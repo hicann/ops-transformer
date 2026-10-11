@@ -25,7 +25,7 @@
 
 namespace optiling {
 
-static ge::graphStatus Tiling4MhcPreBackward(gert::TilingContext *context)
+static ge::graphStatus Tiling4MhcPreBackward(gert::TilingContext* context)
 {
     OP_LOGD(context->GetNodeName(), "MhcPreBackward is running.");
 
@@ -42,11 +42,11 @@ static ge::graphStatus Tiling4MhcPreBackward(gert::TilingContext *context)
     return TilingMhcPreBackwardArch22(context);
 }
 
-static ge::graphStatus TilingPrepare4MhcPreBackward(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepare4MhcPreBackward(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("[TilingPrepare4mHC]", "context is null"),
                 return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null"),
                 return ge::GRAPH_FAILED);
 

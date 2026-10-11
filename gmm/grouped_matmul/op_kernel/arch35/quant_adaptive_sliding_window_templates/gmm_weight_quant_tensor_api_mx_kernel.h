@@ -25,7 +25,7 @@ namespace GROUPED_MATMUL {
 template <class XType_, class WeightType_, class ScaleBType_, class BiasType_, class YType_, bool IsSingleMultiSingle_>
 __aicore__ inline void GmmWeightQuantTensorApiMxKernel(
     GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR bias, GM_ADDR groupList, GM_ADDR perTokenScale,
-    GM_ADDR y, const GroupedMatmulTilingData::GMMWeightQuantParam *gmmBaseParams, const TCubeTiling *mmTilingData)
+    GM_ADDR y, const GroupedMatmulTilingData::GMMWeightQuantParam* gmmBaseParams, const TCubeTiling* mmTilingData)
 {
     using XType = XType_;
     using WeightType = WeightType_;
@@ -87,7 +87,7 @@ __aicore__ inline void GmmWeightQuantTensorApiMxKernel(
                                                     static_cast<uint64_t>(gmmBaseParams->cubeNumBlocksN),
                                                     static_cast<int32_t>(mmTilingData->baseM),
                                                     static_cast<uint64_t>(gmmBaseParams->nSize)};
-    typename BlockPrologue::Params prologueParams{reinterpret_cast<__gm__ BType *>(weightAddr)};
+    typename BlockPrologue::Params prologueParams{reinterpret_cast<__gm__ BType*>(weightAddr)};
     typename KernelImpl::Params params{
         {0UL, static_cast<uint64_t>(gmmBaseParams->kSize), static_cast<uint64_t>(gmmBaseParams->nSize),
          static_cast<uint64_t>(gmmBaseParams->groupNum)},

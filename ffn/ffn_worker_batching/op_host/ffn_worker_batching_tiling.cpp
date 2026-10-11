@@ -48,7 +48,7 @@ ge::graphStatus FfnWorkerBatchingTiling::SetBatchingWorkspaceSize(int64_t expert
     auto platformInfo = context_->GetPlatformInfo();
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     uint32_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, currentWorkspace);
 
     // 前128个int32: 总的有效专家数以及recv功能遍历的micro_batch_id
@@ -105,7 +105,7 @@ ge::graphStatus FfnWorkerBatchingTiling::GetAttrsInfo()
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
-    const int64_t *expertNumPtr = attrs->GetAttrPointer<int64_t>(EXPERT_NUM_ATTR);
+    const int64_t* expertNumPtr = attrs->GetAttrPointer<int64_t>(EXPERT_NUM_ATTR);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expertNumPtr);
     OP_CHECK_IF(
         *expertNumPtr > EXPERT_IDX_MAX || *expertNumPtr <= 0,
@@ -113,12 +113,12 @@ ge::graphStatus FfnWorkerBatchingTiling::GetAttrsInfo()
         return ge::GRAPH_FAILED);
     tilingData_.set_expertNum(*expertNumPtr);
 
-    const gert::ContinuousVector *maxOutShapePtr = attrs->GetAttrPointer<gert::ContinuousVector>(MAX_OUT_SHAPE_ATTR);
+    const gert::ContinuousVector* maxOutShapePtr = attrs->GetAttrPointer<gert::ContinuousVector>(MAX_OUT_SHAPE_ATTR);
     OP_CHECK_NULL_WITH_CONTEXT(context_, maxOutShapePtr);
     OP_CHECK_IF(maxOutShapePtr->GetSize() != NUM_FOUR,
                 OP_LOGE(context_->GetNodeName(), "The max_out_shape size:%lu not equal 4.", maxOutShapePtr->GetSize()),
                 return ge::GRAPH_FAILED);
-    const int64_t *maxOutShapeArray = reinterpret_cast<const int64_t *>(maxOutShapePtr->GetData());
+    const int64_t* maxOutShapeArray = reinterpret_cast<const int64_t*>(maxOutShapePtr->GetData());
     A_ = maxOutShapeArray[INDEX_ZERO];
     BS_ = maxOutShapeArray[INDEX_ONE];
     K_ = maxOutShapeArray[INDEX_TWO];
@@ -140,7 +140,7 @@ ge::graphStatus FfnWorkerBatchingTiling::GetAttrsInfo()
     tilingData_.set_Y(Y_);
     tilingData_.set_H(maxOutShapeArray[INDEX_THREE]);
 
-    const int64_t *tokenDtype = attrs->GetAttrPointer<int64_t>(TOKEN_DTYPE_ATTR);
+    const int64_t* tokenDtype = attrs->GetAttrPointer<int64_t>(TOKEN_DTYPE_ATTR);
     if (tokenDtype != nullptr) {
         OP_CHECK_IF((*tokenDtype < 0 || *tokenDtype > NUM_TWO),
                     OP_LOGE(context_->GetNodeName(), "token_dtype:%ld must be one of [0, 1, 2]", *tokenDtype),
@@ -150,7 +150,7 @@ ge::graphStatus FfnWorkerBatchingTiling::GetAttrsInfo()
         tilingData_.set_tokenDtype(0);
     }
 
-    const int64_t *needSchedulePtr = attrs->GetAttrPointer<int64_t>(NEED_SCHEDULE_ATTR);
+    const int64_t* needSchedulePtr = attrs->GetAttrPointer<int64_t>(NEED_SCHEDULE_ATTR);
     if (needSchedulePtr != nullptr) {
         OP_CHECK_IF((*needSchedulePtr < 0 || *needSchedulePtr > 1),
                     OP_LOGE(context_->GetNodeName(), "need_schedule:%ld must be one of [0, 1]", *needSchedulePtr),
@@ -158,7 +158,7 @@ ge::graphStatus FfnWorkerBatchingTiling::GetAttrsInfo()
         needSchedule_ = *needSchedulePtr;
     }
 
-    const int64_t *layNumPtr = attrs->GetAttrPointer<int64_t>(LAY_NUM_ATTR);
+    const int64_t* layNumPtr = attrs->GetAttrPointer<int64_t>(LAY_NUM_ATTR);
     if (layNumPtr != nullptr) {
         OP_CHECK_IF(
             (*layNumPtr < 0 || *layNumPtr > *expertNumPtr),
@@ -215,7 +215,7 @@ ge::graphStatus FfnWorkerBatchingTiling::RunFfnWorkerBatchingTiling()
             tilingData_.get_tokenDtype(), tilingData_.get_expertNum(), tilingData_.get_sortLoopMaxElement(),
             tilingData_.get_sortNumWorkSpace(), context_->GetTilingKey());
 
-    gert::TilingData *batchingTilingD = context_->GetRawTilingData();
+    gert::TilingData* batchingTilingD = context_->GetRawTilingData();
     OP_CHECK_NULL_WITH_CONTEXT(context_, batchingTilingD);
     tilingData_.SaveToBuffer(batchingTilingD->GetData(), batchingTilingD->GetCapacity());
     batchingTilingD->SetDataSize(tilingData_.GetDataSize());
@@ -224,7 +224,7 @@ ge::graphStatus FfnWorkerBatchingTiling::RunFfnWorkerBatchingTiling()
     return SetBatchingWorkspaceSize(expertNum);
 }
 
-static ge::graphStatus Tiling4FfnWorkerBatching(gert::TilingContext *context)
+static ge::graphStatus Tiling4FfnWorkerBatching(gert::TilingContext* context)
 {
     // ascend950(arch35 / DAV_3510) → 走模板注册表（1000 档 Regbase tiling，见 _tiling_arch35.cpp）；
     // A2/A3 走原 monolithic 路径，逐字不动，零回归。
@@ -235,7 +235,7 @@ static ge::graphStatus Tiling4FfnWorkerBatching(gert::TilingContext *context)
     return tilingObject.RunFfnWorkerBatchingTiling();
 }
 
-static ge::graphStatus TilingPrepare4FfnWorkerBatching(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepare4FfnWorkerBatching(gert::TilingParseContext* context)
 {
     auto compileInfo = context->GetCompiledInfo<FfnWorkerBatchingCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);

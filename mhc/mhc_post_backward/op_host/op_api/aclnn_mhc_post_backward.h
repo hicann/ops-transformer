@@ -27,19 +27,19 @@ extern "C" {
  * 功能描述：该算子实现Manifold-Constraint Hyper-Connection的Post部分的反向
  * @domain aclnn_ops_infer
  */
-aclnnStatus aclnnMhcPostBackwardGetWorkspaceSize(const aclTensor *gradOutput, const aclTensor *x, const aclTensor *hRes,
-    const aclTensor *hOut, const aclTensor *hPost, aclTensor *gradX,
-    aclTensor *gradHRes, aclTensor *gradHOut, aclTensor *gradHPost,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+aclnnStatus aclnnMhcPostBackwardGetWorkspaceSize(const aclTensor* gradOutput, const aclTensor* x, const aclTensor* hRes,
+                                                 const aclTensor* hOut, const aclTensor* hPost, aclTensor* gradX,
+                                                 aclTensor* gradHRes, aclTensor* gradHOut, aclTensor* gradHPost,
+                                                 uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnMhcPostBackward的第二段接口，用于执行计算。
  */
-aclnnStatus aclnnMhcPostBackward(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
-    const aclrtStream stream);
+aclnnStatus aclnnMhcPostBackward(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                 const aclrtStream stream);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // OP_API_INC_MHC_POST_H
+#endif // OP_API_INC_MHC_POST_H

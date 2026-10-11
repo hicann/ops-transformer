@@ -24,10 +24,10 @@ namespace optiling {
 
 class GroupedQmmBasicApiTiling : public GroupedQmmTiling {
 public:
-    explicit GroupedQmmBasicApiTiling(gert::TilingContext *context);
+    explicit GroupedQmmBasicApiTiling(gert::TilingContext* context);
     ~GroupedQmmBasicApiTiling() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         Ops::Transformer::OpTiling::TilingBaseClass::Reset(context);
         Reset();
@@ -67,15 +67,15 @@ private:
 
     ge::graphStatus CalL1Depth(uint64_t leftL1Size);
     bool SearchReducedThreeBufferTiling(uint64_t initialDepthA1, uint64_t initialDepthB1, uint64_t baseASize,
-                                        uint64_t baseBSize, L1SearchResult &result);
+                                        uint64_t baseBSize, L1SearchResult& result);
     void SearchExpandedThreeBufferTiling(uint64_t initialDepthA1, uint64_t initialDepthB1, uint64_t maxDepthA1,
                                          uint64_t maxDepthB1, uint64_t baseASize, uint64_t baseBSize,
-                                         L1SearchResult &result);
+                                         L1SearchResult& result);
     void TryUpdateThreeBufferCandidate(uint64_t candidateDepthA1, uint64_t candidateDepthB1, uint64_t baseASize,
-                                       uint64_t baseBSize, bool requireMinLoadSize, L1SearchResult &result);
+                                       uint64_t baseBSize, bool requireMinLoadSize, L1SearchResult& result);
     bool IsBetterThreeBufferCandidate(uint64_t highBwPayload, uint64_t totalPayload,
-                                      const L1SearchResult &result) const;
-    void ApplyThreeBufferSearchResult(const L1SearchResult &result);
+                                      const L1SearchResult& result) const;
+    void ApplyThreeBufferSearchResult(const L1SearchResult& result);
     ge::graphStatus FinalizeStepAndScale();
     uint64_t GetDepthWithHighBW(uint64_t mnL1) const;
     void ModifyDepthForUnalign(uint64_t leftL1Size, uint64_t baseASize, uint64_t baseBSize, uint64_t baseScaleABSize);
@@ -104,10 +104,10 @@ constexpr uint64_t S4S4_WEIGHT_NZ_C0_32_FLAG = 4ULL;
 
 class GroupedS4S4IntQuantTiling : public GroupedQmmBasicApiTiling {
 public:
-    explicit GroupedS4S4IntQuantTiling(gert::TilingContext *context);
+    explicit GroupedS4S4IntQuantTiling(gert::TilingContext* context);
     ~GroupedS4S4IntQuantTiling() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         GroupedQmmBasicApiTiling::Reset(context);
         Reset();
@@ -125,7 +125,7 @@ protected:
     virtual void Reset();
 
     // S4S4-specific (call base then sync s4s4Tiling_)
-    bool SetMKNForS4S4(const gert::Shape &xShape, const gert::Shape &wShape);
+    bool SetMKNForS4S4(const gert::Shape& xShape, const gert::Shape& wShape);
     bool SetGroupNumForS4S4(uint32_t groupListIndex);
     bool SetMKNListForS4S4();
     bool AnalyzeS4S4();
@@ -135,7 +135,7 @@ protected:
     ge::graphStatus CalWorkspaceS4S4();
     uint32_t FindBestSingleN() const;
     void InitS4S4CommonL1TilingFields();
-    ge::graphStatus CalcS4S4LeftL1Size(uint64_t &leftL1Size) const;
+    ge::graphStatus CalcS4S4LeftL1Size(uint64_t& leftL1Size) const;
     ge::graphStatus CalL1Tiling();
     ge::graphStatus CalL1Depth(uint64_t leftL1Size);
     void SetS4S4Params();

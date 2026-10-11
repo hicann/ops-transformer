@@ -21,14 +21,14 @@
 #include "kernel_tiling/kernel_tiling.h"
 
 namespace optiling {
-static ge::graphStatus TilingForMhcPost(gert::TilingContext *context)
+static ge::graphStatus TilingForMhcPost(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("MhcPost", "context is null"), return ge::GRAPH_FAILED);
     OP_LOGD(context, "Enter TilingMhcPost.");
     return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus TilingPrepareForMhcPost(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForMhcPost(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

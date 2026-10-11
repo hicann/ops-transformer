@@ -62,7 +62,7 @@ class QuantASWBlockSch {
 public:
     __aicore__ inline QuantASWBlockSch() {}
     template <bool isGmm>
-    __aicore__ inline void Init(const TCubeTiling *__restrict &tilingData, uint32_t blockIdx);
+    __aicore__ inline void Init(const TCubeTiling* __restrict& tilingData, uint32_t blockIdx);
     // 每一个group需要更新mm的group偏移和MNK
     template <bool aTrans, bool bTrans, class xType, class scaleType, CubeFormat wFormat = CubeFormat::ND>
     __aicore__ inline void UpdateGroupOffset(int32_t m, int32_t n, int32_t k, uint32_t groupIdx, int8_t groupType);
@@ -82,7 +82,7 @@ public:
 public:
     ASWTilingParam params_;
     ASWOffsetParam offset_;
-    const TCubeTiling *__restrict tilingData_;
+    const TCubeTiling* __restrict tilingData_;
 
 private:
     template <bool bTrans>
@@ -100,7 +100,7 @@ private:
 };
 
 template <bool isGmm>
-__aicore__ inline void QuantASWBlockSch::Init(const TCubeTiling *__restrict &tilingData, uint32_t blockIdx)
+__aicore__ inline void QuantASWBlockSch::Init(const TCubeTiling* __restrict& tilingData, uint32_t blockIdx)
 {
     blockIdx_ = blockIdx;
     tilingData_ = tilingData;

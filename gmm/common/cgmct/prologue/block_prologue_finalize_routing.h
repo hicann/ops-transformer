@@ -67,20 +67,20 @@ public:
     using Params = Arguments;
 
 public:
-    __aicore__ inline void Init(Params const &params);
+    __aicore__ inline void Init(Params const& params);
     __aicore__ inline void operator()();
 
 private:
     __aicore__ inline void InitAllLocalTensor();
     __aicore__ inline void InitOutputWithZeros(uint64_t offset, uint64_t size);
     __aicore__ inline void Compute(uint64_t singleCount, uint64_t outOffset, uint64_t baseOffset, uint64_t curCount);
-    __aicore__ inline void CopyInShareInput(LocalTensor<DataTypeIn> &residualLocal, uint64_t offset, uint64_t size);
-    __aicore__ inline void CopyOutShareInput(LocalTensor<DataTypeOut> &yLocal, uint64_t offset, uint64_t size);
-    __aicore__ inline void VFDoSharedCastAndMuls(__ubuf__ DataTypeOut *dstPtr, __ubuf__ DataTypeIn *residualLocalUbAddr,
+    __aicore__ inline void CopyInShareInput(LocalTensor<DataTypeIn>& residualLocal, uint64_t offset, uint64_t size);
+    __aicore__ inline void CopyOutShareInput(LocalTensor<DataTypeOut>& yLocal, uint64_t offset, uint64_t size);
+    __aicore__ inline void VFDoSharedCastAndMuls(__ubuf__ DataTypeOut* dstPtr, __ubuf__ DataTypeIn* residualLocalUbAddr,
                                                  float sharedWeight, uint64_t curCount);
 
 private:
-    const Params *params_;
+    const Params* params_;
     AscendC::GlobalTensor<DataTypeIn> residualGm_;
     AscendC::GlobalTensor<DataTypeOut> yGmAddr_;
     // local tensor
@@ -96,21 +96,21 @@ private:
 
 BLOCK_PROLOGUE_BLOCK_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockPrologueFinalizeRouting<BLOCK_PROLOGUE_BLOCK_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::Init(
-    Params const &params)
+    Params const& params)
 {
     if ASCEND_IS_AIC {
         return;
     }
     params_ = &params;
     InitAllLocalTensor();
-    residualGm_.SetGlobalBuffer(reinterpret_cast<__gm__ DataTypeIn *>(params_->residualGm));
-    yGmAddr_.SetGlobalBuffer(reinterpret_cast<__gm__ DataTypeOut *>(params_->yGmAddr));
+    residualGm_.SetGlobalBuffer(reinterpret_cast<__gm__ DataTypeIn*>(params_->residualGm));
+    yGmAddr_.SetGlobalBuffer(reinterpret_cast<__gm__ DataTypeOut*>(params_->yGmAddr));
 }
 
 BLOCK_PROLOGUE_BLOCK_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
 __aicore__ inline void
 BlockPrologueFinalizeRouting<BLOCK_PROLOGUE_BLOCK_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::CopyInShareInput(
-    LocalTensor<DataTypeIn> &residualLocal, uint64_t offset, uint64_t size)
+    LocalTensor<DataTypeIn>& residualLocal, uint64_t offset, uint64_t size)
 {
     DataCopyExtParams paramsIn{1, static_cast<uint32_t>(size * sizeof(DataTypeIn)), 1, 1, 0};
     DataCopyPadExtParams<DataTypeIn> Padparams;
@@ -120,7 +120,7 @@ BlockPrologueFinalizeRouting<BLOCK_PROLOGUE_BLOCK_FINALIZE_ROUTING_FUNC_LOCAL_PA
 BLOCK_PROLOGUE_BLOCK_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
 __aicore__ inline void
 BlockPrologueFinalizeRouting<BLOCK_PROLOGUE_BLOCK_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::CopyOutShareInput(
-    LocalTensor<DataTypeOut> &yLocal, uint64_t offset, uint64_t size)
+    LocalTensor<DataTypeOut>& yLocal, uint64_t offset, uint64_t size)
 {
     DataCopyExtParams paramsOut{1, static_cast<uint32_t>(size * sizeof(DataTypeOut)), 1, 1, 0};
     DataCopyPad(yGmAddr_[offset], yLocal, paramsOut);
@@ -189,7 +189,7 @@ __aicore__ inline void BlockPrologueFinalizeRouting<
 BLOCK_PROLOGUE_BLOCK_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
 __aicore__ inline void
 BlockPrologueFinalizeRouting<BLOCK_PROLOGUE_BLOCK_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::VFDoSharedCastAndMuls(
-    __ubuf__ DataTypeOut *dstPtr, __ubuf__ DataTypeIn *residualLocalUbAddr, float sharedWeight, uint64_t curCount)
+    __ubuf__ DataTypeOut* dstPtr, __ubuf__ DataTypeIn* residualLocalUbAddr, float sharedWeight, uint64_t curCount)
 {
     constexpr uint32_t vectorRegLen = VECTOR_REG_WIDTH / sizeof(DataTypeOut);
     uint16_t loopNum = CeilDiv(static_cast<uint64_t>(curCount), static_cast<uint64_t>(vectorRegLen));
@@ -225,14 +225,14 @@ __aicore__ inline void BlockPrologueFinalizeRouting<BLOCK_PROLOGUE_BLOCK_FINALIZ
         if (unlikely(offset + curCount > singleCount)) {
             curCount = singleCount - offset;
         }
-        AscendC::LocalTensor<DataTypeIn> *residualLocal = pingPongID == 0 ? &shareInputUbPing_ : &shareInputUbPong_;
+        AscendC::LocalTensor<DataTypeIn>* residualLocal = pingPongID == 0 ? &shareInputUbPing_ : &shareInputUbPong_;
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(pingPongID);
         CopyInShareInput(*residualLocal, baseOffset + offset, curCount);
         AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(pingPongID);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(pingPongID);
-        AscendC::LocalTensor<DataTypeOut> *yLocal = pingPongID == 0 ? &UbOutPing_ : &UbOutPong_;
-        __ubuf__ DataTypeIn *residualLocalUbAddr = (__ubuf__ DataTypeIn *)residualLocal->GetPhyAddr();
-        __ubuf__ DataTypeOut *outUbAddr = (__ubuf__ DataTypeOut *)yLocal->GetPhyAddr();
+        AscendC::LocalTensor<DataTypeOut>* yLocal = pingPongID == 0 ? &UbOutPing_ : &UbOutPong_;
+        __ubuf__ DataTypeIn* residualLocalUbAddr = (__ubuf__ DataTypeIn*)residualLocal->GetPhyAddr();
+        __ubuf__ DataTypeOut* outUbAddr = (__ubuf__ DataTypeOut*)yLocal->GetPhyAddr();
         // before vector compute,need wait MTE3 copyout finished
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(pingPongID);
         VFDoSharedCastAndMuls(outUbAddr, residualLocalUbAddr, params_->residualScale, curCount);

@@ -13,10 +13,10 @@
 
 namespace gmm_add_advanced {
 struct GroupedMatmulAddParams {
-    const aclTensor *x = nullptr;
-    const aclTensor *weight = nullptr;
-    const aclTensor *groupList = nullptr;
-    aclTensor *yRef = nullptr;
+    const aclTensor* x = nullptr;
+    const aclTensor* weight = nullptr;
+    const aclTensor* groupList = nullptr;
+    aclTensor* yRef = nullptr;
     bool transposeX = true;
     bool transposeWeight = false;
     int64_t groupType = 2;

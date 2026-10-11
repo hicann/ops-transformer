@@ -72,8 +72,8 @@ static ge::graphStatus InferShape4MhcSinkhorn(gert::InferShapeContext* context)
 
     size_t xDims = xShape->GetDimNum();
     if ((xDims != TNN_DIMS) && (xDims != BSNN_DIMS)) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "x",
-            std::to_string(xDims).c_str(), "the dim of x must be 3 or 4");
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "x", std::to_string(xDims).c_str(),
+                                                 "the dim of x must be 3 or 4");
         return ge::GRAPH_FAILED;
     }
 
@@ -93,8 +93,8 @@ static ge::graphStatus InferShape4MhcSinkhorn(gert::InferShapeContext* context)
 
     if ((n0 != UNKNOWN_DIM_VALUE) && (n1 != UNKNOWN_DIM_VALUE) && (n0 != n1)) {
         std::string shapeMsg = "{" + std::to_string(n0) + ", " + std::to_string(n1) + "}";
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "n0, n1",
-            shapeMsg.c_str(), "n0 must be equal to n1");
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "n0, n1", shapeMsg.c_str(),
+                                               "n0 must be equal to n1");
         return ge::GRAPH_FAILED;
     }
 
@@ -145,7 +145,5 @@ static graphStatus InferDtype4MhcSinkhorn(gert::InferDataTypeContext* context)
     return GRAPH_SUCCESS;
 }
 
-IMPL_OP_INFERSHAPE(MhcSinkhorn)
-    .InferShape(InferShape4MhcSinkhorn)
-    .InferDataType(InferDtype4MhcSinkhorn);
+IMPL_OP_INFERSHAPE(MhcSinkhorn).InferShape(InferShape4MhcSinkhorn).InferDataType(InferDtype4MhcSinkhorn);
 } // namespace ops

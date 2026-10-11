@@ -75,7 +75,7 @@ static const std::vector<ge::DataType> MXFP4_IN_TYPE_SUPPORT_LIST = {ge::DT_FLOA
 static const std::vector<ge::DataType> MXFP8_IN_TYPE_SUPPORT_LIST = {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2};
 
 template <typename T>
-std::string Shape2String(const T &shape)
+std::string Shape2String(const T& shape)
 {
     std::ostringstream oss;
     oss << "[";
@@ -90,9 +90,9 @@ std::string Shape2String(const T &shape)
 }
 
 template <typename T>
-bool CheckType(const T &value, const std::vector<T> &list)
+bool CheckType(const T& value, const std::vector<T>& list)
 {
-    for (const auto &item : list) {
+    for (const auto& item : list) {
         if (item == value) {
             return true;
         }
@@ -100,12 +100,12 @@ bool CheckType(const T &value, const std::vector<T> &list)
     return false;
 }
 
-static bool IsMxBf16Output(const int64_t *outputDtype)
+static bool IsMxBf16Output(const int64_t* outputDtype)
 {
     return outputDtype != nullptr && *outputDtype == OUT_DTYPE_BF16;
 }
 
-static bool IsSupportMxLogitDtype(ge::DataType logitDtype, const int64_t *outputDtype)
+static bool IsSupportMxLogitDtype(ge::DataType logitDtype, const int64_t* outputDtype)
 {
     if (IsMxBf16Output(outputDtype)) {
         return logitDtype == ge::DT_FLOAT || logitDtype == ge::DT_BF16;
@@ -113,7 +113,7 @@ static bool IsSupportMxLogitDtype(ge::DataType logitDtype, const int64_t *output
     return logitDtype == ge::DT_FLOAT;
 }
 
-static bool IsSupportMxRowIndexDtype(ge::DataType rowIndexDtype, const int64_t *outputDtype)
+static bool IsSupportMxRowIndexDtype(ge::DataType rowIndexDtype, const int64_t* outputDtype)
 {
     if (IsMxBf16Output(outputDtype)) {
         return rowIndexDtype == ge::DT_INT32;
@@ -122,8 +122,8 @@ static bool IsSupportMxRowIndexDtype(ge::DataType rowIndexDtype, const int64_t *
 }
 
 struct CheckXandWParams {
-    const gert::Shape *shape_x1 = nullptr;
-    const gert::Shape *shape_x2 = nullptr;
+    const gert::Shape* shape_x1 = nullptr;
+    const gert::Shape* shape_x2 = nullptr;
     int64_t m = 0;
     int64_t k = 0;
     int64_t n = 0;
@@ -131,7 +131,7 @@ struct CheckXandWParams {
     bool weightTrans = false;
 };
 
-static ge::graphStatus ValidateXAndWShapes(const char *op_name, CheckXandWParams &params)
+static ge::graphStatus ValidateXAndWShapes(const char* op_name, CheckXandWParams& params)
 {
     OP_CHECK_IF(params.shape_x1->GetDimNum() != twoDimNum, OPS_REPORT_CUBE_INNER_ERR(op_name, "X dim is not 2."),
                 return ge::GRAPH_FAILED);
@@ -148,7 +148,7 @@ static ge::graphStatus ValidateXAndWShapes(const char *op_name, CheckXandWParams
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetXAndWShapesForMX(const InferShapeContext *context, CheckXandWParams &params)
+static ge::graphStatus SetXAndWShapesForMX(const InferShapeContext* context, CheckXandWParams& params)
 {
     params.m = params.shape_x1->GetDim(xIndex);
     params.k = params.shape_x1->GetDim(wIndex);
@@ -162,8 +162,8 @@ static ge::graphStatus SetXAndWShapesForMX(const InferShapeContext *context, Che
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateScaleAndBias(const InferShapeContext *context, const char *op_name,
-                                            const CheckXandWParams &xAndWParams)
+static ge::graphStatus ValidateScaleAndBias(const InferShapeContext* context, const char* op_name,
+                                            const CheckXandWParams& xAndWParams)
 {
     auto shape_scale = context->GetOptionalInputShape(scaleOptionIndex);
     OP_CHECK_IF(shape_scale == nullptr, OPS_REPORT_CUBE_INNER_ERR(op_name, "scale is not given."),
@@ -193,8 +193,8 @@ static ge::graphStatus ValidateScaleAndBias(const InferShapeContext *context, co
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidatePertokenAndGroupList(const InferShapeContext *context, const char *op_name,
-                                                    const CheckXandWParams &xAndWParams)
+static ge::graphStatus ValidatePertokenAndGroupList(const InferShapeContext* context, const char* op_name,
+                                                    const CheckXandWParams& xAndWParams)
 {
     if (context->GetOptionalInputShape(pertokenScaleOptionIndex) != nullptr) {
         OP_CHECK_IF(context->GetOptionalInputShape(pertokenScaleOptionIndex)->GetDimNum() != oneDimNum ||
@@ -210,8 +210,8 @@ static ge::graphStatus ValidatePertokenAndGroupList(const InferShapeContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateSharedInputAndLogit(const InferShapeContext *context, int &bsdp, const char *op_name,
-                                                   const CheckXandWParams &xAndWParams)
+static ge::graphStatus ValidateSharedInputAndLogit(const InferShapeContext* context, int& bsdp, const char* op_name,
+                                                   const CheckXandWParams& xAndWParams)
 {
     if (context->GetOptionalInputShape(sharedInputOptionIndex) != nullptr) {
         OP_CHECK_IF(context->GetOptionalInputShape(sharedInputOptionIndex)->GetDimNum() != twoDimNum ||
@@ -231,8 +231,8 @@ static ge::graphStatus ValidateSharedInputAndLogit(const InferShapeContext *cont
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateRowIndex(const InferShapeContext *context, const char *op_name,
-                                        const CheckXandWParams &xAndWParams)
+static ge::graphStatus ValidateRowIndex(const InferShapeContext* context, const char* op_name,
+                                        const CheckXandWParams& xAndWParams)
 {
     OP_CHECK_IF(context->GetOptionalInputShape(rowIndexOptionIndex) == nullptr,
                 OPS_REPORT_CUBE_INNER_ERR(op_name, "row_index is not given."), return ge::GRAPH_FAILED);
@@ -242,15 +242,15 @@ static ge::graphStatus ValidateRowIndex(const InferShapeContext *context, const 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetupOutputAndCheckAttrs(InferShapeContext *context, const char *op_name,
-                                                CheckXandWParams &xAndWParams)
+static ge::graphStatus SetupOutputAndCheckAttrs(InferShapeContext* context, const char* op_name,
+                                                CheckXandWParams& xAndWParams)
 {
     auto attrs = context->GetAttrs();
     auto shape_out = context->GetOutputShape(0);
     OP_CHECK_IF(attrs == nullptr || shape_out == nullptr,
                 OPS_REPORT_CUBE_INNER_ERR(op_name, "attrs or output shape is null."), return ge::GRAPH_FAILED);
     shape_out->SetDimNum(twoDimNum);
-    const int64_t *output_bs = attrs->GetAttrPointer<int64_t>(outputBSAttrIndex);
+    const int64_t* output_bs = attrs->GetAttrPointer<int64_t>(outputBSAttrIndex);
     OP_CHECK_IF(output_bs == nullptr, OPS_REPORT_CUBE_INNER_ERR(op_name, "output_bs is not given."),
                 return ge::GRAPH_FAILED);
     if (output_bs != nullptr) {
@@ -261,7 +261,7 @@ static ge::graphStatus SetupOutputAndCheckAttrs(InferShapeContext *context, cons
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetupOutputForMX(InferShapeContext *context, const char *op_name, CheckXandWParams &xAndWParams)
+static ge::graphStatus SetupOutputForMX(InferShapeContext* context, const char* op_name, CheckXandWParams& xAndWParams)
 {
     auto attrs = context->GetAttrs();
     auto shape_out = context->GetOutputShape(0);
@@ -269,7 +269,7 @@ static ge::graphStatus SetupOutputForMX(InferShapeContext *context, const char *
                 OPS_REPORT_CUBE_INNER_ERR(op_name, "attrs or output shape is null."), return ge::GRAPH_FAILED);
 
     shape_out->SetDimNum(twoDimNum);
-    const int64_t *output_bs = attrs->GetAttrPointer<int64_t>(outputBSAttrIndex);
+    const int64_t* output_bs = attrs->GetAttrPointer<int64_t>(outputBSAttrIndex);
 
     if (output_bs != nullptr) {
         shape_out->SetDim(0, *output_bs);
@@ -286,8 +286,8 @@ static ge::graphStatus SetupOutputForMX(InferShapeContext *context, const char *
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateOffsetShape(const InferShapeContext *context, const char *op_name,
-                                           const CheckXandWParams &xAndWParams)
+static ge::graphStatus ValidateOffsetShape(const InferShapeContext* context, const char* op_name,
+                                           const CheckXandWParams& xAndWParams)
 {
     auto shape_offset = context->GetOptionalInputShape(offsetOptionIndex);
     if (shape_offset != nullptr) {
@@ -302,7 +302,7 @@ static ge::graphStatus ValidateOffsetShape(const InferShapeContext *context, con
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShapeGroupedMatmulFinalizeRouting(InferShapeContext *context)
+static ge::graphStatus InferShapeGroupedMatmulFinalizeRouting(InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("GroupedMatmulFinalizeRouting", "context is null"),
                 return ge::GRAPH_FAILED);
@@ -318,7 +318,7 @@ static ge::graphStatus InferShapeGroupedMatmulFinalizeRouting(InferShapeContext 
     OP_LOGD(context->GetNodeName(), "x1_shape: %s, x2_shape: %s", Shape2String(*shape_x1).c_str(),
             Shape2String(*shape_x2).c_str());
 
-    const bool *transposeWeightPtr = attrs->GetBool(weightTransIndex);
+    const bool* transposeWeightPtr = attrs->GetBool(weightTransIndex);
     bool transposeWeight = (transposeWeightPtr != nullptr ? *transposeWeightPtr : false);
 
     CheckXandWParams xAndWParams{shape_x1, shape_x2, 0, 0, 0, 0, transposeWeight};
@@ -363,7 +363,7 @@ static ge::graphStatus InferShapeGroupedMatmulFinalizeRouting(InferShapeContext 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateFailedDataType(const gert::InferDataTypeContext *context)
+static ge::graphStatus ValidateFailedDataType(const gert::InferDataTypeContext* context)
 {
     // 先判断a8w4还是a8w8出问题
     if ((context->GetInputDataType(xIndex) == ge::DT_INT8 ||
@@ -406,7 +406,7 @@ static ge::graphStatus ValidateFailedDataType(const gert::InferDataTypeContext *
     if (CheckType(context->GetInputDataType(xIndex), MX_IN_TYPE_SUPPORT_LIST) &&
         CheckType(context->GetInputDataType(wIndex), MX_IN_TYPE_SUPPORT_LIST)) {
         auto attrs = context->GetAttrs();
-        const int64_t *outputDtype = attrs == nullptr ? nullptr : attrs->GetAttrPointer<int64_t>(0);
+        const int64_t* outputDtype = attrs == nullptr ? nullptr : attrs->GetAttrPointer<int64_t>(0);
         OP_CHECK_IF(
             (context->GetOptionalInputDataType(scaleOptionIndex) != ge::DT_FLOAT8_E8M0),
             OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(),
@@ -449,7 +449,7 @@ static ge::graphStatus ValidateFailedDataType(const gert::InferDataTypeContext *
     return ge::GRAPH_FAILED;
 }
 
-static bool IsSupportMX(const gert::InferDataTypeContext *context, const int64_t *outputDtype)
+static bool IsSupportMX(const gert::InferDataTypeContext* context, const int64_t* outputDtype)
 {
     if (CheckType(context->GetInputDataType(xIndex), MX_IN_TYPE_SUPPORT_LIST) &&
         CheckType(context->GetInputDataType(wIndex), MX_IN_TYPE_SUPPORT_LIST) &&
@@ -463,12 +463,12 @@ static bool IsSupportMX(const gert::InferDataTypeContext *context, const int64_t
     return false;
 }
 
-static ge::graphStatus InferDataTypeGroupedMatmulFinalizeRouting(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeGroupedMatmulFinalizeRouting(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("GroupedMatmulFinalizeRouting", "context is null"),
                 return ge::GRAPH_FAILED);
     auto attrs = context->GetAttrs();
-    const int64_t *outputDtype = attrs == nullptr ? nullptr : attrs->GetAttrPointer<int64_t>(0);
+    const int64_t* outputDtype = attrs == nullptr ? nullptr : attrs->GetAttrPointer<int64_t>(0);
     bool supportDataTypeMX = IsSupportMX(context, outputDtype);
 
     bool supportDataTypeW8A8 = (context->GetInputDataType(xIndex) == ge::DT_INT8 ||

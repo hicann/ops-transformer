@@ -148,16 +148,16 @@
 #if defined(V310_GMM_ANTI_QUANT)
 #define GET_TILING_DATA_MEMBER_ADDR(tilingType, member, var, tiling) \
     GET_TILING_DATA_MEMBER(GMMWeightQuantTilingData, member, obj, tiling); \
-    const int32_t *(var) = (const int32_t *)((const uint8_t *)&obj);
+    const int32_t*(var) = (const int32_t*)((const uint8_t*)&obj);
 #else
 #define GET_TILING_DATA_MEMBER_ADDR(tilingType, member, var, tiling) \
     GET_TILING_DATA_MEMBER(tilingType, member, obj, tiling); \
-    const int32_t *(var) = (const int32_t *)((const uint8_t *)&obj);
+    const int32_t*(var) = (const int32_t*)((const uint8_t*)&obj);
 #endif
 #else
 #define GET_TILING_DATA_MEMBER_ADDR(tilingType, member, var, tiling) \
-    size_t offset##var = (size_t)(&((tilingType *)0)->member); \
-    __gm__ int32_t *(var) = (__gm__ int32_t *)((tiling) + (offset##var));
+    size_t offset##var = (size_t)(&((tilingType*)0)->member); \
+    __gm__ int32_t*(var) = (__gm__ int32_t*)((tiling) + (offset##var));
 #endif
 
 namespace GROUPED_MATMUL {
@@ -194,7 +194,7 @@ constexpr uint32_t STATIC_TILING_MAX_SINGLE_N = 1024;
 constexpr uint32_t GROUP_LIST_TYPE_SPARSE = 2;
 constexpr uint32_t SPARSE_GROUP_LIST_SPLIT_VALUE_OFFSET = 1;
 
-template <class AT_, class BT_, class CT_, class BiasT_, const auto &MM_CFG = CFG_MDL>
+template <class AT_, class BT_, class CT_, class BiasT_, const auto& MM_CFG = CFG_MDL>
 struct MMType {
     using AT = AT_;
     using BT = BT_;
@@ -203,7 +203,7 @@ struct MMType {
     using MT = matmul::Matmul<AT, BT, CT, BiasT, MM_CFG>;
 };
 
-template <class AT_, class BT_, class CT_, class BiasT_, const auto &MM_CFG = CFG_MDL>
+template <class AT_, class BT_, class CT_, class BiasT_, const auto& MM_CFG = CFG_MDL>
 struct MMImplType {
     using AT = AT_;
     using BT = BT_;
@@ -314,19 +314,19 @@ __aicore__ inline uint32_t AlignUp<32, uint32_t>(uint32_t a)
 }
 
 template <typename T>
-__aicore__ inline __gm__ T *GetTensorAddr(uint16_t index, GM_ADDR tensorPtr)
+__aicore__ inline __gm__ T* GetTensorAddr(uint16_t index, GM_ADDR tensorPtr)
 {
-    __gm__ uint64_t *dataAddr = reinterpret_cast<__gm__ uint64_t *>(tensorPtr);
+    __gm__ uint64_t* dataAddr = reinterpret_cast<__gm__ uint64_t*>(tensorPtr);
     uint64_t tensorPtrOffset = *dataAddr; // The offset of the data address from the first address.
     // Moving 3 bits to the right means dividing by sizeof(uint64 t).
-    __gm__ uint64_t *retPtr = dataAddr + (tensorPtrOffset >> 3);
-    return reinterpret_cast<__gm__ T *>(*(retPtr + index));
+    __gm__ uint64_t* retPtr = dataAddr + (tensorPtrOffset >> 3);
+    return reinterpret_cast<__gm__ T*>(*(retPtr + index));
 }
 
 #if (defined(__CCE_AICORE__) && __CCE_AICORE__ != 310) || (defined(__NPU_ARCH__) && __NPU_ARCH__ == 3113)
-__aicore__ inline int32_t GetSplitValueFromGroupList(uint32_t groupIdx, int32_t &preOffset,
-                                                     const GMMBaseParams *__restrict &gmmBaseParams,
-                                                     const GlobalTensor<int64_t> &groupListGm)
+__aicore__ inline int32_t GetSplitValueFromGroupList(uint32_t groupIdx, int32_t& preOffset,
+                                                     const GMMBaseParams* __restrict& gmmBaseParams,
+                                                     const GlobalTensor<int64_t>& groupListGm)
 {
     int32_t splitValue = 0;
     if (likely(gmmBaseParams->groupType != -1)) { // -1: no  need to split

@@ -54,15 +54,15 @@ struct SwinTransformerLnQKVTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, SwinTransformerLnQKVTilingData *const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, SwinTransformerLnQKVTilingData* const_data)
 {
-    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
-    uint32_t *dst = (uint32_t *)const_data;
+    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
+    uint32_t* dst = (uint32_t*)const_data;
     for (auto i = 0; i < sizeof(SwinTransformerLnQKVTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t *tiling, SwinTransformerLnQKVTilingData *const_data)
+inline void InitTilingData(uint8_t* tiling, SwinTransformerLnQKVTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(SwinTransformerLnQKVTilingData));
 }

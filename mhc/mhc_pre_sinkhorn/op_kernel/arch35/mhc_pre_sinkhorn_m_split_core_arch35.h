@@ -29,18 +29,18 @@ public:
     __aicore__ inline MhcPreSinkhornMSplitCorePart1() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hcFn, GM_ADDR hcScale, GM_ADDR hcBase, GM_ADDR y, GM_ADDR post,
-                                GM_ADDR combFrag, const MhcPreSinkhornRegbaseTilingData *tilingDataPtr, TPipe *pipePtr)
+                                GM_ADDR combFrag, const MhcPreSinkhornRegbaseTilingData* tilingDataPtr, TPipe* pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
-        xGm.SetGlobalBuffer((__gm__ T *)x);
-        hcFnGm.SetGlobalBuffer((__gm__ float *)hcFn);
-        yGm.SetGlobalBuffer((__gm__ T *)y);
+        xGm.SetGlobalBuffer((__gm__ T*)x);
+        hcFnGm.SetGlobalBuffer((__gm__ float*)hcFn);
+        yGm.SetGlobalBuffer((__gm__ T*)y);
 
-        hcScaleGm.SetGlobalBuffer((__gm__ float *)hcScale);
-        hcBaseGm.SetGlobalBuffer((__gm__ float *)hcBase);
-        postGm.SetGlobalBuffer((__gm__ float *)post);
-        combFragGm.SetGlobalBuffer((__gm__ float *)combFrag);
+        hcScaleGm.SetGlobalBuffer((__gm__ float*)hcScale);
+        hcBaseGm.SetGlobalBuffer((__gm__ float*)hcBase);
+        postGm.SetGlobalBuffer((__gm__ float*)post);
+        combFragGm.SetGlobalBuffer((__gm__ float*)combFrag);
 
         TBuf<TPosition::A1> l1Buffer;
         pipe->InitBuffer(l1Buffer, L1_ALLOC_SIZE);
@@ -366,8 +366,8 @@ public:
     }
 
 private:
-    TPipe *pipe;
-    const MhcPreSinkhornRegbaseTilingData *tilingData;
+    TPipe* pipe;
+    const MhcPreSinkhornRegbaseTilingData* tilingData;
     // (M, K) * (N, K)
 
     GlobalTensor<T> xGm;

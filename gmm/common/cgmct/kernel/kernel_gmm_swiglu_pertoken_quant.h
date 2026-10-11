@@ -73,10 +73,10 @@ class KernelGmmSwiGluPertokenQuant<
     DataTypeX2Scale_, DataTypeX1Scale_,
     AscendC::Std::enable_if_t<AscendC::Std::is_same_v<BlockScheduler_, GroupedMatmulAswtWithTailSplitScheduler>>> {
 private:
-    TPipe *pPipe_ = nullptr;
+    TPipe* pPipe_ = nullptr;
 
 public:
-    __aicore__ inline KernelGmmSwiGluPertokenQuant(TPipe *pipe)
+    __aicore__ inline KernelGmmSwiGluPertokenQuant(TPipe* pipe)
         : pPipe_(pipe),
           epiloguePertokenQuantOp_(pipe)
     {}
@@ -147,7 +147,7 @@ public:
         int32_t baseM;
         int32_t baseN;
         int32_t baseK;
-        const TCubeTiling *__restrict matmulTiling;
+        const TCubeTiling* __restrict matmulTiling;
         __aicore__ GMMTiling() {}
         __aicore__ GMMTiling(uint32_t groupNum_, uint8_t groupListType_, int32_t baseM_, int32_t baseN_, int32_t baseK_)
             : groupNum(groupNum_),
@@ -218,10 +218,10 @@ public:
         return splitValue;
     }
 
-    __aicore__ inline void UpdateGlobalBuffer(const Params &params)
+    __aicore__ inline void UpdateGlobalBuffer(const Params& params)
     {
         if ASCEND_IS_AIC {
-            aGlobal_.SetGlobalBuffer((__gm__ AType *)params.mmadParams.aGmAddr + Get<INDEX_A_OFFSET>(baseOffset_));
+            aGlobal_.SetGlobalBuffer((__gm__ AType*)params.mmadParams.aGmAddr + Get<INDEX_A_OFFSET>(baseOffset_));
             bGlobal_.SetGlobalBuffer(GetTensorAddr<BType>(0, params.mmadParams.bGmAddr) +
                                      Get<INDEX_B_OFFSET>(baseOffset_));
         }
@@ -254,7 +254,7 @@ public:
         Get<INDEX_C_OFFSET>(baseOffset_) += (m * n) >> 1;
     }
 
-    __aicore__ inline bool UpdateGroupParams(const Params &params, uint32_t groupIdx)
+    __aicore__ inline bool UpdateGroupParams(const Params& params, uint32_t groupIdx)
     {
         UpdateOffset(groupIdx);
         int32_t splitValue = GetSplitValueFromGroupList(groupIdx, params.gmmParams.groupListType);
@@ -266,7 +266,7 @@ public:
         return true;
     }
 
-    __aicore__ inline void InitParamsAndTensor(const Params &params)
+    __aicore__ inline void InitParamsAndTensor(const Params& params)
     {
         Get<N_VALUES>(problemShape_) = params.gmmParams.matmulTiling->N;
         Get<K_VALUES>(problemShape_) = params.gmmParams.matmulTiling->Ka;
@@ -283,15 +283,15 @@ public:
             bRightOffsetStep_ = transB ? (Get<N_VALUES>(problemShape_) >> 1) * Get<K_VALUES>(problemShape_) :
                                          (Get<N_VALUES>(problemShape_) >> 1);
         }
-        groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(params.mmadParams.groupListGmAddr));
+        groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(params.mmadParams.groupListGmAddr));
     }
 
-    __aicore__ inline void ComputeOffset(int64_t &bRightOffset)
+    __aicore__ inline void ComputeOffset(int64_t& bRightOffset)
     {
         bRightOffset += bRightOffsetStep_;
     }
 
-    __aicore__ inline void BaseMBalance(BlockSchedulerOp &bs, int64_t m, int64_t baseM)
+    __aicore__ inline void BaseMBalance(BlockSchedulerOp& bs, int64_t m, int64_t baseM)
     {
         const int64_t safeBaseM = baseM > 0 ? baseM : static_cast<int64_t>(AscendC::BLOCK_CUBE);
         const int64_t mCnt = CeilDiv(m, safeBaseM);
@@ -300,7 +300,7 @@ public:
         bs.UpdateBaseM(curBaseM_);
     }
 
-    __aicore__ inline void ProcessSingleGroup(const Params &params, BlockSchedulerOp &bs, uint32_t groupIdx)
+    __aicore__ inline void ProcessSingleGroup(const Params& params, BlockSchedulerOp& bs, uint32_t groupIdx)
     {
         int64_t m = Get<M_VALUES>(problemShape_);
         int64_t n = Get<N_VALUES>(problemShape_);
@@ -352,10 +352,10 @@ public:
         }
     }
 
-    __aicore__ inline void operator()(const Params &params)
+    __aicore__ inline void operator()(const Params& params)
     {
         if ASCEND_IS_AIC {
-            mmadOp_.Init(const_cast<TCubeTiling *__restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
+            mmadOp_.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
             l0cOutUbFirst_ = epilogueDequantAndSwigluOp_.GetFirstL0c2UbTensor();
             l0cOutUbSecond_ = epilogueDequantAndSwigluOp_.GetSecondL0c2UbTensor();
         }

@@ -41,12 +41,12 @@ extern "C" {
  * @param [out] executor: 返回op执行器，包含了算子计算流程。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnMhcPreGetWorkspaceSize(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha,
-                                                  const aclTensor *bias, const aclTensor *gammaOptional, double normEps,
-                                                  double hcEps, aclTensor *hIn, aclTensor *hPost, aclTensor *hRes,
-                                                  aclTensor *invRmsOptional, aclTensor *hMixOptional,
-                                                  aclTensor *hPreOptional, uint64_t *workspaceSize,
-                                                  aclOpExecutor **executor);
+ACLNN_API aclnnStatus aclnnMhcPreGetWorkspaceSize(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha,
+                                                  const aclTensor* bias, const aclTensor* gammaOptional, double normEps,
+                                                  double hcEps, aclTensor* hIn, aclTensor* hPost, aclTensor* hRes,
+                                                  aclTensor* invRmsOptional, aclTensor* hMixOptional,
+                                                  aclTensor* hPreOptional, uint64_t* workspaceSize,
+                                                  aclOpExecutor** executor);
 
 /**
  * @brief aclnnMhcPre 的第二段接口，执行算子计算。
@@ -57,7 +57,7 @@ ACLNN_API aclnnStatus aclnnMhcPreGetWorkspaceSize(const aclTensor *x, const aclT
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnMhcPre(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+ACLNN_API aclnnStatus aclnnMhcPre(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

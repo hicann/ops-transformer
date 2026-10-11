@@ -22,11 +22,11 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(MhcPreSinkhornBackward);
 
-const std::tuple<aclTensor *, aclTensor *, aclTensor *, aclTensor *> MhcPreSinkhornBackward(
-    const aclTensor *gradHin, const aclTensor *gradHPost, const aclTensor *gradHRes, const aclTensor *x,
-    const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias, const aclTensor *hPre,
-    const aclTensor *hcBeforeNorm, const aclTensor *invRms, const aclTensor *sumOut, const aclTensor *normOut,
-    float hcEps, aclOpExecutor *executor)
+const std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*> MhcPreSinkhornBackward(
+    const aclTensor* gradHin, const aclTensor* gradHPost, const aclTensor* gradHRes, const aclTensor* x,
+    const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias, const aclTensor* hPre,
+    const aclTensor* hcBeforeNorm, const aclTensor* invRms, const aclTensor* sumOut, const aclTensor* normOut,
+    float hcEps, aclOpExecutor* executor)
 {
     L0_DFX(MhcPreSinkhornBackward, gradHin, gradHPost, gradHRes, x, phi, alpha, bias, hPre, hcBeforeNorm, invRms,
            sumOut, normOut, hcEps);

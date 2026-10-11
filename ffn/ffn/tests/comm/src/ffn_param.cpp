@@ -19,10 +19,13 @@ using namespace ops::adv::tests::ffn;
 
 Param::Param(std::vector<Tensor> inputs, std::vector<int64_t> expertTokensData, std::string activation,
              int32_t innerPrecise, int32_t outputDtype, bool tokensIndexFlag)
-    : mExpertTokensData(std::move(expertTokensData)), mActivation(activation), mInnerPrecise(innerPrecise),
-      mOutputDtype(outputDtype), mTokensIndexFlag(tokensIndexFlag)
+    : mExpertTokensData(std::move(expertTokensData)),
+      mActivation(activation),
+      mInnerPrecise(innerPrecise),
+      mOutputDtype(outputDtype),
+      mTokensIndexFlag(tokensIndexFlag)
 {
-    for (auto &tensor : inputs) {
+    for (auto& tensor : inputs) {
         mTensors[tensor.Name()] = tensor;
     }
 }

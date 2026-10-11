@@ -70,8 +70,8 @@ protected:
         OP_CHECK_WRONG_DIMENSION(gmmDsqParams_.x, X_DIM_LIMIT, return false);
         size_t wLength = gmmDsqParams_.weight->Size();
         for (size_t i = 0; i < wLength; i++) {
-            const aclTensor *w = (*gmmDsqParams_.weight)[i];
-            const aclTensor *wScale = (*gmmDsqParams_.weightScale)[i];
+            const aclTensor* w = (*gmmDsqParams_.weight)[i];
+            const aclTensor* wScale = (*gmmDsqParams_.weightScale)[i];
             op::Format wFormat = w->GetViewFormat();
             if (wLength == static_cast<size_t>(1)) { // 单Tensor场景
                 if (IsPrivateFormat(wFormat)) {
@@ -112,8 +112,8 @@ protected:
         }
         size_t wLength = gmmDsqParams_.weight->Size();
         for (size_t i = 0; i < wLength; i++) {
-            const aclTensor *w = (*gmmDsqParams_.weight)[i];
-            const aclTensor *wScale = (*gmmDsqParams_.weightScale)[i];
+            const aclTensor* w = (*gmmDsqParams_.weight)[i];
+            const aclTensor* wScale = (*gmmDsqParams_.weightScale)[i];
             op::Format weightViewFormat = w->GetViewFormat();
             bool isSingle = (wLength == 1);
             // 检查权重维度
@@ -133,7 +133,7 @@ protected:
                 return false);
             // 检查辅助矩阵（A8W4模式）
             if (gmmDsqParams_.isA8W4) {
-                const aclTensor *weightAssistMatrix = (*gmmDsqParams_.weightAssistMatrix)[i];
+                const aclTensor* weightAssistMatrix = (*gmmDsqParams_.weightAssistMatrix)[i];
                 OP_CHECK_WRONG_DIMENSION(
                     weightAssistMatrix,
                     (isSingle ? SINGLE_WEIGHT_ASSIST_MATRIX_DIM_LIMIT : MULTI_WEIGHT_ASSIST_MATRIX_DIM_LIMIT),
@@ -164,8 +164,8 @@ protected:
         op::Shape weightScaleExpectShape1 = {e, n};
         op::Shape weightScaleExpectShape2 = {n};
 
-        const aclTensor *w = (*gmmDsqParams_.weight)[0];
-        const aclTensor *wScale = (*gmmDsqParams_.weightScale)[0];
+        const aclTensor* w = (*gmmDsqParams_.weight)[0];
+        const aclTensor* wScale = (*gmmDsqParams_.weightScale)[0];
 
         op::Format wFormat = w->GetViewFormat();
         op::Format storageFormat = w->GetStorageFormat();
@@ -229,8 +229,8 @@ protected:
         size_t wLength = gmmDsqParams_.weight->Size();
 
         for (size_t i = 0; i < wLength; i++) {
-            const aclTensor *w = (*gmmDsqParams_.weight)[0];
-            const aclTensor *wScale = (*gmmDsqParams_.weightScale)[0];
+            const aclTensor* w = (*gmmDsqParams_.weight)[0];
+            const aclTensor* wScale = (*gmmDsqParams_.weightScale)[0];
             op::Format wFormat = w->GetViewFormat();
             op::Format storageFormat = w->GetStorageFormat();
             if (IsPrivateFormat(wFormat)) {
@@ -354,8 +354,8 @@ protected:
         // 辅助矩阵的shape期望为[E, N]
         op::Shape weightAssistMatrixExpectShape = {e, n};
 
-        const aclTensor *w = (*gmmDsqParams_.weight)[0];
-        const aclTensor *weightAssistMatrix = nullptr;
+        const aclTensor* w = (*gmmDsqParams_.weight)[0];
+        const aclTensor* weightAssistMatrix = nullptr;
         if (gmmDsqParams_.weightAssistMatrix != nullptr && (*gmmDsqParams_.weightAssistMatrix)[0] != nullptr) {
             weightAssistMatrix = (*gmmDsqParams_.weightAssistMatrix)[0];
             OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(weightAssistMatrix, weightAssistMatrixExpectShape,
@@ -394,8 +394,8 @@ protected:
         size_t wLength = gmmDsqParams_.weight->Size();
 
         for (size_t i = 0; i < wLength; i++) {
-            const aclTensor *w = (*gmmDsqParams_.weight)[i];
-            const aclTensor *weightAssistMatrix = nullptr;
+            const aclTensor* w = (*gmmDsqParams_.weight)[i];
+            const aclTensor* weightAssistMatrix = nullptr;
             if (gmmDsqParams_.weightAssistMatrix != nullptr && (*gmmDsqParams_.weightAssistMatrix)[i] != nullptr) {
                 weightAssistMatrix = (*gmmDsqParams_.weightAssistMatrix)[i];
                 OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(weightAssistMatrix, weightAssistMatrixExpectShape,
@@ -445,8 +445,8 @@ protected:
         return CheckMultiTensorTypeA8W4orA4W4(k, n);
     }
 
-    void ParseWeightScaleExpectShape(int64_t k, int64_t &e, int64_t &n, int64_t &KGroupCount, int64_t &KGroupSize,
-                                     op::Shape &weightScaleExpectShape)
+    void ParseWeightScaleExpectShape(int64_t k, int64_t& e, int64_t& n, int64_t& KGroupCount, int64_t& KGroupSize,
+                                     op::Shape& weightScaleExpectShape)
     {
         size_t wLength = gmmDsqParams_.weight->Size();
         if (gmmDsqParams_.dequantMode == 0 && wLength == static_cast<size_t>(1)) {
@@ -476,7 +476,7 @@ protected:
         }
     }
 
-    bool CheckKGroupCountAndN(int64_t k, int64_t n, int64_t KGroupCount, const std::string &scenario)
+    bool CheckKGroupCountAndN(int64_t k, int64_t n, int64_t KGroupCount, const std::string& scenario)
     {
         if (KGroupCount == 0 || k % KGroupCount != 0) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
@@ -499,7 +499,7 @@ protected:
         return true;
     }
 
-    bool CheckGroupListAndTailLimits(int64_t e, int64_t n, int64_t k, const std::string &scenario)
+    bool CheckGroupListAndTailLimits(int64_t e, int64_t n, int64_t k, const std::string& scenario)
     {
         // groupList的长度应小于等于weight的专家数
         int64_t groupListLen = gmmDsqParams_.groupList->GetViewShape().GetDim(0);
@@ -579,7 +579,7 @@ protected:
         }
 
         for (size_t i = 0; i < wLength; i++) {
-            const aclTensor *wScale = (*gmmDsqParams_.weightScale)[i];
+            const aclTensor* wScale = (*gmmDsqParams_.weightScale)[i];
             OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(wScale, weightScaleExpectShape, return false);
         }
         OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(gmmDsqParams_.x, xExpectShape, return false);
@@ -596,7 +596,7 @@ protected:
         return true;
     }
 
-    bool IsTransposeLastTwoDims(const aclTensor *tensor)
+    bool IsTransposeLastTwoDims(const aclTensor* tensor)
     {
         auto shape = tensor->GetViewShape();
         size_t dimNum = shape.GetDimNum();
@@ -616,10 +616,10 @@ protected:
         return false;
     }
 
-    void UnpackInt32ToInt4(const aclTensor *&tensorS32, const std::string &tensorType)
+    void UnpackInt32ToInt4(const aclTensor*& tensorS32, const std::string& tensorType)
     {
         OP_LOGD("Unpack %s from int32 to int4 start.", tensorType.c_str());
-        auto tensorS4 = const_cast<aclTensor *>(tensorS32);
+        auto tensorS4 = const_cast<aclTensor*>(tensorS32);
         op::Shape tensorShape = tensorS4->GetViewShape();
         size_t viewShapeDim = tensorShape.GetDimNum();
         op::Strides newStride = tensorS4->GetViewStrides();
@@ -671,14 +671,14 @@ protected:
             if (((*gmmDsqParams_.weight)[0])->GetDataType() == DataType::DT_INT32) {
                 size_t wLength = gmmDsqParams_.weight->Size();
                 for (size_t i = 0; i < wLength; i++) {
-                    const aclTensor *w = (*gmmDsqParams_.weight)[i];
+                    const aclTensor* w = (*gmmDsqParams_.weight)[i];
                     UnpackInt32ToInt4(w, "weight");
                 }
             }
 
             if (transposeWeight == true) {
                 std::string scenario = gmmDsqParams_.isA4W4 ? "A4W4" : "A8W4";
-                const aclTensor *w = (*gmmDsqParams_.weight)[0];
+                const aclTensor* w = (*gmmDsqParams_.weight)[0];
                 bool isNZ = w->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ;
                 if (!isNZ) {
                     OP_LOGE(ACLNN_ERR_PARAM_INVALID,
@@ -695,7 +695,7 @@ protected:
             if (((*gmmDsqParams_.weightScale)[0])->GetDataType() == DataType::DT_INT64) {
                 size_t weightScaleLength = gmmDsqParams_.weightScale->Size();
                 for (size_t i = 0; i < weightScaleLength; i++) {
-                    auto weightScale_fix = const_cast<aclTensor *>((*gmmDsqParams_.weightScale)[i]);
+                    auto weightScale_fix = const_cast<aclTensor*>((*gmmDsqParams_.weightScale)[i]);
                     weightScale_fix->SetDataType(DataType::DT_UINT64);
                 }
             }
@@ -721,15 +721,15 @@ protected:
     {
         size_t wLength = gmmDsqParams_.weight->Size();
         for (size_t i = 0; i < wLength; i++) {
-            const aclTensor *wScale = (*gmmDsqParams_.weightScale)[i];
-            const aclTensor *w = (*gmmDsqParams_.weight)[i];
+            const aclTensor* wScale = (*gmmDsqParams_.weightScale)[i];
+            const aclTensor* w = (*gmmDsqParams_.weight)[i];
 
             OP_CHECK_DTYPE_NOT_SUPPORT(w, WEIGHT_DTYPE_SUPPORT_LIST, return false);
 
             if (w->GetDataType() == DataType::DT_INT4) {
                 OP_CHECK_DTYPE_NOT_SUPPORT(wScale, WEIGHT_SCALE_A8W4_DTYPE_SUPPORT_LIST, return false);
                 if (gmmDsqParams_.weightAssistMatrix != nullptr && (*gmmDsqParams_.weightAssistMatrix)[i] != nullptr) {
-                    const aclTensor *weightAssistMatrix = (*gmmDsqParams_.weightAssistMatrix)[i];
+                    const aclTensor* weightAssistMatrix = (*gmmDsqParams_.weightAssistMatrix)[i];
                     OP_CHECK_DTYPE_NOT_SUPPORT(weightAssistMatrix, WEIGHT_ASSIST_DTYPE_SUPPORT_LIST, return false);
                 }
             } else if (w->GetDataType() == DataType::DT_INT8) {
@@ -747,7 +747,7 @@ protected:
 
     bool CheckFormat() override
     {
-        const aclTensor *w = (*gmmDsqParams_.weight)[0];
+        const aclTensor* w = (*gmmDsqParams_.weight)[0];
         bool isNZ = w->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ;
         if ((gmmDsqParams_.x->GetDataType() == DataType::DT_INT8 && w->GetDataType() == DataType::DT_INT8) && !isNZ) {
             // fp16 in fp32 out that is split k template, not precision-advanced now

@@ -41,55 +41,55 @@ using ops::ut::ParseBool;
 using ops::ut::SplitStr2Vec;
 using ops::ut::Trim;
 
-ge::DataType ParseDtype(const string &dtype)
+ge::DataType ParseDtype(const string& dtype)
 {
     return ops::ut::ParseGeDtype(dtype);
 }
 
-ge::Format ParseFormat(const string &format)
+ge::Format ParseFormat(const string& format)
 {
     return ops::ut::ParseGeFormat(format);
 }
 
-bool IsAbsentTensorListSpec(const string &value)
+bool IsAbsentTensorListSpec(const string& value)
 {
     const string lower = ops::ut::ToLower(Trim(value));
     return lower == "absent" || lower == "null";
 }
 
-vector<string> ParseTensorSpecs(const string &value)
+vector<string> ParseTensorSpecs(const string& value)
 {
     if (IsAbsentTensorListSpec(value)) {
         return {};
     }
     vector<string> specs;
     SplitStr2Vec(value, ";", specs);
-    for (auto &spec : specs) {
+    for (auto& spec : specs) {
         spec = Trim(spec);
     }
     return specs;
 }
 
-vector<int64_t> ParseInt64List(const string &value)
+vector<int64_t> ParseInt64List(const string& value)
 {
     return ops::ut::ParseI64List(value, ":");
 }
 
-uint32_t GetTensorInstanceNum(const string &shapeSpec)
+uint32_t GetTensorInstanceNum(const string& shapeSpec)
 {
     return static_cast<uint32_t>(ParseTensorSpecs(shapeSpec).size());
 }
 
-void AppendTensorDescs(vector<gert::InfershapeContextPara::TensorDescription> &descs, const string &shapeSpec,
-                       ge::DataType dtype, ge::Format format, bool isConst = false, void *constValue = nullptr)
+void AppendTensorDescs(vector<gert::InfershapeContextPara::TensorDescription>& descs, const string& shapeSpec,
+                       ge::DataType dtype, ge::Format format, bool isConst = false, void* constValue = nullptr)
 {
-    for (const auto &spec : ParseTensorSpecs(shapeSpec)) {
+    for (const auto& spec : ParseTensorSpecs(shapeSpec)) {
         descs.emplace_back(ops::ut::MakeGertStorageShape(ops::ut::ParseDims(spec, {}, Trim(spec) == "NONE")), dtype,
                            format, isConst, constValue);
     }
 }
 
-void SetupPlatformForCase(const string &socVersion)
+void SetupPlatformForCase(const string& socVersion)
 {
     fe::PlatformInfo platformInfo;
     fe::OptionalInfo optiCompilationInfo;
@@ -158,7 +158,7 @@ struct GroupedMatmulInfershapeCase {
     {
         SetupPlatformForCase(socVersion);
         vector<int64_t> groupListValues = ParseInt64List(groupListData);
-        void *groupListValuePtr = groupListValues.empty() ? nullptr : static_cast<void *>(groupListValues.data());
+        void* groupListValuePtr = groupListValues.empty() ? nullptr : static_cast<void*>(groupListValues.data());
         vector<gert::InfershapeContextPara::TensorDescription> inputTensorDescs;
         AppendTensorDescs(inputTensorDescs, xShape, ParseDtype(xDtype), ParseFormat(xFormat));
         AppendTensorDescs(inputTensorDescs, weightShape, ParseDtype(weightDtype), ParseFormat(weightFormat));
@@ -180,7 +180,7 @@ struct GroupedMatmulInfershapeCase {
         }
         vector<gert::InfershapeContextPara::TensorDescription> outputTensorDescs;
         vector<vector<int64_t>> expectShape;
-        for (const auto &outputSpec : outputSpecs) {
+        for (const auto& outputSpec : outputSpecs) {
             outputTensorDescs.emplace_back(ops::ut::MakeGertStorageShape(ops::ut::ParseDims("")), ParseDtype(outDtype),
                                            ParseFormat(outFormat));
             expectShape.push_back(ops::ut::ParseDims(outputSpec, {}, Trim(outputSpec) == "NONE"));
@@ -232,7 +232,7 @@ struct GroupedMatmulInfershapeCase {
         ge::DataType antiquantOffsetDataType = ParseDtype(antiquantOffsetDtype);
         ge::DataType groupListDataType = ParseDtype(groupListDtype);
         ge::DataType perTokenScaleDataType = ParseDtype(perTokenScaleDtype);
-        vector<void *> inputDataTypes = {
+        vector<void*> inputDataTypes = {
             &xDataType,
             &weightDataType,
             &biasDataType,
@@ -321,7 +321,7 @@ struct GroupedMatmulInfershapeCase {
     string tuningConfigData;
 };
 
-vector<GroupedMatmulInfershapeCase> LoadCases(const string &socVersion)
+vector<GroupedMatmulInfershapeCase> LoadCases(const string& socVersion)
 {
     vector<GroupedMatmulInfershapeCase> cases;
     string csvPath =
@@ -409,14 +409,14 @@ vector<GroupedMatmulInfershapeCase> LoadCases(const string &socVersion)
                 tc.tuningConfigData = Trim(items[idx++]);
             }
             cases.push_back(tc);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
     return cases;
 }
 
-string MakeParamName(const testing::TestParamInfo<GroupedMatmulInfershapeCase> &info)
+string MakeParamName(const testing::TestParamInfo<GroupedMatmulInfershapeCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
@@ -425,12 +425,12 @@ string MakeParamName(const testing::TestParamInfo<GroupedMatmulInfershapeCase> &
 
 namespace GroupedMatmulInfershapeUT {
 
-const vector<GroupedMatmulInfershapeCase> &GetGroupedMatmulInfershapeCsvCases()
+const vector<GroupedMatmulInfershapeCase>& GetGroupedMatmulInfershapeCsvCases()
 {
     static const vector<GroupedMatmulInfershapeCase> cases = [] {
         vector<GroupedMatmulInfershapeCase> ascend950 = LoadCases("Ascend950");
         vector<GroupedMatmulInfershapeCase> ascend350 = ascend950;
-        for (auto &testCase : ascend350) {
+        for (auto& testCase : ascend350) {
             testCase.socVersion = "Ascend350";
             testCase.prefix = "ascend350_" + testCase.prefix;
         }

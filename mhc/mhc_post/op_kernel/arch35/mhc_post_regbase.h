@@ -35,7 +35,7 @@ using namespace AscendC;
 REGBASE_TEMPLATE_DECLARE
 class MhcPostRegbase {
 public:
-    __aicore__ inline MhcPostRegbase(TPipe *tPipe, const MhcPostRegbaseTilingData *__restrict tilingData)
+    __aicore__ inline MhcPostRegbase(TPipe* tPipe, const MhcPostRegbaseTilingData* __restrict tilingData)
         : pipe_(tPipe),
           tilingData_(tilingData){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hRes, GM_ADDR hOut, GM_ADDR hPost, GM_ADDR output,
@@ -54,8 +54,8 @@ private:
     __aicore__ inline void CopyOutY(int64_t bsIdx, int64_t nIdx, int64_t nNum, int64_t dIdx, int64_t dNum);
 
 private:
-    TPipe *pipe_;
-    const MhcPostRegbaseTilingData *tilingData_;
+    TPipe* pipe_;
+    const MhcPostRegbaseTilingData* tilingData_;
 
     // Input queues - Double Buffer enabled (queue depth = DOUBLE_BUFFER_DEPTH)
     TQue<QuePosition::VECIN, DOUBLE_BUFFER_DEPTH> hOutTileQueue_;
@@ -102,11 +102,11 @@ __aicore__ inline void MhcPostRegbase<REGBASE_TEMPLATE_ARGS>::Init(GM_ADDR x, GM
     }
 
     // Set global memory buffers
-    xGm_.SetGlobalBuffer((__gm__ T *)x);
-    hOutGm_.SetGlobalBuffer((__gm__ T *)hOut);
-    hResGm_.SetGlobalBuffer((__gm__ float *)hRes);
-    hPostGm_.SetGlobalBuffer((__gm__ float *)hPost);
-    outputGm_.SetGlobalBuffer((__gm__ T *)output);
+    xGm_.SetGlobalBuffer((__gm__ T*)x);
+    hOutGm_.SetGlobalBuffer((__gm__ T*)hOut);
+    hResGm_.SetGlobalBuffer((__gm__ float*)hRes);
+    hPostGm_.SetGlobalBuffer((__gm__ float*)hPost);
+    outputGm_.SetGlobalBuffer((__gm__ T*)output);
 
     // Initialize output queues - Double Buffer with depth=DOUBLE_BUFFER_DEPTH
     pipe_->InitBuffer(yTileBuf_, tilingData_->nInner * tilingData_->dInner * sizeof(float));
@@ -141,11 +141,11 @@ __aicore__ inline void MhcPostRegbase<REGBASE_TEMPLATE_ARGS>::DoMulAndAdd(LocalT
 
     LocalTensor<float> yTileBuf = yTileBuf_.Get<float>();
 
-    auto xAddr = (__ubuf__ T *)xUb.GetPhyAddr();
-    auto hResAddr = (__ubuf__ float *)hResUb.GetPhyAddr();
-    auto hPostAddr = (__ubuf__ float *)hPostUb.GetPhyAddr();
-    auto hOutAddr = (__ubuf__ T *)hOutUb.GetPhyAddr();
-    auto yAddr = (__ubuf__ float *)yTileBuf.GetPhyAddr();
+    auto xAddr = (__ubuf__ T*)xUb.GetPhyAddr();
+    auto hResAddr = (__ubuf__ float*)hResUb.GetPhyAddr();
+    auto hPostAddr = (__ubuf__ float*)hPostUb.GetPhyAddr();
+    auto hOutAddr = (__ubuf__ T*)hOutUb.GetPhyAddr();
+    auto yAddr = (__ubuf__ float*)yTileBuf.GetPhyAddr();
 
     __VEC_SCOPE__
     {
@@ -199,11 +199,11 @@ __aicore__ inline void MhcPostRegbase<REGBASE_TEMPLATE_ARGS>::DoMulAndAdd_N4(Loc
     LocalTensor<T> hOutUb = hOutTileQueue_.DeQue<T>();
     LocalTensor<float> yTileBuf = yTileBuf_.Get<float>();
 
-    auto xAddr = (__ubuf__ T *)xUb.GetPhyAddr();
-    auto hResAddr = (__ubuf__ float *)hResUb.GetPhyAddr();
-    auto hPostAddr = (__ubuf__ float *)hPostUb.GetPhyAddr();
-    auto hOutAddr = (__ubuf__ T *)hOutUb.GetPhyAddr();
-    auto yAddr = (__ubuf__ float *)yTileBuf.GetPhyAddr();
+    auto xAddr = (__ubuf__ T*)xUb.GetPhyAddr();
+    auto hResAddr = (__ubuf__ float*)hResUb.GetPhyAddr();
+    auto hPostAddr = (__ubuf__ float*)hPostUb.GetPhyAddr();
+    auto hOutAddr = (__ubuf__ T*)hOutUb.GetPhyAddr();
+    auto yAddr = (__ubuf__ float*)yTileBuf.GetPhyAddr();
 
     __VEC_SCOPE__
     {

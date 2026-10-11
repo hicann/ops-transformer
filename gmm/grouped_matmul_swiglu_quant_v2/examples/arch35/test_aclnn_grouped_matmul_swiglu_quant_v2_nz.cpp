@@ -27,7 +27,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto v : shape) {
@@ -45,7 +45,7 @@ auto Ceil(T1 a, T2 b) -> T1
     return (a + b - 1) / b;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ret=%d\n", ret); return ret);
@@ -67,9 +67,9 @@ void Finalize(int32_t deviceId, aclrtStream stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &logicalShape,
-                    const std::vector<int64_t> &storageShape, void **deviceAddr, aclDataType dataType,
-                    aclFormat formatType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& logicalShape,
+                    const std::vector<int64_t>& storageShape, void** deviceAddr, aclDataType dataType,
+                    aclFormat formatType, aclTensor** tensor)
 {
     uint64_t size = GetShapeSize(storageShape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -87,14 +87,14 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 }
 
 template <typename T>
-int CreateAclTensorND(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                      aclDataType dataType, aclTensor **tensor)
+int CreateAclTensorND(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                      aclDataType dataType, aclTensor** tensor)
 {
     return CreateAclTensor(hostData, shape, shape, deviceAddr, dataType, ACL_FORMAT_ND, tensor);
 }
 
 template <typename T>
-void PrintVector(const std::vector<T> &data, const std::string &name, int64_t printNum = 32)
+void PrintVector(const std::vector<T>& data, const std::string& name, int64_t printNum = 32)
 {
     LOG_PRINT("======== %s ========\n", name.c_str());
     int64_t size = static_cast<int64_t>(data.size());
@@ -134,82 +134,82 @@ int main()
     std::vector<uint8_t> outputHostData(GetShapeSize(outputShape), 0);
     std::vector<int8_t> outputScaleHostData(GetShapeSize(outputScaleShape), 0);
 
-    void *xDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *weightScaleDeviceAddr = nullptr;
-    void *xScaleDeviceAddr = nullptr;
-    void *groupListDeviceAddr = nullptr;
-    void *outputDeviceAddr = nullptr;
-    void *outputScaleDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* weightScaleDeviceAddr = nullptr;
+    void* xScaleDeviceAddr = nullptr;
+    void* groupListDeviceAddr = nullptr;
+    void* outputDeviceAddr = nullptr;
+    void* outputScaleDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *weightTensor = nullptr;
-    aclTensor *weightScaleTensor = nullptr;
-    aclTensor *xScale = nullptr;
-    aclTensor *groupList = nullptr;
-    aclTensor *output = nullptr;
-    aclTensor *outputScale = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* weightTensor = nullptr;
+    aclTensor* weightScaleTensor = nullptr;
+    aclTensor* xScale = nullptr;
+    aclTensor* groupList = nullptr;
+    aclTensor* output = nullptr;
+    aclTensor* outputScale = nullptr;
 
-    aclTensorList *weight = nullptr;
-    aclTensorList *weightScale = nullptr;
+    aclTensorList* weight = nullptr;
+    aclTensorList* weightScale = nullptr;
 
     ret = CreateAclTensorND<uint8_t>(xHostData, xShape, &xDeviceAddr, ACL_FLOAT8_E4M3FN, &x);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> xTensorPtr(x, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> xDeviceAddrPtr(xDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> xTensorPtr(x, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> xDeviceAddrPtr(xDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor<uint8_t>(weightHostData, weightLogicalShape, weightStorageShape, &weightDeviceAddr,
                                    ACL_FLOAT8_E4M3FN, ACL_FORMAT_FRACTAL_NZ, &weightTensor);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> weightTensorPtr(weightTensor, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> weightDeviceAddrPtr(weightDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> weightTensorPtr(weightTensor, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> weightDeviceAddrPtr(weightDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    aclTensor *weightArray[] = {weightTensor};
+    aclTensor* weightArray[] = {weightTensor};
     weight = aclCreateTensorList(weightArray, 1);
     CHECK_RET(weight != nullptr, LOG_PRINT("aclCreateTensorList(weight) failed\n"); return ACL_ERROR_FAILURE);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> weightTensorListPtr(weight,
-                                                                                               aclDestroyTensorList);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> weightTensorListPtr(weight,
+                                                                                              aclDestroyTensorList);
     ret = CreateAclTensorND<int8_t>(weightScaleHostData, weightScaleShape, &weightScaleDeviceAddr, ACL_FLOAT8_E8M0,
                                     &weightScaleTensor);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> weightScaleTensorPtr(weightScaleTensor,
-                                                                                        aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> weightScaleDeviceAddrPtr(weightScaleDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> weightScaleTensorPtr(weightScaleTensor,
+                                                                                       aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> weightScaleDeviceAddrPtr(weightScaleDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    aclTensor *weightScaleArray[] = {weightScaleTensor};
+    aclTensor* weightScaleArray[] = {weightScaleTensor};
     weightScale = aclCreateTensorList(weightScaleArray, 1);
     CHECK_RET(weightScale != nullptr, LOG_PRINT("aclCreateTensorList(weightScale) failed\n"); return ACL_ERROR_FAILURE);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> weightScaleTensorListPtr(
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> weightScaleTensorListPtr(
         weightScale, aclDestroyTensorList);
 
     ret = CreateAclTensorND<int8_t>(xScaleHostData, xScaleShape, &xScaleDeviceAddr, ACL_FLOAT8_E8M0, &xScale);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> xScaleTensorPtr(xScale, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> xScaleDeviceAddrPtr(xScaleDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> xScaleTensorPtr(xScale, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> xScaleDeviceAddrPtr(xScaleDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensorND<int64_t>(groupListHostData, groupListShape, &groupListDeviceAddr, ACL_INT64, &groupList);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> groupListTensorPtr(groupList, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> groupListDeviceAddrPtr(groupListDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> groupListTensorPtr(groupList, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> groupListDeviceAddrPtr(groupListDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensorND<uint8_t>(outputHostData, outputShape, &outputDeviceAddr, ACL_FLOAT8_E4M3FN, &output);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> outputTensorPtr(output, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> outputDeviceAddrPtr(outputDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> outputTensorPtr(output, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> outputDeviceAddrPtr(outputDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensorND<int8_t>(outputScaleHostData, outputScaleShape, &outputScaleDeviceAddr, ACL_FLOAT8_E8M0,
                                     &outputScale);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> outputScaleTensorPtr(outputScale, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> outputScaleDeviceAddrPtr(outputScaleDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> outputScaleTensorPtr(outputScale, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> outputScaleDeviceAddrPtr(outputScaleDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     ret = aclnnGroupedMatmulSwigluQuantWeightNzV2GetWorkspaceSize(x, weight, weightScale, nullptr, nullptr, xScale,
                                                                   nullptr, groupList, 2, 0, 2, 1, nullptr, output,
                                                                   outputScale, &workspaceSize, &executor);
 
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("GetWorkspaceSize failed. ret=%d\n", ret); return ret);
     LOG_PRINT("workspaceSize = %lu\n", workspaceSize);
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("workspace malloc failed\n"); return ret);

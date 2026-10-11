@@ -86,7 +86,7 @@ public:
         this->Attr("hc_eps").AttrType(OPTIONAL).Float(1e-6f); // default value
         this->Attr("norm_eps").AttrType(OPTIONAL).Float(1e-6f);
         this->Attr("need_backward").AttrType(OPTIONAL).Bool(true);
-            
+
         this->AICore().AddConfig("ascend910b");
         this->AICore().AddConfig("ascend910_93");
 

@@ -88,23 +88,23 @@ public:
 
 public:
     __aicore__ inline BlockMmadGmm();
-    __aicore__ inline void Init(const TupleShape &l0Shape, const TupleTileShape &tileL12L0,
-                                AscendC::LocalTensor<CType> *ping, AscendC::LocalTensor<CType> *pong);
-    __aicore__ inline void operator()(const TupleShape &actualSingleShape, const AscendC::GlobalTensor<AType> &aGlobal,
-                                      const AscendC::GlobalTensor<BType> &bGlobal);
-    __aicore__ inline void UpdateParamsForNextProblem(const TupleShape &problemShape);
+    __aicore__ inline void Init(const TupleShape& l0Shape, const TupleTileShape& tileL12L0,
+                                AscendC::LocalTensor<CType>* ping, AscendC::LocalTensor<CType>* pong);
+    __aicore__ inline void operator()(const TupleShape& actualSingleShape, const AscendC::GlobalTensor<AType>& aGlobal,
+                                      const AscendC::GlobalTensor<BType>& bGlobal);
+    __aicore__ inline void UpdateParamsForNextProblem(const TupleShape& problemShape);
     __aicore__ inline void End();
     __aicore__ inline ~BlockMmadGmm();
 
 private:
-    __aicore__ inline void AicBaseMadProcess(AscendC::LocalTensor<AType> &aL1, AscendC::LocalTensor<BType> &bL1,
+    __aicore__ inline void AicBaseMadProcess(AscendC::LocalTensor<AType>& aL1, AscendC::LocalTensor<BType>& bL1,
                                              uint64_t kInner, uint64_t kAL1Offset, bool isTailAL1, uint64_t kBL1Offset,
                                              bool isTailBL1);
-    __aicore__ inline void CopyInA1Nd2Nz(const AscendC::GlobalTensor<AType> &aGlobal, uint64_t kOffset, bool isTailAL1);
-    __aicore__ inline void CopyInB1Nd2Nz(const AscendC::GlobalTensor<BType> &bGlobal, uint64_t kOffset, bool isTailBL1);
-    __aicore__ inline void CopyInA2(AscendC::LocalTensor<AType> &aL1, uint64_t mAL1Offset, uint64_t kAL1Offset,
+    __aicore__ inline void CopyInA1Nd2Nz(const AscendC::GlobalTensor<AType>& aGlobal, uint64_t kOffset, bool isTailAL1);
+    __aicore__ inline void CopyInB1Nd2Nz(const AscendC::GlobalTensor<BType>& bGlobal, uint64_t kOffset, bool isTailBL1);
+    __aicore__ inline void CopyInA2(AscendC::LocalTensor<AType>& aL1, uint64_t mAL1Offset, uint64_t kAL1Offset,
                                     uint64_t kOffset, bool isTailAL1);
-    __aicore__ inline void CopyInB2(AscendC::LocalTensor<BType> &bL1, uint64_t nBL1Offset, uint64_t kBL1Offset,
+    __aicore__ inline void CopyInB2(AscendC::LocalTensor<BType>& bL1, uint64_t nBL1Offset, uint64_t kBL1Offset,
                                     uint64_t kOffset, bool isTailBL1);
     __aicore__ inline void MmadBase(uint64_t kOffset);
 
@@ -124,8 +124,8 @@ private:
     }
 
 public:
-    AscendC::LocalTensor<CType> *mmResPing_;
-    AscendC::LocalTensor<CType> *mmResPong_;
+    AscendC::LocalTensor<CType>* mmResPing_;
+    AscendC::LocalTensor<CType>* mmResPong_;
 
     AscendC::LocalTensor<AType> aL1Ping_;
     AscendC::LocalTensor<AType> aL1Pong_;
@@ -178,10 +178,10 @@ __aicore__ inline BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::BlockMmadGmm(
 }
 
 QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::Init(const TupleShape &l0Shape,
-                                                                             const TupleTileShape &tileL12L0,
-                                                                             AscendC::LocalTensor<CType> *ping,
-                                                                             AscendC::LocalTensor<CType> *pong)
+__aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::Init(const TupleShape& l0Shape,
+                                                                             const TupleTileShape& tileL12L0,
+                                                                             AscendC::LocalTensor<CType>* ping,
+                                                                             AscendC::LocalTensor<CType>* pong)
 {
     if ASCEND_IS_AIC {
         baseM_ = Get<MNK_M>(l0Shape);
@@ -222,7 +222,7 @@ __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::Init(con
 
 QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::UpdateParamsForNextProblem(
-    const TupleShape &problemShape)
+    const TupleShape& problemShape)
 {
     problemShape_ = problemShape;
     matmulParam_.UpdateForNextGroup(problemShape_);
@@ -256,8 +256,8 @@ __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::UpdatePe
 
 QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::operator()(
-    const TupleShape &actualSingleShape, const AscendC::GlobalTensor<AType> &aGlobal,
-    const AscendC::GlobalTensor<BType> &bGlobal)
+    const TupleShape& actualSingleShape, const AscendC::GlobalTensor<AType>& aGlobal,
+    const AscendC::GlobalTensor<BType>& bGlobal)
 {
     actualSingleShape_ = actualSingleShape;
     matmulParam_.UpdateNextBlockParams(actualSingleShape_);
@@ -305,7 +305,7 @@ __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::operator
 
 QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::AicBaseMadProcess(
-    AscendC::LocalTensor<AType> &aL1, AscendC::LocalTensor<BType> &bL1, uint64_t kInner, uint64_t kAL1Offset,
+    AscendC::LocalTensor<AType>& aL1, AscendC::LocalTensor<BType>& bL1, uint64_t kInner, uint64_t kAL1Offset,
     bool isTailAL1, uint64_t kBL1Offset, bool isTailBL1)
 {
     for (uint64_t kb = kInner;
@@ -344,7 +344,7 @@ __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::AicBaseM
 }
 
 QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInA2(AscendC::LocalTensor<AType> &aL1,
+__aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInA2(AscendC::LocalTensor<AType>& aL1,
                                                                                  uint64_t mAL1Offset,
                                                                                  uint64_t kAL1Offset, uint64_t kOffset,
                                                                                  bool isTailAL1)
@@ -356,7 +356,7 @@ __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInA2
 }
 
 QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInB2(AscendC::LocalTensor<BType> &bL1,
+__aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInB2(AscendC::LocalTensor<BType>& bL1,
                                                                                  uint64_t nBL1Offset,
                                                                                  uint64_t kBL1Offset, uint64_t kOffset,
                                                                                  bool isTailBL1)
@@ -390,7 +390,7 @@ __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::MmadBase
 
 QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInA1Nd2Nz(
-    const AscendC::GlobalTensor<AType> &aGlobal, uint64_t kOffset, bool isTailAL1)
+    const AscendC::GlobalTensor<AType>& aGlobal, uint64_t kOffset, bool isTailAL1)
 {
     AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(aL1PingPongID_);
     uint64_t offset = matmulParam_.CalcAGMOffsetInnerLoop(0, kOffset);
@@ -403,7 +403,7 @@ __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInA1
 
 QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInB1Nd2Nz(
-    const AscendC::GlobalTensor<BType> &bGlobal, uint64_t kOffset, bool isTailBL1)
+    const AscendC::GlobalTensor<BType>& bGlobal, uint64_t kOffset, bool isTailBL1)
 {
     AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(bL1PingPongID_ + GMM_BUFFER_NUM);
     uint64_t offset = matmulParam_.CalcBGMOffsetInnerLoop(0, kOffset);

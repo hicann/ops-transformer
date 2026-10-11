@@ -19,14 +19,14 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *FFN(const aclTensor *x, const aclTensor *weight1, const aclTensor *weight2,
-                     const aclTensor *expertTokensOptional, const aclTensor *bias1Optional,
-                     const aclTensor *bias2Optional, const aclTensor *scaleOptional, const aclTensor *offsetOptional,
-                     const aclTensor *deqScale1Optional, const aclTensor *deqScale2Optional,
-                     const aclTensor *antiquantScale1Optional, const aclTensor *antiquantScale2Optional,
-                     const aclTensor *antiquantOffset1Optional, const aclTensor *antiquantOffset2Optional,
-                     const char *activation, int64_t innerPrecise, const op::DataType yDtype, bool tokensIndexFlag,
-                     aclOpExecutor *executor);
+const aclTensor* FFN(const aclTensor* x, const aclTensor* weight1, const aclTensor* weight2,
+                     const aclTensor* expertTokensOptional, const aclTensor* bias1Optional,
+                     const aclTensor* bias2Optional, const aclTensor* scaleOptional, const aclTensor* offsetOptional,
+                     const aclTensor* deqScale1Optional, const aclTensor* deqScale2Optional,
+                     const aclTensor* antiquantScale1Optional, const aclTensor* antiquantScale2Optional,
+                     const aclTensor* antiquantOffset1Optional, const aclTensor* antiquantOffset2Optional,
+                     const char* activation, int64_t innerPrecise, const op::DataType yDtype, bool tokensIndexFlag,
+                     aclOpExecutor* executor);
 }
 
 #endif

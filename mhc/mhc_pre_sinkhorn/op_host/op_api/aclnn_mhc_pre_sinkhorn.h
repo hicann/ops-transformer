@@ -33,19 +33,17 @@ extern "C" {
  *                alpha为缩放系数，用于调整输出范围
  * @domain aclnn_ops_infer
  */
-aclnnStatus aclnnMhcPreSinkhornGetWorkspaceSize(
-    const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias,
-    int64_t hcMult, int64_t numIters, double hcEps, double normEps, bool needBackward,
-    aclTensor *hin, aclTensor *hPost, aclTensor *hRes,
-    aclTensor *hPre, aclTensor *hcBeforeNorm, aclTensor *invRms,
-    aclTensor *sumOut, aclTensor *normOut,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+aclnnStatus aclnnMhcPreSinkhornGetWorkspaceSize(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha,
+                                                const aclTensor* bias, int64_t hcMult, int64_t numIters, double hcEps,
+                                                double normEps, bool needBackward, aclTensor* hin, aclTensor* hPost,
+                                                aclTensor* hRes, aclTensor* hPre, aclTensor* hcBeforeNorm,
+                                                aclTensor* invRms, aclTensor* sumOut, aclTensor* normOut,
+                                                uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnMhcPreSinkhorn的第二段接口，用于执行计算。
  */
-aclnnStatus aclnnMhcPreSinkhorn(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
-                                aclrtStream stream);
+aclnnStatus aclnnMhcPreSinkhorn(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

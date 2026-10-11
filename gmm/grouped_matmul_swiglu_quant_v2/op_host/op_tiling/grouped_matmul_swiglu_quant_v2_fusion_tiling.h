@@ -24,7 +24,7 @@ namespace GroupedMatmulSwigluQuantV2Tiling {
 
 class GroupedMatmulSwigluQuantV2FusionTiling : public GroupedMatmulSwigluQuantV2Tiling {
 public:
-    explicit GroupedMatmulSwigluQuantV2FusionTiling(gert::TilingContext *context)
+    explicit GroupedMatmulSwigluQuantV2FusionTiling(gert::TilingContext* context)
         : GroupedMatmulSwigluQuantV2Tiling(context) {};
 
     ~GroupedMatmulSwigluQuantV2FusionTiling() override = default;

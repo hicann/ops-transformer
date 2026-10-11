@@ -71,7 +71,7 @@ ge::graphStatus MhcSinkhornBackwardTiling::GetShapeAttrsInfo()
 
 ge::graphStatus MhcSinkhornBackwardTiling::GetPlatformInfo()
 {
-    auto compileInfo = reinterpret_cast<const MhcSinkhornBackwardCompileInfo *>(context_->GetCompileInfo());
+    auto compileInfo = reinterpret_cast<const MhcSinkhornBackwardCompileInfo*>(context_->GetCompileInfo());
     OP_CHECK_NULL_WITH_CONTEXT(context_, compileInfo);
     totalCoreNum_ = compileInfo->coreNum;
     ubSize_ = compileInfo->ubSize;
@@ -336,7 +336,7 @@ ge::graphStatus MhcSinkhornBackwardTiling::DoOpTiling()
 
 void MhcSinkhornBackwardTiling::SetTilingData()
 {
-    MhcSinkhornBackwardTilingData *tilingData = context_->GetTilingData<MhcSinkhornBackwardTilingData>();
+    MhcSinkhornBackwardTilingData* tilingData = context_->GetTilingData<MhcSinkhornBackwardTilingData>();
     tilingData->totalLength = totalLength_;
     tilingData->tSize = tSize_;
     tilingData->bSize = bSize_;
@@ -397,14 +397,14 @@ void MhcSinkhornBackwardTiling::DumpTilingInfo()
     OP_LOGI(opName_, "%s", info.str().c_str());
 }
 
-static ge::graphStatus TilingForMhcSinkhornBackward(gert::TilingContext *context)
+static ge::graphStatus TilingForMhcSinkhornBackward(gert::TilingContext* context)
 {
     MhcSinkhornBackwardTiling tiling(context);
     auto ret = tiling.DoTiling();
     return ret;
 }
 
-static ge::graphStatus TilingPrepareForMhcSinkhornBackward([[maybe_unused]] gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForMhcSinkhornBackward([[maybe_unused]] gert::TilingParseContext* context)
 {
     auto compileInfo = context->GetCompiledInfo<MhcSinkhornBackwardCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);

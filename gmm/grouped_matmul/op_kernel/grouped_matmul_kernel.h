@@ -89,7 +89,7 @@ __aicore__ inline void DataCopyPad2D(const GlobalTensor<T> dst, const LocalTenso
     DataCopyPad(dst, src, params);
 }
 
-__aicore__ inline void MNBlockIdxCompute(MNConfig &mnConfig, const uint32_t curBlock, const uint32_t count,
+__aicore__ inline void MNBlockIdxCompute(MNConfig& mnConfig, const uint32_t curBlock, const uint32_t count,
                                          const uint32_t thresholdM_dimN)
 {
     if (mnConfig.blockDimM <= thresholdDimM || thresholdDimM == 1) {
@@ -120,9 +120,9 @@ template <typename ComputeType>
 class GMMProcess {
 protected:
     using B = typename ComputeType::B;
-    ComputeType &computeOp; // inernal computation operator
-    const GMMBaseParams *__restrict gmmBaseParams;
-    const TCubeTiling *__restrict mmTilingData;
+    ComputeType& computeOp; // inernal computation operator
+    const GMMBaseParams* __restrict gmmBaseParams;
+    const TCubeTiling* __restrict mmTilingData;
 
     uint32_t blockIndex_;
     uint32_t coreIdx;
@@ -130,20 +130,20 @@ protected:
     int32_t preOffset = 0;
     GM_ADDR groupListPtr;
     GlobalTensor<int64_t> groupListGm;
-    TILING_TYPE *mListGm;
-    TILING_TYPE *kListGm;
-    TILING_TYPE *nListGm;
+    TILING_TYPE* mListGm;
+    TILING_TYPE* kListGm;
+    TILING_TYPE* nListGm;
     uint32_t baseM_ = 0;
     uint32_t baseN_ = 0;
 
 public:
     /** @brief constructor */
-    __aicore__ inline GMMProcess(ComputeType &computeOp_)
+    __aicore__ inline GMMProcess(ComputeType& computeOp_)
         : computeOp(computeOp_)
     {}
 
-    __aicore__ inline void Init(const GMMBaseParams *__restrict gmmBaseParamsIn,
-                                const TCubeTiling *__restrict mmTilingDataIn, TILING_TYPE *gmmArrayAddrIn,
+    __aicore__ inline void Init(const GMMBaseParams* __restrict gmmBaseParamsIn,
+                                const TCubeTiling* __restrict mmTilingDataIn, TILING_TYPE* gmmArrayAddrIn,
                                 GM_ADDR groupList, GM_ADDR tiling);
 
     __aicore__ inline void InitStaticTiling(int32_t baseM, int32_t baseN);
@@ -153,20 +153,20 @@ public:
     bool isA8W4FakeQuant = false;
 
 protected:
-    __aicore__ inline void SetMNConfig(const int32_t splitValue, const uint32_t groupIdx, MNConfig &mnConfig);
+    __aicore__ inline void SetMNConfig(const int32_t splitValue, const uint32_t groupIdx, MNConfig& mnConfig);
 
-    __aicore__ inline void SetMKN(const int32_t splitValue, const uint32_t groupIdx, MNConfig &mnConfig);
+    __aicore__ inline void SetMKN(const int32_t splitValue, const uint32_t groupIdx, MNConfig& mnConfig);
 
-    __aicore__ inline void UpdateMnConfig(MNConfig &mnConfig);
+    __aicore__ inline void UpdateMnConfig(MNConfig& mnConfig);
 
-    __aicore__ inline bool UpdateMnConfigForGroupListMSparse(MNConfig &mnConfig, uint32_t splitValue,
+    __aicore__ inline bool UpdateMnConfigForGroupListMSparse(MNConfig& mnConfig, uint32_t splitValue,
                                                              uint32_t groupIdx);
 };
 
 template <typename ComputeType>
-__aicore__ inline void GMMProcess<ComputeType>::Init(const GMMBaseParams *__restrict gmmBaseParamsIn,
-                                                     const TCubeTiling *__restrict mmTilingDataIn,
-                                                     TILING_TYPE *gmmArrayAddrIn, GM_ADDR groupList, GM_ADDR tiling)
+__aicore__ inline void GMMProcess<ComputeType>::Init(const GMMBaseParams* __restrict gmmBaseParamsIn,
+                                                     const TCubeTiling* __restrict mmTilingDataIn,
+                                                     TILING_TYPE* gmmArrayAddrIn, GM_ADDR groupList, GM_ADDR tiling)
 {
     blockIndex_ = GetBlockIdx();
     coreIdx = blockIndex_;
@@ -179,7 +179,7 @@ __aicore__ inline void GMMProcess<ComputeType>::Init(const GMMBaseParams *__rest
     groupNum = gmmBaseParams->groupNum;
     groupListPtr = groupList;
     if (groupListPtr != nullptr) {
-        groupListGm.SetGlobalBuffer((__gm__ int64_t *)groupList);
+        groupListGm.SetGlobalBuffer((__gm__ int64_t*)groupList);
     }
     mListGm = gmmArrayAddrIn;
     kListGm = gmmArrayAddrIn + MKN_LIST_LEN;
@@ -195,7 +195,7 @@ __aicore__ inline void GMMProcess<ComputeType>::InitStaticTiling(int32_t baseM, 
 
 template <typename ComputeType>
 __aicore__ inline void GMMProcess<ComputeType>::SetMNConfig(const int32_t splitValue, const uint32_t groupIdx,
-                                                            MNConfig &mnConfig)
+                                                            MNConfig& mnConfig)
 {
     SetMKN(splitValue, groupIdx, mnConfig);
     if (mmTilingData != nullptr) {
@@ -216,7 +216,7 @@ __aicore__ inline void GMMProcess<ComputeType>::SetMNConfig(const int32_t splitV
 
 template <typename ComputeType>
 __aicore__ inline void GMMProcess<ComputeType>::SetMKN(const int32_t splitValue, const uint32_t groupIdx,
-                                                       MNConfig &mnConfig)
+                                                       MNConfig& mnConfig)
 {
     uint32_t singleWeight = gmmBaseParams->singleWeight;
     uint32_t singleX = gmmBaseParams->singleX;
@@ -251,7 +251,7 @@ __aicore__ inline void GMMProcess<ComputeType>::SetMKN(const int32_t splitValue,
 }
 
 template <typename ComputeType>
-__aicore__ inline void GMMProcess<ComputeType>::UpdateMnConfig(MNConfig &mnConfig)
+__aicore__ inline void GMMProcess<ComputeType>::UpdateMnConfig(MNConfig& mnConfig)
 {
     if constexpr (B::format == CubeFormat::NZ) {
         mnConfig.wBaseOffset +=
@@ -267,7 +267,7 @@ __aicore__ inline void GMMProcess<ComputeType>::UpdateMnConfig(MNConfig &mnConfi
 }
 
 template <typename ComputeType>
-__aicore__ inline bool GMMProcess<ComputeType>::UpdateMnConfigForGroupListMSparse(MNConfig &mnConfig,
+__aicore__ inline bool GMMProcess<ComputeType>::UpdateMnConfigForGroupListMSparse(MNConfig& mnConfig,
                                                                                   uint32_t splitValue,
                                                                                   uint32_t groupIdx)
 {
@@ -339,7 +339,7 @@ template <typename ComputeType>
 class GMMGroupMSparseProcess : public GMMProcess<ComputeType> {
 public:
     /** @brief constructor */
-    __aicore__ inline GMMGroupMSparseProcess(ComputeType &computeOp_)
+    __aicore__ inline GMMGroupMSparseProcess(ComputeType& computeOp_)
         : GMMProcess<ComputeType>(computeOp_)
     {}
 
@@ -405,32 +405,32 @@ public:
     bool isA8W4FakeQuant = false;
 
     /** @brief constructor */
-    __aicore__ inline GMMCompute(typename mmType::MT &mm_)
+    __aicore__ inline GMMCompute(typename mmType::MT& mm_)
         : mm(mm_)
     {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR offset,
                                 GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR groupList,
                                 GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                const GMMBaseParams *__restrict gmmBaseParams,
-                                const TCubeTiling *__restrict mmTilingData, TPipe *tPipe);
+                                const GMMBaseParams* __restrict gmmBaseParams,
+                                const TCubeTiling* __restrict mmTilingData, TPipe* tPipe);
 
-    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig &mnConfig, uint32_t coreIdx, uint32_t listIndex = 0);
+    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig& mnConfig, uint32_t coreIdx, uint32_t listIndex = 0);
 
-    __aicore__ inline void VectorCompute(MNConfig &mnConfig) {}
+    __aicore__ inline void VectorCompute(MNConfig& mnConfig) {}
 
     __aicore__ inline void PostCompute() {}
 
 protected:
     __aicore__ inline void SetGlobalBufferBias(uint32_t groupIdx, uint32_t tailN, const MNConfig mnConfig);
 
-    __aicore__ inline GlobalTensor<BT> SetGlobalBufferW(uint32_t groupIdx, uint32_t tailN, MNConfig &mnConfig);
+    __aicore__ inline GlobalTensor<BT> SetGlobalBufferW(uint32_t groupIdx, uint32_t tailN, MNConfig& mnConfig);
 
     __aicore__ inline uint64_t SetWOffset(uint32_t tailN, uint32_t k);
 
 protected:
-    TPipe *pipe;
-    typename mmType::MT &mm; // matmul operator
+    TPipe* pipe;
+    typename mmType::MT& mm; // matmul operator
     bool hasBias = false;
     GM_ADDR xTensorPtr;
     GM_ADDR weightTensorPtr;
@@ -462,8 +462,8 @@ template <typename mmType, bool sync>
 __aicore__ inline void GMMCompute<mmType, sync>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale,
                                                       GM_ADDR offset, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                                       GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR y,
-                                                      GM_ADDR workspace, const GMMBaseParams *__restrict gmmBaseParams,
-                                                      const TCubeTiling *__restrict mmTilingData, TPipe *tPipe)
+                                                      GM_ADDR workspace, const GMMBaseParams* __restrict gmmBaseParams,
+                                                      const TCubeTiling* __restrict mmTilingData, TPipe* tPipe)
 {
     xTensorPtr = x;
     weightTensorPtr = weight;
@@ -543,7 +543,7 @@ __aicore__ inline uint64_t GMMCompute<mmType, sync>::SetWOffset(uint32_t tailN, 
 template <typename mmType, bool sync>
 __aicore__ inline GlobalTensor<typename mmType::BT::T> GMMCompute<mmType, sync>::SetGlobalBufferW(uint32_t groupIdx,
                                                                                                   uint32_t tailN,
-                                                                                                  MNConfig &mnConfig)
+                                                                                                  MNConfig& mnConfig)
 {
     uint64_t wOffset = SetWOffset(tailN, mnConfig.k);
 #if defined(GMM_ANTI_QUANT) && !defined(GMM_ANTI_QUANT_A8W4_MSD)
@@ -553,7 +553,7 @@ __aicore__ inline GlobalTensor<typename mmType::BT::T> GMMCompute<mmType, sync>:
     if (singleWeight == 0) {
         weightGmLocal.SetGlobalBuffer(GetTensorAddr<BT>(groupIdx, weightTensorPtr) + wOffset);
     } else if (isA8W4FakeQuant) {
-        weightGmLocal.SetGlobalBuffer(reinterpret_cast<__gm__ BT *>(weightTensorPtr) + mnConfig.wBaseOffset + wOffset);
+        weightGmLocal.SetGlobalBuffer(reinterpret_cast<__gm__ BT*>(weightTensorPtr) + mnConfig.wBaseOffset + wOffset);
     } else {
         weightGmLocal.SetGlobalBuffer(GetTensorAddr<BT>(0, weightTensorPtr) + mnConfig.wBaseOffset + wOffset);
     }
@@ -567,7 +567,7 @@ __aicore__ inline GlobalTensor<typename mmType::BT::T> GMMCompute<mmType, sync>:
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMCompute<mmType, sync>::MMCompute(uint32_t groupIdx, MNConfig &mnConfig, uint32_t coreIdx,
+__aicore__ inline void GMMCompute<mmType, sync>::MMCompute(uint32_t groupIdx, MNConfig& mnConfig, uint32_t coreIdx,
                                                            uint32_t listIndex)
 {
     if (subBlockIdx != 0) {

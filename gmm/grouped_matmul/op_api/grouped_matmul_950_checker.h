@@ -18,14 +18,14 @@ namespace gmm {
 template <typename T>
 class AclnnGroupedMatmulDAV3510Checker {
 public:
-    explicit AclnnGroupedMatmulDAV3510Checker(const GroupedMatmulParamsBase<T> &gmmParams)
+    explicit AclnnGroupedMatmulDAV3510Checker(const GroupedMatmulParamsBase<T>& gmmParams)
         : gmmParams_(gmmParams) {};
     ~AclnnGroupedMatmulDAV3510Checker() {};
     aclnnStatus CheckGroupedMatmulDAV3510() const;
     bool IsPerTileQuantMode() const;
-    void SetInputName(const std::string &xName, const std::string &weightName, const std::string &perTokenScaleName,
-                      const std::string &scaleName, const std::string &groupTensorName);
-    void SetAclnnOpName(const std::string &opName);
+    void SetInputName(const std::string& xName, const std::string& weightName, const std::string& perTokenScaleName,
+                      const std::string& scaleName, const std::string& groupTensorName);
+    void SetAclnnOpName(const std::string& opName);
 
 private:
     struct TensorDimInfo {
@@ -51,13 +51,13 @@ private:
     aclnnStatus CheckWeightNzSpecialParams() const;
     aclnnStatus CheckWeightNzMultiTensorElements() const;
     aclnnStatus CheckWeightNzTensorShapes() const;
-    aclnnStatus CheckWeightNzTensorShape(const aclTensor *weightTensor, const aclTensor *firstWeightTensor,
-                                         size_t index, int64_t &firstKDimValue, int64_t &firstNDimValue) const;
-    aclnnStatus CheckWeightStorageShape(const aclTensor *weightTensor, int64_t kDimValue, int64_t nDimValue) const;
-    aclnnStatus CheckWeightNzStorageDim(const aclTensor *weightTensor) const;
-    aclnnStatus CheckWeightNzC0(const aclTensor *weightTensor, int64_t weightStorageLastDim,
-                                int64_t &cubeBlockSizeK) const;
-    aclnnStatus CheckWeightNzOuterDims(const aclTensor *weightTensor, int64_t kDimValue, int64_t nDimValue,
+    aclnnStatus CheckWeightNzTensorShape(const aclTensor* weightTensor, const aclTensor* firstWeightTensor,
+                                         size_t index, int64_t& firstKDimValue, int64_t& firstNDimValue) const;
+    aclnnStatus CheckWeightStorageShape(const aclTensor* weightTensor, int64_t kDimValue, int64_t nDimValue) const;
+    aclnnStatus CheckWeightNzStorageDim(const aclTensor* weightTensor) const;
+    aclnnStatus CheckWeightNzC0(const aclTensor* weightTensor, int64_t weightStorageLastDim,
+                                int64_t& cubeBlockSizeK) const;
+    aclnnStatus CheckWeightNzOuterDims(const aclTensor* weightTensor, int64_t kDimValue, int64_t nDimValue,
                                        int64_t cubeBlockSizeK, int64_t weightStorageLastFourthDim,
                                        int64_t weightStorageLastThirdDim) const;
     aclnnStatus CheckBasicQuantParams(DataType yDtype) const;
@@ -68,7 +68,7 @@ private:
     aclnnStatus CheckGroupedMatmulMxDtype() const;
     aclnnStatus CheckGroupedMatmulPerGroupDim() const;
     aclnnStatus CheckPerGroupWeightDim(size_t weightDimNumber) const;
-    aclnnStatus CheckPerGroupScaleDim(const TensorIndexInfo &tensorIndex, size_t scaleDimNumber,
+    aclnnStatus CheckPerGroupScaleDim(const TensorIndexInfo& tensorIndex, size_t scaleDimNumber,
                                       size_t perTokenDimNumber, size_t xDimNumber, size_t weightDimNumber) const;
     aclnnStatus CheckGroupedMatmulMxShape() const;
     aclnnStatus CheckGroupedMatmulMxScaleTranspose() const;
@@ -91,22 +91,22 @@ private:
     aclnnStatus CheckInt8QuantDtype() const;
     aclnnStatus CheckInt8QuantParams() const;
     aclnnStatus CheckFp8Hif8QuantParams() const;
-    aclnnStatus CheckFp8Params(const DataType &scaleDtype) const;
-    aclnnStatus CheckFp4Params(const DataType &scaleDtype) const;
+    aclnnStatus CheckFp8Params(const DataType& scaleDtype) const;
+    aclnnStatus CheckFp4Params(const DataType& scaleDtype) const;
     aclnnStatus CheckNonMxQuantTransposeStatus() const;
     aclnnStatus CheckInputParamsForV3Version() const;
     aclnnStatus CheckInputShapeForV3Version() const;
     aclnnStatus CheckInputAndOutputDtypeForV3Version() const;
     aclnnStatus CheckInputTensorsNotNull() const;
     bool CheckTensorListSizeForEachInput() const;
-    bool IsSpecialMXCase(const T *tensorList) const;
+    bool IsSpecialMXCase(const T* tensorList) const;
     bool IsMxfp4() const;
     bool IsMultiTensorWeight() const;
     bool IsWeightNzMultiTensorLayout() const;
     TensorIndexInfo GetTensorIndexInfo(size_t index = 0) const;
-    aclnnStatus CheckMxFp8TypeKCaseInputShape(const TensorDimInfo &dimInfo, size_t index) const;
-    aclnnStatus CheckMxSplitKDimNum(const TensorDimInfo &dimInfo) const;
-    aclnnStatus CheckMxSplitKDimValue(const TensorIndexInfo &tensorIndex, int64_t groupNum) const;
+    aclnnStatus CheckMxFp8TypeKCaseInputShape(const TensorDimInfo& dimInfo, size_t index) const;
+    aclnnStatus CheckMxSplitKDimNum(const TensorDimInfo& dimInfo) const;
+    aclnnStatus CheckMxSplitKDimValue(const TensorIndexInfo& tensorIndex, int64_t groupNum) const;
     struct MxTypeMDims {
         int64_t xMDimValue;
         int64_t xKDimValue;
@@ -118,12 +118,12 @@ private:
         int64_t scaleLastDimValue;
         int64_t groupNum;
     };
-    aclnnStatus CheckMxTypeMCaseInputShape(const TensorDimInfo &dimInfo, size_t index) const;
-    MxTypeMDims ExtractMxTypeMDims(const TensorDimInfo &dimInfo, size_t index) const;
-    aclnnStatus CheckMxTypeMScaleShape(const MxTypeMDims &dims, const TensorIndexInfo &tensorIndex) const;
-    aclnnStatus CheckMxTypeMPerTokenAndScaleLastDim(const MxTypeMDims &dims, const TensorIndexInfo &tensorIndex) const;
-    aclnnStatus CheckMxBiasInputShape(const TensorDimInfo &dimInfo, size_t index) const;
-    bool LastTwoDimValueIsOne(const aclTensor *tensor) const;
+    aclnnStatus CheckMxTypeMCaseInputShape(const TensorDimInfo& dimInfo, size_t index) const;
+    MxTypeMDims ExtractMxTypeMDims(const TensorDimInfo& dimInfo, size_t index) const;
+    aclnnStatus CheckMxTypeMScaleShape(const MxTypeMDims& dims, const TensorIndexInfo& tensorIndex) const;
+    aclnnStatus CheckMxTypeMPerTokenAndScaleLastDim(const MxTypeMDims& dims, const TensorIndexInfo& tensorIndex) const;
+    aclnnStatus CheckMxBiasInputShape(const TensorDimInfo& dimInfo, size_t index) const;
+    bool LastTwoDimValueIsOne(const aclTensor* tensor) const;
     bool IsSpecialperTileScene(int64_t groupNum, int64_t weightNDim, int64_t weightKDim, int64_t xMDim,
                                int64_t perTokenMDim) const;
     std::string GetAclnnOpName() const;

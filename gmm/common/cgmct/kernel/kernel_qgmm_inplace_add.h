@@ -126,7 +126,7 @@ public:
         int32_t baseM;
         int32_t baseN;
         int32_t baseK;
-        const TCubeTiling *__restrict matmulTiling;
+        const TCubeTiling* __restrict matmulTiling;
         __aicore__ GMMTiling() {}
         __aicore__ GMMTiling(uint32_t groupNum_, uint8_t groupListType_, int32_t baseM_, int32_t baseN_, int32_t baseK_)
             : groupNum(groupNum_),
@@ -166,15 +166,15 @@ public:
         return splitValue;
     }
 
-    __aicore__ inline void UpdateGlobalBuffer(const Params &params)
+    __aicore__ inline void UpdateGlobalBuffer(const Params& params)
     {
-        aGlobal_.SetGlobalBuffer((__gm__ AType *)params.mmadParams.aGmAddr + Get<IDX_A_OFFSET>(baseOffset_));
-        bGlobal_.SetGlobalBuffer((__gm__ BType *)params.mmadParams.bGmAddr + Get<IDX_B_OFFSET>(baseOffset_));
-        x1ScaleGlobal_.SetGlobalBuffer((__gm__ AscendC::fp8_e8m0_t *)params.mmadParams.x1ScaleGmAddr +
+        aGlobal_.SetGlobalBuffer((__gm__ AType*)params.mmadParams.aGmAddr + Get<IDX_A_OFFSET>(baseOffset_));
+        bGlobal_.SetGlobalBuffer((__gm__ BType*)params.mmadParams.bGmAddr + Get<IDX_B_OFFSET>(baseOffset_));
+        x1ScaleGlobal_.SetGlobalBuffer((__gm__ AscendC::fp8_e8m0_t*)params.mmadParams.x1ScaleGmAddr +
                                        Get<IDX_X1SCALE_OFFSET>(baseOffset_));
-        x2ScaleGlobal_.SetGlobalBuffer((__gm__ AscendC::fp8_e8m0_t *)params.mmadParams.x2ScaleGmAddr +
+        x2ScaleGlobal_.SetGlobalBuffer((__gm__ AscendC::fp8_e8m0_t*)params.mmadParams.x2ScaleGmAddr +
                                        Get<IDX_X2SCALE_OFFSET>(baseOffset_));
-        cGlobal_.SetGlobalBuffer((__gm__ CType *)params.mmadParams.cGmAddr + Get<IDX_C_OFFSET>(baseOffset_));
+        cGlobal_.SetGlobalBuffer((__gm__ CType*)params.mmadParams.cGmAddr + Get<IDX_C_OFFSET>(baseOffset_));
     }
 
     __aicore__ inline void UpdateOffset(uint32_t groupIdx)
@@ -199,7 +199,7 @@ public:
         Get<IDX_C_OFFSET>(baseOffset_) = Get<IDX_C_OFFSET>(baseOffset_) + m * n;
     }
 
-    __aicore__ inline bool UpdateGroupParams(const Params &params, uint32_t groupIdx)
+    __aicore__ inline bool UpdateGroupParams(const Params& params, uint32_t groupIdx)
     {
         UpdateOffset(groupIdx);
         int32_t splitValue = GetSplitValueFromGroupList(groupIdx, params.gmmParams.groupListType);
@@ -212,15 +212,15 @@ public:
         return true;
     }
 
-    __aicore__ inline void InitParamsAndTensor(const Params &params)
+    __aicore__ inline void InitParamsAndTensor(const Params& params)
     {
         Get<M_VALUE>(problemShape_) = params.gmmParams.matmulTiling->M;
         Get<N_VALUE>(problemShape_) = params.gmmParams.matmulTiling->N;
         cGlobal_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
-        groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(params.mmadParams.groupListGmAddr));
+        groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(params.mmadParams.groupListGmAddr));
     }
 
-    __aicore__ inline void ProcessSingleGroup(const Params &params, BlockSchedulerOp &bs, BlockMmadOp &blockMmadOp)
+    __aicore__ inline void ProcessSingleGroup(const Params& params, BlockSchedulerOp& bs, BlockMmadOp& blockMmadOp)
     {
         int64_t m = Get<M_VALUE>(problemShape_);
         int64_t n = Get<N_VALUE>(problemShape_);
@@ -245,7 +245,7 @@ public:
         }
     }
 
-    __aicore__ inline void operator()(const Params &params)
+    __aicore__ inline void operator()(const Params& params)
     {
         if ASCEND_IS_AIV {
             return;
@@ -256,7 +256,7 @@ public:
         AscendC::SetAtomicAdd<float>(); // GMM res + yIn
         // Instantiate mmadOp
         BlockMmadOp blockMmadOp;
-        blockMmadOp.Init(const_cast<TCubeTiling *__restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
+        blockMmadOp.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
         InitParamsAndTensor(params);
         uint32_t groupNum = params.gmmParams.groupNum;
         BlockSchedulerOp bs(params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);

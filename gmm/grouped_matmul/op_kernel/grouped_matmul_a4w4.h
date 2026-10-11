@@ -67,36 +67,36 @@ public:
     using DTYPE_OUT = DTYPE_Y_A4W4;
 
 public:
-    __aicore__ inline GMMA4W4Compute(typename mmType::MT &matmul)
+    __aicore__ inline GMMA4W4Compute(typename mmType::MT& matmul)
         : mm(matmul)
     {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR scale, GM_ADDR groupList, GM_ADDR perTokenScale,
-                                GM_ADDR y, GM_ADDR workspace, const GMMBaseParams *__restrict gmmBaseParams,
-                                const TCubeTiling *__restrict mmTilingData, TPipe *tPipe);
+                                GM_ADDR y, GM_ADDR workspace, const GMMBaseParams* __restrict gmmBaseParams,
+                                const TCubeTiling* __restrict mmTilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 protected:
-    __aicore__ inline void ProcessCommon(MNConfig &mnConfig, uint32_t splitValue, uint32_t groupIdx,
-                                         uint32_t &preCount);
+    __aicore__ inline void ProcessCommon(MNConfig& mnConfig, uint32_t splitValue, uint32_t groupIdx,
+                                         uint32_t& preCount);
     __aicore__ inline void InitUbBuffer();
-    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig &mnConfig);
-    __aicore__ inline void MMComputePerGroup(uint32_t groupIdx, MNConfig &mnConfig, uint32_t curSingleM,
+    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig& mnConfig);
+    __aicore__ inline void MMComputePerGroup(uint32_t groupIdx, MNConfig& mnConfig, uint32_t curSingleM,
                                              uint32_t curSingleN, uint64_t xOffset, uint64_t weightOffset,
                                              uint32_t tailN);
-    __aicore__ inline void MMComputePerChannel(uint32_t groupIdx, MNConfig &mnConfig, uint32_t curSingleM,
+    __aicore__ inline void MMComputePerChannel(uint32_t groupIdx, MNConfig& mnConfig, uint32_t curSingleM,
                                                uint32_t curSingleN, uint64_t xOffset, uint64_t weightOffset,
                                                uint32_t tailN);
-    __aicore__ inline void VectorCompute(uint32_t groupIdx, MNConfig &mnConfig);
-    __aicore__ inline void VectorTilingCalc(MNConfig &mnConfig, uint32_t &curCubeSingleN, uint32_t &curCubeSingleM,
-                                            uint32_t &vecBaseM);
-    __aicore__ inline void ComputeDequantAndActivate(MNConfig &mnConfig, uint32_t curVecBaseM, uint32_t alignBaseN,
+    __aicore__ inline void VectorCompute(uint32_t groupIdx, MNConfig& mnConfig);
+    __aicore__ inline void VectorTilingCalc(MNConfig& mnConfig, uint32_t& curCubeSingleN, uint32_t& curCubeSingleM,
+                                            uint32_t& vecBaseM);
+    __aicore__ inline void ComputeDequantAndActivate(MNConfig& mnConfig, uint32_t curVecBaseM, uint32_t alignBaseN,
                                                      uint32_t curVecBaseN, uint32_t offsetM);
     __aicore__ inline void DataCopyScale(uint32_t curBaseN, uint32_t alignBaseN, uint64_t scaleOffset);
-    __aicore__ inline void DataCopyPerTokenScaleAndBrcb(MNConfig &mnConfig, uint32_t curBaseM, uint32_t alignBaseN,
+    __aicore__ inline void DataCopyPerTokenScaleAndBrcb(MNConfig& mnConfig, uint32_t curBaseM, uint32_t alignBaseN,
                                                         uint32_t offsetM);
 
 protected:
-    typename mmType::MT &mm;
+    typename mmType::MT& mm;
     const uint32_t HALF_ALIGN = 16;
     GlobalTensor<DTYPE_X_A4W4> xGm;
     GlobalTensor<DTYPE_WEIGHT_A4W4> weightGm;
@@ -121,23 +121,23 @@ protected:
     uint32_t cubeCount = 0;
     uint32_t vecCount_ = 0;
     uint32_t mmBaseBlockOffset_ = 0;
-    TPipe *pipe;
-    const GMMBaseParams *tiling;
-    const TCubeTiling *mmTilingData;
+    TPipe* pipe;
+    const GMMBaseParams* tiling;
+    const TCubeTiling* mmTilingData;
 };
 
 template <typename mmType>
 __aicore__ inline void GMMA4W4Compute<mmType>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR scale, GM_ADDR groupList,
                                                     GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                                    const GMMBaseParams *__restrict gmmBaseParams,
-                                                    const TCubeTiling *__restrict mmTilingData, TPipe *tPipe)
+                                                    const GMMBaseParams* __restrict gmmBaseParams,
+                                                    const TCubeTiling* __restrict mmTilingData, TPipe* tPipe)
 {
     xGm.SetGlobalBuffer(GetTensorAddr<DTYPE_X_A4W4>(0, x));
     weightGm.SetGlobalBuffer(GetTensorAddr<DTYPE_WEIGHT_A4W4>(0, weight));
-    mmOutGm.SetGlobalBuffer(reinterpret_cast<__gm__ cT::T *>(workspace));
+    mmOutGm.SetGlobalBuffer(reinterpret_cast<__gm__ cT::T*>(workspace));
     scaleGm.SetGlobalBuffer(GetTensorAddr<DTYPE_SCALE_A4W4>(0, scale));
-    perTokenScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ DTYPE_PERTOKEN_SCALE_A4W4 *>(perTokenScale));
-    groupListGm.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(groupList));
+    perTokenScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ DTYPE_PERTOKEN_SCALE_A4W4*>(perTokenScale));
+    groupListGm.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(groupList));
     yGm.SetGlobalBuffer(GetTensorAddr<DTYPE_OUT>(0, y));
 
     this->tiling = gmmBaseParams;
@@ -205,8 +205,8 @@ __aicore__ inline void GMMA4W4Compute<mmType>::Process()
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA4W4Compute<mmType>::ProcessCommon(MNConfig &mnConfig, uint32_t splitValue, uint32_t groupIdx,
-                                                             uint32_t &preCount)
+__aicore__ inline void GMMA4W4Compute<mmType>::ProcessCommon(MNConfig& mnConfig, uint32_t splitValue, uint32_t groupIdx,
+                                                             uint32_t& preCount)
 {
     uint32_t coreNum = tiling->coreNum;
     mnConfig.m = static_cast<uint32_t>(splitValue);
@@ -228,7 +228,7 @@ __aicore__ inline void GMMA4W4Compute<mmType>::ProcessCommon(MNConfig &mnConfig,
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA4W4Compute<mmType>::MMComputePerChannel(uint32_t groupIdx, MNConfig &mnConfig,
+__aicore__ inline void GMMA4W4Compute<mmType>::MMComputePerChannel(uint32_t groupIdx, MNConfig& mnConfig,
                                                                    uint32_t curSingleM, uint32_t curSingleN,
                                                                    uint64_t xOffset, uint64_t weightOffset,
                                                                    uint32_t tailN)
@@ -258,7 +258,7 @@ __aicore__ inline void GMMA4W4Compute<mmType>::MMComputePerChannel(uint32_t grou
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA4W4Compute<mmType>::MMComputePerGroup(uint32_t groupIdx, MNConfig &mnConfig,
+__aicore__ inline void GMMA4W4Compute<mmType>::MMComputePerGroup(uint32_t groupIdx, MNConfig& mnConfig,
                                                                  uint32_t curSingleM, uint32_t curSingleN,
                                                                  uint64_t xOffset, uint64_t weightOffset,
                                                                  uint32_t tailN)
@@ -293,7 +293,7 @@ __aicore__ inline void GMMA4W4Compute<mmType>::MMComputePerGroup(uint32_t groupI
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA4W4Compute<mmType>::MMCompute(uint32_t groupIdx, MNConfig &mnConfig)
+__aicore__ inline void GMMA4W4Compute<mmType>::MMCompute(uint32_t groupIdx, MNConfig& mnConfig)
 {
     if ASCEND_IS_AIC {
         uint32_t tailN = mnConfig.nIdx * mnConfig.singleN;
@@ -327,8 +327,8 @@ __aicore__ inline void GMMA4W4Compute<mmType>::MMCompute(uint32_t groupIdx, MNCo
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA4W4Compute<mmType>::VectorTilingCalc(MNConfig &mnConfig, uint32_t &curCubeSingleN,
-                                                                uint32_t &curCubeSingleM, uint32_t &vecBaseM)
+__aicore__ inline void GMMA4W4Compute<mmType>::VectorTilingCalc(MNConfig& mnConfig, uint32_t& curCubeSingleN,
+                                                                uint32_t& curCubeSingleM, uint32_t& vecBaseM)
 {
     curCubeSingleN =
         mnConfig.nIdx == mnConfig.blockDimN - 1 ? tiling->n - mnConfig.nIdx * mnConfig.singleN : mnConfig.singleN;
@@ -340,7 +340,7 @@ __aicore__ inline void GMMA4W4Compute<mmType>::VectorTilingCalc(MNConfig &mnConf
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA4W4Compute<mmType>::VectorCompute(uint32_t groupIdx, MNConfig &mnConfig)
+__aicore__ inline void GMMA4W4Compute<mmType>::VectorCompute(uint32_t groupIdx, MNConfig& mnConfig)
 {
     uint32_t curCubeSingleN;
     uint32_t curCubeSingleM;
@@ -389,7 +389,7 @@ __aicore__ inline void GMMA4W4Compute<mmType>::VectorCompute(uint32_t groupIdx, 
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA4W4Compute<mmType>::ComputeDequantAndActivate(MNConfig &mnConfig, uint32_t curVecBaseM,
+__aicore__ inline void GMMA4W4Compute<mmType>::ComputeDequantAndActivate(MNConfig& mnConfig, uint32_t curVecBaseM,
                                                                          uint32_t alignBaseN, uint32_t curVecBaseN,
                                                                          uint32_t offsetM)
 {
@@ -417,7 +417,7 @@ __aicore__ inline void GMMA4W4Compute<mmType>::ComputeDequantAndActivate(MNConfi
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA4W4Compute<mmType>::DataCopyPerTokenScaleAndBrcb(MNConfig &mnConfig, uint32_t curBaseM,
+__aicore__ inline void GMMA4W4Compute<mmType>::DataCopyPerTokenScaleAndBrcb(MNConfig& mnConfig, uint32_t curBaseM,
                                                                             uint32_t alignBaseN, uint32_t offsetM)
 {
     uint64_t perTokenScaleOffset = mnConfig.offsetM + mnConfig.mIdx * mnConfig.singleM + offsetM;
@@ -440,7 +440,7 @@ __aicore__ inline void GMMA4W4Compute<mmType>::DataCopyPerTokenScaleAndBrcb(MNCo
 template <class mmType>
 class GMMA4W4SparseCompute : public GMMA4W4Compute<mmType> {
 public:
-    __aicore__ inline GMMA4W4SparseCompute(typename mmType::MT &matmul)
+    __aicore__ inline GMMA4W4SparseCompute(typename mmType::MT& matmul)
         : GMMA4W4Compute<mmType>(matmul)
     {}
     __aicore__ inline void Process();

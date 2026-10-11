@@ -32,7 +32,7 @@ class KernelFfnWBGroupListing {
 public:
     __aicore__ inline KernelFfnWBGroupListing(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR groupList, GM_ADDR groupListTmp,
-                                ScheduleContextInfo *scheduleContext, TPipe *tPipe, int64_t groupListingDealFlag);
+                                ScheduleContextInfo* scheduleContext, TPipe* tPipe, int64_t groupListingDealFlag);
     __aicore__ inline void Process(int64_t groupListingDealFlag);
     __aicore__ inline void ProcessExpertCount();
 
@@ -48,7 +48,7 @@ private:
     __aicore__ inline void ComputeOneCore(int64_t inputNum);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
 
     GlobalTensor<int32_t> expandedExpertIdsGm; // 排序后的专家索引（全局内存）
     GlobalTensor<int64_t> groupListGm;         // 最终专家Token计数（int64）
@@ -86,7 +86,7 @@ private:
 };
 
 __aicore__ inline void KernelFfnWBGroupListing::Init(GM_ADDR x, GM_ADDR groupList, GM_ADDR groupListTmp,
-                                                     ScheduleContextInfo *scheduleContext, TPipe *tPipe,
+                                                     ScheduleContextInfo* scheduleContext, TPipe* tPipe,
                                                      int64_t groupListingDealFlag)
 {
     pipe_ = tPipe;
@@ -125,15 +125,15 @@ __aicore__ inline void KernelFfnWBGroupListing::Init(GM_ADDR x, GM_ADDR groupLis
 
     // 输入global 排序好的ExpertIds
     if (groupListingDealFlag == 1) {
-        expandedExpertIdsGm.SetGlobalBuffer((__gm__ int32_t *)x + (blockIdx - firstCoreIdx) * perCoreElements,
+        expandedExpertIdsGm.SetGlobalBuffer((__gm__ int32_t*)x + (blockIdx - firstCoreIdx) * perCoreElements,
                                             curCoreElements);
     } else {
-        expandedExpertIdsGm.SetGlobalBuffer((__gm__ int32_t *)x, validGatherIdxLength);
+        expandedExpertIdsGm.SetGlobalBuffer((__gm__ int32_t*)x, validGatherIdxLength);
     }
     // 输出global group_list数据[id * count] int_64
-    groupListGm.SetGlobalBuffer((__gm__ int64_t *)groupList, expertNum * NUM_TWO);
+    groupListGm.SetGlobalBuffer((__gm__ int64_t*)groupList, expertNum * NUM_TWO);
     // 输出global 存放原子加group_list数据[count] int_32
-    expertCountTempGm.SetGlobalBuffer((__gm__ int32_t *)groupListTmp, expertNum);
+    expertCountTempGm.SetGlobalBuffer((__gm__ int32_t*)groupListTmp, expertNum);
 
     int64_t cntSize = (expertNum * NUM_TWO * sizeof(int64_t) + BLOCK_BYTES - 1) / BLOCK_BYTES * BLOCK_BYTES;
     pipe_->InitBuffer(sortedExpertIdxInQueue, 1, perLoopRows * sizeof(int32_t));

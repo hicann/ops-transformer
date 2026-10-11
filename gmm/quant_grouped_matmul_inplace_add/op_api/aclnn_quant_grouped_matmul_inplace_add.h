@@ -40,11 +40,10 @@ extern "C" {
  * @param [out] executor: 返回op执行器，包含算子计算流程。
  * @return aclnnStatus: 返回状态码。
  */
-__attribute__((visibility("default"))) aclnnStatus
-aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize(const aclTensor *x1, const aclTensor *x2,
-                                                  const aclTensor *scale1Optional, const aclTensor *scale2,
-                                                  const aclTensor *groupList, aclTensor *yRef, int64_t groupListType,
-                                                  int64_t groupSize, uint64_t *workspaceSize, aclOpExecutor **executor);
+__attribute__((visibility("default"))) aclnnStatus aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize(
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* scale1Optional, const aclTensor* scale2,
+    const aclTensor* groupList, aclTensor* yRef, int64_t groupListType, int64_t groupSize, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
 /**
  * @brief aclnnQuantGroupedMatmulInplaceAdd的第二段接口，用于执行计算。
@@ -55,8 +54,10 @@ aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize(const aclTensor *x1, const acl
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码。
  */
-__attribute__((visibility("default"))) aclnnStatus
-aclnnQuantGroupedMatmulInplaceAdd(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(void* workspace,
+                                                                                     uint64_t workspaceSize,
+                                                                                     aclOpExecutor* executor,
+                                                                                     aclrtStream stream);
 
 #ifdef __cplusplus
 }

@@ -23,8 +23,10 @@ from atk.tasks.dataset.base_dataset import OpsDataset
 class MethodTorchGroupedMatmulAddApi(BaseApi):
     def __init__(self, task_result: TaskResult):
         super(MethodTorchGroupedMatmulAddApi, self).__init__(task_result)
+
     def get_cpp_func_signature_type(self):
-       return "aclnnStatus aclnnGroupedMatmulAddGetWorkspaceSize(const aclTensor *x, const aclTensor *weight, const aclTensor *groupList, aclTensor *yRef, bool transposeX, bool transposeWeight, int64_t groupType, uint64_t *workspaceSize, aclOpExecutor **executor)"
+        return "aclnnStatus aclnnGroupedMatmulAddGetWorkspaceSize(const aclTensor *x, const aclTensor *weight, const aclTensor *groupList, aclTensor *yRef, bool transposeX, bool transposeWeight, int64_t groupType, uint64_t *workspaceSize, aclOpExecutor **executor)"
+
     def __call__(self, input_data: InputDataset, with_output: bool = False):
         x = input_data.kwargs["x"]
         weight = input_data.kwargs["weight"]
@@ -39,20 +41,38 @@ class MethodTorchGroupedMatmulAddApi(BaseApi):
             weight_tensor = weight[last:i, :].to(torch.float64)
             result.append(torch.matmul(x_tensor.t(), weight_tensor))
             last = i
-        
+
         result = torch.stack(result).reshape(y.shape) + y.cpu()
         return result.to(y_dtype)
-    
+
     def init_by_input_data(self, input_data: InputDataset, with_output: bool = False):
         # print("before----------------------------------------------------")
         # print(input_data.kwargs)
         # print("before----------------------------------------------------")
         x = input_data.kwargs["x"]
         groupList = input_data.kwargs["groupList"]
-        if self.device == 'pyaclnn':
-            input_data.kwargs['groupList'] = torch.linspace(x.shape[0] // groupList.shape[0], x.shape[0], steps=int(groupList.size(0))).round().to(torch.int64).npu()
+        if self.device == "pyaclnn":
+            input_data.kwargs["groupList"] = (
+                torch.linspace(
+                    x.shape[0] // groupList.shape[0],
+                    x.shape[0],
+                    steps=int(groupList.size(0)),
+                )
+                .round()
+                .to(torch.int64)
+                .npu()
+            )
         else:
-            input_data.kwargs['groupList'] = torch.linspace(x.shape[0] // groupList.shape[0], x.shape[0], steps=int(groupList.size(0))).round().to(torch.int64).cpu()
+            input_data.kwargs["groupList"] = (
+                torch.linspace(
+                    x.shape[0] // groupList.shape[0],
+                    x.shape[0],
+                    steps=int(groupList.size(0)),
+                )
+                .round()
+                .to(torch.int64)
+                .cpu()
+            )
         # print("----------------------------------------------------")
         # print(input_data.kwargs)
         # print("----------------------------------------------------")
@@ -69,7 +89,7 @@ class AclnnFunctionApi(AclnnBaseApi):
         for i in range(len(output_packages)):
             input_args.pop()
         # 将前1个输入参数标记为输出
-        output_packages[:] = [input_args[3]] 
+        output_packages[:] = [input_args[3]]
         return input_args, output_packages
 
     def after_call(self, output_packages):

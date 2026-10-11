@@ -29,7 +29,6 @@
 #include "tiling_case_executor.h"
 #include "gmm_csv_ge_parse_utils.h"
 
-
 using namespace std;
 using namespace ge;
 
@@ -39,7 +38,7 @@ using ops::ut::ParseBool;
 using ops::ut::SplitStr2Vec;
 using ops::ut::Trim;
 
-DataType ParseDtype(const string &dtype)
+DataType ParseDtype(const string& dtype)
 {
     const auto parsed = ops::ut::ParseGeDtype(dtype);
     if (parsed == ge::DT_UNDEFINED) {
@@ -53,10 +52,10 @@ gert::StorageShape MakeEmptyShape()
     return gert::StorageShape();
 }
 
-string TilingData2Str(const void *tilingData, size_t tilingSize)
+string TilingData2Str(const void* tilingData, size_t tilingSize)
 {
     ostringstream oss;
-    const auto *data = reinterpret_cast<const int32_t *>(tilingData);
+    const auto* data = reinterpret_cast<const int32_t*>(tilingData);
     const size_t len = tilingSize / sizeof(int32_t);
     for (size_t i = 0; i < len; ++i) {
         if (i != 0) {
@@ -83,7 +82,7 @@ vector<gert::TilingContextPara::OpAttr> GetGroupedQmmAttrs(bool transposeX, bool
 
 class GroupedQuantArch35TilingTestParam {
 public:
-    void Prepare(optiling::GMMCompileInfo &compileInfo) const
+    void Prepare(optiling::GMMCompileInfo& compileInfo) const
     {
         compileInfo = {
             static_cast<uint32_t>(coreNum > 0 ? coreNum : 32),     // aicNum
@@ -99,7 +98,7 @@ public:
         };
     }
 
-    void InvokeTilingFunc(optiling::GMMCompileInfo &compileInfo) const
+    void InvokeTilingFunc(optiling::GMMCompileInfo& compileInfo) const
     {
         vector<int64_t> xOriginDims = transposeX ? vector<int64_t>{k, m} : vector<int64_t>{m, k};
         gert::StorageShape xShape = ops::ut::MakeGertStorageShape(xOriginDims, xOriginDims);
@@ -111,15 +110,15 @@ public:
         bool isSplitKPertensor = groupType == 2 && scaleDtype != ge::DT_FLOAT8_E8M0;
         gert::StorageShape perTokenScaleShape =
             isSplitKPertensor ? ops::ut::MakeGertStorageShape({groupNum}, {groupNum}) :
-            groupType == 2 ? ops::ut::MakeGertStorageShape({splitKScaleBlocks, m, 2}, {splitKScaleBlocks, m, 2}) :
-                             ops::ut::MakeGertStorageShape({m, kScaleBlocks, 2}, {m, kScaleBlocks, 2});
+            groupType == 2    ? ops::ut::MakeGertStorageShape({splitKScaleBlocks, m, 2}, {splitKScaleBlocks, m, 2}) :
+                                ops::ut::MakeGertStorageShape({m, kScaleBlocks, 2}, {m, kScaleBlocks, 2});
 
         vector<int64_t> weightOriginDims =
             transposeWeight ? vector<int64_t>{groupNum, n, k} : vector<int64_t>{groupNum, k, n};
         vector<int64_t> weightStorageDims;
         if (weightFormat == "NZ") {
-            const bool weight4Bit = weightDtype == ge::DT_INT4 || weightDtype == ge::DT_FLOAT4_E2M1 ||
-                                    weightDtype == ge::DT_FLOAT4_E1M2;
+            const bool weight4Bit =
+                weightDtype == ge::DT_INT4 || weightDtype == ge::DT_FLOAT4_E2M1 || weightDtype == ge::DT_FLOAT4_E1M2;
             const int64_t n0 = weight4Bit ? 64 : 32;
             const int64_t n1 = (n + n0 - 1) / n0;
             const int64_t k1 = (k + 15) / 16;
@@ -130,11 +129,10 @@ public:
         }
         gert::StorageShape weightShape = ops::ut::MakeGertStorageShape(weightOriginDims, weightStorageDims);
 
-        vector<int64_t> scaleDims =
-            isSplitKPertensor ? vector<int64_t>{groupNum} :
-            groupType == 2 ? vector<int64_t>{splitKScaleBlocks, n, 2}
-                           : (transposeWeight ? vector<int64_t>{groupNum, n, kScaleBlocks, 2}
-                                              : vector<int64_t>{groupNum, kScaleBlocks, n, 2});
+        vector<int64_t> scaleDims = isSplitKPertensor ? vector<int64_t>{groupNum} :
+                                    groupType == 2    ? vector<int64_t>{splitKScaleBlocks, n, 2} :
+                                                        (transposeWeight ? vector<int64_t>{groupNum, n, kScaleBlocks, 2} :
+                                                                           vector<int64_t>{groupNum, kScaleBlocks, n, 2});
         gert::StorageShape scaleShape = ops::ut::MakeGertStorageShape(scaleDims, scaleDims);
 
         gert::TilingContextPara tilingContextPara(
@@ -151,8 +149,8 @@ public:
                 {perTokenScaleShape, perTokenScaleDtype, ge::FORMAT_ND}, // perTokenScale
             },
             {{ops::ut::MakeGertStorageShape({m}, {n}), yDtype, ge::FORMAT_ND}},
-            GetGroupedQmmAttrs(transposeX, transposeWeight, groupType),
-            &compileInfo, "3510", compileInfo.aicNum, compileInfo.ubSize);
+            GetGroupedQmmAttrs(transposeX, transposeWeight, groupType), &compileInfo, "3510", compileInfo.aicNum,
+            compileInfo.ubSize);
 
         TilingInfo tilingInfo;
         bool tilingResult = ExecuteTiling(tilingContextPara, tilingInfo);
@@ -207,8 +205,7 @@ public:
     string expectTilingData;
 };
 
-
-vector<GroupedQuantArch35TilingTestParam> GetParams(const string &socVersion)
+vector<GroupedQuantArch35TilingTestParam> GetParams(const string& socVersion)
 {
     vector<GroupedQuantArch35TilingTestParam> params;
     std::string csvPath = ops::ut::ResolveCsvPath("test_grouped_quant_arch35_tiling.csv",
@@ -270,14 +267,14 @@ vector<GroupedQuantArch35TilingTestParam> GetParams(const string &socVersion)
             param.expectTilingKey = static_cast<uint64_t>(stoull(items[idx++]));
             param.expectTilingData = items[idx++];
             params.push_back(param);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
     return params;
 }
 
-string MakeParamName(const testing::TestParamInfo<GroupedQuantArch35TilingTestParam> &info)
+string MakeParamName(const testing::TestParamInfo<GroupedQuantArch35TilingTestParam>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
@@ -286,7 +283,7 @@ string MakeParamName(const testing::TestParamInfo<GroupedQuantArch35TilingTestPa
 
 namespace GroupedQuantArch35TilingUT {
 
-const vector<GroupedQuantArch35TilingTestParam> &GetAscend950Params()
+const vector<GroupedQuantArch35TilingTestParam>& GetAscend950Params()
 {
     static const vector<GroupedQuantArch35TilingTestParam> params = GetParams("Ascend950");
     return params;
@@ -294,20 +291,14 @@ const vector<GroupedQuantArch35TilingTestParam> &GetAscend950Params()
 
 class TestGroupedQuantArch35Tiling : public testing::TestWithParam<GroupedQuantArch35TilingTestParam> {
 protected:
-    static void SetUpTestCase()
-    {
-    }
-    static void TearDownTestCase()
-    {
-    }
+    static void SetUpTestCase() {}
+    static void TearDownTestCase() {}
 };
 
 TEST_P(TestGroupedQuantArch35Tiling, generalTest)
 {
     GetParam().Test();
 }
-
-
 
 INSTANTIATE_TEST_SUITE_P(GROUPED_QMM_950, TestGroupedQuantArch35Tiling, testing::ValuesIn(GetAscend950Params()),
                          MakeParamName);

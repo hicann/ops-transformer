@@ -44,7 +44,7 @@ namespace WeightQuantBatchMatmulV2::Arch35 {
 
 #define WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM \
     template <typename xType, typename biasType, typename antiQuantScaleType, typename perTokenScaleType, \
-              typename yType, const WqmmConfig &wqmmConfig, typename MatmulImplType>
+              typename yType, const WqmmConfig& wqmmConfig, typename MatmulImplType>
 
 #define WQBMM_CUBE_COMPUTE_CLASS \
     WeightQuantBatchMatmulV2CubeCompute<xType, biasType, antiQuantScaleType, perTokenScaleType, yType, wqmmConfig, \
@@ -54,38 +54,38 @@ WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
 class WeightQuantBatchMatmulV2CubeCompute {
 public:
     __aicore__ inline WeightQuantBatchMatmulV2CubeCompute(){};
-    __aicore__ inline void UpdateGlobalAddr(__gm__ xType *x, __gm__ yType *y, __gm__ biasType *bias,
-                                            __gm__ antiQuantScaleType *antiquantScale, __gm__ uint64_t *quantScale,
-                                            __gm__ perTokenScaleType *perTokenScale, const bool isBias);
+    __aicore__ inline void UpdateGlobalAddr(__gm__ xType* x, __gm__ yType* y, __gm__ biasType* bias,
+                                            __gm__ antiQuantScaleType* antiquantScale, __gm__ uint64_t* quantScale,
+                                            __gm__ perTokenScaleType* perTokenScale, const bool isBias);
     __aicore__ inline void Init(uint64_t totalSize, uint64_t weightL1Space, uint64_t aPrefetchSize,
-                                const TCubeTiling *__restrict matmulTiling, AscendC::TPipe *tPipe,
+                                const TCubeTiling* __restrict matmulTiling, AscendC::TPipe* tPipe,
                                 uint64_t mxBiasL1DbOffset);
     __aicore__ inline void MxA8W4Init(uint64_t l1RemainSize, uint64_t l1StartSize, uint64_t mxBiasL1DbOffset,
-                                      const TCubeTiling *__restrict matmulTiling, const LocalTensor<biasType> &biasL1,
-                                      uint64_t mxScaleBL1DbOffset, const LocalTensor<fp8_e8m0_t> &mxScaleBL1);
-    __aicore__ inline void LaunchMatmul(const LocalTensor<xType> &weightL1, int64_t kbOffset, uint64_t kbL1RealSize,
-                                        uint64_t cvLoopIdx, const BasicBlockOffsetParam &param);
-    __aicore__ inline void WaitMTE1ToMTE2(uint64_t kaGmOffset, const BasicBlockOffsetParam &offsetParam);
-    __aicore__ inline void SetMTE1ToMTE2(uint64_t kaGmOffset, const BasicBlockOffsetParam &offsetParam);
+                                      const TCubeTiling* __restrict matmulTiling, const LocalTensor<biasType>& biasL1,
+                                      uint64_t mxScaleBL1DbOffset, const LocalTensor<fp8_e8m0_t>& mxScaleBL1);
+    __aicore__ inline void LaunchMatmul(const LocalTensor<xType>& weightL1, int64_t kbOffset, uint64_t kbL1RealSize,
+                                        uint64_t cvLoopIdx, const BasicBlockOffsetParam& param);
+    __aicore__ inline void WaitMTE1ToMTE2(uint64_t kaGmOffset, const BasicBlockOffsetParam& offsetParam);
+    __aicore__ inline void SetMTE1ToMTE2(uint64_t kaGmOffset, const BasicBlockOffsetParam& offsetParam);
     __aicore__ inline void WaitScaleMTE1ToMTE2(uint64_t kbGmOffset);
-    __aicore__ inline void SetScaleMTE1ToMTE2(uint64_t kbGmOffset, const BasicBlockOffsetParam &offsetParam);
-    __aicore__ inline void CopyAAndBiasGmToL1(const BasicBlockOffsetParam &param, int64_t kaGmOffset,
+    __aicore__ inline void SetScaleMTE1ToMTE2(uint64_t kbGmOffset, const BasicBlockOffsetParam& offsetParam);
+    __aicore__ inline void CopyAAndBiasGmToL1(const BasicBlockOffsetParam& param, int64_t kaGmOffset,
                                               uint64_t cvLoopIdx);
-    __aicore__ inline void CopyMxScaleGmToL1(const BasicBlockOffsetParam &param, uint64_t kbL1Offset);
-    __aicore__ inline void GetTensorC(const BasicBlockOffsetParam &param);
-    __aicore__ inline void GetTensorC(LocalTensor<yType> &yUb);
+    __aicore__ inline void CopyMxScaleGmToL1(const BasicBlockOffsetParam& param, uint64_t kbL1Offset);
+    __aicore__ inline void GetTensorC(const BasicBlockOffsetParam& param);
+    __aicore__ inline void GetTensorC(LocalTensor<yType>& yUb);
     __aicore__ inline void EndSync();
     __aicore__ inline void ClearAFullLoadFlag();
     __aicore__ inline void PrefetchA(uint64_t aPrefetchSize, uint64_t xSizeLimit);
 
 private:
-    __aicore__ inline void PrefetchA(uint64_t aPrefetchSize, uint64_t aGmSize, const LocalTensor<xType> &perloadBuffer);
+    __aicore__ inline void PrefetchA(uint64_t aPrefetchSize, uint64_t aGmSize, const LocalTensor<xType>& perloadBuffer);
     __aicore__ inline void InitSync();
-    __aicore__ inline uint64_t CheckMaxSpace(const BasicBlockOffsetParam &param);
-    __aicore__ inline void CopyAGmToL1SingleBuffer(const BasicBlockOffsetParam &param, int64_t kaGmOffset,
+    __aicore__ inline uint64_t CheckMaxSpace(const BasicBlockOffsetParam& param);
+    __aicore__ inline void CopyAGmToL1SingleBuffer(const BasicBlockOffsetParam& param, int64_t kaGmOffset,
                                                    int64_t kbL1RealSize, int64_t biasRealN, int64_t aGmOffset);
     __aicore__ inline void ConfigScaleDn2NzParams(uint64_t rowNum, uint64_t scaleKGmSize, uint64_t scaleKL1RealSize,
-                                                  Dn2NzParams &dn2NzParams);
+                                                  Dn2NzParams& dn2NzParams);
 
     int8_t aL1DbNum_;
     bool isBias_;
@@ -122,7 +122,7 @@ private:
 };
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline uint64_t WQBMM_CUBE_COMPUTE_CLASS::CheckMaxSpace(const BasicBlockOffsetParam &param)
+__aicore__ inline uint64_t WQBMM_CUBE_COMPUTE_CLASS::CheckMaxSpace(const BasicBlockOffsetParam& param)
 {
     uint64_t maxSpace = aL1MaxHalfCount_ * param.kbL1Size * CeilAlign(param.mL1Size, static_cast<uint64_t>(BLOCK_CUBE));
     if (param.kbL1Size > 0 && param.kSize % param.kbL1Size == 0 && !wqmmConfig.aTrans && maxSpace <= aL1DbOffset_) {
@@ -132,9 +132,9 @@ __aicore__ inline uint64_t WQBMM_CUBE_COMPUTE_CLASS::CheckMaxSpace(const BasicBl
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::LaunchMatmul(const LocalTensor<xType> &weightL1, int64_t kbOffset,
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::LaunchMatmul(const LocalTensor<xType>& weightL1, int64_t kbOffset,
                                                               uint64_t kbL1RealSize, uint64_t cvLoopIdx,
-                                                              const BasicBlockOffsetParam &param)
+                                                              const BasicBlockOffsetParam& param)
 {
     SetFlag<HardEvent::MTE2_MTE1>(cubeEventIdMte2ToMte1_);
     WaitFlag<HardEvent::MTE2_MTE1>(cubeEventIdMte2ToMte1_);
@@ -191,7 +191,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::LaunchMatmul(const LocalTensor<
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::WaitMTE1ToMTE2(uint64_t kaGmOffset,
-                                                                const BasicBlockOffsetParam &offsetParam)
+                                                                const BasicBlockOffsetParam& offsetParam)
 {
     if (aL1DbNum_ > SINGLE_BUFFER_NUM && kaGmOffset % offsetParam.kaL1Size == 0) {
         WaitFlag<HardEvent::MTE1_MTE2>(cubeEventIdsMte1ToMte2_[aL1BufIdx_ & 1]);
@@ -208,7 +208,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::WaitScaleMTE1ToMTE2(uint64_t kb
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::SetScaleMTE1ToMTE2(uint64_t kbGmOffset,
-                                                                    const BasicBlockOffsetParam &offsetParam)
+                                                                    const BasicBlockOffsetParam& offsetParam)
 {
     if ((kbGmOffset + offsetParam.kbL1Size) % MX_SCALE_K_L1_SIZE == 0 ||
         kbGmOffset + offsetParam.kbL1Size >= offsetParam.kSize) {
@@ -219,7 +219,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::SetScaleMTE1ToMTE2(uint64_t kbG
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::SetMTE1ToMTE2(uint64_t kaGmOffset,
-                                                               const BasicBlockOffsetParam &offsetParam)
+                                                               const BasicBlockOffsetParam& offsetParam)
 {
     if (aL1DbNum_ > SINGLE_BUFFER_NUM && ((kaGmOffset + offsetParam.kbL1Size) % offsetParam.kaL1Size == 0 ||
                                           kaGmOffset + offsetParam.kbL1Size >= offsetParam.kSize)) {
@@ -229,7 +229,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::SetMTE1ToMTE2(uint64_t kaGmOffs
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyAGmToL1SingleBuffer(const BasicBlockOffsetParam &param,
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyAGmToL1SingleBuffer(const BasicBlockOffsetParam& param,
                                                                          int64_t kaGmOffset, int64_t kbL1RealSize,
                                                                          int64_t biasRealN, int64_t aGmOffset)
 {
@@ -270,7 +270,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyAGmToL1SingleBuffer(const B
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyAAndBiasGmToL1(const BasicBlockOffsetParam &param,
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyAAndBiasGmToL1(const BasicBlockOffsetParam& param,
                                                                     int64_t kaGmOffset, uint64_t cvLoopIdx)
 {
     if (kaGmOffset % param.kaL1Size != 0) {
@@ -316,7 +316,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyAAndBiasGmToL1(const BasicB
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyMxScaleGmToL1(const BasicBlockOffsetParam &param,
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyMxScaleGmToL1(const BasicBlockOffsetParam& param,
                                                                    uint64_t kbL1Offset)
 {
     if (kbL1Offset % MX_SCALE_K_L1_SIZE != 0) {
@@ -335,7 +335,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyMxScaleGmToL1(const BasicBl
 
     int64_t scaleAGmOffset = param.mOffset * scaleKGmSize + kbL1Offset / MX_GROUPSIZE;
     GlobalTensor<half> f16ScaleAGlobal;
-    f16ScaleAGlobal.SetGlobalBuffer((__gm__ half *)mxScaleAGlobal_[scaleAGmOffset].GetPhyAddr(),
+    f16ScaleAGlobal.SetGlobalBuffer((__gm__ half*)mxScaleAGlobal_[scaleAGmOffset].GetPhyAddr(),
                                     (param.mL1Size * scaleKL1RealSize) >> 1);
     auto f16ScaleALocal = mxScaleAL1_[(mxScaleBufIdx_ & 1) * mxScaleAL1DbOffset_].template ReinterpretCast<half>();
 
@@ -345,7 +345,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyMxScaleGmToL1(const BasicBl
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::ConfigScaleDn2NzParams(uint64_t rowNum, uint64_t scaleKGmSize,
                                                                         uint64_t scaleKL1RealSize,
-                                                                        Dn2NzParams &dn2NzParams)
+                                                                        Dn2NzParams& dn2NzParams)
 {
     dn2NzParams.dnNum = 1;
     dn2NzParams.dValue = rowNum; // 矩阵的行数，即待搬运的mxScaleA的m或mxScaleB的n
@@ -403,8 +403,8 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::InitSync()
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::UpdateGlobalAddr(
-    __gm__ xType *x, __gm__ yType *y, __gm__ biasType *bias, __gm__ antiQuantScaleType *antiquantScale,
-    __gm__ uint64_t *quantScale, __gm__ perTokenScaleType *perTokenScale, const bool isBias)
+    __gm__ xType* x, __gm__ yType* y, __gm__ biasType* bias, __gm__ antiQuantScaleType* antiquantScale,
+    __gm__ uint64_t* quantScale, __gm__ perTokenScaleType* perTokenScale, const bool isBias)
 {
     isBias_ = isBias;
     xGlobal_.SetGlobalBuffer(x);
@@ -420,7 +420,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::UpdateGlobalAddr(
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::PrefetchA(uint64_t aPrefetchSize, uint64_t xSizeLimit,
-                                                           const LocalTensor<xType> &perloadBuffer)
+                                                           const LocalTensor<xType>& perloadBuffer)
 {
     uint64_t xOffset = GetBlockIdx() * aPrefetchSize;
     if (aPrefetchSize == 0 || xOffset >= xSizeLimit) {
@@ -460,8 +460,8 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::PrefetchA(uint64_t aPrefetchSiz
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::MxA8W4Init(
-    uint64_t l1RemainSize, uint64_t l1StartSize, uint64_t mxBiasL1DbOffset, const TCubeTiling *__restrict matmulTiling,
-    const LocalTensor<biasType> &biasL1, uint64_t mxScaleBL1DbOffset, const LocalTensor<fp8_e8m0_t> &mxScaleBL1)
+    uint64_t l1RemainSize, uint64_t l1StartSize, uint64_t mxBiasL1DbOffset, const TCubeTiling* __restrict matmulTiling,
+    const LocalTensor<biasType>& biasL1, uint64_t mxScaleBL1DbOffset, const LocalTensor<fp8_e8m0_t>& mxScaleBL1)
 {
     //  MxA8W4场景空间分配: 其中 weight\Bias为全局分配，此处不感知
     //  L1 (0~512KB): WeightL1_P0(64KB) |    Bias_P0(4KB)   | ScaleAL1_P0(32KB) | ScaleBL1_P0(32KB) | AL1_P0(80KB) |
@@ -494,7 +494,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::MxA8W4Init(
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::Init(uint64_t totalSize, uint64_t weightL1Space,
                                                       uint64_t aPrefetchSize,
-                                                      const TCubeTiling *__restrict matmulTiling, AscendC::TPipe *tPipe,
+                                                      const TCubeTiling* __restrict matmulTiling, AscendC::TPipe* tPipe,
                                                       uint64_t mxBiasL1DbOffset)
 {
     // (1) L1 上有bias时:
@@ -539,7 +539,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::Init(uint64_t totalSize, uint64
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::GetTensorC(const BasicBlockOffsetParam &param)
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::GetTensorC(const BasicBlockOffsetParam& param)
 {
     uint64_t outOffset = param.mOffset * param.nSize + param.nOffset;
 #ifndef __CCE_KT_TEST__
@@ -552,7 +552,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::GetTensorC(const BasicBlockOffs
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::GetTensorC(LocalTensor<yType> &yUb)
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::GetTensorC(LocalTensor<yType>& yUb)
 {
 #ifndef __CCE_KT_TEST__
     mmObj_.GetTensorC(yUb, 0, true);

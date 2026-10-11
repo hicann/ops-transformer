@@ -25,14 +25,14 @@ using namespace std;
 
 namespace {
 
-#define CHECK_RET(cond) ((cond) ? true :(false))
+#define CHECK_RET(cond) ((cond) ? true : (false))
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -41,7 +41,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // Fixed writing method, AscendCL initialization.
     auto ret = aclInit(nullptr);
@@ -62,10 +62,9 @@ int Init(int32_t deviceId, aclrtStream *stream)
     return 0;
 }
 
-
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // Call aclrtMalloc to request device side memory.
@@ -111,36 +110,36 @@ int main()
 
     // 2. To construct input and output, it is necessary to customize the construction according to the API interface.
     // Example: BSND format (B, S, n, D)
-    std::vector<int64_t> gradYShape = {1, 1024, 4, 5120};   // BSND
-    std::vector<int64_t> xShape = {1, 1024, 4, 5120};   // BSND
-    std::vector<int64_t> hResShape = {1, 1024, 4, 4};   // BSND
-    std::vector<int64_t> hOutShape = {1, 1024, 5120};   // BSD
-    std::vector<int64_t> hPostShape = {1, 1024, 4};     // BSn
-    std::vector<int64_t> gradXShape = {1, 1024, 4, 5120};   // BSND
-    std::vector<int64_t> gradHresShape = {1, 1024, 4, 4};   // BSND
-    std::vector<int64_t> gradHoutShape = {1, 1024, 5120};   // BSD
-    std::vector<int64_t> gradHpostShape = {1, 1024, 4};     // BSn
-    
-    void *gradYDeviceAddr = nullptr;
-    void *xDeviceAddr = nullptr;
-    void *hResDeviceAddr = nullptr;
-    void *hOutDeviceAddr = nullptr;
-    void *hPostDeviceAddr = nullptr;
-    void *gradXDeviceAddr = nullptr;
-    void *gradHresDeviceAddr = nullptr;
-    void *gradHoutDeviceAddr = nullptr;
-    void *gradHpostDeviceAddr = nullptr;
+    std::vector<int64_t> gradYShape = {1, 1024, 4, 5120}; // BSND
+    std::vector<int64_t> xShape = {1, 1024, 4, 5120};     // BSND
+    std::vector<int64_t> hResShape = {1, 1024, 4, 4};     // BSND
+    std::vector<int64_t> hOutShape = {1, 1024, 5120};     // BSD
+    std::vector<int64_t> hPostShape = {1, 1024, 4};       // BSn
+    std::vector<int64_t> gradXShape = {1, 1024, 4, 5120}; // BSND
+    std::vector<int64_t> gradHresShape = {1, 1024, 4, 4}; // BSND
+    std::vector<int64_t> gradHoutShape = {1, 1024, 5120}; // BSD
+    std::vector<int64_t> gradHpostShape = {1, 1024, 4};   // BSn
 
-    aclTensor *gradYTensor = nullptr;
-    aclTensor *xTensor = nullptr;
-    aclTensor *hResTensor = nullptr;
-    aclTensor *hOutTensor = nullptr;
-    aclTensor *hPostTensor = nullptr;
-    aclTensor *gradXTensor = nullptr;
-    aclTensor *gradHresTensor = nullptr;
-    aclTensor *gradHoutTensor = nullptr;
-    aclTensor *gradHpostTensor = nullptr;
-    
+    void* gradYDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* hResDeviceAddr = nullptr;
+    void* hOutDeviceAddr = nullptr;
+    void* hPostDeviceAddr = nullptr;
+    void* gradXDeviceAddr = nullptr;
+    void* gradHresDeviceAddr = nullptr;
+    void* gradHoutDeviceAddr = nullptr;
+    void* gradHpostDeviceAddr = nullptr;
+
+    aclTensor* gradYTensor = nullptr;
+    aclTensor* xTensor = nullptr;
+    aclTensor* hResTensor = nullptr;
+    aclTensor* hOutTensor = nullptr;
+    aclTensor* hPostTensor = nullptr;
+    aclTensor* gradXTensor = nullptr;
+    aclTensor* gradHresTensor = nullptr;
+    aclTensor* gradHoutTensor = nullptr;
+    aclTensor* gradHpostTensor = nullptr;
+
     int64_t gradYShapeSize = GetShapeSize(gradYShape);
     int64_t xShapeSize = GetShapeSize(xShape);
     int64_t hResShapeSize = GetShapeSize(hResShape);
@@ -159,7 +158,7 @@ int main()
     std::vector<float> gradHresHostData(gradHresShapeSize, 1.0f);
     std::vector<aclFloat16> gradHoutHostData(gradHoutShapeSize, aclFloatToFloat16(1.0f));
     std::vector<float> gradHpostHostData(gradHpostShapeSize, 1.0f);
-    
+
     ret = CreateAclTensor(gradYHostData, gradYShape, &gradYDeviceAddr, aclDataType::ACL_FLOAT16, &gradYTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
@@ -180,50 +179,48 @@ int main()
         return ret;
     }
     // Create hPost aclTensor.
-    ret = CreateAclTensor(hPostHostData, hPostShape, &hPostDeviceAddr, aclDataType::ACL_FLOAT,
-        &hPostTensor);
+    ret = CreateAclTensor(hPostHostData, hPostShape, &hPostDeviceAddr, aclDataType::ACL_FLOAT, &hPostTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
 
     // Create gradX aclTensor.
-    ret = CreateAclTensor(gradXHostData, gradXShape, &gradXDeviceAddr, aclDataType::ACL_FLOAT16,
-        &gradXTensor);
+    ret = CreateAclTensor(gradXHostData, gradXShape, &gradXDeviceAddr, aclDataType::ACL_FLOAT16, &gradXTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
     // Create gradHres aclTensor.
-    ret = CreateAclTensor(gradHresHostData, gradHresShape, &gradHresDeviceAddr, aclDataType::ACL_FLOAT,
-        &gradHresTensor);
+    ret =
+        CreateAclTensor(gradHresHostData, gradHresShape, &gradHresDeviceAddr, aclDataType::ACL_FLOAT, &gradHresTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
     // Create gradHout aclTensor.
     ret = CreateAclTensor(gradHoutHostData, gradHoutShape, &gradHoutDeviceAddr, aclDataType::ACL_FLOAT16,
-        &gradHoutTensor);
+                          &gradHoutTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
     // Create gradHpost aclTensor.
     ret = CreateAclTensor(gradHpostHostData, gradHpostShape, &gradHpostDeviceAddr, aclDataType::ACL_FLOAT,
-        &gradHpostTensor);
+                          &gradHpostTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
 
     // 3. Call CANN operator library API.
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     // Call the first interface.
-    ret = aclnnMhcPostBackwardGetWorkspaceSize(
-        gradYTensor, xTensor, hResTensor, hOutTensor, hPostTensor, gradXTensor, gradHresTensor, gradHoutTensor,
-        gradHpostTensor, &workspaceSize, &executor);
+    ret = aclnnMhcPostBackwardGetWorkspaceSize(gradYTensor, xTensor, hResTensor, hOutTensor, hPostTensor, gradXTensor,
+                                               gradHresTensor, gradHoutTensor, gradHpostTensor, &workspaceSize,
+                                               &executor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         LOG_PRINT("aclnnMhcPostBackwardGetWorkspaceSize failed. ERROR: %d\n", ret);
         return ret;
     }
     // Apply for device memory based on the workspaceSize calculated from the first interface paragraph.
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0U) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         if (!CHECK_RET(ret == ACL_SUCCESS)) {

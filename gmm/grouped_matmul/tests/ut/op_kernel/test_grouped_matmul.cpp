@@ -17,16 +17,15 @@
 
 using namespace std;
 
-#define PARAM_LIST_DEF GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale,\
-                                                     GM_ADDR offset, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,\
-                                                     GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR y,\
-                                                     GM_ADDR workspace, GM_ADDR tiling
+#define PARAM_LIST_DEF \
+    GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR offset, GM_ADDR antiquantScale, \
+        GM_ADDR antiquantOffset, GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace, \
+        GM_ADDR tiling
 
-#define PARAM_LIST x,  weight,  bias,  scale, offset,  antiquantScale,  antiquantOffset, groupList, perTokenScale, y, workspace, tiling
+#define PARAM_LIST \
+    x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale, y, workspace, tiling
 
-
-class grouped_matmul_test : public testing::Test
-{
+class grouped_matmul_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -38,7 +37,7 @@ protected:
     }
 };
 
-//非量化fp16场景
+// 非量化fp16场景
 TEST_F(grouped_matmul_test, test_case_fp16)
 {
     size_t M = 345;
@@ -46,18 +45,20 @@ TEST_F(grouped_matmul_test, test_case_fp16)
     size_t N = 567;
     size_t E = 2;
     AscendC::SetKernelMode(KernelMode::AIC_MODE);
-    std::function<void(PARAM_LIST_DEF)> func = [](PARAM_LIST_DEF){return grouped_matmul<GMM_TPL_FLOAT16, // D_T_A
-                                                GMM_TPL_FLOAT16, // D_T_B
-                                                GMM_TPL_FLOAT16, // D_T_Y
-                                                0, // TRANS_A
-                                                0, // TRANS_B
-                                                GROUPED_MATMUL_GROUP_LIST_TYPE_COUNT, // GROUP_LIST_TYPE
-                                                0, // IS_STATIC_TILING_API
-                                                GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_NONE, // A8W4_KERNEL_TEMPLATE
-                                                GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_NONE, // A16W8_KERNEL_TEMPLATE
-                                                GROUPED_MATMUL_CUBE_ONLY, // AIV_AIC_RATIO
-                                                false //IS_ENABLE_FIXED_AXIS
-                                                >(PARAM_LIST);};
+    std::function<void(PARAM_LIST_DEF)> func = [](PARAM_LIST_DEF) {
+        return grouped_matmul<GMM_TPL_FLOAT16,                           // D_T_A
+                              GMM_TPL_FLOAT16,                           // D_T_B
+                              GMM_TPL_FLOAT16,                           // D_T_Y
+                              0,                                         // TRANS_A
+                              0,                                         // TRANS_B
+                              GROUPED_MATMUL_GROUP_LIST_TYPE_COUNT,      // GROUP_LIST_TYPE
+                              0,                                         // IS_STATIC_TILING_API
+                              GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_NONE,  // A8W4_KERNEL_TEMPLATE
+                              GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_NONE, // A16W8_KERNEL_TEMPLATE
+                              GROUPED_MATMUL_CUBE_ONLY,                  // AIV_AIC_RATIO
+                              false                                      // IS_ENABLE_FIXED_AXIS
+                              >(PARAM_LIST);
+    };
     size_t xSize = M * K * sizeof(half);
     size_t weightSize = E * K * N * sizeof(half);
     size_t groupedListSize = E * sizeof(int64_t);
@@ -106,7 +107,7 @@ TEST_F(grouped_matmul_test, test_case_fp16)
     tilingData->mmTilingData.dbL0B = true;
     tilingData->mmTilingData.dbL0C = false;
 
-    ICPU_RUN_KF(func, NumBlocks, x, weight, groupedList, y, y,y,y,y,y,y,  workspace, tiling);
+    ICPU_RUN_KF(func, NumBlocks, x, weight, groupedList, y, y, y, y, y, y, y, workspace, tiling);
 
     AscendC::GmFree(x);
     AscendC::GmFree(weight);
@@ -166,7 +167,6 @@ TEST_F(grouped_matmul_test, test_case_fp16)
 //     tilingData->mmTilingData.dbL0A = true;
 //     tilingData->mmTilingData.dbL0B = true;
 //     tilingData->mmTilingData.dbL0C = false;
-
 
 //     ICPU_SET_TILING_KEY(0);
 //     ICPU_RUN_KF(grouped_matmul, NumBlocks, x, weight, groupedList, y, y, workspace, tiling);

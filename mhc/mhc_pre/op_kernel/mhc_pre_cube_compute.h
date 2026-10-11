@@ -37,8 +37,8 @@ MHC_PRE_CUBE_COMPUTE_TEMPLATE_PARAM
 class MhcPreCubeCompute {
 public:
     __aicore__ inline MhcPreCubeCompute(){};
-    __aicore__ inline void Init(const GlobalTensor<float> &xGm, const GlobalTensor<float> &phiGm,
-                                const GlobalTensor<float> &workspaceGlobalAB, int64_t bs, int64_t n, int64_t c,
+    __aicore__ inline void Init(const GlobalTensor<float>& xGm, const GlobalTensor<float>& phiGm,
+                                const GlobalTensor<float>& workspaceGlobalAB, int64_t bs, int64_t n, int64_t c,
                                 int64_t vecCoreNum);
     __aicore__ inline void ProcessMatmulXPhi(const int32_t taskOffset, const int32_t mm1M);
 
@@ -60,9 +60,9 @@ public:
 };
 
 MHC_PRE_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void MHC_PRE_CUBE_COMPUTE_TEMPLATE_CLASS::Init(const GlobalTensor<float> &xGm,
-                                                                 const GlobalTensor<float> &phiGm,
-                                                                 const GlobalTensor<float> &workspaceGlobalAB,
+__aicore__ inline void MHC_PRE_CUBE_COMPUTE_TEMPLATE_CLASS::Init(const GlobalTensor<float>& xGm,
+                                                                 const GlobalTensor<float>& phiGm,
+                                                                 const GlobalTensor<float>& workspaceGlobalAB,
                                                                  int64_t bs, int64_t n, int64_t c, int64_t vecCoreNum)
 {
     blockIdx_ = GetBlockIdx();

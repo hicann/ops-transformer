@@ -40,7 +40,7 @@ using namespace AscendC;
 template <typename D_IN>
 class BlockAttentionResidualsHSlice {
 public:
-    __aicore__ inline BlockAttentionResidualsHSlice(TPipe *pipe, const BlockAttentionResidualsTilingData *tilingData)
+    __aicore__ inline BlockAttentionResidualsHSlice(TPipe* pipe, const BlockAttentionResidualsTilingData* tilingData)
     {
         pipe_ = pipe;
         tiling_ = tilingData;
@@ -62,7 +62,7 @@ public:
         hChunkAlignFp32_ = (hiddenSizeChunk_ + ELEM_PER_BLK_FP32 - 1U) / ELEM_PER_BLK_FP32 * ELEM_PER_BLK_FP32;
     }
 
-    __aicore__ inline void Init(const BlockAttentionResidualsInitParams &params)
+    __aicore__ inline void Init(const BlockAttentionResidualsInitParams& params)
     {
         blockIdx_ = GetBlockIdx();
         blockNum_ = GetBlockNum();
@@ -80,14 +80,14 @@ public:
             tokenNum_ = numTokens_ - tokenStart_;
         }
 
-        partialBlockGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.partialBlock));
-        blockResGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.blockRes));
-        projWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.projWeight));
-        normWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.normWeight));
-        hiddenStatesGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.hiddenStates));
+        partialBlockGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.partialBlock));
+        blockResGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.blockRes));
+        projWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.projWeight));
+        normWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.normWeight));
+        hiddenStatesGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.hiddenStates));
         if (needBackward_) {
-            invNormGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(params.invNorm));
-            probsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(params.probs));
+            invNormGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(params.invNorm));
+            probsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(params.probs));
         }
 
         InitBuffers();
@@ -105,7 +105,7 @@ public:
     }
 
 private:
-    __aicore__ inline void KahanSumUpdate(LocalTensor<float> &input, LocalTensor<float> sumList[2], int32_t &sumPos)
+    __aicore__ inline void KahanSumUpdate(LocalTensor<float>& input, LocalTensor<float> sumList[2], int32_t& sumPos)
     {
         LocalTensor<float> sum = sumList[sumPos];
         LocalTensor<float> compensation = sumList[1 - sumPos];
@@ -169,7 +169,7 @@ private:
     }
 
     /*! 按 len 切片的 GM→UB 搬入（DataCopyPad，len 可为非对齐尾部） */
-    __aicore__ inline void CopyInRowEnqueueOff(const GlobalTensor<D_IN> &srcGm, int64_t srcOffset, uint32_t len)
+    __aicore__ inline void CopyInRowEnqueueOff(const GlobalTensor<D_IN>& srcGm, int64_t srcOffset, uint32_t len)
     {
         LocalTensor<D_IN> inLocal = inQue_.AllocTensor<D_IN>();
         DataCopyExtParams copyParams{1, static_cast<uint32_t>(len * sizeof(D_IN)), 0, 0, 0};
@@ -183,20 +183,20 @@ private:
         return inQue_.DeQue<D_IN>();
     }
 
-    __aicore__ inline LocalTensor<D_IN> CopyInRowSyncOff(const GlobalTensor<D_IN> &srcGm, int64_t srcOffset,
+    __aicore__ inline LocalTensor<D_IN> CopyInRowSyncOff(const GlobalTensor<D_IN>& srcGm, int64_t srcOffset,
                                                          uint32_t len)
     {
         CopyInRowEnqueueOff(srcGm, srcOffset, len);
         return CopyInRowDeQue();
     }
 
-    __aicore__ inline void FreeInRow(LocalTensor<D_IN> &inLocal)
+    __aicore__ inline void FreeInRow(LocalTensor<D_IN>& inLocal)
     {
         inQue_.FreeTensor(inLocal);
     }
 
     /*! golden：n < N → residual；n == N → partial_block */
-    __aicore__ inline const GlobalTensor<D_IN> &GetLogicRowGm(uint32_t n) const
+    __aicore__ inline const GlobalTensor<D_IN>& GetLogicRowGm(uint32_t n) const
     {
         return (n < numBlocks_) ? blockResGm_ : partialBlockGm_;
     }
@@ -227,7 +227,7 @@ private:
     }
 
     /*! 本块行归约：vecMeta[n]=Σv²；metaSoftmax[n]=Σ(v*scoreWeight)。metaIdx 标量槽（WholeReduce 标量 sink）。 */
-    __aicore__ inline void ProcessRowScoreChunk(const LocalTensor<D_IN> &inLocal, uint32_t metaIdx, uint32_t hcLen)
+    __aicore__ inline void ProcessRowScoreChunk(const LocalTensor<D_IN>& inLocal, uint32_t metaIdx, uint32_t hcLen)
     {
         CastRowToFp32(vRow_, inLocal, hcLen);
         PipeBarrier<PIPE_V>();
@@ -327,7 +327,7 @@ private:
     }
 
     /*! Softmax 后加权累加（Counter 外置）：outFp32 += v[n,hc] * prob[n] */
-    __aicore__ inline void ProcessRowWeighted(const LocalTensor<D_IN> &inLocal, uint32_t metaIdx, uint32_t hcLen)
+    __aicore__ inline void ProcessRowWeighted(const LocalTensor<D_IN>& inLocal, uint32_t metaIdx, uint32_t hcLen)
     {
         CastRowToFp32CounterNoSetMask(vRow_, inLocal);
         PipeBarrier<PIPE_V>();
@@ -385,8 +385,8 @@ private:
     }
 
 private:
-    TPipe *pipe_{nullptr};
-    const BlockAttentionResidualsTilingData *tiling_{nullptr};
+    TPipe* pipe_{nullptr};
+    const BlockAttentionResidualsTilingData* tiling_{nullptr};
 
     GlobalTensor<D_IN> partialBlockGm_;
     GlobalTensor<D_IN> blockResGm_;

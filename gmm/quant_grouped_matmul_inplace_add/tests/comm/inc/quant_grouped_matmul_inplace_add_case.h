@@ -39,7 +39,7 @@ public:
 
 public:
     QuantGroupedMatmulInplaceAddCase();
-    QuantGroupedMatmulInplaceAddCase(const char *name, bool enable, const char *dbgInfo, OpInfo opInfo, Param param,
+    QuantGroupedMatmulInplaceAddCase(const char* name, bool enable, const char* dbgInfo, OpInfo opInfo, Param param,
                                      int32_t tilingTemplatePriority);
 
     bool Run() override;

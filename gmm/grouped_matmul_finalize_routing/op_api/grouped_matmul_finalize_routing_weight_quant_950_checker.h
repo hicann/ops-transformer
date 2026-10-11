@@ -29,7 +29,7 @@
     } while (0)
 
 namespace {
-static constexpr const char *ACLNN_NAME = "aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize";
+static constexpr const char* ACLNN_NAME = "aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize";
 };
 
 namespace GmmFinalizeRouting {
@@ -61,7 +61,7 @@ class GroupedMatmulFinalizeRoutingWeightQuant950Checker {
 public:
     GroupedMatmulFinalizeRoutingWeightQuant950Checker() = default;
 
-    aclnnStatus CheckParams(GroupedMatmulParams &gmmParams)
+    aclnnStatus CheckParams(GroupedMatmulParams& gmmParams)
     {
         gmmParams_ = gmmParams;
         // 1. 检查参数是否为空指针

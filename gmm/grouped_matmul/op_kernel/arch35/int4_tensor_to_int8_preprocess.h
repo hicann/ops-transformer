@@ -57,7 +57,7 @@ public:
     __aicore__ inline Int4TensorToInt8Preprocess() {}
     __aicore__ inline ~Int4TensorToInt8Preprocess() {}
 
-    __aicore__ inline void Init(const Params &params, AscendC::TPipe *pipe)
+    __aicore__ inline void Init(const Params& params, AscendC::TPipe* pipe)
     {
         groupNum_ = params.groupNum;
         outerDim_ = params.outerDim;
@@ -79,8 +79,8 @@ public:
             elementCount_ = groupNum_ * outerDim_ * innerDim_;
             workItemCount_ = CeilDiv(elementCount_, static_cast<uint64_t>(LINEAR_TILE_ELEMENTS));
         }
-        srcGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int4b_t *>(params.srcInt4GmAddr));
-        dstGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(params.dstInt8GmAddr));
+        srcGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int4b_t*>(params.srcInt4GmAddr));
+        dstGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(params.dstInt8GmAddr));
         if ASCEND_IS_AIV {
             pipe->InitBuffer(srcQueue_, 1, LOCAL_TILE_ELEMENTS / INT4_ELEMENTS_PER_BYTE);
             pipe->InitBuffer(outputQueue_, 1, LOCAL_TILE_ELEMENTS * sizeof(int8_t));
@@ -121,7 +121,7 @@ public:
         }
     }
 
-    __aicore__ inline void operator()(const Params &params, AscendC::TPipe *pipe)
+    __aicore__ inline void operator()(const Params& params, AscendC::TPipe* pipe)
     {
         Init(params, pipe);
         Process();

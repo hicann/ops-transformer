@@ -40,7 +40,7 @@ class GMMA8W4PreProcessNZ {
 public:
     __aicore__ inline GMMA8W4PreProcessNZ(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR x_out, GM_ADDR groupList, GM_ADDR workspace,
-                                const GMMBaseParams &tilingData, TPipe *pipe);
+                                const GMMBaseParams& tilingData, TPipe* pipe);
     __aicore__ inline void Process();
     __aicore__ inline void copyIn(uint32_t mIdx, uint32_t kIdx, uint32_t curVecBaseM, uint32_t curVecBaseK);
     __aicore__ inline void compute(uint32_t mIdx, uint32_t kIdx, uint32_t curVecBaseM, uint32_t curVecBaseK);
@@ -94,11 +94,11 @@ private:
 };
 
 __aicore__ inline void GMMA8W4PreProcessNZ::Init(GM_ADDR x, GM_ADDR x_out, GM_ADDR groupList, GM_ADDR workspace,
-                                                 const GMMBaseParams &tilingData, TPipe *pipe)
+                                                 const GMMBaseParams& tilingData, TPipe* pipe)
 {
-    groupListGm.SetGlobalBuffer((__gm__ int64_t *)groupList);
+    groupListGm.SetGlobalBuffer((__gm__ int64_t*)groupList);
     xGm.SetGlobalBuffer(GetTensorAddr<int8_t>(0, x));
-    xOutInt4.SetGlobalBuffer((__gm__ int4b_t *)((__gm__ int8_t *)x_out));
+    xOutInt4.SetGlobalBuffer((__gm__ int4b_t*)((__gm__ int8_t*)x_out));
     groupNum = static_cast<uint32_t>(tilingData.groupNum);
     withOffset = tilingData.withOffset;
     m = tilingData.m;

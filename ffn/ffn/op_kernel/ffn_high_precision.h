@@ -22,7 +22,7 @@ namespace FFN {
 template <typename T, class mm1Type, class mm2Type = mm1Type, typename c1T = T, typename c2T = c1T, typename BiasT = T>
 class FFNHighPrecision : public FFNBase<T, mm1Type, mm2Type, c1T, c2T, BiasT> {
 public:
-    __aicore__ inline FFNHighPrecision(typename mm1Type::MT &mm1_, typename mm2Type::MT &mm2_)
+    __aicore__ inline FFNHighPrecision(typename mm1Type::MT& mm1_, typename mm2Type::MT& mm2_)
         : FFNBase<T, mm1Type, mm2Type, c1T, c2T, BiasT>(mm1_, mm2_)
     {}
 

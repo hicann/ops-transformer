@@ -39,11 +39,12 @@ extern "C" {
  * @param [out] executor: Operator executor.
  * @return aclnnStatus: Status code.
  */
-ACLNN_API aclnnStatus aclnnMhcPreV2GetWorkspaceSize(
-    const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias,
-    const aclTensor *gammaOptional, double normEps, double hcEps, int64_t opImplMode, aclTensor *hIn,
-    aclTensor *hPost, aclTensor *hRes, aclTensor *invRmsOptional, aclTensor *hMixOptional, aclTensor *hPreOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+ACLNN_API aclnnStatus aclnnMhcPreV2GetWorkspaceSize(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha,
+                                                    const aclTensor* bias, const aclTensor* gammaOptional,
+                                                    double normEps, double hcEps, int64_t opImplMode, aclTensor* hIn,
+                                                    aclTensor* hPost, aclTensor* hRes, aclTensor* invRmsOptional,
+                                                    aclTensor* hMixOptional, aclTensor* hPreOptional,
+                                                    uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief The second-stage interface of aclnnMhcPreV2. Executes the operator.
@@ -54,7 +55,7 @@ ACLNN_API aclnnStatus aclnnMhcPreV2GetWorkspaceSize(
  * @param [in] stream: ACL stream used to execute the operator.
  * @return aclnnStatus: Status code.
  */
-ACLNN_API aclnnStatus aclnnMhcPreV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMhcPreV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                     aclrtStream stream);
 
 #ifdef __cplusplus

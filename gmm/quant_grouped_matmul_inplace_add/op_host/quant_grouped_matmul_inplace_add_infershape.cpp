@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-
 /*!
  * \file quant_grouped_matmul_inplace_add_infershape.cpp
  * \brief
@@ -27,28 +26,28 @@ const int64_t SCALE2_INDEX = 2;
 const int64_t GROUPLIST_INDEX = 3;
 const int64_t YREF_INDEX = 4;
 const int64_t SCALE1_INDEX = 5;
-constexpr const char *QUANT_GROUPED_MATMUL_INPLACE_ADD_OP_TYPE = "QuantGroupedMatmulInplaceAdd";
+constexpr const char* QUANT_GROUPED_MATMUL_INPLACE_ADD_OP_TYPE = "QuantGroupedMatmulInplaceAdd";
 
-static ge::graphStatus IsInputTensorNull(const gert::InferShapeContext *context)
+static ge::graphStatus IsInputTensorNull(const gert::InferShapeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context->GetInputShape(X1_INDEX));
     OP_CHECK_NULL_WITH_CONTEXT(context, context->GetInputShape(X2_INDEX));
     OP_CHECK_NULL_WITH_CONTEXT(context, context->GetInputShape(SCALE2_INDEX));
     OP_CHECK_NULL_WITH_CONTEXT(context, context->GetInputShape(GROUPLIST_INDEX));
     OP_CHECK_NULL_WITH_CONTEXT(context, context->GetInputShape(YREF_INDEX));
-    OP_CHECK_IF(context->GetOptionalInputShape(SCALE1_INDEX) == nullptr,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                    QUANT_GROUPED_MATMUL_INPLACE_ADD_OP_TYPE, "scale1", "nullptr",
-                    "null check with context: context->GetOptionalInputShape(SCALE1_INDEX)"),
-                return GRAPH_FAILED);
+    OP_CHECK_IF(
+        context->GetOptionalInputShape(SCALE1_INDEX) == nullptr,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QUANT_GROUPED_MATMUL_INPLACE_ADD_OP_TYPE, "scale1", "nullptr",
+                                              "null check with context: context->GetOptionalInputShape(SCALE1_INDEX)"),
+        return GRAPH_FAILED);
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShape4QuantGroupedMatmulInplaceAdd(gert::InferShapeContext *context)
+static ge::graphStatus InferShape4QuantGroupedMatmulInplaceAdd(gert::InferShapeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     OP_CHECK_IF(IsInputTensorNull(context) != GRAPH_SUCCESS,
-              OP_LOGE(context->GetNodeName(), "Some of the required inputs are null."), return GRAPH_FAILED);
+                OP_LOGE(context->GetNodeName(), "Some of the required inputs are null."), return GRAPH_FAILED);
     auto yRefShape = context->GetInputShape(YREF_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, yRefShape);
     auto outShape = context->GetOutputShape(0);
@@ -59,7 +58,7 @@ static ge::graphStatus InferShape4QuantGroupedMatmulInplaceAdd(gert::InferShapeC
 
 // =========================================================================================
 
-static graphStatus InferDataType4QuantGroupedMatmulInplaceAdd(gert::InferDataTypeContext *context)
+static graphStatus InferDataType4QuantGroupedMatmulInplaceAdd(gert::InferDataTypeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     context->SetOutputDataType(0, ge::DT_FLOAT);

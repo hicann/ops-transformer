@@ -43,8 +43,8 @@ namespace GROUPED_MATMUL_FINALIZE_ROUTING {
 #define GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_TEMPLATE_PARAM \
     template <typename xType, typename wType, typename antiQuantScaleType, typename scaleType, \
               typename perTokenScaleType, typename biasType, typename yType, typename sharedInputDType, \
-              typename logitsType, typename rowIndexType, bool hasBias, const WqmmConfig &wqmmConfig, \
-              const VecAntiQuantConfig &vecConfig>
+              typename logitsType, typename rowIndexType, bool hasBias, const WqmmConfig& wqmmConfig, \
+              const VecAntiQuantConfig& vecConfig>
 
 #define GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS \
     GMMFRWeightQuantResplitController<xType, wType, antiQuantScaleType, scaleType, perTokenScaleType, biasType, yType, \
@@ -57,29 +57,29 @@ public:
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR bias, GM_ADDR groupList,
                                 GM_ADDR perTokenScale, GM_ADDR logitsAddr, GM_ADDR rowIndexAddr, GM_ADDR y,
                                 GM_ADDR shareInput,
-                                const GMMFinalizeRoutingWeightQuantTilingData *__restrict baseTiling);
+                                const GMMFinalizeRoutingWeightQuantTilingData* __restrict baseTiling);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void InitOffsetParam(BasicBlockOffsetParam offsetParam[BASIC_BLOCK_PROCESS_NUM]);
     __aicore__ inline void SplitNByMultiCore(BasicBlockOffsetParam offsetParam[BASIC_BLOCK_PROCESS_NUM],
-                                             BasicBlockControlParam &ctrlParam, uint64_t basicBlockCount,
+                                             BasicBlockControlParam& ctrlParam, uint64_t basicBlockCount,
                                              uint64_t basicBlockSize);
     __aicore__ inline uint64_t GetSplitValueFromGroupList(uint64_t groupIdx);
     __aicore__ inline void UpdateGmAddr(uint64_t mSize, uint64_t kSize, uint64_t nSize);
-    __aicore__ inline uint64_t GetSwitchedProcessId(const BasicBlockControlParam &ctrlParam);
+    __aicore__ inline uint64_t GetSwitchedProcessId(const BasicBlockControlParam& ctrlParam);
 
-    const GMMFinalizeRoutingWeightQuantTilingData *tiling_;
+    const GMMFinalizeRoutingWeightQuantTilingData* tiling_;
 
-    __gm__ xType *xGm_;
-    __gm__ wType *weightGm_;
-    __gm__ antiQuantScaleType *antiquantScaleGm_;
-    __gm__ biasType *biasGm_;
-    __gm__ yType *yGm_;
-    __gm__ perTokenScaleType *perTokenScaleGm_;
-    __gm__ sharedInputDType *shareInputAddr_;
-    __gm__ logitsType *logitsAddr_;
-    __gm__ rowIndexType *rowIndexAddr_;
+    __gm__ xType* xGm_;
+    __gm__ wType* weightGm_;
+    __gm__ antiQuantScaleType* antiquantScaleGm_;
+    __gm__ biasType* biasGm_;
+    __gm__ yType* yGm_;
+    __gm__ perTokenScaleType* perTokenScaleGm_;
+    __gm__ sharedInputDType* shareInputAddr_;
+    __gm__ logitsType* logitsAddr_;
+    __gm__ rowIndexType* rowIndexAddr_;
     GlobalTensor<int64_t> groupListGm_;
     GMMFRWeightQuantVcvBasicBlock<xType, wType, antiQuantScaleType, scaleType, perTokenScaleType, biasType, yType,
                                   sharedInputDType, logitsType, rowIndexType, hasBias, wqmmConfig, vecConfig>
@@ -101,20 +101,20 @@ GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_TEMPLATE_PARAM
 __aicore__ inline void GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS::Init(
     GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR bias, GM_ADDR groupList, GM_ADDR perTokenScale,
     GM_ADDR logitsAddr, GM_ADDR rowIndexAddr, GM_ADDR y, GM_ADDR shareInput,
-    const GMMFinalizeRoutingWeightQuantTilingData *__restrict baseTiling)
+    const GMMFinalizeRoutingWeightQuantTilingData* __restrict baseTiling)
 {
     tiling_ = baseTiling;
 
-    xGm_ = reinterpret_cast<__gm__ xType *>(x);
-    weightGm_ = reinterpret_cast<__gm__ wType *>(weight);
-    biasGm_ = reinterpret_cast<__gm__ biasType *>(bias);
-    antiquantScaleGm_ = reinterpret_cast<__gm__ antiQuantScaleType *>(antiquantScale);
-    perTokenScaleGm_ = reinterpret_cast<__gm__ perTokenScaleType *>(perTokenScale);
-    logitsAddr_ = reinterpret_cast<__gm__ logitsType *>(logitsAddr);
-    rowIndexAddr_ = reinterpret_cast<__gm__ rowIndexType *>(rowIndexAddr);
-    yGm_ = reinterpret_cast<__gm__ yType *>(y);
-    shareInputAddr_ = reinterpret_cast<__gm__ sharedInputDType *>(shareInput);
-    groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(groupList));
+    xGm_ = reinterpret_cast<__gm__ xType*>(x);
+    weightGm_ = reinterpret_cast<__gm__ wType*>(weight);
+    biasGm_ = reinterpret_cast<__gm__ biasType*>(bias);
+    antiquantScaleGm_ = reinterpret_cast<__gm__ antiQuantScaleType*>(antiquantScale);
+    perTokenScaleGm_ = reinterpret_cast<__gm__ perTokenScaleType*>(perTokenScale);
+    logitsAddr_ = reinterpret_cast<__gm__ logitsType*>(logitsAddr);
+    rowIndexAddr_ = reinterpret_cast<__gm__ rowIndexType*>(rowIndexAddr);
+    yGm_ = reinterpret_cast<__gm__ yType*>(y);
+    shareInputAddr_ = reinterpret_cast<__gm__ sharedInputDType*>(shareInput);
+    groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(groupList));
     basicBlock_.Init(tiling_->groupSize, yGm_, tiling_->sharedInputWeight);
     if constexpr (hasBias) {
         mxA8W4L1KDynamicConfigMThreshold_ = MX_A8W4_L1_K_DYNAMIC_CONFIG_M_THRESHOLD_240;
@@ -194,7 +194,7 @@ __aicore__ inline void GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS::InitOffsetP
 
 GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_TEMPLATE_PARAM
 __aicore__ inline void GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS::SplitNByMultiCore(
-    BasicBlockOffsetParam offsetParam[BASIC_BLOCK_PROCESS_NUM], BasicBlockControlParam &ctrlParam,
+    BasicBlockOffsetParam offsetParam[BASIC_BLOCK_PROCESS_NUM], BasicBlockControlParam& ctrlParam,
     uint64_t basicBlockCount, uint64_t basicBlockSize)
 {
     for (; ctrlParam.curBasicBlockId < ctrlParam.basicBlockLimit + basicBlockCount;
@@ -277,7 +277,7 @@ __aicore__ inline uint64_t GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS::GetSpli
 
 GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_TEMPLATE_PARAM
 __aicore__ inline uint64_t GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS::GetSwitchedProcessId(
-    const BasicBlockControlParam &ctrlParam)
+    const BasicBlockControlParam& ctrlParam)
 {
     return 1 - ctrlParam.processId;
 }

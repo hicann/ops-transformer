@@ -84,7 +84,7 @@ public:
                   "TileShape is too large to fit in UB");
 
     struct Params {
-        __gm__ ElementPerTokenScale *ptrPerTokenScale{nullptr};
+        __gm__ ElementPerTokenScale* ptrPerTokenScale{nullptr};
         LayoutPerTokenScale layoutPerTokenScale{};
         AscendC::GlobalTensor<ElementD> gmD;
         LayoutD layoutD{};
@@ -93,8 +93,8 @@ public:
         Params() {};
 
         CATLASS_DEVICE
-        Params(__gm__ ElementPerTokenScale *ptrPerTokenScale_, LayoutPerTokenScale const &layoutPerTokenScale_,
-               AscendC::GlobalTensor<ElementD> gmD_, LayoutD const &layoutD_)
+        Params(__gm__ ElementPerTokenScale* ptrPerTokenScale_, LayoutPerTokenScale const& layoutPerTokenScale_,
+               AscendC::GlobalTensor<ElementD> gmD_, LayoutD const& layoutD_)
             : ptrPerTokenScale(ptrPerTokenScale_),
               layoutPerTokenScale(layoutPerTokenScale_),
               gmD(gmD_),
@@ -103,7 +103,7 @@ public:
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> const &resource, Params const &params = Params{})
+    BlockEpilogue(Arch::Resource<ArchTag> const& resource, Params const& params = Params{})
         : params(params)
     {
         size_t ubOffset = 0;
@@ -193,16 +193,16 @@ public:
     }
 
     CATLASS_DEVICE
-    void UpdateParams(Params const &params_)
+    void UpdateParams(Params const& params_)
     {
         params = params_;
     }
 
     CATLASS_DEVICE
-    void operator()(GemmCoord const &blockShapeMNK, GemmCoord const &blockCoordMNK,
-                    GemmCoord const &actualBlockShapeMNK, AscendC::GlobalTensor<ElementC> const &gmBlockC,
-                    LayoutC const &layoutBlockC, bool isFirstLoopK, bool isSecondLoopK, bool isLastLoopK,
-                    Callback &&callback = Callback{})
+    void operator()(GemmCoord const& blockShapeMNK, GemmCoord const& blockCoordMNK,
+                    GemmCoord const& actualBlockShapeMNK, AscendC::GlobalTensor<ElementC> const& gmBlockC,
+                    LayoutC const& layoutBlockC, bool isFirstLoopK, bool isSecondLoopK, bool isLastLoopK,
+                    Callback&& callback = Callback{})
     {
         if (actualBlockShapeMNK.k() == 0) {
             return;
@@ -242,7 +242,7 @@ public:
                 copyGmToUbC(ubCAdd[ubCOffset], gmTileC, layoutUbC, layoutGmTileC);
                 AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(eventUbCAddMTE2VList[ubListId]);
             } else {
-                auto &ubC = ubCList[ubListId];
+                auto& ubC = ubCList[ubListId];
                 AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[ubListId]);
                 copyGmToUbC(ubC, gmTileC, layoutUbC, layoutGmTileC);
                 AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[ubListId]);
@@ -268,7 +268,7 @@ public:
                     gmPerTokenScale[params.layoutPerTokenScale.GetOffset(perTokenScaleTileOffset)];
                 auto layoutGmTilePerTokenScale = params.layoutPerTokenScale.GetTileLayout(perTokenScaleTileShape);
 
-                auto &ubPerTokenScale = ubPerTokenScaleList[ubListId];
+                auto& ubPerTokenScale = ubPerTokenScaleList[ubListId];
                 auto layoutUbPerTokenScale =
                     LayoutPerTokenScale::template MakeLayoutInUb<ElementPerTokenScale>(perTokenScaleTileShape);
 
@@ -293,7 +293,7 @@ public:
                 tileOneBlkColumnBroadcastMul(ubPerTokenMul, ubCFp32, ubPerTokenScaleFp32Brcb);
                 AscendC::PipeBarrier<PIPE_V>();
 
-                auto &ubD = ubDList[ubListId];
+                auto& ubD = ubDList[ubListId];
                 LayoutD layoutUbD{actualTileShape, ubTileStride};
 
                 AscendC::Cast(ubD, ubPerTokenMul, AscendC::RoundMode::CAST_RINT, TileShape::COUNT);

@@ -38,7 +38,7 @@ constexpr size_t ATTR_NORM_EPS_INDEX = 1;
 constexpr size_t ATTR_NEED_BACKWARD_INDEX = 2;
 constexpr int64_t MAX_NUM_BLOCKS = 100;
 
-static ge::graphStatus InferShapeBlockAttentionResiduals(InferShapeContext *context)
+static ge::graphStatus InferShapeBlockAttentionResiduals(InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("BlockAttentionResiduals", "inference context is null");
@@ -95,7 +95,7 @@ static ge::graphStatus InferShapeBlockAttentionResiduals(InferShapeContext *cont
     bool needBackward = false;
     auto attrs = context->GetAttrs();
     if (attrs != nullptr) {
-        const bool *needBackwardPtr = attrs->GetAttrPointer<bool>(ATTR_NEED_BACKWARD_INDEX);
+        const bool* needBackwardPtr = attrs->GetAttrPointer<bool>(ATTR_NEED_BACKWARD_INDEX);
         if (needBackwardPtr != nullptr) {
             needBackward = *needBackwardPtr;
         }
@@ -118,7 +118,7 @@ static ge::graphStatus InferShapeBlockAttentionResiduals(InferShapeContext *cont
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeBlockAttentionResiduals(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeBlockAttentionResiduals(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("BlockAttentionResiduals", "inference context is null");
@@ -130,7 +130,7 @@ static ge::graphStatus InferDataTypeBlockAttentionResiduals(gert::InferDataTypeC
     bool needBackward = false;
     auto attrs = context->GetAttrs();
     if (attrs != nullptr) {
-        const bool *needBackwardPtr = attrs->GetAttrPointer<bool>(ATTR_NEED_BACKWARD_INDEX);
+        const bool* needBackwardPtr = attrs->GetAttrPointer<bool>(ATTR_NEED_BACKWARD_INDEX);
         if (needBackwardPtr != nullptr) {
             needBackward = *needBackwardPtr;
         }

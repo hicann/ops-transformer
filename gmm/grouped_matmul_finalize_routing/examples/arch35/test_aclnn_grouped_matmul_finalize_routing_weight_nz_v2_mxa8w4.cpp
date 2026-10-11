@@ -55,7 +55,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -73,7 +73,7 @@ int64_t CeilDiv(int64_t a, int64_t b)
     return (a - 1) / b + 1;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -92,8 +92,8 @@ void Finalize(int32_t deviceId, aclrtStream stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -113,8 +113,8 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 }
 
 template <typename T>
-int CreateAclTensorWithFormat(const std::vector<T> &hostData, const std::vector<int64_t> &shape, int64_t *storageShape,
-                              uint64_t storageShapeSize, void **deviceAddr, aclDataType dataType, aclTensor **tensor,
+int CreateAclTensorWithFormat(const std::vector<T>& hostData, const std::vector<int64_t>& shape, int64_t* storageShape,
+                              uint64_t storageShapeSize, void** deviceAddr, aclDataType dataType, aclTensor** tensor,
                               aclFormat format)
 {
     auto size = hostData.size() * sizeof(T);
@@ -135,11 +135,11 @@ int CreateAclTensorWithFormat(const std::vector<T> &hostData, const std::vector<
 }
 
 template <typename T>
-int CreateAclTensorNz(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                      aclDataType dataType, aclTensor **tensor, aclrtStream &stream)
+int CreateAclTensorNz(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                      aclDataType dataType, aclTensor** tensor, aclrtStream& stream)
 {
-    void *srcDeviceAddr = nullptr;
-    aclTensor *srcTensor = nullptr;
+    void* srcDeviceAddr = nullptr;
+    aclTensor* srcTensor = nullptr;
     auto size = hostData.size() * sizeof(T);
 
     auto ret = aclrtMalloc(&srcDeviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -155,7 +155,7 @@ int CreateAclTensorNz(const std::vector<T> &hostData, const std::vector<int64_t>
     srcTensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
                                 shape.data(), shape.size(), srcDeviceAddr);
 
-    int64_t *dstShape = nullptr;
+    int64_t* dstShape = nullptr;
     uint64_t dstShapeSize = 0;
     int actualFormat;
     // aclnnNpuFormatCast private format code: 29 means FRACTAL_NZ.
@@ -165,8 +165,8 @@ int CreateAclTensorNz(const std::vector<T> &hostData, const std::vector<int64_t>
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNpuFormatCastCalculateSizeAndFormat failed. ERROR: %d\n", ret);
               return ret);
 
-    aclTensor *dstTensor = nullptr;
-    void *dstDeviceAddr = nullptr;
+    aclTensor* dstTensor = nullptr;
+    void* dstDeviceAddr = nullptr;
 
     uint64_t tensorSize = 1;
     for (uint64_t i = 0; i < dstShapeSize; i++) {
@@ -182,8 +182,8 @@ int CreateAclTensorNz(const std::vector<T> &hostData, const std::vector<int64_t>
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor;
+    void* workspaceAddr = nullptr;
 
     ret = aclnnNpuFormatCastGetWorkspaceSize(srcTensor, dstTensor, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNpuFormatCastGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
@@ -211,7 +211,7 @@ int CreateAclTensorNz(const std::vector<T> &hostData, const std::vector<int64_t>
     return ACL_SUCCESS;
 }
 
-int RunExample(int32_t deviceId, aclrtStream &stream)
+int RunExample(int32_t deviceId, aclrtStream& stream)
 {
     auto ret = Init(deviceId, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init stream failed. ERROR: %d\n", ret); return ret);
@@ -240,25 +240,25 @@ int RunExample(int32_t deviceId, aclrtStream &stream)
     std::vector<int64_t> rowIndexShape = {m};
     std::vector<int64_t> outShape = {batch, n};
 
-    void *xDeviceAddr = nullptr;
-    void *wDeviceAddr = nullptr;
-    void *scaleDeviceAddr = nullptr;
-    void *pertokenScaleDeviceAddr = nullptr;
-    void *groupListDeviceAddr = nullptr;
-    void *sharedInputDeviceAddr = nullptr;
-    void *logitDeviceAddr = nullptr;
-    void *rowIndexDeviceAddr = nullptr;
-    void *outDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* wDeviceAddr = nullptr;
+    void* scaleDeviceAddr = nullptr;
+    void* pertokenScaleDeviceAddr = nullptr;
+    void* groupListDeviceAddr = nullptr;
+    void* sharedInputDeviceAddr = nullptr;
+    void* logitDeviceAddr = nullptr;
+    void* rowIndexDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *w = nullptr;
-    aclTensor *groupList = nullptr;
-    aclTensor *scale = nullptr;
-    aclTensor *pertokenScale = nullptr;
-    aclTensor *sharedInput = nullptr;
-    aclTensor *logit = nullptr;
-    aclTensor *rowIndex = nullptr;
-    aclTensor *out = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* w = nullptr;
+    aclTensor* groupList = nullptr;
+    aclTensor* scale = nullptr;
+    aclTensor* pertokenScale = nullptr;
+    aclTensor* sharedInput = nullptr;
+    aclTensor* logit = nullptr;
+    aclTensor* rowIndex = nullptr;
+    aclTensor* out = nullptr;
 
     std::vector<uint8_t> xHostData(GetShapeSize(xShape));
     std::vector<uint8_t> wHostData(GetShapeSize(wShape));
@@ -273,56 +273,56 @@ int RunExample(int32_t deviceId, aclrtStream &stream)
 
     ret = CreateAclTensor(xHostData, xShape, &xDeviceAddr, aclDataType::ACL_FLOAT8_E4M3FN, &x);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<void, aclError (*)(void *)> xDeviceAddrPtr(xDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> xTensorPtr(x, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> xDeviceAddrPtr(xDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> xTensorPtr(x, aclDestroyTensor);
 
     ret = CreateAclTensorNz(wHostData, wShape, &wDeviceAddr, aclDataType::ACL_FLOAT4_E2M1, &w, stream);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<void, aclError (*)(void *)> wDeviceAddrPtr(wDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> wTensorPtr(w, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> wDeviceAddrPtr(wDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> wTensorPtr(w, aclDestroyTensor);
 
     ret = CreateAclTensor(scaleHostData, scaleShape, &scaleDeviceAddr, aclDataType::ACL_FLOAT8_E8M0, &scale);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<void, aclError (*)(void *)> scaleDeviceAddrPtr(scaleDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> scaleTensorPtr(scale, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> scaleDeviceAddrPtr(scaleDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> scaleTensorPtr(scale, aclDestroyTensor);
 
     ret = CreateAclTensor(pertokenScaleHostData, pertokenScaleShape, &pertokenScaleDeviceAddr,
                           aclDataType::ACL_FLOAT8_E8M0, &pertokenScale);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<void, aclError (*)(void *)> pertokenScaleDeviceAddrPtr(pertokenScaleDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> pertokenScaleTensorPtr(pertokenScale,
-                                                                                          aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> pertokenScaleDeviceAddrPtr(pertokenScaleDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> pertokenScaleTensorPtr(pertokenScale,
+                                                                                         aclDestroyTensor);
 
     ret = CreateAclTensor(groupListHostData, groupListShape, &groupListDeviceAddr, aclDataType::ACL_INT64, &groupList);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<void, aclError (*)(void *)> groupListDeviceAddrPtr(groupListDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> groupListTensorPtr(groupList, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> groupListDeviceAddrPtr(groupListDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> groupListTensorPtr(groupList, aclDestroyTensor);
 
     ret = CreateAclTensor(sharedInputHostData, sharedInputShape, &sharedInputDeviceAddr, aclDataType::ACL_BF16,
                           &sharedInput);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<void, aclError (*)(void *)> sharedInputDeviceAddrPtr(sharedInputDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> sharedInputTensorPtr(sharedInput, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> sharedInputDeviceAddrPtr(sharedInputDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> sharedInputTensorPtr(sharedInput, aclDestroyTensor);
 
     ret = CreateAclTensor(logitHostData, logitShape, &logitDeviceAddr, aclDataType::ACL_FLOAT, &logit);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<void, aclError (*)(void *)> logitDeviceAddrPtr(logitDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> logitTensorPtr(logit, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> logitDeviceAddrPtr(logitDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> logitTensorPtr(logit, aclDestroyTensor);
 
     ret = CreateAclTensor(rowIndexHostData, rowIndexShape, &rowIndexDeviceAddr, aclDataType::ACL_INT64, &rowIndex);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<void, aclError (*)(void *)> rowIndexDeviceAddrPtr(rowIndexDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> rowIndexTensorPtr(rowIndex, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> rowIndexDeviceAddrPtr(rowIndexDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> rowIndexTensorPtr(rowIndex, aclDestroyTensor);
 
     ret = CreateAclTensor(outHostData, outShape, &outDeviceAddr, aclDataType::ACL_FLOAT, &out);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<void, aclError (*)(void *)> outDeviceAddrPtr(outDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> outTensorPtr(out, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> outDeviceAddrPtr(outDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> outTensorPtr(out, aclDestroyTensor);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
-    void *workspaceAddr = nullptr;
-    std::unique_ptr<void, aclError (*)(void *)> workspaceAddrPtr(workspaceAddr, aclrtFree);
+    aclOpExecutor* executor;
+    void* workspaceAddr = nullptr;
+    std::unique_ptr<void, aclError (*)(void*)> workspaceAddrPtr(workspaceAddr, aclrtFree);
 
     ret = aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize(
         x, w, scale, nullptr, nullptr, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype,

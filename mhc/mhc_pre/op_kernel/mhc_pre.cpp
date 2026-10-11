@@ -39,7 +39,7 @@ extern "C" __global__ __aicore__ void mhc_pre(GM_ADDR x, GM_ADDR phi, GM_ADDR al
     }
 
     GET_TILING_DATA_WITH_STRUCT(MhcPreMembaseTilingData, tiling_data_in, tiling);
-    const MhcPreMembaseTilingData *__restrict tilingData = &tiling_data_in;
+    const MhcPreMembaseTilingData* __restrict tilingData = &tiling_data_in;
 
     if (TILING_KEY_IS(0)) {
         // -----------power + res--------------

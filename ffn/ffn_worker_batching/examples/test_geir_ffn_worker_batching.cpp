@@ -142,10 +142,10 @@ static_assert(offsetof(ScheduleContext, ffn) == 384, "FfnArea must use the sched
 
 struct ExampleResources {
     std::array<uint8_t, sizeof(ScheduleContext)> schedule_context{};
-    std::vector<void *> device_buffers;
+    std::vector<void*> device_buffers;
 };
 
-int32_t CopyToDevice(const void *host_data, size_t data_size, void **device_data, ExampleResources &resources)
+int32_t CopyToDevice(const void* host_data, size_t data_size, void** device_data, ExampleResources& resources)
 {
     aclError acl_ret = aclrtMalloc(device_data, data_size, ACL_MEM_MALLOC_HUGE_FIRST);
     if (acl_ret != ACL_SUCCESS) {
@@ -163,9 +163,9 @@ int32_t CopyToDevice(const void *host_data, size_t data_size, void **device_data
     return SUCCESS;
 }
 
-void ReleaseDeviceBuffers(ExampleResources &resources)
+void ReleaseDeviceBuffers(ExampleResources& resources)
 {
-    for (void *device_buffer : resources.device_buffers) {
+    for (void* device_buffer : resources.device_buffers) {
         if (device_buffer != nullptr) {
             aclrtFree(device_buffer);
         }
@@ -173,9 +173,9 @@ void ReleaseDeviceBuffers(ExampleResources &resources)
     resources.device_buffers.clear();
 }
 
-int32_t WriteDataToFile(string bin_file, uint64_t data_size, uint8_t *inputData)
+int32_t WriteDataToFile(string bin_file, uint64_t data_size, uint8_t* inputData)
 {
-    FILE *fp;
+    FILE* fp;
     fp = fopen(bin_file.c_str(), "w");
     if (fp == nullptr) {
         return FAILED;
@@ -185,8 +185,8 @@ int32_t WriteDataToFile(string bin_file, uint64_t data_size, uint8_t *inputData)
     return SUCCESS;
 }
 
-int CreateOppInGraph(std::vector<ge::Tensor> &input, std::vector<Operator> &inputs, std::vector<Operator> &outputs,
-                     Graph &graph, ExampleResources &resources)
+int CreateOppInGraph(std::vector<ge::Tensor>& input, std::vector<Operator>& inputs, std::vector<Operator>& outputs,
+                     Graph& graph, ExampleResources& resources)
 {
     auto ffn_worker_batching_op = op::FfnWorkerBatching("ffn_worker_batching");
 
@@ -216,10 +216,10 @@ int CreateOppInGraph(std::vector<ge::Tensor> &input, std::vector<Operator> &inpu
     std::vector<int32_t> session_ids(session_num, 0);
     std::vector<int32_t> micro_batch_ids(session_num, 0);
 
-    void *token_data_device = nullptr;
-    void *expert_ids_device = nullptr;
-    void *session_ids_device = nullptr;
-    void *micro_batch_ids_device = nullptr;
+    void* token_data_device = nullptr;
+    void* expert_ids_device = nullptr;
+    void* session_ids_device = nullptr;
+    void* micro_batch_ids_device = nullptr;
     if (CopyToDevice(token_data.data(), token_data.size() * sizeof(uint16_t), &token_data_device, resources) !=
             SUCCESS ||
         CopyToDevice(expert_ids.data(), expert_ids.size() * sizeof(int32_t), &expert_ids_device, resources) !=
@@ -290,7 +290,7 @@ int CreateOppInGraph(std::vector<ge::Tensor> &input, std::vector<Operator> &inpu
 
 int main()
 {
-    const char *graph_name = "tc_ge_irrun_test";
+    const char* graph_name = "tc_ge_irrun_test";
     Graph graph(graph_name);
     std::vector<ge::Tensor> input;
 
@@ -323,7 +323,7 @@ int main()
 
     };
     printf("%s - INFO - [XIR]: Start to create ir session using build options\n", GetTime().c_str());
-    ge::Session *session = new Session(build_options);
+    ge::Session* session = new Session(build_options);
 
     if (session == nullptr) {
         printf("%s - ERROR - [XIR]: Create ir session using build options failed\n", GetTime().c_str());
@@ -369,22 +369,22 @@ int main()
     for (int i = 0; i < input_num; i++) {
         std::cout << "input " << i << " dtype :  " << input[i].GetTensorDesc().GetDataType() << std::endl;
         string input_file = "./tc_ge_irrun_test_0008_npu_input_" + std::to_string(i) + ".bin";
-        uint8_t *input_data_i = input[i].GetData();
+        uint8_t* input_data_i = input[i].GetData();
         int64_t input_shape = input[i].GetTensorDesc().GetShape().GetShapeSize();
         std::cout << "this is " << i << "th input, input shape size =" << input_shape << std::endl;
         uint32_t data_size = input_shape * GetDataTypeSize(input[i].GetTensorDesc().GetDataType());
-        WriteDataToFile((const char *)input_file.c_str(), data_size, input_data_i);
+        WriteDataToFile((const char*)input_file.c_str(), data_size, input_data_i);
     }
 
     int output_num = output.size();
     for (int i = 0; i < output_num; i++) {
         std::cout << "output " << i << " dtype :  " << output[i].GetTensorDesc().GetDataType() << std::endl;
         string output_file = "./tc_ge_irrun_test_0008_npu_output_" + std::to_string(i) + ".bin";
-        uint8_t *output_data_i = output[i].GetData();
+        uint8_t* output_data_i = output[i].GetData();
         int64_t output_shape = output[i].GetTensorDesc().GetShape().GetShapeSize();
         std::cout << "this is " << i << "th output, output shape size =" << output_shape << std::endl;
         uint32_t data_size = output_shape * GetDataTypeSize(output[i].GetTensorDesc().GetDataType());
-        WriteDataToFile((const char *)output_file.c_str(), data_size, output_data_i);
+        WriteDataToFile((const char*)output_file.c_str(), data_size, output_data_i);
     }
 
     ge::AscendString error_msg = ge::GEGetErrorMsgV2();

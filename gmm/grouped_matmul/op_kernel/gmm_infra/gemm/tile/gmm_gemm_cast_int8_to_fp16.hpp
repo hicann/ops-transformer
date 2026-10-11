@@ -57,7 +57,7 @@ struct TileCastInt8ToFp16Dequant {
 
     /// Construct
     CATLASS_DEVICE
-    TileCastInt8ToFp16Dequant(Arch::Resource<ArchTag> const &resource, Params const &params_)
+    TileCastInt8ToFp16Dequant(Arch::Resource<ArchTag> const& resource, Params const& params_)
         : params(params_)
     {
         if constexpr (g_coreType == AscendC::AIV) {
@@ -91,8 +91,8 @@ struct TileCastInt8ToFp16Dequant {
     }
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementDst> const &gmDst, LayoutDst const &layoutDst,
-                    AscendC::GlobalTensor<ElementSrc> const &gmSrc, LayoutSrc const &layoutSrc)
+    void operator()(AscendC::GlobalTensor<ElementDst> const& gmDst, LayoutDst const& layoutDst,
+                    AscendC::GlobalTensor<ElementSrc> const& gmSrc, LayoutSrc const& layoutSrc)
     {
         uint32_t tilesNum = layoutSrc.shape(0);
         uint32_t tileLen = layoutSrc.shape(1);

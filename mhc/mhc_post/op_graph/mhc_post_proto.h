@@ -21,22 +21,22 @@
 
 namespace ge {
 /**
-* @brief Fuse the main branch feature h_out with the residual branch feature x
-* using the gating mechanism h_post and the doubly stochastic matrix  h_res
-* to enable information flow.
-* @par Inputs:
-* @li x: A Tensor. Represents input data in the mHC layer. Type is:BFloat16 or Float16. \n
-* Dataformat:ND. Supports 3D (Shape:[T, n, D]) or 4D (Shape:[B, S, n, D]) tensors.
-* @li h_res: A Tensor. Represents the h_res transformation matrix. Type is:Float32. \n 
-* Dataformat:ND. Supports 3D (Shape:[T, n, n]) or 4D (Shape:[B, S, n, n]) tensors.
-* @li h_out: A Tensor. Represents output of the Atten/MLP layer. Type is:BFloat16 or Float16. \n
-* Dataformat:ND. Supports 2D (Shape:[T, D]) or 3D (Shape:[B, S, D]) tensors.
-* @li h_post: A Tensor. Represents the h_res transformation matrix. Type is:Float32. \n
-* Dataformat:ND. Supports 2D (Shape:[T, n]) or 3D (Shape:[B, S, n]) tensors.
-* @par Outputs:
-* y: A Tensor. Type is:BFloat16 or Float16. Dataformat:ND. \n
-* Supports 3D (Shape:[T, n, D]) or 4D (Shape:[B, S, n, D]) tensors. 
-*/
+ * @brief Fuse the main branch feature h_out with the residual branch feature x
+ * using the gating mechanism h_post and the doubly stochastic matrix  h_res
+ * to enable information flow.
+ * @par Inputs:
+ * @li x: A Tensor. Represents input data in the mHC layer. Type is:BFloat16 or Float16. \n
+ * Dataformat:ND. Supports 3D (Shape:[T, n, D]) or 4D (Shape:[B, S, n, D]) tensors.
+ * @li h_res: A Tensor. Represents the h_res transformation matrix. Type is:Float32. \n
+ * Dataformat:ND. Supports 3D (Shape:[T, n, n]) or 4D (Shape:[B, S, n, n]) tensors.
+ * @li h_out: A Tensor. Represents output of the Atten/MLP layer. Type is:BFloat16 or Float16. \n
+ * Dataformat:ND. Supports 2D (Shape:[T, D]) or 3D (Shape:[B, S, D]) tensors.
+ * @li h_post: A Tensor. Represents the h_res transformation matrix. Type is:Float32. \n
+ * Dataformat:ND. Supports 2D (Shape:[T, n]) or 3D (Shape:[B, S, n]) tensors.
+ * @par Outputs:
+ * y: A Tensor. Type is:BFloat16 or Float16. Dataformat:ND. \n
+ * Supports 3D (Shape:[T, n, D]) or 4D (Shape:[B, S, n, D]) tensors.
+ */
 REG_OP(MhcPost)
     .INPUT(x, TensorType({DT_FLOAT16, DT_BF16}))
     .INPUT(h_res, TensorType({DT_FLOAT}))

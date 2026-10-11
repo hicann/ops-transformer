@@ -18,8 +18,8 @@
 
 namespace op_api {
 
-at::Tensor MhcPost(const at::Tensor &x, const c10::optional<at::Tensor> &hRes, const at::Tensor &hOut,
-                   const at::Tensor &hPost)
+at::Tensor MhcPost(const at::Tensor& x, const c10::optional<at::Tensor>& hRes, const at::Tensor& hOut,
+                   const at::Tensor& hPost)
 {
     at::Tensor out = at::empty_like(x);
 

@@ -29,8 +29,8 @@ public:
 public:
     /* 输入输出 */
     AclnnTensor aclnnX1, aclnnX2, aclnnScale2, aclnnGroupList, aclnnScale1, aclnnY;
-    aclTensor *x1 = nullptr;
-    aclTensor *scale1 = nullptr;
+    aclTensor* x1 = nullptr;
+    aclTensor* scale1 = nullptr;
     std::map<std::string, Tensor> mTensors;
 
 public:

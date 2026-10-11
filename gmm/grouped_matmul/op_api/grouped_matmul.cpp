@@ -20,21 +20,21 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(GroupedMatmul);
 
-const aclTensorList *GroupedMatmul(const aclTensorList *x, const aclTensorList *weight,
-                                   const aclTensorList *biasOptional, const aclTensorList *scaleOptional,
-                                   const aclTensorList *offsetOptional, const aclTensorList *antiquantScaleOptional,
-                                   const aclTensorList *antiquantOffsetOptional, const aclTensor *groupListOptional,
-                                   const aclTensor *perTokenScaleOptional, int64_t splitItem, op::DataType yDtype,
+const aclTensorList* GroupedMatmul(const aclTensorList* x, const aclTensorList* weight,
+                                   const aclTensorList* biasOptional, const aclTensorList* scaleOptional,
+                                   const aclTensorList* offsetOptional, const aclTensorList* antiquantScaleOptional,
+                                   const aclTensorList* antiquantOffsetOptional, const aclTensor* groupListOptional,
+                                   const aclTensor* perTokenScaleOptional, int64_t splitItem, op::DataType yDtype,
                                    bool transposeWeight, bool transposeX, int64_t groupType, int64_t groupListType,
-                                   int64_t actType, const aclIntArray *tuningConfig, size_t outLength,
-                                   aclOpExecutor *executor)
+                                   int64_t actType, const aclIntArray* tuningConfig, size_t outLength,
+                                   aclOpExecutor* executor)
 {
     L0_DFX(GroupedMatmul, x, weight, biasOptional, scaleOptional, offsetOptional, antiquantScaleOptional,
            antiquantOffsetOptional, groupListOptional, perTokenScaleOptional, splitItem, yDtype, transposeWeight,
            transposeX, groupType, groupListType, actType, tuningConfig, outLength);
 
-    std::vector<const aclTensor *> tensorsVec;
-    const aclTensor *x0 = x->Size() > 0 ? (*x)[0] : nullptr;
+    std::vector<const aclTensor*> tensorsVec;
+    const aclTensor* x0 = x->Size() > 0 ? (*x)[0] : nullptr;
     if (x0 == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("GroupedMatmul", "x[0]", "nullptr",
                                               "x must contain a non-null first tensor");

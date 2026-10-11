@@ -76,7 +76,7 @@ static const std::vector<DataType> QUANTOUT_DTYPE_SUPPORT_LIST = {DataType::DT_I
 static const std::vector<DataType> QUANTSCALEOUT_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
 static const std::vector<DataType> BIAS_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
 
-static std::string GetSwigluQuantScenarioName(const DataType &xDtype, const DataType &weightDtype)
+static std::string GetSwigluQuantScenarioName(const DataType& xDtype, const DataType& weightDtype)
 {
     if (xDtype == DataType::DT_INT8 && weightDtype == DataType::DT_INT8) {
         return "A8W8";
@@ -87,10 +87,10 @@ static std::string GetSwigluQuantScenarioName(const DataType &xDtype, const Data
     return "unsupported";
 }
 
-static bool CheckNotNull(const aclTensor *x, const aclTensor *weight, const aclTensor *bias, const aclTensor *offset,
-                         const aclTensor *weightScale, const aclTensor *xScale, const aclTensor *groupList,
-                         const aclTensor *output, const aclTensor *outputScale, const aclTensor *outputOffset,
-                         const char *opName)
+static bool CheckNotNull(const aclTensor* x, const aclTensor* weight, const aclTensor* bias, const aclTensor* offset,
+                         const aclTensor* weightScale, const aclTensor* xScale, const aclTensor* groupList,
+                         const aclTensor* output, const aclTensor* outputScale, const aclTensor* outputOffset,
+                         const char* opName)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(weight, return false);
@@ -120,9 +120,9 @@ static bool CheckNotNull(const aclTensor *x, const aclTensor *weight, const aclT
     return true;
 }
 
-static bool CheckInputOutDims_A8W8(const aclTensor *x, const aclTensor *weight, const aclTensor *weightScale,
-                                   const aclTensor *xScale, const aclTensor *groupList, const aclTensor *output,
-                                   const aclTensor *outputScale)
+static bool CheckInputOutDims_A8W8(const aclTensor* x, const aclTensor* weight, const aclTensor* weightScale,
+                                   const aclTensor* xScale, const aclTensor* groupList, const aclTensor* output,
+                                   const aclTensor* outputScale)
 {
     OP_CHECK_WRONG_DIMENSION(x, X_DIM_LIMIT, return false);
     op::Format weightViewFormat = weight->GetViewFormat();
@@ -139,9 +139,9 @@ static bool CheckInputOutDims_A8W8(const aclTensor *x, const aclTensor *weight, 
     return true;
 }
 
-static bool CheckInputOutDims_A8W4(const aclTensor *x, const aclTensor *weight, const aclTensor *bias,
-                                   const aclTensor *weightScale, const aclTensor *xScale, const aclTensor *groupList,
-                                   const aclTensor *output, const aclTensor *outputScale)
+static bool CheckInputOutDims_A8W4(const aclTensor* x, const aclTensor* weight, const aclTensor* bias,
+                                   const aclTensor* weightScale, const aclTensor* xScale, const aclTensor* groupList,
+                                   const aclTensor* output, const aclTensor* outputScale)
 {
     OP_CHECK_WRONG_DIMENSION(x, X_DIM_LIMIT, return false);
     op::Format weightViewFormat = weight->GetViewFormat();
@@ -161,9 +161,9 @@ static bool CheckInputOutDims_A8W4(const aclTensor *x, const aclTensor *weight, 
     return true;
 }
 
-static bool CheckInputOutShape_A8W8(const aclTensor *x, const aclTensor *weight, const aclTensor *weightScale,
-                                    const aclTensor *xScale, const aclTensor *groupList, const aclTensor *output,
-                                    const aclTensor *outputScale, const char *opName)
+static bool CheckInputOutShape_A8W8(const aclTensor* x, const aclTensor* weight, const aclTensor* weightScale,
+                                    const aclTensor* xScale, const aclTensor* groupList, const aclTensor* output,
+                                    const aclTensor* outputScale, const char* opName)
 {
     int64_t m = x->GetViewShape().GetDim(0);
     int64_t k = x->GetViewShape().GetDim(1);
@@ -226,9 +226,9 @@ static bool CheckInputOutShape_A8W8(const aclTensor *x, const aclTensor *weight,
     return true;
 }
 
-static bool CheckInputOutShape_A8W4(const aclTensor *x, const aclTensor *weight, const aclTensor *bias,
-                                    const aclTensor *weightScale, const aclTensor *xScale, const aclTensor *groupList,
-                                    const aclTensor *output, const aclTensor *outputScale, const char *opName)
+static bool CheckInputOutShape_A8W4(const aclTensor* x, const aclTensor* weight, const aclTensor* bias,
+                                    const aclTensor* weightScale, const aclTensor* xScale, const aclTensor* groupList,
+                                    const aclTensor* output, const aclTensor* outputScale, const char* opName)
 {
     int64_t e = weight->GetViewShape().GetDim(0);
     int64_t m = x->GetViewShape().GetDim(0);
@@ -314,9 +314,9 @@ static bool CheckInputOutShape_A8W4(const aclTensor *x, const aclTensor *weight,
     return true;
 }
 
-static bool CheckDtypeValid(const aclTensor *x, const aclTensor *weight, const aclTensor *bias,
-                            const aclTensor *weightScale, const aclTensor *xScale, const aclTensor *groupList,
-                            const aclTensor *output, const aclTensor *outputScale)
+static bool CheckDtypeValid(const aclTensor* x, const aclTensor* weight, const aclTensor* bias,
+                            const aclTensor* weightScale, const aclTensor* xScale, const aclTensor* groupList,
+                            const aclTensor* output, const aclTensor* outputScale)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(x, X_DTYPE_SUPPORT_LIST, return false);
     OP_CHECK_DTYPE_NOT_SUPPORT(weight, WEIGHT_DTYPE_SUPPORT_LIST, return false);
@@ -336,7 +336,7 @@ static bool CheckDtypeValid(const aclTensor *x, const aclTensor *weight, const a
     return true;
 }
 
-static bool CheckFormat(const aclTensor *x, const aclTensor *weight, const aclTensor *output, const char *opName)
+static bool CheckFormat(const aclTensor* x, const aclTensor* weight, const aclTensor* output, const char* opName)
 {
     bool isNZ = weight->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ;
     std::string scenario = GetSwigluQuantScenarioName(x->GetDataType(), weight->GetDataType());
@@ -359,10 +359,10 @@ static bool CheckFormat(const aclTensor *x, const aclTensor *weight, const aclTe
     return true;
 }
 
-static void UnpackInt32ToInt4(const aclTensor *&tensorS32, const std::string &tensorType)
+static void UnpackInt32ToInt4(const aclTensor*& tensorS32, const std::string& tensorType)
 {
     OP_LOGD("Unpack %s from int32 to int4 start.", tensorType.c_str());
-    auto tensorS4 = const_cast<aclTensor *>(tensorS32);
+    auto tensorS4 = const_cast<aclTensor*>(tensorS32);
     op::Shape tensorShape = tensorS4->GetViewShape();
     auto viewShapeDim = tensorShape.GetDimNum();
     tensorShape[viewShapeDim - 1] = tensorShape[viewShapeDim - 1] * INT4_PER_INT32;
@@ -372,10 +372,10 @@ static void UnpackInt32ToInt4(const aclTensor *&tensorS32, const std::string &te
     OP_LOGD("Unpack %s from int32 to int4 finished.", tensorType.c_str());
 }
 
-static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *weight, const aclTensor *bias,
-                               const aclTensor *offset, const aclTensor *weightScale, const aclTensor *xScale,
-                               const aclTensor *groupList, const aclTensor *output, const aclTensor *outputScale,
-                               const aclTensor *outputOffset, const char *opName)
+static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* weight, const aclTensor* bias,
+                               const aclTensor* offset, const aclTensor* weightScale, const aclTensor* xScale,
+                               const aclTensor* groupList, const aclTensor* output, const aclTensor* outputScale,
+                               const aclTensor* outputOffset, const char* opName)
 {
     // 1. 检查参数是否为空指针
     CHECK_RET(CheckNotNull(x, weight, bias, offset, weightScale, xScale, groupList, output, outputScale, outputOffset,
@@ -399,7 +399,7 @@ static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *weight, cons
             UnpackInt32ToInt4(weight, "weight");
         }
         if (weightScale->GetDataType() == DataType::DT_INT64) {
-            auto weightScale_fix = const_cast<aclTensor *>(weightScale);
+            auto weightScale_fix = const_cast<aclTensor*>(weightScale);
             weightScale_fix->SetDataType(DataType::DT_UINT64);
         }
         // 2. 校验输入、输出参数维度
@@ -420,10 +420,10 @@ static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *weight, cons
 }
 
 static aclnnStatus aclnnGroupedMatmulSwigluQuantGetWorkspaceSizeCommon(
-    const aclTensor *x, const aclTensor *weight, const aclTensor *bias, const aclTensor *offset,
-    const aclTensor *weightScale, const aclTensor *xScale, const aclTensor *groupList, aclTensor *output,
-    aclTensor *outputScale, aclTensor *outputOffset, uint64_t *workspaceSize, aclOpExecutor **executor,
-    const char *opName)
+    const aclTensor* x, const aclTensor* weight, const aclTensor* bias, const aclTensor* offset,
+    const aclTensor* weightScale, const aclTensor* xScale, const aclTensor* groupList, aclTensor* output,
+    aclTensor* outputScale, aclTensor* outputOffset, uint64_t* workspaceSize, aclOpExecutor** executor,
+    const char* opName)
 {
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -479,14 +479,14 @@ static aclnnStatus aclnnGroupedMatmulSwigluQuantGetWorkspaceSizeCommon(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnGroupedMatmulSwigluQuantGetWorkspaceSize(const aclTensor *x, const aclTensor *weight,
-                                                          const aclTensor *bias, const aclTensor *offset,
-                                                          const aclTensor *weightScale, const aclTensor *xScale,
-                                                          const aclTensor *groupList, aclTensor *output,
-                                                          aclTensor *outputScale, aclTensor *outputOffset,
-                                                          uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnGroupedMatmulSwigluQuantGetWorkspaceSize(const aclTensor* x, const aclTensor* weight,
+                                                          const aclTensor* bias, const aclTensor* offset,
+                                                          const aclTensor* weightScale, const aclTensor* xScale,
+                                                          const aclTensor* groupList, aclTensor* output,
+                                                          aclTensor* outputScale, aclTensor* outputOffset,
+                                                          uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    const char *opName = "grouped_matmul_swiglu_quant";
+    const char* opName = "grouped_matmul_swiglu_quant";
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     L2_DFX_PHASE_1(aclnnGroupedMatmulSwigluQuant, DFX_IN(x, weight, bias, offset, weightScale, xScale, groupList),
                    DFX_OUT(output, outputScale, outputOffset));
@@ -496,14 +496,14 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantGetWorkspaceSize(const aclTensor *x, co
                                                                executor, opName);
 }
 
-aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZGetWorkspaceSize(const aclTensor *x, const aclTensor *weight,
-                                                                  const aclTensor *bias, const aclTensor *offset,
-                                                                  const aclTensor *weightScale, const aclTensor *xScale,
-                                                                  const aclTensor *groupList, aclTensor *output,
-                                                                  aclTensor *outputScale, aclTensor *outputOffset,
-                                                                  uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZGetWorkspaceSize(const aclTensor* x, const aclTensor* weight,
+                                                                  const aclTensor* bias, const aclTensor* offset,
+                                                                  const aclTensor* weightScale, const aclTensor* xScale,
+                                                                  const aclTensor* groupList, aclTensor* output,
+                                                                  aclTensor* outputScale, aclTensor* outputOffset,
+                                                                  uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    const char *opName = "grouped_matmul_swiglu_quant";
+    const char* opName = "grouped_matmul_swiglu_quant";
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     L2_DFX_PHASE_1(aclnnGroupedMatmulSwigluQuantWeightNZ,
                    DFX_IN(x, weight, bias, offset, weightScale, xScale, groupList),
@@ -512,7 +512,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZGetWorkspaceSize(const aclTenso
     CHECK_RET(weight != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     auto storgeShape = weight->GetStorageShape();
     auto viewShape = weight->GetViewShape();
-    aclTensor *weightNZ = const_cast<aclTensor *>(weight);
+    aclTensor* weightNZ = const_cast<aclTensor*>(weight);
     CHECK_COND((storgeShape.GetDimNum() == WEIGHT_NZ_DIM_LIMIT), ACLNN_ERR_PARAM_INVALID,
                "In op [%s], the shape of [%s] is not supported, got [%s with dim num %zu]. Constraint:[storage "
                "shape dim num must be 5 when A8W4 weight NZ swiglu quant].",
@@ -532,7 +532,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZGetWorkspaceSize(const aclTenso
                                                                executor, opName);
 }
 
-aclnnStatus aclnnGroupedMatmulSwigluQuant(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnGroupedMatmulSwigluQuant(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                           aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnGroupedMatmulSwigluQuant);
@@ -541,7 +541,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuant(void *workspace, uint64_t workspaceSiz
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                   aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnGroupedMatmulSwigluQuantWeightNZ);

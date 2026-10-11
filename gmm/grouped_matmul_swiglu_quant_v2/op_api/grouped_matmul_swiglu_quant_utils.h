@@ -39,7 +39,7 @@ constexpr size_t WEIGHT_NZ_DIM_LIMIT = 5UL;
 constexpr size_t WEIGHT_ND_DIM_LIMIT = 3UL;
 
 template <typename T>
-inline std::string BuildLogValue(const char *name, T value)
+inline std::string BuildLogValue(const char* name, T value)
 {
     std::ostringstream oss;
     oss << name << " " << value;
@@ -47,7 +47,7 @@ inline std::string BuildLogValue(const char *name, T value)
 }
 
 template <typename T0, typename T1>
-inline std::string BuildLogValues(const char *name0, T0 value0, const char *name1, T1 value1)
+inline std::string BuildLogValues(const char* name0, T0 value0, const char* name1, T1 value1)
 {
     std::ostringstream oss;
     oss << name0 << " " << value0 << ", " << name1 << " " << value1;
@@ -55,17 +55,17 @@ inline std::string BuildLogValues(const char *name0, T0 value0, const char *name
 }
 
 struct GroupedMatmulSwigluQuantParamsBase {
-    const aclTensor *x = nullptr;
-    const aclTensorList *weight = nullptr;
-    const aclTensorList *weightScale = nullptr;
-    const aclTensorList *weightAssistMatrix = nullptr;
-    const aclTensor *xScale = nullptr;
-    const aclTensor *bias = nullptr;
-    const aclTensor *smoothScale = nullptr;
-    const aclTensor *groupList = nullptr;
-    const aclTensor *output = nullptr;
-    const aclTensor *outputScale = nullptr;
-    const aclIntArray *tuningConfig = nullptr;
+    const aclTensor* x = nullptr;
+    const aclTensorList* weight = nullptr;
+    const aclTensorList* weightScale = nullptr;
+    const aclTensorList* weightAssistMatrix = nullptr;
+    const aclTensor* xScale = nullptr;
+    const aclTensor* bias = nullptr;
+    const aclTensor* smoothScale = nullptr;
+    const aclTensor* groupList = nullptr;
+    const aclTensor* output = nullptr;
+    const aclTensor* outputScale = nullptr;
+    const aclIntArray* tuningConfig = nullptr;
     int64_t dequantMode = 0;
     int64_t dequantDtype = 0;
     int64_t quantMode = 0;
@@ -79,9 +79,9 @@ struct GroupedMatmulSwigluQuantParamsBase {
 
 class GroupedMatmulSwigluQuantParamsBuilder {
 public:
-    static GroupedMatmulSwigluQuantParamsBuilder Create(const aclTensor *x, const aclTensorList *weight,
-                                                        const aclTensorList *weightScale, const aclTensor *output,
-                                                        const aclTensor *outputScale)
+    static GroupedMatmulSwigluQuantParamsBuilder Create(const aclTensor* x, const aclTensorList* weight,
+                                                        const aclTensorList* weightScale, const aclTensor* output,
+                                                        const aclTensor* outputScale)
     {
         GroupedMatmulSwigluQuantParamsBuilder b;
         b.p_.x = x;
@@ -92,69 +92,69 @@ public:
         return b;
     }
 
-    GroupedMatmulSwigluQuantParamsBuilder &SetWeightAssistMatrix(const aclTensorList *weightAssistMatrix)
+    GroupedMatmulSwigluQuantParamsBuilder& SetWeightAssistMatrix(const aclTensorList* weightAssistMatrix)
     {
         p_.weightAssistMatrix = weightAssistMatrix;
         return *this;
     }
 
-    GroupedMatmulSwigluQuantParamsBuilder &SetXScale(const aclTensor *xScale)
+    GroupedMatmulSwigluQuantParamsBuilder& SetXScale(const aclTensor* xScale)
     {
         p_.xScale = xScale;
         return *this;
     }
 
-    GroupedMatmulSwigluQuantParamsBuilder &SetSmoothScale(const aclTensor *smoothScale)
+    GroupedMatmulSwigluQuantParamsBuilder& SetSmoothScale(const aclTensor* smoothScale)
     {
         p_.smoothScale = smoothScale;
         return *this;
     }
 
-    GroupedMatmulSwigluQuantParamsBuilder &SetBias(const aclTensor *bias)
+    GroupedMatmulSwigluQuantParamsBuilder& SetBias(const aclTensor* bias)
     {
         p_.bias = bias;
         return *this;
     }
 
-    GroupedMatmulSwigluQuantParamsBuilder &SetGroupList(const aclTensor *groupList)
+    GroupedMatmulSwigluQuantParamsBuilder& SetGroupList(const aclTensor* groupList)
     {
         p_.groupList = groupList;
         return *this;
     }
 
-    GroupedMatmulSwigluQuantParamsBuilder &SetGroupListType(const int64_t groupListType)
+    GroupedMatmulSwigluQuantParamsBuilder& SetGroupListType(const int64_t groupListType)
     {
         p_.groupListType = groupListType;
         return *this;
     }
 
-    GroupedMatmulSwigluQuantParamsBuilder &SetTuningConfig(const aclIntArray *tuningConfig)
+    GroupedMatmulSwigluQuantParamsBuilder& SetTuningConfig(const aclIntArray* tuningConfig)
     {
         p_.tuningConfig = tuningConfig;
         return *this;
     }
 
-    GroupedMatmulSwigluQuantParamsBuilder &SetDequantAttr(int64_t dequantMode, int64_t dequantDtype)
+    GroupedMatmulSwigluQuantParamsBuilder& SetDequantAttr(int64_t dequantMode, int64_t dequantDtype)
     {
         p_.dequantMode = dequantMode;
         p_.dequantDtype = dequantDtype;
         return *this;
     }
 
-    GroupedMatmulSwigluQuantParamsBuilder &SetQuantAttr(int64_t quantMode, int64_t quantDtype)
+    GroupedMatmulSwigluQuantParamsBuilder& SetQuantAttr(int64_t quantMode, int64_t quantDtype)
     {
         p_.quantMode = quantMode;
         p_.quantDtype = quantDtype;
         return *this;
     }
 
-    GroupedMatmulSwigluQuantParamsBuilder &SetTransposeAttr(bool transposeWeight)
+    GroupedMatmulSwigluQuantParamsBuilder& SetTransposeAttr(bool transposeWeight)
     {
         p_.transposeWeight = transposeWeight;
         return *this;
     }
 
-    GroupedMatmulSwigluQuantParamsBuilder &SetScenario()
+    GroupedMatmulSwigluQuantParamsBuilder& SetScenario()
     {
         p_.isA8W4 = ((this->p_.x->GetDataType() == DataType::DT_INT8 &&
                       ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT4) ||
@@ -187,7 +187,7 @@ public:
     virtual ~GroupedMatmulSwigluQuantHandler() = default;
 
 protected:
-    bool CheckTensorListNull(const aclTensorList *&tensors) const
+    bool CheckTensorListNull(const aclTensorList*& tensors) const
     {
         OP_CHECK_NULL(tensors, return false);
         if (tensors->Size() == 0) {
@@ -275,7 +275,7 @@ protected:
         return ACLNN_SUCCESS;
     }
 
-    void CheckOptionalTensorListEmpty(const aclTensorList *&tensorList) const
+    void CheckOptionalTensorListEmpty(const aclTensorList*& tensorList) const
     {
         if (tensorList == nullptr) {
             return;
@@ -291,15 +291,15 @@ protected:
         }
     }
 
-    aclnnStatus CreateEmptyTensor(const aclDataType dataType, const aclTensorList *&tensorList,
-                                  aclTensorList *&emptyTensorList) const
+    aclnnStatus CreateEmptyTensor(const aclDataType dataType, const aclTensorList*& tensorList,
+                                  aclTensorList*& emptyTensorList) const
     {
         if (tensorList != nullptr) {
             return ACLNN_SUCCESS;
         }
 
-        FVector<aclTensor *> emptyTensors;
-        aclTensor *emptyTensor = l0Executor_->AllocTensor({0}, static_cast<op::DataType>(dataType));
+        FVector<aclTensor*> emptyTensors;
+        aclTensor* emptyTensor = l0Executor_->AllocTensor({0}, static_cast<op::DataType>(dataType));
         CHECK_RET(emptyTensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
         emptyTensors.emplace_back(emptyTensor);
         emptyTensorList = l0Executor_->AllocTensorList(emptyTensors.data(), emptyTensors.size());
@@ -308,12 +308,12 @@ protected:
         return ACLNN_SUCCESS;
     }
 
-    aclnnStatus DataContiguous(const aclTensorList *&tensors) const
+    aclnnStatus DataContiguous(const aclTensorList*& tensors) const
     {
-        std::vector<const aclTensor *> tensorsVec;
-        const aclTensor *contiguousTensor = nullptr;
+        std::vector<const aclTensor*> tensorsVec;
+        const aclTensor* contiguousTensor = nullptr;
         for (size_t i = 0; i < tensors->Size(); ++i) {
-            const aclTensor *tensor = (*tensors)[i];
+            const aclTensor* tensor = (*tensors)[i];
             contiguousTensor = l0op::Contiguous(tensor, l0Executor_);
             CHECK_RET(contiguousTensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
             tensorsVec.push_back(contiguousTensor);
@@ -323,12 +323,12 @@ protected:
         return ACLNN_SUCCESS;
     }
 
-    aclnnStatus DataContiguousWeight(const aclTensorList *&tensors) const
+    aclnnStatus DataContiguousWeight(const aclTensorList*& tensors) const
     {
-        std::vector<const aclTensor *> tensorsVec;
-        const aclTensor *contiguousTensor = nullptr;
+        std::vector<const aclTensor*> tensorsVec;
+        const aclTensor* contiguousTensor = nullptr;
         for (size_t i = 0; i < tensors->Size(); ++i) {
-            const aclTensor *tensor = (*tensors)[i];
+            const aclTensor* tensor = (*tensors)[i];
             if (!IsPrivateFormat(tensor->GetStorageFormat())) {
                 contiguousTensor = l0op::Contiguous(tensor, l0Executor_);
                 CHECK_RET(contiguousTensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -344,7 +344,7 @@ protected:
 
     virtual aclnnStatus CovertDataContiguous()
     {
-        aclTensorList *emptyWeightAssistMatrixList = nullptr;
+        aclTensorList* emptyWeightAssistMatrixList = nullptr;
         CheckOptionalTensorListEmpty(gmmDsqParams_.weightAssistMatrix);
         CHECK_RET(CreateEmptyTensor(aclDataType::ACL_FLOAT, gmmDsqParams_.weightAssistMatrix,
                                     emptyWeightAssistMatrixList) == ACLNN_SUCCESS,
@@ -372,7 +372,7 @@ protected:
     virtual void PrepareOriginalShapesBeforeContiguous()
     {
         for (size_t i = 0; i < gmmDsqParams_.weight->Size(); i++) {
-            auto *w = (*gmmDsqParams_.weight)[i];
+            auto* w = (*gmmDsqParams_.weight)[i];
             if (IsPrivateFormat(w->GetStorageFormat())) {
                 w->SetOriginalShape(w->GetViewShape());
             }
@@ -382,8 +382,8 @@ protected:
     virtual void RestoreOriginalShapesAfterContiguous() {}
 
 public:
-    void Initialize(const char *apiName, GroupedMatmulSwigluQuantParamsBase &params, uint64_t *workspaceSize,
-                    aclOpExecutor **executor)
+    void Initialize(const char* apiName, GroupedMatmulSwigluQuantParamsBase& params, uint64_t* workspaceSize,
+                    aclOpExecutor** executor)
     {
         opName_ = GMM_SWIGLU_QUANT_V2_HANDLER_OP_NAME;
         apiName_ = apiName;
@@ -450,9 +450,9 @@ protected:
     string opName_;
     string apiName_;
     GroupedMatmulSwigluQuantParamsBase gmmDsqParams_;
-    uint64_t *workspaceSize_;
-    aclOpExecutor **executor_;
-    aclOpExecutor *l0Executor_;
+    uint64_t* workspaceSize_;
+    aclOpExecutor** executor_;
+    aclOpExecutor* l0Executor_;
 };
 
 } // namespace gmm_dsq

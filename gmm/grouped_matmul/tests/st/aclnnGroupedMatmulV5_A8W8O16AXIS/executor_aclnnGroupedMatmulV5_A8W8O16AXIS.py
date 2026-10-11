@@ -19,6 +19,7 @@ from atk.tasks.api_execute.aclnn_base_api import AclnnBaseApi
 from atk.tasks.dataset.base_dataset import OpsDataset
 from atk.tasks.backends.lib_interface.acl_wrapper import AclFormat
 
+
 @register("ascend_function_grouped_matmul")
 class MethodTorchGroupedMatmulApi(BaseApi):
     def __init__(self, task_result: TaskResult):
@@ -50,18 +51,24 @@ class MethodTorchGroupedMatmulApi(BaseApi):
         print(groupList)
         for i in groupList.tolist():
             x_tensor = x[last:i, :].to(torch.int32)
-            weight[index] = weight[index].reshape(N//32,16,K//16, 32).permute(1, 2, 0, 3).reshape(K, N).contiguous()
+            weight[index] = (
+                weight[index]
+                .reshape(N // 32, 16, K // 16, 32)
+                .permute(1, 2, 0, 3)
+                .reshape(K, N)
+                .contiguous()
+            )
             weight_tensor = weight[index].to(torch.int32)
             scale_tensor = scale[index].clone().detach().to(torch.float32)
             matmul_res = torch.matmul(x_tensor, weight_tensor)
             cur_res = matmul_res.to(torch.float32) * scale_tensor.unsqueeze(0)
             pertokenScale_tensor = pertokenScale[last:i]
-            cur_res = cur_res * pertokenScale_tensor.reshape(-1,1)
+            cur_res = cur_res * pertokenScale_tensor.reshape(-1, 1)
             index += 1
             result = torch.cat([result, cur_res], dim=0)
             last = i
         return [result.to(self.outType)]
-        
+
     def cpu_benchmark(self, input_data: InputDataset, with_output: bool = True):
         x = input_data.kwargs["x"][0]
         weight = input_data.kwargs["weight"][0]
@@ -87,21 +94,25 @@ class MethodTorchGroupedMatmulApi(BaseApi):
         for i in groupList.tolist():
             x_tensor = x[last:i, :].to(torch.int32)
             if wformat == "FRACTAL_NZ":
-                weight[index] = weight[index].reshape(N//32,16,K//16, 32).permute(1, 2, 0, 3).reshape(K, N).contiguous()
+                weight[index] = (
+                    weight[index]
+                    .reshape(N // 32, 16, K // 16, 32)
+                    .permute(1, 2, 0, 3)
+                    .reshape(K, N)
+                    .contiguous()
+                )
             weight_tensor = weight[index].to(torch.int32)
             scale_tensor = scale[index].clone().detach().to(torch.float64)
             matmul_res = torch.matmul(x_tensor, weight_tensor)
             cur_res = matmul_res.to(torch.float64) * scale_tensor.unsqueeze(0)
             pertokenScale_tensor = pertokenScale[last:i]
-            cur_res = cur_res * pertokenScale_tensor.reshape(-1,1)
+            cur_res = cur_res * pertokenScale_tensor.reshape(-1, 1)
             index += 1
             result = torch.cat([result, cur_res], dim=0)
             last = i
         return [result.to(output_dtype)]
-    
 
     def __call__(self, input_data: InputDataset, with_output: bool = True):
-        
         scale = input_data.kwargs["scaleOptional"][0]
         print("scale.dtype:", scale.dtype)
         if self.outType == torch.float16:
@@ -113,20 +124,42 @@ class MethodTorchGroupedMatmulApi(BaseApi):
     def init_by_input_data(self, input_data: InputDataset, with_output: bool = False):
         x = input_data.kwargs["x"][0]
         groupList = input_data.kwargs["groupList"]
-        if self.device == 'pyaclnn':
-            input_data.kwargs['groupList'] = torch.linspace(x.shape[0] // groupList.shape[0], x.shape[0], steps=int(groupList.size(0))).round().to(torch.int64).npu()
+        if self.device == "pyaclnn":
+            input_data.kwargs["groupList"] = (
+                torch.linspace(
+                    x.shape[0] // groupList.shape[0],
+                    x.shape[0],
+                    steps=int(groupList.size(0)),
+                )
+                .round()
+                .to(torch.int64)
+                .npu()
+            )
         else:
-            input_data.kwargs['groupList'] = torch.linspace(x.shape[0] // groupList.shape[0], x.shape[0], steps=int(groupList.size(0))).round().to(torch.int64).cpu()
+            input_data.kwargs["groupList"] = (
+                torch.linspace(
+                    x.shape[0] // groupList.shape[0],
+                    x.shape[0],
+                    steps=int(groupList.size(0)),
+                )
+                .round()
+                .to(torch.int64)
+                .cpu()
+            )
         if input_data.kwargs["outType"] == "fp16":
             self.outType = torch.float16
         else:
             self.outType = torch.bfloat16
-        input_data.kwargs['tuningConfigOptional'] = (input_data.kwargs['tuningConfigOptional'][0], 0, -1)
-        print("tuningConfigOptional ", input_data.kwargs['tuningConfigOptional'])
-        print("groupList ", input_data.kwargs['groupList'])
+        input_data.kwargs["tuningConfigOptional"] = (
+            input_data.kwargs["tuningConfigOptional"][0],
+            0,
+            -1,
+        )
+        print("tuningConfigOptional ", input_data.kwargs["tuningConfigOptional"])
+        print("groupList ", input_data.kwargs["groupList"])
         print("self.outType ", self.outType)
         input_data.kwargs.pop("outType")
-    
+
     # def get_cpp_func_signature_type(self):
     #     return "aclnnStatus aclnnGroupedMatmulV5GetWorkspaceSize(const aclTensorList *x, const aclTensorList *weight,\
     #             const aclTensorList *biasOptional, const aclTensorList *scaleOptional, const aclTensorList *offsetOptional,\
@@ -137,36 +170,40 @@ class MethodTorchGroupedMatmulApi(BaseApi):
     #             int64_t actType, aclIntArray *tuningConfigOptional, aclTensorList *out, aclTensorList *activationFeatureOutOptional,\
     #             aclTensorList *dynQuantScaleOutOptional, uint64_t *workspaceSize, aclOpExecutor **executor)"
 
+
 @register("aclnn_grouped_matmul")
 class AclnnFunctionApi(AclnnBaseApi):
     def __call__(self):
         super().__call__()
-    def get_format(self , input_data, index=None, name=None):
-        if name == 'weight' and self.wformat == 'FRACTAL_NZ':
+
+    def get_format(self, input_data, index=None, name=None):
+        if name == "weight" and self.wformat == "FRACTAL_NZ":
             return AclFormat.ACL_FORMAT_FRACTAL_NZ
         return AclFormat.ACL_FORMAT_ND
+
     def init_by_input_data(self, input_data):
-        print(input_data.kwargs['wformat'])
-        if(input_data.kwargs['wformat'] == 'FRACTAL_NZ') :
-            self.wformat = 'FRACTAL_NZ'
+        print(input_data.kwargs["wformat"])
+        if input_data.kwargs["wformat"] == "FRACTAL_NZ":
+            self.wformat = "FRACTAL_NZ"
         else:
-            self.wformat = 'ND'
-        if self.device == 'pyaclnn':
-            input_data.kwargs.pop('wformat')
+            self.wformat = "ND"
+        if self.device == "pyaclnn":
+            input_data.kwargs.pop("wformat")
         import ctypes
+
         # self.task_result.output_info_list = [self.task_result.output_info_list]
         input_args, output_pac = super().init_by_input_data(input_data)
-        input_args.insert(2, ctypes.c_void_p(0)) # bias
+        input_args.insert(2, ctypes.c_void_p(0))  # bias
         # input_args.insert(3, ctypes.c_void_p(0)) # scale
-        input_args.insert(4, ctypes.c_void_p(0)) # offset
-        input_args.insert(5, ctypes.c_void_p(0)) # antiquantscale
-        input_args.insert(6, ctypes.c_void_p(0)) # antiquantoffset
+        input_args.insert(4, ctypes.c_void_p(0))  # offset
+        input_args.insert(5, ctypes.c_void_p(0))  # antiquantscale
+        input_args.insert(6, ctypes.c_void_p(0))  # antiquantoffset
         # input_args.insert(7, ctypes.c_void_p(0)) # pertokenScale
         # 8 : groupList
-        input_args.insert(9, ctypes.c_void_p(0)) # activationInputOptional
-        input_args.insert(10, ctypes.c_void_p(0)) # activationQuantScaleOptional
-        input_args.insert(11, ctypes.c_void_p(0)) # activationQuantOffsetOptional
-        input_args[12] = ctypes.c_long(2) # split item = 2
+        input_args.insert(9, ctypes.c_void_p(0))  # activationInputOptional
+        input_args.insert(10, ctypes.c_void_p(0))  # activationQuantScaleOptional
+        input_args.insert(11, ctypes.c_void_p(0))  # activationQuantOffsetOptional
+        input_args[12] = ctypes.c_long(2)  # split item = 2
         # input_args.insert(15, ctypes.c_long(0)) # actType
         # input_args.insert(16, ctypes.c_void_p(0)) #tuningConfig
         # nullptr output

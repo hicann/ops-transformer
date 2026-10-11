@@ -25,19 +25,18 @@
 
 namespace {
 
-#define CHECK_ACL(expr)                                                                            \
-    do {                                                                                           \
-        const aclError ret = (expr);                                                               \
-        if (ret != ACL_SUCCESS) {                                                                  \
-            std::cerr << #expr << " failed, ret=" << ret << ", message=" << aclGetRecentErrMsg() \
-                      << std::endl;                                                                \
-            return ret;                                                                            \
-        }                                                                                          \
+#define CHECK_ACL(expr) \
+    do { \
+        const aclError ret = (expr); \
+        if (ret != ACL_SUCCESS) { \
+            std::cerr << #expr << " failed, ret=" << ret << ", message=" << aclGetRecentErrMsg() << std::endl; \
+            return ret; \
+        } \
     } while (0)
 
 struct TensorResource {
-    void *deviceAddr = nullptr;
-    aclTensor *tensor = nullptr;
+    void* deviceAddr = nullptr;
+    aclTensor* tensor = nullptr;
 
     ~TensorResource()
     {
@@ -50,7 +49,7 @@ struct TensorResource {
     }
 };
 
-std::vector<int64_t> MakeStrides(const std::vector<int64_t> &shape)
+std::vector<int64_t> MakeStrides(const std::vector<int64_t>& shape)
 {
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = static_cast<int64_t>(shape.size()) - 2; i >= 0; --i) {
@@ -59,14 +58,14 @@ std::vector<int64_t> MakeStrides(const std::vector<int64_t> &shape)
     return strides;
 }
 
-int CreateTensor(const void *hostData, size_t byteSize, const std::vector<int64_t> &shape, aclDataType dtype,
-                 TensorResource &resource)
+int CreateTensor(const void* hostData, size_t byteSize, const std::vector<int64_t>& shape, aclDataType dtype,
+                 TensorResource& resource)
 {
     CHECK_ACL(aclrtMalloc(&resource.deviceAddr, byteSize, ACL_MEM_MALLOC_HUGE_FIRST));
     CHECK_ACL(aclrtMemcpy(resource.deviceAddr, byteSize, hostData, byteSize, ACL_MEMCPY_HOST_TO_DEVICE));
     const auto strides = MakeStrides(shape);
-    resource.tensor = aclCreateTensor(shape.data(), shape.size(), dtype, strides.data(), 0, ACL_FORMAT_ND,
-                                      shape.data(), shape.size(), resource.deviceAddr);
+    resource.tensor = aclCreateTensor(shape.data(), shape.size(), dtype, strides.data(), 0, ACL_FORMAT_ND, shape.data(),
+                                      shape.size(), resource.deviceAddr);
     if (resource.tensor == nullptr) {
         std::cerr << "aclCreateTensor failed" << std::endl;
         return ACL_ERROR_FAILURE;
@@ -194,42 +193,40 @@ int RunS8S4Example(aclrtStream stream)
     CHECK_ACL(CreateTensor(x.data(), x.size(), {M, K}, ACL_INT8, xTensor));
     CHECK_ACL(CreateTensor(packedWeight.data(), packedWeight.size(), {E, K, N}, ACL_INT4, weightTensor));
     CHECK_ACL(CreateTensor(bias.data(), bias.size() * sizeof(float), {E, N}, ACL_FLOAT, biasTensor));
-    CHECK_ACL(CreateTensor(quantScale.data(), quantScale.size() * sizeof(uint64_t), {E, 1, N}, ACL_UINT64,
-                           scaleTensor));
-    CHECK_ACL(CreateTensor(fusedOffset.data(), fusedOffset.size() * sizeof(float), {E, 1, N}, ACL_FLOAT,
-                           offsetTensor));
-    CHECK_ACL(CreateTensor(perTokenScale.data(), perTokenScale.size() * sizeof(float), {M}, ACL_FLOAT,
-                           perTokenTensor));
+    CHECK_ACL(
+        CreateTensor(quantScale.data(), quantScale.size() * sizeof(uint64_t), {E, 1, N}, ACL_UINT64, scaleTensor));
+    CHECK_ACL(CreateTensor(fusedOffset.data(), fusedOffset.size() * sizeof(float), {E, 1, N}, ACL_FLOAT, offsetTensor));
+    CHECK_ACL(CreateTensor(perTokenScale.data(), perTokenScale.size() * sizeof(float), {M}, ACL_FLOAT, perTokenTensor));
     CHECK_ACL(CreateTensor(groupList.data(), groupList.size() * sizeof(int64_t), {E}, ACL_INT64, groupListTensor));
     CHECK_ACL(CreateTensor(output.data(), output.size() * sizeof(uint16_t), {M, N}, ACL_FLOAT16, outputTensor));
 
-    const aclTensor *xItems[] = {xTensor.tensor};
-    const aclTensor *weightItems[] = {weightTensor.tensor};
-    const aclTensor *biasItems[] = {biasTensor.tensor};
-    const aclTensor *scaleItems[] = {scaleTensor.tensor};
-    const aclTensor *offsetItems[] = {offsetTensor.tensor};
-    const aclTensor *perTokenItems[] = {perTokenTensor.tensor};
-    const aclTensor *outputItems[] = {outputTensor.tensor};
-    aclTensorList *xList = aclCreateTensorList(xItems, 1);
-    aclTensorList *weightList = aclCreateTensorList(weightItems, 1);
-    aclTensorList *biasList = aclCreateTensorList(biasItems, 1);
-    aclTensorList *scaleList = aclCreateTensorList(scaleItems, 1);
-    aclTensorList *offsetList = aclCreateTensorList(offsetItems, 1);
-    aclTensorList *perTokenList = aclCreateTensorList(perTokenItems, 1);
-    aclTensorList *outputList = aclCreateTensorList(outputItems, 1);
+    const aclTensor* xItems[] = {xTensor.tensor};
+    const aclTensor* weightItems[] = {weightTensor.tensor};
+    const aclTensor* biasItems[] = {biasTensor.tensor};
+    const aclTensor* scaleItems[] = {scaleTensor.tensor};
+    const aclTensor* offsetItems[] = {offsetTensor.tensor};
+    const aclTensor* perTokenItems[] = {perTokenTensor.tensor};
+    const aclTensor* outputItems[] = {outputTensor.tensor};
+    aclTensorList* xList = aclCreateTensorList(xItems, 1);
+    aclTensorList* weightList = aclCreateTensorList(weightItems, 1);
+    aclTensorList* biasList = aclCreateTensorList(biasItems, 1);
+    aclTensorList* scaleList = aclCreateTensorList(scaleItems, 1);
+    aclTensorList* offsetList = aclCreateTensorList(offsetItems, 1);
+    aclTensorList* perTokenList = aclCreateTensorList(perTokenItems, 1);
+    aclTensorList* outputList = aclCreateTensorList(outputItems, 1);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     const aclnnStatus ret = aclnnGroupedMatmulV5GetWorkspaceSize(
         xList, weightList, biasList, scaleList, offsetList, nullptr, nullptr, perTokenList, groupListTensor.tensor,
         nullptr, nullptr, nullptr, 3, 0, 1, 0, nullptr, outputList, nullptr, nullptr, &workspaceSize, &executor);
     if (ret != ACL_SUCCESS) {
-        std::cerr << "aclnnGroupedMatmulV5GetWorkspaceSize failed, ret=" << ret
-                  << ", message=" << aclGetRecentErrMsg() << std::endl;
+        std::cerr << "aclnnGroupedMatmulV5GetWorkspaceSize failed, ret=" << ret << ", message=" << aclGetRecentErrMsg()
+                  << std::endl;
         return ret;
     }
 
-    void *workspace = nullptr;
+    void* workspace = nullptr;
     if (workspaceSize != 0) {
         CHECK_ACL(aclrtMalloc(&workspace, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST));
     }
@@ -256,8 +253,8 @@ int RunS8S4Example(aclrtStream stream)
             for (int64_t n = 0; n < N; ++n) {
                 float golden = 0.0F;
                 for (int64_t k = 0; k < K; ++k) {
-                    const float dequantWeight = logicalWeight[(e * K + k) * N + n] * floatScale[e * N + n] +
-                                                fusedOffset[e * N + n];
+                    const float dequantWeight =
+                        logicalWeight[(e * K + k) * N + n] * floatScale[e * N + n] + fusedOffset[e * N + n];
                     golden += static_cast<float>(x[m * K + k]) * dequantWeight;
                 }
                 golden *= perTokenScale[m];

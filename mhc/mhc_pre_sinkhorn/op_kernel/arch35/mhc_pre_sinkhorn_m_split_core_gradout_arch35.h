@@ -30,24 +30,24 @@ public:
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hcFn, GM_ADDR hcScale, GM_ADDR hcBase, GM_ADDR y, GM_ADDR post,
                                 GM_ADDR combFrag, GM_ADDR hPre, GM_ADDR hcBeforeNorm, GM_ADDR invRms, GM_ADDR sumOut,
-                                GM_ADDR normOut, const MhcPreSinkhornRegbaseTilingData *tilingDataPtr, TPipe *pipePtr)
+                                GM_ADDR normOut, const MhcPreSinkhornRegbaseTilingData* tilingDataPtr, TPipe* pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
-        xGm.SetGlobalBuffer((__gm__ T *)x);
-        hcFnGm.SetGlobalBuffer((__gm__ float *)hcFn);
-        yGm.SetGlobalBuffer((__gm__ T *)y);
+        xGm.SetGlobalBuffer((__gm__ T*)x);
+        hcFnGm.SetGlobalBuffer((__gm__ float*)hcFn);
+        yGm.SetGlobalBuffer((__gm__ T*)y);
 
-        hcScaleGm.SetGlobalBuffer((__gm__ float *)hcScale);
-        hcBaseGm.SetGlobalBuffer((__gm__ float *)hcBase);
-        postGm.SetGlobalBuffer((__gm__ float *)post);
-        combFragGm.SetGlobalBuffer((__gm__ float *)combFrag);
+        hcScaleGm.SetGlobalBuffer((__gm__ float*)hcScale);
+        hcBaseGm.SetGlobalBuffer((__gm__ float*)hcBase);
+        postGm.SetGlobalBuffer((__gm__ float*)post);
+        combFragGm.SetGlobalBuffer((__gm__ float*)combFrag);
         // 新增反向的输出
-        hPreGm.SetGlobalBuffer((__gm__ float *)hPre);
-        hcBeforeNormGm.SetGlobalBuffer((__gm__ float *)hcBeforeNorm);
-        invRmsGm.SetGlobalBuffer((__gm__ float *)invRms);
-        sumOutGm.SetGlobalBuffer((__gm__ float *)sumOut);
-        normOutGm.SetGlobalBuffer((__gm__ float *)normOut);
+        hPreGm.SetGlobalBuffer((__gm__ float*)hPre);
+        hcBeforeNormGm.SetGlobalBuffer((__gm__ float*)hcBeforeNorm);
+        invRmsGm.SetGlobalBuffer((__gm__ float*)invRms);
+        sumOutGm.SetGlobalBuffer((__gm__ float*)sumOut);
+        normOutGm.SetGlobalBuffer((__gm__ float*)normOut);
 
         TBuf<TPosition::A1> l1Buffer;
         pipe->InitBuffer(l1Buffer, L1_ALLOC_SIZE);
@@ -482,8 +482,8 @@ public:
     }
 
 private:
-    TPipe *pipe;
-    const MhcPreSinkhornRegbaseTilingData *tilingData;
+    TPipe* pipe;
+    const MhcPreSinkhornRegbaseTilingData* tilingData;
     // (M, K) * (N, K)
 
     GlobalTensor<T> xGm;

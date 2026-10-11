@@ -27,7 +27,7 @@ namespace {
 constexpr uint64_t GMM_FR_MX_SCALE_FACTOR_BIT = 8UL;
 constexpr uint64_t GMM_FR_MX_SCALE_FACTOR_MASK = 0xFFUL;
 
-__aicore__ inline uint64_t GetGmmFrScaleKL1(const TCubeTiling &matmulTiling)
+__aicore__ inline uint64_t GetGmmFrScaleKL1(const TCubeTiling& matmulTiling)
 {
     const uint64_t scaleFactorA = matmulTiling.mxTypePara & GMM_FR_MX_SCALE_FACTOR_MASK;
     const uint64_t scaleFactorB = (matmulTiling.mxTypePara >> GMM_FR_MX_SCALE_FACTOR_BIT) & GMM_FR_MX_SCALE_FACTOR_MASK;
@@ -49,8 +49,8 @@ __aicore__ inline void grouped_matmul_finalize_routing_mx(GM_ADDR x, GM_ADDR w, 
     REGISTER_TILING_DEFAULT(GMMFinalizeRoutingArch35Tiling::GMMFinalizeRoutingTilingData);
     GET_TILING_DATA(tilingData, tilingGM);
 
-    const auto &gmmParamsIn = tilingData.gmmFinalizeRoutingDataParams;
-    const auto &matmulTiling = tilingData.matmulTiling;
+    const auto& gmmParamsIn = tilingData.gmmFinalizeRoutingDataParams;
+    const auto& matmulTiling = tilingData.matmulTiling;
 
     using AType = DTYPE_X;
     using BType = DTYPE_W;

@@ -58,24 +58,24 @@ WQBMM_BASIC_API_V1_TEMPLATE_PARAM class WqbmmBasicApiV1 {
 public:
     __aicore__ inline WqbmmBasicApiV1(){};
     __aicore__ inline void Init();
-    __aicore__ inline void Iterate(bool isLast, bool isFirst, const LocalTensor<xType> &aL1,
-                                   const LocalTensor<fp8_e8m0_t> &aMxScaleL1, const LocalTensor<xType> &bL1,
-                                   const LocalTensor<fp8_e8m0_t> &bMxScaleL1, const LocalTensor<biasType> &biasL1,
-                                   const BasicApiParamsV1 &basicApiParams);
+    __aicore__ inline void Iterate(bool isLast, bool isFirst, const LocalTensor<xType>& aL1,
+                                   const LocalTensor<fp8_e8m0_t>& aMxScaleL1, const LocalTensor<xType>& bL1,
+                                   const LocalTensor<fp8_e8m0_t>& bMxScaleL1, const LocalTensor<biasType>& biasL1,
+                                   const BasicApiParamsV1& basicApiParams);
     __aicore__ inline void GetTensorC(uint64_t mL0Size, uint64_t nL0Size, uint64_t nDstSize,
-                                      const GlobalTensor<yType> &yGm);
+                                      const GlobalTensor<yType>& yGm);
     __aicore__ inline void End();
 
 private:
     __aicore__ inline void LoadAL1ToL0A(uint64_t baseK, uint64_t loopId, uint64_t l1KOffset,
-                                        const BasicApiParamsV1 &basicApiParams, const LocalTensor<xType> &aL1Tensor,
-                                        const LocalTensor<fp8_e8m0_t> &scaleAL1Tensor);
+                                        const BasicApiParamsV1& basicApiParams, const LocalTensor<xType>& aL1Tensor,
+                                        const LocalTensor<fp8_e8m0_t>& scaleAL1Tensor);
     __aicore__ inline void LoadBL1ToL0B(uint64_t baseK, uint64_t loopId, uint64_t l1KOffset,
-                                        const BasicApiParamsV1 &basicApiParams, const LocalTensor<xType> &bL1Tensor,
-                                        const LocalTensor<fp8_e8m0_t> &scaleBL1Tensor);
-    __aicore__ inline void LoadBiasToBt(uint64_t nL0Size, uint64_t loopId, const LocalTensor<biasType> &biasL1Tensor);
+                                        const BasicApiParamsV1& basicApiParams, const LocalTensor<xType>& bL1Tensor,
+                                        const LocalTensor<fp8_e8m0_t>& scaleBL1Tensor);
+    __aicore__ inline void LoadBiasToBt(uint64_t nL0Size, uint64_t loopId, const LocalTensor<biasType>& biasL1Tensor);
     __aicore__ inline void Mmad(bool isLast, bool isFirst, uint64_t kL0RealSize, uint64_t loopId,
-                                const BasicApiParamsV1 &basicApiParams);
+                                const BasicApiParamsV1& basicApiParams);
 
     static constexpr uint64_t L0_BUF_OFFSET_B8 = 32 * 1024;
     static constexpr uint64_t L0_BUF_NUM = 2;
@@ -108,12 +108,12 @@ __aicore__ inline void WQBMM_BASIC_API_V1_CLASS::Init()
 }
 
 WQBMM_BASIC_API_V1_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_BASIC_API_V1_CLASS::Iterate(bool isLastGmK, bool isFirstGmK, const LocalTensor<xType> &aL1,
-                                                         const LocalTensor<fp8_e8m0_t> &aMxScaleL1,
-                                                         const LocalTensor<xType> &bL1,
-                                                         const LocalTensor<fp8_e8m0_t> &bMxScaleL1,
-                                                         const LocalTensor<biasType> &biasL1,
-                                                         const BasicApiParamsV1 &basicApiParams)
+__aicore__ inline void WQBMM_BASIC_API_V1_CLASS::Iterate(bool isLastGmK, bool isFirstGmK, const LocalTensor<xType>& aL1,
+                                                         const LocalTensor<fp8_e8m0_t>& aMxScaleL1,
+                                                         const LocalTensor<xType>& bL1,
+                                                         const LocalTensor<fp8_e8m0_t>& bMxScaleL1,
+                                                         const LocalTensor<biasType>& biasL1,
+                                                         const BasicApiParamsV1& basicApiParams)
 {
     uint64_t l0KSize = (basicApiParams.l0MSize <= 128 && basicApiParams.l0NSize <= 128) ? 256 : 128;
     for (uint64_t l1KOffset = 0; l1KOffset < basicApiParams.l1KbSize; l1KOffset += l0KSize) {
@@ -134,9 +134,9 @@ __aicore__ inline void WQBMM_BASIC_API_V1_CLASS::Iterate(bool isLastGmK, bool is
 
 WQBMM_BASIC_API_V1_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_BASIC_API_V1_CLASS::LoadAL1ToL0A(uint64_t baseK, uint64_t loopId, uint64_t l1KOffset,
-                                                              const BasicApiParamsV1 &basicApiParams,
-                                                              const LocalTensor<xType> &aL1Tensor,
-                                                              const LocalTensor<fp8_e8m0_t> &scaleAL1Tensor)
+                                                              const BasicApiParamsV1& basicApiParams,
+                                                              const LocalTensor<xType>& aL1Tensor,
+                                                              const LocalTensor<fp8_e8m0_t>& scaleAL1Tensor)
 {
     AscendC::LoadData2DParamsV2 aL0Load2dParams;
     aL0Load2dParams.mStartPosition = 0;
@@ -163,9 +163,9 @@ __aicore__ inline void WQBMM_BASIC_API_V1_CLASS::LoadAL1ToL0A(uint64_t baseK, ui
 
 WQBMM_BASIC_API_V1_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_BASIC_API_V1_CLASS::LoadBL1ToL0B(uint64_t baseK, uint64_t loopId, uint64_t l1KOffset,
-                                                              const BasicApiParamsV1 &basicApiParams,
-                                                              const LocalTensor<xType> &bL1Tensor,
-                                                              const LocalTensor<fp8_e8m0_t> &scaleBL1Tensor)
+                                                              const BasicApiParamsV1& basicApiParams,
+                                                              const LocalTensor<xType>& bL1Tensor,
+                                                              const LocalTensor<fp8_e8m0_t>& scaleBL1Tensor)
 {
     AscendC::LoadData2DParamsV2 bL0Load2dParams;
     bL0Load2dParams.mStartPosition = 0;
@@ -190,7 +190,7 @@ __aicore__ inline void WQBMM_BASIC_API_V1_CLASS::LoadBL1ToL0B(uint64_t baseK, ui
 
 WQBMM_BASIC_API_V1_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_BASIC_API_V1_CLASS::LoadBiasToBt(uint64_t nL0Size, uint64_t loopId,
-                                                              const LocalTensor<biasType> &biasL1Tensor)
+                                                              const LocalTensor<biasType>& biasL1Tensor)
 {
     AscendC::DataCopy(biasTable_[loopId * BIAS_TABLE_OFFSET_B32], biasL1Tensor,
                       {1, static_cast<uint16_t>(CeilDivide(nL0Size * sizeof(float), 64UL)), 0, 0});
@@ -198,7 +198,7 @@ __aicore__ inline void WQBMM_BASIC_API_V1_CLASS::LoadBiasToBt(uint64_t nL0Size, 
 
 WQBMM_BASIC_API_V1_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_BASIC_API_V1_CLASS::Mmad(bool isLastK, bool isFirstK, uint64_t kL0RealSize,
-                                                      uint64_t loopId, const BasicApiParamsV1 &basicApiParams)
+                                                      uint64_t loopId, const BasicApiParamsV1& basicApiParams)
 {
     AscendC::MmadParams mmadParams;
     mmadParams.m = basicApiParams.l0MSize;
@@ -221,7 +221,7 @@ __aicore__ inline void WQBMM_BASIC_API_V1_CLASS::Mmad(bool isLastK, bool isFirst
 
 WQBMM_BASIC_API_V1_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_BASIC_API_V1_CLASS::GetTensorC(uint64_t mL0Size, uint64_t nL0Size, uint64_t nDstSize,
-                                                            const GlobalTensor<yType> &yGm)
+                                                            const GlobalTensor<yType>& yGm)
 {
     constexpr uint64_t FP32_64_AS_UINT64 = 0x42800000;
 

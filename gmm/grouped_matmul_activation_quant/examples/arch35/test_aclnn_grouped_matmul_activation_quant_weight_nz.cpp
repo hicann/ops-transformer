@@ -21,27 +21,27 @@
  * \brief GroupedMatmulActivationQuant WeightNz MXFP8 aclnn example for Ascend 950PR/Ascend 950DT.
  */
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define CHECK_FREE_RET(cond, return_expr)                                                                              \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            Finalize(deviceId, stream);                                                                                \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_FREE_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            Finalize(deviceId, stream); \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto dim : shape) {
@@ -59,7 +59,7 @@ auto CeilDiv(T1 a, T2 b) -> T1
     return (a + b - 1) / b;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -78,8 +78,8 @@ void Finalize(int32_t deviceId, aclrtStream stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclFormat formatType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclFormat formatType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -99,11 +99,11 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 }
 
 template <typename T>
-int CreateAclTensorList(const std::vector<std::vector<T>> &hostData, const std::vector<std::vector<int64_t>> &shapes,
-                        void **deviceAddr, aclDataType dataType, aclFormat formatType, aclTensorList **tensorList)
+int CreateAclTensorList(const std::vector<std::vector<T>>& hostData, const std::vector<std::vector<int64_t>>& shapes,
+                        void** deviceAddr, aclDataType dataType, aclFormat formatType, aclTensorList** tensorList)
 {
     int size = static_cast<int>(shapes.size());
-    std::vector<aclTensor *> tensors(size, nullptr);
+    std::vector<aclTensor*> tensors(size, nullptr);
     for (int i = 0; i < size; ++i) {
         int ret = CreateAclTensor<T>(hostData[i], shapes[i], deviceAddr + i, dataType, formatType, &tensors[i]);
         CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -113,14 +113,14 @@ int CreateAclTensorList(const std::vector<std::vector<T>> &hostData, const std::
 }
 
 template <typename T>
-int CreateAclTensorListWithStorageShape(const std::vector<std::vector<T>> &hostData,
-                                        const std::vector<std::vector<int64_t>> &viewShapes,
-                                        const std::vector<std::vector<int64_t>> &storageShapes,
-                                        const std::vector<std::vector<int64_t>> &strides, void **deviceAddr,
-                                        aclDataType dataType, aclFormat formatType, aclTensorList **tensorList)
+int CreateAclTensorListWithStorageShape(const std::vector<std::vector<T>>& hostData,
+                                        const std::vector<std::vector<int64_t>>& viewShapes,
+                                        const std::vector<std::vector<int64_t>>& storageShapes,
+                                        const std::vector<std::vector<int64_t>>& strides, void** deviceAddr,
+                                        aclDataType dataType, aclFormat formatType, aclTensorList** tensorList)
 {
     int size = static_cast<int>(storageShapes.size());
-    std::vector<aclTensor *> tensors(size, nullptr);
+    std::vector<aclTensor*> tensors(size, nullptr);
     for (int i = 0; i < size; ++i) {
         auto storageSize = GetShapeSize(storageShapes[i]) * sizeof(T);
         auto ret = aclrtMalloc(deviceAddr + i, storageSize, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -136,7 +136,7 @@ int CreateAclTensorListWithStorageShape(const std::vector<std::vector<T>> &hostD
     return ACL_SUCCESS;
 }
 
-int RunGroupedMatmulActivationQuantWeightNz(int32_t deviceId, aclrtStream &stream)
+int RunGroupedMatmulActivationQuantWeightNz(int32_t deviceId, aclrtStream& stream)
 {
     auto ret = Init(deviceId, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
@@ -166,80 +166,80 @@ int RunGroupedMatmulActivationQuantWeightNz(int32_t deviceId, aclrtStream &strea
     std::vector<uint8_t> yHostData(GetShapeSize(yShape), 0);
     std::vector<uint8_t> yScaleHostData(GetShapeSize(yScaleShape), 0);
 
-    void *xDeviceAddr = nullptr;
-    void *groupListDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *weightScaleDeviceAddr = nullptr;
-    void *xScaleDeviceAddr = nullptr;
-    void *yDeviceAddr = nullptr;
-    void *yScaleDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* groupListDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* weightScaleDeviceAddr = nullptr;
+    void* xScaleDeviceAddr = nullptr;
+    void* yDeviceAddr = nullptr;
+    void* yScaleDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *groupList = nullptr;
-    aclTensorList *weight = nullptr;
-    aclTensorList *weightScale = nullptr;
-    aclTensorList *bias = nullptr;
-    aclTensor *xScale = nullptr;
-    aclTensor *y = nullptr;
-    aclTensor *yScale = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* groupList = nullptr;
+    aclTensorList* weight = nullptr;
+    aclTensorList* weightScale = nullptr;
+    aclTensorList* bias = nullptr;
+    aclTensor* xScale = nullptr;
+    aclTensor* y = nullptr;
+    aclTensor* yScale = nullptr;
 
     ret = CreateAclTensor<uint8_t>(xHostData, xShape, &xDeviceAddr, aclDataType::ACL_FLOAT8_E4M3FN,
                                    aclFormat::ACL_FORMAT_ND, &x);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> xTensorPtr(x, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> xDeviceAddrPtr(xDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> xTensorPtr(x, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> xDeviceAddrPtr(xDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor<int64_t>(groupListHostData, groupListShape, &groupListDeviceAddr, aclDataType::ACL_INT64,
                                    aclFormat::ACL_FORMAT_ND, &groupList);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> groupListTensorPtr(groupList, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> groupListDeviceAddrPtr(groupListDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> groupListTensorPtr(groupList, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> groupListDeviceAddrPtr(groupListDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<std::vector<uint8_t>> weightHostDataList = {weightHostData};
     ret = CreateAclTensorListWithStorageShape<uint8_t>(weightHostDataList, weightViewShapes, weightStorageShapes,
                                                        weightStrides, &weightDeviceAddr, aclDataType::ACL_FLOAT8_E4M3FN,
                                                        aclFormat::ACL_FORMAT_FRACTAL_NZ, &weight);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> weightTensorListPtr(weight,
-                                                                                               aclDestroyTensorList);
-    std::unique_ptr<void, aclError (*)(void *)> weightDeviceAddrPtr(weightDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> weightTensorListPtr(weight,
+                                                                                              aclDestroyTensorList);
+    std::unique_ptr<void, aclError (*)(void*)> weightDeviceAddrPtr(weightDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<std::vector<uint8_t>> weightScaleHostDataList = {weightScaleHostData};
     ret = CreateAclTensorList<uint8_t>(weightScaleHostDataList, weightScaleShapes, &weightScaleDeviceAddr,
                                        aclDataType::ACL_FLOAT8_E8M0, aclFormat::ACL_FORMAT_ND, &weightScale);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> weightScaleTensorListPtr(
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> weightScaleTensorListPtr(
         weightScale, aclDestroyTensorList);
-    std::unique_ptr<void, aclError (*)(void *)> weightScaleDeviceAddrPtr(weightScaleDeviceAddr, aclrtFree);
+    std::unique_ptr<void, aclError (*)(void*)> weightScaleDeviceAddrPtr(weightScaleDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor<uint8_t>(xScaleHostData, xScaleShape, &xScaleDeviceAddr, aclDataType::ACL_FLOAT8_E8M0,
                                    aclFormat::ACL_FORMAT_ND, &xScale);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> xScaleTensorPtr(xScale, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> xScaleDeviceAddrPtr(xScaleDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> xScaleTensorPtr(xScale, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> xScaleDeviceAddrPtr(xScaleDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor<uint8_t>(yHostData, yShape, &yDeviceAddr, aclDataType::ACL_FLOAT8_E4M3FN,
                                    aclFormat::ACL_FORMAT_ND, &y);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> yTensorPtr(y, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> yDeviceAddrPtr(yDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> yTensorPtr(y, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> yDeviceAddrPtr(yDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor<uint8_t>(yScaleHostData, yScaleShape, &yScaleDeviceAddr, aclDataType::ACL_FLOAT8_E8M0,
                                    aclFormat::ACL_FORMAT_ND, &yScale);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> yScaleTensorPtr(yScale, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> yScaleDeviceAddrPtr(yScaleDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> yScaleTensorPtr(yScale, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> yScaleDeviceAddrPtr(yScaleDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    const char *activationType = "gelu_tanh";
+    const char* activationType = "gelu_tanh";
     int64_t groupListType = 1;
-    aclIntArray *tuningConfig = nullptr;
-    const char *quantMode = "mx";
-    const char *roundMode = "rint";
+    aclIntArray* tuningConfig = nullptr;
+    const char* quantMode = "mx";
+    const char* roundMode = "rint";
     int64_t scaleAlg = 0;
     float dstTypeMax = 0.0F;
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
 
     ret = aclnnGroupedMatmulActivationQuantWeightNzGetWorkspaceSize(
         x, groupList, weight, weightScale, bias, xScale, activationType, groupListType, tuningConfig, quantMode,
@@ -248,7 +248,7 @@ int RunGroupedMatmulActivationQuantWeightNz(int32_t deviceId, aclrtStream &strea
               LOG_PRINT("aclnnGroupedMatmulActivationQuantWeightNzGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    std::unique_ptr<void, aclError (*)(void *)> workspaceAddrPtr(nullptr, aclrtFree);
+    std::unique_ptr<void, aclError (*)(void*)> workspaceAddrPtr(nullptr, aclrtFree);
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

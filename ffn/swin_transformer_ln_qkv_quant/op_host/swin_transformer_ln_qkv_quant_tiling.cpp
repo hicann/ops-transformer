@@ -32,8 +32,7 @@ constexpr static uint32_t BLOCK_UINT_16 = 16;
 constexpr static uint32_t RESVERD_BUFF = 64 * 1024;
 class SwinTransformerLnQkvQuantTilingCompute {
 public:
-    enum class ProcessMode
-    {
+    enum class ProcessMode {
         NORMAL_MODE = 0UL,
         SPLIT_N_MODE,
         LN_PRE_ALL_SHARE_MODE,
@@ -41,10 +40,10 @@ public:
         INVALID_MODE
     };
     SwinTransformerLnQkvQuantTilingData tilingData;
-    ge::graphStatus SwinTransformerLnQkvQuantTilingMainProc(gert::TilingContext *context);
+    ge::graphStatus SwinTransformerLnQkvQuantTilingMainProc(gert::TilingContext* context);
     bool transposeB = true;
-    int32_t sizePerHead = 32;   // 32 is Block Unit
-    float epsilon = 0.000001f;   // 0.000001 is default epsilon
+    int32_t sizePerHead = 32;  // 32 is Block Unit
+    float epsilon = 0.000001f; // 0.000001 is default epsilon
     bool allPreProcessA = false;
     bool dbBuffer = (BUFFER_NUM > 1) ? true : false;
     ProcessMode templateId = ProcessMode::LN_INDEPENDT_MODE;
@@ -57,24 +56,24 @@ public:
     int64_t hWinSize;
     int64_t wWinSize;
     bool bTransOpt;
-protected:
 
-    ge::graphStatus SwinTransformerLnQkvQuantSaveTilingData(gert::TilingContext *context);
-    ge::graphStatus SwinTransformerLnQkvQuantSetWorkSpace(gert::TilingContext *context);
-    ge::graphStatus SwinTransformerLnQkvQuantSetMatmulTilingData(gert::TilingContext *context,
-        TCubeTiling mmtilingData, uint64_t l1SizePlatform, uint64_t l0SizePlatform);
+protected:
+    ge::graphStatus SwinTransformerLnQkvQuantSaveTilingData(gert::TilingContext* context);
+    ge::graphStatus SwinTransformerLnQkvQuantSetWorkSpace(gert::TilingContext* context);
+    ge::graphStatus SwinTransformerLnQkvQuantSetMatmulTilingData(gert::TilingContext* context, TCubeTiling mmtilingData,
+                                                                 uint64_t l1SizePlatform, uint64_t l0SizePlatform);
     ge::graphStatus SwinTransformerLnQkvQuantSetMatmulMutiTilingData(gert::TilingContext* context,
-        TCubeTiling mmtilingData);
-    int32_t SwinTransformerLnQkvQuantGetMatmulTmpSize(gert::TilingContext* context, TCubeTiling &mmtilingData,
-                                int32_t m, int32_t n, int32_t k);
+                                                                     TCubeTiling mmtilingData);
+    int32_t SwinTransformerLnQkvQuantGetMatmulTmpSize(gert::TilingContext* context, TCubeTiling& mmtilingData,
+                                                      int32_t m, int32_t n, int32_t k);
     void SwinTransformerLnQkvQuantSetTilingKey(gert::TilingContext* context);
     int32_t SwinTransformerLnQkvQuantGetUsedUbSize(int32_t mSize, int32_t kSize, int32_t splitN);
-    ge::graphStatus GetBaseParams(gert::TilingContext *context);
-    ge::graphStatus IsSupport(gert::TilingContext *context);
+    ge::graphStatus GetBaseParams(gert::TilingContext* context);
+    ge::graphStatus IsSupport(gert::TilingContext* context);
 }; // class SwinTransformerLnQkvQuantTilingCompute
 
 ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuantSaveTilingData(
-                                                            gert::TilingContext *context)
+    gert::TilingContext* context)
 {
     tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
     context->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
@@ -82,12 +81,11 @@ ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuan
 }
 
 ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuantSetWorkSpace(
-                                                            gert::TilingContext *context)
+    gert::TilingContext* context)
 {
-    size_t *workspaces = context->GetWorkspaceSizes(1);
-    OP_CHECK_IF(workspaces == nullptr, OP_LOGE("SwinTransformerLnQkvQuantTiling",
-                        "failed to get workspace size"),
-                        return ge::GRAPH_FAILED);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
+    OP_CHECK_IF(workspaces == nullptr, OP_LOGE("SwinTransformerLnQkvQuantTiling", "failed to get workspace size"),
+                return ge::GRAPH_FAILED);
     workspaces[0] = sizePerHead * sizePerHead * sizePerHead * sizePerHead;
     return ge::GRAPH_SUCCESS;
 }
@@ -132,7 +130,7 @@ const std::map<int32_t, SwinTransformerLnQkvQuantTilingCompute::ProcessMode> TEM
  *
  * [templatedId][A_Dtype][B_Dtype][C_Dtype][A_Trans][B_Trans]
  *
-************************************************/
+ ************************************************/
 void SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuantSetTilingKey(gert::TilingContext* context)
 {
     uint64_t tilingKey = 0;
@@ -142,43 +140,39 @@ void SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuantSetTilingK
     return;
 }
 
-int32_t SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuantGetUsedUbSize(int32_t mSize,
-                                                        int32_t kSize, int32_t splitN)
+int32_t SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuantGetUsedUbSize(int32_t mSize, int32_t kSize,
+                                                                                       int32_t splitN)
 {
     int32_t bufferForLn = (mSize + BLOCK_UINT_16 - 1) / BLOCK_UINT_16 * BLOCK_UINT_16;
     int32_t allUbSize = 0;
     if (splitN == 0) {
         allUbSize += bufferForLn * kSize * sizeof(uint16_t) * BUFFER_NUM; // 2 fp16 in out
-        allUbSize += bufferForLn * kSize * sizeof(int8_t); // int 8 A
-        allUbSize += bufferForLn * kSize * sizeof(float) * BUFFER_NUM; // fp32 in + tmpSub
+        allUbSize += bufferForLn * kSize * sizeof(int8_t);                // int 8 A
+        allUbSize += bufferForLn * kSize * sizeof(float) * BUFFER_NUM;    // fp32 in + tmpSub
     } else {
         bufferForLn = BLOCK_UINT_16;
         allUbSize += bufferForLn * kSize * sizeof(uint16_t) * BUFFER_NUM; // fp16 in out
-        allUbSize += bufferForLn * kSize * sizeof(int8_t); // int 8 A
-        allUbSize += bufferForLn * kSize * sizeof(float) * BUFFER_NUM; // fp32 in + tmpSub
+        allUbSize += bufferForLn * kSize * sizeof(int8_t);                // int 8 A
+        allUbSize += bufferForLn * kSize * sizeof(float) * BUFFER_NUM;    // fp32 in + tmpSub
     }
     return allUbSize;
 }
 
 ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuantSetMatmulTilingData(
-                                    gert::TilingContext *context, TCubeTiling mmtilingData,
-                                    uint64_t l1SizePlatform, uint64_t l0CSizePlatform)
+    gert::TilingContext* context, TCubeTiling mmtilingData, uint64_t l1SizePlatform, uint64_t l0CSizePlatform)
 {
     auto platformInfo = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     matmul_tiling::MatmulApiTiling tiling(platformInfo);
-    tiling.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
-                                        matmul_tiling::DataType::DT_INT8, transposeB);
+    tiling.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_INT8,
+                    transposeB);
     tiling.SetCType(matmul_tiling::TPosition::VECCALC, matmul_tiling::CubeFormat::ND,
-                                        matmul_tiling::DataType::DT_FLOAT16);
-    tiling.SetBiasType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
-                                        matmul_tiling::DataType::DT_INT32);
-    tiling.SetAType(matmul_tiling::TPosition::TSCM, matmul_tiling::CubeFormat::NZ,
-                                        matmul_tiling::DataType::DT_INT8);
+                    matmul_tiling::DataType::DT_FLOAT16);
+    tiling.SetBiasType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_INT32);
+    tiling.SetAType(matmul_tiling::TPosition::TSCM, matmul_tiling::CubeFormat::NZ, matmul_tiling::DataType::DT_INT8);
 
-    tiling.SetShape(tilingData.mmInfo.get_mmSizeM(),
-                    tilingData.mmInfo.get_mmSizeN(), tilingData.mmInfo.get_mmSizeK());
-    tiling.SetOrgShape(tilingData.mmInfo.get_mmSizeM(),
-                    tilingData.mmInfo.get_mmSizeN(), tilingData.mmInfo.get_mmSizeK());
+    tiling.SetShape(tilingData.mmInfo.get_mmSizeM(), tilingData.mmInfo.get_mmSizeN(), tilingData.mmInfo.get_mmSizeK());
+    tiling.SetOrgShape(tilingData.mmInfo.get_mmSizeM(), tilingData.mmInfo.get_mmSizeN(),
+                       tilingData.mmInfo.get_mmSizeK());
     tiling.SetBias(true);
     tiling.SetBufferSpace(l1SizePlatform, l0CSizePlatform, -1);
     tiling.SetDequantType(matmul_tiling::DequantType::TENSOR);
@@ -189,15 +183,17 @@ ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuan
     return ge::GRAPH_SUCCESS;
 }
 
-int32_t SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuantGetMatmulTmpSize(
-            gert::TilingContext* context, TCubeTiling &mmtilingData, int32_t m, int32_t n, int32_t k)
+int32_t SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuantGetMatmulTmpSize(gert::TilingContext* context,
+                                                                                          TCubeTiling& mmtilingData,
+                                                                                          int32_t m, int32_t n,
+                                                                                          int32_t k)
 {
     auto platformInfo = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     matmul_tiling::MatmulApiTiling tiling(platformInfo);
-    tiling.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
-                                    matmul_tiling::DataType::DT_INT8, transposeB);
+    tiling.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_INT8,
+                    transposeB);
     tiling.SetCType(matmul_tiling::TPosition::VECCALC, matmul_tiling::CubeFormat::ND,
-                                    matmul_tiling::DataType::DT_FLOAT16);
+                    matmul_tiling::DataType::DT_FLOAT16);
     tiling.SetBiasType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_INT32);
     tiling.SetAType(matmul_tiling::TPosition::TSCM, matmul_tiling::CubeFormat::NZ, matmul_tiling::DataType::DT_INT8);
 
@@ -214,22 +210,20 @@ int32_t SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuantGetMatm
 }
 
 ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuantSetMatmulMutiTilingData(
-                                                            gert::TilingContext* context, TCubeTiling mmTilingData)
+    gert::TilingContext* context, TCubeTiling mmTilingData)
 {
     auto platformInfo = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     matmul_tiling::MatmulApiTiling tiling(platformInfo);
-    tiling.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
-                                            matmul_tiling::DataType::DT_INT8, transposeB);
-    tiling.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
-                                            matmul_tiling::DataType::DT_FLOAT16);
-    tiling.SetBiasType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
-                                            matmul_tiling::DataType::DT_INT32);
+    tiling.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_INT8,
+                    transposeB);
+    tiling.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT16);
+    tiling.SetBiasType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_INT32);
     tiling.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_INT8);
 
-    tiling.SetShape(tilingData.opBaseInfo.get_bSize() * tilingData.opBaseInfo.get_sSize(),
-                    tilingData.get_weightN(), tilingData.get_weightK());
-    tiling.SetOrgShape(tilingData.opBaseInfo.get_bSize() * tilingData.opBaseInfo.get_sSize(),
-                    tilingData.get_weightN(), tilingData.get_weightK());
+    tiling.SetShape(tilingData.opBaseInfo.get_bSize() * tilingData.opBaseInfo.get_sSize(), tilingData.get_weightN(),
+                    tilingData.get_weightK());
+    tiling.SetOrgShape(tilingData.opBaseInfo.get_bSize() * tilingData.opBaseInfo.get_sSize(), tilingData.get_weightN(),
+                       tilingData.get_weightK());
     tiling.SetBias(true);
     tiling.SetBufferSpace(-1, -1, -1);
     tiling.SetDequantType(matmul_tiling::DequantType::TENSOR);
@@ -241,29 +235,26 @@ ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuan
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::GetBaseParams(gert::TilingContext *context)
+ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::GetBaseParams(gert::TilingContext* context)
 {
-    const gert::StorageShape *x1Shape = context->GetInputShape(0);
+    const gert::StorageShape* x1Shape = context->GetInputShape(0);
     int32_t dataSize = 1;
-    OP_CHECK_IF(x1Shape == nullptr, OP_LOGE("SwinTransformerLnQkvQuant",
-                    "The INPUT x1Shape param is null!"),
-                    return ge::GRAPH_FAILED);
+    OP_CHECK_IF(x1Shape == nullptr, OP_LOGE("SwinTransformerLnQkvQuant", "The INPUT x1Shape param is null!"),
+                return ge::GRAPH_FAILED);
     for (uint32_t i = 0; i < x1Shape->GetStorageShape().GetDimNum(); ++i) {
         dataSize *= x1Shape->GetStorageShape().GetDim(i);
     }
     tilingData.set_size(dataSize);
     bLength = x1Shape->GetStorageShape().GetDim(0);
     sLength = x1Shape->GetStorageShape().GetDim(1);
-    hLength = x1Shape->GetStorageShape().GetDim(2);   // 2 shape dim2
+    hLength = x1Shape->GetStorageShape().GetDim(2); // 2 shape dim2
 
-    const gert::StorageShape *weightShape = context->GetInputShape(3); // 3 is weight
-    OP_CHECK_IF(weightShape == nullptr, OP_LOGE("SwinTransformerLnQkvQuant",
-                    "The INPUT weight param is null!"),
-                    return ge::GRAPH_FAILED);
+    const gert::StorageShape* weightShape = context->GetInputShape(3); // 3 is weight
+    OP_CHECK_IF(weightShape == nullptr, OP_LOGE("SwinTransformerLnQkvQuant", "The INPUT weight param is null!"),
+                return ge::GRAPH_FAILED);
     auto attrs = context->GetAttrs();
-    OP_CHECK_IF(attrs == nullptr, OP_LOGE("SwinTransformerLnQkvQuant",
-                    "The attrs param is null!"),
-                    return ge::GRAPH_FAILED);
+    OP_CHECK_IF(attrs == nullptr, OP_LOGE("SwinTransformerLnQkvQuant", "The attrs param is null!"),
+                return ge::GRAPH_FAILED);
     size_t idx = 0;
     headNum = *attrs->GetAttrPointer<int64_t>(idx++);
     auto seqLength = attrs->GetAttrPointer<int64_t>(idx++);
@@ -276,7 +267,7 @@ ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::GetBaseParams(gert::Tili
     sizePerHead = (seqLength != nullptr) ? (*seqLength) : sizePerHead;
     transposeB = bTransOpt;
     if ((transposeB == false) || (hWinSize < 7) || (hWinSize > 32) || // win [7 - 32]
-                (wWinSize < 7) || (wWinSize > 32)) { // win [7 - 32]
+        (wWinSize < 7) || (wWinSize > 32)) {                          // win [7 - 32]
         return ge::GRAPH_FAILED;
     }
     auto patchHeight = oriHeight / hWinSize;
@@ -300,16 +291,16 @@ ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::GetBaseParams(gert::Tili
         tilingData.set_weightK(weightShape->GetStorageShape().GetDim(0));
         tilingData.set_weightN(weightShape->GetStorageShape().GetDim(1));
     }
-    if ((sizePerHead != 32) && (sizePerHead != 64)) {   // seqLengh = 32 / 64
+    if ((sizePerHead != 32) && (sizePerHead != 64)) { // seqLengh = 32 / 64
         return ge::GRAPH_FAILED;
     }
-    if ((hLength > 1024) || (bLength > 32)) {     // K <= 1024, b <=32
+    if ((hLength > 1024) || (bLength > 32)) { // K <= 1024, b <=32
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::IsSupport(gert::TilingContext *context)
+ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::IsSupport(gert::TilingContext* context)
 {
     if (bLength <= 0) {
         return ge::GRAPH_FAILED;
@@ -334,7 +325,7 @@ ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::IsSupport(gert::TilingCo
 }
 
 ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuantTilingMainProc(
-                                                                        gert::TilingContext *context)
+    gert::TilingContext* context)
 {
     auto platformInfo = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     auto checkRet = GetBaseParams(context);
@@ -375,34 +366,33 @@ ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuan
     uint32_t maxValueQuant = 0;
     uint32_t minValueQuant = 0;
 
-    int64_t maxUbSizeForLn = ubSize - 6 * 1024;   // resverd 6 * 1024
-    
+    int64_t maxUbSizeForLn = ubSize - 6 * 1024; // resverd 6 * 1024
+
     int64_t blockNum = coreNum;
     auto iter = TEMPLATE_MAP.find(headNum);
     templateId = (iter != TEMPLATE_MAP.end()) ? iter->second : ProcessMode::LN_INDEPENDT_MODE;
     bool solutionFlag = false;
     bool lnSolutionFlag = false;
-    switch (templateId)
-    {
-    case ProcessMode::NORMAL_MODE:
-        {
+    switch (templateId) {
+        case ProcessMode::NORMAL_MODE: {
             int64_t lnBsSize = bLength * sLength;
             blockNum = lnBsSize / wWinSize;
             blockNum = (blockNum <= coreNum) ? blockNum : coreNum;
             int64_t singleCoreLnBs = (lnBsSize + blockNum - 1) / blockNum;
             singleCoreLnBs = (singleCoreLnBs + wWinSize - 1) / (wWinSize) * (wWinSize);
             blockNum = (lnBsSize + singleCoreLnBs - 1) / singleCoreLnBs; // update blockNum after align to winSize
-            blockNum = (blockNum <= coreNum) ? blockNum: coreNum;
+            blockNum = (blockNum <= coreNum) ? blockNum : coreNum;
             int64_t kSizePerLoop = hLength;
             int64_t nSizePerLoop = weightN;
             int64_t mSizePerLoop = wWinSize;
-            int64_t maxMnSize = l0CSize / typeSize; // to Ub
+            int64_t maxMnSize = l0CSize / typeSize;                            // to Ub
             maxMnSize = (maxMnSize > (ubSize / 2)) ? (ubSize / 2) : maxMnSize; // 2 IS SPLIT FOR A AND B
-            int32_t lnResverdBuffer = (hLength <= 256) ? RESVERD_BUFF :
-                                            (hLength * sizeof(float) * 2 + hLength * typeSize * 4); // 2 PART AND 4 PART
+            int32_t lnResverdBuffer = (hLength <= 256) ?
+                                          RESVERD_BUFF :
+                                          (hLength * sizeof(float) * 2 + hLength * typeSize * 4); // 2 PART AND 4 PART
             int32_t matmulUbMaxSize = maxUbSizeForLn - lnResverdBuffer;
             uint32_t splitN = 0;
-            for (; splitN < 3 * (headNum); ++ splitN) { // q k v sum is 3
+            for (; splitN < 3 * (headNum); ++splitN) { // q k v sum is 3
                 for (uint32_t multipleM = (singleCoreLnBs / wWinSize); multipleM >= 1; --multipleM) {
                     mSizePerLoop = multipleM * (wWinSize);
                     if (mSizePerLoop == 0) {
@@ -415,8 +405,8 @@ ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuan
                         continue;
                     }
                     TCubeTiling mmtilingData;
-                    int32_t ret = SwinTransformerLnQkvQuantGetMatmulTmpSize(context,  mmtilingData,
-                                                                mSizePerLoop, nSizePerLoop, kSizePerLoop);
+                    int32_t ret = SwinTransformerLnQkvQuantGetMatmulTmpSize(context, mmtilingData, mSizePerLoop,
+                                                                            nSizePerLoop, kSizePerLoop);
                     if (ret == -1) {
                         continue;
                     }
@@ -425,9 +415,9 @@ ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuan
                     int32_t mmOutUbSize = mSizePerLoop * nSizePerLoop * sizeof(uint16_t);
                     int32_t mmUseAllSize = mmOutUbSize + bufSize.ubSize;
                     mmUseAllSize += ((splitN == 0) ? (mSizePerLoop + BLOCK_UINT_16 - 1) / BLOCK_UINT_16 *
-                        BLOCK_UINT_16 * kSizePerLoop * typeSize : BLOCK_UINT_16 * kSizePerLoop * typeSize);
-                    int32_t lnUseUbSize = SwinTransformerLnQkvQuantGetUsedUbSize(mSizePerLoop,
-                                                                                kSizePerLoop, splitN);
+                                                         BLOCK_UINT_16 * kSizePerLoop * typeSize :
+                                                     BLOCK_UINT_16 * kSizePerLoop * typeSize);
+                    int32_t lnUseUbSize = SwinTransformerLnQkvQuantGetUsedUbSize(mSizePerLoop, kSizePerLoop, splitN);
                     if ((mmUseAllSize > matmulUbMaxSize) || (lnUseUbSize > matmulUbMaxSize)) {
                         continue;
                     }
@@ -450,8 +440,8 @@ ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuan
             int64_t quantSize = hLength * (sizeof(uint16_t)) * 2; // scale + offset is 2
             int64_t bufferMForLn = lnBaseM;
             int64_t minWinSize = (splitN) ? (7) : std::min(wWinSize, (int64_t)16); // 7 is min win , 16 is align
-            int64_t stepLnBaseM = (splitN) ? 8 : wWinSize; // 8 is best
-            for (;lnBaseK >= sizePerHead; lnBaseK -= sizePerHead) {
+            int64_t stepLnBaseM = (splitN) ? 8 : wWinSize;                         // 8 is best
+            for (; lnBaseK >= sizePerHead; lnBaseK -= sizePerHead) {
                 lnBaseM = mSizePerLoop;
                 for (; lnBaseM >= minWinSize; lnBaseM -= stepLnBaseM) {
                     if (lnBaseM < 1) {
@@ -498,25 +488,26 @@ ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuan
             tilingData.opBaseInfo.set_lnKSubLoop(lnKloopNum);
             tilingData.set_tmpBufferForQuant(minValueQuant);
             OP_LOGI(context->GetNodeName(), "lnBaseM: %ld, mSizePerLoop:%ld, nSizePerLoop:%ld, kSizePerLoop:%ld",
-                lnBaseM, mSizePerLoop, nSizePerLoop, kSizePerLoop);
+                    lnBaseM, mSizePerLoop, nSizePerLoop, kSizePerLoop);
             OP_LOGI(context->GetNodeName(), "bufferMForLn: %ld, lnMloopNum:%ld", bufferMForLn, lnMloopNum);
-            if ((solutionFlag == true) && (lnSolutionFlag ==true)) {
+            if ((solutionFlag == true) && (lnSolutionFlag == true)) {
                 tilingData.mmInfo.set_mmSizeM(mSizePerLoop);
                 tilingData.mmInfo.set_mmSizeN(nSizePerLoop);
                 tilingData.mmInfo.set_mmSizeK(kSizePerLoop);
                 tilingData.opBaseInfo.set_singleCoreLnBsSize(singleCoreLnBs);
-                ubSizePlatform = maxUbSizeForLn - (lnGammaBetaSize + quantSize) - minValueQuant - \
-                       bufferMForLn * lnBaseK * (sizeof(uint16_t)) - mSizePerLoop * nSizePerLoop * sizeof(uint16_t);
+                ubSizePlatform = maxUbSizeForLn - (lnGammaBetaSize + quantSize) - minValueQuant -
+                                 bufferMForLn * lnBaseK * (sizeof(uint16_t)) -
+                                 mSizePerLoop * nSizePerLoop * sizeof(uint16_t);
                 l1SizePlatForm = l1Size - mSizePerLoop * kSizePerLoop;
-                SwinTransformerLnQkvQuantSetMatmulTilingData(context, tilingData.mmTilingParams, \
-                                                            l1SizePlatForm, l0CSizePlatForm);
+                SwinTransformerLnQkvQuantSetMatmulTilingData(context, tilingData.mmTilingParams, l1SizePlatForm,
+                                                             l0CSizePlatForm);
                 tilingData.set_tmpShareBufferForLn(ubSizePlatform + mSizePerLoop * nSizePerLoop * sizeof(uint16_t));
                 OP_LOGI(context->GetNodeName(), "tmpShareBufferForLn: %d", tilingData.get_tmpShareBufferForLn());
             }
             break;
         }
-    default:
-        break;
+        default:
+            break;
     }
     SwinTransformerLnQkvQuantSetWorkSpace(context);
     context->SetBlockDim(static_cast<int64_t>(blockNum));
@@ -526,7 +517,7 @@ ge::graphStatus SwinTransformerLnQkvQuantTilingCompute::SwinTransformerLnQkvQuan
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingFuncForSwinTransformerLnQkvQuant(gert::TilingContext *context)
+ge::graphStatus TilingFuncForSwinTransformerLnQkvQuant(gert::TilingContext* context)
 {
     SwinTransformerLnQkvQuantTilingCompute tilingCompute;
     auto ret = tilingCompute.SwinTransformerLnQkvQuantTilingMainProc(context);
@@ -535,7 +526,8 @@ ge::graphStatus TilingFuncForSwinTransformerLnQkvQuant(gert::TilingContext *cont
     return ret;
 } // TilingFunc
 
-ge::graphStatus TilingPrepareForSwinTransformerLnQkvQuant(gert::TilingParseContext* context) {
+ge::graphStatus TilingPrepareForSwinTransformerLnQkvQuant(gert::TilingParseContext* context)
+{
     // auto compileInfo = GetCompileInfoPtr<SwinTransformerLnQkvQuantCompileInfo>(context);
     auto compileInfo = context->GetCompiledInfo<SwinTransformerLnQkvQuantCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);
@@ -555,8 +547,7 @@ ge::graphStatus TilingPrepareForSwinTransformerLnQkvQuant(gert::TilingParseConte
     return ge::GRAPH_SUCCESS;
 }
 
-
 IMPL_OP_OPTILING(SwinTransformerLnQkvQuant)
-.Tiling(TilingFuncForSwinTransformerLnQkvQuant)
-.TilingParse<SwinTransformerLnQkvQuantCompileInfo>(TilingPrepareForSwinTransformerLnQkvQuant);
+    .Tiling(TilingFuncForSwinTransformerLnQkvQuant)
+    .TilingParse<SwinTransformerLnQkvQuantCompileInfo>(TilingPrepareForSwinTransformerLnQkvQuant);
 } // namespace optiling

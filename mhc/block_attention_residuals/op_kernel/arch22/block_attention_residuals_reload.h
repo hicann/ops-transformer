@@ -42,7 +42,7 @@ struct BlockAttentionResidualsInitParams {
 template <typename D_IN>
 class BlockAttentionResidualsReload {
 public:
-    __aicore__ inline BlockAttentionResidualsReload(TPipe *pipe, const BlockAttentionResidualsTilingData *tilingData)
+    __aicore__ inline BlockAttentionResidualsReload(TPipe* pipe, const BlockAttentionResidualsTilingData* tilingData)
     {
         pipe_ = pipe;
         tiling_ = tilingData;
@@ -58,7 +58,7 @@ public:
         hiddenSizeAlignFp32_ = (hiddenSize_ + ELEM_PER_BLK_FP32 - 1U) / ELEM_PER_BLK_FP32 * ELEM_PER_BLK_FP32;
     }
 
-    __aicore__ inline void Init(const BlockAttentionResidualsInitParams &params)
+    __aicore__ inline void Init(const BlockAttentionResidualsInitParams& params)
     {
         blockIdx_ = GetBlockIdx();
         blockNum_ = GetBlockNum();
@@ -76,14 +76,14 @@ public:
             tokenNum_ = numTokens_ - tokenStart_;
         }
 
-        partialBlockGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.partialBlock));
-        blockResGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.blockRes));
-        projWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.projWeight));
-        normWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.normWeight));
-        hiddenStatesGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.hiddenStates));
+        partialBlockGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.partialBlock));
+        blockResGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.blockRes));
+        projWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.projWeight));
+        normWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.normWeight));
+        hiddenStatesGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.hiddenStates));
         if (needBackward_) {
-            invNormGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(params.invNorm));
-            probsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(params.probs));
+            invNormGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(params.invNorm));
+            probsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(params.probs));
         }
 
         InitBuffers();
@@ -131,7 +131,7 @@ private:
         }
     }
 
-    __aicore__ inline void CopyInRowEnqueue(const GlobalTensor<D_IN> &srcGm, int64_t srcOffset)
+    __aicore__ inline void CopyInRowEnqueue(const GlobalTensor<D_IN>& srcGm, int64_t srcOffset)
     {
         LocalTensor<D_IN> inLocal = inQue_.AllocTensor<D_IN>();
         DataCopyExtParams copyParams{1, static_cast<uint32_t>(hiddenSize_ * sizeof(D_IN)), 0, 0, 0};
@@ -145,19 +145,19 @@ private:
         return inQue_.DeQue<D_IN>();
     }
 
-    __aicore__ inline LocalTensor<D_IN> CopyInRowSync(const GlobalTensor<D_IN> &srcGm, int64_t srcOffset)
+    __aicore__ inline LocalTensor<D_IN> CopyInRowSync(const GlobalTensor<D_IN>& srcGm, int64_t srcOffset)
     {
         CopyInRowEnqueue(srcGm, srcOffset);
         return CopyInRowDeQue();
     }
 
-    __aicore__ inline void FreeInRow(LocalTensor<D_IN> &inLocal)
+    __aicore__ inline void FreeInRow(LocalTensor<D_IN>& inLocal)
     {
         inQue_.FreeTensor(inLocal);
     }
 
     /*! golden：n < N → residual；n == N → partial_block */
-    __aicore__ inline const GlobalTensor<D_IN> &GetLogicRowGm(uint32_t n) const
+    __aicore__ inline const GlobalTensor<D_IN>& GetLogicRowGm(uint32_t n) const
     {
         return (n < numBlocks_) ? blockResGm_ : partialBlockGm_;
     }
@@ -171,7 +171,7 @@ private:
     }
 
     /*! Softmax 前：Cast → sumSq → invNorm → score → vecMeta[metaIdx] */
-    __aicore__ inline void ProcessRowScore(const LocalTensor<D_IN> &inLocal, uint32_t metaIdx, int64_t tokenIdx)
+    __aicore__ inline void ProcessRowScore(const LocalTensor<D_IN>& inLocal, uint32_t metaIdx, int64_t tokenIdx)
     {
         CastRowToFp32(vRow_, inLocal, hiddenSize_);
         PipeBarrier<PIPE_V>();
@@ -201,7 +201,7 @@ private:
     }
 
     /*! Softmax 后加权累加：Cast + MulAdd（调用方已外置 Counter mask） */
-    __aicore__ inline void ProcessRowWeighted(const LocalTensor<D_IN> &inLocal, uint32_t metaIdx)
+    __aicore__ inline void ProcessRowWeighted(const LocalTensor<D_IN>& inLocal, uint32_t metaIdx)
     {
         CastRowToFp32CounterNoSetMask(vRow_, inLocal);
         PipeBarrier<PIPE_V>();
@@ -314,8 +314,8 @@ private:
     }
 
 private:
-    TPipe *pipe_{nullptr};
-    const BlockAttentionResidualsTilingData *tiling_{nullptr};
+    TPipe* pipe_{nullptr};
+    const BlockAttentionResidualsTilingData* tiling_{nullptr};
 
     GlobalTensor<D_IN> partialBlockGm_;
     GlobalTensor<D_IN> blockResGm_;

@@ -27,7 +27,7 @@
 namespace optiling {
 namespace gmm_add_advanced {
 using namespace GroupedMatmulAdd;
-inline ge::graphStatus InitCompileInfo(fe::PlatFormInfos *platformInfo, GMMCompileInfo *compileInfoPtr)
+inline ge::graphStatus InitCompileInfo(fe::PlatFormInfos* platformInfo, GMMCompileInfo* compileInfoPtr)
 {
     OP_CHECK_IF(platformInfo == nullptr, OP_LOGE("GroupedMatmulAdd", "InitCompileInfo platformInfo is null"),
                 return ge::GRAPH_FAILED);
@@ -54,11 +54,11 @@ inline ge::graphStatus InitCompileInfo(fe::PlatFormInfos *platformInfo, GMMCompi
     return ge::GRAPH_SUCCESS;
 }
 
-inline ge::graphStatus InitCompileInfo(gert::TilingParseContext *context)
+inline ge::graphStatus InitCompileInfo(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE(context->GetNodeName(), "InitCompileInfo context is null"),
                 return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     auto compileInfoPtr = context->GetCompiledInfo<GMMCompileInfo>();
     return InitCompileInfo(platformInfo, compileInfoPtr);
 }

@@ -16,10 +16,10 @@
 #include "opdev/make_op_executor.h"
 
 namespace l0op {
-const std::array<const aclTensor *, 3> BlockAttentionResiduals(const aclTensor *partialBlock, const aclTensor *blockRes,
-                                                               const aclTensor *projWeight, const aclTensor *normWeight,
-                                                               int64_t validBlockNum, double normEps, bool needBackward,
-                                                               aclOpExecutor *executor);
+const std::array<const aclTensor*, 3> BlockAttentionResiduals(const aclTensor* partialBlock, const aclTensor* blockRes,
+                                                              const aclTensor* projWeight, const aclTensor* normWeight,
+                                                              int64_t validBlockNum, double normEps, bool needBackward,
+                                                              aclOpExecutor* executor);
 } // namespace l0op
 
 #endif // MHC_BLOCK_ATTENTION_RESIDUALS_OP_HOST_OP_API_BLOCK_ATTENTION_RESIDUALS_H_

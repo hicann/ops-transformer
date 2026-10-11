@@ -52,12 +52,12 @@ struct GmmPlatformCache {
     std::string shortSocVersion;
 };
 
-static bool IsGmmDavidSupportSoc(const std::string &shortSocVersion)
+static bool IsGmmDavidSupportSoc(const std::string& shortSocVersion)
 {
     return GmmDavidSupportSoc.count(shortSocVersion) > 0;
 }
 
-static PlatformID GetGmmPlatformId(const std::string &shortSocVersion)
+static PlatformID GetGmmPlatformId(const std::string& shortSocVersion)
 {
     if (shortSocVersion.find("310P") != std::string::npos) {
         return PlatformID::ASCEND310P;
@@ -68,7 +68,7 @@ static PlatformID GetGmmPlatformId(const std::string &shortSocVersion)
     return PlatformID::ASCEND910B;
 }
 
-static const GmmPlatformCache &GetGmmPlatformCache(const bool initialize = false)
+static const GmmPlatformCache& GetGmmPlatformCache(const bool initialize = false)
 {
     static GmmPlatformCache cache;
     if (initialize) {
@@ -113,7 +113,7 @@ static ge::graphStatus CheckSplitItem(int64_t splitItem)
     }
 }
 
-static bool IsTensorListNullOrEmpty(const gert::InferShapeContext *context, size_t index)
+static bool IsTensorListNullOrEmpty(const gert::InferShapeContext* context, size_t index)
 {
     auto shape = context->GetDynamicInputShape(index, 0);
     if (shape == nullptr) {
@@ -127,7 +127,7 @@ static bool IsTensorListNullOrEmpty(const gert::InferShapeContext *context, size
     return false;
 }
 
-static ge::graphStatus CheckGroupType(const gert::InferShapeContext *context, int64_t groupType)
+static ge::graphStatus CheckGroupType(const gert::InferShapeContext* context, int64_t groupType)
 {
     if (groupType == GMM_NO_SPLIT || groupType == GMM_SPLIT_M || groupType == GMM_SPLIT_K) {
         return GRAPH_SUCCESS;
@@ -143,17 +143,17 @@ static ge::graphStatus CheckGroupType(const gert::InferShapeContext *context, in
     }
 }
 
-static ge::graphStatus UpdateShapeYMultiDim(gert::InferShapeContext *context, size_t idxY, const gert::Shape *xShape,
-                                            const gert::Shape *weightShape)
+static ge::graphStatus UpdateShapeYMultiDim(gert::InferShapeContext* context, size_t idxY, const gert::Shape* xShape,
+                                            const gert::Shape* weightShape)
 {
-    gert::Shape *yShape = context->GetOutputShape(idxY);
+    gert::Shape* yShape = context->GetOutputShape(idxY);
     OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
     *yShape = *xShape;
     size_t dimY = yShape->GetDimNum();
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const bool *transposeWPtr = attrs->GetAttrPointer<bool>(GMM_INDEX_ATTR_TRANSPOSE_W);
-    const bool *transposeXPtr = attrs->GetAttrPointer<bool>(GMM_INDEX_ATTR_TRANSPOSE_X);
+    const bool* transposeWPtr = attrs->GetAttrPointer<bool>(GMM_INDEX_ATTR_TRANSPOSE_W);
+    const bool* transposeXPtr = attrs->GetAttrPointer<bool>(GMM_INDEX_ATTR_TRANSPOSE_X);
 
     OP_CHECK_NULL_WITH_CONTEXT(context, weightShape);
     if (transposeWPtr != nullptr && *transposeWPtr) {
@@ -167,9 +167,9 @@ static ge::graphStatus UpdateShapeYMultiDim(gert::InferShapeContext *context, si
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus UpdateShapeY(gert::InferShapeContext *context, size_t idxY, std::vector<int64_t> yDims)
+static ge::graphStatus UpdateShapeY(gert::InferShapeContext* context, size_t idxY, std::vector<int64_t> yDims)
 {
-    gert::Shape *yShape = context->GetOutputShape(idxY);
+    gert::Shape* yShape = context->GetOutputShape(idxY);
     OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
     yShape->SetDimNum(yDims.size());
     for (size_t dim = 0; dim < yDims.size(); ++dim) {
@@ -178,7 +178,7 @@ static ge::graphStatus UpdateShapeY(gert::InferShapeContext *context, size_t idx
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus UpdateMultipleShapeY(gert::InferShapeContext *context, const gert::Tensor *groupListTensor,
+static ge::graphStatus UpdateMultipleShapeY(gert::InferShapeContext* context, const gert::Tensor* groupListTensor,
                                             size_t weightDimN, bool isXTransposed, size_t xDimM)
 {
     auto groupListData = groupListTensor->GetData<int64_t>();
@@ -186,13 +186,13 @@ static ge::graphStatus UpdateMultipleShapeY(gert::InferShapeContext *context, co
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "groupList",
                                                          "Failed to obtain necessary data from groupListTensor"),
                 return GRAPH_FAILED);
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *groupListTypePtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_GROUP_LIST_TYPE);
+    const int64_t* groupListTypePtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_GROUP_LIST_TYPE);
     OP_CHECK_NULL_WITH_CONTEXT(context, groupListTypePtr);
-    const gert::Shape *x0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_X, 0);
+    const gert::Shape* x0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_X, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, x0Shape);
-    const gert::Shape *weight0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
+    const gert::Shape* weight0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, weight0Shape);
     // For SPARSEM (groupListType=2), groupList shape is [E, 2], so loop count should be E (first dim)
     // For CUMSUM/COUNT (groupListType=0/1), groupList is 1D, loop count is shape size
@@ -200,12 +200,12 @@ static ge::graphStatus UpdateMultipleShapeY(gert::InferShapeContext *context, co
                                                                    groupListTensor->GetShapeSize();
     int64_t preOffset = 0;
     for (int idx = 0; idx < loopCount; ++idx) {
-        const gert::Shape *weightShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, idx);
+        const gert::Shape* weightShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, idx);
         if (weightShape == nullptr) {
             weightShape = weight0Shape;
         }
         if (isXTransposed) {
-            const gert::Shape *xShape = context->GetDynamicInputShape(GMM_INDEX_IN_X, idx);
+            const gert::Shape* xShape = context->GetDynamicInputShape(GMM_INDEX_IN_X, idx);
             if (xShape == nullptr) {
                 xShape = x0Shape;
             }
@@ -242,19 +242,19 @@ static ge::graphStatus UpdateMultipleShapeY(gert::InferShapeContext *context, co
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MultiInMultiOutWithoutGroupList(gert::InferShapeContext *context)
+static ge::graphStatus MultiInMultiOutWithoutGroupList(gert::InferShapeContext* context)
 {
     size_t idx = 0;
     size_t idw = 0;
-    const gert::Shape *w0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
+    const gert::Shape* w0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, w0Shape);
     while (true) {
-        const gert::Shape *xShape = context->GetDynamicInputShape(GMM_INDEX_IN_X, idx);
+        const gert::Shape* xShape = context->GetDynamicInputShape(GMM_INDEX_IN_X, idx);
         if (xShape == nullptr) {
             break;
         }
         ++idx;
-        const gert::Shape *wShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, idw);
+        const gert::Shape* wShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, idw);
         if (wShape) {
             ++idw;
         } else {
@@ -268,9 +268,9 @@ static ge::graphStatus MultiInMultiOutWithoutGroupList(gert::InferShapeContext *
                             .c_str()),
                     return GRAPH_FAILED);
     }
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *groupTypePtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_GROUP_TYPE);
+    const int64_t* groupTypePtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_GROUP_TYPE);
     bool success = true;
     if (w0Shape->GetDimNum() == 2) { // 2 two-dim weight tensor
         if (groupTypePtr != nullptr && *groupTypePtr == 2) {
@@ -292,13 +292,13 @@ static ge::graphStatus MultiInMultiOutWithoutGroupList(gert::InferShapeContext *
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MultiWeightMultiOutWithoutGroupList(gert::InferShapeContext *context)
+static ge::graphStatus MultiWeightMultiOutWithoutGroupList(gert::InferShapeContext* context)
 {
     size_t idx = 0;
-    const gert::Shape *x0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_X, 0);
+    const gert::Shape* x0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_X, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, x0Shape);
     while (true) {
-        const gert::Shape *wShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, idx);
+        const gert::Shape* wShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, idx);
         if (!wShape) {
             break;
         }
@@ -317,17 +317,17 @@ static ge::graphStatus MultiWeightMultiOutWithoutGroupList(gert::InferShapeConte
 }
 
 template <typename T>
-static ge::graphStatus GetAttrsValue(T context, GMMAttrs &gmmAttrs)
+static ge::graphStatus GetAttrsValue(T context, GMMAttrs& gmmAttrs)
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const int64_t *splitItemPtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_SPLIT_ITEM);
+    const int64_t* splitItemPtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_SPLIT_ITEM);
     OP_CHECK_NULL_WITH_CONTEXT(context, splitItemPtr);
     gmmAttrs.splitItem = *splitItemPtr;
     OP_LOGI(context->GetNodeName(), "Attr splitItem = %ld", gmmAttrs.splitItem);
 
-    const int64_t *dtypePtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_OUTPUT_DTYPE);
+    const int64_t* dtypePtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_OUTPUT_DTYPE);
     OP_CHECK_NULL_WITH_CONTEXT(context, dtypePtr);
     gmmAttrs.outputDtype = *dtypePtr;
     OP_LOGI(context->GetNodeName(), "Attr dtype = %ld", gmmAttrs.outputDtype);
@@ -338,31 +338,31 @@ static ge::graphStatus GetAttrsValue(T context, GMMAttrs &gmmAttrs)
         (tuningConfigPtr != nullptr && tuningConfigPtr->GetSize() > 0) ? tuningConfigPtr->GetData()[0] : 0;
     OP_LOGI(context->GetNodeName(), "Attr tuningConfig = %ld", gmmAttrs.tuningConfig);
 
-    const int64_t *groupTypePtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_GROUP_TYPE);
+    const int64_t* groupTypePtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_GROUP_TYPE);
     OP_CHECK_NULL_WITH_CONTEXT(context, groupTypePtr);
     gmmAttrs.groupType = *groupTypePtr;
     OP_LOGI(context->GetNodeName(), "Attr groupType = %ld", gmmAttrs.groupType);
 
-    const bool *transposeWPtr = attrs->GetAttrPointer<bool>(GMM_INDEX_ATTR_TRANSPOSE_W);
+    const bool* transposeWPtr = attrs->GetAttrPointer<bool>(GMM_INDEX_ATTR_TRANSPOSE_W);
     OP_CHECK_NULL_WITH_CONTEXT(context, transposeWPtr);
     gmmAttrs.transposeWeight = *transposeWPtr;
     OP_LOGI(context->GetNodeName(), "Attr isWeightTransposed = %d", gmmAttrs.transposeWeight);
 
-    const bool *transposeXPtr = attrs->GetAttrPointer<bool>(GMM_INDEX_ATTR_TRANSPOSE_X);
+    const bool* transposeXPtr = attrs->GetAttrPointer<bool>(GMM_INDEX_ATTR_TRANSPOSE_X);
     OP_CHECK_NULL_WITH_CONTEXT(context, transposeXPtr);
     gmmAttrs.transposeX = *transposeXPtr;
     OP_LOGI(context->GetNodeName(), "Attr isXTransposed = %d", gmmAttrs.transposeX);
 
-    const int64_t *activeType = attrs->GetInt(GMM_INDEX_ATTR_ACT_TYPE);
+    const int64_t* activeType = attrs->GetInt(GMM_INDEX_ATTR_ACT_TYPE);
     OP_CHECK_NULL_WITH_CONTEXT(context, activeType);
     gmmAttrs.activeType = *activeType;
     OP_LOGI(context->GetNodeName(), "Attr activeType = %ld", gmmAttrs.activeType);
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckAttrs(gert::InferShapeContext *context, GMMAttrs &gmmAttrs)
+static ge::graphStatus CheckAttrs(gert::InferShapeContext* context, GMMAttrs& gmmAttrs)
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
     OP_CHECK_IF(
         CheckSplitItem(gmmAttrs.splitItem) != GRAPH_SUCCESS,
@@ -373,7 +373,7 @@ static ge::graphStatus CheckAttrs(gert::InferShapeContext *context, GMMAttrs &gm
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "groupType",
                                                       std::to_string(gmmAttrs.groupType), "Invalid groupType"),
                 return GRAPH_FAILED);
-    const int64_t *activeType = attrs->GetInt(GMM_INDEX_ATTR_ACT_TYPE);
+    const int64_t* activeType = attrs->GetInt(GMM_INDEX_ATTR_ACT_TYPE);
     OP_CHECK_NULL_WITH_CONTEXT(context, activeType);
     OP_CHECK_IF(
         *activeType < 0 || *activeType >= static_cast<int64_t>(GMMActType::END_ACT_TYPE_ENUM),
@@ -387,11 +387,11 @@ static ge::graphStatus CheckAttrs(gert::InferShapeContext *context, GMMAttrs &gm
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus GetNumOfInputs(const gert::InferShapeContext *context, size_t &numX, size_t &numWeight,
-                                      int64_t &lenGroupList)
+static ge::graphStatus GetNumOfInputs(const gert::InferShapeContext* context, size_t& numX, size_t& numWeight,
+                                      int64_t& lenGroupList)
 {
     ge::graphStatus res = GRAPH_SUCCESS;
-    const gert::Shape *shape = nullptr;
+    const gert::Shape* shape = nullptr;
     while (true) {
         shape = context->GetDynamicInputShape(GMM_INDEX_IN_X, numX);
         if (shape == nullptr) { // last shape
@@ -422,7 +422,7 @@ static ge::graphStatus GetNumOfInputs(const gert::InferShapeContext *context, si
     }
     OP_LOGI(context->GetNodeName(), "numWeight = %lu", numWeight);
 
-    const gert::Tensor *groupListTensor = context->GetOptionalInputTensor(GMM_INDEX_IN_GROUP_LIST);
+    const gert::Tensor* groupListTensor = context->GetOptionalInputTensor(GMM_INDEX_IN_GROUP_LIST);
     if (groupListTensor != nullptr) {
         lenGroupList = groupListTensor->GetStorageShape().GetDim(0); // groupListType 2 shape is [e, 2]
         if (lenGroupList < 0) {                                      // lenGroupList cannot be smaller than 0
@@ -434,15 +434,15 @@ static ge::graphStatus GetNumOfInputs(const gert::InferShapeContext *context, si
     return res;
 }
 
-static int64_t GetDim0(const gert::InferShapeContext *context, bool isXTransposed, size_t numX, size_t xDimM)
+static int64_t GetDim0(const gert::InferShapeContext* context, bool isXTransposed, size_t numX, size_t xDimM)
 {
     int64_t dim0 = 0;
     if (isXTransposed) {
-        const gert::Shape *x0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_X, 0);
+        const gert::Shape* x0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_X, 0);
         dim0 = (x0Shape == nullptr ? 0 : x0Shape->GetDim(xDimM));
     } else {
         for (size_t idx = 0; idx < numX; ++idx) {
-            const gert::Shape *xShape = context->GetDynamicInputShape(GMM_INDEX_IN_X, idx);
+            const gert::Shape* xShape = context->GetDynamicInputShape(GMM_INDEX_IN_X, idx);
             int64_t tmpDim0 = (xShape == nullptr ? 0 : xShape->GetDim(0));
             if (tmpDim0 >= 0) {
                 dim0 += tmpDim0;
@@ -455,7 +455,7 @@ static int64_t GetDim0(const gert::InferShapeContext *context, bool isXTranspose
     return dim0;
 }
 
-static bool inline IsNonEmpty(const gert::Shape *shape)
+static bool inline IsNonEmpty(const gert::Shape* shape)
 {
     return (shape != nullptr && !(shape->GetDimNum() == 1 && shape->GetDim(0) == 0));
 }
@@ -465,7 +465,7 @@ struct GMMWeightAxisInfo {
     size_t n;
 };
 
-static bool IsS8S4PseudoQuant(const gert::InferShapeContext *context)
+static bool IsS8S4PseudoQuant(const gert::InferShapeContext* context)
 {
     auto xDesc = context->GetDynamicInputDesc(GMM_INDEX_IN_X, 0);
     auto weightDesc = context->GetDynamicInputDesc(GMM_INDEX_IN_WEIGHT, 0);
@@ -476,9 +476,9 @@ static bool IsS8S4PseudoQuant(const gert::InferShapeContext *context)
            scaleDesc->GetDataType() == DT_UINT64;
 }
 
-static bool IsS8S4SpecialWeightFormat(const gert::InferShapeContext *context)
+static bool IsS8S4SpecialWeightFormat(const gert::InferShapeContext* context)
 {
-    const auto &platformInfo = GetGmmPlatformCache();
+    const auto& platformInfo = GetGmmPlatformCache();
     const auto ret = platformInfo.ret;
     if (ret != GRAPH_SUCCESS || !IsGmmDavidSupportSoc(platformInfo.shortSocVersion)) {
         return false;
@@ -499,14 +499,14 @@ static bool IsS8S4SpecialWeightFormat(const gert::InferShapeContext *context)
     return tuningConfig[1] == 1;
 }
 
-static GMMWeightAxisInfo GetWeightAxisInfo(const gert::InferShapeContext *context, size_t weightDimNum,
+static GMMWeightAxisInfo GetWeightAxisInfo(const gert::InferShapeContext* context, size_t weightDimNum,
                                            bool transposeWeight)
 {
     const bool logicalTransposeWeight = transposeWeight || IsS8S4SpecialWeightFormat(context);
     return {weightDimNum - (logicalTransposeWeight ? 1UL : 2UL), weightDimNum - (logicalTransposeWeight ? 2UL : 1UL)};
 }
 
-static ge::graphStatus IsGmmAntiQuantEmpty(gert::InferShapeContext *context)
+static ge::graphStatus IsGmmAntiQuantEmpty(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(!IsTensorListNullOrEmpty(context, GMM_INDEX_IN_ANTIQUANT_SCALE),
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "antiquantScale",
@@ -519,7 +519,7 @@ static ge::graphStatus IsGmmAntiQuantEmpty(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus IsGmmQuantEmpty(gert::InferShapeContext *context)
+static ge::graphStatus IsGmmQuantEmpty(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(!IsTensorListNullOrEmpty(context, GMM_INDEX_IN_SCALE),
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "scale", "scale is not null or empty"),
@@ -528,7 +528,7 @@ static ge::graphStatus IsGmmQuantEmpty(gert::InferShapeContext *context)
         !IsTensorListNullOrEmpty(context, GMM_INDEX_IN_OFFSET),
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "offset", "offset is not null or empty"),
         return GRAPH_FAILED);
-    const gert::Shape *pertokenQuantScale0Shape = context->GetOptionalInputShape(GMM_INDEX_IN_PERTOKEN_SCALE);
+    const gert::Shape* pertokenQuantScale0Shape = context->GetOptionalInputShape(GMM_INDEX_IN_PERTOKEN_SCALE);
     OP_CHECK_IF(IsNonEmpty(pertokenQuantScale0Shape),
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "perTokenScale",
                                                          "pertokenQuant scale is not null or empty"),
@@ -536,7 +536,7 @@ static ge::graphStatus IsGmmQuantEmpty(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckNonQuant(gert::InferShapeContext *context)
+static ge::graphStatus CheckNonQuant(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(IsGmmQuantEmpty(context) != GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "input",
@@ -549,7 +549,7 @@ static ge::graphStatus CheckNonQuant(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus GetGroupSize(const gert::InferShapeContext *context, GMMParamsInfo &paramsInfo)
+static ge::graphStatus GetGroupSize(const gert::InferShapeContext* context, GMMParamsInfo& paramsInfo)
 {
     size_t groupNum = 1;
     // all case allows 1024 in infershape, specific check in tiling
@@ -573,9 +573,9 @@ static ge::graphStatus GetGroupSize(const gert::InferShapeContext *context, GMMP
     return GRAPH_SUCCESS;
 }
 
-static graphStatus CheckDimNumAndPerGroupNum(const gert::InferShapeContext *context, bool isAntiquantInt4,
-                                             const std::tuple<size_t, size_t, int64_t> &dimData,
-                                             const gert::Shape *tensorShape, const std::string &tensorType)
+static graphStatus CheckDimNumAndPerGroupNum(const gert::InferShapeContext* context, bool isAntiquantInt4,
+                                             const std::tuple<size_t, size_t, int64_t>& dimData,
+                                             const gert::Shape* tensorShape, const std::string& tensorType)
 {
     size_t tensorDimNum = std::get<0>(dimData);
     size_t expectedDimNum = std::get<1>(dimData);   // 1: the sceond element
@@ -612,18 +612,18 @@ static graphStatus CheckDimNumAndPerGroupNum(const gert::InferShapeContext *cont
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckOptionalTensorList(gert::InferShapeContext *context, const std::string tensorType,
-                                               const GMMParamsInfo &paramsInfo, const GMMAttrs &gmmAttrs,
+static ge::graphStatus CheckOptionalTensorList(gert::InferShapeContext* context, const std::string tensorType,
+                                               const GMMParamsInfo& paramsInfo, const GMMAttrs& gmmAttrs,
                                                size_t nodeIdx)
 {
     // check bias，scale, antiquant scale or antiquant offset's size，tensor dimension and shape.
-    const size_t &groupNum = paramsInfo.groupNum;
+    const size_t& groupNum = paramsInfo.groupNum;
     size_t tensorSize = 0;
     while (context->GetDynamicInputShape(nodeIdx, tensorSize) != nullptr) {
         ++tensorSize;
     }
     uint64_t weightGroupedSize = static_cast<uint64_t>(paramsInfo.numWeight);
-    const int64_t &groupType = gmmAttrs.groupType;
+    const int64_t& groupType = gmmAttrs.groupType;
     auto shape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, shape);
     const auto weightAxis = GetWeightAxisInfo(context, shape->GetDimNum(), gmmAttrs.transposeWeight);
@@ -702,12 +702,12 @@ static ge::graphStatus CheckOptionalTensorList(gert::InferShapeContext *context,
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckPerTokenScale(const gert::InferShapeContext *context, const GMMParamsInfo &paramsInfo)
+static ge::graphStatus CheckPerTokenScale(const gert::InferShapeContext* context, const GMMParamsInfo& paramsInfo)
 {
     // check pertoken scale's size, tensor dimension and shape
-    const size_t &xGroupedSize = paramsInfo.numX;
-    const size_t &weightGroupedSize = paramsInfo.numWeight;
-    const size_t &yGroupedSize = paramsInfo.numY;
+    const size_t& xGroupedSize = paramsInfo.numX;
+    const size_t& weightGroupedSize = paramsInfo.numWeight;
+    const size_t& yGroupedSize = paramsInfo.numY;
     uint64_t xMDimIdx = 0;
     // check pertoken scale's size to be equal with x's
     if ((xGroupedSize == 1UL) && (yGroupedSize == 1UL)) {
@@ -743,8 +743,8 @@ static ge::graphStatus CheckPerTokenScale(const gert::InferShapeContext *context
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckGroupedMatmulQuant(gert::InferShapeContext *context, const GMMAttrs &gmmAttrs,
-                                               const GMMParamsInfo &paramsInfo)
+static ge::graphStatus CheckGroupedMatmulQuant(gert::InferShapeContext* context, const GMMAttrs& gmmAttrs,
+                                               const GMMParamsInfo& paramsInfo)
 {
     OP_CHECK_IF(paramsInfo.platform == PlatformID::ASCEND310P,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "platform", "Ascend310P",
@@ -780,7 +780,7 @@ static ge::graphStatus CheckGroupedMatmulQuant(gert::InferShapeContext *context,
                 return GRAPH_FAILED);
     return GRAPH_SUCCESS;
 }
-static bool isA8W4AsymmetricQuant(const gert::InferShapeContext *context)
+static bool isA8W4AsymmetricQuant(const gert::InferShapeContext* context)
 {
     auto offsetShape = context->GetDynamicInputShape(GMM_INDEX_IN_OFFSET, 0);
     if (offsetShape == nullptr) {
@@ -804,7 +804,7 @@ static bool isA8W4AsymmetricQuant(const gert::InferShapeContext *context)
     }
     return false;
 }
-static ge::graphStatus CheckA8W4AsymQuantParams(gert::InferShapeContext *context, const GMMParamsInfo &paramsInfo)
+static ge::graphStatus CheckA8W4AsymQuantParams(gert::InferShapeContext* context, const GMMParamsInfo& paramsInfo)
 {
     OP_CHECK_IF(paramsInfo.platform == PlatformID::ASCEND310P,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "platform", "Ascend310P",
@@ -842,8 +842,8 @@ static ge::graphStatus CheckA8W4AsymQuantParams(gert::InferShapeContext *context
     return GRAPH_SUCCESS;
 }
 
-static int64_t GetPergroupSize(const GMMAttrs &gmmAttrs, bool isSingleWeight, const gert::Shape *wShape,
-                               const gert::Shape *shape)
+static int64_t GetPergroupSize(const GMMAttrs& gmmAttrs, bool isSingleWeight, const gert::Shape* wShape,
+                               const gert::Shape* shape)
 {
     int64_t pergroupSize = 0;
     size_t shapeDimNum = shape->GetDimNum();
@@ -861,8 +861,8 @@ static int64_t GetPergroupSize(const GMMAttrs &gmmAttrs, bool isSingleWeight, co
     return pergroupSize;
 }
 
-static ge::graphStatus CheckGroupedMatmulAntiQuantGroupSize(const gert::InferShapeContext *context,
-                                                            const GMMAttrs &gmmAttrs, const GMMParamsInfo &paramsInfo,
+static ge::graphStatus CheckGroupedMatmulAntiQuantGroupSize(const gert::InferShapeContext* context,
+                                                            const GMMAttrs& gmmAttrs, const GMMParamsInfo& paramsInfo,
                                                             bool hasAntiquantOffset)
 {
     auto antiquantScale0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_ANTIQUANT_SCALE, 0);
@@ -918,8 +918,8 @@ static ge::graphStatus CheckGroupedMatmulAntiQuantGroupSize(const gert::InferSha
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckGroupedMatmulAntiQuantForShape(gert::InferShapeContext *context, const GMMAttrs &gmmAttrs,
-                                                           const GMMParamsInfo &paramsInfo)
+static ge::graphStatus CheckGroupedMatmulAntiQuantForShape(gert::InferShapeContext* context, const GMMAttrs& gmmAttrs,
+                                                           const GMMParamsInfo& paramsInfo)
 {
     OP_CHECK_IF(paramsInfo.platform == PlatformID::ASCEND310P,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "platform", "Ascend310P",
@@ -963,8 +963,8 @@ static ge::graphStatus CheckGroupedMatmulAntiQuantForShape(gert::InferShapeConte
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckQuantParams(gert::InferShapeContext *context, const GMMAttrs &gmmAttrs,
-                                        GMMParamsInfo &paramsInfo)
+static ge::graphStatus CheckQuantParams(gert::InferShapeContext* context, const GMMAttrs& gmmAttrs,
+                                        GMMParamsInfo& paramsInfo)
 {
     auto x0Desc = context->GetDynamicInputDesc(GMM_INDEX_IN_X, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, x0Desc);
@@ -994,13 +994,13 @@ static ge::graphStatus CheckQuantParams(gert::InferShapeContext *context, const 
     }
     return GRAPH_SUCCESS;
 }
-static ge::graphStatus CheckFunctionParamsForShape(gert::InferShapeContext *context, const GMMAttrs &gmmAttrs,
-                                                   GMMParamsInfo &paramsInfo)
+static ge::graphStatus CheckFunctionParamsForShape(gert::InferShapeContext* context, const GMMAttrs& gmmAttrs,
+                                                   GMMParamsInfo& paramsInfo)
 {
     if (context == nullptr) {
         return GRAPH_FAILED;
     }
-    const auto &platformInfo = GetGmmPlatformCache();
+    const auto& platformInfo = GetGmmPlatformCache();
     auto ret = platformInfo.ret;
     if (ret != ge::GRAPH_SUCCESS) {
         paramsInfo.platform = PlatformID::UNKNOWN;
@@ -1014,7 +1014,7 @@ static ge::graphStatus CheckFunctionParamsForShape(gert::InferShapeContext *cont
                 return GRAPH_FAILED);
     return GRAPH_SUCCESS;
 }
-static ge::graphStatus CheckDimNumAndGroupListNoSplitAndFormat(const gert::InferShapeContext *context,
+static ge::graphStatus CheckDimNumAndGroupListNoSplitAndFormat(const gert::InferShapeContext* context,
                                                                uint64_t tensorListLength, const size_t numWeight)
 {
     // when groupList is not empty, check its size equal with the length of x.
@@ -1057,7 +1057,7 @@ static ge::graphStatus CheckDimNumAndGroupListNoSplitAndFormat(const gert::Infer
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TensorType2NodeId(const std::vector<std::string> &tensorType, std::vector<int64_t> &nodeIdx)
+static ge::graphStatus TensorType2NodeId(const std::vector<std::string>& tensorType, std::vector<int64_t>& nodeIdx)
 {
     if (nodeIdx.size() > tensorType.size()) {
         return GRAPH_FAILED;
@@ -1076,7 +1076,7 @@ static ge::graphStatus TensorType2NodeId(const std::vector<std::string> &tensorT
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckDimNum(gert::InferShapeContext *context, uint64_t tensorListLength,
+static ge::graphStatus CheckDimNum(gert::InferShapeContext* context, uint64_t tensorListLength,
                                    const size_t expectedDimNum, const std::string tensorType)
 {
     int64_t nodeIdx = 0;
@@ -1089,7 +1089,7 @@ static ge::graphStatus CheckDimNum(gert::InferShapeContext *context, uint64_t te
     } else {
         return GRAPH_FAILED;
     }
-    const gert::Shape *shape;
+    const gert::Shape* shape;
     for (size_t i = 0; i < tensorListLength; ++i) {
         if (tensorType == "y") {
             shape = context->GetOutputShape(nodeIdx + i);
@@ -1113,7 +1113,7 @@ static ge::graphStatus CheckDimNum(gert::InferShapeContext *context, uint64_t te
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckWeightShapeInnerAxisEven(const gert::InferShapeContext *context, const size_t weightSize,
+static ge::graphStatus CheckWeightShapeInnerAxisEven(const gert::InferShapeContext* context, const size_t weightSize,
                                                      const int64_t innerAxisDimId)
 {
     auto w0Desc = context->GetDynamicInputDesc(GMM_INDEX_IN_WEIGHT, 0);
@@ -1136,9 +1136,9 @@ static ge::graphStatus CheckWeightShapeInnerAxisEven(const gert::InferShapeConte
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus IsxSizeEqualWithWeightKAxis(const gert::InferShapeContext *context,
-                                                   const GMMParamsInfo &paramsInfo, const gert::Shape *wShape,
-                                                   size_t &wKDimIdx, size_t &wNDimIdx)
+static ge::graphStatus IsxSizeEqualWithWeightKAxis(const gert::InferShapeContext* context,
+                                                   const GMMParamsInfo& paramsInfo, const gert::Shape* wShape,
+                                                   size_t& wKDimIdx, size_t& wNDimIdx)
 {
     if (paramsInfo.numWeight == 1 && wShape->GetDimNum() > 2) { // 2: separated tensor's dim
         wKDimIdx += 1UL;
@@ -1156,13 +1156,13 @@ static ge::graphStatus IsxSizeEqualWithWeightKAxis(const gert::InferShapeContext
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckCaseNoSplit(gert::InferShapeContext *context, bool transposeWeight,
-                                        const GMMParamsInfo &paramsInfo)
+static ge::graphStatus CheckCaseNoSplit(gert::InferShapeContext* context, bool transposeWeight,
+                                        const GMMParamsInfo& paramsInfo)
 {
-    const auto &platformInfo = GetGmmPlatformCache();
+    const auto& platformInfo = GetGmmPlatformCache();
     auto ret = platformInfo.ret;
-    const size_t &xSize = paramsInfo.numX;
-    const size_t &weightSize = paramsInfo.numWeight;
+    const size_t& xSize = paramsInfo.numX;
+    const size_t& weightSize = paramsInfo.numWeight;
     // check group num
     OP_CHECK_IF(xSize != paramsInfo.numY,
                 OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(
@@ -1251,10 +1251,10 @@ static ge::graphStatus CheckCaseNoSplit(gert::InferShapeContext *context, bool t
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckInnerAxisOfTensorList(const gert::InferShapeContext *context, size_t nodeId,
-                                                  int64_t innerAxisDimId, size_t checkNum, const char *tensorType)
+static ge::graphStatus CheckInnerAxisOfTensorList(const gert::InferShapeContext* context, size_t nodeId,
+                                                  int64_t innerAxisDimId, size_t checkNum, const char* tensorType)
 {
-    const auto &platformInfo = GetGmmPlatformCache();
+    const auto& platformInfo = GetGmmPlatformCache();
     auto ret = platformInfo.ret;
     for (size_t i = 0; i < checkNum; i++) {
         auto shape = context->GetDynamicInputShape(nodeId, i);
@@ -1275,18 +1275,18 @@ static ge::graphStatus CheckInnerAxisOfTensorList(const gert::InferShapeContext 
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckShapeSameLengthTensorList(gert::InferShapeContext *context,
-                                                      const std::vector<size_t> &dimIds, const int64_t innerAxisDimId,
+static ge::graphStatus CheckShapeSameLengthTensorList(gert::InferShapeContext* context,
+                                                      const std::vector<size_t>& dimIds, const int64_t innerAxisDimId,
                                                       const std::vector<std::string> tensorType, uint64_t groupNum)
 {
-    const auto &platformInfo = GetGmmPlatformCache();
+    const auto& platformInfo = GetGmmPlatformCache();
     auto ret = platformInfo.ret;
     std::vector<int64_t> nodeIdx = {0, 0};
     OP_CHECK_IF(TensorType2NodeId(tensorType, nodeIdx) != GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "input", "TensorType2NodeId failed"),
                 return GRAPH_FAILED);
     // check two tensorlist's size to be the same, and tensors to have consistant dimension.
-    const gert::Shape *shape;
+    const gert::Shape* shape;
     for (uint64_t i = 0; i < groupNum; i++) {
         shape = context->GetDynamicInputShape(nodeIdx[0], i);
         OP_CHECK_NULL_WITH_CONTEXT(context, shape);
@@ -1321,11 +1321,11 @@ static ge::graphStatus CheckShapeSameLengthTensorList(gert::InferShapeContext *c
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckShapeDiffLengthTensorList(gert::InferShapeContext *context,
-                                                      const std::vector<size_t> &dimIds, const int64_t innerAxisdimId,
+static ge::graphStatus CheckShapeDiffLengthTensorList(gert::InferShapeContext* context,
+                                                      const std::vector<size_t>& dimIds, const int64_t innerAxisdimId,
                                                       const std::vector<std::string> tensorType, uint64_t groupNum)
 {
-    const auto &platformInfo = GetGmmPlatformCache();
+    const auto& platformInfo = GetGmmPlatformCache();
     auto ret = platformInfo.ret;
     std::vector<int64_t> nodeIdx = {0, 0};
     OP_CHECK_IF(TensorType2NodeId(tensorType, nodeIdx) != GRAPH_SUCCESS,
@@ -1334,7 +1334,7 @@ static ge::graphStatus CheckShapeDiffLengthTensorList(gert::InferShapeContext *c
     // check each tensor's selected dimension size in a multi-tensor tensorlist's to equal with
     // the tensor selected dimension in single-tensor tensorlist.
     // the selected axis is not the split-axis.
-    const gert::Shape *singleTensor0;
+    const gert::Shape* singleTensor0;
     if (tensorType[1] == "y") {
         singleTensor0 = context->GetOutputShape(nodeIdx[1]);
     } else {
@@ -1355,7 +1355,7 @@ static ge::graphStatus CheckShapeDiffLengthTensorList(gert::InferShapeContext *c
                         return GRAPH_FAILED);
         }
     }
-    const gert::Shape *longTensor;
+    const gert::Shape* longTensor;
     for (uint64_t i = 0; i < groupNum; i++) {
         if (tensorType[0] == "y") {
             longTensor = context->GetOutputShape(nodeIdx[0] + i);
@@ -1377,7 +1377,7 @@ static ge::graphStatus CheckShapeDiffLengthTensorList(gert::InferShapeContext *c
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckGroupListCommonTensor(const gert::InferShapeContext *context,
+static ge::graphStatus CheckGroupListCommonTensor(const gert::InferShapeContext* context,
                                                   const bool isRequiredGroupList, const int64_t groupNum)
 {
     auto groupTensorOptionalShape = context->GetOptionalInputShape(GMM_INDEX_IN_GROUP_LIST);
@@ -1410,8 +1410,8 @@ static ge::graphStatus CheckGroupListCommonTensor(const gert::InferShapeContext 
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SplitMSingleXSingleWeightSingleY(gert::InferShapeContext *context, bool transposeWeight,
-                                                        const GMMParamsInfo &paramsInfo)
+static ge::graphStatus SplitMSingleXSingleWeightSingleY(gert::InferShapeContext* context, bool transposeWeight,
+                                                        const GMMParamsInfo& paramsInfo)
 {
     std::vector<std::string> tenorXAndWeight{"x", "weight", "true"};
     // check dimension
@@ -1459,8 +1459,8 @@ static ge::graphStatus SplitMSingleXSingleWeightSingleY(gert::InferShapeContext 
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SplitMSingleXSeparatedWeightSingleY(gert::InferShapeContext *context, bool transposeWeight,
-                                                           const GMMParamsInfo &paramsInfo)
+static ge::graphStatus SplitMSingleXSeparatedWeightSingleY(gert::InferShapeContext* context, bool transposeWeight,
+                                                           const GMMParamsInfo& paramsInfo)
 {
     std::vector<std::string> tenorWeightAndX{"weight", "x", "true"};
     // check dimension
@@ -1500,11 +1500,11 @@ static ge::graphStatus SplitMSingleXSeparatedWeightSingleY(gert::InferShapeConte
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SplitMSeparatedXSeparatedWeightSingleY(gert::InferShapeContext *context, bool transposeWeight,
-                                                              const GMMParamsInfo &paramsInfo)
+static ge::graphStatus SplitMSeparatedXSeparatedWeightSingleY(gert::InferShapeContext* context, bool transposeWeight,
+                                                              const GMMParamsInfo& paramsInfo)
 {
-    const size_t &xSize = paramsInfo.numX;
-    const size_t &weightSize = paramsInfo.numWeight;
+    const size_t& xSize = paramsInfo.numX;
+    const size_t& weightSize = paramsInfo.numWeight;
     std::vector<std::string> tenorWeightAndX{"weight", "x", "true"};
     OP_CHECK_IF(
         xSize != weightSize,
@@ -1550,12 +1550,12 @@ static ge::graphStatus SplitMSeparatedXSeparatedWeightSingleY(gert::InferShapeCo
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckCaseSplitM(gert::InferShapeContext *context, bool transposeWeight,
-                                       const GMMParamsInfo &paramsInfo)
+static ge::graphStatus CheckCaseSplitM(gert::InferShapeContext* context, bool transposeWeight,
+                                       const GMMParamsInfo& paramsInfo)
 {
-    const size_t &xSize = paramsInfo.numX;
-    const size_t &weightSize = paramsInfo.numWeight;
-    const size_t &ySize = paramsInfo.numY;
+    const size_t& xSize = paramsInfo.numX;
+    const size_t& weightSize = paramsInfo.numWeight;
+    const size_t& ySize = paramsInfo.numY;
     if ((xSize == 1UL) && (weightSize == 1UL) && (ySize == 1UL)) {
         OP_CHECK_IF(SplitMSingleXSingleWeightSingleY(context, transposeWeight, paramsInfo) != GRAPH_SUCCESS,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "weight",
@@ -1578,7 +1578,7 @@ static ge::graphStatus CheckCaseSplitM(gert::InferShapeContext *context, bool tr
         return GRAPH_SUCCESS;
     }
     if ((xSize == 1UL) && (weightSize > 1UL) && (ySize > 1UL)) {
-        const gert::Tensor *groupListTensor = context->GetOptionalInputTensor(GMM_INDEX_IN_GROUP_LIST);
+        const gert::Tensor* groupListTensor = context->GetOptionalInputTensor(GMM_INDEX_IN_GROUP_LIST);
         OP_CHECK_IF(groupListTensor == nullptr || groupListTensor->GetData<int64_t>() == nullptr,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "groupList",
                                                              "Failed to obtain necessary data from groupListTensor. "
@@ -1611,13 +1611,13 @@ static ge::graphStatus CheckCaseSplitM(gert::InferShapeContext *context, bool tr
     return GRAPH_FAILED;
 }
 
-static ge::graphStatus CheckCaseSplitK(gert::InferShapeContext *context, bool transposeX, bool transposeWeight,
-                                       const GMMParamsInfo &paramsInfo)
+static ge::graphStatus CheckCaseSplitK(gert::InferShapeContext* context, bool transposeX, bool transposeWeight,
+                                       const GMMParamsInfo& paramsInfo)
 {
     std::vector<std::string> tenorXAndWeight{"x", "weight", "true"};
-    const size_t &xSize = paramsInfo.numX;
-    const size_t &weightSize = paramsInfo.numWeight;
-    const size_t &ySize = paramsInfo.numY;
+    const size_t& xSize = paramsInfo.numX;
+    const size_t& weightSize = paramsInfo.numWeight;
+    const size_t& ySize = paramsInfo.numY;
     if (xSize == 1UL) {
         if (paramsInfo.platform == PlatformID::ASCEND950) {
             return GRAPH_SUCCESS;
@@ -1672,14 +1672,14 @@ static ge::graphStatus CheckCaseSplitK(gert::InferShapeContext *context, bool tr
     return GRAPH_FAILED;
 }
 
-static ge::graphStatus CheckParamDifferentGroupType(gert::InferShapeContext *context, const GMMAttrs &gmmAttrs,
-                                                    const GMMParamsInfo &paramsInfo)
+static ge::graphStatus CheckParamDifferentGroupType(gert::InferShapeContext* context, const GMMAttrs& gmmAttrs,
+                                                    const GMMParamsInfo& paramsInfo)
 {
     OP_CHECK_IF(paramsInfo.platform == PlatformID::UNKNOWN,
                 OP_LOGW(context->GetNodeName(), "Cannot get platform info!"), return GRAPH_SUCCESS);
-    const int64_t &groupType = gmmAttrs.groupType;
-    const bool &transposeX = gmmAttrs.transposeX;
-    const bool &transposeWeight = gmmAttrs.transposeWeight;
+    const int64_t& groupType = gmmAttrs.groupType;
+    const bool& transposeX = gmmAttrs.transposeX;
+    const bool& transposeWeight = gmmAttrs.transposeWeight;
     OP_CHECK_IF(transposeX && transposeWeight,
                 OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
                     context->GetNodeName(), "transposeX, transposeWeight",
@@ -1689,9 +1689,9 @@ static ge::graphStatus CheckParamDifferentGroupType(gert::InferShapeContext *con
                     "x and weight can not be transposed at the same time"),
                 return GRAPH_FAILED);
     auto groupTensorOptionalShape = context->GetOptionalInputShape(GMM_INDEX_IN_GROUP_LIST);
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *groupListTypePtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_GROUP_LIST_TYPE);
+    const int64_t* groupListTypePtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_GROUP_LIST_TYPE);
     OP_CHECK_NULL_WITH_CONTEXT(context, groupListTypePtr);
     size_t validGroupTensorDimNum = (*groupListTypePtr == 2L) ? 2UL : 1UL; // 2: split M sparse, group list shape [e, 2]
     OP_CHECK_IF(
@@ -1750,10 +1750,10 @@ static ge::graphStatus CheckParamDifferentGroupType(gert::InferShapeContext *con
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus XNotSingleYSeparated(gert::InferShapeContext *context, size_t weightDimN, bool isXTransposed,
+static ge::graphStatus XNotSingleYSeparated(gert::InferShapeContext* context, size_t weightDimN, bool isXTransposed,
                                             size_t xDimM)
 {
-    const gert::Tensor *groupListTensor = context->GetOptionalInputTensor(GMM_INDEX_IN_GROUP_LIST);
+    const gert::Tensor* groupListTensor = context->GetOptionalInputTensor(GMM_INDEX_IN_GROUP_LIST);
     if (groupListTensor != nullptr) {
         OP_CHECK_IF(
             UpdateMultipleShapeY(context, groupListTensor, weightDimN, isXTransposed, xDimM) != GRAPH_SUCCESS,
@@ -1769,10 +1769,10 @@ static ge::graphStatus XNotSingleYSeparated(gert::InferShapeContext *context, si
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus XSingleYSeparated(gert::InferShapeContext *context, size_t weightDimN, bool isXTransposed,
+static ge::graphStatus XSingleYSeparated(gert::InferShapeContext* context, size_t weightDimN, bool isXTransposed,
                                          size_t xDimM)
 {
-    const gert::Tensor *groupListTensor = context->GetOptionalInputTensor(GMM_INDEX_IN_GROUP_LIST);
+    const gert::Tensor* groupListTensor = context->GetOptionalInputTensor(GMM_INDEX_IN_GROUP_LIST);
     OP_CHECK_IF(groupListTensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "groupList"),
                 return GRAPH_FAILED);
     OP_CHECK_IF(UpdateMultipleShapeY(context, groupListTensor, weightDimN, isXTransposed, xDimM) != GRAPH_SUCCESS,
@@ -1782,9 +1782,9 @@ static ge::graphStatus XSingleYSeparated(gert::InferShapeContext *context, size_
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus GMMSetOutputShape(gert::InferShapeContext *context, GMMAttrs &gmmAttrs,
-                                         const GMMSetOutputParams &outputParams, const gert::Shape *x0Shape,
-                                         const gert::Shape *w0Shape)
+static ge::graphStatus GMMSetOutputShape(gert::InferShapeContext* context, GMMAttrs& gmmAttrs,
+                                         const GMMSetOutputParams& outputParams, const gert::Shape* x0Shape,
+                                         const gert::Shape* w0Shape)
 {
     bool isSingleX = outputParams.isSingleX;
     bool isSingleY = outputParams.isSingleY;
@@ -1844,7 +1844,7 @@ static ge::graphStatus GMMSetOutputShape(gert::InferShapeContext *context, GMMAt
     return GRAPH_SUCCESS;
 }
 
-static graphStatus InferShape4DavidWeightQuantGMM(gert::InferShapeContext *context)
+static graphStatus InferShape4DavidWeightQuantGMM(gert::InferShapeContext* context)
 {
     GroupedMatmulWeightQuantChecker davidWeightQuantGMMChecker;
     GroupedMatmulCommonUtil utilForDavidWeightQuantGMM;
@@ -1861,7 +1861,7 @@ static graphStatus InferShape4DavidWeightQuantGMM(gert::InferShapeContext *conte
     return GRAPH_SUCCESS;
 }
 
-static graphStatus InferShape4DavidQuantGMM(gert::InferShapeContext *context)
+static graphStatus InferShape4DavidQuantGMM(gert::InferShapeContext* context)
 {
     GroupedMatmulQuantChecker davidQuantGMMChecker;
     GroupedMatmulCommonUtil utilForDavidQuantGMM;
@@ -1907,10 +1907,10 @@ static graphStatus IsDavidQuantGMMByShape(T context)
     return (GetSizeByDataType(xDtype) == 1 && GetSizeByDataType(weightDtype) == 1) ? GRAPH_SUCCESS : GRAPH_FAILED;
 }
 
-static ge::graphStatus TryDavidInferShape(gert::InferShapeContext *context, bool &isDavidCase)
+static ge::graphStatus TryDavidInferShape(gert::InferShapeContext* context, bool& isDavidCase)
 {
     isDavidCase = false;
-    const auto &platformInfo = GetGmmPlatformCache();
+    const auto& platformInfo = GetGmmPlatformCache();
     auto ret = platformInfo.ret;
     if (ret != GRAPH_SUCCESS || !IsGmmDavidSupportSoc(platformInfo.shortSocVersion) || IsS8S4PseudoQuant(context)) {
         return GRAPH_FAILED; // not handled by David path
@@ -1929,8 +1929,8 @@ static ge::graphStatus TryDavidInferShape(gert::InferShapeContext *context, bool
     return GRAPH_FAILED; // not a David quant case
 }
 
-static ge::graphStatus ParseAttrsAndCountInputs(gert::InferShapeContext *context, GMMAttrs &gmmAttrs, size_t &numX,
-                                                size_t &numWeight, int64_t &lenGroupList)
+static ge::graphStatus ParseAttrsAndCountInputs(gert::InferShapeContext* context, GMMAttrs& gmmAttrs, size_t& numX,
+                                                size_t& numWeight, int64_t& lenGroupList)
 {
     numX = 0;
     numWeight = 0;
@@ -1958,13 +1958,13 @@ static ge::graphStatus ParseAttrsAndCountInputs(gert::InferShapeContext *context
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ComputeAndSetOutputShape(gert::InferShapeContext *context, GMMAttrs &gmmAttrs, size_t numX,
+static ge::graphStatus ComputeAndSetOutputShape(gert::InferShapeContext* context, GMMAttrs& gmmAttrs, size_t numX,
                                                 size_t numWeight, int64_t lenGroupList)
 {
-    const gert::Shape *x0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_X, 0);
+    const gert::Shape* x0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_X, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, x0Shape);
     size_t xDimNum = x0Shape->GetDimNum();
-    const gert::Shape *w0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
+    const gert::Shape* w0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, w0Shape);
     size_t weightDimNum = w0Shape->GetDimNum();
     size_t numY = context->GetComputeNodeOutputNum();
@@ -1987,7 +1987,7 @@ static ge::graphStatus ComputeAndSetOutputShape(gert::InferShapeContext *context
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShape4GroupedMatmul(gert::InferShapeContext *context)
+static ge::graphStatus InferShape4GroupedMatmul(gert::InferShapeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     GetGmmPlatformCache(true);
@@ -2012,8 +2012,8 @@ static ge::graphStatus InferShape4GroupedMatmul(gert::InferShapeContext *context
 
 // =========================================================================================
 // =========================================================================================
-static graphStatus CheckTensorListDataType(const gert::InferDataTypeContext *context, uint32_t index,
-                                           const DataType dtype, const char *tensorType)
+static graphStatus CheckTensorListDataType(const gert::InferDataTypeContext* context, uint32_t index,
+                                           const DataType dtype, const char* tensorType)
 {
     size_t inIdx = 0;
     while (true) {
@@ -2035,7 +2035,7 @@ static graphStatus CheckTensorListDataType(const gert::InferDataTypeContext *con
     return GRAPH_SUCCESS;
 }
 
-static graphStatus CheckMatmulDataType(gert::InferDataTypeContext *context, const DataType xDtype,
+static graphStatus CheckMatmulDataType(gert::InferDataTypeContext* context, const DataType xDtype,
                                        const DataType weightDtype, const DataType biasDtype)
 {
     OP_CHECK_IF(CheckTensorListDataType(context, GMM_INDEX_IN_X, xDtype, "x") != GRAPH_SUCCESS,
@@ -2062,7 +2062,7 @@ static graphStatus CheckMatmulDataType(gert::InferDataTypeContext *context, cons
     return GRAPH_SUCCESS;
 }
 
-static graphStatus CheckNonQuantMatmulParams(const GmmPlatformCache &platformInfo, gert::InferDataTypeContext *context,
+static graphStatus CheckNonQuantMatmulParams(const GmmPlatformCache& platformInfo, gert::InferDataTypeContext* context,
                                              const DataType xDtype, const DataType weightDtype)
 {
     DataType biasDtype = xDtype == DataType::DT_BF16 ? DataType::DT_FLOAT : xDtype;
@@ -2090,7 +2090,7 @@ static graphStatus CheckNonQuantMatmulParams(const GmmPlatformCache &platformInf
     return GRAPH_SUCCESS;
 }
 
-static graphStatus CheckFunctionQuantParams(gert::InferDataTypeContext *context)
+static graphStatus CheckFunctionQuantParams(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(CheckTensorListDataType(context, GMM_INDEX_IN_X, DataType::DT_INT8, "x") != GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "x",
@@ -2110,7 +2110,7 @@ static graphStatus CheckFunctionQuantParams(gert::InferDataTypeContext *context)
         return GRAPH_FAILED);
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *outputDtype = attrs->GetInt(GMM_INDEX_ATTR_OUTPUT_DTYPE);
+    const int64_t* outputDtype = attrs->GetInt(GMM_INDEX_ATTR_OUTPUT_DTYPE);
     if (*outputDtype == GMM_OUT_DTYPE_INT32) { // output dtype is int32, this scene does not need scale
         return GRAPH_SUCCESS;
     }
@@ -2129,7 +2129,7 @@ static graphStatus CheckFunctionQuantParams(gert::InferDataTypeContext *context)
     return GRAPH_SUCCESS;
 }
 
-static graphStatus CheckGroupedMatmulAntiQuantForDtype(gert::InferDataTypeContext *context)
+static graphStatus CheckGroupedMatmulAntiQuantForDtype(gert::InferDataTypeContext* context)
 {
     auto xDtype = context->GetDynamicInputDataType(GMM_INDEX_IN_X, 0);
     OP_CHECK_IF(
@@ -2151,9 +2151,9 @@ static graphStatus CheckGroupedMatmulAntiQuantForDtype(gert::InferDataTypeContex
     return GRAPH_SUCCESS;
 }
 
-static graphStatus CheckFunctionParamsForDtype(gert::InferDataTypeContext *context)
+static graphStatus CheckFunctionParamsForDtype(gert::InferDataTypeContext* context)
 {
-    const auto &platformInfo = GetGmmPlatformCache();
+    const auto& platformInfo = GetGmmPlatformCache();
     graphStatus ret = platformInfo.ret;
     PlatformID platform = PlatformID::UNKNOWN;
     if (ret != ge::GRAPH_SUCCESS) {
@@ -2222,7 +2222,7 @@ static graphStatus CheckFunctionParamsForDtype(gert::InferDataTypeContext *conte
     return GRAPH_FAILED;
 }
 
-static graphStatus CheckQuantParamsDtype(const gert::InferDataTypeContext *context, const int64_t outputDtype,
+static graphStatus CheckQuantParamsDtype(const gert::InferDataTypeContext* context, const int64_t outputDtype,
                                          const DataType yDtype)
 {
     size_t i = 0;
@@ -2273,7 +2273,7 @@ static graphStatus CheckQuantParamsDtype(const gert::InferDataTypeContext *conte
     return GRAPH_SUCCESS;
 }
 
-static graphStatus InferDtype4DavidWeightQuantGMM(gert::InferDataTypeContext *context)
+static graphStatus InferDtype4DavidWeightQuantGMM(gert::InferDataTypeContext* context)
 {
     GroupedMatmulWeightQuantChecker davidWeightQuantGMMChecker;
     OP_CHECK_IF(davidWeightQuantGMMChecker.CheckDtype(context) != GRAPH_SUCCESS,
@@ -2283,7 +2283,7 @@ static graphStatus InferDtype4DavidWeightQuantGMM(gert::InferDataTypeContext *co
     return GRAPH_SUCCESS;
 }
 
-static graphStatus InferDtype4DavidQuantGMM(gert::InferDataTypeContext *context)
+static graphStatus InferDtype4DavidQuantGMM(gert::InferDataTypeContext* context)
 {
     GroupedMatmulQuantChecker davidQuantGMMChecker;
     GroupedMatmulCommonUtil utilForDavidQuantGMM;
@@ -2296,10 +2296,10 @@ static graphStatus InferDtype4DavidQuantGMM(gert::InferDataTypeContext *context)
     return GRAPH_SUCCESS;
 }
 
-static graphStatus InferDataType4GroupedMatmul(gert::InferDataTypeContext *context)
+static graphStatus InferDataType4GroupedMatmul(gert::InferDataTypeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
-    const auto &platformInfo = GetGmmPlatformCache(true);
+    const auto& platformInfo = GetGmmPlatformCache(true);
     auto ret = platformInfo.ret;
     if (ret == GRAPH_SUCCESS && IsGmmDavidSupportSoc(platformInfo.shortSocVersion)) {
         if (IsDavidQuantGMMByShape(context) == GRAPH_SUCCESS) {
@@ -2324,7 +2324,7 @@ static graphStatus InferDataType4GroupedMatmul(gert::InferDataTypeContext *conte
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
     bool isQuantCase = x0Dtype == ge::DT_INT8 && weight0Dtype == ge::DT_INT8;
     bool isA8W4 = x0Dtype == ge::DT_INT8 && weight0Dtype == ge::DT_INT4;
-    const int64_t *outputDtype = attrs->GetInt(GMM_INDEX_ATTR_OUTPUT_DTYPE);
+    const int64_t* outputDtype = attrs->GetInt(GMM_INDEX_ATTR_OUTPUT_DTYPE);
     DataType yDtype = x0Dtype;
     if (isQuantCase && outputDtype != nullptr) {
         auto it = GMM_OUTPUT_DTYPE_MAP.find(*outputDtype);

@@ -55,7 +55,7 @@ public:
      * @param [in] orgKc: original Kc value
      * @param [in] subBlockId: sub-block id, default is 0
      */
-    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT> &dst, const AscendC::LocalTensor<SrcT> &src,
+    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT>& dst, const AscendC::LocalTensor<SrcT>& src,
                                       int32_t curRow, int32_t curCol, int32_t l0CTileHeight, int32_t l0CTileWidth,
                                       int32_t baseM, int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc,
                                       uint8_t subBlockId = 0)
@@ -125,7 +125,7 @@ public:
      * @param [in] orgKc: original Kc value
      * @param [in] id: sub-block id, default is 0
      */
-    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT> &dst, const AscendC::LocalTensor<SrcT> &src,
+    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT>& dst, const AscendC::LocalTensor<SrcT>& src,
                                       int32_t curRow, int32_t curCol, int32_t l0CTileHeight, int32_t l0CTileWidth,
                                       int32_t baseM, int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc,
                                       uint8_t id = 0)
@@ -192,10 +192,10 @@ public:
      * @param [in] orgKc: original Kc value
      * @param [in] quantTens: quantization tensor
      */
-    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT> &dst, const AscendC::LocalTensor<SrcT> &src,
+    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT>& dst, const AscendC::LocalTensor<SrcT>& src,
                                       int32_t curRow, int32_t curCol, int32_t l0CTileHeight, int32_t l0CTileWidth,
                                       int32_t baseM, int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc,
-                                      const AscendC::LocalTensor<uint64_t> &quantTens)
+                                      const AscendC::LocalTensor<uint64_t>& quantTens)
     {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         CopyOutNZ2ND(dst, src, curRow, curCol, l0CTileHeight, l0CTileWidth, baseM, baseN, orgKc != 0 ? orgKc : orgN,
@@ -220,7 +220,7 @@ public:
      * @param [in] orgKc: original Kc value
      * @param [in] quantScalar: quantization scalar tensor
      */
-    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT> &dst, const AscendC::LocalTensor<SrcT> &src,
+    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT>& dst, const AscendC::LocalTensor<SrcT>& src,
                                       int32_t curRow, int32_t curCol, int32_t l0CTileHeight, int32_t l0CTileWidth,
                                       int32_t baseM, int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc,
                                       uint64_t quantScalar)
@@ -250,7 +250,7 @@ private:
      * @param [in] quantObject: the quantization object
      */
     template <typename T>
-    __aicore__ inline void CopyOutNZ2ND(const AscendC::LocalTensor<DstT> &dst, const AscendC::LocalTensor<SrcT> &src,
+    __aicore__ inline void CopyOutNZ2ND(const AscendC::LocalTensor<DstT>& dst, const AscendC::LocalTensor<SrcT>& src,
                                         int32_t curRow, int32_t curCol, int32_t l0CTileHeight, int32_t l0CTileWidth,
                                         int32_t baseM, int32_t baseN, int32_t orgN, T quantObject)
     {
@@ -277,9 +277,9 @@ private:
      * @param [in] quantTensor: quantization tensor
      * @param [in] params: the fixpipe parameters
      */
-    __aicore__ inline void CopyTensor(const AscendC::LocalTensor<DstT> &dst, const AscendC::LocalTensor<SrcT> &src,
-                                      const AscendC::LocalTensor<uint64_t> &quantTensor,
-                                      AscendC::FixpipeParamsC310<AscendC::CO2Layout::ROW_MAJOR> &params)
+    __aicore__ inline void CopyTensor(const AscendC::LocalTensor<DstT>& dst, const AscendC::LocalTensor<SrcT>& src,
+                                      const AscendC::LocalTensor<uint64_t>& quantTensor,
+                                      AscendC::FixpipeParamsC310<AscendC::CO2Layout::ROW_MAJOR>& params)
     {
         if constexpr (AscendC::IsSameType<SrcT, int32_t>::value &&
                       (AscendC::IsSameType<DstT, int8_t>::value || AscendC::IsSameType<DstT, uint8_t>::value)) {
@@ -300,9 +300,9 @@ private:
      * @param [in] quantScal: quantization scalar
      * @param [in] params: the fixpipe parameters
      */
-    __aicore__ inline static void CopyTensor(const AscendC::LocalTensor<DstT> &dst,
-                                             const AscendC::LocalTensor<SrcT> &src, uint64_t quantScal,
-                                             AscendC::FixpipeParamsC310<AscendC::CO2Layout::ROW_MAJOR> &params)
+    __aicore__ inline static void CopyTensor(const AscendC::LocalTensor<DstT>& dst,
+                                             const AscendC::LocalTensor<SrcT>& src, uint64_t quantScal,
+                                             AscendC::FixpipeParamsC310<AscendC::CO2Layout::ROW_MAJOR>& params)
     {
         if constexpr (AscendC::IsSameType<SrcT, int32_t>::value && AscendC::IsSameType<DstT, half>::value) {
             params.quantPre = QuantMode_t::DEQF16;
@@ -353,10 +353,10 @@ public:
      * @param [in] orgKc: original Kc value
      * @param [in] quantTensor: quantization tensor
      */
-    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT> &dst, const AscendC::LocalTensor<SrcT> &src,
+    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT>& dst, const AscendC::LocalTensor<SrcT>& src,
                                       int32_t curRow, int32_t curCol, int32_t l0CTileHeight, int32_t l0CTileWidth,
                                       int32_t baseM, int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc,
-                                      const AscendC::LocalTensor<uint64_t> &quantTensor)
+                                      const AscendC::LocalTensor<uint64_t>& quantTensor)
     {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         CopyOutNZ2NZ(dst, src, curRow, curCol, l0CTileHeight, l0CTileWidth, baseM, baseN, orgM, quantTensor);
@@ -380,7 +380,7 @@ public:
      * @param [in] orgKc: original Kc value
      * @param [in] quantScalar: quantization scalar tensor
      */
-    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT> &dst, const AscendC::LocalTensor<SrcT> &src,
+    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT>& dst, const AscendC::LocalTensor<SrcT>& src,
                                       int32_t curRow, int32_t curCol, int32_t l0CTileHeight, int32_t l0CTileWidth,
                                       int32_t baseM, int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc,
                                       uint64_t quantScalar)
@@ -409,8 +409,8 @@ private:
      * @param [in] quantObject: the quantization object
      */
     template <typename T>
-    __aicore__ inline static void CopyOutNZ2NZ(const AscendC::LocalTensor<DstT> &dst,
-                                               const AscendC::LocalTensor<SrcT> &src, int32_t curRow, int32_t curCol,
+    __aicore__ inline static void CopyOutNZ2NZ(const AscendC::LocalTensor<DstT>& dst,
+                                               const AscendC::LocalTensor<SrcT>& src, int32_t curRow, int32_t curCol,
                                                int32_t l0CTileHeight, int32_t l0CTileWidth, int32_t baseM,
                                                int32_t baseN, int32_t orgM, T quantObject)
     {
@@ -443,10 +443,10 @@ private:
      * @param [in] quantTensor: quantization tensor
      * @param [in] params: the fixpipe parameters
      */
-    __aicore__ inline static void CopyTensor(const AscendC::LocalTensor<DstT> &dst,
-                                             const AscendC::LocalTensor<SrcT> &src,
-                                             const AscendC::LocalTensor<uint64_t> &quantTensor,
-                                             AscendC::FixpipeParamsC310<AscendC::CO2Layout::NZ> &params)
+    __aicore__ inline static void CopyTensor(const AscendC::LocalTensor<DstT>& dst,
+                                             const AscendC::LocalTensor<SrcT>& src,
+                                             const AscendC::LocalTensor<uint64_t>& quantTensor,
+                                             AscendC::FixpipeParamsC310<AscendC::CO2Layout::NZ>& params)
     {
         if constexpr (AscendC::IsSameType<SrcT, int32_t>::value && AscendC::IsSameType<DstT, half>::value) {
             params.quantPre = QuantMode_t::VDEQF16;
@@ -467,9 +467,9 @@ private:
      * @param [in] quantScalar: quantization scalar
      * @param [in] params: the fixpipe parameters
      */
-    __aicore__ inline static void CopyTensor(const AscendC::LocalTensor<DstT> &dst,
-                                             const AscendC::LocalTensor<SrcT> &src, uint64_t quantScal,
-                                             AscendC::FixpipeParamsC310<AscendC::CO2Layout::NZ> &params)
+    __aicore__ inline static void CopyTensor(const AscendC::LocalTensor<DstT>& dst,
+                                             const AscendC::LocalTensor<SrcT>& src, uint64_t quantScal,
+                                             AscendC::FixpipeParamsC310<AscendC::CO2Layout::NZ>& params)
     {
         if constexpr (AscendC::IsSameType<SrcT, int32_t>::value && AscendC::IsSameType<DstT, half>::value) {
             params.quantPre = QuantMode_t::DEQF16;

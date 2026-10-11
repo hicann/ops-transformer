@@ -22,14 +22,14 @@ namespace Cgmct {
 namespace Gemm {
 // Base template: handles single-index case
 template <size_t I, typename T>
-__aicore__ constexpr inline decltype(auto) Get(T &&t)
+__aicore__ constexpr inline decltype(auto) Get(T&& t)
 {
     return AscendC::Std::get<I>(AscendC::Std::forward<T>(t));
 }
 
 // Recursive template: handles multiple index cases
 template <size_t First, size_t Second, size_t... Rest, typename T>
-__aicore__ constexpr inline decltype(auto) Get(T &&t)
+__aicore__ constexpr inline decltype(auto) Get(T&& t)
 {
     return Get<Second, Rest...>(AscendC::Std::get<First>(AscendC::Std::forward<T>(t)));
 }

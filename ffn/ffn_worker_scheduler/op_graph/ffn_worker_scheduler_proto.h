@@ -21,7 +21,8 @@
 namespace ge {
 
 /**
-*@brief Data Scanning Operator for the FFN Side in Decoupled Attention-FFN Deployment Scenarios，This operator polls data from AttentionToFFN to confirm its readiness state.
+*@brief Data Scanning Operator for the FFN Side in Decoupled Attention-FFN Deployment Scenarios，This operator polls
+data from AttentionToFFN to confirm its readiness state.
 *@par Inputs:
 *@li  schedule_context: A tensor. The type support int8. Its shape must be 1D (1024). Format: ND
 

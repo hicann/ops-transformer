@@ -56,8 +56,8 @@ static constexpr AscendC::Reg::CastTrait CAST_FP32_TO_BF16 = {
  * \param[in] sizePerRepeat     Elements processed per vector repeat.
  */
 template <typename DataTypeIn>
-__simd_vf__ inline void GmmSwigluVf(__ubuf__ DataTypeIn *firstSrc, __ubuf__ DataTypeIn *secondSrc,
-                                    __ubuf__ bfloat16_t *gluResAddr, uint16_t mSize, uint16_t nSize,
+__simd_vf__ inline void GmmSwigluVf(__ubuf__ DataTypeIn* firstSrc, __ubuf__ DataTypeIn* secondSrc,
+                                    __ubuf__ bfloat16_t* gluResAddr, uint16_t mSize, uint16_t nSize,
                                     uint32_t nSrcUbAligned, uint32_t nDstUbAligned, uint16_t oneRowRepeatTimes,
                                     uint16_t sizePerRepeat)
 {
@@ -109,7 +109,7 @@ __simd_vf__ inline void GmmSwigluVf(__ubuf__ DataTypeIn *firstSrc, __ubuf__ Data
  * \param[in] vlForHalfNumber     Vector length for half precision elements.
  * \param[in] elementAfterReduce  Element count after reduction.
  */
-__simd_vf__ inline void ComputeMaxExpVf(__ubuf__ bfloat16_t *srcAddr, __ubuf__ uint16_t *maxExpAddr,
+__simd_vf__ inline void ComputeMaxExpVf(__ubuf__ bfloat16_t* srcAddr, __ubuf__ uint16_t* maxExpAddr,
                                         uint32_t totalCountInUB, uint16_t loopNum, uint32_t vlForHalfNumber,
                                         uint16_t elementAfterReduce)
 {
@@ -128,8 +128,8 @@ __simd_vf__ inline void ComputeMaxExpVf(__ubuf__ bfloat16_t *srcAddr, __ubuf__ u
         AscendC::Reg::LoadAlign<bfloat16_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
                                 AscendC::Reg::LoadDist::DIST_DINTLV_B16>(vdExp0, vdExp1, srcAddr, vlForHalfNumber * 2);
 
-        AscendC::Reg::And(vdExpExtract0, (AscendC::Reg::RegTensor<uint16_t> &)vdExp0, expMaskBF16, scaleMask1);
-        AscendC::Reg::And(vdExpExtract1, (AscendC::Reg::RegTensor<uint16_t> &)vdExp1, expMaskBF16, scaleMask1);
+        AscendC::Reg::And(vdExpExtract0, (AscendC::Reg::RegTensor<uint16_t>&)vdExp0, expMaskBF16, scaleMask1);
+        AscendC::Reg::And(vdExpExtract1, (AscendC::Reg::RegTensor<uint16_t>&)vdExp1, expMaskBF16, scaleMask1);
 
         AscendC::Reg::Max(vdMaxExp, vdExpExtract0, vdExpExtract1, scaleMask1);
         AscendC::Reg::ReduceMaxWithDataBlock(vdMaxExp, vdMaxExp, scaleMask1);
@@ -151,8 +151,8 @@ __simd_vf__ inline void ComputeMaxExpVf(__ubuf__ bfloat16_t *srcAddr, __ubuf__ u
  * \param[in] vlForHalfNumber     Vector length for half precision elements.
  * \param[in] fpEmax              FP format max exponent value.
  */
-__simd_vf__ inline void ComputeScaleVf(__ubuf__ uint16_t *maxExpAddr, __ubuf__ uint16_t *mxScaleLocalAddr,
-                                       __ubuf__ uint16_t *halfScaleLocalAddr, uint32_t totalScaleInUB,
+__simd_vf__ inline void ComputeScaleVf(__ubuf__ uint16_t* maxExpAddr, __ubuf__ uint16_t* mxScaleLocalAddr,
+                                       __ubuf__ uint16_t* halfScaleLocalAddr, uint32_t totalScaleInUB,
                                        uint16_t loopNumScale, uint32_t vlForHalfNumber, uint16_t fpEmax)
 {
     AscendC::Reg::RegTensor<uint16_t> expMask, sharedExp, scaleValue, scaleOffset, halfScale, fp8NanRegTensor;
@@ -209,7 +209,7 @@ __simd_vf__ inline void ComputeScaleVf(__ubuf__ uint16_t *maxExpAddr, __ubuf__ u
  * \param[in] mSize       M dimension size.
  * \param[in] scaleBlockN Number of scale elements per block.
  */
-__simd_vf__ inline void TransMxScaleLayoutVf(__ubuf__ int8_t *srcAddr, __ubuf__ int8_t *dstAddr, uint16_t mSize,
+__simd_vf__ inline void TransMxScaleLayoutVf(__ubuf__ int8_t* srcAddr, __ubuf__ int8_t* dstAddr, uint16_t mSize,
                                              uint16_t scaleBlockN)
 {
     for (uint16_t mIdx = 0; mIdx < mSize; ++mIdx) {
@@ -239,9 +239,9 @@ __simd_vf__ inline void TransMxScaleLayoutVf(__ubuf__ int8_t *srcAddr, __ubuf__ 
  * \param[in] elementAfterReduce  Element count after reduction.
  */
 template <typename DataTypeOut>
-__simd_vf__ inline void ComputeDataForQuantTargetFp8Vf(__ubuf__ bfloat16_t *srcAddr,
-                                                       __ubuf__ uint16_t *halfScaleLocalAddr,
-                                                       __ubuf__ int8_t *outLocalAddr, uint32_t totalCountInUB,
+__simd_vf__ inline void ComputeDataForQuantTargetFp8Vf(__ubuf__ bfloat16_t* srcAddr,
+                                                       __ubuf__ uint16_t* halfScaleLocalAddr,
+                                                       __ubuf__ int8_t* outLocalAddr, uint32_t totalCountInUB,
                                                        uint16_t loopNum, uint32_t vlForHalfNumber,
                                                        uint16_t elementAfterReduce)
 {
@@ -276,8 +276,8 @@ __simd_vf__ inline void ComputeDataForQuantTargetFp8Vf(__ubuf__ bfloat16_t *srcA
                                 AscendC::Reg::LoadDist::DIST_E2B_B16>(halfScaleForMul, halfScaleLocalAddr,
                                                                       elementAfterReduce);
 
-        AscendC::Reg::Mul(vdExp0, vdExp0, (AscendC::Reg::RegTensor<bfloat16_t> &)halfScaleForMul, dataMask1);
-        AscendC::Reg::Mul(vdExp1, vdExp1, (AscendC::Reg::RegTensor<bfloat16_t> &)halfScaleForMul, dataMask1);
+        AscendC::Reg::Mul(vdExp0, vdExp0, (AscendC::Reg::RegTensor<bfloat16_t>&)halfScaleForMul, dataMask1);
+        AscendC::Reg::Mul(vdExp1, vdExp1, (AscendC::Reg::RegTensor<bfloat16_t>&)halfScaleForMul, dataMask1);
 
         AscendC::Reg::Interleave(vdExp0, vdExp1, vdExp0, vdExp1);
 
@@ -296,16 +296,16 @@ __simd_vf__ inline void ComputeDataForQuantTargetFp8Vf(__ubuf__ bfloat16_t *srcA
         // 64：使用DIST_PACK4_B32进行搬运4个float8拼成一个float32，256 / 4 = 64
         AscendC::Reg::StoreAlign<int8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
                                  AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-            outLocalAddr, (AscendC::Reg::RegTensor<int8_t> &)vdExp0FP8Zero, static_cast<int64_t>(64), dataMask3);
+            outLocalAddr, (AscendC::Reg::RegTensor<int8_t>&)vdExp0FP8Zero, static_cast<int64_t>(64), dataMask3);
         AscendC::Reg::StoreAlign<int8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
                                  AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-            outLocalAddr, (AscendC::Reg::RegTensor<int8_t> &)vdExp0FP8One, static_cast<int64_t>(64), dataMask3);
+            outLocalAddr, (AscendC::Reg::RegTensor<int8_t>&)vdExp0FP8One, static_cast<int64_t>(64), dataMask3);
         AscendC::Reg::StoreAlign<int8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
                                  AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-            outLocalAddr, (AscendC::Reg::RegTensor<int8_t> &)vdExp1FP8Zero, static_cast<int64_t>(64), dataMask4);
+            outLocalAddr, (AscendC::Reg::RegTensor<int8_t>&)vdExp1FP8Zero, static_cast<int64_t>(64), dataMask4);
         AscendC::Reg::StoreAlign<int8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
                                  AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-            outLocalAddr, (AscendC::Reg::RegTensor<int8_t> &)vdExp1FP8One, static_cast<int64_t>(64), dataMask4);
+            outLocalAddr, (AscendC::Reg::RegTensor<int8_t>&)vdExp1FP8One, static_cast<int64_t>(64), dataMask4);
     }
 }
 
@@ -324,8 +324,8 @@ __simd_vf__ inline void GmmsqAntiQuantMxA8W4NzNkVf(MxA8W4NzParams<xType, wType> 
         for (uint16_t innerLoopIdx = 0; innerLoopIdx < mxA8W4NzParams.innerLoopNum; ++innerLoopIdx) {
             Reg::AddrReg aregWeightB8In = Reg::CreateAddrReg<uint8_t>(
                 loopKIdx, (C0_SIZE_B8 * mxA8W4NzParams.nRealSizeAlign) >> 1, innerLoopIdx, VECTOR_REG_WIDTH >> 1);
-            Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_US_B8>((Reg::RegTensor<uint8_t> &)wLoad,
-                                                               (__ubuf__ uint8_t *&)mxA8W4NzParams.weightLowBitPhyAddr,
+            Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_US_B8>((Reg::RegTensor<uint8_t>&)wLoad,
+                                                               (__ubuf__ uint8_t*&)mxA8W4NzParams.weightLowBitPhyAddr,
                                                                aregWeightB8In);
 
             Reg::ShiftRight(wShr0, wLoad, wShrReg, preg);
@@ -337,7 +337,7 @@ __simd_vf__ inline void GmmsqAntiQuantMxA8W4NzNkVf(MxA8W4NzParams<xType, wType> 
             Reg::AddrReg aregWeightB8Out = Reg::CreateAddrReg<uint8_t>(loopKIdx, mxA8W4NzParams.loopKDstStride,
                                                                        innerLoopIdx, mxA8W4NzParams.innerDstStride);
             Reg::StoreAlign<uint8_t, Reg::StoreDist::DIST_NORM_B8>(
-                (__ubuf__ uint8_t *&)mxA8W4NzParams.weightHighBitPhyAddr, (Reg::RegTensor<uint8_t> &)wAnd,
+                (__ubuf__ uint8_t*&)mxA8W4NzParams.weightHighBitPhyAddr, (Reg::RegTensor<uint8_t>&)wAnd,
                 aregWeightB8Out, preg);
         }
     }

@@ -31,15 +31,15 @@ public:
     __aicore__ inline GmmASWKernel() {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR groupList,
                                 GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                const GMMQuantParams *__restrict gmmBaseParamsIn,
-                                const TCubeTiling *__restrict mmTilingDataIn, TILING_TYPE *gmmArrayAddrIn, TPipe *que);
+                                const GMMQuantParams* __restrict gmmBaseParamsIn,
+                                const TCubeTiling* __restrict mmTilingDataIn, TILING_TYPE* gmmArrayAddrIn, TPipe* que);
     __aicore__ inline void Process();
 
 protected:
     __aicore__ inline void InitAddrAndParams(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR groupList,
-                                             GM_ADDR perTokenScale, GM_ADDR y, TILING_TYPE *gmmArrayAddrIn);
+                                             GM_ADDR perTokenScale, GM_ADDR y, TILING_TYPE* gmmArrayAddrIn);
     __aicore__ inline void UpdateMMGlobalAddr(uint32_t groupIdx);
-    __aicore__ inline void SetMNK(uint32_t loopIdx, uint32_t groupIdx, int32_t &mSize, int32_t &nSize, int32_t &kSize);
+    __aicore__ inline void SetMNK(uint32_t loopIdx, uint32_t groupIdx, int32_t& mSize, int32_t& nSize, int32_t& kSize);
     __aicore__ inline void CalcTailTile(uint64_t mTail, uint64_t nTail);
     __aicore__ inline void SetMMParaAndCompute();
     __aicore__ inline void SetL2CacheDisableIfNeeded(int64_t mSize, int64_t curBaseM_, int64_t nSize, int64_t kSize,
@@ -53,12 +53,12 @@ protected:
     uint8_t groupListType_;
     int32_t preOffset_;
     uint64_t scaleScalar_;
-    const TCubeTiling *__restrict mmTilingData_;
-    const GMMQuantParams *__restrict gmmQuantParams_;
+    const TCubeTiling* __restrict mmTilingData_;
+    const GMMQuantParams* __restrict gmmQuantParams_;
 
-    TILING_TYPE *mListGm_;
-    TILING_TYPE *kListGm_;
-    TILING_TYPE *nListGm_;
+    TILING_TYPE* mListGm_;
+    TILING_TYPE* kListGm_;
+    TILING_TYPE* nListGm_;
 
     GlobalTensor<xType> xGlobal_;
     GlobalTensor<wType> wGlobal_;
@@ -101,8 +101,8 @@ protected:
 LOCAL_TEMPLATE_CLASS_PARAMS
 __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::Init(
     GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR y,
-    GM_ADDR workspace, const GMMQuantParams *__restrict gmmBaseParamsIn, const TCubeTiling *__restrict mmTilingDataIn,
-    TILING_TYPE *gmmArrayAddrIn, TPipe *que)
+    GM_ADDR workspace, const GMMQuantParams* __restrict gmmBaseParamsIn, const TCubeTiling* __restrict mmTilingDataIn,
+    TILING_TYPE* gmmArrayAddrIn, TPipe* que)
 {
     if ASCEND_IS_AIV {
         return;
@@ -120,7 +120,7 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::InitAddrAndPara
                                                                                    GM_ADDR bias, GM_ADDR scale,
                                                                                    GM_ADDR groupList,
                                                                                    GM_ADDR perTokenScale, GM_ADDR y,
-                                                                                   TILING_TYPE *gmmArrayAddrIn)
+                                                                                   TILING_TYPE* gmmArrayAddrIn)
 {
     groupNum_ = gmmQuantParams_->groupNum;
     groupType_ = gmmQuantParams_->groupType;
@@ -134,10 +134,10 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::InitAddrAndPara
     perTokenScalePtr_ = perTokenScale;
     yTensorPtr_ = y;
     if constexpr (QuantUtils::IsMxType<scaleType>()) {
-        scaleAGlobal_.SetGlobalBuffer((__gm__ fp8_e8m0_t *)perTokenScale);
+        scaleAGlobal_.SetGlobalBuffer((__gm__ fp8_e8m0_t*)perTokenScale);
     }
     if (groupList != nullptr) {
-        groupListGlobal_.SetGlobalBuffer((__gm__ int64_t *)groupList);
+        groupListGlobal_.SetGlobalBuffer((__gm__ int64_t*)groupList);
     }
     mListGm_ = gmmArrayAddrIn;
     kListGm_ = gmmArrayAddrIn + GROUPED_MATMUL::MKN_LIST_LEN;
@@ -152,14 +152,14 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::UpdateMMGlobalA
         mxScaleBGlobal_.SetGlobalBuffer(GROUPED_MATMUL::GetTensorAddr<fp8_e8m0_t>(0, scaleTensorPtr_) +
                                         block_.params_.wScaleGroupAddrOffset);
     } else {
-        __gm__ scaleType *scaleB = GROUPED_MATMUL::GetTensorAddr<scaleType>(0, scaleTensorPtr_) + groupIdx;
+        __gm__ scaleType* scaleB = GROUPED_MATMUL::GetTensorAddr<scaleType>(0, scaleTensorPtr_) + groupIdx;
         if (gmmQuantParams_->aQuantMode == static_cast<uint32_t>(QuantUtils::QuantMode::PERTENSOR_MODE) &&
             gmmQuantParams_->bQuantMode ==
                 static_cast<uint32_t>(QuantUtils::QuantMode::PERTENSOR_MODE)) { // doubleScale, M_SPLIT
-            float scaleBValue = *((__gm__ float *)scaleB);
-            float scaleAValue = *((__gm__ float *)perTokenScalePtr_ + groupIdx);
+            float scaleBValue = *((__gm__ float*)scaleB);
+            float scaleAValue = *((__gm__ float*)perTokenScalePtr_ + groupIdx);
             float deqScale = scaleBValue * scaleAValue;
-            uint32_t uint32Scale = *(reinterpret_cast<uint32_t *>(&deqScale));
+            uint32_t uint32Scale = *(reinterpret_cast<uint32_t*>(&deqScale));
             scaleScalar_ = uint32Scale & DEQ_SCALE_MUL; // fixpipe只能取高19位
         } else if (gmmQuantParams_->aQuantMode == static_cast<uint32_t>(QuantUtils::QuantMode::DEFAULT) &&
                    gmmQuantParams_->bQuantMode ==
@@ -167,15 +167,15 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::UpdateMMGlobalA
             if constexpr (!IsSameType<scaleType, uint64_t>::value && !IsSameType<scaleType, int64_t>::value) {
                 uint32_t uint32Scale = 0;
                 if constexpr (IsSameType<scaleType, bfloat16_t>::value) {
-                    uint16_t uint16Scale = *((__gm__ uint16_t *)scaleB);
+                    uint16_t uint16Scale = *((__gm__ uint16_t*)scaleB);
                     // 16为将uint16的数据前移16位，依据硬件逻辑，将scale变为uint32类型
                     uint32Scale = uint16Scale << 16;
                 } else {
-                    uint32Scale = *((__gm__ uint32_t *)scaleB);
+                    uint32Scale = *((__gm__ uint32_t*)scaleB);
                 }
                 scaleScalar_ = uint32Scale & DEQ_SCALE_MUL;
             } else {
-                scaleScalar_ = *((__gm__ uint64_t *)scaleB);
+                scaleScalar_ = *((__gm__ uint64_t*)scaleB);
             }
         } else if (gmmQuantParams_->bQuantMode ==
                    static_cast<uint32_t>(QuantUtils::QuantMode::PERCHANNEL_MODE)) { // perChannel, M_SPLIT
@@ -194,7 +194,7 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::UpdateMMGlobalA
 }
 LOCAL_TEMPLATE_CLASS_PARAMS
 __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::SetMNK(uint32_t loopIdx, uint32_t groupIdx,
-                                                                        int32_t &mSize, int32_t &nSize, int32_t &kSize)
+                                                                        int32_t& mSize, int32_t& nSize, int32_t& kSize)
 {
     int32_t splitValue =
         QuantUtils::GetSplitValueFromGroupList(loopIdx, preOffset_, groupType_, groupListType_, groupListGlobal_);

@@ -24,22 +24,26 @@ using namespace std;
 
 #include <cstdint>
 
-extern "C" __global__ __aicore__ void quant_grouped_matmul_dequant(GM_ADDR x, GM_ADDR quantized_weight, GM_ADDR weight_scale, GM_ADDR group_list,
-                                                           GM_ADDR bias, GM_ADDR x_scale, GM_ADDR x_offset, GM_ADDR smooth_scale,
-                                                           GM_ADDR y, GM_ADDR usrworkspace, GM_ADDR qmmTiling);
-
+extern "C" __global__ __aicore__ void quant_grouped_matmul_dequant(GM_ADDR x, GM_ADDR quantized_weight,
+                                                                   GM_ADDR weight_scale, GM_ADDR group_list,
+                                                                   GM_ADDR bias, GM_ADDR x_scale, GM_ADDR x_offset,
+                                                                   GM_ADDR smooth_scale, GM_ADDR y,
+                                                                   GM_ADDR usrworkspace, GM_ADDR qmmTiling);
 
 class quant_grouped_matmul_dequant_test : public testing::Test {
-    protected:
-    static void SetUpTestCase() {
+protected:
+    static void SetUpTestCase()
+    {
         cout << "quant_grouped_matmul_dequant_test SetUp\n" << endl;
     }
-    static void TearDownTestCase() {
+    static void TearDownTestCase()
+    {
         cout << "quant_grouped_matmul_dequant_test TearDown\n" << endl;
     }
 };
 
-TEST_F(quant_grouped_matmul_dequant_test, test_case_1) {
+TEST_F(quant_grouped_matmul_dequant_test, test_case_1)
+{
     int G = 4;
     int M = 64;
     int K = 256;
@@ -51,8 +55,8 @@ TEST_F(quant_grouped_matmul_dequant_test, test_case_1) {
     int64_t groupListSize = G * sizeof(int64_t);
     int64_t outSize = M * N * sizeof(half);
 
-    #define ORIG_DTYPE_WEIGHT_SCALE DT_FLOAT
-    #define ORIG_DTYPE_X_SCALE DT_FLOAT
+#define ORIG_DTYPE_WEIGHT_SCALE DT_FLOAT
+#define ORIG_DTYPE_X_SCALE DT_FLOAT
 
     uint8_t* xGM = (uint8_t*)AscendC::GmAlloc(xSize);
     uint8_t* weightGM = (uint8_t*)AscendC::GmAlloc(weightSize);
@@ -60,7 +64,7 @@ TEST_F(quant_grouped_matmul_dequant_test, test_case_1) {
     uint8_t* groupListGM = (uint8_t*)AscendC::GmAlloc(groupListSize);
     uint8_t* outGM = (uint8_t*)AscendC::GmAlloc(outSize);
 
-    uint64_t *groupListData = reinterpret_cast<uint64_t*>(groupListGM);
+    uint64_t* groupListData = reinterpret_cast<uint64_t*>(groupListGM);
     groupListData[0] = 7;
     groupListData[1] = 29;
     groupListData[2] = 31;
@@ -94,10 +98,8 @@ TEST_F(quant_grouped_matmul_dequant_test, test_case_1) {
     int64_t workspaceSize = 2115840;
     uint8_t* workspaceGM = (uint8_t*)AscendC::GmAlloc(workspaceSize);
     ICPU_SET_TILING_KEY(10000003);
-    ICPU_RUN_KF(quant_grouped_matmul_dequant, 8, xGM, weightGM, weightScaleGM, groupListGM,
-                nullptr, nullptr, nullptr, nullptr,
-                outGM,
-                workspaceGM, (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(quant_grouped_matmul_dequant, 8, xGM, weightGM, weightScaleGM, groupListGM, nullptr, nullptr, nullptr,
+                nullptr, outGM, workspaceGM, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(xGM);
     AscendC::GmFree(weightGM);
@@ -108,7 +110,8 @@ TEST_F(quant_grouped_matmul_dequant_test, test_case_1) {
     AscendC::GmFree(tiling);
 }
 
-TEST_F(quant_grouped_matmul_dequant_test, test_case_2) {
+TEST_F(quant_grouped_matmul_dequant_test, test_case_2)
+{
     int G = 4;
     int M = 64;
     int K = 256;
@@ -122,8 +125,8 @@ TEST_F(quant_grouped_matmul_dequant_test, test_case_2) {
     int64_t smoothScaleSize = K * sizeof(half);
     int64_t outSize = M * N * sizeof(half);
 
-    #define ORIG_DTYPE_WEIGHT_SCALE DT_FLOAT
-    #define ORIG_DTYPE_X_SCALE DT_FLOAT
+#define ORIG_DTYPE_WEIGHT_SCALE DT_FLOAT
+#define ORIG_DTYPE_X_SCALE DT_FLOAT
 
     uint8_t* xGM = (uint8_t*)AscendC::GmAlloc(xSize);
     uint8_t* weightGM = (uint8_t*)AscendC::GmAlloc(weightSize);
@@ -133,7 +136,7 @@ TEST_F(quant_grouped_matmul_dequant_test, test_case_2) {
     uint8_t* smoothScaleGM = (uint8_t*)AscendC::GmAlloc(smoothScaleSize);
     uint8_t* outGM = (uint8_t*)AscendC::GmAlloc(outSize);
 
-    uint64_t *groupListData = reinterpret_cast<uint64_t*>(groupListGM);
+    uint64_t* groupListData = reinterpret_cast<uint64_t*>(groupListGM);
     groupListData[0] = 7;
     groupListData[1] = 29;
     groupListData[2] = 31;
@@ -164,10 +167,8 @@ TEST_F(quant_grouped_matmul_dequant_test, test_case_2) {
     int64_t workspaceSize = 2113792;
     uint8_t* workspaceGM = (uint8_t*)AscendC::GmAlloc(workspaceSize);
     ICPU_SET_TILING_KEY(10000003);
-    ICPU_RUN_KF(quant_grouped_matmul_dequant, 8, xGM, weightGM, weightScaleGM, groupListGM,
-                nullptr, xScaleGM, nullptr, smoothScaleGM,
-                outGM,
-                workspaceGM, (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(quant_grouped_matmul_dequant, 8, xGM, weightGM, weightScaleGM, groupListGM, nullptr, xScaleGM, nullptr,
+                smoothScaleGM, outGM, workspaceGM, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(xGM);
     AscendC::GmFree(weightGM);

@@ -46,11 +46,17 @@ using ops::ut::MakeAclTensorDesc;
 
 constexpr size_t kSwigluCsvColumnCount = 45;
 
-aclDataType ParseDtype(const string &dtype) { return ops::ut::ParseAclDtype(dtype); }
+aclDataType ParseDtype(const string& dtype)
+{
+    return ops::ut::ParseAclDtype(dtype);
+}
 
-aclFormat ParseFormat(const string &format) { return ops::ut::ParseAclFormat(format); }
+aclFormat ParseFormat(const string& format)
+{
+    return ops::ut::ParseAclFormat(format);
+}
 
-void SetupPlatformForCase(const string &socVersion)
+void SetupPlatformForCase(const string& socVersion)
 {
     static const map<string, op::SocVersion> socMap = {
         {"Ascend910B", op::SocVersion::ASCEND910B},
@@ -60,9 +66,9 @@ void SetupPlatformForCase(const string &socVersion)
     op::SetPlatformSocVersion(it == socMap.end() ? op::SocVersion::ASCEND910B : it->second);
 }
 
-void FallbackSingleNzWeightToNdStorage(const string &api, aclFormat &weightFormat,
-                                       vector<vector<int64_t>> &weightShapesVec,
-                                       vector<vector<int64_t>> &weightStorageShapesVec)
+void FallbackSingleNzWeightToNdStorage(const string& api, aclFormat& weightFormat,
+                                       vector<vector<int64_t>>& weightShapesVec,
+                                       vector<vector<int64_t>>& weightStorageShapesVec)
 {
     if (api != "WeightNzV2" || weightFormat != ACL_FORMAT_FRACTAL_NZ) {
         return;
@@ -70,7 +76,7 @@ void FallbackSingleNzWeightToNdStorage(const string &api, aclFormat &weightForma
     if (weightShapesVec.size() != 1 || !weightStorageShapesVec.empty()) {
         return;
     }
-    const auto &w = weightShapesVec[0];
+    const auto& w = weightShapesVec[0];
     if (w.size() != 5 || w[0] <= 0 || w[3] != 16 || w[4] != 32) {
         return;
     }
@@ -167,7 +173,7 @@ struct SwigluOpApiCase {
         const bool hasSmoothScale = !smoothScaleDims.empty();
 
         vector<int64_t> tuningValues = ParseI64List(tuningConfig, "|");
-        aclIntArray *tuningConfigArr =
+        aclIntArray* tuningConfigArr =
             tuningValues.empty() ? nullptr : aclCreateIntArray(tuningValues.data(), tuningValues.size());
 
         uint64_t workspaceSize = 0;
@@ -178,7 +184,7 @@ struct SwigluOpApiCase {
             if (hasWeightAssist && hasSmoothScale) {
                 vector<TensorDesc> weight_assist_tensor_vec;
                 weight_assist_tensor_vec.reserve(weightAssistShapesVec.size());
-                for (const auto &dims : weightAssistShapesVec) {
+                for (const auto& dims : weightAssistShapesVec) {
                     weight_assist_tensor_vec.emplace_back(
                         TensorDesc(dims, ParseDtype(weightAssistDtype), ParseFormat(weightAssistFormat))
                             .ValueRange(-10, 10));
@@ -205,7 +211,7 @@ struct SwigluOpApiCase {
             } else if (hasWeightAssist) {
                 vector<TensorDesc> weight_assist_tensor_vec_b;
                 weight_assist_tensor_vec_b.reserve(weightAssistShapesVec.size());
-                for (const auto &dims : weightAssistShapesVec) {
+                for (const auto& dims : weightAssistShapesVec) {
                     weight_assist_tensor_vec_b.emplace_back(
                         TensorDesc(dims, ParseDtype(weightAssistDtype), ParseFormat(weightAssistFormat))
                             .ValueRange(-10, 10));
@@ -269,7 +275,7 @@ struct SwigluOpApiCase {
             if (hasWeightAssist && hasSmoothScale) {
                 vector<TensorDesc> weight_assist_tensor_vec_c;
                 weight_assist_tensor_vec_c.reserve(weightAssistShapesVec.size());
-                for (const auto &dims : weightAssistShapesVec) {
+                for (const auto& dims : weightAssistShapesVec) {
                     weight_assist_tensor_vec_c.emplace_back(
                         TensorDesc(dims, ParseDtype(weightAssistDtype), ParseFormat(weightAssistFormat))
                             .ValueRange(-10, 10));
@@ -296,7 +302,7 @@ struct SwigluOpApiCase {
             } else if (hasWeightAssist) {
                 vector<TensorDesc> weight_assist_tensor_vec_d;
                 weight_assist_tensor_vec_d.reserve(weightAssistShapesVec.size());
-                for (const auto &dims : weightAssistShapesVec) {
+                for (const auto& dims : weightAssistShapesVec) {
                     weight_assist_tensor_vec_d.emplace_back(
                         TensorDesc(dims, ParseDtype(weightAssistDtype), ParseFormat(weightAssistFormat))
                             .ValueRange(-10, 10));
@@ -364,7 +370,7 @@ struct SwigluOpApiCase {
     }
 };
 
-vector<SwigluOpApiCase> LoadCases(const string &csvFilePath)
+vector<SwigluOpApiCase> LoadCases(const string& csvFilePath)
 {
     ifstream in(csvFilePath);
     EXPECT_TRUE(in.is_open()) << "Failed to open CSV file: " << csvFilePath;
@@ -438,7 +444,7 @@ vector<SwigluOpApiCase> LoadCases(const string &csvFilePath)
             if (c.socVersion == "Ascend950" || c.socVersion == "Ascend910B") {
                 cases.emplace_back(c);
             }
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvFilePath, lineNo, caseName, error);
         }
     }
@@ -446,7 +452,7 @@ vector<SwigluOpApiCase> LoadCases(const string &csvFilePath)
     return cases;
 }
 
-string BuildCaseName(const testing::TestParamInfo<SwigluOpApiCase> &info)
+string BuildCaseName(const testing::TestParamInfo<SwigluOpApiCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.caseName);
 }
@@ -476,7 +482,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w8a
     TensorDesc xScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -505,7 +511,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w8a
     TensorDesc xScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -534,7 +540,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w8a
     TensorDesc xScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -563,7 +569,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w8a
     TensorDesc xScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -593,7 +599,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w4a
     TensorDesc xScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -625,7 +631,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w4a
     TensorDesc xScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -655,7 +661,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w4a
     TensorDesc xScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -685,7 +691,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w4a
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     TensorDesc smoothScale_desc = TensorDesc({e}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -715,7 +721,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w4a
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     TensorDesc smoothScale_desc = TensorDesc({e, n / 2}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -745,7 +751,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w4a
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     TensorDesc smoothScale_desc = TensorDesc({e, n / 2, 2}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -775,7 +781,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w4a
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     TensorDesc smoothScale_desc = TensorDesc({e + 1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -805,7 +811,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w4a
     TensorDesc xScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -840,7 +846,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w8a
     TensorDesc xScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -875,7 +881,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w8a
     TensorDesc xScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -910,7 +916,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w8a
     TensorDesc xScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -945,7 +951,7 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w8a
     TensorDesc xScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(0, 64);
     vector<int64_t> tuningConfigVal = {10};
-    aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
+    aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
     TensorDesc out1_desc = TensorDesc({m, 1024}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
     TensorDesc out2_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
 
@@ -958,7 +964,10 @@ TEST_F(grouped_matmul_swiglu_quant_v2_opapi_csv_test, ascend910B2_test_opapi_w8a
     EXPECT_EQ(aclRet, 161002);
 }
 
-TEST_P(grouped_matmul_swiglu_quant_v2_opapi_csv_test, run_case) { GetParam().Run(); }
+TEST_P(grouped_matmul_swiglu_quant_v2_opapi_csv_test, run_case)
+{
+    GetParam().Run();
+}
 
 INSTANTIATE_TEST_SUITE_P(grouped_matmul_swiglu_quant_v2_opapi_csv, grouped_matmul_swiglu_quant_v2_opapi_csv_test,
                          testing::ValuesIn(LoadCases(

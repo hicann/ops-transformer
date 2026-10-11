@@ -52,15 +52,15 @@ static const int64_t N_VALID_8 = 8;
 static constexpr int64_t N_ALIGN = 8;
 static constexpr int64_t DOUBLE_SIZE = 2;
 
-static bool CheckNotNull(const aclTensor *x, const aclTensor *output)
+static bool CheckNotNull(const aclTensor* x, const aclTensor* output)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(output, return false);
     return true;
 }
 
-static bool CheckDtypeValid(const aclTensor *x, int64_t outFlag, const aclTensor *output, const aclTensor *normOut,
-                            const aclTensor *sumOut)
+static bool CheckDtypeValid(const aclTensor* x, int64_t outFlag, const aclTensor* output, const aclTensor* normOut,
+                            const aclTensor* sumOut)
 {
     // 检查x的数据类型是否在算子的支持列表内
     OP_CHECK_DTYPE_NOT_SUPPORT(x, DTYPE_SUPPORT_LIST, return false);
@@ -75,8 +75,8 @@ static bool CheckDtypeValid(const aclTensor *x, int64_t outFlag, const aclTensor
     return true;
 }
 
-static bool CheckFormat(const aclTensor *x, int64_t outFlag, const aclTensor *output, const aclTensor *normOut,
-                        const aclTensor *sumOut)
+static bool CheckFormat(const aclTensor* x, int64_t outFlag, const aclTensor* output, const aclTensor* normOut,
+                        const aclTensor* sumOut)
 {
     // 输入输出的格式需要一致
     if (x->GetStorageFormat() != output->GetStorageFormat()) {
@@ -87,8 +87,8 @@ static bool CheckFormat(const aclTensor *x, int64_t outFlag, const aclTensor *ou
     return true;
 }
 
-static bool CheckShape(const aclTensor *x, int64_t outFlag, const aclTensor *output, const aclTensor *normOut,
-                       const aclTensor *sumOut, int64_t numIters)
+static bool CheckShape(const aclTensor* x, int64_t outFlag, const aclTensor* output, const aclTensor* normOut,
+                       const aclTensor* sumOut, int64_t numIters)
 {
     // 校验self的shape是否等于out的shape
     OP_CHECK_SHAPE_NOT_EQUAL(x, output, return false);
@@ -167,8 +167,8 @@ static bool CheckShape(const aclTensor *x, int64_t outFlag, const aclTensor *out
     return true;
 }
 
-static inline aclnnStatus CheckParams(const aclTensor *x, int64_t outFlag, float eps, int64_t numIters,
-                                      const aclTensor *output, const aclTensor *normOut, const aclTensor *sumOut)
+static inline aclnnStatus CheckParams(const aclTensor* x, int64_t outFlag, float eps, int64_t numIters,
+                                      const aclTensor* output, const aclTensor* normOut, const aclTensor* sumOut)
 {
     // 1. 检查输入的数据类型是否在API支持的数据类型范围之内
     CHECK_RET(CheckDtypeValid(x, outFlag, output, normOut, sumOut), ACLNN_ERR_PARAM_INVALID);
@@ -182,9 +182,9 @@ static inline aclnnStatus CheckParams(const aclTensor *x, int64_t outFlag, float
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMhcSinkhornGetWorkspaceSize(const aclTensor *x, float eps, int64_t numIters, aclTensor *output,
-                                             aclTensor *normOut, aclTensor *sumOut, uint64_t *workspaceSize,
-                                             aclOpExecutor **executor)
+aclnnStatus aclnnMhcSinkhornGetWorkspaceSize(const aclTensor* x, float eps, int64_t numIters, aclTensor* output,
+                                             aclTensor* normOut, aclTensor* sumOut, uint64_t* workspaceSize,
+                                             aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnMhcSinkhorn, DFX_IN(x, eps, numIters), DFX_OUT(output, normOut, sumOut));
 
@@ -232,12 +232,12 @@ aclnnStatus aclnnMhcSinkhornGetWorkspaceSize(const aclTensor *x, float eps, int6
     }
 
     // 将输入x转换成连续的tensor
-    const aclTensor *xContiguous = l0op::Contiguous(x, uniqueExecutor.get());
+    const aclTensor* xContiguous = l0op::Contiguous(x, uniqueExecutor.get());
     CHECK_RET(xContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    aclTensor *outputContiguous = const_cast<aclTensor *>(l0op::Contiguous(output, uniqueExecutor.get()));
+    aclTensor* outputContiguous = const_cast<aclTensor*>(l0op::Contiguous(output, uniqueExecutor.get()));
     CHECK_RET(outputContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor *kernelOut =
+    const aclTensor* kernelOut =
         l0op::MhcSinkhorn(xContiguous, outFlag, eps, numIters, outputContiguous, normOut, sumOut, uniqueExecutor.get());
     CHECK_RET(kernelOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
@@ -251,7 +251,7 @@ aclnnStatus aclnnMhcSinkhornGetWorkspaceSize(const aclTensor *x, float eps, int6
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMhcSinkhorn(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMhcSinkhorn(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMhcSinkhorn);
     // 固定写法，调用框架能力，完成计算

@@ -41,10 +41,10 @@ extern "C" {
  * @return aclnnStatus: 返回状态码。
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnQuantGroupedMatmulDequantWeightNZGetWorkspaceSize(
-    const aclTensor *x, const aclTensor *weight, const aclTensor *weightScale, const aclTensor *groupList,
-    const aclTensor *biasOptional, const aclTensor *xScaleOptional, const aclTensor *xOffsetOptional,
-    const aclTensor *smoothScaleOptional, char *xQuantMode, bool transposeWeight, aclTensor *out,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* x, const aclTensor* weight, const aclTensor* weightScale, const aclTensor* groupList,
+    const aclTensor* biasOptional, const aclTensor* xScaleOptional, const aclTensor* xOffsetOptional,
+    const aclTensor* smoothScaleOptional, char* xQuantMode, bool transposeWeight, aclTensor* out,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnQuantGroupedMatmulDequantWeightNZ的第二段接口，用于执行计算。
@@ -55,11 +55,13 @@ __attribute__((visibility("default"))) aclnnStatus aclnnQuantGroupedMatmulDequan
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码。
  */
-__attribute__((visibility("default"))) aclnnStatus aclnnQuantGroupedMatmulDequantWeightNZ(void *workspace,
-    uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnQuantGroupedMatmulDequantWeightNZ(void* workspace,
+                                                                                          uint64_t workspaceSize,
+                                                                                          aclOpExecutor* executor,
+                                                                                          aclrtStream stream);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // OP_API_INC_QUANT_GROUPED_MATMUL_DEQUANT_WEIGHT_NZ_H_
+#endif // OP_API_INC_QUANT_GROUPED_MATMUL_DEQUANT_WEIGHT_NZ_H_

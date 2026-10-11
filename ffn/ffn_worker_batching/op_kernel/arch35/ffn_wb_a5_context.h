@@ -163,12 +163,12 @@ __aicore__ inline int64_t GetSortLen(int64_t count)
 // isRecv=true (RECV):expert_id 藏在 FfnArea.token_info_buf 的 FfnDataDesc 内,
 //                    另读 polling_index 定位当前 micro batch。
 template <bool isRecv = false, typename TilingT>
-__aicore__ inline void ScheduleContextParse(GM_ADDR schedule_context, const TilingT *tilingData,
-                                            ScheduleContextInfo &ctx, TPipe *pipe)
+__aicore__ inline void ScheduleContextParse(GM_ADDR schedule_context, const TilingT* tilingData,
+                                            ScheduleContextInfo& ctx, TPipe* pipe)
 {
     GlobalTensor<int8_t> ctxGm;
     TBuf<TPosition::VECIN> buffer;
-    ctxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(schedule_context), SCHEDULE_CONTEXT_BYTES);
+    ctxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(schedule_context), SCHEDULE_CONTEXT_BYTES);
     pipe->InitBuffer(buffer, SCHEDULE_CONTEXT_BYTES);
     LocalTensor<int8_t> val = buffer.Get<int8_t>();
     DataCopy(val, ctxGm, SCHEDULE_CONTEXT_BYTES);

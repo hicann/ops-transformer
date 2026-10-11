@@ -14,7 +14,8 @@
  */
 
 #include "kernel_operator.h"
-#if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
+#if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) || \
+    (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
 #include "ffn_high_performence.h"
 #include "ffn_quant.h"
 #include "ffn_antiquant.h"
@@ -50,10 +51,14 @@ constexpr CubeFormat formatY = CubeFormat::NZ;
 constexpr CubeFormat formatY = CubeFormat::ND;
 #endif
 
-template <typename T, CubeFormat cubeFormatA> using aType = matmul::MatmulType<TPosition::GM, cubeFormatA, T, false>;
-template <typename T, CubeFormat cubeFormatB> using bType = matmul::MatmulType<TPosition::GM, cubeFormatB, T, false>;
-template <typename T> using biasType = matmul::MatmulType<TPosition::GM, CubeFormat::ND, T>;
-template <typename T, TPosition tPositionC> using cType = matmul::MatmulType<tPositionC, formatY, T>;
+template <typename T, CubeFormat cubeFormatA>
+using aType = matmul::MatmulType<TPosition::GM, cubeFormatA, T, false>;
+template <typename T, CubeFormat cubeFormatB>
+using bType = matmul::MatmulType<TPosition::GM, cubeFormatB, T, false>;
+template <typename T>
+using biasType = matmul::MatmulType<TPosition::GM, CubeFormat::ND, T>;
+template <typename T, TPosition tPositionC>
+using cType = matmul::MatmulType<tPositionC, formatY, T>;
 // CFG_MDL: open large pack movement mode
 template <typename T, CubeFormat cubeFormatA, CubeFormat cubeFormatB = CubeFormat::ND,
           TPosition tPositionC = TPosition::GM>
@@ -68,51 +73,56 @@ constexpr MatmulConfig MM_CFG_UNITFLAG{false, false, true, 0, 0, 0, false, false
                                        false, 0,     0,    0, 0, 0, 0,     0,     true};
 static constexpr MatmulConfig MM_CFG_STEPN = GetSpecialMDLConfig();
 template <typename T, typename cT = T, typename biasT = T, CubeFormat cubeFormatA = CubeFormat::ND,
-          const MatmulConfig &MM_CFG = MM_CFG_UNITFLAG, TPosition tPositionC = TPosition::GM>
+          const MatmulConfig& MM_CFG = MM_CFG_UNITFLAG, TPosition tPositionC = TPosition::GM>
 using mmQuantType =
     MMType<aType<T, cubeFormatA>, bType<T, CubeFormat::ND>, cType<cT, tPositionC>, biasType<biasT>, MM_CFG>;
 
-#if defined(__CCE_AICORE__) && __CCE_AICORE__ == 220 || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
-template <typename T> struct GetC1Type {
+#if defined(__CCE_AICORE__) && __CCE_AICORE__ == 220 || \
+    (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
+template <typename T>
+struct GetC1Type {
     using Type = T;
 };
 
 #if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
-template <> struct GetC1Type<bfloat16_t> {
+template <>
+struct GetC1Type<bfloat16_t> {
     using Type = float;
 };
 #endif
 
-template <> struct GetC1Type<half> {
+template <>
+struct GetC1Type<half> {
     using Type = half;
 };
 #endif
 
-extern "C" __global__ __aicore__ void ffn(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
-                                          __gm__ uint8_t *expertTokens, __gm__ uint8_t *bias1, __gm__ uint8_t *bias2,
-                                          __gm__ uint8_t *scale, __gm__ uint8_t *offset, __gm__ uint8_t *deqScale1,
-                                          __gm__ uint8_t *deqScale2, __gm__ uint8_t *antiquant_scale1,
-                                          __gm__ uint8_t *antiquant_scale2, __gm__ uint8_t *antiquant_offset1,
-                                          __gm__ uint8_t *antiquant_offset2, __gm__ uint8_t *y,
-                                          __gm__ uint8_t *workSpace, __gm__ uint8_t *tiling)
+extern "C" __global__ __aicore__ void ffn(__gm__ uint8_t* x, __gm__ uint8_t* weight1, __gm__ uint8_t* weight2,
+                                          __gm__ uint8_t* expertTokens, __gm__ uint8_t* bias1, __gm__ uint8_t* bias2,
+                                          __gm__ uint8_t* scale, __gm__ uint8_t* offset, __gm__ uint8_t* deqScale1,
+                                          __gm__ uint8_t* deqScale2, __gm__ uint8_t* antiquant_scale1,
+                                          __gm__ uint8_t* antiquant_scale2, __gm__ uint8_t* antiquant_offset1,
+                                          __gm__ uint8_t* antiquant_offset2, __gm__ uint8_t* y,
+                                          __gm__ uint8_t* workSpace, __gm__ uint8_t* tiling)
 {
     TPipe tPipe;
     AscendCUtils::SetOverflow(1);
     // 拆解TilingData 数据
     GET_TILING_DATA(tiling_data, tiling);
-    const FFNTilingData *__restrict ffn_tiling_data = &tiling_data;
-    const TCubeTiling *__restrict mm1Tiling = &(ffn_tiling_data->mm1TilingData);
-    const TCubeTiling *__restrict mm2Tiling = &(ffn_tiling_data->mm2TilingData);
+    const FFNTilingData* __restrict ffn_tiling_data = &tiling_data;
+    const TCubeTiling* __restrict mm1Tiling = &(ffn_tiling_data->mm1TilingData);
+    const TCubeTiling* __restrict mm2Tiling = &(ffn_tiling_data->mm2TilingData);
     // 获取Op可用WorkSpace空间
-    __gm__ uint8_t *user1 = GetUserWorkspace(workSpace);
+    __gm__ uint8_t* user1 = GetUserWorkspace(workSpace);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 
-#if defined(__CCE_AICORE__) && __CCE_AICORE__ == 220 || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
+#if defined(__CCE_AICORE__) && __CCE_AICORE__ == 220 || \
+    (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
     if (TILING_KEY_IS(2000)) { // One matmul, float16
         KERNEL_TASK_TYPE(2000, KERNEL_TYPE_MIX_AIC_1_1);
         using mt = mmType<half, CubeFormat::ND, CubeFormat::ND>;
         mt::MT mm;
-        const TCubeTiling *__restrict mmTiling = mm1Tiling->isBias ? mm1Tiling : mm2Tiling;
+        const TCubeTiling* __restrict mmTiling = mm1Tiling->isBias ? mm1Tiling : mm2Tiling;
         REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), mm, mmTiling);
         FFNHighPerformence<half, mt> op(mm, mm);
         op.Init(x, weight1, weight2, expertTokens, bias1, bias2, y, user1, ffn_tiling_data, &tPipe);
@@ -136,7 +146,7 @@ extern "C" __global__ __aicore__ void ffn(__gm__ uint8_t *x, __gm__ uint8_t *wei
         op.Process();
     } else if (TILING_KEY_IS(2001)) { // QUANT, One matmul
         mmQuantType<int8_t, half, int32_t>::MT mm;
-        const TCubeTiling *__restrict mmTiling = mm1Tiling->isBias ? mm1Tiling : mm2Tiling;
+        const TCubeTiling* __restrict mmTiling = mm1Tiling->isBias ? mm1Tiling : mm2Tiling;
         REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), mm, mmTiling);
         FFNQuant<int8_t, decltype(mm), decltype(mm), half, half, int32_t, half, uint64_t> op(mm, mm);
         op.Init(x, weight1, weight2, expertTokens, bias1, bias2, scale, offset, deqScale1, deqScale2, y, user1,
@@ -144,7 +154,7 @@ extern "C" __global__ __aicore__ void ffn(__gm__ uint8_t *x, __gm__ uint8_t *wei
         op.Process();
     } else if (TILING_KEY_IS(2002)) { // QUANT, One matmul, stepN=2
         mmQuantType<int8_t, half, int32_t, CubeFormat::ND, MM_CFG_STEPN>::MT mm;
-        const TCubeTiling *__restrict mmTiling = mm1Tiling->isBias ? mm1Tiling : mm2Tiling;
+        const TCubeTiling* __restrict mmTiling = mm1Tiling->isBias ? mm1Tiling : mm2Tiling;
         REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), mm, mmTiling);
         FFNQuant<int8_t, decltype(mm), decltype(mm), half, half, int32_t, half, uint64_t> op(mm, mm);
         op.Init(x, weight1, weight2, expertTokens, bias1, bias2, scale, offset, deqScale1, deqScale2, y, user1,

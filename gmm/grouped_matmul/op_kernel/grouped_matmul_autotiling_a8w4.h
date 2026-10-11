@@ -175,7 +175,7 @@ public:
         axis_name[0] = name;
     }
 
-    __aicore__ inline Dim1(const Dim1 &d)
+    __aicore__ inline Dim1(const Dim1& d)
         : Dim0(DIM_VAL1)
     {
         s[0] = d.s[0];
@@ -207,7 +207,7 @@ public:
         axis_name[0] = n0;
     }
 
-    __aicore__ inline void copyAxisName(Dim1 &dim)
+    __aicore__ inline void copyAxisName(Dim1& dim)
     {
         axis_name[0] = dim.axis_name[0];
     }
@@ -233,12 +233,12 @@ public:
         return -1;
     }
 
-    __aicore__ inline bool operator==(Dim1 &in)
+    __aicore__ inline bool operator==(Dim1& in)
     {
         return s[0] == in.s[0];
     }
 
-    __aicore__ inline void posIterator(Dim1 ori_pos, Dim1 base_tiling, Dim1 ori_vec, Dim1 &curr_vec)
+    __aicore__ inline void posIterator(Dim1 ori_pos, Dim1 base_tiling, Dim1 ori_vec, Dim1& curr_vec)
     {
         uint32_t temp0 = s[0] + base_tiling.s[0];
         if (temp0 < ori_pos.s[0] + ori_vec.s[0]) {
@@ -276,7 +276,7 @@ public:
         axis_name[1] = name1;
     }
 
-    __aicore__ inline Dim2(const Dim2 &d)
+    __aicore__ inline Dim2(const Dim2& d)
     {
         s[0] = d.s[0];
         s[1] = d.s[1];
@@ -328,7 +328,7 @@ public:
         axis_name[1] = n1;
     }
 
-    __aicore__ inline void copyAxisName(Dim2 &dim)
+    __aicore__ inline void copyAxisName(Dim2& dim)
     {
         axis_name[0] = dim.axis_name[0];
         axis_name[1] = dim.axis_name[1];
@@ -354,12 +354,12 @@ public:
         return -1;
     }
 
-    __aicore__ inline bool operator==(Dim2 &in)
+    __aicore__ inline bool operator==(Dim2& in)
     {
         return s[0] == in.s[0] && s[1] == in.s[1];
     }
 
-    __aicore__ inline void posIterator(Dim2 ori_pos, Dim2 base_tiling, Dim2 ori_vec, Dim2 &curr_vec)
+    __aicore__ inline void posIterator(Dim2 ori_pos, Dim2 base_tiling, Dim2 ori_vec, Dim2& curr_vec)
     {
         uint32_t temp0 = s[0] + base_tiling.s[0];
         if (temp0 < ori_pos.s[0] + ori_vec.s[0]) {
@@ -411,7 +411,7 @@ public:
         axis_name[ARRAY_IDX2] = name2;
     }
 
-    __aicore__ inline Dim3(const Dim3 &d)
+    __aicore__ inline Dim3(const Dim3& d)
         : Dim0(DIM_VAL3)
     {
         s[ARRAY_IDX0] = d.s[ARRAY_IDX0];
@@ -458,7 +458,7 @@ public:
         axis_name[ARRAY_IDX2] = n2;
     }
 
-    __aicore__ inline void copyAxisName(Dim3 &dim)
+    __aicore__ inline void copyAxisName(Dim3& dim)
     {
         axis_name[ARRAY_IDX0] = dim.axis_name[ARRAY_IDX0];
         axis_name[ARRAY_IDX1] = dim.axis_name[ARRAY_IDX1];
@@ -489,13 +489,13 @@ public:
         return -1;
     }
 
-    __aicore__ inline bool operator==(Dim3 &in)
+    __aicore__ inline bool operator==(Dim3& in)
     {
         return s[ARRAY_IDX0] == in.s[ARRAY_IDX0] && s[ARRAY_IDX1] == in.s[ARRAY_IDX1] &&
                s[ARRAY_IDX2] == in.s[ARRAY_IDX2];
     }
 
-    __aicore__ inline void posIterator(Dim3 ori_pos, Dim3 base_tiling, Dim3 ori_vec, Dim3 &curr_vec)
+    __aicore__ inline void posIterator(Dim3 ori_pos, Dim3 base_tiling, Dim3 ori_vec, Dim3& curr_vec)
     {
         // 记录下初始的坐标
         uint32_t t_pos[DIM_VAL3];
@@ -582,7 +582,7 @@ public:
         vec = dim;
     }
 
-    __aicore__ inline Cartesian(const Cartesian &c)
+    __aicore__ inline Cartesian(const Cartesian& c)
     {
         pos = c.pos;
         vec = c.vec;
@@ -623,7 +623,7 @@ public:
         odd_even = false;
     }
 
-    __aicore__ inline bool posIterator(Cartesian<Dim> &cartesianUnisorC)
+    __aicore__ inline bool posIterator(Cartesian<Dim>& cartesianUnisorC)
     {
         odd_even = !odd_even;
         cartesianUnisorC.pos = offset_pos;
@@ -678,7 +678,7 @@ public:
           Cartesian<Dim>()
     {}
 
-    __aicore__ inline Unisor(const Unisor &t)
+    __aicore__ inline Unisor(const Unisor& t)
         : UnisorShape<Dim>(t.vector_val),
           Cartesian<Dim>(t.pos, t.vec),
           format_size(t.format_size),
@@ -702,7 +702,7 @@ public:
     {
         this->format_size = format_size;
         int64_t dataSize = format_size * vec.size_16();
-        inputGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t *>(gm), dataSize);
+        inputGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t*>(gm), dataSize);
     }
 
     __aicore__ inline Unisor(GM_ADDR gm, Dim vec, float format_size, bool isReal)
@@ -711,7 +711,7 @@ public:
     {
         this->format_size = format_size;
         int64_t dataSize = format_size * vec.size();
-        inputGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t *>(gm), dataSize);
+        inputGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t*>(gm), dataSize);
     }
 
     __aicore__ inline void setCartesian(Dim p, Dim v)
@@ -737,7 +737,7 @@ public:
         this->vec.transpose();
     }
 
-    __aicore__ inline void init(Dim vec, float format_size, TPipe *pipe)
+    __aicore__ inline void init(Dim vec, float format_size, TPipe* pipe)
     {
         // Shape和Cartesian初始化
         this->vector_val = vec.Dim_16();
@@ -752,7 +752,7 @@ public:
         }
     }
 
-    __aicore__ inline void init_RealShape(Dim vec, float format_size, TPipe *pipe)
+    __aicore__ inline void init_RealShape(Dim vec, float format_size, TPipe* pipe)
     {
         // Shape和Cartesian初始化
         this->vector_val = vec;
@@ -781,7 +781,7 @@ public:
     __aicore__ inline GlobalTensor<int32_t> getGM_32()
     {
         GlobalTensor<int32_t> tmp32tGlobalTensor;
-        tmp32tGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(this->gm_addr),
+        tmp32tGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(this->gm_addr),
                                            this->gm_datasize / FACTOR_4);
         return tmp32tGlobalTensor;
     }
@@ -789,7 +789,7 @@ public:
 
 class KernelBase {
 public:
-    TPipe *pipe;
+    TPipe* pipe;
     Dim3 splitDim;
     Dim3 block;
     uint32_t blockId;
@@ -803,13 +803,13 @@ public:
     uint32_t szAvailL0C;
 
 public:
-    __aicore__ inline void Init(TPipe *pipeIn)
+    __aicore__ inline void Init(TPipe* pipeIn)
     {
         pipe = pipeIn;
     }
 
     template <typename T>
-    __aicore__ inline void NPU_Duplicate(Unisor<UBMem, Dim1> &out, const T value)
+    __aicore__ inline void NPU_Duplicate(Unisor<UBMem, Dim1>& out, const T value)
     {
         LocalTensor<uint16_t> srcLocal = out.get<uint16_t>();
         uint32_t dstShape = out.vec.s[0] / FACTOR_2;
@@ -819,7 +819,7 @@ public:
     }
 
     template <class T>
-    __aicore__ inline void NPU_Adds(Unisor<UBMem, Dim2> &out, Unisor<UBMem, Dim2> &in, const T &value)
+    __aicore__ inline void NPU_Adds(Unisor<UBMem, Dim2>& out, Unisor<UBMem, Dim2>& in, const T& value)
     {
         LocalTensor<T> outLocal = out.get<T>();
         LocalTensor<T> inLocal = in.get<T>();
@@ -843,7 +843,7 @@ public:
     }
 
     template <class Out, class In>
-    __aicore__ inline void NPU_Cast(Unisor<UBMem, Dim2> &out, Unisor<UBMem, Dim2> &in,
+    __aicore__ inline void NPU_Cast(Unisor<UBMem, Dim2>& out, Unisor<UBMem, Dim2>& in,
                                     const AscendC::RoundMode round_mode = AscendC::RoundMode::CAST_NONE)
     {
         LocalTensor<In> srcLocal = in.get<In>();
@@ -860,7 +860,7 @@ public:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void NPU_Broadcast(Unisor<UBMem, Dim2> &out, Unisor<UBMem, Dim1> &in)
+    __aicore__ inline void NPU_Broadcast(Unisor<UBMem, Dim2>& out, Unisor<UBMem, Dim1>& in)
     {
         Dim2 vec = out.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -883,7 +883,7 @@ public:
     }
 
     // 向量乘：需要A的输入是dim1的
-    __aicore__ inline void NPU_VecMul(Unisor<UBMem, Dim2> &out, Unisor<UBMem, Dim2> &A, Unisor<UBMem, Dim2> &B)
+    __aicore__ inline void NPU_VecMul(Unisor<UBMem, Dim2>& out, Unisor<UBMem, Dim2>& A, Unisor<UBMem, Dim2>& B)
     {
         Dim2 vec = out.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -903,7 +903,7 @@ public:
     }
 
     // 向量乘：需要A的输入是[1:]的
-    __aicore__ inline void NPU_VecMuls(Unisor<UBMem, Dim2> &out, Unisor<UBMem, Dim2> &A, Unisor<UBMem, Dim2> &B)
+    __aicore__ inline void NPU_VecMuls(Unisor<UBMem, Dim2>& out, Unisor<UBMem, Dim2>& A, Unisor<UBMem, Dim2>& B)
     {
         Dim2 vec = out.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -941,7 +941,7 @@ public:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void NPU_Add_Bias(Unisor<UBMem, Dim2> &out, Unisor<UBMem, Dim2> &bias)
+    __aicore__ inline void NPU_Add_Bias(Unisor<UBMem, Dim2>& out, Unisor<UBMem, Dim2>& bias)
     {
         Dim2 vec = out.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -974,7 +974,7 @@ public:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void NPU_Load(Unisor<UBMem, Dim2> &out, Unisor<GlobalMem, Dim2> &in)
+    __aicore__ inline void NPU_Load(Unisor<UBMem, Dim2>& out, Unisor<GlobalMem, Dim2>& in)
     {
         Dim2 vec = in.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -1004,7 +1004,7 @@ public:
         DataCopy(dstLocal[dstOffset], srcLocal[srcOffset], {blockCount, blockLen, srcStride, dstStride});
     }
 
-    __aicore__ void NPU_Store(Unisor<GlobalMem, Dim2> &out, Unisor<UBMem, Dim2> &in)
+    __aicore__ void NPU_Store(Unisor<GlobalMem, Dim2>& out, Unisor<UBMem, Dim2>& in)
     {
         Dim2 vec = out.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -1037,7 +1037,7 @@ public:
         DataCopy(dst[dstOffset], src[srcOffset], {blockCount, blockLen, srcStride, dstStride});
     }
 
-    __aicore__ void NPU_And(Unisor<UBMem, Dim2> &out, Unisor<UBMem, Dim2> &a, Unisor<UBMem, Dim1> &b)
+    __aicore__ void NPU_And(Unisor<UBMem, Dim2>& out, Unisor<UBMem, Dim2>& a, Unisor<UBMem, Dim1>& b)
     {
         // 获取 UB 中的 Tensor
         LocalTensor<uint16_t> outLocal = out.get<uint16_t>();
@@ -1061,7 +1061,7 @@ public:
 
     // 底层API
     // GM到UB
-    __aicore__ inline void NPU_Load_GMToUB(Unisor<UBMem, Dim2> &out, Unisor<GlobalMem, Dim2> &in, int stride = 1)
+    __aicore__ inline void NPU_Load_GMToUB(Unisor<UBMem, Dim2>& out, Unisor<GlobalMem, Dim2>& in, int stride = 1)
     {
         Dim2 vec = in.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -1092,7 +1092,7 @@ public:
     }
 
     // UB到GM
-    __aicore__ inline void NPU_Load_UBToGM(Unisor<GlobalMem, Dim2> &out, Unisor<UBMem, Dim2> &in)
+    __aicore__ inline void NPU_Load_UBToGM(Unisor<GlobalMem, Dim2>& out, Unisor<UBMem, Dim2>& in)
     {
         Dim2 vec = out.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -1125,7 +1125,7 @@ public:
     }
 
     // 从 GM 到 L1A, ND -> Nz
-    __aicore__ inline void NPU_Load_GMToL1A(Unisor<L1AMem, Dim2> &out, Unisor<GlobalMem, Dim2> &in)
+    __aicore__ inline void NPU_Load_GMToL1A(Unisor<L1AMem, Dim2>& out, Unisor<GlobalMem, Dim2>& in)
     {
         Dim2 vec = out.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -1163,7 +1163,7 @@ public:
     }
 
     // 从 GM 到 L1B, ND -> Nz
-    __aicore__ inline void NPU_Load_GMToL1B(Unisor<L1BMem, Dim2> &out, Unisor<GlobalMem, Dim2> &in)
+    __aicore__ inline void NPU_Load_GMToL1B(Unisor<L1BMem, Dim2>& out, Unisor<GlobalMem, Dim2>& in)
     {
         Dim2 vec = out.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -1199,7 +1199,7 @@ public:
     }
 
     // 从 L1 到 L0A, 转格式
-    __aicore__ inline void NPU_Load_L1ToL0A(Unisor<L0AMem, Dim2> &out, Unisor<L1AMem, Dim2> &in)
+    __aicore__ inline void NPU_Load_L1ToL0A(Unisor<L0AMem, Dim2>& out, Unisor<L1AMem, Dim2>& in)
     {
         Dim2 vec = out.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -1239,7 +1239,7 @@ public:
     }
 
     // 从 L1 到 L0B, 转格式
-    __aicore__ inline void NPU_Load_L1ToL0B(Unisor<L0BMem, Dim2> &out, Unisor<L1BMem, Dim2> &in)
+    __aicore__ inline void NPU_Load_L1ToL0B(Unisor<L0BMem, Dim2>& out, Unisor<L1BMem, Dim2>& in)
     {
         Dim2 vec = out.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -1375,8 +1375,8 @@ public:
         }
     }
 
-    __aicore__ inline void NPU_Load_GMToL0B(Unisor<L0BMem, Dim2> &unisorB0, Unisor<L1BMem, Dim2> &unisorB1,
-                                            Unisor<GlobalMem, Dim2> &B, uint32_t MTE1_MTE2_EventID,
+    __aicore__ inline void NPU_Load_GMToL0B(Unisor<L0BMem, Dim2>& unisorB0, Unisor<L1BMem, Dim2>& unisorB1,
+                                            Unisor<GlobalMem, Dim2>& B, uint32_t MTE1_MTE2_EventID,
                                             uint32_t M_MTE1_EventID)
     {
         WaitFlag<HardEvent::MTE1_MTE2>(MTE1_MTE2_EventID);
@@ -1390,8 +1390,8 @@ public:
         SetFlag<HardEvent::MTE1_MTE2>(MTE1_MTE2_EventID);
     }
 
-    __aicore__ inline void NPU_Load_GMToL0A_CacheL1(Unisor<L0AMem, Dim2> &unisorA0, Unisor<L1AMem, Dim2> &unisorA1,
-                                                    Unisor<GlobalMem, Dim2> &A, uint32_t MTE1_MTE2_EventID_0,
+    __aicore__ inline void NPU_Load_GMToL0A_CacheL1(Unisor<L0AMem, Dim2>& unisorA0, Unisor<L1AMem, Dim2>& unisorA1,
+                                                    Unisor<GlobalMem, Dim2>& A, uint32_t MTE1_MTE2_EventID_0,
                                                     uint32_t MTE1_MTE2_EventID_1, uint32_t M_MTE1_EventID,
                                                     bool NN_firstflag, bool NN_lastflag, bool firstNIter)
     {
@@ -1411,7 +1411,7 @@ public:
         SetFlag<HardEvent::MTE1_M>(M_MTE1_EventID);
     }
 
-    __aicore__ inline void NPU_Add_float(Unisor<UBMem, Dim2> &out, Unisor<UBMem, Dim2> &a, Unisor<UBMem, Dim2> &b)
+    __aicore__ inline void NPU_Add_float(Unisor<UBMem, Dim2>& out, Unisor<UBMem, Dim2>& a, Unisor<UBMem, Dim2>& b)
     {
         LocalTensor<float> outLocal = out.get<float>();
         LocalTensor<float> aLocal = a.get<float>();
@@ -1423,7 +1423,7 @@ public:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void NPU_Add_float(Unisor<UBMem, Dim1> &out, Unisor<UBMem, Dim1> &a, Unisor<UBMem, Dim1> &b)
+    __aicore__ inline void NPU_Add_float(Unisor<UBMem, Dim1>& out, Unisor<UBMem, Dim1>& a, Unisor<UBMem, Dim1>& b)
     {
         LocalTensor<float> outLocal = out.get<float>();
         LocalTensor<float> aLocal = a.get<float>();
@@ -1435,7 +1435,7 @@ public:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void NPU_Load_GMToUB(Unisor<UBMem, Dim1> &out, Unisor<GlobalMem, Dim1> &in)
+    __aicore__ inline void NPU_Load_GMToUB(Unisor<UBMem, Dim1>& out, Unisor<GlobalMem, Dim1>& in)
     {
         Dim1 vec = in.vec;
         if (vec.s[0] == 0) {
@@ -1462,7 +1462,7 @@ public:
         DataCopy(dstLocal[dstOffset], srcLocal[srcOffset], {blockCount, blockLen, srcStride, dstStride});
     }
 
-    __aicore__ inline void NPU_Load_UBToGM(Unisor<GlobalMem, Dim1> &out, Unisor<UBMem, Dim1> &in)
+    __aicore__ inline void NPU_Load_UBToGM(Unisor<GlobalMem, Dim1>& out, Unisor<UBMem, Dim1>& in)
     {
         Dim1 vec = out.vec;
         if (vec.s[0] == 0) {
@@ -1488,7 +1488,7 @@ public:
         DataCopy(dst[dstOffset], src[srcOffset], {blockCount, blockLen, srcStride, dstStride});
     }
 
-    __aicore__ inline void NPU_Load_GMToL1A_ND(Unisor<L1AMem, Dim2> &out, Unisor<GlobalMem, Dim2> &in)
+    __aicore__ inline void NPU_Load_GMToL1A_ND(Unisor<L1AMem, Dim2>& out, Unisor<GlobalMem, Dim2>& in)
     {
         Dim2 vec = in.vec;
         if (vec.s[0] == 0 || vec.s[1] == 0) {
@@ -1517,7 +1517,7 @@ public:
         DataCopy(dstLocal[dstOffset], srcLocal[srcOffset], {blockCount, blockLen, srcStride, dstStride});
     }
 
-    __aicore__ inline void NPU_Load_L0CToGM(GlobalTensor<uint8_t> dst, TBuf<L0CMem> &src, TBuf<L1AMem> &deq,
+    __aicore__ inline void NPU_Load_L0CToGM(GlobalTensor<uint8_t> dst, TBuf<L0CMem>& src, TBuf<L1AMem>& deq,
                                             Cartesian<Dim2> dstCart, Cartesian<Dim2> deqCart, Dim2 dstShape,
                                             float dstFormat)
     {
@@ -1554,7 +1554,7 @@ public:
         AscendC::Fixpipe(dst[dstOffset], srcLocal[srcOffset], deqTensorLocal[deq_posWidth], fixpipeParams);
     }
 
-    __aicore__ inline void NPU_Store_L0CToGM(Unisor<GlobalMem, Dim2> &C, Unisor<L0CMem, Dim2> &unisorC0,
+    __aicore__ inline void NPU_Store_L0CToGM(Unisor<GlobalMem, Dim2>& C, Unisor<L0CMem, Dim2>& unisorC0,
                                              Unisor<L1AMem, Dim2> unisorDeq, uint32_t eventID, bool atomic_flag)
     {
         // int32_t 类型
@@ -1573,7 +1573,7 @@ public:
     }
 
     template <class T>
-    __aicore__ inline void NPU_Muls(Unisor<UBMem, Dim2> &out, Unisor<UBMem, Dim2> &in, const T &value)
+    __aicore__ inline void NPU_Muls(Unisor<UBMem, Dim2>& out, Unisor<UBMem, Dim2>& in, const T& value)
     {
         LocalTensor<T> outLocal = out.get<T>();
         LocalTensor<T> inLocal = in.get<T>();
@@ -1603,7 +1603,7 @@ public:
         : KernelBase()
     {}
 
-    __aicore__ inline void initBlockPos_3D(AxisTiling3Vector &splitRecord)
+    __aicore__ inline void initBlockPos_3D(AxisTiling3Vector& splitRecord)
     {
         splitDim.s[ARRAY_IDX0] = splitRecord.s[ARRAY_IDX0];
         splitDim.s[ARRAY_IDX1] = splitRecord.s[ARRAY_IDX1];
@@ -1636,8 +1636,8 @@ public:
         return result;
     }
 
-    __aicore__ inline void NPU_Matmul(Unisor<L0CMem, Dim2> &out, Unisor<L0AMem, Dim2> &in0, Unisor<L0BMem, Dim2> &in1,
-                                      bool isBias, Dim3 &realShape)
+    __aicore__ inline void NPU_Matmul(Unisor<L0CMem, Dim2>& out, Unisor<L0AMem, Dim2>& in0, Unisor<L0BMem, Dim2>& in1,
+                                      bool isBias, Dim3& realShape)
     {
         if (realShape.s[ARRAY_IDX0] == 0 || realShape.s[ARRAY_IDX1] == 0 || realShape.s[ARRAY_IDX2] == 0) {
             return;
@@ -1706,8 +1706,8 @@ public:
     }
 
     // loadEvenEventID是通过isEven决定的EventID！
-    __aicore__ inline void npu_matmulUnisor_ping(Unisor<L0CMem, Dim2> &unisorC0, Unisor<L0AMem, Dim2> &unisorA0,
-                                                 Unisor<L0BMem, Dim2> &unisorB0, Dim3 &realShape,
+    __aicore__ inline void npu_matmulUnisor_ping(Unisor<L0CMem, Dim2>& unisorC0, Unisor<L0AMem, Dim2>& unisorA0,
+                                                 Unisor<L0BMem, Dim2>& unisorB0, Dim3& realShape,
                                                  uint32_t loadEvenEventID, uint32_t loadEventID, uint32_t storeCEventID,
                                                  bool firstKIter)
     {
@@ -1721,8 +1721,8 @@ public:
     }
 
     // loadEvenEventID是通过isEven决定的EventID！
-    __aicore__ inline void npu_matmulUnisor_pong(Unisor<L0CMem, Dim2> &unisorC0, Unisor<L0AMem, Dim2> &unisorA0,
-                                                 Unisor<L0BMem, Dim2> &unisorB0, Dim3 &realShape,
+    __aicore__ inline void npu_matmulUnisor_pong(Unisor<L0CMem, Dim2>& unisorC0, Unisor<L0AMem, Dim2>& unisorA0,
+                                                 Unisor<L0BMem, Dim2>& unisorB0, Dim3& realShape,
                                                  uint32_t loadEvenEventID, uint32_t loadEventID, uint32_t storeCEventID,
                                                  bool firstKIter)
     {
@@ -1736,18 +1736,18 @@ public:
     }
 
     __aicore__ inline void npu_user_defined_matmul_kernel_switch(
-        Unisor<GlobalMem, Dim2> &unisorA, Unisor<GlobalMem, Dim2> &unisorB, Unisor<GlobalMem, Dim2> &unisorC,
-        Unisor<GlobalMem, Dim2> &workUnisor, Unisor<GlobalMem, Dim2> &biasUnisor, Unisor<GlobalMem, Dim1> &saUnisor,
-        Unisor<GlobalMem, Dim2> &swUnisor, Dim2 &baseCTiling, uint32_t group_index, uint8_t kernel_index)
+        Unisor<GlobalMem, Dim2>& unisorA, Unisor<GlobalMem, Dim2>& unisorB, Unisor<GlobalMem, Dim2>& unisorC,
+        Unisor<GlobalMem, Dim2>& workUnisor, Unisor<GlobalMem, Dim2>& biasUnisor, Unisor<GlobalMem, Dim1>& saUnisor,
+        Unisor<GlobalMem, Dim2>& swUnisor, Dim2& baseCTiling, uint32_t group_index, uint8_t kernel_index)
     {
         npu_user_defined_matmul_kernel_slave_CacheA_split_BaseN(unisorA, unisorB, unisorC, workUnisor, biasUnisor,
                                                                 saUnisor, swUnisor, baseCTiling, group_index);
     }
 
     __aicore__ inline void npu_user_defined_matmul_kernel_slave_CacheA_split_BaseN(
-        Unisor<GlobalMem, Dim2> &A, Unisor<GlobalMem, Dim2> &B, Unisor<GlobalMem, Dim2> &C,
-        Unisor<GlobalMem, Dim2> &workUnisor, Unisor<GlobalMem, Dim2> &biasUnisor, Unisor<GlobalMem, Dim1> &saUnisor,
-        Unisor<GlobalMem, Dim2> &swUnisor, Dim2 &baseCTiling, uint32_t group_index)
+        Unisor<GlobalMem, Dim2>& A, Unisor<GlobalMem, Dim2>& B, Unisor<GlobalMem, Dim2>& C,
+        Unisor<GlobalMem, Dim2>& workUnisor, Unisor<GlobalMem, Dim2>& biasUnisor, Unisor<GlobalMem, Dim1>& saUnisor,
+        Unisor<GlobalMem, Dim2>& swUnisor, Dim2& baseCTiling, uint32_t group_index)
     {
         if (g_coreType == AscendC::AIV) {
             return;
@@ -2071,11 +2071,11 @@ public:
         this->pipe->Reset();
     }
 
-    __aicore__ inline void npu_user_defined_matmul_kernel_slave_Post_Processing_off(Unisor<GlobalMem, Dim2> &C,
-                                                                                    Unisor<GlobalMem, Dim2> &workUnisor,
-                                                                                    Unisor<GlobalMem, Dim2> &biasUnisor,
-                                                                                    Unisor<GlobalMem, Dim1> &saUnisor,
-                                                                                    Unisor<GlobalMem, Dim2> &swUnisor)
+    __aicore__ inline void npu_user_defined_matmul_kernel_slave_Post_Processing_off(Unisor<GlobalMem, Dim2>& C,
+                                                                                    Unisor<GlobalMem, Dim2>& workUnisor,
+                                                                                    Unisor<GlobalMem, Dim2>& biasUnisor,
+                                                                                    Unisor<GlobalMem, Dim1>& saUnisor,
+                                                                                    Unisor<GlobalMem, Dim2>& swUnisor)
     {
         // 注意下面值不一定是16的倍数
         uint32_t pos_Work_M = workUnisor.pos.getAxisByName('M');
@@ -2330,7 +2330,7 @@ public:
     }
 
     __aicore__ inline void InternalRun_off(Unisor<GlobalMem, Dim2> in, Unisor<GlobalMem, Dim2> outHigh,
-                                           Unisor<GlobalMem, Dim2> outLow, Dim2 &baseTiling)
+                                           Unisor<GlobalMem, Dim2> outLow, Dim2& baseTiling)
     {
         uint32_t posM_in = in.pos.getAxisByName('M');
         Dim1 posM(0, 'M');
@@ -2456,7 +2456,7 @@ public:
 
 __aicore__ inline void dynamic_unisor_programming(GM_ADDR gmA, GM_ADDR gmB, GM_ADDR gmC, GM_ADDR gmGrpList,
                                                   GM_ADDR gmBias, GM_ADDR gmOffset, GM_ADDR gmSa, GM_ADDR gmSw,
-                                                  GM_ADDR gmWorkspaceDevice, A8W4HPTiling *tiling_data, TPipe *pipe)
+                                                  GM_ADDR gmWorkspaceDevice, A8W4HPTiling* tiling_data, TPipe* pipe)
 {
     auto ori_in0_shape = tiling_data->ori_in0_shape;
     auto ori_in1_shape = tiling_data->ori_in1_shape;
@@ -2519,7 +2519,7 @@ __aicore__ inline void dynamic_unisor_programming(GM_ADDR gmA, GM_ADDR gmB, GM_A
     float format_out = tiling_data->format_out;
 
     GlobalTensor<uint64_t> groupListGm;
-    groupListGm.SetGlobalBuffer((__gm__ uint64_t *)gmGrpList);
+    groupListGm.SetGlobalBuffer((__gm__ uint64_t*)gmGrpList);
 
     uint32_t true_group_num = 0;
     for (uint32_t group_idx = 0; group_idx < group_num; group_idx++) {
@@ -2719,7 +2719,7 @@ __aicore__ inline void dynamic_unisor_programming(GM_ADDR gmA, GM_ADDR gmB, GM_A
 
 class GMMA4W8AutotilingCompute {
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     GM_ADDR gmA;
     GM_ADDR gmB;
     GM_ADDR gmC;
@@ -2729,12 +2729,12 @@ private:
     GM_ADDR gmSa;
     GM_ADDR gmSw;
     GM_ADDR gmWorkspaceDevice;
-    A8W4HPTiling *tiling_data;
+    A8W4HPTiling* tiling_data;
 
 public:
     __aicore__ inline GMMA4W8AutotilingCompute(GM_ADDR addrA, GM_ADDR addrB, GM_ADDR addrC, GM_ADDR addrGrpList,
                                                GM_ADDR addrBias, GM_ADDR addrOffset, GM_ADDR addrSa, GM_ADDR addrSw,
-                                               GM_ADDR addrWorkspace, A8W4HPTiling *tilingData, TPipe *p)
+                                               GM_ADDR addrWorkspace, A8W4HPTiling* tilingData, TPipe* p)
         : pipe(p),
           gmA(addrA),
           gmB(addrB),

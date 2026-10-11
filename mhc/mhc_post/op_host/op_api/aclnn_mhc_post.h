@@ -30,17 +30,17 @@ extern "C" {
  *                h_{l}^{out} * H_{t}^{post} 表示逐元素相乘后广播到所有维度
  * @domain aclnn_ops_infer
  */
-aclnnStatus aclnnMhcPostGetWorkspaceSize(const aclTensor *x, const aclTensor *hRes, const aclTensor *hOut,
-                                         const aclTensor *hPost, aclTensor *out, uint64_t *workspaceSize,
-                                         aclOpExecutor **executor);
+aclnnStatus aclnnMhcPostGetWorkspaceSize(const aclTensor* x, const aclTensor* hRes, const aclTensor* hOut,
+                                         const aclTensor* hPost, aclTensor* out, uint64_t* workspaceSize,
+                                         aclOpExecutor** executor);
 
 /**
  * @brief aclnnMhcPost的第二段接口，用于执行计算。
  */
-aclnnStatus aclnnMhcPost(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+aclnnStatus aclnnMhcPost(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // OP_API_INC_MHC_POST_H
+#endif // OP_API_INC_MHC_POST_H

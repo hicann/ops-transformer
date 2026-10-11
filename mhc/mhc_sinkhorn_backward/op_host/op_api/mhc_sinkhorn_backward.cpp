@@ -7,7 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
- 
+
 /*!
  * \file mhc_sinkhorn_backward.cpp
  * \brief mhc_sinkhorn_backward
@@ -29,8 +29,8 @@ namespace l0op {
 OP_TYPE_REGISTER(MhcSinkhornBackward);
 
 // AICORE算子kernel
-static const aclTensor *MhcSinkhornBackwardAiCore(const aclTensor *gradOutput, const aclTensor *normOut,
-                                                  const aclTensor *sumOut, aclTensor *out, aclOpExecutor *executor)
+static const aclTensor* MhcSinkhornBackwardAiCore(const aclTensor* gradOutput, const aclTensor* normOut,
+                                                  const aclTensor* sumOut, aclTensor* out, aclOpExecutor* executor)
 {
     L0_DFX(MhcSinkhornBackwardAiCore, gradOutput, normOut, sumOut, out);
     // 使用框架宏 ADD_TO_LAUNCHER_LIST_AICORE，将MhcSinkhornBackward算子加入任务队列
@@ -41,8 +41,8 @@ static const aclTensor *MhcSinkhornBackwardAiCore(const aclTensor *gradOutput, c
     return out;
 }
 
-const aclTensor *MhcSinkhornBackward(const aclTensor *gradOutput, const aclTensor *normOut, const aclTensor *sumOut,
-                                     aclTensor *out, aclOpExecutor *executor)
+const aclTensor* MhcSinkhornBackward(const aclTensor* gradOutput, const aclTensor* normOut, const aclTensor* sumOut,
+                                     aclTensor* out, aclOpExecutor* executor)
 {
     return MhcSinkhornBackwardAiCore(gradOutput, normOut, sumOut, out, executor);
 }

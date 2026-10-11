@@ -33,7 +33,7 @@ class KernelScanTokenInfo {
 public:
     __aicore__ inline KernelScanTokenInfo(){};
     __aicore__ inline void Init(GM_ADDR schedule_context, GM_ADDR token_info_gm_addr, GM_ADDR workspace,
-                                ScheduleContextInfo *scheduleContextInfo, TPipe *tPipe);
+                                ScheduleContextInfo* scheduleContextInfo, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -47,7 +47,7 @@ private:
     uint32_t K = 0;
     uint32_t F = 0;
 
-    TPipe *pipe = nullptr;
+    TPipe* pipe = nullptr;
     GlobalTensor<int32_t> tokenInfoGm;
     GlobalTensor<uint64_t> pollIdxGm;
     TQue<QuePosition::VECIN, BUFFER_NUM_ONE> tokenFlagInQueue;
@@ -66,8 +66,8 @@ __aicore__ inline void KernelScanTokenInfo::CopyInFlag()
 }
 
 __aicore__ inline void KernelScanTokenInfo::Init(GM_ADDR schedule_context, GM_ADDR token_info_gm_addr,
-                                                 GM_ADDR workspace, ScheduleContextInfo *scheduleContextInfo,
-                                                 TPipe *tPipe)
+                                                 GM_ADDR workspace, ScheduleContextInfo* scheduleContextInfo,
+                                                 TPipe* tPipe)
 {
     pipe = tPipe;
     A = scheduleContextInfo->A;
@@ -78,7 +78,7 @@ __aicore__ inline void KernelScanTokenInfo::Init(GM_ADDR schedule_context, GM_AD
     curMicroBatchID = scheduleContextInfo->curMicroBatchID;
 
     GlobalTensor<int32_t> rsvdCntGm;
-    rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace), SCAN_BATCHID_GM_OFFSET);
+    rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace), SCAN_BATCHID_GM_OFFSET);
     if (GetBlockIdx() == 0) {
         InitGlobalMemory(rsvdCntGm, SCAN_BATCHID_GM_OFFSET, 0);
 
@@ -86,7 +86,7 @@ __aicore__ inline void KernelScanTokenInfo::Init(GM_ADDR schedule_context, GM_AD
             workspace + (OFFSET_SORTED_EXPERT_IDS + scheduleContextInfo->sortNumWorkSpace * (NUM_TWO * NUM_FOUR + 1)) *
                             sizeof(int32_t);
         GlobalTensor<int32_t> groupListTmpGm;
-        groupListTmpGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(groupListTmpAddr),
+        groupListTmpGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(groupListTmpAddr),
                                        scheduleContextInfo->expertNum);
         InitGlobalMemory(groupListTmpGm, scheduleContextInfo->expertNum, 0);
 
@@ -100,8 +100,8 @@ __aicore__ inline void KernelScanTokenInfo::Init(GM_ADDR schedule_context, GM_AD
     }
     // 为sort清理的gm,后面天然有 SyncAll,此处不需要
 
-    tokenInfoGm.SetGlobalBuffer((__gm__ int32_t *)token_info_gm_addr, A * M * F);
-    pollIdxGm.SetGlobalBuffer((__gm__ uint64_t *)schedule_context);
+    tokenInfoGm.SetGlobalBuffer((__gm__ int32_t*)token_info_gm_addr, A * M * F);
+    pollIdxGm.SetGlobalBuffer((__gm__ uint64_t*)schedule_context);
 
     pipe->InitBuffer(tokenFlagInQueue, 1, A * BLOCK_SIZE);
     pipe->InitBuffer(workBuf, A * BLOCK_SIZE);

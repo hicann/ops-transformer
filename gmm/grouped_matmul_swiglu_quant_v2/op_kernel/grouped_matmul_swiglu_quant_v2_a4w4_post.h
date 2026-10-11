@@ -29,37 +29,37 @@ class GMMA4W4PostProcess {
 public:
     __aicore__ inline GMMA4W4PostProcess(){};
     __aicore__ inline void Init(const GMAddrParams gmAddrParams,
-                                const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN,
-                                const GMMSwigluQuantV2 *__restrict gmmSwigluIN);
+                                const GMMSwigluQuantV2BaseParams* __restrict gmmSwigluQuantV2BaseParamsIN,
+                                const GMMSwigluQuantV2* __restrict gmmSwigluIN);
 
-    __aicore__ inline void Process(WorkSpaceSplitConfig &workspaceSplitConfig, int64_t workspaceSplitLoopIdx,
-                                   TPipe *pipe);
+    __aicore__ inline void Process(WorkSpaceSplitConfig& workspaceSplitConfig, int64_t workspaceSplitLoopIdx,
+                                   TPipe* pipe);
 
 private:
-    __aicore__ inline void UpdateVecConfig(uint32_t blockIdx, VecConfig &vecConfig,
-                                           WorkSpaceSplitConfig &workspaceSplitConfig, int64_t workspaceSplitLoopIdx,
-                                           TPipe *pipe);
+    __aicore__ inline void UpdateVecConfig(uint32_t blockIdx, VecConfig& vecConfig,
+                                           WorkSpaceSplitConfig& workspaceSplitConfig, int64_t workspaceSplitLoopIdx,
+                                           TPipe* pipe);
 
-    __aicore__ inline void VectorCompute(uint32_t loopIdx, VecConfig &vecConfig,
-                                         WorkSpaceSplitConfig &workspaceSplitConfig);
+    __aicore__ inline void VectorCompute(uint32_t loopIdx, VecConfig& vecConfig,
+                                         WorkSpaceSplitConfig& workspaceSplitConfig);
 
-    __aicore__ inline void customDataCopyIn(uint32_t outLoopIdx, GlobalTensor<half> &mmOutGM, VecConfig &vecConfig,
-                                            WorkSpaceSplitConfig &workspaceSplitConfig);
+    __aicore__ inline void customDataCopyIn(uint32_t outLoopIdx, GlobalTensor<half>& mmOutGM, VecConfig& vecConfig,
+                                            WorkSpaceSplitConfig& workspaceSplitConfig);
 
-    __aicore__ inline void customDataCopyOut(VecConfig &vecConfig, WorkSpaceSplitConfig &workspaceSplitConfig);
+    __aicore__ inline void customDataCopyOut(VecConfig& vecConfig, WorkSpaceSplitConfig& workspaceSplitConfig);
 
-    __aicore__ inline void Quant(uint32_t loopIdx, VecConfig &vecConfig);
+    __aicore__ inline void Quant(uint32_t loopIdx, VecConfig& vecConfig);
 
-    __aicore__ inline void Swiglu(uint32_t loopIdx, VecConfig &vecConfig);
+    __aicore__ inline void Swiglu(uint32_t loopIdx, VecConfig& vecConfig);
 
-    __aicore__ inline void MulPertokenScale(uint32_t loopIdx, VecConfig &vecConfig,
-                                            WorkSpaceSplitConfig &workspaceSplitConfig);
+    __aicore__ inline void MulPertokenScale(uint32_t loopIdx, VecConfig& vecConfig,
+                                            WorkSpaceSplitConfig& workspaceSplitConfig);
 
-    __aicore__ inline void ApplySmoothScale(uint32_t loopIdx, VecConfig &vecConfig,
-                                            WorkSpaceSplitConfig &workspaceSplitConfig);
+    __aicore__ inline void ApplySmoothScale(uint32_t loopIdx, VecConfig& vecConfig,
+                                            WorkSpaceSplitConfig& workspaceSplitConfig);
 
-    const GMMSwigluQuantV2 *__restrict gmmSwigluQuantV2;
-    const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParams;
+    const GMMSwigluQuantV2* __restrict gmmSwigluQuantV2;
+    const GMMSwigluQuantV2BaseParams* __restrict gmmSwigluQuantV2BaseParams;
     GlobalTensor<float> perTokenScaleGM;
     GlobalTensor<int64_t> groupListGM;
     GlobalTensor<float> smoothScaleGM;
@@ -80,8 +80,8 @@ private:
 };
 
 __aicore__ inline void GMMA4W4PostProcess::Init(
-    const GMAddrParams gmAddrParams, const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN,
-    const GMMSwigluQuantV2 *__restrict gmmSwigluIN)
+    const GMAddrParams gmAddrParams, const GMMSwigluQuantV2BaseParams* __restrict gmmSwigluQuantV2BaseParamsIN,
+    const GMMSwigluQuantV2* __restrict gmmSwigluIN)
 {
     if ASCEND_IS_AIV {
         aicCoreNum = GetBlockNum();
@@ -89,22 +89,22 @@ __aicore__ inline void GMMA4W4PostProcess::Init(
         blockIdx = GetBlockIdx();
         gmmSwigluQuantV2BaseParams = gmmSwigluQuantV2BaseParamsIN;
         gmmSwigluQuantV2 = gmmSwigluIN;
-        groupListGM.SetGlobalBuffer((__gm__ int64_t *)gmAddrParams.groupListGM, gmmSwigluQuantV2->groupListLen);
-        mmOutGM1.SetGlobalBuffer((__gm__ half *)((__gm__ int8_t *)gmAddrParams.workSpaceGM));
+        groupListGM.SetGlobalBuffer((__gm__ int64_t*)gmAddrParams.groupListGM, gmmSwigluQuantV2->groupListLen);
+        mmOutGM1.SetGlobalBuffer((__gm__ half*)((__gm__ int8_t*)gmAddrParams.workSpaceGM));
         mmOutGM2.SetGlobalBuffer(
-            (__gm__ half *)((__gm__ int8_t *)gmAddrParams.workSpaceGM + gmAddrParams.workSpaceOffset1));
-        perTokenScaleGM.SetGlobalBuffer((__gm__ float *)gmAddrParams.xScaleGM, gmmSwigluQuantV2BaseParams->M);
-        smoothScaleGM.SetGlobalBuffer((__gm__ float *)gmAddrParams.smoothScaleGM);
+            (__gm__ half*)((__gm__ int8_t*)gmAddrParams.workSpaceGM + gmAddrParams.workSpaceOffset1));
+        perTokenScaleGM.SetGlobalBuffer((__gm__ float*)gmAddrParams.xScaleGM, gmmSwigluQuantV2BaseParams->M);
+        smoothScaleGM.SetGlobalBuffer((__gm__ float*)gmAddrParams.smoothScaleGM);
         quantOutputGM.SetGlobalBuffer(
-            (__gm__ int8_t *)gmAddrParams.yGM,
+            (__gm__ int8_t*)gmAddrParams.yGM,
             gmmSwigluQuantV2BaseParams->M * gmmSwigluQuantV2->tokenLen / SWIGLU_REDUCE_FACTOR);
-        quantScaleOutputGM.SetGlobalBuffer((__gm__ float *)gmAddrParams.yScaleGM, gmmSwigluQuantV2BaseParams->M);
+        quantScaleOutputGM.SetGlobalBuffer((__gm__ float*)gmAddrParams.yScaleGM, gmmSwigluQuantV2BaseParams->M);
     }
 }
 
-__aicore__ inline void GMMA4W4PostProcess::customDataCopyIn(uint32_t outLoopIdx, GlobalTensor<half> &mmOutGM,
-                                                            VecConfig &vecConfig,
-                                                            WorkSpaceSplitConfig &workspaceSplitConfig)
+__aicore__ inline void GMMA4W4PostProcess::customDataCopyIn(uint32_t outLoopIdx, GlobalTensor<half>& mmOutGM,
+                                                            VecConfig& vecConfig,
+                                                            WorkSpaceSplitConfig& workspaceSplitConfig)
 {
     mmLocal_fp16 = mmOutQueue.DeQue<half>();
     mmLocal_fp32 = mmLocal_fp16.ReinterpretCast<float>();
@@ -125,8 +125,8 @@ __aicore__ inline void GMMA4W4PostProcess::customDataCopyIn(uint32_t outLoopIdx,
     vecConfig.curOffset = vecConfig.curIdx * gmmSwigluQuantV2->tokenLen;
 }
 
-__aicore__ inline void GMMA4W4PostProcess::VectorCompute(uint32_t loopIdx, VecConfig &vecConfig,
-                                                         WorkSpaceSplitConfig &workspaceSplitConfig)
+__aicore__ inline void GMMA4W4PostProcess::VectorCompute(uint32_t loopIdx, VecConfig& vecConfig,
+                                                         WorkSpaceSplitConfig& workspaceSplitConfig)
 {
     // 1.perToken反量化
     MulPertokenScale(loopIdx, vecConfig, workspaceSplitConfig);
@@ -140,8 +140,8 @@ __aicore__ inline void GMMA4W4PostProcess::VectorCompute(uint32_t loopIdx, VecCo
     Quant(loopIdx, vecConfig);
 }
 
-__aicore__ inline void GMMA4W4PostProcess::MulPertokenScale(uint32_t loopIdx, VecConfig &vecConfig,
-                                                            WorkSpaceSplitConfig &workspaceSplitConfig)
+__aicore__ inline void GMMA4W4PostProcess::MulPertokenScale(uint32_t loopIdx, VecConfig& vecConfig,
+                                                            WorkSpaceSplitConfig& workspaceSplitConfig)
 {
     if (loopIdx != 0) {
         mmLocal_fp32 = mmOutQueue.DeQue<float>();
@@ -153,7 +153,7 @@ __aicore__ inline void GMMA4W4PostProcess::MulPertokenScale(uint32_t loopIdx, Ve
     PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline void GMMA4W4PostProcess::Swiglu(uint32_t loopIdx, VecConfig &vecConfig)
+__aicore__ inline void GMMA4W4PostProcess::Swiglu(uint32_t loopIdx, VecConfig& vecConfig)
 {
     // 高阶API swiglu
     float beta = 1.0f;
@@ -170,8 +170,8 @@ __aicore__ inline void GMMA4W4PostProcess::Swiglu(uint32_t loopIdx, VecConfig &v
     PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline void GMMA4W4PostProcess::ApplySmoothScale(uint32_t loopIdx, VecConfig &vecConfig,
-                                                            WorkSpaceSplitConfig &workspaceSplitConfig)
+__aicore__ inline void GMMA4W4PostProcess::ApplySmoothScale(uint32_t loopIdx, VecConfig& vecConfig,
+                                                            WorkSpaceSplitConfig& workspaceSplitConfig)
 {
     int64_t smoothScaleDimNum = gmmSwigluQuantV2BaseParams->smoothScaleDimNum;
     int64_t halfTokenLen = gmmSwigluQuantV2->tokenLen / SWIGLU_REDUCE_FACTOR;
@@ -221,7 +221,7 @@ __aicore__ inline void GMMA4W4PostProcess::ApplySmoothScale(uint32_t loopIdx, Ve
     }
 }
 
-__aicore__ inline void GMMA4W4PostProcess::Quant(uint32_t loopIdx, VecConfig &vecConfig)
+__aicore__ inline void GMMA4W4PostProcess::Quant(uint32_t loopIdx, VecConfig& vecConfig)
 {
     uint64_t preOffset = loopIdx * gmmSwigluQuantV2->tokenLen;
     uint64_t halfTokenLen = gmmSwigluQuantV2->tokenLen / BISECT;
@@ -258,9 +258,9 @@ __aicore__ inline void GMMA4W4PostProcess::Quant(uint32_t loopIdx, VecConfig &ve
     quantScaleOutQueue.EnQue(quantScaleLocal);
 }
 
-__aicore__ inline void GMMA4W4PostProcess::UpdateVecConfig(uint32_t blockIdx, VecConfig &vecConfig,
-                                                           WorkSpaceSplitConfig &workspaceSplitConfig,
-                                                           int64_t workspaceSplitLoopIdx, TPipe *pipe)
+__aicore__ inline void GMMA4W4PostProcess::UpdateVecConfig(uint32_t blockIdx, VecConfig& vecConfig,
+                                                           WorkSpaceSplitConfig& workspaceSplitConfig,
+                                                           int64_t workspaceSplitLoopIdx, TPipe* pipe)
 {
     // 第一步 读取grouplist reduceSum 计算总数据个数
     vecConfig.M = workspaceSplitLoopIdx < workspaceSplitConfig.loopCount - 1 ? workspaceSplitConfig.notLastTaskSize :
@@ -317,8 +317,8 @@ __aicore__ inline void GMMA4W4PostProcess::UpdateVecConfig(uint32_t blockIdx, Ve
                                           UB_BLOCK_UNIT_SIZE + UB_BLOCK_UNIT_SIZE);
 }
 
-__aicore__ inline void GMMA4W4PostProcess::Process(WorkSpaceSplitConfig &workspaceSplitConfig,
-                                                   int64_t workspaceSplitLoopIdx, TPipe *pipe)
+__aicore__ inline void GMMA4W4PostProcess::Process(WorkSpaceSplitConfig& workspaceSplitConfig,
+                                                   int64_t workspaceSplitLoopIdx, TPipe* pipe)
 {
     if ASCEND_IS_AIV {
         if (workspaceSplitLoopIdx >= workspaceSplitConfig.loopCount || workspaceSplitLoopIdx < 0) {
@@ -365,8 +365,8 @@ __aicore__ inline void GMMA4W4PostProcess::Process(WorkSpaceSplitConfig &workspa
     }
 }
 
-__aicore__ inline void GMMA4W4PostProcess::customDataCopyOut(VecConfig &vecConfig,
-                                                             WorkSpaceSplitConfig &workspaceSplitConfig)
+__aicore__ inline void GMMA4W4PostProcess::customDataCopyOut(VecConfig& vecConfig,
+                                                             WorkSpaceSplitConfig& workspaceSplitConfig)
 {
     LocalTensor<float> quantScaleLocal = quantScaleOutQueue.DeQue<float>();
     DataCopyParams copyParams_0{1, (uint16_t)(vecConfig.innerLoopNum * sizeof(float)), 0, 0};

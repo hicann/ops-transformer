@@ -8,24 +8,24 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
- #include <array>
- #include <vector>
- #include <iostream>
- #include <string>
- #include <cstdint>
- #include "gtest/gtest.h"
- #include "tikicpulib.h"
- #include "data_utils.h"
- #include "tiling_case_executor.h"
- #include "swin_transformer_ln_qkv_tiling.h"
+#include <array>
+#include <vector>
+#include <iostream>
+#include <string>
+#include <cstdint>
+#include "gtest/gtest.h"
+#include "tikicpulib.h"
+#include "data_utils.h"
+#include "tiling_case_executor.h"
+#include "swin_transformer_ln_qkv_tiling.h"
 
 using namespace std;
 extern "C" __global__ __aicore__ void swin_transformer_ln_qkv(GM_ADDR inputX, GM_ADDR gamma, GM_ADDR beta,
-    GM_ADDR weight, GM_ADDR bias, GM_ADDR query_output, GM_ADDR key_output, GM_ADDR value_output, GM_ADDR workspace,
-    GM_ADDR tiling);
+                                                              GM_ADDR weight, GM_ADDR bias, GM_ADDR query_output,
+                                                              GM_ADDR key_output, GM_ADDR value_output,
+                                                              GM_ADDR workspace, GM_ADDR tiling);
 
-class swin_transformer_ln_qkv_test : public testing::Test
-{
+class swin_transformer_ln_qkv_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -49,7 +49,7 @@ TEST_F(swin_transformer_ln_qkv_test, test_case0)
     size_t key_output_bytesize = 1 * 4 * 64 * 32 * sizeof(half);
     size_t value_output_bytesize = 1 * 4 * 64 * 32 * sizeof(half);
 
-    size_t tiling_data_size = sizeof(SwinTransformerLnQKVTilingData);//280
+    size_t tiling_data_size = sizeof(SwinTransformerLnQKVTilingData); // 280
     uint32_t blockDim = 24;
 
     uint8_t* inputX = (uint8_t*)AscendC::GmAlloc(inputX_bytesize);
@@ -66,8 +66,7 @@ TEST_F(swin_transformer_ln_qkv_test, test_case0)
     char* path_ = get_current_dir_name();
     string path(path_);
 
-    SwinTransformerLnQKVTilingData* tilingDatafromBin =
-        reinterpret_cast<SwinTransformerLnQKVTilingData*>(tiling);
+    SwinTransformerLnQKVTilingData* tilingDatafromBin = reinterpret_cast<SwinTransformerLnQKVTilingData*>(tiling);
 
     TCubeTiling mmTilingParams;
     SwinTransformerLnQKVBaseInfo opBaseInfo;
@@ -145,11 +144,9 @@ TEST_F(swin_transformer_ln_qkv_test, test_case0)
     tilingDatafromBin->mmTilingParams.BatchNum = 0;
     tilingDatafromBin->mmTilingParams.mxTypePara = 0;
 
-
     ICPU_SET_TILING_KEY(0);
-    ICPU_RUN_KF(
-        swin_transformer_ln_qkv, blockDim, inputX, gamma, beta, weight, bias, query_output, key_output, value_output, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(swin_transformer_ln_qkv, blockDim, inputX, gamma, beta, weight, bias, query_output, key_output,
+                value_output, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(inputX);
     AscendC::GmFree(gamma);
@@ -162,5 +159,4 @@ TEST_F(swin_transformer_ln_qkv_test, test_case0)
     AscendC::GmFree(workspace);
     AscendC::GmFree(tiling);
     free(path_);
-
 }

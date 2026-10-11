@@ -39,37 +39,37 @@ extern "C" {
 #endif
 
 struct AclnnMhcPreSinkhornBackwardParams {
-    const aclTensor *gradHin = nullptr;
-    const aclTensor *gradHPost = nullptr;
-    const aclTensor *gradHRes = nullptr;
-    const aclTensor *x = nullptr;
-    const aclTensor *phi = nullptr;
-    const aclTensor *alpha = nullptr;
-    const aclTensor *bias = nullptr;
-    const aclTensor *hPre = nullptr;
-    const aclTensor *hcBeforeNorm = nullptr;
-    const aclTensor *invRms = nullptr;
-    const aclTensor *sumOut = nullptr;
-    const aclTensor *normOut = nullptr;
+    const aclTensor* gradHin = nullptr;
+    const aclTensor* gradHPost = nullptr;
+    const aclTensor* gradHRes = nullptr;
+    const aclTensor* x = nullptr;
+    const aclTensor* phi = nullptr;
+    const aclTensor* alpha = nullptr;
+    const aclTensor* bias = nullptr;
+    const aclTensor* hPre = nullptr;
+    const aclTensor* hcBeforeNorm = nullptr;
+    const aclTensor* invRms = nullptr;
+    const aclTensor* sumOut = nullptr;
+    const aclTensor* normOut = nullptr;
     double hcEps;
 
-    const aclTensor *gradX = nullptr;
-    const aclTensor *gradPhi = nullptr;
-    const aclTensor *gradAlpha = nullptr;
-    const aclTensor *gradBias = nullptr;
+    const aclTensor* gradX = nullptr;
+    const aclTensor* gradPhi = nullptr;
+    const aclTensor* gradAlpha = nullptr;
+    const aclTensor* gradBias = nullptr;
 
-    const aclTensor *gradHinContiguous = nullptr;
-    const aclTensor *gradHPostContiguous = nullptr;
-    const aclTensor *gradHResContiguous = nullptr;
-    const aclTensor *xContiguous = nullptr;
-    const aclTensor *phiContiguous = nullptr;
-    const aclTensor *alphaContiguous = nullptr;
-    const aclTensor *biasContiguous = nullptr;
-    const aclTensor *hPreContiguous = nullptr;
-    const aclTensor *hcBeforeNormContiguous = nullptr;
-    const aclTensor *invRmsContiguous = nullptr;
-    const aclTensor *sumOutContiguous = nullptr;
-    const aclTensor *normOutContiguous = nullptr;
+    const aclTensor* gradHinContiguous = nullptr;
+    const aclTensor* gradHPostContiguous = nullptr;
+    const aclTensor* gradHResContiguous = nullptr;
+    const aclTensor* xContiguous = nullptr;
+    const aclTensor* phiContiguous = nullptr;
+    const aclTensor* alphaContiguous = nullptr;
+    const aclTensor* biasContiguous = nullptr;
+    const aclTensor* hPreContiguous = nullptr;
+    const aclTensor* hcBeforeNormContiguous = nullptr;
+    const aclTensor* invRmsContiguous = nullptr;
+    const aclTensor* sumOutContiguous = nullptr;
+    const aclTensor* normOutContiguous = nullptr;
 };
 
 class AclnnMhcPreSinkhornBackward {
@@ -80,8 +80,8 @@ public:
         return obj;
     }
 
-    AclnnMhcPreSinkhornBackward &SetGradInput(const aclTensor *gradHin, const aclTensor *gradHPost,
-                                              const aclTensor *gradHRes)
+    AclnnMhcPreSinkhornBackward& SetGradInput(const aclTensor* gradHin, const aclTensor* gradHPost,
+                                              const aclTensor* gradHRes)
     {
         obj_.gradHin = gradHin;
         obj_.gradHPost = gradHPost;
@@ -89,8 +89,8 @@ public:
         return *this;
     }
 
-    AclnnMhcPreSinkhornBackward &SetInput(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha,
-                                          const aclTensor *bias)
+    AclnnMhcPreSinkhornBackward& SetInput(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha,
+                                          const aclTensor* bias)
     {
         obj_.x = x;
         obj_.phi = phi;
@@ -99,9 +99,9 @@ public:
         return *this;
     }
 
-    AclnnMhcPreSinkhornBackward &SetForwardInput(const aclTensor *hPre, const aclTensor *hcBeforeNorm,
-                                                 const aclTensor *invRms, const aclTensor *sumOut,
-                                                 const aclTensor *normOut)
+    AclnnMhcPreSinkhornBackward& SetForwardInput(const aclTensor* hPre, const aclTensor* hcBeforeNorm,
+                                                 const aclTensor* invRms, const aclTensor* sumOut,
+                                                 const aclTensor* normOut)
     {
         obj_.hPre = hPre;
         obj_.hcBeforeNorm = hcBeforeNorm;
@@ -111,14 +111,14 @@ public:
         return *this;
     }
 
-    AclnnMhcPreSinkhornBackward &SetAttr(double hcEps)
+    AclnnMhcPreSinkhornBackward& SetAttr(double hcEps)
     {
         obj_.hcEps = hcEps;
         return *this;
     }
 
-    AclnnMhcPreSinkhornBackward &SetOutput(const aclTensor *gradX, const aclTensor *gradPhi, const aclTensor *gradAlpha,
-                                           const aclTensor *gradBias)
+    AclnnMhcPreSinkhornBackward& SetOutput(const aclTensor* gradX, const aclTensor* gradPhi, const aclTensor* gradAlpha,
+                                           const aclTensor* gradBias)
     {
         obj_.gradX = gradX;
         obj_.gradPhi = gradPhi;
@@ -136,7 +136,7 @@ private:
     AclnnMhcPreSinkhornBackwardParams obj_;
 };
 
-static bool CheckInputNotNullImpl(const aclTensor *tensor, const char *name)
+static bool CheckInputNotNullImpl(const aclTensor* tensor, const char* name)
 {
     if (tensor == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "%s tensor is nullptr", name);
@@ -145,7 +145,7 @@ static bool CheckInputNotNullImpl(const aclTensor *tensor, const char *name)
     return true;
 }
 
-static bool CheckTensorFormat(const aclTensor *tensor, const char *name)
+static bool CheckTensorFormat(const aclTensor* tensor, const char* name)
 {
     if (tensor != nullptr && op::IsPrivateFormat(tensor->GetStorageFormat())) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s's format should be ND, but got %s.", name,
@@ -155,7 +155,7 @@ static bool CheckTensorFormat(const aclTensor *tensor, const char *name)
     return true;
 }
 
-static bool CheckFormat(const AclnnMhcPreSinkhornBackwardParams &params)
+static bool CheckFormat(const AclnnMhcPreSinkhornBackwardParams& params)
 {
     return CheckTensorFormat(params.gradHin, "gradHin") && CheckTensorFormat(params.gradHPost, "gradHPost") &&
            CheckTensorFormat(params.gradHRes, "gradHRes") && CheckTensorFormat(params.x, "x") &&
@@ -167,7 +167,7 @@ static bool CheckFormat(const AclnnMhcPreSinkhornBackwardParams &params)
            CheckTensorFormat(params.gradAlpha, "gradAlpha") && CheckTensorFormat(params.gradBias, "gradBias");
 }
 
-static bool CheckNotNull(const AclnnMhcPreSinkhornBackwardParams &params)
+static bool CheckNotNull(const AclnnMhcPreSinkhornBackwardParams& params)
 {
     return CheckInputNotNullImpl(params.gradHin, "gradHin") && CheckInputNotNullImpl(params.gradHPost, "gradHPost") &&
            CheckInputNotNullImpl(params.gradHRes, "gradHRes") && CheckInputNotNullImpl(params.x, "x") &&
@@ -180,7 +180,7 @@ static bool CheckNotNull(const AclnnMhcPreSinkhornBackwardParams &params)
            CheckInputNotNullImpl(params.gradBias, "gradBias");
 }
 
-static bool CheckDimNum(const aclTensor *tensor, size_t expected, const char *name, bool isRange = false,
+static bool CheckDimNum(const aclTensor* tensor, size_t expected, const char* name, bool isRange = false,
                         size_t expected2 = 0)
 {
     auto dimNum = tensor->GetViewShape().GetDimNum();
@@ -195,7 +195,7 @@ static bool CheckDimNum(const aclTensor *tensor, size_t expected, const char *na
     return true;
 }
 
-static bool CheckInputDims(const AclnnMhcPreSinkhornBackwardParams &params)
+static bool CheckInputDims(const AclnnMhcPreSinkhornBackwardParams& params)
 {
     bool is3D = params.x->GetViewShape().GetDimNum() == DIM_NUM_3D;
     if (is3D) {
@@ -224,7 +224,7 @@ static bool CheckInputDims(const AclnnMhcPreSinkhornBackwardParams &params)
            CheckDimNum(params.normOut, DIM_NUM_5D, "normOut");
 }
 
-static bool CheckOutputDims(const AclnnMhcPreSinkhornBackwardParams &params)
+static bool CheckOutputDims(const AclnnMhcPreSinkhornBackwardParams& params)
 {
     bool is3D = params.x->GetViewShape().GetDimNum() == DIM_NUM_3D;
     if (is3D && !Ops::Transformer::AclnnUtil::IsRegbase()) {
@@ -237,12 +237,12 @@ static bool CheckOutputDims(const AclnnMhcPreSinkhornBackwardParams &params)
            CheckDimNum(params.gradBias, DIM_NUM_1D, "gradBias");
 }
 
-static bool CheckInputOutDims(const AclnnMhcPreSinkhornBackwardParams &params)
+static bool CheckInputOutDims(const AclnnMhcPreSinkhornBackwardParams& params)
 {
     return CheckInputDims(params) && CheckOutputDims(params);
 }
 
-static bool CheckShapeDim(const gert::Shape &shape, uint64_t index, uint64_t expected, const char *msg)
+static bool CheckShapeDim(const gert::Shape& shape, uint64_t index, uint64_t expected, const char* msg)
 {
     if (shape.GetDim(index) != expected) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s, and dim %lu must be %lu, actual is %ld", msg, index, expected,
@@ -252,10 +252,10 @@ static bool CheckShapeDim(const gert::Shape &shape, uint64_t index, uint64_t exp
     return true;
 }
 
-static bool CheckShape3D(const AclnnMhcPreSinkhornBackwardParams &params)
+static bool CheckShape3D(const AclnnMhcPreSinkhornBackwardParams& params)
 {
-    auto &xShape = params.x->GetViewShape();
-    auto &gradHInShape = params.gradHin->GetViewShape();
+    auto& xShape = params.x->GetViewShape();
+    auto& gradHInShape = params.gradHin->GetViewShape();
     uint64_t batch = gradHInShape.GetDim(0);
     uint64_t numsResidual = xShape.GetDim(1);
     uint64_t dimen = xShape.GetDim(2);
@@ -267,19 +267,19 @@ static bool CheckShape3D(const AclnnMhcPreSinkhornBackwardParams &params)
     }
 
     uint64_t nD = numsResidual * dimen;
-    auto &phiShape = params.phi->GetViewShape();
+    auto& phiShape = params.phi->GetViewShape();
     uint64_t fusionSize = phiShape.GetDim(0);
     if (!CheckShapeDim(phiShape, 1, nD, "phi tensor second dim must be N*C")) {
         return false;
     }
 
-    auto &gradHPostShape = params.gradHPost->GetViewShape();
+    auto& gradHPostShape = params.gradHPost->GetViewShape();
     if (!CheckShapeDim(gradHPostShape, 0, batch, "gradHPost shape must be [T, N]") ||
         !CheckShapeDim(gradHPostShape, 1, numsResidual, "gradHPost shape must be [T, N]")) {
         return false;
     }
 
-    auto &gradHResShape = params.gradHRes->GetViewShape();
+    auto& gradHResShape = params.gradHRes->GetViewShape();
     if (!CheckShapeDim(gradHResShape, 0, batch, "gradHRes shape must be [T, N, N] or [T, N*N]")) {
         return false;
     }
@@ -294,66 +294,66 @@ static bool CheckShape3D(const AclnnMhcPreSinkhornBackwardParams &params)
         }
     }
 
-    auto &alphaShape = params.alpha->GetViewShape();
+    auto& alphaShape = params.alpha->GetViewShape();
     if (!CheckShapeDim(alphaShape, 0, 3, "alpha tensor shape must be (3)")) {
         return false;
     }
 
-    auto &biasShape = params.bias->GetViewShape();
+    auto& biasShape = params.bias->GetViewShape();
     if (!CheckShapeDim(biasShape, 0, fusionSize, "bias tensor shape must be (2N+N^2)")) {
         return false;
     }
 
-    auto &hPreShape = params.hPre->GetViewShape();
+    auto& hPreShape = params.hPre->GetViewShape();
     if (!CheckShapeDim(hPreShape, 0, batch, "hPre shape must be [T, N]") ||
         !CheckShapeDim(hPreShape, 1, numsResidual, "hPre shape must be [T, N]")) {
         return false;
     }
 
-    auto &hcBeforeNormShape = params.hcBeforeNorm->GetViewShape();
+    auto& hcBeforeNormShape = params.hcBeforeNorm->GetViewShape();
     if (!CheckShapeDim(hcBeforeNormShape, 0, batch, "hcBeforeNorm shape must be [T, 2N+N^2]") ||
         !CheckShapeDim(hcBeforeNormShape, 1, fusionSize, "hcBeforeNorm shape must be [T, 2N+N^2]")) {
         return false;
     }
 
-    auto &invRmsShape = params.invRms->GetViewShape();
+    auto& invRmsShape = params.invRms->GetViewShape();
     if (!CheckShapeDim(invRmsShape, 0, batch, "invRms shape must be [T, 1]") ||
         !CheckShapeDim(invRmsShape, 1, 1, "invRms shape must be [T, 1]")) {
         return false;
     }
 
-    auto &sumOutShape = params.sumOut->GetViewShape();
+    auto& sumOutShape = params.sumOut->GetViewShape();
     if (!CheckShapeDim(sumOutShape, 1, batch, "sumOut shape must be [2*sk_iter_count, T, N]") ||
         !CheckShapeDim(sumOutShape, 2, numsResidual, "sumOut shape must be [2*sk_iter_count, T, N]")) {
         return false;
     }
 
-    auto &normOutShape = params.normOut->GetViewShape();
+    auto& normOutShape = params.normOut->GetViewShape();
     if (!CheckShapeDim(normOutShape, 1, batch, "normOut shape must be [2*sk_iter_count, T, N, N]") ||
         !CheckShapeDim(normOutShape, 2, numsResidual, "normOut shape must be [2*sk_iter_count, T, N, N]") ||
         !CheckShapeDim(normOutShape, 3, numsResidual, "normOut shape must be [2*sk_iter_count, T, N, N]")) {
         return false;
     }
 
-    auto &gradXShape = params.gradX->GetViewShape();
+    auto& gradXShape = params.gradX->GetViewShape();
     if (!CheckShapeDim(gradXShape, 0, batch, "gradX shape must be [T, N, C]") ||
         !CheckShapeDim(gradXShape, 1, numsResidual, "gradX shape must be [T, N, C]") ||
         !CheckShapeDim(gradXShape, 2, dimen, "gradX shape must be [T, N, C]")) {
         return false;
     }
 
-    auto &gradPhiShape = params.gradPhi->GetViewShape();
+    auto& gradPhiShape = params.gradPhi->GetViewShape();
     if (!CheckShapeDim(gradPhiShape, 0, fusionSize, "gradPhi shape must be [2N+N^2, N*C]") ||
         !CheckShapeDim(gradPhiShape, 1, nD, "gradPhi shape must be [2N+N^2, N*C]")) {
         return false;
     }
 
-    auto &gradAlphaShape = params.gradAlpha->GetViewShape();
+    auto& gradAlphaShape = params.gradAlpha->GetViewShape();
     if (!CheckShapeDim(gradAlphaShape, 0, 3, "gradAlpha shape must be (3)")) {
         return false;
     }
 
-    auto &gradBiasShape = params.gradBias->GetViewShape();
+    auto& gradBiasShape = params.gradBias->GetViewShape();
     if (!CheckShapeDim(gradBiasShape, 0, fusionSize, "gradBias shape must be (2N+N^2)")) {
         return false;
     }
@@ -361,9 +361,9 @@ static bool CheckShape3D(const AclnnMhcPreSinkhornBackwardParams &params)
     return true;
 }
 
-static bool CheckShape(const AclnnMhcPreSinkhornBackwardParams &params)
+static bool CheckShape(const AclnnMhcPreSinkhornBackwardParams& params)
 {
-    auto &xShape = params.x->GetViewShape();
+    auto& xShape = params.x->GetViewShape();
     if (xShape.GetDimNum() == 3) {
         if (!Ops::Transformer::AclnnUtil::IsRegbase()) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "3D (TND) input format is only supported on Ascend 950");
@@ -372,7 +372,7 @@ static bool CheckShape(const AclnnMhcPreSinkhornBackwardParams &params)
         return CheckShape3D(params);
     }
 
-    auto &gradHInShape = params.gradHin->GetViewShape();
+    auto& gradHInShape = params.gradHin->GetViewShape();
     uint64_t batch = gradHInShape.GetDim(0);
     uint64_t sequence = gradHInShape.GetDim(1);
     uint64_t dimen = gradHInShape.GetDim(2);
@@ -387,20 +387,20 @@ static bool CheckShape(const AclnnMhcPreSinkhornBackwardParams &params)
     }
 
     uint64_t nD = numsResidual * dimen;
-    auto &phiShape = params.phi->GetViewShape();
+    auto& phiShape = params.phi->GetViewShape();
     uint64_t fusionSize = phiShape.GetDim(0);
     if (!CheckShapeDim(phiShape, 1, nD, "phi tensor second dim must be N*C")) {
         return false;
     }
 
-    auto &gradHPostShape = params.gradHPost->GetViewShape();
+    auto& gradHPostShape = params.gradHPost->GetViewShape();
     if (!CheckShapeDim(gradHPostShape, 0, batch, "gradHPost shape must be [B, S, N]") ||
         !CheckShapeDim(gradHPostShape, 1, sequence, "gradHPost shape must be [B, S, N]") ||
         !CheckShapeDim(gradHPostShape, 2, numsResidual, "gradHPost shape must be [B, S, N]")) {
         return false;
     }
 
-    auto &gradHResShape = params.gradHRes->GetViewShape();
+    auto& gradHResShape = params.gradHRes->GetViewShape();
     if (!CheckShapeDim(gradHResShape, 0, batch, "gradHRes shape must be [B, S, N, N] or [B, S, N*N]") ||
         !CheckShapeDim(gradHResShape, 1, sequence, "gradHRes shape must be [B, S, N, N] or [B, S, N*N]")) {
         return false;
@@ -416,45 +416,45 @@ static bool CheckShape(const AclnnMhcPreSinkhornBackwardParams &params)
         }
     }
 
-    auto &alphaShape = params.alpha->GetViewShape();
+    auto& alphaShape = params.alpha->GetViewShape();
     if (!CheckShapeDim(alphaShape, 0, 3, "alpha tensor shape must be (3)")) {
         return false;
     }
 
-    auto &biasShape = params.bias->GetViewShape();
+    auto& biasShape = params.bias->GetViewShape();
     if (!CheckShapeDim(biasShape, 0, fusionSize, "bias tensor shape must be (2N+N^2)")) {
         return false;
     }
 
-    auto &hPreShape = params.hPre->GetViewShape();
+    auto& hPreShape = params.hPre->GetViewShape();
     if (!CheckShapeDim(hPreShape, 0, batch, "hPre shape must be [B, S, N]") ||
         !CheckShapeDim(hPreShape, 1, sequence, "hPre shape must be [B, S, N]") ||
         !CheckShapeDim(hPreShape, 2, numsResidual, "hPre shape must be [B, S, N]")) {
         return false;
     }
 
-    auto &hcBeforeNormShape = params.hcBeforeNorm->GetViewShape();
+    auto& hcBeforeNormShape = params.hcBeforeNorm->GetViewShape();
     if (!CheckShapeDim(hcBeforeNormShape, 0, batch, "hcBeforeNorm shape must be [B, S, 2N+N^2]") ||
         !CheckShapeDim(hcBeforeNormShape, 1, sequence, "hcBeforeNorm shape must be [B, S, 2N+N^2]") ||
         !CheckShapeDim(hcBeforeNormShape, 2, fusionSize, "hcBeforeNorm shape must be [B, S, 2N+N^2]")) {
         return false;
     }
 
-    auto &invRmsShape = params.invRms->GetViewShape();
+    auto& invRmsShape = params.invRms->GetViewShape();
     if (!CheckShapeDim(invRmsShape, 0, batch, "invRms shape must be [B, S, 1]") ||
         !CheckShapeDim(invRmsShape, 1, sequence, "invRms shape must be [B, S, 1]") ||
         !CheckShapeDim(invRmsShape, 2, 1, "invRms shape must be [B, S, 1]")) {
         return false;
     }
 
-    auto &sumOutShape = params.sumOut->GetViewShape();
+    auto& sumOutShape = params.sumOut->GetViewShape();
     if (!CheckShapeDim(sumOutShape, 1, batch, "sumOut shape must be [2*sk_iter_count, B, S, N]") ||
         !CheckShapeDim(sumOutShape, 2, sequence, "sumOut shape must be [2*sk_iter_count, B, S, N]") ||
         !CheckShapeDim(sumOutShape, 3, numsResidual, "sumOut shape must be [2*sk_iter_count, B, S, N]")) {
         return false;
     }
 
-    auto &normOutShape = params.normOut->GetViewShape();
+    auto& normOutShape = params.normOut->GetViewShape();
     if (!CheckShapeDim(normOutShape, 1, batch, "normOut shape must be [2*sk_iter_count, B, S, N, N]") ||
         !CheckShapeDim(normOutShape, 2, sequence, "normOut shape must be [2*sk_iter_count, B, S, N, N]") ||
         !CheckShapeDim(normOutShape, 3, numsResidual, "normOut shape must be [2*sk_iter_count, B, S, N, N]") ||
@@ -462,7 +462,7 @@ static bool CheckShape(const AclnnMhcPreSinkhornBackwardParams &params)
         return false;
     }
 
-    auto &gradXShape = params.gradX->GetViewShape();
+    auto& gradXShape = params.gradX->GetViewShape();
     if (!CheckShapeDim(gradXShape, 0, batch, "gradX shape must be [B, S, N, C]") ||
         !CheckShapeDim(gradXShape, 1, sequence, "gradX shape must be [B, S, N, C]") ||
         !CheckShapeDim(gradXShape, 2, numsResidual, "gradX shape must be [B, S, N, C]") ||
@@ -470,18 +470,18 @@ static bool CheckShape(const AclnnMhcPreSinkhornBackwardParams &params)
         return false;
     }
 
-    auto &gradPhiShape = params.gradPhi->GetViewShape();
+    auto& gradPhiShape = params.gradPhi->GetViewShape();
     if (!CheckShapeDim(gradPhiShape, 0, fusionSize, "gradPhi shape must be [2N+N^2, N*C]") ||
         !CheckShapeDim(gradPhiShape, 1, nD, "gradPhi shape must be [2N+N^2, N*C]")) {
         return false;
     }
 
-    auto &gradAlphaShape = params.gradAlpha->GetViewShape();
+    auto& gradAlphaShape = params.gradAlpha->GetViewShape();
     if (!CheckShapeDim(gradAlphaShape, 0, 3, "gradAlpha shape must be (3)")) {
         return false;
     }
 
-    auto &gradBiasShape = params.gradBias->GetViewShape();
+    auto& gradBiasShape = params.gradBias->GetViewShape();
     if (!CheckShapeDim(gradBiasShape, 0, fusionSize, "gradBias shape must be (2N+N^2)")) {
         return false;
     }
@@ -489,7 +489,7 @@ static bool CheckShape(const AclnnMhcPreSinkhornBackwardParams &params)
     return true;
 }
 
-static bool CheckDtype(const aclTensor *tensor, DataType expected, const char *name, bool isValidX = false)
+static bool CheckDtype(const aclTensor* tensor, DataType expected, const char* name, bool isValidX = false)
 {
     auto dtype = tensor->GetDataType();
     bool valid = isValidX ? (dtype == DataType::DT_BF16 || dtype == DataType::DT_FLOAT16) : (dtype == expected);
@@ -501,7 +501,7 @@ static bool CheckDtype(const aclTensor *tensor, DataType expected, const char *n
     return true;
 }
 
-static bool CheckInputDtype(const AclnnMhcPreSinkhornBackwardParams &params)
+static bool CheckInputDtype(const AclnnMhcPreSinkhornBackwardParams& params)
 {
     return CheckDtype(params.gradHin, DataType::DT_FLOAT16, "gradHin", true) &&
            CheckDtype(params.gradHPost, DataType::DT_FLOAT, "gradHPost") &&
@@ -515,7 +515,7 @@ static bool CheckInputDtype(const AclnnMhcPreSinkhornBackwardParams &params)
            CheckDtype(params.normOut, DataType::DT_FLOAT, "normOut");
 }
 
-static bool CheckOutputDtype(const AclnnMhcPreSinkhornBackwardParams &params)
+static bool CheckOutputDtype(const AclnnMhcPreSinkhornBackwardParams& params)
 {
     auto gradHInDtype = params.gradHin->GetDataType();
     if (params.gradX->GetDataType() != gradHInDtype) {
@@ -527,12 +527,12 @@ static bool CheckOutputDtype(const AclnnMhcPreSinkhornBackwardParams &params)
            CheckDtype(params.gradBias, DataType::DT_FLOAT, "gradBias");
 }
 
-static bool CheckDtypeValid(const AclnnMhcPreSinkhornBackwardParams &params)
+static bool CheckDtypeValid(const AclnnMhcPreSinkhornBackwardParams& params)
 {
     return CheckInputDtype(params) && CheckOutputDtype(params);
 }
 
-static aclnnStatus CheckParams(const AclnnMhcPreSinkhornBackwardParams &params)
+static aclnnStatus CheckParams(const AclnnMhcPreSinkhornBackwardParams& params)
 {
     // 1. 检查参数是否为空指针
     CHECK_RET(CheckNotNull(params), ACLNN_ERR_PARAM_NULLPTR);
@@ -550,7 +550,7 @@ static aclnnStatus CheckParams(const AclnnMhcPreSinkhornBackwardParams &params)
     CHECK_RET(CheckFormat(params), ACLNN_ERR_PARAM_INVALID);
 
     // 6. 校验N、C取值范围
-    auto &xShape = params.x->GetViewShape();
+    auto& xShape = params.x->GetViewShape();
     bool is3D = xShape.GetDimNum() == 3;
     int64_t nVal = is3D ? xShape.GetDim(1) : xShape.GetDim(2);
     int64_t cVal = is3D ? xShape.GetDim(2) : xShape.GetDim(3);
@@ -573,7 +573,7 @@ static aclnnStatus CheckParams(const AclnnMhcPreSinkhornBackwardParams &params)
     return ACLNN_SUCCESS;
 }
 
-static const aclTensor *ConvertToContiguous(const aclTensor *tensor, aclOpExecutor *executor)
+static const aclTensor* ConvertToContiguous(const aclTensor* tensor, aclOpExecutor* executor)
 {
     auto result = l0op::Contiguous(tensor, executor);
     if (result == nullptr) {
@@ -582,7 +582,7 @@ static const aclTensor *ConvertToContiguous(const aclTensor *tensor, aclOpExecut
     return result;
 }
 
-aclnnStatus MhcSinkhornGradCovertDataContiguous(AclnnMhcPreSinkhornBackwardParams &params, aclOpExecutor *executor)
+aclnnStatus MhcSinkhornGradCovertDataContiguous(AclnnMhcPreSinkhornBackwardParams& params, aclOpExecutor* executor)
 {
     params.gradHinContiguous = ConvertToContiguous(params.gradHin, executor);
     params.gradHPostContiguous = ConvertToContiguous(params.gradHPost, executor);
@@ -607,14 +607,14 @@ aclnnStatus MhcSinkhornGradCovertDataContiguous(AclnnMhcPreSinkhornBackwardParam
     return ACLNN_SUCCESS;
 }
 
-static bool CopyOutput(const aclTensor *out, const aclTensor *dst, aclOpExecutor *executor)
+static bool CopyOutput(const aclTensor* out, const aclTensor* dst, aclOpExecutor* executor)
 {
     auto ret = l0op::ViewCopy(out, dst, executor);
     return ret != nullptr;
 }
 
-static aclnnStatus mhcPreSinkhornBackwardCommonProcess(AclnnMhcPreSinkhornBackwardParams &params,
-                                                       aclOpExecutor *executor)
+static aclnnStatus mhcPreSinkhornBackwardCommonProcess(AclnnMhcPreSinkhornBackwardParams& params,
+                                                       aclOpExecutor* executor)
 {
     auto ret = MhcSinkhornGradCovertDataContiguous(params, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -634,11 +634,11 @@ static aclnnStatus mhcPreSinkhornBackwardCommonProcess(AclnnMhcPreSinkhornBackwa
 }
 
 aclnnStatus aclnnMhcPreSinkhornBackwardGetWorkspaceSize(
-    const aclTensor *gradHin, const aclTensor *gradHPost, const aclTensor *gradHRes, const aclTensor *x,
-    const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias, const aclTensor *hPre,
-    const aclTensor *hcBeforeNorm, const aclTensor *invRms, const aclTensor *sumOut, const aclTensor *normOut,
-    double hcEps, const aclTensor *gradX, const aclTensor *gradPhi, const aclTensor *gradAlpha,
-    const aclTensor *gradBias, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* gradHin, const aclTensor* gradHPost, const aclTensor* gradHRes, const aclTensor* x,
+    const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias, const aclTensor* hPre,
+    const aclTensor* hcBeforeNorm, const aclTensor* invRms, const aclTensor* sumOut, const aclTensor* normOut,
+    double hcEps, const aclTensor* gradX, const aclTensor* gradPhi, const aclTensor* gradAlpha,
+    const aclTensor* gradBias, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(
         aclnnMhcPreSinkhornBackward,
@@ -676,7 +676,7 @@ aclnnStatus aclnnMhcPreSinkhornBackwardGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMhcPreSinkhornBackward(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMhcPreSinkhornBackward(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                         aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMhcPreSinkhornBackward);

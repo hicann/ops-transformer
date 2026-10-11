@@ -37,8 +37,8 @@ struct InitParams {
     GM_ADDR h_mix;
     GM_ADDR h_pre;
     GM_ADDR workspace;
-    TPipe *tPipeIn;
-    const MhcPreTilingData *tilingData;
+    TPipe* tPipeIn;
+    const MhcPreTilingData* tilingData;
 };
 
 struct MatrixInfo {
@@ -141,25 +141,25 @@ __aicore__ inline uint32_t BasicApiRoundUp(uint32_t value)
 }
 
 // Register and tensor data-movement helpers.
-__aicore__ inline void MhcPreBasicApiLoadBroadcast(AscendC::Reg::RegTensor<float> &dst, __local_mem__ float *src,
+__aicore__ inline void MhcPreBasicApiLoadBroadcast(AscendC::Reg::RegTensor<float>& dst, __local_mem__ float* src,
                                                    AscendC::Reg::MaskReg mask, uint32_t offset)
 {
     AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(dst, src + offset);
 }
 
 template <typename T>
-__aicore__ inline void BasicApiCopyToL1(const LocalTensor<T> &srcLocal, const LocalTensor<T> &dstLocal,
-                                        const DataCopyParams &copyParams)
+__aicore__ inline void BasicApiCopyToL1(const LocalTensor<T>& srcLocal, const LocalTensor<T>& dstLocal,
+                                        const DataCopyParams& copyParams)
 {
     DataCopy(dstLocal, srcLocal, copyParams);
 }
 
 template <typename T>
-__aicore__ inline void MhcPreVFCompactRows(const LocalTensor<T> &dstLocal, const LocalTensor<T> &srcLocal,
+__aicore__ inline void MhcPreVFCompactRows(const LocalTensor<T>& dstLocal, const LocalTensor<T>& srcLocal,
                                            uint16_t rowCount, uint32_t srcRowStride, uint32_t rowWidth)
 {
-    __ubuf__ T *dst = (__ubuf__ T *)dstLocal.GetPhyAddr();
-    __ubuf__ T *src = (__ubuf__ T *)srcLocal.GetPhyAddr();
+    __ubuf__ T* dst = (__ubuf__ T*)dstLocal.GetPhyAddr();
+    __ubuf__ T* src = (__ubuf__ T*)srcLocal.GetPhyAddr();
     __VEC_SCOPE__
     {
         Reg::RegTensor<T> data;

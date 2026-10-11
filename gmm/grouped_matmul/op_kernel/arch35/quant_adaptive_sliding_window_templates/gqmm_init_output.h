@@ -21,7 +21,7 @@ using GMMQuantParams = GroupedMatmulTilingData::GMMQuantParams;
 
 namespace AscendC {
 template <typename T>
-__aicore__ inline void GQmmEmptyTensor(GM_ADDR groupListPtr, GM_ADDR y, const GMMQuantParams *__restrict gmmQuantParams,
+__aicore__ inline void GQmmEmptyTensor(GM_ADDR groupListPtr, GM_ADDR y, const GMMQuantParams* __restrict gmmQuantParams,
                                        uint32_t m, uint32_t n)
 {
     if (GetSubBlockIdx() > 1) {
@@ -36,7 +36,7 @@ __aicore__ inline void GQmmEmptyTensor(GM_ADDR groupListPtr, GM_ADDR y, const GM
     GlobalTensor<int64_t> groupListGm;
     LocalTensor<T> initLocal;
     yGm.SetGlobalBuffer(GROUPED_MATMUL::GetTensorAddr<T>(0, y));
-    groupListGm.SetGlobalBuffer((__gm__ int64_t *)groupListPtr);
+    groupListGm.SetGlobalBuffer((__gm__ int64_t*)groupListPtr);
     if (GetSubBlockIdx() == 0) {
         initLocal =
             LocalTensor<T>(TPosition::VECCALC, 0, QuantUtils::MAX_REPEAT_TIMES * QuantUtils::UB_ALIGN_SIZE / sizeof(T));

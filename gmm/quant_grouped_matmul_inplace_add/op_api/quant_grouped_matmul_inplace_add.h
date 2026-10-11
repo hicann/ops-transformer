@@ -13,9 +13,9 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-aclTensor *QuantGroupedMatmulInplaceAdd(const aclTensor *x1, const aclTensor *x2, const aclTensor *scale1Optional,
-                                        const aclTensor *scale2, const aclTensor *groupList, aclTensor *yRef,
-                                        int64_t groupListType, int64_t groupSize, aclOpExecutor *executor);
+aclTensor* QuantGroupedMatmulInplaceAdd(const aclTensor* x1, const aclTensor* x2, const aclTensor* scale1Optional,
+                                        const aclTensor* scale2, const aclTensor* groupList, aclTensor* yRef,
+                                        int64_t groupListType, int64_t groupSize, aclOpExecutor* executor);
 }
 
 #endif

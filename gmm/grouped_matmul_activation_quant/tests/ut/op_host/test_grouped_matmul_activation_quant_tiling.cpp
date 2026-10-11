@@ -93,8 +93,8 @@ struct GroupedMatmulActivationQuantTilingCase {
         ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo)) << "prefix=" << prefix;
         EXPECT_EQ(tilingInfo.tilingKey, expectTilingKey) << "prefix=" << prefix;
         ASSERT_GE(tilingInfo.tilingDataSize, sizeof(GroupedMatmulActivationQuant::GMMActivationQuantTilingDataParams));
-        const auto *tilingData =
-            reinterpret_cast<const GroupedMatmulActivationQuant::GMMActivationQuantTilingDataParams *>(
+        const auto* tilingData =
+            reinterpret_cast<const GroupedMatmulActivationQuant::GMMActivationQuantTilingDataParams*>(
                 tilingInfo.tilingData.get());
         ASSERT_NE(tilingData, nullptr);
         EXPECT_LE(((static_cast<uint64_t>(tilingData->mmTilingData.baseM) + MX_EPILOGUE_AIV_COUNT - 1) /
@@ -142,11 +142,11 @@ private:
         };
     }
 
-    static vector<gert::TilingContextPara::TensorDescription> BuildTensorDescs(const vector<TensorDescParam> &tensors)
+    static vector<gert::TilingContextPara::TensorDescription> BuildTensorDescs(const vector<TensorDescParam>& tensors)
     {
         vector<gert::TilingContextPara::TensorDescription> descs;
         descs.reserve(tensors.size());
-        for (const auto &tensor : tensors) {
+        for (const auto& tensor : tensors) {
             descs.emplace_back(ops::ut::MakeGertStorageShape(tensor.originDims, tensor.storageDims), tensor.dtype,
                                tensor.format);
         }
@@ -154,7 +154,7 @@ private:
     }
 };
 
-vector<GroupedMatmulActivationQuantTilingCase> LoadCases(const string &socVersion)
+vector<GroupedMatmulActivationQuantTilingCase> LoadCases(const string& socVersion)
 {
     vector<GroupedMatmulActivationQuantTilingCase> cases;
     const string csvPath = ops::ut::ResolveCsvPath("test_grouped_matmul_activation_quant_tiling.csv",
@@ -218,14 +218,14 @@ vector<GroupedMatmulActivationQuantTilingCase> LoadCases(const string &socVersio
                                       ops::ut::ParseGeFormat(Trim(items[idx++]))});
             }
             cases.push_back(tc);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
     return cases;
 }
 
-string MakeParamName(const testing::TestParamInfo<GroupedMatmulActivationQuantTilingCase> &info)
+string MakeParamName(const testing::TestParamInfo<GroupedMatmulActivationQuantTilingCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
@@ -236,7 +236,7 @@ namespace GroupedMatmulActivationQuantTilingUT {
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TestGroupedMatmulActivationQuantTiling950);
 
-const vector<GroupedMatmulActivationQuantTilingCase> &GetAscend950Cases()
+const vector<GroupedMatmulActivationQuantTilingCase>& GetAscend950Cases()
 {
     static const vector<GroupedMatmulActivationQuantTilingCase> cases = LoadCases("Ascend950");
     return cases;

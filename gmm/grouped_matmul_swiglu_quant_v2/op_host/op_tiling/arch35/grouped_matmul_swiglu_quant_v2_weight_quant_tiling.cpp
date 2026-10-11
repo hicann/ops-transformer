@@ -21,7 +21,7 @@
 using namespace Ops::Transformer::OpTiling;
 
 namespace {
-static constexpr const char *OP_NAME = "GroupedMatmulSwigluQuantV2";
+static constexpr const char* OP_NAME = "GroupedMatmulSwigluQuantV2";
 } // namespace
 
 namespace optiling {
@@ -52,7 +52,7 @@ constexpr int64_t MAX_GROUP_NUM = 1024;
 constexpr int64_t MX_QUANT_MODE = 2;
 
 template <typename T>
-constexpr T GetOrDefault(const T *ptr, T defaultValue)
+constexpr T GetOrDefault(const T* ptr, T defaultValue)
 {
     return ptr == nullptr ? defaultValue : *ptr;
 }
@@ -80,24 +80,24 @@ bool CheckCoreNum(uint32_t aicNum, uint32_t aivNum)
     return true;
 }
 
-bool GetContext(GMMSQWeightQuantInputParams &params, const gert::TilingContext &context)
+bool GetContext(GMMSQWeightQuantInputParams& params, const gert::TilingContext& context)
 {
     params.opName = context.GetNodeName();
     return true;
 }
 
 // 检查动态TensorList中指定下标的shape是否存在且非空。
-bool CheckDynamicInputShapeNotEmpty(const gert::TilingContext &context, uint32_t inputIndex, uint32_t tensorIndex,
-                                    const char *inputName)
+bool CheckDynamicInputShapeNotEmpty(const gert::TilingContext& context, uint32_t inputIndex, uint32_t tensorIndex,
+                                    const char* inputName)
 {
     const std::string paramName = std::string(inputName) + "[" + std::to_string(tensorIndex) + "]";
-    const auto *shapePtr = context.GetDynamicInputShape(inputIndex, tensorIndex);
+    const auto* shapePtr = context.GetDynamicInputShape(inputIndex, tensorIndex);
     OP_CHECK_IF(
         shapePtr == nullptr,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(OP_NAME, paramName, "nullptr", "Dynamic input shape cannot be nullptr"),
         return false);
 
-    const auto &storageShape = shapePtr->GetStorageShape();
+    const auto& storageShape = shapePtr->GetStorageShape();
     OP_CHECK_IF(
         storageShape.GetShapeSize() == 0,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(OP_NAME, paramName, "shapeSize=0", "Empty tensor is not supported"),
@@ -105,21 +105,21 @@ bool CheckDynamicInputShapeNotEmpty(const gert::TilingContext &context, uint32_t
     return true;
 }
 
-bool IsDynamicInputEmpty(const gert::TilingContext &context, uint32_t index)
+bool IsDynamicInputEmpty(const gert::TilingContext& context, uint32_t index)
 {
-    const auto *shapePtr = context.GetDynamicInputShape(index, 0);
+    const auto* shapePtr = context.GetDynamicInputShape(index, 0);
     if (shapePtr == nullptr) {
         return true;
     }
-    const auto *desc = context.GetDynamicInputDesc(index, 0);
+    const auto* desc = context.GetDynamicInputDesc(index, 0);
     if (desc == nullptr) {
         return true;
     }
-    const auto &storageShape = shapePtr->GetStorageShape();
+    const auto& storageShape = shapePtr->GetStorageShape();
     return storageShape.GetShapeSize() == 0 || storageShape.GetShapeSize() == 1;
 }
 
-uint32_t GetDynamicInputTensorListSize(const gert::TilingContext &context, uint32_t inputIndex)
+uint32_t GetDynamicInputTensorListSize(const gert::TilingContext& context, uint32_t inputIndex)
 {
     uint32_t count = 0;
     for (; count <= MAX_GROUP_NUM; ++count) {
@@ -130,10 +130,10 @@ uint32_t GetDynamicInputTensorListSize(const gert::TilingContext &context, uint3
     return count;
 }
 
-bool CheckDynamicInputDesc(const gert::TilingContext &context, uint32_t inputIndex, uint32_t tensorIndex,
-                           const char *inputName, ge::DataType expectedDtype)
+bool CheckDynamicInputDesc(const gert::TilingContext& context, uint32_t inputIndex, uint32_t tensorIndex,
+                           const char* inputName, ge::DataType expectedDtype)
 {
-    const auto *desc = context.GetDynamicInputDesc(inputIndex, tensorIndex);
+    const auto* desc = context.GetDynamicInputDesc(inputIndex, tensorIndex);
     OP_CHECK_IF(desc == nullptr, OP_LOGE(OP_NAME, "Dynamic input desc of %s[%u] is nullptr.", inputName, tensorIndex),
                 return false);
     OP_CHECK_IF(desc->GetDataType() != expectedDtype,
@@ -144,9 +144,9 @@ bool CheckDynamicInputDesc(const gert::TilingContext &context, uint32_t inputInd
     return true;
 }
 
-bool CheckWeightFormat(const gert::TilingContext &context, uint32_t tensorIndex)
+bool CheckWeightFormat(const gert::TilingContext& context, uint32_t tensorIndex)
 {
-    const auto *desc = context.GetDynamicInputDesc(WEIGHT_INDEX, tensorIndex);
+    const auto* desc = context.GetDynamicInputDesc(WEIGHT_INDEX, tensorIndex);
     OP_CHECK_IF(desc == nullptr, OP_LOGE(OP_NAME, "Dynamic input desc of weight[%u] is nullptr.", tensorIndex),
                 return false);
     auto wFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(desc->GetStorageFormat()));
@@ -158,9 +158,9 @@ bool CheckWeightFormat(const gert::TilingContext &context, uint32_t tensorIndex)
     return true;
 }
 
-bool CheckWeightScaleFormat(const gert::TilingContext &context, uint32_t tensorIndex, const char *opName)
+bool CheckWeightScaleFormat(const gert::TilingContext& context, uint32_t tensorIndex, const char* opName)
 {
-    const auto *desc = context.GetDynamicInputDesc(WEIGHT_SCALE_INDEX, tensorIndex);
+    const auto* desc = context.GetDynamicInputDesc(WEIGHT_SCALE_INDEX, tensorIndex);
     OP_CHECK_IF(desc == nullptr, OP_LOGE(opName, "Dynamic input desc of weightScale[%u] is nullptr.", tensorIndex),
                 return false);
     auto wScaleFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(desc->GetStorageFormat()));
@@ -172,7 +172,7 @@ bool CheckWeightScaleFormat(const gert::TilingContext &context, uint32_t tensorI
     return true;
 }
 
-bool CheckWeightAndScaleListSize(const gert::TilingContext &context, GMMSQWeightQuantInputParams &params)
+bool CheckWeightAndScaleListSize(const gert::TilingContext& context, GMMSQWeightQuantInputParams& params)
 {
     uint32_t weightListSize = GetDynamicInputTensorListSize(context, WEIGHT_INDEX);
     uint32_t weightScaleListSize = GetDynamicInputTensorListSize(context, WEIGHT_SCALE_INDEX);
@@ -185,9 +185,9 @@ bool CheckWeightAndScaleListSize(const gert::TilingContext &context, GMMSQWeight
     return true;
 }
 
-bool CheckTilingDataCapacity(gert::TilingContext &context, uint64_t tilingDataSize)
+bool CheckTilingDataCapacity(gert::TilingContext& context, uint64_t tilingDataSize)
 {
-    const auto *rawTiling = context.GetRawTilingData();
+    const auto* rawTiling = context.GetRawTilingData();
     OP_CHECK_IF(rawTiling == nullptr, OP_LOGE(OP_NAME, "GetRawTilingData can not be empty."), return false);
     OP_CHECK_IF(rawTiling->GetData() == nullptr, OP_LOGE(OP_NAME, "RawTilingData cannot be a null pointer."),
                 return false);
@@ -198,9 +198,9 @@ bool CheckTilingDataCapacity(gert::TilingContext &context, uint64_t tilingDataSi
     return true;
 }
 
-bool CheckContext(gert::TilingContext &context, uint64_t tilingDataSize)
+bool CheckContext(gert::TilingContext& context, uint64_t tilingDataSize)
 {
-    const auto *attrs = context.GetAttrs();
+    const auto* attrs = context.GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(OP_NAME, "Function context.GetAttrs() failed!"), return false);
 
     OP_CHECK_IF(context.GetInputDesc(X_INDEX) == nullptr, OP_LOGE(OP_NAME, "InputDesc x is nullptr."), return false);
@@ -236,7 +236,7 @@ bool CheckContext(gert::TilingContext &context, uint64_t tilingDataSize)
     return CheckTilingDataCapacity(context, tilingDataSize);
 }
 
-bool GetAttrs(GMMSQWeightQuantInputParams &params, const gert::TilingContext &context)
+bool GetAttrs(GMMSQWeightQuantInputParams& params, const gert::TilingContext& context)
 {
     params.wTrans = true;
     params.groupListType = 0;
@@ -245,7 +245,7 @@ bool GetAttrs(GMMSQWeightQuantInputParams &params, const gert::TilingContext &co
     params.quantMode = MX_QUANT_MODE;
     params.quantDtype = static_cast<int64_t>(ge::DataType::DT_FLOAT8_E4M3FN);
 
-    const auto *attrs = context.GetAttrs();
+    const auto* attrs = context.GetAttrs();
     if (attrs == nullptr) {
         return true;
     }
@@ -261,7 +261,7 @@ bool GetAttrs(GMMSQWeightQuantInputParams &params, const gert::TilingContext &co
     return true;
 }
 
-bool CheckAttrs([[maybe_unused]] const gert::TilingContext &context, const GMMSQWeightQuantInputParams &params)
+bool CheckAttrs([[maybe_unused]] const gert::TilingContext& context, const GMMSQWeightQuantInputParams& params)
 {
     if (unlikely(params.dequantMode != MX_QUANT_MODE)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(OP_NAME, "dequantMode", std::to_string(params.dequantMode),
@@ -305,13 +305,13 @@ bool CheckAttrs([[maybe_unused]] const gert::TilingContext &context, const GMMSQ
     return true;
 }
 
-bool CheckDtypes(const gert::TilingContext &context)
+bool CheckDtypes(const gert::TilingContext& context)
 {
-    const auto *xDesc = context.GetInputDesc(X_INDEX);
-    const auto *wDesc = context.GetDynamicInputDesc(WEIGHT_INDEX, 0);
-    const auto *xScaleDesc = context.GetInputDesc(X_SCALE_INDEX);
-    const auto *wScaleDesc = context.GetDynamicInputDesc(WEIGHT_SCALE_INDEX, 0);
-    const auto *groupListDesc = context.GetInputDesc(GROUPLIST_INDEX);
+    const auto* xDesc = context.GetInputDesc(X_INDEX);
+    const auto* wDesc = context.GetDynamicInputDesc(WEIGHT_INDEX, 0);
+    const auto* xScaleDesc = context.GetInputDesc(X_SCALE_INDEX);
+    const auto* wScaleDesc = context.GetDynamicInputDesc(WEIGHT_SCALE_INDEX, 0);
+    const auto* groupListDesc = context.GetInputDesc(GROUPLIST_INDEX);
     OP_CHECK_IF(wDesc == nullptr, OP_LOGE(OP_NAME, "Dynamic input desc of weight[0] is nullptr."), return false);
     OP_CHECK_IF(wScaleDesc == nullptr, OP_LOGE(OP_NAME, "Dynamic input desc of weightScale[0] is nullptr."),
                 return false);
@@ -354,24 +354,24 @@ bool CheckDtypes(const gert::TilingContext &context)
     return true;
 }
 
-bool GetInputs(GMMSQWeightQuantInputParams &params, const gert::TilingContext &context)
+bool GetInputs(GMMSQWeightQuantInputParams& params, const gert::TilingContext& context)
 {
     OP_CHECK_IF(!CheckWeightFormat(context, 0), OP_LOGE(OP_NAME, "Check weight format failed."), return false);
-    const auto *wDesc = context.GetDynamicInputDesc(WEIGHT_INDEX, 0);
+    const auto* wDesc = context.GetDynamicInputDesc(WEIGHT_INDEX, 0);
     OP_CHECK_IF(wDesc == nullptr, OP_LOGE(OP_NAME, "Dynamic input desc of weight[0] is nullptr."), return false);
     params.wFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(wDesc->GetStorageFormat()));
 
-    const auto *xShapePtr = context.GetInputShape(X_INDEX);
+    const auto* xShapePtr = context.GetInputShape(X_INDEX);
     OP_CHECK_IF(!CheckDynamicInputShapeNotEmpty(context, WEIGHT_INDEX, 0, "weight"),
                 OP_LOGE(OP_NAME, "Check dynamic input shape of weight failed."), return false);
     OP_CHECK_IF(!CheckDynamicInputShapeNotEmpty(context, WEIGHT_SCALE_INDEX, 0, "weightScale"),
                 OP_LOGE(OP_NAME, "Check dynamic input shape of weightScale failed."), return false);
-    const auto *wShapePtr = context.GetDynamicInputShape(WEIGHT_INDEX, 0);
+    const auto* wShapePtr = context.GetDynamicInputShape(WEIGHT_INDEX, 0);
     OP_CHECK_IF(xShapePtr == nullptr || wShapePtr == nullptr, OP_LOGE(OP_NAME, "Required input shape is nullptr."),
                 return false);
 
-    const gert::Shape &xShape = xShapePtr->GetOriginShape();
-    const gert::Shape &wShape = wShapePtr->GetOriginShape();
+    const gert::Shape& xShape = xShapePtr->GetOriginShape();
+    const gert::Shape& wShape = wShapePtr->GetOriginShape();
     auto xShapeLen = xShape.GetDimNum();
     auto wShapeLen = wShape.GetDimNum();
     OP_CHECK_IF(!CheckWeightAndScaleListSize(context, params),
@@ -406,23 +406,23 @@ bool GetInputs(GMMSQWeightQuantInputParams &params, const gert::TilingContext &c
     return true;
 }
 
-bool CheckInputFormats(const gert::TilingContext &context, const GMMSQWeightQuantInputParams &params)
+bool CheckInputFormats(const gert::TilingContext& context, const GMMSQWeightQuantInputParams& params)
 {
-    const auto *xDesc = context.GetInputDesc(X_INDEX);
+    const auto* xDesc = context.GetInputDesc(X_INDEX);
     auto xFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(xDesc->GetFormat().GetStorageFormat()));
     if (unlikely(xFormat != ge::FORMAT_ND)) {
         OP_LOGE_FOR_INVALID_FORMAT(OP_NAME, "x", ge::TypeUtils::FormatToSerialString(xFormat), "ND");
         return false;
     }
 
-    const auto *xScaleDesc = context.GetInputDesc(X_SCALE_INDEX);
+    const auto* xScaleDesc = context.GetInputDesc(X_SCALE_INDEX);
     auto xScaleFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(xScaleDesc->GetFormat().GetStorageFormat()));
     if (unlikely(xScaleFormat != ge::FORMAT_ND && xScaleFormat != ge::FORMAT_NCL)) {
         OP_LOGE_FOR_INVALID_FORMAT(OP_NAME, "xScale", ge::TypeUtils::FormatToSerialString(xScaleFormat), "ND or NCL");
         return false;
     }
 
-    const auto *groupListDesc = context.GetInputDesc(GROUPLIST_INDEX);
+    const auto* groupListDesc = context.GetInputDesc(GROUPLIST_INDEX);
     auto groupListFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(groupListDesc->GetFormat().GetStorageFormat()));
     if (unlikely(groupListFormat != ge::FORMAT_ND)) {
         OP_LOGE_FOR_INVALID_FORMAT(OP_NAME, "groupList", ge::TypeUtils::FormatToSerialString(groupListFormat), "ND");
@@ -435,10 +435,10 @@ bool CheckInputFormats(const gert::TilingContext &context, const GMMSQWeightQuan
     return true;
 }
 
-std::string ToShapeString(const std::vector<int64_t> &shape)
+std::string ToShapeString(const std::vector<int64_t>& shape)
 {
     std::string shapeStr("[");
-    const char *sep = "";
+    const char* sep = "";
     for (auto x : shape) {
         shapeStr.append(sep);
         shapeStr.append(std::to_string(x));
@@ -448,7 +448,7 @@ std::string ToShapeString(const std::vector<int64_t> &shape)
     return shapeStr;
 }
 
-bool CheckInputShape(const char *variableName, const gert::Shape &shape, const std::vector<int64_t> &expectedShape)
+bool CheckInputShape(const char* variableName, const gert::Shape& shape, const std::vector<int64_t>& expectedShape)
 {
     auto shapeLen = shape.GetDimNum();
     if (unlikely(shapeLen != expectedShape.size())) {
@@ -469,7 +469,7 @@ bool CheckInputShape(const char *variableName, const gert::Shape &shape, const s
     return true;
 }
 
-bool IsInputShapeValid([[maybe_unused]] gert::TilingContext &context, const GMMSQWeightQuantInputParams &params)
+bool IsInputShapeValid([[maybe_unused]] gert::TilingContext& context, const GMMSQWeightQuantInputParams& params)
 {
     if (unlikely(params.mSize < MIN_M_SIZE)) {
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(OP_NAME, "x", "M=" + std::to_string(params.mSize),
@@ -505,7 +505,7 @@ bool IsInputShapeValid([[maybe_unused]] gert::TilingContext &context, const GMMS
     return true;
 }
 
-bool CheckSingleMultiSingleInputs(gert::TilingContext &context, const GMMSQWeightQuantInputParams &params,
+bool CheckSingleMultiSingleInputs(gert::TilingContext& context, const GMMSQWeightQuantInputParams& params,
                                   int64_t scaleKSize)
 {
     const std::vector<int64_t> expectedWeightShape = {GroupedMatmul::CeilDiv<int64_t>(params.kSize, C0_SIZE),
@@ -514,8 +514,8 @@ bool CheckSingleMultiSingleInputs(gert::TilingContext &context, const GMMSQWeigh
     const std::vector<int64_t> expectedWeightScaleShape = {params.nSize, scaleKSize, MX_INNER_DIM};
     for (int64_t i = 0; i < params.groupNum; ++i) {
         uint32_t tensorIndex = static_cast<uint32_t>(i);
-        auto *curWeightShapePtr = context.GetDynamicInputShape(WEIGHT_INDEX, tensorIndex);
-        auto *curWeightScaleShapePtr = context.GetDynamicInputShape(WEIGHT_SCALE_INDEX, tensorIndex);
+        auto* curWeightShapePtr = context.GetDynamicInputShape(WEIGHT_INDEX, tensorIndex);
+        auto* curWeightScaleShapePtr = context.GetDynamicInputShape(WEIGHT_SCALE_INDEX, tensorIndex);
         OP_CHECK_IF(curWeightShapePtr == nullptr || curWeightScaleShapePtr == nullptr,
                     OP_LOGE(params.opName, "weight or weightScale shape[%ld] should not be null", i), return false);
         OP_CHECK_IF(!CheckDynamicInputShapeNotEmpty(context, WEIGHT_INDEX, tensorIndex, "weight"),
@@ -541,9 +541,9 @@ bool CheckSingleMultiSingleInputs(gert::TilingContext &context, const GMMSQWeigh
 }
 
 // 大函数整改：提取 xScale/groupList/weightScale shape 校验为独立函数
-static bool CheckScaleAndGroupListShapes(gert::TilingContext &context, const GMMSQWeightQuantInputParams &params,
-                                         const gert::Shape &xScaleShape, const gert::Shape &groupListShape,
-                                         const gert::Shape &weightScaleShape)
+static bool CheckScaleAndGroupListShapes(gert::TilingContext& context, const GMMSQWeightQuantInputParams& params,
+                                         const gert::Shape& xScaleShape, const gert::Shape& groupListShape,
+                                         const gert::Shape& weightScaleShape)
 {
     int64_t scaleKSize = GroupedMatmul::CeilDiv<int64_t>(params.kSize, MX_SCALE_BLOCK_SIZE);
     const std::vector<int64_t> expectedXScaleShape = {static_cast<int64_t>(params.mSize), scaleKSize, MX_INNER_DIM};
@@ -560,7 +560,7 @@ static bool CheckScaleAndGroupListShapes(gert::TilingContext &context, const GMM
     return true;
 }
 
-bool CheckInputs(gert::TilingContext &context, const GMMSQWeightQuantInputParams &params)
+bool CheckInputs(gert::TilingContext& context, const GMMSQWeightQuantInputParams& params)
 {
     if (!IsInputShapeValid(context, params)) {
         return false;
@@ -570,22 +570,22 @@ bool CheckInputs(gert::TilingContext &context, const GMMSQWeightQuantInputParams
         return false;
     }
 
-    auto *xScaleShapePtr = context.GetInputShape(X_SCALE_INDEX);
-    auto *groupListShapePtr = context.GetInputShape(GROUPLIST_INDEX);
+    auto* xScaleShapePtr = context.GetInputShape(X_SCALE_INDEX);
+    auto* groupListShapePtr = context.GetInputShape(GROUPLIST_INDEX);
     OP_CHECK_IF(!CheckDynamicInputShapeNotEmpty(context, WEIGHT_INDEX, 0, "weight"),
                 OP_LOGE(OP_NAME, "Check dynamic input shape of weight failed."), return false);
     OP_CHECK_IF(!CheckDynamicInputShapeNotEmpty(context, WEIGHT_SCALE_INDEX, 0, "weightScale"),
                 OP_LOGE(OP_NAME, "Check dynamic input shape of weightScale failed."), return false);
-    auto *weightShapePtr = context.GetDynamicInputShape(WEIGHT_INDEX, 0);
-    auto *weightScaleShapePtr = context.GetDynamicInputShape(WEIGHT_SCALE_INDEX, 0);
+    auto* weightShapePtr = context.GetDynamicInputShape(WEIGHT_INDEX, 0);
+    auto* weightScaleShapePtr = context.GetDynamicInputShape(WEIGHT_SCALE_INDEX, 0);
 
     OP_CHECK_IF(xScaleShapePtr == nullptr, OP_LOGE(OP_NAME, "xScaleShape cannot be null"), return false);
     OP_CHECK_IF(groupListShapePtr == nullptr, OP_LOGE(OP_NAME, "groupListShape cannot be null"), return false);
     OP_CHECK_IF(weightShapePtr == nullptr || weightScaleShapePtr == nullptr,
                 OP_LOGE(OP_NAME, "weightShape or weightScaleShape cannot be null"), return false);
 
-    auto &xScaleShape = xScaleShapePtr->GetOriginShape();
-    auto &groupListShape = groupListShapePtr->GetOriginShape();
+    auto& xScaleShape = xScaleShapePtr->GetOriginShape();
+    auto& groupListShape = groupListShapePtr->GetOriginShape();
 
     int64_t scaleKSize = GroupedMatmul::CeilDiv<int64_t>(params.kSize, MX_SCALE_BLOCK_SIZE);
     const std::vector<int64_t> expectedXScaleShape = {static_cast<int64_t>(params.mSize), scaleKSize, MX_INNER_DIM};
@@ -601,7 +601,7 @@ bool CheckInputs(gert::TilingContext &context, const GMMSQWeightQuantInputParams
     }
 
     if (params.wFormat == ge::FORMAT_FRACTAL_NZ || params.wFormat == ge::FORMAT_FRACTAL_NZ_C0_32) {
-        const gert::Shape &wStorageShape = weightShapePtr->GetStorageShape();
+        const gert::Shape& wStorageShape = weightShapePtr->GetStorageShape();
         const std::vector<int64_t> expectedWeightShape = {
             static_cast<int64_t>(params.groupNum), GroupedMatmul::CeilDiv<int64_t>(params.kSize, C0_SIZE),
             GroupedMatmul::CeilDiv<int64_t>(params.nSize, CUBE_BLOCK), CUBE_BLOCK, C0_SIZE};
@@ -610,11 +610,11 @@ bool CheckInputs(gert::TilingContext &context, const GMMSQWeightQuantInputParams
         }
     }
 
-    auto &weightScaleShape = weightScaleShapePtr->GetOriginShape();
+    auto& weightScaleShape = weightScaleShapePtr->GetOriginShape();
     return CheckScaleAndGroupListShapes(context, params, xScaleShape, groupListShape, weightScaleShape);
 }
 
-void PrintInputParams(gert::TilingContext &context, const GMMSQWeightQuantInputParams &params)
+void PrintInputParams(gert::TilingContext& context, const GMMSQWeightQuantInputParams& params)
 {
     OP_LOGD(context.GetNodeName(),
             "Input params: mSize=%lld, kSize=%lld, nSize=%lld, groupNum=%lld, "
@@ -631,7 +631,7 @@ bool GroupedMatmulSwigluQuantV2WeightQuantTiling::IsCapable()
 
 ge::graphStatus GroupedMatmulSwigluQuantV2WeightQuantTiling::GetPlatformInfo()
 {
-    const auto *compileInfoPtr = context_->GetCompileInfo<GMMSwigluV2CompileInfo>();
+    const auto* compileInfoPtr = context_->GetCompileInfo<GMMSwigluV2CompileInfo>();
     OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(OP_NAME, "CompileInfo is null"), return ge::GRAPH_FAILED);
     compileInfoPtr_ = compileInfoPtr;
     OP_LOGI(context_, "Compile info: aicNum(%u) aivNum(%u) ubSize(%llu) baseM(%u) baseN(%u) supportL12BtBf16(%s).",
@@ -705,7 +705,7 @@ uint64_t GroupedMatmulSwigluQuantV2WeightQuantTiling::GetTilingKey() const
 
 ge::graphStatus GroupedMatmulSwigluQuantV2WeightQuantTiling::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(workspaces == nullptr, OP_LOGE(OP_NAME, "workspaces is nullptr."), return ge::GRAPH_FAILED);
     workspaces[0] = SYS_WORKSPACE_SIZE;
     return ge::GRAPH_SUCCESS;
@@ -717,10 +717,10 @@ ge::graphStatus GroupedMatmulSwigluQuantV2WeightQuantTiling::PostTiling()
             sizeof(tilingData_));
 
     context_->SetBlockDim(tilingData_.coreNum);
-    auto *rawTiling = context_->GetRawTilingData();
+    auto* rawTiling = context_->GetRawTilingData();
     OP_CHECK_IF(rawTiling == nullptr, OP_LOGE(OP_NAME, "RawTilingData is nullptr."), return ge::GRAPH_FAILED);
-    errno_t ret = memcpy_s(rawTiling->GetData(), rawTiling->GetCapacity(), static_cast<void *>(&tilingData_),
-                           sizeof(tilingData_));
+    errno_t ret =
+        memcpy_s(rawTiling->GetData(), rawTiling->GetCapacity(), static_cast<void*>(&tilingData_), sizeof(tilingData_));
     if (ret != EOK) {
         OP_LOGE(OP_NAME, "memcpy_s failed, ret = %d", static_cast<int>(ret));
         return ge::GRAPH_FAILED;
@@ -734,7 +734,7 @@ ge::graphStatus GroupedMatmulSwigluQuantV2WeightQuantTiling::PostTiling()
 void GroupedMatmulSwigluQuantV2WeightQuantTiling::Reset()
 {
     tilingData_ = GMMSQArch35Tiling::GMMSQWeightQuantTilingData();
-    auto *rawTiling = context_->GetRawTilingData();
+    auto* rawTiling = context_->GetRawTilingData();
     if (rawTiling == nullptr || rawTiling->GetData() == nullptr) {
         return;
     }

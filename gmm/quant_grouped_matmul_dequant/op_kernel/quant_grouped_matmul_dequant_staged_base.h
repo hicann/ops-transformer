@@ -189,46 +189,45 @@ protected:
                                                    GM_ADDR bias, GM_ADDR x_scale, GM_ADDR x_offset,
                                                    GM_ADDR smooth_scale, GM_ADDR y, GM_ADDR usrWorkspace)
     {
-        xGm.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(x), tilingData->originM * tilingData->originK);
-        quantizedWeightGm.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(quantized_weight),
+        xGm.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(x), tilingData->originM * tilingData->originK);
+        quantizedWeightGm.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(quantized_weight),
                                           tilingData->fracK * tilingData->fracN * K_FRACTAL_INT8 * NM_FRACTAL_INT8);
         if (tilingData->smoothScale) {
-            smoothScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(smooth_scale), tilingData->originK);
+            smoothScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(smooth_scale), tilingData->originK);
         }
         isWScaleInt64 = (ORIG_DTYPE_WEIGHT_SCALE == DT_INT64);
         if (isWScaleInt64) {
-            wScaleGmInt64.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(weight_scale), tilingData->originN);
+            wScaleGmInt64.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(weight_scale), tilingData->originN);
         } else {
-            wScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(weight_scale), tilingData->originN);
+            wScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(weight_scale), tilingData->originN);
         }
-        yGm.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(y), tilingData->originM * tilingData->originN);
+        yGm.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(y), tilingData->originM * tilingData->originN);
 
         if (tilingData->dynamicQuant) {
-            xScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(usrWorkspace),
+            xScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(usrWorkspace),
                                      tilingData->originM * FLOAT_PERBLOCK);
             usrWorkspace += tilingData->originM * BLOCK_SIZE;
         } else {
             if (tilingData->perToken) {
-                xScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(x_scale), tilingData->originM);
+                xScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(x_scale), tilingData->originM);
             } else {
                 isXScaleHalf = (tilingData->isXScaleHalf == 1);
                 if (isXScaleHalf) {
-                    xScaleGmHalf.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(x_scale), 1);
+                    xScaleGmHalf.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(x_scale), 1);
                     x_scale_dequant = static_cast<float>(xScaleGmHalf.GetValue(0));
                     x_scale_quant = FLOAT_1 / x_scale_dequant;
                 } else {
-                    xScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(x_scale), 1);
+                    xScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(x_scale), 1);
                     x_scale_dequant = xScaleGm.GetValue(0);
                     x_scale_quant = x_scale_dequant == 0 ? FLOAT_1 : FLOAT_1 / x_scale_dequant;
                 }
             }
         }
-        syncGmWs.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(usrWorkspace),
-                                 tilingData->CoreNum * FLOAT_PERBLOCK);
-        syncGmWsSelf.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(usrWorkspace + block_id * BLOCK_SIZE),
+        syncGmWs.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(usrWorkspace), tilingData->CoreNum * FLOAT_PERBLOCK);
+        syncGmWsSelf.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(usrWorkspace + block_id * BLOCK_SIZE),
                                      FLOAT_PERBLOCK);
     }
-    __aicore__ inline void InitCommonLocalTensors(LocalTensor<uint8_t> &ub)
+    __aicore__ inline void InitCommonLocalTensors(LocalTensor<uint8_t>& ub)
     {
         syncUbWs = ub.ReinterpretCast<int32_t>();
         syncUbWsSelf = syncUbWs[block_id * FLOAT_PERBLOCK];
@@ -338,7 +337,7 @@ protected:
     LocalTensor<half> dynamicScale[NUMBER_2];
     LocalTensor<float> dynamicScaleFloat[NUMBER_2];
 
-    const QuantGroupedMatmulDequantTilingData *__restrict tilingData;
+    const QuantGroupedMatmulDequantTilingData* __restrict tilingData;
 
     event_t eventIdMTE3ToV[NUMBER_2];
     event_t eventIdMTE2ToV[1];

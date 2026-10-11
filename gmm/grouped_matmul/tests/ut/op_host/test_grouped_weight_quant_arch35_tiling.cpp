@@ -78,22 +78,22 @@ size_t GetConfiguredSize(int64_t configuredSize, size_t defaultSize)
     return configuredSize == DEFAULT_DYNAMIC_SIZE ? defaultSize : static_cast<size_t>(configuredSize);
 }
 
-size_t GetNumWeight(const MxA8W4SmsTilingParam &param)
+size_t GetNumWeight(const MxA8W4SmsTilingParam& param)
 {
     return GetConfiguredSize(param.numWeight, param.groupNum);
 }
 
-size_t GetNumAntiquantScale(const MxA8W4SmsTilingParam &param)
+size_t GetNumAntiquantScale(const MxA8W4SmsTilingParam& param)
 {
     return GetConfiguredSize(param.numAntiquantScale, GetNumWeight(param));
 }
 
-size_t GetNumBias(const MxA8W4SmsTilingParam &param)
+size_t GetNumBias(const MxA8W4SmsTilingParam& param)
 {
     return GetConfiguredSize(param.numBias, param.hasBias ? GetNumWeight(param) : 0U);
 }
 
-size_t GetGroupListSize(const MxA8W4SmsTilingParam &param)
+size_t GetGroupListSize(const MxA8W4SmsTilingParam& param)
 {
     return GetConfiguredSize(param.groupListSize, GetNumWeight(param));
 }
@@ -114,7 +114,7 @@ optiling::GMMCompileInfo MakeArch35CompileInfo()
     };
 }
 
-std::vector<OpAttr> MakeMxA8W4SmsAttrs(const MxA8W4SmsTilingParam &param)
+std::vector<OpAttr> MakeMxA8W4SmsAttrs(const MxA8W4SmsTilingParam& param)
 {
     return {
         {"split_item", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.splitItem)},
@@ -128,33 +128,33 @@ std::vector<OpAttr> MakeMxA8W4SmsAttrs(const MxA8W4SmsTilingParam &param)
     };
 }
 
-TensorDescription MakeTensorDesc(const std::vector<int64_t> &originShape, const std::vector<int64_t> &storageShape,
+TensorDescription MakeTensorDesc(const std::vector<int64_t>& originShape, const std::vector<int64_t>& storageShape,
                                  ge::DataType dtype, ge::Format format)
 {
     return {ops::ut::MakeGertStorageShape(originShape, storageShape), dtype, format};
 }
 
-TensorDescription MakeTensorDesc(const std::vector<int64_t> &shape, ge::DataType dtype, ge::Format format)
+TensorDescription MakeTensorDesc(const std::vector<int64_t>& shape, ge::DataType dtype, ge::Format format)
 {
     return {ops::ut::MakeGertStorageShape(shape), dtype, format};
 }
 
-std::vector<int64_t> MakeDefaultWeightShape(const MxA8W4SmsTilingParam &param)
+std::vector<int64_t> MakeDefaultWeightShape(const MxA8W4SmsTilingParam& param)
 {
     return {static_cast<int64_t>(param.k / 32), static_cast<int64_t>(param.n / 16), 16, 32};
 }
 
-std::vector<int64_t> MakeDefaultAntiquantScaleShape(const MxA8W4SmsTilingParam &param)
+std::vector<int64_t> MakeDefaultAntiquantScaleShape(const MxA8W4SmsTilingParam& param)
 {
     return {static_cast<int64_t>(param.n), static_cast<int64_t>(param.k / 64), 2};
 }
 
-std::vector<int64_t> MakeDefaultPerTokenScaleShape(const MxA8W4SmsTilingParam &param)
+std::vector<int64_t> MakeDefaultPerTokenScaleShape(const MxA8W4SmsTilingParam& param)
 {
     return {static_cast<int64_t>(param.m), static_cast<int64_t>(param.k / 64), 2};
 }
 
-std::vector<TensorDescription> MakeMxA8W4SmsInputs(const MxA8W4SmsTilingParam &param)
+std::vector<TensorDescription> MakeMxA8W4SmsInputs(const MxA8W4SmsTilingParam& param)
 {
     const size_t numX = GetConfiguredSize(param.numX, 1U);
     const size_t numWeight = GetNumWeight(param);
@@ -204,7 +204,7 @@ std::vector<TensorDescription> MakeMxA8W4SmsInputs(const MxA8W4SmsTilingParam &p
     return inputs;
 }
 
-std::vector<uint32_t> MakeMxA8W4SmsInputInstanceNums(const MxA8W4SmsTilingParam &param)
+std::vector<uint32_t> MakeMxA8W4SmsInputInstanceNums(const MxA8W4SmsTilingParam& param)
 {
     return {static_cast<uint32_t>(GetConfiguredSize(param.numX, 1U)),
             static_cast<uint32_t>(GetNumWeight(param)),
@@ -217,7 +217,7 @@ std::vector<uint32_t> MakeMxA8W4SmsInputInstanceNums(const MxA8W4SmsTilingParam 
             1U};
 }
 
-gert::TilingContextPara MakeMxA8W4SmsContext(const MxA8W4SmsTilingParam &param, optiling::GMMCompileInfo *compileInfo)
+gert::TilingContextPara MakeMxA8W4SmsContext(const MxA8W4SmsTilingParam& param, optiling::GMMCompileInfo* compileInfo)
 {
     return gert::TilingContextPara(
         "GroupedMatmul", MakeMxA8W4SmsInputs(param),
@@ -268,22 +268,22 @@ uint64_t MakeExpectedMxA8W4TilingKey(bool isSingleMultiSingle)
     return tilingKey;
 }
 
-const GMMWeightQuantTilingData *GetGMMWeightQuantTilingData(const TilingInfo &tilingInfo)
+const GMMWeightQuantTilingData* GetGMMWeightQuantTilingData(const TilingInfo& tilingInfo)
 {
     EXPECT_EQ(tilingInfo.tilingDataSize, sizeof(GMMWeightQuantTilingData));
-    return reinterpret_cast<const GMMWeightQuantTilingData *>(tilingInfo.tilingData.get());
+    return reinterpret_cast<const GMMWeightQuantTilingData*>(tilingInfo.tilingData.get());
 }
 
-bool RunMxA8W4SmsTiling(const MxA8W4SmsTilingParam &param, TilingInfo &tilingInfo)
+bool RunMxA8W4SmsTiling(const MxA8W4SmsTilingParam& param, TilingInfo& tilingInfo)
 {
     auto compileInfo = MakeArch35CompileInfo();
     auto tilingContextPara = MakeMxA8W4SmsContext(param, &compileInfo);
     return ExecuteTiling(tilingContextPara, tilingInfo);
 }
 
-void ExpectMxA8W4SmsTilingData(const TilingInfo &tilingInfo, const MxA8W4SmsTilingParam &param)
+void ExpectMxA8W4SmsTilingData(const TilingInfo& tilingInfo, const MxA8W4SmsTilingParam& param)
 {
-    const auto *tilingData = GetGMMWeightQuantTilingData(tilingInfo);
+    const auto* tilingData = GetGMMWeightQuantTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->gmmWeightQuantParam.groupNum, static_cast<uint32_t>(GetNumWeight(param)));
     EXPECT_EQ(tilingData->gmmWeightQuantParam.kSize, static_cast<uint64_t>(param.k));
@@ -302,7 +302,7 @@ void ExpectMxA8W4SmsTilingData(const TilingInfo &tilingInfo, const MxA8W4SmsTili
     }
 }
 
-void ExpectMxA8W4SmsTilingSuccess(const MxA8W4SmsTilingParam &param)
+void ExpectMxA8W4SmsTilingSuccess(const MxA8W4SmsTilingParam& param)
 {
     TilingInfo tilingInfo;
     ASSERT_TRUE(RunMxA8W4SmsTiling(param, tilingInfo));
@@ -310,13 +310,13 @@ void ExpectMxA8W4SmsTilingSuccess(const MxA8W4SmsTilingParam &param)
     ExpectMxA8W4SmsTilingData(tilingInfo, param);
 }
 
-void ExpectMxA8W4SmsTilingFailure(const MxA8W4SmsTilingParam &param)
+void ExpectMxA8W4SmsTilingFailure(const MxA8W4SmsTilingParam& param)
 {
     TilingInfo tilingInfo;
     EXPECT_FALSE(RunMxA8W4SmsTiling(param, tilingInfo));
 }
 
-gert::TilingContextPara MakeMxA8W4SssContext(optiling::GMMCompileInfo *compileInfo)
+gert::TilingContextPara MakeMxA8W4SssContext(optiling::GMMCompileInfo* compileInfo)
 {
     constexpr size_t m = 64;
     constexpr size_t k = 128;
@@ -399,7 +399,7 @@ TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_mxa8w4_sms_n_tail_re
     ASSERT_TRUE(RunMxA8W4SmsTiling(param, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, static_cast<int64_t>(MakeExpectedMxA8W4TilingKey(true)));
     ExpectMxA8W4SmsTilingData(tilingInfo, param);
-    const auto *tilingData = GetGMMWeightQuantTilingData(tilingInfo);
+    const auto* tilingData = GetGMMWeightQuantTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->gmmWeightQuantParam.mainBlockSize, optiling::BASIC_BLOCK_BASE_N);
     EXPECT_GE(tilingData->gmmWeightQuantParam.firstTailBlockSize, optiling::BASIC_BLOCK_BASE_N_MIN);
@@ -428,7 +428,7 @@ TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_mxa8w4_sss_tiling_ke
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, static_cast<int64_t>(MakeExpectedMxA8W4TilingKey(false)));
     EXPECT_NE(tilingInfo.tilingKey, static_cast<int64_t>(MakeExpectedMxA8W4TilingKey(true)));
-    const auto *tilingData = GetGMMWeightQuantTilingData(tilingInfo);
+    const auto* tilingData = GetGMMWeightQuantTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->gmmWeightQuantParam.groupNum, 2);
     EXPECT_EQ(tilingData->gmmWeightQuantParam.singleX, 1);

@@ -25,12 +25,12 @@ class FFNBase {
 protected:
     using Btype = typename mm1Type::BT;
 
-    const FFNTilingData *__restrict tilingData;
+    const FFNTilingData* __restrict tilingData;
     // define matmul
-    typename mm1Type::MT &mm1;
-    typename mm2Type::MT &mm2;
+    typename mm1Type::MT& mm1;
+    typename mm2Type::MT& mm2;
 
-    TPipe *pipe;
+    TPipe* pipe;
     GlobalTensor<T> xGm;
     GlobalTensor<int64_t> expertTokensGm;
     GlobalTensor<T> weight1Gm;
@@ -67,7 +67,7 @@ protected:
 
 public:
     /** @brief constructor */
-    __aicore__ inline FFNBase(typename mm1Type::MT &mm1_, typename mm2Type::MT &mm2_)
+    __aicore__ inline FFNBase(typename mm1Type::MT& mm1_, typename mm2Type::MT& mm2_)
         : mm1(mm1_),
           mm2(mm2_)
     {}
@@ -83,10 +83,10 @@ public:
      * @param tiling: tiling pointer.
      * @param tPipe: memory manager.
      */
-    __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
-                                __gm__ uint8_t *expertTokens, __gm__ uint8_t *bias1, __gm__ uint8_t *bias2,
-                                __gm__ uint8_t *y, __gm__ uint8_t *workspace, const FFNTilingData *__restrict tiling,
-                                TPipe *tPipe)
+    __aicore__ inline void Init(__gm__ uint8_t* x, __gm__ uint8_t* weight1, __gm__ uint8_t* weight2,
+                                __gm__ uint8_t* expertTokens, __gm__ uint8_t* bias1, __gm__ uint8_t* bias2,
+                                __gm__ uint8_t* y, __gm__ uint8_t* workspace, const FFNTilingData* __restrict tiling,
+                                TPipe* tPipe)
     {
         blockIdx = GetBlockIdx();
         subBlockIdx = GetSubBlockIdx();
@@ -96,20 +96,20 @@ public:
         InitTilingData();
 
         // init global buffer
-        xGm.SetGlobalBuffer((__gm__ T *)x);
-        weight1Gm.SetGlobalBuffer((__gm__ T *)weight1);
+        xGm.SetGlobalBuffer((__gm__ T*)x);
+        weight1Gm.SetGlobalBuffer((__gm__ T*)weight1);
         if (bias1 != nullptr) {
             hasBias1 = true;
-            bias1Gm.SetGlobalBuffer((__gm__ BiasT *)bias1);
+            bias1Gm.SetGlobalBuffer((__gm__ BiasT*)bias1);
         }
-        weight2Gm.SetGlobalBuffer((__gm__ T *)weight2);
+        weight2Gm.SetGlobalBuffer((__gm__ T*)weight2);
         if (bias2 != nullptr) {
             hasBias2 = true;
-            bias2Gm.SetGlobalBuffer((__gm__ BiasT *)bias2);
+            bias2Gm.SetGlobalBuffer((__gm__ BiasT*)bias2);
         }
-        yGm.SetGlobalBuffer((__gm__ T *)y);
-        mm1WorkspaceGm.SetGlobalBuffer((__gm__ c1T *)workspace);
-        mm2WorkspaceGm.SetGlobalBuffer((__gm__ T *)(workspace + tilingData->ffnBaseParams.workspace1Size));
+        yGm.SetGlobalBuffer((__gm__ T*)y);
+        mm1WorkspaceGm.SetGlobalBuffer((__gm__ c1T*)workspace);
+        mm2WorkspaceGm.SetGlobalBuffer((__gm__ T*)(workspace + tilingData->ffnBaseParams.workspace1Size));
 
         uint32_t ubCalSize = tilingData->ffnSingleCoreParams.ubCalSize;
         pipe->InitBuffer(vecInQueue, 1, ubCalSize * sizeof(c1T));
@@ -140,7 +140,7 @@ protected:
         ubBaseN = tilingData->ffnSingleCoreParams.baseN1;
     }
 
-    __aicore__ inline bool CheckSyncBeforeMM1(MNConfig &mnConfig, uint32_t maxMM1ExpertParallelism,
+    __aicore__ inline bool CheckSyncBeforeMM1(MNConfig& mnConfig, uint32_t maxMM1ExpertParallelism,
                                               uint32_t maxMM2ExpertParallelism)
     {
         UpdateKernelTilingInfo info{n1, n2, expertNum, maxMM1ExpertParallelism};
@@ -152,7 +152,7 @@ protected:
         return minMM2UsedCubeCore < maxMM1UsedCubeCore;
     }
 
-    __aicore__ inline void SyncBeforeMM1(bool waitIterateAll, bool &mm2WaitStatus, bool &firstMM1)
+    __aicore__ inline void SyncBeforeMM1(bool waitIterateAll, bool& mm2WaitStatus, bool& firstMM1)
     {
         if (mm2WaitStatus) {
             mm2.WaitIterateAll();
@@ -168,7 +168,7 @@ protected:
         }
     }
 
-    __aicore__ inline void MM1Compute(MNConfig &mnConfig, uint32_t baseBlockIdx, uint32_t expertIdx,
+    __aicore__ inline void MM1Compute(MNConfig& mnConfig, uint32_t baseBlockIdx, uint32_t expertIdx,
                                       uint32_t tokensOffset, uint32_t outRowOffset)
     {
         uint32_t mIdx = baseBlockIdx / mnConfig.blockDimN;
@@ -364,8 +364,8 @@ protected:
         vecOutQueue.template EnQue<T>(activeResUb);
     }
 
-    __aicore__ inline void MM1Process(ExpertParallInfo &mm1ExpertParallInfo, bool waitIterateAll, MNConfig &mnConfig,
-                                      bool &mm2WaitStatus, bool &firstMM1)
+    __aicore__ inline void MM1Process(ExpertParallInfo& mm1ExpertParallInfo, bool waitIterateAll, MNConfig& mnConfig,
+                                      bool& mm2WaitStatus, bool& firstMM1)
     {
         uint32_t coreNumEachExpert = maxCoreNum / mm1ExpertParallInfo.expertParallelism;
         mnConfig.SetConstriant(tokens, n1, tilingData->mm1TilingData.baseM, tilingData->mm1TilingData.baseN,
@@ -393,7 +393,7 @@ protected:
     }
 
     template <bool sync = false>
-    __aicore__ inline void MM2Compute(MNConfig &mnConfig, uint32_t baseBlockIdx, uint32_t expertIdx,
+    __aicore__ inline void MM2Compute(MNConfig& mnConfig, uint32_t baseBlockIdx, uint32_t expertIdx,
                                       uint32_t tokensRowOffset, uint32_t outRowOffset, bool waitIterateAll)
     {
         uint32_t mIdx = baseBlockIdx / mnConfig.blockDimN;
@@ -436,8 +436,8 @@ protected:
         }
     }
 
-    __aicore__ inline void MM2Process(ExpertParallInfo &mm2ExpertParallInfo, bool waitIterateAll, MNConfig &mnConfig,
-                                      bool &mm2WaitStatus)
+    __aicore__ inline void MM2Process(ExpertParallInfo& mm2ExpertParallInfo, bool waitIterateAll, MNConfig& mnConfig,
+                                      bool& mm2WaitStatus)
     {
         for (uint32_t i = mm2ExpertParallInfo.start; i < mm2ExpertParallInfo.size;
              i += mm2ExpertParallInfo.expertParallelism) {
@@ -472,8 +472,8 @@ protected:
         }
     }
 
-    __aicore__ inline void ComputeExpertParallNum(const uint32_t &expertI, const uint32_t &baseM,
-                                                  ExpertParallInfo &expertParallInfo)
+    __aicore__ inline void ComputeExpertParallNum(const uint32_t& expertI, const uint32_t& baseM,
+                                                  ExpertParallInfo& expertParallInfo)
     {
         if (expertI == expertNum) {
             expertParallInfo.expertParallelism = Min(expertParallInfo.size, expertParallInfo.maxExpertParallelism);

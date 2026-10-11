@@ -42,10 +42,10 @@ public:
           int32_t groupListType, int32_t groupSize);
 };
 
-Tensor GenTensor(const char *name, const std::vector<int64_t> &shape, ge::DataType dType,
+Tensor GenTensor(const char* name, const std::vector<int64_t>& shape, ge::DataType dType,
                  ge::Format format = ge::FORMAT_ND);
 
-TensorList GenTensorList(const char *name, const std::vector<std::vector<int64_t>> &shapes, ge::DataType dType,
+TensorList GenTensorList(const char* name, const std::vector<std::vector<int64_t>>& shapes, ge::DataType dType,
                          ge::Format format = ge::FORMAT_ND);
 
 } // namespace ops::adv::tests::quant_grouped_matmul_inplace_add

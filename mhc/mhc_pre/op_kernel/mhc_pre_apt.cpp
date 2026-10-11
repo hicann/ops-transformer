@@ -28,19 +28,19 @@ __global__ __aicore__ void mhc_pre(GM_ADDR x, GM_ADDR phi, GM_ADDR alpha, GM_ADD
                                    GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     GET_TILING_DATA(tilingData, tilingGM);
-    __gm__ uint8_t *user = GetUserWorkspace(workspaceGM);
+    __gm__ uint8_t* user = GetUserWorkspace(workspaceGM);
 
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     TPipe pipe;
     if constexpr (TILING_MODE == MHC_PRE_SPLIT_BS) {
-        InitParams initParams{x, phi, alpha, bias, gamma, hin, h_post,
-                              h_res, inv_rms, h_mix, h_pre, user, &pipe, &tilingData};
+        InitParams initParams{x,     phi,     alpha, bias,  gamma, hin,   h_post,
+                              h_res, inv_rms, h_mix, h_pre, user,  &pipe, &tilingData};
         MhcPreSplitBS<DTYPE_X, float32_t, RESI_MODE> op;
         op.Init(initParams);
         op.Process();
     } else if constexpr (TILING_MODE == MHC_PRE_SPLIT_M_K) {
-        InitParams initParams{x, phi, alpha, bias, gamma, hin, h_post,
-                              h_res, inv_rms, h_mix, h_pre, user, &pipe, &tilingData};
+        InitParams initParams{x,     phi,     alpha, bias,  gamma, hin,   h_post,
+                              h_res, inv_rms, h_mix, h_pre, user,  &pipe, &tilingData};
         MhcPreMKPart1<DTYPE_X, float32_t, RESI_MODE> part1;
         part1.Init(initParams);
         part1.Process();
@@ -53,8 +53,8 @@ __global__ __aicore__ void mhc_pre(GM_ADDR x, GM_ADDR phi, GM_ADDR alpha, GM_ADD
         part2.Init(initParams);
         part2.Process();
     } else if constexpr (TILING_MODE == MHC_PRE_SPLIT_ND) {
-        InitParams initParams{x, phi, alpha, bias, gamma, hin, h_post,
-                              h_res, inv_rms, h_mix, h_pre, user, &pipe, &tilingData};
+        InitParams initParams{x,     phi,     alpha, bias,  gamma, hin,   h_post,
+                              h_res, inv_rms, h_mix, h_pre, user,  &pipe, &tilingData};
         MhcPreSplitND<DTYPE_X, float32_t, RESI_MODE> op;
         op.Init(initParams);
         op.Process();

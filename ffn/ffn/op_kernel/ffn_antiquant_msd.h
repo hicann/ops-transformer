@@ -95,33 +95,33 @@ __aicore__ inline void DataCopyPad2D(const GlobalTensor<T> dst, const LocalTenso
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 class FFNAntiQuantMSD {
 public:
-    __aicore__ inline FFNAntiQuantMSD(mm1Type &mm1_, mm2Type &mm2_)
+    __aicore__ inline FFNAntiQuantMSD(mm1Type& mm1_, mm2Type& mm2_)
         : mm1(mm1_),
           mm2(mm2_)
     {}
-    __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
-                                __gm__ uint8_t *expertTokens, __gm__ uint8_t *bias1, __gm__ uint8_t *bias2,
-                                __gm__ uint8_t *antiQuantScale1, __gm__ uint8_t *antiQuantScale2,
-                                __gm__ uint8_t *antiQuantOffset1, __gm__ uint8_t *antiQuantOffset2, __gm__ uint8_t *y,
-                                __gm__ uint8_t *mm1Workspace, const FFNTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t* x, __gm__ uint8_t* weight1, __gm__ uint8_t* weight2,
+                                __gm__ uint8_t* expertTokens, __gm__ uint8_t* bias1, __gm__ uint8_t* bias2,
+                                __gm__ uint8_t* antiQuantScale1, __gm__ uint8_t* antiQuantScale2,
+                                __gm__ uint8_t* antiQuantOffset1, __gm__ uint8_t* antiQuantOffset2, __gm__ uint8_t* y,
+                                __gm__ uint8_t* mm1Workspace, const FFNTilingData* __restrict tiling, TPipe* tPipe);
     __aicore__ inline void InitTilingData();
-    __aicore__ inline void GetMaxToken(__gm__ uint8_t *expertTokens);
-    __aicore__ inline void InitWorkspace(__gm__ uint8_t *workSpace);
-    __aicore__ inline void AllocLocalTensor(TPipe *tPipe);
+    __aicore__ inline void GetMaxToken(__gm__ uint8_t* expertTokens);
+    __aicore__ inline void InitWorkspace(__gm__ uint8_t* workSpace);
+    __aicore__ inline void AllocLocalTensor(TPipe* tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void PreProcessMM1(TilingConfig tilingParams, ExpertParallInfo mmExpertParallInfo);
     __aicore__ inline void PreProcessMM2(uint32_t offsetM, uint32_t curBaseK, TilingConfig tilingParams,
-                                         uint32_t &syncCount, ExpertParallInfo mmExpertParallInfo);
-    __aicore__ inline void MM1VectorTiling(TilingConfig &tilingParams);
+                                         uint32_t& syncCount, ExpertParallInfo mmExpertParallInfo);
+    __aicore__ inline void MM1VectorTiling(TilingConfig& tilingParams);
     __aicore__ inline void MM2VectorTiling(uint32_t curV2BaseN, uint32_t blockDimK, uint32_t v2BaseM,
-                                           TilingConfig &tilingParams);
+                                           TilingConfig& tilingParams);
     __aicore__ inline void CalcReduceMax(uint32_t gmReduceOffset, uint32_t curBaseM, uint32_t curBaseK,
                                          GlobalTensor<float> reduceMaxWorkspaceGm);
     __aicore__ inline void CalcReduceSum(uint32_t gmReduceOffset, uint32_t curBaseM, uint32_t curBaseK,
                                          GlobalTensor<float> reduceSumWorkspaceGm);
-    __aicore__ inline void CalcA1A2(const TilingConfig &tilingParams, uint32_t offsetM, uint32_t curBaseM,
+    __aicore__ inline void CalcA1A2(const TilingConfig& tilingParams, uint32_t offsetM, uint32_t curBaseM,
                                     uint32_t curBaseK, uint32_t aOffsetGm, GlobalTensor<int8_t> workspaceAMatrixGm);
-    __aicore__ inline void MM1Compute(uint32_t curCubeSingleCoreN, uint32_t offsetN, const TilingConfig &tilingParams,
+    __aicore__ inline void MM1Compute(uint32_t curCubeSingleCoreN, uint32_t offsetN, const TilingConfig& tilingParams,
                                       ExpertParallInfo mmExpertParallInfo);
     __aicore__ inline void MM2Compute(uint32_t curCubeSingleCoreN, uint32_t offsetN, TilingConfig tilingParams,
                                       ExpertParallInfo mmExpertParallInfo, uint32_t curIterCount);
@@ -132,31 +132,31 @@ public:
     __aicore__ inline void CopyOutFinalResult(uint32_t curV2BaseM, uint32_t curV2BaseN, uint32_t yOffset, uint32_t n);
     __aicore__ inline void ComputeExpert(ExpertParallInfo mm1ExpertParallInfo, ExpertParallInfo mm2ExpertParallInfo);
     __aicore__ inline void SyncAllByCount(uint32_t count);
-    __aicore__ inline void ComputeExpertMM1(TilingConfig &tilingParams1, TilingConfig &tilingParams2,
+    __aicore__ inline void ComputeExpertMM1(TilingConfig& tilingParams1, TilingConfig& tilingParams2,
                                             ExpertParallInfo mm1ExpertParallInfo);
-    __aicore__ inline void ComputeExpertMM2(TilingConfig &tilingParams, ExpertParallInfo mm2ExpertParallInfo);
-    __aicore__ inline void CubeResultPostProcess(TilingConfig &tilingParams2, ExpertParallInfo mm2ExpertParallInfo,
+    __aicore__ inline void ComputeExpertMM2(TilingConfig& tilingParams, ExpertParallInfo mm2ExpertParallInfo);
+    __aicore__ inline void CubeResultPostProcess(TilingConfig& tilingParams2, ExpertParallInfo mm2ExpertParallInfo,
                                                  const uint32_t curIterCount, const uint32_t preExpertUsedCoreInIter,
                                                  const uint32_t idx);
     __aicore__ inline void ActivationCompute(uint32_t computeSize);
     __aicore__ inline void Elewise1(uint32_t curV2BaseM, uint32_t curV2BaseN);
-    __aicore__ inline void CubeTiling(TilingConfig &tilingParams);
-    __aicore__ inline void ComputeExpertParallNum(const uint32_t expertI, ExpertParallInfo &expertParallInfo);
-    __aicore__ inline void CalcTailBlock(TilingConfig tilingParams, uint32_t &curSingleM, uint32_t &curBaseK);
-    __aicore__ inline void CopyOriginInput(const TilingConfig &tilingParams, uint32_t curBaseM, uint32_t curBaseK,
+    __aicore__ inline void CubeTiling(TilingConfig& tilingParams);
+    __aicore__ inline void ComputeExpertParallNum(const uint32_t expertI, ExpertParallInfo& expertParallInfo);
+    __aicore__ inline void CalcTailBlock(TilingConfig tilingParams, uint32_t& curSingleM, uint32_t& curBaseK);
+    __aicore__ inline void CopyOriginInput(const TilingConfig& tilingParams, uint32_t curBaseM, uint32_t curBaseK,
                                            uint32_t xGmOffset);
     __aicore__ inline void CalcResDataUsedInPostProcessMM1(uint32_t offsetM, uint32_t vecOffsetN,
-                                                           const TilingConfig &tilingParams1,
+                                                           const TilingConfig& tilingParams1,
                                                            ExpertParallInfo mm1ExpertParallInfo);
     __aicore__ inline void CalcResDataUsedInPostProcessMM2(uint32_t offsetM, uint32_t vecOffsetN,
                                                            ExpertParallInfo mm1ExpertParallInfo,
                                                            TilingConfig tilingParams2);
     __aicore__ inline void ProcessC1C2(uint32_t curV2BaseM, uint32_t curV2BaseN, uint32_t MMOutputOffset,
-                                       const TilingConfig &tilingParams, GlobalTensor<int32_t> workspaceMMOutputGm);
+                                       const TilingConfig& tilingParams, GlobalTensor<int32_t> workspaceMMOutputGm);
     __aicore__ inline void CalcCMatrix(uint32_t curV2BaseM, uint32_t curV2BaseN, uint32_t offsetM);
     __aicore__ inline void AddOffsetAndMulScale(uint32_t curV2BaseM, uint32_t curV2BaseN,
-                                                const TilingConfig &tilingParams);
-    __aicore__ inline void CalcAMax(const TilingConfig &tilingParams, uint32_t gmReduceOffset, uint32_t curBaseM,
+                                                const TilingConfig& tilingParams);
+    __aicore__ inline void CalcAMax(const TilingConfig& tilingParams, uint32_t gmReduceOffset, uint32_t curBaseM,
                                     uint32_t offsetM, GlobalTensor<float> reduceMaxWorkspaceGm);
     __aicore__ inline void CopyInReduceSum(uint32_t curV2BaseM, uint32_t reduceSumOffset,
                                            GlobalTensor<float> reduceSumWorkspaceGm);
@@ -165,10 +165,10 @@ public:
     __aicore__ inline void ScaleProcess(uint32_t curV2BaseN, uint32_t offsetAndScaleOffset, TilingConfig tilingParams,
                                         GlobalTensor<xT> scaleWorkspaceGm);
 
-    TPipe *pipe;
-    const FFNTilingData *tilingData;
-    mm1Type &mm1;
-    mm2Type &mm2;
+    TPipe* pipe;
+    const FFNTilingData* tilingData;
+    mm1Type& mm1;
+    mm2Type& mm2;
 
     GlobalTensor<xT> xGm;
     GlobalTensor<int8_t> workspaceMM1AMatrixGm_;
@@ -263,10 +263,10 @@ public:
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::Init(
-    __gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2, __gm__ uint8_t *expertTokens,
-    __gm__ uint8_t *bias1, __gm__ uint8_t *bias2, __gm__ uint8_t *antiQuantScale1, __gm__ uint8_t *antiQuantScale2,
-    __gm__ uint8_t *antiQuantOffset1, __gm__ uint8_t *antiQuantOffset2, __gm__ uint8_t *y, __gm__ uint8_t *workSpace,
-    const FFNTilingData *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t* x, __gm__ uint8_t* weight1, __gm__ uint8_t* weight2, __gm__ uint8_t* expertTokens,
+    __gm__ uint8_t* bias1, __gm__ uint8_t* bias2, __gm__ uint8_t* antiQuantScale1, __gm__ uint8_t* antiQuantScale2,
+    __gm__ uint8_t* antiQuantOffset1, __gm__ uint8_t* antiQuantOffset2, __gm__ uint8_t* y, __gm__ uint8_t* workSpace,
+    const FFNTilingData* __restrict tiling, TPipe* tPipe)
 {
     tilingData = tiling;
     pipe = tPipe;
@@ -274,23 +274,23 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     GetMaxToken(expertTokens);
 
     // init global buffer
-    xGm.SetGlobalBuffer((__gm__ xT *)x);
-    weight1Gm.SetGlobalBuffer((__gm__ int8_t *)weight1);
+    xGm.SetGlobalBuffer((__gm__ xT*)x);
+    weight1Gm.SetGlobalBuffer((__gm__ int8_t*)weight1);
     if (bias1 != nullptr) {
         hasBias1 = true;
-        bias1Gm.SetGlobalBuffer((__gm__ biasT *)bias1);
+        bias1Gm.SetGlobalBuffer((__gm__ biasT*)bias1);
     }
-    weight2Gm.SetGlobalBuffer((__gm__ int8_t *)weight2);
+    weight2Gm.SetGlobalBuffer((__gm__ int8_t*)weight2);
     if (bias2 != nullptr) {
         hasBias2 = true;
-        bias2Gm.SetGlobalBuffer((__gm__ biasT *)bias2);
+        bias2Gm.SetGlobalBuffer((__gm__ biasT*)bias2);
     }
 
-    scale1WorkspaceGm.SetGlobalBuffer((__gm__ xT *)antiQuantScale1);
-    scale2WorkspaceGm.SetGlobalBuffer((__gm__ xT *)antiQuantScale2);
-    offset1WorkspaceGm.SetGlobalBuffer((__gm__ xT *)antiQuantOffset1);
-    offset2WorkspaceGm.SetGlobalBuffer((__gm__ xT *)antiQuantOffset2);
-    yGm.SetGlobalBuffer((__gm__ yT *)y);
+    scale1WorkspaceGm.SetGlobalBuffer((__gm__ xT*)antiQuantScale1);
+    scale2WorkspaceGm.SetGlobalBuffer((__gm__ xT*)antiQuantScale2);
+    offset1WorkspaceGm.SetGlobalBuffer((__gm__ xT*)antiQuantOffset1);
+    offset2WorkspaceGm.SetGlobalBuffer((__gm__ xT*)antiQuantOffset2);
+    yGm.SetGlobalBuffer((__gm__ yT*)y);
 
     InitWorkspace(workSpace);
     AllocLocalTensor(tPipe);
@@ -323,14 +323,14 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::GetMaxToken(
-    __gm__ uint8_t *expertTokens)
+    __gm__ uint8_t* expertTokens)
 {
     uint32_t expertTokensUbSize = AlignUp<UB_BLOCK_UNIT_SIZE>(expertNum * sizeof(int64_t));
     pipe->InitBuffer(eTokens64Buf, expertTokensUbSize); // 32Byte alignment
     ubTokens = eTokens64Buf.Get<int64_t>();
     if (likely(expertTokens != nullptr)) {
         // copy tokens array from GM
-        expertTokensGm.SetGlobalBuffer((__gm__ int64_t *)expertTokens);
+        expertTokensGm.SetGlobalBuffer((__gm__ int64_t*)expertTokens);
         DataCopy(ubTokens, expertTokensGm, AlignUp<EXPERT_NUM_ALIGN>(expertNum)); // 32Byte alignment
         SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
         WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
@@ -350,42 +350,42 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::InitWorkspace(
-    __gm__ uint8_t *workSpace)
+    __gm__ uint8_t* workSpace)
 {
     // init global buffer
     uint32_t maxParallelExpertNum1 = Max<uint32_t>(cubeCoreNum / Ceil(n1, tilingData->mm1TilingData.baseN), 1);
     uint32_t maxParallelExpertNum2 = Max<uint32_t>(cubeCoreNum / Ceil(n2, tilingData->mm2TilingData.baseN), 1);
     uint32_t usedWorkspaceSize = 0;
-    workspaceMM1AMatrixGm_.SetGlobalBuffer((__gm__ int8_t *)(workSpace),
+    workspaceMM1AMatrixGm_.SetGlobalBuffer((__gm__ int8_t*)(workSpace),
                                            ANTIQUANT_MSD_STEP * maxTokens * k1 * maxParallelExpertNum1);
     usedWorkspaceSize += ANTIQUANT_MSD_STEP * maxTokens * k1 * sizeof(int8_t) * maxParallelExpertNum1;
-    workspaceMM1OutputGm_.SetGlobalBuffer((__gm__ int32_t *)(workSpace + usedWorkspaceSize),
+    workspaceMM1OutputGm_.SetGlobalBuffer((__gm__ int32_t*)(workSpace + usedWorkspaceSize),
                                           ANTIQUANT_MSD_STEP * maxTokens * n1 * maxParallelExpertNum1);
     usedWorkspaceSize += ANTIQUANT_MSD_STEP * maxTokens * n1 * sizeof(int32_t) * maxParallelExpertNum1;
-    workspaceMM2AMatrixGm_.SetGlobalBuffer((__gm__ int8_t *)(workSpace + usedWorkspaceSize),
+    workspaceMM2AMatrixGm_.SetGlobalBuffer((__gm__ int8_t*)(workSpace + usedWorkspaceSize),
                                            ANTIQUANT_MSD_STEP * maxTokens * k2 * maxParallelExpertNum1);
     usedWorkspaceSize += ANTIQUANT_MSD_STEP * maxTokens * k2 * sizeof(int8_t) * maxParallelExpertNum1;
-    workspaceMM2OutputGm_.SetGlobalBuffer((__gm__ int32_t *)(workSpace + usedWorkspaceSize),
+    workspaceMM2OutputGm_.SetGlobalBuffer((__gm__ int32_t*)(workSpace + usedWorkspaceSize),
                                           ANTIQUANT_MSD_STEP * maxTokens * n2 * maxParallelExpertNum2);
     usedWorkspaceSize += ANTIQUANT_MSD_STEP * maxTokens * n2 * sizeof(int32_t) * maxParallelExpertNum2;
 
     uint32_t reduceMaxWorkspaceGmSize = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE * totalTokens * sizeof(float);
-    reduceMax1WorkspaceGm_.SetGlobalBuffer((__gm__ float *)(workSpace + usedWorkspaceSize));
+    reduceMax1WorkspaceGm_.SetGlobalBuffer((__gm__ float*)(workSpace + usedWorkspaceSize));
     InitOutput(reduceMax1WorkspaceGm_, reduceMaxWorkspaceGmSize); // clear workspace
     usedWorkspaceSize += reduceMaxWorkspaceGmSize;
-    reduceSum1WorkspaceGm_.SetGlobalBuffer((__gm__ float *)(workSpace + usedWorkspaceSize));
+    reduceSum1WorkspaceGm_.SetGlobalBuffer((__gm__ float*)(workSpace + usedWorkspaceSize));
     InitOutput(reduceSum1WorkspaceGm_, reduceMaxWorkspaceGmSize); // clear workspace
     usedWorkspaceSize += reduceMaxWorkspaceGmSize;
-    reduceMax2WorkspaceGm_.SetGlobalBuffer((__gm__ float *)(workSpace + usedWorkspaceSize));
+    reduceMax2WorkspaceGm_.SetGlobalBuffer((__gm__ float*)(workSpace + usedWorkspaceSize));
     InitOutput(reduceMax2WorkspaceGm_, reduceMaxWorkspaceGmSize); // clear workspace
     usedWorkspaceSize += reduceMaxWorkspaceGmSize;
-    reduceSum2WorkspaceGm_.SetGlobalBuffer((__gm__ float *)(workSpace + usedWorkspaceSize));
+    reduceSum2WorkspaceGm_.SetGlobalBuffer((__gm__ float*)(workSpace + usedWorkspaceSize));
     InitOutput(reduceSum2WorkspaceGm_, reduceMaxWorkspaceGmSize); // clear workspace
     SyncAll<true>();
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::AllocLocalTensor(TPipe *tPipe)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::AllocLocalTensor(TPipe* tPipe)
 {
     pipe = tPipe;
     // init ub Tbuf
@@ -419,7 +419,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::MM1VectorTiling(
-    TilingConfig &tilingParams)
+    TilingConfig& tilingParams)
 {
     uint32_t vecBlockDimK_ = tilingParams.aivNumPerExpert;
     uint32_t vecBaseK_ = Ceil(tilingParams.k, vecBlockDimK_);
@@ -443,7 +443,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::MM2VectorTiling(
-    uint32_t curV2BaseN, uint32_t blockDimK, uint32_t v2BaseM, TilingConfig &tilingParams)
+    uint32_t curV2BaseN, uint32_t blockDimK, uint32_t v2BaseM, TilingConfig& tilingParams)
 {
     tilingParams.vecBaseK = curV2BaseN;
     tilingParams.vecBaseM = v2BaseM;
@@ -454,7 +454,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CubeTiling(TilingConfig &tilingParams)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CubeTiling(TilingConfig& tilingParams)
 {
     tilingParams.cubeSingleM = ANTIQUANT_MSD_STEP * tilingParams.mCube; // M-axis is twice size ori m in msd-method
     tilingParams.cubeSingleM = (tilingParams.cubeSingleM + NUM_ALIGN_TO_SIXTEEN) & (~NUM_ALIGN_TO_SIXTEEN);
@@ -472,7 +472,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CopyOriginInput(
-    const TilingConfig &tilingParams, uint32_t curBaseM, uint32_t curBaseK, uint32_t xGmOffset)
+    const TilingConfig& tilingParams, uint32_t curBaseM, uint32_t curBaseK, uint32_t xGmOffset)
 {
     uint32_t alignedBaseK = (curBaseK + NUM_ALIGN_TO_SIXTEEN) & (~NUM_ALIGN_TO_SIXTEEN);
     LocalTensor<xT> xLocal = inQueueX_.AllocTensor<xT>();
@@ -492,7 +492,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CalcTailBlock(
-    TilingConfig tilingParams, uint32_t &curSingleM, uint32_t &curBaseK)
+    TilingConfig tilingParams, uint32_t& curSingleM, uint32_t& curBaseK)
 {
     if (vec1BlockMIdx_ == tilingParams.vecBlockDimM - 1) {
         curSingleM = tilingParams.vecSingleMTail;
@@ -555,7 +555,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::PreProcessMM2(
-    uint32_t offsetM, uint32_t curBaseK, TilingConfig tilingParams, uint32_t &syncCount,
+    uint32_t offsetM, uint32_t curBaseK, TilingConfig tilingParams, uint32_t& syncCount,
     ExpertParallInfo mmExpertParallInfo)
 {
     uint32_t curBaseM = tilingParams.vecBaseM;
@@ -657,7 +657,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CalcAMax(
-    const TilingConfig &tilingParams, uint32_t gmReduceOffset, uint32_t curBaseM, uint32_t offsetM,
+    const TilingConfig& tilingParams, uint32_t gmReduceOffset, uint32_t curBaseM, uint32_t offsetM,
     GlobalTensor<float> reduceMaxWorkspaceGm)
 {
     // Calc Amax
@@ -683,7 +683,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CalcA1A2(
-    const TilingConfig &tilingParams, uint32_t offsetM, uint32_t curBaseM, uint32_t curBaseK, uint32_t aOffsetGm,
+    const TilingConfig& tilingParams, uint32_t offsetM, uint32_t curBaseM, uint32_t curBaseK, uint32_t aOffsetGm,
     GlobalTensor<int8_t> workspaceAMatrixGm)
 {
     uint32_t alignedBaseK = (curBaseK + NUM_ALIGN_TO_THIRTYTWO) & (~NUM_ALIGN_TO_THIRTYTWO);
@@ -741,7 +741,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::MM1Compute(
-    uint32_t curCubeSingleCoreN, uint32_t offsetN, const TilingConfig &tilingParams,
+    uint32_t curCubeSingleCoreN, uint32_t offsetN, const TilingConfig& tilingParams,
     ExpertParallInfo mmExpertParallInfo)
 {
     uint32_t AMatrixMM1Offset =
@@ -865,7 +865,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ProcessC1C2(
-    uint32_t curV2BaseM, uint32_t curV2BaseN, uint32_t MMOutputOffset, const TilingConfig &tilingParams,
+    uint32_t curV2BaseM, uint32_t curV2BaseN, uint32_t MMOutputOffset, const TilingConfig& tilingParams,
     GlobalTensor<int32_t> workspaceMMOutputGm)
 {
     uint32_t curBaseNAligned = (curV2BaseN + NUM_ALIGN_TO_THIRTYTWO) & (~NUM_ALIGN_TO_THIRTYTWO);
@@ -935,7 +935,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::AddOffsetAndMulScale(
-    uint32_t curV2BaseM, uint32_t curV2BaseN, const TilingConfig &tilingParams)
+    uint32_t curV2BaseM, uint32_t curV2BaseN, const TilingConfig& tilingParams)
 {
     uint32_t curBaseNAligned = (curV2BaseN + NUM_ALIGN_TO_THIRTYTWO) & (~NUM_ALIGN_TO_THIRTYTWO);
     // add with processed offset
@@ -1046,7 +1046,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CalcResDataUsedInPostProcessMM1(
-    uint32_t offsetM, uint32_t vecOffsetN, const TilingConfig &tilingParams1, ExpertParallInfo mm1ExpertParallInfo)
+    uint32_t offsetM, uint32_t vecOffsetN, const TilingConfig& tilingParams1, ExpertParallInfo mm1ExpertParallInfo)
 {
     uint32_t reduceSumOffset =
         (mm1ExpertParallInfo.GlobalOffset[expertIdxInParaGroupMM1] + offsetM) * FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE;
@@ -1095,7 +1095,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpertMM1(
-    TilingConfig &tilingParams1, TilingConfig &tilingParams2, ExpertParallInfo mm1ExpertParallInfo)
+    TilingConfig& tilingParams1, TilingConfig& tilingParams2, ExpertParallInfo mm1ExpertParallInfo)
 {
     curCubeNIdx = (coreIdx - expertIdxInParaGroupMM1 * tilingParams1.aicNumPerExpert) % tilingParams1.cubeBlockDimN;
     uint32_t curCubeSingleCoreN = tilingParams1.cubeSingleN;
@@ -1153,7 +1153,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpertMM2(
-    TilingConfig &tilingParams2, ExpertParallInfo mm2ExpertParallInfo)
+    TilingConfig& tilingParams2, ExpertParallInfo mm2ExpertParallInfo)
 {
     uint32_t curIterCount = 0;
     for (uint32_t i = mm2ExpertParallInfo.start; i < mm2ExpertParallInfo.size;
@@ -1193,7 +1193,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CubeResultPostProcess(
-    TilingConfig &tilingParams2, ExpertParallInfo mm2ExpertParallInfo, const uint32_t curIterCount,
+    TilingConfig& tilingParams2, ExpertParallInfo mm2ExpertParallInfo, const uint32_t curIterCount,
     const uint32_t v2BaseM, const uint32_t idx)
 {
     event_t eventIdMTE3ToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
@@ -1268,7 +1268,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpertParallNum(
-    const uint32_t expertI, ExpertParallInfo &expertParallInfo)
+    const uint32_t expertI, ExpertParallInfo& expertParallInfo)
 {
     if (expertI == expertNum) {
         expertParallInfo.expertParallelism = Min(expertParallInfo.size, expertParallInfo.maxExpertParallelism);

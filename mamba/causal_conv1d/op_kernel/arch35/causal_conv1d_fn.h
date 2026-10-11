@@ -26,13 +26,13 @@ public:
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates, GM_ADDR bias, GM_ADDR queryStartLoc,
                                 GM_ADDR cacheIndices, GM_ADDR initialStateMode, GM_ADDR numAcceptedTokens,
                                 GM_ADDR convStatesOut, GM_ADDR y, GM_ADDR workspace,
-                                const CausalConv1dTilingData *tilingData)
+                                const CausalConv1dTilingData* tilingData)
     {
         (void)numAcceptedTokens;
         this->InitGlobalBuffers(x, weight, convStates, bias, queryStartLoc, cacheIndices, y, convStatesOut, tilingData);
-        this->initialStateModeGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(initialStateMode));
+        this->initialStateModeGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(initialStateMode));
         if (tilingData->hasInitStateWorkspace) {
-            this->initStateWorkspaceGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace));
+            this->initStateWorkspaceGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace));
         }
         this->InitBuffers();
     }
@@ -65,8 +65,8 @@ protected:
     }
 
     template <int32_t kWindowMode>
-    __aicore__ inline bool InitBlock(int64_t &dimStart, int32_t &curBaseDim, int32_t &batchIdx, int32_t &batchCnt,
-                                     int64_t &cursor, int64_t &cursorEnd)
+    __aicore__ inline bool InitBlock(int64_t& dimStart, int32_t& curBaseDim, int32_t& batchIdx, int32_t& batchCnt,
+                                     int64_t& cursor, int64_t& cursorEnd)
     {
         const int64_t dim = this->tilingData_->dim;
         const int64_t batch = this->tilingData_->batch;
@@ -123,8 +123,8 @@ protected:
     }
 
     template <int32_t kWindowMode>
-    __aicore__ inline void ProcessBlock(int64_t dimStart, int32_t curBaseDim, int32_t &batchIdx, int32_t batchCnt,
-                                        int64_t &cursor, int64_t cursorEnd)
+    __aicore__ inline void ProcessBlock(int64_t dimStart, int32_t curBaseDim, int32_t& batchIdx, int32_t batchCnt,
+                                        int64_t& cursor, int64_t cursorEnd)
     {
         const int64_t dim = this->tilingData_->dim;
         const int64_t seqLen = this->tilingData_->seqLen;
@@ -295,7 +295,7 @@ protected:
         SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
     }
 
-    __aicore__ inline bool LoadConvStates(LocalTensor<T> &ring, int32_t padLen, int32_t cacheIdx, int64_t histBegin,
+    __aicore__ inline bool LoadConvStates(LocalTensor<T>& ring, int32_t padLen, int32_t cacheIdx, int64_t histBegin,
                                           int64_t seqStart, int32_t width, int64_t dimStart, int64_t dim,
                                           int32_t baseDim, bool hasInit)
     {
@@ -335,7 +335,7 @@ protected:
         return true;
     }
 
-    __aicore__ inline bool LoadInput(LocalTensor<T> &ring, int32_t loadLen, int32_t padLen, int64_t chunkStart,
+    __aicore__ inline bool LoadInput(LocalTensor<T>& ring, int32_t loadLen, int32_t padLen, int64_t chunkStart,
                                      int32_t width, int64_t dimStart, int64_t dim, int32_t baseDim)
     {
         if (loadLen <= 0) {
@@ -439,7 +439,7 @@ template <typename T, uint32_t inputModeKey, uint32_t widthKey, uint32_t hasBias
 __aicore__ inline void RunCausalConv1dFn(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates, GM_ADDR bias,
                                          GM_ADDR queryStartLoc, GM_ADDR cacheIndices, GM_ADDR initialStateMode,
                                          GM_ADDR numAcceptedTokens, GM_ADDR convStatesOut, GM_ADDR y, GM_ADDR workspace,
-                                         const CausalConv1dTilingData *tilingData)
+                                         const CausalConv1dTilingData* tilingData)
 {
     CausalConv1dFn<T, inputModeKey, widthKey, hasBiasKey, activationKey> op;
     op.Init(x, weight, convStates, bias, queryStartLoc, cacheIndices, initialStateMode, numAcceptedTokens,

@@ -21,16 +21,14 @@
 using namespace AscendC;
 
 template <uint32_t SCHMODE = 0>
-__global__ __aicore__ void mhc_post_backward(
-    GM_ADDR grad_y, GM_ADDR x, GM_ADDR h_res, GM_ADDR h_out, GM_ADDR h_post,
-    GM_ADDR grad_x, GM_ADDR grad_h_res, GM_ADDR grad_h_out, GM_ADDR grad_h_post,
-    GM_ADDR workspace, GM_ADDR tiling)
+__global__ __aicore__ void mhc_post_backward(GM_ADDR grad_y, GM_ADDR x, GM_ADDR h_res, GM_ADDR h_out, GM_ADDR h_post,
+                                             GM_ADDR grad_x, GM_ADDR grad_h_res, GM_ADDR grad_h_out,
+                                             GM_ADDR grad_h_post, GM_ADDR workspace, GM_ADDR tiling)
 {
     TPipe pipe;
     REGISTER_TILING_DEFAULT(MhcPostBackwardTilingDataArch22);
     GET_TILING_DATA(tiling_data, tiling);
     KernelMhcPostBackward<DTYPE_GRAD_Y> op;
-    op.Init(grad_y, x, h_res, h_out, h_post, grad_x, grad_h_res, grad_h_out,
-            grad_h_post, tiling_data, &pipe);
+    op.Init(grad_y, x, h_res, h_out, h_post, grad_x, grad_h_res, grad_h_out, grad_h_post, tiling_data, &pipe);
     op.Process();
 }

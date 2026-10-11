@@ -48,14 +48,14 @@ struct GMMSQWeightQuantInputParams {
 
 class GroupedMatmulSwigluQuantV2WeightQuantTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit GroupedMatmulSwigluQuantV2WeightQuantTiling(gert::TilingContext *context)
+    explicit GroupedMatmulSwigluQuantV2WeightQuantTiling(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {
         Reset();
     }
     ~GroupedMatmulSwigluQuantV2WeightQuantTiling() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         Ops::Transformer::OpTiling::TilingBaseClass::Reset(context);
         Reset();
@@ -75,7 +75,7 @@ protected:
     GMMSQWeightQuantInputParams inputParams_;
 
 private:
-    const GMMSwigluV2CompileInfo *compileInfoPtr_;
+    const GMMSwigluV2CompileInfo* compileInfoPtr_;
     GMMSQArch35Tiling::GMMSQWeightQuantTilingData tilingData_;
 };
 } // namespace optiling

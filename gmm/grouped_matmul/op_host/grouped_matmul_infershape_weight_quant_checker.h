@@ -23,60 +23,60 @@ class GroupedMatmulWeightQuantChecker {
 public:
     GroupedMatmulWeightQuantChecker() {};
     ~GroupedMatmulWeightQuantChecker() {};
-    ge::graphStatus GetXAndWeightDimValue(const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs);
-    ge::graphStatus CheckShape(const gert::InferShapeContext *context, const GroupedMatmulCommonUtil &commonUtil);
-    ge::graphStatus InferOutShape(gert::InferShapeContext *context, const GMMAttrs &gmmAttrs) const;
-    ge::graphStatus CheckScaleDtypeForS8S4(const gert::InferDataTypeContext *context) const;
-    ge::graphStatus CheckBiasDtype(const gert::InferDataTypeContext *context) const;
-    ge::graphStatus CheckDtype(const gert::InferDataTypeContext *context) const;
-    ge::graphStatus InferOutDtype(gert::InferDataTypeContext *context) const;
+    ge::graphStatus GetXAndWeightDimValue(const gert::InferShapeContext* context, const GMMAttrs& gmmAttrs);
+    ge::graphStatus CheckShape(const gert::InferShapeContext* context, const GroupedMatmulCommonUtil& commonUtil);
+    ge::graphStatus InferOutShape(gert::InferShapeContext* context, const GMMAttrs& gmmAttrs) const;
+    ge::graphStatus CheckScaleDtypeForS8S4(const gert::InferDataTypeContext* context) const;
+    ge::graphStatus CheckBiasDtype(const gert::InferDataTypeContext* context) const;
+    ge::graphStatus CheckDtype(const gert::InferDataTypeContext* context) const;
+    ge::graphStatus InferOutDtype(gert::InferDataTypeContext* context) const;
 
 private:
-    ge::graphStatus GetXandWeightDtype(const gert::InferShapeContext *context);
-    ge::graphStatus CheckTensorDimEqualOne(const gert::InferShapeContext *context, const gert::Shape *shape,
+    ge::graphStatus GetXandWeightDtype(const gert::InferShapeContext* context);
+    ge::graphStatus CheckTensorDimEqualOne(const gert::InferShapeContext* context, const gert::Shape* shape,
                                            const std::string paramName, const size_t index) const;
-    ge::graphStatus UpdateShapeYMultiDim(gert::InferShapeContext *context, size_t idxY, const gert::Shape *xShape,
-                                         const gert::Shape *weightShape) const;
-    ge::graphStatus CheckMatmulDataType(const gert::InferDataTypeContext *context, const ge::DataType xDtype,
+    ge::graphStatus UpdateShapeYMultiDim(gert::InferShapeContext* context, size_t idxY, const gert::Shape* xShape,
+                                         const gert::Shape* weightShape) const;
+    ge::graphStatus CheckMatmulDataType(const gert::InferDataTypeContext* context, const ge::DataType xDtype,
                                         const ge::DataType weightDtype, const ge::DataType biasDtype,
                                         const ge::DataType antiquantScaleDtype,
                                         const ge::DataType antiquantOffsetDtype) const;
-    ge::graphStatus CheckTensorListDataType(const gert::InferDataTypeContext *context, uint32_t index,
+    ge::graphStatus CheckTensorListDataType(const gert::InferDataTypeContext* context, uint32_t index,
                                             const ge::DataType dtype) const;
-    ge::graphStatus CheckShapeForXAndWeight(const gert::InferShapeContext *context) const;
-    ge::graphStatus CheckDimNumNoSplit(const gert::InferShapeContext *context,
-                                       const GMMInputParamsInfo &paramsInputInfo) const;
-    ge::graphStatus CheckXWeightYGroupSizeMultiScenario(const gert::InferShapeContext *context,
-                                                        const GMMInputParamsInfo &paramsInputInfo) const;
-    ge::graphStatus CheckTensorNDimMultiScenario(const gert::InferShapeContext *context, const size_t wNDimIdx,
+    ge::graphStatus CheckShapeForXAndWeight(const gert::InferShapeContext* context) const;
+    ge::graphStatus CheckDimNumNoSplit(const gert::InferShapeContext* context,
+                                       const GMMInputParamsInfo& paramsInputInfo) const;
+    ge::graphStatus CheckXWeightYGroupSizeMultiScenario(const gert::InferShapeContext* context,
+                                                        const GMMInputParamsInfo& paramsInputInfo) const;
+    ge::graphStatus CheckTensorNDimMultiScenario(const gert::InferShapeContext* context, const size_t wNDimIdx,
                                                  const int64_t weightNDimValue, const size_t index) const;
-    ge::graphStatus CheckCaseMultiScenario(const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs,
-                                           const GMMInputParamsInfo &paramsInputInfo) const;
-    ge::graphStatus CheckPerTensorShapeMultiScenario(const gert::InferShapeContext *context, size_t wKDimIdx,
+    ge::graphStatus CheckCaseMultiScenario(const gert::InferShapeContext* context, const GMMAttrs& gmmAttrs,
+                                           const GMMInputParamsInfo& paramsInputInfo) const;
+    ge::graphStatus CheckPerTensorShapeMultiScenario(const gert::InferShapeContext* context, size_t wKDimIdx,
                                                      size_t wNDimIdx, size_t xSize) const;
-    ge::graphStatus CheckA16W4PergroupMultiScenario(const gert::InferShapeContext *context, size_t wKDimIdx,
+    ge::graphStatus CheckA16W4PergroupMultiScenario(const gert::InferShapeContext* context, size_t wKDimIdx,
                                                     size_t xSize) const;
-    ge::graphStatus CheckShapeForTensorList(const gert::InferShapeContext *context, size_t gmm_index,
-                                            const std::string &tensorType, const GMMAttrs &gmmAttrs) const;
-    ge::graphStatus CheckShapeForTensorListAtIndex(const gert::InferShapeContext *context, size_t gmm_index,
-                                                   const std::string &tensorType, size_t tensorIdx) const;
-    ge::graphStatus CheckScenarioValid(const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs) const;
-    ge::graphStatus GetNumOfInputs(const gert::InferShapeContext *context, GMMInputParamsInfo &paramsInputInfo) const;
-    ge::graphStatus CheckTensorListSizeMultiScenario(const gert::InferShapeContext *context,
-                                                     const GMMInputParamsInfo &paramsInputInfo) const;
-    ge::graphStatus CheckShapeValid(const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs);
-    ge::graphStatus CheckShapeValidNoSplit(const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs);
-    ge::graphStatus CheckShapeValidSplitM(const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs);
+    ge::graphStatus CheckShapeForTensorList(const gert::InferShapeContext* context, size_t gmm_index,
+                                            const std::string& tensorType, const GMMAttrs& gmmAttrs) const;
+    ge::graphStatus CheckShapeForTensorListAtIndex(const gert::InferShapeContext* context, size_t gmm_index,
+                                                   const std::string& tensorType, size_t tensorIdx) const;
+    ge::graphStatus CheckScenarioValid(const gert::InferShapeContext* context, const GMMAttrs& gmmAttrs) const;
+    ge::graphStatus GetNumOfInputs(const gert::InferShapeContext* context, GMMInputParamsInfo& paramsInputInfo) const;
+    ge::graphStatus CheckTensorListSizeMultiScenario(const gert::InferShapeContext* context,
+                                                     const GMMInputParamsInfo& paramsInputInfo) const;
+    ge::graphStatus CheckShapeValid(const gert::InferShapeContext* context, const GMMAttrs& gmmAttrs);
+    ge::graphStatus CheckShapeValidNoSplit(const gert::InferShapeContext* context, const GMMAttrs& gmmAttrs);
+    ge::graphStatus CheckShapeValidSplitM(const gert::InferShapeContext* context, const GMMAttrs& gmmAttrs);
 
-    ge::graphStatus CheckShapeForWeightQuantParam(const gert::InferShapeContext *context,
-                                                  const GMMAttrs &gmmAttrs) const;
-    ge::graphStatus CheckShapeForGrouplist(const gert::InferShapeContext *context,
-                                           const gert::Shape *groupListShape) const;
-    ge::graphStatus UpdateShapeY(gert::InferShapeContext *context, size_t idxY, std::vector<int64_t> &yDims) const;
-    ge::graphStatus CheckGroupAntiS(const gert::Shape *tensorShape, const gert::InferShapeContext *context,
-                                    const std::string &tensorType) const;
-    ge::graphStatus CheckPertokenScaleForA8W4(const gert::InferShapeContext *context) const;
-    ge::graphStatus CheckGroupSize(const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs,
+    ge::graphStatus CheckShapeForWeightQuantParam(const gert::InferShapeContext* context,
+                                                  const GMMAttrs& gmmAttrs) const;
+    ge::graphStatus CheckShapeForGrouplist(const gert::InferShapeContext* context,
+                                           const gert::Shape* groupListShape) const;
+    ge::graphStatus UpdateShapeY(gert::InferShapeContext* context, size_t idxY, std::vector<int64_t>& yDims) const;
+    ge::graphStatus CheckGroupAntiS(const gert::Shape* tensorShape, const gert::InferShapeContext* context,
+                                    const std::string& tensorType) const;
+    ge::graphStatus CheckPertokenScaleForA8W4(const gert::InferShapeContext* context) const;
+    ge::graphStatus CheckGroupSize(const gert::InferShapeContext* context, const GMMAttrs& gmmAttrs,
                                    const size_t tensorIdx) const;
     bool IsA16MxFp4NZ(const ge::DataType xDtype, const ge::DataType weightDtype) const;
     bool IsMxA8W4NZ(const ge::DataType xDtype, const ge::DataType weightDtype) const;
@@ -85,8 +85,8 @@ private:
     bool IsA16F8(const ge::DataType xDtype, const ge::DataType weightDtype) const;
     bool IsA16W4(const ge::DataType xDtype, const ge::DataType weightDtype) const;
     bool IsA16W4Pergroup(const ge::DataType xDtype, const ge::DataType weightDtype,
-                         const gert::InferShapeContext *context, const size_t tensorIdx) const;
-    bool IsMultiTensorWeight(const gert::InferShapeContext *context) const;
+                         const gert::InferShapeContext* context, const size_t tensorIdx) const;
+    bool IsMultiTensorWeight(const gert::InferShapeContext* context) const;
 
 private:
     int64_t groupNum_;

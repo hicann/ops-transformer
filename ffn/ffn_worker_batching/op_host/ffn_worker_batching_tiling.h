@@ -44,7 +44,7 @@ struct FfnWorkerBatchingCompileInfo {};
 
 class FfnWorkerBatchingTiling {
 public:
-    explicit FfnWorkerBatchingTiling(gert::TilingContext *context)
+    explicit FfnWorkerBatchingTiling(gert::TilingContext* context)
         : context_(context) {};
     ge::graphStatus RunFfnWorkerBatchingTiling();
 
@@ -57,7 +57,7 @@ private:
 
 private:
     FfnWorkerBatchingTilingData tilingData_;
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
 
     int64_t A_ = 0;
     int64_t BS_ = 0;

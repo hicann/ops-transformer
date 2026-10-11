@@ -13,9 +13,9 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-aclTensor *GroupedMatmulAdd(const aclTensor *x1, const aclTensor *x2, const aclTensor *groupList, aclTensor *yRef,
+aclTensor* GroupedMatmulAdd(const aclTensor* x1, const aclTensor* x2, const aclTensor* groupList, aclTensor* yRef,
                             bool transposeX, bool transposeWeight, int64_t groupType, int64_t groupListType,
-                            aclOpExecutor *executor);
+                            aclOpExecutor* executor);
 }
 
 #endif

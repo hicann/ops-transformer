@@ -26,21 +26,21 @@ using namespace GroupedMatmulAdd;
 
 class GroupedMatmulAddNoQuantTiling {
 public:
-    bool SetTiling(gert::TilingContext *context);
+    bool SetTiling(gert::TilingContext* context);
 
 protected:
-    bool Init(const gert::TilingContext *context);
-    bool GetAttrs(const gert::TilingContext *context);
-    bool CalMatMulTiling(const gert::TilingContext *context, const GMMCompileInfo *compileInfoPtr);
+    bool Init(const gert::TilingContext* context);
+    bool GetAttrs(const gert::TilingContext* context);
+    bool CalMatMulTiling(const gert::TilingContext* context, const GMMCompileInfo* compileInfoPtr);
     void SetGMMTiling();
     void SetMatMulTiling();
-    void PrintTilingResult(const gert::TilingContext *context);
-    void FormulateBasicBlock(const GMMCompileInfo *compileInfoPtr, uint32_t remainCoreNum);
-    void CalAswtL1Tiling(const GMMCompileInfo *compileInfoPtr);
-    void CalcTailBasicBlock(const GMMCompileInfo *compileInfoPtr);
-    bool SetCustomParam(gert::TilingContext *context);
-    void SetTilingKey(gert::TilingContext *context) const;
-    bool SplitKSingleXSingleWeightSingleY(const gert::TilingContext *context, const gert::Shape xShape,
+    void PrintTilingResult(const gert::TilingContext* context);
+    void FormulateBasicBlock(const GMMCompileInfo* compileInfoPtr, uint32_t remainCoreNum);
+    void CalAswtL1Tiling(const GMMCompileInfo* compileInfoPtr);
+    void CalcTailBasicBlock(const GMMCompileInfo* compileInfoPtr);
+    bool SetCustomParam(gert::TilingContext* context);
+    void SetTilingKey(gert::TilingContext* context) const;
+    bool SplitKSingleXSingleWeightSingleY(const gert::TilingContext* context, const gert::Shape xShape,
                                           const gert::Shape wShape);
 
 private:

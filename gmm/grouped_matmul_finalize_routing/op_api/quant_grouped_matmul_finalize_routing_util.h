@@ -14,31 +14,31 @@
 namespace GmmFinalizeRouting {
 using namespace op;
 struct GroupedMatmulFinalizeRoutingParams {
-    const aclTensor *x1 = nullptr;
-    const aclTensor *x2 = nullptr;
-    const aclTensor *scale1Optional = nullptr;
-    const aclTensor *scale2 = nullptr;
-    const aclTensor *groupList = nullptr;
-    aclTensor *yRef = nullptr;
+    const aclTensor* x1 = nullptr;
+    const aclTensor* x2 = nullptr;
+    const aclTensor* scale1Optional = nullptr;
+    const aclTensor* scale2 = nullptr;
+    const aclTensor* groupList = nullptr;
+    aclTensor* yRef = nullptr;
     int64_t groupListType = 0;
     int64_t groupSize = 0;
 };
 
 struct GroupedMatmulParams {
     // mandatory
-    const aclTensor *x1{nullptr};
-    const aclTensor *x2{nullptr};
-    const aclTensor *out{nullptr};
+    const aclTensor* x1{nullptr};
+    const aclTensor* x2{nullptr};
+    const aclTensor* out{nullptr};
     // optional
-    const aclTensor *scale{nullptr};
-    const aclTensor *bias{nullptr};
-    const aclTensor *pertokenScaleOptional{nullptr};
-    const aclTensor *groupList{nullptr};
-    const aclTensor *shareInput{nullptr};
-    const aclTensor *logit{nullptr};
-    const aclTensor *rowIndex{nullptr};
-    const aclTensor *offset{nullptr};
-    const aclIntArray *tuningConfig{nullptr};
+    const aclTensor* scale{nullptr};
+    const aclTensor* bias{nullptr};
+    const aclTensor* pertokenScaleOptional{nullptr};
+    const aclTensor* groupList{nullptr};
+    const aclTensor* shareInput{nullptr};
+    const aclTensor* logit{nullptr};
+    const aclTensor* rowIndex{nullptr};
+    const aclTensor* offset{nullptr};
+    const aclIntArray* tuningConfig{nullptr};
     // numbers
     float shareInputWeight{0.0f};
     int64_t shareInputOffset{0};
@@ -51,7 +51,7 @@ struct GroupedMatmulParams {
 
 class GroupedMatmulParamsBuilder {
 public:
-    static GroupedMatmulParamsBuilder Create(const aclTensor *x1, const aclTensor *x2, const aclTensor *out)
+    static GroupedMatmulParamsBuilder Create(const aclTensor* x1, const aclTensor* x2, const aclTensor* out)
     {
         GroupedMatmulParamsBuilder b;
         b.p_.x1 = x1;
@@ -60,61 +60,61 @@ public:
         return b;
     }
 
-    GroupedMatmulParamsBuilder &SetScale(const aclTensor *scale)
+    GroupedMatmulParamsBuilder& SetScale(const aclTensor* scale)
     {
         p_.scale = scale;
         return *this;
     }
 
-    GroupedMatmulParamsBuilder &SetBias(const aclTensor *bias)
+    GroupedMatmulParamsBuilder& SetBias(const aclTensor* bias)
     {
         p_.bias = bias;
         return *this;
     }
 
-    GroupedMatmulParamsBuilder &SetPertokenScale(const aclTensor *pertoken)
+    GroupedMatmulParamsBuilder& SetPertokenScale(const aclTensor* pertoken)
     {
         p_.pertokenScaleOptional = pertoken;
         return *this;
     }
 
-    GroupedMatmulParamsBuilder &SetGroupList(const aclTensor *groupList)
+    GroupedMatmulParamsBuilder& SetGroupList(const aclTensor* groupList)
     {
         p_.groupList = groupList;
         return *this;
     }
 
-    GroupedMatmulParamsBuilder &SetShareInput(const aclTensor *shareInput)
+    GroupedMatmulParamsBuilder& SetShareInput(const aclTensor* shareInput)
     {
         p_.shareInput = shareInput;
         return *this;
     }
 
-    GroupedMatmulParamsBuilder &SetLogit(const aclTensor *logit)
+    GroupedMatmulParamsBuilder& SetLogit(const aclTensor* logit)
     {
         p_.logit = logit;
         return *this;
     }
 
-    GroupedMatmulParamsBuilder &SetRowIndex(const aclTensor *rowIndex)
+    GroupedMatmulParamsBuilder& SetRowIndex(const aclTensor* rowIndex)
     {
         p_.rowIndex = rowIndex;
         return *this;
     }
 
-    GroupedMatmulParamsBuilder &SetOffset(const aclTensor *offset)
+    GroupedMatmulParamsBuilder& SetOffset(const aclTensor* offset)
     {
         p_.offset = offset;
         return *this;
     }
 
-    GroupedMatmulParamsBuilder &SetTuningConfig(const aclIntArray *tuningConfig)
+    GroupedMatmulParamsBuilder& SetTuningConfig(const aclIntArray* tuningConfig)
     {
         p_.tuningConfig = tuningConfig;
         return *this;
     }
 
-    GroupedMatmulParamsBuilder &SetNumbers(float shareInputWeight, int64_t shareInputOffset, int64_t groupListType)
+    GroupedMatmulParamsBuilder& SetNumbers(float shareInputWeight, int64_t shareInputOffset, int64_t groupListType)
     {
         p_.shareInputWeight = shareInputWeight;
         p_.shareInputOffset = shareInputOffset;
@@ -122,13 +122,13 @@ public:
         return *this;
     }
 
-    GroupedMatmulParamsBuilder &SetDtype(int64_t dtype)
+    GroupedMatmulParamsBuilder& SetDtype(int64_t dtype)
     {
         p_.dtype = dtype;
         return *this;
     }
 
-    GroupedMatmulParamsBuilder &SetTranspose(bool transposeX1, bool transposeX2)
+    GroupedMatmulParamsBuilder& SetTranspose(bool transposeX1, bool transposeX2)
     {
         p_.transposeX1 = transposeX1;
         p_.transposeX2 = transposeX2;

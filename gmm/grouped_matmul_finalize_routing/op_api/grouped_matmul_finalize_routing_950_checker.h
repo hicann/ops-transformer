@@ -22,7 +22,7 @@
 
 namespace GmmFinalizeRouting {
 
-inline std::string ShapeToStringWithoutBracket(const op::Shape &shape)
+inline std::string ShapeToStringWithoutBracket(const op::Shape& shape)
 {
     std::ostringstream oss;
     for (size_t i = 0; i < shape.GetDimNum(); ++i) {
@@ -34,7 +34,7 @@ inline std::string ShapeToStringWithoutBracket(const op::Shape &shape)
     return oss.str();
 }
 
-inline std::string ViewShapeToString(const aclTensor *tensor)
+inline std::string ViewShapeToString(const aclTensor* tensor)
 {
     return ShapeToStringWithoutBracket(tensor->GetViewShape());
 }
@@ -76,7 +76,7 @@ constexpr int64_t GMMFR_SPLIT_SIZE = 64L;
 constexpr int64_t GMMFR_SPLIT_FACTOR = 2L;
 constexpr int64_t MOD2 = 2L;
 constexpr int64_t MAX_NUM_EXPERTS = 1024L;
-constexpr const char *GMMFR_ACLNN_OP_NAME = "aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSize";
+constexpr const char* GMMFR_ACLNN_OP_NAME = "aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSize";
 
 const std::vector<DataType> X_WEIGHT_TYPE_SUPPORT_LIST_MX = {
     op::DataType::DT_FLOAT8_E4M3FN, op::DataType::DT_FLOAT8_E5M2, op::DataType::DT_FLOAT4_E2M1};
@@ -117,7 +117,7 @@ class AclnnGroupedMatmulFinalizeRoutingDAV3510Checker {
 public:
     explicit AclnnGroupedMatmulFinalizeRoutingDAV3510Checker() {};
     ~AclnnGroupedMatmulFinalizeRoutingDAV3510Checker() {};
-    aclnnStatus CheckParams(GroupedMatmulParams &gmmParams)
+    aclnnStatus CheckParams(GroupedMatmulParams& gmmParams)
     {
         gmmParams_ = gmmParams;
         // 0. 进入判断逻辑之前先判断是哪种量化
@@ -379,7 +379,7 @@ public:
             return false;
         }
         if (e > MAX_NUM_EXPERTS) {
-            const char *quantModeStr = (quantMode_ == QuantMode::MX) ? "MX quant" : "pertoken quant";
+            const char* quantModeStr = (quantMode_ == QuantMode::MX) ? "MX quant" : "pertoken quant";
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                 GMMFR_ACLNN_OP_NAME, "weight", ViewShapeToString(gmmParams_.x2),
                 "in " + std::string(quantModeStr) + ", e must be less than or equal to 1024");
@@ -586,7 +586,7 @@ public:
             bool weightFormatInvalid =
                 !isWeightNz && (isBf16Output || op::IsPrivateFormat(gmmParams_.x2->GetStorageFormat()));
             if (weightFormatInvalid) {
-                const char *expectedFormatStr = isBf16Output ? "FRACTAL_NZ" : "ND or FRACTAL_NZ";
+                const char* expectedFormatStr = isBf16Output ? "FRACTAL_NZ" : "ND or FRACTAL_NZ";
                 OP_LOGE_FOR_INVALID_FORMAT(GMMFR_ACLNN_OP_NAME, "weight",
                                            op::ToString(gmmParams_.x2->GetStorageFormat()).GetString(),
                                            expectedFormatStr);

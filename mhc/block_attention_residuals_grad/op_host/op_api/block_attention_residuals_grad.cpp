@@ -21,12 +21,12 @@ namespace l0op {
 
 OP_TYPE_REGISTER(BlockAttentionResidualsGrad);
 
-const aclTensor *BlockAttentionResidualsGrad(const aclTensor *partialBlock, const aclTensor *blockRes,
-                                             const aclTensor *projWeight, const aclTensor *normWeight,
-                                             const aclTensor *gradHiddenStates, const aclTensor *invNorm,
-                                             const aclTensor *probs, int64_t validBlockNum, aclTensor *gradPartialBlock,
-                                             aclTensor *gradBlockRes, aclTensor *gradProjWeight,
-                                             aclTensor *gradNormWeight, aclOpExecutor *executor)
+const aclTensor* BlockAttentionResidualsGrad(const aclTensor* partialBlock, const aclTensor* blockRes,
+                                             const aclTensor* projWeight, const aclTensor* normWeight,
+                                             const aclTensor* gradHiddenStates, const aclTensor* invNorm,
+                                             const aclTensor* probs, int64_t validBlockNum, aclTensor* gradPartialBlock,
+                                             aclTensor* gradBlockRes, aclTensor* gradProjWeight,
+                                             aclTensor* gradNormWeight, aclOpExecutor* executor)
 {
     L0_DFX(BlockAttentionResidualsGrad, partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm,
            probs, validBlockNum, gradPartialBlock, gradBlockRes, gradProjWeight, gradNormWeight);

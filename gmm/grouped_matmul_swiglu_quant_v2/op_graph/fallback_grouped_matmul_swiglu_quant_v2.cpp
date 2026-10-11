@@ -45,8 +45,8 @@ constexpr size_t TYPEM_SCALE_N_DIM_INDEX = 2UL;
 constexpr size_t DIM_TWO = 2UL;
 constexpr size_t QUNATMODE_MX = 2UL;
 
-static bool SetShapeAndStrideForMXFPTypeMForGMMSwigluQuantV2(std::vector<int64_t> &viewShape,
-                                                             std::vector<int64_t> &strides)
+static bool SetShapeAndStrideForMXFPTypeMForGMMSwigluQuantV2(std::vector<int64_t>& viewShape,
+                                                             std::vector<int64_t>& strides)
 {
     OP_CHECK_IF(viewShape.size() < MXFP_TPYEM_SCALE_DIM_NUM,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback",
@@ -61,8 +61,8 @@ static bool SetShapeAndStrideForMXFPTypeMForGMMSwigluQuantV2(std::vector<int64_t
     return true;
 }
 
-static bool SetShapeAndStrideForLastTwoDimForGMMSwigluQuantV2(std::vector<int64_t> &viewShape,
-                                                              std::vector<int64_t> &strides)
+static bool SetShapeAndStrideForLastTwoDimForGMMSwigluQuantV2(std::vector<int64_t>& viewShape,
+                                                              std::vector<int64_t>& strides)
 {
     OP_CHECK_IF(viewShape.size() < DIM_TWO,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback",
@@ -77,8 +77,8 @@ static bool SetShapeAndStrideForLastTwoDimForGMMSwigluQuantV2(std::vector<int64_
     return true;
 }
 
-static void InitShapeAndStrideForGMMSwigluQuantV2(const gert::Shape &originShape, std::vector<int64_t> &viewShape,
-                                                  std::vector<int64_t> &strides)
+static void InitShapeAndStrideForGMMSwigluQuantV2(const gert::Shape& originShape, std::vector<int64_t>& viewShape,
+                                                  std::vector<int64_t>& strides)
 {
     for (size_t i = 0; i < originShape.GetDimNum(); ++i) {
         viewShape.push_back(originShape.GetDim(i));
@@ -110,12 +110,12 @@ static inline aclDataType ToAclDataTypeForGMMSwigluQuantV2(ge::DataType dtype)
     return static_cast<aclDataType>(dtype);
 }
 
-static inline aclTensorList *ConvertType(aclTensorList *geTensorList)
+static inline aclTensorList* ConvertType(aclTensorList* geTensorList)
 {
     return geTensorList;
 }
 
-static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool enableTranspose, size_t index,
+static inline aclTensor* GeTensor2AclTensor(const gert::Tensor* geTensor, bool enableTranspose, size_t index,
                                             bool enableNZ = false)
 {
     OP_CHECK_IF(geTensor == nullptr, OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "The geTensor nullptr"),
@@ -133,7 +133,7 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
     OP_CHECK_IF(aclCreateTensor == nullptr,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "The aclCreateTensor nullptr"), return nullptr);
 
-    void *deviceAddr = const_cast<void *>(geTensor->GetAddr());
+    void* deviceAddr = const_cast<void*>(geTensor->GetAddr());
     // convert data type
     auto dataTypeGE = geTensor->GetDataType();
     aclDataType dataType = ACL_DT_UNDEFINED;
@@ -143,7 +143,7 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
         dataType = ToAclDataType(dataTypeGE);
     }
     // convert view shape
-    const gert::Shape &origin_shape = geTensor->GetOriginShape();
+    const gert::Shape& origin_shape = geTensor->GetOriginShape();
     std::vector<int64_t> viewShape;
     std::vector<int64_t> strides;
     InitShapeAndStrideForGMMSwigluQuantV2(origin_shape, viewShape, strides);
@@ -166,7 +166,7 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
     if (enableNZ && GetPrimaryFormat(geTensor->GetStorageFormat()) == ge::Format::FORMAT_FRACTAL_NZ) {
         aclFormat = aclFormat::ACL_FORMAT_FRACTAL_NZ;
     }
-    aclTensor *out = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides.data(), 0, aclFormat,
+    aclTensor* out = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides.data(), 0, aclFormat,
                                      storageShapeVec.data(), storageShapeVec.size(), deviceAddr);
     OP_CHECK_IF(out == nullptr,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "The GeTensor2AclTensor out nullptr"),
@@ -174,7 +174,7 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
     return out;
 }
 
-static graphStatus PrepareAclTensor(const OpExecuteContext *host_api_ctx, const aclTensor *&tensor, size_t index,
+static graphStatus PrepareAclTensor(const OpExecuteContext* host_api_ctx, const aclTensor*& tensor, size_t index,
                                     bool enableTranspose, bool enableNZ)
 {
     if (index != INDEX_INPUT_SMOOTH_SCALE && index != INDEX_INPUT_BIAS) {
@@ -187,8 +187,8 @@ static graphStatus PrepareAclTensor(const OpExecuteContext *host_api_ctx, const 
     return GRAPH_SUCCESS;
 }
 
-static graphStatus PrepareAclTensorVector(const OpExecuteContext *host_api_ctx,
-                                          std::vector<const aclTensor *> &tensorVector, size_t index,
+static graphStatus PrepareAclTensorVector(const OpExecuteContext* host_api_ctx,
+                                          std::vector<const aclTensor*>& tensorVector, size_t index,
                                           bool enableTranspose, bool enableNZ)
 {
     size_t cnt = 0;
@@ -209,7 +209,7 @@ static graphStatus PrepareAclTensorVector(const OpExecuteContext *host_api_ctx,
     return GRAPH_SUCCESS;
 }
 
-static graphStatus PrepareOutputTensor(const OpExecuteContext *host_api_ctx, const gert::Tensor *&tensor, size_t index)
+static graphStatus PrepareOutputTensor(const OpExecuteContext* host_api_ctx, const gert::Tensor*& tensor, size_t index)
 {
     tensor = host_api_ctx->GetOutputTensor(index);
     OP_CHECK_IF(tensor == nullptr, OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "PrepareOutputTensor failed"),
@@ -217,27 +217,27 @@ static graphStatus PrepareOutputTensor(const OpExecuteContext *host_api_ctx, con
     return GRAPH_SUCCESS;
 }
 
-static graphStatus GroupedMatmulSwigluQuantV2ExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus GroupedMatmulSwigluQuantV2ExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_CHECK_IF(host_api_ctx == nullptr,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "The host_api_ctx is null"), return GRAPH_FAILED);
     auto attrs = host_api_ctx->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "The attrs is null"),
                 return GRAPH_FAILED);
-    const int64_t *dequantModeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_DEQUANT_MODE);
+    const int64_t* dequantModeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_DEQUANT_MODE);
     OP_CHECK_IF(dequantModeGe == nullptr,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "The dequantModeGe is null"), return GRAPH_FAILED);
-    const int64_t *dequantDtypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_DEQUANT_DTYPE);
+    const int64_t* dequantDtypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_DEQUANT_DTYPE);
     OP_CHECK_IF(dequantDtypeGe == nullptr,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "The dequantDtypeGe is null"), return GRAPH_FAILED);
-    const int64_t *quantModeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_QUANT_MODE);
+    const int64_t* quantModeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_QUANT_MODE);
     OP_CHECK_IF(quantModeGe == nullptr, OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "The quantModeGe is null"),
                 return GRAPH_FAILED);
-    const int64_t *groupListTypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_GROUP_LIST_TYPE);
+    const int64_t* groupListTypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_GROUP_LIST_TYPE);
     OP_CHECK_IF(groupListTypeGe == nullptr,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "The groupListTypeGe is null"),
                 return GRAPH_FAILED);
-    const bool *transWeightGe = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANSPOSE_WEIGHT);
+    const bool* transWeightGe = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANSPOSE_WEIGHT);
     OP_CHECK_IF(transWeightGe == nullptr, OP_LOGE("aclnnfallback", "transWeightGe is null"), return GRAPH_FAILED);
 
     static const auto aclCreateTensorList = GET_OP_API_FUNC(aclCreateTensorList);
@@ -245,21 +245,21 @@ static graphStatus GroupedMatmulSwigluQuantV2ExecuteFunc(OpExecuteContext *host_
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "Get opapi func aclCreateTensorList failed"),
                 return GRAPH_FAILED);
 
-    const aclTensor *aclTensorX = nullptr;
+    const aclTensor* aclTensorX = nullptr;
     OP_CHECK_IF(PrepareAclTensor(host_api_ctx, aclTensorX, INDEX_INPUT_X, false, false) != GRAPH_SUCCESS,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "PrepareAclTensor x failed"), return GRAPH_FAILED);
 
-    const aclTensor *aclTensorXScale = nullptr;
+    const aclTensor* aclTensorXScale = nullptr;
     OP_CHECK_IF(PrepareAclTensor(host_api_ctx, aclTensorXScale, INDEX_INPUT_X_SCALE, false, false) != GRAPH_SUCCESS,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "PrepareAclTensor xScale failed"),
                 return GRAPH_FAILED);
 
-    const aclTensor *aclTensorGroupList = nullptr;
+    const aclTensor* aclTensorGroupList = nullptr;
     OP_CHECK_IF(
         PrepareAclTensor(host_api_ctx, aclTensorGroupList, INDEX_INPUT_GROUP_LIST, false, false) != GRAPH_SUCCESS,
         OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "PrepareAclTensor groupList failed"), return GRAPH_FAILED);
 
-    std::vector<const aclTensor *> aclTensorVectorWeight;
+    std::vector<const aclTensor*> aclTensorVectorWeight;
     OP_CHECK_IF(PrepareAclTensorVector(host_api_ctx, aclTensorVectorWeight, INDEX_INPUT_WEIGHT, *transWeightGe,
                                        false) != GRAPH_SUCCESS,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "Prepare weight list failed"), return GRAPH_FAILED);
@@ -268,7 +268,7 @@ static graphStatus GroupedMatmulSwigluQuantV2ExecuteFunc(OpExecuteContext *host_
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "aclTensorListWeight is null"),
                 return GRAPH_FAILED);
 
-    std::vector<const aclTensor *> aclTensorVectorWeightScale;
+    std::vector<const aclTensor*> aclTensorVectorWeightScale;
     if (*quantModeGe == QUNATMODE_MX) {
         OP_CHECK_IF(PrepareAclTensorVector(host_api_ctx, aclTensorVectorWeightScale, INDEX_INPUT_WEIGHT_SCALE,
                                            *transWeightGe, false) != GRAPH_SUCCESS,
@@ -286,20 +286,20 @@ static graphStatus GroupedMatmulSwigluQuantV2ExecuteFunc(OpExecuteContext *host_
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "aclTensorListWeightScale is null"),
                 return GRAPH_FAILED);
 
-    const gert::Tensor *geTensorY = nullptr;
+    const gert::Tensor* geTensorY = nullptr;
     OP_CHECK_IF(PrepareOutputTensor(host_api_ctx, geTensorY, INDEX_OUTPUT_Y) != GRAPH_SUCCESS,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "PrepareOutputTensor y failed"),
                 return GRAPH_FAILED);
 
-    const gert::Tensor *geTensorYScale = nullptr;
+    const gert::Tensor* geTensorYScale = nullptr;
     OP_CHECK_IF(PrepareOutputTensor(host_api_ctx, geTensorYScale, INDEX_OUTPUT_Y_SCALE) != GRAPH_SUCCESS,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "PrepareOutputTensor yScale failed"),
                 return GRAPH_FAILED);
 
-    aclTensorList *biasTensorOptional = nullptr;
-    aclTensorList *smoothScaleTensorOptional = nullptr;
-    aclIntArray *tuningConfig = nullptr;
-    aclTensorList *aclTensorListWeightAssistMatrix = nullptr;
+    aclTensorList* biasTensorOptional = nullptr;
+    aclTensorList* smoothScaleTensorOptional = nullptr;
+    aclIntArray* tuningConfig = nullptr;
+    aclTensorList* aclTensorListWeightAssistMatrix = nullptr;
 
     // execute opapi
     auto api_ret =

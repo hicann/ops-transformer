@@ -21,11 +21,22 @@ from atk.tasks.api_execute.base_api import BaseApi
 from atk.tasks.dataset.base_dataset import OpsDataset
 from atk.tasks.api_execute.aclnn_base_api import AclnnBaseApi
 from atk.tasks.backends.lib_interface.acl_wrapper import TensorPtr
-from atk.tasks.backends.lib_interface.acl_wrapper import AclFormat,AclTensorList,AclTensorStruct
+from atk.tasks.backends.lib_interface.acl_wrapper import (
+    AclFormat,
+    AclTensorList,
+    AclTensorStruct,
+)
 
 os.environ["PYTORCH_NO_NPU_MEMORY_CACHING"] = "1"
 
-def GMM_Swiglu_quant(x: torch.Tensor, weight: torch.Tensor, perChannelScale: torch.Tensor, perTokenScale: torch.Tensor, m: int):
+
+def GMM_Swiglu_quant(
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    perChannelScale: torch.Tensor,
+    perTokenScale: torch.Tensor,
+    m: int,
+):
     """
     执行量化的 GMM(通用矩阵乘法)操作,并使用 SwiGLU 激活函数。
 
@@ -56,14 +67,21 @@ def GMM_Swiglu_quant(x: torch.Tensor, weight: torch.Tensor, perChannelScale: tor
     # 对输出进行量化
     max = torch.max(torch.abs(c_temp6), -1).values  # 找到最大绝对值以计算缩放因子
     quantScaleOutput = 127 / max  # 计算量化缩放因子
-    quantOutput = torch.round(
-        c_temp6 * quantScaleOutput.reshape(m, 1)).to(torch.int8)  # 量化为 int8
+    quantOutput = torch.round(c_temp6 * quantScaleOutput.reshape(m, 1)).to(
+        torch.int8
+    )  # 量化为 int8
     quantScaleOutput = 1 / quantScaleOutput  # 反向量化缩放因子以便后续反量化
 
     return quantOutput, quantScaleOutput
 
 
-def process_groups(x: torch.Tensor, weight: torch.Tensor, perChannelScale: torch.Tensor, perTokenScale: torch.Tensor, groupList: torch.Tensor):
+def process_groups(
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    perChannelScale: torch.Tensor,
+    perTokenScale: torch.Tensor,
+    groupList: torch.Tensor,
+):
     """
     按组处理输入数据,并调用 GMM_Swiglu_quant 函数进行量化计算。
 
@@ -90,14 +108,18 @@ def process_groups(x: torch.Tensor, weight: torch.Tensor, perChannelScale: torch
         currV = v
         tempV = currV - preV  # 计算当前组的 token 数量
         preV = currV  # 更新前一个组的 token 数量
-        if (tempV > 0):
+        if tempV > 0:
             # 调用 GMM_Swiglu_quant 处理当前组
-            quantOutput[start_idx:start_idx + tempV], quantScaleOutput[start_idx:start_idx + tempV] = \
-                GMM_Swiglu_quant(x[start_idx:start_idx + tempV],
-                                 weight[i],
-                                 perChannelScale[i],
-                                 perTokenScale[start_idx:start_idx + tempV],
-                                 tempV)
+            (
+                quantOutput[start_idx : start_idx + tempV],
+                quantScaleOutput[start_idx : start_idx + tempV],
+            ) = GMM_Swiglu_quant(
+                x[start_idx : start_idx + tempV],
+                weight[i],
+                perChannelScale[i],
+                perTokenScale[start_idx : start_idx + tempV],
+                tempV,
+            )
 
         start_idx += tempV  # 更新起始索引以处理下一组
     return quantOutput, quantScaleOutput
@@ -124,20 +146,24 @@ def generate_non_decreasing_sequence(length, upper_limit, seed: int):
         sequence = (sequence * scale_factor).to(torch.int64)  # 缩放并转换为整数
     return sequence
 
+
 def cumsum_to_count(cumsum_tensor):
     """
     将累积和模式的Tensor转换为计数模式
-    
+
     参数:
         cumsum_tensor: 一维Tensor，表示累积和
-    
+
     返回:
         count_tensor: 一维Tensor，表示原始计数
     """
     # 在开头添加0，然后计算相邻元素的差值
-    padded = torch.cat([torch.tensor([0], device=cumsum_tensor.device), cumsum_tensor[:-1]])
+    padded = torch.cat(
+        [torch.tensor([0], device=cumsum_tensor.device), cumsum_tensor[:-1]]
+    )
     count_tensor = cumsum_tensor - padded
     return count_tensor
+
 
 @register("function_aclnn_grouped_matmul_swiglu_quant_v2")
 class AclnnGroupedMatmulSwigluQuant(BaseApi):
@@ -148,30 +174,34 @@ class AclnnGroupedMatmulSwigluQuant(BaseApi):
         :param input_data:
         :return:
         """
-        x = input_data.kwargs['x']
-        weight = input_data.kwargs['weight'][0]
-        seed = input_data.kwargs['seed']
+        x = input_data.kwargs["x"]
+        weight = input_data.kwargs["weight"][0]
+        seed = input_data.kwargs["seed"]
         # 指定随机种子
         torch.manual_seed(seed)
-        groupList = generate_non_decreasing_sequence(
-            weight.shape[0], x.shape[0], seed)
+        groupList = generate_non_decreasing_sequence(weight.shape[0], x.shape[0], seed)
         E, K, N = weight.shape[0], weight.shape[1], weight.shape[2]
-        if self.device == 'pyaclnn':
-            input_data.kwargs['smoothScale'] = TensorPtr()
-            input_data.kwargs['weightAssistMatrix'] = ctypes.POINTER(AclTensorList)()
-            input_data.kwargs['groupList'] = groupList.npu()
-            input_data.kwargs['weight'][0]  = weight.reshape(E, K // 16, 16, N // 32, 32).permute(0, 3, 1, 2, 4).contiguous().npu()
+        if self.device == "pyaclnn":
+            input_data.kwargs["smoothScale"] = TensorPtr()
+            input_data.kwargs["weightAssistMatrix"] = ctypes.POINTER(AclTensorList)()
+            input_data.kwargs["groupList"] = groupList.npu()
+            input_data.kwargs["weight"][0] = (
+                weight.reshape(E, K // 16, 16, N // 32, 32)
+                .permute(0, 3, 1, 2, 4)
+                .contiguous()
+                .npu()
+            )
 
-            if input_data.kwargs['groupListType'] == 0:
-                input_data.kwargs['groupList'] = groupList.npu()
+            if input_data.kwargs["groupListType"] == 0:
+                input_data.kwargs["groupList"] = groupList.npu()
             else:
                 groupList_cumsum = groupList.clone()
                 groupList_count = cumsum_to_count(groupList_cumsum)
-                input_data.kwargs['groupList'] = groupList_count.npu()
+                input_data.kwargs["groupList"] = groupList_count.npu()
         else:
-            input_data.kwargs['groupList'] = groupList.cpu()
-        input_data.kwargs.pop('seed')
-        input_data.kwargs.pop('case')
+            input_data.kwargs["groupList"] = groupList.cpu()
+        input_data.kwargs.pop("seed")
+        input_data.kwargs.pop("case")
 
     def get_format(self, input_data: InputDataset, index=None, name=None):
         """
@@ -181,7 +211,7 @@ class AclnnGroupedMatmulSwigluQuant(BaseApi):
         :return:
         format at this index or name
         """
-        if name == 'weight':
+        if name == "weight":
             return AclFormat.ACL_FORMAT_FRACTAL_NZ
 
         return AclFormat.ACL_FORMAT_ND
@@ -194,17 +224,16 @@ class AclnnGroupedMatmulSwigluQuant(BaseApi):
         else:
             device = "cpu"
 
-        x = input_data.kwargs['x']
-        weight = input_data.kwargs['weight'][0]
+        x = input_data.kwargs["x"]
+        weight = input_data.kwargs["weight"][0]
 
-        weightScale = input_data.kwargs['weightScale'][0]
-        xScale = input_data.kwargs['xScale']
-        groupList = input_data.kwargs['groupList']
+        weightScale = input_data.kwargs["weightScale"][0]
+        xScale = input_data.kwargs["xScale"]
+        groupList = input_data.kwargs["groupList"]
 
-        output0, output1 = process_groups(
-            x, weight, weightScale, xScale, groupList)
+        output0, output1 = process_groups(x, weight, weightScale, xScale, groupList)
 
-        real0, real1 = output0[:groupList[-1], :], output1[:groupList[-1]]
+        real0, real1 = output0[: groupList[-1], :], output1[: groupList[-1]]
         # 将标杆的脏数据部分改成全0
         group_index = groupList[-1]
         output0[group_index:, :] = 0
@@ -215,8 +244,8 @@ class AclnnGroupedMatmulSwigluQuant(BaseApi):
 
 @register("function_pyaclnn_grouped_matmul_swiglu_quant_v2")
 class AclnnGroupedMatmulSwigluQuant(AclnnBaseApi):  # SampleApi类型仅需设置唯一即可。
-    def __init__(self,task_result:TaskResult,backend):
-        super().__init__(task_result,backend)
+    def __init__(self, task_result: TaskResult, backend):
+        super().__init__(task_result, backend)
         self.input_args = None
         self.groupList = None
         self.isCount = None

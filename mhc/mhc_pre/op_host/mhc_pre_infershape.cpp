@@ -47,7 +47,7 @@ const constexpr int64_t BSND_DIM_NUM = 4;
 const constexpr int64_t TND_DIM_NUM = 3;
 const constexpr int64_t UNKNOWN_DIM_VALUE = -1LL;
 
-static void SetShape3D(gert::Shape *shape, uint64_t d0, uint64_t d1, uint64_t d2)
+static void SetShape3D(gert::Shape* shape, uint64_t d0, uint64_t d1, uint64_t d2)
 {
     shape->SetDimNum(3);
     shape->SetDim(0, d0);
@@ -55,14 +55,14 @@ static void SetShape3D(gert::Shape *shape, uint64_t d0, uint64_t d1, uint64_t d2
     shape->SetDim(2, d2);
 }
 
-static void SetShape2D(gert::Shape *shape, uint64_t d0, uint64_t d1)
+static void SetShape2D(gert::Shape* shape, uint64_t d0, uint64_t d1)
 {
     shape->SetDimNum(2);
     shape->SetDim(0, d0);
     shape->SetDim(1, d1);
 }
 
-static void SetShape4D(gert::Shape *shape, uint64_t d0, uint64_t d1, uint64_t d2, uint64_t d3)
+static void SetShape4D(gert::Shape* shape, uint64_t d0, uint64_t d1, uint64_t d2, uint64_t d3)
 {
     shape->SetDimNum(4);
     shape->SetDim(0, d0);
@@ -71,13 +71,13 @@ static void SetShape4D(gert::Shape *shape, uint64_t d0, uint64_t d1, uint64_t d2
     shape->SetDim(3, d3);
 }
 
-static void SetShape1D(gert::Shape *shape, uint64_t d0)
+static void SetShape1D(gert::Shape* shape, uint64_t d0)
 {
     shape->SetDimNum(1);
     shape->SetDim(0, d0);
 }
 
-static void SetShapeFromX(gert::Shape *dst, const gert::Shape *src)
+static void SetShapeFromX(gert::Shape* dst, const gert::Shape* src)
 {
     dst->SetDimNum(src->GetDimNum());
     for (int64_t i = 0; i < src->GetDimNum(); ++i) {
@@ -94,12 +94,12 @@ static uint64_t Factorial(uint64_t n)
     return r;
 }
 
-static ge::graphStatus InferShape4MhcPre(InferShapeContext *context)
+static ge::graphStatus InferShape4MhcPre(InferShapeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferShape MhcPre");
-    const gert::Shape *xShape = context->GetDynamicInputShape(X_INDEX, 0);
-    const gert::Shape *phiShape = context->GetDynamicInputShape(PHI_INDEX, 0);
-    const gert::Shape *alphaShape = context->GetDynamicInputShape(ALPHA_INDEX, 0);
+    const gert::Shape* xShape = context->GetDynamicInputShape(X_INDEX, 0);
+    const gert::Shape* phiShape = context->GetDynamicInputShape(PHI_INDEX, 0);
+    const gert::Shape* alphaShape = context->GetDynamicInputShape(ALPHA_INDEX, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, phiShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, alphaShape);
@@ -126,7 +126,7 @@ static ge::graphStatus InferShape4MhcPre(InferShapeContext *context)
     // has residual
     bool hasResi = (alphaDimSize == 3);
 
-    gert::Shape *outShapes[6] = {context->GetOutputShape(OUT_H_IN_INDEX),  context->GetOutputShape(OUT_H_POST_INDEX),
+    gert::Shape* outShapes[6] = {context->GetOutputShape(OUT_H_IN_INDEX),  context->GetOutputShape(OUT_H_POST_INDEX),
                                  context->GetOutputShape(OUT_H_RES_INDEX), context->GetOutputShape(OUT_INV_RMS_INDEX),
                                  context->GetOutputShape(OUT_H_MIX_INDEX), context->GetOutputShape(OUT_H_PRE_INDEX)};
 
@@ -204,7 +204,7 @@ static ge::graphStatus InferShape4MhcPre(InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-static graphStatus InferDataType4MhcPre(gert::InferDataTypeContext *context)
+static graphStatus InferDataType4MhcPre(gert::InferDataTypeContext* context)
 {
     const auto xDtype = context->GetInputDataType(X_INDEX);
     context->SetOutputDataType(OUT_H_IN_INDEX, xDtype);

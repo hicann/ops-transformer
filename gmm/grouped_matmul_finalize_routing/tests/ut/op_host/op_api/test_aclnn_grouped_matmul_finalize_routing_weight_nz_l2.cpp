@@ -24,8 +24,7 @@
 using namespace std;
 using namespace op;
 
-class l2_GroupedMatmulFinalizeRoutingWeightNz_test : public testing::Test
-{
+class l2_GroupedMatmulFinalizeRoutingWeightNz_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -467,8 +466,7 @@ TEST_F(l2_GroupedMatmulFinalizeRoutingWeightNz_test, ascend910B2_test_normal_cas
     int64_t bs = 24;
     int64_t bsdp = 8;
     TensorDesc x1_desc = TensorDesc({m, k}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
-    TensorDesc x2_desc =
-        TensorDesc({0}, ACL_INT8, ACL_FORMAT_FRACTAL_NZ).ValueRange(-1, 1);
+    TensorDesc x2_desc = TensorDesc({0}, ACL_INT8, ACL_FORMAT_FRACTAL_NZ).ValueRange(-1, 1);
     TensorDesc scale_desc = TensorDesc({e, n}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc perTokenScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(bs, bs);
@@ -494,8 +492,7 @@ TEST_F(l2_GroupedMatmulFinalizeRoutingWeightNz_test, ascend910B2_test_normal_cas
     int64_t bs = 24;
     int64_t bsdp = 8;
     TensorDesc x1_desc = TensorDesc({m, k}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
-    TensorDesc x2_desc =
-        TensorDesc({0}, ACL_INT8, ACL_FORMAT_FRACTAL_NZ).ValueRange(-1, 1);
+    TensorDesc x2_desc = TensorDesc({0}, ACL_INT8, ACL_FORMAT_FRACTAL_NZ).ValueRange(-1, 1);
     TensorDesc scale_desc = TensorDesc({e, n}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc perTokenScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(bs, bs);
@@ -604,8 +601,8 @@ TEST_F(l2_GroupedMatmulFinalizeRoutingWeightNz_test, ascend910B2_test_k_n_not_su
     int64_t quantGroupSize = 256;
 
     TensorDesc x1_desc = TensorDesc({m, k}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-1, 1);
-    TensorDesc x2_desc =
-        TensorDesc({e, k, n / 8}, ACL_INT8, ACL_FORMAT_FRACTAL_NZ, {}, 0, {e, n / 32, k / 16, 16, 32}).ValueRange(-1, 1);
+    TensorDesc x2_desc = TensorDesc({e, k, n / 8}, ACL_INT8, ACL_FORMAT_FRACTAL_NZ, {}, 0, {e, n / 32, k / 16, 16, 32})
+                             .ValueRange(-1, 1);
     TensorDesc scale_desc = TensorDesc({e, k / quantGroupSize, n}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc perTokenScale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 3);
     TensorDesc groupList_desc = TensorDesc({e}, ACL_INT64, ACL_FORMAT_ND).ValueRange(bs, bs);

@@ -18,16 +18,22 @@ using namespace std;
 
 class MhcPreSinkhornBackwardTiling : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "MhcPreSinkhornBackwardTiling SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "MhcPreSinkhornBackwardTiling SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "MhcPreSinkhornBackwardTiling TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "MhcPreSinkhornBackwardTiling TearDown" << std::endl;
+    }
 };
 
 template <typename T>
-static string TilingData2Str(void *buf, size_t size)
+static string TilingData2Str(void* buf, size_t size)
 {
     string result;
-    const T *data = reinterpret_cast<const T *>(buf);
+    const T* data = reinterpret_cast<const T*>(buf);
     size_t len = size / sizeof(T);
     for (size_t i = 0; i < len; i++) {
         result += std::to_string(data[i]);

@@ -57,8 +57,8 @@ public:
     // Bind GM tensors + tiling data. Must be called before Process().
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR quantized_weight, GM_ADDR weight_scale, GM_ADDR group_list,
                                 GM_ADDR bias, GM_ADDR x_scale, GM_ADDR x_offset, GM_ADDR smooth_scale, GM_ADDR y,
-                                GM_ADDR usr_workspace, const QuantMatmulDequantTilingData *__restrict tiling,
-                                TPipe *pipe);
+                                GM_ADDR usr_workspace, const QuantMatmulDequantTilingData* __restrict tiling,
+                                TPipe* pipe);
 
     // Main compute loop - iter-level distribution over experts.
     __aicore__ inline void Process();
@@ -102,10 +102,10 @@ private:
     // Workspace base pointer. xZNGm_ / syncGmWs_ GlobalTensors are derived
     // on-demand inside the staged-PhaseX/PhaseMM code paths - keeping them
     // as class members exceeds the 16000-byte aicore stack frame limit.
-    __gm__ uint8_t *usrWs_ = nullptr;
+    __gm__ uint8_t* usrWs_ = nullptr;
 
-    TPipe *pipe_ = nullptr;
-    const QuantMatmulDequantTilingData *__restrict tiling_ = nullptr;
+    TPipe* pipe_ = nullptr;
+    const QuantMatmulDequantTilingData* __restrict tiling_ = nullptr;
 
     // -------------------------------------------------------------
     // UB arena - single TBuf carved into persistent + aliased slots.

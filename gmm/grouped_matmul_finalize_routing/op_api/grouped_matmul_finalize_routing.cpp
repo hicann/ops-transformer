@@ -26,7 +26,7 @@ OP_TYPE_REGISTER(GroupedMatmulFinalizeRouting);
 namespace {
 constexpr int64_t OUT_DTYPE_BF16 = 2;
 
-bool IsMxBf16OutputSupported(const aclTensor *x1, const aclTensor *x2)
+bool IsMxBf16OutputSupported(const aclTensor* x1, const aclTensor* x2)
 {
     if (x1 == nullptr || x2 == nullptr) {
         return false;
@@ -38,7 +38,7 @@ bool IsMxBf16OutputSupported(const aclTensor *x1, const aclTensor *x2)
     return x2->GetStorageFormat() == Format::FORMAT_FRACTAL_NZ && (isMxFp4 || isMxFp8E4M3);
 }
 
-DataType GetOutputDataType(const aclTensor *x1, const aclTensor *x2, const aclTensor *logit, int64_t dtype)
+DataType GetOutputDataType(const aclTensor* x1, const aclTensor* x2, const aclTensor* logit, int64_t dtype)
 {
     bool isBf16Output = dtype == OUT_DTYPE_BF16 || (logit != nullptr && logit->GetDataType() == DataType::DT_BF16);
     if (isBf16Output && op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 &&
@@ -49,14 +49,14 @@ DataType GetOutputDataType(const aclTensor *x1, const aclTensor *x2, const aclTe
 }
 } // namespace
 
-const aclTensor *GroupedMatmulFinalizeRouting(const aclTensor *x1, const aclTensor *x2, const aclTensor *scale,
-                                              const aclTensor *bias, const aclTensor *pertokenScale,
-                                              const aclTensor *groupList, const aclTensor *shareInput,
-                                              const aclTensor *logit, const aclTensor *rowIndex,
-                                              const aclTensor *offset, int64_t dtype, float sharedInputWeight,
+const aclTensor* GroupedMatmulFinalizeRouting(const aclTensor* x1, const aclTensor* x2, const aclTensor* scale,
+                                              const aclTensor* bias, const aclTensor* pertokenScale,
+                                              const aclTensor* groupList, const aclTensor* shareInput,
+                                              const aclTensor* logit, const aclTensor* rowIndex,
+                                              const aclTensor* offset, int64_t dtype, float sharedInputWeight,
                                               int64_t sharedInputOffset, bool transposeX1, bool transposeX2,
-                                              int64_t outputBS, int64_t groupListType, const aclIntArray *tuningConfig,
-                                              aclOpExecutor *executor)
+                                              int64_t outputBS, int64_t groupListType, const aclIntArray* tuningConfig,
+                                              aclOpExecutor* executor)
 {
     L0_DFX(GroupedMatmulFinalizeRouting, x1, x2, scale, bias, pertokenScale, groupList, shareInput, logit, rowIndex,
            dtype, sharedInputWeight, sharedInputOffset, transposeX1, transposeX2, outputBS, groupListType);

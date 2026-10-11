@@ -72,8 +72,7 @@ TEST_F(l2_grouped_matmul_add_test, Ascend910B2_grouped_matmul_add_fp16_v2)
     for (int i = 0; i < groupListTypeMode; i++) {
         // groupListType = 0 or 1.
         auto ut = OP_API_UT(aclnnGroupedMatmulAddV2,
-                            INPUT(x, weight, groupList, yRef, transposeX, transposeWeight, groupType, i),
-                            OUTPUT());
+                            INPUT(x, weight, groupList, yRef, transposeX, transposeWeight, groupType, i), OUTPUT());
 
         aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);
     }

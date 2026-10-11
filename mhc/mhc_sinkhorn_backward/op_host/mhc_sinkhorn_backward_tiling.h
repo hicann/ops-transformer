@@ -38,7 +38,7 @@ struct MhcSinkhornBackwardCompileInfo {
 
 class MhcSinkhornBackwardTiling : public MhcSinkhornBaseTiling {
 public:
-    explicit MhcSinkhornBackwardTiling(gert::TilingContext *context)
+    explicit MhcSinkhornBackwardTiling(gert::TilingContext* context)
         : MhcSinkhornBaseTiling(context)
     {}
 
@@ -76,10 +76,10 @@ private:
     void SetTilingData();
 
     // Shape Info
-    const gert::Shape *gradYShape_ = nullptr;
-    const gert::Shape *normShape_ = nullptr;
-    const gert::Shape *sumShape_ = nullptr;
-    const gert::Shape *gradInputShape_ = nullptr;
+    const gert::Shape* gradYShape_ = nullptr;
+    const gert::Shape* normShape_ = nullptr;
+    const gert::Shape* sumShape_ = nullptr;
+    const gert::Shape* gradInputShape_ = nullptr;
     int64_t tSize_ = 0;
     int64_t bSize_ = 0;
     int64_t sSize_ = 0;
@@ -107,7 +107,7 @@ private:
     int64_t tailCorePerLoopTSize_ = 0;  // 尾核每次循环处理的数据量
     int64_t tailCoreLastLoopTSize_ = 0; // 尾核最后一次循环处理的数据量
 
-    const char *opName_ = "MhcSinkhornBackward";
+    const char* opName_ = "MhcSinkhornBackward";
     MhcSinkhornBackwardTilingData tilingData_;
 };
 } // namespace optiling

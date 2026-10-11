@@ -46,27 +46,27 @@ constexpr size_t kGroupedMatmulCsvColumnCount = 31;
 constexpr size_t kGroupedMatmulCsvExtendedColumnCount = 35;
 constexpr size_t kGroupedMatmulCsvOptionalTensorColumnCount = 44;
 
-vector<int64_t> ParseDims(const string &value)
+vector<int64_t> ParseDims(const string& value)
 {
     return ops::ut::ParseAclTensorViewDims(value);
 }
 
-vector<int64_t> ParseI64List(const string &value)
+vector<int64_t> ParseI64List(const string& value)
 {
     return ops::ut::ParseI64List(value);
 }
 
-aclDataType ParseDtype(const string &dtype)
+aclDataType ParseDtype(const string& dtype)
 {
     return ops::ut::ParseAclDtype(dtype);
 }
 
-aclFormat ParseFormat(const string &format)
+aclFormat ParseFormat(const string& format)
 {
     return ops::ut::ParseAclFormat(format);
 }
 
-void SetupPlatformForCase(const string &socVersion)
+void SetupPlatformForCase(const string& socVersion)
 {
     static const map<string, op::SocVersion> socMap = {
         {"Ascend310P", op::SocVersion::ASCEND310P},
@@ -443,7 +443,7 @@ struct GroupedMatmulOpApiCase {
     string antiquantOffsetFormat = "ND";
 };
 
-vector<GroupedMatmulOpApiCase> LoadCases(const string &csvFilePath)
+vector<GroupedMatmulOpApiCase> LoadCases(const string& csvFilePath)
 {
     ifstream in(csvFilePath);
     EXPECT_TRUE(in.is_open()) << "Failed to open CSV file: " << csvFilePath;
@@ -541,7 +541,7 @@ vector<GroupedMatmulOpApiCase> LoadCases(const string &csvFilePath)
                 c.antiquantOffsetFormat = Trim(cols[i++]);
             }
             cases.emplace_back(c);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvFilePath, lineNo, caseName, error);
         }
     }
@@ -549,7 +549,7 @@ vector<GroupedMatmulOpApiCase> LoadCases(const string &csvFilePath)
     return cases;
 }
 
-string BuildCaseName(const testing::TestParamInfo<GroupedMatmulOpApiCase> &info)
+string BuildCaseName(const testing::TestParamInfo<GroupedMatmulOpApiCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.caseName);
 }
@@ -568,7 +568,7 @@ aclnnStatus CheckS8S4Inputs(int64_t groupListType, bool hasOffset, bool nullBias
     auto perTokenScale = BuildAclTensorListDesc("64", "FLOAT", "ND").ToAclType();
     auto out = BuildAclTensorListDesc("64:256", hasOffset ? "FLOAT16" : "BF16", "ND").ToAclType();
     auto groupList = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).ToAclType();
-    const aclTensor *nullTensor = nullptr;
+    const aclTensor* nullTensor = nullptr;
     std::unique_ptr<aclTensorList, decltype(&aclDestroyTensorList)> nullBias(aclCreateTensorList(&nullTensor, 1),
                                                                              aclDestroyTensorList);
 
@@ -621,11 +621,11 @@ TEST(GroupedMatmulS8S4OpApiChecker, UsesA3WeightFormatWhitelist)
     EXPECT_EQ(CheckS8S4Inputs(1, false, false, ACL_FORMAT_NHWC), ACLNN_ERR_PARAM_INVALID);
 }
 
-using OptionalTensorLists = std::array<const aclTensorList *, 6>;
+using OptionalTensorLists = std::array<const aclTensorList*, 6>;
 using OwnedTensorList = std::unique_ptr<aclTensorList, decltype(&aclDestroyTensorList)>;
 
-const std::array<const char *, 6> kOptionalTensorNames = {"bias",           "scale",           "offset",
-                                                          "antiquantScale", "antiquantOffset", "perTokenScale"};
+const std::array<const char*, 6> kOptionalTensorNames = {"bias",           "scale",           "offset",
+                                                         "antiquantScale", "antiquantOffset", "perTokenScale"};
 const std::array<gmm::GMMApiVersion, 6> kGroupedMatmulPublicApis = {
     gmm::GMMApiVersion::V1, gmm::GMMApiVersion::V2, gmm::GMMApiVersion::V3,
     gmm::GMMApiVersion::V4, gmm::GMMApiVersion::V5, gmm::GMMApiVersion::WeightNz};
@@ -633,7 +633,7 @@ const std::array<gmm::GMMApiVersion, 6> kGroupedMatmulPublicApis = {
 OwnedTensorList MakeTensorListWithNullElement(size_t nullIndex, bool emptyFirst = false)
 {
     auto first = TensorDesc({emptyFirst ? 0 : 32}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclType();
-    const aclTensor *tensors[] = {nullptr, nullptr};
+    const aclTensor* tensors[] = {nullptr, nullptr};
     if (nullIndex != 0) {
         tensors[0] = first.get();
     }
@@ -658,14 +658,14 @@ protected:
         op::SetPlatformSocVersion(previousSoc_);
     }
 
-    aclnnStatus GetWorkspaceSize(gmm::GMMApiVersion api, const OptionalTensorLists &optional)
+    aclnnStatus GetWorkspaceSize(gmm::GMMApiVersion api, const OptionalTensorLists& optional)
     {
         // A valid no-split FP16 case with zero M avoids kernel execution for compatibility checks.
         auto x = BuildAclTensorListDesc("0:32", "FLOAT16", "ND").ToAclType();
         auto weight = BuildAclTensorListDesc("32:32", "FLOAT16", "ND").ToAclType();
         auto out = BuildAclTensorListDesc("0:32", "FLOAT16", "ND").ToAclType();
         uint64_t workspaceSize = 0;
-        aclOpExecutor *executor = nullptr;
+        aclOpExecutor* executor = nullptr;
         aclnnStatus status = ACLNN_ERR_PARAM_INVALID;
         switch (api) {
             case gmm::GMMApiVersion::V1:
@@ -762,14 +762,14 @@ TEST_F(GroupedMatmulOptionalTensorListTest, A5WeightNzRejectsNullOffsetBeforeQua
             SCOPED_TRACE(testing::Message()
                          << "scale dtype=" << static_cast<int>(scaleDtype) << ", offset[" << nullIndex << "]");
             auto firstOffset = TensorDesc({2, 1, 256}, ACL_FLOAT, ACL_FORMAT_ND).ToAclType();
-            const aclTensor *offsetTensors[] = {nullIndex == 0 ? nullptr : firstOffset.get(), nullptr};
+            const aclTensor* offsetTensors[] = {nullIndex == 0 ? nullptr : firstOffset.get(), nullptr};
             OwnedTensorList offset(aclCreateTensorList(offsetTensors, nullIndex + 1), aclDestroyTensorList);
             ASSERT_NE(offset.get(), nullptr);
             if (nullIndex != 0) {
                 (void)firstOffset.release();
             }
             uint64_t workspaceSize = 0;
-            aclOpExecutor *executor = nullptr;
+            aclOpExecutor* executor = nullptr;
             // A null element must not turn offset mode into symmetric mode and report invalid quantGroupSize.
             const auto status = aclnnGroupedMatmulWeightNzGetWorkspaceSize(
                 x.get(), weight.get(), nullptr, scale.get(), offset.get(), nullptr, nullptr, perTokenScale.get(),
@@ -786,13 +786,13 @@ TEST_F(GroupedMatmulOptionalTensorListTest, A5WeightNzRejectsNullOffsetBeforeQua
 TEST_F(GroupedMatmulOptionalTensorListTest, A5AcceptsOmittedAndEmptyLists)
 {
     EXPECT_EQ(GetWorkspaceSize(gmm::GMMApiVersion::V5, {}), ACLNN_SUCCESS);
-    const aclTensor *unused = nullptr;
+    const aclTensor* unused = nullptr;
     OwnedTensorList emptyList(aclCreateTensorList(&unused, 0), aclDestroyTensorList);
     auto emptyTensor = BuildAclTensorListDesc("0", "FLOAT16", "ND").ToAclType();
     ASSERT_NE(emptyList.get(), nullptr);
     for (size_t input = 0; input < kOptionalTensorNames.size(); ++input) {
         SCOPED_TRACE(kOptionalTensorNames[input]);
-        for (const aclTensorList *list : {emptyList.get(), emptyTensor.get()}) {
+        for (const aclTensorList* list : {emptyList.get(), emptyTensor.get()}) {
             OptionalTensorLists optional{};
             optional[input] = list;
             EXPECT_EQ(GetWorkspaceSize(gmm::GMMApiVersion::V5, optional), ACLNN_SUCCESS);
@@ -807,7 +807,7 @@ TEST_F(GroupedMatmulOptionalTensorListTest, A5PreservesValidBiasAndInvalidParame
     auto invalidShape = BuildAclTensorListDesc("31", "FLOAT16", "ND").ToAclType();
     auto invalidDtype = BuildAclTensorListDesc("32", "INT8", "ND").ToAclType();
     auto invalidCount = TensorListDesc(2, TensorDesc({32}, ACL_FLOAT16, ACL_FORMAT_ND)).ToAclType();
-    for (const aclTensorList *bias : {invalidShape.get(), invalidDtype.get(), invalidCount.get()}) {
+    for (const aclTensorList* bias : {invalidShape.get(), invalidDtype.get(), invalidCount.get()}) {
         EXPECT_EQ(GetWorkspaceSize(gmm::GMMApiVersion::V5, {bias}), ACLNN_ERR_PARAM_INVALID);
     }
 }

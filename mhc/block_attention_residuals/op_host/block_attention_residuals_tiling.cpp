@@ -81,7 +81,7 @@ void BlockAttentionResidualsTiling::InitCompileInfo()
         OP_LOGE(context_->GetNodeName(), "platformInfoPtr is null");
         return;
     }
-    const auto &ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
+    const auto& ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfo_.ubSize);
     compileInfo_.aivNum = ascendcPlatform.GetCoreNumAiv();
     if (compileInfo_.aivNum <= 0) {
@@ -308,14 +308,14 @@ ge::graphStatus BlockAttentionResidualsTiling::PostTiling()
                 return ge::GRAPH_FAILED);
 
     errno_t ret = memcpy_s(rawTilingData->GetData(), rawTilingData->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
     }
     rawTilingData->SetDataSize(tilingDataSize);
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(workspaces == nullptr, OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(), "workspaces is null"),
                 return ge::GRAPH_FAILED);
     workspaces[0] = workspaceSize_;
@@ -380,10 +380,10 @@ uint32_t BlockAttentionResidualsTiling::DtypeElemsPerBlk() const
 
 ge::graphStatus BlockAttentionResidualsTiling::AnalyzeShapes()
 {
-    const auto &partialBlockShape = context_->GetInputShape(PARTIAL_BLOCK_INDEX)->GetOriginShape();
-    const auto &blockShape = context_->GetInputShape(BLOCK_RES_INDEX)->GetOriginShape();
-    const auto &projShape = context_->GetInputShape(PROJ_WEIGHT_INDEX)->GetOriginShape();
-    const auto &normShape = context_->GetInputShape(NORM_WEIGHT_INDEX)->GetOriginShape();
+    const auto& partialBlockShape = context_->GetInputShape(PARTIAL_BLOCK_INDEX)->GetOriginShape();
+    const auto& blockShape = context_->GetInputShape(BLOCK_RES_INDEX)->GetOriginShape();
+    const auto& projShape = context_->GetInputShape(PROJ_WEIGHT_INDEX)->GetOriginShape();
+    const auto& normShape = context_->GetInputShape(NORM_WEIGHT_INDEX)->GetOriginShape();
 
     OP_CHECK_IF(partialBlockShape.GetDimNum() != PARTIAL_BLOCK_DIM,
                 OP_LOGE(context_->GetNodeName(), "partial_block dim num must be %zu", PARTIAL_BLOCK_DIM),
@@ -423,7 +423,7 @@ ge::graphStatus BlockAttentionResidualsTiling::GetValidBlockNum()
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is null"), return ge::GRAPH_FAILED);
-    const int64_t *validBlockNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_VALID_BLOCK_NUM_INDEX);
+    const int64_t* validBlockNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_VALID_BLOCK_NUM_INDEX);
     int64_t validBlockNum = (validBlockNumPtr != nullptr) ? *validBlockNumPtr : -1;
     const int64_t inputValidBlockNum = validBlockNum;
     if (validBlockNum == -1) {
@@ -442,7 +442,7 @@ ge::graphStatus BlockAttentionResidualsTiling::GetNormEps()
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is null"), return ge::GRAPH_FAILED);
-    const float *normEpsPtr = attrs->GetAttrPointer<float>(ATTR_NORM_EPS_INDEX);
+    const float* normEpsPtr = attrs->GetAttrPointer<float>(ATTR_NORM_EPS_INDEX);
     tilingData_.normEps = (normEpsPtr != nullptr) ? *normEpsPtr : 1e-6F;
     OP_CHECK_IF(tilingData_.normEps <= 0.0f, OP_LOGE(context_->GetNodeName(), "norm_eps must be > 0"),
                 return ge::GRAPH_FAILED);
@@ -453,7 +453,7 @@ ge::graphStatus BlockAttentionResidualsTiling::GetNeedBackward()
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is null"), return ge::GRAPH_FAILED);
-    const bool *needBackwardPtr = attrs->GetAttrPointer<bool>(ATTR_NEED_BACKWARD_INDEX);
+    const bool* needBackwardPtr = attrs->GetAttrPointer<bool>(ATTR_NEED_BACKWARD_INDEX);
     const bool needBackward = (needBackwardPtr != nullptr) ? *needBackwardPtr : false;
     tilingData_.needBackward = needBackward ? 1U : 0U;
 
@@ -488,18 +488,18 @@ void BlockAttentionResidualsTiling::PrintTilingData()
             tilingData_.needBackward, tilingData_.stagingBytes, tilingData_.tokensPerFlush, tilingData_.elemsPerToken);
 }
 
-static ge::graphStatus BlockAttentionResidualsTilingFunc(gert::TilingContext *context)
+static ge::graphStatus BlockAttentionResidualsTilingFunc(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("BlockAttentionResiduals", "context is null"),
                 return ge::GRAPH_FAILED);
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus TilingPrepareForBlockAttentionResiduals(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForBlockAttentionResiduals(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("BlockAttentionResiduals", "context is null"),
                 return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;

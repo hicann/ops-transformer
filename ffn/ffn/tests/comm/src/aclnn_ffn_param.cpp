@@ -23,7 +23,8 @@ using ops::adv::tests::utils::ReadFile;
 using ops::adv::tests::utils::WriteFile;
 
 namespace {
-template <class T> bool InitAclIntArray(aclIntArray **intArray, std::vector<T> &hostData)
+template <class T>
+bool InitAclIntArray(aclIntArray** intArray, std::vector<T>& hostData)
 {
     if (intArray == nullptr) {
         LOG_ERR("intArray nil.");
@@ -51,10 +52,9 @@ AclnnFFNParam::AclnnFFNParam(std::vector<Tensor> inputs, std::vector<int64_t> ex
                              int32_t innerPrecise, int32_t outputDtype, FunctionType functionType,
                              AclnnFFNVersion aclnnFFNVersion, bool tokensIndexFlag)
     : Param(std::move(inputs), std::move(expertTokensData), activation, innerPrecise, outputDtype, tokensIndexFlag),
-      mFunctionType(functionType), mAclnnFFNVersion(aclnnFFNVersion)
-{
-}
-
+      mFunctionType(functionType),
+      mAclnnFFNVersion(aclnnFFNVersion)
+{}
 
 AclnnFFNParam::~AclnnFFNParam()
 {
@@ -94,10 +94,10 @@ bool AclnnFFNParam::Init()
     auto ret = InitExpertTokens();
     LOG_IF_EXPR(ret == false, LOG_ERR("InitExpertTokens faild"), return false);
 
-    auto *cs = static_cast<ops::adv::tests::utils::Case *>(ops::adv::tests::utils::Case::GetCurrentCase());
+    auto* cs = static_cast<ops::adv::tests::utils::Case*>(ops::adv::tests::utils::Case::GetCurrentCase());
     LOG_IF_EXPR(cs == nullptr, LOG_ERR("Can't get current case"), return false);
 
-    for (auto *t :
+    for (auto* t :
          {&aclnnX, &aclnnWeight1, &aclnnWeight2, &aclnnBias1, &aclnnBias2, &aclnnScale, &aclnnOffset, &aclnnDeqScale1,
           &aclnnDeqScale2, &aclnnAntiquantScale1, &aclnnAntiquantScale2, &aclnnAntiquantOffset1, &aclnnAntiquantOffset1,
           &aclnnAntiquantOffset2, &aclnnY, &aclnnExpertTokens}) {
@@ -105,7 +105,7 @@ bool AclnnFFNParam::Init()
         if (t->GetExpDataSize() <= 0) {
             continue;
         }
-        auto *devData = t->AllocDevData(0, 0);
+        auto* devData = t->AllocDevData(0, 0);
         if (devData == nullptr) {
             return false;
         }

@@ -32,16 +32,16 @@ extern "C" {
 
 namespace {
 struct BlockAttentionResidualsParams {
-    const aclTensor *partialBlock{nullptr};
-    const aclTensor *blockRes{nullptr};
-    const aclTensor *projWeight{nullptr};
-    const aclTensor *normWeight{nullptr};
+    const aclTensor* partialBlock{nullptr};
+    const aclTensor* blockRes{nullptr};
+    const aclTensor* projWeight{nullptr};
+    const aclTensor* normWeight{nullptr};
     int64_t validBlockNum{-1};
     double normEps{1e-6};
     bool needBackward{false};
-    const aclTensor *hiddenStates{nullptr};
-    const aclTensor *invNorm{nullptr};
-    const aclTensor *probs{nullptr};
+    const aclTensor* hiddenStates{nullptr};
+    const aclTensor* invNorm{nullptr};
+    const aclTensor* probs{nullptr};
 };
 
 // 输入/输出 hidden_states 支持 BF16 / FP16 / FP32（kernel 由编译期宏按 dtype 生成独立二进制）
@@ -60,7 +60,7 @@ constexpr size_t WEIGHT_2D_DIM_NUM = 2;
 constexpr size_t INV_PROBS_DIM_NUM = 2;
 constexpr int64_t PROJ_WEIGHT_LEADING_ONES = 1;
 
-static inline bool CheckNotNull(const BlockAttentionResidualsParams &params)
+static inline bool CheckNotNull(const BlockAttentionResidualsParams& params)
 {
     OP_CHECK_NULL(params.partialBlock, return false);
     OP_CHECK_NULL(params.blockRes, return false);
@@ -74,7 +74,7 @@ static inline bool CheckNotNull(const BlockAttentionResidualsParams &params)
     return true;
 }
 
-static inline bool CheckDtypeValid(const BlockAttentionResidualsParams &params)
+static inline bool CheckDtypeValid(const BlockAttentionResidualsParams& params)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(params.partialBlock, BF16_TYPE_SUPPORT_LIST, return false);
     OP_CHECK_DTYPE_NOT_SUPPORT(params.blockRes, BF16_TYPE_SUPPORT_LIST, return false);
@@ -92,13 +92,13 @@ static inline bool CheckDtypeValid(const BlockAttentionResidualsParams &params)
     return true;
 }
 
-static inline bool CheckShapeValid(BlockAttentionResidualsParams &params)
+static inline bool CheckShapeValid(BlockAttentionResidualsParams& params)
 {
-    const auto &partialBlockShape = params.partialBlock->GetViewShape();
-    const auto &blockShape = params.blockRes->GetViewShape();
-    const auto &projShape = params.projWeight->GetViewShape();
-    const auto &normShape = params.normWeight->GetViewShape();
-    const auto &hiddenShape = params.hiddenStates->GetViewShape();
+    const auto& partialBlockShape = params.partialBlock->GetViewShape();
+    const auto& blockShape = params.blockRes->GetViewShape();
+    const auto& projShape = params.projWeight->GetViewShape();
+    const auto& normShape = params.normWeight->GetViewShape();
+    const auto& hiddenShape = params.hiddenStates->GetViewShape();
     if (partialBlockShape.GetDimNum() != PARTIAL_BLOCK_DIM_NUM || blockShape.GetDimNum() != BLOCK_RES_DIM_NUM ||
         (projShape.GetDimNum() != WEIGHT_1D_DIM_NUM && projShape.GetDimNum() != WEIGHT_2D_DIM_NUM) ||
         normShape.GetDimNum() != WEIGHT_1D_DIM_NUM || hiddenShape.GetDimNum() != HIDDEN_STATES_DIM_NUM) {
@@ -141,8 +141,8 @@ static inline bool CheckShapeValid(BlockAttentionResidualsParams &params)
     if (!params.needBackward) {
         return true;
     }
-    const auto &invShape = params.invNorm->GetViewShape();
-    const auto &probsShape = params.probs->GetViewShape();
+    const auto& invShape = params.invNorm->GetViewShape();
+    const auto& probsShape = params.probs->GetViewShape();
     if (invShape.GetDimNum() != INV_PROBS_DIM_NUM || probsShape.GetDimNum() != INV_PROBS_DIM_NUM) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "inv_norm/probs must be 2D [T,B]");
         return false;
@@ -155,7 +155,7 @@ static inline bool CheckShapeValid(BlockAttentionResidualsParams &params)
     return true;
 }
 
-static aclnnStatus CheckParams(BlockAttentionResidualsParams &params)
+static aclnnStatus CheckParams(BlockAttentionResidualsParams& params)
 {
     CHECK_RET(CheckDtypeValid(params), ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckShapeValid(params), ACLNN_ERR_PARAM_INVALID);
@@ -167,7 +167,7 @@ static aclnnStatus CheckParams(BlockAttentionResidualsParams &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus PreProcess(BlockAttentionResidualsParams &params)
+static aclnnStatus PreProcess(BlockAttentionResidualsParams& params)
 {
     params.partialBlock->SetOriginalShape(params.partialBlock->GetViewShape());
     params.blockRes->SetOriginalShape(params.blockRes->GetViewShape());
@@ -182,11 +182,11 @@ static aclnnStatus PreProcess(BlockAttentionResidualsParams &params)
 }
 } // namespace
 
-aclnnStatus aclnnBlockAttentionResidualsGetWorkspaceSize(const aclTensor *partialBlock, const aclTensor *blockRes,
-                                                         const aclTensor *projWeight, const aclTensor *normWeight,
+aclnnStatus aclnnBlockAttentionResidualsGetWorkspaceSize(const aclTensor* partialBlock, const aclTensor* blockRes,
+                                                         const aclTensor* projWeight, const aclTensor* normWeight,
                                                          int64_t validBlockNum, double normEps, bool needBackward,
-                                                         aclTensor *hiddenStates, aclTensor *invNorm, aclTensor *probs,
-                                                         uint64_t *workspaceSize, aclOpExecutor **executor)
+                                                         aclTensor* hiddenStates, aclTensor* invNorm, aclTensor* probs,
+                                                         uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnBlockAttentionResiduals,
                    DFX_IN(partialBlock, blockRes, projWeight, normWeight, validBlockNum, normEps, needBackward),
@@ -240,7 +240,7 @@ aclnnStatus aclnnBlockAttentionResidualsGetWorkspaceSize(const aclTensor *partia
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnBlockAttentionResiduals(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnBlockAttentionResiduals(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                          aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnBlockAttentionResiduals);

@@ -76,14 +76,14 @@ __attribute__((
         "and will be replaced by the aclnnGroupedMatmulV5GetWorkspaceSize. We apologize for any inconvenience caused "
         "and appreciate your timely migration to the new interface."))) aclnnStatus
 aclnnGroupedMatmulV4GetWorkspaceSize(
-    const aclTensorList *x, const aclTensorList *weight, const aclTensorList *biasOptional,
-    const aclTensorList *scaleOptional, const aclTensorList *offsetOptional,
-    const aclTensorList *antiquantScaleOptional, const aclTensorList *antiquantOffsetOptional,
-    const aclTensorList *perTokenScaleOptional, const aclTensor *groupListOptional,
-    const aclTensorList *activationInputOptional, const aclTensorList *activationQuantScaleOptional,
-    const aclTensorList *activationQuantOffsetOptional, int64_t splitItem, int64_t groupType, int64_t groupListType,
-    int64_t actType, aclTensorList *out, aclTensorList *activationFeatureOutOptional,
-    aclTensorList *dynQuantScaleOutOptional, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensorList* x, const aclTensorList* weight, const aclTensorList* biasOptional,
+    const aclTensorList* scaleOptional, const aclTensorList* offsetOptional,
+    const aclTensorList* antiquantScaleOptional, const aclTensorList* antiquantOffsetOptional,
+    const aclTensorList* perTokenScaleOptional, const aclTensor* groupListOptional,
+    const aclTensorList* activationInputOptional, const aclTensorList* activationQuantScaleOptional,
+    const aclTensorList* activationQuantOffsetOptional, int64_t splitItem, int64_t groupType, int64_t groupListType,
+    int64_t actType, aclTensorList* out, aclTensorList* activationFeatureOutOptional,
+    aclTensorList* dynQuantScaleOutOptional, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnGroupedMatmulV4的第二段接口，用于执行计算。
@@ -97,7 +97,7 @@ __attribute__((visibility("default"),
                deprecated("aclnnGroupedMatmulV4 is scheduled to be deprecated in a post-December 2026 version update, "
                           "and will be replaced by the aclnnGroupedMatmulV5. We apologize for any inconvenience caused "
                           "and appreciate your timely migration to the new interface."))) aclnnStatus
-aclnnGroupedMatmulV4(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+aclnnGroupedMatmulV4(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

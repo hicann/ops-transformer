@@ -21,14 +21,14 @@
 // 75 is from AscendC host stub
 #define ALL_DUMPSIZE (75 * SINGLE_CORE_DUMPSIZE)
 
-using LogFuncType = std::function<void(const char *)>;
+using LogFuncType = std::function<void(const char*)>;
 /**
  * @brief Check acl api status code.
  * @param status The return code of acl api.
  * @param logFunc Log function, which receives a C-Style string.
  * @return
  */
-inline void aclCheck(aclError status, LogFuncType logFunc = [](const char *logStrPtr) { std::cerr << logStrPtr; })
+inline void aclCheck(aclError status, LogFuncType logFunc = [](const char* logStrPtr) { std::cerr << logStrPtr; })
 {
     if (status != ACL_SUCCESS) {
         std::stringstream ss;
@@ -42,7 +42,7 @@ inline void aclCheck(aclError status, LogFuncType logFunc = [](const char *logSt
  * @param logFunc Log function, which receives a C-Style string.
  * @return
  */
-inline void rtCheck(int status, LogFuncType logFunc = [](const char *logStrPtr) { std::cerr << logStrPtr; })
+inline void rtCheck(int status, LogFuncType logFunc = [](const char* logStrPtr) { std::cerr << logStrPtr; })
 {
     if (status != 0) {
         std::stringstream ss;
@@ -52,8 +52,8 @@ inline void rtCheck(int status, LogFuncType logFunc = [](const char *logStrPtr) 
 }
 
 namespace Adx {
-void AdumpPrintWorkSpace(const void *dumpBufferAddr, const size_t dumpBufferSize, aclrtStream stream,
-                         const char *opType);
+void AdumpPrintWorkSpace(const void* dumpBufferAddr, const size_t dumpBufferSize, aclrtStream stream,
+                         const char* opType);
 } // namespace Adx
 
 #endif // CATLASS_DEBUG_HPP

@@ -65,7 +65,7 @@ using namespace AscendC;
 
 namespace optiling {
 
-ge::graphStatus ShapeVerify(gert::TilingContext *context, int64_t batchSize, int64_t seqLength, int64_t n, int64_t c,
+ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int64_t seqLength, int64_t n, int64_t c,
                             bool isTND)
 {
     auto opName = context->GetNodeName();
@@ -374,7 +374,7 @@ ge::graphStatus ShapeVerify(gert::TilingContext *context, int64_t batchSize, int
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingMhcPreBackwardArch22(gert::TilingContext *context)
+ge::graphStatus TilingMhcPreBackwardArch22(gert::TilingContext* context)
 {
     if (context == nullptr) {
         OP_LOGE(context, "context is nullptr");
@@ -468,7 +468,7 @@ ge::graphStatus TilingMhcPreBackwardArch22(gert::TilingContext *context)
     int64_t mm2M = fusionSize;
     int64_t mm2N = n * c;
 
-    MhcPreBackwardArch22TilingData *tilingData = context->GetTilingData<MhcPreBackwardArch22TilingData>();
+    MhcPreBackwardArch22TilingData* tilingData = context->GetTilingData<MhcPreBackwardArch22TilingData>();
     auto featureDataType = matmul_tiling::DataType::DT_FLOAT;
     matmul_tiling::MultiCoreMatmulTiling mm1Tiling(ascendPlatformInfo);
     matmul_tiling::MultiCoreMatmulTiling mm2Tiling(ascendPlatformInfo);
@@ -520,7 +520,7 @@ ge::graphStatus TilingMhcPreBackwardArch22(gert::TilingContext *context)
 
     size_t systemWorkspaceSize = ascendPlatformInfo.GetLibApiWorkSpaceSize();
     size_t usrWorkSpaceSize = xCastWorkspace + gradHat2Workspace;
-    size_t *currentWorkspace = context->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context->GetWorkspaceSizes(1);
     if (currentWorkspace == nullptr) {
         OP_LOGE(context, "GetWorkspaceSizes() returned nullptr");
         return ge::GRAPH_FAILED;

@@ -61,7 +61,7 @@ __aicore__ inline int32_t RoundUp(int32_t num)
     return CeilAlign(num, elemNum);
 }
 
-__aicore__ inline void SetGatherMaskPattern(const LocalTensor<uint32_t> &maskPattern)
+__aicore__ inline void SetGatherMaskPattern(const LocalTensor<uint32_t>& maskPattern)
 {
     uint32_t base = ONE;
     int32_t length = 8;
@@ -72,7 +72,7 @@ __aicore__ inline void SetGatherMaskPattern(const LocalTensor<uint32_t> &maskPat
     PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline void GatherMaskByDiagonal(const LocalTensor<float> &output, const LocalTensor<float> &input,
+__aicore__ inline void GatherMaskByDiagonal(const LocalTensor<float>& output, const LocalTensor<float>& input,
                                             const LocalTensor<uint32_t> maskPattern, uint16_t dim0)
 {
     uint32_t totalCount = 16 * 16;
@@ -106,8 +106,8 @@ enum class ABLastDimBrcOp : uint8_t {
 };
 
 template <ABLastDimBrcOp op, typename T>
-__aicore__ inline void ApplyABLastDimBrcOp(const LocalTensor<T> &output, const LocalTensor<T> &input0,
-                                           const LocalTensor<T> &input1, const int32_t count)
+__aicore__ inline void ApplyABLastDimBrcOp(const LocalTensor<T>& output, const LocalTensor<T>& input0,
+                                           const LocalTensor<T>& input1, const int32_t count)
 {
     if constexpr (op == ABLastDimBrcOp::MUL) {
         Mul(output, input0, input1, count);
@@ -119,9 +119,9 @@ __aicore__ inline void ApplyABLastDimBrcOp(const LocalTensor<T> &output, const L
 }
 
 template <ABLastDimBrcOp op, typename T>
-__aicore__ inline void ApplyABLastDimBrcOp(const LocalTensor<T> &output, const LocalTensor<T> &input0,
-                                           const LocalTensor<T> &input1, const int32_t repeatSize,
-                                           const int32_t repeatTimes, const BinaryRepeatParams &instrParams)
+__aicore__ inline void ApplyABLastDimBrcOp(const LocalTensor<T>& output, const LocalTensor<T>& input0,
+                                           const LocalTensor<T>& input1, const int32_t repeatSize,
+                                           const int32_t repeatTimes, const BinaryRepeatParams& instrParams)
 {
     if constexpr (op == ABLastDimBrcOp::MUL) {
         Mul(output, input0, input1, repeatSize, repeatTimes, instrParams);
@@ -133,8 +133,8 @@ __aicore__ inline void ApplyABLastDimBrcOp(const LocalTensor<T> &output, const L
 }
 
 template <typename T, ABLastDimBrcOp op, bool needBrc = true>
-__aicore__ inline void ABLastDimBrcInline(const LocalTensor<T> &output, const LocalTensor<T> &input0,
-                                          const LocalTensor<T> &input1, const LocalTensor<T> &tmpBuffer,
+__aicore__ inline void ABLastDimBrcInline(const LocalTensor<T>& output, const LocalTensor<T>& input0,
+                                          const LocalTensor<T>& input1, const LocalTensor<T>& tmpBuffer,
                                           const int32_t curRowNum, const int32_t curColNum)
 {
     if constexpr (needBrc) {
@@ -212,32 +212,32 @@ __aicore__ inline void ABLastDimBrcInline(const LocalTensor<T> &output, const Lo
 }
 
 template <typename T, bool needBrc = true>
-__aicore__ inline void MulABLastDimBrcInline(const LocalTensor<T> &output, const LocalTensor<T> &input0,
-                                             const LocalTensor<T> &input1, const LocalTensor<T> &tmpBuffer,
+__aicore__ inline void MulABLastDimBrcInline(const LocalTensor<T>& output, const LocalTensor<T>& input0,
+                                             const LocalTensor<T>& input1, const LocalTensor<T>& tmpBuffer,
                                              const int32_t curRowNum, const int32_t curColNum)
 {
     ABLastDimBrcInline<T, ABLastDimBrcOp::MUL, needBrc>(output, input0, input1, tmpBuffer, curRowNum, curColNum);
 }
 
 template <typename T, bool needBrc = true>
-__aicore__ inline void SubABLastDimBrcInline(const LocalTensor<T> &output, const LocalTensor<T> &input0,
-                                             const LocalTensor<T> &input1, const LocalTensor<T> &tmpBuffer,
+__aicore__ inline void SubABLastDimBrcInline(const LocalTensor<T>& output, const LocalTensor<T>& input0,
+                                             const LocalTensor<T>& input1, const LocalTensor<T>& tmpBuffer,
                                              const int32_t curRowNum, const int32_t curColNum)
 {
     ABLastDimBrcInline<T, ABLastDimBrcOp::SUB, needBrc>(output, input0, input1, tmpBuffer, curRowNum, curColNum);
 }
 
 template <typename T, bool needBrc = true>
-__aicore__ inline void DivABLastDimBrcInline(const LocalTensor<T> &output, const LocalTensor<T> &input0,
-                                             const LocalTensor<T> &input1, const LocalTensor<T> &tmpBuffer,
+__aicore__ inline void DivABLastDimBrcInline(const LocalTensor<T>& output, const LocalTensor<T>& input0,
+                                             const LocalTensor<T>& input1, const LocalTensor<T>& tmpBuffer,
                                              const int32_t curRowNum, const int32_t curColNum)
 {
     ABLastDimBrcInline<T, ABLastDimBrcOp::DIV, needBrc>(output, input0, input1, tmpBuffer, curRowNum, curColNum);
 }
 
 template <typename T, bool needBrc = true>
-__aicore__ inline void MulABLastDimBrcInline2(const LocalTensor<T> &output, const LocalTensor<T> &input0,
-                                              const LocalTensor<T> &input1, const LocalTensor<T> &tmpBuffer,
+__aicore__ inline void MulABLastDimBrcInline2(const LocalTensor<T>& output, const LocalTensor<T>& input0,
+                                              const LocalTensor<T>& input1, const LocalTensor<T>& tmpBuffer,
                                               const int32_t curRowNum, const int32_t curColNum, const int32_t numN)
 {
     uint32_t elemInOneBlock = BLOCK_SIZE / sizeof(T);
@@ -305,8 +305,8 @@ __aicore__ inline void MulABLastDimBrcInline2(const LocalTensor<T> &output, cons
 }
 
 template <typename T>
-__aicore__ inline void AddBAFirstDimBrcInline(const LocalTensor<T> &output, const LocalTensor<T> &input0,
-                                              const LocalTensor<T> &input1, const int32_t curRowNum,
+__aicore__ inline void AddBAFirstDimBrcInline(const LocalTensor<T>& output, const LocalTensor<T>& input0,
+                                              const LocalTensor<T>& input1, const int32_t curRowNum,
                                               const int32_t curColNum)
 {
     uint32_t elemInOneBlock = BLOCK_SIZE / sizeof(T);
@@ -371,7 +371,7 @@ __aicore__ inline void AddBAFirstDimBrcInline(const LocalTensor<T> &output, cons
 }
 
 template <typename T>
-__aicore__ inline void CalcDenominator(const LocalTensor<T> &output, const LocalTensor<T> &input,
+__aicore__ inline void CalcDenominator(const LocalTensor<T>& output, const LocalTensor<T>& input,
                                        const uint32_t calCount)
 {
     Muls(output, input, static_cast<T>(-1.0), calCount);
@@ -384,8 +384,8 @@ __aicore__ inline void CalcDenominator(const LocalTensor<T> &output, const Local
 
 // 暂时不处理repeat超限场景
 template <typename T>
-__aicore__ inline void SigmoidPerf(const LocalTensor<T> &output, const LocalTensor<T> &input,
-                                   const LocalTensor<T> &tmpBuffer, const int64_t calCount)
+__aicore__ inline void SigmoidPerf(const LocalTensor<T>& output, const LocalTensor<T>& input,
+                                   const LocalTensor<T>& tmpBuffer, const int64_t calCount)
 {
     uint32_t elemInOneBlock = BLOCK_SIZE / sizeof(T);
     Duplicate(tmpBuffer, static_cast<T>(1.0), elemInOneBlock);
@@ -408,9 +408,9 @@ __aicore__ inline void SigmoidPerf(const LocalTensor<T> &output, const LocalTens
     PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline void ProcessPre(const LocalTensor<float> &preLocal, const LocalTensor<float> &mixLocal,
-                                  const LocalTensor<float> &hcBaseLocal, const LocalTensor<float> &rsqrtLocal,
-                                  const LocalTensor<float> &tmpBuffer0, const LocalTensor<float> &tmpBuffer1,
+__aicore__ inline void ProcessPre(const LocalTensor<float>& preLocal, const LocalTensor<float>& mixLocal,
+                                  const LocalTensor<float>& hcBaseLocal, const LocalTensor<float>& rsqrtLocal,
+                                  const LocalTensor<float>& tmpBuffer0, const LocalTensor<float>& tmpBuffer1,
                                   float scale, float eps, const int32_t curRowNum, const int32_t curColNum)
 {
     int32_t curColNumAlign = RoundUp<float>(curColNum);
@@ -423,7 +423,7 @@ __aicore__ inline void ProcessPre(const LocalTensor<float> &preLocal, const Loca
     PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline void ReduceSumARAPerf(const LocalTensor<float> &output, const LocalTensor<float> &input,
+__aicore__ inline void ReduceSumARAPerf(const LocalTensor<float>& output, const LocalTensor<float>& input,
                                         const uint32_t dim0, const uint32_t dim1, const uint32_t dim2)
 {
     uint32_t elemInOneBlock = BLOCK_SIZE / sizeof(float);
@@ -465,7 +465,7 @@ __aicore__ inline void ReduceSumARAPerf(const LocalTensor<float> &output, const 
 }
 
 template <typename T0, typename T1>
-__aicore__ inline void CastTwoDim(const LocalTensor<T0> &output, const LocalTensor<T1> &input, const uint32_t dim0,
+__aicore__ inline void CastTwoDim(const LocalTensor<T0>& output, const LocalTensor<T1>& input, const uint32_t dim0,
                                   const uint32_t dim1)
 {
     uint32_t dim1AlignT0 = RoundUp<T0>(dim1);
@@ -484,9 +484,9 @@ __aicore__ inline void CastTwoDim(const LocalTensor<T0> &output, const LocalTens
 
 // dim0:bs dim1:n dim2:c
 template <typename T>
-__aicore__ void inline ProcessY(const LocalTensor<T> &yLocal, const LocalTensor<T> &xLocal,
-                                const LocalTensor<float> &mix01Local, const LocalTensor<float> &hcBrcbLocal1,
-                                const LocalTensor<float> &xCastLocal, const LocalTensor<float> &yCastLocal,
+__aicore__ void inline ProcessY(const LocalTensor<T>& yLocal, const LocalTensor<T>& xLocal,
+                                const LocalTensor<float>& mix01Local, const LocalTensor<float>& hcBrcbLocal1,
+                                const LocalTensor<float>& xCastLocal, const LocalTensor<float>& yCastLocal,
                                 const uint32_t dim0, const uint32_t dim1, const uint32_t dim2)
 {
     CastTwoDim(xCastLocal, xLocal, dim0 * dim1, dim2);
@@ -495,9 +495,9 @@ __aicore__ void inline ProcessY(const LocalTensor<T> &yLocal, const LocalTensor<
     CastTwoDim(yLocal, yCastLocal, dim0, dim2);
 }
 
-__aicore__ inline void ProcessPost(const LocalTensor<float> &postLocal, const LocalTensor<float> &mixLocal,
-                                   const LocalTensor<float> &hcBaseLocal, const LocalTensor<float> &rsqrtLocal,
-                                   const LocalTensor<float> &tmpBuffer0, const LocalTensor<float> &tmpBuffer1,
+__aicore__ inline void ProcessPost(const LocalTensor<float>& postLocal, const LocalTensor<float>& mixLocal,
+                                   const LocalTensor<float>& hcBaseLocal, const LocalTensor<float>& rsqrtLocal,
+                                   const LocalTensor<float>& tmpBuffer0, const LocalTensor<float>& tmpBuffer1,
                                    float scale, const int32_t curRowNum, const int32_t curColNum)
 {
     int32_t curColNumAlign = RoundUp<float>(curColNum);
@@ -510,7 +510,7 @@ __aicore__ inline void ProcessPost(const LocalTensor<float> &postLocal, const Lo
     PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline void LastDimReduceMaxPerf(const LocalTensor<float> &output, const LocalTensor<float> &input,
+__aicore__ inline void LastDimReduceMaxPerf(const LocalTensor<float>& output, const LocalTensor<float>& input,
                                             const uint32_t curRowNum, const uint32_t curColNum)
 {
     uint32_t elemInOneBlock = BLOCK_SIZE / sizeof(float);
@@ -519,7 +519,7 @@ __aicore__ inline void LastDimReduceMaxPerf(const LocalTensor<float> &output, co
     PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline void LastDimReduceSumPerf(const LocalTensor<float> &output, const LocalTensor<float> &input,
+__aicore__ inline void LastDimReduceSumPerf(const LocalTensor<float>& output, const LocalTensor<float>& input,
                                             const uint32_t curRowNum, const uint32_t curColNum)
 {
     uint32_t elemInOneBlock = BLOCK_SIZE / sizeof(float);
@@ -528,8 +528,8 @@ __aicore__ inline void LastDimReduceSumPerf(const LocalTensor<float> &output, co
 }
 
 // 暂时只支持R轴小于64,既curColNum不能超过64
-__aicore__ inline void SoftmaxFP32Perf(const LocalTensor<float> &output, const LocalTensor<float> &input,
-                                       const LocalTensor<float> &tmpReduceBuffer,
+__aicore__ inline void SoftmaxFP32Perf(const LocalTensor<float>& output, const LocalTensor<float>& input,
+                                       const LocalTensor<float>& tmpReduceBuffer,
                                        const LocalTensor<float> tmpBrcbBuffer, const int32_t curRowNum,
                                        const int32_t curColNum, float eps)
 {
@@ -548,8 +548,8 @@ __aicore__ inline void SoftmaxFP32Perf(const LocalTensor<float> &output, const L
 // (bs, hc_mult, hc_mult) = (bs, hc_mult, hc_mult) +  (bs, 1, hc_mult)
 
 template <typename T>
-__aicore__ inline void DivABABrcInline(const LocalTensor<T> &output, const LocalTensor<T> &input0,
-                                       const LocalTensor<T> &input1, const uint32_t dim0, const uint32_t dim1,
+__aicore__ inline void DivABABrcInline(const LocalTensor<T>& output, const LocalTensor<T>& input0,
+                                       const LocalTensor<T>& input1, const uint32_t dim0, const uint32_t dim1,
                                        const uint32_t dim2)
 {
     uint32_t elemInOneBlock = BLOCK_SIZE / sizeof(T);
@@ -598,7 +598,7 @@ __aicore__ inline void DivABABrcInline(const LocalTensor<T> &output, const Local
 }
 
 template <typename T>
-__aicore__ inline void CopyIn(const GlobalTensor<T> &inputGm, const LocalTensor<T> &inputTensor, const uint16_t nBurst,
+__aicore__ inline void CopyIn(const GlobalTensor<T>& inputGm, const LocalTensor<T>& inputTensor, const uint16_t nBurst,
                               const uint32_t copyLen, uint32_t srcStride = 0, uint32_t dstStride = 0)
 {
     uint32_t elemInOneBlock = BLOCK_SIZE / sizeof(T);
@@ -618,7 +618,7 @@ __aicore__ inline void CopyIn(const GlobalTensor<T> &inputGm, const LocalTensor<
 
 // (bs, hc_mult, hc_mult) --> (bs, hc_mult, hc_mult_align)
 template <typename T>
-__aicore__ inline void CopyInWithOuterFor(const GlobalTensor<T> &inputGm, const LocalTensor<T> &inputTensor,
+__aicore__ inline void CopyInWithOuterFor(const GlobalTensor<T>& inputGm, const LocalTensor<T>& inputTensor,
                                           const uint16_t outerLoop, const uint16_t nBurst, const uint32_t copyLen,
                                           const uint32_t gmLastDim)
 {
@@ -631,7 +631,7 @@ __aicore__ inline void CopyInWithOuterFor(const GlobalTensor<T> &inputGm, const 
 }
 
 template <typename T>
-__aicore__ inline void CopyInWithOuterFor(const GlobalTensor<T> &inputGm, const LocalTensor<T> &inputTensor,
+__aicore__ inline void CopyInWithOuterFor(const GlobalTensor<T>& inputGm, const LocalTensor<T>& inputTensor,
                                           const uint16_t outerLoop, const uint16_t nBurst, const uint32_t copyLen,
                                           const uint32_t gmFirstDim, const uint32_t gmLastDim)
 {
@@ -652,7 +652,7 @@ __aicore__ inline void CopyInWithOuterFor(const GlobalTensor<T> &inputGm, const 
 }
 
 template <typename T>
-__aicore__ inline void CopyOut(const LocalTensor<T> &outputTensor, const GlobalTensor<T> &outputGm,
+__aicore__ inline void CopyOut(const LocalTensor<T>& outputTensor, const GlobalTensor<T>& outputGm,
                                const uint16_t nBurst, const uint32_t copyLen, uint32_t dstStride = 0)
 {
     DataCopyExtParams dataCopyParams;

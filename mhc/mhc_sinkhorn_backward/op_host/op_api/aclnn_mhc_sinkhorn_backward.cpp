@@ -7,8 +7,8 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
- 
- /*!
+
+/*!
  * \file aclnn_mhc_sinkhorn_backward.cpp
  * \brief aclnn_mhc_sinkhorn_backward
  */
@@ -49,9 +49,8 @@ static const int64_t N_VALID_4 = 4;
 static const int64_t N_VALID_6 = 6;
 static const int64_t N_VALID_8 = 8;
 
-
-static bool CheckNotNull(const aclTensor *gradOutput, const aclTensor *normOut,
-                         const aclTensor *sumOut, const aclTensor *out)
+static bool CheckNotNull(const aclTensor* gradOutput, const aclTensor* normOut, const aclTensor* sumOut,
+                         const aclTensor* out)
 {
     OP_CHECK_NULL(gradOutput, return false);
     OP_CHECK_NULL(normOut, return false);
@@ -60,8 +59,8 @@ static bool CheckNotNull(const aclTensor *gradOutput, const aclTensor *normOut,
     return true;
 }
 
-static bool CheckDtypeValid(const aclTensor *gradOutput, const aclTensor *normOut,
-                            const aclTensor *sumOut, const aclTensor *out)
+static bool CheckDtypeValid(const aclTensor* gradOutput, const aclTensor* normOut, const aclTensor* sumOut,
+                            const aclTensor* out)
 {
     // 检查x的数据类型是否在算子的支持列表内
     OP_CHECK_DTYPE_NOT_SUPPORT(gradOutput, DTYPE_SUPPORT_LIST, return false);
@@ -74,7 +73,7 @@ static bool CheckDtypeValid(const aclTensor *gradOutput, const aclTensor *normOu
     return true;
 }
 
-static bool CheckFormat(const aclTensor *gradOutput, const aclTensor *out)
+static bool CheckFormat(const aclTensor* gradOutput, const aclTensor* out)
 {
     // 输入输出的格式需要一致
     if (gradOutput->GetStorageFormat() != out->GetStorageFormat()) {
@@ -85,8 +84,8 @@ static bool CheckFormat(const aclTensor *gradOutput, const aclTensor *out)
     return true;
 }
 
-static bool CheckShape(const aclTensor *gradOutput, const aclTensor *normOut,
-                       const aclTensor *sumOut, const aclTensor *out)
+static bool CheckShape(const aclTensor* gradOutput, const aclTensor* normOut, const aclTensor* sumOut,
+                       const aclTensor* out)
 {
     // 校验gradOutput的shape是否等于out的shape
     OP_CHECK_SHAPE_NOT_EQUAL(gradOutput, out, return false);
@@ -95,8 +94,8 @@ static bool CheckShape(const aclTensor *gradOutput, const aclTensor *normOut,
     auto gradOutputShape = gradOutput->GetViewShape();
     auto gradOutputDim = gradOutputShape.GetDimNum();
     if (gradOutputDim != SUPPORT_DIM_NUM_3 && gradOutputDim != SUPPORT_DIM_NUM_4) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "Dim value error, input gradOutput dim must be 3 or 4, but got Dim = %ld .", gradOutputDim);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Dim value error, input gradOutput dim must be 3 or 4, but got Dim = %ld .",
+                gradOutputDim);
         return false;
     }
     // gradOutput最后两维的大小n0和n1满足：n0等于n1 且n0为4,6,8
@@ -118,8 +117,8 @@ static bool CheckShape(const aclTensor *gradOutput, const aclTensor *normOut,
     return true;
 }
 
-static inline aclnnStatus CheckParams(const aclTensor *gradOutput, const aclTensor *normOut,
-                                      const aclTensor *sumOut, const aclTensor *out)
+static inline aclnnStatus CheckParams(const aclTensor* gradOutput, const aclTensor* normOut, const aclTensor* sumOut,
+                                      const aclTensor* out)
 {
     // 1. 检查参数是否为空指针
     CHECK_RET(CheckNotNull(gradOutput, normOut, sumOut, out), ACLNN_ERR_PARAM_NULLPTR);
@@ -136,9 +135,9 @@ static inline aclnnStatus CheckParams(const aclTensor *gradOutput, const aclTens
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMhcSinkhornBackwardGetWorkspaceSize(const aclTensor *gradOutput, const aclTensor *normOut,
-                                                     const aclTensor *sumOut, aclTensor *out,
-                                                     uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnMhcSinkhornBackwardGetWorkspaceSize(const aclTensor* gradOutput, const aclTensor* normOut,
+                                                     const aclTensor* sumOut, aclTensor* out, uint64_t* workspaceSize,
+                                                     aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnMhcSinkhornBackward, DFX_IN(gradOutput, normOut, sumOut), DFX_OUT(out));
 
@@ -157,19 +156,18 @@ aclnnStatus aclnnMhcSinkhornBackwardGetWorkspaceSize(const aclTensor *gradOutput
     }
 
     // 将输入转换成连续的tensor
-    const aclTensor *gradOutputContiguous = l0op::Contiguous(gradOutput, uniqueExecutor.get());
+    const aclTensor* gradOutputContiguous = l0op::Contiguous(gradOutput, uniqueExecutor.get());
     CHECK_RET(gradOutputContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *normOutContiguous = l0op::Contiguous(normOut, uniqueExecutor.get());
+    const aclTensor* normOutContiguous = l0op::Contiguous(normOut, uniqueExecutor.get());
     CHECK_RET(normOutContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *sumOutContiguous = l0op::Contiguous(sumOut, uniqueExecutor.get());
+    const aclTensor* sumOutContiguous = l0op::Contiguous(sumOut, uniqueExecutor.get());
     CHECK_RET(sumOutContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     // 将输出转换成连续的tensor
-    aclTensor *outContiguous = const_cast<aclTensor*>(l0op::Contiguous(out, uniqueExecutor.get()));
+    aclTensor* outContiguous = const_cast<aclTensor*>(l0op::Contiguous(out, uniqueExecutor.get()));
     CHECK_RET(outContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor *kernelOut =
-        l0op::MhcSinkhornBackward(gradOutputContiguous, normOutContiguous,
-                                  sumOutContiguous, outContiguous, uniqueExecutor.get());
+    const aclTensor* kernelOut = l0op::MhcSinkhornBackward(gradOutputContiguous, normOutContiguous, sumOutContiguous,
+                                                           outContiguous, uniqueExecutor.get());
     CHECK_RET(kernelOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     // 固定写法，将计算结果拷贝到输出outRef上
@@ -182,8 +180,8 @@ aclnnStatus aclnnMhcSinkhornBackwardGetWorkspaceSize(const aclTensor *gradOutput
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMhcSinkhornBackward(void *workspace, uint64_t workspaceSize,
-                                     aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMhcSinkhornBackward(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                     aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMhcSinkhornBackward);
     // 固定写法，调用框架能力，完成计算

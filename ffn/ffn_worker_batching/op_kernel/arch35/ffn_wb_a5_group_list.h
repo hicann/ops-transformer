@@ -77,8 +77,8 @@ public:
     __aicore__ inline FfnWbA5GroupList(){};
 
     // sortedIdsWs:有序 expert_id(长度为排序后的有效数);groupList:输出 [expertNum, 2]
-    __aicore__ inline void Init(GM_ADDR sortedIdsWs, GM_ADDR groupList, const A5GroupListParam &param,
-                                const ScheduleContextInfo *ctx, TPipe *pipe)
+    __aicore__ inline void Init(GM_ADDR sortedIdsWs, GM_ADDR groupList, const A5GroupListParam& param,
+                                const ScheduleContextInfo* ctx, TPipe* pipe)
     {
         param_ = param;
         pipe_ = pipe;
@@ -91,8 +91,8 @@ public:
             return;
         }
 
-        idsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(sortedIdsWs), (totalLen_ > 0) ? totalLen_ : 1);
-        groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(groupList), expertNum_ * NUM_TWO);
+        idsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(sortedIdsWs), (totalLen_ > 0) ? totalLen_ : 1);
+        groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(groupList), expertNum_ * NUM_TWO);
 
         // 分块长度由运行时 UB 反推:先扣掉行拼装区与各缓冲的块对齐余量,再按每元素占用摊分,
         // 最后向下取整到比较指令的 repeat 粒度。
@@ -179,7 +179,7 @@ private:
 
     // 载入一块的 cur/prev/next 三路,并按边界置哨兵:块首一律记为游程起点(缺的那段由
     // pendingCnt 承接),全局末元素一律记为游程终点。
-    __aicore__ inline void LoadChunk(A5RunLanes &ln, int64_t begin, int64_t len)
+    __aicore__ inline void LoadChunk(A5RunLanes& ln, int64_t begin, int64_t len)
     {
         // GatherMask 只消费前 len 个元素，DMA 对齐尾部无需填哨兵。
         // 上一轮向量读取与本轮 DMA 复用 cur/prev/next，覆盖前必须等待读取完成。
@@ -205,7 +205,7 @@ private:
     }
 
     // 出首尾两张掩码并压缩成等长的三列,返回本块内完整游程数。
-    __aicore__ inline int64_t BuildAndCompact(A5RunLanes &ln, int64_t len, uint64_t &startNum, uint64_t &endNum)
+    __aicore__ inline int64_t BuildAndCompact(A5RunLanes& ln, int64_t len, uint64_t& startNum, uint64_t& endNum)
     {
         const int64_t cmpLen = Ceil(len, ONE_REPEAT_COMPARE_NUM) * ONE_REPEAT_COMPARE_NUM;
         // CompareScalar 保留 64 元素对齐长度，缓冲容量覆盖 cmpLen；Sub/Cast 只计算有效元素。
@@ -250,13 +250,13 @@ private:
         return static_cast<int64_t>(endNum);
     }
 
-    __aicore__ inline void EncodeRuns(const LocalTensor<int64_t> &rows, int64_t &outIdx, int64_t &fill)
+    __aicore__ inline void EncodeRuns(const LocalTensor<int64_t>& rows, int64_t& outIdx, int64_t& fill)
     {
         A5RunLanes ln = MakeLanes();
-        LocalTensor<int32_t> &cur = ln.cur;
-        LocalTensor<int32_t> &outStart = ln.outStart;
-        LocalTensor<int32_t> &outId = ln.outId;
-        LocalTensor<int32_t> &cnt = ln.cnt;
+        LocalTensor<int32_t>& cur = ln.cur;
+        LocalTensor<int32_t>& outStart = ln.outStart;
+        LocalTensor<int32_t>& outId = ln.outId;
+        LocalTensor<int32_t>& cnt = ln.cnt;
         DataCopyPadExtParams<int32_t> pad{false, 0, 0, 0};
 
         // 首元素单独起头:此后每块的起点都有前驱,ln.prev 可整块从 ids[begin-1] 读入(免去
@@ -313,7 +313,7 @@ private:
         }
     }
 
-    __aicore__ inline void AppendRow(const LocalTensor<int64_t> &rows, int64_t &outIdx, int64_t &fill, int64_t expertId,
+    __aicore__ inline void AppendRow(const LocalTensor<int64_t>& rows, int64_t& outIdx, int64_t& fill, int64_t expertId,
                                      int64_t tokenNum)
     {
         if (outIdx + fill >= expertNum_) {
@@ -327,7 +327,7 @@ private:
         }
     }
 
-    __aicore__ inline void FlushRows(const LocalTensor<int64_t> &rows, int64_t &outIdx, int64_t &fill)
+    __aicore__ inline void FlushRows(const LocalTensor<int64_t>& rows, int64_t& outIdx, int64_t& fill)
     {
         if (fill <= 0) {
             return;
@@ -344,7 +344,7 @@ private:
     }
 
     // 整块清零:起点为缓冲区首地址,满足向量指令的对齐要求。
-    __aicore__ inline void ClearRows(const LocalTensor<int32_t> &rows32)
+    __aicore__ inline void ClearRows(const LocalTensor<int32_t>& rows32)
     {
         // 清零是向量写:既要等前面的标量填充,也要等上一块的搬出真正读完。
         SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);
@@ -354,7 +354,7 @@ private:
     }
 
     A5GroupListParam param_;
-    TPipe *pipe_ = nullptr;
+    TPipe* pipe_ = nullptr;
 
     GlobalTensor<int32_t> idsGm_;
     GlobalTensor<int64_t> groupListGm_;

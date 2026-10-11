@@ -38,17 +38,17 @@ using ops::ut::ParseScalarToken;
 using ops::ut::ResolveCsvPath;
 using ops::ut::Trim;
 
-static float ParseFloatDefault(const string &v, float d = 0.0F)
+static float ParseFloatDefault(const string& v, float d = 0.0F)
 {
     string t = Trim(v);
     return t.empty() ? d : stof(t);
 }
 
-static const char *K_IN_NAMES[] = {"x",         "w",           "scale", "bias",    "pertokenScale",
+static const char* K_IN_NAMES[] = {"x",         "w",           "scale", "bias",    "pertokenScale",
                                    "groupList", "sharedInput", "logit", "rowIndex"};
 
 struct GmmFrInfershapeCase {
-    GmmFrInfershapeCase(const csv_map &m)
+    GmmFrInfershapeCase(const csv_map& m)
     {
         caseName = ReadMap(m, "caseName");
         enable = ParseBool(ReadMap(m, "enable"));
@@ -114,7 +114,7 @@ vector<GmmFrInfershapeCase> LoadEnabled()
                                  "gmm/grouped_matmul_finalize_routing/tests/ut/op_host", __FILE__);
     auto all = GetCasesFromCsv<GmmFrInfershapeCase>(path);
     vector<GmmFrInfershapeCase> out;
-    for (auto &c : all) {
+    for (auto& c : all) {
         if (c.enable) {
             out.push_back(std::move(c));
         }
@@ -123,12 +123,12 @@ vector<GmmFrInfershapeCase> LoadEnabled()
 }
 
 ge::graphStatus RunInferDtype(const ge::DataType dtypes[9], bool tpW, int64_t dtypeAttr = 0,
-                              ge::DataType *outDtype = nullptr)
+                              ge::DataType* outDtype = nullptr)
 {
     auto reg = gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry();
     auto impl = reg->GetOpImpl("GroupedMatmulFinalizeRouting");
     ge::DataType v[9];
-    vector<void *> iv;
+    vector<void*> iv;
     for (size_t i = 0; i < 9; ++i) {
         v[i] = dtypes[i];
         iv.push_back(&v[i]);
@@ -156,7 +156,7 @@ ge::graphStatus RunInferDtype(const ge::DataType dtypes[9], bool tpW, int64_t dt
     return ret;
 }
 
-string MakeParamName(const testing::TestParamInfo<GmmFrInfershapeCase> &info)
+string MakeParamName(const testing::TestParamInfo<GmmFrInfershapeCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }

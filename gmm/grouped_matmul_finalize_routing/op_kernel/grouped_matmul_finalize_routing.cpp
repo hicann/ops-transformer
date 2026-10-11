@@ -33,77 +33,77 @@ using namespace AscendC;
 using namespace matmul;
 using namespace GroupedMatmulFinalizeRouting;
 
-#define GMMFR_A8W8_IMPL(RowIndexDtype, scaleType, groupListType, sharedInputIsNone)                                    \
-    do {                                                                                                               \
-        TPipe pipe;                                                                                                    \
-        MT mm;                                                                                                         \
-        if ASCEND_IS_AIC {                                                                                             \
-            mm.SetSubBlockIdx(0);                                                                                      \
-            mm.Init(&tilingData.matmulTiling, &pipe);                                                                  \
-        }                                                                                                              \
-        using param =                                                                                                  \
-            Param<true, RowIndexDtype, GroupMatmulFRTilingData, scaleType, groupListType, sharedInputIsNone>;          \
-        QuantGroupMatmul<param> op(mm);                                                                                \
-        op.Init(initParams, &tilingData, &pipe);                                                                       \
-        op.Process();                                                                                                  \
+#define GMMFR_A8W8_IMPL(RowIndexDtype, scaleType, groupListType, sharedInputIsNone) \
+    do { \
+        TPipe pipe; \
+        MT mm; \
+        if ASCEND_IS_AIC { \
+            mm.SetSubBlockIdx(0); \
+            mm.Init(&tilingData.matmulTiling, &pipe); \
+        } \
+        using param = \
+            Param<true, RowIndexDtype, GroupMatmulFRTilingData, scaleType, groupListType, sharedInputIsNone>; \
+        QuantGroupMatmul<param> op(mm); \
+        op.Init(initParams, &tilingData, &pipe); \
+        op.Process(); \
     } while (0)
 
-#define GMMFR_A8W4_IMPL(groupListType, sharedInputIsNone)                                                              \
-    do {                                                                                                               \
-        TPipe pipe;                                                                                                    \
-        if ASCEND_IS_AIV {                                                                                             \
-            using param = ParamW4A8Pre<groupListType>;                                                                 \
-            GMMA8W4PreProcess<param> op1;                                                                              \
-            MMPreInitParams preInitParams{x, x, group_list, workspaceGM};                                              \
-            op1.Init(preInitParams, tilingData, &pipe);                                                                \
-            op1.Process();                                                                                             \
-            pipe.Reset();                                                                                              \
-            pipe.Destroy();                                                                                            \
-            pipe.Init();                                                                                               \
-        }                                                                                                              \
-        using aT = MatmulType<TPosition::GM, CubeFormat::ND, int4b_t, false>;                                          \
-        using bT = MatmulType<TPosition::GM, wFormat, int4b_t, false>;                                                 \
-        using biasT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>;                                       \
-        using cT = MatmulType<TPosition::GM, CubeFormat::ND, half, false>;                                             \
-        using matmulType = MMImplType<aT, bT, cT, biasT, GroupedMatmulFinalizeRouting::A8W4_GMM_CFG_MDL,               \
-                                      groupListType, sharedInputIsNone>;                                               \
-        matmulType::MT mm;                                                                                             \
-        if ASCEND_IS_AIC {                                                                                             \
-            mm.SetSubBlockIdx(0);                                                                                      \
-            mm.Init(&tilingData.matmulTiling, &pipe);                                                                  \
-        }                                                                                                              \
-        GMMA8W4MSDCompute<matmulType> op(mm);                                                                          \
-        op.Init(initParams, &tilingData, &pipe);                                                                       \
-        op.Process();                                                                                                  \
+#define GMMFR_A8W4_IMPL(groupListType, sharedInputIsNone) \
+    do { \
+        TPipe pipe; \
+        if ASCEND_IS_AIV { \
+            using param = ParamW4A8Pre<groupListType>; \
+            GMMA8W4PreProcess<param> op1; \
+            MMPreInitParams preInitParams{x, x, group_list, workspaceGM}; \
+            op1.Init(preInitParams, tilingData, &pipe); \
+            op1.Process(); \
+            pipe.Reset(); \
+            pipe.Destroy(); \
+            pipe.Init(); \
+        } \
+        using aT = MatmulType<TPosition::GM, CubeFormat::ND, int4b_t, false>; \
+        using bT = MatmulType<TPosition::GM, wFormat, int4b_t, false>; \
+        using biasT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>; \
+        using cT = MatmulType<TPosition::GM, CubeFormat::ND, half, false>; \
+        using matmulType = MMImplType<aT, bT, cT, biasT, GroupedMatmulFinalizeRouting::A8W4_GMM_CFG_MDL, \
+                                      groupListType, sharedInputIsNone>; \
+        matmulType::MT mm; \
+        if ASCEND_IS_AIC { \
+            mm.SetSubBlockIdx(0); \
+            mm.Init(&tilingData.matmulTiling, &pipe); \
+        } \
+        GMMA8W4MSDCompute<matmulType> op(mm); \
+        op.Init(initParams, &tilingData, &pipe); \
+        op.Process(); \
     } while (0)
 
-#define GMMFR_A8W4_L1_OPT_IMPL(groupListType, sharedInputIsNone)                                                       \
-    do {                                                                                                               \
-        TPipe pipe;                                                                                                    \
-        if ASCEND_IS_AIV {                                                                                             \
-            using param = ParamW4A8Pre<groupListType>;                                                                 \
-            GMMA8W4PreProcess<param> op1;                                                                              \
-            MMPreInitParams preInitParams{x, x, group_list, user};                                                     \
-            op1.Init(preInitParams, tilingData, &pipe);                                                                \
-            op1.Process();                                                                                             \
-            pipe.Reset();                                                                                              \
-            pipe.Destroy();                                                                                            \
-            pipe.Init();                                                                                               \
-        }                                                                                                              \
-        using bT = MatmulType<TPosition::GM, wFormat, int4b_t, false>;                                                 \
-        using biasT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>;                                       \
-        using cT = MatmulType<TPosition::GM, CubeFormat::ND, half, false>;                                             \
-        using aT = MatmulType<TPosition::TSCM, CubeFormat::NZ, int4b_t, false>;                                        \
-        using matmulType = MMImplType<aT, bT, cT, biasT, GroupedMatmulFinalizeRouting::A8W4_GMM_CFG_MDL,               \
-                                      groupListType, sharedInputIsNone>;                                               \
-        matmulType::MT mm;                                                                                             \
-        if ASCEND_IS_AIC {                                                                                             \
-            mm.SetSubBlockIdx(0);                                                                                      \
-            mm.Init(&tilingData.matmulTiling, &pipe);                                                                  \
-        }                                                                                                              \
-        GMMA8W4MSDL1OptCompute<matmulType> op(mm);                                                                     \
-        op.Init(initParams, &tilingData, &pipe);                                                                       \
-        op.Process();                                                                                                  \
+#define GMMFR_A8W4_L1_OPT_IMPL(groupListType, sharedInputIsNone) \
+    do { \
+        TPipe pipe; \
+        if ASCEND_IS_AIV { \
+            using param = ParamW4A8Pre<groupListType>; \
+            GMMA8W4PreProcess<param> op1; \
+            MMPreInitParams preInitParams{x, x, group_list, user}; \
+            op1.Init(preInitParams, tilingData, &pipe); \
+            op1.Process(); \
+            pipe.Reset(); \
+            pipe.Destroy(); \
+            pipe.Init(); \
+        } \
+        using bT = MatmulType<TPosition::GM, wFormat, int4b_t, false>; \
+        using biasT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>; \
+        using cT = MatmulType<TPosition::GM, CubeFormat::ND, half, false>; \
+        using aT = MatmulType<TPosition::TSCM, CubeFormat::NZ, int4b_t, false>; \
+        using matmulType = MMImplType<aT, bT, cT, biasT, GroupedMatmulFinalizeRouting::A8W4_GMM_CFG_MDL, \
+                                      groupListType, sharedInputIsNone>; \
+        matmulType::MT mm; \
+        if ASCEND_IS_AIC { \
+            mm.SetSubBlockIdx(0); \
+            mm.Init(&tilingData.matmulTiling, &pipe); \
+        } \
+        GMMA8W4MSDL1OptCompute<matmulType> op(mm); \
+        op.Init(initParams, &tilingData, &pipe); \
+        op.Process(); \
     } while (0)
 
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 220
@@ -114,7 +114,7 @@ extern "C" __global__ __aicore__ void grouped_matmul_finalize_routing(GM_ADDR x,
                                                                       GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     GET_TILING_DATA(tilingData, tilingGM);
-    __gm__ uint8_t *user = GetUserWorkspace(workspaceGM);
+    __gm__ uint8_t* user = GetUserWorkspace(workspaceGM);
     MMInitParams initParams{x,      w,     bias,      group_list,  scale, pertoken_scale,
                             offset, logit, row_index, share_input, y,     workspaceGM};
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);

@@ -22,14 +22,19 @@ namespace ge {
 * @brief QuantGroupedMatmulDequant operator interface implementation.
 
 * @par Inputs
-* @li x: A tensor. Quantized input data in combination operations. Support dtype: float16, dimension must be 2, support format: ND.
-* @li quantized_weight: A tensor. Weights used for quantitative calculations. Support dtype: int8, dimension must be 3, support format: NZ.
+* @li x: A tensor. Quantized input data in combination operations. Support dtype: float16, dimension must be 2, support
+format: ND.
+* @li quantized_weight: A tensor. Weights used for quantitative calculations. Support dtype: int8, dimension must be 3,
+support format: NZ.
 * @li weight_scale: A tensor. Quantization coefficient for weight. Support dtype: float32 and int64, support format: ND.
-* @li group_list: A tensor. The cumsum result (cumulative sum) of the matmul size distribution representing the x and out group axis direction.
+* @li group_list: A tensor. The cumsum result (cumulative sum) of the matmul size distribution representing the x and
+out group axis direction.
 * Support dtype: int64, support format: ND.
 * @li bias: An optional input bias tensor. Support dtype: int32, support format: ND.
-* @li x_scale: A optional tensor. Indicates the quantization coefficient of x. Support dtype: float32 and float16, support format: ND.
-* @li x_offset: A optional tensor. Indicates the offset of the input x. Support dtype: float32 and float16, support format: ND.
+* @li x_scale: A optional tensor. Indicates the quantization coefficient of x. Support dtype: float32 and float16,
+support format: ND.
+* @li x_offset: A optional tensor. Indicates the offset of the input x. Support dtype: float32 and float16, support
+format: ND.
 * @li smooth_scale: A optional tensor. The smoothing coefficient for x. Support dtype: float16, support format: ND.
 
 * @par Attributes
@@ -53,7 +58,7 @@ REG_OP(QuantGroupedMatmulDequant)
     .OUTPUT(y, TensorType({DT_FLOAT16}))
     .ATTR(x_quant_mode, String, "pertoken")
     .ATTR(transpose_weight, Bool, true)
-    .OP_END_FACTORY_REG(QuantGroupedMatmulDequant) 
+    .OP_END_FACTORY_REG(QuantGroupedMatmulDequant)
 
 } // namespace ge
 

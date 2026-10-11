@@ -54,21 +54,21 @@ template <typename ComputeType>
 class GMMA16W8MSDProcess {
 public:
     /** @brief constructor */
-    __aicore__ inline GMMA16W8MSDProcess(ComputeType &computeOp_)
+    __aicore__ inline GMMA16W8MSDProcess(ComputeType& computeOp_)
         : computeOp(computeOp_)
     {}
 
-    __aicore__ inline void Init(const GMMBaseParams *__restrict gmmBaseParamsIn,
-                                const TCubeTiling *__restrict mmTilingDataIn, TILING_TYPE *gmmArrayAddrIn,
+    __aicore__ inline void Init(const GMMBaseParams* __restrict gmmBaseParamsIn,
+                                const TCubeTiling* __restrict mmTilingDataIn, TILING_TYPE* gmmArrayAddrIn,
                                 GM_ADDR groupList, GM_ADDR tiling);
 
     __aicore__ inline void Process();
 
 protected:
     using B = typename ComputeType::B;
-    ComputeType &computeOp; // internal computation operator
-    const GMMBaseParams *__restrict gmmBaseParams;
-    const TCubeTiling *__restrict mmTilingData;
+    ComputeType& computeOp; // internal computation operator
+    const GMMBaseParams* __restrict gmmBaseParams;
+    const TCubeTiling* __restrict mmTilingData;
 
     uint32_t blockIdx;
     uint32_t coreIdx;
@@ -79,25 +79,25 @@ protected:
     int32_t preOffsetPre;
     GM_ADDR groupListPtr;
     GlobalTensor<int64_t> groupListGm;
-    TILING_TYPE *kListGm;
-    TILING_TYPE *nListGm;
+    TILING_TYPE* kListGm;
+    TILING_TYPE* nListGm;
 
-    __aicore__ inline void PreProcess(PreBaseMNConfig &preBaseMNConfig, MNConfig &mnConfig, uint32_t &preGroupIdx,
-                                      uint32_t &preCoreCount, bool &isPreRequired);
+    __aicore__ inline void PreProcess(PreBaseMNConfig& preBaseMNConfig, MNConfig& mnConfig, uint32_t& preGroupIdx,
+                                      uint32_t& preCoreCount, bool& isPreRequired);
 
-    __aicore__ inline void TailProcess(MNConfig &mnConfig, uint32_t secondHalfIterCount);
+    __aicore__ inline void TailProcess(MNConfig& mnConfig, uint32_t secondHalfIterCount);
 
-    __aicore__ inline void SetMNConfigs(PreBaseMNConfig &preBaseMNConfig, MNConfig &mnConfig);
+    __aicore__ inline void SetMNConfigs(PreBaseMNConfig& preBaseMNConfig, MNConfig& mnConfig);
 
-    __aicore__ inline void UpdateMnConfig(MNConfig &mnConfig);
-    __aicore__ inline void ProcessCommon(MNConfig &mnConfig, uint32_t &count, uint32_t &curCount, uint32_t &curBlock,
-                                         uint32_t &secondHalfIterCount);
+    __aicore__ inline void UpdateMnConfig(MNConfig& mnConfig);
+    __aicore__ inline void ProcessCommon(MNConfig& mnConfig, uint32_t& count, uint32_t& curCount, uint32_t& curBlock,
+                                         uint32_t& secondHalfIterCount);
 };
 
 template <typename ComputeType>
-__aicore__ inline void GMMA16W8MSDProcess<ComputeType>::Init(const GMMBaseParams *__restrict gmmBaseParamsIn,
-                                                             const TCubeTiling *__restrict mmTilingDataIn,
-                                                             TILING_TYPE *gmmArrayAddrIn, GM_ADDR groupList,
+__aicore__ inline void GMMA16W8MSDProcess<ComputeType>::Init(const GMMBaseParams* __restrict gmmBaseParamsIn,
+                                                             const TCubeTiling* __restrict mmTilingDataIn,
+                                                             TILING_TYPE* gmmArrayAddrIn, GM_ADDR groupList,
                                                              GM_ADDR tiling)
 {
     blockIdx = GetBlockIdx();
@@ -115,15 +115,15 @@ __aicore__ inline void GMMA16W8MSDProcess<ComputeType>::Init(const GMMBaseParams
     preOffset = 0;
     preOffsetPre = 0;
     if (groupListPtr != nullptr) {
-        groupListGm.SetGlobalBuffer((__gm__ int64_t *)groupList);
+        groupListGm.SetGlobalBuffer((__gm__ int64_t*)groupList);
     }
     kListGm = gmmArrayAddrIn + MKN_LIST_LEN;
     nListGm = gmmArrayAddrIn + MKN_LIST_LEN * 2;
 }
 
 template <typename ComputeType>
-__aicore__ inline void GMMA16W8MSDProcess<ComputeType>::SetMNConfigs(PreBaseMNConfig &preBaseMNConfig,
-                                                                     MNConfig &mnConfig)
+__aicore__ inline void GMMA16W8MSDProcess<ComputeType>::SetMNConfigs(PreBaseMNConfig& preBaseMNConfig,
+                                                                     MNConfig& mnConfig)
 {
     preBaseMNConfig.k = kListGm[0];
 
@@ -142,7 +142,7 @@ __aicore__ inline void GMMA16W8MSDProcess<ComputeType>::SetMNConfigs(PreBaseMNCo
 }
 
 template <typename ComputeType>
-__aicore__ inline void GMMA16W8MSDProcess<ComputeType>::UpdateMnConfig(MNConfig &mnConfig)
+__aicore__ inline void GMMA16W8MSDProcess<ComputeType>::UpdateMnConfig(MNConfig& mnConfig)
 {
     if constexpr (B::format == CubeFormat::NZ) {
         mnConfig.wBaseOffset +=
@@ -157,9 +157,9 @@ __aicore__ inline void GMMA16W8MSDProcess<ComputeType>::UpdateMnConfig(MNConfig 
 }
 
 template <typename ComputeType>
-__aicore__ inline void GMMA16W8MSDProcess<ComputeType>::PreProcess(PreBaseMNConfig &preBaseMNConfig, MNConfig &mnConfig,
-                                                                   uint32_t &preGroupIdx, uint32_t &preCoreCount,
-                                                                   bool &isPreRequired)
+__aicore__ inline void GMMA16W8MSDProcess<ComputeType>::PreProcess(PreBaseMNConfig& preBaseMNConfig, MNConfig& mnConfig,
+                                                                   uint32_t& preGroupIdx, uint32_t& preCoreCount,
+                                                                   bool& isPreRequired)
 {
     PreBaseMNConfig preBaseMNConfigs[A16W8_MSD_PREPROCESS_MAX_GROUP];
     uint32_t preValidGroupCount = 0;
@@ -187,7 +187,7 @@ __aicore__ inline void GMMA16W8MSDProcess<ComputeType>::PreProcess(PreBaseMNConf
 }
 
 template <typename ComputeType>
-__aicore__ inline void GMMA16W8MSDProcess<ComputeType>::TailProcess(MNConfig &mnConfig, uint32_t secondHalfIterCount)
+__aicore__ inline void GMMA16W8MSDProcess<ComputeType>::TailProcess(MNConfig& mnConfig, uint32_t secondHalfIterCount)
 {
     uint32_t resPostLoop = POST_SKIP_ITER_NUM;
     if (secondHalfIterCount < POST_SKIP_ITER_NUM) {
@@ -236,9 +236,9 @@ __aicore__ inline void GMMA16W8MSDProcess<ComputeType>::Process()
 }
 
 template <typename ComputeType>
-__aicore__ inline void GMMA16W8MSDProcess<ComputeType>::ProcessCommon(MNConfig &mnConfig, uint32_t &count,
-                                                                      uint32_t &curCount, uint32_t &curBlock,
-                                                                      uint32_t &secondHalfIterCount)
+__aicore__ inline void GMMA16W8MSDProcess<ComputeType>::ProcessCommon(MNConfig& mnConfig, uint32_t& count,
+                                                                      uint32_t& curCount, uint32_t& curBlock,
+                                                                      uint32_t& secondHalfIterCount)
 {
     mnConfig.blockDimM = Ceil(A16W8_MSD_STEP * mnConfig.m, mnConfig.singleM);
     mnConfig.blockDimN = Ceil(mnConfig.n, mnConfig.singleN);
@@ -268,22 +268,22 @@ public:
     constexpr static bool transposeX = mmType::AT::isTrans;
     constexpr static bool transposeW = mmType::BT::isTrans;
     /** @brief constructor */
-    __aicore__ inline GMMA16W8MSDCompute(typename mmType::MT &mm_)
+    __aicore__ inline GMMA16W8MSDCompute(typename mmType::MT& mm_)
         : mm(mm_)
     {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR offset,
                                 GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR group_list,
                                 GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                const GMMBaseParams *__restrict gmmBaseParams,
-                                const TCubeTiling *__restrict mmTilingData, TPipe *tPipe);
+                                const GMMBaseParams* __restrict gmmBaseParams,
+                                const TCubeTiling* __restrict mmTilingData, TPipe* tPipe);
 
-    __aicore__ inline void MMCompute(MNConfig &mnConfig);
+    __aicore__ inline void MMCompute(MNConfig& mnConfig);
 
-    __aicore__ inline void PreProcess(PreBaseMNConfig *preBaseMNConfigs, uint32_t preValidGroupCount,
+    __aicore__ inline void PreProcess(PreBaseMNConfig* preBaseMNConfigs, uint32_t preValidGroupCount,
                                       uint32_t maxMPerGroup);
 
-    __aicore__ inline void PostProcess(MNConfig &mnConfig, bool isLastGroup, uint32_t secondHalfIterCount);
+    __aicore__ inline void PostProcess(MNConfig& mnConfig, bool isLastGroup, uint32_t secondHalfIterCount);
 
 private:
     __aicore__ inline void InitLocalTensor();
@@ -291,12 +291,12 @@ private:
     __aicore__ inline void InitWorkspace(GM_ADDR workspace);
 
     __aicore__ inline void PreProcessTiling(uint32_t m, uint32_t curCoreNum, uint32_t startCoreIdx,
-                                            PreBaseMNConfig &preBaseMNConfig, PreMNConfig &preMNConfig);
+                                            PreBaseMNConfig& preBaseMNConfig, PreMNConfig& preMNConfig);
 
-    __aicore__ inline void PreProcessCalc(uint32_t curCoreNum, uint32_t startCoreIdx, uint32_t &resSyncCount,
-                                          PreMNConfig &preMNConfig);
+    __aicore__ inline void PreProcessCalc(uint32_t curCoreNum, uint32_t startCoreIdx, uint32_t& resSyncCount,
+                                          PreMNConfig& preMNConfig);
 
-    __aicore__ inline void PreProcessSync(uint32_t preValidGroupCount, uint32_t &resSyncCount);
+    __aicore__ inline void PreProcessSync(uint32_t preValidGroupCount, uint32_t& resSyncCount);
 
     __aicore__ inline void CopyOriginInput(uint32_t k, uint32_t curBaseM, uint32_t curBaseK, uint64_t xGmOffset);
 
@@ -306,27 +306,27 @@ private:
 
     __aicore__ inline void CopyInAmax(uint32_t curBaseM, uint64_t gmReduceMaxOffset);
 
-    __aicore__ inline void CalcAMatrix(PreMNConfig &preMNConfig, uint32_t curBaseM, uint32_t curBaseK,
+    __aicore__ inline void CalcAMatrix(PreMNConfig& preMNConfig, uint32_t curBaseM, uint32_t curBaseK,
                                        uint64_t gmReduceMaxOffset, uint64_t aOffsetGm);
 
-    __aicore__ inline void CalcASum(MNConfig &postMNConfig, uint32_t curBaseM, uint32_t curBaseN, uint32_t offsetM,
+    __aicore__ inline void CalcASum(MNConfig& postMNConfig, uint32_t curBaseM, uint32_t curBaseN, uint32_t offsetM,
                                     uint64_t offsetAndScaleOffset);
 
     __aicore__ inline void ProcessScaleAndBias(uint32_t n, uint32_t curBaseN, uint64_t offsetAndScaleOffset);
 
-    __aicore__ inline void ProcessC1C2(MNConfig &postMNConfig, uint32_t curBaseM, uint32_t curBaseN, uint32_t offsetM,
+    __aicore__ inline void ProcessC1C2(MNConfig& postMNConfig, uint32_t curBaseM, uint32_t curBaseN, uint32_t offsetM,
                                        uint32_t curSingleM);
 
-    __aicore__ inline void CalcCMatrix(MNConfig &postMNConfig, uint32_t curBaseM, uint32_t curBaseN, uint32_t offsetM);
+    __aicore__ inline void CalcCMatrix(MNConfig& postMNConfig, uint32_t curBaseM, uint32_t curBaseN, uint32_t offsetM);
 
     __aicore__ inline void CopyOutFinalResult(uint32_t n, uint32_t curBaseM, uint32_t curBaseN, uint64_t yOffset);
 
-    __aicore__ inline GlobalTensor<BT> SetGlobalBufferW(uint32_t tailN, MNConfig &mnConfig);
+    __aicore__ inline GlobalTensor<BT> SetGlobalBufferW(uint32_t tailN, MNConfig& mnConfig);
 
     __aicore__ inline uint64_t SetWOffset(uint32_t tailN, uint32_t k);
 
-    TPipe *pipe;
-    typename mmType::MT &mm; // matmul operator
+    TPipe* pipe;
+    typename mmType::MT& mm; // matmul operator
     bool hasBias = false;
     GM_ADDR weightTensorPtr;
     GlobalTensor<DTYPE_X> xGm;
@@ -377,8 +377,8 @@ __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::Init(GM_ADDR x, GM_ADDR
                                                               GM_ADDR offset, GM_ADDR antiquantScale,
                                                               GM_ADDR antiquantOffset, GM_ADDR group_list,
                                                               GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                                              const GMMBaseParams *__restrict gmmBaseParams,
-                                                              const TCubeTiling *__restrict mmTilingData, TPipe *tPipe)
+                                                              const GMMBaseParams* __restrict gmmBaseParams,
+                                                              const TCubeTiling* __restrict mmTilingData, TPipe* tPipe)
 {
     weightTensorPtr = weight;
     pipe = tPipe;
@@ -443,19 +443,19 @@ template <typename mmType, bool sync>
 __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::InitWorkspace(GM_ADDR workspace)
 {
     uint32_t usedWorkspaceSize = 0;
-    globalMaxGm.SetGlobalBuffer((__gm__ float *)(workspace));
+    globalMaxGm.SetGlobalBuffer((__gm__ float*)(workspace));
     if (aivIdx == 0) { // 0: use aiv 0 to init gm for amax
         InitOutput(globalMaxGm, totalM * FACTOR_FOR_FLOAT_ALIGN_TO_32);
     }
     usedWorkspaceSize += totalM * sizeof(float) * FACTOR_FOR_FLOAT_ALIGN_TO_32;
-    localSumGm.SetGlobalBuffer((__gm__ float *)(workspace + usedWorkspaceSize));
+    localSumGm.SetGlobalBuffer((__gm__ float*)(workspace + usedWorkspaceSize));
     if (aivIdx == 1) { // 1: use aiv 1 to init gm for asum
         InitOutput(localSumGm, totalM * coreNum);
     }
     usedWorkspaceSize += totalM * coreNum * sizeof(float);
-    aMatrixGm.SetGlobalBuffer((__gm__ int8_t *)(workspace + usedWorkspaceSize));
+    aMatrixGm.SetGlobalBuffer((__gm__ int8_t*)(workspace + usedWorkspaceSize));
     usedWorkspaceSize += aMatrixSize * sizeof(int8_t);
-    mmOutGm.SetGlobalBuffer((__gm__ int32_t *)(workspace + usedWorkspaceSize));
+    mmOutGm.SetGlobalBuffer((__gm__ int32_t*)(workspace + usedWorkspaceSize));
     if ASCEND_IS_AIV {
         SyncAll();
     }
@@ -479,7 +479,7 @@ __aicore__ inline uint64_t GMMA16W8MSDCompute<mmType, sync>::SetWOffset(uint32_t
 
 template <typename mmType, bool sync>
 __aicore__ inline GlobalTensor<typename mmType::BT::T> GMMA16W8MSDCompute<mmType, sync>::SetGlobalBufferW(
-    uint32_t tailN, MNConfig &mnConfig)
+    uint32_t tailN, MNConfig& mnConfig)
 {
     uint64_t wOffset = SetWOffset(tailN, mnConfig.k);
     GlobalTensor<BT> weightGmLocal;
@@ -491,7 +491,7 @@ __aicore__ inline GlobalTensor<typename mmType::BT::T> GMMA16W8MSDCompute<mmType
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::PreProcess(PreBaseMNConfig *preBaseMNConfigs,
+__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::PreProcess(PreBaseMNConfig* preBaseMNConfigs,
                                                                     uint32_t preValidGroupCount, uint32_t maxMPerGroup)
 {
     if ASCEND_IS_AIC {
@@ -540,7 +540,7 @@ __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::PreProcess(PreBaseMNCon
 
 template <typename mmType, bool sync>
 __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::PreProcessSync(uint32_t preValidGroupCount,
-                                                                        uint32_t &resSyncCount)
+                                                                        uint32_t& resSyncCount)
 {
     while (resSyncCount > 0) {
         SyncAll();
@@ -553,8 +553,8 @@ __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::PreProcessSync(uint32_t
 template <typename mmType, bool sync>
 __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::PreProcessTiling(uint32_t m, uint32_t curCoreNum,
                                                                           uint32_t startCoreIdx,
-                                                                          PreBaseMNConfig &preBaseMNConfig,
-                                                                          PreMNConfig &preMNConfig)
+                                                                          PreBaseMNConfig& preBaseMNConfig,
+                                                                          PreMNConfig& preMNConfig)
 {
     if (aivIdx < startCoreIdx || aivIdx >= curCoreNum + startCoreIdx) {
         return;
@@ -583,8 +583,8 @@ __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::PreProcessTiling(uint32
 
 template <typename mmType, bool sync>
 __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::PreProcessCalc(uint32_t curCoreNum, uint32_t startCoreIdx,
-                                                                        uint32_t &resSyncCount,
-                                                                        PreMNConfig &preMNConfig)
+                                                                        uint32_t& resSyncCount,
+                                                                        PreMNConfig& preMNConfig)
 {
     if (aivIdx < startCoreIdx || aivIdx >= startCoreIdx + curCoreNum) {
         return;
@@ -710,7 +710,7 @@ __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::CopyInAmax(uint32_t cur
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::CalcAMatrix(PreMNConfig &preMNConfig, uint32_t curBaseM,
+__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::CalcAMatrix(PreMNConfig& preMNConfig, uint32_t curBaseM,
                                                                      uint32_t curBaseK, uint64_t gmReduceMaxOffset,
                                                                      uint64_t aOffsetGm)
 {
@@ -763,7 +763,7 @@ __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::CalcAMatrix(PreMNConfig
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::MMCompute(MNConfig &mnConfig)
+__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::MMCompute(MNConfig& mnConfig)
 {
     uint32_t tailN = mnConfig.nIdx * mnConfig.singleN;
     uint64_t outOffset = mnConfig.mIdx * mnConfig.singleM * mnConfig.n + tailN;
@@ -789,7 +789,7 @@ __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::MMCompute(MNConfig &mnC
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::PostProcess(MNConfig &mnConfig, bool isLastGroup,
+__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::PostProcess(MNConfig& mnConfig, bool isLastGroup,
                                                                      uint32_t secondHalfIterCount)
 {
     if ASCEND_IS_AIC {
@@ -832,7 +832,7 @@ __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::PostProcess(MNConfig &m
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::CalcASum(MNConfig &postMNConfig, uint32_t curBaseM,
+__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::CalcASum(MNConfig& postMNConfig, uint32_t curBaseM,
                                                                   uint32_t curBaseN, uint32_t offsetM,
                                                                   uint64_t offsetAndScaleOffset)
 {
@@ -914,7 +914,7 @@ __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::ProcessScaleAndBias(uin
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::ProcessC1C2(MNConfig &postMNConfig, uint32_t curBaseM,
+__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::ProcessC1C2(MNConfig& postMNConfig, uint32_t curBaseM,
                                                                      uint32_t curBaseN, uint32_t offsetM,
                                                                      uint32_t curSingleM)
 {
@@ -941,7 +941,7 @@ __aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::ProcessC1C2(MNConfig &p
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::CalcCMatrix(MNConfig &postMNConfig, uint32_t curBaseM,
+__aicore__ inline void GMMA16W8MSDCompute<mmType, sync>::CalcCMatrix(MNConfig& postMNConfig, uint32_t curBaseM,
                                                                      uint32_t curBaseN, uint32_t offsetM)
 {
     uint32_t alignedBaseN = AlignUp<32>(curBaseN);
@@ -999,13 +999,13 @@ template <typename ComputeType>
 class GMMA16W8MSDMSparseProcess : public GMMA16W8MSDProcess<ComputeType> {
 public:
     /** @brief constructor */
-    __aicore__ inline GMMA16W8MSDMSparseProcess(ComputeType &computeOp_)
+    __aicore__ inline GMMA16W8MSDMSparseProcess(ComputeType& computeOp_)
         : GMMA16W8MSDProcess<ComputeType>(computeOp_)
     {}
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void UpdateMnConfigForGroupListMSparse(MNConfig &mnConfig, uint32_t splitValue,
+    __aicore__ inline void UpdateMnConfigForGroupListMSparse(MNConfig& mnConfig, uint32_t splitValue,
                                                              uint32_t expertIdx, uint32_t groupIdx);
 };
 
@@ -1051,7 +1051,7 @@ __aicore__ inline void GMMA16W8MSDMSparseProcess<ComputeType>::Process()
 }
 
 template <typename ComputeType>
-__aicore__ inline void GMMA16W8MSDMSparseProcess<ComputeType>::UpdateMnConfigForGroupListMSparse(MNConfig &mnConfig,
+__aicore__ inline void GMMA16W8MSDMSparseProcess<ComputeType>::UpdateMnConfigForGroupListMSparse(MNConfig& mnConfig,
                                                                                                  uint32_t splitValue,
                                                                                                  uint32_t expertIdx,
                                                                                                  uint32_t groupIdx)

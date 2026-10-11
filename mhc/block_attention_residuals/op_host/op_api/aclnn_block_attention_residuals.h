@@ -36,9 +36,9 @@ extern "C" {
  * @return 成功时返回ACLNN_SUCCESS。
  */
 ACLNN_API aclnnStatus aclnnBlockAttentionResidualsGetWorkspaceSize(
-    const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight, const aclTensor *normWeight,
-    int64_t validBlockNum, double normEps, bool needBackward, aclTensor *hiddenStates, aclTensor *invNorm,
-    aclTensor *probs, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* partialBlock, const aclTensor* blockRes, const aclTensor* projWeight, const aclTensor* normWeight,
+    int64_t validBlockNum, double normEps, bool needBackward, aclTensor* hiddenStates, aclTensor* invNorm,
+    aclTensor* probs, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief 使用第一段接口生成的执行器运行BlockAttentionResiduals。
@@ -49,7 +49,7 @@ ACLNN_API aclnnStatus aclnnBlockAttentionResidualsGetWorkspaceSize(
  * @param stream [输入] AscendCL Stream。
  * @return ACLNN_SUCCESS或对应错误码。
  */
-ACLNN_API aclnnStatus aclnnBlockAttentionResiduals(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnBlockAttentionResiduals(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                    aclrtStream stream);
 
 #ifdef __cplusplus

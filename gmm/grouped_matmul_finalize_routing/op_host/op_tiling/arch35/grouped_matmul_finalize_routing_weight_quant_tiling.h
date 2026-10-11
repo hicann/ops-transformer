@@ -133,14 +133,14 @@ DataSize GetSizeByDataType(ge::DataType dType);
 
 class GMMFRWeightQuantTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit GMMFRWeightQuantTiling(gert::TilingContext *context)
+    explicit GMMFRWeightQuantTiling(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {
         Reset();
     }
     ~GMMFRWeightQuantTiling() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         Ops::Transformer::OpTiling::TilingBaseClass::Reset(context);
         Reset();
@@ -167,10 +167,10 @@ protected:
     GMMFRWeightQuantInputParams inputParams_;
 
 private:
-    const GroupedMatmulFinalizeRoutingCompileInfo *compileInfoPtr_;
+    const GroupedMatmulFinalizeRoutingCompileInfo* compileInfoPtr_;
     ScenarioType scenarioType_ = ScenarioType::NONE;
-    std::vector<std::function<bool(gert::TilingContext *context)>> checkConditionFuncs_;
-    std::vector<std::function<void(gert::TilingContext *context, GMMFRWeightQuantInputParams &inputParams_)>>
+    std::vector<std::function<bool(gert::TilingContext* context)>> checkConditionFuncs_;
+    std::vector<std::function<void(gert::TilingContext* context, GMMFRWeightQuantInputParams& inputParams_)>>
         SetInputFuncs_;
     GMMFinalizeRoutingArch35Tiling::GMMFinalizeRoutingWeightQuantTilingData tilingData_;
 

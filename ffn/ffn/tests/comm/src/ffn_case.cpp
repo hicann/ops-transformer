@@ -34,11 +34,11 @@ using ops::adv::tests::utils::WriteFile;
  * 参数所控制的 Kernel 入口一致.
  */
 
-#define FFN_KERNEL_PARAM                                                                                               \
-    (__gm__ uint8_t * x, __gm__ uint8_t * weight1, __gm__ uint8_t * weight2, __gm__ uint8_t * expertTokens,            \
-     __gm__ uint8_t * bias1, __gm__ uint8_t * bias2, __gm__ uint8_t * scale, __gm__ uint8_t * offset,                  \
-     __gm__ uint8_t * deqScale1, __gm__ uint8_t * deqScale2, __gm__ uint8_t * antiquant_scale1,                        \
-     __gm__ uint8_t * antiquant_scale2, __gm__ uint8_t * antiquant_offset1, __gm__ uint8_t * antiquant_offset2,        \
+#define FFN_KERNEL_PARAM \
+    (__gm__ uint8_t * x, __gm__ uint8_t * weight1, __gm__ uint8_t * weight2, __gm__ uint8_t * expertTokens, \
+     __gm__ uint8_t * bias1, __gm__ uint8_t * bias2, __gm__ uint8_t * scale, __gm__ uint8_t * offset, \
+     __gm__ uint8_t * deqScale1, __gm__ uint8_t * deqScale2, __gm__ uint8_t * antiquant_scale1, \
+     __gm__ uint8_t * antiquant_scale2, __gm__ uint8_t * antiquant_offset1, __gm__ uint8_t * antiquant_offset2, \
      __gm__ uint8_t * y, __gm__ uint8_t * workSpace, __gm__ uint8_t * tiling)
 
 typedef void(*FFNKernelFunc) FFN_KERNEL_PARAM;
@@ -74,8 +74,8 @@ enum KernelParams {
     ANTIQUANT_OFFSET2
 };
 
-bool RunFFN(void *func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
-            std::vector<TensorIntf *> &output, uint8_t *workspace, uint8_t *tilingData)
+bool RunFFN(void* func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf*>& inputs,
+            std::vector<TensorIntf*>& output, uint8_t* workspace, uint8_t* tilingData)
 {
     (void)blockDim;
     // Kernel 运行
@@ -90,13 +90,15 @@ bool RunFFN(void *func, uint64_t tilingKey, int64_t blockDim, std::vector<Tensor
     return true;
 }
 
-FFNCase::FFNCase() : FFNCase("Undefined", true, "", OpInfo(), Param(), 0)
-{
-}
+FFNCase::FFNCase()
+    : FFNCase("Undefined", true, "", OpInfo(), Param(), 0)
+{}
 
-FFNCase::FFNCase(const char *name, bool enable, const char *dbgInfo, OpInfo opInfo, Param param,
+FFNCase::FFNCase(const char* name, bool enable, const char* dbgInfo, OpInfo opInfo, Param param,
                  int32_t tilingTemplatePriority)
-    : Case(name, enable, dbgInfo, tilingTemplatePriority), mOpInfo(std::move(opInfo)), mParam(std::move(param))
+    : Case(name, enable, dbgInfo, tilingTemplatePriority),
+      mOpInfo(std::move(opInfo)),
+      mParam(std::move(param))
 {
     this->mOpInfo.mName = "FFN";
 }
@@ -105,7 +107,7 @@ bool FFNCase::InitParam()
 {
     if (mParam.mExpertTokensData.size() > 0) {
         size_t dataSize = mParam.mExpertTokensData.size() * sizeof(int64_t);
-        uint8_t *addr = mParam.mTensors["expertTokens"].AllocDevData(0, dataSize);
+        uint8_t* addr = mParam.mTensors["expertTokens"].AllocDevData(0, dataSize);
         if (addr == nullptr) {
             LOG_ERR("Tensor(%s, %zu) AllocDevData Failed.", mParam.mTensors["expertTokens"].Name().c_str(), dataSize);
             return false;
@@ -125,35 +127,35 @@ bool FFNCase::InitParam()
 
 bool FFNCase::InitOpInfo()
 {
-    auto *ffnKernelFunc = (void *)ffn_quant_fp16;
+    auto* ffnKernelFunc = (void*)ffn_quant_fp16;
 
     if (mParam.mTensors["x"].GetDataType() == mParam.mTensors["weight1"].GetDataType()) {
         if (mParam.mTensors["weight1"].GetDataType() == ge::DataType::DT_INT8) { // 量化
             mIsQuant = true;
             if (mParam.mTensors["y"].GetDataType() == ge::DataType::DT_FLOAT16) {
-                ffnKernelFunc = (void *)ffn_quant_fp16;
+                ffnKernelFunc = (void*)ffn_quant_fp16;
             } else {
-                ffnKernelFunc = (void *)ffn_quant_bf16;
+                ffnKernelFunc = (void*)ffn_quant_bf16;
             }
         } else { // 非量化
             if (mParam.mTensors["weight1"].GetDataType() == ge::DataType::DT_FLOAT16) {
-                ffnKernelFunc = (void *)ffn_fp16;
+                ffnKernelFunc = (void*)ffn_fp16;
             } else {
-                ffnKernelFunc = (void *)ffn_bf16;
+                ffnKernelFunc = (void*)ffn_bf16;
             }
         }
     } else { // 伪量化
         if (mParam.mTensors["weight1"].GetDataType() == ge::DataType::DT_INT8) {
             if (mParam.mTensors["x"].GetDataType() == ge::DataType::DT_FLOAT16) {
-                ffnKernelFunc = (void *)ffn_a16w8_fp16;
+                ffnKernelFunc = (void*)ffn_a16w8_fp16;
             } else {
-                ffnKernelFunc = (void *)ffn_a16w8_bf16;
+                ffnKernelFunc = (void*)ffn_a16w8_bf16;
             }
         } else {
             if (mParam.mTensors["x"].GetDataType() == ge::DataType::DT_FLOAT16) {
-                ffnKernelFunc = (void *)ffn_a16w4_fp16;
+                ffnKernelFunc = (void*)ffn_a16w4_fp16;
             } else {
-                ffnKernelFunc = (void *)ffn_a16w4_bf16;
+                ffnKernelFunc = (void*)ffn_a16w4_bf16;
             }
         }
     }
@@ -172,7 +174,7 @@ bool FFNCase::InitOpInfo()
                                 {"output_dtype", mParam.mOutputDtype},
                                 {"tokens_index_flag", mParam.mTokensIndexFlag}});
     rst = rst && mCtx.SetKernelRunCbf(RunFFN);
-    rst = rst && mCtx.SetKernelMainFunc((void *)ffnKernelFunc);
+    rst = rst && mCtx.SetKernelMainFunc((void*)ffnKernelFunc);
     rst = rst && mOpInfo.SetContext(&mCtx);
     return rst;
 }
@@ -185,7 +187,7 @@ bool FFNCase::Run()
     if (!mOpInfo.ProcessTiling(mName)) {
         return false;
     }
-    auto *ffnTiling = const_cast<FFNTilingData *>((const FFNTilingData *)(mCtx.GetTilingData()));
+    auto* ffnTiling = const_cast<FFNTilingData*>((const FFNTilingData*)(mCtx.GetTilingData()));
     if (ffnTiling == nullptr) {
         LOG_ERR("Tiling failed!");
         return false;
@@ -219,7 +221,7 @@ bool FFNCase::InitCurrentCasePtr()
     return true;
 }
 
-Tensor ops::adv::tests::ffn::GenTensor(const char *name, const std::initializer_list<int64_t> &shape,
+Tensor ops::adv::tests::ffn::GenTensor(const char* name, const std::initializer_list<int64_t>& shape,
                                        ge::DataType dType, ge::Format format)
 {
     return Tensor(name, shape, "", dType, format);

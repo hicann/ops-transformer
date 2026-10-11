@@ -36,12 +36,12 @@ struct SortCustomMrgsortParam {
 class SortCustomMrgsort {
 public:
     __aicore__ inline SortCustomMrgsort(){};
-    __aicore__ inline void Init(SortCustomMrgsortParam *param);
+    __aicore__ inline void Init(SortCustomMrgsortParam* param);
     __aicore__ inline void Process();
-    __aicore__ inline void SetInput(GlobalTensor<float> &gmInput, GlobalTensor<int32_t> &gmSortNum,
-                                    LocalTensor<float> &ubInput);
-    __aicore__ inline void SetOutput(GlobalTensor<float> &gmOutput, LocalTensor<float> &ubOutput,
-                                     LocalTensor<int32_t> &outSortNumLocal);
+    __aicore__ inline void SetInput(GlobalTensor<float>& gmInput, GlobalTensor<int32_t>& gmSortNum,
+                                    LocalTensor<float>& ubInput);
+    __aicore__ inline void SetOutput(GlobalTensor<float>& gmOutput, LocalTensor<float>& ubOutput,
+                                     LocalTensor<int32_t>& outSortNumLocal);
 
 private:
     __aicore__ inline void CopyOutSortNum();
@@ -53,7 +53,7 @@ private:
     __aicore__ inline void ClearCache();
 
 private:
-    SortCustomMrgsortParam *param = nullptr;
+    SortCustomMrgsortParam* param = nullptr;
 
     GlobalTensor<float> gmInputs[4];
     GlobalTensor<float> gmOutput;
@@ -85,8 +85,8 @@ __aicore__ inline void SortCustomMrgsort::ClearCache()
     this->outOffset = 0;
 }
 
-__aicore__ inline void SortCustomMrgsort::SetInput(GlobalTensor<float> &gmInput, GlobalTensor<int32_t> &gmSortNum,
-                                                   LocalTensor<float> &ubInput)
+__aicore__ inline void SortCustomMrgsort::SetInput(GlobalTensor<float>& gmInput, GlobalTensor<int32_t>& gmSortNum,
+                                                   LocalTensor<float>& ubInput)
 {
     this->gmInputs[listNum] = gmInput;
     this->ubInputs[listNum] = ubInput;
@@ -94,8 +94,8 @@ __aicore__ inline void SortCustomMrgsort::SetInput(GlobalTensor<float> &gmInput,
     this->listNum += 1;
 }
 
-__aicore__ inline void SortCustomMrgsort::SetOutput(GlobalTensor<float> &gmOutput, LocalTensor<float> &ubOutput,
-                                                    LocalTensor<int32_t> &outSortNumLocal)
+__aicore__ inline void SortCustomMrgsort::SetOutput(GlobalTensor<float>& gmOutput, LocalTensor<float>& ubOutput,
+                                                    LocalTensor<int32_t>& outSortNumLocal)
 {
     this->gmOutput = gmOutput;
     this->ubOutput = ubOutput;
@@ -195,7 +195,7 @@ __aicore__ inline void SortCustomMrgsort::CopyOutSortNum()
     DataCopyPad(gmActualSortNum_, ubOutSortNum_, copyParams);
 }
 
-__aicore__ inline void SortCustomMrgsort::Init(SortCustomMrgsortParam *param)
+__aicore__ inline void SortCustomMrgsort::Init(SortCustomMrgsortParam* param)
 {
     this->param = param;
     this->remainListNum = listNum;

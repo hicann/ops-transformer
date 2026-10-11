@@ -22,11 +22,11 @@ constexpr int64_t DIMS_THREE = 3;
 constexpr int64_t DIMS_FOUR = 4;
 constexpr size_t SECOND_TO_LAST_OFFSET = 2;
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> MhcPostBackward(const at::Tensor &gradOutput,
-                                                                           const at::Tensor &x,
-                                                                           const c10::optional<at::Tensor> &hRes,
-                                                                           const at::Tensor &hOut,
-                                                                           const at::Tensor &hPost)
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> MhcPostBackward(const at::Tensor& gradOutput,
+                                                                           const at::Tensor& x,
+                                                                           const c10::optional<at::Tensor>& hRes,
+                                                                           const at::Tensor& hOut,
+                                                                           const at::Tensor& hPost)
 {
     const c10::OptionalDeviceGuard deviceGuard(x.device());
     bool hasHRes = hRes.has_value() && hRes.value().numel() > 0;

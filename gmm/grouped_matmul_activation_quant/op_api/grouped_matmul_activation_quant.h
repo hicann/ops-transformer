@@ -16,11 +16,11 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const std::tuple<aclTensor *, aclTensor *> GroupedMatmulActivationQuant(
-    const aclTensor *x, const aclTensor *groupList, const aclTensorList *weight, const aclTensorList *weightScale,
-    const aclTensorList *bias, const aclTensor *xScale, const char *activationType, bool transposeWeight,
-    int64_t groupListType, const aclIntArray *tuningConfig, const char *quantMode, int64_t yDtype,
-    const char *roundMode, int64_t scaleAlg, float dstTypeMax, aclOpExecutor *executor);
+const std::tuple<aclTensor*, aclTensor*> GroupedMatmulActivationQuant(
+    const aclTensor* x, const aclTensor* groupList, const aclTensorList* weight, const aclTensorList* weightScale,
+    const aclTensorList* bias, const aclTensor* xScale, const char* activationType, bool transposeWeight,
+    int64_t groupListType, const aclIntArray* tuningConfig, const char* quantMode, int64_t yDtype,
+    const char* roundMode, int64_t scaleAlg, float dstTypeMax, aclOpExecutor* executor);
 }
 
 #endif // OP_API_OP_API_COMMON_INC_LEVEL0_OP_GROUPED_MATMUL_ACTIVATION_QUANT_H

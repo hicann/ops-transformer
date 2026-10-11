@@ -19,7 +19,7 @@
 #include "../../../op_kernel/arch35/weight_quant_basic_block/weight_quant_tiling_key.h"
 
 namespace {
-static constexpr const char *OP_NAME = "GroupedMatmul";
+static constexpr const char* OP_NAME = "GroupedMatmul";
 constexpr size_t LAST_DIM = 1;             // 倒数第1维
 constexpr size_t FOURTH_FROM_LAST_DIM = 4; // 倒数第4维
 constexpr uint32_t ND_WEIGHT_DIM_NUM = 2;  // ND weight形如(K, N)
@@ -38,7 +38,7 @@ constexpr double DEFAULT_L2_RATE = 100.0;
 constexpr double MHZ_PER_GHZ = 1000.0;
 constexpr double KB_SIZE = 1024.0;
 
-double StrToDoubleWithDefault(const std::string &value, double defaultValue)
+double StrToDoubleWithDefault(const std::string& value, double defaultValue)
 {
     try {
         std::size_t parsedLength = 0;
@@ -47,9 +47,9 @@ double StrToDoubleWithDefault(const std::string &value, double defaultValue)
             return defaultValue;
         }
         return result;
-    } catch (const std::invalid_argument &) {
+    } catch (const std::invalid_argument&) {
         return defaultValue;
-    } catch (const std::out_of_range &) {
+    } catch (const std::out_of_range&) {
         return defaultValue;
     }
 }
@@ -66,8 +66,8 @@ namespace optiling {
 static const std::map<ge::DataType, std::unordered_set<ge::DataType>> BIAS_TYPE_SUPPORT_MAP = {
     {ge::DT_FLOAT16, {ge::DT_FLOAT16}}, {ge::DT_BF16, {ge::DT_BF16, ge::DT_FLOAT}}};
 
-bool GroupedWeightQuantBatchMatmulTiling::GetDimFromEnd(const gert::Shape &shape, size_t posFromEnd,
-                                                        uint64_t &out) const
+bool GroupedWeightQuantBatchMatmulTiling::GetDimFromEnd(const gert::Shape& shape, size_t posFromEnd,
+                                                        uint64_t& out) const
 {
     OP_CHECK_IF(posFromEnd == 0 || posFromEnd > shape.GetDimNum(),
                 OP_LOGE(OP_NAME, "posFromEnd[%zu] invalid, dimNum[%zu].", posFromEnd, shape.GetDimNum()), return false);
@@ -77,7 +77,7 @@ bool GroupedWeightQuantBatchMatmulTiling::GetDimFromEnd(const gert::Shape &shape
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckCoreNum(const gert::TilingContext *context) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckCoreNum(const gert::TilingContext* context) const
 {
     OP_CHECK_IF(
         coreNum_ <= 0 || aivNum_ <= 0,
@@ -93,7 +93,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckCoreNum(const gert::TilingContext
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::SetTiling(gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::SetTiling(gert::TilingContext* context)
 {
     OP_CHECK_IF(!AnalyzeAttr(context), OP_LOGE(context->GetNodeName(), "Invalid attr param"), return false);
     OP_CHECK_IF(!CalcResplitTiling(context), OP_LOGE(context->GetNodeName(), "Unable to calculate resplit-tiling"),
@@ -110,7 +110,7 @@ bool GroupedWeightQuantBatchMatmulTiling::SetTiling(gert::TilingContext *context
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::SetShapeList(const gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::SetShapeList(const gert::TilingContext* context)
 {
     if (isSingleX_ && isSingleWeight_ && isSingleY_) {
         OP_CHECK_IF(!SetShapeListSplitMSingleXSingleWeightSingleY(context),
@@ -189,9 +189,9 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckTensorListSize() const
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDtype(const gert::TilingContext *context, uint32_t attrIdx,
-                                                           size_t idx, const ge::DataType &tensorDtype,
-                                                           const std::string &tensorType) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDtype(const gert::TilingContext* context, uint32_t attrIdx,
+                                                           size_t idx, const ge::DataType& tensorDtype,
+                                                           const std::string& tensorType) const
 {
     if (!IsA16W4ND()) {
         return true;
@@ -208,10 +208,10 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDtype(const gert::TilingCon
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDtypeSingleXMultiWeightSingleY(const gert::TilingContext *context,
+bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDtypeSingleXMultiWeightSingleY(const gert::TilingContext* context,
                                                                                     uint32_t attrIdx, size_t idx,
-                                                                                    const ge::DataType &tensorDtype,
-                                                                                    const std::string &tensorType) const
+                                                                                    const ge::DataType& tensorDtype,
+                                                                                    const std::string& tensorType) const
 {
     auto tmpDesc = context->GetDynamicInputDesc(attrIdx, idx);
     auto tmpDType = tmpDesc->GetDataType();
@@ -225,7 +225,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDtypeSingleXMultiWeightSing
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::IsNzFormat(const gert::TilingContext *context, uint32_t attrIdx,
+bool GroupedWeightQuantBatchMatmulTiling::IsNzFormat(const gert::TilingContext* context, uint32_t attrIdx,
                                                      size_t idx) const
 {
     auto tmpDesc = context->GetDynamicInputDesc(attrIdx, idx);
@@ -237,7 +237,7 @@ bool GroupedWeightQuantBatchMatmulTiling::IsNzFormat(const gert::TilingContext *
     return tmpFormat == ge::FORMAT_FRACTAL_NZ;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckXAndWeightFormat(const gert::TilingContext *context, size_t idx) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckXAndWeightFormat(const gert::TilingContext* context, size_t idx) const
 {
     bool xNzFlag = IsNzFormat(context, X_IDX, idx);
     OP_CHECK_IF(xNzFlag, OP_LOGE_FOR_INVALID_FORMAT(OP_NAME, "x", "NZ", "ND"), return false);
@@ -249,7 +249,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckXAndWeightFormat(const gert::Tili
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckNotNullPtr(const gert::TilingContext *context, uint32_t attrIdx,
+bool GroupedWeightQuantBatchMatmulTiling::CheckNotNullPtr(const gert::TilingContext* context, uint32_t attrIdx,
                                                           size_t idx) const
 {
     auto tmpIDesc = context->GetDynamicInputDesc(attrIdx, idx);
@@ -261,7 +261,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckNotNullPtr(const gert::TilingCont
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckNotNull(const gert::TilingContext *context, size_t idx) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckNotNull(const gert::TilingContext* context, size_t idx) const
 {
     OP_CHECK_IF(!CheckNotNullPtr(context, X_IDX, idx),
                 OP_LOGE(context->GetNodeName(), "x's tensor or Desc is nullptr."), return false);
@@ -280,9 +280,9 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckNotNull(const gert::TilingContext
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDimEqualTarget(const gert::TilingContext *context,
+bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDimEqualTarget(const gert::TilingContext* context,
                                                                     uint32_t attrIdx, size_t idx, uint32_t targetDim,
-                                                                    const std::string &tensorType) const
+                                                                    const std::string& tensorType) const
 {
     auto tmpShapePtr = context->GetDynamicInputShape(attrIdx, idx);
     OP_CHECK_IF(tmpShapePtr == nullptr,
@@ -298,7 +298,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDimEqualTarget(const gert::
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDimSingleXSingleWeightSingleY(const gert::TilingContext *context,
+bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDimSingleXSingleWeightSingleY(const gert::TilingContext* context,
                                                                                    size_t idx) const
 {
     OP_CHECK_IF(!CheckTensorDimEqualTarget(context, X_IDX, idx, 2, "x"),
@@ -347,7 +347,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDimSingleXSingleWeightSingl
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDimMultiXMultiWeightMultiY(const gert::TilingContext *context,
+bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDimMultiXMultiWeightMultiY(const gert::TilingContext* context,
                                                                                 size_t idx) const
 {
     // 多多多场景x已在CheckEmptyTensor中校验
@@ -393,7 +393,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDimMultiXMultiWeightMultiY(
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDim(const gert::TilingContext *context, size_t idx) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDim(const gert::TilingContext* context, size_t idx) const
 {
     if (groupType_ == static_cast<int64_t>(GroupType::SPLIT_M)) {
         OP_CHECK_IF(!CheckTensorDimSingleXSingleWeightSingleY(context, idx),
@@ -405,8 +405,8 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckTensorDim(const gert::TilingConte
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckTensorShape(const gert::TilingContext *context, uint32_t attrIdx,
-                                                           size_t idx, const std::string &tensorType) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckTensorShape(const gert::TilingContext* context, uint32_t attrIdx,
+                                                           size_t idx, const std::string& tensorType) const
 {
     if (!IsA16W4ND() && !IsMxA8W4()) {
         return true;
@@ -447,9 +447,9 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckTensorShape(const gert::TilingCon
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckTensorShapeSingleXMultiWeightSingleY(const gert::TilingContext *context,
+bool GroupedWeightQuantBatchMatmulTiling::CheckTensorShapeSingleXMultiWeightSingleY(const gert::TilingContext* context,
                                                                                     uint32_t attrIdx, size_t idx,
-                                                                                    const std::string &tensorType) const
+                                                                                    const std::string& tensorType) const
 {
     auto tensorShapePtr = context->GetDynamicInputShape(attrIdx, idx);
     auto wShapePtr = context->GetDynamicInputShape(WEIGHT_IDX, idx);
@@ -496,7 +496,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckTensorShapeSingleXMultiWeightSing
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckDimValue(const gert::TilingContext *context, size_t idx) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckDimValue(const gert::TilingContext* context, size_t idx) const
 {
     auto xDimNum = context->GetDynamicInputTensor(X_IDX, idx)->GetStorageShape().GetDimNum();
     // 校验batch轴和M轴大于等于0，bf16/fp16-int4/int32 ND场景下不考虑X转置的情况
@@ -538,7 +538,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckDimValue(const gert::TilingContex
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckWeightInnerAxisEven(const gert::TilingContext *context, size_t idx) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckWeightInnerAxisEven(const gert::TilingContext* context, size_t idx) const
 {
     if (weightDtype_ == ge::DT_INT4) {
         auto wShapePtr = context->GetDynamicInputShape(WEIGHT_IDX, idx);
@@ -554,7 +554,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckWeightInnerAxisEven(const gert::T
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckEveryTensor(const gert::TilingContext *context) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckEveryTensor(const gert::TilingContext* context) const
 {
     for (size_t i = 0; i < numX_; i++) {
         OP_CHECK_IF(!CheckNotNull(context, i), OP_LOGE(context->GetNodeName(), "CheckTensorNotNull failed"),
@@ -590,7 +590,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckEveryTensor(const gert::TilingCon
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckWeightSingleXMultiWeightSingleY(const gert::TilingContext *context) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckWeightSingleXMultiWeightSingleY(const gert::TilingContext* context) const
 {
     auto xShapePtr = context->GetDynamicInputShape(X_IDX, 0);
     OP_CHECK_IF(xShapePtr == nullptr, OP_LOGE(context->GetNodeName(), "xShapePtr is nullptr."), return false);
@@ -600,7 +600,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckWeightSingleXMultiWeightSingleY(c
 
     auto yShapePtr = context->GetOutputShape(0);
     OP_CHECK_IF(yShapePtr == nullptr, OP_LOGE(context->GetNodeName(), "yShapePtr is nullptr."), return false);
-    const gert::Shape &yShape = yShapePtr->GetOriginShape();
+    const gert::Shape& yShape = yShapePtr->GetOriginShape();
     int64_t yNDimValue = yShape.GetDim(static_cast<uint32_t>(yShape.GetDimNum()) - LAST_DIM);
 
     uint32_t targetWeightDim = weightNzFlag_ ? NZ_WEIGHT_DIM_NUM : ND_WEIGHT_DIM_NUM;
@@ -647,7 +647,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckWeightSingleXMultiWeightSingleY(c
 }
 
 bool GroupedWeightQuantBatchMatmulTiling::CheckAntiquantScaleSingleXMultiWeightSingleY(
-    const gert::TilingContext *context) const
+    const gert::TilingContext* context) const
 {
     for (size_t i = 0; i < numAntiquantScale_; ++i) {
         OP_CHECK_IF(!CheckNotNullPtr(context, ANTIQUANT_SCALE_IDX, i),
@@ -664,7 +664,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckAntiquantScaleSingleXMultiWeightS
 }
 
 bool GroupedWeightQuantBatchMatmulTiling::CheckAntiquantOffsetSingleXMultiWeightSingleY(
-    const gert::TilingContext *context) const
+    const gert::TilingContext* context) const
 {
     OP_CHECK_IF(hasAntiquantOffset_,
                 OP_LOGE(context->GetNodeName(), "When x-weight is float8_e4m3fn-float4_e2m1/fp32 in "
@@ -673,7 +673,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckAntiquantOffsetSingleXMultiWeight
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckBiasSingleXMultiWeightSingleY(const gert::TilingContext *context) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckBiasSingleXMultiWeightSingleY(const gert::TilingContext* context) const
 {
     if (!hasBias_) {
         return true;
@@ -692,7 +692,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckBiasSingleXMultiWeightSingleY(con
 }
 
 bool GroupedWeightQuantBatchMatmulTiling::CheckEveryTensorSingleXMultiWeightSingleY(
-    const gert::TilingContext *context) const
+    const gert::TilingContext* context) const
 {
     OP_CHECK_IF(!CheckNotNullPtr(context, X_IDX, 0), OP_LOGE(context->GetNodeName(), "x's tensor or Desc is nullptr."),
                 return false);
@@ -714,7 +714,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckEveryTensorSingleXMultiWeightSing
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckGroupList(const gert::TilingContext *context) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckGroupList(const gert::TilingContext* context) const
 {
     if (groupType_ == static_cast<int64_t>(GroupType::SPLIT_M)) {
         const bool isMxSparse = IsMxA8W4() && groupListType_ == GroupedMatmul::GROUPLIST_TYPE_SPARSE_M;
@@ -726,7 +726,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckGroupList(const gert::TilingConte
         auto groupListPtr = context->GetOptionalInputShape(GroupedMatmul::GROUPLIST_INDEX);
         OP_CHECK_IF(groupListPtr == nullptr, OP_LOGE(context->GetNodeName(), "GroupList is nullptr."), return false);
         if (groupListType_ == GroupedMatmul::GROUPLIST_TYPE_SPARSE_M) {
-            const auto &groupListShape = groupListPtr->GetOriginShape();
+            const auto& groupListShape = groupListPtr->GetOriginShape();
             OP_CHECK_IF(groupListShape.GetDimNum() != GmmConstant::GROUP_LIST_SPARSE_DIMS,
                         OP_LOGE_FOR_INVALID_SHAPEDIM(OP_NAME, "groupList", std::to_string(groupListShape.GetDimNum()),
                                                      std::to_string(GmmConstant::GROUP_LIST_SPARSE_DIMS)),
@@ -757,7 +757,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckGroupList(const gert::TilingConte
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::AnalyzeCompileInfoAndAttrs(const gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::AnalyzeCompileInfoAndAttrs(const gert::TilingContext* context)
 {
     auto compileInfoPtr = context->GetCompileInfo<GMMCompileInfo>();
     OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "compileInfoPtr is nullptr."), return false);
@@ -766,11 +766,11 @@ bool GroupedWeightQuantBatchMatmulTiling::AnalyzeCompileInfoAndAttrs(const gert:
 
     auto attr = context->GetAttrs();
     OP_CHECK_IF(attr == nullptr, OP_LOGE(context->GetNodeName(), "attr is nullptr."), return false);
-    const bool *transposeWeightPtr = attr->GetAttrPointer<bool>(ATTR_TRANS_W_IDX);
-    const bool *transposeXPtr = attr->GetAttrPointer<bool>(ATTR_TRANS_X_IDX);
-    const int64_t *groupTypePtr = attr->GetAttrPointer<int64_t>(ATTR_GROUPTYPE_IDX);
-    const int64_t *splitItemPtr = attr->GetAttrPointer<int64_t>(ATTR_SPLIT_ITEM_IDX);
-    const int64_t *groupListTypePtr = attr->GetAttrPointer<int64_t>(ATTR_GROUP_LIST_TYPE_IDX);
+    const bool* transposeWeightPtr = attr->GetAttrPointer<bool>(ATTR_TRANS_W_IDX);
+    const bool* transposeXPtr = attr->GetAttrPointer<bool>(ATTR_TRANS_X_IDX);
+    const int64_t* groupTypePtr = attr->GetAttrPointer<int64_t>(ATTR_GROUPTYPE_IDX);
+    const int64_t* splitItemPtr = attr->GetAttrPointer<int64_t>(ATTR_SPLIT_ITEM_IDX);
+    const int64_t* groupListTypePtr = attr->GetAttrPointer<int64_t>(ATTR_GROUP_LIST_TYPE_IDX);
     transA_ = transposeXPtr != nullptr ? *transposeXPtr : false;
     transB_ = transposeWeightPtr != nullptr ? *transposeWeightPtr : false;
     groupType_ = groupTypePtr != nullptr ? *groupTypePtr : static_cast<int64_t>(GroupType::NO_SPLIT);
@@ -781,7 +781,7 @@ bool GroupedWeightQuantBatchMatmulTiling::AnalyzeCompileInfoAndAttrs(const gert:
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::AnalyzeTensorLayout(const gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::AnalyzeTensorLayout(const gert::TilingContext* context)
 {
     // 2: when x is multi-tensor, y is single-tensor; 3: when x is single-tensor, y is single-tensor
     isSingleY_ = (splitItem_ == 2 || splitItem_ == 3);
@@ -798,7 +798,7 @@ bool GroupedWeightQuantBatchMatmulTiling::AnalyzeTensorLayout(const gert::Tiling
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckAllParams(const gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::CheckAllParams(const gert::TilingContext* context)
 {
     // 参数校验
     OP_CHECK_IF(!CheckCoreNum(context), OP_LOGE(context->GetNodeName(), "Invalid core number ratio"), return false);
@@ -821,7 +821,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckAllParams(const gert::TilingConte
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::AnalyzeAttr(const gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::AnalyzeAttr(const gert::TilingContext* context)
 {
     if (!AnalyzeCompileInfoAndAttrs(context)) {
         return false;
@@ -845,7 +845,7 @@ bool GroupedWeightQuantBatchMatmulTiling::AnalyzeAttr(const gert::TilingContext 
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::AnalyzeInput(const gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::AnalyzeInput(const gert::TilingContext* context)
 {
     auto xDesc = context->GetDynamicInputDesc(X_IDX, 0);
     OP_CHECK_IF(xDesc == nullptr, OP_LOGE(context->GetNodeName(), "xDesc is nullptr."), return false);
@@ -912,7 +912,7 @@ bool GroupedWeightQuantBatchMatmulTiling::EnableTailResplit() const
     return true;
 }
 
-double GroupedWeightQuantBatchMatmulTiling::GetCoreFreq(fe::PlatFormInfos *platformInfo) const
+double GroupedWeightQuantBatchMatmulTiling::GetCoreFreq(fe::PlatFormInfos* platformInfo) const
 {
     std::string freqStr;
     platformInfo->GetPlatformRes("AICoreSpec", "cube_freq", freqStr);
@@ -920,7 +920,7 @@ double GroupedWeightQuantBatchMatmulTiling::GetCoreFreq(fe::PlatFormInfos *platf
     return StrToDoubleWithDefault(freqStr, DEFAULT_AICORE_FREQ_MHZ);
 }
 
-double GroupedWeightQuantBatchMatmulTiling::GetHbmBW(fe::PlatFormInfos *platformInfo) const
+double GroupedWeightQuantBatchMatmulTiling::GetHbmBW(fe::PlatFormInfos* platformInfo) const
 {
     std::string coreCntStr;
     std::string ddrRateStr;
@@ -930,7 +930,7 @@ double GroupedWeightQuantBatchMatmulTiling::GetHbmBW(fe::PlatFormInfos *platform
            StrToDoubleWithDefault(ddrRateStr, DEFAULT_DDR_RATE) / MHZ_PER_GHZ / KB_SIZE;
 }
 
-double GroupedWeightQuantBatchMatmulTiling::GetL2BW(fe::PlatFormInfos *platformInfo) const
+double GroupedWeightQuantBatchMatmulTiling::GetL2BW(fe::PlatFormInfos* platformInfo) const
 {
     std::string coreCntStr;
     std::string l2RateStr;
@@ -940,16 +940,16 @@ double GroupedWeightQuantBatchMatmulTiling::GetL2BW(fe::PlatFormInfos *platformI
            StrToDoubleWithDefault(l2RateStr, DEFAULT_L2_RATE) / MHZ_PER_GHZ / KB_SIZE;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CalcMxA8W4BandwidthResplit(const gert::TilingContext *context,
-                                                                     uint64_t c0Size, uint64_t &selectedNBlockCount,
-                                                                     uint64_t &selectedNBlockSize) const
+bool GroupedWeightQuantBatchMatmulTiling::CalcMxA8W4BandwidthResplit(const gert::TilingContext* context,
+                                                                     uint64_t c0Size, uint64_t& selectedNBlockCount,
+                                                                     uint64_t& selectedNBlockSize) const
 {
     if (!IsMxA8W4() || groupType_ != static_cast<int64_t>(GroupType::SPLIT_M) || groupNum_ == 0 ||
         nSize_ > coreNum_ * BASIC_BLOCK_BASE_N || (groupListType_ != 0 && groupListType_ != 1)) {
         return false;
     }
 
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     if (platformInfo == nullptr) {
         OP_LOGI(context->GetNodeName(), "platformInfo is null");
         return false;
@@ -1016,7 +1016,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CalcMxA8W4BandwidthResplit(const gert:
     return false;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CalcResplitTiling(const gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::CalcResplitTiling(const gert::TilingContext* context)
 {
     if (!EnableTailResplit()) {
         return true;
@@ -1166,7 +1166,7 @@ void GroupedWeightQuantBatchMatmulTiling::SetMatMulTiling()
     }
 }
 
-void GroupedWeightQuantBatchMatmulTiling::SetTilingKey(gert::TilingContext *context)
+void GroupedWeightQuantBatchMatmulTiling::SetTilingKey(gert::TilingContext* context)
 {
     constexpr uint8_t DECIMAL = 10U;
     // 平台类型占2位(平台大类， 平台小类)，平台大类在高位，需要乘10
@@ -1214,9 +1214,9 @@ void GroupedWeightQuantBatchMatmulTiling::SetTilingKey(gert::TilingContext *cont
     context->SetTilingKey(tilingKeyConfig_.GenTilingKey());
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::SetCustomParam(gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::SetCustomParam(gert::TilingContext* context)
 {
-    size_t *workspaces = context->GetWorkspaceSizes(1); // get second variable
+    size_t* workspaces = context->GetWorkspaceSizes(1); // get second variable
     OP_CHECK_IF(workspaces == nullptr, OP_LOGE(context->GetNodeName(), "workspaces is nullptr."),
                 return false); // check workspaces is not null
     workspaces[0] = DEFAULT_WORKSPACE_SIZE;
@@ -1225,7 +1225,7 @@ bool GroupedWeightQuantBatchMatmulTiling::SetCustomParam(gert::TilingContext *co
     OP_CHECK_IF(context->GetRawTilingData() == nullptr, OP_LOGE(context->GetNodeName(), "RawTilingData is nullptr."),
                 return false);
     errno_t ret = memcpy_s(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity(),
-                           static_cast<void *>(&tilingData_), sizeof(tilingData_));
+                           static_cast<void*>(&tilingData_), sizeof(tilingData_));
     if (ret != EOK) {
         OP_LOGE(context->GetNodeName(), "memcpy_s failed, ret = %d", ret);
         return false;
@@ -1342,7 +1342,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckAntiQuantDtype() const
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckPerTokenScale(const gert::TilingContext *context) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckPerTokenScale(const gert::TilingContext* context) const
 {
     if (IsMxA8W4()) {
         auto perTokenScaleShapePtr = context->GetDynamicInputShape(GroupedMatmul::PER_TOKEN_SCALE_INDEX, 0);
@@ -1419,7 +1419,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckTransposeStatus() const
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckEmptyTensor(const gert::TilingContext *context) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckEmptyTensor(const gert::TilingContext* context) const
 {
     if (isSingleMultiSingle_) {
         return CheckEmptyTensorSingleXMultiWeightSingleY(context);
@@ -1428,7 +1428,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckEmptyTensor(const gert::TilingCon
 }
 
 bool GroupedWeightQuantBatchMatmulTiling::CheckEmptyTensorSingleXMultiWeightSingleY(
-    const gert::TilingContext *context) const
+    const gert::TilingContext* context) const
 {
     auto xShapePtr = context->GetDynamicInputShape(X_IDX, 0);
     OP_CHECK_IF(xShapePtr == nullptr, OP_LOGE(context->GetNodeName(), "xShapePtr is nullptr."), return false);
@@ -1483,7 +1483,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckEmptyTensorSingleXMultiWeightSing
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckEmptyTensorDefault(const gert::TilingContext *context) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckEmptyTensorDefault(const gert::TilingContext* context) const
 {
     size_t numGroups = std::min(numX_, numWeight_);
     for (size_t i = 0; i < numGroups; ++i) {
@@ -1525,7 +1525,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckEmptyTensorDefault(const gert::Ti
 }
 
 bool GroupedWeightQuantBatchMatmulTiling::SetShapeListSplitMSingleXSingleWeightSingleY(
-    const gert::TilingContext *context)
+    const gert::TilingContext* context)
 {
     auto xTensor = context->GetDynamicInputTensor(X_IDX, 0); // 0: get first tensor
     OP_CHECK_IF(xTensor == nullptr, OP_LOGE(context->GetNodeName(), "xTensor is nullptr."), return false);
@@ -1551,9 +1551,9 @@ bool GroupedWeightQuantBatchMatmulTiling::SetShapeListSplitMSingleXSingleWeightS
             // wDimNum-4：非转置N1索引；wDimNum-1：非转置N0索引
             nSize_ = wShape.GetDim(wDimNum - 4) * wShape.GetDim(wDimNum - 1);
         }
-        const gert::StorageShape *yShapePtr = context->GetOutputShape(0);
+        const gert::StorageShape* yShapePtr = context->GetOutputShape(0);
         OP_CHECK_IF(yShapePtr == nullptr, OP_LOGE(context->GetNodeName(), "yShapePtr is nullptr."), return false);
-        const gert::Shape &yShape = yShapePtr->GetOriginShape();
+        const gert::Shape& yShape = yShapePtr->GetOriginShape();
         OP_CHECK_IF(!GetDimFromEnd(yShape, 1, nSizeOri_),
                     OP_LOGE(context->GetNodeName(), "Get nSizeOri_ from y last dim failed."), return false);
     }
@@ -1575,7 +1575,7 @@ bool GroupedWeightQuantBatchMatmulTiling::SetShapeListSplitMSingleXSingleWeightS
 }
 
 bool GroupedWeightQuantBatchMatmulTiling::SetShapeListSplitMSingleXMultiWeightSingleY(
-    const gert::TilingContext *context)
+    const gert::TilingContext* context)
 {
     auto xTensor = context->GetDynamicInputTensor(X_IDX, 0); // 0: get first tensor
     OP_CHECK_IF(xTensor == nullptr, OP_LOGE(context->GetNodeName(), "xTensor is nullptr."), return false);
@@ -1591,9 +1591,9 @@ bool GroupedWeightQuantBatchMatmulTiling::SetShapeListSplitMSingleXMultiWeightSi
     }
 
     if (weightNzFlag_) {
-        const gert::StorageShape *yShapePtr = context->GetOutputShape(0);
+        const gert::StorageShape* yShapePtr = context->GetOutputShape(0);
         OP_CHECK_IF(yShapePtr == nullptr, OP_LOGE(context->GetNodeName(), "yShapePtr is nullptr."), return false);
-        const gert::Shape &yShape = yShapePtr->GetOriginShape();
+        const gert::Shape& yShape = yShapePtr->GetOriginShape();
         OP_CHECK_IF(!GetDimFromEnd(yShape, 1, nSizeOri_),
                     OP_LOGE(context->GetNodeName(), "Get nSizeOri_ from y last dim failed."), return false);
     }
@@ -1644,7 +1644,7 @@ bool GroupedWeightQuantBatchMatmulTiling::SetShapeListSplitMSingleXMultiWeightSi
     return true;
 }
 
-uint16_t GroupedWeightQuantBatchMatmulTiling::GetTensorListSize(const gert::TilingContext *context,
+uint16_t GroupedWeightQuantBatchMatmulTiling::GetTensorListSize(const gert::TilingContext* context,
                                                                 uint32_t attrIdx) const
 {
     uint16_t count = 0;
@@ -1658,7 +1658,7 @@ uint16_t GroupedWeightQuantBatchMatmulTiling::GetTensorListSize(const gert::Tili
     return count;
 }
 
-void GroupedWeightQuantBatchMatmulTiling::GetNumOfInputs(const gert::TilingContext *context)
+void GroupedWeightQuantBatchMatmulTiling::GetNumOfInputs(const gert::TilingContext* context)
 {
     numX_ = GetTensorListSize(context, X_IDX);
     numWeight_ = GetTensorListSize(context, WEIGHT_IDX);
@@ -1667,7 +1667,7 @@ void GroupedWeightQuantBatchMatmulTiling::GetNumOfInputs(const gert::TilingConte
     numAntiquantOffset_ = GetTensorListSize(context, ANTIQUANT_OFFSET_IDX);
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::SetShapeListMultiXMultiWeightMultiY(const gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::SetShapeListMultiXMultiWeightMultiY(const gert::TilingContext* context)
 {
     for (uint16_t i = 0; i < GroupedMatmul::MAX_TENSOR_CONT; i++) {
         auto xShapePtr = context->GetDynamicInputShape(X_IDX, i);
@@ -1722,7 +1722,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckGroupSize() const
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::SetAntiquantGroupSize(const gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::SetAntiquantGroupSize(const gert::TilingContext* context)
 {
     groupSize_ = 0;
     auto antiquantScale = context->GetDynamicInputTensor(ANTIQUANT_SCALE_IDX, 0);
@@ -1740,7 +1740,7 @@ bool GroupedWeightQuantBatchMatmulTiling::SetAntiquantGroupSize(const gert::Tili
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::DeriveGroupSizeSingle(const gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::DeriveGroupSizeSingle(const gert::TilingContext* context)
 {
     auto antiquantScale = context->GetDynamicInputTensor(ANTIQUANT_SCALE_IDX, 0);
     auto antiquantScaleShape = antiquantScale->GetStorageShape();
@@ -1785,7 +1785,7 @@ bool GroupedWeightQuantBatchMatmulTiling::DeriveGroupSizeSingle(const gert::Tili
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::DeriveGroupSizeMulti(const gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::DeriveGroupSizeMulti(const gert::TilingContext* context)
 {
     gert::Shape scaleShape0;
     OP_CHECK_IF(!GetA16W4MultiScaleShape(context, 0, scaleShape0),
@@ -1818,8 +1818,8 @@ bool GroupedWeightQuantBatchMatmulTiling::DeriveGroupSizeMulti(const gert::Tilin
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::GetA16W4MultiScaleShape(const gert::TilingContext *context, uint16_t idx,
-                                                                  gert::Shape &scaleShape) const
+bool GroupedWeightQuantBatchMatmulTiling::GetA16W4MultiScaleShape(const gert::TilingContext* context, uint16_t idx,
+                                                                  gert::Shape& scaleShape) const
 {
     auto scaleShapePtr = context->GetDynamicInputShape(ANTIQUANT_SCALE_IDX, idx);
     OP_CHECK_IF(scaleShapePtr == nullptr, OP_LOGE(context->GetNodeName(), "antiquantScale[%u] shape is nullptr.", idx),
@@ -1828,9 +1828,9 @@ bool GroupedWeightQuantBatchMatmulTiling::GetA16W4MultiScaleShape(const gert::Ti
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::DeriveA16W4MultiPergroupSizeFromScale(const gert::Shape &scaleShape,
+bool GroupedWeightQuantBatchMatmulTiling::DeriveA16W4MultiPergroupSizeFromScale(const gert::Shape& scaleShape,
                                                                                 int64_t kSize, uint16_t idx,
-                                                                                uint32_t &groupSize) const
+                                                                                uint32_t& groupSize) const
 {
     int64_t scaleGroupNum = scaleShape.GetDim(0);
     OP_CHECK_IF(scaleGroupNum <= 0 || kSize <= 0 || kSize % scaleGroupNum != 0,
@@ -1844,7 +1844,7 @@ bool GroupedWeightQuantBatchMatmulTiling::DeriveA16W4MultiPergroupSizeFromScale(
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckA16W4MultiPergroupScaleShape(const gert::TilingContext *context,
+bool GroupedWeightQuantBatchMatmulTiling::CheckA16W4MultiPergroupScaleShape(const gert::TilingContext* context,
                                                                             uint16_t idx, int64_t expectedDimNum,
                                                                             uint32_t expectedGroupSize) const
 {
@@ -1887,9 +1887,9 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckA16W4MultiPergroupScaleShape(cons
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckAntiquantOffsetMatchScale(const gert::TilingContext *context,
+bool GroupedWeightQuantBatchMatmulTiling::CheckAntiquantOffsetMatchScale(const gert::TilingContext* context,
                                                                          uint16_t idx,
-                                                                         const gert::Shape &scaleShape) const
+                                                                         const gert::Shape& scaleShape) const
 {
     if (!hasAntiquantOffset_) {
         return true;
@@ -1917,7 +1917,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckAntiquantOffsetMatchScale(const g
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckMultiA16W4PerChannelShape(const gert::TilingContext *context) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckMultiA16W4PerChannelShape(const gert::TilingContext* context) const
 {
     for (uint16_t i = 0; i < groupNum_; i++) {
         auto scaleShapePtr = context->GetDynamicInputShape(ANTIQUANT_SCALE_IDX, i);
@@ -1945,8 +1945,8 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckMultiA16W4PerChannelShape(const g
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::GetC0Size(const gert::TilingContext *context, ge::DataType dtype,
-                                                    uint64_t &c0Size) const
+bool GroupedWeightQuantBatchMatmulTiling::GetC0Size(const gert::TilingContext* context, ge::DataType dtype,
+                                                    uint64_t& c0Size) const
 {
     if (dtype == ge::DT_INT4) {
         c0Size = AscendC::ONE_BLK_SIZE + AscendC::ONE_BLK_SIZE;
@@ -2054,7 +2054,7 @@ void GroupedWeightQuantBatchMatmulTiling::CalcNoFullNumBlocksResplitTiling(uint6
     }
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::CheckResplitTilingResult(const gert::TilingContext *context) const
+bool GroupedWeightQuantBatchMatmulTiling::CheckResplitTilingResult(const gert::TilingContext* context) const
 {
     OP_CHECK_IF(nSize_ >= static_cast<uint64_t>(BASIC_BLOCK_BASE_N_MIN) && resplitParam_.firstTailBlockCount > 0 &&
                     (resplitParam_.firstTailBlockSize < BASIC_BLOCK_BASE_N_MIN ||
@@ -2073,7 +2073,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckResplitTilingResult(const gert::T
     return true;
 }
 
-void GroupedWeightQuantBatchMatmulTiling::PrintInputParam(const gert::TilingContext *context) const
+void GroupedWeightQuantBatchMatmulTiling::PrintInputParam(const gert::TilingContext* context) const
 {
     OP_LOGI(context->GetNodeName(),
             "Input params: coreNum: %u, gmm groupNum: %u, groupType: %d, groupListType: %lld, splitItem: %lld, "
@@ -2088,7 +2088,7 @@ void GroupedWeightQuantBatchMatmulTiling::PrintInputParam(const gert::TilingCont
             ge::TypeUtils::DataTypeToSerialString(weightDtype_).c_str());
 }
 
-void GroupedWeightQuantBatchMatmulTiling::PrintTilingResult(const gert::TilingContext *context)
+void GroupedWeightQuantBatchMatmulTiling::PrintTilingResult(const gert::TilingContext* context)
 {
     OP_LOGI(context->GetNodeName(),
             "Tiling result: groupNum: %u, coreNum: %u, kSize: %llu, nSize: %llu, singleX: %u, singleWeight: %u, "
@@ -2129,7 +2129,7 @@ using namespace Ops::Transformer::OpTiling;
 using namespace GroupedMatmul;
 using namespace optiling::GmmConstant;
 
-GroupedS8S4BasicApiTiling::GroupedS8S4BasicApiTiling(gert::TilingContext *context)
+GroupedS8S4BasicApiTiling::GroupedS8S4BasicApiTiling(gert::TilingContext* context)
     : GroupedQmmTiling(context)
 {
     Reset();
@@ -2248,12 +2248,12 @@ bool GroupedS8S4BasicApiTiling::AnalyzeAttrs()
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is nullptr."), return false);
-    const int64_t *splitItemPtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_SPLIT_ITEM);
-    const bool *transposeWeightPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANS_W);
-    const bool *transposeXPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANS_X);
-    const int64_t *groupTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUPTYPE);
-    const int64_t *groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE);
-    const int64_t *actTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_ACT_TYPE);
+    const int64_t* splitItemPtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_SPLIT_ITEM);
+    const bool* transposeWeightPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANS_W);
+    const bool* transposeXPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANS_X);
+    const int64_t* groupTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUPTYPE);
+    const int64_t* groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE);
+    const int64_t* actTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_ACT_TYPE);
     const auto tuningConfigPtr = attrs->GetAttrPointer<gert::TypedContinuousVector<int64_t>>(ATTR_INDEX_TUNING_CONFIG);
 
     inputParams_.splitItem = splitItemPtr != nullptr ? static_cast<int8_t>(*splitItemPtr) : inputParams_.splitItem;
@@ -2316,7 +2316,7 @@ bool GroupedS8S4BasicApiTiling::CheckTensorLists() const
     return true;
 }
 
-bool GroupedS8S4BasicApiTiling::CheckCommonShapes(const gert::Shape &xShape, const gert::Shape &wShape) const
+bool GroupedS8S4BasicApiTiling::CheckCommonShapes(const gert::Shape& xShape, const gert::Shape& wShape) const
 {
     OP_CHECK_IF(xShape.GetDimNum() != SPLIT_K_W_DIMS || wShape.GetDimNum() != SPLIT_M_W_DIMS,
                 OP_LOGE(context_->GetNodeName(), "S8S4 BasicApi expects 2D x and 3D weight."), return false);
@@ -2335,13 +2335,13 @@ bool GroupedS8S4BasicApiTiling::CheckCommonShapes(const gert::Shape &xShape, con
     return true;
 }
 
-bool GroupedS8S4BasicApiTiling::SetLogicalMKN(const gert::Shape &xShape, const gert::Shape &wShape)
+bool GroupedS8S4BasicApiTiling::SetLogicalMKN(const gert::Shape& xShape, const gert::Shape& wShape)
 {
     auto outStorageShape = context_->GetOutputShape(Y_INDEX);
     OP_CHECK_IF(
         outStorageShape == nullptr || xShape.GetDimNum() != SPLIT_K_W_DIMS || wShape.GetDimNum() != SPLIT_M_W_DIMS,
         OP_LOGE(context_->GetNodeName(), "Invalid x/weight/out shape."), return false);
-    const gert::Shape &outShape = outStorageShape->GetOriginShape();
+    const gert::Shape& outShape = outStorageShape->GetOriginShape();
     OP_CHECK_IF(outShape.GetDimNum() != SPLIT_K_W_DIMS,
                 OP_LOGE(context_->GetNodeName(), "S8S4 BasicApi expects out [M,N]."), return false);
 
@@ -2367,7 +2367,7 @@ bool GroupedS8S4BasicApiTiling::CheckBiasShape() const
     auto biasShape = context_->GetDynamicInputShape(BIAS_INDEX, 0);
     OP_CHECK_IF(!inputParams_.hasBias || biasShape == nullptr, OP_LOGE(context_->GetNodeName(), "bias is required."),
                 return false);
-    const gert::Shape &shape = biasShape->GetOriginShape();
+    const gert::Shape& shape = biasShape->GetOriginShape();
     OP_CHECK_IF(shape.GetDimNum() != SPLIT_K_W_DIMS ||
                     static_cast<uint64_t>(shape.GetDim(0)) != inputParams_.groupNum ||
                     static_cast<uint64_t>(shape.GetDim(1)) != inputParams_.nSize,
@@ -2380,7 +2380,7 @@ bool GroupedS8S4BasicApiTiling::CheckPerTokenScaleShape() const
     auto perTokenScaleShape = context_->GetOptionalInputShape(PER_TOKEN_SCALE_INDEX);
     OP_CHECK_IF(perTokenScaleShape == nullptr, OP_LOGE(context_->GetNodeName(), "perTokenScale shape is nullptr."),
                 return false);
-    const gert::Shape &shape = perTokenScaleShape->GetOriginShape();
+    const gert::Shape& shape = perTokenScaleShape->GetOriginShape();
     OP_CHECK_IF(shape.GetDimNum() != 1 || static_cast<uint64_t>(shape.GetDim(0)) != inputParams_.mSize,
                 OP_LOGE(context_->GetNodeName(), "perTokenScale shape must be [M]."), return false);
     return true;
@@ -2401,7 +2401,7 @@ bool GroupedS8S4BasicApiTiling::CheckAntiquantInputsEmpty() const
     return true;
 }
 
-bool GroupedS8S4BasicApiTiling::CheckWeightNzStorageShape(const gert::Shape &storageShape)
+bool GroupedS8S4BasicApiTiling::CheckWeightNzStorageShape(const gert::Shape& storageShape)
 {
     // torch_npu constructs the normal A5 KN-NZ path as follows:
     //   INT8 NZ:          [E, ceil(N/32), ceil(K/16), 16, 32]
@@ -2434,9 +2434,9 @@ bool GroupedS8S4BasicApiTiling::CheckWeightNzStorageShape(const gert::Shape &sto
     return true;
 }
 
-bool GroupedS8S4BasicApiTiling::CheckWeightStorageShape(const gert::StorageShape &weightShape)
+bool GroupedS8S4BasicApiTiling::CheckWeightStorageShape(const gert::StorageShape& weightShape)
 {
-    const gert::Shape &storageShape = weightShape.GetStorageShape();
+    const gert::Shape& storageShape = weightShape.GetStorageShape();
     if (inputParams_.bFormat == ge::FORMAT_FRACTAL_NZ) {
         return CheckWeightNzStorageShape(storageShape);
     }
@@ -2474,7 +2474,7 @@ bool GroupedS8S4BasicApiTiling::CheckScaleAndOffsetShapes()
 {
     auto scaleShape = context_->GetDynamicInputShape(SCALE_INDEX, 0);
     OP_CHECK_IF(scaleShape == nullptr, OP_LOGE(context_->GetNodeName(), "scale shape is nullptr."), return false);
-    const gert::Shape &shape = scaleShape->GetOriginShape();
+    const gert::Shape& shape = scaleShape->GetOriginShape();
     const uint64_t expectedScaleGroups =
         dequantMode_ == DequantMode::SYMMETRIC_PER_GROUP ? inputParams_.kSize / QUANT_GROUP_SIZE : 1UL;
     OP_CHECK_IF(shape.GetDimNum() != 3 || static_cast<uint64_t>(shape.GetDim(0)) != inputParams_.groupNum ||
@@ -2487,7 +2487,7 @@ bool GroupedS8S4BasicApiTiling::CheckScaleAndOffsetShapes()
     }
     auto offsetShape = context_->GetDynamicInputShape(OFFSET_INDEX, 0);
     OP_CHECK_IF(offsetShape == nullptr, OP_LOGE(context_->GetNodeName(), "offset shape is nullptr."), return false);
-    const gert::Shape &offset = offsetShape->GetOriginShape();
+    const gert::Shape& offset = offsetShape->GetOriginShape();
     OP_CHECK_IF(offset.GetDimNum() != 3 || static_cast<uint64_t>(offset.GetDim(0)) != inputParams_.groupNum ||
                     offset.GetDim(1) != 1 || static_cast<uint64_t>(offset.GetDim(2)) != inputParams_.nSize,
                 OP_LOGE(context_->GetNodeName(), "offset shape must be [groupNum, 1, N]."), return false);
@@ -2501,8 +2501,8 @@ bool GroupedS8S4BasicApiTiling::AnalyzeInputs()
     auto weightStorageShape = context_->GetDynamicInputShape(WEIGHT_INDEX, 0);
     OP_CHECK_IF(xStorageShape == nullptr || weightStorageShape == nullptr,
                 OP_LOGE(context_->GetNodeName(), "x or weight shape is nullptr."), return false);
-    const gert::Shape &xShape = xStorageShape->GetOriginShape();
-    const gert::Shape &weightShape = weightStorageShape->GetOriginShape();
+    const gert::Shape& xShape = xStorageShape->GetOriginShape();
+    const gert::Shape& weightShape = weightStorageShape->GetOriginShape();
 
     OP_CHECK_IF(!SetGroupNum(GROUPLIST_INDEX), OP_LOGE(context_->GetNodeName(), "SetGroupNum failed."), return false);
     OP_CHECK_IF(!SetLogicalMKN(xShape, weightShape), OP_LOGE(context_->GetNodeName(), "SetLogicalMKN failed."),
@@ -2637,21 +2637,21 @@ ge::graphStatus GroupedS8S4BasicApiTiling::ComputeWorkspaceLayout()
         constexpr uint64_t NZ_K_ALIGN = 16UL;
         constexpr uint64_t NZ_N_ALIGN = 32UL;
         constexpr uint64_t UINT64_MAX_VALUE = std::numeric_limits<uint64_t>::max();
-        auto checkedMul = [](uint64_t lhs, uint64_t rhs, uint64_t &result) {
+        auto checkedMul = [](uint64_t lhs, uint64_t rhs, uint64_t& result) {
             if (rhs != 0UL && lhs > UINT64_MAX_VALUE / rhs) {
                 return false;
             }
             result = lhs * rhs;
             return true;
         };
-        auto checkedAdd = [](uint64_t lhs, uint64_t rhs, uint64_t &result) {
+        auto checkedAdd = [](uint64_t lhs, uint64_t rhs, uint64_t& result) {
             if (lhs > UINT64_MAX_VALUE - rhs) {
                 return false;
             }
             result = lhs + rhs;
             return true;
         };
-        auto checkedAlign = [](uint64_t value, uint64_t &result) {
+        auto checkedAlign = [](uint64_t value, uint64_t& result) {
             if (value > UINT64_MAX_VALUE - (WORKSPACE_ALIGN - 1UL)) {
                 return false;
             }
@@ -2732,7 +2732,7 @@ ge::graphStatus GroupedS8S4BasicApiTiling::PostTiling()
 
 ge::graphStatus GroupedS8S4BasicApiTiling::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(workspaces == nullptr, OP_LOGE(context_->GetNodeName(), "workspaces is nullptr."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(userWorkspaceSize_ > std::numeric_limits<uint64_t>::max() - SYS_WORKSPACE_SIZES,

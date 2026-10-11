@@ -32,13 +32,13 @@ using namespace AscendC;
 constexpr int64_t STRUCT_LENGTH = 1024;
 template <bool isScanMode = false>
 __aicore__ inline void ScheduleContextInfoCompute(GM_ADDR schedule_context,
-                                                  const FfnWorkerBatchingTilingData *tilingData,
-                                                  ScheduleContextInfo &contextInfo, TPipe *pipe)
+                                                  const FfnWorkerBatchingTilingData* tilingData,
+                                                  ScheduleContextInfo& contextInfo, TPipe* pipe)
 {
     GlobalTensor<int8_t> scheduleContext;
     TBuf<TPosition::VECIN> buffer;
 
-    scheduleContext.SetGlobalBuffer((__gm__ int8_t *)schedule_context, STRUCT_LENGTH);
+    scheduleContext.SetGlobalBuffer((__gm__ int8_t*)schedule_context, STRUCT_LENGTH);
 
     pipe->InitBuffer(buffer, STRUCT_LENGTH); // 检验数据是否正确；
     LocalTensor<int8_t> valLocal = buffer.Get<int8_t>();

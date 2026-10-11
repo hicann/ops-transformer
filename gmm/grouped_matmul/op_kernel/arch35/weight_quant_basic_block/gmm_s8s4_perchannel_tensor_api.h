@@ -28,8 +28,8 @@ namespace GROUPED_MATMUL::S8S4V5 {
 template <typename YType, CubeFormat WFormat>
 __aicore__ inline void InvokeGmmS8S4TensorApi(GM_ADDR x, GM_ADDR weight, GM_ADDR scale, GM_ADDR offset,
                                               GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                              AscendC::TPipe *pipe,
-                                              const GroupedMatmulTilingData::GMMS8S4BasicApiTilingData *tiling)
+                                              AscendC::TPipe* pipe,
+                                              const GroupedMatmulTilingData::GMMS8S4BasicApiTilingData* tiling)
 {
     using LayoutB = std::conditional_t<WFormat == CubeFormat::NZ, asc::te::nz_layout_ptn, asc::te::nd_ext_layout_ptn>;
     using LayoutA = asc::te::nd_ext_layout_ptn;
@@ -45,8 +45,8 @@ __aicore__ inline void InvokeGmmS8S4TensorApi(GM_ADDR x, GM_ADDR weight, GM_ADDR
     using ProblemShape = typename BlockMmad::ProblemShape;
     using TensorApiKernel = Blaze::Gemm::Kernel::GemmUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>;
     using Params = typename TensorApiKernel::Params;
-    const auto &mm = tiling->mmTilingData;
-    const auto &s8s4 = tiling->s8s4Params;
+    const auto& mm = tiling->mmTilingData;
+    const auto& s8s4 = tiling->s8s4Params;
     GM_ADDR expandedWeight = workspace + s8s4.expandedWeightOffsetBytes;
     GM_ADDR tileWorkspace = workspace + s8s4.tileWorkspaceOffsetBytes;
     GM_ADDR rowSumWorkspace = workspace + s8s4.rowSumOffsetBytes;

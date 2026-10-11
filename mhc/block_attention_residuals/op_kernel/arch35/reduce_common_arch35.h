@@ -51,9 +51,9 @@ __aicore__ inline uint32_t AlignDownFloatOffset(uint32_t idx)
     return (idx / ELEM_PER_BLK_FP32) * ELEM_PER_BLK_FP32;
 }
 
-__aicore__ inline void ReduceSumForSmallReduceDimPreRepeat(const LocalTensor<float> &dstLocal,
-                                                           const LocalTensor<float> &srcLocal,
-                                                           const LocalTensor<float> &tmpLocal, const uint32_t elemNum,
+__aicore__ inline void ReduceSumForSmallReduceDimPreRepeat(const LocalTensor<float>& dstLocal,
+                                                           const LocalTensor<float>& srcLocal,
+                                                           const LocalTensor<float>& tmpLocal, const uint32_t elemNum,
                                                            const uint32_t numLastDim, const uint32_t tailCount,
                                                            const uint32_t repeat, const uint8_t repStride)
 {
@@ -78,9 +78,9 @@ __aicore__ inline void ReduceSumForSmallReduceDimPreRepeat(const LocalTensor<flo
 #endif
 }
 
-__aicore__ inline void ReduceSumForSmallReduceDim(const LocalTensor<float> &dstLocal,
-                                                  const LocalTensor<float> &srcLocal,
-                                                  const LocalTensor<float> &tmpLocal, const uint32_t numLastDimAligned,
+__aicore__ inline void ReduceSumForSmallReduceDim(const LocalTensor<float>& dstLocal,
+                                                  const LocalTensor<float>& srcLocal,
+                                                  const LocalTensor<float>& tmpLocal, const uint32_t numLastDimAligned,
                                                   const uint32_t numLastDim, const uint32_t tailCount,
                                                   const uint32_t repeat, const uint8_t repStride)
 {
@@ -104,8 +104,8 @@ __aicore__ inline void ReduceSumForSmallReduceDim(const LocalTensor<float> &dstL
     }
 }
 
-__aicore__ inline void ReduceSumMultiN(const LocalTensor<float> &dstLocal, const LocalTensor<float> &srcLocal,
-                                       const LocalTensor<float> &tmpLocal, const uint32_t numRow, const uint32_t numCol,
+__aicore__ inline void ReduceSumMultiN(const LocalTensor<float>& dstLocal, const LocalTensor<float>& srcLocal,
+                                       const LocalTensor<float>& tmpLocal, const uint32_t numRow, const uint32_t numCol,
                                        const uint32_t numColAlign)
 {
     const uint32_t tailCount = numCol % ELEM_PER_REP_FP32;
@@ -131,7 +131,7 @@ __aicore__ inline int32_t findPowerTwo(int32_t n)
  * NOTE: src is destroyed in-place. No GetValue/SetValue.
  * 支持 count > ELEM_PER_REP_FP32（64）。
  */
-__aicore__ inline void ReduceMaxHalfInterval(const LocalTensor<float> &dst_local, const LocalTensor<float> &src_local,
+__aicore__ inline void ReduceMaxHalfInterval(const LocalTensor<float>& dst_local, const LocalTensor<float>& src_local,
                                              int32_t count)
 {
     if (likely(count > static_cast<int32_t>(ELEM_PER_REP_FP32))) {
@@ -171,7 +171,7 @@ __aicore__ inline void ReduceMaxHalfInterval(const LocalTensor<float> &dst_local
  * NOTE: src is destroyed in-place. No GetValue/SetValue.
  * 支持 count > ELEM_PER_REP_FP32（64）。
  */
-__aicore__ inline void ReduceSumHalfInterval(const LocalTensor<float> &dst_local, const LocalTensor<float> &src_local,
+__aicore__ inline void ReduceSumHalfInterval(const LocalTensor<float>& dst_local, const LocalTensor<float>& src_local,
                                              int32_t count)
 {
     if (likely(count > ELEM_PER_REP_FP32)) {
@@ -210,8 +210,8 @@ __aicore__ inline void ReduceSumHalfInterval(const LocalTensor<float> &dst_local
  * 对齐 ops-nn RMSNorm：Sqrt + Duplicate(1.0) + Div（避免 Rsqrt / Reciprocal 融合近似）。
  * scratch 需 ≥1 个 32B 对齐块，用于存放 1.0。
  */
-__aicore__ inline void InvRmsInPlace(const LocalTensor<float> &dst, float invHiddenSize, float normEps,
-                                     const LocalTensor<float> &scratch)
+__aicore__ inline void InvRmsInPlace(const LocalTensor<float>& dst, float invHiddenSize, float normEps,
+                                     const LocalTensor<float>& scratch)
 {
     Muls(dst, dst, invHiddenSize, 1);
     PipeBarrier<PIPE_V>();
@@ -228,7 +228,7 @@ __aicore__ inline void InvRmsInPlace(const LocalTensor<float> &dst, float invHid
 /*! 从 meta 标量槽拷 1 个 float 到 dst；用 Vector Copy（PIPE_V），便于 EnQue V_MTE3 同步。
  *  禁止 GetValue/SetValue。dst/src 建议 32B 对齐（如 scalarLocal_ / invQue_ block）。
  */
-__aicore__ inline void CopyMetaScalarToLocal(const LocalTensor<float> &dst, const LocalTensor<float> &metaSrc)
+__aicore__ inline void CopyMetaScalarToLocal(const LocalTensor<float>& dst, const LocalTensor<float>& metaSrc)
 {
     // mask=1, repeat=1：仅拷 1 个 float；stride 参数同官方 Copy 示例
     Copy(dst, metaSrc, static_cast<uint64_t>(1), 1, {1, 1, 8, 8});
@@ -239,7 +239,7 @@ __aicore__ inline void CopyMetaScalarToLocal(const LocalTensor<float> &dst, cons
  * 调用方保证容量 ≥ RoundUpFp32(elemCount)（如 metaAlign）。
  * （实测 DataCopy(非 8 倍 count) 在跨 VL rem 上可能漏写。）
  */
-__aicore__ inline void CopyCompactFloatsUb(const LocalTensor<float> &dst, const LocalTensor<float> &src,
+__aicore__ inline void CopyCompactFloatsUb(const LocalTensor<float>& dst, const LocalTensor<float>& src,
                                            uint32_t elemCount)
 {
     if (elemCount == 0) {
@@ -250,8 +250,8 @@ __aicore__ inline void CopyCompactFloatsUb(const LocalTensor<float> &dst, const 
 }
 
 /*! stride=8：紧凑 meta[n] → vecMeta[n*metaStride]（Softmax 后 scatter）。 */
-__aicore__ inline void ScatterCompactMetaToStrided(const LocalTensor<float> &vecMetaStrided,
-                                                   const LocalTensor<float> &compact, uint32_t blockCount,
+__aicore__ inline void ScatterCompactMetaToStrided(const LocalTensor<float>& vecMetaStrided,
+                                                   const LocalTensor<float>& compact, uint32_t blockCount,
                                                    uint32_t metaStride)
 {
     for (uint32_t n = 0; n < blockCount; ++n) {
@@ -260,8 +260,8 @@ __aicore__ inline void ScatterCompactMetaToStrided(const LocalTensor<float> &vec
 }
 
 /*! stride=8：vecMeta[n*metaStride] → 紧凑 meta[n]（Softmax 前 gather）。 */
-__aicore__ inline void GatherStridedMetaToCompact(const LocalTensor<float> &compact,
-                                                  const LocalTensor<float> &vecMetaStrided, uint32_t blockCount,
+__aicore__ inline void GatherStridedMetaToCompact(const LocalTensor<float>& compact,
+                                                  const LocalTensor<float>& vecMetaStrided, uint32_t blockCount,
                                                   uint32_t metaStride)
 {
     for (uint32_t n = 0; n < blockCount; ++n) {
@@ -274,8 +274,8 @@ __aicore__ inline void GatherStridedMetaToCompact(const LocalTensor<float> &comp
  * Counter 单次 Mul：mask=hiddenSize，repeat=1；src1Blk/RepStride=0 复用同一 broadcast block。
  * repStride=8（MUL_BRC_REP_STRIDE）与文档 Counter 示例 {1,1,1,8,8,8} 一致（block 单位步长）。
  */
-__aicore__ inline void MulRowByBrcBlock(const LocalTensor<float> &dst, const LocalTensor<float> &src,
-                                        const LocalTensor<float> &brcOneBlock, uint32_t hiddenSize,
+__aicore__ inline void MulRowByBrcBlock(const LocalTensor<float>& dst, const LocalTensor<float>& src,
+                                        const LocalTensor<float>& brcOneBlock, uint32_t hiddenSize,
                                         uint32_t hiddenSizeAlignFp32)
 {
     (void)hiddenSizeAlignFp32;
@@ -296,8 +296,8 @@ __aicore__ inline void MulRowByBrcBlock(const LocalTensor<float> &dst, const Loc
  * Counter 外置：isSetMask=false；src1Blk/RepStride=0 广播同一 block。
  * manageMask=false：调用方已 SetMaskCount + SetVectorMask。
  */
-__aicore__ inline void MulAddRowByBrcBlock(const LocalTensor<float> &dst, const LocalTensor<float> &src,
-                                           const LocalTensor<float> &brcOneBlock, uint32_t hiddenSize,
+__aicore__ inline void MulAddRowByBrcBlock(const LocalTensor<float>& dst, const LocalTensor<float>& src,
+                                           const LocalTensor<float>& brcOneBlock, uint32_t hiddenSize,
                                            uint32_t hiddenSizeAlignFp32, bool manageMask = true)
 {
     (void)hiddenSizeAlignFp32;
@@ -321,7 +321,7 @@ __aicore__ inline void MulAddRowByBrcBlock(const LocalTensor<float> &dst, const 
  * 调用前须已 SetMaskCount + SetVectorMask<float, COUNTER>(elemCount)。
  */
 template <typename SrcT>
-__aicore__ inline void CastRowToFp32CounterNoSetMask(const LocalTensor<float> &dst, const LocalTensor<SrcT> &src)
+__aicore__ inline void CastRowToFp32CounterNoSetMask(const LocalTensor<float>& dst, const LocalTensor<SrcT>& src)
 {
     // 与 Level2 Cast 内部一致：fp32 dstRep=8，bf16/half srcRep=4
     const UnaryRepeatParams castParams{1, 1, static_cast<uint8_t>(MUL_BRC_REP_STRIDE),
@@ -330,7 +330,7 @@ __aicore__ inline void CastRowToFp32CounterNoSetMask(const LocalTensor<float> &d
 }
 
 /*! 小 B 末轴归约 max/sum（等价 mhc LastDimReduceMax/SumPerf，curRowNum=1）。 */
-__aicore__ inline void ReduceMaxSmallB(const LocalTensor<float> &workScalar, const LocalTensor<float> &src,
+__aicore__ inline void ReduceMaxSmallB(const LocalTensor<float>& workScalar, const LocalTensor<float>& src,
                                        uint32_t blockCount)
 {
     const uint32_t srcRepStride = (blockCount + ELEM_PER_BLK_FP32 - 1U) / ELEM_PER_BLK_FP32;
@@ -346,7 +346,7 @@ __aicore__ inline void ReduceMaxSmallB(const LocalTensor<float> &workScalar, con
     PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline void ReduceSumSmallB(const LocalTensor<float> &workScalar, const LocalTensor<float> &src,
+__aicore__ inline void ReduceSumSmallB(const LocalTensor<float>& workScalar, const LocalTensor<float>& src,
                                        uint32_t blockCount)
 {
     const uint32_t srcRepStride = (blockCount + ELEM_PER_BLK_FP32 - 1U) / ELEM_PER_BLK_FP32;
@@ -361,15 +361,15 @@ __aicore__ inline void ReduceSumSmallB(const LocalTensor<float> &workScalar, con
 }
 
 /*! Brcb 标量到 1 block（8 float）。 */
-__aicore__ inline void BrcbScalarRow1(const LocalTensor<float> &tmpBuffer, const LocalTensor<float> &scalarRow)
+__aicore__ inline void BrcbScalarRow1(const LocalTensor<float>& tmpBuffer, const LocalTensor<float>& scalarRow)
 {
     Brcb(tmpBuffer, scalarRow, 1, {1, MOV_8});
     PipeBarrier<PIPE_V>();
 }
 
 /*! curRowNum=1 末轴 Sub；tmpBuffer 已由 BrcbScalarRow1 填好 broadcast 值。支持 curColNum>64。 */
-__aicore__ inline void SubLastDimRow1NoBrc(const LocalTensor<float> &output, const LocalTensor<float> &input0,
-                                           const LocalTensor<float> &tmpBuffer, int32_t curColNum)
+__aicore__ inline void SubLastDimRow1NoBrc(const LocalTensor<float>& output, const LocalTensor<float>& input0,
+                                           const LocalTensor<float>& tmpBuffer, int32_t curColNum)
 {
     const uint32_t curColNumAlign = RoundUpFp32(static_cast<uint32_t>(curColNum));
     if (curColNum <= static_cast<int32_t>(ELEM_PER_BLK_FP32)) {
@@ -400,8 +400,8 @@ __aicore__ inline void SubLastDimRow1NoBrc(const LocalTensor<float> &output, con
 }
 
 /*! curRowNum=1 末轴 Mul；支持 curColNum>64。 */
-__aicore__ inline void MulLastDimRow1NoBrc(const LocalTensor<float> &output, const LocalTensor<float> &input0,
-                                           const LocalTensor<float> &tmpBuffer, int32_t curColNum)
+__aicore__ inline void MulLastDimRow1NoBrc(const LocalTensor<float>& output, const LocalTensor<float>& input0,
+                                           const LocalTensor<float>& tmpBuffer, int32_t curColNum)
 {
     const uint32_t curColNumAlign = RoundUpFp32(static_cast<uint32_t>(curColNum));
     if (curColNum <= static_cast<int32_t>(ELEM_PER_BLK_FP32)) {
@@ -431,8 +431,8 @@ __aicore__ inline void MulLastDimRow1NoBrc(const LocalTensor<float> &output, con
 }
 
 /*! curRowNum=1 末轴 Sub broadcast（含 Brcb）。 */
-__aicore__ inline void SubLastDimBrcRow1(const LocalTensor<float> &output, const LocalTensor<float> &input0,
-                                         const LocalTensor<float> &scalarRow, const LocalTensor<float> &tmpBuffer,
+__aicore__ inline void SubLastDimBrcRow1(const LocalTensor<float>& output, const LocalTensor<float>& input0,
+                                         const LocalTensor<float>& scalarRow, const LocalTensor<float>& tmpBuffer,
                                          int32_t curColNum)
 {
     BrcbScalarRow1(tmpBuffer, scalarRow);
@@ -443,10 +443,10 @@ __aicore__ inline void SubLastDimBrcRow1(const LocalTensor<float> &output, const
  * dst = src * broadcast(scalarSrc[0])；1 标量 Brcb 成 1 block，再 MulRowByBrcBlock 沿 H 复用。
  * brcScratch 前 1 block 作 Brcb 输出；dupLocal 为 Brcb 源 block（8 float）。dupLocal 不可与 scalarSrc 同址。
  */
-__aicore__ inline void BroadcastScalarMulTensor(const LocalTensor<float> &dst, const LocalTensor<float> &src,
-                                                const LocalTensor<float> &scalarSrc,
-                                                const LocalTensor<float> &brcScratch,
-                                                const LocalTensor<float> &dupLocal, uint32_t hiddenSize,
+__aicore__ inline void BroadcastScalarMulTensor(const LocalTensor<float>& dst, const LocalTensor<float>& src,
+                                                const LocalTensor<float>& scalarSrc,
+                                                const LocalTensor<float>& brcScratch,
+                                                const LocalTensor<float>& dupLocal, uint32_t hiddenSize,
                                                 uint32_t hiddenSizeAlignFp32)
 {
     Duplicate(dupLocal, 0.0f, ELEM_PER_BLK_FP32);

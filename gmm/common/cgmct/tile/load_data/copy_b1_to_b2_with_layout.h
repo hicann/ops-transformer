@@ -53,7 +53,7 @@ public:
      * @param [in] coord: the coordinate
      */
     template <class Coord>
-    __aicore__ inline void operator()(const DstTensor &l0B, const SrcTensor &l1B, const Coord &coord)
+    __aicore__ inline void operator()(const DstTensor& l0B, const SrcTensor& l1B, const Coord& coord)
     {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 2201)
         if constexpr (BType::isTrans) {
@@ -80,7 +80,7 @@ private:
      * @param [in] coord: the coordinate
      */
     template <class Coord>
-    __aicore__ inline void TransposeLoadB2(const DstTensor &l0B, const SrcTensor &l1B, const Coord &coord)
+    __aicore__ inline void TransposeLoadB2(const DstTensor& l0B, const SrcTensor& l1B, const Coord& coord)
     {
         auto srcShape = l1B.GetTensorTrait().GetLayout().GetShape();
         auto srcStride = l1B.GetTensorTrait().GetLayout().GetStride();
@@ -148,7 +148,7 @@ private:
      * @param [in] coord: the coordinate
      */
     template <class Coord>
-    __aicore__ inline void NoneTransposeLoadB2(const DstTensor &l0B, const SrcTensor &l1B, const Coord &coord)
+    __aicore__ inline void NoneTransposeLoadB2(const DstTensor& l0B, const SrcTensor& l1B, const Coord& coord)
     {
         auto srcShape = l1B.GetTensorTrait().GetLayout().GetShape();
         auto srcStride = l1B.GetTensorTrait().GetLayout().GetStride();
@@ -223,7 +223,7 @@ public:
      * @param [in] coord: the coordinate
      */
     template <class Coord>
-    __aicore__ inline void operator()(const DstTensor &l0B, const SrcTensor &l1B, const Coord &coord)
+    __aicore__ inline void operator()(const DstTensor& l0B, const SrcTensor& l1B, const Coord& coord)
     {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         if constexpr (BType::isTrans) {
@@ -252,7 +252,7 @@ private:
      * @param [in] coord: the coordinate
      */
     template <class Coord>
-    __aicore__ inline void TransposeLoadB2(const DstTensor &l0B, const SrcTensor &l1B, const Coord &coord)
+    __aicore__ inline void TransposeLoadB2(const DstTensor& l0B, const SrcTensor& l1B, const Coord& coord)
     {
         auto srcShape = l1B.GetTensorTrait().GetLayout().GetShape();
         auto dstShape = l0B.GetTensorTrait().GetLayout().GetShape();
@@ -289,7 +289,7 @@ private:
      * @param [in] coord: the coordinate
      */
     template <class Coord>
-    __aicore__ inline void NoneTransposeLoadB2(const DstTensor &l0B, const SrcTensor &l1B, const Coord &coord)
+    __aicore__ inline void NoneTransposeLoadB2(const DstTensor& l0B, const SrcTensor& l1B, const Coord& coord)
     {
         auto srcShape = l1B.GetTensorTrait().GetLayout().GetShape();
         auto dstShape = l0B.GetTensorTrait().GetLayout().GetShape();

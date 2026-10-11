@@ -52,7 +52,7 @@ constexpr int64_t OUTPUT_NUM = 3;
 
 struct TestCase {
     int64_t outFlag;
-    const char *name;
+    const char* name;
 };
 } // namespace
 
@@ -65,7 +65,7 @@ std::string GetTime()
     return tmp;
 }
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t size = 1;
     for (auto dim : shape) {
@@ -74,17 +74,17 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return size;
 }
 
-int GenTensorData(const std::vector<int64_t> &shape, Tensor &tensor, TensorDesc &desc)
+int GenTensorData(const std::vector<int64_t>& shape, Tensor& tensor, TensorDesc& desc)
 {
     desc.SetRealDimCnt(shape.size());
     const int64_t elem_num = GetShapeSize(shape);
     const uint32_t byte_len = static_cast<uint32_t>(elem_num * sizeof(float));
-    uint8_t *data = new (std::nothrow) uint8_t[byte_len];
+    uint8_t* data = new (std::nothrow) uint8_t[byte_len];
     if (data == nullptr) {
         return FAILED;
     }
 
-    auto *float_data = reinterpret_cast<float *>(data);
+    auto* float_data = reinterpret_cast<float*>(data);
     for (int64_t i = 0; i < elem_num; ++i) {
         float_data[i] = 0.01f * static_cast<float>((i % 17) - 8);
     }
@@ -93,8 +93,8 @@ int GenTensorData(const std::vector<int64_t> &shape, Tensor &tensor, TensorDesc 
     return SUCCESS;
 }
 
-int CreateGraph(std::vector<Tensor> &input_tensors, std::vector<Operator> &input_ops, std::vector<Operator> &outputs,
-                Graph &graph, const TestCase &testCase)
+int CreateGraph(std::vector<Tensor>& input_tensors, std::vector<Operator>& input_ops, std::vector<Operator>& outputs,
+                Graph& graph, const TestCase& testCase)
 {
     auto mhc_sinkhorn = ge::op::MhcSinkhorn(testCase.name);
 
@@ -137,7 +137,7 @@ int CreateGraph(std::vector<Tensor> &input_tensors, std::vector<Operator> &input
     return SUCCESS;
 }
 
-int RunCase(Session &session, uint32_t graphId, const TestCase &testCase)
+int RunCase(Session& session, uint32_t graphId, const TestCase& testCase)
 {
     Graph graph(testCase.name);
     std::vector<Tensor> input_tensors;

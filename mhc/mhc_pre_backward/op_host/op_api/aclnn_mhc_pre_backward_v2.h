@@ -46,11 +46,11 @@ extern "C" {
  * @return aclnnStatus: 返回状态码
  */
 ACLNN_API aclnnStatus aclnnMhcPreBackwardV2GetWorkspaceSize(
-    const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *gradHIn,
-    const aclTensor *gradHPost, const aclTensor *gradHRes, const aclTensor *invRms, const aclTensor *hMix,
-    const aclTensor *hPre, const aclTensor *hPost, const aclTensor *gammaOptional, const aclTensor *gradXPostOptional,
-    float hcEps, int64_t opImplMode, const aclTensor *gradX, const aclTensor *gradPhi, const aclTensor *gradAlpha,
-    const aclTensor *gradBias, const aclTensor *gradGamma, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* x, const aclTensor* phi, const aclTensor* alpha, const aclTensor* gradHIn,
+    const aclTensor* gradHPost, const aclTensor* gradHRes, const aclTensor* invRms, const aclTensor* hMix,
+    const aclTensor* hPre, const aclTensor* hPost, const aclTensor* gammaOptional, const aclTensor* gradXPostOptional,
+    float hcEps, int64_t opImplMode, const aclTensor* gradX, const aclTensor* gradPhi, const aclTensor* gradAlpha,
+    const aclTensor* gradBias, const aclTensor* gradGamma, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnMhcPreBackwardV2 的第二段接口。
@@ -61,7 +61,7 @@ ACLNN_API aclnnStatus aclnnMhcPreBackwardV2GetWorkspaceSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnMhcPreBackwardV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMhcPreBackwardV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                             aclrtStream stream);
 
 #ifdef __cplusplus

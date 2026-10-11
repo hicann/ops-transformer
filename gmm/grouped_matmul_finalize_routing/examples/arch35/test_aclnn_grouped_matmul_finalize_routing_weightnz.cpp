@@ -35,7 +35,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -44,7 +44,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -64,8 +64,8 @@ void Finalize(int32_t deviceId, aclrtStream stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -88,8 +88,8 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 }
 
 template <typename T>
-int CreateAclTensorWeightNz(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                            aclDataType dataType, aclTensor **tensor)
+int CreateAclTensorWeightNz(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                            aclDataType dataType, aclTensor** tensor)
 {
     // 计算NZ格式的storageShape
     int64_t e = shape[0];
@@ -150,25 +150,25 @@ int main()
     std::vector<int64_t> rowIndexShape = {m};
     std::vector<int64_t> outShape = {batch, n};
 
-    void *xDeviceAddr = nullptr;
-    void *wDeviceAddr = nullptr;
-    void *scaleDeviceAddr = nullptr;
-    void *pertokenScaleDeviceAddr = nullptr;
-    void *groupListDeviceAddr = nullptr;
-    void *sharedInputDeviceAddr = nullptr;
-    void *logitDeviceAddr = nullptr;
-    void *rowIndexDeviceAddr = nullptr;
-    void *outDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* wDeviceAddr = nullptr;
+    void* scaleDeviceAddr = nullptr;
+    void* pertokenScaleDeviceAddr = nullptr;
+    void* groupListDeviceAddr = nullptr;
+    void* sharedInputDeviceAddr = nullptr;
+    void* logitDeviceAddr = nullptr;
+    void* rowIndexDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *w = nullptr;
-    aclTensor *groupList = nullptr;
-    aclTensor *scale = nullptr;
-    aclTensor *pertokenScale = nullptr;
-    aclTensor *sharedInput = nullptr;
-    aclTensor *logit = nullptr;
-    aclTensor *rowIndex = nullptr;
-    aclTensor *out = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* w = nullptr;
+    aclTensor* groupList = nullptr;
+    aclTensor* scale = nullptr;
+    aclTensor* pertokenScale = nullptr;
+    aclTensor* sharedInput = nullptr;
+    aclTensor* logit = nullptr;
+    aclTensor* rowIndex = nullptr;
+    aclTensor* out = nullptr;
 
     std::vector<int8_t> xHostData(GetShapeSize(xShape));
     std::vector<int8_t> wHostData(GetShapeSize(wShape));
@@ -215,8 +215,8 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor;
+    void* workspaceAddr = nullptr;
 
     // 调用aclnnGroupedMatmulFinalizeRoutingWeightNzV2第一段接口
     ret = aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize(

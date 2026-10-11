@@ -62,6 +62,6 @@ REG_OP(SwinTransformerLnQKV)
     .ATTR(epsilon, Float, 0.0000001f)
     .OP_END_FACTORY_REG(SwinTransformerLnQKV)
 
-}  // namespace ge
+} // namespace ge
 
-#endif  // OPS_BUILT_IN_OP_PROTO_INC_MATRIX_CALCULATION_OPS_H_
+#endif // OPS_BUILT_IN_OP_PROTO_INC_MATRIX_CALCULATION_OPS_H_

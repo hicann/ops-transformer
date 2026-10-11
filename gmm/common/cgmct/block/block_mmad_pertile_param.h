@@ -40,18 +40,18 @@ public:
 
 public:
     __aicore__ inline MatMulCommonParam(){};
-    __aicore__ inline void Init(const TupleShape &l0Shape, const TupleTileShape &tileL12L0);
-    __aicore__ inline void UpdateForNextGroup(const TupleShape &problemShape);
-    __aicore__ inline void UpdateNextBlockParams(const TupleShape &actualSingleShape);
+    __aicore__ inline void Init(const TupleShape& l0Shape, const TupleTileShape& tileL12L0);
+    __aicore__ inline void UpdateForNextGroup(const TupleShape& problemShape);
+    __aicore__ inline void UpdateNextBlockParams(const TupleShape& actualSingleShape);
     __aicore__ inline uint64_t CalcAGMOffsetInnerLoop(uint64_t mOffset, uint64_t kOffset);
     __aicore__ inline uint64_t CalcBGMOffsetInnerLoop(uint64_t nOffset, uint64_t kOffset);
-    __aicore__ inline void CalNd2NzParamA(AscendC::Nd2NzParams &nd2nzParam, bool isTailAL1);
-    __aicore__ inline void CalNd2NzParamB(AscendC::Nd2NzParams &nd2nzParam, bool isTailBL1);
+    __aicore__ inline void CalNd2NzParamA(AscendC::Nd2NzParams& nd2nzParam, bool isTailAL1);
+    __aicore__ inline void CalNd2NzParamB(AscendC::Nd2NzParams& nd2nzParam, bool isTailBL1);
     __aicore__ inline uint32_t CalcAL1Offset(uint64_t mAL1Offset, uint64_t kAL1Offset, bool isKTail);
     __aicore__ inline uint32_t CalcBL1Offset(uint64_t nBL1Offset, uint64_t kBL1Offset, bool isKTail);
-    __aicore__ inline void LoadData2dParamsA(AscendC::LoadData2DParamsV2 &loadData2dParams, uint64_t kOffset,
+    __aicore__ inline void LoadData2dParamsA(AscendC::LoadData2DParamsV2& loadData2dParams, uint64_t kOffset,
                                              bool isTailAL1);
-    __aicore__ inline void LoadData2dParamsB(AscendC::LoadData2DParamsV2 &loadData2dParams, uint64_t kOffset,
+    __aicore__ inline void LoadData2dParamsB(AscendC::LoadData2DParamsV2& loadData2dParams, uint64_t kOffset,
                                              bool isTailBL1);
 
 protected:
@@ -72,8 +72,8 @@ private:
 };
 
 template <bool aTrans, bool bTrans>
-__aicore__ inline void MatMulCommonParam<aTrans, bTrans>::Init(const TupleShape &l0Shape,
-                                                               const TupleTileShape &tileL12L0)
+__aicore__ inline void MatMulCommonParam<aTrans, bTrans>::Init(const TupleShape& l0Shape,
+                                                               const TupleTileShape& tileL12L0)
 {
     l0Shape_ = l0Shape;
     tileL12L0_ = tileL12L0;
@@ -97,7 +97,7 @@ __aicore__ inline void MatMulCommonParam<aTrans, bTrans>::Init(const TupleShape 
 }
 
 template <bool aTrans, bool bTrans>
-__aicore__ inline void MatMulCommonParam<aTrans, bTrans>::UpdateForNextGroup(const TupleShape &problemShape)
+__aicore__ inline void MatMulCommonParam<aTrans, bTrans>::UpdateForNextGroup(const TupleShape& problemShape)
 {
     problemShape_ = problemShape;
 
@@ -106,7 +106,7 @@ __aicore__ inline void MatMulCommonParam<aTrans, bTrans>::UpdateForNextGroup(con
 }
 
 template <bool aTrans, bool bTrans>
-__aicore__ inline void MatMulCommonParam<aTrans, bTrans>::UpdateNextBlockParams(const TupleShape &actualSingleShape)
+__aicore__ inline void MatMulCommonParam<aTrans, bTrans>::UpdateNextBlockParams(const TupleShape& actualSingleShape)
 {
     actualSingleShape_ = actualSingleShape;
 }
@@ -132,7 +132,7 @@ __aicore__ inline uint64_t MatMulCommonParam<aTrans, bTrans>::CalcBGMOffsetInner
 }
 
 template <bool aTrans, bool bTrans>
-__aicore__ inline void MatMulCommonParam<aTrans, bTrans>::CalNd2NzParamA(AscendC::Nd2NzParams &nd2nzParam,
+__aicore__ inline void MatMulCommonParam<aTrans, bTrans>::CalNd2NzParamA(AscendC::Nd2NzParams& nd2nzParam,
                                                                          bool isTailAL1)
 {
     uint64_t currentK = isTailAL1 ? kA1Tail_ : kA1_;
@@ -154,7 +154,7 @@ __aicore__ inline void MatMulCommonParam<aTrans, bTrans>::CalNd2NzParamA(AscendC
 }
 
 template <bool aTrans, bool bTrans>
-__aicore__ inline void MatMulCommonParam<aTrans, bTrans>::CalNd2NzParamB(AscendC::Nd2NzParams &nd2nzParam,
+__aicore__ inline void MatMulCommonParam<aTrans, bTrans>::CalNd2NzParamB(AscendC::Nd2NzParams& nd2nzParam,
                                                                          bool isTailBL1)
 {
     uint64_t currentK = isTailBL1 ? kB1Tail_ : kB1_;
@@ -209,7 +209,7 @@ __aicore__ inline uint32_t MatMulCommonParam<aTrans, bTrans>::CalcBL1Offset(uint
 
 template <bool aTrans, bool bTrans>
 __aicore__ inline void MatMulCommonParam<aTrans, bTrans>::LoadData2dParamsA(
-    AscendC::LoadData2DParamsV2 &loadData2dParams, uint64_t kOffset, bool isTailAL1)
+    AscendC::LoadData2DParamsV2& loadData2dParams, uint64_t kOffset, bool isTailAL1)
 {
     uint64_t currM = AscendC::Std::min(Get<MNK_M>(actualSingleShape_), Get<MNK_M>(l0Shape_));
     uint64_t currK =
@@ -232,7 +232,7 @@ __aicore__ inline void MatMulCommonParam<aTrans, bTrans>::LoadData2dParamsA(
 
 template <bool aTrans, bool bTrans>
 __aicore__ inline void MatMulCommonParam<aTrans, bTrans>::LoadData2dParamsB(
-    AscendC::LoadData2DParamsV2 &loadData2dParams, uint64_t kOffset, bool isTailBL1)
+    AscendC::LoadData2DParamsV2& loadData2dParams, uint64_t kOffset, bool isTailBL1)
 {
     uint64_t currN = AscendC::Std::min(Get<MNK_N>(actualSingleShape_), Get<MNK_N>(l0Shape_));
     uint64_t currK =

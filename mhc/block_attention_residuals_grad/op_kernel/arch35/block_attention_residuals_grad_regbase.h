@@ -36,8 +36,8 @@ constexpr uint32_t GRAD_SCALAR_SLOTS = 6;
 template <typename D_IN>
 class BlockAttentionResidualsGradRegbase {
 public:
-    __aicore__ inline BlockAttentionResidualsGradRegbase(TPipe *pipe,
-                                                         const BlockAttentionResidualsGradTilingData *tiling)
+    __aicore__ inline BlockAttentionResidualsGradRegbase(TPipe* pipe,
+                                                         const BlockAttentionResidualsGradTilingData* tiling)
         : pipe_(pipe),
           tiling_(tiling)
     {}
@@ -52,9 +52,9 @@ public:
 private:
     __aicore__ inline void InitBuffers();
     __aicore__ inline void LoadScoreWeight();
-    __aicore__ inline void CopyInRowEnqueue(const GlobalTensor<D_IN> &srcGm, uint64_t srcOffset);
-    __aicore__ inline LocalTensor<D_IN> CopyInRowSync(const GlobalTensor<D_IN> &srcGm, uint64_t srcOffset);
-    __aicore__ inline const GlobalTensor<D_IN> &GetLogicRowGm(uint32_t n) const;
+    __aicore__ inline void CopyInRowEnqueue(const GlobalTensor<D_IN>& srcGm, uint64_t srcOffset);
+    __aicore__ inline LocalTensor<D_IN> CopyInRowSync(const GlobalTensor<D_IN>& srcGm, uint64_t srcOffset);
+    __aicore__ inline const GlobalTensor<D_IN>& GetLogicRowGm(uint32_t n) const;
     __aicore__ inline uint64_t GetLogicRowOffset(uint32_t tokenIdx, uint32_t n) const;
     __aicore__ inline void LoadToken(uint32_t tokenIdx);
     __aicore__ inline void ComputeGradProbs(uint32_t tokenIdx);
@@ -64,8 +64,8 @@ private:
     __aicore__ inline void WriteGradScoreWeight();
     __aicore__ inline void ReduceAndWriteWeights();
 
-    TPipe *pipe_{nullptr};
-    const BlockAttentionResidualsGradTilingData *tiling_{nullptr};
+    TPipe* pipe_{nullptr};
+    const BlockAttentionResidualsGradTilingData* tiling_{nullptr};
 
     GlobalTensor<D_IN> prefixSumGm_;
     GlobalTensor<D_IN> blockResidualGm_;
@@ -194,19 +194,19 @@ __aicore__ inline void BlockAttentionResidualsGradRegbase<D_IN>::Init(GM_ADDR pr
     hiddenSizeAlignFp32_ = RegBase::CeilDivU32(hiddenSize_, RegBase::kVlFp32) * RegBase::kVlFp32;
     metaAlign_ = RegBase::CeilDivU32(blockCount_, RegBase::kVlFp32) * RegBase::kVlFp32;
 
-    prefixSumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(prefixSum));
-    blockResidualGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(blockResidual));
-    projWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(projWeight));
-    normWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(normWeight));
-    gradOutGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(gradOutput));
-    invRmsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(invRms));
-    probsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(probs));
-    gradPrefixSumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(gradPrefixSum));
-    gradBlockResGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(gradBlockResidual));
-    gradProjWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(gradProjWeight));
-    gradNormWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(gradNormWeight));
+    prefixSumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(prefixSum));
+    blockResidualGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(blockResidual));
+    projWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(projWeight));
+    normWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(normWeight));
+    gradOutGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(gradOutput));
+    invRmsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(invRms));
+    probsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(probs));
+    gradPrefixSumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(gradPrefixSum));
+    gradBlockResGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(gradBlockResidual));
+    gradProjWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(gradProjWeight));
+    gradNormWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(gradNormWeight));
 
-    __gm__ float *userWksp = reinterpret_cast<__gm__ float *>(GetUserWorkspace(workspace));
+    __gm__ float* userWksp = reinterpret_cast<__gm__ float*>(GetUserWorkspace(workspace));
     uint64_t wkspOff = perCoreWkspBytes_ * static_cast<uint64_t>(blockIdx_);
     gswWkspGm_.SetGlobalBuffer(userWksp + wkspOff / sizeof(float), hiddenSize_);
     wkspAllGm_.SetGlobalBuffer(userWksp, perCoreWkspBytes_ * static_cast<uint64_t>(coreNum_) / sizeof(float));
@@ -241,7 +241,7 @@ __aicore__ inline void BlockAttentionResidualsGradRegbase<D_IN>::LoadScoreWeight
 }
 
 template <typename D_IN>
-__aicore__ inline void BlockAttentionResidualsGradRegbase<D_IN>::CopyInRowEnqueue(const GlobalTensor<D_IN> &srcGm,
+__aicore__ inline void BlockAttentionResidualsGradRegbase<D_IN>::CopyInRowEnqueue(const GlobalTensor<D_IN>& srcGm,
                                                                                   uint64_t srcOffset)
 {
     LocalTensor<D_IN> inLocal = inQue_.AllocTensor<D_IN>();
@@ -253,7 +253,7 @@ __aicore__ inline void BlockAttentionResidualsGradRegbase<D_IN>::CopyInRowEnqueu
 
 template <typename D_IN>
 __aicore__ inline LocalTensor<D_IN> BlockAttentionResidualsGradRegbase<D_IN>::CopyInRowSync(
-    const GlobalTensor<D_IN> &srcGm, uint64_t srcOffset)
+    const GlobalTensor<D_IN>& srcGm, uint64_t srcOffset)
 {
     LocalTensor<D_IN> inLocal = inQue_.AllocTensor<D_IN>();
     DataCopyExtParams copyParams{1, static_cast<uint32_t>(hiddenSize_ * sizeof(D_IN)), 0, 0, 0};
@@ -264,7 +264,7 @@ __aicore__ inline LocalTensor<D_IN> BlockAttentionResidualsGradRegbase<D_IN>::Co
 }
 
 template <typename D_IN>
-__aicore__ inline const GlobalTensor<D_IN> &BlockAttentionResidualsGradRegbase<D_IN>::GetLogicRowGm(uint32_t n) const
+__aicore__ inline const GlobalTensor<D_IN>& BlockAttentionResidualsGradRegbase<D_IN>::GetLogicRowGm(uint32_t n) const
 {
     return (n < numBlocks_) ? blockResidualGm_ : prefixSumGm_;
 }

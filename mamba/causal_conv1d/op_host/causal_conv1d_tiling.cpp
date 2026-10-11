@@ -103,12 +103,14 @@ struct CausalConv1dInputInfo {
 
 class CausalConv1dTiling {
 public:
-    explicit CausalConv1dTiling(gert::TilingContext *context) : context_(context) {}
+    explicit CausalConv1dTiling(gert::TilingContext* context)
+        : context_(context)
+    {}
     ge::graphStatus DoTiling();
 
 private:
-    gert::TilingContext *context_;
-    const int32_t *queryStartLocData_ = nullptr;
+    gert::TilingContext* context_;
+    const int32_t* queryStartLocData_ = nullptr;
     CausalConv1dInputInfo inputInfo_;
     uint64_t ubSize_ = 0;
     uint32_t coreNum_ = 0;
@@ -121,10 +123,10 @@ private:
     ge::graphStatus GetPlatformInfo();
     ge::graphStatus SetWorkspaceSize(size_t workspaceSize);
     ge::graphStatus SetupFnInitStateWorkspace();
-    ge::graphStatus GetAttrsInfo(CausalConv1dAttrInfo &attrInfo);
-    ge::graphStatus ParseCausalConv1dInputInfo(const CausalConv1dAttrInfo &attrInfo);
+    ge::graphStatus GetAttrsInfo(CausalConv1dAttrInfo& attrInfo);
+    ge::graphStatus ParseCausalConv1dInputInfo(const CausalConv1dAttrInfo& attrInfo);
 
-    ge::graphStatus SetTilingData(const CausalConv1dAttrInfo &attrInfo);
+    ge::graphStatus SetTilingData(const CausalConv1dAttrInfo& attrInfo);
     bool ChooseBaseDim(int64_t cuSeqlen, int64_t dim);
     static constexpr bool IsFnInputMode(uint32_t inputModeKey);
     static constexpr bool IsVarlenInputModeKey(uint32_t key)
@@ -170,7 +172,7 @@ void CausalConv1dTiling::ResolveTilingKeys(int64_t activationMode)
 
 ge::graphStatus CausalConv1dTiling::GetPlatformInfo()
 {
-    fe::PlatFormInfos *platformInfoPtr = context_->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context_->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context_, platformInfoPtr);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     coreNum_ = ascendcPlatform.GetCoreNumAiv();
@@ -184,7 +186,7 @@ ge::graphStatus CausalConv1dTiling::GetPlatformInfo()
 
 ge::graphStatus CausalConv1dTiling::SetWorkspaceSize(size_t workspaceSize)
 {
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, currentWorkspace);
     currentWorkspace[0] = workspaceSize;
     return ge::GRAPH_SUCCESS;
@@ -215,7 +217,7 @@ ge::graphStatus CausalConv1dTiling::SetupFnInitStateWorkspace()
 // Attrs
 // ============================================================
 
-static int64_t ParseActivationModeStr(const char *str)
+static int64_t ParseActivationModeStr(const char* str)
 {
     if (str == nullptr || std::strcmp(str, "") == 0 || std::strcmp(str, "silu") == 0) {
         return 1;
@@ -226,7 +228,7 @@ static int64_t ParseActivationModeStr(const char *str)
     return -1;
 }
 
-ge::graphStatus CausalConv1dTiling::GetAttrsInfo(CausalConv1dAttrInfo &attrInfo)
+ge::graphStatus CausalConv1dTiling::GetAttrsInfo(CausalConv1dAttrInfo& attrInfo)
 {
     constexpr int32_t kActivationModeAttrIndex = 0;
     constexpr int32_t kNullBlockIdAttrIndex = 1;
@@ -234,7 +236,7 @@ ge::graphStatus CausalConv1dTiling::GetAttrsInfo(CausalConv1dAttrInfo &attrInfo)
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
-    const char *activationModeStr = attrs->GetAttrPointer<char>(kActivationModeAttrIndex);
+    const char* activationModeStr = attrs->GetAttrPointer<char>(kActivationModeAttrIndex);
     OP_CHECK_NULL_WITH_CONTEXT(context_, activationModeStr);
     attrInfo.activationMode = ParseActivationModeStr(activationModeStr);
     OP_CHECK_IF(attrInfo.activationMode < 0,
@@ -242,7 +244,7 @@ ge::graphStatus CausalConv1dTiling::GetAttrsInfo(CausalConv1dAttrInfo &attrInfo)
                                                       "only supports \"silu\" or \"none\""),
                 return ge::GRAPH_FAILED);
 
-    const int64_t *nullBlockIdPtr = attrs->GetAttrPointer<int64_t>(kNullBlockIdAttrIndex);
+    const int64_t* nullBlockIdPtr = attrs->GetAttrPointer<int64_t>(kNullBlockIdAttrIndex);
     OP_CHECK_NULL_WITH_CONTEXT(context_, nullBlockIdPtr);
     attrInfo.nullBlockId = *nullBlockIdPtr;
 
@@ -437,7 +439,7 @@ ge::graphStatus CausalConv1dTiling::ParseQueryStartLoc(bool isFnMode)
 {
     // Step 1: determine qsl existence and size from shape
     auto qslShapePtr = context_->GetOptionalInputShape(QUERY_START_LOC_INDEX);
-    const gert::CompileTimeTensorDesc *qslDesc = context_->GetOptionalInputDesc(QUERY_START_LOC_INDEX);
+    const gert::CompileTimeTensorDesc* qslDesc = context_->GetOptionalInputDesc(QUERY_START_LOC_INDEX);
     bool qslExist = false;
     int64_t qslSize = 0;
     if (qslShapePtr != nullptr) {
@@ -518,7 +520,7 @@ ge::graphStatus CausalConv1dTiling::ParseCacheIndices(int64_t nullBlockId)
                                           Ops::Base::ToString(cIdxDesc->GetDataType()).c_str(), "int32"),
                 return ge::GRAPH_FAILED);
 
-    const gert::Tensor *cIdxTensor = context_->GetOptionalInputTensor(CACHE_INDICES_INDEX);
+    const gert::Tensor* cIdxTensor = context_->GetOptionalInputTensor(CACHE_INDICES_INDEX);
     if (cIdxTensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -559,7 +561,7 @@ ge::graphStatus CausalConv1dTiling::ParseInitialStateMode(bool isFnMode)
                                           Ops::Base::ToString(initStDesc->GetDataType()).c_str(), "int32"),
                 return ge::GRAPH_FAILED);
 
-    const gert::Tensor *initStTensor = context_->GetOptionalInputTensor(INITIAL_STATE_MODE_INDEX);
+    const gert::Tensor* initStTensor = context_->GetOptionalInputTensor(INITIAL_STATE_MODE_INDEX);
     if (initStTensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -660,7 +662,7 @@ ge::graphStatus CausalConv1dTiling::ParseBias()
 // Shape & dtype info (orchestrator)
 // ============================================================
 
-ge::graphStatus CausalConv1dTiling::ParseCausalConv1dInputInfo(const CausalConv1dAttrInfo &attrInfo)
+ge::graphStatus CausalConv1dTiling::ParseCausalConv1dInputInfo(const CausalConv1dAttrInfo& attrInfo)
 {
     const bool isFnMode = InferIsFnMode();
 
@@ -845,9 +847,9 @@ bool CausalConv1dTiling::InferIsFnMode()
 // Tiling data serialization
 // ============================================================
 
-ge::graphStatus CausalConv1dTiling::SetTilingData(const CausalConv1dAttrInfo &attrInfo)
+ge::graphStatus CausalConv1dTiling::SetTilingData(const CausalConv1dAttrInfo& attrInfo)
 {
-    CausalConv1dTilingData *tiling = context_->GetTilingData<CausalConv1dTilingData>();
+    CausalConv1dTilingData* tiling = context_->GetTilingData<CausalConv1dTilingData>();
     OP_CHECK_NULL_WITH_CONTEXT(context_, tiling);
 
     tiling->activationMode = attrInfo.activationMode;
@@ -932,13 +934,13 @@ ge::graphStatus CausalConv1dTiling::DoTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CausalConv1dTilingFunc(gert::TilingContext *context)
+static ge::graphStatus CausalConv1dTilingFunc(gert::TilingContext* context)
 {
     CausalConv1dTiling tctx(context);
     return tctx.DoTiling();
 }
 
-static ge::graphStatus TilingParseForCausalConv1d(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForCausalConv1d(gert::TilingParseContext* context)
 {
     OP_LOGD(context, "Enter TilingParseForCausalConv1d.");
     return ge::GRAPH_SUCCESS;

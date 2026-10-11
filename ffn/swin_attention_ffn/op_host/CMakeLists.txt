@@ -23,5 +23,5 @@ if (BUILD_OPEN_PROJECT)
         add_modules_sources(OPTYPE swin_attention_ffn ACLNNTYPE aclnn_exclude)
     endif()
 else() # 回黄host
-    add_modules_sources(OPTYPE swin_attention_ffn ACLNNTYPE aclnn_exclude)  
+    add_modules_sources(OPTYPE swin_attention_ffn ACLNNTYPE aclnn_exclude)
 endif()

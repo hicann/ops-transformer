@@ -125,7 +125,7 @@ __aicore__ inline void ScatterZZToL1(LocalTensor<int8_t> xL1Dst, LocalTensor<int
  * last block that may have fewer N-groups than blockN1.
  */
 template <bool BlockedZN>
-__aicore__ inline void PrefetchWeightToL1(LocalTensor<int8_t> wL1, const GlobalTensor<int8_t> &weightGm,
+__aicore__ inline void PrefetchWeightToL1(LocalTensor<int8_t> wL1, const GlobalTensor<int8_t>& weightGm,
                                           uint64_t expertBaseOff, uint32_t colBatch, uint32_t nSize, uint32_t baseNG,
                                           uint32_t N1, uint32_t K1q, uint32_t K, uint32_t weightBlockN1,
                                           uint32_t k1Start = 0)

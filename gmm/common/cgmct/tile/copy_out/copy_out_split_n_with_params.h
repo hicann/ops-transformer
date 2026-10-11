@@ -55,7 +55,7 @@ public:
      * @param [in] id: blcok id, default is 0
      * @note This functionimplements data copy in the DAV3510 architecture using the CopyOutSplitNWithParams mode
      */
-    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT> &dst, const AscendC::LocalTensor<SrcT> &src,
+    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT>& dst, const AscendC::LocalTensor<SrcT>& src,
                                       int32_t curRow, int32_t curCol, int32_t l0CTileH, int32_t l0CTileW, int32_t baseM,
                                       int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc, uint8_t id = 0)
     {
@@ -128,7 +128,7 @@ public:
      * @param [in] orgKc: original Kc value
      * @param [in] id: optional id, default is 0
      */
-    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT> &dst, const AscendC::LocalTensor<SrcT> &src,
+    __aicore__ inline void operator()(const AscendC::LocalTensor<DstT>& dst, const AscendC::LocalTensor<SrcT>& src,
                                       int32_t curRow, int32_t curCol, int32_t l0CTileH, int32_t l0CTileW, int32_t baseM,
                                       int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc, uint8_t id = 0)
     {

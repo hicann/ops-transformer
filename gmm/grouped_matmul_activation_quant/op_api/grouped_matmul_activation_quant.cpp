@@ -29,17 +29,18 @@ using Ops::Transformer::Gmm::FormatString;
 namespace l0op {
 OP_TYPE_REGISTER(GroupedMatmulActivationQuant);
 
-const std::tuple<aclTensor *, aclTensor *> GroupedMatmulActivationQuant(const aclTensor *x,
-    const aclTensor *groupList, const aclTensorList *weight, const aclTensorList *weightScale,
-    const aclTensorList *bias, const aclTensor *xScale, const char *activationType, bool transposeWeight,
-    int64_t groupListType, const aclIntArray *tuningConfig, const char *quantMode, int64_t yDtype,
-    const char *roundMode, int64_t scaleAlg, float dstTypeMax, aclOpExecutor *executor)
+const std::tuple<aclTensor*, aclTensor*> GroupedMatmulActivationQuant(
+    const aclTensor* x, const aclTensor* groupList, const aclTensorList* weight, const aclTensorList* weightScale,
+    const aclTensorList* bias, const aclTensor* xScale, const char* activationType, bool transposeWeight,
+    int64_t groupListType, const aclIntArray* tuningConfig, const char* quantMode, int64_t yDtype,
+    const char* roundMode, int64_t scaleAlg, float dstTypeMax, aclOpExecutor* executor)
 {
     L0_DFX(GroupedMatmulActivationQuant, x, groupList, weight, weightScale, bias, xScale, activationType,
            transposeWeight, groupListType, tuningConfig, quantMode, yDtype, roundMode, scaleAlg, dstTypeMax);
     if (executor == nullptr || x == nullptr || weightScale == nullptr || weightScale->Size() == 0 ||
         (*weightScale)[gmaq::FIRST_TENSOR_INDEX] == nullptr) {
-        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("GroupedMatmulActivationQuant", "executor, x and weightScale",
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            "GroupedMatmulActivationQuant", "executor, x and weightScale",
             FormatString("executor=%s, x=%s, weightScale=%s", executor == nullptr ? "nullptr" : "not nullptr",
                          x == nullptr ? "nullptr" : "not nullptr",
                          weightScale == nullptr ? "nullptr" : "invalid tensorList"),
@@ -48,11 +49,11 @@ const std::tuple<aclTensor *, aclTensor *> GroupedMatmulActivationQuant(const ac
     }
 
     int64_t m = x->GetViewShape().GetDim(gmaq::X_M_DIM_INDEX);
-    const auto &weightScaleShape = (*weightScale)[gmaq::FIRST_TENSOR_INDEX]->GetViewShape();
+    const auto& weightScaleShape = (*weightScale)[gmaq::FIRST_TENSOR_INDEX]->GetViewShape();
     if (weightScaleShape.GetDimNum() != gmaq::WEIGHT_SCALE_DIM_NUM) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("GroupedMatmulActivationQuant", "weightScale",
-            std::to_string(weightScaleShape.GetDimNum()),
-            "the shape dim of weightScale must be 4");
+                                                 std::to_string(weightScaleShape.GetDimNum()),
+                                                 "the shape dim of weightScale must be 4");
         return std::tuple(nullptr, nullptr);
     }
     int64_t n = transposeWeight ? weightScaleShape.GetDim(gmaq::WEIGHT_SCALE_TRANS_N_DIM_INDEX) :
@@ -67,19 +68,20 @@ const std::tuple<aclTensor *, aclTensor *> GroupedMatmulActivationQuant(const ac
         return std::tuple(nullptr, nullptr);
     }
 
-    auto ret = INFER_SHAPE(GroupedMatmulActivationQuant,
-        OP_INPUT(x, groupList, weight, weightScale, bias, xScale), OP_OUTPUT(out, scaleOut),
-        OP_ATTR(activationType, transposeWeight, groupListType, tuningConfig, quantMode, yDtype, roundMode, scaleAlg,
-                dstTypeMax));
+    auto ret = INFER_SHAPE(GroupedMatmulActivationQuant, OP_INPUT(x, groupList, weight, weightScale, bias, xScale),
+                           OP_OUTPUT(out, scaleOut),
+                           OP_ATTR(activationType, transposeWeight, groupListType, tuningConfig, quantMode, yDtype,
+                                   roundMode, scaleAlg, dstTypeMax));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "InferShape failed.");
         return std::tuple(nullptr, nullptr);
     }
 
-    ret = ADD_TO_LAUNCHER_LIST_AICORE(GroupedMatmulActivationQuant,
-        OP_INPUT(x, groupList, weight, weightScale, bias, xScale), OP_OUTPUT(out, scaleOut),
-        OP_ATTR(activationType, transposeWeight, groupListType, tuningConfig, quantMode, yDtype, roundMode, scaleAlg,
-                dstTypeMax));
+    ret =
+        ADD_TO_LAUNCHER_LIST_AICORE(GroupedMatmulActivationQuant,
+                                    OP_INPUT(x, groupList, weight, weightScale, bias, xScale), OP_OUTPUT(out, scaleOut),
+                                    OP_ATTR(activationType, transposeWeight, groupListType, tuningConfig, quantMode,
+                                            yDtype, roundMode, scaleAlg, dstTypeMax));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "ADD_TO_LAUNCHER_LIST_AICORE failed.");
         return std::tuple(nullptr, nullptr);

@@ -25,9 +25,9 @@ template <typename T>
 class FFNGlu {
 public:
     __aicore__ inline FFNGlu() {}
-    __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
-                                __gm__ uint8_t *bias1, __gm__ uint8_t *bias2, __gm__ uint8_t *y,
-                                __gm__ uint8_t *workSpace, const FFNTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t* x, __gm__ uint8_t* weight1, __gm__ uint8_t* weight2,
+                                __gm__ uint8_t* bias1, __gm__ uint8_t* bias2, __gm__ uint8_t* y,
+                                __gm__ uint8_t* workSpace, const FFNTilingData* __restrict tiling, TPipe* tPipe);
     __aicore__ inline void Process();
 
     // define matmul1
@@ -44,8 +44,8 @@ public:
     Matmul<a2Type, b2Type, c2Type, bias2Type, CFG_MDL> mm2;
 
 protected:
-    const FFNTilingData *__restrict tilingData;
-    TPipe *pipe;
+    const FFNTilingData* __restrict tilingData;
+    TPipe* pipe;
     // define the que
     TQue<QuePosition::VECIN, 1> vecInQueueLeft;
     TQue<QuePosition::VECIN, 1> vecInQueueRight;

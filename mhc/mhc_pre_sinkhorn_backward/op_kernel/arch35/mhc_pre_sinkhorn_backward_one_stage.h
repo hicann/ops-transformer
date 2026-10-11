@@ -52,7 +52,7 @@ public:
                                 GM_ADDR gradHRes, GM_ADDR alpha, GM_ADDR bias, GM_ADDR hcBeforeNorm, GM_ADDR invRms,
                                 GM_ADDR sumOut, GM_ADDR normOut, GM_ADDR gradX, GM_ADDR gradPhi, GM_ADDR gradAlpha,
                                 GM_ADDR gradBias, GM_ADDR workspace,
-                                const MhcPreSinkhornBackwardArch35TilingData *tilingData, TPipe *pipe)
+                                const MhcPreSinkhornBackwardArch35TilingData* tilingData, TPipe* pipe)
     {
         pipe_ = pipe;
         blkIdx_ = GetBlockIdx();
@@ -67,7 +67,7 @@ public:
 protected:
     int8_t ping1_ = 0;
     int64_t blkIdx_, aivNum_, aicNum_;
-    TPipe *pipe_;
+    TPipe* pipe_;
     int64_t batchSize_, seqLength_, totalTasks_, totalTasksAligned_;
     int64_t c_, n_, c0_, c1_;
     int64_t tile_, tileAligned_;
@@ -121,7 +121,7 @@ protected:
     GlobalTensor<T> phiGlobal_;
 
 private:
-    __aicore__ inline void InitTiling(const MhcPreSinkhornBackwardArch35TilingData *tilingData)
+    __aicore__ inline void InitTiling(const MhcPreSinkhornBackwardArch35TilingData* tilingData)
     {
         batchSize_ = tilingData->batchSize;
         seqLength_ = tilingData->seqLength;
@@ -154,32 +154,32 @@ private:
                                   GM_ADDR gradBias, GM_ADDR workspace)
     {
         // cube 和 vector 共用
-        xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ U *>(x));             // fp32
-        xFp32Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace)); // fp32
-        gradPhiGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(gradPhi)); // fp32
-        phiGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(phi));         // fp32
-        gradXGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ U *>(gradX));     // fp32
-        gradH2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + batchSize_ * seqLength_ * n_ * c_);
+        xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ U*>(x));             // fp32
+        xFp32Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace)); // fp32
+        gradPhiGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(gradPhi)); // fp32
+        phiGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(phi));         // fp32
+        gradXGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ U*>(gradX));     // fp32
+        gradH2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + batchSize_ * seqLength_ * n_ * c_);
 
         if ASCEND_IS_AIV {
-            hPreGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(hPre));       // fp32
-            gradHinGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ U *>(gradHin)); // fp32
+            hPreGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(hPre));       // fp32
+            gradHinGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ U*>(gradHin)); // fp32
 
-            gradHPostGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(gradHPost)); // fp32
+            gradHPostGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(gradHPost)); // fp32
 
-            alphaGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(alpha)); // fp32
-            biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(bias));   // fp32
+            alphaGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(alpha)); // fp32
+            biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(bias));   // fp32
 
-            invRmsGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(invRms)); // fp32
-            gradAlphaGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(gradAlpha));
-            gradBiasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(gradBias));
+            invRmsGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(invRms)); // fp32
+            gradAlphaGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(gradAlpha));
+            gradBiasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(gradBias));
 
-            h2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(hcBeforeNorm)); // fp32
+            h2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(hcBeforeNorm)); // fp32
 
-            skNormGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(normOut)); // fp32
-            skSumGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(sumOut));   // fp32
+            skNormGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(normOut)); // fp32
+            skSumGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(sumOut));   // fp32
 
-            gradHResGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(gradHRes)); // fp32
+            gradHResGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(gradHRes)); // fp32
         }
     }
 
@@ -298,12 +298,12 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradResHHat2
 
     Duplicate(gradInvRmsLocal_, 0.f, tileTaskCount);
     Simt::VF_CALL<SinkhornKnoppSimt<T>>(
-        Simt::Dim3{xThreadCount, yThreadCount}, (__ubuf__ T *)gradH2Local_.GetPhyAddr(),
-        (__ubuf__ T *)gradInvRmsLocal_.GetPhyAddr(), (__gm__ T *)gradAlphaGlobal_[2].GetPhyAddr(),
-        (__gm__ T *)gradBiasGlobal_[n_ * 2].GetPhyAddr(), (__gm__ T *)skSumGlobal_.GetPhyAddr(),
-        (__gm__ T *)skNormGlobal_.GetPhyAddr(), (__ubuf__ T *)gradHResLocal_.GetPhyAddr(),
-        (__ubuf__ T *)hRes2Local_.GetPhyAddr(), (__ubuf__ T *)invRmsLocal_.GetPhyAddr(),
-        (__ubuf__ T *)biasLocal_[n_ * 2].GetPhyAddr(), (__ubuf__ T *)tmpLocal_.GetPhyAddr(), alphaRes_, totalTasks_,
+        Simt::Dim3{xThreadCount, yThreadCount}, (__ubuf__ T*)gradH2Local_.GetPhyAddr(),
+        (__ubuf__ T*)gradInvRmsLocal_.GetPhyAddr(), (__gm__ T*)gradAlphaGlobal_[2].GetPhyAddr(),
+        (__gm__ T*)gradBiasGlobal_[n_ * 2].GetPhyAddr(), (__gm__ T*)skSumGlobal_.GetPhyAddr(),
+        (__gm__ T*)skNormGlobal_.GetPhyAddr(), (__ubuf__ T*)gradHResLocal_.GetPhyAddr(),
+        (__ubuf__ T*)hRes2Local_.GetPhyAddr(), (__ubuf__ T*)invRmsLocal_.GetPhyAddr(),
+        (__ubuf__ T*)biasLocal_[n_ * 2].GetPhyAddr(), (__ubuf__ T*)tmpLocal_.GetPhyAddr(), alphaRes_, totalTasks_,
         taskOffset, tileTaskCount, skIterCount_, n_);
 }
 

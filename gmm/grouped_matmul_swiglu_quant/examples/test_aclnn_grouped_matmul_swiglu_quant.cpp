@@ -19,18 +19,19 @@
 #include "aclnnop/aclnn_grouped_matmul_swiglu_quant.h"
 
 #define CHECK_RET(cond, return_expr) \
-do {                               \
-  if (!(cond)) {                   \
-    return_expr;                   \
-  }                                \
-} while (0)
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
+    } while (0)
 
-#define LOG_PRINT(message, ...)     \
-do {                              \
-  printf(message, ##__VA_ARGS__); \
-} while (0)
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
+    } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t>& shape) {
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
+{
     int64_t shapeSize = 1;
     for (auto i : shape) {
         shapeSize *= i;
@@ -38,7 +39,8 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape) {
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream* stream) {
+int Init(int32_t deviceId, aclrtStream* stream)
+{
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -50,8 +52,9 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, 
-                    void** deviceAddr, aclDataType dataType, aclFormat formatType, aclTensor** tensor) {
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclFormat formatType, aclTensor** tensor)
+{
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -63,16 +66,17 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
     // 计算连续tensor的strides
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = shape.size() - 2; i >= 0; i--) {
-    strides[i] = shape[i + 1] * strides[i + 1];
+        strides[i] = shape[i + 1] * strides[i + 1];
     }
 
     // 调用aclCreateTensor接口创建aclTensor
-    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, formatType,
-                            shape.data(), shape.size(), *deviceAddr);
+    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, formatType, shape.data(),
+                              shape.size(), *deviceAddr);
     return 0;
 }
 
-int main() {
+int main()
+{
     // 1. （固定写法）device/stream初始化，参考acl API手册
     // 根据自己的实际device填写deviceId
     int32_t deviceId = 0;
@@ -87,7 +91,7 @@ int main() {
     int64_t N = 4096;
     int64_t K = 7168;
     std::vector<int64_t> xShape = {M, K};
-    std::vector<int64_t> weightShape = {E, N / 32 ,K / 16, 16, 32};
+    std::vector<int64_t> weightShape = {E, N / 32, K / 16, 16, 32};
     std::vector<int64_t> weightScaleShape = {E, N};
     std::vector<int64_t> xScaleShape = {M};
     std::vector<int64_t> groupListShape = {E};
@@ -119,25 +123,31 @@ int main() {
     std::vector<float> outputScaleHostData(M, 0);
 
     // 创建x aclTensor
-    ret = CreateAclTensor(xHostData, xShape, &xDeviceAddr,  aclDataType::ACL_INT8, aclFormat::ACL_FORMAT_ND, &x);
+    ret = CreateAclTensor(xHostData, xShape, &xDeviceAddr, aclDataType::ACL_INT8, aclFormat::ACL_FORMAT_ND, &x);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建weight aclTensor
-    ret = CreateAclTensor(weightHostData, weightShape, &weightDeviceAddr,  aclDataType::ACL_INT8, aclFormat::ACL_FORMAT_FRACTAL_NZ, &weight);
+    ret = CreateAclTensor(weightHostData, weightShape, &weightDeviceAddr, aclDataType::ACL_INT8,
+                          aclFormat::ACL_FORMAT_FRACTAL_NZ, &weight);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建weightScale aclTensor
-    ret = CreateAclTensor(weightScaleHostData, weightScaleShape, &weightScaleDeviceAddr, aclDataType::ACL_FLOAT,  aclFormat::ACL_FORMAT_ND, &weightScale);
+    ret = CreateAclTensor(weightScaleHostData, weightScaleShape, &weightScaleDeviceAddr, aclDataType::ACL_FLOAT,
+                          aclFormat::ACL_FORMAT_ND, &weightScale);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建xScale aclTensor
-    ret = CreateAclTensor(xScaleHostData, xScaleShape, &xScaleDeviceAddr, aclDataType::ACL_FLOAT,  aclFormat::ACL_FORMAT_ND, &xScale);
+    ret = CreateAclTensor(xScaleHostData, xScaleShape, &xScaleDeviceAddr, aclDataType::ACL_FLOAT,
+                          aclFormat::ACL_FORMAT_ND, &xScale);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建groupList aclTensor
-    ret = CreateAclTensor(groupListHostData, groupListShape, &groupListDeviceAddr, aclDataType::ACL_INT64, aclFormat::ACL_FORMAT_ND, &groupList);
+    ret = CreateAclTensor(groupListHostData, groupListShape, &groupListDeviceAddr, aclDataType::ACL_INT64,
+                          aclFormat::ACL_FORMAT_ND, &groupList);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建output aclTensor
-    ret = CreateAclTensor(outputHostData, outputShape, &outputDeviceAddr, aclDataType::ACL_INT8, aclFormat::ACL_FORMAT_ND, &output);
+    ret = CreateAclTensor(outputHostData, outputShape, &outputDeviceAddr, aclDataType::ACL_INT8,
+                          aclFormat::ACL_FORMAT_ND, &output);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建outputScale aclTensor
-    ret = CreateAclTensor(outputScaleHostData, outputScaleShape, &outputScaleDeviceAddr, aclDataType::ACL_FLOAT, aclFormat::ACL_FORMAT_ND, &outputScale);
+    ret = CreateAclTensor(outputScaleHostData, outputScaleShape, &outputScaleDeviceAddr, aclDataType::ACL_FLOAT,
+                          aclFormat::ACL_FORMAT_ND, &outputScale);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     uint64_t workspaceSize = 0;
@@ -145,21 +155,19 @@ int main() {
 
     // 3. 调用CANN算子库API
     // 调用aclnnGroupedMatmulSwigluQuant第一段接口
-    ret = aclnnGroupedMatmulSwigluQuantGetWorkspaceSize(x, weight, nullptr, nullptr, weightScale, xScale, 
-                                                        groupList, output, outputScale, nullptr,
-                                                        &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, 
-    LOG_PRINT("aclnnGroupedMatmulSwigluQuantGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+    ret = aclnnGroupedMatmulSwigluQuantGetWorkspaceSize(x, weight, nullptr, nullptr, weightScale, xScale, groupList,
+                                                        output, outputScale, nullptr, &workspaceSize, &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulSwigluQuantGetWorkspaceSize failed. ERROR: %d\n", ret);
+              return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
     void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
-    ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+        ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
     }
     // 调用aclnnGroupedMatmulSwigluQuant第二段接口
     ret = aclnnGroupedMatmulSwigluQuant(workspaceAddr, workspaceSize, executor, stream);
-    CHECK_RET(ret == ACL_SUCCESS, 
-    LOG_PRINT("aclnnGroupedMatmulSwigluQuant failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulSwigluQuant failed. ERROR: %d\n", ret); return ret);
 
     // 4. （固定写法）同步等待任务执行结束
     ret = aclrtSynchronizeStream(stream);
@@ -169,7 +177,7 @@ int main() {
     auto size = GetShapeSize(outputShape);
     std::vector<int8_t> out1Data(size, 0);
     ret = aclrtMemcpy(out1Data.data(), out1Data.size() * sizeof(out1Data[0]), outputDeviceAddr,
-                        size * sizeof(out1Data[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+                      size * sizeof(out1Data[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t j = 0; j < 10; j++) {
         LOG_PRINT("result[%ld] is: %d\n", j, out1Data[j]);
@@ -177,7 +185,7 @@ int main() {
     size = GetShapeSize(outputScaleShape);
     std::vector<float> out2Data(size, 0);
     ret = aclrtMemcpy(out2Data.data(), out2Data.size() * sizeof(out2Data[0]), outputScaleDeviceAddr,
-                        size * sizeof(out2Data[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+                      size * sizeof(out2Data[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t j = 0; j < 10; j++) {
         LOG_PRINT("result[%ld] is: %f\n", j, out2Data[j]);
@@ -200,7 +208,7 @@ int main() {
     aclrtFree(outputDeviceAddr);
     aclrtFree(outputScaleDeviceAddr);
     if (workspaceSize > 0) {
-    aclrtFree(workspaceAddr);
+        aclrtFree(workspaceAddr);
     }
     aclrtDestroyStream(stream);
     aclrtResetDevice(deviceId);

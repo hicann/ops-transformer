@@ -61,7 +61,7 @@ constexpr uint32_t QUANT_STEPN_KEY = 2002;
 
 class ActiveMap {
 public:
-    const char *activeName;
+    const char* activeName;
     ActiveType activeType;
 };
 
@@ -199,81 +199,81 @@ struct FFNCompileInfo {
 class FFNTiling {
 public:
     FFNTilingData tilingData;
-    ge::graphStatus RunFusionKernelTiling(gert::TilingContext *context);
+    ge::graphStatus RunFusionKernelTiling(gert::TilingContext* context);
 
 protected:
     void Init();
-    ge::graphStatus FFNParamsCheck(gert::TilingContext *context);
-    ge::graphStatus DataTypeCheck(gert::TilingContext *context);
-    ge::graphStatus FormatCheck(const gert::TilingContext *context);
-    ge::graphStatus FFNSingleCoreTiling(const gert::TilingContext *context, uint64_t ubSize);
-    matmul_tiling::PlatformInfo MmGetPlatInfo(const FFNCompileInfo *compileInfoPtr) const;
-    ge::graphStatus FFNApiMM1Tiling(const gert::TilingContext *context, const matmul_tiling::PlatformInfo &platInfo,
+    ge::graphStatus FFNParamsCheck(gert::TilingContext* context);
+    ge::graphStatus DataTypeCheck(gert::TilingContext* context);
+    ge::graphStatus FormatCheck(const gert::TilingContext* context);
+    ge::graphStatus FFNSingleCoreTiling(const gert::TilingContext* context, uint64_t ubSize);
+    matmul_tiling::PlatformInfo MmGetPlatInfo(const FFNCompileInfo* compileInfoPtr) const;
+    ge::graphStatus FFNApiMM1Tiling(const gert::TilingContext* context, const matmul_tiling::PlatformInfo& platInfo,
                                     matmul_tiling::DataType matmulDtype);
-    void FFNApiMM2CalBaseMN(uint32_t &mm2BaseN, uint32_t &baseM, const matmul_tiling::PlatformInfo &platInfo);
-    ge::graphStatus FFNApiMM2Tiling(const gert::TilingContext *context, const matmul_tiling::PlatformInfo &platInfo,
+    void FFNApiMM2CalBaseMN(uint32_t& mm2BaseN, uint32_t& baseM, const matmul_tiling::PlatformInfo& platInfo);
+    ge::graphStatus FFNApiMM2Tiling(const gert::TilingContext* context, const matmul_tiling::PlatformInfo& platInfo,
                                     matmul_tiling::DataType matmulDtype);
-    ge::graphStatus FFNApiTiling(const gert::TilingContext *context, const matmul_tiling::PlatformInfo &platInfo,
+    ge::graphStatus FFNApiTiling(const gert::TilingContext* context, const matmul_tiling::PlatformInfo& platInfo,
                                  matmul_tiling::DataType matmulDtype);
-    ge::graphStatus FFNSetTilingKey(gert::TilingContext *context, uint64_t &key);
-    ge::graphStatus FFNSetTilingData(gert::TilingContext *context);
-    ge::graphStatus CalMM1ValidUbBytes(int64_t &mm1VaildUbBytes) const;
-    ge::graphStatus CalMM1BaseM(const gert::TilingContext *context, const uint32_t baseN, const uint64_t l0CSize,
-                                const int64_t mm1VaildUbBytes, uint32_t &baseM);
-    ge::graphStatus CalMMTilingBaseMNBasicBlock(const uint64_t basicBlkOperTimes, const uint32_t n, uint32_t &baseM,
-                                                uint32_t &baseN) const;
-    ge::graphStatus CalMM1TilingBaseMNBasicBlock(const gert::TilingContext *context, const uint64_t l0CSize,
+    ge::graphStatus FFNSetTilingKey(gert::TilingContext* context, uint64_t& key);
+    ge::graphStatus FFNSetTilingData(gert::TilingContext* context);
+    ge::graphStatus CalMM1ValidUbBytes(int64_t& mm1VaildUbBytes) const;
+    ge::graphStatus CalMM1BaseM(const gert::TilingContext* context, const uint32_t baseN, const uint64_t l0CSize,
+                                const int64_t mm1VaildUbBytes, uint32_t& baseM);
+    ge::graphStatus CalMMTilingBaseMNBasicBlock(const uint64_t basicBlkOperTimes, const uint32_t n, uint32_t& baseM,
+                                                uint32_t& baseN) const;
+    ge::graphStatus CalMM1TilingBaseMNBasicBlock(const gert::TilingContext* context, const uint64_t l0CSize,
                                                  const int64_t mm1VaildUbBytes, uint64_t basicBlkOperTimes,
-                                                 uint32_t &baseN);
-    ge::graphStatus CalMM1TilingBaseMNKBasicBlock(const gert::TilingContext *context,
-                                                  const matmul_tiling::PlatformInfo &platInfo);
-    ge::graphStatus CalMM2TilingBaseMNKBasicBlock(const gert::TilingContext *context,
-                                                  const matmul_tiling::PlatformInfo &platInfo);
-    ge::graphStatus CalMM1TilingBaseMNK(const gert::TilingContext *context,
-                                        const matmul_tiling::PlatformInfo &platInfo);
-    ge::graphStatus CalMM2TilingBaseMNK(const matmul_tiling::PlatformInfo &platInfo);
+                                                 uint32_t& baseN);
+    ge::graphStatus CalMM1TilingBaseMNKBasicBlock(const gert::TilingContext* context,
+                                                  const matmul_tiling::PlatformInfo& platInfo);
+    ge::graphStatus CalMM2TilingBaseMNKBasicBlock(const gert::TilingContext* context,
+                                                  const matmul_tiling::PlatformInfo& platInfo);
+    ge::graphStatus CalMM1TilingBaseMNK(const gert::TilingContext* context,
+                                        const matmul_tiling::PlatformInfo& platInfo);
+    ge::graphStatus CalMM2TilingBaseMNK(const matmul_tiling::PlatformInfo& platInfo);
 
-    void SetBiasInfo(const gert::TilingContext *context, matmul_tiling::MatmulApiTiling &mm,
-                     const uint32_t &irIndex) const;
-    void FFNCalMMStep(const uint32_t baseM, const uint32_t baseN, const uint32_t baseK, TCubeTiling &mmTilingData);
-    ge::graphStatus FFNSetMM1Tiling(const gert::TilingContext *context, const matmul_tiling::PlatformInfo &platInfo,
+    void SetBiasInfo(const gert::TilingContext* context, matmul_tiling::MatmulApiTiling& mm,
+                     const uint32_t& irIndex) const;
+    void FFNCalMMStep(const uint32_t baseM, const uint32_t baseN, const uint32_t baseK, TCubeTiling& mmTilingData);
+    ge::graphStatus FFNSetMM1Tiling(const gert::TilingContext* context, const matmul_tiling::PlatformInfo& platInfo,
                                     matmul_tiling::DataType matmulDtype);
-    ge::graphStatus FFNSetMM2Tiling(const gert::TilingContext *context, const matmul_tiling::PlatformInfo &platInfo,
+    ge::graphStatus FFNSetMM2Tiling(const gert::TilingContext* context, const matmul_tiling::PlatformInfo& platInfo,
                                     matmul_tiling::DataType matmulDtype);
-    ge::graphStatus FFNSetUbDivideBlk(const gert::TilingContext *context);
-    ge::graphStatus FFNCalUbSize(uint32_t baseN, uint32_t divideBlkNum, uint32_t ioBlkNum, uint32_t &baseM);
+    ge::graphStatus FFNSetUbDivideBlk(const gert::TilingContext* context);
+    ge::graphStatus FFNCalUbSize(uint32_t baseN, uint32_t divideBlkNum, uint32_t ioBlkNum, uint32_t& baseM);
     inline ge::graphStatus N1EqualZeroWithBias2(uint64_t ubSize);
-    ge::graphStatus TilingCalcAndSetting(const gert::TilingContext *context,
-                                         const matmul_tiling::PlatformInfo &platInfo,
+    ge::graphStatus TilingCalcAndSetting(const gert::TilingContext* context,
+                                         const matmul_tiling::PlatformInfo& platInfo,
                                          matmul_tiling::DataType matmulDtype);
-    ge::graphStatus FFNGlu(gert::TilingContext *context, uint64_t ubSize, uint64_t l1Size, uint64_t l0CSize,
+    ge::graphStatus FFNGlu(gert::TilingContext* context, uint64_t ubSize, uint64_t l1Size, uint64_t l0CSize,
                            uint32_t aivNum);
-    ge::graphStatus FFNGluParamsCheck(const gert::TilingContext *context) const;
-    ge::graphStatus SetMMTilingType(const gert::TilingContext *context, bool isMM1, matmul_tiling::DataType matmulDtype,
-                                    matmul_tiling::MatmulApiTiling &mm) const;
+    ge::graphStatus FFNGluParamsCheck(const gert::TilingContext* context) const;
+    ge::graphStatus SetMMTilingType(const gert::TilingContext* context, bool isMM1, matmul_tiling::DataType matmulDtype,
+                                    matmul_tiling::MatmulApiTiling& mm) const;
     ge::graphStatus FFNGluCalMM1Tiling(uint64_t ubSize, uint64_t l0CSize);
-    ge::graphStatus FFNGluSetMM1Tiling(gert::TilingContext *context, uint64_t l1Size, uint64_t l0CSize,
+    ge::graphStatus FFNGluSetMM1Tiling(gert::TilingContext* context, uint64_t l1Size, uint64_t l0CSize,
                                        matmul_tiling::DataType matmulDtype, uint32_t aivNum);
     ge::graphStatus FFNGluCalMM2Tiling(uint64_t l0CSize);
-    ge::graphStatus FFNGluSetMM2Tiling(gert::TilingContext *context, uint64_t l1Size, uint64_t l0CSize,
+    ge::graphStatus FFNGluSetMM2Tiling(gert::TilingContext* context, uint64_t l1Size, uint64_t l0CSize,
                                        matmul_tiling::DataType matmulDtype);
-    ge::graphStatus FFNGetScaleGroupNum(const gert::TilingContext *context, const gert::Tensor *tokensArrTensor);
+    ge::graphStatus FFNGetScaleGroupNum(const gert::TilingContext* context, const gert::Tensor* tokensArrTensor);
     void CheckMSD();
     void UpdateMaxTokens();
-    ge::graphStatus GetInputShape(const gert::TilingContext *context);
+    ge::graphStatus GetInputShape(const gert::TilingContext* context);
 
     uint64_t SelectQuantTilingKey() const;
 
-    ge::graphStatus FFNGetQuantScale(const gert::TilingContext *context, const gert::Tensor *tokensArrTensor);
+    ge::graphStatus FFNGetQuantScale(const gert::TilingContext* context, const gert::Tensor* tokensArrTensor);
 
     uint64_t SelectTilingKey() const;
 
-    ge::graphStatus CheckAndGetBasicInfo(gert::TilingContext *context, const FFNCompileInfo *compileInfoPtr);
-    ge::graphStatus TilingWithDifferentKN(gert::TilingContext *context, const FFNCompileInfo *compileInfoPtr,
+    ge::graphStatus CheckAndGetBasicInfo(gert::TilingContext* context, const FFNCompileInfo* compileInfoPtr);
+    ge::graphStatus TilingWithDifferentKN(gert::TilingContext* context, const FFNCompileInfo* compileInfoPtr,
                                           const uint32_t aicNum);
-    void SetTilingBaseParams(gert::TilingContext *context, const FFNCompileInfo *compileInfoPtr, const uint32_t aicNum);
+    void SetTilingBaseParams(gert::TilingContext* context, const FFNCompileInfo* compileInfoPtr, const uint32_t aicNum);
 
-    void UpdateMM2BaseNByCoreTiling(uint32_t baseM, uint32_t &mm2BaseN);
+    void UpdateMM2BaseNByCoreTiling(uint32_t baseM, uint32_t& mm2BaseN);
 
     inline uint32_t GetSmallElementsNum(int32_t baseM) const
     {
@@ -286,7 +286,7 @@ protected:
         return 0;
     }
 
-    bool GetTokensIndexFlag(const gert::TilingContext *context) const;
+    bool GetTokensIndexFlag(const gert::TilingContext* context) const;
 
 private:
     uint32_t bs;
@@ -330,13 +330,13 @@ private:
     uint32_t minBaseNShape = MATMUL_MIN_SHAPE;
     bool isTilingDataValid = false;
 
-    ActiveType GetActiveType(const gert::TilingContext *context, const char *activeType) const;
-    ge::graphStatus GetBs(const gert::TilingContext *context, const gert::StorageShape *xShape);
+    ActiveType GetActiveType(const gert::TilingContext* context, const char* activeType) const;
+    ge::graphStatus GetBs(const gert::TilingContext* context, const gert::StorageShape* xShape);
     void CalMM2Single(uint32_t baseM2, uint32_t baseN2);
-    void AdjustMM2MNLoops(const uint32_t align, uint32_t &m2Loops, uint32_t &n2Loops);
-    void PrintFFNTiling(const gert::TilingContext *context, bool debugLevel);
-    void PrintCriticalInfo(gert::TilingContext *context);
-    void PrintMatMulTiling(const char *opName, TCubeTiling &matmulTiling) const;
+    void AdjustMM2MNLoops(const uint32_t align, uint32_t& m2Loops, uint32_t& n2Loops);
+    void PrintFFNTiling(const gert::TilingContext* context, bool debugLevel);
+    void PrintCriticalInfo(gert::TilingContext* context);
+    void PrintMatMulTiling(const char* opName, TCubeTiling& matmulTiling) const;
 };
 
 void FFNTiling::Init()
@@ -351,7 +351,7 @@ void FFNTiling::Init()
 }
 
 // Update baseN of mm2 according to kernel tiling logic, in order to boost performance
-void FFNTiling::UpdateMM2BaseNByCoreTiling(uint32_t baseM, uint32_t &mm2BaseN)
+void FFNTiling::UpdateMM2BaseNByCoreTiling(uint32_t baseM, uint32_t& mm2BaseN)
 {
     // Step1: determine how many AI cubes are available for each shape
     uint32_t aicNum = tilingData.ffnBaseParams.get_coreNum();
@@ -374,9 +374,9 @@ void FFNTiling::UpdateMM2BaseNByCoreTiling(uint32_t baseM, uint32_t &mm2BaseN)
     }
 }
 
-ActiveType FFNTiling::GetActiveType(const gert::TilingContext *context, const char *activeType) const
+ActiveType FFNTiling::GetActiveType(const gert::TilingContext* context, const char* activeType) const
 {
-    for (const ActiveMap &item : ACTIVE_MAP) {
+    for (const ActiveMap& item : ACTIVE_MAP) {
         size_t len = strlen(item.activeName);
         bool isValidActiveType = strlen(activeType) == len;
         // use for loop instead of strncasecmp to avoid possible out-of-bounds problems
@@ -397,7 +397,7 @@ ActiveType FFNTiling::GetActiveType(const gert::TilingContext *context, const ch
     return ActiveType::INVALID_TYPE;
 }
 
-ge::graphStatus FFNTiling::GetBs(const gert::TilingContext *context, const gert::StorageShape *xShape)
+ge::graphStatus FFNTiling::GetBs(const gert::TilingContext* context, const gert::StorageShape* xShape)
 {
     int64_t tempBs;
     if (is310P) {
@@ -440,8 +440,8 @@ void FFNTiling::CheckMSD()
                 maxTokensCheckOpt <= bestMaxTokenMsd && bs <= 512; // 512: max M value in msd-scenario
 }
 
-ge::graphStatus FFNTiling::TilingCalcAndSetting(const gert::TilingContext *context,
-                                                const matmul_tiling::PlatformInfo &platInfo,
+ge::graphStatus FFNTiling::TilingCalcAndSetting(const gert::TilingContext* context,
+                                                const matmul_tiling::PlatformInfo& platInfo,
                                                 matmul_tiling::DataType matmulDtype)
 {
     if (is310P) {
@@ -466,15 +466,15 @@ ge::graphStatus FFNTiling::TilingCalcAndSetting(const gert::TilingContext *conte
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FFNGetScaleGroupNum(const gert::TilingContext *context, const gert::Tensor *tokensArrTensor)
+ge::graphStatus FFNTiling::FFNGetScaleGroupNum(const gert::TilingContext* context, const gert::Tensor* tokensArrTensor)
 {
     uint32_t scale1GroupNum = 1;
     uint32_t scale2GroupNum = 1;
     isPerGroup = false;
     if (context->GetOptionalInputTensor(ANTIQUANT_SCALE1_INDEX)) {
-        const gert::StorageShape *antiScale1Shape = context->GetOptionalInputShape(ANTIQUANT_SCALE1_INDEX);
+        const gert::StorageShape* antiScale1Shape = context->GetOptionalInputShape(ANTIQUANT_SCALE1_INDEX);
         uint32_t antiScale1DimNum = antiScale1Shape->GetStorageShape().GetDimNum();
-        const gert::StorageShape *antiScale2Shape = context->GetOptionalInputShape(ANTIQUANT_SCALE2_INDEX);
+        const gert::StorageShape* antiScale2Shape = context->GetOptionalInputShape(ANTIQUANT_SCALE2_INDEX);
         if (tokensArrTensor == nullptr && antiScale1DimNum == DIMS_2) { // scale shape is (G,N)
             scale1GroupNum = antiScale1Shape->GetStorageShape().GetDim(0);
             scale2GroupNum = antiScale2Shape->GetStorageShape().GetDim(0);
@@ -490,10 +490,10 @@ ge::graphStatus FFNTiling::FFNGetScaleGroupNum(const gert::TilingContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FFNGetQuantScale(const gert::TilingContext *context, const gert::Tensor *tokensArrTensor)
+ge::graphStatus FFNTiling::FFNGetQuantScale(const gert::TilingContext* context, const gert::Tensor* tokensArrTensor)
 {
     if (context->GetOptionalInputTensor(SCALE_INDEX)) {
-        const gert::StorageShape *quantScaleShape = context->GetOptionalInputShape(SCALE_INDEX);
+        const gert::StorageShape* quantScaleShape = context->GetOptionalInputShape(SCALE_INDEX);
         if (quantScaleShape != nullptr) {
             uint32_t quantScaleDimNum = quantScaleShape->GetStorageShape().GetDimNum();
             uint32_t scaleShape0 = quantScaleShape->GetStorageShape().GetDim(0);
@@ -509,14 +509,14 @@ ge::graphStatus FFNTiling::FFNGetQuantScale(const gert::TilingContext *context, 
     return ge::GRAPH_SUCCESS;
 }
 
-bool FFNTiling::GetTokensIndexFlag(const gert::TilingContext *context) const
+bool FFNTiling::GetTokensIndexFlag(const gert::TilingContext* context) const
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     if (attrs == nullptr) {
         return false;
     }
 
-    const bool *tokensIndexFlagPtr = attrs->GetAttrPointer<bool>(FFN_ATTR_INDEX_TOKENS_INDEX_FLAG);
+    const bool* tokensIndexFlagPtr = attrs->GetAttrPointer<bool>(FFN_ATTR_INDEX_TOKENS_INDEX_FLAG);
     if (tokensIndexFlagPtr == nullptr) {
         return false;
     }
@@ -524,15 +524,15 @@ bool FFNTiling::GetTokensIndexFlag(const gert::TilingContext *context) const
     return *tokensIndexFlagPtr;
 }
 
-ge::graphStatus FFNTiling::GetInputShape(const gert::TilingContext *context)
+ge::graphStatus FFNTiling::GetInputShape(const gert::TilingContext* context)
 {
-    const gert::StorageShape *xShape = context->GetInputShape(X_INDEX);
+    const gert::StorageShape* xShape = context->GetInputShape(X_INDEX);
     OP_CHECK_IF(xShape == nullptr, OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "xShape is nullptr"),
                 return ge::GRAPH_FAILED);
-    const gert::StorageShape *weight1Shape = context->GetInputShape(WEIGHT1_INDEX);
+    const gert::StorageShape* weight1Shape = context->GetInputShape(WEIGHT1_INDEX);
     OP_CHECK_IF(weight1Shape == nullptr, OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "weight1Shape is nullptr"),
                 return ge::GRAPH_FAILED);
-    const gert::StorageShape *weight2Shape = context->GetInputShape(WEIGHT2_INDEX);
+    const gert::StorageShape* weight2Shape = context->GetInputShape(WEIGHT2_INDEX);
     OP_CHECK_IF(weight2Shape == nullptr, OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "weight2Shape is nullptr"),
                 return ge::GRAPH_FAILED);
 
@@ -573,7 +573,7 @@ ge::graphStatus FFNTiling::GetInputShape(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-matmul_tiling::PlatformInfo FFNTiling::MmGetPlatInfo(const FFNCompileInfo *compileInfoPtr) const
+matmul_tiling::PlatformInfo FFNTiling::MmGetPlatInfo(const FFNCompileInfo* compileInfoPtr) const
 {
     matmul_tiling::PlatformInfo platInfo;
     platInfo.socVersion = compileInfoPtr->socVersion;
@@ -586,7 +586,7 @@ matmul_tiling::PlatformInfo FFNTiling::MmGetPlatInfo(const FFNCompileInfo *compi
     return platInfo;
 }
 
-ge::graphStatus FFNTiling::CheckAndGetBasicInfo(gert::TilingContext *context, const FFNCompileInfo *compileInfoPtr)
+ge::graphStatus FFNTiling::CheckAndGetBasicInfo(gert::TilingContext* context, const FFNCompileInfo* compileInfoPtr)
 {
     const uint32_t coreNum = compileInfoPtr->coreNum;
     is310P = compileInfoPtr->socVersion == platform_ascendc::SocVersion::ASCEND310P;
@@ -610,7 +610,7 @@ ge::graphStatus FFNTiling::CheckAndGetBasicInfo(gert::TilingContext *context, co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::TilingWithDifferentKN(gert::TilingContext *context, const FFNCompileInfo *compileInfoPtr,
+ge::graphStatus FFNTiling::TilingWithDifferentKN(gert::TilingContext* context, const FFNCompileInfo* compileInfoPtr,
                                                  const uint32_t aicNum)
 {
     matmul_tiling::PlatformInfo mmPlatInfo = MmGetPlatInfo(compileInfoPtr);
@@ -637,7 +637,7 @@ ge::graphStatus FFNTiling::TilingWithDifferentKN(gert::TilingContext *context, c
     return ge::GRAPH_SUCCESS;
 }
 
-void FFNTiling::SetTilingBaseParams(gert::TilingContext *context, const FFNCompileInfo *compileInfoPtr,
+void FFNTiling::SetTilingBaseParams(gert::TilingContext* context, const FFNCompileInfo* compileInfoPtr,
                                     const uint32_t aicNum)
 {
     context->SetBlockDim(compileInfoPtr->blockDim);
@@ -651,10 +651,10 @@ void FFNTiling::SetTilingBaseParams(gert::TilingContext *context, const FFNCompi
     tilingData.ffnBaseParams.set_dataTypeSize(xDataTypeSize);
 }
 
-ge::graphStatus FFNTiling::RunFusionKernelTiling(gert::TilingContext *context)
+ge::graphStatus FFNTiling::RunFusionKernelTiling(gert::TilingContext* context)
 {
     Init();
-    const FFNCompileInfo *compileInfoPtr = reinterpret_cast<const FFNCompileInfo *>(context->GetCompileInfo());
+    const FFNCompileInfo* compileInfoPtr = reinterpret_cast<const FFNCompileInfo*>(context->GetCompileInfo());
     OP_CHECK_IF(compileInfoPtr == nullptr,
                 OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "compileInfoPtr is null"), return ge::GRAPH_FAILED);
 
@@ -703,7 +703,7 @@ ge::graphStatus FFNTiling::RunFusionKernelTiling(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-void FFNTiling::PrintMatMulTiling(const char *opName, TCubeTiling &matmulTiling) const
+void FFNTiling::PrintMatMulTiling(const char* opName, TCubeTiling& matmulTiling) const
 {
     std::stringstream ss;
     ss << "usedCoreNum " << matmulTiling.get_usedCoreNum() << " M " << matmulTiling.get_M() << " N "
@@ -722,7 +722,7 @@ void FFNTiling::PrintMatMulTiling(const char *opName, TCubeTiling &matmulTiling)
     OP_LOGI(opName, "matmul tiling: %s", ss.str().c_str());
 }
 
-void FFNTiling::PrintFFNTiling(const gert::TilingContext *context, bool debugLevel)
+void FFNTiling::PrintFFNTiling(const gert::TilingContext* context, bool debugLevel)
 {
     if (debugLevel) {
         return;
@@ -731,7 +731,7 @@ void FFNTiling::PrintFFNTiling(const gert::TilingContext *context, bool debugLev
     PrintMatMulTiling(context->GetNodeName(), tilingData.mm1TilingData);
     PrintMatMulTiling(context->GetNodeName(), tilingData.mm2TilingData);
     std::stringstream ss;
-    auto &baseParams = tilingData.ffnBaseParams;
+    auto& baseParams = tilingData.ffnBaseParams;
     ss << "totalTokens " << baseParams.get_totalTokens() << " k1 " << baseParams.get_k1() << " n2 "
        << baseParams.get_n2() << " expertNum " << baseParams.get_expertNum() << " maxTokens "
        << baseParams.get_maxTokens() << " coreNum " << baseParams.get_coreNum() << " activeType "
@@ -740,7 +740,7 @@ void FFNTiling::PrintFFNTiling(const gert::TilingContext *context, bool debugLev
        << " dataTypeSize " << baseParams.get_dataTypeSize();
     OP_LOGD(context->GetNodeName(), "ffnBaseParams: %s", ss.str().c_str());
 
-    auto &singleCoreParams = tilingData.ffnSingleCoreParams;
+    auto& singleCoreParams = tilingData.ffnSingleCoreParams;
     std::stringstream ss1;
     ss1 << "baseM1 " << singleCoreParams.get_baseM1() << " baseN1 " << singleCoreParams.get_baseN1() << " baseN2 "
         << singleCoreParams.get_baseN2() << " ubCalSize " << singleCoreParams.get_ubCalSize() << " ubRestBytes "
@@ -749,7 +749,7 @@ void FFNTiling::PrintFFNTiling(const gert::TilingContext *context, bool debugLev
     OP_LOGD(context->GetNodeName(), "ffnSingleCoreParams: %s", ss1.str().c_str());
 }
 
-void FFNTiling::PrintCriticalInfo(gert::TilingContext *context)
+void FFNTiling::PrintCriticalInfo(gert::TilingContext* context)
 {
     std::stringstream ss;
     ss << "maxTokens  " << maxTokens << "; expertTokens [";
@@ -758,7 +758,7 @@ void FFNTiling::PrintCriticalInfo(gert::TilingContext *context)
     } else {
         ss << "unknown";
     }
-    size_t *workspaces = context->GetWorkspaceSizes(1); // workspaceSize is at index 1
+    size_t* workspaces = context->GetWorkspaceSizes(1); // workspaceSize is at index 1
     ss << "]; workspace = " << workspaces[0];
     OP_LOGD(context->GetNodeName(), "Critical Info for kernel: %s.", ss.str().c_str());
 }
@@ -787,11 +787,11 @@ void FFNTiling::PrintCriticalInfo(gert::TilingContext *context)
  *  Notice: E/bias may or may not be. The output shape is equal to x's.
  * @return ge::STATUS.
  */
-ge::graphStatus FFNTiling::FFNParamsCheck(gert::TilingContext *context)
+ge::graphStatus FFNTiling::FFNParamsCheck(gert::TilingContext* context)
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const char *activeType = attrs->GetAttrPointer<char>(FFN_ATTR_INDEX_ACTIVATION);
+    const char* activeType = attrs->GetAttrPointer<char>(FFN_ATTR_INDEX_ACTIVATION);
     OP_CHECK_NULL_WITH_CONTEXT(context, activeType);
     ActiveType activationType = GetActiveType(context, activeType);
     OP_CHECK_IF(
@@ -805,7 +805,7 @@ ge::graphStatus FFNTiling::FFNParamsCheck(gert::TilingContext *context)
                 return ge::GRAPH_FAILED);
     weightDataTypeSize = GetSizeByDataType(weight1Dtype);
     innerPrecise = HIGH_PRECISION;
-    const int64_t *innerPrecisePtr = attrs->GetAttrPointer<int64_t>(FFN_ATTR_INDEX_INNER_PRECISE);
+    const int64_t* innerPrecisePtr = attrs->GetAttrPointer<int64_t>(FFN_ATTR_INDEX_INNER_PRECISE);
     if (innerPrecisePtr != nullptr) {
         innerPrecise = static_cast<int32_t>(*innerPrecisePtr);
     }
@@ -823,7 +823,7 @@ ge::graphStatus FFNTiling::FFNParamsCheck(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FFNSetUbDivideBlk(const gert::TilingContext *context)
+ge::graphStatus FFNTiling::FFNSetUbDivideBlk(const gert::TilingContext* context)
 {
     ubBlockAlign = UB_PER_BLOCK_ALIGN;
     OP_LOGD(
@@ -880,7 +880,7 @@ ge::graphStatus FFNTiling::FFNSetUbDivideBlk(const gert::TilingContext *context)
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus FFNTiling::FFNCalUbSize(uint32_t baseN, uint32_t divideBlkNum, uint32_t ioBlkNum, uint32_t &baseM)
+ge::graphStatus FFNTiling::FFNCalUbSize(uint32_t baseN, uint32_t divideBlkNum, uint32_t ioBlkNum, uint32_t& baseM)
 {
     if (divideBlkNum == 0 || baseN == 0 || ubBlockAlign == 0) {
         return ge::GRAPH_FAILED;
@@ -903,7 +903,7 @@ ge::graphStatus FFNTiling::FFNCalUbSize(uint32_t baseN, uint32_t divideBlkNum, u
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::CalMM1ValidUbBytes(int64_t &mm1VaildUbBytes) const
+ge::graphStatus FFNTiling::CalMM1ValidUbBytes(int64_t& mm1VaildUbBytes) const
 {
     if (innerPrecise == HIGH_PRECISION) {
         mm1VaildUbBytes = ubSize_ / UB_DIVIDE_NUM_HIGH_PRECISION;
@@ -920,8 +920,8 @@ ge::graphStatus FFNTiling::CalMM1ValidUbBytes(int64_t &mm1VaildUbBytes) const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::CalMM1BaseM(const gert::TilingContext *context, const uint32_t baseN, const uint64_t l0CSize,
-                                       const int64_t mm1VaildUbBytes, uint32_t &baseM)
+ge::graphStatus FFNTiling::CalMM1BaseM(const gert::TilingContext* context, const uint32_t baseN, const uint64_t l0CSize,
+                                       const int64_t mm1VaildUbBytes, uint32_t& baseM)
 {
     if (baseN == 0) {
         return ge::GRAPH_FAILED;
@@ -942,9 +942,9 @@ ge::graphStatus FFNTiling::CalMM1BaseM(const gert::TilingContext *context, const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::CalMM1TilingBaseMNBasicBlock(const gert::TilingContext *context, const uint64_t l0CSize,
+ge::graphStatus FFNTiling::CalMM1TilingBaseMNBasicBlock(const gert::TilingContext* context, const uint64_t l0CSize,
                                                         const int64_t mm1VaildUbBytes, uint64_t basicBlkOperTimes,
-                                                        uint32_t &baseN)
+                                                        uint32_t& baseN)
 {
     uint32_t coreNum = tilingData.ffnBaseParams.get_coreNum();
     uint32_t nCal = n1 - 1;
@@ -980,7 +980,7 @@ ge::graphStatus FFNTiling::CalMM1TilingBaseMNBasicBlock(const gert::TilingContex
 }
 
 ge::graphStatus FFNTiling::CalMMTilingBaseMNBasicBlock(const uint64_t basicBlkOperTimes, const uint32_t n,
-                                                       uint32_t &baseM, uint32_t &baseN) const
+                                                       uint32_t& baseM, uint32_t& baseN) const
 {
     bool isRecomputed = false; // variable indicates whether baseM/baseN is recomputed
     uint32_t blockDimM = Ceil(maxTokens, baseM);
@@ -1023,8 +1023,8 @@ ge::graphStatus FFNTiling::CalMMTilingBaseMNBasicBlock(const uint64_t basicBlkOp
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::CalMM1TilingBaseMNKBasicBlock(const gert::TilingContext *context,
-                                                         const matmul_tiling::PlatformInfo &platInfo)
+ge::graphStatus FFNTiling::CalMM1TilingBaseMNKBasicBlock(const gert::TilingContext* context,
+                                                         const matmul_tiling::PlatformInfo& platInfo)
 {
     int64_t mm1VaildUbBytes = ubSize_ / (UB_DIVIDE_NUM * xDataTypeSize);
     uint32_t coreNum = tilingData.ffnBaseParams.get_coreNum();
@@ -1069,8 +1069,8 @@ ge::graphStatus FFNTiling::CalMM1TilingBaseMNKBasicBlock(const gert::TilingConte
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::CalMM1TilingBaseMNK(const gert::TilingContext *context,
-                                               const matmul_tiling::PlatformInfo &platInfo)
+ge::graphStatus FFNTiling::CalMM1TilingBaseMNK(const gert::TilingContext* context,
+                                               const matmul_tiling::PlatformInfo& platInfo)
 {
     int64_t mm1VaildUbBytes = ubSize_ / UB_DIVIDE_NUM;
     CalMM1ValidUbBytes(mm1VaildUbBytes);
@@ -1126,8 +1126,8 @@ ge::graphStatus FFNTiling::CalMM1TilingBaseMNK(const gert::TilingContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::CalMM2TilingBaseMNKBasicBlock(const gert::TilingContext *context,
-                                                         const matmul_tiling::PlatformInfo &platInfo)
+ge::graphStatus FFNTiling::CalMM2TilingBaseMNKBasicBlock(const gert::TilingContext* context,
+                                                         const matmul_tiling::PlatformInfo& platInfo)
 {
     uint32_t coreNum = tilingData.ffnBaseParams.get_coreNum();
     uint32_t baseN = std::min<uint32_t>(SixteenAlign(n2), BEST_BASEN);
@@ -1152,7 +1152,7 @@ ge::graphStatus FFNTiling::CalMM2TilingBaseMNKBasicBlock(const gert::TilingConte
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::CalMM2TilingBaseMNK(const matmul_tiling::PlatformInfo &platInfo)
+ge::graphStatus FFNTiling::CalMM2TilingBaseMNK(const matmul_tiling::PlatformInfo& platInfo)
 {
     uint32_t baseN = MATMUL_MIN_SHAPE;
     if (isMsdCase) {
@@ -1187,8 +1187,8 @@ ge::graphStatus FFNTiling::CalMM2TilingBaseMNK(const matmul_tiling::PlatformInfo
     return ge::GRAPH_SUCCESS;
 }
 
-void FFNTiling::SetBiasInfo(const gert::TilingContext *context, matmul_tiling::MatmulApiTiling &mm,
-                            const uint32_t &irIndex) const
+void FFNTiling::SetBiasInfo(const gert::TilingContext* context, matmul_tiling::MatmulApiTiling& mm,
+                            const uint32_t& irIndex) const
 {
     auto bias = context->GetOptionalInputDesc(irIndex);
     if (bias == nullptr) {
@@ -1201,7 +1201,7 @@ void FFNTiling::SetBiasInfo(const gert::TilingContext *context, matmul_tiling::M
 }
 
 void FFNTiling::FFNCalMMStep(const uint32_t baseM, const uint32_t baseN, const uint32_t baseK,
-                             TCubeTiling &mmTilingData)
+                             TCubeTiling& mmTilingData)
 {
     // whether enable double buffer in L1B
     bool divTwo = (maxTokens <= SMALL_TOKEN_BOUND && expertNum > 1);
@@ -1246,8 +1246,8 @@ void FFNTiling::FFNCalMMStep(const uint32_t baseM, const uint32_t baseN, const u
     xDataTypeSize = GetSizeByDataType(xDataType);
 }
 
-ge::graphStatus FFNTiling::FFNSetMM1Tiling(const gert::TilingContext *context,
-                                           const matmul_tiling::PlatformInfo &platInfo,
+ge::graphStatus FFNTiling::FFNSetMM1Tiling(const gert::TilingContext* context,
+                                           const matmul_tiling::PlatformInfo& platInfo,
                                            matmul_tiling::DataType matmulDtype)
 {
     matmul_tiling::MatmulApiTiling mm1(platInfo);
@@ -1286,8 +1286,8 @@ ge::graphStatus FFNTiling::FFNSetMM1Tiling(const gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FFNSetMM2Tiling(const gert::TilingContext *context,
-                                           const matmul_tiling::PlatformInfo &platInfo,
+ge::graphStatus FFNTiling::FFNSetMM2Tiling(const gert::TilingContext* context,
+                                           const matmul_tiling::PlatformInfo& platInfo,
                                            matmul_tiling::DataType matmulDtype)
 {
     matmul_tiling::MatmulApiTiling mm2(platInfo);
@@ -1319,7 +1319,7 @@ ge::graphStatus FFNTiling::FFNSetMM2Tiling(const gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FFNGlu(gert::TilingContext *context, uint64_t ubSize, uint64_t l1Size, uint64_t l0CSize,
+ge::graphStatus FFNTiling::FFNGlu(gert::TilingContext* context, uint64_t ubSize, uint64_t l1Size, uint64_t l0CSize,
                                   uint32_t aivNum)
 {
     OP_CHECK_IF(FFNGluParamsCheck(context) != ge::GRAPH_SUCCESS,
@@ -1338,7 +1338,7 @@ ge::graphStatus FFNTiling::FFNGlu(gert::TilingContext *context, uint64_t ubSize,
                 return ge::GRAPH_FAILED);
 
     context->SetTilingKey(2); // 2: for glu template
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
     auto workspace1Size = baseM1_ * baseN1_ * xDataTypeSize * 4 * aivNum; // 4: pingpong buffer and left/right part
     auto workspace2Size = maxTokens * n1 / 2 * xDataTypeSize;             // 2: dim in n1 should be divided by 2
     tilingData.ffnBaseParams.set_workspace1Size(workspace1Size);
@@ -1355,7 +1355,7 @@ ge::graphStatus FFNTiling::FFNGlu(gert::TilingContext *context, uint64_t ubSize,
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FFNGluParamsCheck(const gert::TilingContext *context) const
+ge::graphStatus FFNTiling::FFNGluParamsCheck(const gert::TilingContext* context) const
 {
     // n1 should be a even number
     OP_CHECK_IF(
@@ -1376,7 +1376,7 @@ ge::graphStatus FFNTiling::FFNGluParamsCheck(const gert::TilingContext *context)
                                             "the glu activation function only supports the scene without experts"),
                 return ge::GRAPH_FAILED);
     // k2 should be equal to n1/2
-    const gert::StorageShape *weight2Shape = context->GetInputShape(WEIGHT2_INDEX);
+    const gert::StorageShape* weight2Shape = context->GetInputShape(WEIGHT2_INDEX);
     size_t kIndex = hasExperts ? 1 : 0;
     auto k2 = weight2Shape->GetStorageShape().GetDim(kIndex);
     OP_CHECK_IF(
@@ -1387,9 +1387,9 @@ ge::graphStatus FFNTiling::FFNGluParamsCheck(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::SetMMTilingType(const gert::TilingContext *context, bool isMM1,
+ge::graphStatus FFNTiling::SetMMTilingType(const gert::TilingContext* context, bool isMM1,
                                            matmul_tiling::DataType matmulDtype,
-                                           matmul_tiling::MatmulApiTiling &mm) const
+                                           matmul_tiling::MatmulApiTiling& mm) const
 {
     mm.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmulDtype, false);
     mm.SetBType(matmul_tiling::TPosition::GM, wFormat, matmulDtype, false);
@@ -1458,7 +1458,7 @@ ge::graphStatus FFNTiling::FFNGluCalMM1Tiling(uint64_t ubSize, uint64_t l0CSize)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FFNGluSetMM1Tiling(gert::TilingContext *context, uint64_t l1Size, uint64_t l0CSize,
+ge::graphStatus FFNTiling::FFNGluSetMM1Tiling(gert::TilingContext* context, uint64_t l1Size, uint64_t l0CSize,
                                               matmul_tiling::DataType matmulDtype, uint32_t aivNum)
 {
     matmul_tiling::MatmulApiTiling mm1;
@@ -1538,7 +1538,7 @@ ge::graphStatus FFNTiling::FFNGluCalMM2Tiling(uint64_t l0CSize)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FFNGluSetMM2Tiling(gert::TilingContext *context, uint64_t l1Size, uint64_t l0CSize,
+ge::graphStatus FFNTiling::FFNGluSetMM2Tiling(gert::TilingContext* context, uint64_t l1Size, uint64_t l0CSize,
                                               matmul_tiling::DataType matmulDtype)
 {
     matmul_tiling::MatmulApiTiling mm2;
@@ -1558,13 +1558,13 @@ ge::graphStatus FFNTiling::FFNGluSetMM2Tiling(gert::TilingContext *context, uint
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::DataTypeCheck(gert::TilingContext *context)
+ge::graphStatus FFNTiling::DataTypeCheck(gert::TilingContext* context)
 {
     auto x = context->GetInputDesc(X_INDEX);
     auto weight1 = context->GetInputDesc(WEIGHT1_INDEX);
     auto weight2 = context->GetInputDesc(WEIGHT2_INDEX);
     auto output = context->GetOutputDesc(0);
-    const gert::Tensor *weight2Tensor = context->GetInputTensor(WEIGHT2_INDEX);
+    const gert::Tensor* weight2Tensor = context->GetInputTensor(WEIGHT2_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, weight2Tensor);
     OP_CHECK_NULL_WITH_CONTEXT(context, x);
     OP_CHECK_NULL_WITH_CONTEXT(context, weight1);
@@ -1602,7 +1602,7 @@ ge::graphStatus FFNTiling::DataTypeCheck(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FormatCheck(const gert::TilingContext *context)
+ge::graphStatus FFNTiling::FormatCheck(const gert::TilingContext* context)
 {
     auto x = context->GetInputDesc(X_INDEX);
     auto weight1 = context->GetInputDesc(WEIGHT1_INDEX);
@@ -1650,7 +1650,7 @@ inline ge::graphStatus FFNTiling::N1EqualZeroWithBias2(uint64_t ubSize)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FFNSingleCoreTiling(const gert::TilingContext *context, uint64_t ubSize)
+ge::graphStatus FFNTiling::FFNSingleCoreTiling(const gert::TilingContext* context, uint64_t ubSize)
 {
     if (n1 == 0) {
         auto bias2 = context->GetOptionalInputDesc(BIAS2_INDEX);
@@ -1703,8 +1703,8 @@ ge::graphStatus FFNTiling::FFNSingleCoreTiling(const gert::TilingContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FFNApiMM1Tiling(const gert::TilingContext *context,
-                                           const matmul_tiling::PlatformInfo &platInfo,
+ge::graphStatus FFNTiling::FFNApiMM1Tiling(const gert::TilingContext* context,
+                                           const matmul_tiling::PlatformInfo& platInfo,
                                            matmul_tiling::DataType matmulDtype)
 {
     matmul_tiling::MatmulApiTiling mm1(platInfo);
@@ -1745,7 +1745,7 @@ ge::graphStatus FFNTiling::FFNApiMM1Tiling(const gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-void FFNTiling::FFNApiMM2CalBaseMN(uint32_t &mm2BaseN, uint32_t &baseM, const matmul_tiling::PlatformInfo &platInfo)
+void FFNTiling::FFNApiMM2CalBaseMN(uint32_t& mm2BaseN, uint32_t& baseM, const matmul_tiling::PlatformInfo& platInfo)
 {
     while (n2 < mm2BaseN) {
         mm2BaseN = mm2BaseN >> 1;
@@ -1772,8 +1772,8 @@ void FFNTiling::FFNApiMM2CalBaseMN(uint32_t &mm2BaseN, uint32_t &baseM, const ma
     UpdateMM2BaseNByCoreTiling(baseM, mm2BaseN);
 }
 
-ge::graphStatus FFNTiling::FFNApiMM2Tiling(const gert::TilingContext *context,
-                                           const matmul_tiling::PlatformInfo &platInfo,
+ge::graphStatus FFNTiling::FFNApiMM2Tiling(const gert::TilingContext* context,
+                                           const matmul_tiling::PlatformInfo& platInfo,
                                            matmul_tiling::DataType matmulDtype)
 {
     matmul_tiling::MatmulApiTiling mm2(platInfo);
@@ -1810,7 +1810,7 @@ ge::graphStatus FFNTiling::FFNApiMM2Tiling(const gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FFNApiTiling(const gert::TilingContext *context, const matmul_tiling::PlatformInfo &platInfo,
+ge::graphStatus FFNTiling::FFNApiTiling(const gert::TilingContext* context, const matmul_tiling::PlatformInfo& platInfo,
                                         matmul_tiling::DataType matmulDtype)
 {
     if (FFNApiMM1Tiling(context, platInfo, matmulDtype) != ge::GRAPH_SUCCESS) {
@@ -1856,7 +1856,7 @@ void FFNTiling::CalMM2Single(uint32_t baseM2, uint32_t baseN2)
     return;
 }
 
-void FFNTiling::AdjustMM2MNLoops(const uint32_t align, uint32_t &m2Loops, uint32_t &n2Loops)
+void FFNTiling::AdjustMM2MNLoops(const uint32_t align, uint32_t& m2Loops, uint32_t& n2Loops)
 {
     if (m2Loops < CALC_MM2_SINGLE_CORE_NUM) {
         uint32_t maxMLoops = 0;
@@ -1947,7 +1947,7 @@ uint64_t FFNTiling::SelectTilingKey() const
     return HIGH_PERFORMANCE_KEY;
 }
 
-ge::graphStatus FFNTiling::FFNSetTilingKey(gert::TilingContext *context, uint64_t &key)
+ge::graphStatus FFNTiling::FFNSetTilingKey(gert::TilingContext* context, uint64_t& key)
 {
     if (is310P) {
         return ge::GRAPH_SUCCESS;
@@ -1971,11 +1971,11 @@ ge::graphStatus FFNTiling::FFNSetTilingKey(gert::TilingContext *context, uint64_
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNTiling::FFNSetTilingData(gert::TilingContext *context)
+ge::graphStatus FFNTiling::FFNSetTilingData(gert::TilingContext* context)
 {
     uint64_t key = SelectTilingKey();
     FFNSetTilingKey(context, key);
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
     uint32_t aicNum = tilingData.ffnBaseParams.get_coreNum();
     uint32_t mm1TilingBaseN = tilingData.mm1TilingData.get_baseN();
     uint32_t mm1BaseN = key == QUANT_STEPN_KEY ? mm1TilingBaseN * tilingData.mm1TilingData.get_stepN() : mm1TilingBaseN;
@@ -2024,16 +2024,16 @@ ge::graphStatus FFNTiling::FFNSetTilingData(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingFFN(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingFFN(gert::TilingContext* context)
 {
     FFNTiling FFN_tiling;
     auto ret = FFN_tiling.RunFusionKernelTiling(context);
     return ret;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFFN(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFFN(gert::TilingParseContext* context)
 {
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfoPtr);
     auto compileInfoPtr = context->GetCompiledInfo<FFNCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfoPtr);

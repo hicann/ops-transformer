@@ -61,7 +61,7 @@ constexpr uint16_t PERGROUP_SIZE_256 = 256;
 
 #define GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM \
     template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType, \
-              const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+              const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 
 #define GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS \
     BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig, vecConfig>
@@ -71,80 +71,80 @@ class BasicBlockLibVectorAntiQuantCompute {
 public:
     __aicore__ inline BasicBlockLibVectorAntiQuantCompute(){};
 
-    __aicore__ inline void UpdateGlobalAddr(__gm__ wType *weight, __gm__ antiQuantScaleType *antiQuantScale,
-                                            __gm__ xType *antiQuantOffset, __gm__ float *perTokenScale,
-                                            __gm__ float *perChannelScale, __gm__ biasType *bias,
+    __aicore__ inline void UpdateGlobalAddr(__gm__ wType* weight, __gm__ antiQuantScaleType* antiQuantScale,
+                                            __gm__ xType* antiQuantOffset, __gm__ float* perTokenScale,
+                                            __gm__ float* perChannelScale, __gm__ biasType* bias,
                                             const bool weightL2Cacheable);
-    __aicore__ inline void Init(TPipe *tPipe, bool hasBias, uint64_t antiquantGroupSize = 1);
+    __aicore__ inline void Init(TPipe* tPipe, bool hasBias, uint64_t antiquantGroupSize = 1);
     __aicore__ inline void InitKCG(uint32_t antiQuantGroupSize, bool hasBias,
-                                   const LocalTensor<xType> &ubHighBitTotalBuffer, uint64_t highBitUbOffset);
+                                   const LocalTensor<xType>& ubHighBitTotalBuffer, uint64_t highBitUbOffset);
     __aicore__ inline void WaitVToMTE2();
     __aicore__ inline void SetVToMTE2();
     __aicore__ inline void CopyWeightMxScaleGmToUb(uint64_t nOffset, uint64_t nL1Size, uint64_t kOffset,
                                                    uint64_t mxGroupNum, uint64_t realGroupNum);
     __aicore__ inline void TransWeightMxScale(uint64_t nSize, uint64_t kSize);
-    __aicore__ inline void CopyWeightMxScaleUbToL1(LocalTensor<uint16_t> &scaleL1, uint64_t l1NOffset, uint64_t nSize);
+    __aicore__ inline void CopyWeightMxScaleUbToL1(LocalTensor<uint16_t>& scaleL1, uint64_t l1NOffset, uint64_t nSize);
     __aicore__ inline void CopyGmToUb(uint64_t ubMte2NSize, uint64_t ubMte2KSize, uint64_t ubMte2NOffset,
-                                      uint64_t ubMte2KOffset, const BasicBlockOffsetParam &offsetParam);
+                                      uint64_t ubMte2KOffset, const BasicBlockOffsetParam& offsetParam);
     __aicore__ inline void CopyMxBiasGmToUb(uint64_t ubMte2MxBiasNSize, uint64_t ubMte2MxBiasNOffset);
-    __aicore__ inline void WeightAntiQuantCompute(const UbConsumeConfig &ubConsumeConfig,
-                                                  const LocalTensor<xType> &weightHighBitL1,
-                                                  const L1ConsumeConfig &l1ConsumeConfig,
-                                                  const LocalTensor<biasType> *biasL1Ptr);
-    __aicore__ inline void WeightAntiQuantComputeNzNk(const UbConsumeConfig &ubConsumeConfig,
-                                                      const LocalTensor<xType> &weightHighBitL1,
-                                                      const L1ConsumeConfig &l1ConsumeConfig,
-                                                      const LocalTensor<biasType> &biasL1);
+    __aicore__ inline void WeightAntiQuantCompute(const UbConsumeConfig& ubConsumeConfig,
+                                                  const LocalTensor<xType>& weightHighBitL1,
+                                                  const L1ConsumeConfig& l1ConsumeConfig,
+                                                  const LocalTensor<biasType>* biasL1Ptr);
+    __aicore__ inline void WeightAntiQuantComputeNzNk(const UbConsumeConfig& ubConsumeConfig,
+                                                      const LocalTensor<xType>& weightHighBitL1,
+                                                      const L1ConsumeConfig& l1ConsumeConfig,
+                                                      const LocalTensor<biasType>& biasL1);
     __aicore__ inline void CopyKcScaleBiasGmToUb(uint64_t nRealL0Size, uint64_t mRealL0Size, uint64_t nOffset,
                                                  uint64_t mOffset);
     __aicore__ inline void AntiQuantYWithKc(uint64_t nRealL0Size, uint64_t mRealL0Size);
-    __aicore__ inline void CopyYUbToGm(uint64_t nRealL0Size, uint64_t mRealL0Size, __gm__ half *yGm,
-                                       const BasicBlockOffsetParam &offsetParam, uint64_t aivMOffset);
+    __aicore__ inline void CopyYUbToGm(uint64_t nRealL0Size, uint64_t mRealL0Size, __gm__ half* yGm,
+                                       const BasicBlockOffsetParam& offsetParam, uint64_t aivMOffset);
     __aicore__ inline void End();
 
 private:
     __aicore__ inline void InitMx();
     __aicore__ inline void CopyWeightGmToUb(uint64_t ubMte2NSize, uint64_t ubMte2KSize, uint64_t ubMte2NOffset,
-                                            uint64_t ubMte2KOffset, const BasicBlockOffsetParam &offsetParam);
+                                            uint64_t ubMte2KOffset, const BasicBlockOffsetParam& offsetParam);
     __aicore__ inline void CopyAntiQuantParamsGmToUb(uint64_t ubMte2NSize, uint64_t ubMte2KSize, uint64_t ubMte2NOffset,
-                                                     uint64_t ubMte2KOffset, const BasicBlockOffsetParam &offsetParam);
+                                                     uint64_t ubMte2KOffset, const BasicBlockOffsetParam& offsetParam);
     __aicore__ inline void WeightAntiQuantProcess(uint64_t nRealLen, uint64_t kRealLen, uint64_t antiQuantNOffset,
-                                                  uint64_t antiQuantKOffset, const UbConsumeConfig &ubConsumeConfig);
+                                                  uint64_t antiQuantKOffset, const UbConsumeConfig& ubConsumeConfig);
     __aicore__ inline void AntiQuantProcess(uint64_t vfExternalRealLen, uint64_t vfInnerRealLen,
                                             uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset,
-                                            const UbConsumeConfig &ubConsumeConfig);
+                                            const UbConsumeConfig& ubConsumeConfig);
     __aicore__ inline void AntiQuantProcessNd(uint64_t vfExternalRealLen, uint64_t vfInnerRealLen,
                                               uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset);
-    __aicore__ inline void AntiQuantProcessNdInt4(const LocalAddressParam<xType, wType> &addressParam,
+    __aicore__ inline void AntiQuantProcessNdInt4(const LocalAddressParam<xType, wType>& addressParam,
                                                   uint64_t vfExternalRealLen, uint64_t vfInnerRealLen);
     __aicore__ inline void AntiQuantProcessNz(uint64_t vfExternalRealLen, uint64_t vfInnerRealLen,
                                               uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset);
     __aicore__ inline void CalLocalAddrForVf(uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset,
-                                             LocalAddressParam<xType, wType> &localAddressParam);
+                                             LocalAddressParam<xType, wType>& localAddressParam);
     __aicore__ inline void CalInt4NzKnLocalAddrForVf(uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset,
-                                                     Int4NzParams<xType, wType, antiQuantScaleType> &int4NzParams);
+                                                     Int4NzParams<xType, wType, antiQuantScaleType>& int4NzParams);
     __aicore__ inline void WeightHighBitUbToL1(uint64_t weightHighBitL1Offset, uint64_t antiQuantRealN,
-                                               uint64_t antiQuantRealK, const LocalTensor<xType> &weightHighBitL1,
+                                               uint64_t antiQuantRealK, const LocalTensor<xType>& weightHighBitL1,
                                                uint64_t l1RealExternalLen);
     __aicore__ inline uint64_t ComputeWeightHighBitL1Offset(uint64_t antiQuantNOffset, uint64_t antiQuantKOffset,
                                                             uint64_t nRealLen, uint64_t kRealLen,
-                                                            const L1ConsumeConfig &l1ConsumeConfig);
+                                                            const L1ConsumeConfig& l1ConsumeConfig);
     __aicore__ inline void CopyMxAntiQuantParamsGmToUb(uint64_t ubMte2NSize, uint64_t ubMte2KSize,
                                                        uint64_t ubMte2NOffset, uint64_t ubMte2KOffset,
-                                                       const BasicBlockOffsetParam &offsetParam);
+                                                       const BasicBlockOffsetParam& offsetParam);
     __aicore__ inline void MxScaleProcess(uint64_t ubMte2NSize, uint64_t ubMte2KSize);
     __aicore__ inline void AntiQuantProcessNdMx(uint64_t vfExternalRealLen, uint64_t vfInnerRealLen,
                                                 uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset);
     __aicore__ inline void AntiQuantProcessNzMx(uint64_t vfExternalRealLen, uint64_t vfInnerRealLen,
                                                 uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset);
-    __aicore__ inline void AntiQuantProcessNzMxA8W4(const UbConsumeConfig &ubConsumeConfig);
-    __aicore__ inline void CalLocalAddrForYVf(LocalAddressYParam<yType> &localAddressParam);
+    __aicore__ inline void AntiQuantProcessNzMxA8W4(const UbConsumeConfig& ubConsumeConfig);
+    __aicore__ inline void CalLocalAddrForYVf(LocalAddressYParam<yType>& localAddressParam);
     __aicore__ inline void CopyWeightHighBitForAligned(uint64_t weightHighBitL1Offset, uint64_t antiQuantRealN,
                                                        const uint64_t antiQuantRealK,
-                                                       const LocalTensor<xType> &weightHighBitL1);
+                                                       const LocalTensor<xType>& weightHighBitL1);
     __aicore__ inline void CopyWeightHighBitForUnaligned(uint64_t weightHighBitL1Offset, uint64_t antiQuantRealN,
                                                          uint64_t antiQuantRealK,
-                                                         const LocalTensor<xType> &weightHighBitL1);
+                                                         const LocalTensor<xType>& weightHighBitL1);
 
     // mte2搬运计数，用于控制weight输入的buffer和 mte2&&V间同步控制
     uint64_t ubMte2LoopIdx_ = 0;
@@ -222,8 +222,8 @@ private:
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::UpdateGlobalAddr(
-    __gm__ wType *weight, __gm__ antiQuantScaleType *antiQuantScale, __gm__ xType *antiQuantOffset,
-    __gm__ float *perTokenScale, __gm__ float *perChannelScale, __gm__ biasType *bias, const bool weightL2Cacheable)
+    __gm__ wType* weight, __gm__ antiQuantScaleType* antiQuantScale, __gm__ xType* antiQuantOffset,
+    __gm__ float* perTokenScale, __gm__ float* perChannelScale, __gm__ biasType* bias, const bool weightL2Cacheable)
 {
     wGlobal_.SetGlobalBuffer(weight);
     antiQuantScaleGlobal_.SetGlobalBuffer(antiQuantScale);
@@ -248,7 +248,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::UpdateGlo
  * 初始化buffer和同步所需的EventID
  */
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::Init(TPipe *tPipe, bool hasBias,
+__aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::Init(TPipe* tPipe, bool hasBias,
                                                                             uint64_t antiquantGroupSize)
 {
     hasBias_ = hasBias;
@@ -303,9 +303,9 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::InitMx()
         transIdBuffer_ = LocalTensor<uint16_t>(TPosition::LCM, currentOffset, transIdBufferSize);
         currentOffset += transIdBufferSize * sizeof(uint16_t);
         GlobalTensor<uint16_t> transIdGm;
-        transIdGm.SetGlobalBuffer((__gm__ uint16_t *)(MX_TRANS_ID));
+        transIdGm.SetGlobalBuffer((__gm__ uint16_t*)(MX_TRANS_ID));
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
-        AscendC::OOMCheckAddrRange((__gm__ uint8_t *)(MX_TRANS_ID), MX_TRANS_ID_CHECK_SIZE);
+        AscendC::OOMCheckAddrRange((__gm__ uint8_t*)(MX_TRANS_ID), MX_TRANS_ID_CHECK_SIZE);
 #endif
         DataCopyParams dmaParams;
         dmaParams.blockCount = 1;
@@ -342,7 +342,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::InitMx()
  */
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::InitKCG(
-    uint32_t antiQuantGroupSize, bool hasBias, const LocalTensor<xType> &ubHighBitTotalBuffer, uint64_t highBitUbOffset)
+    uint32_t antiQuantGroupSize, bool hasBias, const LocalTensor<xType>& ubHighBitTotalBuffer, uint64_t highBitUbOffset)
 {
     antiQuantGroupSize_ = antiQuantGroupSize;
     hasBias_ = hasBias;
@@ -414,7 +414,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::SetVToMTE
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyGmToUb(
     uint64_t ubMte2NSize, uint64_t ubMte2KSize, uint64_t ubMte2NOffset, uint64_t ubMte2KOffset,
-    const BasicBlockOffsetParam &offsetParam)
+    const BasicBlockOffsetParam& offsetParam)
 {
     // ubMte2NSize和ubMte2KSize为实际MTE2搬运到UB的有效数据，
     // 其按照ubMte2InnerSize进行跳写，垃圾数据无需操作，搬出的时搬运有效数据即可。
@@ -460,7 +460,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyGmToU
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyWeightGmToUb(
     uint64_t ubMte2NSize, uint64_t ubMte2KSize, uint64_t ubMte2NOffset, uint64_t ubMte2KOffset,
-    const BasicBlockOffsetParam &offsetParam)
+    const BasicBlockOffsetParam& offsetParam)
 {
     if constexpr (wqmmConfig.weightFormat != CubeFormat::NZ) {
         if constexpr (!wqmmConfig.bTrans) {
@@ -503,7 +503,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyWeigh
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyAntiQuantParamsGmToUb(
     uint64_t ubMte2NSize, uint64_t ubMte2KSize, uint64_t ubMte2NOffset, uint64_t ubMte2KOffset,
-    const BasicBlockOffsetParam &offsetParam)
+    const BasicBlockOffsetParam& offsetParam)
 {
     if constexpr (wqmmConfig.antiQuantType == QuantType::PER_CHANNEL) {
         DataCopyPad2D(ubAntiQuantScaleTotalBuffer_[(ubMte2LoopIdx_ % vecConfig.ubMte2BufferNum) *
@@ -547,7 +547,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyAntiQ
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyMxAntiQuantParamsGmToUb(
     uint64_t ubMte2NSize, uint64_t ubMte2KSize, uint64_t ubMte2NOffset, uint64_t ubMte2KOffset,
-    const BasicBlockOffsetParam &offsetParam)
+    const BasicBlockOffsetParam& offsetParam)
 {
     uint64_t mxGroupNum = CeilDivide(offsetParam.kSize, MX_GROUPSIZE);
     LocalTensor<fp8_e8m0_t> ubAntiQuantScaleBuffer =
@@ -581,12 +581,12 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::MxScalePr
     uint64_t ubMte2BufferIdx = ubMte2LoopIdx_ % vecConfig.ubMte2BufferNum;
     MxFp4NdScaleParams<xType> mxFp4NdScaleParams;
     mxFp4NdScaleParams.antiQuantScaleBasePhyAddr =
-        (__local_mem__ uint8_t *)
+        (__local_mem__ uint8_t*)
             ubAntiQuantScaleTotalBuffer_[ubMte2BufferIdx * UB_BUFFER_INFO.antiQuantScaleUbSingleBufferSize]
                 .GetPhyAddr();
 
     mxFp4NdScaleParams.antiQuantScaleF16PhyAddr0 =
-        (__local_mem__ xType *)
+        (__local_mem__ xType*)
             ubAntiQuantScaleAfterCastTotalBuffer_[ubMte2BufferIdx *
                                                   UB_BUFFER_INFO.antiQuantScaleAfterCastUbSingleBufferSize]
                 .GetPhyAddr();
@@ -676,8 +676,8 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyKcSca
 */
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::WeightAntiQuantCompute(
-    const UbConsumeConfig &ubConsumeConfig, const LocalTensor<xType> &weightHighBitL1,
-    const L1ConsumeConfig &l1ConsumeConfig, const LocalTensor<biasType> *biasL1Ptr)
+    const UbConsumeConfig& ubConsumeConfig, const LocalTensor<xType>& weightHighBitL1,
+    const L1ConsumeConfig& l1ConsumeConfig, const LocalTensor<biasType>* biasL1Ptr)
 {
     uint64_t weightHighBitL1Offset;
     uint64_t nRealLen;
@@ -755,19 +755,19 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::TransWeig
     WaitFlag<HardEvent::MTE3_V>(vecEventIdTransScaleMte3ToV_[ubTransScaleLoopIdx_ & (DOUBLE_BUFFER_NUM - 1)]);
     AscendC::VF_CALL<TransMxScaleNdToDnVf<((MX_SCALE_GROUP_NUM_DEFAULT_LEN + MX_SCALE_BANK_CONFLICT_OFFSET) >> 1),
                                           VEC_MAX_ELEM_B16>>(
-        (__ubuf__ uint16_t *)ubWeightInputLowBitTotalBuffer_.GetPhyAddr(
+        (__ubuf__ uint16_t*)ubWeightInputLowBitTotalBuffer_.GetPhyAddr(
             ((ubMte2LoopIdx_ - 1) & (vecConfig.ubMte2BufferNum - 1)) *
             UB_BUFFER_INFO.weightInputLowBitUbSingleBufferSize),
-        (__ubuf__ uint16_t *)transScaleBuffer_.GetPhyAddr((ubTransScaleLoopIdx_ & (DOUBLE_BUFFER_NUM - 1)) *
-                                                          TRANS_SCALE_SINGLE_BUF_SIZE),
-        (__ubuf__ uint16_t *)transIdBuffer_.GetPhyAddr(), CeilDivide<uint64_t>(nSize, BLOCK_CUBE),
+        (__ubuf__ uint16_t*)transScaleBuffer_.GetPhyAddr((ubTransScaleLoopIdx_ & (DOUBLE_BUFFER_NUM - 1)) *
+                                                         TRANS_SCALE_SINGLE_BUF_SIZE),
+        (__ubuf__ uint16_t*)transIdBuffer_.GetPhyAddr(), CeilDivide<uint64_t>(nSize, BLOCK_CUBE),
         CeilDivide<uint64_t>(CeilDivide<uint64_t>(kSize, 2 * MX_GROUPSIZE), 8),
         (MX_SCALE_GROUP_NUM_DEFAULT_LEN * BLOCK_CUBE) >> 1);
 }
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyWeightMxScaleUbToL1(
-    LocalTensor<uint16_t> &scaleL1, uint64_t l1NOffset, uint64_t nSize)
+    LocalTensor<uint16_t>& scaleL1, uint64_t l1NOffset, uint64_t nSize)
 {
     event_t eventIdVToMTE3 = static_cast<event_t>(GetTPipePtr()->FetchEventID<HardEvent::V_MTE3>());
     SetFlag<HardEvent::V_MTE3>(eventIdVToMTE3);
@@ -790,8 +790,8 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyWeigh
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::WeightAntiQuantComputeNzNk(
-    const UbConsumeConfig &ubConsumeConfig, const LocalTensor<xType> &weightHighBitL1,
-    const L1ConsumeConfig &l1ConsumeConfig, const LocalTensor<biasType> &biasL1)
+    const UbConsumeConfig& ubConsumeConfig, const LocalTensor<xType>& weightHighBitL1,
+    const L1ConsumeConfig& l1ConsumeConfig, const LocalTensor<biasType>& biasL1)
 {
     TEventID vecEventIdMte3ToV[QUADRUPLE_BUFFER_NUM];
 
@@ -835,7 +835,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::WeightAnt
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline uint64_t GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::ComputeWeightHighBitL1Offset(
     uint64_t antiQuantNOffset, uint64_t antiQuantKOffset, uint64_t nRealLen, uint64_t kRealLen,
-    const L1ConsumeConfig &l1ConsumeConfig)
+    const L1ConsumeConfig& l1ConsumeConfig)
 {
     if constexpr (wqmmConfig.weightFormat != CubeFormat::NZ) {
         uint64_t l1RealExternalLenAlign =
@@ -863,7 +863,7 @@ __aicore__ inline uint64_t GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::Compu
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::WeightAntiQuantProcess(
     uint64_t nRealLen, uint64_t kRealLen, uint64_t antiQuantNOffset, uint64_t antiQuantKOffset,
-    const UbConsumeConfig &ubConsumeConfig)
+    const UbConsumeConfig& ubConsumeConfig)
 {
     if constexpr (wqmmConfig.weightFormat != CubeFormat::NZ && !wqmmConfig.bTrans) {
         AntiQuantProcess(kRealLen, nRealLen, ubConsumeConfig.nWeightLowBitUbOffset + antiQuantNOffset,
@@ -878,7 +878,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::WeightAnt
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuantProcess(
     uint64_t vfExternalRealLen, uint64_t vfInnerRealLen, uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset,
-    const UbConsumeConfig &ubConsumeConfig)
+    const UbConsumeConfig& ubConsumeConfig)
 {
     if constexpr (wqmmConfig.antiQuantType == QuantType::MX) {
         if constexpr (wqmmConfig.weightFormat != CubeFormat::NZ) {
@@ -924,12 +924,12 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuant
 
     MxFp4NdWeightParams<xType, wType> mxFp4NdWeightParams;
     mxFp4NdWeightParams.antiQuantScaleF16PhyAddr0 =
-        (__local_mem__ xType *)ubAntiQuantScaleAfterCastTotalBuffer_.GetPhyAddr(antiQuantScaleAfterCastBufOffset) +
+        (__local_mem__ xType*)ubAntiQuantScaleAfterCastTotalBuffer_.GetPhyAddr(antiQuantScaleAfterCastBufOffset) +
         antiQuantScaleAfterCastOffset;
     mxFp4NdWeightParams.weightLowBitPhyAddr0 =
-        (__local_mem__ wType *)ubWeightInputLowBitTotalBuffer_.GetPhyAddr(weightLowBitBufOffset) + weightLowBitOffset;
+        (__local_mem__ wType*)ubWeightInputLowBitTotalBuffer_.GetPhyAddr(weightLowBitBufOffset) + weightLowBitOffset;
     mxFp4NdWeightParams.weightLowBitPhyAddr1 = mxFp4NdWeightParams.weightLowBitPhyAddr0 + (VECTOR_REG_WIDTH >> 2);
-    mxFp4NdWeightParams.weightF16PhyAddr0 = (__local_mem__ xType *)ubHighBitTotalBuffer_.GetPhyAddr(
+    mxFp4NdWeightParams.weightF16PhyAddr0 = (__local_mem__ xType*)ubHighBitTotalBuffer_.GetPhyAddr(
         weightF16BufIdx * UB_BUFFER_INFO.highBitDataUbSingleBufferSize);
     mxFp4NdWeightParams.weightF16PhyAddr1 =
         mxFp4NdWeightParams.weightF16PhyAddr0 + WEIGHT_F16_UB_NZ_STRIDE * (VECTOR_REG_WIDTH >> 1);
@@ -958,15 +958,15 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuant
         uint64_t antiQuantScaleAfterCastBufOffset =
             ubMte2BufferIdx * UB_BUFFER_INFO.antiQuantScaleAfterCastUbSingleBufferSize + nWeightLowBitUbOffset;
         fp4NzParams.antiQuantScaleBasePhyAddr =
-            (__local_mem__ xType *)ubAntiQuantScaleAfterCastTotalBuffer_[antiQuantScaleAfterCastBufOffset].GetPhyAddr();
+            (__local_mem__ xType*)ubAntiQuantScaleAfterCastTotalBuffer_[antiQuantScaleAfterCastBufOffset].GetPhyAddr();
         fp4NzParams.weightLowBitPhyAddr =
-            (__local_mem__ wType *)
+            (__local_mem__ wType*)
                 ubWeightInputLowBitTotalBuffer_[ubMte2BufferIdx * UB_BUFFER_INFO.weightInputLowBitUbSingleBufferSize]
                     .GetPhyAddr() +
             ((nWeightLowBitUbOffset * vecConfig.ubMte2InnerSize + kWeightLowBitUbOffset * C0_SIZE) >> 1);
 
         fp4NzParams.weightHighBitPhyAddr =
-            (__local_mem__ xType *)
+            (__local_mem__ xType*)
                 ubHighBitTotalBuffer_[(ubComputeLoopIdx_ & (UB_BUFFER_INFO.ubWeightOutputHighBitBufferNum - 1)) *
                                       VEC_MAX_ELEM_B16]
                     .GetPhyAddr();
@@ -989,19 +989,19 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuant
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuantProcessNzMxA8W4(
-    const UbConsumeConfig &ubConsumeConfig)
+    const UbConsumeConfig& ubConsumeConfig)
 {
     MxA8W4NzParams<xType, wType, biasType> mxA8W4NzParams;
     uint64_t ubMte2BufferIdx = (ubMte2LoopIdx_ - 1) & (vecConfig.ubMte2BufferNum - 1);
     mxA8W4NzParams.nRealSizeAlign =
         CeilAlign(ubConsumeConfig.l1RequireVfComputeRealN, static_cast<uint64_t>(BLOCK_CUBE));
     mxA8W4NzParams.weightLowBitPhyAddr =
-        (__ubuf__ wType *)
+        (__ubuf__ wType*)
             ubWeightInputLowBitTotalBuffer_[ubMte2BufferIdx * UB_BUFFER_INFO.weightInputLowBitUbSingleBufferSize]
                 .GetPhyAddr();
 
     mxA8W4NzParams.weightHighBitPhyAddr =
-        (__ubuf__ xType *)
+        (__ubuf__ xType*)
             ubHighBitTotalBuffer_[(ubComputeLoopIdx_ & (UB_BUFFER_INFO.ubWeightOutputHighBitBufferNum - 1)) *
                                   VECTOR_REG_WIDTH]
                 .GetPhyAddr();
@@ -1013,10 +1013,10 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuant
     mxA8W4NzParams.loopKDstStride = mxA8W4NzParams.innerLoopNum * mxA8W4NzParams.innerDstStride;
     if (ubConsumeConfig.calcMxBias) {
         mxA8W4NzParams.biasInUbAddr =
-            (__ubuf__ biasType *)ubBiasTotalBuffer_[ubMte2BufferIdx * UB_BUFFER_INFO.biasUbSingleBufferSize]
+            (__ubuf__ biasType*)ubBiasTotalBuffer_[ubMte2BufferIdx * UB_BUFFER_INFO.biasUbSingleBufferSize]
                 .GetPhyAddr();
         mxA8W4NzParams.biasOutUbAddr =
-            (__ubuf__ biasType *)
+            (__ubuf__ biasType*)
                 ubBiasOutTotalBuffer_[(ubComputeLoopIdx_ & (UB_BUFFER_INFO.ubWeightOutputHighBitBufferNum - 1)) *
                                       UB_BUFFER_INFO.biasReducedSingleBufferSize]
                     .GetPhyAddr();
@@ -1068,7 +1068,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuant
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuantProcessNdInt4(
-    const LocalAddressParam<xType, wType> &addressParam, uint64_t vfExternalRealLen, uint64_t vfInnerRealLen)
+    const LocalAddressParam<xType, wType>& addressParam, uint64_t vfExternalRealLen, uint64_t vfInnerRealLen)
 {
     if constexpr (wqmmConfig.antiQuantType == QuantType::PER_GROUP) {
         if constexpr (wqmmConfig.bTrans) {
@@ -1162,40 +1162,40 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuant
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CalInt4NzKnLocalAddrForVf(
     uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset,
-    Int4NzParams<xType, wType, antiQuantScaleType> &int4NzParams)
+    Int4NzParams<xType, wType, antiQuantScaleType>& int4NzParams)
 {
     uint64_t ubMte2BufferIdx;
     if constexpr (IsSameType<xType, int8_t>::value) {
         ubMte2BufferIdx = (ubMte2LoopIdx_ - 1) % vecConfig.ubMte2BufferNum;
         int4NzParams.antiQuantScaleBasePhyAddr =
-            (__local_mem__ antiQuantScaleType *)
+            (__local_mem__ antiQuantScaleType*)
                 ubAntiQuantScaleTotalBuffer_[ubMte2BufferIdx * UB_BUFFER_INFO.antiQuantScaleUbSingleBufferSize +
                                              kWeightLowBitUbOffset / antiQuantGroupSize_ * VEC_MAX_ELEM_B16 +
                                              nWeightLowBitUbOffset]
                     .GetPhyAddr();
-        int4NzParams.antiQuantScaleMaskPhyAddr = (__local_mem__ uint8_t *)ubAntiQuantScaleMaskBuffer_.GetPhyAddr();
+        int4NzParams.antiQuantScaleMaskPhyAddr = (__local_mem__ uint8_t*)ubAntiQuantScaleMaskBuffer_.GetPhyAddr();
     } else {
         ubMte2BufferIdx = (ubMte2LoopIdx_ - 1) & (vecConfig.ubMte2BufferNum - 1);
         int4NzParams.antiQuantScaleBasePhyAddr =
-            (__local_mem__ antiQuantScaleType *)
+            (__local_mem__ antiQuantScaleType*)
                 ubAntiQuantScaleTotalBuffer_[ubMte2BufferIdx * UB_BUFFER_INFO.antiQuantScaleUbSingleBufferSize +
                                              nWeightLowBitUbOffset]
                     .GetPhyAddr();
         int4NzParams.antiQuantOffsetBasePhyAddr =
-            (__local_mem__ xType *)
+            (__local_mem__ xType*)
                 ubAntiQuantOffsetTotalBuffer_[ubMte2BufferIdx * UB_BUFFER_INFO.antiQuantScaleUbSingleBufferSize +
                                               nWeightLowBitUbOffset]
                     .GetPhyAddr();
     }
 
     int4NzParams.weightLowBitPhyAddr =
-        (__local_mem__ wType *)
+        (__local_mem__ wType*)
             ubWeightInputLowBitTotalBuffer_[ubMte2BufferIdx * UB_BUFFER_INFO.weightInputLowBitUbSingleBufferSize]
                 .GetPhyAddr() +
         ((nWeightLowBitUbOffset * vecConfig.ubMte2InnerSize + kWeightLowBitUbOffset * C0_SIZE) >> 1);
 
     int4NzParams.weightHighBitPhyAddr =
-        (__local_mem__ xType *)
+        (__local_mem__ xType*)
             ubHighBitTotalBuffer_[(ubComputeLoopIdx_ & (UB_BUFFER_INFO.ubWeightOutputHighBitBufferNum - 1)) *
                                   VEC_MAX_ELEM_B16]
                 .GetPhyAddr();
@@ -1203,7 +1203,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CalInt4Nz
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CalLocalAddrForVf(
-    uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset, LocalAddressParam<xType, wType> &localAddressParam)
+    uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset, LocalAddressParam<xType, wType>& localAddressParam)
 {
     uint64_t mte2BufIdx = (ubMte2LoopIdx_ - 1) & (vecConfig.ubMte2BufferNum - 1);
     uint64_t antiquantParamOffset;
@@ -1215,10 +1215,10 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CalLocalA
         antiquantParamOffset = mte2BufIdx * UB_BUFFER_INFO.antiQuantScaleUbSingleBufferSize + nWeightLowBitUbOffset;
     }
     localAddressParam.antiQuantScaleBasePhyAddr =
-        (__local_mem__ xType *)ubAntiQuantScaleTotalBuffer_.GetPhyAddr(antiquantParamOffset);
+        (__local_mem__ xType*)ubAntiQuantScaleTotalBuffer_.GetPhyAddr(antiquantParamOffset);
     localAddressParam.antiQuantScaleBasePhyAddr1 = localAddressParam.antiQuantScaleBasePhyAddr + VEC_MAX_ELEM_B16;
     localAddressParam.antiQuantOffsetBasePhyAddr =
-        (__local_mem__ xType *)ubAntiQuantOffsetTotalBuffer_.GetPhyAddr(antiquantParamOffset);
+        (__local_mem__ xType*)ubAntiQuantOffsetTotalBuffer_.GetPhyAddr(antiquantParamOffset);
     localAddressParam.antiQuantOffsetBasePhyAddr1 = localAddressParam.antiQuantOffsetBasePhyAddr + VEC_MAX_ELEM_B16;
 
     uint64_t weightLowBitOffset;
@@ -1234,7 +1234,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CalLocalA
 
     uint64_t weightLowBitBufOffset = mte2BufIdx * UB_BUFFER_INFO.weightInputLowBitUbSingleBufferSize;
     localAddressParam.weightLowBitPhyAddr0 =
-        (__local_mem__ wType *)ubWeightInputLowBitTotalBuffer_.GetPhyAddr(weightLowBitBufOffset) + weightLowBitOffset;
+        (__local_mem__ wType*)ubWeightInputLowBitTotalBuffer_.GetPhyAddr(weightLowBitBufOffset) + weightLowBitOffset;
     if constexpr (IsSameType<wType, int4b_t>::value) {
         // int4每次处理128个数即为64B, 256>>2=64
         localAddressParam.weightLowBitPhyAddr1 = localAddressParam.weightLowBitPhyAddr0 + (VECTOR_REG_WIDTH >> 2);
@@ -1243,7 +1243,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CalLocalA
     }
 
     uint64_t weightF16BufIdx = ubComputeLoopIdx_ & 1;
-    localAddressParam.weightF16PhyAddr0 = (__local_mem__ xType *)ubHighBitTotalBuffer_.GetPhyAddr(
+    localAddressParam.weightF16PhyAddr0 = (__local_mem__ xType*)ubHighBitTotalBuffer_.GetPhyAddr(
         weightF16BufIdx * UB_BUFFER_INFO.highBitDataUbSingleBufferSize);
     localAddressParam.weightF16PhyAddr1 =
         localAddressParam.weightF16PhyAddr0 + WEIGHT_F16_UB_NZ_STRIDE * (VECTOR_REG_WIDTH >> 1);
@@ -1252,7 +1252,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CalLocalA
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::WeightHighBitUbToL1(
     uint64_t weightHighBitL1Offset, uint64_t antiQuantRealN, uint64_t antiQuantRealK,
-    const LocalTensor<xType> &weightHighBitL1, uint64_t l1RealExternalLen)
+    const LocalTensor<xType>& weightHighBitL1, uint64_t l1RealExternalLen)
 {
     DataCopyParams params;
     if constexpr (wqmmConfig.weightFormat != CubeFormat::NZ) {
@@ -1289,7 +1289,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::WeightHig
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyWeightHighBitForAligned(
     uint64_t weightHighBitL1Offset, uint64_t antiQuantRealN, uint64_t antiQuantRealK,
-    const LocalTensor<xType> &weightHighBitL1)
+    const LocalTensor<xType>& weightHighBitL1)
 {
     DataCopyParams params;
     if constexpr (!wqmmConfig.bTrans) {
@@ -1314,7 +1314,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyWeigh
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyWeightHighBitForUnaligned(
     uint64_t weightHighBitL1Offset, uint64_t antiQuantRealN, uint64_t antiQuantRealK,
-    const LocalTensor<xType> &weightHighBitL1)
+    const LocalTensor<xType>& weightHighBitL1)
 {
     DataCopyParams params;
     // 跳写UB避免bank冲突，A16跳1024B; MTE3对应跳读
@@ -1368,25 +1368,25 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuant
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CalLocalAddrForYVf(
-    LocalAddressYParam<yType> &localAddressParam)
+    LocalAddressYParam<yType>& localAddressParam)
 {
     uint64_t mte3BufIdx = (ubMte2AntiquantYLoopIdx_ - 1) & (UB_ANTI_QUANT_Y_BUFFER_NUM - 1);
     uint64_t antiquantParamOffset = mte3BufIdx * ANTI_QUANT_Y_PER_CHANNEL_SCALE_SINGLE_BUFFER_SIZE;
-    localAddressParam.yOriginPhyAddr = (__local_mem__ int32_t *)ubHighBitTotalBuffer_.GetPhyAddr();
-    localAddressParam.yPhyAddr = (__local_mem__ yType *)localAddressParam.yOriginPhyAddr;
+    localAddressParam.yOriginPhyAddr = (__local_mem__ int32_t*)ubHighBitTotalBuffer_.GetPhyAddr();
+    localAddressParam.yPhyAddr = (__local_mem__ yType*)localAddressParam.yOriginPhyAddr;
     localAddressParam.cScalePhyAddr =
-        (__local_mem__ float *)ubAntiQuantYPerChannelScaleTotalBuffer_.GetPhyAddr(antiquantParamOffset);
+        (__local_mem__ float*)ubAntiQuantYPerChannelScaleTotalBuffer_.GetPhyAddr(antiquantParamOffset);
     localAddressParam.kScalePhyAddr =
-        (__local_mem__ float *)ubAntiQuantYPerTokenScaleTotalBuffer_.GetPhyAddr(antiquantParamOffset);
+        (__local_mem__ float*)ubAntiQuantYPerTokenScaleTotalBuffer_.GetPhyAddr(antiquantParamOffset);
     if (hasBias_) {
         localAddressParam.biasPhyAddr =
-            (__local_mem__ float *)ubAntiQuantYBiasTotalBuffer_.GetPhyAddr(antiquantParamOffset);
+            (__local_mem__ float*)ubAntiQuantYBiasTotalBuffer_.GetPhyAddr(antiquantParamOffset);
     }
 }
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyYUbToGm(
-    uint64_t nRealL0Size, uint64_t mRealL0Size, __gm__ half *yGm, const BasicBlockOffsetParam &offsetParam,
+    uint64_t nRealL0Size, uint64_t mRealL0Size, __gm__ half* yGm, const BasicBlockOffsetParam& offsetParam,
     uint64_t aivMOffset)
 {
     if (unlikely(mRealL0Size == 0)) {

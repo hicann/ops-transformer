@@ -31,35 +31,35 @@ class GMMA16W4MsdCubeService {
 public:
     __aicore__ inline GMMA16W4MsdCubeService(){};
 
-    __aicore__ inline void UpdateGlobalAddr(__gm__ int8_t *aUnfoldS8WsAddr);
-    __aicore__ inline void ComputeA8W8MatDuce(uint64_t cvLoopIdx, const A16W4MsdConstParam &constParams,
-                                              const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
-    __aicore__ inline void InitMsd(__gm__ int8_t *weightS8WsAddr, __gm__ int8_t *aUnfoldS8WsAddr,
-                                   __gm__ mm1OutputType *cF32WsAddr, TPipe *tPipe);
+    __aicore__ inline void UpdateGlobalAddr(__gm__ int8_t* aUnfoldS8WsAddr);
+    __aicore__ inline void ComputeA8W8MatDuce(uint64_t cvLoopIdx, const A16W4MsdConstParam& constParams,
+                                              const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
+    __aicore__ inline void InitMsd(__gm__ int8_t* weightS8WsAddr, __gm__ int8_t* aUnfoldS8WsAddr,
+                                   __gm__ mm1OutputType* cF32WsAddr, TPipe* tPipe);
     __aicore__ inline void EndMsd();
 
 private:
-    __aicore__ inline void InitTensors(__gm__ int8_t *weightS8WsAddr, __gm__ int8_t *aUnfoldS8WsAddr,
-                                       __gm__ mm1OutputType *cF32WsAddr, TPipe *tPipe);
+    __aicore__ inline void InitTensors(__gm__ int8_t* weightS8WsAddr, __gm__ int8_t* aUnfoldS8WsAddr,
+                                       __gm__ mm1OutputType* cF32WsAddr, TPipe* tPipe);
     __aicore__ inline void InitMatDuceL0();
-    __aicore__ inline void InitDato(TPipe *tPipe);
+    __aicore__ inline void InitDato(TPipe* tPipe);
     __aicore__ inline void DataCopyGmToL1(uint64_t kGmOffset, uint64_t kL1RealSize, uint64_t cvLoopIdx,
-                                          const A16W4MsdConstParam &constParams,
-                                          const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
-    __aicore__ inline void LoadWeightS8ToL0b(uint64_t kL1Offset, const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
-    __aicore__ inline void MmadC2S32(uint64_t kL0RealSize, const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
-    __aicore__ inline void FixpC2S32ToL1(uint64_t kLoopId, const DataCopyCO12DstParams &params);
+                                          const A16W4MsdConstParam& constParams,
+                                          const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
+    __aicore__ inline void LoadWeightS8ToL0b(uint64_t kL1Offset, const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
+    __aicore__ inline void MmadC2S32(uint64_t kL0RealSize, const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
+    __aicore__ inline void FixpC2S32ToL1(uint64_t kLoopId, const DataCopyCO12DstParams& params);
     __aicore__ inline void LoadAS8ToL0a(uint64_t kL1BaseOffset, uint64_t kL1Offset,
-                                        const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
-    __aicore__ inline void MmadC1F32(uint64_t kL0RealSize, const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
+                                        const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
+    __aicore__ inline void MmadC1F32(uint64_t kL0RealSize, const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
     __aicore__ inline void LoadCF16ToL0b(uint64_t kLoopIdx, uint64_t cF16BufId,
-                                         const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
-    __aicore__ inline void MmadCF16ConstMatrix(const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
-    __aicore__ inline void FixpCF32ToGm(uint64_t cvLoopIdx, uint64_t kOffset, const DataCopyCO12DstParams &intriParams);
-    __aicore__ inline void ComputeC2S32ToL1(uint64_t kL1Offset, const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
+                                         const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
+    __aicore__ inline void MmadCF16ConstMatrix(const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
+    __aicore__ inline void FixpCF32ToGm(uint64_t cvLoopIdx, uint64_t kOffset, const DataCopyCO12DstParams& intriParams);
+    __aicore__ inline void ComputeC2S32ToL1(uint64_t kL1Offset, const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
     __aicore__ inline void ComputeCFp32ToGm(uint64_t kL1Offset, uint64_t loopCF16L1Idx, uint64_t cvLoopIdx,
-                                            const A16W4MsdConstParam &constParams,
-                                            const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
+                                            const A16W4MsdConstParam& constParams,
+                                            const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
     GlobalTensor<mm1InputType> weightS8Gm_;
     GlobalTensor<mm1InputType> aUnfoldGm_;
     GlobalTensor<mm1OutputType> cF32Gm_;
@@ -115,9 +115,9 @@ private:
 };
 
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::InitMsd(__gm__ int8_t *weightS8WsAddr,
-                                                                    __gm__ int8_t *aUnfoldS8WsAddr,
-                                                                    __gm__ mm1OutputType *cF32WsAddr, TPipe *tPipe)
+__aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::InitMsd(__gm__ int8_t* weightS8WsAddr,
+                                                                    __gm__ int8_t* aUnfoldS8WsAddr,
+                                                                    __gm__ mm1OutputType* cF32WsAddr, TPipe* tPipe)
 {
     InitTensors(weightS8WsAddr, aUnfoldS8WsAddr, cF32WsAddr, tPipe);
     InitDato(tPipe);
@@ -136,9 +136,9 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::InitMsd(__gm__ int8_
 }
 
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::InitTensors(__gm__ int8_t *weightS8WsAddr,
-                                                                        __gm__ int8_t *aUnfoldS8WsAddr,
-                                                                        __gm__ mm1OutputType *cF32WsAddr, TPipe *tPipe)
+__aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::InitTensors(__gm__ int8_t* weightS8WsAddr,
+                                                                        __gm__ int8_t* aUnfoldS8WsAddr,
+                                                                        __gm__ mm1OutputType* cF32WsAddr, TPipe* tPipe)
 {
     weightS8Gm_.SetGlobalBuffer(weightS8WsAddr);
     cF32Gm_.SetGlobalBuffer(cF32WsAddr);
@@ -167,7 +167,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::InitTensors(__gm__ i
 }
 
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::InitDato(TPipe *tPipe)
+__aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::InitDato(TPipe* tPipe)
 {
     // 初始化bias
     InitConstValueParams<int32_t> initDatoBiasParams;
@@ -216,10 +216,10 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::InitMatDuceL0()
     WaitFlag<HardEvent::MTE1_MTE2>(MTE1_MTE2_EVENT);
 
     GlobalTensor<half> c1c2Diag;
-    c1c2Diag.SetGlobalBuffer((__gm__ half *)(C1C2_EYE_DIAG));
+    c1c2Diag.SetGlobalBuffer((__gm__ half*)(C1C2_EYE_DIAG));
 // diag在gm上，需要告知oom框架diag的地址
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
-    AscendC::OOMCheckAddrRange((__gm__ uint8_t *)(C1C2_EYE_DIAG), 512);
+    AscendC::OOMCheckAddrRange((__gm__ uint8_t*)(C1C2_EYE_DIAG), 512);
 #endif
 
     DataCopyParams dmaParams;
@@ -241,14 +241,14 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::InitMatDuceL0()
 }
 
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::UpdateGlobalAddr(__gm__ int8_t *aUnfoldS8WsAddr)
+__aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::UpdateGlobalAddr(__gm__ int8_t* aUnfoldS8WsAddr)
 {
     aUnfoldGm_.SetGlobalBuffer(aUnfoldS8WsAddr);
 }
 
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::ComputeA8W8MatDuce(
-    uint64_t cvLoopIdx, const A16W4MsdConstParam &constParams, const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t cvLoopIdx, const A16W4MsdConstParam& constParams, const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     WaitFlag<HardEvent::MTE1_MTE2>(MTE1_MTE2_EVENT + loopIdx_ % S8_L1_BUF_NUM);
     DataCopyGmToL1(0, curOffsetParam.kUbSize > K_L1_BASE_SIZE ? K_L1_BASE_SIZE : curOffsetParam.kUbSize, cvLoopIdx,
@@ -280,7 +280,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::ComputeA8W8MatDuce(
 
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::ComputeC2S32ToL1(
-    uint64_t kL1BaseOffset, const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t kL1BaseOffset, const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     DataCopyCO12DstParams params;
     params.mSize = curOffsetParam.mL1Size;
@@ -312,8 +312,8 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::ComputeC2S32ToL1(
 
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::ComputeCFp32ToGm(
-    uint64_t kL1BaseOffset, uint64_t loopCF16L1Idx, uint64_t cvLoopIdx, const A16W4MsdConstParam &constParams,
-    const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t kL1BaseOffset, uint64_t loopCF16L1Idx, uint64_t cvLoopIdx, const A16W4MsdConstParam& constParams,
+    const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     DataCopyCO12DstParams intriParams;
     intriParams.mSize = curOffsetParam.mL1Size;
@@ -354,8 +354,8 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::ComputeCFp32ToGm(
 
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::DataCopyGmToL1(
-    uint64_t kGmOffset, uint64_t kL1RealSize, uint64_t cvLoopIdx, const A16W4MsdConstParam &constParams,
-    const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t kGmOffset, uint64_t kL1RealSize, uint64_t cvLoopIdx, const A16W4MsdConstParam& constParams,
+    const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     uint64_t loopIdx = loopIdx_ + (kGmOffset >= KL1_BASE_SIZE);
     // B矩阵 GmToL1
@@ -387,7 +387,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::DataCopyGmToL1(
 // 256 * 32
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::LoadWeightS8ToL0b(
-    uint64_t kL1Offset, const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t kL1Offset, const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     uint64_t realL1LoopId = kL1Offset >= KL1_BASE_SIZE ? loopIdx_ + 1 : loopIdx_;
     LoadData2DParams l1ToL0bParams;
@@ -404,7 +404,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::LoadWeightS8ToL0b(
 
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::MmadC2S32(
-    uint64_t kL0RealSize, const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t kL0RealSize, const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     SetFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
     WaitFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
@@ -421,7 +421,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::MmadC2S32(
 
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::FixpC2S32ToL1(uint64_t kLoopId,
-                                                                          const DataCopyCO12DstParams &params)
+                                                                          const DataCopyCO12DstParams& params)
 {
     SetFlag<HardEvent::M_FIX>(M_FIX_EVENT);
     WaitFlag<HardEvent::M_FIX>(M_FIX_EVENT);
@@ -433,7 +433,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::FixpC2S32ToL1(uint64
 // 32 * 32
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::LoadAS8ToL0a(
-    uint64_t kL1BaseOffset, uint64_t kL1Offset, const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t kL1BaseOffset, uint64_t kL1Offset, const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     uint64_t realL1LoopId = kL1Offset >= KL1_BASE_SIZE ? loopIdx_ + 1 : loopIdx_;
     LoadData2DParams l1ToL0aParams;
@@ -451,7 +451,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::LoadAS8ToL0a(
 
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::MmadC1F32(
-    uint64_t kL0RealSize, const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t kL0RealSize, const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     SetFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
     WaitFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
@@ -472,7 +472,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::MmadC1F32(
 // 32 * 256
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::LoadCF16ToL0b(
-    uint64_t kLoopIdx, uint64_t cF16BufId, const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t kLoopIdx, uint64_t cF16BufId, const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     AscendC::LoadData3DParamsV2<half> loadData3DParams;
     // SetFmatrixParams
@@ -509,7 +509,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::LoadCF16ToL0b(
 // 32 * 256 @ 64 * 64
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::MmadCF16ConstMatrix(
-    const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     SetFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
     WaitFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
@@ -525,7 +525,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::MmadCF16ConstMatrix(
 
 GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_CUBE_SERVICE_CLASS::FixpCF32ToGm(uint64_t cvLoopIdx, uint64_t kOffset,
-                                                                         const DataCopyCO12DstParams &intriParams)
+                                                                         const DataCopyCO12DstParams& intriParams)
 {
     SetFlag<HardEvent::M_FIX>(M_FIX_EVENT);
     WaitFlag<HardEvent::M_FIX>(M_FIX_EVENT);

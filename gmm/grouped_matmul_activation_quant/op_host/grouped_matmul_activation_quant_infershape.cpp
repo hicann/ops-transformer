@@ -40,15 +40,15 @@ constexpr int64_t DYNAMIC_DIM = -1L;
 
 } // namespace
 
-static ge::graphStatus InferShape4GroupedMatmulActivationQuant(gert::InferShapeContext *context)
+static ge::graphStatus InferShape4GroupedMatmulActivationQuant(gert::InferShapeContext* context)
 {
-    const gert::Shape *xShape = context->GetInputShape(X_INDEX);
+    const gert::Shape* xShape = context->GetInputShape(X_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
-    const gert::Shape *weightScaleShape = context->GetDynamicInputShape(WEIGHT_SCALE_INDEX, 0);
+    const gert::Shape* weightScaleShape = context->GetDynamicInputShape(WEIGHT_SCALE_INDEX, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightScaleShape);
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const bool *transposeWeightPtr = attrs->GetBool(ATTR_INDEX_TRANSPOSE_WEIGHT);
+    const bool* transposeWeightPtr = attrs->GetBool(ATTR_INDEX_TRANSPOSE_WEIGHT);
     bool transposeWeight = transposeWeightPtr != nullptr ? *transposeWeightPtr : false;
 
     OP_CHECK_IF(xShape->GetDimNum() < MIN_X_DIM_NUM,
@@ -87,12 +87,12 @@ static ge::graphStatus InferShape4GroupedMatmulActivationQuant(gert::InferShapeC
     return GRAPH_SUCCESS;
 }
 
-static graphStatus InferDataType4GroupedMatmulActivationQuant(gert::InferDataTypeContext *context)
+static graphStatus InferDataType4GroupedMatmulActivationQuant(gert::InferDataTypeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *yDtype = attrs->GetInt(ATTR_INDEX_Y_DTYPE);
+    const int64_t* yDtype = attrs->GetInt(ATTR_INDEX_Y_DTYPE);
     OP_CHECK_NULL_WITH_CONTEXT(context, yDtype);
     ge::DataType outputDtype = static_cast<ge::DataType>(*yDtype);
     if (outputDtype == ge::DT_UNDEFINED) {

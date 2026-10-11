@@ -21,12 +21,12 @@ using namespace matmul;
 #define BUFFER_NUM 1
 #define DATA_COPY_UNIT 32U
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 class KernelBatchMatmul {
 public:
-    __aicore__ inline KernelBatchMatmul() {};
+    __aicore__ inline KernelBatchMatmul(){};
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR x3, GM_ADDR y, GM_ADDR workspace,
-        const SwinAttentionFFNTilingData* tiling, TPipe* tPipe);
+                                const SwinAttentionFFNTilingData* tiling, TPipe* tPipe);
     __aicore__ inline void Process();
     using x1Type = MatmulType<TPosition::GM, CubeFormat::ND, X1_TYPE>;
     using x2Type = MatmulType<TPosition::GM, CubeFormat::ND, X2_TYPE>;
@@ -53,10 +53,10 @@ protected:
 
     uint32_t tmp_block_idx;
 
-    uint32_t offsetA        = 0;
-    uint32_t offsetBmm      = 0;
-    uint32_t offsetC        = 0;
-    uint32_t offsetD        = 0;
+    uint32_t offsetA = 0;
+    uint32_t offsetBmm = 0;
+    uint32_t offsetC = 0;
+    uint32_t offsetD = 0;
 
     uint32_t dataNumPerBatchA;
     uint32_t dataNumPerBatchD;
@@ -77,7 +77,8 @@ protected:
     uint32_t bmmSpaceID, bmmBlockID, bmmRowID, bmmColID;
     uint32_t cSpaceID, cBlockID, cRowID, cColID;
 
-    DataCopyParams inDCParams, outDCParams, inDCParams2, inDCParams3, inDCParams4, outDCParams2, outDCParams3, outDCParams4;
+    DataCopyParams inDCParams, outDCParams, inDCParams2, inDCParams3, inDCParams4, outDCParams2, outDCParams3,
+        outDCParams4;
 
     __aicore__ inline void BmmCompute1(uint32_t coreIdx);
     __aicore__ inline void BmmCompute2(uint32_t coreIdx);
@@ -92,9 +93,10 @@ protected:
     __aicore__ inline void CopyOut4();
 };
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
-__aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias,
-    GM_ADDR x3, GM_ADDR y, GM_ADDR workspace, const SwinAttentionFFNTilingData* tiling, TPipe* tPipe)
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+__aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::Init(
+    GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR x3, GM_ADDR y, GM_ADDR workspace,
+    const SwinAttentionFFNTilingData* tiling, TPipe* tPipe)
 {
     tmp_block_idx = GetBlockIdx();
     // init global buffer
@@ -125,7 +127,7 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     bmmTiling = tilingData->bmmTilingData;
     shift1 = tilingData->shift1;
     shift2 = tilingData->shift2;
-    
+
     mm.Init(&bmmTiling);
 
     pipe->InitBuffer(inQueueTmp, BUFFER_NUM, dataNumPerLoop * sizeof(X3_TYPE));
@@ -142,8 +144,7 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     outDCParams.srcStride = 0;
     outDCParams.dstStride = (tpSpaceH - 1) * outDCParams.blockLen;
 
-    if (shift1 == 0 && shift2 == 0)
-    {
+    if (shift1 == 0 && shift2 == 0) {
         return;
     }
 
@@ -156,7 +157,7 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     inDCParams3.blockLen = tpBlockSize * sizeof(X3_TYPE) / 2 / DATA_COPY_UNIT;
     inDCParams3.srcStride = (tpSpaceH * 2 - 1) * inDCParams3.blockLen;
     inDCParams3.dstStride = 1 * inDCParams3.blockLen;
-    
+
     inDCParams4.blockCount = 4;
     inDCParams4.blockLen = tpBlockSize * sizeof(X3_TYPE) / 2 / DATA_COPY_UNIT;
     inDCParams4.srcStride = (tpSpaceH * 2 - 1) * inDCParams4.blockLen;
@@ -178,24 +179,20 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     outDCParams4.dstStride = (tpSpaceH * 2 - 1) * outDCParams4.blockLen;
 }
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::Process()
 {
-    if (shift1 == 0 && shift2 == 0)
-    {
+    if (shift1 == 0 && shift2 == 0) {
         BmmCompute1(tmp_block_idx);
-    }
-    else
-    {
+    } else {
         BmmCompute2(tmp_block_idx);
     }
 }
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::BmmCompute1(uint32_t coreIdx)
 {
-    if (coreIdx >= aivNum)
-    {
+    if (coreIdx >= aivNum) {
         return;
     }
     int loopNum;
@@ -205,7 +202,8 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
         loopNum = tilingData->bmmTailBatchNum;
     }
 
-    mm.SetWorkspace((__gm__ uint8_t*)workspaceGm[coreIdx * dataNumPerBatchD].GetPhyAddr(), dataNumPerBatchD * sizeof(Y_TYPE));
+    mm.SetWorkspace((__gm__ uint8_t*)workspaceGm[coreIdx * dataNumPerBatchD].GetPhyAddr(),
+                    dataNumPerBatchD * sizeof(Y_TYPE));
     for (int i = 0; i < loopNum; i++) {
         offsetA = (aivNum * i + coreIdx) * dataNumPerBatchA;
         offsetBmm = (aivNum * i + coreIdx) * dataNumPerBatchD;
@@ -230,11 +228,10 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     }
 }
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::BmmCompute2(uint32_t coreIdx)
 {
-    if (coreIdx >= aivNum)
-    {
+    if (coreIdx >= aivNum) {
         return;
     }
     int loopNum;
@@ -245,7 +242,8 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     }
 
     // 使用 MatMul 异步 Iterate 接口时必须使用
-    mm.SetWorkspace((__gm__ uint8_t*)workspaceGm[coreIdx * dataNumPerBatchD].GetPhyAddr(), dataNumPerBatchD * sizeof(Y_TYPE));
+    mm.SetWorkspace((__gm__ uint8_t*)workspaceGm[coreIdx * dataNumPerBatchD].GetPhyAddr(),
+                    dataNumPerBatchD * sizeof(Y_TYPE));
 
     for (int i = 0; i < loopNum; i++) {
         offsetA = (aivNum * i + coreIdx) * dataNumPerBatchA;
@@ -268,23 +266,17 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
                     CopyIn1();
                     Compute();
                     CopyOut1();
-                }
-                else
-                {
+                } else {
                     CopyIn2();
                     Compute();
                     CopyOut2();
                 }
-            }
-            else
-            {
+            } else {
                 if (likely(cColID != tpSpaceWTransposed - 2)) {
                     CopyIn3();
                     Compute();
                     CopyOut3();
-                }
-                else
-                {
+                } else {
                     CopyIn4();
                     Compute();
                     CopyOut4();
@@ -295,7 +287,7 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     }
 }
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::CopyIn1()
 {
     xLocal = inQueueX.AllocTensor<X3_TYPE>();
@@ -304,7 +296,7 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     inQueueX.EnQue(xLocal);
 }
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::CopyIn2()
 {
     xLocal = inQueueX.AllocTensor<X3_TYPE>();
@@ -315,20 +307,20 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     inQueueX.EnQue(xLocal);
 }
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::CopyIn3()
 {
     xLocal = inQueueX.AllocTensor<X3_TYPE>();
     DataCopy(xLocal, cGlobal[offsetC], inDCParams2);
     DataCopy(xLocal[dataNumPerLoop / 2], cGlobal[offsetC + tpBlockSize], inDCParams2);
 
-    offsetC = cColID * tpBlockSize + tpBlockSize / 2;  // 重新计算 offsetC 的值, cSpaceID 为 0, cRowID 为 0
+    offsetC = cColID * tpBlockSize + tpBlockSize / 2; // 重新计算 offsetC 的值, cSpaceID 为 0, cRowID 为 0
     DataCopy(xLocal[dataNumPerLoop / 4], cGlobal[offsetC], inDCParams2);
     DataCopy(xLocal[dataNumPerLoop * 3 / 4], cGlobal[offsetC + tpBlockSize], inDCParams2);
     inQueueX.EnQue(xLocal);
 }
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::CopyIn4()
 {
     xLocal = inQueueX.AllocTensor<X3_TYPE>();
@@ -346,7 +338,7 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     inQueueX.EnQue(xLocal);
 }
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::Compute()
 {
     xLocal = inQueueX.DeQue<X3_TYPE>();
@@ -361,7 +353,7 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     inQueueTmp.FreeTensor(tmpLocal);
 }
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::CopyOut1()
 {
     zLocal = outQueueZ.DeQue<Y_TYPE>();
@@ -370,7 +362,7 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     outQueueZ.FreeTensor(zLocal);
 }
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::CopyOut2()
 {
     zLocal = outQueueZ.DeQue<Y_TYPE>();
@@ -382,7 +374,7 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     outQueueZ.FreeTensor(zLocal);
 }
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::CopyOut3()
 {
     zLocal = outQueueZ.DeQue<Y_TYPE>();
@@ -395,7 +387,7 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     outQueueZ.FreeTensor(zLocal);
 }
 
-template<class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
+template <class X1_TYPE, class X2_TYPE, class X3_TYPE, class BIAS_TYPE, class Y_TYPE>
 __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y_TYPE>::CopyOut4()
 {
     zLocal = outQueueZ.DeQue<Y_TYPE>();
@@ -413,9 +405,10 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     outQueueZ.FreeTensor(zLocal);
 }
 #ifdef __CCE_KT_TEST__
-    REGISTER_TILING_DEFAULT(SwinAttentionFFNTilingData);
+REGISTER_TILING_DEFAULT(SwinAttentionFFNTilingData);
 #endif
-extern "C" __global__ __aicore__ void swin_attention_ffn(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR x3, GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void swin_attention_ffn(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR x3, GM_ADDR y,
+                                                         GM_ADDR workspace, GM_ADDR tiling)
 {
     TPipe tPipe;
     GET_TILING_DATA(tiling_data, tiling);

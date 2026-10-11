@@ -55,24 +55,24 @@ const auto Tc_FFN_Aclnn_Case = ::testing::Values(
                                 GenTensor("antiquant_offset2", {4, 2560}, ge::DataType::DT_FLOAT16),
                                 GenTensor("y", {4, 2560}, ge::DataType::DT_FLOAT16)},
                                {1, 1, 1, 1}, "gelu", 1, -1, FunctionType::ANTIQUANT, AclnnFFNVersion::V2)),
-    AclnnFFNCase("Test_003", true,                                       /* CaseName,Enable */
-                 "",                                                     /* DebugInfo */
-                 OpInfo(ControlInfo(true, true),                         /* RunTiling,RunKernel */
-                        ExpectInfo(true,                                 /* ExpectSuccess */
-                                   ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
-                                   ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-                 AclnnFFNParam({GenTensor("x", {256, 512}, ge::DataType::DT_INT8),
-                                GenTensor("weight1", {4, 512, 256}, ge::DataType::DT_INT8),
-                                GenTensor("weight2", {4, 256, 512}, ge::DataType::DT_INT8),
-                                GenTensor("expertTokens", {4}, ge::DataType::DT_INT64),
-                                GenTensor("bias1", {4, 256}, ge::DataType::DT_INT32),
-                                GenTensor("bias2", {4, 512}, ge::DataType::DT_INT32),
-                                GenTensor("scale", {4}, ge::DataType::DT_FLOAT),
-                                GenTensor("offset", {4}, ge::DataType::DT_FLOAT),
-                                GenTensor("deqScale1", {4, 256}, ge::DataType::DT_INT64),
-                                GenTensor("deqScale2", {4, 512}, ge::DataType::DT_INT64),
-                                GenTensor("y", {256, 512}, ge::DataType::DT_FLOAT16)},
-                               {64, 64, 64, 64}, "fastgelu", 1, -1, FunctionType::QUANT, AclnnFFNVersion::V3)),
+    AclnnFFNCase(
+        "Test_003", true,                                       /* CaseName,Enable */
+        "",                                                     /* DebugInfo */
+        OpInfo(ControlInfo(true, true),                         /* RunTiling,RunKernel */
+               ExpectInfo(true,                                 /* ExpectSuccess */
+                          ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
+                          ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+        AclnnFFNParam(
+            {GenTensor("x", {256, 512}, ge::DataType::DT_INT8),
+             GenTensor("weight1", {4, 512, 256}, ge::DataType::DT_INT8),
+             GenTensor("weight2", {4, 256, 512}, ge::DataType::DT_INT8),
+             GenTensor("expertTokens", {4}, ge::DataType::DT_INT64),
+             GenTensor("bias1", {4, 256}, ge::DataType::DT_INT32), GenTensor("bias2", {4, 512}, ge::DataType::DT_INT32),
+             GenTensor("scale", {4}, ge::DataType::DT_FLOAT), GenTensor("offset", {4}, ge::DataType::DT_FLOAT),
+             GenTensor("deqScale1", {4, 256}, ge::DataType::DT_INT64),
+             GenTensor("deqScale2", {4, 512}, ge::DataType::DT_INT64),
+             GenTensor("y", {256, 512}, ge::DataType::DT_FLOAT16)},
+            {64, 64, 64, 64}, "fastgelu", 1, -1, FunctionType::QUANT, AclnnFFNVersion::V3)),
     AclnnFFNCase("Test_geglu_004", true,                                 /* CaseName,Enable */
                  "",                                                     /* DebugInfo */
                  OpInfo(ControlInfo(true, true),                         /* RunTiling,RunKernel */
@@ -130,24 +130,24 @@ const auto Tc_FFN_Aclnn_Case = ::testing::Values(
                                 GenTensor("antiquant_offset2", {4, 256}, ge::DataType::DT_BF16),
                                 GenTensor("y", {4, 256}, ge::DataType::DT_BF16)},
                                {1, 1, 1, 1}, "gelu", 1, -1, FunctionType::ANTIQUANT, AclnnFFNVersion::V3)),
-    AclnnFFNCase("Test_008", true,                                       /* CaseName,Enable */
-                 "",                                                     /* DebugInfo */
-                 OpInfo(ControlInfo(true, true),                         /* RunTiling,RunKernel */
-                        ExpectInfo(true,                                 /* ExpectSuccess */
-                                   ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
-                                   ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-                 AclnnFFNParam({GenTensor("x", {16, 32}, ge::DataType::DT_BF16),
-                                GenTensor("weight1", {1, 32, 16}, ge::DataType::DT_INT4),
-                                GenTensor("weight2", {1, 16, 32}, ge::DataType::DT_INT4),
-                                GenTensor("expertTokens", {1}, ge::DataType::DT_INT64),
-                                GenTensor("bias1", {1, 16}, ge::DataType::DT_FLOAT),
-                                GenTensor("bias2", {1, 32}, ge::DataType::DT_FLOAT),
-                                GenTensor("antiquant_scale1", {1, 2, 16}, ge::DataType::DT_BF16),
-                                GenTensor("antiquant_scale2", {1, 2, 32}, ge::DataType::DT_BF16),
-                                GenTensor("antiquant_offset1", {1, 2, 16}, ge::DataType::DT_BF16),
-                                GenTensor("antiquant_offset2", {1, 2, 32}, ge::DataType::DT_BF16),
-                                GenTensor("y", {16, 32}, ge::DataType::DT_BF16)},
-                               {16}, "gelu", 1, -1, FunctionType::ANTIQUANT, AclnnFFNVersion::V3)),
+    AclnnFFNCase(
+        "Test_008", true,                                       /* CaseName,Enable */
+        "",                                                     /* DebugInfo */
+        OpInfo(ControlInfo(true, true),                         /* RunTiling,RunKernel */
+               ExpectInfo(true,                                 /* ExpectSuccess */
+                          ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
+                          ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+        AclnnFFNParam(
+            {GenTensor("x", {16, 32}, ge::DataType::DT_BF16), GenTensor("weight1", {1, 32, 16}, ge::DataType::DT_INT4),
+             GenTensor("weight2", {1, 16, 32}, ge::DataType::DT_INT4),
+             GenTensor("expertTokens", {1}, ge::DataType::DT_INT64),
+             GenTensor("bias1", {1, 16}, ge::DataType::DT_FLOAT), GenTensor("bias2", {1, 32}, ge::DataType::DT_FLOAT),
+             GenTensor("antiquant_scale1", {1, 2, 16}, ge::DataType::DT_BF16),
+             GenTensor("antiquant_scale2", {1, 2, 32}, ge::DataType::DT_BF16),
+             GenTensor("antiquant_offset1", {1, 2, 16}, ge::DataType::DT_BF16),
+             GenTensor("antiquant_offset2", {1, 2, 32}, ge::DataType::DT_BF16),
+             GenTensor("y", {16, 32}, ge::DataType::DT_BF16)},
+            {16}, "gelu", 1, -1, FunctionType::ANTIQUANT, AclnnFFNVersion::V3)),
     AclnnFFNCase(
         "Test_009", true,                                       /* CaseName,Enable */
         "",                                                     /* DebugInfo */

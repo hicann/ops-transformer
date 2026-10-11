@@ -14,12 +14,12 @@
 namespace QGmmInPlaceAdd {
 using namespace op;
 struct QuantGroupedMatmulInplaceAddParams {
-    const aclTensor *x1 = nullptr;
-    const aclTensor *x2 = nullptr;
-    const aclTensor *scale1Optional = nullptr;
-    const aclTensor *scale2 = nullptr;
-    const aclTensor *groupList = nullptr;
-    aclTensor *yRef = nullptr;
+    const aclTensor* x1 = nullptr;
+    const aclTensor* x2 = nullptr;
+    const aclTensor* scale1Optional = nullptr;
+    const aclTensor* scale2 = nullptr;
+    const aclTensor* groupList = nullptr;
+    aclTensor* yRef = nullptr;
     int64_t groupListType = 0;
     int64_t groupSize = 0;
 };

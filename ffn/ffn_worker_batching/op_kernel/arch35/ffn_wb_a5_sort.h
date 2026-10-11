@@ -41,8 +41,8 @@ public:
     // flatIdsWs   : 归一后的扁平 expert_id(int32)
     // pairWs      : 段内排序结果的 proposal 对区(float),按段 slice
     // cntWs       : 每段有效元素数(int32),每段占一个数据块槽位
-    __aicore__ inline void Init(GM_ADDR flatIdsWs, GM_ADDR pairWs, GM_ADDR cntWs, const A5SortSegParam &param,
-                                const ScheduleContextInfo *ctx, TPipe *pipe)
+    __aicore__ inline void Init(GM_ADDR flatIdsWs, GM_ADDR pairWs, GM_ADDR cntWs, const A5SortSegParam& param,
+                                const ScheduleContextInfo* ctx, TPipe* pipe)
     {
         param_ = param;
         ctx_ = ctx;
@@ -51,9 +51,9 @@ public:
         vecId_ = GetFlatAivIdx();
         vecNum_ = GetFlatAivNum();
 
-        flatIdsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(flatIdsWs), param_.totalElements);
-        pairGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(pairWs), param_.segNum * param_.sortLenPerSeg);
-        cntGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(cntWs),
+        flatIdsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(flatIdsWs), param_.totalElements);
+        pairGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(pairWs), param_.segNum * param_.sortLenPerSeg);
+        cntGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(cntWs),
                                param_.segNum * (ONE_BLK_SIZE / static_cast<int64_t>(sizeof(int32_t))));
 
         // UB:输入段(int32 id + int32 原下标) / proposal 对区 / 排序临时区
@@ -77,7 +77,7 @@ public:
 private:
     // 取负 + 判定有效位。取负让降序排序等价于 expert_id 升序;判定阈值同样取负后比较,
     // 于是"有效"= 键 > -expertStart。这一段是纯规则的逐元素向量运算,用 Reg 写。
-    __aicore__ inline void PrepareKeys(const LocalTensor<float> &keys, const LocalTensor<uint32_t> &maskBits,
+    __aicore__ inline void PrepareKeys(const LocalTensor<float>& keys, const LocalTensor<uint32_t>& maskBits,
                                        int64_t count)
     {
         // CompareScalar 的实际读取粒度是 64 个 FP32。GM -> UB 只搬运 count 个有效 id，
@@ -105,7 +105,7 @@ private:
 
         const uint16_t repeatTimes = static_cast<uint16_t>(Ceil(count, FLOAT_REG_ELEMENTS));
         uint32_t remain = static_cast<uint32_t>(count);
-        __ubuf__ float *keyAddr = reinterpret_cast<__ubuf__ float *>(keys.GetPhyAddr());
+        __ubuf__ float* keyAddr = reinterpret_cast<__ubuf__ float*>(keys.GetPhyAddr());
         const float negOne = -1.0f;
 
         __VEC_SCOPE__
@@ -151,7 +151,7 @@ private:
 
     // 段内排序主体:压掉被 mask 的 token,补尾到 Sort32 粒度后 Concat+Sort,结果落 pairGm_。
     // 返回本段的有效元素数。
-    __aicore__ inline int64_t SortOneSegBody(const LocalTensor<int32_t> &inLocal, int64_t seg, int64_t begin,
+    __aicore__ inline int64_t SortOneSegBody(const LocalTensor<int32_t>& inLocal, int64_t seg, int64_t begin,
                                              int64_t len)
     {
         int64_t validCnt = 0;
@@ -231,8 +231,8 @@ private:
     static constexpr int64_t DST_REP_STRIDE = 8;
 
     A5SortSegParam param_;
-    const ScheduleContextInfo *ctx_ = nullptr;
-    TPipe *pipe_ = nullptr;
+    const ScheduleContextInfo* ctx_ = nullptr;
+    TPipe* pipe_ = nullptr;
 
     GlobalTensor<int32_t> flatIdsGm_;
     GlobalTensor<float> pairGm_;
@@ -263,7 +263,7 @@ public:
     __aicore__ inline FfnWbA5MrgSort(){};
 
     // wsA/wsB:两块等大的 proposal 对工作区(乒乓);cntWs:各段有效元素数
-    __aicore__ inline void Init(GM_ADDR wsA, GM_ADDR wsB, GM_ADDR cntWs, const A5MergeParam &param, TPipe *pipe)
+    __aicore__ inline void Init(GM_ADDR wsA, GM_ADDR wsB, GM_ADDR cntWs, const A5MergeParam& param, TPipe* pipe)
     {
         param_ = param;
         pipe_ = pipe;
@@ -271,9 +271,9 @@ public:
         vecNum_ = GetFlatAivNum();
 
         const int64_t wsFloats = param_.segNum * param_.sortLenPerSeg;
-        wsGm_[0].SetGlobalBuffer(reinterpret_cast<__gm__ float *>(wsA), wsFloats);
-        wsGm_[1].SetGlobalBuffer(reinterpret_cast<__gm__ float *>(wsB), wsFloats);
-        cntGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(cntWs),
+        wsGm_[0].SetGlobalBuffer(reinterpret_cast<__gm__ float*>(wsA), wsFloats);
+        wsGm_[1].SetGlobalBuffer(reinterpret_cast<__gm__ float*>(wsB), wsFloats);
+        cntGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(cntWs),
                                param_.segNum * (ONE_BLK_SIZE / static_cast<int64_t>(sizeof(int32_t))));
 
         // UB:MRG_LIST_NUM 路输入 + 1 路输出,均按 proposal 对宽度分配
@@ -395,7 +395,7 @@ private:
     // 流式归并主循环:每轮从各路取一段填满 UB,MrgSort 后整段写出,直到各路耗尽。
     // 从各路各取一块填进 UB 输入区(已耗尽的路跳过),记下每块元素数与其对应的原路号。
     // 返回本轮真正参与归并的路数。
-    __aicore__ inline int64_t FillLists(const LocalTensor<float> &inLocal, int64_t listNum, int64_t loopFloats,
+    __aicore__ inline int64_t FillLists(const LocalTensor<float>& inLocal, int64_t listNum, int64_t loopFloats,
                                         int64_t srcIdx, const int64_t (&offsets)[MRG_LIST_NUM],
                                         const int64_t (&remains)[MRG_LIST_NUM],
                                         LocalTensor<float> (&lists)[MRG_LIST_NUM], uint16_t (&counts)[MRG_LIST_NUM],
@@ -419,8 +419,8 @@ private:
         return liveNum;
     }
 
-    __aicore__ inline void MergeStream(const LocalTensor<float> &inLocal, const LocalTensor<float> &outLocal,
-                                       int64_t listNum, int64_t loopFloats, int64_t &outOffset, int64_t &allRemain,
+    __aicore__ inline void MergeStream(const LocalTensor<float>& inLocal, const LocalTensor<float>& outLocal,
+                                       int64_t listNum, int64_t loopFloats, int64_t& outOffset, int64_t& allRemain,
                                        int64_t (&offsets)[MRG_LIST_NUM], int64_t (&remains)[MRG_LIST_NUM],
                                        int64_t srcIdx)
     {
@@ -477,7 +477,7 @@ private:
 
 private:
     A5MergeParam param_;
-    TPipe *pipe_ = nullptr;
+    TPipe* pipe_ = nullptr;
 
     GlobalTensor<float> wsGm_[NUM_TWO];
     GlobalTensor<int32_t> cntGm_;
@@ -506,16 +506,16 @@ public:
     // pairWs   : 最终一路 proposal 对
     // idsWs    : 输出,有序 expert_id(int32)
     // idxWs    : 输出,gather_idx(int32,指向原始扁平序列的下标)
-    __aicore__ inline void Init(GM_ADDR pairWs, GM_ADDR idsWs, GM_ADDR idxWs, const A5ExtractParam &param, TPipe *pipe)
+    __aicore__ inline void Init(GM_ADDR pairWs, GM_ADDR idsWs, GM_ADDR idxWs, const A5ExtractParam& param, TPipe* pipe)
     {
         param_ = param;
         pipe_ = pipe;
         vecId_ = GetFlatAivIdx();
         vecNum_ = GetFlatAivNum();
 
-        pairGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(pairWs), GetSortLen<float>(param_.totalValid));
-        idsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(idsWs), param_.totalValid);
-        idxGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(idxWs), param_.totalValid);
+        pairGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(pairWs), GetSortLen<float>(param_.totalValid));
+        idsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(idsWs), param_.totalValid);
+        idxGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(idxWs), param_.totalValid);
 
         // Extract 按 ONE_REPEAT_SORT_NUM 成批写出:落盘量是**对齐后的长度**,不是有效长度。
         // 按有效长度分配会溢出到相邻缓冲(实测把索引缓冲的开头冲成 0),故三块都按对齐长度给。
@@ -599,7 +599,7 @@ private:
     static constexpr int64_t DST_REP_STRIDE = 8;
 
     A5ExtractParam param_;
-    TPipe *pipe_ = nullptr;
+    TPipe* pipe_ = nullptr;
 
     GlobalTensor<float> pairGm_;
     GlobalTensor<int32_t> idsGm_;

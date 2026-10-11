@@ -25,7 +25,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -34,7 +34,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -47,8 +47,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -85,29 +85,29 @@ int main()
     std::vector<int64_t> weightShape = {32 * 3, 32};
     std::vector<int64_t> biasShape = {3 * 32};
     std::vector<int64_t> outShape = {1, 1, 49, 32};
-    void *xDeviceAddr = nullptr;
-    void *gammaDeviceAddr = nullptr;
-    void *betaDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *biasDeviceAddr = nullptr;
-    void *scaleDeviceAddr = nullptr;
-    void *offsetDeviceAddr = nullptr;
-    void *dequantDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* gammaDeviceAddr = nullptr;
+    void* betaDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* biasDeviceAddr = nullptr;
+    void* scaleDeviceAddr = nullptr;
+    void* offsetDeviceAddr = nullptr;
+    void* dequantDeviceAddr = nullptr;
 
-    void *outqDeviceAddr = nullptr;
-    void *outkDeviceAddr = nullptr;
-    void *outvDeviceAddr = nullptr;
-    aclTensor *x = nullptr;
-    aclTensor *gamma = nullptr;
-    aclTensor *beta = nullptr;
-    aclTensor *weight = nullptr;
-    aclTensor *bias = nullptr;
-    aclTensor *quantScale = nullptr;
-    aclTensor *quantOffset = nullptr;
-    aclTensor *dequantScale = nullptr;
-    aclTensor *queryOutput = nullptr;
-    aclTensor *keyOutput = nullptr;
-    aclTensor *valueOutput = nullptr;
+    void* outqDeviceAddr = nullptr;
+    void* outkDeviceAddr = nullptr;
+    void* outvDeviceAddr = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* gamma = nullptr;
+    aclTensor* beta = nullptr;
+    aclTensor* weight = nullptr;
+    aclTensor* bias = nullptr;
+    aclTensor* quantScale = nullptr;
+    aclTensor* quantOffset = nullptr;
+    aclTensor* dequantScale = nullptr;
+    aclTensor* queryOutput = nullptr;
+    aclTensor* keyOutput = nullptr;
+    aclTensor* valueOutput = nullptr;
 
     std::vector<uint16_t> selfHostData(49 * 32, 0x1);
     std::vector<int32_t> biasHostData(3 * 32, 0x1);
@@ -156,7 +156,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     float epsilon = 0.0001;
     int64_t oriHeight = 7;
     int64_t oriWeight = 7;
@@ -173,7 +173,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSwinTransformerLnQkvQuantGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

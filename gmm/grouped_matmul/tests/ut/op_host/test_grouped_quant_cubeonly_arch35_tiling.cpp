@@ -62,7 +62,7 @@ private:
 } // namespace
 
 // Host UT executable stub; production resolves this API from acl_rt.
-extern "C" aclError aclsysGetVersionNum(char *name, int32_t *version)
+extern "C" aclError aclsysGetVersionNum(char* name, int32_t* version)
 {
     if (name == nullptr || version == nullptr || std::strcmp(name, "asc-devkit") != 0) {
         return static_cast<aclError>(1);
@@ -84,7 +84,7 @@ using ops::ut::ParseBool;
 using ops::ut::SplitStr2Vec;
 using ops::ut::Trim;
 
-DataType ParseDtype(const string &dtype)
+DataType ParseDtype(const string& dtype)
 {
     const auto parsed = ops::ut::ParseGeDtype(dtype);
     if (parsed == ge::DT_UNDEFINED) {
@@ -98,10 +98,10 @@ gert::StorageShape MakeEmptyShape()
     return gert::StorageShape();
 }
 
-string TilingData2Str(const void *tilingData, size_t tilingSize)
+string TilingData2Str(const void* tilingData, size_t tilingSize)
 {
     ostringstream oss;
-    const auto *data = reinterpret_cast<const int32_t *>(tilingData);
+    const auto* data = reinterpret_cast<const int32_t*>(tilingData);
     const size_t len = tilingSize / sizeof(int32_t);
     for (size_t i = 0; i < len; ++i) {
         if (i != 0) {
@@ -128,7 +128,7 @@ vector<gert::TilingContextPara::OpAttr> GetGroupedQmmAttrs(bool transposeX, bool
 
 class GroupedQuantCubeonlyArch35TilingTestParam {
 public:
-    void Prepare(optiling::GMMCompileInfo &compileInfo) const
+    void Prepare(optiling::GMMCompileInfo& compileInfo) const
     {
         compileInfo = {
             static_cast<uint32_t>(coreNum > 0 ? coreNum : 32),     // aicNum
@@ -144,7 +144,7 @@ public:
         };
     }
 
-    void InvokeTilingFunc(optiling::GMMCompileInfo &compileInfo) const
+    void InvokeTilingFunc(optiling::GMMCompileInfo& compileInfo) const
     {
         vector<int64_t> xOriginDims = transposeX ? vector<int64_t>{k, m} : vector<int64_t>{m, k};
         gert::StorageShape xShape = ops::ut::MakeGertStorageShape(xOriginDims, xOriginDims);
@@ -225,9 +225,9 @@ public:
             // Fixpipe keeps kernel type 0; B transpose occupies the low two bits.
             ASSERT_EQ(tilingInfo.tilingKey, static_cast<uint64_t>(transposeWeight));
             ASSERT_EQ(tilingInfo.tilingDataSize, sizeof(GroupedMatmulTilingData::GMMQuantCubeBasicApiTilingData));
-            const auto &data = *reinterpret_cast<const GroupedMatmulTilingData::GMMQuantCubeBasicApiTilingData *>(
+            const auto& data = *reinterpret_cast<const GroupedMatmulTilingData::GMMQuantCubeBasicApiTilingData*>(
                 tilingInfo.tilingData.get());
-            const auto &mm = data.mmTilingData;
+            const auto& mm = data.mmTilingData;
             EXPECT_EQ(mm.m, m);
             EXPECT_EQ(mm.n, n);
             EXPECT_EQ(mm.k, k);
@@ -329,7 +329,7 @@ public:
     string expectTilingData;
 };
 
-vector<GroupedQuantCubeonlyArch35TilingTestParam> GetParams(const string &socVersion)
+vector<GroupedQuantCubeonlyArch35TilingTestParam> GetParams(const string& socVersion)
 {
     vector<GroupedQuantCubeonlyArch35TilingTestParam> params;
     std::string csvPath = ops::ut::ResolveCsvPath("test_grouped_quant_cubeonly_arch35_tiling.csv",
@@ -393,14 +393,14 @@ vector<GroupedQuantCubeonlyArch35TilingTestParam> GetParams(const string &socVer
             param.expectTilingKey = static_cast<uint64_t>(stoull(items[idx++]));
             param.expectTilingData = items[idx++];
             params.push_back(param);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
     return params;
 }
 
-string MakeParamName(const testing::TestParamInfo<GroupedQuantCubeonlyArch35TilingTestParam> &info)
+string MakeParamName(const testing::TestParamInfo<GroupedQuantCubeonlyArch35TilingTestParam>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
@@ -409,7 +409,7 @@ string MakeParamName(const testing::TestParamInfo<GroupedQuantCubeonlyArch35Tili
 
 namespace GroupedQuantCubeonlyArch35TilingUT {
 
-const vector<GroupedQuantCubeonlyArch35TilingTestParam> &GetAscend950Params()
+const vector<GroupedQuantCubeonlyArch35TilingTestParam>& GetAscend950Params()
 {
     static const vector<GroupedQuantCubeonlyArch35TilingTestParam> params = GetParams("Ascend950");
     return params;
@@ -475,7 +475,7 @@ TEST(TestGroupedQuantCubeBasicApi, AbsentBiasIgnoresDescriptorDefault)
 TEST(TestGroupedQuantCubeBasicApi, HiFloat8Routing)
 {
     for (bool transposeWeight : {false, true}) {
-        for (const auto &format : {"ND", "NZ"}) {
+        for (const auto& format : {"ND", "NZ"}) {
             for (bool hasBias : {false, true}) {
                 for (auto biasDtype : {ge::DT_INT32, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_UNDEFINED}) {
                     auto p = MakeCubeCase();
@@ -538,7 +538,7 @@ TEST(TestGroupedQuantCubeBasicApi, DevkitVersionRouting)
     const VersionCase cases[] = {{0, false},        {80500000, false}, {90000000, false}, {90099999, false},
                                  {90100000, true},  {90101999, true},  {90200000, true},  {100000000, false},
                                  {100100000, true}, {-1, false}};
-    for (const auto &versionCase : cases) {
+    for (const auto& versionCase : cases) {
         for (bool transposeWeight : {false, true}) {
             for (auto format : {ge::FORMAT_ND, ge::FORMAT_FRACTAL_NZ}) {
                 auto p = MakeCubeCase();

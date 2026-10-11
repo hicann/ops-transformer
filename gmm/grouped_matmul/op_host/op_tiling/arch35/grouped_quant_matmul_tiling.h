@@ -91,7 +91,7 @@ constexpr uint32_t CORE_RATIO = 2U;
 } // namespace GmmConstant
 
 template <typename ShapeT>
-std::string ShapeToString(const ShapeT &shape)
+std::string ShapeToString(const ShapeT& shape)
 {
     std::ostringstream oss;
     for (size_t i = 0; i < shape.GetDimNum(); ++i) {
@@ -104,7 +104,7 @@ std::string ShapeToString(const ShapeT &shape)
 }
 
 template <typename... Args>
-std::string ListToString(const Args &...args)
+std::string ListToString(const Args&... args)
 {
     std::ostringstream oss;
     bool isFirst = true;
@@ -114,13 +114,13 @@ std::string ListToString(const Args &...args)
 }
 
 template <typename... Dims>
-std::string ShapeDimsToString(const Dims &...dims)
+std::string ShapeDimsToString(const Dims&... dims)
 {
     return ListToString(dims...);
 }
 
 template <typename... Args>
-std::string BuildErrorMsgStr(const Args &...args)
+std::string BuildErrorMsgStr(const Args&... args)
 {
     std::ostringstream oss;
     using Expander = int[];
@@ -128,11 +128,11 @@ std::string BuildErrorMsgStr(const Args &...args)
     return oss.str();
 }
 
-inline std::string ShapesToString(const std::vector<std::string> &shapes)
+inline std::string ShapesToString(const std::vector<std::string>& shapes)
 {
     std::ostringstream oss;
     bool isFirst = true;
-    for (const auto &shape : shapes) {
+    for (const auto& shape : shapes) {
         if (!isFirst) {
             oss << ", ";
         }
@@ -198,8 +198,8 @@ public:
     int8_t groupListType = 0;
     int8_t splitItem = 0;
     int8_t actType = 0;
-    const char *opName = nullptr;
-    const char *opType = "GroupedMatmul";
+    const char* opName = nullptr;
+    const char* opType = "GroupedMatmul";
     ge::DataType aDtype = ge::DT_INT8;
     ge::DataType bDtype = ge::DT_INT8;
     ge::DataType cDtype = ge::DT_FLOAT16;
@@ -225,10 +225,10 @@ public:
 
 class GroupedQmmTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit GroupedQmmTiling(gert::TilingContext *context);
+    explicit GroupedQmmTiling(gert::TilingContext* context);
     ~GroupedQmmTiling() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         Ops::Transformer::OpTiling::TilingBaseClass::Reset(context);
         Reset();
@@ -251,51 +251,51 @@ protected:
     // 7、保存Tiling数据
     ge::graphStatus PostTiling() override;
     virtual void Reset();
-    virtual const char *GetOpType() const
+    virtual const char* GetOpType() const
     {
         return "GroupedMatmul";
     }
     void CalBasicBlock();
     ge::graphStatus CalL1Tiling();
     ge::graphStatus CalL1Depth(uint64_t leftL1Size);
-    ge::graphStatus FillGmmArray(GroupedMatmulTilingData::GMMArray &gmmArray);
+    ge::graphStatus FillGmmArray(GroupedMatmulTilingData::GMMArray& gmmArray);
     bool SetGroupNum(uint32_t groupListIndex);
-    bool SetMKN(const gert::Shape &xShape, const gert::Shape &wShape);
+    bool SetMKN(const gert::Shape& xShape, const gert::Shape& wShape);
     bool IsMxfp4() const;
     bool IsMultiTensorWeight() const;
     bool IsWeightNzMultiTensorLayout() const;
     uint16_t GetTensorListSize(uint32_t index, uint16_t maxCount = GroupedMatmul::MAX_TENSOR_CONT) const;
     bool CheckWeightTensorListForWeightNz() const;
-    uint64_t GetWeightLogicalNSize(const gert::Shape &wShape) const;
-    bool CheckMultiWeightNzInputs(const gert::StorageShape *xScaleStorageShape) const;
+    uint64_t GetWeightLogicalNSize(const gert::Shape& wShape) const;
+    bool CheckMultiWeightNzInputs(const gert::StorageShape* xScaleStorageShape) const;
     void SetKernelType();
     virtual bool AnalyzeAttrs();
     virtual bool AnalyzeDtype();
     virtual bool AnalyzeInputs();
     virtual void PrintQuantParams();
     bool IsMicroScaling() const;
-    bool CheckQuantParamsForMXTypeM(const gert::Shape &xScaleShape, const gert::StorageShape *wScaleStorageShape,
+    bool CheckQuantParamsForMXTypeM(const gert::Shape& xScaleShape, const gert::StorageShape* wScaleStorageShape,
                                     uint64_t expectedNSize = 0UL) const;
-    bool CheckQuantParamsForMXTypeM(const gert::Shape &xScaleShape, const gert::Shape &wScaleShape,
+    bool CheckQuantParamsForMXTypeM(const gert::Shape& xScaleShape, const gert::Shape& wScaleShape,
                                     uint64_t expectedNSize = 0UL) const;
-    bool CheckShapeForWeightNz(const gert::Shape &wShape, uint64_t expectedNSize = 0UL) const;
+    bool CheckShapeForWeightNz(const gert::Shape& wShape, uint64_t expectedNSize = 0UL) const;
     uint64_t GetSizeWithDataType(uint64_t shapeSize, ge::DataType dtype) const;
     uint64_t GetShapeWithDataType(uint64_t shapeSize, ge::DataType dtype) const;
     uint64_t GetDepthA1B1(uint64_t leftSize, uint64_t perDepthSize, uint64_t depthInit);
     void CalStepKs();
     bool IsBiasInL1() const;
     void InitCommonL1TilingFields();
-    ge::graphStatus CalcLeftL1Size(uint64_t &leftL1Size) const;
-    void CalcAlignedMxBaseScaleSize(uint64_t &baseScaleASize, uint64_t &baseScaleBSize) const;
+    ge::graphStatus CalcLeftL1Size(uint64_t& leftL1Size) const;
+    void CalcAlignedMxBaseScaleSize(uint64_t& baseScaleASize, uint64_t& baseScaleBSize) const;
     template <typename TTilingData>
-    ge::graphStatus SaveTilingDataToContext(const TTilingData &tilingData)
+    ge::graphStatus SaveTilingDataToContext(const TTilingData& tilingData)
     {
         context_->SetBlockDim(aicoreParams_.aicNum);
         OP_CHECK_IF(sizeof(tilingData) % sizeof(uint64_t) != 0,
                     OP_LOGE(context_->GetNodeName(), "Tiling data size[%zu] is not aligned to 8", sizeof(tilingData)),
                     return ge::GRAPH_FAILED);
         errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                               reinterpret_cast<const void *>(&tilingData), sizeof(tilingData));
+                               reinterpret_cast<const void*>(&tilingData), sizeof(tilingData));
         if (ret != EOK) {
             OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret = %d", ret);
             return ge::GRAPH_FAILED;
@@ -303,43 +303,43 @@ protected:
         context_->GetRawTilingData()->SetDataSize(sizeof(tilingData));
         return ge::GRAPH_SUCCESS;
     }
-    int64_t LogQuantParams(const GroupedMatmulTilingData::GMMQuantParams &params) const;
+    int64_t LogQuantParams(const GroupedMatmulTilingData::GMMQuantParams& params) const;
     GQmmBasicTiling basicTiling_;
-    GQmmInputInfo &inputParams_;
+    GQmmInputInfo& inputParams_;
 
 private:
     void CalScaleFactors();
-    bool SetQuantMode(const gert::Shape &wScaleShape, const gert::StorageShape *xScaleStorageShape,
-                      const gert::Shape &wShape);
-    void SetPerGroupQuantMode(const gert::Shape &xScaleShape, const gert::Shape &wScaleShape,
-                              const gert::Shape &wShape);
-    bool CheckQuantParamsForMXTypeK(const gert::Shape &xScaleShape, const gert::Shape &wScaleShape) const;
-    bool CheckFp4Shape(const gert::Shape &xShape, const gert::Shape &wShape) const;
+    bool SetQuantMode(const gert::Shape& wScaleShape, const gert::StorageShape* xScaleStorageShape,
+                      const gert::Shape& wShape);
+    void SetPerGroupQuantMode(const gert::Shape& xScaleShape, const gert::Shape& wScaleShape,
+                              const gert::Shape& wShape);
+    bool CheckQuantParamsForMXTypeK(const gert::Shape& xScaleShape, const gert::Shape& wScaleShape) const;
+    bool CheckFp4Shape(const gert::Shape& xShape, const gert::Shape& wShape) const;
     bool CheckBiasDtype() const;
-    bool CheckBiasShape(const gert::StorageShape *biasStorageShape) const;
-    bool CheckQuantParamsForMxQuantMode(const gert::StorageShape *xScaleStorageShape,
-                                        const gert::StorageShape *wScaleStorageShape,
+    bool CheckBiasShape(const gert::StorageShape* biasStorageShape) const;
+    bool CheckQuantParamsForMxQuantMode(const gert::StorageShape* xScaleStorageShape,
+                                        const gert::StorageShape* wScaleStorageShape,
                                         uint64_t expectedNSize = 0UL) const;
-    bool CheckQuantParams(const gert::StorageShape *xScaleStorageShape, const gert::StorageShape *wScaleStorageShape,
+    bool CheckQuantParams(const gert::StorageShape* xScaleStorageShape, const gert::StorageShape* wScaleStorageShape,
                           uint64_t expectedNSize = 0UL) const;
-    bool CheckScaleNzShape(const gert::StorageShape *wScaleStorageShape, uint64_t expectedNSize = 0UL) const;
-    bool CheckQuantParamsForMXTypeMImpl(const gert::Shape &xScaleShape, const gert::Shape &wScaleShape,
+    bool CheckScaleNzShape(const gert::StorageShape* wScaleStorageShape, uint64_t expectedNSize = 0UL) const;
+    bool CheckQuantParamsForMXTypeMImpl(const gert::Shape& xScaleShape, const gert::Shape& wScaleShape,
                                         bool isScaleNzStorage, uint64_t expectedNSize = 0UL) const;
-    bool CheckQuantParamsForNonKGroupQuantMode(const gert::Shape &wScaleShape, uint64_t expectedNSize = 0UL) const;
+    bool CheckQuantParamsForNonKGroupQuantMode(const gert::Shape& wScaleShape, uint64_t expectedNSize = 0UL) const;
     bool SetMKNList();
     bool CheckDtypeForWeightNz(bool isPertokenScaleNull) const;
-    bool CheckActiveModeDtype(const gert::StorageShape *xScaleStorageShape) const;
-    bool CheckActiveMode(const gert::Shape &wScaleShape, const gert::StorageShape *xScaleStorageShape);
+    bool CheckActiveModeDtype(const gert::StorageShape* xScaleStorageShape) const;
+    bool CheckActiveMode(const gert::Shape& wScaleShape, const gert::StorageShape* xScaleStorageShape);
     virtual bool CheckCoreNum() const;
     bool CheckTransposeAndFormatByGroupType() const;
     bool CheckPertokenScaleDtypeForWeightNz(bool isA8W8Int, bool isA8W8Fp, bool isA4W4Fp, bool isA4W4Int) const;
-    bool CheckWeightNzTransposedDims(const gert::Shape &wShape, uint64_t wShapeDimThird, uint64_t wShapeDimSecond,
+    bool CheckWeightNzTransposedDims(const gert::Shape& wShape, uint64_t wShapeDimThird, uint64_t wShapeDimSecond,
                                      uint32_t weightNzLastDim, uint64_t logicalNSize) const;
-    bool CheckWeightNzDimNum(const gert::Shape &wShape) const;
-    bool CheckWeightNzLastDim(const gert::Shape &wShape, size_t nzDimOffset, uint32_t expectedValue,
-                              const char *dtypeLabel) const;
-    bool CheckWeightNzSecondLastDim(const gert::Shape &wShape, size_t nzDimOffset) const;
-    bool ValidateAAndWDtype(const std::vector<ge::DataType> &legalInputDtypes) const;
+    bool CheckWeightNzDimNum(const gert::Shape& wShape) const;
+    bool CheckWeightNzLastDim(const gert::Shape& wShape, size_t nzDimOffset, uint32_t expectedValue,
+                              const char* dtypeLabel) const;
+    bool CheckWeightNzSecondLastDim(const gert::Shape& wShape, size_t nzDimOffset) const;
+    bool ValidateAAndWDtype(const std::vector<ge::DataType>& legalInputDtypes) const;
 
     GroupedMatmulTilingData::GMMQuantTilingData tilingData_;
 

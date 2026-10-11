@@ -52,13 +52,13 @@ constexpr int64_t UNKNOWN_DIM = -1;   // unknown shape dim
 constexpr int64_t UNKNOWN_RANK = -2;  // unknown rank marker (dimNum=1, dim0=-2)
 } // namespace
 
-static bool IsUnknownRankShape(const gert::Shape *shape)
+static bool IsUnknownRankShape(const gert::Shape* shape)
 {
     return shape != nullptr && shape->GetDimNum() == RANK_1D && shape->GetDim(0) == UNKNOWN_RANK;
 }
 
 // 从候选输入中依次取第一个已知维度值；全部为 -1 时返回 UNKNOWN_DIM。
-static int64_t ResolveFirstKnownDim(const gert::Shape *const shapes[], const size_t dims[], size_t shapeNum)
+static int64_t ResolveFirstKnownDim(const gert::Shape* const shapes[], const size_t dims[], size_t shapeNum)
 {
     size_t shapeIndex = 0;
     while (shapeIndex < shapeNum) {
@@ -72,8 +72,8 @@ static int64_t ResolveFirstKnownDim(const gert::Shape *const shapes[], const siz
 }
 
 // 取有效 N：block_res 为 -1 时用 inv_norm/probs 的 K - 1 反推；全部未知时保持 -1。
-static int64_t ResolveNumBlocks(const gert::Shape *blockResShape, const gert::Shape *invNormShape,
-                                const gert::Shape *probsShape)
+static int64_t ResolveNumBlocks(const gert::Shape* blockResShape, const gert::Shape* invNormShape,
+                                const gert::Shape* probsShape)
 {
     const int64_t numBlocks = blockResShape->GetDim(DIM_BLOCK);
     if (numBlocks != UNKNOWN_DIM) {
@@ -90,8 +90,8 @@ static int64_t ResolveNumBlocks(const gert::Shape *blockResShape, const gert::Sh
     return UNKNOWN_DIM;
 }
 
-static bool CheckInputRank(gert::InferShapeContext *context, const gert::Shape *shape, size_t expectedRank,
-                           const char *tensorName)
+static bool CheckInputRank(gert::InferShapeContext* context, const gert::Shape* shape, size_t expectedRank,
+                           const char* tensorName)
 {
     if (shape->GetDimNum() == expectedRank) {
         return true;
@@ -101,8 +101,8 @@ static bool CheckInputRank(gert::InferShapeContext *context, const gert::Shape *
     return false;
 }
 
-static bool CheckInputDimValue(gert::InferShapeContext *context, const gert::Shape *shape, size_t dimIndex,
-                               int64_t expectedValue, const char *dimName)
+static bool CheckInputDimValue(gert::InferShapeContext* context, const gert::Shape* shape, size_t dimIndex,
+                               int64_t expectedValue, const char* dimName)
 {
     const int64_t actualValue = shape->GetDim(dimIndex);
     if (actualValue == UNKNOWN_DIM || expectedValue == UNKNOWN_DIM || actualValue == expectedValue) {
@@ -119,7 +119,7 @@ static bool IsSupportedMainDtype(ge::DataType dtype)
     return dtype == ge::DT_FLOAT16 || dtype == ge::DT_BF16 || dtype == ge::DT_FLOAT;
 }
 
-static const char *DtypeName(ge::DataType dataType)
+static const char* DtypeName(ge::DataType dataType)
 {
     switch (dataType) {
         case ge::DT_FLOAT16:
@@ -133,7 +133,7 @@ static const char *DtypeName(ge::DataType dataType)
     }
 }
 
-static ge::graphStatus CheckSupportedMainDtype(gert::InferDataTypeContext *context, const char *tensorName,
+static ge::graphStatus CheckSupportedMainDtype(gert::InferDataTypeContext* context, const char* tensorName,
                                                ge::DataType dtype)
 {
     if (IsSupportedMainDtype(dtype)) {
@@ -143,7 +143,7 @@ static ge::graphStatus CheckSupportedMainDtype(gert::InferDataTypeContext *conte
     return GRAPH_FAILED;
 }
 
-static ge::graphStatus CheckMainDtypeSame(gert::InferDataTypeContext *context, const char *tensorName,
+static ge::graphStatus CheckMainDtypeSame(gert::InferDataTypeContext* context, const char* tensorName,
                                           ge::DataType dtype, ge::DataType referenceDtype)
 {
     if (dtype == referenceDtype) {
@@ -154,15 +154,15 @@ static ge::graphStatus CheckMainDtypeSame(gert::InferDataTypeContext *context, c
     return GRAPH_FAILED;
 }
 
-static bool CheckShapeBlockAttentionResidualsGrad(gert::InferShapeContext *context, int64_t &B, int64_t &N, int64_t &H)
+static bool CheckShapeBlockAttentionResidualsGrad(gert::InferShapeContext* context, int64_t& B, int64_t& N, int64_t& H)
 {
-    const gert::Shape *partialBlockShape = context->GetInputShape(INPUT_PARTIAL_BLOCK);
-    const gert::Shape *blockResShape = context->GetInputShape(INPUT_BLOCK_RES);
-    const gert::Shape *projWeightShape = context->GetInputShape(INPUT_PROJ_WEIGHT);
-    const gert::Shape *normWeightShape = context->GetInputShape(INPUT_NORM_WEIGHT);
-    const gert::Shape *gradHiddenStatesShape = context->GetInputShape(INPUT_GRAD_HIDDEN_STATES);
-    const gert::Shape *invNormShape = context->GetInputShape(INPUT_INV_NORM);
-    const gert::Shape *probsShape = context->GetInputShape(INPUT_PROBS);
+    const gert::Shape* partialBlockShape = context->GetInputShape(INPUT_PARTIAL_BLOCK);
+    const gert::Shape* blockResShape = context->GetInputShape(INPUT_BLOCK_RES);
+    const gert::Shape* projWeightShape = context->GetInputShape(INPUT_PROJ_WEIGHT);
+    const gert::Shape* normWeightShape = context->GetInputShape(INPUT_NORM_WEIGHT);
+    const gert::Shape* gradHiddenStatesShape = context->GetInputShape(INPUT_GRAD_HIDDEN_STATES);
+    const gert::Shape* invNormShape = context->GetInputShape(INPUT_INV_NORM);
+    const gert::Shape* probsShape = context->GetInputShape(INPUT_PROBS);
 
     if (!CheckInputRank(context, partialBlockShape, RANK_2D, "partial_block") ||
         !CheckInputRank(context, blockResShape, RANK_3D, "block_res") ||
@@ -175,7 +175,7 @@ static bool CheckShapeBlockAttentionResidualsGrad(gert::InferShapeContext *conte
     }
 
     // 先取有效 B：partial_block 为 -1 时逐个从其它输入取已知值；全部未知时保持 -1。
-    const gert::Shape *batchShapes[] = {partialBlockShape, blockResShape, gradHiddenStatesShape, invNormShape,
+    const gert::Shape* batchShapes[] = {partialBlockShape, blockResShape, gradHiddenStatesShape, invNormShape,
                                         probsShape};
     const size_t batchDims[] = {DIM_BATCH, DIM_BATCH, DIM_BATCH, DIM_BATCH, DIM_BATCH};
     B = ResolveFirstKnownDim(batchShapes, batchDims, sizeof(batchShapes) / sizeof(batchShapes[0]));
@@ -188,7 +188,7 @@ static bool CheckShapeBlockAttentionResidualsGrad(gert::InferShapeContext *conte
     }
 
     // 先取有效 H：partial_block 为 -1 时逐个从其它输入取已知值；全部未知时保持 -1。
-    const gert::Shape *hiddenShapes[] = {partialBlockShape, blockResShape, projWeightShape, normWeightShape,
+    const gert::Shape* hiddenShapes[] = {partialBlockShape, blockResShape, projWeightShape, normWeightShape,
                                          gradHiddenStatesShape};
     const size_t hiddenDims[] = {DIM_HIDDEN, DIM_BLOCK_RES_HIDDEN, DIM_HIDDEN, DIM_NORM_WEIGHT, DIM_HIDDEN};
     H = ResolveFirstKnownDim(hiddenShapes, hiddenDims, sizeof(hiddenShapes) / sizeof(hiddenShapes[0]));
@@ -217,11 +217,11 @@ static bool CheckShapeBlockAttentionResidualsGrad(gert::InferShapeContext *conte
     return true;
 }
 
-static ge::graphStatus CheckValidBlockNum(gert::InferShapeContext *context, int64_t blockNum)
+static ge::graphStatus CheckValidBlockNum(gert::InferShapeContext* context, int64_t blockNum)
 {
-    const auto *attrs = context->GetAttrs();
+    const auto* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const auto *validBlockNum = attrs->GetInt(0);
+    const auto* validBlockNum = attrs->GetInt(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, validBlockNum);
     // Defer equality with N until the block dimension is known.
     if (*validBlockNum < -1 || (*validBlockNum != -1 && blockNum != UNKNOWN_DIM && *validBlockNum != blockNum)) {
@@ -232,19 +232,19 @@ static ge::graphStatus CheckValidBlockNum(gert::InferShapeContext *context, int6
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShapeBlockAttentionResidualsGrad(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeBlockAttentionResidualsGrad(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("BlockAttentionResidualsGrad", "infer shape context is nullptr"),
                 return GRAPH_FAILED);
     OP_LOGD(context->GetNodeName(), "Enter BlockAttentionResidualsGrad InferShape.");
 
-    const gert::Shape *partialBlockShape = context->GetInputShape(INPUT_PARTIAL_BLOCK);
-    const gert::Shape *blockResShape = context->GetInputShape(INPUT_BLOCK_RES);
-    const gert::Shape *projWeightShape = context->GetInputShape(INPUT_PROJ_WEIGHT);
-    const gert::Shape *normWeightShape = context->GetInputShape(INPUT_NORM_WEIGHT);
-    const gert::Shape *gradHiddenStatesShape = context->GetInputShape(INPUT_GRAD_HIDDEN_STATES);
-    const gert::Shape *invNormShape = context->GetInputShape(INPUT_INV_NORM);
-    const gert::Shape *probsShape = context->GetInputShape(INPUT_PROBS);
+    const gert::Shape* partialBlockShape = context->GetInputShape(INPUT_PARTIAL_BLOCK);
+    const gert::Shape* blockResShape = context->GetInputShape(INPUT_BLOCK_RES);
+    const gert::Shape* projWeightShape = context->GetInputShape(INPUT_PROJ_WEIGHT);
+    const gert::Shape* normWeightShape = context->GetInputShape(INPUT_NORM_WEIGHT);
+    const gert::Shape* gradHiddenStatesShape = context->GetInputShape(INPUT_GRAD_HIDDEN_STATES);
+    const gert::Shape* invNormShape = context->GetInputShape(INPUT_INV_NORM);
+    const gert::Shape* probsShape = context->GetInputShape(INPUT_PROBS);
     OP_CHECK_NULL_WITH_CONTEXT(context, partialBlockShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, blockResShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, projWeightShape);
@@ -253,10 +253,10 @@ static ge::graphStatus InferShapeBlockAttentionResidualsGrad(gert::InferShapeCon
     OP_CHECK_NULL_WITH_CONTEXT(context, invNormShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, probsShape);
 
-    gert::Shape *gradPartialBlockShape = context->GetOutputShape(OUTPUT_GRAD_PARTIAL_BLOCK);
-    gert::Shape *gradBlockResShape = context->GetOutputShape(OUTPUT_GRAD_BLOCK_RES);
-    gert::Shape *gradProjWeightShape = context->GetOutputShape(OUTPUT_GRAD_PROJ_WEIGHT);
-    gert::Shape *gradNormWeightShape = context->GetOutputShape(OUTPUT_GRAD_NORM_WEIGHT);
+    gert::Shape* gradPartialBlockShape = context->GetOutputShape(OUTPUT_GRAD_PARTIAL_BLOCK);
+    gert::Shape* gradBlockResShape = context->GetOutputShape(OUTPUT_GRAD_BLOCK_RES);
+    gert::Shape* gradProjWeightShape = context->GetOutputShape(OUTPUT_GRAD_PROJ_WEIGHT);
+    gert::Shape* gradNormWeightShape = context->GetOutputShape(OUTPUT_GRAD_NORM_WEIGHT);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradPartialBlockShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradBlockResShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradProjWeightShape);
@@ -311,7 +311,7 @@ static ge::graphStatus InferShapeBlockAttentionResidualsGrad(gert::InferShapeCon
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeBlockAttentionResidualsGrad(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeBlockAttentionResidualsGrad(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("BlockAttentionResidualsGrad", "infer data type context is nullptr"),
                 return GRAPH_FAILED);

@@ -37,7 +37,7 @@ public:
 
 public:
     AclnnQGMMInplaceAddCase();
-    AclnnQGMMInplaceAddCase(const char *name, bool enable, const char *dbgInfo, OpInfo opInfo,
+    AclnnQGMMInplaceAddCase(const char* name, bool enable, const char* dbgInfo, OpInfo opInfo,
                             AclnnQGMMInplaceAddParam param,
                             int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
     bool Run() override;

@@ -32,8 +32,8 @@ constexpr size_t INDEX_OUTPUT_Y = 0;
 constexpr size_t INDEX_ATTR_GROUP_LIST_TYPE = 0;
 constexpr size_t DIM_TWO = 2;
 
-static bool BuildViewShapeAndStrides(const gert::Tensor *geTensor, std::vector<int64_t> &viewShape,
-                                     std::vector<int64_t> &strides)
+static bool BuildViewShapeAndStrides(const gert::Tensor* geTensor, std::vector<int64_t>& viewShape,
+                                     std::vector<int64_t>& strides)
 {
     auto origin_shape = geTensor->GetOriginShape();
     for (size_t i = 0; i < origin_shape.GetDimNum(); ++i) {
@@ -54,7 +54,7 @@ static bool BuildViewShapeAndStrides(const gert::Tensor *geTensor, std::vector<i
 }
 
 static bool ApplyTranspose(size_t index, bool enableTranspose, ge::DataType dataType_ge,
-                           std::vector<int64_t> &viewShape, std::vector<int64_t> &strides)
+                           std::vector<int64_t>& viewShape, std::vector<int64_t>& strides)
 {
     if (index == INDEX_INPUT_SCALE1 && dataType_ge == ge::DataType::DT_FLOAT8_E8M0 && enableTranspose) {
         OP_CHECK_IF(viewShape.size() < 3,
@@ -87,7 +87,7 @@ static bool ApplyTranspose(size_t index, bool enableTranspose, ge::DataType data
     return true;
 }
 
-static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool enableTranspose, size_t index)
+static inline aclTensor* GeTensor2AclTensor(const gert::Tensor* geTensor, bool enableTranspose, size_t index)
 {
     if (geTensor == nullptr) {
         return nullptr;
@@ -102,7 +102,7 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
     }
     static const auto aclCreateTensor = GET_OP_API_FUNC(aclCreateTensor);
     OP_CHECK_IF(aclCreateTensor == nullptr, OP_LOGE("aclnnfallback", "aclCreateTensor nullptr"), return nullptr);
-    void *deviceAddr = const_cast<void *>(geTensor->GetAddr());
+    void* deviceAddr = const_cast<void*>(geTensor->GetAddr());
     auto dataType_ge = geTensor->GetDataType();
     aclDataType dataType = ACL_DT_UNDEFINED;
     if (dataType_ge == ge::DataType::DT_FLOAT8_E4M3FN || dataType_ge == ge::DataType::DT_FLOAT8_E5M2 ||
@@ -121,13 +121,13 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
         return nullptr;
     }
     auto aclFormat = aclFormat::ACL_FORMAT_ND;
-    aclTensor *out = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides.data(), 0, aclFormat,
+    aclTensor* out = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides.data(), 0, aclFormat,
                                      storageShapeVec.data(), storageShapeVec.size(), deviceAddr);
     OP_CHECK_IF(out == nullptr, OP_LOGE("aclnnfallback", "out nullptr"), return nullptr);
     return out;
 }
 
-static graphStatus PrepareAclTensor(const OpExecuteContext *host_api_ctx, const aclTensor *&tensor, size_t index,
+static graphStatus PrepareAclTensor(const OpExecuteContext* host_api_ctx, const aclTensor*& tensor, size_t index,
                                     bool enableTranspose)
 {
     if (index != INDEX_INPUT_SCALE1) {
@@ -140,29 +140,29 @@ static graphStatus PrepareAclTensor(const OpExecuteContext *host_api_ctx, const 
     return GRAPH_SUCCESS;
 }
 
-static graphStatus QuantGroupedMatmulInplaceAddExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus QuantGroupedMatmulInplaceAddExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
 
     auto attrs = host_api_ctx->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE("aclnnfallback", "attrs is null"), return GRAPH_FAILED);
-    const int64_t *groupListTypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_GROUP_LIST_TYPE);
+    const int64_t* groupListTypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_GROUP_LIST_TYPE);
     OP_CHECK_IF(groupListTypeGe == nullptr, OP_LOGE("aclnnfallback", "groupListTypeGe is null"), return GRAPH_FAILED);
 
-    const aclTensor *aclTensorX1 = nullptr;
+    const aclTensor* aclTensorX1 = nullptr;
     OP_CHECK_IF(PrepareAclTensor(host_api_ctx, aclTensorX1, INDEX_INPUT_X1, true) != GRAPH_SUCCESS,
                 OP_LOGE("aclnnfallback", "PrepareAclTensor x1 failed"), return GRAPH_FAILED);
 
-    const aclTensor *aclTensorX2 = nullptr;
+    const aclTensor* aclTensorX2 = nullptr;
     OP_CHECK_IF(PrepareAclTensor(host_api_ctx, aclTensorX2, INDEX_INPUT_X2, false) != GRAPH_SUCCESS,
                 OP_LOGE("aclnnfallback", "PrepareAclTensor x2 failed"), return GRAPH_FAILED);
 
-    const aclTensor *aclTensorScale2 = nullptr;
+    const aclTensor* aclTensorScale2 = nullptr;
     OP_CHECK_IF(PrepareAclTensor(host_api_ctx, aclTensorScale2, INDEX_INPUT_SCALE2, false) != GRAPH_SUCCESS,
                 OP_LOGE("aclnnfallback", "PrepareAclTensor scale2 failed"), return GRAPH_FAILED);
 
     auto scale1Tensor = host_api_ctx->GetOptionalInputTensor(INDEX_INPUT_SCALE1);
-    const aclTensor *aclTensorScale1 = nullptr;
+    const aclTensor* aclTensorScale1 = nullptr;
 
     if (scale1Tensor != nullptr && scale1Tensor->GetDataType() == ge::DataType::DT_FLOAT8_E8M0) {
         OP_CHECK_IF(PrepareAclTensor(host_api_ctx, aclTensorScale1, INDEX_INPUT_SCALE1, true) != GRAPH_SUCCESS,

@@ -47,10 +47,10 @@ static bool IsAscend950()
     return GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
 }
 
-static bool CheckNotNull(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias,
-                         const aclTensor *hin, const aclTensor *hPost, const aclTensor *hRes, const aclTensor *hPre,
-                         const aclTensor *hcBeforeNorm, const aclTensor *invRms, const aclTensor *sumOut,
-                         const aclTensor *normOut, bool needBackward)
+static bool CheckNotNull(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias,
+                         const aclTensor* hin, const aclTensor* hPost, const aclTensor* hRes, const aclTensor* hPre,
+                         const aclTensor* hcBeforeNorm, const aclTensor* invRms, const aclTensor* sumOut,
+                         const aclTensor* normOut, bool needBackward)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(phi, return false);
@@ -69,10 +69,10 @@ static bool CheckNotNull(const aclTensor *x, const aclTensor *phi, const aclTens
     return true;
 }
 
-static bool CheckDtypeValid(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias,
-                            const aclTensor *hin, const aclTensor *hPost, const aclTensor *hRes, const aclTensor *hPre,
-                            const aclTensor *hcBeforeNorm, const aclTensor *invRms, const aclTensor *sumOut,
-                            const aclTensor *normOut, bool needBackward)
+static bool CheckDtypeValid(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias,
+                            const aclTensor* hin, const aclTensor* hPost, const aclTensor* hRes, const aclTensor* hPre,
+                            const aclTensor* hcBeforeNorm, const aclTensor* invRms, const aclTensor* sumOut,
+                            const aclTensor* normOut, bool needBackward)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(x, DTYPE_X_SUPPORT_LIST, return false);
     OP_CHECK_DTYPE_NOT_SUPPORT(phi, DTYPE_OTHER_SUPPORT_LIST, return false);
@@ -92,10 +92,10 @@ static bool CheckDtypeValid(const aclTensor *x, const aclTensor *phi, const aclT
     return true;
 }
 
-static bool CheckShape(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias,
-                       const aclTensor *hin, const aclTensor *hPost, const aclTensor *hRes, const aclTensor *hPre,
-                       const aclTensor *hcBeforeNorm, const aclTensor *invRms, const aclTensor *sumOut,
-                       const aclTensor *normOut, int64_t hcMult, int64_t numIters, bool needBackward)
+static bool CheckShape(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias,
+                       const aclTensor* hin, const aclTensor* hPost, const aclTensor* hRes, const aclTensor* hPre,
+                       const aclTensor* hcBeforeNorm, const aclTensor* invRms, const aclTensor* sumOut,
+                       const aclTensor* normOut, int64_t hcMult, int64_t numIters, bool needBackward)
 {
     auto xShape = x->GetViewShape();
     auto xDim = xShape.GetDimNum();
@@ -319,7 +319,7 @@ static bool CheckShape(const aclTensor *x, const aclTensor *phi, const aclTensor
     return true;
 }
 
-static bool IsFormatSupport(const aclTensor *tensor, const std::string &tensorName)
+static bool IsFormatSupport(const aclTensor* tensor, const std::string& tensorName)
 {
     if (tensor != nullptr && op::IsPrivateFormat(tensor->GetStorageFormat())) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s's format should be ND, but got %s.", tensorName.c_str(),
@@ -329,10 +329,10 @@ static bool IsFormatSupport(const aclTensor *tensor, const std::string &tensorNa
     return true;
 }
 
-static bool CheckFormat(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias,
-                        const aclTensor *hin, const aclTensor *hPost, const aclTensor *hRes, const aclTensor *hPre,
-                        const aclTensor *hcBeforeNorm, const aclTensor *invRms, const aclTensor *sumOut,
-                        const aclTensor *normOut, bool needBackward)
+static bool CheckFormat(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias,
+                        const aclTensor* hin, const aclTensor* hPost, const aclTensor* hRes, const aclTensor* hPre,
+                        const aclTensor* hcBeforeNorm, const aclTensor* invRms, const aclTensor* sumOut,
+                        const aclTensor* normOut, bool needBackward)
 {
     CHECK_RET(IsFormatSupport(x, "x"), false);
     CHECK_RET(IsFormatSupport(phi, "phi"), false);
@@ -353,10 +353,10 @@ static bool CheckFormat(const aclTensor *x, const aclTensor *phi, const aclTenso
     return true;
 }
 
-static inline aclnnStatus CheckParams(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha,
-                                      const aclTensor *bias, const aclTensor *hin, const aclTensor *hPost,
-                                      const aclTensor *hRes, const aclTensor *hPre, const aclTensor *hcBeforeNorm,
-                                      const aclTensor *invRms, const aclTensor *sumOut, const aclTensor *normOut,
+static inline aclnnStatus CheckParams(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha,
+                                      const aclTensor* bias, const aclTensor* hin, const aclTensor* hPost,
+                                      const aclTensor* hRes, const aclTensor* hPre, const aclTensor* hcBeforeNorm,
+                                      const aclTensor* invRms, const aclTensor* sumOut, const aclTensor* normOut,
                                       int64_t hcMult, int64_t numIters, bool needBackward)
 {
     CHECK_RET(
@@ -374,12 +374,12 @@ static inline aclnnStatus CheckParams(const aclTensor *x, const aclTensor *phi, 
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMhcPreSinkhornGetWorkspaceSize(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha,
-                                                const aclTensor *bias, int64_t hcMult, int64_t numIters, double hcEps,
-                                                double normEps, bool needBackward, aclTensor *hin, aclTensor *hPost,
-                                                aclTensor *hRes, aclTensor *hPre, aclTensor *hcBeforeNorm,
-                                                aclTensor *invRms, aclTensor *sumOut, aclTensor *normOut,
-                                                uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnMhcPreSinkhornGetWorkspaceSize(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha,
+                                                const aclTensor* bias, int64_t hcMult, int64_t numIters, double hcEps,
+                                                double normEps, bool needBackward, aclTensor* hin, aclTensor* hPost,
+                                                aclTensor* hRes, aclTensor* hPre, aclTensor* hcBeforeNorm,
+                                                aclTensor* invRms, aclTensor* sumOut, aclTensor* normOut,
+                                                uint64_t* workspaceSize, aclOpExecutor** executor)
 
 {
     L2_DFX_PHASE_1(aclnnMhcPreSinkhorn, DFX_IN(x, phi, alpha, bias, hcMult, numIters, hcEps, normEps, needBackward),
@@ -397,16 +397,16 @@ aclnnStatus aclnnMhcPreSinkhornGetWorkspaceSize(const aclTensor *x, const aclTen
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;
     }
-    const aclTensor *xContiguous = l0op::Contiguous(x, uniqueExecutor.get());
+    const aclTensor* xContiguous = l0op::Contiguous(x, uniqueExecutor.get());
     CHECK_RET(xContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *phiContiguous = l0op::Contiguous(phi, uniqueExecutor.get());
+    const aclTensor* phiContiguous = l0op::Contiguous(phi, uniqueExecutor.get());
     CHECK_RET(phiContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *alphaContiguous = l0op::Contiguous(alpha, uniqueExecutor.get());
+    const aclTensor* alphaContiguous = l0op::Contiguous(alpha, uniqueExecutor.get());
     CHECK_RET(alphaContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *biasContiguous = l0op::Contiguous(bias, uniqueExecutor.get());
+    const aclTensor* biasContiguous = l0op::Contiguous(bias, uniqueExecutor.get());
     CHECK_RET(biasContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor *kernelOut = l0op::MhcPreSinkhorn(
+    const aclTensor* kernelOut = l0op::MhcPreSinkhorn(
         xContiguous, phiContiguous, alphaContiguous, biasContiguous, hcMult, numIters, hcEps, normEps, needBackward,
         hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut, uniqueExecutor.get());
     CHECK_RET(kernelOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -416,7 +416,7 @@ aclnnStatus aclnnMhcPreSinkhornGetWorkspaceSize(const aclTensor *x, const aclTen
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMhcPreSinkhorn(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMhcPreSinkhorn(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMhcPreSinkhorn);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);

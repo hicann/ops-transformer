@@ -58,7 +58,7 @@ struct GemvCoord : public Coord<2, uint32_t> {
 
     /// Constructs from Coord<2> and a batch
     CATLASS_HOST_DEVICE
-    GemvCoord(Coord<2, Index> const &coord)
+    GemvCoord(Coord<2, Index> const& coord)
         : Base(coord)
     {}
 
@@ -70,28 +70,28 @@ struct GemvCoord : public Coord<2, uint32_t> {
 
     /// Returns the GEMV M coordinate (row of the result y)
     CATLASS_HOST_DEVICE
-    Index const &m() const
+    Index const& m() const
     {
         return this->At(M_INDEX);
     }
 
     /// Returns reference to the GEMV M coordinate
     CATLASS_HOST_DEVICE
-    Index &m()
+    Index& m()
     {
         return this->At(M_INDEX);
     }
 
     /// Returns the GEMV N coordinate (column of the matrix A or the input vector x)
     CATLASS_HOST_DEVICE
-    Index const &n() const
+    Index const& n() const
     {
         return this->At(N_INDEX);
     }
 
     /// Returns reference to the GEMV N coordinate
     CATLASS_HOST_DEVICE
-    Index &n()
+    Index& n()
     {
         return this->At(N_INDEX);
     }

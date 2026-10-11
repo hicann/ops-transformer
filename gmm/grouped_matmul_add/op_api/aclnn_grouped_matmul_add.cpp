@@ -42,7 +42,7 @@ extern "C" {
 #endif
 
 namespace {
-static aclnnStatus CheckNotNull(gmm_add_advanced::GroupedMatmulAddParams params, const char *opName)
+static aclnnStatus CheckNotNull(gmm_add_advanced::GroupedMatmulAddParams params, const char* opName)
 {
     CHECK_COND(params.x != nullptr, ACLNN_ERR_PARAM_NULLPTR, "In op [%s], [%s] must not be nullptr.", opName, "x");
     CHECK_COND(params.weight != nullptr, ACLNN_ERR_PARAM_NULLPTR, "In op [%s], [%s] must not be nullptr.", opName,
@@ -54,7 +54,7 @@ static aclnnStatus CheckNotNull(gmm_add_advanced::GroupedMatmulAddParams params,
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckFormat(gmm_add_advanced::GroupedMatmulAddParams params, const char *opName)
+static aclnnStatus CheckFormat(gmm_add_advanced::GroupedMatmulAddParams params, const char* opName)
 {
     CHECK_COND(params.x->GetStorageFormat() == Format::FORMAT_ND, ACLNN_ERR_PARAM_INVALID,
                "In op [%s], when non-quant, the format of [%s] is not supported, got [%s].", opName, "x",
@@ -72,7 +72,7 @@ static aclnnStatus CheckFormat(gmm_add_advanced::GroupedMatmulAddParams params, 
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckShape(gmm_add_advanced::GroupedMatmulAddParams params, const char *opName)
+static aclnnStatus CheckShape(gmm_add_advanced::GroupedMatmulAddParams params, const char* opName)
 {
     auto xViewShape = params.x->GetViewShape();
     auto wViewShape = params.weight->GetViewShape();
@@ -159,15 +159,15 @@ static aclnnStatus CheckZeroShape(gmm_add_advanced::GroupedMatmulAddParams param
     return ret;
 }
 
-static aclnnStatus DataContiguous(const aclTensor *&tensor, aclOpExecutor *executor)
+static aclnnStatus DataContiguous(const aclTensor*& tensor, aclOpExecutor* executor)
 {
     tensor = l0op::Contiguous(tensor, executor);
     CHECK_RET(tensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ParamsDataContiguous(gmm_add_advanced::GroupedMatmulAddParams &params, aclOpExecutor *executorPtr,
-                                        const char *opName)
+static aclnnStatus ParamsDataContiguous(gmm_add_advanced::GroupedMatmulAddParams& params, aclOpExecutor* executorPtr,
+                                        const char* opName)
 {
     CHECK_COND(DataContiguous(params.x, executorPtr) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID,
                "In op [%s], when non-quant, contiguous [%s] failed.", opName, "x");
@@ -178,7 +178,7 @@ static aclnnStatus ParamsDataContiguous(gmm_add_advanced::GroupedMatmulAddParams
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckDtype(gmm_add_advanced::GroupedMatmulAddParams params, const char *opName)
+static aclnnStatus CheckDtype(gmm_add_advanced::GroupedMatmulAddParams params, const char* opName)
 {
     auto xDtype = params.x->GetDataType();
     auto weightDtype = params.weight->GetDataType();
@@ -199,7 +199,7 @@ static aclnnStatus CheckDtype(gmm_add_advanced::GroupedMatmulAddParams params, c
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckAttrs(gmm_add_advanced::GroupedMatmulAddParams params, const char *opName)
+static aclnnStatus CheckAttrs(gmm_add_advanced::GroupedMatmulAddParams params, const char* opName)
 {
     CHECK_COND(params.groupListType == 0 || params.groupListType == 1, ACLNN_ERR_PARAM_INVALID,
                "In op [%s], when non-quant, [%s] only supported 0/1, but got [%ld].", opName, "groupListType",
@@ -213,7 +213,7 @@ static aclnnStatus CheckAttrs(gmm_add_advanced::GroupedMatmulAddParams params, c
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckParams(gmm_add_advanced::GroupedMatmulAddParams params, const char *opName)
+static aclnnStatus CheckParams(gmm_add_advanced::GroupedMatmulAddParams params, const char* opName)
 {
     CHECK_RET(CheckNotNull(params, opName) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckFormat(params, opName) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
@@ -224,8 +224,8 @@ static aclnnStatus CheckParams(gmm_add_advanced::GroupedMatmulAddParams params, 
 }
 
 static aclnnStatus aclnnGroupedMatmulAddGetWorkspaceSizeCommon(gmm_add_advanced::GroupedMatmulAddParams params,
-                                                               uint64_t *workspaceSize, aclOpExecutor **executor,
-                                                               const char *opName)
+                                                               uint64_t* workspaceSize, aclOpExecutor** executor,
+                                                               const char* opName)
 {
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -259,12 +259,12 @@ static aclnnStatus aclnnGroupedMatmulAddGetWorkspaceSizeCommon(gmm_add_advanced:
 }
 } // namespace
 
-aclnnStatus aclnnGroupedMatmulAddGetWorkspaceSize(const aclTensor *x, const aclTensor *weight,
-                                                  const aclTensor *groupList, aclTensor *yRef, bool transposeX,
-                                                  bool transposeWeight, int64_t groupType, uint64_t *workspaceSize,
-                                                  aclOpExecutor **executor)
+aclnnStatus aclnnGroupedMatmulAddGetWorkspaceSize(const aclTensor* x, const aclTensor* weight,
+                                                  const aclTensor* groupList, aclTensor* yRef, bool transposeX,
+                                                  bool transposeWeight, int64_t groupType, uint64_t* workspaceSize,
+                                                  aclOpExecutor** executor)
 {
-    const char *opName = "grouped_matmul_add";
+    const char* opName = "grouped_matmul_add";
     gmm_add_advanced::GroupedMatmulAddParams params{x, weight, groupList, yRef, transposeX, transposeWeight, groupType};
     // Standard syntax, Check parameters.
     L2_DFX_PHASE_1(aclnnGroupedMatmulAdd, DFX_IN(x, weight, groupList, yRef, transposeX, transposeWeight, groupType),
@@ -272,12 +272,12 @@ aclnnStatus aclnnGroupedMatmulAddGetWorkspaceSize(const aclTensor *x, const aclT
     return aclnnGroupedMatmulAddGetWorkspaceSizeCommon(params, workspaceSize, executor, opName);
 }
 
-aclnnStatus aclnnGroupedMatmulAddV2GetWorkspaceSize(const aclTensor *x, const aclTensor *weight,
-                                                    const aclTensor *groupList, aclTensor *yRef, bool transposeX,
+aclnnStatus aclnnGroupedMatmulAddV2GetWorkspaceSize(const aclTensor* x, const aclTensor* weight,
+                                                    const aclTensor* groupList, aclTensor* yRef, bool transposeX,
                                                     bool transposeWeight, int64_t groupType, int64_t groupListType,
-                                                    uint64_t *workspaceSize, aclOpExecutor **executor)
+                                                    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    const char *opName = "grouped_matmul_add";
+    const char* opName = "grouped_matmul_add";
     gmm_add_advanced::GroupedMatmulAddParams params{x,          weight,          groupList, yRef,
                                                     transposeX, transposeWeight, groupType, groupListType};
     // Standard syntax, Check parameters.
@@ -287,7 +287,7 @@ aclnnStatus aclnnGroupedMatmulAddV2GetWorkspaceSize(const aclTensor *x, const ac
     return aclnnGroupedMatmulAddGetWorkspaceSizeCommon(params, workspaceSize, executor, opName);
 }
 
-aclnnStatus aclnnGroupedMatmulAdd(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnGroupedMatmulAdd(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnGroupedMatmulAdd);
     CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,
@@ -295,7 +295,7 @@ aclnnStatus aclnnGroupedMatmulAdd(void *workspace, uint64_t workspaceSize, aclOp
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnGroupedMatmulAddV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnGroupedMatmulAddV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                     aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnGroupedMatmulAddV2);

@@ -24,14 +24,15 @@ using namespace std;
 
 namespace {
 
-#define CHECK_RET(cond) ((cond) ? true :(false))
+#define CHECK_RET(cond) ((cond) ? true : (false))
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape) {
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
+{
     int64_t shapeSize = 1;
     for (auto i : shape) {
         shapeSize *= i;
@@ -39,7 +40,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape) {
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream) {
+int Init(int32_t deviceId, aclrtStream* stream)
+{
     // Fixed writing method, AscendCL initialization.
     auto ret = aclInit(nullptr);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
@@ -60,8 +62,9 @@ int Init(int32_t deviceId, aclrtStream *stream) {
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor) {
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
+{
     auto size = GetShapeSize(shape) * sizeof(T);
     // Call aclrtMalloc to request device side memory.
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -90,7 +93,8 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 
 } // namespace
 
-int main() {
+int main()
+{
     // 1. (Fixed writing method)  device/stream initialization. Refer to AscendCL's list of external interfaces.
     // Fill in the deviceId based on your actual device.
     int32_t deviceId = 0;
@@ -107,19 +111,19 @@ int main() {
     std::vector<int64_t> hResShape = {1, 1024, 4, 4};   // BSND
     std::vector<int64_t> hOutShape = {1, 1024, 5120};   // BSD
     std::vector<int64_t> hPostShape = {1, 1024, 4};     // BSn
-    std::vector<int64_t> outShape = {1, 1024, 4, 5120};  // BSND
+    std::vector<int64_t> outShape = {1, 1024, 4, 5120}; // BSND
 
-    void *xDeviceAddr = nullptr;
-    void *hResDeviceAddr = nullptr;
-    void *hOutDeviceAddr = nullptr;
-    void *hPostDeviceAddr = nullptr;
-    void *outDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* hResDeviceAddr = nullptr;
+    void* hOutDeviceAddr = nullptr;
+    void* hPostDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
 
-    aclTensor *xTensor = nullptr;
-    aclTensor *hResTensor = nullptr;
-    aclTensor *hOutTensor = nullptr;
-    aclTensor *hPostTensor = nullptr;
-    aclTensor *outTensor = nullptr;
+    aclTensor* xTensor = nullptr;
+    aclTensor* hResTensor = nullptr;
+    aclTensor* hOutTensor = nullptr;
+    aclTensor* hPostTensor = nullptr;
+    aclTensor* outTensor = nullptr;
 
     int64_t xShapeSize = GetShapeSize(xShape);
     int64_t hResShapeSize = GetShapeSize(hResShape);
@@ -161,17 +165,16 @@ int main() {
 
     // 3. Call CANN operator library API.
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     // Call the first interface.
-    ret = aclnnMhcPostGetWorkspaceSize(
-        xTensor, hResTensor, hOutTensor, hPostTensor, outTensor,
-        &workspaceSize, &executor);
+    ret = aclnnMhcPostGetWorkspaceSize(xTensor, hResTensor, hOutTensor, hPostTensor, outTensor, &workspaceSize,
+                                       &executor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         LOG_PRINT("aclnnMhcPostGetWorkspaceSize failed. ERROR: %d\n", ret);
         return ret;
     }
     // Apply for device memory based on the workspaceSize calculated from the first interface paragraph.
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0U) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         if (!CHECK_RET(ret == ACL_SUCCESS)) {

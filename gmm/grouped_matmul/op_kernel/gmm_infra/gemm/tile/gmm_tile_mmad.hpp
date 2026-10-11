@@ -38,8 +38,8 @@ struct TileMmad {
     TileMmad() {}
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<ElementAccumulator> const &l0CTensor,
-                    AscendC::LocalTensor<ElementA> const &l0ATensor, AscendC::LocalTensor<ElementB> const &l0BTensor,
+    void operator()(AscendC::LocalTensor<ElementAccumulator> const& l0CTensor,
+                    AscendC::LocalTensor<ElementA> const& l0ATensor, AscendC::LocalTensor<ElementB> const& l0BTensor,
                     uint32_t m, uint32_t n, uint32_t k, bool initC = true, uint8_t unitFlag = 0)
     {
         AscendC::MmadParams mmadParams;
@@ -63,9 +63,9 @@ struct TileMmad {
     }
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<ElementAccumulator> const &l0CTensor,
-                    AscendC::LocalTensor<ElementA> const &l0ATensor, AscendC::LocalTensor<ElementB> const &l0BTensor,
-                    AscendC::LocalTensor<ElementAccumulator> const &l0BiasTensor, uint32_t m, uint32_t n, uint32_t k,
+    void operator()(AscendC::LocalTensor<ElementAccumulator> const& l0CTensor,
+                    AscendC::LocalTensor<ElementA> const& l0ATensor, AscendC::LocalTensor<ElementB> const& l0BTensor,
+                    AscendC::LocalTensor<ElementAccumulator> const& l0BiasTensor, uint32_t m, uint32_t n, uint32_t k,
                     bool initC = true, uint8_t unitFlag = 0)
     {
         AscendC::MmadParams mmadParams;

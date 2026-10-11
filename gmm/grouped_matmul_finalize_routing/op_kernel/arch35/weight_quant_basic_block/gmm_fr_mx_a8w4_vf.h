@@ -32,7 +32,7 @@ using AscendC::Reg::RegTensor;
 
 namespace WeightQuantBatchMatmulV2::Arch35 {
 
-__simd_vf__ inline void InitZeroVf(__ubuf__ float *ubAddr, uint16_t loopCount)
+__simd_vf__ inline void InitZeroVf(__ubuf__ float* ubAddr, uint16_t loopCount)
 {
     Reg::RegTensor<float> zeroVreg;
     Reg::Duplicate(zeroVreg, 0);
@@ -49,7 +49,7 @@ static constexpr Reg::CastTrait CAST_B16_TO_B32_TRAIT = {AscendC::Reg::RegLayout
 ;
 
 template <typename sharedInputType>
-__simd_vf__ inline void CastAndMulWithSharedWeightVf(__ubuf__ float *dstAddr, __ubuf__ sharedInputType *srcAddr,
+__simd_vf__ inline void CastAndMulWithSharedWeightVf(__ubuf__ float* dstAddr, __ubuf__ sharedInputType* srcAddr,
                                                      uint16_t loopCount, float weight)
 {
     Reg::RegTensor<sharedInputType> sharedInputB16Vreg;
@@ -66,8 +66,8 @@ __simd_vf__ inline void CastAndMulWithSharedWeightVf(__ubuf__ float *dstAddr, __
 }
 
 template <typename biasType>
-__simd_callee__ inline void FrMxA8W4BiasCompute(uint16_t biasLoopNum, __ubuf__ biasType *biasInUbAddr,
-                                                __ubuf__ biasType *biasOutUbAddr)
+__simd_callee__ inline void FrMxA8W4BiasCompute(uint16_t biasLoopNum, __ubuf__ biasType* biasInUbAddr,
+                                                __ubuf__ biasType* biasOutUbAddr)
 {
     static constexpr biasType MX_BIAS_FACTOR = static_cast<biasType>(0.015625f);
     Reg::RegTensor<biasType> biasVreg, biasFactorVreg;
@@ -104,8 +104,8 @@ __simd_vf__ inline void FrAntiQuantMxA8W4NzNkVf(MxA8W4NzParams<xType, wType, bia
             // 4bit物理地址位移 = 逻辑索引 >> 1
             Reg::AddrReg aregWeightB8In = Reg::CreateAddrReg<uint8_t>(
                 loopKIdx, (C0_SIZE_B8 * mxA8W4NzParams.nRealSizeAlign) >> 1, innerLoopIdx, VECTOR_REG_WIDTH >> 1);
-            Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_US_B8>((Reg::RegTensor<uint8_t> &)wLoad,
-                                                               (__ubuf__ uint8_t *&)mxA8W4NzParams.weightLowBitPhyAddr,
+            Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_US_B8>((Reg::RegTensor<uint8_t>&)wLoad,
+                                                               (__ubuf__ uint8_t*&)mxA8W4NzParams.weightLowBitPhyAddr,
                                                                aregWeightB8In);
 
             Reg::ShiftRight(wShr0, wLoad, wShrReg, preg);
@@ -117,14 +117,14 @@ __simd_vf__ inline void FrAntiQuantMxA8W4NzNkVf(MxA8W4NzParams<xType, wType, bia
             Reg::AddrReg aregWeightB8Out = Reg::CreateAddrReg<uint8_t>(loopKIdx, mxA8W4NzParams.loopKDstStride,
                                                                        innerLoopIdx, mxA8W4NzParams.innerDstStride);
             Reg::StoreAlign<uint8_t, Reg::StoreDist::DIST_NORM_B8>(
-                (__ubuf__ uint8_t *&)mxA8W4NzParams.weightHighBitPhyAddr, (Reg::RegTensor<uint8_t> &)wAnd,
+                (__ubuf__ uint8_t*&)mxA8W4NzParams.weightHighBitPhyAddr, (Reg::RegTensor<uint8_t>&)wAnd,
                 aregWeightB8Out, preg);
         }
     }
 }
 
-__simd_vf__ inline void FrMulLogitsVf(uint16_t mSize, uint64_t nLoopCnt, __ubuf__ float *logitsUbAddr,
-                                      __ubuf__ float *yUbAddr)
+__simd_vf__ inline void FrMulLogitsVf(uint16_t mSize, uint64_t nLoopCnt, __ubuf__ float* logitsUbAddr,
+                                      __ubuf__ float* yUbAddr)
 {
     Reg::RegTensor<float> yFp32;
     Reg::RegTensor<float> logits;

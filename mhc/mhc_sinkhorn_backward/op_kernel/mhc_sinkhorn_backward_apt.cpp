@@ -18,8 +18,8 @@ using namespace AscendC;
 using namespace MhcSinkhornBackward;
 
 template <int64_t TILING_KEY>
-__global__ __aicore__ void mhc_sinkhorn_backward(GM_ADDR gradY, GM_ADDR norm, GM_ADDR sum,
-                                                 GM_ADDR gradInput, GM_ADDR workSpace, GM_ADDR tiling)
+__global__ __aicore__ void mhc_sinkhorn_backward(GM_ADDR gradY, GM_ADDR norm, GM_ADDR sum, GM_ADDR gradInput,
+                                                 GM_ADDR workSpace, GM_ADDR tiling)
 {
     GM_ADDR user = GetUserWorkspace(workSpace);
     if (user == nullptr) {

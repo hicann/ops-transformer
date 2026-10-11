@@ -75,20 +75,20 @@ public:
     using bT = typename mmType::BT;
 
 public:
-    __aicore__ inline GMMA8W4MidProcess(typename mmType::MT &matmul)
+    __aicore__ inline GMMA8W4MidProcess(typename mmType::MT& matmul)
         : mm(matmul)
     {}
     __aicore__ inline void Init(const GMAddrParams gmAddrParams,
-                                const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN);
-    __aicore__ inline void Process(WorkSpaceSplitConfig &workspaceSplitConfig, int64_t workspaceSplitLoopIdx);
+                                const GMMSwigluQuantV2BaseParams* __restrict gmmSwigluQuantV2BaseParamsIN);
+    __aicore__ inline void Process(WorkSpaceSplitConfig& workspaceSplitConfig, int64_t workspaceSplitLoopIdx);
 
 private:
-    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig &mnConfig, WorkSpaceSplitConfig &workspaceSplitConfig);
-    __aicore__ inline void SetMNConfig(const int32_t splitValue, MNConfig &mnConfig);
-    __aicore__ inline void UpdateMnConfig(MNConfig &mnConfig);
+    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig& mnConfig, WorkSpaceSplitConfig& workspaceSplitConfig);
+    __aicore__ inline void SetMNConfig(const int32_t splitValue, MNConfig& mnConfig);
+    __aicore__ inline void UpdateMnConfig(MNConfig& mnConfig);
 
 private:
-    typename mmType::MT &mm;
+    typename mmType::MT& mm;
     const uint32_t HALF_ALIGN = 16;
     GlobalTensor<int4b_t> xGM;
     GlobalTensor<int4b_t> xGM1;
@@ -110,26 +110,26 @@ private:
     uint32_t quantGroupSize = 0;
     uint32_t vecCount = 0;
     uint32_t xRowSumCount = 0;
-    const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParams;
+    const GMMSwigluQuantV2BaseParams* __restrict gmmSwigluQuantV2BaseParams;
 };
 
 template <typename mmType>
 __aicore__ inline void GMMA8W4MidProcess<mmType>::Init(
-    const GMAddrParams gmAddrParams, const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN)
+    const GMAddrParams gmAddrParams, const GMMSwigluQuantV2BaseParams* __restrict gmmSwigluQuantV2BaseParamsIN)
 {
     if ASCEND_IS_AIC {
         gmmSwigluQuantV2BaseParams = gmmSwigluQuantV2BaseParamsIN;
         xRowSumCount = gmmSwigluQuantV2BaseParams->M;
-        xGM1.SetGlobalBuffer((__gm__ int4b_t *)gmAddrParams.workSpaceGM); // 从前处理中获得的结果
+        xGM1.SetGlobalBuffer((__gm__ int4b_t*)gmAddrParams.workSpaceGM); // 从前处理中获得的结果
         xGM2.SetGlobalBuffer(
-            (__gm__ int4b_t *)((__gm__ int8_t *)gmAddrParams.workSpaceGM + gmAddrParams.workSpaceOffset1));
+            (__gm__ int4b_t*)((__gm__ int8_t*)gmAddrParams.workSpaceGM + gmAddrParams.workSpaceOffset1));
         weightGM.SetGlobalBuffer(GetTensorAddr<int4b_t>(0, gmAddrParams.weightGM));
         weightScaleGM.SetGlobalBuffer(GetTensorAddr<uint64_t>(0, gmAddrParams.weightScaleGM));
-        groupListGM.SetGlobalBuffer((__gm__ int64_t *)gmAddrParams.groupListGM);
+        groupListGM.SetGlobalBuffer((__gm__ int64_t*)gmAddrParams.groupListGM);
         mmOutGM1.SetGlobalBuffer(
-            (__gm__ half *)((__gm__ int8_t *)gmAddrParams.workSpaceGM + gmAddrParams.workSpaceOffset2));
+            (__gm__ half*)((__gm__ int8_t*)gmAddrParams.workSpaceGM + gmAddrParams.workSpaceOffset2));
         mmOutGM2.SetGlobalBuffer(
-            (__gm__ half *)((__gm__ int8_t *)gmAddrParams.workSpaceGM + gmAddrParams.workSpaceOffset3));
+            (__gm__ half*)((__gm__ int8_t*)gmAddrParams.workSpaceGM + gmAddrParams.workSpaceOffset3));
         quantGroupSize = gmmSwigluQuantV2BaseParams->K / gmmSwigluQuantV2BaseParams->quantGroupNum; // 约束为整除关系
         subBlockIdx = GetSubBlockIdx();
         coreIdx = GetBlockIdx();
@@ -139,7 +139,7 @@ __aicore__ inline void GMMA8W4MidProcess<mmType>::Init(
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MidProcess<mmType>::UpdateMnConfig(MNConfig &mnConfig)
+__aicore__ inline void GMMA8W4MidProcess<mmType>::UpdateMnConfig(MNConfig& mnConfig)
 {
     if constexpr (bT::format == CubeFormat::NZ) {
         mnConfig.wBaseOffset +=
@@ -154,7 +154,7 @@ __aicore__ inline void GMMA8W4MidProcess<mmType>::UpdateMnConfig(MNConfig &mnCon
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MidProcess<mmType>::SetMNConfig(const int32_t splitValue, MNConfig &mnConfig)
+__aicore__ inline void GMMA8W4MidProcess<mmType>::SetMNConfig(const int32_t splitValue, MNConfig& mnConfig)
 {
     mnConfig.m = static_cast<int64_t>(splitValue);
     mnConfig.baseM = gmmSwigluQuantV2BaseParams->baseM;
@@ -164,7 +164,7 @@ __aicore__ inline void GMMA8W4MidProcess<mmType>::SetMNConfig(const int32_t spli
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MidProcess<mmType>::Process(WorkSpaceSplitConfig &workspaceSplitConfig,
+__aicore__ inline void GMMA8W4MidProcess<mmType>::Process(WorkSpaceSplitConfig& workspaceSplitConfig,
                                                           int64_t workspaceSplitLoopIdx)
 {
     if ASCEND_IS_AIC {
@@ -225,8 +225,8 @@ __aicore__ inline void GMMA8W4MidProcess<mmType>::Process(WorkSpaceSplitConfig &
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MidProcess<mmType>::MMCompute(uint32_t groupIdx, MNConfig &mnConfig,
-                                                            WorkSpaceSplitConfig &workspaceSplitConfig)
+__aicore__ inline void GMMA8W4MidProcess<mmType>::MMCompute(uint32_t groupIdx, MNConfig& mnConfig,
+                                                            WorkSpaceSplitConfig& workspaceSplitConfig)
 {
     uint32_t tailN = mnConfig.nIdx * mnConfig.singleN;
     uint32_t curSingleN = mnConfig.singleN;

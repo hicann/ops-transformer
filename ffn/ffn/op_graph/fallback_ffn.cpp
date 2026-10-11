@@ -39,7 +39,7 @@ constexpr size_t kffnInputantiquantOffset1 = 12;
 constexpr size_t kffnInputantiquantOffset2 = 13;
 constexpr size_t kffnOutput = 0;
 
-inline static aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool enableTranspose = false,
+inline static aclTensor* GeTensor2AclTensor(const gert::Tensor* geTensor, bool enableTranspose = false,
                                             bool enableNZ = false)
 {
     if (geTensor == nullptr) {
@@ -53,7 +53,7 @@ inline static aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
     static const auto aclCreateTensor = GET_OP_API_FUNC(aclCreateTensor);
     OP_CHECK_IF((aclCreateTensor == nullptr), OP_LOGE("aclnnfallback", "aclCreateTensor nullptr"), return nullptr);
 
-    void *deviceAddr = const_cast<void *>(geTensor->GetAddr());
+    void* deviceAddr = const_cast<void*>(geTensor->GetAddr());
 
     // convert data type
     auto dataType_ge = geTensor->GetDataType();
@@ -89,14 +89,14 @@ inline static aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
     if (enableNZ && GetPrimaryFormat(geTensor->GetStorageFormat()) == ge::Format::FORMAT_FRACTAL_NZ) {
         aclFormat = aclFormat::ACL_FORMAT_FRACTAL_NZ;
     }
-    aclTensor *out = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides.data(), 0, aclFormat,
+    aclTensor* out = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides.data(), 0, aclFormat,
                                      shape.data(), shape.size(), deviceAddr);
     OP_CHECK_IF((out == nullptr), OP_LOGE("aclnnfallback", "out nullptr"), return nullptr);
 
     return out;
 }
 
-static graphStatus FFNExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus FFNExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
 
@@ -140,16 +140,15 @@ static graphStatus FFNExecuteFunc(OpExecuteContext *host_api_ctx)
     OP_CHECK_IF((output_ge == nullptr), OP_LOGE("aclnnfallback", "output_ge is null"), return GRAPH_FAILED);
     auto attrs = host_api_ctx->GetAttrs();
     OP_CHECK_IF((attrs == nullptr), OP_LOGE("aclnnfallback", "attrs is null"), return GRAPH_FAILED);
-    const char *activation_type_ge = attrs->GetAttrPointer<char>(0);
-    const int64_t *inner_pricise_ge = attrs->GetAttrPointer<int64_t>(1);
-    const bool *tokens_index_flag_ge = attrs->GetAttrPointer<bool>(3);
+    const char* activation_type_ge = attrs->GetAttrPointer<char>(0);
+    const int64_t* inner_pricise_ge = attrs->GetAttrPointer<int64_t>(1);
+    const bool* tokens_index_flag_ge = attrs->GetAttrPointer<bool>(3);
     // execute opapi
     auto api_ret = EXEC_OPAPI_CMD(aclnnFFNV3, x_acl, weight1_acl, weight2_acl, expert_tokens_ge, bias1_ge, bias2_ge,
                                   scale_ge, offset_ge, deq_scale1_ge, deq_scale2_ge, antiquant_scale1_ge,
                                   antiquant_scale2_ge, antiquant_offset1_ge, antiquant_offset2_ge, activation_type_ge,
                                   *inner_pricise_ge, *tokens_index_flag_ge, output_acl);
-    OP_CHECK_IF((api_ret != GRAPH_SUCCESS), OP_LOGE("aclnnfallback", "api_ret faild:%u", api_ret),
-               return GRAPH_FAILED);
+    OP_CHECK_IF((api_ret != GRAPH_SUCCESS), OP_LOGE("aclnnfallback", "api_ret faild:%u", api_ret), return GRAPH_FAILED);
 
     return GRAPH_SUCCESS;
 }

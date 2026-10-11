@@ -51,10 +51,11 @@ static ge::graphStatus InferShape4MhcSinkhornBackward(gert::InferShapeContext* c
     }
 
     size_t gradYDims = gradYShape->GetDimNum();
-    OP_CHECK_IF((gradYDims != TNN_DIMS) && (gradYDims != BSNN_DIMS),
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "gradY",
-            std::to_string(gradYDims).c_str(), "the dim of gradY must be 3 or 4"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (gradYDims != TNN_DIMS) && (gradYDims != BSNN_DIMS),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "gradY", std::to_string(gradYDims).c_str(),
+                                                 "the dim of gradY must be 3 or 4"),
+        return ge::GRAPH_FAILED);
 
     gradInputShape->SetDimNum(gradYDims);
     for (size_t i = 0; i < gradYDims; ++i) {

@@ -24,7 +24,7 @@ namespace grouped_matmul_finalize_routing {
 class GroupedMatmulFinalizeRoutingBaseTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
 public:
-    explicit GroupedMatmulFinalizeRoutingBaseTiling(gert::TilingContext *context)
+    explicit GroupedMatmulFinalizeRoutingBaseTiling(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context) {};
 
     ~GroupedMatmulFinalizeRoutingBaseTiling() override = default;

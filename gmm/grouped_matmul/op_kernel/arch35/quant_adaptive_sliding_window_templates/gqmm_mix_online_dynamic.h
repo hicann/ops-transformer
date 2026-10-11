@@ -49,8 +49,8 @@ public:
     __aicore__ inline ~GQmmMixRegbaseKernel();
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR groupList,
                                 GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                const GMMQuantParams *__restrict gmmBaseParamsIn,
-                                const TCubeTiling *__restrict mmTilingDataIn, TILING_TYPE *gmmArrayAddrIn, TPipe *pipe);
+                                const GMMQuantParams* __restrict gmmBaseParamsIn,
+                                const TCubeTiling* __restrict mmTilingDataIn, TILING_TYPE* gmmArrayAddrIn, TPipe* pipe);
     __aicore__ inline void Process();
 
 public:
@@ -64,9 +64,9 @@ public:
 
 protected:
     __aicore__ inline void InitAddrAndParams(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR groupList,
-                                             GM_ADDR perTokenScale, GM_ADDR y, TILING_TYPE *gmmArrayAddrIn);
+                                             GM_ADDR perTokenScale, GM_ADDR y, TILING_TYPE* gmmArrayAddrIn);
     __aicore__ inline void UpdateMMGlobalAddr(uint32_t groupIdx);
-    __aicore__ inline void SetMNK(uint32_t loopIdx, uint32_t groupIdx, int32_t &mSize, int32_t &nSize, int32_t &kSize);
+    __aicore__ inline void SetMNK(uint32_t loopIdx, uint32_t groupIdx, int32_t& mSize, int32_t& nSize, int32_t& kSize);
     __aicore__ inline void CalcTailTile(uint64_t mTail, uint64_t nTail);
     __aicore__ inline bool IsLastGroupAndNeedSplit(uint32_t groupIdx);
     __aicore__ inline bool IsLastGroupAndRound(uint32_t groupIdx, uint64_t roundIdx);
@@ -74,16 +74,16 @@ protected:
     __aicore__ inline void MMCompute();
     __aicore__ inline void DequantCompute();
     __aicore__ inline void End();
-    __aicore__ inline void VFDoDequantWithAPertoken(__ubuf__ yType *dequantOutInUbAddr, __ubuf__ l0cType *l0cOutUbAddr,
+    __aicore__ inline void VFDoDequantWithAPertoken(__ubuf__ yType* dequantOutInUbAddr, __ubuf__ l0cType* l0cOutUbAddr,
                                                     uint64_t offsetPtScale, uint16_t mSize);
-    __aicore__ inline void VFDoDequantWithAPertensor(__ubuf__ yType *dequantOutInUbAddr, __ubuf__ l0cType *l0cOutUbAddr,
+    __aicore__ inline void VFDoDequantWithAPertensor(__ubuf__ yType* dequantOutInUbAddr, __ubuf__ l0cType* l0cOutUbAddr,
                                                      uint16_t mSize);
-    __aicore__ inline void VFDoDequantWithoutAScale(__ubuf__ yType *dequantOutInUbAddr, __ubuf__ l0cType *l0cOutUbAddr,
+    __aicore__ inline void VFDoDequantWithoutAScale(__ubuf__ yType* dequantOutInUbAddr, __ubuf__ l0cType* l0cOutUbAddr,
                                                     uint16_t mSize);
     template <bool isPertensor, QuantUtils::QuantMode aQuantMode, bool isBiasEpilogue,
               GROUPED_MATMUL::ActiveType activeType>
-    __aicore__ inline void VFDoDequant(__ubuf__ yType *dst, __ubuf__ l0cType *l0cOut, __ubuf__ scaleType *scale,
-                                       __ubuf__ ptScaleType *perTokenScale, __ubuf__ biasType *bias, uint16_t mSize,
+    __aicore__ inline void VFDoDequant(__ubuf__ yType* dst, __ubuf__ l0cType* l0cOut, __ubuf__ scaleType* scale,
+                                       __ubuf__ ptScaleType* perTokenScale, __ubuf__ biasType* bias, uint16_t mSize,
                                        uint16_t nSize);
     __aicore__ inline void NotifyCube()
     {
@@ -106,10 +106,10 @@ protected:
         CrossCoreWaitFlag<QuantUtils::SYNC_AIC_AIV_MODE, PIPE_V>(QuantUtils::AIC_SYNC_AIV_FLAG);
     }
     __aicore__ inline void CopyDataFromGm2Ub();
-    __aicore__ inline void CopyX1ScaleFromGm2Ub(LocalTensor<ptScaleType> &dst, uint64_t blockLen, uint64_t offset);
-    __aicore__ inline void CopyX2ScaleFromGm2Ub(LocalTensor<scaleType> &dst);
-    __aicore__ inline void CopyBiasFromGm2Ub(LocalTensor<biasType> &dst);
-    __aicore__ inline void CopyDequantResFromUb2Gm(uint64_t blockCount, uint64_t offset, LocalTensor<yType> &src);
+    __aicore__ inline void CopyX1ScaleFromGm2Ub(LocalTensor<ptScaleType>& dst, uint64_t blockLen, uint64_t offset);
+    __aicore__ inline void CopyX2ScaleFromGm2Ub(LocalTensor<scaleType>& dst);
+    __aicore__ inline void CopyBiasFromGm2Ub(LocalTensor<biasType>& dst);
+    __aicore__ inline void CopyDequantResFromUb2Gm(uint64_t blockCount, uint64_t offset, LocalTensor<yType>& src);
     __aicore__ inline void UbSetFlag();
 
 protected:
@@ -131,12 +131,12 @@ protected:
     constexpr static uint16_t OUTPUT_BUFFER_FLAG_1 = 1;
     GroupedMatmul::QuantASWBlockSch block_;
 
-    const TCubeTiling *__restrict mmTilingData_;
-    const GMMQuantParams *__restrict gmmQuantParams_;
+    const TCubeTiling* __restrict mmTilingData_;
+    const GMMQuantParams* __restrict gmmQuantParams_;
 
-    TILING_TYPE *mListGm_;
-    TILING_TYPE *kListGm_;
-    TILING_TYPE *nListGm_;
+    TILING_TYPE* mListGm_;
+    TILING_TYPE* kListGm_;
+    TILING_TYPE* nListGm_;
 
     GlobalTensor<xType> xGlobal_;
     GlobalTensor<wType> wGlobal_;
@@ -187,8 +187,8 @@ __aicore__ inline GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::~GQmmMix
 LOCAL_TEMPLATE_CLASS_MIX_PARAMS
 __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::Init(
     GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR y,
-    GM_ADDR workspace, const GMMQuantParams *__restrict gmmBaseParamsIn, const TCubeTiling *__restrict mmTilingDataIn,
-    TILING_TYPE *gmmArrayAddrIn, TPipe *pipe)
+    GM_ADDR workspace, const GMMQuantParams* __restrict gmmBaseParamsIn, const TCubeTiling* __restrict mmTilingDataIn,
+    TILING_TYPE* gmmArrayAddrIn, TPipe* pipe)
 {
     blockIdx_ = GetBlockIdx();
     if ASCEND_IS_AIV {
@@ -244,7 +244,7 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::Ini
 LOCAL_TEMPLATE_CLASS_MIX_PARAMS
 __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::InitAddrAndParams(
     GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR y,
-    TILING_TYPE *gmmArrayAddrIn)
+    TILING_TYPE* gmmArrayAddrIn)
 {
     groupNum_ = gmmQuantParams_->groupNum;
     groupType_ = gmmQuantParams_->groupType;
@@ -257,9 +257,9 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::Ini
     groupListPtr_ = groupList;
     perTokenScalePtr_ = perTokenScale;
     yTensorPtr_ = y;
-    scaleAGlobal_.SetGlobalBuffer((__gm__ ptScaleType *)perTokenScale);
+    scaleAGlobal_.SetGlobalBuffer((__gm__ ptScaleType*)perTokenScale);
     if (groupList != nullptr) {
-        groupListGlobal_.SetGlobalBuffer((__gm__ int64_t *)groupList);
+        groupListGlobal_.SetGlobalBuffer((__gm__ int64_t*)groupList);
     }
     mListGm_ = gmmArrayAddrIn;
     kListGm_ = gmmArrayAddrIn + GROUPED_MATMUL::MKN_LIST_LEN;
@@ -279,7 +279,7 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::Upd
     }
     if (gmmQuantParams_->bQuantMode == static_cast<uint32_t>(QuantUtils::QuantMode::PERTENSOR_MODE)) {
         scaleType scaleBValue =
-            *((__gm__ scaleType *)(GROUPED_MATMUL::GetTensorAddr<scaleType>(0, scaleTensorPtr_) + groupIdx));
+            *((__gm__ scaleType*)(GROUPED_MATMUL::GetTensorAddr<scaleType>(0, scaleTensorPtr_) + groupIdx));
         if constexpr (IsSameType<scaleType, bfloat16_t>::value) {
             scaleScalar_ = ToFloat(scaleBValue);
         } else {
@@ -290,14 +290,14 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::Upd
                                       block_.params_.wScaleGroupAddrOffset);
     }
     if (gmmQuantParams_->aQuantMode == static_cast<uint32_t>(QuantUtils::QuantMode::PERTENSOR_MODE)) {
-        perTokenScaleScalar_ = *((__gm__ ptScaleType *)perTokenScalePtr_ + groupIdx);
+        perTokenScaleScalar_ = *((__gm__ ptScaleType*)perTokenScalePtr_ + groupIdx);
     }
     yGlobal_.SetGlobalBuffer(GROUPED_MATMUL::GetTensorAddr<yType>(0, yTensorPtr_) + block_.params_.cGroupAddrOffset);
 }
 LOCAL_TEMPLATE_CLASS_MIX_PARAMS
 __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::SetMNK(uint32_t loopIdx, uint32_t groupIdx,
-                                                                                    int32_t &mSize, int32_t &nSize,
-                                                                                    int32_t &kSize)
+                                                                                    int32_t& mSize, int32_t& nSize,
+                                                                                    int32_t& kSize)
 {
     int32_t splitValue =
         QuantUtils::GetSplitValueFromGroupList(loopIdx, preOffset_, groupType_, groupListType_, groupListGlobal_);
@@ -491,12 +491,12 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::Deq
             break;
         }
         auto mSize = singleMInVec - i * mSizeForOnce >= mSizeForOnce ? mSizeForOnce : singleMInVec - i * mSizeForOnce;
-        LocalTensor<yType> &dequantOutInUB =
+        LocalTensor<yType>& dequantOutInUB =
             (dequantOutInUBPingPongID_ == 0) ? dequantOutInUBPing_ : dequantOutInUBPong_;
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(dequantOutInUBPingPongID_);
 
-        __ubuf__ yType *dequantOutInUbAddr = (__ubuf__ yType *)dequantOutInUB.GetPhyAddr();
-        __ubuf__ l0cType *l0cOutUbAddr = (__ubuf__ l0cType *)l0cOutUb_.GetPhyAddr();
+        __ubuf__ yType* dequantOutInUbAddr = (__ubuf__ yType*)dequantOutInUB.GetPhyAddr();
+        __ubuf__ l0cType* l0cOutUbAddr = (__ubuf__ l0cType*)l0cOutUb_.GetPhyAddr();
         l0cOutUbAddr = l0cOutUbAddr + offsetL0c;
 
         switch (gmmQuantParams_->aQuantMode) {
@@ -555,7 +555,7 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::Cop
 
 LOCAL_TEMPLATE_CLASS_MIX_PARAMS
 __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::CopyX1ScaleFromGm2Ub(
-    LocalTensor<ptScaleType> &dst, uint64_t blockLen, uint64_t offset)
+    LocalTensor<ptScaleType>& dst, uint64_t blockLen, uint64_t offset)
 {
     DataCopyParams ptScale2UbParams{1, 0, 0, 0};
     DataCopyPadParams padParams;
@@ -565,7 +565,7 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::Cop
 
 LOCAL_TEMPLATE_CLASS_MIX_PARAMS
 __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::CopyX2ScaleFromGm2Ub(
-    LocalTensor<scaleType> &dst)
+    LocalTensor<scaleType>& dst)
 {
     DataCopyParams scale2UbParams{1, 0, 0, 0};
     DataCopyPadParams padParams;
@@ -575,7 +575,7 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::Cop
 
 LOCAL_TEMPLATE_CLASS_MIX_PARAMS
 __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::CopyBiasFromGm2Ub(
-    LocalTensor<biasType> &dst)
+    LocalTensor<biasType>& dst)
 {
     DataCopyParams bias2UbParams{1, 0, 0, 0};
     DataCopyPadParams padParams;
@@ -585,7 +585,7 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::Cop
 
 LOCAL_TEMPLATE_CLASS_MIX_PARAMS
 __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::CopyDequantResFromUb2Gm(
-    uint64_t blockCount, uint64_t offset, LocalTensor<yType> &src)
+    uint64_t blockCount, uint64_t offset, LocalTensor<yType>& src)
 {
     DataCopyExtParams ub2GmParams{1, 0, 0, 0, 0};
     ub2GmParams.blockLen = block_.params_.singleCoreN * sizeof(yType);
@@ -612,9 +612,9 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::UbS
 
 LOCAL_TEMPLATE_CLASS_MIX_PARAMS
 __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::VFDoDequantWithAPertoken(
-    __ubuf__ yType *dequantOutInUbAddr, __ubuf__ l0cType *l0cOutUbAddr, uint64_t offsetPtScale, uint16_t mSize)
+    __ubuf__ yType* dequantOutInUbAddr, __ubuf__ l0cType* l0cOutUbAddr, uint64_t offsetPtScale, uint16_t mSize)
 {
-    __ubuf__ ptScaleType *ptScaleUbAddr = (__ubuf__ ptScaleType *)ptScaleUb_.GetPhyAddr();
+    __ubuf__ ptScaleType* ptScaleUbAddr = (__ubuf__ ptScaleType*)ptScaleUb_.GetPhyAddr();
     ptScaleUbAddr = ptScaleUbAddr + offsetPtScale;
     if (!isBiasEpilogue_) {
         if (gmmQuantParams_->bQuantMode == static_cast<uint32_t>(QuantUtils::QuantMode::PERTENSOR_MODE)) {
@@ -625,33 +625,33 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::VFD
                 case GROUPED_MATMUL::ActiveType::FASTGELU: {
                     VFDoDequant<false, QuantUtils::QuantMode::PERTOKEN_MODE, false,
                                 GROUPED_MATMUL::ActiveType::FASTGELU>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
                         nullptr, mSize, block_.params_.singleCoreN);
                     break;
                 }
                 case GROUPED_MATMUL::ActiveType::SILU: {
                     VFDoDequant<false, QuantUtils::QuantMode::PERTOKEN_MODE, false, GROUPED_MATMUL::ActiveType::SILU>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
                         nullptr, mSize, block_.params_.singleCoreN);
                     break;
                 }
                 case GROUPED_MATMUL::ActiveType::RELU: {
                     VFDoDequant<false, QuantUtils::QuantMode::PERTOKEN_MODE, false, GROUPED_MATMUL::ActiveType::RELU>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
                         nullptr, mSize, block_.params_.singleCoreN);
                     break;
                 }
                 case GROUPED_MATMUL::ActiveType::GELU_TANH: {
                     VFDoDequant<false, QuantUtils::QuantMode::PERTOKEN_MODE, false,
                                 GROUPED_MATMUL::ActiveType::GELU_TANH>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
                         nullptr, mSize, block_.params_.singleCoreN);
                     break;
                 }
                 default: {
                     VFDoDequant<false, QuantUtils::QuantMode::PERTOKEN_MODE, false,
                                 GROUPED_MATMUL::ActiveType::INVALID_TYPE>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
                         nullptr, mSize, block_.params_.singleCoreN);
                     break;
                 }
@@ -660,41 +660,41 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::VFD
     } else {
         if (gmmQuantParams_->bQuantMode == static_cast<uint32_t>(QuantUtils::QuantMode::PERTENSOR_MODE)) {
             VFDoDequant<true, QuantUtils::QuantMode::PERTOKEN_MODE, true, GROUPED_MATMUL::ActiveType::INVALID_TYPE>(
-                dequantOutInUbAddr, l0cOutUbAddr, nullptr, ptScaleUbAddr, (__ubuf__ biasType *)biasUb_.GetPhyAddr(),
+                dequantOutInUbAddr, l0cOutUbAddr, nullptr, ptScaleUbAddr, (__ubuf__ biasType*)biasUb_.GetPhyAddr(),
                 mSize, block_.params_.singleCoreN);
         } else {
             switch (GROUPED_MATMUL::ActiveType(gmmQuantParams_->activeType)) {
                 case GROUPED_MATMUL::ActiveType::FASTGELU: {
                     VFDoDequant<false, QuantUtils::QuantMode::PERTOKEN_MODE, true,
                                 GROUPED_MATMUL::ActiveType::FASTGELU>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
-                        (__ubuf__ biasType *)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                        (__ubuf__ biasType*)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
                     break;
                 }
                 case GROUPED_MATMUL::ActiveType::SILU: {
                     VFDoDequant<false, QuantUtils::QuantMode::PERTOKEN_MODE, true, GROUPED_MATMUL::ActiveType::SILU>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
-                        (__ubuf__ biasType *)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                        (__ubuf__ biasType*)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
                     break;
                 }
                 case GROUPED_MATMUL::ActiveType::RELU: {
                     VFDoDequant<false, QuantUtils::QuantMode::PERTOKEN_MODE, true, GROUPED_MATMUL::ActiveType::RELU>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
-                        (__ubuf__ biasType *)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                        (__ubuf__ biasType*)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
                     break;
                 }
                 case GROUPED_MATMUL::ActiveType::GELU_TANH: {
                     VFDoDequant<false, QuantUtils::QuantMode::PERTOKEN_MODE, true,
                                 GROUPED_MATMUL::ActiveType::GELU_TANH>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
-                        (__ubuf__ biasType *)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                        (__ubuf__ biasType*)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
                     break;
                 }
                 default: {
                     VFDoDequant<false, QuantUtils::QuantMode::PERTOKEN_MODE, true,
                                 GROUPED_MATMUL::ActiveType::INVALID_TYPE>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
-                        (__ubuf__ biasType *)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                        (__ubuf__ biasType*)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
                     break;
                 }
             }
@@ -704,46 +704,46 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::VFD
 
 LOCAL_TEMPLATE_CLASS_MIX_PARAMS
 __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::VFDoDequantWithAPertensor(
-    __ubuf__ yType *dequantOutInUbAddr, __ubuf__ l0cType *l0cOutUbAddr, uint16_t mSize)
+    __ubuf__ yType* dequantOutInUbAddr, __ubuf__ l0cType* l0cOutUbAddr, uint16_t mSize)
 {
     VFDoDequant<false, QuantUtils::QuantMode::PERTENSOR_MODE, false, GROUPED_MATMUL::ActiveType::INVALID_TYPE>(
-        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), nullptr, nullptr, mSize,
+        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), nullptr, nullptr, mSize,
         block_.params_.singleCoreN);
 }
 
 LOCAL_TEMPLATE_CLASS_MIX_PARAMS
 __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::VFDoDequantWithoutAScale(
-    __ubuf__ yType *dequantOutInUbAddr, __ubuf__ l0cType *l0cOutUbAddr, uint16_t mSize)
+    __ubuf__ yType* dequantOutInUbAddr, __ubuf__ l0cType* l0cOutUbAddr, uint16_t mSize)
 {
     if (!isBiasEpilogue_) {
         switch (GROUPED_MATMUL::ActiveType(gmmQuantParams_->activeType)) {
             case GROUPED_MATMUL::ActiveType::FASTGELU: {
                 VFDoDequant<false, QuantUtils::QuantMode::DEFAULT, false, GROUPED_MATMUL::ActiveType::FASTGELU>(
-                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), nullptr, nullptr,
+                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), nullptr, nullptr,
                     mSize, block_.params_.singleCoreN);
                 break;
             }
             case GROUPED_MATMUL::ActiveType::SILU: {
                 VFDoDequant<false, QuantUtils::QuantMode::DEFAULT, false, GROUPED_MATMUL::ActiveType::SILU>(
-                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), nullptr, nullptr,
+                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), nullptr, nullptr,
                     mSize, block_.params_.singleCoreN);
                 break;
             }
             case GROUPED_MATMUL::ActiveType::RELU: {
                 VFDoDequant<false, QuantUtils::QuantMode::DEFAULT, false, GROUPED_MATMUL::ActiveType::RELU>(
-                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), nullptr, nullptr,
+                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), nullptr, nullptr,
                     mSize, block_.params_.singleCoreN);
                 break;
             }
             case GROUPED_MATMUL::ActiveType::GELU_TANH: {
                 VFDoDequant<false, QuantUtils::QuantMode::DEFAULT, false, GROUPED_MATMUL::ActiveType::GELU_TANH>(
-                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), nullptr, nullptr,
+                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), nullptr, nullptr,
                     mSize, block_.params_.singleCoreN);
                 break;
             }
             default: {
                 VFDoDequant<false, QuantUtils::QuantMode::DEFAULT, false, GROUPED_MATMUL::ActiveType::INVALID_TYPE>(
-                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), nullptr, nullptr,
+                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), nullptr, nullptr,
                     mSize, block_.params_.singleCoreN);
                 break;
             }
@@ -751,38 +751,38 @@ __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::VFD
     } else {
         if (gmmQuantParams_->bQuantMode == static_cast<uint32_t>(QuantUtils::QuantMode::PERTENSOR_MODE)) {
             VFDoDequant<true, QuantUtils::QuantMode::DEFAULT, true, GROUPED_MATMUL::ActiveType::INVALID_TYPE>(
-                dequantOutInUbAddr, l0cOutUbAddr, nullptr, nullptr, (__ubuf__ biasType *)biasUb_.GetPhyAddr(), mSize,
+                dequantOutInUbAddr, l0cOutUbAddr, nullptr, nullptr, (__ubuf__ biasType*)biasUb_.GetPhyAddr(), mSize,
                 block_.params_.singleCoreN);
         } else {
             switch (GROUPED_MATMUL::ActiveType(gmmQuantParams_->activeType)) {
                 case GROUPED_MATMUL::ActiveType::FASTGELU: {
                     VFDoDequant<false, QuantUtils::QuantMode::DEFAULT, true, GROUPED_MATMUL::ActiveType::FASTGELU>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), nullptr,
-                        (__ubuf__ biasType *)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), nullptr,
+                        (__ubuf__ biasType*)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
                     break;
                 }
                 case GROUPED_MATMUL::ActiveType::SILU: {
                     VFDoDequant<false, QuantUtils::QuantMode::DEFAULT, true, GROUPED_MATMUL::ActiveType::SILU>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), nullptr,
-                        (__ubuf__ biasType *)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), nullptr,
+                        (__ubuf__ biasType*)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
                     break;
                 }
                 case GROUPED_MATMUL::ActiveType::RELU: {
                     VFDoDequant<false, QuantUtils::QuantMode::DEFAULT, true, GROUPED_MATMUL::ActiveType::RELU>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), nullptr,
-                        (__ubuf__ biasType *)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), nullptr,
+                        (__ubuf__ biasType*)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
                     break;
                 }
                 case GROUPED_MATMUL::ActiveType::GELU_TANH: {
                     VFDoDequant<false, QuantUtils::QuantMode::DEFAULT, true, GROUPED_MATMUL::ActiveType::GELU_TANH>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), nullptr,
-                        (__ubuf__ biasType *)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), nullptr,
+                        (__ubuf__ biasType*)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
                     break;
                 }
                 default: {
                     VFDoDequant<false, QuantUtils::QuantMode::DEFAULT, true, GROUPED_MATMUL::ActiveType::INVALID_TYPE>(
-                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType *)scaleUb_.GetPhyAddr(), nullptr,
-                        (__ubuf__ biasType *)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
+                        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ scaleType*)scaleUb_.GetPhyAddr(), nullptr,
+                        (__ubuf__ biasType*)biasUb_.GetPhyAddr(), mSize, block_.params_.singleCoreN);
                     break;
                 }
             }
@@ -794,8 +794,8 @@ LOCAL_TEMPLATE_CLASS_MIX_PARAMS
 template <bool isPertensor, QuantUtils::QuantMode aQuantMode, bool isBiasEpilogue,
           GROUPED_MATMUL::ActiveType activeType>
 __aicore__ inline void GQmmMixRegbaseKernel<LOCAL_TEMPLATE_FUNC_MIX_PARAMS>::VFDoDequant(
-    __ubuf__ yType *dst, __ubuf__ l0cType *l0cOut, __ubuf__ scaleType *scale, __ubuf__ ptScaleType *perTokenScale,
-    __ubuf__ biasType *bias, uint16_t mSize, uint16_t nSize)
+    __ubuf__ yType* dst, __ubuf__ l0cType* l0cOut, __ubuf__ scaleType* scale, __ubuf__ ptScaleType* perTokenScale,
+    __ubuf__ biasType* bias, uint16_t mSize, uint16_t nSize)
 {
     uint32_t eleNumPerVf = QuantUtils::GetVRegSize() / sizeof(l0cType);
     uint32_t nSrcUbAligned =

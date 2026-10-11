@@ -30,7 +30,7 @@ extern "C" {
 
 namespace {
 
-static int64_t ParseActivationStr(const char *str)
+static int64_t ParseActivationStr(const char* str)
 {
     if (str == nullptr || std::strcmp(str, "") == 0 || std::strcmp(str, "silu") == 0) {
         return 1;
@@ -41,8 +41,8 @@ static int64_t ParseActivationStr(const char *str)
     return -1;
 }
 
-static bool CheckNotNull(const aclTensor *x, const aclTensor *weight, const aclTensor *convStatesRef,
-                         const aclTensor *y, uint64_t *workspaceSize, aclOpExecutor **executor)
+static bool CheckNotNull(const aclTensor* x, const aclTensor* weight, const aclTensor* convStatesRef,
+                         const aclTensor* y, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(weight, return false);
@@ -60,10 +60,10 @@ static bool CheckNotNull(const aclTensor *x, const aclTensor *weight, const aclT
     return true;
 }
 
-static bool CheckDtype(const aclTensor *x, const aclTensor *weight, const aclTensor *convStatesRef,
-                       const aclTensor *biasOptional, const aclTensor *queryStartLocOptional,
-                       const aclTensor *cacheIndicesOptional, const aclTensor *initialStateModeOptional,
-                       const aclTensor *y)
+static bool CheckDtype(const aclTensor* x, const aclTensor* weight, const aclTensor* convStatesRef,
+                       const aclTensor* biasOptional, const aclTensor* queryStartLocOptional,
+                       const aclTensor* cacheIndicesOptional, const aclTensor* initialStateModeOptional,
+                       const aclTensor* y)
 {
     auto xDtype = x->GetDataType();
     if (xDtype != op::DataType::DT_FLOAT16 && xDtype != op::DataType::DT_BF16) {
@@ -109,7 +109,7 @@ static bool CheckDtype(const aclTensor *x, const aclTensor *weight, const aclTen
     return true;
 }
 
-static int64_t GetDtypeSize(const aclTensor *tensor)
+static int64_t GetDtypeSize(const aclTensor* tensor)
 {
     auto dtype = tensor->GetDataType();
     if (dtype == op::DataType::DT_FLOAT16 || dtype == op::DataType::DT_BF16) {
@@ -118,7 +118,7 @@ static int64_t GetDtypeSize(const aclTensor *tensor)
     return 0;
 }
 
-static bool GetQslSize(const aclTensor *qsl, int64_t &outSize)
+static bool GetQslSize(const aclTensor* qsl, int64_t& outSize)
 {
     if (qsl == nullptr) {
         return false;
@@ -131,7 +131,7 @@ static bool GetQslSize(const aclTensor *qsl, int64_t &outSize)
     return true;
 }
 
-static bool CheckXShape(const aclTensor *x, int64_t &dim)
+static bool CheckXShape(const aclTensor* x, int64_t& dim)
 {
     auto xShape = x->GetViewShape();
     auto xDimNum = xShape.GetDimNum();
@@ -150,7 +150,7 @@ static bool CheckXShape(const aclTensor *x, int64_t &dim)
     return true;
 }
 
-static bool CheckWeightShape(const aclTensor *weight, int64_t dim, int64_t &kernelWidth)
+static bool CheckWeightShape(const aclTensor* weight, int64_t dim, int64_t& kernelWidth)
 {
     auto wShape = weight->GetViewShape();
     if (wShape.GetDimNum() != 2) {
@@ -169,7 +169,7 @@ static bool CheckWeightShape(const aclTensor *weight, int64_t dim, int64_t &kern
     return true;
 }
 
-static bool CheckConvStatesShape(const aclTensor *convStatesRef, int64_t dim, int64_t kernelWidth)
+static bool CheckConvStatesShape(const aclTensor* convStatesRef, int64_t dim, int64_t kernelWidth)
 {
     const int64_t DIM_MIN = 64;
     const int64_t DIM_MAX = 16384;
@@ -202,8 +202,8 @@ static bool CheckConvStatesShape(const aclTensor *convStatesRef, int64_t dim, in
     return true;
 }
 
-static bool CheckScenarioConstraints(const aclTensor *x, const aclTensor *convStatesRef,
-                                     const aclTensor *queryStartLocOptional)
+static bool CheckScenarioConstraints(const aclTensor* x, const aclTensor* convStatesRef,
+                                     const aclTensor* queryStartLocOptional)
 {
     const int64_t BATCH_MIN = 1;
     const int64_t BATCH_MAX = 1024;
@@ -242,7 +242,7 @@ static bool CheckScenarioConstraints(const aclTensor *x, const aclTensor *convSt
     return true;
 }
 
-static bool CheckOutputShape(const aclTensor *x, const aclTensor *y)
+static bool CheckOutputShape(const aclTensor* x, const aclTensor* y)
 {
     auto xDimNum = x->GetViewShape().GetDimNum();
     auto yDimNum = y->GetViewShape().GetDimNum();
@@ -253,8 +253,8 @@ static bool CheckOutputShape(const aclTensor *x, const aclTensor *y)
     return true;
 }
 
-static bool CheckShape(const aclTensor *x, const aclTensor *weight, const aclTensor *convStatesRef,
-                       const aclTensor *queryStartLocOptional, const aclTensor *y)
+static bool CheckShape(const aclTensor* x, const aclTensor* weight, const aclTensor* convStatesRef,
+                       const aclTensor* queryStartLocOptional, const aclTensor* y)
 {
     int64_t dim = 0;
     CHECK_RET(CheckXShape(x, dim), false);
@@ -271,12 +271,12 @@ static bool CheckShape(const aclTensor *x, const aclTensor *weight, const aclTen
 }
 
 aclnnStatus CausalConv1dFnCommonProcess(
-    const aclTensor *x, const aclTensor *weight, aclTensor *convStatesRef, const aclTensor *biasOptional,
-    const aclTensor *queryStartLocOptional, const aclTensor *cacheIndicesOptional,
-    const aclTensor *initialStateModeOptional, const aclTensor *blockIdxFirstScheduledTokenOptional,
-    const aclTensor *blockIdxLastScheduledTokenOptional, const aclTensor *initialStateIdxOptional,
-    const aclTensor *numComputedTokensOptional, const char *activation, int64_t nullBlockId, int64_t blockSizeToAlign,
-    aclTensor *y, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* x, const aclTensor* weight, aclTensor* convStatesRef, const aclTensor* biasOptional,
+    const aclTensor* queryStartLocOptional, const aclTensor* cacheIndicesOptional,
+    const aclTensor* initialStateModeOptional, const aclTensor* blockIdxFirstScheduledTokenOptional,
+    const aclTensor* blockIdxLastScheduledTokenOptional, const aclTensor* initialStateIdxOptional,
+    const aclTensor* numComputedTokensOptional, const char* activation, int64_t nullBlockId, int64_t blockSizeToAlign,
+    aclTensor* y, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     auto uniqueExecutor = CREATE_EXECUTOR();
 
@@ -288,13 +288,13 @@ aclnnStatus CausalConv1dFnCommonProcess(
 
     CHECK_RET(CheckShape(x, weight, convStatesRef, queryStartLocOptional, y), ACLNN_ERR_PARAM_INVALID);
 
-    const aclTensor *xFinal = l0op::Contiguous(x, uniqueExecutor.get());
+    const aclTensor* xFinal = l0op::Contiguous(x, uniqueExecutor.get());
     CHECK_COND(xFinal != nullptr, ACLNN_ERR_PARAM_NULLPTR, "Contiguous x failed.");
 
-    aclTensor *convStatesFinal = const_cast<aclTensor *>(l0op::Contiguous(convStatesRef, uniqueExecutor.get()));
+    aclTensor* convStatesFinal = const_cast<aclTensor*>(l0op::Contiguous(convStatesRef, uniqueExecutor.get()));
     CHECK_COND(convStatesFinal != nullptr, ACLNN_ERR_PARAM_NULLPTR, "Contiguous convStatesRef failed.");
 
-    aclTensor *yFinal = const_cast<aclTensor *>(l0op::Contiguous(y, uniqueExecutor.get()));
+    aclTensor* yFinal = const_cast<aclTensor*>(l0op::Contiguous(y, uniqueExecutor.get()));
     CHECK_COND(yFinal != nullptr, ACLNN_ERR_PARAM_NULLPTR, "Contiguous y failed.");
 
     weight = l0op::Contiguous(weight, uniqueExecutor.get());
@@ -346,12 +346,12 @@ aclnnStatus CausalConv1dFnCommonProcess(
 } // namespace
 
 ACLNN_API aclnnStatus aclnnCausalConv1dFnGetWorkspaceSize(
-    const aclTensor *x, const aclTensor *weight, aclTensor *convStatesRef, const aclTensor *biasOptional,
-    const aclTensor *queryStartLocOptional, const aclTensor *cacheIndicesOptional,
-    const aclTensor *initialStateModeOptional, const aclTensor *blockIdxFirstScheduledTokenOptional,
-    const aclTensor *blockIdxLastScheduledTokenOptional, const aclTensor *initialStateIdxOptional,
-    const aclTensor *numComputedTokensOptional, const char *activation, int64_t nullBlockId, int64_t blockSizeToAlign,
-    aclTensor *y, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* x, const aclTensor* weight, aclTensor* convStatesRef, const aclTensor* biasOptional,
+    const aclTensor* queryStartLocOptional, const aclTensor* cacheIndicesOptional,
+    const aclTensor* initialStateModeOptional, const aclTensor* blockIdxFirstScheduledTokenOptional,
+    const aclTensor* blockIdxLastScheduledTokenOptional, const aclTensor* initialStateIdxOptional,
+    const aclTensor* numComputedTokensOptional, const char* activation, int64_t nullBlockId, int64_t blockSizeToAlign,
+    aclTensor* y, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnCausalConv1dFn,
                    DFX_IN(x, weight, convStatesRef, biasOptional, queryStartLocOptional, cacheIndicesOptional,
@@ -363,7 +363,7 @@ ACLNN_API aclnnStatus aclnnCausalConv1dFnGetWorkspaceSize(
         numComputedTokensOptional, activation, nullBlockId, blockSizeToAlign, y, workspaceSize, executor);
 }
 
-ACLNN_API aclnnStatus aclnnCausalConv1dFn(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnCausalConv1dFn(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                           aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnCausalConv1dFn);

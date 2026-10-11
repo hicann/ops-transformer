@@ -19,8 +19,8 @@
 #include "opdev/shape_utils.h"
 
 namespace gmm {
-inline bool ReportInvalidTensorStorage(const aclTensor *tensor, const char *opName, const char *name,
-                                       const char *reason)
+inline bool ReportInvalidTensorStorage(const aclTensor* tensor, const char* opName, const char* name,
+                                       const char* reason)
 {
     const std::string layout = std::string("viewShape=") + op::ToString(tensor->GetViewShape()).GetString() +
                                ", strides=" + op::ToString(tensor->GetViewStrides()).GetString() +
@@ -34,15 +34,15 @@ inline bool ReportInvalidTensorStorage(const aclTensor *tensor, const char *opNa
 // Use the caller's declared element counts before reinterpreting packed weights as four-bit tensors.
 // Format-specific physical layout checks remain the responsibility of each operator.
 // This validates the declared storage only; aclTensor does not expose the caller's allocation size.
-inline bool CheckTensorStorageBounds(const aclTensor *tensor, const char *opName, const char *name)
+inline bool CheckTensorStorageBounds(const aclTensor* tensor, const char* opName, const char* name)
 {
     // Required/optional null semantics belong to each operator's existing parameter checks.
     if (tensor == nullptr) {
         return true;
     }
-    const auto &viewShape = tensor->GetViewShape();
-    const auto &strides = tensor->GetViewStrides();
-    const auto &storageShape = tensor->GetStorageShape();
+    const auto& viewShape = tensor->GetViewShape();
+    const auto& strides = tensor->GetViewStrides();
+    const auto& storageShape = tensor->GetStorageShape();
     const int64_t offset = tensor->GetViewOffset();
     if (viewShape.GetDimNum() != strides.size()) {
         return ReportInvalidTensorStorage(tensor, opName, name, "view shape and strides must have the same rank");
@@ -97,7 +97,7 @@ inline bool CheckTensorStorageBounds(const aclTensor *tensor, const char *opName
     return true;
 }
 
-inline bool CheckTensorListStorageBounds(const aclTensorList *tensors, const char *opName, const char *name)
+inline bool CheckTensorListStorageBounds(const aclTensorList* tensors, const char* opName, const char* name)
 {
     if (tensors == nullptr) {
         return true;

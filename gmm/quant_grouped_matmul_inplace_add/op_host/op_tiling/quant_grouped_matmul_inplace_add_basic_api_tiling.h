@@ -28,17 +28,17 @@ namespace optiling {
 
 class QGMMInplaceAddBasicApiTiling : public GroupedQmmBasicApiTiling {
 public:
-    explicit QGMMInplaceAddBasicApiTiling(gert::TilingContext *context);
+    explicit QGMMInplaceAddBasicApiTiling(gert::TilingContext* context);
     ~QGMMInplaceAddBasicApiTiling() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         GroupedQmmBasicApiTiling::Reset(context);
         tilingData_ = QuantGroupedMatmulInplaceAdd::QGmmInplaceAddBasicApiTilingData();
     }
 
 protected:
-    const char *GetOpType() const override
+    const char* GetOpType() const override
     {
         return "QuantGroupedMatmulInplaceAdd";
     }

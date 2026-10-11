@@ -58,7 +58,7 @@ static inline auto AlignUp(T num1, T num2) -> T
     return (num1 + num2 - 1) / num2 * num2;
 }
 
-static bool IsS8S4PseudoQuant(const gert::TilingContext *context, ge::DataType xDtype, ge::DataType weightDtype)
+static bool IsS8S4PseudoQuant(const gert::TilingContext* context, ge::DataType xDtype, ge::DataType weightDtype)
 {
     const auto scaleDesc = context->GetDynamicInputDesc(SCALE_INDEX, 0);
     return xDtype == ge::DT_INT8 && (weightDtype == ge::DT_INT4 || weightDtype == ge::DT_INT32) &&
@@ -142,7 +142,7 @@ constexpr int64_t DIM_NUM_4 = 4;
 constexpr int64_t DIM_NUM_5 = 5;
 
 static inline uint32_t FindBestSingleNA8W4(uint32_t baseM_, uint32_t baseN_, uint32_t avg_m, uint32_t maxN_,
-                                           uint32_t groupNum_, const uint32_t &aicNum)
+                                           uint32_t groupNum_, const uint32_t& aicNum)
 {
     int32_t mDim = CeilDiv(avg_m, baseM_);
     int32_t nDim = CeilDiv(maxN_, baseN_);
@@ -171,7 +171,7 @@ static inline uint32_t FindBestSingleNA8W4(uint32_t baseM_, uint32_t baseN_, uin
     return baseN_;
 }
 
-ge::graphStatus GMMTiling::CheckWeightNZShape(const gert::TilingContext *context, int64_t numInOneBlk) const
+ge::graphStatus GMMTiling::CheckWeightNZShape(const gert::TilingContext* context, int64_t numInOneBlk) const
 {
     OP_CHECK_IF(numInOneBlk <= 0,
                 OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
@@ -197,7 +197,7 @@ ge::graphStatus GMMTiling::CheckWeightNZShape(const gert::TilingContext *context
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GMMTiling::CheckMKN(const gert::TilingContext *context)
+ge::graphStatus GMMTiling::CheckMKN(const gert::TilingContext* context)
 {
     mmDataTypeSize_ = GetSizeByDataType(mmDType_);
     OP_CHECK_IF(mmDataTypeSize_ == 0,
@@ -231,7 +231,7 @@ void GMMTiling::SetTilingDataIsSingleTensor()
     tilingData.gmmBaseParams.set_singleY(static_cast<uint32_t>(isSingleY_));
 }
 
-bool GMMTiling::CheckTensorListLength(const gert::TilingContext *context)
+bool GMMTiling::CheckTensorListLength(const gert::TilingContext* context)
 {
     auto xTensor = context->GetDynamicInputTensor(X_INDEX, MAX_TENSOR_CONT);
     auto wTensor = context->GetDynamicInputTensor(WEIGHT_INDEX, MAX_TENSOR_CONT);
@@ -242,7 +242,7 @@ bool GMMTiling::CheckTensorListLength(const gert::TilingContext *context)
     return true;
 }
 
-ge::graphStatus GMMTiling::PrepareTilingData(const gert::TilingContext *context)
+ge::graphStatus GMMTiling::PrepareTilingData(const gert::TilingContext* context)
 {
     // get transpose and groupType
     OP_CHECK_IF(GMMGetAttrs(context) != ge::GRAPH_SUCCESS,
@@ -315,8 +315,8 @@ ge::graphStatus GMMTiling::PrepareTilingData(const gert::TilingContext *context)
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus GMMTiling::GMMGetTensorShapeSplitM(const gert::TilingContext *context, const gert::Shape &xShape,
-                                                   const gert::Shape &wShape)
+ge::graphStatus GMMTiling::GMMGetTensorShapeSplitM(const gert::TilingContext* context, const gert::Shape& xShape,
+                                                   const gert::Shape& wShape)
 {
     if (isSingleX_ && isSingleWeight_ && isSingleY_) { // split M, s-s-s
         return SplitMSingleXSingleWeightSingleY(xShape, wShape);
@@ -345,8 +345,8 @@ ge::graphStatus GMMTiling::GMMGetTensorShapeSplitM(const gert::TilingContext *co
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus GMMTiling::GMMGetTensorShapeSplitK(const gert::TilingContext *context, const gert::Shape &xShape,
-                                                   const gert::Shape &wShape)
+ge::graphStatus GMMTiling::GMMGetTensorShapeSplitK(const gert::TilingContext* context, const gert::Shape& xShape,
+                                                   const gert::Shape& wShape)
 {
     if (isSingleX_ && isSingleWeight_ && isSingleY_) { // splitK, s-s-s
         return SplitKSingleXSingleWeightSingleY(context, xShape, wShape);
@@ -368,7 +368,7 @@ ge::graphStatus GMMTiling::GMMGetTensorShapeSplitK(const gert::TilingContext *co
 
 /** @brief split M：single-single-single(s-s-s)
  */
-ge::graphStatus GMMTiling::SplitMSingleXSingleWeightSingleY(const gert::Shape &xShape, const gert::Shape &wShape)
+ge::graphStatus GMMTiling::SplitMSingleXSingleWeightSingleY(const gert::Shape& xShape, const gert::Shape& wShape)
 {
     groupNum_ = static_cast<int32_t>(wShape.GetDim(0));
     int64_t m = GMMGetBS(xShape);
@@ -387,7 +387,7 @@ ge::graphStatus GMMTiling::SplitMSingleXSingleWeightSingleY(const gert::Shape &x
 
 /** @brief split M：single-multi-single(s-m-s)/single-multi-multi(s-m-m), share the same function.
  */
-ge::graphStatus GMMTiling::SplitMSingleXSeparatedWeight(const gert::TilingContext *context, const gert::Shape &xShape)
+ge::graphStatus GMMTiling::SplitMSingleXSeparatedWeight(const gert::TilingContext* context, const gert::Shape& xShape)
 {
     int64_t m = GMMGetBS(xShape);
     int64_t k = xShape.GetDim(xKDim_);
@@ -414,7 +414,7 @@ ge::graphStatus GMMTiling::SplitMSingleXSeparatedWeight(const gert::TilingContex
 
 /** @brief split M：multi-multi-single(m-m-s); no split: multi-multi-multi(m-m-m), share the same function
  */
-ge::graphStatus GMMTiling::SeparatedXSeparatedWeight(const gert::TilingContext *context)
+ge::graphStatus GMMTiling::SeparatedXSeparatedWeight(const gert::TilingContext* context)
 {
     for (uint32_t i = 0; i < MAX_TENSOR_CONT; i++) {
         auto wTensor = context->GetDynamicInputTensor(WEIGHT_INDEX, i);
@@ -442,7 +442,7 @@ ge::graphStatus GMMTiling::SeparatedXSeparatedWeight(const gert::TilingContext *
 
 /** @brief split M : multi-single-multi(m-s-m), split K : multi-single-multi(m-s-m), share the same function
  */
-ge::graphStatus GMMTiling::SeparatedXSingleWeight(const gert::TilingContext *context, const gert::Shape &wShape)
+ge::graphStatus GMMTiling::SeparatedXSingleWeight(const gert::TilingContext* context, const gert::Shape& wShape)
 {
     int64_t n = wShape.GetDim(weightNDim_) * nzFactor_;
     for (uint32_t i = 0; i < MAX_TENSOR_CONT; i++) {
@@ -468,8 +468,8 @@ ge::graphStatus GMMTiling::SeparatedXSingleWeight(const gert::TilingContext *con
 
 /** @brief split K single-single-single
  */
-ge::graphStatus GMMTiling::SplitKSingleXSingleWeightSingleY(const gert::TilingContext *context,
-                                                            const gert::Shape &xShape, const gert::Shape &wShape)
+ge::graphStatus GMMTiling::SplitKSingleXSingleWeightSingleY(const gert::TilingContext* context,
+                                                            const gert::Shape& xShape, const gert::Shape& wShape)
 {
     int64_t m = GMMGetBS(xShape);
     int64_t k = xShape.GetDim(xKDim_);
@@ -492,8 +492,8 @@ ge::graphStatus GMMTiling::SplitKSingleXSingleWeightSingleY(const gert::TilingCo
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GMMTiling::SplitKSingleXSeparatedWeight(const gert::TilingContext *context, const gert::Shape &xShape,
-                                                        const gert::Shape &wShape)
+ge::graphStatus GMMTiling::SplitKSingleXSeparatedWeight(const gert::TilingContext* context, const gert::Shape& xShape,
+                                                        const gert::Shape& wShape)
 {
     int64_t m = GMMGetBS(xShape);
     int64_t k = xShape.GetDim(xKDim_);
@@ -520,7 +520,7 @@ ge::graphStatus GMMTiling::SplitKSingleXSeparatedWeight(const gert::TilingContex
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GMMTiling::Init(const gert::TilingContext *context)
+ge::graphStatus GMMTiling::Init(const gert::TilingContext* context)
 {
     OP_CHECK_IF(!CheckTensorListLength(context),
                 OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "Check tensorList length failed."),
@@ -599,7 +599,7 @@ ge::graphStatus GMMTiling::Init(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GMMTiling::GetPerGroupNum(const gert::TilingContext *context)
+ge::graphStatus GMMTiling::GetPerGroupNum(const gert::TilingContext* context)
 {
     auto antiquantScale = context->GetDynamicInputTensor(ANTIQUANT_SCALE_INDEX, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, antiquantScale);
@@ -623,7 +623,7 @@ ge::graphStatus GMMTiling::GetPerGroupNum(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-void GMMTiling::DivideUbAndSetWorkspaceAntiquant(size_t *workspaces, const uint32_t &aicNum, uint32_t &ubSize)
+void GMMTiling::DivideUbAndSetWorkspaceAntiquant(size_t* workspaces, const uint32_t& aicNum, uint32_t& ubSize)
 {
     if (isA16W8Msd_) {
         // whole workspace for a16w8 msd scene is combined by workspace for global max of each row (m * 8),
@@ -673,7 +673,7 @@ void GMMTiling::DivideUbAndSetWorkspaceAntiquant(size_t *workspaces, const uint3
     }
 }
 
-int32_t GMMTiling::FindBestSingleN(const uint32_t &usedCoreNum)
+int32_t GMMTiling::FindBestSingleN(const uint32_t& usedCoreNum)
 {
     uint64_t quantGroupNum = tilingData.gmmBaseParams.get_quantGroupNum();
     bool isDtypeSupport = (isA16W16_ || isA8W8_ || (isA4W4_ && quantGroupNum == 1));
@@ -718,7 +718,7 @@ int32_t GMMTiling::FindBestSingleN(const uint32_t &usedCoreNum)
     return baseN_;
 }
 
-bool GMMTiling::TryFullLoadA(int32_t baseM, const GMMCompileInfo *compileInfoPtr)
+bool GMMTiling::TryFullLoadA(int32_t baseM, const GMMCompileInfo* compileInfoPtr)
 {
     auto l1Size = compileInfoPtr->l1Size;
     static const std::unordered_map<ge::DataType, float> typeSizeMap = {
@@ -755,7 +755,7 @@ bool GMMTiling::TryFullLoadA(int32_t baseM, const GMMCompileInfo *compileInfoPtr
 2、后续算子可能会用到当前算子的输出，若当前输出不在L2Cache中可能会影响后续算子效率
 3、当前算子输出如果超过L2Cache大小时，实测不会对后续算子造成影响，此时可以跳过L2Cache
 */
-ge::graphStatus GMMTiling::IsOutputDisableL2Cache(gert::TilingContext *context, const GMMCompileInfo *compileInfoPtr)
+ge::graphStatus GMMTiling::IsOutputDisableL2Cache(gert::TilingContext* context, const GMMCompileInfo* compileInfoPtr)
 {
     OP_CHECK_IF(compileInfoPtr == nullptr,
                 OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "compileInfoPtr is nullptr."),
@@ -774,8 +774,8 @@ ge::graphStatus GMMTiling::IsOutputDisableL2Cache(gert::TilingContext *context, 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GMMTiling::DynamicTilingSingleN(gert::TilingContext *context, const uint32_t &usedCoreNum,
-                                                const GMMCompileInfo *compileInfoPtr)
+ge::graphStatus GMMTiling::DynamicTilingSingleN(gert::TilingContext* context, const uint32_t& usedCoreNum,
+                                                const GMMCompileInfo* compileInfoPtr)
 {
     OP_CHECK_IF(compileInfoPtr == nullptr,
                 OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "compileInfoPtr is nullptr."),
@@ -803,9 +803,9 @@ ge::graphStatus GMMTiling::DynamicTilingSingleN(gert::TilingContext *context, co
     }
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus GMMTiling::DivideUbAndSetWorkspace(gert::TilingContext *context, const uint32_t &aicNum)
+ge::graphStatus GMMTiling::DivideUbAndSetWorkspace(gert::TilingContext* context, const uint32_t& aicNum)
 {
-    size_t *workspaces = context->GetWorkspaceSizes(1); // get second variable
+    size_t* workspaces = context->GetWorkspaceSizes(1); // get second variable
     OP_CHECK_NULL_WITH_CONTEXT(context, workspaces);    // check workspaces is not null
     workspaces[0] = SYS_WORKSPACE_SIZE;                 // default size
     if (weightDtype_ != ge::DT_INT8 && weightDtype_ != ge::DT_INT4) {
@@ -901,7 +901,7 @@ void GMMTiling::FindBestUsedCoreNumOneGroup(const uint32_t aicNum)
     }
 }
 
-ge::graphStatus GMMTiling::SetWorkspscesPerTokenQuant(const uint32_t aicNum, size_t *workspaces)
+ge::graphStatus GMMTiling::SetWorkspscesPerTokenQuant(const uint32_t aicNum, size_t* workspaces)
 {
     if (aicNum == 0U) { // invaild value
         return ge::GRAPH_FAILED;
@@ -929,7 +929,7 @@ ge::graphStatus GMMTiling::SetWorkspscesPerTokenQuant(const uint32_t aicNum, siz
     return ge::GRAPH_SUCCESS;
 }
 
-bool GMMTiling::StaticTilingProcess(gert::TilingContext *context)
+bool GMMTiling::StaticTilingProcess(gert::TilingContext* context)
 {
     // cond.1 A8W8
     // cond.2 singleX-singleW-singleY scenario
@@ -981,14 +981,14 @@ bool GMMTiling::CheckTilingMatchStaticValue()
     return false;
 }
 
-ge::graphStatus GMMTiling::RunFusionKernelTiling(gert::TilingContext *context)
+ge::graphStatus GMMTiling::RunFusionKernelTiling(gert::TilingContext* context)
 {
     OP_LOGI(context->GetNodeName(), "Begin Run GMM Tiling");
     auto compileInfoPtr = context->GetCompileInfo<GMMCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfoPtr); // check compileInfoPtr is not null
 
     ubSize_ = compileInfoPtr->ubSize;                // get ubSize from compileInfo
-    const uint32_t &aicNum = compileInfoPtr->aicNum; // get aicNum from compileInfo
+    const uint32_t& aicNum = compileInfoPtr->aicNum; // get aicNum from compileInfo
     if (aicNum == 0U) {                              // invaild value
         return ge::GRAPH_FAILED;
     }
@@ -1024,7 +1024,7 @@ ge::graphStatus GMMTiling::RunFusionKernelTiling(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-void GMMTiling::PrintTilingInfo(gert::TilingContext *context)
+void GMMTiling::PrintTilingInfo(gert::TilingContext* context)
 {
     OP_LOGD(context->GetNodeName(), "End Run GMM Tiling");
     OP_LOGD(context->GetNodeName(), "GMM_tiling_new: usedCoreNum is %d.", tilingData.mmTilingData.get_usedCoreNum());
@@ -1052,7 +1052,7 @@ void GMMTiling::PrintTilingInfo(gert::TilingContext *context)
     OP_LOGD(context->GetNodeName(), "GMM_tiling_new: usedUBSize is %d.", tilingData.mmTilingData.get_shareUbSize());
     OP_LOGD(context->GetNodeName(), "GMM_tiling_new: isOutputDisableL2Cache is %d.",
             tilingData.gmmBaseParams.get_isOutputDisableL2Cache());
-    auto buf = (uint32_t *)context->GetRawTilingData()->GetData();
+    auto buf = (uint32_t*)context->GetRawTilingData()->GetData();
     auto bufLen = context->GetRawTilingData()->GetDataSize();
     std::ostringstream oss;
     oss << "Start to dump tiling info. tilingkey:" << context->GetTilingKey() << ", tiling data size:" << bufLen
@@ -1067,7 +1067,7 @@ void GMMTiling::PrintTilingInfo(gert::TilingContext *context)
     OP_LOGD(context, "%s", oss.str().c_str());
 }
 
-ge::graphStatus GMMTiling::GMMCalUbSize(const gert::TilingContext *context, uint32_t ubSize)
+ge::graphStatus GMMTiling::GMMCalUbSize(const gert::TilingContext* context, uint32_t ubSize)
 {
     OP_CHECK_IF((ubDivideBlkNum_ == 0 || ubBlockAlign_ == 0),
                 OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "ubDivideBlkNum and ubBlockAlign cannot be 0"),
@@ -1122,7 +1122,7 @@ ge::graphStatus GMMTiling::GMMCalUbSize(const gert::TilingContext *context, uint
     return ge::GRAPH_SUCCESS;
 }
 
-int64_t GMMTiling::GMMGetBS(const gert::Shape &xShape) const
+int64_t GMMTiling::GMMGetBS(const gert::Shape& xShape) const
 {
     int64_t bs = 0; // init bs
     if (transposeX_) {
@@ -1141,7 +1141,7 @@ int64_t GMMTiling::GMMGetBS(const gert::Shape &xShape) const
     return bs;
 }
 
-uint32_t GMMTiling::GetTplDataType(const ge::DataType &dtype)
+uint32_t GMMTiling::GetTplDataType(const ge::DataType& dtype)
 {
     static const std::map<ge::DataType, uint32_t> dtype_map = {
         {ge::DT_INT4, GMM_TPL_INT4}, {ge::DT_INT8, GMM_TPL_INT8},   {ge::DT_FLOAT16, GMM_TPL_FLOAT16},
@@ -1222,7 +1222,7 @@ bool GMMTiling::IsIntDataType()
     return yDtype_ == ge::DT_INT8 || yDtype_ == ge::DT_INT32;
 }
 
-void GMMTiling::GMMSetTplTilingKey(gert::TilingContext *context)
+void GMMTiling::GMMSetTplTilingKey(gert::TilingContext* context)
 {
     uint32_t isStaticTilingApi = 0;
     uint32_t a8w4KernelTemplate = GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_NONE;
@@ -1274,16 +1274,16 @@ void GMMTiling::GMMSetTplTilingKey(gert::TilingContext *context)
     }
 }
 
-ge::graphStatus GMMTiling::GMMGetAttrs(const gert::TilingContext *context)
+ge::graphStatus GMMTiling::GMMGetAttrs(const gert::TilingContext* context)
 {
     auto attr = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attr); // check attr is not null
-    const bool *transposeWeightPtr = attr->GetAttrPointer<bool>(ATTR_INDEX_TRANS_W);
-    const bool *transposeXPtr = attr->GetAttrPointer<bool>(ATTR_INDEX_TRANS_X);
-    const int64_t *groupTypePtr = attr->GetAttrPointer<int64_t>(ATTR_INDEX_GROUPTYPE);
-    const int64_t *splitItemPtr = attr->GetAttrPointer<int64_t>(ATTR_INDEX_SPLIT_ITEM);
-    const int64_t *actTypePtr = attr->GetAttrPointer<int64_t>(ATTR_INDEX_ACT_TYPE);
-    const int64_t *groupListTypePtr = attr->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE);
+    const bool* transposeWeightPtr = attr->GetAttrPointer<bool>(ATTR_INDEX_TRANS_W);
+    const bool* transposeXPtr = attr->GetAttrPointer<bool>(ATTR_INDEX_TRANS_X);
+    const int64_t* groupTypePtr = attr->GetAttrPointer<int64_t>(ATTR_INDEX_GROUPTYPE);
+    const int64_t* splitItemPtr = attr->GetAttrPointer<int64_t>(ATTR_INDEX_SPLIT_ITEM);
+    const int64_t* actTypePtr = attr->GetAttrPointer<int64_t>(ATTR_INDEX_ACT_TYPE);
+    const int64_t* groupListTypePtr = attr->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE);
     const auto tuningConfigPtr = attr->GetAttrPointer<gert::ContinuousVector>(ATTR_INDEX_TUNING_CONFIG);
     transposeWeight_ = transposeWeightPtr != nullptr ? *transposeWeightPtr : false;
     transposeX_ = transposeXPtr != nullptr ? *transposeXPtr : false;
@@ -1341,11 +1341,11 @@ ge::graphStatus GMMTiling::GMMGetAttrs(const gert::TilingContext *context)
     wFormat_ = wFormat0 == ge::FORMAT_FRACTAL_NZ ? matmul_tiling::CubeFormat::NZ : matmul_tiling::CubeFormat::ND;
     tuningConfig_ =
         (tuningConfigPtr != nullptr && tuningConfigPtr->GetSize() > TUNING_CONFIG_TOKEN_PER_EXPECT_INDEX) ?
-            (reinterpret_cast<const int64_t *>(tuningConfigPtr->GetData()))[TUNING_CONFIG_TOKEN_PER_EXPECT_INDEX] :
+            (reinterpret_cast<const int64_t*>(tuningConfigPtr->GetData()))[TUNING_CONFIG_TOKEN_PER_EXPECT_INDEX] :
             0;
     tuningConfigWorkspace_ =
         (tuningConfigPtr != nullptr && tuningConfigPtr->GetSize() > TUNING_CONFIG_ALLOW_WORKSPACE_INDEX) ?
-            (reinterpret_cast<const int64_t *>(tuningConfigPtr->GetData()))[TUNING_CONFIG_ALLOW_WORKSPACE_INDEX] :
+            (reinterpret_cast<const int64_t*>(tuningConfigPtr->GetData()))[TUNING_CONFIG_ALLOW_WORKSPACE_INDEX] :
             0;
 
     if (((compileInfoPtr->socVersion == platform_ascendc::SocVersion::ASCEND910B ||
@@ -1440,7 +1440,7 @@ ge::graphStatus GMMTiling::GMMSetUbDivideBlk()
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus GMMTiling::SetBias(const gert::TilingContext *context, matmul_tiling::MultiCoreMatmulTiling &mm) const
+ge::graphStatus GMMTiling::SetBias(const gert::TilingContext* context, matmul_tiling::MultiCoreMatmulTiling& mm) const
 {
     if (!hasBias_ || isA16W8Msd_ || isA4W4_) {
         mm.SetBias(false);
@@ -1456,7 +1456,7 @@ ge::graphStatus GMMTiling::SetBias(const gert::TilingContext *context, matmul_ti
     return ge::GRAPH_SUCCESS;
 }
 
-static void InitPlatformInfo(const GMMCompileInfo *compileInfoPtr, matmul_tiling::PlatformInfo &platformInfo)
+static void InitPlatformInfo(const GMMCompileInfo* compileInfoPtr, matmul_tiling::PlatformInfo& platformInfo)
 {
     platformInfo.socVersion = compileInfoPtr->socVersion;
     platformInfo.l1Size = compileInfoPtr->l1Size;
@@ -1466,7 +1466,7 @@ static void InitPlatformInfo(const GMMCompileInfo *compileInfoPtr, matmul_tiling
     platformInfo.l0BSize = compileInfoPtr->l0BSize;
 }
 
-void GMMTiling::FullLoadK(const GMMCompileInfo *compileInfoPtr)
+void GMMTiling::FullLoadK(const GMMCompileInfo* compileInfoPtr)
 {
     if (wFormat_ == matmul_tiling::CubeFormat::ND && !transposeWeight_ && !transposeX_ && xDType_ == weightDtype_ &&
         (weightDtype_ == ge::DT_FLOAT16 || weightDtype_ == ge::DT_BF16) && maxM_ >= FULL_K_M_E_THRESHOLD * groupNum_ &&
@@ -1490,8 +1490,8 @@ void GMMTiling::FullLoadK(const GMMCompileInfo *compileInfoPtr)
     }
 }
 
-ge::graphStatus GMMTiling::CalcStepKaKb(const gert::TilingContext *context, const GMMCompileInfo *compileInfoPtr,
-                                        int64_t mInMM, uint32_t &mmStepKa, uint32_t &mmStepKb)
+ge::graphStatus GMMTiling::CalcStepKaKb(const gert::TilingContext* context, const GMMCompileInfo* compileInfoPtr,
+                                        int64_t mInMM, uint32_t& mmStepKa, uint32_t& mmStepKb)
 {
     uint64_t availableL1Size = compileInfoPtr->l1Size;
     if (isA8W8_ || isA8W4FakeA8W8_) {
@@ -1545,7 +1545,7 @@ ge::graphStatus GMMTiling::CalcStepKaKb(const gert::TilingContext *context, cons
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GMMTiling::GMMSetMMTiling(const gert::TilingContext *context, const GMMCompileInfo *compileInfoPtr)
+ge::graphStatus GMMTiling::GMMSetMMTiling(const gert::TilingContext* context, const GMMCompileInfo* compileInfoPtr)
 {
     matmul_tiling::DataType matmulDtype = static_cast<matmul_tiling::DataType>(mmDType_);
     matmul_tiling::PlatformInfo platformInfo;
@@ -1647,7 +1647,7 @@ uint32_t GMMTiling::CalUsedCoreNum(const uint32_t aicNum)
     return usedCoreNum;
 }
 
-ge::graphStatus GMMTiling::CalMMTiling(const gert::TilingContext *context, const GMMCompileInfo *compileInfoPtr)
+ge::graphStatus GMMTiling::CalMMTiling(const gert::TilingContext* context, const GMMCompileInfo* compileInfoPtr)
 {
     // if tuningConfig_ in (128, 256], recompute tiling.
     // or y:int32 and tuningConfig_ in (0, 128], k,n:(7168, 2048) or k,n:(7680, 2048), which got by actual measurement)
@@ -1724,7 +1724,7 @@ ge::graphStatus GMMTiling::CalMMTiling(const gert::TilingContext *context, const
     return ge::GRAPH_SUCCESS;
 }
 
-static void SetA8W4HPTiling(A8W4HPTiling *tiling_data, uint32_t aicNum)
+static void SetA8W4HPTiling(A8W4HPTiling* tiling_data, uint32_t aicNum)
 {
     constexpr int SIZE_TWO = 2;
     constexpr int SIZE_THREE = 3;
@@ -1737,7 +1737,7 @@ static void SetA8W4HPTiling(A8W4HPTiling *tiling_data, uint32_t aicNum)
     constexpr uint32_t SINGLE_CORE_BASE_TILING_1 = 256;
     constexpr uint32_t TOTAL_K_THRESHOLD_6656 = 6656;
 
-    uint32_t *ori_in0_shape = tiling_data->get_ori_in0_shape();
+    uint32_t* ori_in0_shape = tiling_data->get_ori_in0_shape();
     uint32_t total_K = ori_in0_shape[IDX_ONE];
     uint32_t core_num = aicNum;
     uint32_t splitRecord[SIZE_THREE] = {1, 1, 1};
@@ -1758,7 +1758,7 @@ static void SetA8W4HPTiling(A8W4HPTiling *tiling_data, uint32_t aicNum)
     tiling_data->set_single_core_base_tiling(single_core_base_tiling);
 }
 
-static void PrintA8W4HPTiling(gert::TilingContext *context, A8W4HPTiling *data)
+static void PrintA8W4HPTiling(gert::TilingContext* context, A8W4HPTiling* data)
 {
     constexpr int TWO = 2;
     OP_LOGD(context->GetNodeName(), "Tiling data strategy: ");
@@ -1793,7 +1793,7 @@ static void PrintA8W4HPTiling(gert::TilingContext *context, A8W4HPTiling *data)
 }
 
 ge::graphStatus GMMTiling::CheckA16W4MsdEnable(uint64_t mSize, uint64_t antiquantGroupNum,
-                                               const gert::TilingContext *context, const GMMCompileInfo *compileInfoPtr)
+                                               const gert::TilingContext* context, const GMMCompileInfo* compileInfoPtr)
 {
     if (!isSingleWeight_ || !isSingleX_ || !isSingleY_) {
         OP_LOGD(context->GetNodeName(),
@@ -1814,7 +1814,7 @@ ge::graphStatus GMMTiling::CheckA16W4MsdEnable(uint64_t mSize, uint64_t antiquan
     auto tuningConfigPtr =
         attr != nullptr ? (attr->GetAttrPointer<gert::ContinuousVector>(ATTR_INDEX_TUNING_CONFIG)) : nullptr;
     int64_t tuningConfig = (tuningConfigPtr != nullptr && tuningConfigPtr->GetSize() > 0) ?
-                               (reinterpret_cast<const int64_t *>(tuningConfigPtr->GetData()))[0] :
+                               (reinterpret_cast<const int64_t*>(tuningConfigPtr->GetData()))[0] :
                                0;
     if (tuningConfig != 0L) {
         avgMSize = static_cast<uint32_t>(tuningConfig);
@@ -1838,12 +1838,12 @@ ge::graphStatus GMMTiling::CheckA16W4MsdEnable(uint64_t mSize, uint64_t antiquan
     return ge::GRAPH_SUCCESS;
 }
 
-uint64_t GMMTiling::GetWithOffset(const gert::TilingContext *context)
+uint64_t GMMTiling::GetWithOffset(const gert::TilingContext* context)
 {
     auto offset = context->GetDynamicInputTensor(ANTIQUANT_OFFSET_INDEX, 0);
     uint64_t withOffset = 0;
     if (offset != nullptr) {
-        auto &offsetShape = offset->GetStorageShape();
+        auto& offsetShape = offset->GetStorageShape();
         if (offsetShape.GetDimNum() > 1 || offsetShape.GetDim(0) > 0) {
             withOffset = 1U;
         }
@@ -1851,7 +1851,7 @@ uint64_t GMMTiling::GetWithOffset(const gert::TilingContext *context)
     return withOffset;
 }
 
-ge::graphStatus GMMTiling::A16W4MsdTiling(gert::TilingContext *context, const GMMCompileInfo *compileInfoPtr)
+ge::graphStatus GMMTiling::A16W4MsdTiling(gert::TilingContext* context, const GMMCompileInfo* compileInfoPtr)
 {
     uint64_t mSize = context->GetDynamicInputTensor(X_INDEX, 0)->GetStorageShape().GetDim(0);
     uint64_t kSize = context->GetDynamicInputTensor(X_INDEX, 0)->GetStorageShape().GetDim(1);
@@ -1894,7 +1894,7 @@ ge::graphStatus GMMTiling::A16W4MsdTiling(gert::TilingContext *context, const GM
     tilingDataA16W4.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
     context->GetRawTilingData()->SetDataSize(tilingDataA16W4.GetDataSize());
 
-    size_t *workspaces = context->GetWorkspaceSizes(1); // get second variable
+    size_t* workspaces = context->GetWorkspaceSizes(1); // get second variable
     OP_CHECK_NULL_WITH_CONTEXT(context, workspaces);    // check workspaces is not null
     workspaces[0] = SYS_WORKSPACE_SIZE;                 // default size
     // A矩阵原始空间需要占用2Byte的m*k
@@ -1911,7 +1911,7 @@ ge::graphStatus GMMTiling::A16W4MsdTiling(gert::TilingContext *context, const GM
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext *context, const GMMCompileInfo *compileInfoPtr)
+ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext* context, const GMMCompileInfo* compileInfoPtr)
 {
     auto yDesc = context->GetOutputDesc(Y_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, yDesc);
@@ -1943,7 +1943,7 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext *context, const GMMCom
     uint32_t singleN = 256;
     uint32_t singleM = 128;
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfoPtr); // check compileInfoPtr is not null
-    const uint32_t &aicNum = compileInfoPtr->aicNum;     // get aicNum from compileInfo
+    const uint32_t& aicNum = compileInfoPtr->aicNum;     // get aicNum from compileInfo
     if (aicNum == 0U) {                                  // invaild value
         return ge::GRAPH_FAILED;
     }
@@ -1954,7 +1954,7 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext *context, const GMMCom
 
     bool useHighPerf =
         (tuningConfigPtr != nullptr && tuningConfigPtr->GetSize() > TUNING_CONFIG_A8W4_SPEC_SCENARIO_INDEX) ?
-            ((reinterpret_cast<const int64_t *>(tuningConfigPtr->GetData()))[TUNING_CONFIG_A8W4_SPEC_SCENARIO_INDEX] ==
+            ((reinterpret_cast<const int64_t*>(tuningConfigPtr->GetData()))[TUNING_CONFIG_A8W4_SPEC_SCENARIO_INDEX] ==
              1) :
             false;
     if (useHighPerf) {
@@ -2067,7 +2067,7 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext *context, const GMMCom
                                GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_AUTOTILING,
                                GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_NONE, GROUPED_MATMUL_AIV_AIC_RATIO_2, 0));
 
-        size_t *workspaces = context->GetWorkspaceSizes(1); // get second variable
+        size_t* workspaces = context->GetWorkspaceSizes(1); // get second variable
         OP_CHECK_NULL_WITH_CONTEXT(context, workspaces);
         workspaces[0] = SYS_WORKSPACE_SIZE; // default size
         workspaces[0] += workspaceSize;
@@ -2110,7 +2110,7 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext *context, const GMMCom
         auto offset = context->GetDynamicInputTensor(OFFSET_INDEX, 0);
         uint32_t withOffset = 0;
         if (offset != nullptr) {
-            auto &offsetShape = offset->GetStorageShape();
+            auto& offsetShape = offset->GetStorageShape();
             const size_t offsetDimNum = offsetShape.GetDimNum();
             if (isSingleTensor == 1) {
                 auto offsetDim0 = offsetShape.GetDim(DIM_NUM_0);
@@ -2139,7 +2139,7 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext *context, const GMMCom
         // GEMM Tiling
         int64_t tuningConfig =
             (tuningConfigPtr != nullptr && tuningConfigPtr->GetSize() > TUNING_CONFIG_TOKEN_PER_EXPECT_INDEX) ?
-                (reinterpret_cast<const int64_t *>(tuningConfigPtr->GetData()))[TUNING_CONFIG_TOKEN_PER_EXPECT_INDEX] :
+                (reinterpret_cast<const int64_t*>(tuningConfigPtr->GetData()))[TUNING_CONFIG_TOKEN_PER_EXPECT_INDEX] :
                 0;
 
         const int is_in_a8w4_white_list =
@@ -2240,7 +2240,7 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext *context, const GMMCom
                                         context->GetRawTilingData()->GetCapacity());
             context->GetRawTilingData()->SetDataSize(tilingDataA8W4.GetDataSize());
 
-            size_t *workspaces = context->GetWorkspaceSizes(1); // get second variable
+            size_t* workspaces = context->GetWorkspaceSizes(1); // get second variable
             OP_CHECK_NULL_WITH_CONTEXT(context, workspaces);    // check workspaces is not null
 
             workspaces[0] = SYS_WORKSPACE_SIZE; // default size
@@ -2337,7 +2337,7 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext *context, const GMMCom
                     GMM_TPL_INT8, GMM_TPL_INT4, yDtype, 0, 0, GROUPED_MATMUL_GROUP_LIST_TYPE_COUNT, 0,
                     a8w4KernelTemplate, GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_NONE, GROUPED_MATMUL_AIV_AIC_RATIO_2, 0));
             }
-            size_t *workspaces = context->GetWorkspaceSizes(1); // get second variable
+            size_t* workspaces = context->GetWorkspaceSizes(1); // get second variable
             OP_CHECK_NULL_WITH_CONTEXT(context, workspaces);    // check workspaces is not null
             workspaces[0] = SYS_WORKSPACE_SIZE;                 // default size
             if (is_in_a8w4_white_list) {
@@ -2356,7 +2356,7 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext *context, const GMMCom
 
                 tuningConfigWorkspace_ =
                     (tuningConfigPtr != nullptr && tuningConfigPtr->GetSize() > TUNING_CONFIG_ALLOW_WORKSPACE_INDEX) ?
-                        (reinterpret_cast<const int64_t *>(
+                        (reinterpret_cast<const int64_t*>(
                             tuningConfigPtr->GetData()))[TUNING_CONFIG_ALLOW_WORKSPACE_INDEX] :
                         0;
 
@@ -2382,7 +2382,7 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext *context, const GMMCom
     }
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingGMM(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingGMM(gert::TilingContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     auto xDesc = context->GetDynamicInputDesc(X_INDEX, 0);
@@ -2451,10 +2451,10 @@ ASCENDC_EXTERN_C ge::graphStatus TilingGMM(gert::TilingContext *context)
     return tiling.RunFusionKernelTiling(context);
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForGMM(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForGMM(gert::TilingParseContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfoPtr);
     auto compileInfoPtr = context->GetCompiledInfo<GMMCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfoPtr);

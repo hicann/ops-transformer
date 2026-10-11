@@ -28,21 +28,21 @@ namespace optiling {
 using namespace Ops::Transformer::OpTiling;
 class QuantGroupedInplaceAddTiling : public GroupedQmmTiling {
 public:
-    explicit QuantGroupedInplaceAddTiling(gert::TilingContext *context)
+    explicit QuantGroupedInplaceAddTiling(gert::TilingContext* context)
         : GroupedQmmTiling(context)
     {
         Reset();
     }
     ~QuantGroupedInplaceAddTiling() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         GroupedQmmTiling::Reset(context);
         Reset();
     }
 
 protected:
-    const char *GetOpType() const override
+    const char* GetOpType() const override
     {
         return "QuantGroupedMatmulInplaceAdd";
     }

@@ -35,8 +35,8 @@ using ops::adv::tests::utils::WriteFile;
  * 参数所控制的 Kernel 入口一致.
  */
 
-#define QUANTGROUPEDMATMULINPLACEADD_KERNEL_PARAM                                                                      \
-    (GM_ADDR x1, GM_ADDR x2, GM_ADDR scale2, GM_ADDR groupList, GM_ADDR yIn, GM_ADDR scale1, GM_ADDR y,                \
+#define QUANTGROUPEDMATMULINPLACEADD_KERNEL_PARAM \
+    (GM_ADDR x1, GM_ADDR x2, GM_ADDR scale2, GM_ADDR groupList, GM_ADDR yIn, GM_ADDR scale1, GM_ADDR y, \
      GM_ADDR workspace, GM_ADDR tiling)
 
 using QuantGroupedMatmulInplaceAddKernelFunc = void(*) QUANTGROUPEDMATMULINPLACEADD_KERNEL_PARAM;
@@ -58,8 +58,8 @@ enum class KernelParams {
     SCALE1
 };
 
-bool RunGroupedMatmul(void *func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
-                      std::vector<TensorIntf *> &output, uint8_t *workspace, uint8_t *tilingData)
+bool RunGroupedMatmul(void* func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf*>& inputs,
+                      std::vector<TensorIntf*>& output, uint8_t* workspace, uint8_t* tilingData)
 {
     (void)blockDim;
     // Kernel 运行
@@ -77,13 +77,14 @@ bool RunGroupedMatmul(void *func, uint64_t tilingKey, int64_t blockDim, std::vec
 
 QuantGroupedMatmulInplaceAddCase::QuantGroupedMatmulInplaceAddCase()
     : QuantGroupedMatmulInplaceAddCase("Undefined", true, "", OpInfo(), Param(), 0)
-{
-}
+{}
 
-QuantGroupedMatmulInplaceAddCase::QuantGroupedMatmulInplaceAddCase(const char *name, bool enable, const char *dbgInfo,
+QuantGroupedMatmulInplaceAddCase::QuantGroupedMatmulInplaceAddCase(const char* name, bool enable, const char* dbgInfo,
                                                                    OpInfo opInfo, Param param,
                                                                    int32_t tilingTemplatePriority)
-    : Case(name, enable, dbgInfo, tilingTemplatePriority), mOpInfo(std::move(opInfo)), mParam(std::move(param))
+    : Case(name, enable, dbgInfo, tilingTemplatePriority),
+      mOpInfo(std::move(opInfo)),
+      mParam(std::move(param))
 {
     this->mOpInfo.mName = "QuantGroupedMatmulInplaceAdd";
 }
@@ -96,8 +97,8 @@ bool QuantGroupedMatmulInplaceAddCase::Run()
     if (!mOpInfo.ProcessTiling(mName)) {
         return false;
     }
-    auto *groupedMatmulTiling =
-        const_cast<QGmmInplaceAddTilingDataParams *>((const QGmmInplaceAddTilingDataParams *)(mCtx.GetTilingData()));
+    auto* groupedMatmulTiling =
+        const_cast<QGmmInplaceAddTilingDataParams*>((const QGmmInplaceAddTilingDataParams*)(mCtx.GetTilingData()));
     if (groupedMatmulTiling == nullptr) {
         LOG_ERR("Tiling failed!");
         return false;
@@ -112,7 +113,7 @@ bool QuantGroupedMatmulInplaceAddCase::InitParam()
 {
     if (mParam.mGroupListData.size() > 0) {
         size_t dataSize = mParam.mGroupListData.size() * sizeof(int64_t);
-        uint8_t *addr = mParam.mGroupList.AllocDevData(0, dataSize);
+        uint8_t* addr = mParam.mGroupList.AllocDevData(0, dataSize);
         if (addr == nullptr) {
             LOG_ERR("TensorList(%s, %zu) AllocDevData Failed.", mParam.mGroupList.Name().c_str(), dataSize);
             return false;
@@ -130,15 +131,15 @@ bool QuantGroupedMatmulInplaceAddCase::InitParam()
     return true;
 }
 
-void *GetQuantGroupedMatmulInplaceAddKernelFunc()
+void* GetQuantGroupedMatmulInplaceAddKernelFunc()
 {
-    auto *quantgroupedMatmulInplaceAddKernelFunc = (void *)quant_grouped_matmul_inplace_add_quant_int8;
+    auto* quantgroupedMatmulInplaceAddKernelFunc = (void*)quant_grouped_matmul_inplace_add_quant_int8;
     return quantgroupedMatmulInplaceAddKernelFunc;
 }
 
 bool QuantGroupedMatmulInplaceAddCase::InitOpInfo()
 {
-    auto *quantgroupedMatmulInplaceAddKernelFunc = GetQuantGroupedMatmulInplaceAddKernelFunc();
+    auto* quantgroupedMatmulInplaceAddKernelFunc = GetQuantGroupedMatmulInplaceAddKernelFunc();
     bool rst = mCtx.SetOpName(mOpInfo.mName.c_str());
     rst = rst && mCtx.SetDeterministic(mOpInfo.mCtr.mDeterministic);
     rst = rst && mCtx.SetInputs({&mParam.mTensorLists["x1"], &mParam.mTensorLists["x2"], &mParam.mTensorLists["scale2"],
@@ -146,7 +147,7 @@ bool QuantGroupedMatmulInplaceAddCase::InitOpInfo()
     rst = rst && mCtx.SetOutputs({&mParam.mTensorLists["y"]});
     rst = rst && mCtx.SetAttrs({{"group_list_type", mParam.mGroupListType}, {"group_size", mParam.mGroupSize}});
     rst = rst && mCtx.SetKernelRunCbf(RunGroupedMatmul);
-    rst = rst && mCtx.SetKernelMainFunc((void *)quantgroupedMatmulInplaceAddKernelFunc);
+    rst = rst && mCtx.SetKernelMainFunc((void*)quantgroupedMatmulInplaceAddKernelFunc);
     rst = rst && mOpInfo.SetContext(&mCtx);
     return rst;
 }

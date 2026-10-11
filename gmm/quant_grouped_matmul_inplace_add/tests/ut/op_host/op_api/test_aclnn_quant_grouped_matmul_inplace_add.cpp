@@ -30,12 +30,12 @@ using ops::ut::SplitStr2Vec;
 using ops::ut::Trim;
 
 constexpr size_t kCsvColumnCount = 22;
-constexpr const char *kRunModeGetWorkspace = "GET_WORKSPACE";
-constexpr const char *kRunModeScale2Null = "SCALE2_NULL";
-constexpr const char *kRunModeGroupListNull = "GROUP_LIST_NULL";
-constexpr const char *kRunModeYNull = "Y_NULL";
+constexpr const char* kRunModeGetWorkspace = "GET_WORKSPACE";
+constexpr const char* kRunModeScale2Null = "SCALE2_NULL";
+constexpr const char* kRunModeGroupListNull = "GROUP_LIST_NULL";
+constexpr const char* kRunModeYNull = "Y_NULL";
 
-vector<int64_t> ParseDims(const string &value)
+vector<int64_t> ParseDims(const string& value)
 {
     return ops::ut::ParseAclTensorViewDims(value);
 }
@@ -66,20 +66,20 @@ struct QGmmInplaceAddOpApiCase {
             auto ut = OP_API_UT(
                 aclnnQuantGroupedMatmulInplaceAdd,
                 INPUT(x1Desc, x2Desc, scale1Desc, nullptr, groupListDesc, yDesc, groupListType, groupSize), OUTPUT());
-            aclOpExecutor *executor = nullptr;
+            aclOpExecutor* executor = nullptr;
             ret = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
         } else if (runMode == kRunModeGroupListNull) {
             auto ut = OP_API_UT(aclnnQuantGroupedMatmulInplaceAdd,
                                 INPUT(x1Desc, x2Desc, scale1Desc, scale2Desc, nullptr, yDesc, groupListType, groupSize),
                                 OUTPUT());
-            aclOpExecutor *executor = nullptr;
+            aclOpExecutor* executor = nullptr;
             ret = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
         } else if (runMode == kRunModeYNull) {
             auto ut = OP_API_UT(
                 aclnnQuantGroupedMatmulInplaceAdd,
                 INPUT(x1Desc, x2Desc, scale1Desc, scale2Desc, groupListDesc, nullptr, groupListType, groupSize),
                 OUTPUT());
-            aclOpExecutor *executor = nullptr;
+            aclOpExecutor* executor = nullptr;
             ret = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
         } else {
             auto ut =
@@ -118,7 +118,7 @@ struct QGmmInplaceAddOpApiCase {
     string runMode = kRunModeGetWorkspace;
 };
 
-vector<QGmmInplaceAddOpApiCase> LoadCases(const string &csvFilePath)
+vector<QGmmInplaceAddOpApiCase> LoadCases(const string& csvFilePath)
 {
     ifstream in(csvFilePath);
     EXPECT_TRUE(in.is_open()) << "Failed to open CSV file: " << csvFilePath;
@@ -171,7 +171,7 @@ vector<QGmmInplaceAddOpApiCase> LoadCases(const string &csvFilePath)
                 c.runMode = Trim(cols[i++]);
             }
             cases.emplace_back(c);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvFilePath, lineNo, caseName, error);
         }
     }
@@ -179,7 +179,7 @@ vector<QGmmInplaceAddOpApiCase> LoadCases(const string &csvFilePath)
     return cases;
 }
 
-string BuildCaseName(const testing::TestParamInfo<QGmmInplaceAddOpApiCase> &info)
+string BuildCaseName(const testing::TestParamInfo<QGmmInplaceAddOpApiCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.caseName);
 }

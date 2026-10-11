@@ -23,8 +23,8 @@ namespace FFN {
 template <typename ComputeType>
 class FFNProcess {
 private:
-    ComputeType &computeOp; // inernal computation operator
-    const FFNTilingData *__restrict tilingData;
+    ComputeType& computeOp; // inernal computation operator
+    const FFNTilingData* __restrict tilingData;
 
     uint32_t k1;
     uint32_t n1;
@@ -39,26 +39,26 @@ private:
 
 public:
     /** @brief constructor */
-    __aicore__ inline FFNProcess(ComputeType &computeOp_)
+    __aicore__ inline FFNProcess(ComputeType& computeOp_)
         : computeOp(computeOp_)
     {}
 
-    __aicore__ inline void Init(const FFNTilingData *__restrict tiling);
+    __aicore__ inline void Init(const FFNTilingData* __restrict tiling);
 
     __aicore__ inline void Process();
 
-    __aicore__ inline void MM1Process(MNConfig &mnConfig);
+    __aicore__ inline void MM1Process(MNConfig& mnConfig);
 
-    __aicore__ inline void MM2Process(MNConfig &mnConfig);
+    __aicore__ inline void MM2Process(MNConfig& mnConfig);
 
-    __aicore__ inline void MNConfigProcess(MNConfig &mnConfig, const TCubeTiling &mmTilingData, const uint32_t k,
+    __aicore__ inline void MNConfigProcess(MNConfig& mnConfig, const TCubeTiling& mmTilingData, const uint32_t k,
                                            const uint32_t n);
 
     __aicore__ inline bool ZeroN1Process();
 };
 
 template <typename ComputeType>
-__aicore__ inline void FFNProcess<ComputeType>::Init(const FFNTilingData *__restrict tiling)
+__aicore__ inline void FFNProcess<ComputeType>::Init(const FFNTilingData* __restrict tiling)
 {
     blockIdx = GetBlockIdx();
     coreIdx = blockIdx / GetTaskRation();
@@ -99,7 +99,7 @@ __aicore__ inline void FFNProcess<ComputeType>::Process()
 }
 
 template <typename ComputeType>
-__aicore__ inline void FFNProcess<ComputeType>::MNConfigProcess(MNConfig &mnConfig, const TCubeTiling &mmTilingData,
+__aicore__ inline void FFNProcess<ComputeType>::MNConfigProcess(MNConfig& mnConfig, const TCubeTiling& mmTilingData,
                                                                 const uint32_t k, const uint32_t n)
 {
     mnConfig.k = k;
@@ -110,7 +110,7 @@ __aicore__ inline void FFNProcess<ComputeType>::MNConfigProcess(MNConfig &mnConf
 }
 
 template <typename ComputeType>
-__aicore__ inline void FFNProcess<ComputeType>::MM1Process(MNConfig &mnConfig)
+__aicore__ inline void FFNProcess<ComputeType>::MM1Process(MNConfig& mnConfig)
 {
     uint32_t totalBlock = mnConfig.blockDimM * mnConfig.blockDimN;
     uint32_t curBlock = coreIdx;
@@ -125,7 +125,7 @@ __aicore__ inline void FFNProcess<ComputeType>::MM1Process(MNConfig &mnConfig)
 }
 
 template <typename ComputeType>
-__aicore__ inline void FFNProcess<ComputeType>::MM2Process(MNConfig &mnConfig)
+__aicore__ inline void FFNProcess<ComputeType>::MM2Process(MNConfig& mnConfig)
 {
     uint32_t totalBlock = mnConfig.blockDimM * mnConfig.blockDimN;
     uint32_t curBlock = coreIdx;
@@ -163,10 +163,10 @@ template <typename T, class mm1Type, class mm2Type = mm1Type, typename c1T = T, 
 class FFNCompute {
 private:
     // define matmul
-    typename mm1Type::MT &mm1;
-    typename mm2Type::MT &mm2;
+    typename mm1Type::MT& mm1;
+    typename mm2Type::MT& mm2;
 
-    TPipe *pipe;
+    TPipe* pipe;
     GlobalTensor<T> xGm;
     GlobalTensor<T> weight1Gm;
     GlobalTensor<BiasT> bias1Gm;
@@ -189,7 +189,7 @@ private:
 
 public:
     /** @brief constructor */
-    __aicore__ inline FFNCompute(typename mm1Type::MT &mm1_, typename mm2Type::MT &mm2_)
+    __aicore__ inline FFNCompute(typename mm1Type::MT& mm1_, typename mm2Type::MT& mm2_)
         : mm1(mm1_),
           mm2(mm2_)
     {}
@@ -205,55 +205,55 @@ public:
      * @param tiling: tiling pointer.
      * @param tPipe: memory manager.
      */
-    __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
-                                __gm__ uint8_t *bias1, __gm__ uint8_t *bias2, __gm__ uint8_t *y,
-                                __gm__ uint8_t *workspace, const FFNTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t* x, __gm__ uint8_t* weight1, __gm__ uint8_t* weight2,
+                                __gm__ uint8_t* bias1, __gm__ uint8_t* bias2, __gm__ uint8_t* y,
+                                __gm__ uint8_t* workspace, const FFNTilingData* __restrict tiling, TPipe* tPipe);
 
-    __aicore__ inline void CalcOffset(MNConfig &mnConfig, uint32_t &posN, uint64_t &xOffset, uint64_t &wOffset,
-                                      uint64_t &outOffset);
+    __aicore__ inline void CalcOffset(MNConfig& mnConfig, uint32_t& posN, uint64_t& xOffset, uint64_t& wOffset,
+                                      uint64_t& outOffset);
 
-    __aicore__ inline void MM1Compute(MNConfig &mnConfig);
+    __aicore__ inline void MM1Compute(MNConfig& mnConfig);
 
-    __aicore__ inline void MM2Compute(MNConfig &mnConfig);
+    __aicore__ inline void MM2Compute(MNConfig& mnConfig);
 
-    __aicore__ inline void Elewise(const MNConfig &mnConfig, const uint64_t activeOffset);
+    __aicore__ inline void Elewise(const MNConfig& mnConfig, const uint64_t activeOffset);
 
     __aicore__ inline void ElewiseCompute(const uint32_t computeSize);
 
-    __aicore__ inline void ZeroN1Compute(MNConfig &mnConfig, const uint32_t coreIdx);
+    __aicore__ inline void ZeroN1Compute(MNConfig& mnConfig, const uint32_t coreIdx);
 
     __aicore__ inline uint32_t CursingleMNCompute(const uint32_t singleMN, const uint32_t mOrN, const uint32_t offset);
 
-    __aicore__ inline void ZeroN1WithoutBiasCompute(const MNConfig &mnConfig, const uint32_t coreIdx);
+    __aicore__ inline void ZeroN1WithoutBiasCompute(const MNConfig& mnConfig, const uint32_t coreIdx);
 
-    __aicore__ inline void ZeroN1WithBiasCompute(MNConfig &mnConfig, const uint32_t coreIdx);
+    __aicore__ inline void ZeroN1WithBiasCompute(MNConfig& mnConfig, const uint32_t coreIdx);
 
     __aicore__ inline void AllCoreSync();
 };
 
 template <typename T, class mm1Type, class mm2Type, typename c1T, typename c2T, typename BiasT>
 __aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::Init(
-    __gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2, __gm__ uint8_t *bias1, __gm__ uint8_t *bias2,
-    __gm__ uint8_t *y, __gm__ uint8_t *workspace, const FFNTilingData *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t* x, __gm__ uint8_t* weight1, __gm__ uint8_t* weight2, __gm__ uint8_t* bias1, __gm__ uint8_t* bias2,
+    __gm__ uint8_t* y, __gm__ uint8_t* workspace, const FFNTilingData* __restrict tiling, TPipe* tPipe)
 {
     activeType = tiling->ffnBaseParams.activeType;
     pipe = tPipe;
     // init global buffer
-    xGm.SetGlobalBuffer((__gm__ T *)x);
-    weight1Gm.SetGlobalBuffer((__gm__ T *)weight1);
-    weight2Gm.SetGlobalBuffer((__gm__ T *)weight2);
+    xGm.SetGlobalBuffer((__gm__ T*)x);
+    weight1Gm.SetGlobalBuffer((__gm__ T*)weight1);
+    weight2Gm.SetGlobalBuffer((__gm__ T*)weight2);
     if (bias1 != nullptr) {
-        bias1Gm.SetGlobalBuffer((__gm__ BiasT *)bias1);
+        bias1Gm.SetGlobalBuffer((__gm__ BiasT*)bias1);
     }
     if (bias2 != nullptr) {
-        bias2Gm.SetGlobalBuffer((__gm__ BiasT *)bias2);
+        bias2Gm.SetGlobalBuffer((__gm__ BiasT*)bias2);
     }
     hasBias1 = bias1 != nullptr;
     hasBias2 = bias2 != nullptr;
-    yGm.SetGlobalBuffer((__gm__ T *)y);
-    syncGm.SetGlobalBuffer((__gm__ int32_t *)workspace);
+    yGm.SetGlobalBuffer((__gm__ T*)y);
+    syncGm.SetGlobalBuffer((__gm__ int32_t*)workspace);
     mm2WorkspaceGm.SetGlobalBuffer(
-        (__gm__ T *)(workspace + tiling->ffnBaseParams.syncWorkspaceSize + tiling->ffnBaseParams.workspace1Size));
+        (__gm__ T*)(workspace + tiling->ffnBaseParams.syncWorkspaceSize + tiling->ffnBaseParams.workspace1Size));
 
     uint32_t ubCalSize = tiling->ffnSingleCoreParams.ubCalSize;
     pipe->InitBuffer(vecInQueue, 1, ubCalSize * sizeof(c1T) + UB_BLOCK_UNIT_SIZE);
@@ -286,10 +286,10 @@ __aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::AllCore
 }
 
 template <typename T, class mm1Type, class mm2Type, typename c1T, typename c2T, typename BiasT>
-__aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::CalcOffset(MNConfig &mnConfig, uint32_t &posN,
-                                                                                    uint64_t &xOffset,
-                                                                                    uint64_t &wOffset,
-                                                                                    uint64_t &outOffset)
+__aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::CalcOffset(MNConfig& mnConfig, uint32_t& posN,
+                                                                                    uint64_t& xOffset,
+                                                                                    uint64_t& wOffset,
+                                                                                    uint64_t& outOffset)
 {
     uint32_t posM = mnConfig.mIdx * mnConfig.baseM;
     posN = mnConfig.nIdx * mnConfig.baseN;
@@ -305,7 +305,7 @@ __aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::CalcOff
 }
 
 template <typename T, class mm1Type, class mm2Type, typename c1T, typename c2T, typename BiasT>
-__aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::MM1Compute(MNConfig &mnConfig)
+__aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::MM1Compute(MNConfig& mnConfig)
 {
     uint32_t posN;
     uint64_t xOffset;
@@ -325,7 +325,7 @@ __aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::MM1Comp
 
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 200
     GlobalTensor<uint64_t> global;
-    global.SetGlobalBuffer((__gm__ uint64_t *)0);
+    global.SetGlobalBuffer((__gm__ uint64_t*)0);
     DataCacheCleanAndInvalid<uint64_t, CacheLine::ENTIRE_DATA_CACHE>(global);
 #endif
 
@@ -343,7 +343,7 @@ __aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::MM1Comp
 }
 
 template <typename T, class mm1Type, class mm2Type, typename c1T, typename c2T, typename BiasT>
-__aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::Elewise(const MNConfig &mnConfig,
+__aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::Elewise(const MNConfig& mnConfig,
                                                                                  const uint64_t activeOffset)
 {
     uint32_t computeSize = mnConfig.singleM * mnConfig.singleN;
@@ -380,7 +380,7 @@ __aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::Elewise
 }
 
 template <typename T, class mm1Type, class mm2Type, typename c1T, typename c2T, typename BiasT>
-__aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::MM2Compute(MNConfig &mnConfig)
+__aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::MM2Compute(MNConfig& mnConfig)
 {
     uint32_t posN;
     uint64_t xOffset;
@@ -401,7 +401,7 @@ __aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::MM2Comp
 }
 
 template <typename T, class mm1Type, class mm2Type, typename c1T, typename c2T, typename BiasT>
-__aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::ZeroN1Compute(MNConfig &mnConfig,
+__aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::ZeroN1Compute(MNConfig& mnConfig,
                                                                                        const uint32_t coreIdx)
 {
     if (hasBias2) {
@@ -428,7 +428,7 @@ __aicore__ inline uint32_t FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::Cur
 
 template <typename T, class mm1Type, class mm2Type, typename c1T, typename c2T, typename BiasT>
 __aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::ZeroN1WithoutBiasCompute(
-    const MNConfig &mnConfig, const uint32_t coreIdx)
+    const MNConfig& mnConfig, const uint32_t coreIdx)
 {
     uint32_t offset = mnConfig.singleN * coreIdx;
     uint32_t cursingleN = CursingleMNCompute(mnConfig.singleN, mnConfig.n, offset);
@@ -440,7 +440,7 @@ __aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::ZeroN1W
 }
 
 template <typename T, class mm1Type, class mm2Type, typename c1T, typename c2T, typename BiasT>
-__aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::ZeroN1WithBiasCompute(MNConfig &mnConfig,
+__aicore__ inline void FFNCompute<T, mm1Type, mm2Type, c1T, c2T, BiasT>::ZeroN1WithBiasCompute(MNConfig& mnConfig,
                                                                                                const uint32_t coreIdx)
 {
     if (mnConfig.singleN < mnConfig.baseN) {

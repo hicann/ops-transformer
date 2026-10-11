@@ -20,13 +20,13 @@ static constexpr int64_t X_INPUT_IDX = 0;
 static constexpr int64_t WEIGHT_SCALE_INPUT_IDX = 2;
 static constexpr int64_t Y_OUTPUT_IDX = 0;
 
-static ge::graphStatus QuantMatmulDequantInferShape(gert::InferShapeContext *context)
+static ge::graphStatus QuantMatmulDequantInferShape(gert::InferShapeContext* context)
 {
-    const gert::Shape *xShape = context->GetInputShape(X_INPUT_IDX);
+    const gert::Shape* xShape = context->GetInputShape(X_INPUT_IDX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
-    const gert::Shape *weightScaleShape = context->GetInputShape(WEIGHT_SCALE_INPUT_IDX);
+    const gert::Shape* weightScaleShape = context->GetInputShape(WEIGHT_SCALE_INPUT_IDX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, weightScaleShape);
-    gert::Shape *yShape = context->GetOutputShape(Y_OUTPUT_IDX);
+    gert::Shape* yShape = context->GetOutputShape(Y_OUTPUT_IDX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, yShape);
     auto M = xShape->GetDim(0);
     auto weightScaleDimNum = weightScaleShape->GetDimNum();
@@ -37,7 +37,7 @@ static ge::graphStatus QuantMatmulDequantInferShape(gert::InferShapeContext *con
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus QuantMatmulDequantInferDataType(gert::InferDataTypeContext *context)
+static ge::graphStatus QuantMatmulDequantInferDataType(gert::InferDataTypeContext* context)
 {
     const ge::DataType xDtype = context->GetInputDataType(X_INPUT_IDX);
     context->SetOutputDataType(Y_OUTPUT_IDX, xDtype);

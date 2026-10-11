@@ -31,10 +31,10 @@ namespace GroupedMatmulDequantSwigluQuant {
 template <class mmType>
 class GMMSwigluQuantPipelineSchedule {
 private:
-    typename mmType::MT &mm;
-    TPipe *pipe;
-    const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParams;
-    const GMMSwigluQuantV2 *__restrict gmmSwigluQuantV2;
+    typename mmType::MT& mm;
+    TPipe* pipe;
+    const GMMSwigluQuantV2BaseParams* __restrict gmmSwigluQuantV2BaseParams;
+    const GMMSwigluQuantV2* __restrict gmmSwigluQuantV2;
     // WorkSpaceSplitConfig控制Workspace切割方式的结构体;
     WorkSpaceSplitConfig workspaceSplitConfig;
     WorkSpaceSplitConfig tempWorkspaceSplitConfig;
@@ -47,15 +47,15 @@ private:
     // 后处理GMMA8W4PostProcess类
     GMMA8W4PostProcess postProcess;
     GlobalTensor<int64_t> groupListGM;
-    __aicore__ inline void InitWorkSpaceSplitConfig(WorkSpaceSplitConfig &workspaceSplitConfig);
+    __aicore__ inline void InitWorkSpaceSplitConfig(WorkSpaceSplitConfig& workspaceSplitConfig);
 
-    __aicore__ inline void UpdateWorkSpaceSplitConfig(WorkSpaceSplitConfig &workspaceSplitConfig,
+    __aicore__ inline void UpdateWorkSpaceSplitConfig(WorkSpaceSplitConfig& workspaceSplitConfig,
                                                       int32_t workspaceSplitLoopIdx);
 
 public:
     __aicore__ inline GMMSwigluQuantPipelineSchedule(
-        typename mmType::MT &mm_, const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN,
-        const GMMSwigluQuantV2 *__restrict gmmSwigluIN, TPipe *tPipeIN)
+        typename mmType::MT& mm_, const GMMSwigluQuantV2BaseParams* __restrict gmmSwigluQuantV2BaseParamsIN,
+        const GMMSwigluQuantV2* __restrict gmmSwigluIN, TPipe* tPipeIN)
         : mm(mm_),
           midProcess(mm),
           gmmSwigluQuantV2BaseParams(gmmSwigluQuantV2BaseParamsIN),
@@ -87,7 +87,7 @@ __aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::Init(GM_ADDR x, G
     gmAddrParams.workSpaceOffset2 = gmmSwigluQuantV2BaseParams->workSpaceOffset1;
     gmAddrParams.workSpaceOffset3 =
         gmmSwigluQuantV2BaseParams->workSpaceOffset1 + gmmSwigluQuantV2BaseParams->workSpaceOffset2 / 2;
-    groupListGM.SetGlobalBuffer((__gm__ int64_t *)gmAddrParams.groupListGM);
+    groupListGM.SetGlobalBuffer((__gm__ int64_t*)gmAddrParams.groupListGM);
     InitWorkSpaceSplitConfig(workspaceSplitConfig);
 }
 
@@ -142,7 +142,7 @@ __aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::Process()
 
 template <class mmType>
 __aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::InitWorkSpaceSplitConfig(
-    WorkSpaceSplitConfig &workspaceSplitConfig)
+    WorkSpaceSplitConfig& workspaceSplitConfig)
 {
     if (gmmSwigluQuantV2BaseParams->groupListType == 0) {
         workspaceSplitConfig.M = groupListGM.GetValue(gmmSwigluQuantV2->groupListLen - 1);
@@ -165,7 +165,7 @@ __aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::InitWorkSpaceSpli
 
 template <class mmType>
 __aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::UpdateWorkSpaceSplitConfig(
-    WorkSpaceSplitConfig &workspaceSplitConfig, int32_t workspaceSplitLoopIdx)
+    WorkSpaceSplitConfig& workspaceSplitConfig, int32_t workspaceSplitLoopIdx)
 {
     if (workspaceSplitLoopIdx < 0)
         return;

@@ -47,7 +47,7 @@ struct Copy<
      * @param [in] coord: coordinate
      */
     template <class Coord>
-    __aicore__ inline void operator()(DstTensor &dst, SrcTensor &src, const Coord &coord)
+    __aicore__ inline void operator()(DstTensor& dst, SrcTensor& src, const Coord& coord)
     {
         auto srcShape = src.GetTensorTrait().GetLayout().GetShape();
         auto srcStride = src.GetTensorTrait().GetLayout().GetStride();
@@ -91,7 +91,7 @@ struct Copy<ArchTag, CopyWithLayout, InputType, DstTrait, SrcTrait,
     using SrcTensor = AscendC::GlobalTensor<SrcTrait>;
 
     template <class Coord>
-    __aicore__ inline void operator()(DstTensor &dst, SrcTensor &src, const Coord &coord)
+    __aicore__ inline void operator()(DstTensor& dst, SrcTensor& src, const Coord& coord)
     {
         using TransT = typename InputType::T;
 
@@ -136,7 +136,7 @@ struct Copy<ArchTag, CopyWithLayout, InputType, DstTrait, SrcTrait,
      * @param [in] coord: coordinate
      */
     template <class Coord>
-    __aicore__ inline void operator()(DstTensor &dst, SrcTensor &src, const Coord &coord)
+    __aicore__ inline void operator()(DstTensor& dst, SrcTensor& src, const Coord& coord)
     {
         auto dstShape = dst.GetTensorTrait().GetLayout().GetShape();
         AscendC::DataCopyParams dataCopyInfo;

@@ -87,13 +87,13 @@ bool IsMxScaleDtype(DataType dtype)
     return dtype == DataType::DT_FLOAT8_E8M0;
 }
 
-bool IsEmptyQuantMode(const char *quantMode)
+bool IsEmptyQuantMode(const char* quantMode)
 {
     return quantMode == nullptr || quantMode[0] == '\0';
 }
 
-aclnnStatus CheckMxQuantDtype(const aclTensor *x, const aclTensor *weight, const aclTensor *xScaleOptional,
-                              const aclTensor *weightScale, const aclTensor *y, const aclTensor *yScale,
+aclnnStatus CheckMxQuantDtype(const aclTensor* x, const aclTensor* weight, const aclTensor* xScaleOptional,
+                              const aclTensor* weightScale, const aclTensor* y, const aclTensor* yScale,
                               int64_t effectiveYDtype)
 {
     GMMAQ_CHECK_WITH_LOG(
@@ -125,12 +125,12 @@ aclnnStatus CheckMxQuantDtype(const aclTensor *x, const aclTensor *weight, const
     return ACLNN_SUCCESS;
 }
 
-bool IsNzFormat(const aclTensor *tensor)
+bool IsNzFormat(const aclTensor* tensor)
 {
     return tensor != nullptr && ge::GetPrimaryFormat(tensor->GetStorageFormat()) == op::Format::FORMAT_FRACTAL_NZ;
 }
 
-bool IsEmptyTensorList(const aclTensorList *tensorList)
+bool IsEmptyTensorList(const aclTensorList* tensorList)
 {
     if (tensorList == nullptr || tensorList->Size() == 0) {
         return true;
@@ -138,18 +138,18 @@ bool IsEmptyTensorList(const aclTensorList *tensorList)
     if (tensorList->Size() != gmaq::SINGLE_TENSOR_SIZE || (*tensorList)[gmaq::FIRST_TENSOR_INDEX] == nullptr) {
         return false;
     }
-    const auto &shape = (*tensorList)[gmaq::FIRST_TENSOR_INDEX]->GetViewShape();
+    const auto& shape = (*tensorList)[gmaq::FIRST_TENSOR_INDEX]->GetViewShape();
     return shape.GetDimNum() == 1 && shape.GetDim(gmaq::DIM_0) == 0;
 }
 
-void NormalizeEmptyTensorList(const aclTensorList *&tensorList)
+void NormalizeEmptyTensorList(const aclTensorList*& tensorList)
 {
     if (IsEmptyTensorList(tensorList)) {
         tensorList = nullptr;
     }
 }
 
-aclnnStatus CheckTensorList(const aclTensorList *tensorList, const char *name)
+aclnnStatus CheckTensorList(const aclTensorList* tensorList, const char* name)
 {
     GMMAQ_CHECK_WITH_LOG(tensorList != nullptr, ACLNN_ERR_PARAM_NULLPTR,
                          OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(OP_NAME, name, "does not support nullptr"));
@@ -163,7 +163,7 @@ aclnnStatus CheckTensorList(const aclTensorList *tensorList, const char *name)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckTensorDimNum(const aclTensor *tensor, const char *name, size_t expectedDimNum)
+aclnnStatus CheckTensorDimNum(const aclTensor* tensor, const char* name, size_t expectedDimNum)
 {
     auto actualDimNum = tensor->GetViewShape().GetDimNum();
     GMMAQ_CHECK_WITH_LOG(actualDimNum == expectedDimNum, ACLNN_ERR_PARAM_INVALID,
@@ -173,7 +173,7 @@ aclnnStatus CheckTensorDimNum(const aclTensor *tensor, const char *name, size_t 
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckTensorShapeEqual(const aclTensor *tensor, const char *name, const op::Shape &expectedShape)
+aclnnStatus CheckTensorShapeEqual(const aclTensor* tensor, const char* name, const op::Shape& expectedShape)
 {
     GMMAQ_CHECK_WITH_LOG(
         tensor->GetViewShape() == expectedShape, ACLNN_ERR_PARAM_INVALID,
@@ -183,13 +183,13 @@ aclnnStatus CheckTensorShapeEqual(const aclTensor *tensor, const char *name, con
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CreateEmptyTensorList(const aclDataType dataType, const aclTensorList *&tensorList, aclOpExecutor *executor)
+aclnnStatus CreateEmptyTensorList(const aclDataType dataType, const aclTensorList*& tensorList, aclOpExecutor* executor)
 {
     if (tensorList != nullptr) {
         return ACLNN_SUCCESS;
     }
-    std::vector<aclTensor *> emptyTensors;
-    aclTensor *emptyTensor = executor->AllocTensor({0}, static_cast<DataType>(dataType));
+    std::vector<aclTensor*> emptyTensors;
+    aclTensor* emptyTensor = executor->AllocTensor({0}, static_cast<DataType>(dataType));
     CHECK_RET(emptyTensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
     emptyTensors.emplace_back(emptyTensor);
     tensorList = executor->AllocTensorList(emptyTensors.data(), emptyTensors.size());
@@ -197,14 +197,14 @@ aclnnStatus CreateEmptyTensorList(const aclDataType dataType, const aclTensorLis
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus WrapWeightNzTensorList(const aclTensorList *&weight, aclOpExecutor *executor)
+aclnnStatus WrapWeightNzTensorList(const aclTensorList*& weight, aclOpExecutor* executor)
 {
     CHECK_RET(weight != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(executor != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    std::vector<const aclTensor *> tensors;
+    std::vector<const aclTensor*> tensors;
     tensors.reserve(weight->Size());
     for (size_t i = 0; i < weight->Size(); ++i) {
-        const aclTensor *tensor = (*weight)[i];
+        const aclTensor* tensor = (*weight)[i];
         CHECK_RET(tensor != nullptr, ACLNN_ERR_PARAM_NULLPTR);
         op::Shape viewShape = tensor->GetViewShape();
         op::Shape storageShape = tensor->GetStorageShape();
@@ -221,7 +221,7 @@ aclnnStatus WrapWeightNzTensorList(const aclTensorList *&weight, aclOpExecutor *
     return ACLNN_SUCCESS;
 }
 
-bool TryMultiplyInt64(int64_t lhs, int64_t rhs, int64_t &result)
+bool TryMultiplyInt64(int64_t lhs, int64_t rhs, int64_t& result)
 {
     if (lhs < 0 || rhs < 0) {
         return false;
@@ -233,7 +233,7 @@ bool TryMultiplyInt64(int64_t lhs, int64_t rhs, int64_t &result)
     return true;
 }
 
-bool IsTransposeLastTwoDims(const aclTensor *tensor)
+bool IsTransposeLastTwoDims(const aclTensor* tensor)
 {
     auto shape = tensor->GetViewShape();
     if (shape.GetDimNum() < gmaq::X_DIM_NUM) {
@@ -260,7 +260,7 @@ bool IsTransposeLastTwoDims(const aclTensor *tensor)
     return true;
 }
 
-bool IsTransposeForMxShape(const aclTensor *tensor)
+bool IsTransposeForMxShape(const aclTensor* tensor)
 {
     auto shape = tensor->GetViewShape();
     if (shape.GetDimNum() < gmaq::WEIGHT_SCALE_DIM_NUM) {
@@ -278,7 +278,7 @@ bool IsTransposeForMxShape(const aclTensor *tensor)
            strides[secondLastDim] == expectedSecondLastStride;
 }
 
-bool IsSpecialMxXTransposeCase(const aclTensor *x, const aclTensor *xScaleOptional)
+bool IsSpecialMxXTransposeCase(const aclTensor* x, const aclTensor* xScaleOptional)
 {
     auto xShape = x->GetViewShape();
     auto xScaleShape = xScaleOptional->GetViewShape();
@@ -289,13 +289,13 @@ bool IsSpecialMxXTransposeCase(const aclTensor *x, const aclTensor *xScaleOption
     return specialX || specialXScale;
 }
 
-aclnnStatus CreateContiguousTensorListForMXTypeMScale(const aclTensorList *tensorList,
-                                                      const aclTensorList *&newTensorList, aclOpExecutor *executor)
+aclnnStatus CreateContiguousTensorListForMXTypeMScale(const aclTensorList* tensorList,
+                                                      const aclTensorList*& newTensorList, aclOpExecutor* executor)
 {
-    std::vector<aclTensor *> tensors;
+    std::vector<aclTensor*> tensors;
     tensors.reserve(tensorList->Size());
     for (size_t idx = 0; idx < tensorList->Size(); ++idx) {
-        const aclTensor *inputTensor = (*tensorList)[idx];
+        const aclTensor* inputTensor = (*tensorList)[idx];
         CHECK_RET(inputTensor != nullptr, ACLNN_ERR_PARAM_NULLPTR);
         op::Shape viewShape = inputTensor->GetViewShape();
         op::Shape shape;
@@ -308,7 +308,7 @@ aclnnStatus CreateContiguousTensorListForMXTypeMScale(const aclTensorList *tenso
         shape.AppendDim(viewShape.GetDim(viewShape.GetDimNum() - gmaq::DIM_2));
         shape.AppendDim(viewShape.GetDim(viewShape.GetDimNum() - gmaq::DIM_3));
         shape.AppendDim(viewShape.GetDim(viewShape.GetDimNum() - gmaq::DIM_1));
-        aclTensor *tensor = executor->CreateView(inputTensor, shape, inputTensor->GetViewOffset());
+        aclTensor* tensor = executor->CreateView(inputTensor, shape, inputTensor->GetViewOffset());
         CHECK_RET(tensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
         tensor->SetStorageFormat(inputTensor->GetStorageFormat());
         tensors.emplace_back(tensor);
@@ -318,13 +318,13 @@ aclnnStatus CreateContiguousTensorListForMXTypeMScale(const aclTensorList *tenso
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CreateContiguousTensorList(const aclTensorList *tensorList, const aclTensorList *&newTensorList,
-                                       aclOpExecutor *executor)
+aclnnStatus CreateContiguousTensorList(const aclTensorList* tensorList, const aclTensorList*& newTensorList,
+                                       aclOpExecutor* executor)
 {
-    std::vector<aclTensor *> tensors;
+    std::vector<aclTensor*> tensors;
     tensors.reserve(tensorList->Size());
     for (size_t idx = 0; idx < tensorList->Size(); ++idx) {
-        const aclTensor *inputTensor = (*tensorList)[idx];
+        const aclTensor* inputTensor = (*tensorList)[idx];
         CHECK_RET(inputTensor != nullptr, ACLNN_ERR_PARAM_NULLPTR);
         op::Shape viewShape = inputTensor->GetViewShape();
         uint32_t viewShapeDimsNum = viewShape.GetDimNum();
@@ -339,7 +339,7 @@ aclnnStatus CreateContiguousTensorList(const aclTensorList *tensorList, const ac
         }
         shape.AppendDim(viewShape.GetDim(viewShapeDimsNum - 1));
         shape.AppendDim(viewShape.GetDim(viewShapeDimsNum - 2));
-        aclTensor *tensor = executor->CreateView(inputTensor, shape, inputTensor->GetViewOffset());
+        aclTensor* tensor = executor->CreateView(inputTensor, shape, inputTensor->GetViewOffset());
         CHECK_RET(tensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
         tensor->SetStorageFormat(inputTensor->GetStorageFormat());
         tensor->SetStorageShape(inputTensor->GetStorageShape());
@@ -350,11 +350,11 @@ aclnnStatus CreateContiguousTensorList(const aclTensorList *tensorList, const ac
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckMXTranspose(const aclTensor *x, const aclTensor *xScaleOptional, const aclTensorList *weight,
-                             const aclTensorList *weightScale, bool &transposeWeight)
+aclnnStatus CheckMXTranspose(const aclTensor* x, const aclTensor* xScaleOptional, const aclTensorList* weight,
+                             const aclTensorList* weightScale, bool& transposeWeight)
 {
-    const aclTensor *w = (*weight)[gmaq::FIRST_TENSOR_INDEX];
-    const aclTensor *wScale = (*weightScale)[gmaq::FIRST_TENSOR_INDEX];
+    const aclTensor* w = (*weight)[gmaq::FIRST_TENSOR_INDEX];
+    const aclTensor* wScale = (*weightScale)[gmaq::FIRST_TENSOR_INDEX];
     bool transposeWeightScale = IsTransposeForMxShape(wScale);
     bool transposeWeightByStride = IsTransposeLastTwoDims(w);
     bool transposeX = IsTransposeLastTwoDims(x);
@@ -379,8 +379,8 @@ aclnnStatus CheckMXTranspose(const aclTensor *x, const aclTensor *xScaleOptional
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus NormalizeMXTranspose(const aclTensorList *&weight, const aclTensorList *&weightScale, bool transposeWeight,
-                                 aclOpExecutor *executor)
+aclnnStatus NormalizeMXTranspose(const aclTensorList*& weight, const aclTensorList*& weightScale, bool transposeWeight,
+                                 aclOpExecutor* executor)
 {
     if (!transposeWeight) {
         return ACLNN_SUCCESS;
@@ -391,9 +391,9 @@ aclnnStatus NormalizeMXTranspose(const aclTensorList *&weight, const aclTensorLi
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckMxQuantShape(const aclTensor *x, const aclTensor *groupList, const aclTensor *xScaleOptional,
-                              const aclTensor *weight, const aclTensor *weightScale, bool transposeWeight,
-                              const aclTensor *y, const aclTensor *yScale)
+aclnnStatus CheckMxQuantShape(const aclTensor* x, const aclTensor* groupList, const aclTensor* xScaleOptional,
+                              const aclTensor* weight, const aclTensor* weightScale, bool transposeWeight,
+                              const aclTensor* y, const aclTensor* yScale)
 {
     int64_t m = x->GetViewShape().GetDim(gmaq::DIM_0);
     int64_t k = x->GetViewShape().GetDim(gmaq::DIM_1);
@@ -417,9 +417,9 @@ aclnnStatus CheckMxQuantShape(const aclTensor *x, const aclTensor *groupList, co
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(OP_NAME, "K", std::to_string(k),
                                               "when x and weight are FLOAT4, K must be even and must not be 2"));
 
-    const auto &weightShape = weight->GetStorageShape();
-    const auto &weightViewShape = weight->GetViewShape();
-    const auto &weightScaleShape = weightScale->GetViewShape();
+    const auto& weightShape = weight->GetStorageShape();
+    const auto& weightViewShape = weight->GetViewShape();
+    const auto& weightScaleShape = weightScale->GetViewShape();
     GMMAQ_CHECK_WITH_LOG(
         weightShape.GetDim(gmaq::DIM_0) == e, ACLNN_ERR_PARAM_INVALID,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(OP_NAME, "weight dim 0", std::to_string(weightShape.GetDim(gmaq::DIM_0)),
@@ -462,14 +462,14 @@ aclnnStatus CheckMxQuantShape(const aclTensor *x, const aclTensor *groupList, co
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckHostGroupListValues(const aclTensor *x, const aclTensor *groupList, int64_t groupListType)
+aclnnStatus CheckHostGroupListValues(const aclTensor* x, const aclTensor* groupList, int64_t groupListType)
 {
     if (!gert::TensorPlacementUtils::IsOnHost(groupList->GetPlacement())) {
         // Runtime groupList tensors are normally on device.  Their values are consumed by the
         // kernel and cannot be dereferenced by the host-side GetWorkspaceSize path.
         return ACLNN_SUCCESS;
     }
-    const auto *groupListData = static_cast<const int64_t *>(groupList->GetData());
+    const auto* groupListData = static_cast<const int64_t*>(groupList->GetData());
     if (groupListData == nullptr) {
         return ACLNN_SUCCESS;
     }
@@ -499,9 +499,9 @@ aclnnStatus CheckHostGroupListValues(const aclTensor *x, const aclTensor *groupL
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckRequiredParams(const aclTensor *x, const aclTensor *groupList, const aclTensorList *weight,
-                                const aclTensorList *weightScale, const char *activationType, const aclTensor *y,
-                                const aclTensor *yScale)
+aclnnStatus CheckRequiredParams(const aclTensor* x, const aclTensor* groupList, const aclTensorList* weight,
+                                const aclTensorList* weightScale, const char* activationType, const aclTensor* y,
+                                const aclTensor* yScale)
 {
     // groupList is a runtime tensor and may be resident in device memory.  Only validate its
     // descriptor here; device-resident values must not be dereferenced by the host.
@@ -523,7 +523,7 @@ aclnnStatus CheckRequiredParams(const aclTensor *x, const aclTensor *groupList, 
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckActivationType(const char *activationType)
+aclnnStatus CheckActivationType(const char* activationType)
 {
     GMMAQ_CHECK_WITH_LOG(std::strcmp(activationType, GELU_TANH) == 0, ACLNN_ERR_PARAM_INVALID,
                          OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(OP_NAME, "activationType", activationType,
@@ -531,8 +531,8 @@ aclnnStatus CheckActivationType(const char *activationType)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus ResolveAndCheckQuantMode(const aclTensor *x, const aclTensor *xScaleOptional, const char *quantMode,
-                                     const char *&effectiveQuantMode)
+aclnnStatus ResolveAndCheckQuantMode(const aclTensor* x, const aclTensor* xScaleOptional, const char* quantMode,
+                                     const char*& effectiveQuantMode)
 {
     if (!IsEmptyQuantMode(quantMode)) {
         GMMAQ_CHECK_WITH_LOG(
@@ -557,7 +557,7 @@ aclnnStatus ResolveAndCheckQuantMode(const aclTensor *x, const aclTensor *xScale
     return ACLNN_ERR_PARAM_INVALID;
 }
 
-aclnnStatus ResolveAndCheckRoundMode(const char *roundMode, const char *&effectiveRoundMode)
+aclnnStatus ResolveAndCheckRoundMode(const char* roundMode, const char*& effectiveRoundMode)
 {
     if (roundMode == nullptr || roundMode[0] == '\0') {
         effectiveRoundMode = ROUND_MODE_RINT;
@@ -571,9 +571,9 @@ aclnnStatus ResolveAndCheckRoundMode(const char *roundMode, const char *&effecti
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckMxQuantAttrs(int64_t groupListType, int64_t effectiveYDtype, const char *roundMode,
-                              const char *&effectiveRoundMode, int64_t scaleAlg, float dstTypeMax,
-                              const aclTensorList *bias)
+aclnnStatus CheckMxQuantAttrs(int64_t groupListType, int64_t effectiveYDtype, const char* roundMode,
+                              const char*& effectiveRoundMode, int64_t scaleAlg, float dstTypeMax,
+                              const aclTensorList* bias)
 {
     CHECK_RET(ResolveAndCheckRoundMode(roundMode, effectiveRoundMode) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     GMMAQ_CHECK_WITH_LOG(IsMxOutputDtypeValue(effectiveYDtype), ACLNN_ERR_PARAM_INVALID,
@@ -618,9 +618,9 @@ aclnnStatus CheckMxQuantAttrs(int64_t groupListType, int64_t effectiveYDtype, co
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckMxQuantDim(const aclTensor *x, const aclTensor *groupList, const aclTensor *weight,
-                            const aclTensor *weightScale, const aclTensor *xScaleOptional, const aclTensor *y,
-                            const aclTensor *yScale)
+aclnnStatus CheckMxQuantDim(const aclTensor* x, const aclTensor* groupList, const aclTensor* weight,
+                            const aclTensor* weightScale, const aclTensor* xScaleOptional, const aclTensor* y,
+                            const aclTensor* yScale)
 {
     CHECK_RET(CheckTensorDimNum(x, "x", gmaq::X_DIM_NUM) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckTensorDimNum(xScaleOptional, "xScaleOptional", gmaq::SCALE_DIM_NUM) == ACLNN_SUCCESS,
@@ -640,9 +640,9 @@ aclnnStatus CheckMxQuantDim(const aclTensor *x, const aclTensor *groupList, cons
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckMxQuantFormat(const aclTensor *x, const aclTensor *groupList, const aclTensor *weight,
-                               const aclTensor *weightScale, const aclTensor *xScaleOptional, const aclTensor *y,
-                               const aclTensor *yScale)
+aclnnStatus CheckMxQuantFormat(const aclTensor* x, const aclTensor* groupList, const aclTensor* weight,
+                               const aclTensor* weightScale, const aclTensor* xScaleOptional, const aclTensor* y,
+                               const aclTensor* yScale)
 {
     GMMAQ_CHECK_WITH_LOG(
         !op::IsPrivateFormat(x->GetStorageFormat()), ACLNN_ERR_PARAM_INVALID,
@@ -675,18 +675,18 @@ aclnnStatus CheckMxQuantFormat(const aclTensor *x, const aclTensor *groupList, c
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckMxQuantParams(const aclTensor *x, const aclTensor *groupList, const aclTensorList *&weight,
-                               const aclTensorList *&weightScale, const aclTensorList *bias,
-                               const aclTensor *xScaleOptional, bool &transposeWeight, int64_t groupListType,
-                               int64_t effectiveYDtype, const char *roundMode, const char *&effectiveRoundMode,
-                               int64_t scaleAlg, float dstTypeMax, const aclTensor *y, const aclTensor *yScale,
-                               aclOpExecutor *executor)
+aclnnStatus CheckMxQuantParams(const aclTensor* x, const aclTensor* groupList, const aclTensorList*& weight,
+                               const aclTensorList*& weightScale, const aclTensorList* bias,
+                               const aclTensor* xScaleOptional, bool& transposeWeight, int64_t groupListType,
+                               int64_t effectiveYDtype, const char* roundMode, const char*& effectiveRoundMode,
+                               int64_t scaleAlg, float dstTypeMax, const aclTensor* y, const aclTensor* yScale,
+                               aclOpExecutor* executor)
 {
     GMMAQ_CHECK_WITH_LOG(
         xScaleOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(OP_NAME, "xScaleOptional", "does not support nullptr"));
-    const aclTensor *w = (*weight)[gmaq::FIRST_TENSOR_INDEX];
-    const aclTensor *wScale = (*weightScale)[gmaq::FIRST_TENSOR_INDEX];
+    const aclTensor* w = (*weight)[gmaq::FIRST_TENSOR_INDEX];
+    const aclTensor* wScale = (*weightScale)[gmaq::FIRST_TENSOR_INDEX];
 
     aclnnStatus checkRet =
         CheckMxQuantAttrs(groupListType, effectiveYDtype, roundMode, effectiveRoundMode, scaleAlg, dstTypeMax, bias);
@@ -714,12 +714,12 @@ aclnnStatus CheckMxQuantParams(const aclTensor *x, const aclTensor *groupList, c
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckParams(const aclTensor *x, const aclTensor *groupList, const aclTensorList *&weight,
-                        const aclTensorList *&weightScale, const aclTensorList *bias, const aclTensor *xScaleOptional,
-                        const char *activationType, bool &transposeWeight, int64_t groupListType, const char *quantMode,
-                        const char *roundMode, int64_t scaleAlg, float dstTypeMax, const aclTensor *y,
-                        const aclTensor *yScale, aclOpExecutor *executor, const char *&effectiveQuantMode,
-                        const char *&effectiveRoundMode, int64_t &effectiveYDtype)
+aclnnStatus CheckParams(const aclTensor* x, const aclTensor* groupList, const aclTensorList*& weight,
+                        const aclTensorList*& weightScale, const aclTensorList* bias, const aclTensor* xScaleOptional,
+                        const char* activationType, bool& transposeWeight, int64_t groupListType, const char* quantMode,
+                        const char* roundMode, int64_t scaleAlg, float dstTypeMax, const aclTensor* y,
+                        const aclTensor* yScale, aclOpExecutor* executor, const char*& effectiveQuantMode,
+                        const char*& effectiveRoundMode, int64_t& effectiveYDtype)
 {
     aclnnStatus checkRet = CheckActivationType(activationType);
     CHECK_RET(checkRet == ACLNN_SUCCESS, checkRet);
@@ -739,12 +739,12 @@ aclnnStatus CheckParams(const aclTensor *x, const aclTensor *groupList, const ac
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus PrepareTensorListContiguous(const aclTensorList *&tensorList, aclOpExecutor *executor)
+aclnnStatus PrepareTensorListContiguous(const aclTensorList*& tensorList, aclOpExecutor* executor)
 {
-    std::vector<const aclTensor *> tensorVec;
+    std::vector<const aclTensor*> tensorVec;
     tensorVec.reserve(tensorList->Size());
     for (size_t i = 0; i < tensorList->Size(); ++i) {
-        const aclTensor *contiguousTensor = l0op::Contiguous((*tensorList)[i], executor);
+        const aclTensor* contiguousTensor = l0op::Contiguous((*tensorList)[i], executor);
         CHECK_RET(contiguousTensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
         tensorVec.push_back(contiguousTensor);
     }
@@ -759,10 +759,10 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnGroupedMatmulActivationQuantWeightNzGetWorkspaceSize(
-    const aclTensor *x, const aclTensor *groupList, const aclTensorList *weight, const aclTensorList *weightScale,
-    const aclTensorList *bias, const aclTensor *xScaleOptional, const char *activationType, int64_t groupListType,
-    const aclIntArray *tuningConfig, const char *quantMode, const char *roundMode, int64_t scaleAlg, float dstTypeMax,
-    aclTensor *y, aclTensor *yScale, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* x, const aclTensor* groupList, const aclTensorList* weight, const aclTensorList* weightScale,
+    const aclTensorList* bias, const aclTensor* xScaleOptional, const char* activationType, int64_t groupListType,
+    const aclIntArray* tuningConfig, const char* quantMode, const char* roundMode, int64_t scaleAlg, float dstTypeMax,
+    aclTensor* y, aclTensor* yScale, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     aclnnStatus checkRet = CheckRequiredParams(x, groupList, weight, weightScale, activationType, y, yScale);
@@ -771,8 +771,8 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNzGetWorkspaceSize(
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-    const char *effectiveQuantMode = nullptr;
-    const char *effectiveRoundMode = nullptr;
+    const char* effectiveQuantMode = nullptr;
+    const char* effectiveRoundMode = nullptr;
     int64_t effectiveYDtype = 0L;
     checkRet = CheckParams(x, groupList, weight, weightScale, bias, xScaleOptional, activationType, transposeWeight,
                            groupListType, quantMode, roundMode, scaleAlg, dstTypeMax, y, yScale, uniqueExecutor.get(),
@@ -819,7 +819,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNzGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                       aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnGroupedMatmulActivationQuantWeightNz);

@@ -52,8 +52,8 @@ struct Copy<
      * @param [in] coord: the coordinates for copying data
      */
     template <class Coord>
-    __aicore__ inline void operator()(AscendC::GlobalTensor<DstTrait> &dstND, AscendC::LocalTensor<SrcTrait> &src,
-                                      const Coord &coord)
+    __aicore__ inline void operator()(AscendC::GlobalTensor<DstTrait>& dstND, AscendC::LocalTensor<SrcTrait>& src,
+                                      const Coord& coord)
     {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 2201)
         using SrcT = typename SrcTrait::LiteType;
@@ -108,8 +108,8 @@ struct Copy<Arch::DAV2201, CopyEnUnitFlagWithLayout, OutputType, DstTrait, SrcTr
      * @param [in] coord: the coordinates for copying data
      */
     template <class Coord>
-    __aicore__ inline void operator()(AscendC::GlobalTensor<DstTrait> &dst, AscendC::LocalTensor<SrcTrait> &src,
-                                      const Coord &coord)
+    __aicore__ inline void operator()(AscendC::GlobalTensor<DstTrait>& dst, AscendC::LocalTensor<SrcTrait>& src,
+                                      const Coord& coord)
     {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 2201)
         using DstT = typename DstTrait::LiteType;
@@ -169,8 +169,8 @@ struct Copy<
      * @param [in] coord: the coordinates for copying data
      */
     template <class Coord>
-    __aicore__ inline void operator()(AscendC::GlobalTensor<DstTrait> &dstND, AscendC::LocalTensor<SrcTrait> &src,
-                                      const Coord &coord)
+    __aicore__ inline void operator()(AscendC::GlobalTensor<DstTrait>& dstND, AscendC::LocalTensor<SrcTrait>& src,
+                                      const Coord& coord)
     {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         using SrcT = typename SrcTrait::LiteType;
@@ -229,8 +229,8 @@ struct Copy<Arch::DAV3510, CopyEnUnitFlagWithLayout, OutputType, DstTrait, SrcTr
      * @param [in] coord: the coordinates for copying data
      */
     template <class Coord>
-    __aicore__ inline void operator()(AscendC::GlobalTensor<DstTrait> &dst, AscendC::LocalTensor<SrcTrait> &src,
-                                      const Coord &coord)
+    __aicore__ inline void operator()(AscendC::GlobalTensor<DstTrait>& dst, AscendC::LocalTensor<SrcTrait>& src,
+                                      const Coord& coord)
     {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         using SrcT = typename SrcTrait::LiteType;

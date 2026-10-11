@@ -33,21 +33,21 @@ class WeightQuantA16W4MsdBasicBlock {
 public:
     using mm1OutputType = float;
     __aicore__ inline WeightQuantA16W4MsdBasicBlock(){};
-    __aicore__ inline void InitPreProcess(TPipe *tPipe);
+    __aicore__ inline void InitPreProcess(TPipe* tPipe);
     __aicore__ inline void PreProcess(uint64_t curMSize, uint64_t mPreOffset, uint64_t mIdx,
-                                      const A16W4MsdConstParam &constParams, const GlobalTensor<xType> &xGlobal,
-                                      const GlobalTensor<float> &aMaxWorkspaceGm,
-                                      const GlobalTensor<int8_t> &aUnfoldGlobal);
-    __aicore__ inline void InitMsd(__gm__ int8_t *weightS8WsAddr, __gm__ int8_t *aUnfoldS8WsAddr,
-                                   __gm__ int8_t *cF32WsAddr, uint64_t antiQuantGroupSize, TPipe *tPipe);
-    __aicore__ inline void UpdateGlobalAddr(__gm__ int8_t *aUnfoldS8WsAddr, __gm__ wType *weight,
-                                            __gm__ xType *antiquantScale, __gm__ biasType *bias, __gm__ xType *y,
-                                            __gm__ float *aMaxWs, const bool hasBias);
-    __aicore__ inline void ComputeBasicBlock(const A16W4MsdConstParam &constParams,
-                                             const A16W4MsdBasicBlockOffsetParam &curOffsetParam,
-                                             const A16W4MsdBasicBlockOffsetParam &lastOffsetParam);
-    __aicore__ inline void EndMsd(const A16W4MsdConstParam &constParams,
-                                  const A16W4MsdBasicBlockOffsetParam &lastOffsetParam);
+                                      const A16W4MsdConstParam& constParams, const GlobalTensor<xType>& xGlobal,
+                                      const GlobalTensor<float>& aMaxWorkspaceGm,
+                                      const GlobalTensor<int8_t>& aUnfoldGlobal);
+    __aicore__ inline void InitMsd(__gm__ int8_t* weightS8WsAddr, __gm__ int8_t* aUnfoldS8WsAddr,
+                                   __gm__ int8_t* cF32WsAddr, uint64_t antiQuantGroupSize, TPipe* tPipe);
+    __aicore__ inline void UpdateGlobalAddr(__gm__ int8_t* aUnfoldS8WsAddr, __gm__ wType* weight,
+                                            __gm__ xType* antiquantScale, __gm__ biasType* bias, __gm__ xType* y,
+                                            __gm__ float* aMaxWs, const bool hasBias);
+    __aicore__ inline void ComputeBasicBlock(const A16W4MsdConstParam& constParams,
+                                             const A16W4MsdBasicBlockOffsetParam& curOffsetParam,
+                                             const A16W4MsdBasicBlockOffsetParam& lastOffsetParam);
+    __aicore__ inline void EndMsd(const A16W4MsdConstParam& constParams,
+                                  const A16W4MsdBasicBlockOffsetParam& lastOffsetParam);
 
 protected:
     GMMA16W4MsdVecService<xType, wType, biasType> vecCompute_;
@@ -57,7 +57,7 @@ protected:
 };
 
 GMM_WQ_A16W4_MSD_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::InitPreProcess(TPipe *tPipe)
+__aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::InitPreProcess(TPipe* tPipe)
 {
     if ASCEND_IS_AIV {
         vecCompute_.InitPreProcess(tPipe);
@@ -67,10 +67,10 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::InitPreProcess(TPipe 
 GMM_WQ_A16W4_MSD_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::PreProcess(uint64_t curMSize, uint64_t mPreOffset,
                                                                       uint64_t mIdx,
-                                                                      const A16W4MsdConstParam &constParams,
-                                                                      const GlobalTensor<xType> &xGlobal,
-                                                                      const GlobalTensor<float> &aMaxWorkspaceGm,
-                                                                      const GlobalTensor<int8_t> &aUnfoldGlobal)
+                                                                      const A16W4MsdConstParam& constParams,
+                                                                      const GlobalTensor<xType>& xGlobal,
+                                                                      const GlobalTensor<float>& aMaxWorkspaceGm,
+                                                                      const GlobalTensor<int8_t>& aUnfoldGlobal)
 {
     if ASCEND_IS_AIV {
         vecCompute_.PreProcess(curMSize, mPreOffset, mIdx, constParams, xGlobal, aMaxWorkspaceGm, aUnfoldGlobal);
@@ -78,25 +78,25 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::PreProcess(uint64_t c
 }
 
 GMM_WQ_A16W4_MSD_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::InitMsd(__gm__ int8_t *weightS8WsAddr,
-                                                                   __gm__ int8_t *aUnfoldS8WsAddr,
-                                                                   __gm__ int8_t *cF32WsAddr,
-                                                                   uint64_t antiQuantGroupSize, TPipe *tPipe)
+__aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::InitMsd(__gm__ int8_t* weightS8WsAddr,
+                                                                   __gm__ int8_t* aUnfoldS8WsAddr,
+                                                                   __gm__ int8_t* cF32WsAddr,
+                                                                   uint64_t antiQuantGroupSize, TPipe* tPipe)
 {
     if ASCEND_IS_AIC {
-        cubeCompute_.InitMsd(weightS8WsAddr, aUnfoldS8WsAddr, (__gm__ mm1OutputType *)cF32WsAddr, tPipe);
+        cubeCompute_.InitMsd(weightS8WsAddr, aUnfoldS8WsAddr, (__gm__ mm1OutputType*)cF32WsAddr, tPipe);
     } else {
-        vecCompute_.InitMsd(weightS8WsAddr, (__gm__ mm1OutputType *)cF32WsAddr, tPipe);
+        vecCompute_.InitMsd(weightS8WsAddr, (__gm__ mm1OutputType*)cF32WsAddr, tPipe);
     }
     cvLoopIdx_ = 0;
 }
 
 GMM_WQ_A16W4_MSD_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::UpdateGlobalAddr(__gm__ int8_t *aUnfoldS8WsAddr,
-                                                                            __gm__ wType *weight,
-                                                                            __gm__ xType *antiquantScale,
-                                                                            __gm__ biasType *bias, __gm__ xType *y,
-                                                                            __gm__ float *aMaxWs, const bool hasBias)
+__aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::UpdateGlobalAddr(__gm__ int8_t* aUnfoldS8WsAddr,
+                                                                            __gm__ wType* weight,
+                                                                            __gm__ xType* antiquantScale,
+                                                                            __gm__ biasType* bias, __gm__ xType* y,
+                                                                            __gm__ float* aMaxWs, const bool hasBias)
 {
     if ASCEND_IS_AIC {
         cubeCompute_.UpdateGlobalAddr(aUnfoldS8WsAddr);
@@ -107,8 +107,8 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::UpdateGlobalAddr(__gm
 
 GMM_WQ_A16W4_MSD_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::ComputeBasicBlock(
-    const A16W4MsdConstParam &constParams, const A16W4MsdBasicBlockOffsetParam &curOffsetParam,
-    const A16W4MsdBasicBlockOffsetParam &lastOffsetParam)
+    const A16W4MsdConstParam& constParams, const A16W4MsdBasicBlockOffsetParam& curOffsetParam,
+    const A16W4MsdBasicBlockOffsetParam& lastOffsetParam)
 {
     if ASCEND_IS_AIV {
         vecCompute_.CastW4ToW8(cvLoopIdx_, constParams, curOffsetParam);
@@ -126,8 +126,8 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::ComputeBasicBlock(
 }
 
 GMM_WQ_A16W4_MSD_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::EndMsd(const A16W4MsdConstParam &constParams,
-                                                                  const A16W4MsdBasicBlockOffsetParam &lastOffsetParam)
+__aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::EndMsd(const A16W4MsdConstParam& constParams,
+                                                                  const A16W4MsdBasicBlockOffsetParam& lastOffsetParam)
 {
     if ASCEND_IS_AIC {
         cubeCompute_.EndMsd();

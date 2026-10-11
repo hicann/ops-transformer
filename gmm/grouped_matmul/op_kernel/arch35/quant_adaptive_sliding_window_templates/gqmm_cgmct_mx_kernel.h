@@ -30,8 +30,8 @@ template <class xType, class wType, class biasType, class scaleType, class ptSca
           class wLayout, class yLayout, class l0cType>
 __aicore__ inline void GmmCgmctMxKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR groupList,
                                         GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                        const GMMQuantParams *gmmBaseParamsIn,
-                                        const QuantBasicApiMMTiling *mmTilingDataIn, AscendC::TPipe *que)
+                                        const GMMQuantParams* gmmBaseParamsIn,
+                                        const QuantBasicApiMMTiling* mmTilingDataIn, AscendC::TPipe* que)
 {
     // 定义L1和L0的TileShape
     using L1TileShape = AscendC::Shape<_0, _0, _0>;

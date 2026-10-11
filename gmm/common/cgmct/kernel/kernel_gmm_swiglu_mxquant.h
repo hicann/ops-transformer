@@ -145,7 +145,7 @@ public:
         int32_t baseN;
         int32_t baseK;
         uint8_t isMxWeightNzMultiTensor;
-        const TCubeTiling *__restrict matmulTiling;
+        const TCubeTiling* __restrict matmulTiling;
         __aicore__ GMMTiling() {}
         __aicore__ GMMTiling(uint32_t groupNum_, uint8_t groupListType_, int32_t baseM_, int32_t baseN_, int32_t baseK_,
                              uint8_t isMxWeightNzMultiTensor_ = 0)
@@ -247,15 +247,15 @@ public:
         return splitValue;
     }
 
-    __aicore__ inline void UpdateGlobalBuffer(const Params &params, uint32_t groupIdx)
+    __aicore__ inline void UpdateGlobalBuffer(const Params& params, uint32_t groupIdx)
     {
         if ASCEND_IS_AIC {
             bool isMxWeightNzMultiTensor = params.gmmParams.isMxWeightNzMultiTensor != 0;
-            aGlobal_.SetGlobalBuffer((__gm__ AType *)params.mmadParams.aGmAddr + Get<IDX_A_OFFSET>(baseOffset_));
+            aGlobal_.SetGlobalBuffer((__gm__ AType*)params.mmadParams.aGmAddr + Get<IDX_A_OFFSET>(baseOffset_));
             bGlobal_.SetGlobalBuffer(
                 GetTensorAddr<BType>(isMxWeightNzMultiTensor ? groupIdx : 0, params.mmadParams.bGmAddr) +
                 Get<IDX_B_OFFSET>(baseOffset_));
-            x1ScaleGlobal_.SetGlobalBuffer((__gm__ AscendC::fp8_e8m0_t *)params.mmadParams.x1ScaleGmAddr +
+            x1ScaleGlobal_.SetGlobalBuffer((__gm__ AscendC::fp8_e8m0_t*)params.mmadParams.x1ScaleGmAddr +
                                            Get<IDX_X1SCALE_OFFSET>(baseOffset_));
             x2ScaleGlobal_.SetGlobalBuffer(GetTensorAddr<AscendC::fp8_e8m0_t>(isMxWeightNzMultiTensor ? groupIdx : 0,
                                                                               params.mmadParams.x2ScaleGmAddr) +
@@ -268,7 +268,7 @@ public:
         }
     }
 
-    __aicore__ inline void UpdateOffset(const Params &params, uint32_t groupIdx)
+    __aicore__ inline void UpdateOffset(const Params& params, uint32_t groupIdx)
     {
         // baseOffset is 0 when groupIdx = 0
         if (groupIdx == 0) {
@@ -304,7 +304,7 @@ public:
             (preOffset_ - m) * CeilDiv(n / SWIGLU_N_HALF, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
     }
 
-    __aicore__ inline bool UpdateGroupParams(const Params &params, uint32_t groupIdx)
+    __aicore__ inline bool UpdateGroupParams(const Params& params, uint32_t groupIdx)
     {
         int32_t splitValue = GetSplitValueFromGroupList(groupIdx, params.gmmParams.groupListType);
         Get<M_VALUE>(problemShape_) = splitValue;
@@ -315,7 +315,7 @@ public:
         return true;
     }
 
-    __aicore__ inline void InitParamsAndTensor(const Params &params)
+    __aicore__ inline void InitParamsAndTensor(const Params& params)
     {
         Get<N_VALUE>(problemShape_) = params.gmmParams.matmulTiling->N;
         Get<K_VALUE>(problemShape_) = params.gmmParams.matmulTiling->Ka;
@@ -332,7 +332,7 @@ public:
         } else {
             perGroupBOffset_ = Get<N_VALUE>(problemShape_) * Get<K_VALUE>(problemShape_);
         }
-        groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(params.mmadParams.groupListGmAddr));
+        groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(params.mmadParams.groupListGmAddr));
         int64_t resN = Get<N_VALUE>(problemShape_) / SWIGLU_N_HALF; // SwiGLU: N -> N/2
 
         if constexpr (formatB == CubeFormat::NZ) {
@@ -357,7 +357,7 @@ public:
         }
     }
 
-    __aicore__ inline void ProcessSingleGroup(const Params &params, BlockSchedulerOp &bs, uint32_t groupIdx)
+    __aicore__ inline void ProcessSingleGroup(const Params& params, BlockSchedulerOp& bs, uint32_t groupIdx)
     {
         int64_t m = Get<M_VALUE>(problemShape_);
         int64_t n = Get<N_VALUE>(problemShape_);
@@ -412,10 +412,10 @@ public:
         }
     }
 
-    __aicore__ inline void operator()(const Params &params)
+    __aicore__ inline void operator()(const Params& params)
     {
         // Init mmadOp epilogue
-        mmadOp_.Init(const_cast<TCubeTiling *__restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
+        mmadOp_.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
         InitParamsAndTensor(params);
         epilogueOp_.Init(params.epilogueParams);
         uint32_t groupNum = params.gmmParams.groupNum;

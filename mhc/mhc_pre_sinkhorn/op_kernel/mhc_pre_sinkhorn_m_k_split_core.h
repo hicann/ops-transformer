@@ -28,7 +28,7 @@ public:
     __aicore__ inline MhcPreSinkhornMembaseKSplitCorePart1() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hcFn, GM_ADDR workspace,
-                                const MhcPreSinkhornTilingData *tilingDataPtr, TPipe *pipePtr, int64_t bsOffset,
+                                const MhcPreSinkhornTilingData* tilingDataPtr, TPipe* pipePtr, int64_t bsOffset,
                                 int64_t curBs, bool isTailBsLoop = false)
     {
         pipe = pipePtr;
@@ -38,9 +38,9 @@ public:
         int64_t curML1Size = isTailBsLoop ? tilingData->tailBsML1Size : tilingData->mL1Size;
         int64_t curCubeBlockDimM = isTailBsLoop ? tilingData->tailBsCubeBlockDimM : tilingData->cubeBlockDimM;
 
-        xGm.SetGlobalBuffer((__gm__ T *)x + (bsOffset * tilingData->hcMult * tilingData->d));
-        hcFnGm.SetGlobalBuffer((__gm__ float *)hcFn);
-        workspaceGm.SetGlobalBuffer((__gm__ float *)workspace);
+        xGm.SetGlobalBuffer((__gm__ T*)x + (bsOffset * tilingData->hcMult * tilingData->d));
+        hcFnGm.SetGlobalBuffer((__gm__ float*)hcFn);
+        workspaceGm.SetGlobalBuffer((__gm__ float*)workspace);
 
         uint64_t curVectorBlockIdx = GetBlockIdx();
         uint64_t curCubeBlockIdx = curVectorBlockIdx;
@@ -50,13 +50,13 @@ public:
         xCastFp32BufSize_ =
             curML1Size * CeilAlign(tilingData->cvLoopKSize, MM_CACHE_LINE_BYTES / sizeof(float)) * sizeof(float);
         int64_t SingleCubeCoreXCastSize = xCastFp32BufSize_ * DOUBLE_BUFFER / sizeof(float);
-        xCastFp32WsGm.SetGlobalBuffer((__gm__ float *)workspace + curCubeBlockIdx * SingleCubeCoreXCastSize);
+        xCastFp32WsGm.SetGlobalBuffer((__gm__ float*)workspace + curCubeBlockIdx * SingleCubeCoreXCastSize);
         uint64_t wsOffset = tilingData->cubeCoreNum * SingleCubeCoreXCastSize;
-        mmOutFp32WsGm.SetGlobalBuffer((__gm__ float *)workspace + wsOffset);
+        mmOutFp32WsGm.SetGlobalBuffer((__gm__ float*)workspace + wsOffset);
         mmOuterInnerSize_ = CeilAlign(N_SIZE, MM_CACHE_LINE_BYTES / sizeof(float));
         mmOutFp32BufSize_ = curBs * mmOuterInnerSize_;
         wsOffset += tilingData->cubeBlockDimK / curCubeBlockDimM * mmOutFp32BufSize_;
-        squareSumFp32WsGm.SetGlobalBuffer((__gm__ float *)workspace + wsOffset);
+        squareSumFp32WsGm.SetGlobalBuffer((__gm__ float*)workspace + wsOffset);
         squareSumFp32BufSize_ = CeilAlign(curBs, BLOCK_CUBE) * BLOCK_CUBE;
 
         if ASCEND_IS_AIC {
@@ -170,8 +170,8 @@ public:
     }
 
 private:
-    TPipe *pipe;
-    const MhcPreSinkhornTilingData *tilingData;
+    TPipe* pipe;
+    const MhcPreSinkhornTilingData* tilingData;
     GlobalTensor<float> workspaceGm;
     GlobalTensor<float> xCastFp32WsGm;
     GlobalTensor<float> mmOutFp32WsGm;
@@ -208,7 +208,7 @@ public:
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hcScale, GM_ADDR hcBase, GM_ADDR y, GM_ADDR post, GM_ADDR combFrag,
                                 GM_ADDR hPre, GM_ADDR hcBeforeNorm, GM_ADDR invRms, GM_ADDR sumOut, GM_ADDR normOut,
-                                GM_ADDR workspace, const MhcPreSinkhornTilingData *tilingDataPtr, TPipe *pipePtr,
+                                GM_ADDR workspace, const MhcPreSinkhornTilingData* tilingDataPtr, TPipe* pipePtr,
                                 int64_t bsOffset, bool isTailBsLoop = false)
     {
         pipe = pipePtr;
@@ -216,21 +216,21 @@ public:
         needGrad_ = tilingData->needGrad;
         isTailBsLoop_ = isTailBsLoop;
 
-        xGm.SetGlobalBuffer((__gm__ T *)x + (bsOffset * tilingData->hcMult * tilingData->d));
-        hcScaleGm.SetGlobalBuffer((__gm__ float *)hcScale);
-        hcBaseGm.SetGlobalBuffer((__gm__ float *)hcBase);
-        yGm.SetGlobalBuffer((__gm__ T *)y + (bsOffset * tilingData->d));
-        postGm.SetGlobalBuffer((__gm__ float *)post + (bsOffset * tilingData->hcMult));
-        combFragGm.SetGlobalBuffer((__gm__ float *)combFrag + (bsOffset * tilingData->hcMult * tilingData->hcMult));
-        workspaceGm.SetGlobalBuffer((__gm__ float *)workspace);
+        xGm.SetGlobalBuffer((__gm__ T*)x + (bsOffset * tilingData->hcMult * tilingData->d));
+        hcScaleGm.SetGlobalBuffer((__gm__ float*)hcScale);
+        hcBaseGm.SetGlobalBuffer((__gm__ float*)hcBase);
+        yGm.SetGlobalBuffer((__gm__ T*)y + (bsOffset * tilingData->d));
+        postGm.SetGlobalBuffer((__gm__ float*)post + (bsOffset * tilingData->hcMult));
+        combFragGm.SetGlobalBuffer((__gm__ float*)combFrag + (bsOffset * tilingData->hcMult * tilingData->hcMult));
+        workspaceGm.SetGlobalBuffer((__gm__ float*)workspace);
 
         if (needGrad_) {
-            hPreGm.SetGlobalBuffer((__gm__ float *)hPre + (bsOffset * tilingData->hcMult));
-            hcBeforeNormGm.SetGlobalBuffer((__gm__ float *)hcBeforeNorm +
+            hPreGm.SetGlobalBuffer((__gm__ float*)hPre + (bsOffset * tilingData->hcMult));
+            hcBeforeNormGm.SetGlobalBuffer((__gm__ float*)hcBeforeNorm +
                                            (bsOffset * tilingData->hcMult * (tilingData->hcMult + 2)));
-            invRmsGm.SetGlobalBuffer((__gm__ float *)invRms + bsOffset);
-            sumOutGm.SetGlobalBuffer((__gm__ float *)sumOut);
-            normOutGm.SetGlobalBuffer((__gm__ float *)normOut);
+            invRmsGm.SetGlobalBuffer((__gm__ float*)invRms + bsOffset);
+            sumOutGm.SetGlobalBuffer((__gm__ float*)sumOut);
+            normOutGm.SetGlobalBuffer((__gm__ float*)normOut);
         }
 
         // InQue
@@ -610,8 +610,8 @@ public:
     }
 
 private:
-    TPipe *pipe;
-    const MhcPreSinkhornTilingData *tilingData;
+    TPipe* pipe;
+    const MhcPreSinkhornTilingData* tilingData;
     GlobalTensor<float> mixesGm;
     GlobalTensor<float> rsqrtGm;
     GlobalTensor<float> hcScaleGm;

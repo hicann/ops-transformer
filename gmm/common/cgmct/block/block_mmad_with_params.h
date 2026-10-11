@@ -40,7 +40,7 @@ public:
      * @param [in] cubeTiling: configuration parameters for matrix multiplication
      * @param [in] tpipe: the pipe object, default is nullptr
      */
-    __aicore__ inline void Init(TCubeTiling *__restrict cubeTiling, AscendC::TPipe *tpipe = nullptr)
+    __aicore__ inline void Init(TCubeTiling* __restrict cubeTiling, AscendC::TPipe* tpipe = nullptr)
     {
         this->AsDerived().matmul_.Init(cubeTiling, tpipe);
     }
@@ -91,7 +91,7 @@ public:
      * @param [out] gm: output tensor for matrix c
      * @param [in] enAtomic: whether to enable atomic operations
      */
-    __aicore__ inline void GetTensorC(const AscendC::GlobalTensor<typename CType::T> &gm, uint8_t enAtomic = 0)
+    __aicore__ inline void GetTensorC(const AscendC::GlobalTensor<typename CType::T>& gm, uint8_t enAtomic = 0)
     {
         this->AsDerived().matmul_.GetTensorC(gm, enAtomic);
     }

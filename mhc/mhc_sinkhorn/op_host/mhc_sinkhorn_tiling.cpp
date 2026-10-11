@@ -59,7 +59,7 @@ bool MhcSinkhornTiling::IsCapable()
 
 ge::graphStatus MhcSinkhornTiling::GetPlatformInfo()
 {
-    auto compileInfo = reinterpret_cast<const MhcSinkhornCompileInfo *>(context_->GetCompileInfo());
+    auto compileInfo = reinterpret_cast<const MhcSinkhornCompileInfo*>(context_->GetCompileInfo());
     OP_CHECK_NULL_WITH_CONTEXT(context_, compileInfo);
     totalCoreNum_ = compileInfo->coreNum;
     ubSize_ = compileInfo->ubSize;
@@ -207,8 +207,7 @@ ge::graphStatus MhcSinkhornTiling::CheckInputShape()
     for (int64_t d = 0; d < yDimNum_; ++d) {
         if (yShape.GetDim(d) != xShape.GetDim(d)) {
             std::string shapeMsg = "y=" + Ops::Base::ToString(yShape) + ", x=" + Ops::Base::ToString(xShape);
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "x, y", shapeMsg.c_str(),
-                                                   "y shape must equal x shape");
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "x, y", shapeMsg.c_str(), "y shape must equal x shape");
             return ge::GRAPH_FAILED;
         }
     }
@@ -219,20 +218,16 @@ ge::graphStatus MhcSinkhornTiling::CheckInputShape()
         auto normOutShapePtr = context_->GetOutputShape(NORM_OUT_IDX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, normOutShapePtr);
         auto normOutShape = normOutShapePtr->GetStorageShape();
-        if (static_cast<int64_t>(normOutShape.GetDimNum()) != 1 ||
-            normOutShape.GetShapeSize() != expectNormSize) {
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "normOut",
-                                                   Ops::Base::ToString(normOutShape).c_str(),
+        if (static_cast<int64_t>(normOutShape.GetDimNum()) != 1 || normOutShape.GetShapeSize() != expectNormSize) {
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "normOut", Ops::Base::ToString(normOutShape).c_str(),
                                                    "normOut shape must be 1-dim and size 2*numIters*T*n*8");
             return ge::GRAPH_FAILED;
         }
         auto sumOutShapePtr = context_->GetOutputShape(SUM_OUT_IDX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, sumOutShapePtr);
         auto sumOutShape = sumOutShapePtr->GetStorageShape();
-        if (static_cast<int64_t>(sumOutShape.GetDimNum()) != 1 ||
-            sumOutShape.GetShapeSize() != expectSumSize) {
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "sumOut",
-                                                   Ops::Base::ToString(sumOutShape).c_str(),
+        if (static_cast<int64_t>(sumOutShape.GetDimNum()) != 1 || sumOutShape.GetShapeSize() != expectSumSize) {
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "sumOut", Ops::Base::ToString(sumOutShape).c_str(),
                                                    "sumOut shape must be 1-dim and size 2*numIters*T*8");
             return ge::GRAPH_FAILED;
         }
@@ -240,20 +235,16 @@ ge::graphStatus MhcSinkhornTiling::CheckInputShape()
         auto normOutShapePtr = context_->GetOutputShape(NORM_OUT_IDX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, normOutShapePtr);
         auto normOutShape = normOutShapePtr->GetStorageShape();
-        if (static_cast<int64_t>(normOutShape.GetDimNum()) != 1 ||
-            normOutShape.GetShapeSize() != 1) {
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "normOut",
-                                                   Ops::Base::ToString(normOutShape).c_str(),
+        if (static_cast<int64_t>(normOutShape.GetDimNum()) != 1 || normOutShape.GetShapeSize() != 1) {
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "normOut", Ops::Base::ToString(normOutShape).c_str(),
                                                    "out_flag=0, normOut shape must be {1}");
             return ge::GRAPH_FAILED;
         }
         auto sumOutShapePtr = context_->GetOutputShape(SUM_OUT_IDX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, sumOutShapePtr);
         auto sumOutShape = sumOutShapePtr->GetStorageShape();
-        if (static_cast<int64_t>(sumOutShape.GetDimNum()) != 1 ||
-            sumOutShape.GetShapeSize() != 1) {
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "sumOut",
-                                                   Ops::Base::ToString(sumOutShape).c_str(),
+        if (static_cast<int64_t>(sumOutShape.GetDimNum()) != 1 || sumOutShape.GetShapeSize() != 1) {
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "sumOut", Ops::Base::ToString(sumOutShape).c_str(),
                                                    "out_flag=0, sumOut shape must be {1}");
             return ge::GRAPH_FAILED;
         }
@@ -286,7 +277,7 @@ ge::graphStatus MhcSinkhornTiling::DoOpTiling()
 
 void MhcSinkhornTiling::SetTilingData()
 {
-    MhcSinkhornTilingData *tilingData = context_->GetTilingData<MhcSinkhornTilingData>();
+    MhcSinkhornTilingData* tilingData = context_->GetTilingData<MhcSinkhornTilingData>();
     tilingData->eps = eps_;
     tilingData->num_iters = num_iters_;
     tilingData->out_flag = outFlag_;
@@ -352,14 +343,14 @@ void MhcSinkhornTiling::DumpTilingInfo()
     OP_LOGI(opName_, "%s", info.str().c_str());
 }
 
-static ge::graphStatus TilingForMhcSinkhorn(gert::TilingContext *context)
+static ge::graphStatus TilingForMhcSinkhorn(gert::TilingContext* context)
 {
     MhcSinkhornTiling tiling(context);
     auto ret = tiling.DoTiling();
     return ret;
 }
 
-static ge::graphStatus TilingPrepareForMhcSinkhorn([[maybe_unused]] gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForMhcSinkhorn([[maybe_unused]] gert::TilingParseContext* context)
 {
     OP_LOGD(context, "TilingPrepareForMhcSinkhorn entering.");
     auto compileInfo = context->GetCompiledInfo<MhcSinkhornCompileInfo>();

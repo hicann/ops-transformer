@@ -37,21 +37,21 @@ public:
 
     struct Params {};
 
-    __aicore__ inline void Init(Params const &params, int64_t calcM, int64_t calcN, int64_t n) {}
+    __aicore__ inline void Init(Params const& params, int64_t calcM, int64_t calcN, int64_t n) {}
     __aicore__ inline void InitBuffers() {}
     __aicore__ inline int64_t GetUbSizeOneM(int64_t ubCalcN)
     {
         return 0;
     }
-    __aicore__ inline void Run(AscendC::LocalTensor<DataTypeOut> &dstLocal, AscendC::LocalTensor<DataTypeIn> &srcLocal,
+    __aicore__ inline void Run(AscendC::LocalTensor<DataTypeOut>& dstLocal, AscendC::LocalTensor<DataTypeIn>& srcLocal,
                                int64_t curAivM, int64_t curAivN, int64_t mIdx, int64_t nIdx)
     {
         dstLocal = srcLocal;
         return;
     }
 
-    __aicore__ inline void operator()(AscendC::LocalTensor<DataTypeOut> &dstLocal,
-                                      AscendC::LocalTensor<DataTypeIn> &srcLocal, int64_t curAivM, int64_t curAivN,
+    __aicore__ inline void operator()(AscendC::LocalTensor<DataTypeOut>& dstLocal,
+                                      AscendC::LocalTensor<DataTypeIn>& srcLocal, int64_t curAivM, int64_t curAivN,
                                       int64_t mIdx, int64_t nIdx)
     {
         Run(dstLocal, srcLocal, curAivM, curAivN, mIdx, nIdx);

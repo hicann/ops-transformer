@@ -21,24 +21,24 @@ namespace ops {
 static constexpr int64_t IDX_0 = 0;
 static constexpr int64_t IDX_CONV_STATES = 2;
 
-static ge::graphStatus InferShapeCausalConv1d(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeCausalConv1d(gert::InferShapeContext* context)
 {
-    const gert::Shape *csShape = context->GetInputShape(IDX_CONV_STATES);
+    const gert::Shape* csShape = context->GetInputShape(IDX_CONV_STATES);
     OP_CHECK_NULL_WITH_CONTEXT(context, csShape);
-    gert::Shape *csOutShape = context->GetOutputShape(0);
+    gert::Shape* csOutShape = context->GetOutputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, csOutShape);
     *csOutShape = *csShape;
 
-    const gert::Shape *xShape = context->GetInputShape(IDX_0);
+    const gert::Shape* xShape = context->GetInputShape(IDX_0);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
-    gert::Shape *yShape = context->GetOutputShape(1);
+    gert::Shape* yShape = context->GetOutputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
     *yShape = *xShape;
 
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeCausalConv1d(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeCausalConv1d(gert::InferDataTypeContext* context)
 {
     context->SetOutputDataType(1, context->GetInputDataType(IDX_0));
     context->SetOutputDataType(0, context->GetInputDataType(IDX_CONV_STATES));

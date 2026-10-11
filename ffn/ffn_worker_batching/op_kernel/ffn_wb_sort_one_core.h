@@ -30,8 +30,8 @@ using namespace AscendC;
 class KernelSortMaskOneCore : public SortMaskBase {
 public:
     __aicore__ inline KernelSortMaskOneCore(){};
-    __aicore__ inline void Init(GM_ADDR expert_ids, GM_ADDR workspace, const SortCustomTilingDataKernel *tilingData,
-                                const ScheduleContextInfo *contextInfo, TPipe *tPipe);
+    __aicore__ inline void Init(GM_ADDR expert_ids, GM_ADDR workspace, const SortCustomTilingDataKernel* tilingData,
+                                const ScheduleContextInfo* contextInfo, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -44,7 +44,7 @@ private:
     int64_t sortNum = 0;
     int32_t validCnt = 0;
     int32_t needCoreNum_ = 0;
-    const ScheduleContextInfo *contextInfo_ = nullptr;
+    const ScheduleContextInfo* contextInfo_ = nullptr;
 };
 
 __aicore__ inline void KernelSortMaskOneCore::CopyIn()
@@ -146,8 +146,8 @@ __aicore__ inline void KernelSortMaskOneCore::CopyOut()
 }
 
 __aicore__ inline void KernelSortMaskOneCore::Init(GM_ADDR expert_ids, GM_ADDR workspace,
-                                                   const SortCustomTilingDataKernel *tilingData,
-                                                   const ScheduleContextInfo *contextInfo, TPipe *tPipe)
+                                                   const SortCustomTilingDataKernel* tilingData,
+                                                   const ScheduleContextInfo* contextInfo, TPipe* tPipe)
 {
     this->pipe = tPipe;
     contextInfo_ = contextInfo;
@@ -156,19 +156,19 @@ __aicore__ inline void KernelSortMaskOneCore::Init(GM_ADDR expert_ids, GM_ADDR w
     this->totalLength = tilingData->totalLength;
     this->sortNum = Ceil(this->totalLength, ONE_REPEAT_SORT_NUM) * ONE_REPEAT_SORT_NUM;
 
-    expertIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(expert_ids), this->totalLength);
-    rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace), OFFSET_SORTED_EXPERT_IDS);
+    expertIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(expert_ids), this->totalLength);
+    rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace), OFFSET_SORTED_EXPERT_IDS);
     sortedexpertIdsGm.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace,
+        reinterpret_cast<__gm__ int32_t*>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace,
         this->totalLength);
-    sortedRowIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS +
+    sortedRowIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace) + OFFSET_SORTED_EXPERT_IDS +
                                        contextInfo_->sortNumWorkSpace + this->totalLength,
                                    this->totalLength);
 
     if (GetBlockIdx() == 0) {
         GM_ADDR targetAddr = workspace + OFFSET_SORTED_EXPERT_IDS * sizeof(int32_t) +
                              contextInfo_->sortNumWorkSpace * sizeof(int32_t) * (NUM_TWO * NUM_FOUR + 1);
-        groupListTmpGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(targetAddr), contextInfo_->expertNum);
+        groupListTmpGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(targetAddr), contextInfo_->expertNum);
         InitGlobalMemory(groupListTmpGm, contextInfo_->expertNum, 0);
         SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
 

@@ -47,15 +47,15 @@ static const int64_t DIM_IDX_2 = 2;
 static const int64_t DIM_IDX_3 = 3;
 
 struct MhcPostParams {
-    const aclTensor *x = nullptr;
-    const aclTensor *hRes = nullptr;
-    const aclTensor *hOut = nullptr;
-    const aclTensor *hPost = nullptr;
-    aclTensor *out = nullptr;
+    const aclTensor* x = nullptr;
+    const aclTensor* hRes = nullptr;
+    const aclTensor* hOut = nullptr;
+    const aclTensor* hPost = nullptr;
+    aclTensor* out = nullptr;
 };
 
-static aclnnStatus CheckNotNull(const aclTensor *x, const aclTensor *hRes, const aclTensor *hOut,
-                                const aclTensor *hPost, aclTensor *out)
+static aclnnStatus CheckNotNull(const aclTensor* x, const aclTensor* hRes, const aclTensor* hOut,
+                                const aclTensor* hPost, aclTensor* out)
 {
     CHECK_COND(x != nullptr, ACLNN_ERR_PARAM_NULLPTR, "x must not be nullptr.");
     // hRes is optional on A5 (DAV_3510), required on A2/A3
@@ -68,7 +68,7 @@ static aclnnStatus CheckNotNull(const aclTensor *x, const aclTensor *hRes, const
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckDtype(const MhcPostParams &params)
+static aclnnStatus CheckDtype(const MhcPostParams& params)
 {
     // x: FP16 or BF16
     const std::initializer_list<op::DataType> xSupportList = {op::DataType::DT_FLOAT16, op::DataType::DT_BF16};
@@ -101,7 +101,7 @@ static bool IsBSNDFormat(size_t dimNum)
     return dimNum == DIM_NUM_4;
 }
 
-static aclnnStatus CheckShape3D(const MhcPostParams &params)
+static aclnnStatus CheckShape3D(const MhcPostParams& params)
 {
     // x shape: [T, n, D]
     auto xDim0 = params.x->GetViewShape().GetDim(DIM_IDX_0);
@@ -151,7 +151,7 @@ static aclnnStatus CheckShape3D(const MhcPostParams &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckShape4D(const MhcPostParams &params)
+static aclnnStatus CheckShape4D(const MhcPostParams& params)
 {
     // x shape: [B, S, n, D]
     auto xDim0 = params.x->GetViewShape().GetDim(DIM_IDX_0);
@@ -214,7 +214,7 @@ static aclnnStatus CheckShape4D(const MhcPostParams &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckShape(const MhcPostParams &params)
+static aclnnStatus CheckShape(const MhcPostParams& params)
 {
     auto xDimNum = params.x->GetViewShape().GetDimNum();
     auto hOutDimNum = params.hOut->GetViewShape().GetDimNum();
@@ -254,7 +254,7 @@ static aclnnStatus CheckShape(const MhcPostParams &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckFormat(const MhcPostParams &params)
+static aclnnStatus CheckFormat(const MhcPostParams& params)
 {
     op::Format xFormat = params.x->GetStorageFormat();
     op::Format outFormat = params.out->GetStorageFormat();
@@ -268,7 +268,7 @@ static aclnnStatus CheckFormat(const MhcPostParams &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckParam(const MhcPostParams &params)
+static aclnnStatus CheckParam(const MhcPostParams& params)
 {
     CHECK_COND(CheckFormat(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "invalid format.");
     CHECK_COND(CheckDtype(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "invalid dtype.");
@@ -277,9 +277,9 @@ static aclnnStatus CheckParam(const MhcPostParams &params)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMhcPostGetWorkspaceSize(const aclTensor *x, const aclTensor *hRes, const aclTensor *hOut,
-                                         const aclTensor *hPost, aclTensor *out, uint64_t *workspaceSize,
-                                         aclOpExecutor **executor)
+aclnnStatus aclnnMhcPostGetWorkspaceSize(const aclTensor* x, const aclTensor* hRes, const aclTensor* hOut,
+                                         const aclTensor* hPost, aclTensor* out, uint64_t* workspaceSize,
+                                         aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnMhcPost, DFX_IN(x, hRes, hOut, hPost), DFX_OUT(out));
 
@@ -307,7 +307,7 @@ aclnnStatus aclnnMhcPostGetWorkspaceSize(const aclTensor *x, const aclTensor *hR
     // Convert input tensors to contiguous
     auto reformatedX = l0op::Contiguous(x, uniqueExecutor.get());
     CHECK_COND(reformatedX != nullptr, ACLNN_ERR_INNER_NULLPTR, "x Contiguous failed.");
-    const aclTensor *reformatedHRes = nullptr;
+    const aclTensor* reformatedHRes = nullptr;
     if (hRes != nullptr) {
         reformatedHRes = l0op::Contiguous(hRes, uniqueExecutor.get());
         CHECK_COND(reformatedHRes != nullptr, ACLNN_ERR_INNER_NULLPTR, "hRes Contiguous failed.");
@@ -320,7 +320,7 @@ aclnnStatus aclnnMhcPostGetWorkspaceSize(const aclTensor *x, const aclTensor *hR
     // Call l0 interface: MhcPost kernel
     // Formula: x_{l+1} = (H_{l}^{res})^{T} * x_l + h_{l}^{out} * H_{t}^{post}
     //          nohres:  x_{l+1} = x_l + h_{l}^{out} * H_{t}^{post}
-    const aclTensor *mhcPostResult =
+    const aclTensor* mhcPostResult =
         l0op::MhcPost(reformatedX, reformatedHRes, reformatedHOut, reformatedHPost, uniqueExecutor.get());
     CHECK_RET(mhcPostResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
@@ -334,7 +334,7 @@ aclnnStatus aclnnMhcPostGetWorkspaceSize(const aclTensor *x, const aclTensor *hR
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMhcPost(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMhcPost(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMhcPost);
     auto ret = CommonOpExecutorRun(workspace, workspaceSize, executor, stream);

@@ -53,7 +53,7 @@ constexpr int64_t HIDDEN_STATES_DIM_NUM = 2;
 constexpr double DEFAULT_NORM_EPS = 1.0e-6;
 constexpr bool NEED_BACKWARD = false;
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (const auto dim : shape) {
@@ -62,7 +62,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -74,8 +74,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     const size_t size = static_cast<size_t>(GetShapeSize(shape)) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -105,9 +105,9 @@ void Finalize(int32_t deviceId, aclrtStream stream)
     aclFinalize();
 }
 
-int CheckDocDims(const std::vector<int64_t> &partialBlockShape, const std::vector<int64_t> &blockResShape,
-                 const std::vector<int64_t> &projWeightShape, const std::vector<int64_t> &normWeightShape,
-                 const std::vector<int64_t> &hiddenStatesShape, int64_t validBlockNum)
+int CheckDocDims(const std::vector<int64_t>& partialBlockShape, const std::vector<int64_t>& blockResShape,
+                 const std::vector<int64_t>& projWeightShape, const std::vector<int64_t>& normWeightShape,
+                 const std::vector<int64_t>& hiddenStatesShape, int64_t validBlockNum)
 {
     CHECK_RET(static_cast<int64_t>(partialBlockShape.size()) == PARTIAL_BLOCK_DIM_NUM,
               LOG_PRINT("partialBlock dim num mismatch, expect %ld got %zu\n", PARTIAL_BLOCK_DIM_NUM,
@@ -139,7 +139,7 @@ int CheckDocDims(const std::vector<int64_t> &partialBlockShape, const std::vecto
     return ACL_SUCCESS;
 }
 
-int aclnnBlockAttentionResidualsTest(int32_t deviceId, aclrtStream &stream)
+int aclnnBlockAttentionResidualsTest(int32_t deviceId, aclrtStream& stream)
 {
     auto ret = Init(deviceId, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
@@ -164,58 +164,56 @@ int aclnnBlockAttentionResidualsTest(int32_t deviceId, aclrtStream &stream)
     std::vector<uint16_t> normWeightHostData(GetShapeSize(normWeightShape), 0x3C00);
     std::vector<uint16_t> hiddenStatesHostData(GetShapeSize(hiddenStatesShape), 0);
 
-    void *partialBlockDeviceAddr = nullptr;
-    void *blockResDeviceAddr = nullptr;
-    void *projWeightDeviceAddr = nullptr;
-    void *normWeightDeviceAddr = nullptr;
-    void *hiddenStatesDeviceAddr = nullptr;
-    aclTensor *partialBlock = nullptr;
-    aclTensor *blockRes = nullptr;
-    aclTensor *projWeight = nullptr;
-    aclTensor *normWeight = nullptr;
-    aclTensor *hiddenStates = nullptr;
+    void* partialBlockDeviceAddr = nullptr;
+    void* blockResDeviceAddr = nullptr;
+    void* projWeightDeviceAddr = nullptr;
+    void* normWeightDeviceAddr = nullptr;
+    void* hiddenStatesDeviceAddr = nullptr;
+    aclTensor* partialBlock = nullptr;
+    aclTensor* blockRes = nullptr;
+    aclTensor* projWeight = nullptr;
+    aclTensor* normWeight = nullptr;
+    aclTensor* hiddenStates = nullptr;
 
     ret = CreateAclTensor(partialBlockHostData, partialBlockShape, &partialBlockDeviceAddr, aclDataType::ACL_BF16,
                           &partialBlock);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> partialBlockTensorPtr(partialBlock,
-                                                                                         aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> partialBlockDeviceAddrPtr(partialBlockDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> partialBlockTensorPtr(partialBlock, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> partialBlockDeviceAddrPtr(partialBlockDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor(blockResHostData, blockResShape, &blockResDeviceAddr, aclDataType::ACL_BF16, &blockRes);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> blockResTensorPtr(blockRes, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> blockResDeviceAddrPtr(blockResDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> blockResTensorPtr(blockRes, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> blockResDeviceAddrPtr(blockResDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret =
         CreateAclTensor(projWeightHostData, projWeightShape, &projWeightDeviceAddr, aclDataType::ACL_BF16, &projWeight);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> projWeightTensorPtr(projWeight, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> projWeightDeviceAddrPtr(projWeightDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> projWeightTensorPtr(projWeight, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> projWeightDeviceAddrPtr(projWeightDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret =
         CreateAclTensor(normWeightHostData, normWeightShape, &normWeightDeviceAddr, aclDataType::ACL_BF16, &normWeight);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> normWeightTensorPtr(normWeight, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> normWeightDeviceAddrPtr(normWeightDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> normWeightTensorPtr(normWeight, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> normWeightDeviceAddrPtr(normWeightDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor(hiddenStatesHostData, hiddenStatesShape, &hiddenStatesDeviceAddr, aclDataType::ACL_BF16,
                           &hiddenStates);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> hiddenStatesTensorPtr(hiddenStates,
-                                                                                         aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> hiddenStatesDeviceAddrPtr(hiddenStatesDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> hiddenStatesTensorPtr(hiddenStates, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> hiddenStatesDeviceAddrPtr(hiddenStatesDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     ret = aclnnBlockAttentionResidualsGetWorkspaceSize(partialBlock, blockRes, projWeight, normWeight, VALID_BLOCK_NUM,
                                                        DEFAULT_NORM_EPS, NEED_BACKWARD, hiddenStates, nullptr, nullptr,
                                                        &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnBlockAttentionResidualsGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *workspaceAddr = nullptr;
-    std::unique_ptr<void, aclError (*)(void *)> workspaceAddrPtr(nullptr, aclrtFree);
+    void* workspaceAddr = nullptr;
+    std::unique_ptr<void, aclError (*)(void*)> workspaceAddrPtr(nullptr, aclrtFree);
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

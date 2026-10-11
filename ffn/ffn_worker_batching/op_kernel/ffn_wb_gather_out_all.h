@@ -37,7 +37,7 @@ public:
     __aicore__ inline KernelFfnWBGatherOutAll() {}
     __aicore__ inline void Init(GM_ADDR expertid_idx, GM_ADDR y, GM_ADDR session_ids, GM_ADDR micro_batch_ids,
                                 GM_ADDR token_ids, GM_ADDR expert_offsets, GM_ADDR dynamic_scale,
-                                const ScheduleContextInfo *contextInfo, TPipe *pipe, uint32_t usedCoreNum)
+                                const ScheduleContextInfo* contextInfo, TPipe* pipe, uint32_t usedCoreNum)
     {
         contextInfo_ = contextInfo;
         curMicroBatchID = contextInfo_->curMicroBatchID;
@@ -78,23 +78,23 @@ public:
         GM_ADDR sessionIdsBufAddr = reinterpret_cast<GM_ADDR>(contextInfo_->bufferPtr.sessionIdsBuf);
         GM_ADDR microBatchIdsBufAddr = reinterpret_cast<GM_ADDR>(contextInfo_->bufferPtr.microBatchIdsBuf);
 
-        tokenDataBufGm_.SetGlobalBuffer((__gm__ int8_t *)tokenDataBufAddr);
+        tokenDataBufGm_.SetGlobalBuffer((__gm__ int8_t*)tokenDataBufAddr);
 
         // 排序的后的  对应gather_index
-        expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertid_idx + blockIdx * perCoreRows);
+        expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertid_idx + blockIdx * perCoreRows);
 
-        sessionIdsInGm_.SetGlobalBuffer((__gm__ int32_t *)sessionIdsBufAddr, contextInfo_->A);
-        microBatchIdsInGm_.SetGlobalBuffer((__gm__ int32_t *)microBatchIdsBufAddr, contextInfo_->A);
+        sessionIdsInGm_.SetGlobalBuffer((__gm__ int32_t*)sessionIdsBufAddr, contextInfo_->A);
+        microBatchIdsInGm_.SetGlobalBuffer((__gm__ int32_t*)microBatchIdsBufAddr, contextInfo_->A);
 
         // 输出空间
-        yOutGm_.SetGlobalBuffer((__gm__ int8_t *)y + blockIdx * SplitY);
+        yOutGm_.SetGlobalBuffer((__gm__ int8_t*)y + blockIdx * SplitY);
 
-        sessionIdsOutGm_.SetGlobalBuffer((__gm__ int32_t *)session_ids + blockIdx * perCoreRows);
-        microBatchIdsOutGm_.SetGlobalBuffer((__gm__ int32_t *)micro_batch_ids + blockIdx * perCoreRows);
-        tokenIdsOutGm_.SetGlobalBuffer((__gm__ int32_t *)token_ids + blockIdx * perCoreRows);
-        expertOffsetsOutGm_.SetGlobalBuffer((__gm__ int32_t *)expert_offsets + blockIdx * perCoreRows);
+        sessionIdsOutGm_.SetGlobalBuffer((__gm__ int32_t*)session_ids + blockIdx * perCoreRows);
+        microBatchIdsOutGm_.SetGlobalBuffer((__gm__ int32_t*)micro_batch_ids + blockIdx * perCoreRows);
+        tokenIdsOutGm_.SetGlobalBuffer((__gm__ int32_t*)token_ids + blockIdx * perCoreRows);
+        expertOffsetsOutGm_.SetGlobalBuffer((__gm__ int32_t*)expert_offsets + blockIdx * perCoreRows);
         if (contextInfo_->tokenDtype == TOKEN_KIND_TWO) {
-            dynamicScaleOutGm_.SetGlobalBuffer((__gm__ float *)dynamic_scale + blockIdx * perCoreRows);
+            dynamicScaleOutGm_.SetGlobalBuffer((__gm__ float*)dynamic_scale + blockIdx * perCoreRows);
         }
 
         int64_t blockBufferSize =
@@ -233,7 +233,7 @@ private:
     }
 
     __aicore__ inline void CopyXIn(int64_t xSrcOffset, int64_t curLoopCols, int64_t indicesIndex,
-                                   const LocalTensor<int32_t> &dynamicScaleLocal, bool isLastBlock)
+                                   const LocalTensor<int32_t>& dynamicScaleLocal, bool isLastBlock)
     {
         LocalTensor<int8_t> xLocal = inQueueX_.AllocTensor<int8_t>();
         uint32_t copySize = curLoopCols * tokenDtypeSize_;
@@ -293,7 +293,7 @@ private:
     LocalTensor<int32_t> sessionIdsLocal_;
     LocalTensor<int32_t> microBatchIdsLocal_;
 
-    const ScheduleContextInfo *contextInfo_ = nullptr;
+    const ScheduleContextInfo* contextInfo_ = nullptr;
 
     int64_t needCoreNum_ = 0;
     int64_t lastLoopRows_ = 0;

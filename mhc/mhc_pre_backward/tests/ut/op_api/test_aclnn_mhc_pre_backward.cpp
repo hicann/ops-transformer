@@ -85,7 +85,7 @@ aclnnStatus RunMhcPreBackward(bool useFactorialGradHRes = false)
                   INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gamma, nullptr, hcEps),
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     return ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
 }
 
@@ -120,7 +120,7 @@ aclnnStatus RunMhcPreBackwardV2(int64_t opImplMode)
                               hcEps, opImplMode),
                         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     return ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
 }
 
@@ -182,7 +182,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_tnd_bf16_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -223,7 +223,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_bsnd_fp16_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -262,7 +262,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_tnd_no_gamma_0)
         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -302,7 +302,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_bsnd_no_gamma_0)
         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -338,12 +338,12 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_x_nullptr_0)
     auto gradGamma = TensorDesc({n, d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 0);
 
     auto ut = OP_API_UT(aclnnMhcPreBackward,
-                        INPUT((const aclTensor *)nullptr, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre,
+                        INPUT((const aclTensor*)nullptr, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre,
                               hPost, gamma, nullptr, hcEps),
                         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -377,12 +377,12 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_phi_nullptr_0)
     auto gradGamma = TensorDesc({n, d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 0);
 
     auto ut = OP_API_UT(aclnnMhcPreBackward,
-                        INPUT(x, (const aclTensor *)nullptr, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre,
+                        INPUT(x, (const aclTensor*)nullptr, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre,
                               hPost, gamma, nullptr, hcEps),
                         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -416,12 +416,12 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_alpha_nullptr_0)
     auto gradGamma = TensorDesc({n, d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 0);
 
     auto ut = OP_API_UT(aclnnMhcPreBackward,
-                        INPUT(x, phi, (const aclTensor *)nullptr, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre,
+                        INPUT(x, phi, (const aclTensor*)nullptr, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre,
                               hPost, gamma, nullptr, hcEps),
                         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -455,12 +455,12 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_in_grad_nullptr_0)
     auto gradGamma = TensorDesc({n, d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 0);
 
     auto ut = OP_API_UT(aclnnMhcPreBackward,
-                        INPUT(x, phi, alpha, (const aclTensor *)nullptr, gradHPost, gradHRes, invRms, hMix, hPre, hPost,
+                        INPUT(x, phi, alpha, (const aclTensor*)nullptr, gradHPost, gradHRes, invRms, hMix, hPre, hPost,
                               gamma, nullptr, hcEps),
                         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -494,12 +494,12 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_post_grad_nullptr_0)
     auto gradGamma = TensorDesc({n, d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 0);
 
     auto ut = OP_API_UT(aclnnMhcPreBackward,
-                        INPUT(x, phi, alpha, gradHIn, (const aclTensor *)nullptr, gradHRes, invRms, hMix, hPre, hPost,
+                        INPUT(x, phi, alpha, gradHIn, (const aclTensor*)nullptr, gradHRes, invRms, hMix, hPre, hPost,
                               gamma, nullptr, hcEps),
                         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -533,12 +533,12 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_res_grad_nullptr_0)
     auto gradGamma = TensorDesc({n, d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 0);
 
     auto ut = OP_API_UT(aclnnMhcPreBackward,
-                        INPUT(x, phi, alpha, gradHIn, gradHPost, (const aclTensor *)nullptr, invRms, hMix, hPre, hPost,
+                        INPUT(x, phi, alpha, gradHIn, gradHPost, (const aclTensor*)nullptr, invRms, hMix, hPre, hPost,
                               gamma, nullptr, hcEps),
                         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -572,12 +572,12 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_inv_rms_nullptr_0)
     auto gradGamma = TensorDesc({n, d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 0);
 
     auto ut = OP_API_UT(aclnnMhcPreBackward,
-                        INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, (const aclTensor *)nullptr, hMix, hPre,
-                              hPost, gamma, nullptr, hcEps),
+                        INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, (const aclTensor*)nullptr, hMix, hPre, hPost,
+                              gamma, nullptr, hcEps),
                         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -611,12 +611,12 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_mix_nullptr_0)
     auto gradGamma = TensorDesc({n, d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 0);
 
     auto ut = OP_API_UT(aclnnMhcPreBackward,
-                        INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, (const aclTensor *)nullptr, hPre,
+                        INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, (const aclTensor*)nullptr, hPre,
                               hPost, gamma, nullptr, hcEps),
                         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -650,12 +650,12 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_pre_nullptr_0)
     auto gradGamma = TensorDesc({n, d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 0);
 
     auto ut = OP_API_UT(aclnnMhcPreBackward,
-                        INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, (const aclTensor *)nullptr,
+                        INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, (const aclTensor*)nullptr,
                               hPost, gamma, nullptr, hcEps),
                         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -690,11 +690,11 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_post_nullptr_0)
 
     auto ut = OP_API_UT(aclnnMhcPreBackward,
                         INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre,
-                              (const aclTensor *)nullptr, gamma, nullptr, hcEps),
+                              (const aclTensor*)nullptr, gamma, nullptr, hcEps),
                         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -732,10 +732,10 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_x_nullptr_0)
     auto ut =
         OP_API_UT(aclnnMhcPreBackward,
                   INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gamma, nullptr, hcEps),
-                  OUTPUT((const aclTensor *)nullptr, gradPhi, gradAlpha, gradBias, gradGamma));
+                  OUTPUT((const aclTensor*)nullptr, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -771,10 +771,10 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_phi_nullptr_0)
     auto ut =
         OP_API_UT(aclnnMhcPreBackward,
                   INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gamma, nullptr, hcEps),
-                  OUTPUT(gradX, (const aclTensor *)nullptr, gradAlpha, gradBias, gradGamma));
+                  OUTPUT(gradX, (const aclTensor*)nullptr, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -810,10 +810,10 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_alpha_nullptr_0)
     auto ut =
         OP_API_UT(aclnnMhcPreBackward,
                   INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gamma, nullptr, hcEps),
-                  OUTPUT(gradX, gradPhi, (const aclTensor *)nullptr, gradBias, gradGamma));
+                  OUTPUT(gradX, gradPhi, (const aclTensor*)nullptr, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -849,10 +849,10 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_bias_nullptr_0)
     auto ut =
         OP_API_UT(aclnnMhcPreBackward,
                   INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gamma, nullptr, hcEps),
-                  OUTPUT(gradX, gradPhi, gradAlpha, (const aclTensor *)nullptr, gradGamma));
+                  OUTPUT(gradX, gradPhi, gradAlpha, (const aclTensor*)nullptr, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -888,10 +888,10 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_gamma_nullptr_0)
     auto ut =
         OP_API_UT(aclnnMhcPreBackward,
                   INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gamma, nullptr, hcEps),
-                  OUTPUT(gradX, gradPhi, gradAlpha, gradBias, (const aclTensor *)nullptr));
+                  OUTPUT(gradX, gradPhi, gradAlpha, gradBias, (const aclTensor*)nullptr));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -933,7 +933,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_x_empty_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -973,7 +973,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_phi_empty_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1013,7 +1013,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_alpha_empty_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1053,7 +1053,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_in_grad_empty_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1093,7 +1093,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_post_grad_empty_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1133,7 +1133,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_res_grad_empty_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1173,7 +1173,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_inv_rms_empty_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1213,7 +1213,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_mix_empty_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1253,7 +1253,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_pre_empty_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1293,7 +1293,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_post_empty_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1335,7 +1335,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_x_dim_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1375,7 +1375,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_x_dim_invalid_tnd_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1416,7 +1416,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_x_dim_invalid_bsnd_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1458,7 +1458,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_x_dtype_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1498,7 +1498,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_x_dtype_mismatch_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1540,7 +1540,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_x_format_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1582,7 +1582,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_alpha_shape_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1622,7 +1622,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_phi_shape_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1664,7 +1664,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_phi_dtype_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1704,7 +1704,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_in_grad_dtype_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1744,7 +1744,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_phi_dtype_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1784,7 +1784,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_alpha_dtype_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1824,7 +1824,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_bias_dtype_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1864,7 +1864,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_gamma_dtype_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1904,7 +1904,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_phi_dim_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1944,7 +1944,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_gamma_dim_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -1987,7 +1987,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_inv_rms_dim_invalid_bsnd_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2027,7 +2027,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_inv_rms_dim_invalid_tnd_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2070,7 +2070,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_tnd_bf16_with_gradxpost_0)
         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2112,7 +2112,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_bsnd_fp16_with_gradxpost_0)
         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2152,7 +2152,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_tnd_no_gamma_with_gradxpost
         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2193,7 +2193,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_bsnd_no_gamma_with_gradxpos
         OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2233,7 +2233,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_post_grad_dim_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2273,7 +2273,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_res_grad_dim_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2313,7 +2313,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_mix_dim_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2353,7 +2353,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_pre_dim_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2393,7 +2393,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_h_post_dim_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2433,7 +2433,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_phi_dim_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2473,7 +2473,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_alpha_dim_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2513,7 +2513,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_bias_dim_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -2553,7 +2553,7 @@ TEST_F(l2_ai_mhc_pre_backward_test, mhc_pre_backward_grad_gamma_dim_invalid_0)
                   OUTPUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(getWorkspaceResult, ACLNN_SUCCESS);
 }

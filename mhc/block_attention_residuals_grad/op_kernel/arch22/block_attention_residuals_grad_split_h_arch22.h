@@ -30,17 +30,17 @@ public:
     __aicore__ inline void Init(GM_ADDR partialBlock, GM_ADDR blockRes, GM_ADDR projWeight, GM_ADDR normWeight,
                                 GM_ADDR gradHiddenState, GM_ADDR invNorm, GM_ADDR probs, GM_ADDR gradPartialBlock,
                                 GM_ADDR gradBlockRes, GM_ADDR gradProjWeight, GM_ADDR gradNormWeight, GM_ADDR workspace,
-                                const BlockAttentionResidualsGradTilingData *td);
+                                const BlockAttentionResidualsGradTilingData* td);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline GlobalTensor<T> GetV(int64_t block, int64_t batch) const;
-    __aicore__ inline void LoadTensorTile(const GlobalTensor<T> &src, uint64_t offset, uint32_t length,
-                                          const LocalTensor<float> &dst);
-    __aicore__ inline void LoadMeta(const GlobalTensor<float> &src, uint64_t offset, uint32_t length,
-                                    const LocalTensor<float> &dst);
+    __aicore__ inline void LoadTensorTile(const GlobalTensor<T>& src, uint64_t offset, uint32_t length,
+                                          const LocalTensor<float>& dst);
+    __aicore__ inline void LoadMeta(const GlobalTensor<float>& src, uint64_t offset, uint32_t length,
+                                    const LocalTensor<float>& dst);
     __aicore__ inline void StoreGradV(int64_t block, int64_t batch, uint32_t hStart, uint32_t length,
-                                      const LocalTensor<float> &src);
+                                      const LocalTensor<float>& src);
     __aicore__ inline void ComputeAndSaveGradMeta();
     __aicore__ inline void InitScoreWeightTile(uint32_t hStart, uint32_t length);
     __aicore__ inline void ComputeGradVAndWeightPartials();
@@ -94,9 +94,9 @@ __aicore__ inline GlobalTensor<T> BlockAttentionResidualsGradSplitH<T>::GetV(int
 }
 
 template <typename T>
-__aicore__ inline void BlockAttentionResidualsGradSplitH<T>::LoadTensorTile(const GlobalTensor<T> &src, uint64_t offset,
+__aicore__ inline void BlockAttentionResidualsGradSplitH<T>::LoadTensorTile(const GlobalTensor<T>& src, uint64_t offset,
                                                                             uint32_t length,
-                                                                            const LocalTensor<float> &dst)
+                                                                            const LocalTensor<float>& dst)
 {
     // 每次只搬入一个连续 H tile，并统一转换为 FP32 参与后续计算。
     LocalTensor<T> input = inputBuf_.Get<T>();
@@ -115,8 +115,8 @@ __aicore__ inline void BlockAttentionResidualsGradSplitH<T>::LoadTensorTile(cons
 }
 
 template <typename T>
-__aicore__ inline void BlockAttentionResidualsGradSplitH<T>::LoadMeta(const GlobalTensor<float> &src, uint64_t offset,
-                                                                      uint32_t length, const LocalTensor<float> &dst)
+__aicore__ inline void BlockAttentionResidualsGradSplitH<T>::LoadMeta(const GlobalTensor<float>& src, uint64_t offset,
+                                                                      uint32_t length, const LocalTensor<float>& dst)
 {
     // K=N+1 轴元数据保持完整搬入 UB，尾部通过 DataCopyPad 补齐到 32 字节。
     DataCopyExtParams copyParams(1, length * sizeof(float), 0, 0, 0);
@@ -129,7 +129,7 @@ __aicore__ inline void BlockAttentionResidualsGradSplitH<T>::LoadMeta(const Glob
 
 template <typename T>
 __aicore__ inline void BlockAttentionResidualsGradSplitH<T>::StoreGradV(int64_t block, int64_t batch, uint32_t hStart,
-                                                                        uint32_t length, const LocalTensor<float> &src)
+                                                                        uint32_t length, const LocalTensor<float>& src)
 {
     // FP32 计算结果转换回输入类型，并按 V 的来源分别写入两个梯度输出。
     LocalTensor<T> output = inputBuf_.Get<T>();
@@ -164,7 +164,7 @@ template <typename T>
 __aicore__ inline void BlockAttentionResidualsGradSplitH<T>::Init(
     GM_ADDR partialBlock, GM_ADDR blockRes, GM_ADDR projWeight, GM_ADDR normWeight, GM_ADDR gradHiddenState,
     GM_ADDR invNorm, GM_ADDR probs, GM_ADDR gradPartialBlock, GM_ADDR gradBlockRes, GM_ADDR gradProjWeight,
-    GM_ADDR gradNormWeight, GM_ADDR workspace, const BlockAttentionResidualsGradTilingData *td)
+    GM_ADDR gradNormWeight, GM_ADDR workspace, const BlockAttentionResidualsGradTilingData* td)
 {
     batchSize_ = td->batchSize;
     numBlocks_ = td->numBlocks;
@@ -191,23 +191,23 @@ __aicore__ inline void BlockAttentionResidualsGradSplitH<T>::Init(
     uint64_t N = static_cast<uint64_t>(numBlocks_);
     uint64_t K = static_cast<uint64_t>(totalBlocks_);
     uint64_t H = static_cast<uint64_t>(hiddenSize_);
-    partialBlockGm_.SetGlobalBuffer((__gm__ T *)partialBlock, B * H);
-    blockResGm_.SetGlobalBuffer((__gm__ T *)blockRes, B * N * H);
-    projWeightGm_.SetGlobalBuffer((__gm__ T *)projWeight, H);
-    normWeightGm_.SetGlobalBuffer((__gm__ T *)normWeight, H);
-    gradHiddenStateGm_.SetGlobalBuffer((__gm__ T *)gradHiddenState, B * H);
-    invNormGm_.SetGlobalBuffer((__gm__ float *)invNorm, B * K);
-    probsGm_.SetGlobalBuffer((__gm__ float *)probs, B * K);
-    gradPartialBlockGm_.SetGlobalBuffer((__gm__ T *)gradPartialBlock, B * H);
-    gradBlockResGm_.SetGlobalBuffer((__gm__ T *)gradBlockRes, B * N * H);
-    gradProjWeightGm_.SetGlobalBuffer((__gm__ T *)gradProjWeight, H);
-    gradNormWeightGm_.SetGlobalBuffer((__gm__ T *)gradNormWeight, H);
+    partialBlockGm_.SetGlobalBuffer((__gm__ T*)partialBlock, B * H);
+    blockResGm_.SetGlobalBuffer((__gm__ T*)blockRes, B * N * H);
+    projWeightGm_.SetGlobalBuffer((__gm__ T*)projWeight, H);
+    normWeightGm_.SetGlobalBuffer((__gm__ T*)normWeight, H);
+    gradHiddenStateGm_.SetGlobalBuffer((__gm__ T*)gradHiddenState, B * H);
+    invNormGm_.SetGlobalBuffer((__gm__ float*)invNorm, B * K);
+    probsGm_.SetGlobalBuffer((__gm__ float*)probs, B * K);
+    gradPartialBlockGm_.SetGlobalBuffer((__gm__ T*)gradPartialBlock, B * H);
+    gradBlockResGm_.SetGlobalBuffer((__gm__ T*)gradBlockRes, B * N * H);
+    gradProjWeightGm_.SetGlobalBuffer((__gm__ T*)gradProjWeight, H);
+    gradNormWeightGm_.SetGlobalBuffer((__gm__ T*)gradNormWeight, H);
 
     // Workspace 布局：
     // [coreNum, align512(H * sizeof(float))]：每核的 gradScoreWeight 部分和；
     // [B, K]：阶段一保存的 gradScore；
     // [B, K]：阶段一保存的 varianceScale。
-    __gm__ float *userWorkspace = (__gm__ float *)GetUserWorkspace(workspace);
+    __gm__ float* userWorkspace = (__gm__ float*)GetUserWorkspace(workspace);
     uint64_t coreOffset = perCoreWkspBytes_ * static_cast<uint64_t>(blockIdx);
     coreWeightWkspGm_.SetGlobalBuffer(userWorkspace + coreOffset / sizeof(float), H);
     allWeightWkspGm_.SetGlobalBuffer(userWorkspace,

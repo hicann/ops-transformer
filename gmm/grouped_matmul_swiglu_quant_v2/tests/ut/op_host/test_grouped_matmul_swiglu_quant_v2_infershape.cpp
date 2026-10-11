@@ -39,12 +39,12 @@ using ops::ut::ParseBool;
 using ops::ut::SplitStr2Vec;
 using ops::ut::Trim;
 
-vector<int64_t> ParseDims(const string &value)
+vector<int64_t> ParseDims(const string& value)
 {
     return ops::ut::ParseDims(value, {}, true);
 }
 
-void SetupPlatformForCase(const string &socVersion)
+void SetupPlatformForCase(const string& socVersion)
 {
     fe::PlatformInfo platformInfo;
     fe::OptionalInfo optiCompilationInfo;
@@ -143,26 +143,20 @@ struct GroupedMatmulSwigluQuantV2InfershapeCase {
         ge::DataType biasDataType = ops::ut::ParseGeDtype(biasDtype);
         ge::DataType offsetDataType = ops::ut::ParseGeDtype(offsetDtype);
         ge::DataType antiquantOffsetDataType = ops::ut::ParseGeDtype(antiquantOffsetDtype);
-        vector<void *> inputDataTypes = {
-            &xDataType,
-            &xScaleDataType,
-            &groupListDataType,
-            &weightDataType,
-            &weightScaleDataType,
-            &biasDataType,
-            &offsetDataType,
-            &antiquantOffsetDataType,
+        vector<void*> inputDataTypes = {
+            &xDataType,           &xScaleDataType, &groupListDataType, &weightDataType,
+            &weightScaleDataType, &biasDataType,   &offsetDataType,    &antiquantOffsetDataType,
         };
 
-        auto contextHolder = gert::InferDataTypeContextFaker()
-                                 .SetOpType("GroupedMatmulSwigluQuantV2")
-                                 .NodeIoNum(8, 2)
-                                 .NodeOutputTd(0, ops::ut::ParseGeFormat(yFormat), ops::ut::ParseGeFormat(yFormat))
-                                 .NodeOutputTd(1, ops::ut::ParseGeFormat(yScaleFormat),
-                                               ops::ut::ParseGeFormat(yScaleFormat))
-                                 .InputDataTypes(inputDataTypes)
-                                 .NodeAttrs(BuildDtypeAttrs())
-                                 .Build();
+        auto contextHolder =
+            gert::InferDataTypeContextFaker()
+                .SetOpType("GroupedMatmulSwigluQuantV2")
+                .NodeIoNum(8, 2)
+                .NodeOutputTd(0, ops::ut::ParseGeFormat(yFormat), ops::ut::ParseGeFormat(yFormat))
+                .NodeOutputTd(1, ops::ut::ParseGeFormat(yScaleFormat), ops::ut::ParseGeFormat(yScaleFormat))
+                .InputDataTypes(inputDataTypes)
+                .NodeAttrs(BuildDtypeAttrs())
+                .Build();
         auto context = contextHolder.GetContext<gert::InferDataTypeContext>();
         ASSERT_NE(context, nullptr);
         auto inferDtypeRet = opImpl->infer_datatype(context);
@@ -232,7 +226,7 @@ struct GroupedMatmulSwigluQuantV2InfershapeCase {
     int64_t groupListType = 0;
 };
 
-vector<GroupedMatmulSwigluQuantV2InfershapeCase> LoadCases(const string &socVersion)
+vector<GroupedMatmulSwigluQuantV2InfershapeCase> LoadCases(const string& socVersion)
 {
     vector<GroupedMatmulSwigluQuantV2InfershapeCase> cases;
     string csvPath = ops::ut::ResolveCsvPath("test_grouped_matmul_swiglu_quant_v2_infershape.csv",
@@ -313,21 +307,21 @@ vector<GroupedMatmulSwigluQuantV2InfershapeCase> LoadCases(const string &socVers
             tc.transposeWeight = ParseBool(Trim(items[idx++]));
             tc.groupListType = stoll(Trim(items[idx++]));
             cases.push_back(tc);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
     return cases;
 }
 
-string MakeParamName(const testing::TestParamInfo<GroupedMatmulSwigluQuantV2InfershapeCase> &info)
+string MakeParamName(const testing::TestParamInfo<GroupedMatmulSwigluQuantV2InfershapeCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
 } // namespace
 
 namespace GroupedMatmulSwigluQuantV2InfershapeUT {
-const vector<GroupedMatmulSwigluQuantV2InfershapeCase> &GetSwigluQuantV2InfershapeCsvCases()
+const vector<GroupedMatmulSwigluQuantV2InfershapeCase>& GetSwigluQuantV2InfershapeCsvCases()
 {
     static const vector<GroupedMatmulSwigluQuantV2InfershapeCase> cases = [] {
         vector<GroupedMatmulSwigluQuantV2InfershapeCase> merged = LoadCases("Ascend950");

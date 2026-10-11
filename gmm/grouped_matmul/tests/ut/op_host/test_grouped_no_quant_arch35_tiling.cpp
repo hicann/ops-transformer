@@ -37,7 +37,7 @@ using ops::ut::ParseBool;
 using ops::ut::SplitStr2Vec;
 using ops::ut::Trim;
 
-DataType ParseDtype(const string &dtype)
+DataType ParseDtype(const string& dtype)
 {
     const auto parsed = ops::ut::ParseGeDtype(dtype);
     if (parsed == ge::DT_UNDEFINED) {
@@ -51,10 +51,10 @@ gert::StorageShape MakeEmptyShape()
     return gert::StorageShape();
 }
 
-string TilingData2Str(const void *tilingData, size_t tilingSize)
+string TilingData2Str(const void* tilingData, size_t tilingSize)
 {
     ostringstream oss;
-    const auto *data = reinterpret_cast<const int32_t *>(tilingData);
+    const auto* data = reinterpret_cast<const int32_t*>(tilingData);
     const size_t len = tilingSize / sizeof(int32_t);
     for (size_t i = 0; i < len; ++i) {
         if (i != 0) {
@@ -82,7 +82,7 @@ vector<gert::TilingContextPara::OpAttr> GetGroupedNoQuantAttrs(int64_t splitItem
 
 class GroupedNoQuantArch35TilingTestParam {
 public:
-    void Prepare(optiling::GMMCompileInfo &compileInfo) const
+    void Prepare(optiling::GMMCompileInfo& compileInfo) const
     {
         compileInfo = {
             static_cast<uint32_t>(coreNum > 0 ? coreNum : 32),     // aicNum
@@ -98,7 +98,7 @@ public:
         };
     }
 
-    void InvokeTilingFunc(optiling::GMMCompileInfo &compileInfo) const
+    void InvokeTilingFunc(optiling::GMMCompileInfo& compileInfo) const
     {
         vector<int64_t> xOriginDims = transposeX ? vector<int64_t>{k, m} : vector<int64_t>{m, k};
         gert::StorageShape xShape = ops::ut::MakeGertStorageShape(xOriginDims, xOriginDims);
@@ -189,7 +189,7 @@ public:
     string expectTilingData;
 };
 
-vector<GroupedNoQuantArch35TilingTestParam> GetParams(const string &socVersion)
+vector<GroupedNoQuantArch35TilingTestParam> GetParams(const string& socVersion)
 {
     vector<GroupedNoQuantArch35TilingTestParam> params;
     std::string csvPath = ops::ut::ResolveCsvPath("test_grouped_no_quant_arch35_tiling.csv",
@@ -260,14 +260,14 @@ vector<GroupedNoQuantArch35TilingTestParam> GetParams(const string &socVersion)
             }
             idx++;
             params.push_back(param);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
     return params;
 }
 
-string MakeParamName(const testing::TestParamInfo<GroupedNoQuantArch35TilingTestParam> &info)
+string MakeParamName(const testing::TestParamInfo<GroupedNoQuantArch35TilingTestParam>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
@@ -276,7 +276,7 @@ string MakeParamName(const testing::TestParamInfo<GroupedNoQuantArch35TilingTest
 
 namespace GroupedNoQuantArch35TilingUT {
 
-const vector<GroupedNoQuantArch35TilingTestParam> &GetAscend950Params()
+const vector<GroupedNoQuantArch35TilingTestParam>& GetAscend950Params()
 {
     static const vector<GroupedNoQuantArch35TilingTestParam> params = GetParams("Ascend950");
     return params;

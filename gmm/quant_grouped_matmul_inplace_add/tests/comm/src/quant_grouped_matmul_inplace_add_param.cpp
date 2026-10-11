@@ -25,20 +25,20 @@ Param::Param(std::vector<TensorList> inputs, Tensor perTokenScale, Tensor groupL
       mGroupListType(groupListType),
       mGroupSize(groupSize)
 {
-    for (auto &tensorList : inputs) {
+    for (auto& tensorList : inputs) {
         mTensorLists[tensorList.Name()] = tensorList;
     }
     mGroupList = groupList;
 }
 
-Tensor ops::adv::tests::quant_grouped_matmul_inplace_add::GenTensor(const char *name, const std::vector<int64_t> &shape,
+Tensor ops::adv::tests::quant_grouped_matmul_inplace_add::GenTensor(const char* name, const std::vector<int64_t>& shape,
                                                                     ge::DataType dType, ge::Format format)
 {
     return Tensor(name, shape, "", dType, format);
 }
 
 TensorList ops::adv::tests::quant_grouped_matmul_inplace_add::GenTensorList(
-    const char *name, const std::vector<std::vector<int64_t>> &shapes, ge::DataType dType, ge::Format format)
+    const char* name, const std::vector<std::vector<int64_t>>& shapes, ge::DataType dType, ge::Format format)
 {
     return TensorList(name, shapes, "", dType, format);
 }

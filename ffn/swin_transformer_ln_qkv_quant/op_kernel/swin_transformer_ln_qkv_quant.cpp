@@ -19,16 +19,15 @@ using namespace AscendC;
 constexpr int32_t DATA_COPY_UINT32 = 32;
 
 template <typename aDType, typename bDType, typename cDType, bool aTrans, bool bTrans, bool isReuseSource = false>
-class SwinTransformerLnQkvQuantNormalKernel : public SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTrans,
-                                                                                    bTrans, false>
-{
+class SwinTransformerLnQkvQuantNormalKernel
+    : public SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTrans, bTrans, false> {
 public:
-    __aicore__ inline SwinTransformerLnQkvQuantNormalKernel() {};
+    __aicore__ inline SwinTransformerLnQkvQuantNormalKernel(){};
 
     __aicore__ inline void Init(GM_ADDR inputxGm, GM_ADDR gammaGm, GM_ADDR betaGm, GM_ADDR weight, GM_ADDR bias,
-                        GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR dequantScale, GM_ADDR queryOutput,
-                        GM_ADDR keyOutput, GM_ADDR valueOutput, const SwinTransformerLnQkvQuantTilingData *tiling,
-                        GM_ADDR userWorkspace, TPipe *tPipe)
+                                GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR dequantScale, GM_ADDR queryOutput,
+                                GM_ADDR keyOutput, GM_ADDR valueOutput,
+                                const SwinTransformerLnQkvQuantTilingData* tiling, GM_ADDR userWorkspace, TPipe* tPipe)
     {
         bLength = tiling->opBaseInfo.bSize;
         sLength = tiling->opBaseInfo.sSize;
@@ -55,13 +54,13 @@ public:
         splitNFlag = (mmSizeN != mmBaseN);
         nSplitPart = mmBaseN / mmSizeN;
 
-        weightGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ bDType *>(weight), lnBaseK * mmBaseN);
-        biasGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(bias), mmBaseN);
-        gammaGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(gammaGm), hLength);
-        betaGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(betaGm), hLength);
-        scaleGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(quantScale), hLength);
-        offsetGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(quantOffset), hLength);
-        quantGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t *>(dequantScale), mmBaseN);
+        weightGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ bDType*>(weight), lnBaseK * mmBaseN);
+        biasGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(bias), mmBaseN);
+        gammaGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(gammaGm), hLength);
+        betaGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(betaGm), hLength);
+        scaleGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(quantScale), hLength);
+        offsetGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(quantOffset), hLength);
+        quantGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t*>(dequantScale), mmBaseN);
 
         curBlockIdx = AscendC::GetBlockIdx();
         int64_t blockDim = AscendC::GetBlockNum();
@@ -75,11 +74,11 @@ public:
             lnBsSize = tiling->opBaseInfo.singleCoreLnBsSize;
         }
         loopNum = DivUp(lnBsSize, mmSizeM);
-        inputXGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(inputxGm), inputSize);
-        qOutputGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ cDType *>(queryOutput), inputSize);
-        kOutputGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ cDType *>(keyOutput), inputSize);
-        vOutputGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ cDType *>(valueOutput), inputSize);
-        mmOutWorkspace.SetGlobalBuffer(reinterpret_cast<__gm__ cDType *>(userWorkspace), bLength * sLength * mmBaseN);
+        inputXGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(inputxGm), inputSize);
+        qOutputGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ cDType*>(queryOutput), inputSize);
+        kOutputGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ cDType*>(keyOutput), inputSize);
+        vOutputGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ cDType*>(valueOutput), inputSize);
+        mmOutWorkspace.SetGlobalBuffer(reinterpret_cast<__gm__ cDType*>(userWorkspace), bLength * sLength * mmBaseN);
 
         tPipe->InitBuffer(gammaTmpBuf, hLength * sizeof(half));
         tPipe->InitBuffer(betaTmpBuf, hLength * sizeof(half));
@@ -97,7 +96,7 @@ public:
         mm.SetLocalWorkspace(sharedUbBuffer[mmSizeM * mmSizeN * sizeof(half)]);
     }
 
-    __aicore__ inline void Process(const SwinTransformerLnQkvQuantTilingData *tiling)
+    __aicore__ inline void Process(const SwinTransformerLnQkvQuantTilingData* tiling)
     {
         AscendC::LocalTensor<half> fp16Gamma = gammaTmpBuf.Get<half>();
         AscendC::LocalTensor<half> fp16Beta = betaTmpBuf.Get<half>();
@@ -118,7 +117,7 @@ public:
         uint32_t gmCopyInOffset = winOffsetNumPerCore * hLength;
         uint32_t gmCopyOutOffset = gmCopyInOffset;
         AscendC::LocalTensor<float> sharedTmpBuffer = lnSharedBuffer.Get<float>();
-        uint32_t mmOutSize = lnBaseM16Align * lnBufferK / 2;     // fp32 -> fp16 is 2
+        uint32_t mmOutSize = lnBaseM16Align * lnBufferK / 2; // fp32 -> fp16 is 2
         AscendC::LocalTensor<float> xFp32 = sharedTmpBuffer[mmOutSize];
         AscendC::LocalTensor<float> tmpSub = sharedTmpBuffer[lnBufferK * lnBaseM16Align + mmOutSize];
         AscendC::LocalTensor<float> mean = sharedTmpBuffer[lnBufferK * lnBaseM16Align * 2 + mmOutSize];
@@ -134,7 +133,7 @@ public:
         AscendC::LocalTensor<int8_t> matAInt8Ub = mmANz[lnBaseM16Align * lnBufferK * sizeof(half)];
 
         DataCopyParams intriParams2L1;
-        AscendC::GlobalTensor<half> dstGlobal[3] = {qOutputGlobal, kOutputGlobal, vOutputGlobal};  // q k v sum is 3
+        AscendC::GlobalTensor<half> dstGlobal[3] = {qOutputGlobal, kOutputGlobal, vOutputGlobal}; // q k v sum is 3
         event_t eventIdMte3ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_V));
         SetFlag<HardEvent::MTE3_V>(eventIdMte3ToV);
         for (uint32_t loopIdx = 0; loopIdx < loopNum; ++loopIdx) {
@@ -142,22 +141,25 @@ public:
             subMLoop = DivUp(actualMmBaseM, lnBaseM16Align);
             for (uint32_t subMLoopIdx = 0; subMLoopIdx < subMLoop; ++subMLoopIdx) {
                 if (subMLoop == 1) {
-                    actualLnBaseM = (lnBsSize - loopIdx * mmSizeM - subMLoopIdx * lnBaseM > lnBaseM) ? lnBaseM : \
-                                                    (lnBsSize - loopIdx * mmSizeM - subMLoopIdx * lnBaseM);
+                    actualLnBaseM = (lnBsSize - loopIdx * mmSizeM - subMLoopIdx * lnBaseM > lnBaseM) ?
+                                        lnBaseM :
+                                        (lnBsSize - loopIdx * mmSizeM - subMLoopIdx * lnBaseM);
                 } else {
-                    actualLnBaseM = (lnBsSize - loopIdx * mmSizeM - subMLoopIdx * lnBaseM16Align > lnBaseM16Align) ? \
-                                    lnBaseM16Align : (lnBsSize - loopIdx * mmSizeM - subMLoopIdx * lnBaseM16Align);
-                    actualLnBaseM = ((mmSizeM - subMLoopIdx * lnBaseM16Align) < actualLnBaseM) ? \
-                                        (mmSizeM - subMLoopIdx * lnBaseM16Align) : actualLnBaseM;
+                    actualLnBaseM = (lnBsSize - loopIdx * mmSizeM - subMLoopIdx * lnBaseM16Align > lnBaseM16Align) ?
+                                        lnBaseM16Align :
+                                        (lnBsSize - loopIdx * mmSizeM - subMLoopIdx * lnBaseM16Align);
+                    actualLnBaseM = ((mmSizeM - subMLoopIdx * lnBaseM16Align) < actualLnBaseM) ?
+                                        (mmSizeM - subMLoopIdx * lnBaseM16Align) :
+                                        actualLnBaseM;
                 }
                 uint32_t mAlign16 = (matmul::CeilDiv(actualLnBaseM, BLOCK_CUBE) * BLOCK_CUBE);
 
                 CopyIn(loopIdx, subMLoopIdx, gmCopyInOffset, subMLoop);
-               
+
                 if (subMLoopIdx == 0) {
                     WaitFlag<HardEvent::MTE3_V>(eventIdMte3ToV);
                 }
-                if (lnBaseK < 256) {    // repeat max is 256
+                if (lnBaseK < 256) { // repeat max is 256
                     LnCompute(xFp32, mean, tmpSub, fp32GammaLocal, fp32BetaLocal);
                 } else {
                     LnComputeNlarge(xFp32, mean, tmpSub, fp32GammaLocal, fp32BetaLocal);
@@ -174,7 +176,8 @@ public:
                 intriParams2L1.blockLen = mAlign16;
                 intriParams2L1.srcStride = 0;
                 intriParams2L1.dstStride = matmul::CeilDiv(actualMmBaseM, BLOCK_CUBE) * BLOCK_CUBE - mAlign16;
-#if defined(__CCE_AICORE__) &&  __CCE_AICORE__ == 200 || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
+#if defined(__CCE_AICORE__) && __CCE_AICORE__ == 200 || \
+    (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
                 if (subMLoop == 1) {
                     DataCopy(aL1Buffer[subMLoopIdx * lnBaseK * actualLnBaseM], mmANz, mAlign16 * lnBaseK);
                 } else {
@@ -204,30 +207,33 @@ public:
         }
         WaitFlag<HardEvent::MTE3_V>(eventIdMte3ToV);
     }
+
 private:
-    __aicore__ inline void GetGmOffset(uint32_t innerLoopIdx, uint32_t &outputOffset)
+    __aicore__ inline void GetGmOffset(uint32_t innerLoopIdx, uint32_t& outputOffset)
     {
         uint32_t curLoopGlobalIdx = innerLoopIdx;
         uint32_t batchIdx = curLoopGlobalIdx / (patchHeight * heightWindow * patchWeight);
-        uint32_t heightPatchIdx = (curLoopGlobalIdx - batchIdx * (patchHeight * heightWindow * patchWeight)) /
-                                                                (heightWindow * patchWeight);
+        uint32_t heightPatchIdx =
+            (curLoopGlobalIdx - batchIdx * (patchHeight * heightWindow * patchWeight)) / (heightWindow * patchWeight);
         uint32_t windowHeightIdx = (curLoopGlobalIdx - batchIdx * (patchHeight * heightWindow * patchWeight) -
-                                    heightPatchIdx * (heightWindow * patchWeight)) / patchWeight;
+                                    heightPatchIdx * (heightWindow * patchWeight)) /
+                                   patchWeight;
         uint32_t weightPatchIdx = curLoopGlobalIdx - batchIdx * (patchHeight * heightWindow * patchWeight) -
-                                    heightPatchIdx * (heightWindow * patchWeight) - windowHeightIdx * patchWeight;
+                                  heightPatchIdx * (heightWindow * patchWeight) - windowHeightIdx * patchWeight;
         outputOffset = (batchIdx * patchHeight * patchWeight + heightPatchIdx * patchWeight + weightPatchIdx) *
-                            headNum * heightWindow * windowSize * sizePerHead;
+                       headNum * heightWindow * windowSize * sizePerHead;
         outputOffset += windowHeightIdx * windowSize * sizePerHead;
     }
 
     __aicore__ inline void LnCompute(LocalTensor<float> xLocalFp32, LocalTensor<float> meanTmp,
-                    LocalTensor<float> tmpSub, LocalTensor<float> fp32Gamma, LocalTensor<float> fp32Beta)
+                                     LocalTensor<float> tmpSub, LocalTensor<float> fp32Gamma,
+                                     LocalTensor<float> fp32Beta)
     {
         GenLnParams();
         LocalTensor<half> inputXLocal = inQueueb.DeQue<half>();
         AscendC::LocalTensor<half> lnOutLocalFp16 = lnSharedBuffer.Get<half>();
 
-        constexpr uint64_t mask = 64;   // fp32 blockNum is 64
+        constexpr uint64_t mask = 64; // fp32 blockNum is 64
         int32_t roll = lnBaseK / (BLOCK_UINT / sizeof(half));
         Duplicate(meanTmp, float(0.0), lnBaseM16Align);
         addRoll = actualLnBaseM / mask;
@@ -236,7 +242,7 @@ private:
         int32_t bakRollTail = lnBaseK - bakRoll * mask;
         PipeBarrier<PIPE_V>();
         constexpr uint64_t blockNumTrans = BLOCK_SIZE_16;
- 
+
         uint64_t dstLocalList[BLOCK_SIZE_16];
         uint64_t srcLocalList[BLOCK_SIZE_16];
         int dstOffset;
@@ -259,8 +265,8 @@ private:
             Add(meanTmp[mask * ll], xLocalFp32[mask * ll], meanTmp[mask * ll], mask, lnBufferK, params);
         }
         if (addRollTail > 0) {
-            Add(meanTmp[mask * addRoll], xLocalFp32[mask * addRoll], meanTmp[mask * addRoll],
-                addRollTail, lnBufferK, params);
+            Add(meanTmp[mask * addRoll], xLocalFp32[mask * addRoll], meanTmp[mask * addRoll], addRollTail, lnBufferK,
+                params);
         }
         PipeBarrier<PIPE_V>();
         Muls(meanTmp, meanTmp, avgFactor, actualLnBaseM);
@@ -270,8 +276,8 @@ private:
             Sub(tmpSub[mask * ll], xLocalFp32[mask * ll], meanTmp[mask * ll], mask, lnBufferK, params1);
         }
         if (addRollTail > 0) {
-            Sub(tmpSub[mask * addRoll], xLocalFp32[mask * addRoll], meanTmp[mask * addRoll], addRollTail,
-                    lnBufferK, params1);
+            Sub(tmpSub[mask * addRoll], xLocalFp32[mask * addRoll], meanTmp[mask * addRoll], addRollTail, lnBufferK,
+                params1);
         }
         PipeBarrier<PIPE_V>();
         Mul(xLocalFp32, tmpSub, tmpSub, lnBufferK * lnBaseM16Align);
@@ -282,8 +288,8 @@ private:
             Add(meanTmp[mask * ll], xLocalFp32[mask * ll], meanTmp[mask * ll], mask, lnBufferK, params);
         }
         if (addRollTail > 0) {
-            Add(meanTmp[mask * addRoll], xLocalFp32[mask * addRoll], meanTmp[mask * addRoll],
-                    addRollTail, lnBufferK, params);
+            Add(meanTmp[mask * addRoll], xLocalFp32[mask * addRoll], meanTmp[mask * addRoll], addRollTail, lnBufferK,
+                params);
         }
         PipeBarrier<PIPE_V>();
         Muls(meanTmp, meanTmp, avgFactor, actualLnBaseM);
@@ -296,8 +302,8 @@ private:
             Div(xLocalFp32[mask * ll], tmpSub[mask * ll], meanTmp[mask * ll], mask, lnBufferK, params1);
         }
         if (addRollTail > 0) {
-            Div(xLocalFp32[mask * addRoll], tmpSub[mask * addRoll], meanTmp[mask * addRoll],
-                addRollTail, lnBufferK, params1);
+            Div(xLocalFp32[mask * addRoll], tmpSub[mask * addRoll], meanTmp[mask * addRoll], addRollTail, lnBufferK,
+                params1);
         }
         PipeBarrier<PIPE_V>();
 
@@ -317,7 +323,7 @@ private:
             Mul(xLocalFp32[mask * ll], tmpSub[mask * ll], fp32Gamma[mask * ll], mask, actualLnBaseM, params2);
         }
         if (bakRollTail > 0) {
-            Mul(xLocalFp32[mask * bakRoll], tmpSub[mask * bakRoll], fp32Gamma[mask * bakRoll], bakRollTail, \
+            Mul(xLocalFp32[mask * bakRoll], tmpSub[mask * bakRoll], fp32Gamma[mask * bakRoll], bakRollTail,
                 actualLnBaseM, params2);
         }
         PipeBarrier<PIPE_V>();
@@ -325,7 +331,7 @@ private:
             Add(tmpSub[mask * ll], xLocalFp32[mask * ll], fp32Beta[mask * ll], mask, actualLnBaseM, params2);
         }
         if (bakRollTail > 0) {
-            Add(tmpSub[mask * bakRoll], xLocalFp32[mask * bakRoll], fp32Beta[mask * bakRoll], bakRollTail, \
+            Add(tmpSub[mask * bakRoll], xLocalFp32[mask * bakRoll], fp32Beta[mask * bakRoll], bakRollTail,
                 actualLnBaseM, params2);
         }
         PipeBarrier<PIPE_V>();
@@ -333,13 +339,14 @@ private:
         inQueueb.FreeTensor(inputXLocal);
     }
     __aicore__ inline void LnComputeNlarge(LocalTensor<float> xLocalFp32, LocalTensor<float> meanTmp,
-                    LocalTensor<float> tmpSub, LocalTensor<float> fp32Gamma, LocalTensor<float> fp32Beta)
+                                           LocalTensor<float> tmpSub, LocalTensor<float> fp32Gamma,
+                                           LocalTensor<float> fp32Beta)
     {
         GenLnParamsNlarge();
         LocalTensor<half> inputXLocal = inQueueb.DeQue<half>();
-        constexpr uint64_t mask = 64;   // fp32 blockNum is 64
-        constexpr uint32_t alignForFloat = BLOCK_UINT / sizeof(float);  // 8
-        constexpr uint64_t repeatMax = 255; // max repeta Times is 255
+        constexpr uint64_t mask = 64;                                  // fp32 blockNum is 64
+        constexpr uint32_t alignForFloat = BLOCK_UINT / sizeof(float); // 8
+        constexpr uint64_t repeatMax = 255;                            // max repeta Times is 255
         Duplicate(meanTmp, float(0.0), lnBaseM16Align);
         int32_t roll = lnBaseM16Align / BLOCK_SIZE_16;
         int32_t roll8 = lnBaseM16Align / (BLOCK_UINT / sizeof(float));
@@ -377,22 +384,22 @@ private:
 
         for (int32_t lll = 0; lll < addRollM; lll++) {
             for (int32_t ll = 0; ll < rollK; ll++) {
-                Add(meanTmp[mask * lll], xLocalFp32[repeatMax * lnBaseM16Align * ll + mask * lll],
-                        meanTmp[mask * lll], mask, repeatMax, params);
+                Add(meanTmp[mask * lll], xLocalFp32[repeatMax * lnBaseM16Align * ll + mask * lll], meanTmp[mask * lll],
+                    mask, repeatMax, params);
             }
             if (rollKTail > 0) {
                 Add(meanTmp[mask * lll], xLocalFp32[repeatMax * lnBaseM16Align * rollK + mask * lll],
-                        meanTmp[mask * lll], mask, rollKTail, params);
+                    meanTmp[mask * lll], mask, rollKTail, params);
             }
         }
         if (addRollMTail > 0) {
             for (int32_t ll = 0; ll < rollK; ll++) {
                 Add(meanTmp[mask * addRollM], xLocalFp32[repeatMax * lnBaseM16Align * ll + mask * addRollM],
-                        meanTmp[mask * addRollM], addRollMTail, repeatMax, params);
+                    meanTmp[mask * addRollM], addRollMTail, repeatMax, params);
             }
             if (rollKTail > 0) {
                 Add(meanTmp[mask * addRollM], xLocalFp32[repeatMax * lnBaseM16Align * rollK + mask * addRollM],
-                        meanTmp[mask * addRollM], addRollMTail, rollKTail, params);
+                    meanTmp[mask * addRollM], addRollMTail, rollKTail, params);
             }
         }
         PipeBarrier<PIPE_V>();
@@ -401,25 +408,25 @@ private:
         for (int32_t lll = 0; lll < addRollM; lll++) {
             for (int32_t ll = 0; ll < rollK; ll++) {
                 Sub(tmpSub[repeatMax * ll * lnBaseM16Align + mask * lll],
-                    xLocalFp32[repeatMax * lnBaseM16Align * ll + mask * lll],
-                    meanTmp[mask * lll], mask, repeatMax, params1);
+                    xLocalFp32[repeatMax * lnBaseM16Align * ll + mask * lll], meanTmp[mask * lll], mask, repeatMax,
+                    params1);
             }
             if (rollKTail > 0) {
                 Sub(tmpSub[repeatMax * rollK * lnBaseM16Align + mask * lll],
-                        xLocalFp32[repeatMax * lnBaseM16Align * rollK + mask * lll],
-                        meanTmp[mask * lll], mask, rollKTail, params1);
+                    xLocalFp32[repeatMax * lnBaseM16Align * rollK + mask * lll], meanTmp[mask * lll], mask, rollKTail,
+                    params1);
             }
         }
         if (addRollMTail > 0) {
             for (int32_t ll = 0; ll < rollK; ll++) {
                 Sub(tmpSub[repeatMax * ll * lnBaseM16Align + mask * addRollM],
-                    xLocalFp32[repeatMax * lnBaseM16Align * ll + mask * addRollM],
-                    meanTmp[mask * addRollM], addRollMTail, repeatMax, params1);
+                    xLocalFp32[repeatMax * lnBaseM16Align * ll + mask * addRollM], meanTmp[mask * addRollM],
+                    addRollMTail, repeatMax, params1);
             }
             if (rollKTail > 0) {
                 Sub(tmpSub[repeatMax * rollK * lnBaseM16Align + mask * addRollM],
-                    xLocalFp32[repeatMax * lnBaseM16Align * rollK + mask * addRollM],
-                    meanTmp[mask * addRollM], addRollMTail, rollKTail, params1);
+                    xLocalFp32[repeatMax * lnBaseM16Align * rollK + mask * addRollM], meanTmp[mask * addRollM],
+                    addRollMTail, rollKTail, params1);
             }
         }
         PipeBarrier<PIPE_V>();
@@ -429,22 +436,22 @@ private:
         PipeBarrier<PIPE_V>();
         for (int32_t lll = 0; lll < addRollM; lll++) {
             for (int32_t ll = 0; ll < rollK; ll++) {
-                Add(meanTmp[mask * lll], xLocalFp32[repeatMax * lnBaseM16Align * ll + mask * lll],
-                        meanTmp[mask * lll], mask, repeatMax, params);
+                Add(meanTmp[mask * lll], xLocalFp32[repeatMax * lnBaseM16Align * ll + mask * lll], meanTmp[mask * lll],
+                    mask, repeatMax, params);
             }
             if (rollKTail > 0) {
                 Add(meanTmp[mask * lll], xLocalFp32[repeatMax * lnBaseM16Align * rollK + mask * lll],
-                        meanTmp[mask * lll], mask, rollKTail, params);
+                    meanTmp[mask * lll], mask, rollKTail, params);
             }
         }
         if (addRollMTail > 0) {
             for (int32_t ll = 0; ll < rollK; ll++) {
                 Add(meanTmp[mask * addRollM], xLocalFp32[repeatMax * lnBaseM16Align * ll + mask * addRollM],
-                        meanTmp[mask * addRollM], addRollMTail, repeatMax, params);
+                    meanTmp[mask * addRollM], addRollMTail, repeatMax, params);
             }
             if (rollKTail > 0) {
                 Add(meanTmp[mask * addRollM], xLocalFp32[repeatMax * lnBaseM16Align * rollK + mask * addRollM],
-                        meanTmp[mask * addRollM], addRollMTail, rollKTail, params);
+                    meanTmp[mask * addRollM], addRollMTail, rollKTail, params);
             }
         }
         Muls(meanTmp, meanTmp, avgFactor, mAlign);
@@ -456,25 +463,25 @@ private:
         for (int32_t lll = 0; lll < addRollM; lll++) {
             for (int32_t ll = 0; ll < rollK; ll++) {
                 Div(xLocalFp32[repeatMax * ll * lnBaseM16Align + mask * lll],
-                    tmpSub[repeatMax * lnBaseM16Align * ll + mask * lll],
-                    meanTmp[mask * lll], mask, repeatMax, params1);
+                    tmpSub[repeatMax * lnBaseM16Align * ll + mask * lll], meanTmp[mask * lll], mask, repeatMax,
+                    params1);
             }
             if (rollKTail > 0) {
                 Div(xLocalFp32[repeatMax * rollK * lnBaseM16Align + mask * lll],
-                    tmpSub[repeatMax * lnBaseM16Align * rollK + mask * lll],
-                    meanTmp[mask * lll], mask, rollKTail, params1);
+                    tmpSub[repeatMax * lnBaseM16Align * rollK + mask * lll], meanTmp[mask * lll], mask, rollKTail,
+                    params1);
             }
         }
         if (addRollMTail > 0) {
             for (int32_t ll = 0; ll < rollK; ll++) {
                 Div(xLocalFp32[repeatMax * ll * lnBaseM16Align + mask * addRollM],
-                    tmpSub[repeatMax * lnBaseM16Align * ll + mask * addRollM],
-                    meanTmp[mask * addRollM], addRollMTail, repeatMax, params1);
+                    tmpSub[repeatMax * lnBaseM16Align * ll + mask * addRollM], meanTmp[mask * addRollM], addRollMTail,
+                    repeatMax, params1);
             }
             if (rollKTail > 0) {
                 Div(xLocalFp32[repeatMax * rollK * lnBaseM16Align + mask * addRollM],
-                    tmpSub[repeatMax * lnBaseM16Align * rollK + mask * addRollM],
-                    meanTmp[mask * addRollM], addRollMTail, rollKTail, params1);
+                    tmpSub[repeatMax * lnBaseM16Align * rollK + mask * addRollM], meanTmp[mask * addRollM],
+                    addRollMTail, rollKTail, params1);
             }
         }
         PipeBarrier<PIPE_V>();
@@ -482,8 +489,8 @@ private:
             dstOffset = 0;
             srcOffset = 0;
             for (int32_t i = 0; i < blockNumTrans; i++) {
-                dstOffset = alignForFloat * k1 * lnBufferK +
-                            lnBufferK * (i / 2) + (i % 2) * alignForFloat; // 2 if for float
+                dstOffset =
+                    alignForFloat * k1 * lnBufferK + lnBufferK * (i / 2) + (i % 2) * alignForFloat; // 2 if for float
                 srcOffset = alignForFloat * k1 + i * lnBaseM16Align;
                 dstLocalList[i] = (uint64_t)(tmpSub[dstOffset].GetPhyAddr());
                 srcLocalList[i] = (uint64_t)(xLocalFp32[srcOffset].GetPhyAddr());
@@ -494,50 +501,49 @@ private:
         for (int32_t lll = 0; lll < bakRollK; lll++) {
             for (int32_t ll = 0; ll < bakRoll; ll++) {
                 Mul(xLocalFp32[repeatMax * ll * lnBufferK + mask * lll],
-                    tmpSub[repeatMax * lnBufferK * ll + mask * lll],
-                    fp32Gamma[mask * lll], mask, repeatMax, params2);
+                    tmpSub[repeatMax * lnBufferK * ll + mask * lll], fp32Gamma[mask * lll], mask, repeatMax, params2);
             }
             if (bakRollTail > 0) {
                 Mul(xLocalFp32[repeatMax * bakRoll * lnBufferK + mask * lll],
-                    tmpSub[repeatMax * lnBufferK * bakRoll + mask * lll],
-                    fp32Gamma[mask * lll], mask, bakRollTail, params2);
+                    tmpSub[repeatMax * lnBufferK * bakRoll + mask * lll], fp32Gamma[mask * lll], mask, bakRollTail,
+                    params2);
             }
         }
         if (bakRollKTail > 0) {
             for (int32_t ll = 0; ll < bakRoll; ll++) {
                 Mul(xLocalFp32[repeatMax * ll * lnBufferK + mask * bakRollK],
-                    tmpSub[repeatMax * lnBufferK * ll + mask * bakRollK],
-                    fp32Gamma[mask * bakRollK], bakRollKTail, repeatMax, params2);
+                    tmpSub[repeatMax * lnBufferK * ll + mask * bakRollK], fp32Gamma[mask * bakRollK], bakRollKTail,
+                    repeatMax, params2);
             }
             if (bakRollTail > 0) {
                 Mul(xLocalFp32[repeatMax * bakRoll * lnBufferK + mask * bakRollK],
-                    tmpSub[repeatMax * lnBufferK * bakRoll + mask * bakRollK],
-                    fp32Gamma[mask * bakRollK], bakRollKTail, bakRollTail, params2);
+                    tmpSub[repeatMax * lnBufferK * bakRoll + mask * bakRollK], fp32Gamma[mask * bakRollK], bakRollKTail,
+                    bakRollTail, params2);
             }
         }
         PipeBarrier<PIPE_V>();
         for (int32_t lll = 0; lll < bakRollK; lll++) {
             for (int32_t ll = 0; ll < bakRoll; ll++) {
                 Add(tmpSub[repeatMax * ll * lnBufferK + mask * lll],
-                    xLocalFp32[repeatMax * lnBufferK * ll + mask * lll],
-                    fp32Beta[mask * lll], mask, repeatMax, params2);
+                    xLocalFp32[repeatMax * lnBufferK * ll + mask * lll], fp32Beta[mask * lll], mask, repeatMax,
+                    params2);
             }
             if (bakRollTail > 0) {
                 Add(tmpSub[repeatMax * bakRoll * lnBufferK + mask * lll],
-                    xLocalFp32[repeatMax * lnBufferK * bakRoll + mask * lll],
-                    fp32Beta[mask * lll], mask, bakRollTail, params2);
+                    xLocalFp32[repeatMax * lnBufferK * bakRoll + mask * lll], fp32Beta[mask * lll], mask, bakRollTail,
+                    params2);
             }
         }
         if (bakRollKTail > 0) {
             for (int32_t ll = 0; ll < bakRoll; ll++) {
                 Add(tmpSub[repeatMax * ll * lnBufferK + mask * bakRollK],
-                    xLocalFp32[repeatMax * lnBufferK * ll + mask * bakRollK],
-                    fp32Beta[mask * bakRollK], bakRollKTail, repeatMax, params2);
+                    xLocalFp32[repeatMax * lnBufferK * ll + mask * bakRollK], fp32Beta[mask * bakRollK], bakRollKTail,
+                    repeatMax, params2);
             }
             if (bakRollTail > 0) {
                 Add(tmpSub[repeatMax * bakRoll * lnBufferK + mask * bakRollK],
-                    xLocalFp32[repeatMax * lnBufferK * bakRoll + mask * bakRollK],
-                    fp32Beta[mask * bakRollK], bakRollKTail, bakRollTail, params2);
+                    xLocalFp32[repeatMax * lnBufferK * bakRoll + mask * bakRollK], fp32Beta[mask * bakRollK],
+                    bakRollKTail, bakRollTail, params2);
             }
         }
         PipeBarrier<PIPE_V>();
@@ -546,11 +552,11 @@ private:
     }
 
     __aicore__ inline void CopyIn(uint32_t innerLoopIdx, uint32_t subMLoopIdx, uint32_t gmCopyInOffset,
-                                    uint32_t subMLoop)
+                                  uint32_t subMLoop)
     {
         uint32_t offset = gmCopyInOffset + innerLoopIdx * mmSizeM * lnBaseK;
         if (subMLoop > 1) {
-            offset +=  subMLoopIdx * lnBaseM16Align * lnBaseK;
+            offset += subMLoopIdx * lnBaseM16Align * lnBaseK;
         }
         AscendC::LocalTensor<half> bLocal = inQueueb.AllocTensor<half>();
         AscendC::DataCopy(bLocal, inputXGlobal[offset], actualLnBaseM * lnBaseK);
@@ -567,22 +573,24 @@ private:
         intriParamsForSplit.srcStride = mmBaseN * sizeof(half) / DATA_COPY_UINT32 - intriParamsForSplit.blockLen;
         intriParamsForSplit.dstStride = 0;
         uint32_t gmCopyOut = 0;
-        for (uint32_t copyIdx = 0; copyIdx < (actualMmBaseM / windowSize); ++ copyIdx) {
+        for (uint32_t copyIdx = 0; copyIdx < (actualMmBaseM / windowSize); ++copyIdx) {
             GetGmOffset((winOffsetNumPerCore / windowSize) + innerLoopIdx * (mmSizeM / windowSize) + copyIdx,
-                            gmCopyOut);
+                        gmCopyOut);
             for (uint32_t headIdx = 0; headIdx < headNum; ++headIdx) {
                 AscendC::DataCopy(qOutputGlobal[gmCopyOut + headIdx * heightWindow * windowSize * sizePerHead],
-                        mmOutTmpFp16[headIdx * sizePerHead + windowSize * mmBaseN * copyIdx], intriParamsForSplit);
+                                  mmOutTmpFp16[headIdx * sizePerHead + windowSize * mmBaseN * copyIdx],
+                                  intriParamsForSplit);
                 AscendC::DataCopy(kOutputGlobal[gmCopyOut + headIdx * heightWindow * windowSize * sizePerHead],
-                        mmOutTmpFp16[lnBaseK + headIdx * sizePerHead + windowSize * mmBaseN * copyIdx],
-                        intriParamsForSplit);
-                AscendC::DataCopy(vOutputGlobal[gmCopyOut + headIdx * heightWindow * windowSize * sizePerHead],
+                                  mmOutTmpFp16[lnBaseK + headIdx * sizePerHead + windowSize * mmBaseN * copyIdx],
+                                  intriParamsForSplit);
+                AscendC::DataCopy(
+                    vOutputGlobal[gmCopyOut + headIdx * heightWindow * windowSize * sizePerHead],
                     mmOutTmpFp16[lnBaseK * 2 + headIdx * sizePerHead + windowSize * mmBaseN * copyIdx], // offset 2
                     intriParamsForSplit);
             }
         }
     }
-    __aicore__ inline void CopyOutForSplitN(uint32_t innerLoopIdx, uint32_t gmCopyOutOffset, GlobalTensor<half>&dst)
+    __aicore__ inline void CopyOutForSplitN(uint32_t innerLoopIdx, uint32_t gmCopyOutOffset, GlobalTensor<half>& dst)
     {
         AscendC::LocalTensor<half> mmOutTmpFp16 = lnSharedBuffer.Get<half>();
 
@@ -594,15 +602,16 @@ private:
         uint32_t gmCopyOut = 0;
         for (uint32_t copyIdx = 0; copyIdx < (actualMmBaseM / windowSize); ++copyIdx) {
             GetGmOffset((winOffsetNumPerCore / windowSize) + innerLoopIdx * (mmSizeM / windowSize) + copyIdx,
-                            gmCopyOut);
+                        gmCopyOut);
             for (uint32_t headIdx = 0; headIdx < headNum; ++headIdx) {
                 AscendC::DataCopy(dst[gmCopyOut + headIdx * heightWindow * windowSize * sizePerHead],
-                        mmOutTmpFp16[headIdx * sizePerHead + windowSize * mmSizeN * copyIdx], intriParamsForSplit);
+                                  mmOutTmpFp16[headIdx * sizePerHead + windowSize * mmSizeN * copyIdx],
+                                  intriParamsForSplit);
             }
         }
     }
-    __aicore__  inline void Quant(AscendC::LocalTensor<int8_t> &matAInt8Ub, uint32_t innerLoopIdx,
-                                    uint32_t gmCopyOutOffset)
+    __aicore__ inline void Quant(AscendC::LocalTensor<int8_t>& matAInt8Ub, uint32_t innerLoopIdx,
+                                 uint32_t gmCopyOutOffset)
     {
         AscendC::LocalTensor<half> scale = quantScaleTmpBuf.Get<half>();
         AscendC::LocalTensor<half> offset = quantOffsetTmpBuf.Get<half>();
@@ -610,7 +619,7 @@ private:
         AscendC::LocalTensor<half> lnOutLocalFp16 = lnSharedBuffer.Get<half>();
 
         AscendC::AscendQuant(matAInt8Ub, lnOutLocalFp16, quantTmpBuffer, scale, offset, lnBaseK, lnBaseK,
-                                actualLnBaseM * lnBaseK);
+                             actualLnBaseM * lnBaseK);
     }
     __aicore__ inline void Matmul(uint32_t innerLoopIdx, uint32_t gmCopyOutOffset, uint32_t mmSubNIdx)
     {
@@ -624,7 +633,8 @@ private:
                 mm.SetTensorB(weightGlobal[mmSizeK * mmSubNIdx], bTrans);
             }
         }
-#if defined(__CCE_AICORE__) &&  __CCE_AICORE__ == 200 || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
+#if defined(__CCE_AICORE__) && __CCE_AICORE__ == 200 || \
+    (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
         mm.SetTail(actualMmBaseM, -1, -1);
         mm.template IterateAll<true>(mmOutTmpFp16, false);
 #endif
@@ -717,13 +727,14 @@ private:
         transParams1.dstHighHalf = 0;
         transParams1.srcHighHalf = 0;
         transParams1.repeatTimes = bakRepeat;
-        transParams1.dstRepStride = 2; // 2 is for fp32 in block unit
+        transParams1.dstRepStride = 2;                  // 2 is for fp32 in block unit
         transParams1.srcRepStride = lnBaseM16Align * 2; // 2 is for fp32
         if (bakRepeat == 1) {
             transParams1.dstRepStride = 0;
             transParams1.srcRepStride = 0;
         }
     }
+
 private:
     AscendC::GlobalTensor<aDType> inputXGlobal;
     AscendC::GlobalTensor<aDType> gammaGlobal;
@@ -748,7 +759,7 @@ private:
     AscendC::TBuf<AscendC::TPosition::VECIN> betaTmpBuf;
     AscendC::TBuf<AscendC::TPosition::VECIN> fp32Gamma;
     AscendC::TBuf<AscendC::TPosition::VECIN> fp32Beta;
-    AscendC::TQue<AscendC::QuePosition::VECIN, 1> inQueueb;   // 1 buffer
+    AscendC::TQue<AscendC::QuePosition::VECIN, 1> inQueueb; // 1 buffer
 
     AscendC::TBuf<AscendC::QuePosition::VECCALC> ubShareForQuant;
     AscendC::TBuf<AscendC::TPosition::A1> inBufAL1;
@@ -784,7 +795,7 @@ private:
     int32_t addRoll;
     uint32_t nSplitPart;
     uint32_t tailM;
-    
+
     int64_t actualLnBaseM;
     int64_t actualMmBaseM;
 
@@ -803,12 +814,15 @@ private:
 };
 
 extern "C" __global__ __aicore__ void swin_transformer_ln_qkv_quant(GM_ADDR x, GM_ADDR gamma, GM_ADDR beta,
-    GM_ADDR weight, GM_ADDR bias, GM_ADDR quant_scale, GM_ADDR quant_offset, GM_ADDR dequant_scale,
-    GM_ADDR query_output, GM_ADDR key_output, GM_ADDR value_output, GM_ADDR workspace, GM_ADDR tiling)
+                                                                    GM_ADDR weight, GM_ADDR bias, GM_ADDR quant_scale,
+                                                                    GM_ADDR quant_offset, GM_ADDR dequant_scale,
+                                                                    GM_ADDR query_output, GM_ADDR key_output,
+                                                                    GM_ADDR value_output, GM_ADDR workspace,
+                                                                    GM_ADDR tiling)
 {
     AscendC::SetSysWorkspace(workspace);
     GET_TILING_DATA(tiling_data, tiling);
-    __gm__ uint8_t *userWorkspace = AscendC::GetUserWorkspace(workspace);
+    __gm__ uint8_t* userWorkspace = AscendC::GetUserWorkspace(workspace);
     TPipe tpipe;
     if (TILING_KEY_IS(100000UL)) {
         SwinTransformerLnQkvQuantNormalKernel<half, int8_t, half, false, true> op;

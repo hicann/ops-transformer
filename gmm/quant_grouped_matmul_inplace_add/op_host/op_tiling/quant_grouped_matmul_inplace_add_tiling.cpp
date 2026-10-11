@@ -59,51 +59,49 @@ bool QuantGroupedInplaceAddTiling::SetQuantModeForQGmmInplaceAdd()
 bool QuantGroupedInplaceAddTiling::AnalyzeInputs()
 {
     auto xStorageShape = context_->GetInputShape(X_INDEX);
-    OP_CHECK_IF(xStorageShape == nullptr,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "x1", "nullptr",
-                                                      "xStorageShape cannot be nullptr"),
-                return false);
-    const gert::Shape &xShape = xStorageShape->GetOriginShape();
+    OP_CHECK_IF(
+        xStorageShape == nullptr,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "x1", "nullptr", "xStorageShape cannot be nullptr"),
+        return false);
+    const gert::Shape& xShape = xStorageShape->GetOriginShape();
 
     auto wStorageShape = context_->GetInputShape(WEIGHT_INDEX);
-    OP_CHECK_IF(wStorageShape == nullptr,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "x2", "nullptr",
-                                                      "wStorageShape cannot be nullptr"),
-                return false);
-    const gert::Shape &wShape = wStorageShape->GetOriginShape();
+    OP_CHECK_IF(
+        wStorageShape == nullptr,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "x2", "nullptr", "wStorageShape cannot be nullptr"),
+        return false);
+    const gert::Shape& wShape = wStorageShape->GetOriginShape();
 
     auto scaleStorageShape = context_->GetInputShape(SCALE_INDEX);
     OP_CHECK_IF(scaleStorageShape == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "scale2", "nullptr",
                                                       "scaleStorageShape cannot be nullptr"),
                 return false);
-    const gert::Shape &wScaleShape = scaleStorageShape->GetOriginShape();
+    const gert::Shape& wScaleShape = scaleStorageShape->GetOriginShape();
     auto scaleDimNum = wScaleShape.GetDimNum();
-    OP_CHECK_IF(scaleDimNum < 1,
-               OP_LOGE_FOR_INVALID_SHAPEDIM(inputParams_.opType, "scale1", std::to_string(scaleDimNum),
-                                            "positive integer"),
-               return false);
+    OP_CHECK_IF(
+        scaleDimNum < 1,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(inputParams_.opType, "scale1", std::to_string(scaleDimNum), "positive integer"),
+        return false);
     auto x1ScaleStorageShape = context_->GetOptionalInputShape(PER_TOKEN_SCALE_INDEX);
     OP_CHECK_IF(x1ScaleStorageShape == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "scale1", "nullptr",
                                                       "x1ScaleStorageShape cannot be nullptr"),
                 return false);
-    const gert::Shape &x1ScaleShape = x1ScaleStorageShape->GetOriginShape();
-    OP_CHECK_IF(!SetGroupNum(GROUPLIST_INDEX), OP_LOGE(inputParams_.opName, "SetGroupNum failed."),
-               return false);
+    const gert::Shape& x1ScaleShape = x1ScaleStorageShape->GetOriginShape();
+    OP_CHECK_IF(!SetGroupNum(GROUPLIST_INDEX), OP_LOGE(inputParams_.opName, "SetGroupNum failed."), return false);
     OP_CHECK_IF(!SetMKN(xShape, wShape), OP_LOGE(inputParams_.opName, "SetMKN failed."), return false);
     if (IsMicroScaling()) {
         OP_CHECK_IF(!CheckShapeForMxQuant(x1ScaleShape, wScaleShape, inputParams_),
-                   OP_LOGE(inputParams_.opName, "CheckShapeForMxQuant failed."), return false);
+                    OP_LOGE(inputParams_.opName, "CheckShapeForMxQuant failed."), return false);
     } else {
         OP_CHECK_IF(!CheckShapeForHif8Quant(x1ScaleShape, wScaleShape, inputParams_),
-                   OP_LOGE(inputParams_.opName, "CheckShapeForHif8Quant failed."), return false);
+                    OP_LOGE(inputParams_.opName, "CheckShapeForHif8Quant failed."), return false);
     }
-    OP_CHECK_IF(!SetQuantModeForQGmmInplaceAdd(),
-               OP_LOGE(inputParams_.opName, "SetQuantModeForQGmmInplaceAdd failed."), return false);
+    OP_CHECK_IF(!SetQuantModeForQGmmInplaceAdd(), OP_LOGE(inputParams_.opName, "SetQuantModeForQGmmInplaceAdd failed."),
+                return false);
     SetKernelType();
-    OP_CHECK_IF(!CheckCoreNum(),
-                OP_LOGE(inputParams_.opName, "CheckCoreNum failed."), return false);
+    OP_CHECK_IF(!CheckCoreNum(), OP_LOGE(inputParams_.opName, "CheckCoreNum failed."), return false);
     return true;
 }
 
@@ -122,7 +120,7 @@ ge::graphStatus QuantGroupedInplaceAddTiling::DoOpTiling()
 
 int64_t QuantGroupedInplaceAddTiling::LogQuantParams() const
 {
-    const auto &params = tilingData_.quantGmmInplaceAddParams;
+    const auto& params = tilingData_.quantGmmInplaceAddParams;
     std::ostringstream oss;
     oss << "QGMMIAParams: groupNum = " << params.groupNum
         << ", groupListType = " << static_cast<uint32_t>(params.groupListType);
@@ -133,8 +131,8 @@ int64_t QuantGroupedInplaceAddTiling::LogQuantParams() const
 ge::graphStatus QuantGroupedInplaceAddTiling::DoLibApiTiling()
 {
     CalBasicBlock();
-    OP_CHECK_IF(CalL1Tiling() != ge::GRAPH_SUCCESS,
-               OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CalL1Tiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed"),
+                return ge::GRAPH_FAILED);
     tilingData_.mmTilingData.M = inputParams_.mSize;
     tilingData_.mmTilingData.N = inputParams_.nSize;
     tilingData_.mmTilingData.Ka = inputParams_.kSize;
@@ -177,11 +175,10 @@ ge::graphStatus QuantGroupedInplaceAddTiling::PostTiling()
 {
     context_->SetBlockDim(aicoreParams_.aicNum);
     OP_CHECK_IF(sizeof(tilingData_) % sizeof(uint64_t) != 0,
-               OP_LOGE(context_->GetNodeName(), "Tiling data size[%zu] is not aligned to 8",
-                                         sizeof(tilingData_)),
-               return ge::GRAPH_FAILED);
+                OP_LOGE(context_->GetNodeName(), "Tiling data size[%zu] is not aligned to 8", sizeof(tilingData_)),
+                return ge::GRAPH_FAILED);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), sizeof(tilingData_));
+                           reinterpret_cast<void*>(&tilingData_), sizeof(tilingData_));
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
@@ -190,16 +187,16 @@ ge::graphStatus QuantGroupedInplaceAddTiling::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingGMMInplaceAdd(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingGMMInplaceAdd(gert::TilingContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForGMMInplaceAdd(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForGMMInplaceAdd(gert::TilingParseContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfoPtr);
     auto compileInfoPtr = context->GetCompiledInfo<GMMCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfoPtr);
@@ -215,19 +212,19 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForGMMInplaceAdd(gert::TilingParse
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, compileInfoPtr->l0CSize);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, compileInfoPtr->l2Size);
 
-    OP_CHECK_IF((compileInfoPtr->aicNum == 0 || compileInfoPtr->aivNum == 0 || compileInfoPtr->ubSize == 0 ||
-                compileInfoPtr->l1Size == 0 || compileInfoPtr->l0CSize == 0 || compileInfoPtr->l0ASize == 0 ||
-                compileInfoPtr->l0BSize == 0 || compileInfoPtr->l2Size == 0),
-               OP_LOGE(context->GetNodeName(),
-                                           "Platform info is invalid, aicNum=%u, aivNum=%u, ubSize=%lu, l1Size=%lu, "
-                                           "l0CSize=%lu, l0ASize=%lu, l0BSize=%lu, l2Size=%lu",
-                                           compileInfoPtr->aicNum, compileInfoPtr->aivNum, compileInfoPtr->ubSize,
-                                           compileInfoPtr->l1Size, compileInfoPtr->l0CSize, compileInfoPtr->l0ASize,
-                                           compileInfoPtr->l0BSize, compileInfoPtr->l2Size),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (compileInfoPtr->aicNum == 0 || compileInfoPtr->aivNum == 0 || compileInfoPtr->ubSize == 0 ||
+         compileInfoPtr->l1Size == 0 || compileInfoPtr->l0CSize == 0 || compileInfoPtr->l0ASize == 0 ||
+         compileInfoPtr->l0BSize == 0 || compileInfoPtr->l2Size == 0),
+        OP_LOGE(context->GetNodeName(),
+                "Platform info is invalid, aicNum=%u, aivNum=%u, ubSize=%lu, l1Size=%lu, "
+                "l0CSize=%lu, l0ASize=%lu, l0BSize=%lu, l2Size=%lu",
+                compileInfoPtr->aicNum, compileInfoPtr->aivNum, compileInfoPtr->ubSize, compileInfoPtr->l1Size,
+                compileInfoPtr->l0CSize, compileInfoPtr->l0ASize, compileInfoPtr->l0BSize, compileInfoPtr->l2Size),
+        return ge::GRAPH_FAILED);
 
     OP_LOGI(context->GetNodeName(), "Parse compile info success, soc: %d",
-              static_cast<int>(compileInfoPtr->socVersion));
+            static_cast<int>(compileInfoPtr->socVersion));
     return ge::GRAPH_SUCCESS;
 }
 uint64_t QuantGroupedInplaceAddTiling::GetTilingKey() const

@@ -20,7 +20,7 @@ template class AclnnQuantGroupedMatmulInplaceAddDAV3510Checker<aclTensor>;
 }
 
 namespace {
-constexpr const char *QGMM_INPLACE_ADD_ACLNN_OP_NAME = "aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize";
+constexpr const char* QGMM_INPLACE_ADD_ACLNN_OP_NAME = "aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize";
 constexpr size_t DIM_NUM_2D = 2U;
 
 #define QGMM_INPLACE_ADD_CHECK_REPORT(cond, retExpr, reportExpr) \
@@ -31,19 +31,19 @@ constexpr size_t DIM_NUM_2D = 2U;
         } \
     } while (0)
 
-const aclTensor *GetInputTensor(const aclTensor *input, size_t index = 0)
+const aclTensor* GetInputTensor(const aclTensor* input, size_t index = 0)
 {
     (void)index;
     return input;
 }
 
-size_t GetInputTensorSize(const aclTensor *input)
+size_t GetInputTensorSize(const aclTensor* input)
 {
     (void)input;
     return 1;
 }
 
-std::string ShapeToStringWithoutBracket(const op::Shape &shape)
+std::string ShapeToStringWithoutBracket(const op::Shape& shape)
 {
     std::ostringstream oss;
     for (size_t i = 0; i < shape.GetDimNum(); ++i) {
@@ -55,18 +55,18 @@ std::string ShapeToStringWithoutBracket(const op::Shape &shape)
     return oss.str();
 }
 
-std::string ViewShapeToString(const aclTensor *tensor)
+std::string ViewShapeToString(const aclTensor* tensor)
 {
     return "[" + ShapeToStringWithoutBracket(tensor->GetViewShape()) + "]";
 }
 } // namespace
 
 template <typename T>
-void AclnnQuantGroupedMatmulInplaceAddDAV3510Checker<T>::SetInputName(const std::string &xName,
-                                                                      const std::string &weightName,
-                                                                      const std::string &perTokenScaleName,
-                                                                      const std::string &scaleName,
-                                                                      const std::string &groupTensorName)
+void AclnnQuantGroupedMatmulInplaceAddDAV3510Checker<T>::SetInputName(const std::string& xName,
+                                                                      const std::string& weightName,
+                                                                      const std::string& perTokenScaleName,
+                                                                      const std::string& scaleName,
+                                                                      const std::string& groupTensorName)
 {
     this->xName_ = xName;
     this->weightName_ = weightName;
@@ -105,9 +105,9 @@ aclnnStatus AclnnQuantGroupedMatmulInplaceAddDAV3510Checker<T>::CheckGeneralQuan
     CHECK_RET(CheckTensorListSizeForEachInput() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     auto groupNum = gmmParams_.groupTensorOptional->GetViewShape().GetDim(0);
     for (size_t i = 0; i < GetInputTensorSize(gmmParams_.x); i++) {
-        const auto *xTensor = GetInputTensor(gmmParams_.x, i);
-        const auto *weightTensor = GetInputTensor(gmmParams_.weight, i);
-        const auto *yTensor = GetInputTensor(gmmParams_.y, i);
+        const auto* xTensor = GetInputTensor(gmmParams_.x, i);
+        const auto* weightTensor = GetInputTensor(gmmParams_.weight, i);
+        const auto* yTensor = GetInputTensor(gmmParams_.y, i);
         auto weightNIndex = GetInputTensor(gmmParams_.weight, i)->GetViewShape().GetDimNum() - 1;
         auto yNIndex = GetInputTensor(gmmParams_.y, i)->GetViewShape().GetDimNum() - 1;
         QGMM_INPLACE_ADD_CHECK_REPORT(
@@ -170,8 +170,8 @@ aclnnStatus AclnnQuantGroupedMatmulInplaceAddDAV3510Checker<T>::CheckHif8QuantPa
     for (size_t i = 0; i < GetInputTensorSize(gmmParams_.weight); ++i) {
         auto scaleDimNumber = GetInputTensor(gmmParams_.scaleOptional, i)->GetViewShape().GetDimNum();
         auto perTokenDimNumber = GetInputTensor(gmmParams_.perTokenScaleOptional, i)->GetViewShape().GetDimNum();
-        const auto *perTokenScaleTensor = GetInputTensor(gmmParams_.perTokenScaleOptional, i);
-        const auto *scaleTensor = GetInputTensor(gmmParams_.scaleOptional, i);
+        const auto* perTokenScaleTensor = GetInputTensor(gmmParams_.perTokenScaleOptional, i);
+        const auto* scaleTensor = GetInputTensor(gmmParams_.scaleOptional, i);
 
         // 校验 scale1 (perTokenScale)
         if (!(perTokenDimNumber == 1 || perTokenDimNumber == DIM_NUM_2D)) {

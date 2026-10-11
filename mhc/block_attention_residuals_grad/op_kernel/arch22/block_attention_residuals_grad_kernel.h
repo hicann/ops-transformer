@@ -54,9 +54,9 @@ __aicore__ inline int32_t ArgFindPowerTwo(int32_t n)
     return (n + 1) >> 1;
 }
 
-__aicore__ inline float ReduceSumKahan(const LocalTensor<float> &srcLocal, int32_t count);
+__aicore__ inline float ReduceSumKahan(const LocalTensor<float>& srcLocal, int32_t count);
 
-__aicore__ inline void ReduceSumHalfInterval(const LocalTensor<float> &dstLocal, const LocalTensor<float> &srcLocal,
+__aicore__ inline void ReduceSumHalfInterval(const LocalTensor<float>& dstLocal, const LocalTensor<float>& srcLocal,
                                              int32_t count)
 {
     if (likely(count > static_cast<int32_t>(ARG_ELEM_PER_REP_FP32))) {
@@ -81,7 +81,7 @@ __aicore__ inline void ReduceSumHalfInterval(const LocalTensor<float> &dstLocal,
 
 // Kahan 补偿求和：H 较小（count<64）时逐标量累加，减少 FP32 归约的累积舍入。
 // 调用方负责在向量写 src 之后、GetValue 之前做必要的同步。
-__aicore__ inline float ReduceSumKahan(const LocalTensor<float> &srcLocal, int32_t count)
+__aicore__ inline float ReduceSumKahan(const LocalTensor<float>& srcLocal, int32_t count)
 {
     float sum = 0.0f;
     float comp = 0.0f;
@@ -95,8 +95,8 @@ __aicore__ inline float ReduceSumKahan(const LocalTensor<float> &srcLocal, int32
 }
 
 template <typename T>
-__aicore__ inline void KahanSumUpdate(LocalTensor<T> &inputTensor, LocalTensor<T> sumTensorList[2], const int32_t len,
-                                      int32_t &outPos)
+__aicore__ inline void KahanSumUpdate(LocalTensor<T>& inputTensor, LocalTensor<T> sumTensorList[2], const int32_t len,
+                                      int32_t& outPos)
 {
     LocalTensor<T> sumTensor = sumTensorList[outPos];
     LocalTensor<T> eTensor = sumTensorList[1 - outPos];
@@ -115,12 +115,12 @@ public:
     __aicore__ inline void Init(GM_ADDR prefixSum, GM_ADDR blockResidual, GM_ADDR projWeight, GM_ADDR normWeight,
                                 GM_ADDR gradOutput, GM_ADDR invRms, GM_ADDR probs, GM_ADDR gradPrefixSum,
                                 GM_ADDR gradBlockResidual, GM_ADDR gradProjWeight, GM_ADDR gradNormWeight,
-                                GM_ADDR workspace, const BlockAttentionResidualsGradTilingData *td);
+                                GM_ADDR workspace, const BlockAttentionResidualsGradTilingData* td);
 
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void ParseTiling(const BlockAttentionResidualsGradTilingData *td);
+    __aicore__ inline void ParseTiling(const BlockAttentionResidualsGradTilingData* td);
     __aicore__ inline GlobalTensor<T> VAddr(int64_t blk, int64_t batch) const;
     __aicore__ inline void InitScoreWeight();
     __aicore__ inline void CopyInToken(int64_t batch);
@@ -179,7 +179,7 @@ __aicore__ inline GlobalTensor<T> BlockAttentionResidualsGrad<T>::VAddr(int64_t 
 }
 
 template <typename T>
-__aicore__ inline void BlockAttentionResidualsGrad<T>::ParseTiling(const BlockAttentionResidualsGradTilingData *td)
+__aicore__ inline void BlockAttentionResidualsGrad<T>::ParseTiling(const BlockAttentionResidualsGradTilingData* td)
 {
     batchSize_ = td->batchSize;
     numBlocks_ = td->numBlocks;
@@ -201,11 +201,11 @@ __aicore__ inline void BlockAttentionResidualsGrad<T>::Init(GM_ADDR prefixSum, G
                                                             GM_ADDR invRms, GM_ADDR probs, GM_ADDR gradPrefixSum,
                                                             GM_ADDR gradBlockResidual, GM_ADDR gradProjWeight,
                                                             GM_ADDR gradNormWeight, GM_ADDR workspace,
-                                                            const BlockAttentionResidualsGradTilingData *td)
+                                                            const BlockAttentionResidualsGradTilingData* td)
 {
     ParseTiling(td);
 
-    __gm__ float *userWksp = (__gm__ float *)AscendC::GetUserWorkspace(workspace);
+    __gm__ float* userWksp = (__gm__ float*)AscendC::GetUserWorkspace(workspace);
 
     // per-core batch range is computed in kernel, not host tiling
     int64_t blockIdx = static_cast<int64_t>(AscendC::GetBlockIdx());
@@ -225,17 +225,17 @@ __aicore__ inline void BlockAttentionResidualsGrad<T>::Init(GM_ADDR prefixSum, G
     uint64_t H = static_cast<uint64_t>(hiddenSize_);
     uint64_t N1 = static_cast<uint64_t>(totalBlocks_);
 
-    prefixSumGm.SetGlobalBuffer((__gm__ T *)prefixSum, B * H);
-    blockResGm.SetGlobalBuffer((__gm__ T *)blockResidual, B * N * H);
-    projWeightGm.SetGlobalBuffer((__gm__ T *)projWeight, H);
-    normWeightGm.SetGlobalBuffer((__gm__ T *)normWeight, H);
-    gradOutGm.SetGlobalBuffer((__gm__ T *)gradOutput, B * H);
-    invRmsGm.SetGlobalBuffer((__gm__ float *)invRms, B * N1);
-    probsGm.SetGlobalBuffer((__gm__ float *)probs, B * N1);
-    gradPrefixSumGm.SetGlobalBuffer((__gm__ T *)gradPrefixSum, B * H);
-    gradBlockResGm.SetGlobalBuffer((__gm__ T *)gradBlockResidual, B * N * H);
-    gradProjWeightGm.SetGlobalBuffer((__gm__ T *)gradProjWeight, H);
-    gradNormWeightGm.SetGlobalBuffer((__gm__ T *)gradNormWeight, H);
+    prefixSumGm.SetGlobalBuffer((__gm__ T*)prefixSum, B * H);
+    blockResGm.SetGlobalBuffer((__gm__ T*)blockResidual, B * N * H);
+    projWeightGm.SetGlobalBuffer((__gm__ T*)projWeight, H);
+    normWeightGm.SetGlobalBuffer((__gm__ T*)normWeight, H);
+    gradOutGm.SetGlobalBuffer((__gm__ T*)gradOutput, B * H);
+    invRmsGm.SetGlobalBuffer((__gm__ float*)invRms, B * N1);
+    probsGm.SetGlobalBuffer((__gm__ float*)probs, B * N1);
+    gradPrefixSumGm.SetGlobalBuffer((__gm__ T*)gradPrefixSum, B * H);
+    gradBlockResGm.SetGlobalBuffer((__gm__ T*)gradBlockResidual, B * N * H);
+    gradProjWeightGm.SetGlobalBuffer((__gm__ T*)gradProjWeight, H);
+    gradNormWeightGm.SetGlobalBuffer((__gm__ T*)gradNormWeight, H);
     uint64_t wkspOff = perCoreWkspBytes_ * static_cast<uint64_t>(blockIdx);
     gswWkspGm.SetGlobalBuffer(userWksp + (wkspOff / sizeof(float)), H);
 

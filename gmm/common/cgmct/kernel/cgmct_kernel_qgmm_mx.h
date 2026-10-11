@@ -131,23 +131,23 @@ public:
     };
 
 public:
-    __aicore__ inline void Init(const Params &params);
-    __aicore__ inline void Run(const Params &params);
-    __aicore__ inline void operator()(const Params &params)
+    __aicore__ inline void Init(const Params& params);
+    __aicore__ inline void Run(const Params& params);
+    __aicore__ inline void operator()(const Params& params)
     {
         Run(params);
     }
 
 private:
     __aicore__ inline void SetMNK(uint32_t groupIdx);
-    __aicore__ inline void BaseMBalance(BlockSchedulerOp &bs, int64_t m, int64_t baseM);
+    __aicore__ inline void BaseMBalance(BlockSchedulerOp& bs, int64_t m, int64_t baseM);
     template <bool isLastGroupAndNeedSplit>
-    __aicore__ inline void ProcessSingleGroup(const Params &params, BlockSchedulerOp &bs, uint32_t groupIdx);
+    __aicore__ inline void ProcessSingleGroup(const Params& params, BlockSchedulerOp& bs, uint32_t groupIdx);
     __aicore__ inline void UpdateOffset(uint32_t groupIdx);
     __aicore__ inline int32_t GetSplitValueFromGroupList(uint32_t groupIdx);
     __aicore__ inline void UpdateMMGlobalAddr();
     __aicore__ inline void Iterate(int64_t singleCoreM, int64_t singleCoreN);
-    __aicore__ inline bool IfNeedSplit(const BlockSchedulerOp &bs);
+    __aicore__ inline bool IfNeedSplit(const BlockSchedulerOp& bs);
     __aicore__ inline void SetL2CacheDisableIfNeeded(int64_t mSize, int64_t curBaseM, int64_t baseN);
 
 private:
@@ -165,12 +165,12 @@ private:
     AscendC::GlobalTensor<CType> yGlobal_;
 
     GM_ADDR groupListPtr_;
-    __gm__ AType *xTensorPtr_;
-    __gm__ BType *wTensorPtr_;
+    __gm__ AType* xTensorPtr_;
+    __gm__ BType* wTensorPtr_;
     GM_ADDR x1ScaleTensorPtr_;
-    __gm__ AscendC::fp8_e8m0_t *x2ScaleTensorPtr_;
-    __gm__ BiasType *biasTensorPtr_;
-    __gm__ CType *yTensorPtr_;
+    __gm__ AscendC::fp8_e8m0_t* x2ScaleTensorPtr_;
+    __gm__ BiasType* biasTensorPtr_;
+    __gm__ CType* yTensorPtr_;
 
     int64_t perGroupBOffset_;
     int32_t preOffset_ = 0; // cumsum of group list
@@ -182,7 +182,7 @@ private:
 };
 
 QGMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::Run(const Params &params)
+__aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::Run(const Params& params)
 {
     Init(params);
     BlockSchedulerOp bs(params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
@@ -235,10 +235,10 @@ __aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::Run(const Pa
 }
 
 QGMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::Init(const Params &params)
+__aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::Init(const Params& params)
 {
-    const auto &mmadParams = params.mmadParams;
-    const auto &gmmParams = params.gmmParams;
+    const auto& mmadParams = params.mmadParams;
+    const auto& gmmParams = params.gmmParams;
 
     xTensorPtr_ = GetTensorAddr<AType>(0, mmadParams.aGmAddr);
     wTensorPtr_ = GetTensorAddr<BType>(0, mmadParams.bGmAddr);
@@ -268,7 +268,7 @@ __aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::Init(const P
     }
 
     if (groupListPtr_ != nullptr) {
-        groupListGlobal_.SetGlobalBuffer((__gm__ int64_t *)groupListPtr_);
+        groupListGlobal_.SetGlobalBuffer((__gm__ int64_t*)groupListPtr_);
     }
     TupleShape l0Shape{static_cast<int64_t>(gmmParams.baseM), static_cast<int64_t>(gmmParams.baseN),
                        static_cast<int64_t>(gmmParams.baseK)};
@@ -312,7 +312,7 @@ __aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::SetL2CacheDi
 }
 
 QGMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::BaseMBalance(BlockSchedulerOp &bs, int64_t m,
+__aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::BaseMBalance(BlockSchedulerOp& bs, int64_t m,
                                                                                  int64_t baseM)
 {
     if constexpr (!transA) {
@@ -323,7 +323,7 @@ __aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::BaseMBalance
 }
 
 QGMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline bool KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::IfNeedSplit(const BlockSchedulerOp &bs)
+__aicore__ inline bool KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::IfNeedSplit(const BlockSchedulerOp& bs)
 {
     // Consider tail split only when at least half of the cores are still available.
     return (bs.GetEndBlockIdx() + 1) <= (AscendC::GetBlockNum() >> 1);
@@ -368,8 +368,8 @@ __aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::UpdateOffset
 
 QGMM_MX_KERNEL_CLASS_TEM_PARAMS
 template <bool isLastGroupAndNeedSplit>
-__aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::ProcessSingleGroup(const Params &params,
-                                                                                       BlockSchedulerOp &bs,
+__aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::ProcessSingleGroup(const Params& params,
+                                                                                       BlockSchedulerOp& bs,
                                                                                        uint32_t groupIdx)
 {
     CoordClass coord(Get<MNK_M>(problemShape_), Get<MNK_N>(problemShape_), Get<MNK_K>(problemShape_),
@@ -430,7 +430,7 @@ __aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::UpdateMMGlob
     if (isBias_) {
         biasGlobal_.SetGlobalBuffer(biasTensorPtr_ + Get<IDX_BIAS_OFFSET>(baseOffset_));
     }
-    x1ScaleGlobal_.SetGlobalBuffer((__gm__ AscendC::fp8_e8m0_t *)(x1ScaleTensorPtr_) +
+    x1ScaleGlobal_.SetGlobalBuffer((__gm__ AscendC::fp8_e8m0_t*)(x1ScaleTensorPtr_) +
                                    Get<IDX_X1SCALE_OFFSET>(baseOffset_)); // optional input
     x2ScaleGlobal_.SetGlobalBuffer(x2ScaleTensorPtr_ + Get<IDX_X2SCALE_OFFSET>(baseOffset_));
     yGlobal_.SetGlobalBuffer(yTensorPtr_ + Get<IDX_C_OFFSET>(baseOffset_));

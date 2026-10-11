@@ -20,26 +20,27 @@
 #include "aclnnop/aclnn_grouped_matmul_add_v2.h"
 
 #define CHECK_RET(cond, return_expr) \
-    do {                             \
-        if (!(cond)) {               \
-        return_expr;                 \
-        }                            \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
 #define CHECK_FREE_RET(cond, return_expr) \
-    do {                                  \
-        if (!(cond)) {                    \
-            Finalize(deviceId, stream);   \
-            return_expr;                  \
-        }                                 \
+    do { \
+        if (!(cond)) { \
+            Finalize(deviceId, stream); \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)         \
-    do {                                \
+#define LOG_PRINT(message, ...) \
+    do { \
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t>& shape) {
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
+{
     int64_t shapeSize = 1;
     for (auto i : shape) {
         shapeSize *= i;
@@ -47,7 +48,8 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape) {
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream* stream) {
+int Init(int32_t deviceId, aclrtStream* stream)
+{
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -60,7 +62,8 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 
 template <typename T>
 int CreateAclTensor_New(const std::vector<int64_t>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                        aclDataType dataType, aclTensor** tensor) {
+                        aclDataType dataType, aclTensor** tensor)
+{
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请Device侧内存
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -83,8 +86,8 @@ int CreateAclTensor_New(const std::vector<int64_t>& hostData, const std::vector<
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<int64_t>& shape, void** deviceAddr,
-                      aclDataType dataType, aclTensor** tensor) {
+int CreateAclTensor(const std::vector<int64_t>& shape, void** deviceAddr, aclDataType dataType, aclTensor** tensor)
+{
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请Device侧内存
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -114,10 +117,11 @@ void Finalize(int32_t deviceId, aclrtStream stream)
     aclFinalize();
 }
 
-int aclnnGroupedMatmulAddV2Test(aclrtStream &stream, int groupListType) {
+int aclnnGroupedMatmulAddV2Test(aclrtStream& stream, int groupListType)
+{
     // 2. 构造输入与输出，需要根据API的接口自定义构造
     std::vector<int64_t> xShape = {512, 256};
-    std::vector<int64_t> weightShape= {512, 256};
+    std::vector<int64_t> weightShape = {512, 256};
     std::vector<int64_t> yShape = {2, 256, 256};
     std::vector<int64_t> groupListShape = {2};
     std::vector<int64_t> groupListData;
@@ -145,23 +149,24 @@ int aclnnGroupedMatmulAddV2Test(aclrtStream &stream, int groupListType) {
     int ret = 0;
     // 创建x aclTensorList
     ret = CreateAclTensor<uint16_t>(xShape, &xDeviceAddr, aclDataType::ACL_BF16, &x);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> xTensorPtr(x, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> xDeviceAddrPtr(xDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> xTensorPtr(x, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> xDeviceAddrPtr(xDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建weight aclTensorList
     ret = CreateAclTensor<uint16_t>(weightShape, &weightDeviceAddr, aclDataType::ACL_BF16, &weight);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> weightTensorPtr(weight, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> weightDeviceAddrPtr(weightDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> weightTensorPtr(weight, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> weightDeviceAddrPtr(weightDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建y aclTensorList
     ret = CreateAclTensor<float>(yShape, &yDeviceAddr, aclDataType::ACL_FLOAT, &y);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> yTensorPtr(y, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> yDeviceAddrPtr(yDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> yTensorPtr(y, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> yDeviceAddrPtr(yDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建group_list aclTensor
-    ret = CreateAclTensor_New<int64_t>(groupListData, groupListShape, &groupListDeviceAddr, aclDataType::ACL_INT64, &groupedList);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> groupedListTensorPtr(groupedList, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> groupListDeviceAddrPtr(groupListDeviceAddr, aclrtFree);
+    ret = CreateAclTensor_New<int64_t>(groupListData, groupListShape, &groupListDeviceAddr, aclDataType::ACL_INT64,
+                                       &groupedList);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> groupedListTensorPtr(groupedList, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> groupListDeviceAddrPtr(groupListDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     yRef = y;
@@ -171,11 +176,13 @@ int aclnnGroupedMatmulAddV2Test(aclrtStream &stream, int groupListType) {
 
     // 3. 调用CANN算子库API
     // 调用aclnnGroupedMatmulAdd第一段接口
-    ret = aclnnGroupedMatmulAddV2GetWorkspaceSize(x, weight, groupedList, yRef, transpose_x, transpose_weight, group_type, group_list_type, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulAddV2GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+    ret = aclnnGroupedMatmulAddV2GetWorkspaceSize(x, weight, groupedList, yRef, transpose_x, transpose_weight,
+                                                  group_type, group_list_type, &workspaceSize, &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulAddV2GetWorkspaceSize failed. ERROR: %d\n", ret);
+              return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
     void* workspaceAddr = nullptr;
-    std::unique_ptr<void, aclError (*)(void *)> workspaceAddrPtr(nullptr, aclrtFree);
+    std::unique_ptr<void, aclError (*)(void*)> workspaceAddrPtr(nullptr, aclrtFree);
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
@@ -192,8 +199,8 @@ int aclnnGroupedMatmulAddV2Test(aclrtStream &stream, int groupListType) {
     // 5. 获取输出的值，将Device侧内存上的结果拷贝至Host侧，需要根据具体API的接口定义修改
     auto size = GetShapeSize(yShape);
     std::vector<uint16_t> resultData(size, 0);
-    ret = aclrtMemcpy(resultData.data(), size * sizeof(resultData[0]), yDeviceAddr,
-                          size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    ret = aclrtMemcpy(resultData.data(), size * sizeof(resultData[0]), yDeviceAddr, size * sizeof(resultData[0]),
+                      ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t j = 0; j < 10; j++) {
         LOG_PRINT("result[%ld] is: %d\n", j, resultData[j]);
@@ -213,7 +220,8 @@ int main()
     for (int i = 0; i < groupListTypeMode; i++) {
         // i: grouplist type
         ret = aclnnGroupedMatmulAddV2Test(stream, i);
-        CHECK_FREE_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulAddV2Test failed. ERROR: %d\n", ret); return ret);
+        CHECK_FREE_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulAddV2Test failed. ERROR: %d\n", ret);
+                       return ret);
     }
     Finalize(deviceId, stream);
     return 0;

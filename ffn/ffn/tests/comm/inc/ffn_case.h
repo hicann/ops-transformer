@@ -40,7 +40,7 @@ public:
 
 public:
     FFNCase();
-    FFNCase(const char *name, bool enable, const char *dbgInfo, OpInfo opInfo, Param param,
+    FFNCase(const char* name, bool enable, const char* dbgInfo, OpInfo opInfo, Param param,
             int32_t tilingTemplatePriority);
 
     bool Run() override;
@@ -51,7 +51,7 @@ protected:
     bool InitCurrentCasePtr() override;
 };
 
-Tensor GenTensor(const char *name, const std::initializer_list<int64_t> &shape, ge::DataType dType,
+Tensor GenTensor(const char* name, const std::initializer_list<int64_t>& shape, ge::DataType dType,
                  ge::Format format = ge::FORMAT_ND);
 
 } // namespace ops::adv::tests::ffn

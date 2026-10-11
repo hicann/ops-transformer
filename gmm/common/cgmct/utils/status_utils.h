@@ -35,7 +35,7 @@ enum class Status {
     l1kErrorL0kNotAlign,
     l1L0ErrorNotAlignInt8
 };
-constexpr const char *GetStatusString(Status status)
+constexpr const char* GetStatusString(Status status)
 {
     switch (status) {
         case Status::success:

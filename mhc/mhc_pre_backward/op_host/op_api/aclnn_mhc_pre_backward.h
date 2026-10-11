@@ -45,11 +45,11 @@ extern "C" {
  * @return aclnnStatus: 返回状态码
  */
 aclnnStatus aclnnMhcPreBackwardGetWorkspaceSize(
-    const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *gradHIn,
-    const aclTensor *gradHPost, const aclTensor *gradHRes, const aclTensor *invRms, const aclTensor *hMix,
-    const aclTensor *hPre, const aclTensor *hPost, const aclTensor *gammaOptional, const aclTensor *gradXPostOptional,
-    float hcEps, const aclTensor *gradX, const aclTensor *gradPhi, const aclTensor *gradAlpha,
-    const aclTensor *gradBias, const aclTensor *gradGamma, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* x, const aclTensor* phi, const aclTensor* alpha, const aclTensor* gradHIn,
+    const aclTensor* gradHPost, const aclTensor* gradHRes, const aclTensor* invRms, const aclTensor* hMix,
+    const aclTensor* hPre, const aclTensor* hPost, const aclTensor* gammaOptional, const aclTensor* gradXPostOptional,
+    float hcEps, const aclTensor* gradX, const aclTensor* gradPhi, const aclTensor* gradAlpha,
+    const aclTensor* gradBias, const aclTensor* gradGamma, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnMhcPreBackward 的第二段接口。
@@ -59,7 +59,7 @@ aclnnStatus aclnnMhcPreBackwardGetWorkspaceSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-aclnnStatus aclnnMhcPreBackward(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+aclnnStatus aclnnMhcPreBackward(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

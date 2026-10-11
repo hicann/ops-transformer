@@ -14,7 +14,7 @@
 using namespace gmm;
 
 namespace gmm {
-bool IsTransposeLastTwoDims(const aclTensor *tensor)
+bool IsTransposeLastTwoDims(const aclTensor* tensor)
 {
     auto shape = tensor->GetViewShape();
     if (shape.GetDimNum() < MIN_DIM_FOR_TRANSPOSE) {
@@ -39,7 +39,7 @@ bool IsTransposeLastTwoDims(const aclTensor *tensor)
     return false;
 }
 
-bool IsTransposeForMxShape(const aclTensor *tensor)
+bool IsTransposeForMxShape(const aclTensor* tensor)
 {
     auto shape = tensor->GetViewShape();
     if (shape.GetDimNum() < MX_SPLIT_K_PER_TOKEN_SCALE_DIM) {
@@ -56,12 +56,12 @@ bool IsTransposeForMxShape(const aclTensor *tensor)
     return false;
 }
 
-bool CreateContiguousTensorListForPertoken(const aclTensorList *tensorList, std::vector<aclTensor *> &newTensorList,
-                                           aclOpExecutor *executor)
+bool CreateContiguousTensorListForPertoken(const aclTensorList* tensorList, std::vector<aclTensor*>& newTensorList,
+                                           aclOpExecutor* executor)
 {
     op::Shape shape;
     for (uint64_t idx = 0; idx < (*tensorList).Size(); idx++) {
-        const aclTensor *inputTensor = (*tensorList)[idx];
+        const aclTensor* inputTensor = (*tensorList)[idx];
         op::Shape viewShape = inputTensor->GetViewShape();
         shape.SetScalar();
         if (viewShape.GetDimNum() <
@@ -72,7 +72,7 @@ bool CreateContiguousTensorListForPertoken(const aclTensorList *tensorList, std:
         shape.AppendDim(viewShape.GetDim(1));
         shape.AppendDim(viewShape.GetDim(0));
         shape.AppendDim(viewShape.GetDim(2)); // 2 is last dim contiguous in k axis in mx typek quant mode
-        aclTensor *tensor =
+        aclTensor* tensor =
             executor->CreateView(inputTensor, shape, inputTensor->GetViewOffset()); // use executor to create tensor
         if (tensor == nullptr) {
             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("GroupedMatmul", "contiguous per-token scale view",
@@ -85,12 +85,12 @@ bool CreateContiguousTensorListForPertoken(const aclTensorList *tensorList, std:
     return true;
 }
 
-bool CreateContiguousTensorListForMXTypeMScale(const aclTensorList *tensorList, std::vector<aclTensor *> &newTensorList,
-                                               aclOpExecutor *executor)
+bool CreateContiguousTensorListForMXTypeMScale(const aclTensorList* tensorList, std::vector<aclTensor*>& newTensorList,
+                                               aclOpExecutor* executor)
 {
     op::Shape shape;
     for (uint64_t idx = 0; idx < (*tensorList).Size(); idx++) {
-        const aclTensor *inputTensor = (*tensorList)[idx];
+        const aclTensor* inputTensor = (*tensorList)[idx];
         op::Shape viewShape = inputTensor->GetViewShape();
         shape.SetScalar();
         if (viewShape.GetDimNum() < MX_MULTI_ANTIQUANT_SCALE_DIM) {
@@ -105,7 +105,7 @@ bool CreateContiguousTensorListForMXTypeMScale(const aclTensorList *tensorList, 
             shape.AppendDim(viewShape.GetDim(viewShape.GetDimNum() - LAST_THIRD_DIM_INDEX));
             shape.AppendDim(viewShape.GetDim(viewShape.GetDimNum() - 1));
         }
-        aclTensor *tensor =
+        aclTensor* tensor =
             executor->CreateView(inputTensor, shape, inputTensor->GetViewOffset()); // use executor to create tensor
         if (tensor == nullptr) {
             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("GroupedMatmul", "contiguous MX scale view",
@@ -118,12 +118,12 @@ bool CreateContiguousTensorListForMXTypeMScale(const aclTensorList *tensorList, 
     return true;
 }
 
-bool CreateContiguousTensorList(const aclTensorList *tensorList, std::vector<aclTensor *> &newTensorList,
-                                aclOpExecutor *executor)
+bool CreateContiguousTensorList(const aclTensorList* tensorList, std::vector<aclTensor*>& newTensorList,
+                                aclOpExecutor* executor)
 {
     op::Shape shape;
     for (uint64_t idx = 0; idx < (*tensorList).Size(); idx++) {
-        const aclTensor *inputTensor = (*tensorList)[idx];
+        const aclTensor* inputTensor = (*tensorList)[idx];
         op::Shape viewShape = inputTensor->GetViewShape();
         uint32_t viewShapeDimsNum = viewShape.GetDimNum();
         shape.SetScalar();
@@ -135,7 +135,7 @@ bool CreateContiguousTensorList(const aclTensorList *tensorList, std::vector<acl
         // dim.
         shape.AppendDim(viewShape.GetDim(viewShapeDimsNum - 1));
         shape.AppendDim(viewShape.GetDim(viewShapeDimsNum - 2)); // 2:the second last dim.
-        aclTensor *tensor =
+        aclTensor* tensor =
             executor->CreateView(inputTensor, shape, inputTensor->GetViewOffset()); // use executor to create tensor
         if (tensor == nullptr) {
             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("GroupedMatmul", "contiguous tensor view",
@@ -148,7 +148,7 @@ bool CreateContiguousTensorList(const aclTensorList *tensorList, std::vector<acl
     return true;
 }
 
-std::string dTypeToString(const ge::DataType &dtype)
+std::string dTypeToString(const ge::DataType& dtype)
 {
     if (DTYPE_STRING.count(dtype) != 0) {
         return DTYPE_STRING.at(dtype);

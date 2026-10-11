@@ -19,20 +19,20 @@
 
 using namespace op;
 
-namespace l0op
-{
+namespace l0op {
 OP_TYPE_REGISTER(FfnWorkerScheduler);
 
 const aclTensor* FfnWorkerScheduler(const aclTensor* scheduleContext, int32_t syncGroupSize, int32_t executeMode,
-                                    aclTensor* scheduleContextOut, aclOpExecutor* executor) {
-  L0_DFX(FfnWorkerScheduler, scheduleContext, syncGroupSize, executeMode, scheduleContextOut);
-  static internal::AicpuTaskSpace space("FfnWorkerScheduler");
-  auto ret = ADD_TO_LAUNCHER_LIST_AICPU(FfnWorkerScheduler, OP_ATTR_NAMES({"sync_group_size", "execute_mode"}),
-                                        OP_INPUT(scheduleContext), OP_OUTPUT(scheduleContextOut),
-                                        OP_ATTR(syncGroupSize, executeMode));
-  OP_CHECK(ret == ACL_SUCCESS,
-           OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "FfnWorkerScheduler ADD_TO_LAUNCHER_LIST_AICPU failed."), return nullptr);
-  return scheduleContextOut;
+                                    aclTensor* scheduleContextOut, aclOpExecutor* executor)
+{
+    L0_DFX(FfnWorkerScheduler, scheduleContext, syncGroupSize, executeMode, scheduleContextOut);
+    static internal::AicpuTaskSpace space("FfnWorkerScheduler");
+    auto ret = ADD_TO_LAUNCHER_LIST_AICPU(FfnWorkerScheduler, OP_ATTR_NAMES({"sync_group_size", "execute_mode"}),
+                                          OP_INPUT(scheduleContext), OP_OUTPUT(scheduleContextOut),
+                                          OP_ATTR(syncGroupSize, executeMode));
+    OP_CHECK(ret == ACL_SUCCESS,
+             OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "FfnWorkerScheduler ADD_TO_LAUNCHER_LIST_AICPU failed."), return nullptr);
+    return scheduleContextOut;
 }
 
-}  // namespace l0op
+} // namespace l0op

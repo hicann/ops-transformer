@@ -19,8 +19,8 @@
 #include "opdev/op_executor.h"
 namespace l0op {
 
-const aclTensor *MhcSinkhorn(const aclTensor *x, int64_t outFlag, float eps, int64_t numIters, aclTensor *output,
-                             aclTensor *normOut, aclTensor *sumOut, aclOpExecutor *executor);
+const aclTensor* MhcSinkhorn(const aclTensor* x, int64_t outFlag, float eps, int64_t numIters, aclTensor* output,
+                             aclTensor* normOut, aclTensor* sumOut, aclOpExecutor* executor);
 }
 
 #endif // PTA_NPU_OP_API_INC_LEVEL0_OP_MHC_SINKHORN_OP_H_

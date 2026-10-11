@@ -18,8 +18,8 @@
 
 namespace {
 
-using TensorDeleter = void (*)(aclTensor *);
-using TensorListDeleter = void (*)(aclTensorList *);
+using TensorDeleter = void (*)(aclTensor*);
+using TensorListDeleter = void (*)(aclTensorList*);
 
 struct CheckerInputPack {
     std::unique_ptr<aclTensor, TensorDeleter> x;
@@ -64,7 +64,7 @@ CheckerInputPack BuildBasePack()
     return pack;
 }
 
-aclnnStatus RunChecker(const gmm::GroupedMatmulParamsBase<aclTensor> &params)
+aclnnStatus RunChecker(const gmm::GroupedMatmulParamsBase<aclTensor>& params)
 {
     QGmmInPlaceAdd::AclnnQuantGroupedMatmulInplaceAddDAV3510Checker<aclTensor> checker(params);
     checker.SetInputName("x1", "x2", "scale1Optional", "scale2", "groupList");

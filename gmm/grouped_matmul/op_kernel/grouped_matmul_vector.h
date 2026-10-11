@@ -21,9 +21,9 @@
 namespace GROUPED_MATMUL {
 
 template <typename T>
-__aicore__ inline void EmptyTensorCompute(GM_ADDR groupListPtr, GM_ADDR y, const GMMTilingData *__restrict tiling)
+__aicore__ inline void EmptyTensorCompute(GM_ADDR groupListPtr, GM_ADDR y, const GMMTilingData* __restrict tiling)
 {
-    const GMMBaseParams *__restrict gmmBaseParams = &tiling->gmmBaseParams;
+    const GMMBaseParams* __restrict gmmBaseParams = &tiling->gmmBaseParams;
     // In the V2 interface, groupType is -1 after host is grouped. Thus, groupType can be either -1 or 2.
     if (groupListPtr == nullptr || gmmBaseParams->groupType == 0) {
         return;
@@ -33,7 +33,7 @@ __aicore__ inline void EmptyTensorCompute(GM_ADDR groupListPtr, GM_ADDR y, const
     GlobalTensor<int64_t> groupListGm;
     yGm.SetGlobalBuffer(GetTensorAddr<T>(0, y));
     if (groupListPtr != nullptr) {
-        groupListGm.SetGlobalBuffer((__gm__ int64_t *)groupListPtr);
+        groupListGm.SetGlobalBuffer((__gm__ int64_t*)groupListPtr);
     }
     uint64_t yBaseOffset = 0;
     int32_t preOffset = 0;
@@ -42,9 +42,9 @@ __aicore__ inline void EmptyTensorCompute(GM_ADDR groupListPtr, GM_ADDR y, const
     uint32_t singleY = gmmBaseParams->singleY;
     bool isAllSingleTensor = singleWeight == 1 && singleX == 1 && singleY == 1;
 
-    const int32_t *ubM = tiling->gmmArray.mList;
-    const int32_t *ubK = tiling->gmmArray.kList;
-    const int32_t *ubN = tiling->gmmArray.nList;
+    const int32_t* ubM = tiling->gmmArray.mList;
+    const int32_t* ubK = tiling->gmmArray.kList;
+    const int32_t* ubN = tiling->gmmArray.nList;
     int64_t coreIdx = GetBlockIdx();
     int64_t coreRation = GetTaskRation();
     if (coreRation > 1) {

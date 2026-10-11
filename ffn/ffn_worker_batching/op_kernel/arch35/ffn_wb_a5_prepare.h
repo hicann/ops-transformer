@@ -35,18 +35,18 @@ class FfnWbA5RecvWait {
 public:
     __aicore__ inline FfnWbA5RecvWait(){};
 
-    __aicore__ inline void Init(GM_ADDR schedule_context, GM_ADDR tokenInfoBuf, const ScheduleContextInfo *ctx,
-                                TPipe *pipe, GM_ADDR readyWs)
+    __aicore__ inline void Init(GM_ADDR schedule_context, GM_ADDR tokenInfoBuf, const ScheduleContextInfo* ctx,
+                                TPipe* pipe, GM_ADDR readyWs)
     {
         ctx_ = ctx;
-        readyGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(readyWs));
+        readyGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(readyWs));
         pipe_ = pipe;
         // FfnDataDesc 每块的 int32 个数:flag + layer_id + expert_ids[BS*K],块数由契约结构给出。
         descWords_ = static_cast<int64_t>(sizeof(aicpu::FfnDataDesc)) / static_cast<int64_t>(sizeof(int32_t)) +
                      static_cast<int64_t>(ctx_->BS) * ctx_->K;
-        tokenInfoGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(tokenInfoBuf),
+        tokenInfoGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(tokenInfoBuf),
                                      static_cast<int64_t>(ctx_->A) * ctx_->M * descWords_);
-        ctxGm_.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t *>(schedule_context));
+        ctxGm_.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t*>(schedule_context));
 
         const int64_t flagWords = static_cast<int64_t>(ctx_->A) * (ONE_BLK_SIZE / sizeof(int32_t));
         pipe_->InitBuffer(flagQue_, 1, flagWords * sizeof(int32_t));
@@ -130,8 +130,8 @@ public:
     }
 
 private:
-    const ScheduleContextInfo *ctx_ = nullptr;
-    TPipe *pipe_ = nullptr;
+    const ScheduleContextInfo* ctx_ = nullptr;
+    TPipe* pipe_ = nullptr;
     GlobalTensor<int32_t> tokenInfoGm_;
     GlobalTensor<uint64_t> ctxGm_;
     GlobalTensor<int32_t> readyGm_;
@@ -145,13 +145,13 @@ private:
 // 前置条件：仅异步 RECV 调用；调用方已执行发布 SyncAll，且 pipe 中没有待复用的活跃缓冲。
 // 必须由所有参与核调用：ctx 是核私有对象，0 号核赋值不能替代其它核的更新。
 // 本函数独占这段 UB 使用阶段，读完后 Reset；跨核屏障仍由 RunPrepare 统一安排。
-__aicore__ inline void LoadSelectedMicroBatch(GM_ADDR readyWs, ScheduleContextInfo &ctx, TPipe &pipe)
+__aicore__ inline void LoadSelectedMicroBatch(GM_ADDR readyWs, ScheduleContextInfo& ctx, TPipe& pipe)
 {
     // 扫描可能跳过若干空项，故入口 ctx.curMicroBatchID 不一定是最终选中项。
     // 所有核统一读取快照头块，后续 descriptor 寻址和 gather 输出的 micro_batch_ids
     // 都使用这个本次索引；不使用已经指向下一项的 schedule_context.polling_index。
     GlobalTensor<uint64_t> selection;
-    selection.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t *>(readyWs));
+    selection.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t*>(readyWs));
     TBuf<TPosition::VECIN> selectionBuf;
     pipe.InitBuffer(selectionBuf, ONE_BLK_SIZE);
     LocalTensor<uint64_t> mb = selectionBuf.Get<uint64_t>();
@@ -173,7 +173,7 @@ public:
 
     // flatIdsWs:归一后的扁平 expert_id 缓冲(长度 totalLen)。
     // rowsPerLoop 由 host 按运行时 UB 容量反推(见 tiling 的 preparePerLoopRows),此处不设任何容量常数。
-    __aicore__ inline void Init(GM_ADDR flatIdsWs, const ScheduleContextInfo *contextInfo, TPipe *pipe,
+    __aicore__ inline void Init(GM_ADDR flatIdsWs, const ScheduleContextInfo* contextInfo, TPipe* pipe,
                                 int64_t totalLen, int64_t rowsPerLoop, int64_t perLoopElements, int64_t activeRows,
                                 GM_ADDR readyWs = nullptr)
     {
@@ -188,7 +188,7 @@ public:
         // 这里的 1 是选择粒度，不是核数或硬件容量；同步/NORM 仍使用 host 给出的批量行数。
         rowsPerLoop_ = contextInfo_->asyncRecv ? 1 : ((rowsPerLoop > 0) ? rowsPerLoop : 1);
         if (contextInfo_->asyncRecv) {
-            readyGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(readyWs));
+            readyGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(readyWs));
             pipe_->InitBuffer(readyBuf_, ONE_BLK_SIZE);
         }
         if (rowsPerLoop_ > activeRows) {
@@ -209,7 +209,7 @@ public:
         if (rowsPerLoop_ > (rowEnd_ - rowBegin_) && (rowEnd_ - rowBegin_) > 0) {
             rowsPerLoop_ = rowEnd_ - rowBegin_;
         }
-        flatIdsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(flatIdsWs), totalLen_ > 0 ? totalLen_ : 1);
+        flatIdsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(flatIdsWs), totalLen_ > 0 ? totalLen_ : 1);
         perLoopElements_ = Min(perLoopElements, rowsPerLoop_ * rowSpan_);
         pipe_->InitBuffer(que_, 1, Align(perLoopElements_ * sizeof(int32_t), BLOCK_BYTES));
         pipe_->InitBuffer(clrBuf_, Align(rowsPerLoop_ * BLOCK_BYTES, BLOCK_BYTES));
@@ -223,7 +223,7 @@ public:
             return;
         }
         GlobalTensor<int32_t> srcGm;
-        srcGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(expertIdsBuf), totalLen_);
+        srcGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(expertIdsBuf), totalLen_);
         const int64_t perLoopElems = perLoopElements_;
         const int64_t beginElem = rowBegin_ * rowSpan_;
         const int64_t endElem = (rowEnd_ * rowSpan_ > totalLen_) ? totalLen_ : rowEnd_ * rowSpan_;
@@ -271,7 +271,7 @@ public:
             return;
         }
         GlobalTensor<int32_t> tokenInfoGm;
-        tokenInfoGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(tokenInfoBuf),
+        tokenInfoGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(tokenInfoBuf),
                                     contextInfo_->A * contextInfo_->M * F_);
         const int64_t base = contextInfo_->curMicroBatchID * F_;
         const int64_t rowStride = contextInfo_->M * F_; // 相邻 session 在 token_info 中的跨度
@@ -339,7 +339,7 @@ public:
 private:
     // layer_id is the second descriptor word. Reuse the snapshot scratch block:
     // IsSelected has already consumed its scalar before this DMA overwrites it.
-    __aicore__ inline int32_t ReadLayerOffset(GlobalTensor<int32_t> &info, int64_t descriptorBase)
+    __aicore__ inline int32_t ReadLayerOffset(GlobalTensor<int32_t>& info, int64_t descriptorBase)
     {
         constexpr int64_t LAYER_WORD = offsetof(aicpu::FfnDataDesc, layer_id) / sizeof(int32_t);
         LocalTensor<int32_t> layer = readyBuf_.Get<int32_t>();
@@ -356,7 +356,7 @@ private:
                    -1;
     }
 
-    __aicore__ inline void EncodeLayerExperts(const LocalTensor<int32_t> &buf, int64_t count, int32_t offset)
+    __aicore__ inline void EncodeLayerExperts(const LocalTensor<int32_t>& buf, int64_t count, int32_t offset)
     {
         // Transform only the private sort key, never the original gather position.
         // Unsigned comparison rejects negative IDs, >=1000000 masks and padding
@@ -367,7 +367,7 @@ private:
         const uint32_t bias = offset >= 0 ? static_cast<uint32_t>(offset) : 0;
         uint32_t remain = static_cast<uint32_t>(count);
         const uint16_t repeats = static_cast<uint16_t>((count + LANES - 1) / LANES);
-        __ubuf__ uint32_t *addr = reinterpret_cast<__ubuf__ uint32_t *>(buf.GetPhyAddr());
+        __ubuf__ uint32_t* addr = reinterpret_cast<__ubuf__ uint32_t*>(buf.GetPhyAddr());
         __VEC_SCOPE__
         {
             Reg::RegTensor<uint32_t> ids, encoded, masked, result;
@@ -390,7 +390,7 @@ private:
     __aicore__ inline void ProcessRecvLargeRow(GM_ADDR tokenInfoBuf)
     {
         GlobalTensor<int32_t> info;
-        info.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(tokenInfoBuf));
+        info.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(tokenInfoBuf));
         const int64_t stride = static_cast<int64_t>(contextInfo_->M) * F_;
         LocalTensor<int32_t> flag = clrBuf_.Get<int32_t>();
         for (int64_t row = rowBegin_; row < rowEnd_; ++row) {
@@ -454,8 +454,8 @@ private:
 
     GlobalTensor<int32_t> readyGm_;
     TBuf<TPosition::VECIN> readyBuf_;
-    const ScheduleContextInfo *contextInfo_ = nullptr;
-    TPipe *pipe_ = nullptr;
+    const ScheduleContextInfo* contextInfo_ = nullptr;
+    TPipe* pipe_ = nullptr;
     GlobalTensor<int32_t> flatIdsGm_;
     TQue<QuePosition::VECCALC, 1> que_;
     TBuf<QuePosition::VECCALC> clrBuf_;

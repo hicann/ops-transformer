@@ -46,7 +46,7 @@ constexpr T AlignUp(T value, T align)
 }
 
 template <typename PARAM_T>
-__aicore__ inline void CopyIn(const LocalTensor<PARAM_T> &dstTensor, const GlobalTensor<PARAM_T> &srcTensor,
+__aicore__ inline void CopyIn(const LocalTensor<PARAM_T>& dstTensor, const GlobalTensor<PARAM_T>& srcTensor,
                               int64_t repTime, int64_t dataLen, uint32_t ubStride, uint32_t gmStride)
 {
     DataCopyExtParams copyParams = {static_cast<uint16_t>(repTime), static_cast<uint32_t>(dataLen * sizeof(PARAM_T)),
@@ -58,7 +58,7 @@ __aicore__ inline void CopyIn(const LocalTensor<PARAM_T> &dstTensor, const Globa
 }
 
 template <typename PARAM_T>
-__aicore__ inline void CopyOut(const GlobalTensor<PARAM_T> &dstTensor, const LocalTensor<PARAM_T> &srcTensor,
+__aicore__ inline void CopyOut(const GlobalTensor<PARAM_T>& dstTensor, const LocalTensor<PARAM_T>& srcTensor,
                                int64_t repTime, int64_t dataLen, uint32_t ubStride, uint32_t gmStride)
 {
     DataCopyExtParams copyParams = {static_cast<uint16_t>(repTime), static_cast<uint32_t>(dataLen * sizeof(PARAM_T)),
@@ -68,7 +68,7 @@ __aicore__ inline void CopyOut(const GlobalTensor<PARAM_T> &dstTensor, const Loc
 }
 
 template <typename U, bool ISPRE>
-__aicore__ inline void SigmoidGrad(__local_mem__ U *gradHAddr, __local_mem__ U *zAddr, __local_mem__ U *gradZAddr,
+__aicore__ inline void SigmoidGrad(__local_mem__ U* gradHAddr, __local_mem__ U* zAddr, __local_mem__ U* gradZAddr,
                                    uint64_t bsLen, uint64_t n, uint64_t vRegSize)
 {
     uint32_t vfLen = vRegSize / sizeof(U);
@@ -108,7 +108,7 @@ __aicore__ inline void SigmoidGrad(__local_mem__ U *gradHAddr, __local_mem__ U *
 }
 
 template <typename U>
-__aicore__ inline void ComputeGradBias(__local_mem__ U *gradBiasAddr, __local_mem__ U *gradZAddr, uint64_t bsLen,
+__aicore__ inline void ComputeGradBias(__local_mem__ U* gradBiasAddr, __local_mem__ U* gradZAddr, uint64_t bsLen,
                                        uint64_t colLen, uint64_t vRegSize)
 {
     uint32_t vfLen = vRegSize / sizeof(U);
@@ -138,8 +138,8 @@ __aicore__ inline void ComputeGradBias(__local_mem__ U *gradBiasAddr, __local_me
 }
 
 template <typename U>
-__aicore__ inline void ComputeGradAlpha(__local_mem__ U *normOutForwardPartAddr, __local_mem__ U *gradZAddr,
-                                        __local_mem__ U *gradAlphaAddr, uint64_t bsLen, uint64_t colLen,
+__aicore__ inline void ComputeGradAlpha(__local_mem__ U* normOutForwardPartAddr, __local_mem__ U* gradZAddr,
+                                        __local_mem__ U* gradAlphaAddr, uint64_t bsLen, uint64_t colLen,
                                         uint64_t vRegSize)
 {
     uint32_t vfLen = vRegSize / sizeof(U);
@@ -172,9 +172,9 @@ __aicore__ inline void ComputeGradAlpha(__local_mem__ U *normOutForwardPartAddr,
 }
 
 template <typename U>
-__aicore__ inline void ComputeZAndForwardPart(__local_mem__ U *zAddr, __local_mem__ U *normOutForwardAddr,
-                                              __local_mem__ U *biasAddr, uint64_t bsLen, uint64_t colLen,
-                                              uint64_t cLenAlign, uint64_t vRegSize, const U &alpha)
+__aicore__ inline void ComputeZAndForwardPart(__local_mem__ U* zAddr, __local_mem__ U* normOutForwardAddr,
+                                              __local_mem__ U* biasAddr, uint64_t bsLen, uint64_t colLen,
+                                              uint64_t cLenAlign, uint64_t vRegSize, const U& alpha)
 {
     uint32_t vfLen = vRegSize / sizeof(U);
     uint16_t loopCnt = (colLen + vfLen - 1) / vfLen;
@@ -210,9 +210,9 @@ __aicore__ inline void ComputeZAndForwardPart(__local_mem__ U *zAddr, __local_me
 }
 
 template <typename U>
-__aicore__ inline void ComputeForwardPart(__local_mem__ U *hcBeformNormAddr, __local_mem__ U *invRmsAddr,
-                                          __local_mem__ U *normOutForwardAddr, uint64_t bsLen, uint64_t colLen,
-                                          uint64_t cLenAlign, uint64_t vRegSize, const U &alpha)
+__aicore__ inline void ComputeForwardPart(__local_mem__ U* hcBeformNormAddr, __local_mem__ U* invRmsAddr,
+                                          __local_mem__ U* normOutForwardAddr, uint64_t bsLen, uint64_t colLen,
+                                          uint64_t cLenAlign, uint64_t vRegSize, const U& alpha)
 {
     uint32_t vfLen = vRegSize / sizeof(U);
     uint16_t loopCnt = (colLen + vfLen - 1) / vfLen;
@@ -246,11 +246,11 @@ __aicore__ inline void ComputeForwardPart(__local_mem__ U *hcBeformNormAddr, __l
  *   2、计算完成GradHcBeforeNorm后需添加syncAll，保证matmul的确定性。
  ******************************************************************************/
 template <typename T>
-__aicore__ inline void ComputeMulScalar(const LocalTensor<T> &dstLocal, const LocalTensor<T> &srcLocal, T scalar,
+__aicore__ inline void ComputeMulScalar(const LocalTensor<T>& dstLocal, const LocalTensor<T>& srcLocal, T scalar,
                                         uint32_t count, uint32_t offset)
 {
-    auto srcAddr = (__local_mem__ T *)srcLocal.GetPhyAddr() + offset;
-    auto dstAddr = (__local_mem__ T *)dstLocal.GetPhyAddr();
+    auto srcAddr = (__local_mem__ T*)srcLocal.GetPhyAddr() + offset;
+    auto dstAddr = (__local_mem__ T*)dstLocal.GetPhyAddr();
     uint32_t repeatCount = Ops::Base::GetVRegSize() / sizeof(T);
     uint32_t maskCount = count;
     uint16_t repeatTimes = Ops::Base::CeilDiv(maskCount, repeatCount);
@@ -270,8 +270,8 @@ __aicore__ inline void ComputeMulScalar(const LocalTensor<T> &dstLocal, const Lo
 }
 
 template <typename T>
-__aicore__ inline void ComputeGradInvRms(const LocalTensor<T> &gradNormOutLocal,
-                                         const LocalTensor<T> &hcBeforeNormLocal, int64_t count, T &gradInvRms)
+__aicore__ inline void ComputeGradInvRms(const LocalTensor<T>& gradNormOutLocal,
+                                         const LocalTensor<T>& hcBeforeNormLocal, int64_t count, T& gradInvRms)
 {
     Mul(hcBeforeNormLocal, gradNormOutLocal, hcBeforeNormLocal, count);
     ReduceSum<T>(hcBeforeNormLocal, hcBeforeNormLocal, hcBeforeNormLocal, count);
@@ -279,11 +279,11 @@ __aicore__ inline void ComputeGradInvRms(const LocalTensor<T> &gradNormOutLocal,
 }
 
 template <typename T>
-__aicore__ inline void ComputeGradXFromRmsVF(const LocalTensor<T> &xFp32Local, const LocalTensor<T> &xFp32LocalOut,
+__aicore__ inline void ComputeGradXFromRmsVF(const LocalTensor<T>& xFp32Local, const LocalTensor<T>& xFp32LocalOut,
                                              T gradInvRms, T invRms, int64_t count, int64_t ncCount)
 {
-    __local_mem__ T *xFp32Addr = (__local_mem__ T *)xFp32Local.GetPhyAddr();
-    __local_mem__ T *xFp32AddrOut = (__local_mem__ T *)xFp32LocalOut.GetPhyAddr();
+    __local_mem__ T* xFp32Addr = (__local_mem__ T*)xFp32Local.GetPhyAddr();
+    __local_mem__ T* xFp32AddrOut = (__local_mem__ T*)xFp32LocalOut.GetPhyAddr();
     uint32_t repeatCount = Ops::Base::GetVRegSize() / sizeof(T);
     uint32_t maskCount = count;
     uint16_t repeatTimes = Ops::Base::CeilDiv(maskCount, repeatCount);
@@ -297,7 +297,7 @@ __aicore__ inline void ComputeGradXFromRmsVF(const LocalTensor<T> &xFp32Local, c
         for (uint16_t i = 0; i < repeatTimes; i++) {
             Reg::MaskReg preg = Reg::UpdateMask<T>(maskCount);
             Reg::AddrReg offset = Reg::CreateAddrReg<T>(i, repeatCount);
-            Reg::DataCopy(xFp32Reg, (__local_mem__ T *)xFp32Addr, offset);
+            Reg::DataCopy(xFp32Reg, (__local_mem__ T*)xFp32Addr, offset);
             Reg::Muls(xFp32Reg, xFp32Reg, static_cast<T>(-invRms), preg);
             Reg::Muls(xFp32Reg, xFp32Reg, gradInvRms, preg);
             Reg::Div(xFp32Reg, xFp32Reg, ncCountReg, preg);

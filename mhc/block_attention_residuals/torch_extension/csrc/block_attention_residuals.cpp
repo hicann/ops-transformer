@@ -45,8 +45,8 @@ bool IsSupportedComputeDtype(at::ScalarType dtype)
 } // namespace
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> block_attention_residuals(
-    const at::Tensor &partialBlock, const at::Tensor &blockRes, const at::Tensor &projWeight,
-    const at::Tensor &normWeight, int64_t validBlockNum, double normEps, bool needBackward)
+    const at::Tensor& partialBlock, const at::Tensor& blockRes, const at::Tensor& projWeight,
+    const at::Tensor& normWeight, int64_t validBlockNum, double normEps, bool needBackward)
 {
     TORCH_CHECK(partialBlock.dim() == PARTIAL_BLOCK_RANK, "partial_block must be a 2D tensor, but got ",
                 partialBlock.dim(), "D");

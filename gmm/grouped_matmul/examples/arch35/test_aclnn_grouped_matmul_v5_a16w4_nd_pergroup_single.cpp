@@ -22,27 +22,27 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_grouped_matmul_v5.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define CHECK_FREE_RET(cond, return_expr)                                                                              \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            Finalize(deviceId, stream);                                                                                \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_FREE_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            Finalize(deviceId, stream); \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1L;
     for (auto i : shape) {
@@ -51,7 +51,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -70,8 +70,8 @@ void Finalize(int32_t deviceId, aclrtStream stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -94,11 +94,11 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 }
 
 template <typename T>
-int CreateAclTensorList(const std::vector<T> &hostData, const std::vector<std::vector<int64_t>> &shapes,
-                        void **deviceAddr, aclDataType dataType, aclTensorList **tensor)
+int CreateAclTensorList(const std::vector<T>& hostData, const std::vector<std::vector<int64_t>>& shapes,
+                        void** deviceAddr, aclDataType dataType, aclTensorList** tensor)
 {
     int size = shapes.size();
-    std::vector<aclTensor *> tensors(size, nullptr);
+    std::vector<aclTensor*> tensors(size, nullptr);
     for (int i = 0; i < size; i++) {
         int ret = CreateAclTensor(hostData, shapes[i], deviceAddr + i, dataType, &tensors[i]);
         if (ret != ACL_SUCCESS) {
@@ -114,7 +114,7 @@ int CreateAclTensorList(const std::vector<T> &hostData, const std::vector<std::v
     return ACL_SUCCESS;
 }
 
-int aclnnGourpedMatmulTest(int32_t deviceId, aclrtStream &stream)
+int aclnnGourpedMatmulTest(int32_t deviceId, aclrtStream& stream)
 {
     auto ret = Init(deviceId, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
@@ -135,28 +135,28 @@ int aclnnGourpedMatmulTest(int32_t deviceId, aclrtStream &stream)
     std::vector<int64_t> groupListShape = {{e}};
     std::vector<int64_t> groupListData = {m / e, m};
 
-    void *xDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *biasDeviceAddr = nullptr;
-    void *antiquantScaleDeviceAddr = nullptr;
-    void *yDeviceAddr = nullptr;
-    void *groupListDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* biasDeviceAddr = nullptr;
+    void* antiquantScaleDeviceAddr = nullptr;
+    void* yDeviceAddr = nullptr;
+    void* groupListDeviceAddr = nullptr;
 
-    aclTensorList *x = nullptr;
-    aclTensorList *weight = nullptr;
-    aclTensorList *bias = nullptr;
-    aclTensor *groupedList = nullptr;
-    aclTensorList *scale = nullptr;
-    aclTensorList *offset = nullptr;
-    aclTensorList *antiquantScale = nullptr;
-    aclTensorList *antiquantOffset = nullptr;
-    aclTensorList *perTokenScale = nullptr;
-    aclTensorList *activationInput = nullptr;
-    aclTensorList *activationQuantScale = nullptr;
-    aclTensorList *activationQuantOffset = nullptr;
-    aclTensorList *out = nullptr;
-    aclTensorList *activationFeatureOut = nullptr;
-    aclTensorList *dynQuantScaleOut = nullptr;
+    aclTensorList* x = nullptr;
+    aclTensorList* weight = nullptr;
+    aclTensorList* bias = nullptr;
+    aclTensor* groupedList = nullptr;
+    aclTensorList* scale = nullptr;
+    aclTensorList* offset = nullptr;
+    aclTensorList* antiquantScale = nullptr;
+    aclTensorList* antiquantOffset = nullptr;
+    aclTensorList* perTokenScale = nullptr;
+    aclTensorList* activationInput = nullptr;
+    aclTensorList* activationQuantScale = nullptr;
+    aclTensorList* activationQuantOffset = nullptr;
+    aclTensorList* out = nullptr;
+    aclTensorList* activationFeatureOut = nullptr;
+    aclTensorList* dynQuantScaleOut = nullptr;
 
     int64_t splitItem = 3L;
     int64_t groupType = 0L;
@@ -170,8 +170,8 @@ int aclnnGourpedMatmulTest(int32_t deviceId, aclrtStream &stream)
     }
     ret = CreateAclTensorList(xHostData, xShape, &xDeviceAddr, aclDataType::ACL_BF16, &x);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> xPtr(x, aclDestroyTensorList);
-    std::unique_ptr<void, aclError (*)(void *)> xDeviceAddrPtr(xDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> xPtr(x, aclDestroyTensorList);
+    std::unique_ptr<void, aclError (*)(void*)> xDeviceAddrPtr(xDeviceAddr, aclrtFree);
 
     // weight: INT4, 每个element 4 bit, 用int8存储, 2 elements per byte
     std::vector<int8_t> weightHostData(e * k * n / 2);
@@ -180,8 +180,8 @@ int aclnnGourpedMatmulTest(int32_t deviceId, aclrtStream &stream)
     }
     ret = CreateAclTensorList(weightHostData, weightShape, &weightDeviceAddr, aclDataType::ACL_INT4, &weight);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> weightPtr(weight, aclDestroyTensorList);
-    std::unique_ptr<void, aclError (*)(void *)> weightDeviceAddrPtr(weightDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> weightPtr(weight, aclDestroyTensorList);
+    std::unique_ptr<void, aclError (*)(void*)> weightDeviceAddrPtr(weightDeviceAddr, aclrtFree);
 
     // bias: FLOAT32 (A16W4场景x为BF16时bias支持BFLOAT16/FLOAT32，通用通路默认期望FLOAT)
     std::vector<float> biasHostData(e * n);
@@ -190,8 +190,8 @@ int aclnnGourpedMatmulTest(int32_t deviceId, aclrtStream &stream)
     }
     ret = CreateAclTensorList(biasHostData, biasShape, &biasDeviceAddr, aclDataType::ACL_FLOAT, &bias);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> biasPtr(bias, aclDestroyTensorList);
-    std::unique_ptr<void, aclError (*)(void *)> biasDeviceAddrPtr(biasDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> biasPtr(bias, aclDestroyTensorList);
+    std::unique_ptr<void, aclError (*)(void*)> biasDeviceAddrPtr(biasDeviceAddr, aclrtFree);
 
     // antiquantScale: BFLOAT16, pergroup 3D (E, G, N)
     std::vector<int16_t> antiquantScaleHostData(e * g * n);
@@ -201,28 +201,28 @@ int aclnnGourpedMatmulTest(int32_t deviceId, aclrtStream &stream)
     ret = CreateAclTensorList(antiquantScaleHostData, antiquantScaleShape, &antiquantScaleDeviceAddr,
                               aclDataType::ACL_BF16, &antiquantScale);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> antiquantScalePtr(antiquantScale,
-                                                                                             aclDestroyTensorList);
-    std::unique_ptr<void, aclError (*)(void *)> antiquantScaleDeviceAddrPtr(antiquantScaleDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> antiquantScalePtr(antiquantScale,
+                                                                                            aclDestroyTensorList);
+    std::unique_ptr<void, aclError (*)(void*)> antiquantScaleDeviceAddrPtr(antiquantScaleDeviceAddr, aclrtFree);
 
     // y: BFLOAT16
     std::vector<uint16_t> yHostData(m * n, 0);
     ret = CreateAclTensorList(yHostData, yShape, &yDeviceAddr, aclDataType::ACL_BF16, &out);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> outPtr(out, aclDestroyTensorList);
-    std::unique_ptr<void, aclError (*)(void *)> yDeviceAddrPtr(yDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> outPtr(out, aclDestroyTensorList);
+    std::unique_ptr<void, aclError (*)(void*)> yDeviceAddrPtr(yDeviceAddr, aclrtFree);
 
     // groupList: INT64
     ret = CreateAclTensor<int64_t>(groupListData, groupListShape, &groupListDeviceAddr, aclDataType::ACL_INT64,
                                    &groupedList);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> groupListPtr(groupedList, aclDestroyTensor);
-    std::unique_ptr<void, aclError (*)(void *)> groupListDeviceAddrPtr(groupListDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> groupListPtr(groupedList, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> groupListDeviceAddrPtr(groupListDeviceAddr, aclrtFree);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
-    std::unique_ptr<void, aclError (*)(void *)> workspaceAddrPtr(nullptr, aclrtFree);
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
+    std::unique_ptr<void, aclError (*)(void*)> workspaceAddrPtr(nullptr, aclrtFree);
 
     // 调用aclnnGroupedMatmulV5第一段接口
     ret = aclnnGroupedMatmulV5GetWorkspaceSize(

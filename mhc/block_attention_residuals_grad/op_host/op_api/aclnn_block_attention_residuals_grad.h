@@ -52,10 +52,10 @@ extern "C" {
  * @return aclnnStatus: 返回状态码。
  */
 ACLNN_API aclnnStatus aclnnBlockAttentionResidualsGradGetWorkspaceSize(
-    const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight, const aclTensor *normWeight,
-    const aclTensor *gradHiddenStates, const aclTensor *invNorm, const aclTensor *probs, int64_t validBlockNum,
-    const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes, const aclTensor *gradProjWeight,
-    const aclTensor *gradNormWeight, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* partialBlock, const aclTensor* blockRes, const aclTensor* projWeight, const aclTensor* normWeight,
+    const aclTensor* gradHiddenStates, const aclTensor* invNorm, const aclTensor* probs, int64_t validBlockNum,
+    const aclTensor* gradPartialBlock, const aclTensor* gradBlockRes, const aclTensor* gradProjWeight,
+    const aclTensor* gradNormWeight, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnBlockAttentionResidualsGrad的第二段接口，用于执行计算。
@@ -66,7 +66,7 @@ ACLNN_API aclnnStatus aclnnBlockAttentionResidualsGradGetWorkspaceSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码。
  */
-ACLNN_API aclnnStatus aclnnBlockAttentionResidualsGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnBlockAttentionResidualsGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                        aclrtStream stream);
 
 #ifdef __cplusplus

@@ -52,13 +52,13 @@ using namespace FfnWbBatchingArch35;
 
 namespace {
 // actual_token_num 由 0 号向量核写出;经 UB 整段搬运,不对 GM 做标量写。
-__aicore__ inline void WriteActualTokenNum(GM_ADDR actualTokenNum, int64_t value, TPipe *pipe)
+__aicore__ inline void WriteActualTokenNum(GM_ADDR actualTokenNum, int64_t value, TPipe* pipe)
 {
     if (GetFlatAivIdx() != 0) {
         return;
     }
     GlobalTensor<int64_t> outGm;
-    outGm.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(actualTokenNum), 1);
+    outGm.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(actualTokenNum), 1);
     TBuf<TPosition::VECCALC> buf;
     pipe->InitBuffer(buf, ONE_BLK_SIZE);
     LocalTensor<int64_t> local = buf.Get<int64_t>();
@@ -76,8 +76,8 @@ template <bool isRecv>
 __aicore__ inline void RunEmitAndGather(GM_ADDR sortedIdsWs, GM_ADDR gatherIdxWs, GM_ADDR group_list, GM_ADDR y,
                                         GM_ADDR session_ids, GM_ADDR micro_batch_ids, GM_ADDR token_ids,
                                         GM_ADDR expert_offsets, GM_ADDR dynamic_scale, GM_ADDR actual_token_num,
-                                        int64_t totalValid, ScheduleContextInfo &ctx,
-                                        const FfnWorkerBatchingTilingData *tilingData, TPipe &pipe)
+                                        int64_t totalValid, ScheduleContextInfo& ctx,
+                                        const FfnWorkerBatchingTilingData* tilingData, TPipe& pipe)
 {
     // ---------------- phase4:group_list ----------------
     {
@@ -106,8 +106,8 @@ __aicore__ inline void RunEmitAndGather(GM_ADDR sortedIdsWs, GM_ADDR gatherIdxWs
 // RECV 按 syncFlag 等待全部/部分 session，并以统一快照驱动本次接收。
 template <bool isRecv>
 __aicore__ inline void RunPrepare(GM_ADDR schedule_context, GM_ADDR flatIdsWs, GM_ADDR readyWs,
-                                  ScheduleContextInfo &ctx, const FfnWorkerBatchingTilingData *tilingData,
-                                  int64_t activeElements, TPipe &pipe)
+                                  ScheduleContextInfo& ctx, const FfnWorkerBatchingTilingData* tilingData,
+                                  int64_t activeElements, TPipe& pipe)
 {
     // ---------------- phase0:expert_id 归一 ----------------
     if constexpr (isRecv) {
@@ -147,9 +147,9 @@ __aicore__ inline void RunPrepare(GM_ADDR schedule_context, GM_ADDR flatIdsWs, G
 // phase1~3:段内排序 → 段间归并 → 拆包。三步共用同一批工作区,故收在一起;
 // 返回排序后剔除被 mask 的有效长度,即 actual_token_num。
 __aicore__ inline int64_t RunSortPipeline(GM_ADDR flatIdsWs, GM_ADDR pairAWs, GM_ADDR pairBWs, GM_ADDR segCntWs,
-                                          GM_ADDR sortedIdsWs, GM_ADDR gatherIdxWs, ScheduleContextInfo &ctx,
-                                          const FfnWorkerBatchingTilingData *tilingData, int64_t activeElements,
-                                          TPipe &pipe)
+                                          GM_ADDR sortedIdsWs, GM_ADDR gatherIdxWs, ScheduleContextInfo& ctx,
+                                          const FfnWorkerBatchingTilingData* tilingData, int64_t activeElements,
+                                          TPipe& pipe)
 {
     // ---------------- phase1:段内排序 ----------------
     {
@@ -209,7 +209,7 @@ template <bool isRecv>
 __aicore__ inline void FfnWorkerBatchingA5(GM_ADDR schedule_context, GM_ADDR y, GM_ADDR group_list, GM_ADDR session_ids,
                                            GM_ADDR micro_batch_ids, GM_ADDR token_ids, GM_ADDR expert_offsets,
                                            GM_ADDR dynamic_scale, GM_ADDR actual_token_num, GM_ADDR userWS,
-                                           const FfnWorkerBatchingTilingData *tilingData)
+                                           const FfnWorkerBatchingTilingData* tilingData)
 {
     TPipe pipe;
     ScheduleContextInfo ctx;
@@ -257,7 +257,7 @@ extern "C" __global__ __aicore__ void ffn_worker_batching(GM_ADDR schedule_conte
 
     REGISTER_TILING_DEFAULT(FfnWorkerBatchingTilingData);
     GET_TILING_DATA_WITH_STRUCT(FfnWorkerBatchingTilingData, tilingDataIn, tiling);
-    const FfnWorkerBatchingTilingData *tilingData = &tilingDataIn;
+    const FfnWorkerBatchingTilingData* tilingData = &tilingDataIn;
 
     if (TILING_KEY_IS(TILING_KEY_NORM)) {
         FfnWorkerBatchingA5<false>(schedule_context, y, group_list, session_ids, micro_batch_ids, token_ids,

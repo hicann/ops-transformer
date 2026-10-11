@@ -27,9 +27,9 @@
 #include "quant_grouped_matmul_dequant_tiling.h"
 #include "../op_kernel/quant_grouped_matmul_dequant_config.h"
 
-bool AddWorkspace(gert::TilingContext *context, const size_t workspace)
+bool AddWorkspace(gert::TilingContext* context, const size_t workspace)
 {
-    size_t *workspace_size = context->GetWorkspaceSizes(1);
+    size_t* workspace_size = context->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, workspace_size);
     *workspace_size = workspace;
     return true;
@@ -37,7 +37,7 @@ bool AddWorkspace(gert::TilingContext *context, const size_t workspace)
 
 namespace optiling {
 
-bool QuantMatmulDequantTiling::CheckInOutShapes(gert::TilingContext *context)
+bool QuantMatmulDequantTiling::CheckInOutShapes(gert::TilingContext* context)
 {
     uint32_t idx = 0;
     auto x = context->GetInputShape(idx++);
@@ -225,9 +225,9 @@ bool QuantMatmulDequantTiling::CheckInOutShapes(gert::TilingContext *context)
     return true;
 }
 
-bool QuantMatmulDequantTiling::GetPlatformInfo(gert::TilingContext *context)
+bool QuantMatmulDequantTiling::GetPlatformInfo(gert::TilingContext* context)
 {
-    auto compileInfoPtr = reinterpret_cast<const QuantMatmulDequantCompileInfo *>(context->GetCompileInfo());
+    auto compileInfoPtr = reinterpret_cast<const QuantMatmulDequantCompileInfo*>(context->GetCompileInfo());
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfoPtr);
     _Params.CoreNum = compileInfoPtr->coreNum;
     _Params.UBSize = compileInfoPtr->ubSize;
@@ -238,7 +238,7 @@ bool QuantMatmulDequantTiling::GetPlatformInfo(gert::TilingContext *context)
     return true;
 }
 
-static bool ShouldUseOptimizedPertokenDynamic(const QuantMatmulDequantParam &params)
+static bool ShouldUseOptimizedPertokenDynamic(const QuantMatmulDequantParam& params)
 {
     const bool hasSmoothFp32Scale = params.smoothScale && !params.scaleIsInt64;
 
@@ -282,7 +282,7 @@ static bool ShouldUseOptimizedPertokenDynamic(const QuantMatmulDequantParam &par
     return false;
 }
 
-bool QuantMatmulDequantTiling::GetOptimizedPertokenDynamicTilingData(gert::TilingContext *context)
+bool QuantMatmulDequantTiling::GetOptimizedPertokenDynamicTilingData(gert::TilingContext* context)
 {
     if (!(isGrouped && _Params.dynamicQuant && _Params.perToken)) {
         return true;
@@ -484,7 +484,7 @@ bool QuantMatmulDequantTiling::GetOptimizedPertokenDynamicTilingData(gert::Tilin
     return true;
 }
 
-bool QuantMatmulDequantTiling::GetTilingData(gert::TilingContext *context)
+bool QuantMatmulDequantTiling::GetTilingData(gert::TilingContext* context)
 {
     _Params.originKAligned512 = (_Params.originK + L0_ADDR_ALIGN - 1) / L0_ADDR_ALIGN * L0_ADDR_ALIGN;
     _Params.originKAligned32 = (_Params.originK + K_FRACTAL_INT8 - 1) / K_FRACTAL_INT8 * K_FRACTAL_INT8;
@@ -781,7 +781,7 @@ bool QuantMatmulDequantTiling::GetTilingData(gert::TilingContext *context)
     return true;
 }
 
-bool QuantMatmulDequantTiling::SetTilingData(gert::TilingContext *context)
+bool QuantMatmulDequantTiling::SetTilingData(gert::TilingContext* context)
 {
     tilingData.set_CoreNum(_Params.CoreNum);
     tilingData.set_perToken(_Params.perToken);
@@ -861,7 +861,7 @@ bool QuantMatmulDequantTiling::SetTilingData(gert::TilingContext *context)
     return true;
 }
 
-bool QuantMatmulDequantTiling::SetLaunchInfo(gert::TilingContext *context)
+bool QuantMatmulDequantTiling::SetLaunchInfo(gert::TilingContext* context)
 {
     context->SetBlockDim(_Params.CoreNum);
 
@@ -886,13 +886,13 @@ bool QuantMatmulDequantTiling::SetLaunchInfo(gert::TilingContext *context)
     return true;
 }
 
-bool QuantMatmulDequantTiling::GetCheckAttr(gert::TilingContext *context)
+bool QuantMatmulDequantTiling::GetCheckAttr(gert::TilingContext* context)
 {
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
     //  optional
     const std::string x_quant_mode = static_cast<std::string>(attrs->GetStr(0));
-    const bool *transpose_weight = attrs->GetAttrPointer<bool>(1);
+    const bool* transpose_weight = attrs->GetAttrPointer<bool>(1);
 
     OP_CHECK_IF(
         x_quant_mode != "pertoken" && x_quant_mode != "pertensor",
@@ -908,7 +908,7 @@ bool QuantMatmulDequantTiling::GetCheckAttr(gert::TilingContext *context)
     return true;
 }
 
-ge::graphStatus QuantMatmulDequantTiling::runTiling(gert::TilingContext *context, bool is_grouped)
+ge::graphStatus QuantMatmulDequantTiling::runTiling(gert::TilingContext* context, bool is_grouped)
 {
     isGrouped = is_grouped;
     _Params = QuantMatmulDequantParam{};
@@ -935,16 +935,16 @@ ge::graphStatus QuantMatmulDequantTiling::runTiling(gert::TilingContext *context
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingForQuantGroupedMatmulDequant(gert::TilingContext *context)
+ge::graphStatus TilingForQuantGroupedMatmulDequant(gert::TilingContext* context)
 {
     QuantMatmulDequantTiling tiling_handle;
     context->SetScheduleMode(BATCH_MODE);
     return tiling_handle.runTiling(context, true);
 }
 
-ge::graphStatus TilingPrepareForQuantGroupedMatmulDequant(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForQuantGroupedMatmulDequant(gert::TilingParseContext* context)
 {
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfoPtr);
     auto compileInfoPtr = context->GetCompiledInfo<QuantMatmulDequantCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfoPtr);

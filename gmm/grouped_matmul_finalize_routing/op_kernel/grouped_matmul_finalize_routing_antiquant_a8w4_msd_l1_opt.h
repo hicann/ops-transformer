@@ -34,11 +34,11 @@ public:
     using DTYPE_OUT = float;
 
 public:
-    __aicore__ inline GMMA8W4MSDL1OptCompute(typename mmType::MT &matmul)
+    __aicore__ inline GMMA8W4MSDL1OptCompute(typename mmType::MT& matmul)
         : mm(matmul)
     {}
-    __aicore__ inline void Init(const MMInitParams &initParams, const GroupMatmulFRTilingData *tilingData,
-                                TPipe *tPipeIn);
+    __aicore__ inline void Init(const MMInitParams& initParams, const GroupMatmulFRTilingData* tilingData,
+                                TPipe* tPipeIn);
     __aicore__ inline void Process();
 
 private:
@@ -48,29 +48,29 @@ private:
     __aicore__ inline void PreProcessInit();
     __aicore__ inline void InitOutputWithZeros(uint64_t offset, uint64_t size);
     __aicore__ inline void CopyInA1(uint64_t xOffset, uint32_t row, uint32_t col, LocalTensor<int4b_t> a1Local);
-    __aicore__ inline void MMComputeSingleN(uint32_t groupIdx, MNConfig &mnConfig, uint32_t singleNOffset,
+    __aicore__ inline void MMComputeSingleN(uint32_t groupIdx, MNConfig& mnConfig, uint32_t singleNOffset,
                                             uint32_t curSingleN, uint32_t curSingleM);
-    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig &mnConfig);
-    __aicore__ inline void VectorCompute(uint32_t groupIdx, MNConfig &mnConfig);
-    __aicore__ inline void ComputeDequantAndActivate(MNConfig &mnConfig, uint32_t curVecBaseM, uint32_t alignBaseN,
+    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig& mnConfig);
+    __aicore__ inline void VectorCompute(uint32_t groupIdx, MNConfig& mnConfig);
+    __aicore__ inline void ComputeDequantAndActivate(MNConfig& mnConfig, uint32_t curVecBaseM, uint32_t alignBaseN,
                                                      uint32_t curVecBaseN, uint32_t offsetM);
     __aicore__ inline void CastMulsAdds(uint32_t computeSize, uint32_t addStartAddr);
     __aicore__ inline void AfterMuls(uint32_t addStartAddr);
     __aicore__ inline void DataCopyScale(uint32_t curBaseN, uint32_t alignBaseN, uint64_t scaleOffset);
     __aicore__ inline void DataCopyOffset(uint32_t curBaseN, uint32_t alignBaseN, uint64_t scaleOffset);
-    __aicore__ inline void DataCopyPerTokenScaleAndBrcb(MNConfig &mnConfig, uint32_t curBaseM, uint32_t alignBaseN,
+    __aicore__ inline void DataCopyPerTokenScaleAndBrcb(MNConfig& mnConfig, uint32_t curBaseM, uint32_t alignBaseN,
                                                         uint32_t offsetM);
     __aicore__ inline void VectorAtomicProcess(uint32_t curVecBaseM, uint32_t curVecBaseN, uint32_t alignBaseN,
                                                uint32_t rowIndexOffset, uint64_t yGmOffset);
-    __aicore__ inline void VectorProcess(VectorAtomicParams &vecAParams, MNConfig &mnConfig, uint64_t mmOutOffset,
-                                         LocalTensor<cT::T> &mmOutLocal);
-    __aicore__ inline void CopyMMOutLocal(LocalTensor<cT::T> &mmOutTensor, uint32_t dstOffset, uint64_t srcAddr,
+    __aicore__ inline void VectorProcess(VectorAtomicParams& vecAParams, MNConfig& mnConfig, uint64_t mmOutOffset,
+                                         LocalTensor<cT::T>& mmOutLocal);
+    __aicore__ inline void CopyMMOutLocal(LocalTensor<cT::T>& mmOutTensor, uint32_t dstOffset, uint64_t srcAddr,
                                           uint32_t curVecBaseM, uint32_t curVecBaseN);
-    __aicore__ inline void DataCopyAndBrcbOfRowSum(MNConfig &mnConfig, uint32_t curBaseM, uint32_t alignBaseN,
+    __aicore__ inline void DataCopyAndBrcbOfRowSum(MNConfig& mnConfig, uint32_t curBaseM, uint32_t alignBaseN,
                                                    uint32_t offsetM);
 
 private:
-    typename mmType::MT &mm;
+    typename mmType::MT& mm;
     const uint32_t HALF_ALIGN = 16;
     GlobalTensor<int4b_t> xGm;
     GlobalTensor<int4b_t> weightGm;
@@ -110,34 +110,34 @@ private:
     uint32_t vecCount = 0;
     uint32_t xRowSumCount = 0;
     uint32_t withOffset;
-    TPipe *pipe;
-    const GroupMatmulFRTilingData *tiling;
+    TPipe* pipe;
+    const GroupMatmulFRTilingData* tiling;
 };
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::Init(const MMInitParams &initParams,
-                                                            const GroupMatmulFRTilingData *tilingData, TPipe *tPipeIn)
+__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::Init(const MMInitParams& initParams,
+                                                            const GroupMatmulFRTilingData* tilingData, TPipe* tPipeIn)
 {
     tiling = tilingData;
     xRowSumCount = tiling->totalInGroup;
     withOffset = tiling->withOffset;
-    xGm.SetGlobalBuffer(reinterpret_cast<__gm__ int4b_t *>(initParams.x));
-    weightGm.SetGlobalBuffer(reinterpret_cast<__gm__ int4b_t *>(initParams.weight));
-    biasGm.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(initParams.bias));
-    scaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t *>(initParams.scale));
-    perTokenScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(initParams.pertoken_scale));
-    groupTokensGm.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(initParams.group_tokens));
-    logitsGm.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(initParams.logits));
-    tokenRanksGm.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(initParams.token_ranks));
-    residualGm.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(initParams.residual));
-    yGm.SetGlobalBuffer(reinterpret_cast<__gm__ DTYPE_OUT *>(initParams.y));
+    xGm.SetGlobalBuffer(reinterpret_cast<__gm__ int4b_t*>(initParams.x));
+    weightGm.SetGlobalBuffer(reinterpret_cast<__gm__ int4b_t*>(initParams.weight));
+    biasGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(initParams.bias));
+    scaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t*>(initParams.scale));
+    perTokenScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(initParams.pertoken_scale));
+    groupTokensGm.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(initParams.group_tokens));
+    logitsGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(initParams.logits));
+    tokenRanksGm.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(initParams.token_ranks));
+    residualGm.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(initParams.residual));
+    yGm.SetGlobalBuffer(reinterpret_cast<__gm__ DTYPE_OUT*>(initParams.y));
     if (withOffset == uint32_t(1)) {
-        xRowSumGm.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(initParams.workspace));
+        xRowSumGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(initParams.workspace));
         mmOutGm.SetGlobalBuffer(
-            reinterpret_cast<__gm__ cT::T *>(initParams.workspace + xRowSumCount * sizeof(float))); // add xRowSumGm
-        offsetGm.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(initParams.offset));
+            reinterpret_cast<__gm__ cT::T*>(initParams.workspace + xRowSumCount * sizeof(float))); // add xRowSumGm
+        offsetGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(initParams.offset));
     } else {
-        mmOutGm.SetGlobalBuffer(reinterpret_cast<__gm__ cT::T *>(initParams.workspace));
+        mmOutGm.SetGlobalBuffer(reinterpret_cast<__gm__ cT::T*>(initParams.workspace));
     }
     quantGroupSize = tiling->k / tiling->quantGroupNum; // 约束为整除关系
     subBlockIdx = GetSubBlockIdx();
@@ -346,7 +346,7 @@ __aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::CopyInA1(uint64_t xOffset
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::MMComputeSingleN(uint32_t groupIdx, MNConfig &mnConfig,
+__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::MMComputeSingleN(uint32_t groupIdx, MNConfig& mnConfig,
                                                                         uint32_t singleNOffset, uint32_t curSingleN,
                                                                         uint32_t curSingleM)
 {
@@ -403,7 +403,7 @@ __aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::MMComputeSingleN(uint32_t
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::MMCompute(uint32_t groupIdx, MNConfig &mnConfig)
+__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::MMCompute(uint32_t groupIdx, MNConfig& mnConfig)
 {
     uint32_t singleNOffset = mnConfig.nIdx * mnConfig.singleN;
     uint32_t curSingleN = mnConfig.singleN;
@@ -418,7 +418,7 @@ __aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::MMCompute(uint32_t groupI
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::CopyMMOutLocal(LocalTensor<cT::T> &mmOutTensor,
+__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::CopyMMOutLocal(LocalTensor<cT::T>& mmOutTensor,
                                                                       uint32_t dstOffset, uint64_t srcAddr,
                                                                       uint32_t curVecBaseM, uint32_t curVecBaseN)
 {
@@ -452,9 +452,9 @@ __aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::VectorAtomicProcess(uint3
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::VectorProcess(VectorAtomicParams &vecAParams, MNConfig &mnConfig,
+__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::VectorProcess(VectorAtomicParams& vecAParams, MNConfig& mnConfig,
                                                                      uint64_t mmOutOffset,
-                                                                     LocalTensor<cT::T> &mmOutLocal)
+                                                                     LocalTensor<cT::T>& mmOutLocal)
 {
     uint32_t targetAddr = vecAParams.curVecBaseM * vecAParams.alignBaseN;
     uint64_t lowBitAddr = mmOutOffset + (vecAParams.offsetM * 2UL + 1UL) * vecAParams.curVecBaseN;
@@ -468,7 +468,7 @@ __aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::VectorProcess(VectorAtomi
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::VectorCompute(uint32_t groupIdx, MNConfig &mnConfig)
+__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::VectorCompute(uint32_t groupIdx, MNConfig& mnConfig)
 {
     uint32_t curCubeSingleN =
         (mnConfig.nIdx == mnConfig.blockDimN - 1) ? tiling->n - mnConfig.nIdx * mnConfig.singleN : mnConfig.singleN;
@@ -564,7 +564,7 @@ __aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::AfterMuls(uint32_t addSta
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::ComputeDequantAndActivate(MNConfig &mnConfig,
+__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::ComputeDequantAndActivate(MNConfig& mnConfig,
                                                                                  uint32_t curVecBaseM,
                                                                                  uint32_t alignBaseN,
                                                                                  uint32_t curVecBaseN, uint32_t offsetM)
@@ -640,7 +640,7 @@ __aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::DataCopyOffset(uint32_t c
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::DataCopyPerTokenScaleAndBrcb(MNConfig &mnConfig,
+__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::DataCopyPerTokenScaleAndBrcb(MNConfig& mnConfig,
                                                                                     uint32_t curBaseM,
                                                                                     uint32_t alignBaseN,
                                                                                     uint32_t offsetM)
@@ -672,7 +672,7 @@ __aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::DataCopyPerTokenScaleAndB
 }
 
 template <typename mmType>
-__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::DataCopyAndBrcbOfRowSum(MNConfig &mnConfig, uint32_t curBaseM,
+__aicore__ inline void GMMA8W4MSDL1OptCompute<mmType>::DataCopyAndBrcbOfRowSum(MNConfig& mnConfig, uint32_t curBaseM,
                                                                                uint32_t alignBaseN, uint32_t offsetM)
 {
     const uint64_t xRowSumOffset =

@@ -23,7 +23,7 @@
 namespace FFN {
 using namespace AscendC;
 
-template <class AT_, class BT_, class CT_, class BiasT_, const MatmulConfig &MM_CFG = CFG_MDL>
+template <class AT_, class BT_, class CT_, class BiasT_, const MatmulConfig& MM_CFG = CFG_MDL>
 struct MMType {
     using AT = AT_;
     using BT = BT_;
@@ -175,8 +175,8 @@ struct MNConfig {
     uint32_t singleM;
     uint32_t singleN;
 
-    __aicore__ inline void SetConstriant(const uint32_t &m_, const uint32_t &n_, const uint32_t &baseM_,
-                                         const uint32_t &baseN_, const uint32_t &coreNum_)
+    __aicore__ inline void SetConstriant(const uint32_t& m_, const uint32_t& n_, const uint32_t& baseM_,
+                                         const uint32_t& baseN_, const uint32_t& coreNum_)
     {
         m = m_;
         n = n_;
@@ -200,7 +200,7 @@ struct ExpertParallInfo {
 
     /** @brief constructor
      */
-    __aicore__ inline ExpertParallInfo(const uint32_t &maxCoreNum, uint32_t nLoops)
+    __aicore__ inline ExpertParallInfo(const uint32_t& maxCoreNum, uint32_t nLoops)
     {
         if (unlikely(nLoops == 0)) {
             nLoops = 1;
@@ -245,7 +245,7 @@ struct UpdateKernelTilingInfo {
     uint32_t maxMM1ExpertParallelism;
 };
 
-__aicore__ inline void TokensIndicesToValues(LocalTensor<int64_t> &ubTokens, uint32_t expertNum)
+__aicore__ inline void TokensIndicesToValues(LocalTensor<int64_t>& ubTokens, uint32_t expertNum)
 {
     int64_t preOffset = 0;
     for (uint32_t i = 0; i < expertNum; i++) {
@@ -255,8 +255,8 @@ __aicore__ inline void TokensIndicesToValues(LocalTensor<int64_t> &ubTokens, uin
     }
 }
 
-__aicore__ inline LocalTensor<int64_t> GetUbTokens(__gm__ uint8_t *expertTokens, GlobalTensor<int64_t> &expertTokensGm,
-                                                   const FFNTilingData *__restrict tilingData, TPipe *pipe)
+__aicore__ inline LocalTensor<int64_t> GetUbTokens(__gm__ uint8_t* expertTokens, GlobalTensor<int64_t>& expertTokensGm,
+                                                   const FFNTilingData* __restrict tilingData, TPipe* pipe)
 {
     uint32_t expertNum = tilingData->ffnBaseParams.expertNum;
     TBuf<QuePosition::VECCALC> eTokens64Buf;
@@ -264,7 +264,7 @@ __aicore__ inline LocalTensor<int64_t> GetUbTokens(__gm__ uint8_t *expertTokens,
     LocalTensor<int64_t> ubTokens = eTokens64Buf.Get<int64_t>();
     if (likely(expertTokens != nullptr)) {
         // copy tokens array from GM
-        expertTokensGm.SetGlobalBuffer((__gm__ int64_t *)expertTokens);
+        expertTokensGm.SetGlobalBuffer((__gm__ int64_t*)expertTokens);
         DataCopy(ubTokens, expertTokensGm, AlignUp<EXPERT_NUM_ALIGN>(expertNum)); // 32-byte alignment
         SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
         WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
@@ -278,7 +278,7 @@ __aicore__ inline LocalTensor<int64_t> GetUbTokens(__gm__ uint8_t *expertTokens,
 }
 
 __aicore__ inline void ComputeExpertParallelNum(uint32_t expertI, uint32_t baseM, uint32_t tokens,
-                                                uint32_t tokensOffset, ExpertParallInfo &expertParallInfo)
+                                                uint32_t tokensOffset, ExpertParallInfo& expertParallInfo)
 {
     expertParallInfo.expertParallelism = 1;
     if (tokens <= baseM) { // small expert
@@ -300,7 +300,7 @@ __aicore__ inline void ComputeExpertParallelNum(uint32_t expertI, uint32_t baseM
 /** device side tiling function. It computes singleCoreM and singleCoreN for each AI core.
  * @param mnConfig: M and N config info for matmul.
  */
-__aicore__ inline void KernelTiling(MNConfig &mnConfig)
+__aicore__ inline void KernelTiling(MNConfig& mnConfig)
 {
     uint32_t maxNLoops = Ceil(mnConfig.n, mnConfig.baseN);
     uint32_t maxMLoops = Ceil(mnConfig.m, mnConfig.baseM);
@@ -350,9 +350,9 @@ __aicore__ inline void KernelTiling(MNConfig &mnConfig)
     }
 }
 
-__aicore__ inline void UpdateKernelTilingBeforeMM1(MNConfig &mnConfig, uint32_t &maxMM1UsedCubeCore, uint32_t &tokens,
-                                                   const UpdateKernelTilingInfo &info,
-                                                   const FFNTilingData *__restrict tilingData)
+__aicore__ inline void UpdateKernelTilingBeforeMM1(MNConfig& mnConfig, uint32_t& maxMM1UsedCubeCore, uint32_t& tokens,
+                                                   const UpdateKernelTilingInfo& info,
+                                                   const FFNTilingData* __restrict tilingData)
 {
     uint32_t expertNum = info.expertNum;
     uint32_t maxMM1ExpertParallelism = info.maxMM1ExpertParallelism;
@@ -392,8 +392,8 @@ __aicore__ inline void UpdateKernelTilingBeforeMM1(MNConfig &mnConfig, uint32_t 
 }
 
 template <typename T>
-__aicore__ inline void ApplyActivation(ActiveType activationType, LocalTensor<T> &dst, const LocalTensor<T> &src,
-                                       LocalTensor<uint8_t> &tmpLocal, uint32_t dataSize)
+__aicore__ inline void ApplyActivation(ActiveType activationType, LocalTensor<T>& dst, const LocalTensor<T>& src,
+                                       LocalTensor<uint8_t>& tmpLocal, uint32_t dataSize)
 {
     if (activationType == ActiveType::FASTGELU) {
         FasterGelu(dst, src, tmpLocal, dataSize);

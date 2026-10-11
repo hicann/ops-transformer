@@ -17,45 +17,44 @@
 
 #include "ffn_glu.h"
 
-
 namespace FFN {
 template <typename T>
-__aicore__ inline void FFNGlu<T>::Init(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
-                                       __gm__ uint8_t *bias1, __gm__ uint8_t *bias2, __gm__ uint8_t *y,
-                                       __gm__ uint8_t *workSpace, const FFNTilingData *__restrict tiling, TPipe *tPipe)
+__aicore__ inline void FFNGlu<T>::Init(__gm__ uint8_t* x, __gm__ uint8_t* weight1, __gm__ uint8_t* weight2,
+                                       __gm__ uint8_t* bias1, __gm__ uint8_t* bias2, __gm__ uint8_t* y,
+                                       __gm__ uint8_t* workSpace, const FFNTilingData* __restrict tiling, TPipe* tPipe)
 {
     curBlockIdx = GetBlockIdx();
     tilingData = tiling;
     pipe = tPipe;
     initTilingData();
 
-    xGm.SetGlobalBuffer((__gm__ T *)x);
-    weight1Gm.SetGlobalBuffer((__gm__ T *)weight1);
+    xGm.SetGlobalBuffer((__gm__ T*)x);
+    weight1Gm.SetGlobalBuffer((__gm__ T*)weight1);
     if (bias1 != nullptr) {
         hasBias1 = true;
-        bias1Gm.SetGlobalBuffer((__gm__ T *)bias1);
+        bias1Gm.SetGlobalBuffer((__gm__ T*)bias1);
     }
-    weight2Gm.SetGlobalBuffer((__gm__ T *)weight2);
+    weight2Gm.SetGlobalBuffer((__gm__ T*)weight2);
     if (bias2 != nullptr) {
         hasBias2 = true;
-        bias2Gm.SetGlobalBuffer((__gm__ T *)bias2);
+        bias2Gm.SetGlobalBuffer((__gm__ T*)bias2);
     }
-    yGm.SetGlobalBuffer((__gm__ T *)y);
+    yGm.SetGlobalBuffer((__gm__ T*)y);
 
     // the data of mm1 once is baseM * baseN, and it will be multiple times
     uint32_t singleOffset = singleTimeM * singleTimeN * sizeof(T);
     uint32_t singleCoreOffset = singleOffset * 4; // 4: 2(left,right) * db(2)
-    mm1ResLeft[0].SetGlobalBuffer((__gm__ T *)(workSpace + curBlockIdx * singleCoreOffset), singleOffset);
-    mm1ResRight[0].SetGlobalBuffer((__gm__ T *)(workSpace + curBlockIdx * singleCoreOffset + singleOffset),
+    mm1ResLeft[0].SetGlobalBuffer((__gm__ T*)(workSpace + curBlockIdx * singleCoreOffset), singleOffset);
+    mm1ResRight[0].SetGlobalBuffer((__gm__ T*)(workSpace + curBlockIdx * singleCoreOffset + singleOffset),
                                    singleOffset);
     // 2: the offset of ping(left + right)
-    mm1ResLeft[1].SetGlobalBuffer((__gm__ T *)(workSpace + curBlockIdx * singleCoreOffset + singleOffset * 2),
+    mm1ResLeft[1].SetGlobalBuffer((__gm__ T*)(workSpace + curBlockIdx * singleCoreOffset + singleOffset * 2),
                                   singleOffset);
     // 3: the offset of other 3 mm1 res(ping all + left pong)
-    mm1ResRight[1].SetGlobalBuffer((__gm__ T *)(workSpace + curBlockIdx * singleCoreOffset + singleOffset * 3),
+    mm1ResRight[1].SetGlobalBuffer((__gm__ T*)(workSpace + curBlockIdx * singleCoreOffset + singleOffset * 3),
                                    singleOffset);
     // use real usedCoreNum
-    mm2WorkspaceGm.SetGlobalBuffer((__gm__ T *)(workSpace + m1Loops * n1Loops * singleCoreOffset));
+    mm2WorkspaceGm.SetGlobalBuffer((__gm__ T*)(workSpace + m1Loops * n1Loops * singleCoreOffset));
 
     // vector without db, not a performance bottleneck, and calc more data
     pipe->InitBuffer(vecInQueueLeft, 1, baseM1 * baseN1 * sizeof(T));

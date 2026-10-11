@@ -49,7 +49,7 @@ struct Param {
 
 template <typename T>
 __aicore__ inline void DataCopyPad2D(const LocalTensor<T> dst, const GlobalTensor<T> src,
-                                     const DataCopy2DDimParams &dimParams)
+                                     const DataCopy2DDimParams& dimParams)
 {
     DataCopyExtParams params;
     params.blockCount = dimParams.dim1;
@@ -64,7 +64,7 @@ __aicore__ inline void DataCopyPad2D(const LocalTensor<T> dst, const GlobalTenso
 
 template <typename T>
 __aicore__ inline void DataCopyPad2D(const GlobalTensor<T> dst, const LocalTensor<T> src,
-                                     const DataCopy2DDimParams &dimParams, uint32_t dstDim0)
+                                     const DataCopy2DDimParams& dimParams, uint32_t dstDim0)
 {
     DataCopyExtParams params;
     params.blockCount = dimParams.dim1;
@@ -80,11 +80,11 @@ class QuantGroupMatmul {
     using DTYPE_OUT = std::conditional_t<P::combine, float, bfloat16_t>;
 
 public:
-    __aicore__ inline QuantGroupMatmul(MT &matmul)
+    __aicore__ inline QuantGroupMatmul(MT& matmul)
         : mm(matmul)
     {}
-    __aicore__ inline void Init(const MMInitParams &initParams, const typename P::TILING_TYPE *tilingData,
-                                TPipe *tPipeIn);
+    __aicore__ inline void Init(const MMInitParams& initParams, const typename P::TILING_TYPE* tilingData,
+                                TPipe* tPipeIn);
     __aicore__ inline void Process();
 
 private:
@@ -92,25 +92,25 @@ private:
     __aicore__ inline void PreProcessInit();
     __aicore__ inline void InitUbBuffer();
     __aicore__ inline void InitOutputWithZeros(uint64_t offset, uint64_t size);
-    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig &mnConfig);
-    __aicore__ inline void VectorCompute(uint32_t groupIdx, MNConfig &mnConfig, SyncConfig &syncConfig);
-    __aicore__ inline void ComputeDequantAndActivate(MNConfig &mnConfig, const VectorAtomicParams &vecAParams,
-                                                     const VectorOffsetParams &coreOffsetM);
+    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig& mnConfig);
+    __aicore__ inline void VectorCompute(uint32_t groupIdx, MNConfig& mnConfig, SyncConfig& syncConfig);
+    __aicore__ inline void ComputeDequantAndActivate(MNConfig& mnConfig, const VectorAtomicParams& vecAParams,
+                                                     const VectorOffsetParams& coreOffsetM);
     __aicore__ inline void ComputeDequantProcess(uint32_t computeSize);
     __aicore__ inline void DataCopyScale(uint32_t curBaseN, uint32_t alignBaseN, uint64_t scaleOffset);
     __aicore__ inline void DataCopyBias(uint32_t curBaseN, uint32_t alignBaseN, uint64_t scaleOffset);
-    __aicore__ inline void PerTokenScaleBrcb(MNConfig &mnConfig, uint32_t curBaseM, uint32_t alignBaseN,
-                                             uint32_t offsetM, const VectorOffsetParams &coreOffsetM);
-    __aicore__ inline void DataCopyPerTokenScale(MNConfig &mnConfig, uint32_t curBaseM, uint32_t offsetM);
-    __aicore__ inline void VectorAtomicProcess(const VectorAtomicParams &vecAParams, const SyncConfig &syncConfig);
-    __aicore__ inline void FRDeterministic(SyncConfig &syncConfig);
-    __aicore__ inline void VectorSync(MNConfig &mnConfig, SyncConfig &syncConfig);
-    __aicore__ inline void GetOffset(VectorOffsetParams &offset, uint32_t curCubeSingleM);
+    __aicore__ inline void PerTokenScaleBrcb(MNConfig& mnConfig, uint32_t curBaseM, uint32_t alignBaseN,
+                                             uint32_t offsetM, const VectorOffsetParams& coreOffsetM);
+    __aicore__ inline void DataCopyPerTokenScale(MNConfig& mnConfig, uint32_t curBaseM, uint32_t offsetM);
+    __aicore__ inline void VectorAtomicProcess(const VectorAtomicParams& vecAParams, const SyncConfig& syncConfig);
+    __aicore__ inline void FRDeterministic(SyncConfig& syncConfig);
+    __aicore__ inline void VectorSync(MNConfig& mnConfig, SyncConfig& syncConfig);
+    __aicore__ inline void GetOffset(VectorOffsetParams& offset, uint32_t curCubeSingleM);
     __aicore__ inline void DataCopyMMOut(uint64_t mmOutOffset, uint32_t curVecBaseM, uint32_t curVecBaseN,
                                          uint32_t offsetM);
 
 private:
-    MT &mm;
+    MT& mm;
     GlobalTensor<int8_t> xGm;
     GlobalTensor<int8_t> weightGm;
     GlobalTensor<bfloat16_t> biasGm;
@@ -145,28 +145,28 @@ private:
     uint32_t cubeCount = 0;
     uint32_t hasPertokenScale;
     uint32_t hasBias;
-    TPipe *pipe;
-    const typename P::TILING_TYPE *tiling;
+    TPipe* pipe;
+    const typename P::TILING_TYPE* tiling;
 };
 
 template <class P>
-__aicore__ inline void QuantGroupMatmul<P>::Init(const MMInitParams &initParams,
-                                                 const typename P::TILING_TYPE *tilingData, TPipe *tPipeIn)
+__aicore__ inline void QuantGroupMatmul<P>::Init(const MMInitParams& initParams,
+                                                 const typename P::TILING_TYPE* tilingData, TPipe* tPipeIn)
 {
-    xGm.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(initParams.x));
-    weightGm.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(initParams.weight));
-    biasGm.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(initParams.bias)); // unused
-    mmOutGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(initParams.workspace));
-    scaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ typename P::SCALE_TYPE *>(initParams.scale));
-    perTokenScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(initParams.pertoken_scale));
-    groupTokensGm.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(initParams.group_tokens));
-    logitsGm.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(initParams.logits));
-    tokenRanksGm.SetGlobalBuffer(reinterpret_cast<__gm__ typename P::ROW_INDEX_DTYPE *>(initParams.token_ranks));
-    residualGm.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(initParams.residual));
-    yGm.SetGlobalBuffer(reinterpret_cast<__gm__ DTYPE_OUT *>(initParams.y));
+    xGm.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(initParams.x));
+    weightGm.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(initParams.weight));
+    biasGm.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(initParams.bias)); // unused
+    mmOutGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(initParams.workspace));
+    scaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ typename P::SCALE_TYPE*>(initParams.scale));
+    perTokenScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(initParams.pertoken_scale));
+    groupTokensGm.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(initParams.group_tokens));
+    logitsGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(initParams.logits));
+    tokenRanksGm.SetGlobalBuffer(reinterpret_cast<__gm__ typename P::ROW_INDEX_DTYPE*>(initParams.token_ranks));
+    residualGm.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(initParams.residual));
+    yGm.SetGlobalBuffer(reinterpret_cast<__gm__ DTYPE_OUT*>(initParams.y));
     tiling = tilingData;
     if (tiling->deterministicFlag == 1) {
-        mmQuantOutGm.SetGlobalBuffer(reinterpret_cast<__gm__ DTYPE_OUT *>(
+        mmQuantOutGm.SetGlobalBuffer(reinterpret_cast<__gm__ DTYPE_OUT*>(
             initParams.workspace + tiling->parallNum * tiling->matmulTiling.baseM * tiling->matmulTiling.baseN *
                                        sizeof(int32_t) * tiling->coreNum));
     }
@@ -352,7 +352,7 @@ __aicore__ inline void QuantGroupMatmul<P>::Process()
 }
 
 template <class P>
-__aicore__ inline void QuantGroupMatmul<P>::MMCompute(uint32_t groupIdx, MNConfig &mnConfig)
+__aicore__ inline void QuantGroupMatmul<P>::MMCompute(uint32_t groupIdx, MNConfig& mnConfig)
 {
     uint32_t tailN = mnConfig.nIdx * mnConfig.singleN;
     uint32_t curSingleN = mnConfig.singleN;
@@ -392,8 +392,8 @@ __aicore__ inline void QuantGroupMatmul<P>::MMCompute(uint32_t groupIdx, MNConfi
 }
 
 template <class P>
-__aicore__ inline void QuantGroupMatmul<P>::VectorAtomicProcess(const VectorAtomicParams &vecAParams,
-                                                                const SyncConfig &syncConfig)
+__aicore__ inline void QuantGroupMatmul<P>::VectorAtomicProcess(const VectorAtomicParams& vecAParams,
+                                                                const SyncConfig& syncConfig)
 {
     LocalTensor<DTYPE_OUT> yLocal = vecOutQueue.DeQue<DTYPE_OUT>();
     if constexpr (P::combine) {
@@ -421,7 +421,7 @@ __aicore__ inline void QuantGroupMatmul<P>::VectorAtomicProcess(const VectorAtom
 }
 
 template <class P>
-__aicore__ inline void QuantGroupMatmul<P>::GetOffset(VectorOffsetParams &offset, uint32_t curCubeSingleM)
+__aicore__ inline void QuantGroupMatmul<P>::GetOffset(VectorOffsetParams& offset, uint32_t curCubeSingleM)
 {
     offset.singleCoreM = curCubeSingleM / uint32_t(2);
     if (subBlockIdx == 0) {
@@ -437,7 +437,7 @@ __aicore__ inline void QuantGroupMatmul<P>::GetOffset(VectorOffsetParams &offset
 }
 
 template <class P>
-__aicore__ inline void QuantGroupMatmul<P>::VectorCompute(uint32_t groupIdx, MNConfig &mnConfig, SyncConfig &syncConfig)
+__aicore__ inline void QuantGroupMatmul<P>::VectorCompute(uint32_t groupIdx, MNConfig& mnConfig, SyncConfig& syncConfig)
 {
     if ASCEND_IS_AIC {
         return;
@@ -508,9 +508,9 @@ __aicore__ inline void QuantGroupMatmul<P>::ComputeDequantProcess(uint32_t compu
 }
 
 template <class P>
-__aicore__ inline void QuantGroupMatmul<P>::ComputeDequantAndActivate(MNConfig &mnConfig,
-                                                                      const VectorAtomicParams &vecAParams,
-                                                                      const VectorOffsetParams &coreOffsetM)
+__aicore__ inline void QuantGroupMatmul<P>::ComputeDequantAndActivate(MNConfig& mnConfig,
+                                                                      const VectorAtomicParams& vecAParams,
+                                                                      const VectorOffsetParams& coreOffsetM)
 {
     PerTokenScaleBrcb(mnConfig, vecAParams.curVecBaseM, vecAParams.alignBaseN, vecAParams.offsetM, coreOffsetM);
     LocalTensor<int32_t> mmOutInUb = vecInQueue.DeQue<cT::T>();
@@ -597,9 +597,9 @@ __aicore__ inline void QuantGroupMatmul<P>::DataCopyBias(uint32_t curBaseN, uint
 }
 
 template <class P>
-__aicore__ inline void QuantGroupMatmul<P>::PerTokenScaleBrcb(MNConfig &mnConfig, uint32_t curBaseM,
+__aicore__ inline void QuantGroupMatmul<P>::PerTokenScaleBrcb(MNConfig& mnConfig, uint32_t curBaseM,
                                                               uint32_t alignBaseN, uint32_t offsetM,
-                                                              const VectorOffsetParams &coreOffsetM)
+                                                              const VectorOffsetParams& coreOffsetM)
 {
     uint32_t alignBaseM = (hasPertokenScale != 0) ? (Ceil(coreOffsetM.singleCoreM, uint32_t(8)) * 8) : 0;
     const uint32_t broadCastDst[BROADCAST_DIM] = {curBaseM, alignBaseN};
@@ -618,7 +618,7 @@ __aicore__ inline void QuantGroupMatmul<P>::PerTokenScaleBrcb(MNConfig &mnConfig
 }
 
 template <class P>
-__aicore__ inline void QuantGroupMatmul<P>::DataCopyPerTokenScale(MNConfig &mnConfig, uint32_t curBaseM,
+__aicore__ inline void QuantGroupMatmul<P>::DataCopyPerTokenScale(MNConfig& mnConfig, uint32_t curBaseM,
                                                                   uint32_t offsetM)
 {
     uint64_t vecBaseMOffset = mnConfig.offsetM + mnConfig.mIdx * mnConfig.singleM + offsetM;
@@ -647,7 +647,7 @@ __aicore__ inline void QuantGroupMatmul<P>::DataCopyPerTokenScale(MNConfig &mnCo
 }
 
 template <class P>
-__aicore__ inline void QuantGroupMatmul<P>::VectorSync(MNConfig &mnConfig, SyncConfig &syncConfig)
+__aicore__ inline void QuantGroupMatmul<P>::VectorSync(MNConfig& mnConfig, SyncConfig& syncConfig)
 {
     if ASCEND_IS_AIC {
         return;
@@ -665,7 +665,7 @@ __aicore__ inline void QuantGroupMatmul<P>::VectorSync(MNConfig &mnConfig, SyncC
 }
 
 template <class P>
-__aicore__ inline void QuantGroupMatmul<P>::FRDeterministic(SyncConfig &syncConfig)
+__aicore__ inline void QuantGroupMatmul<P>::FRDeterministic(SyncConfig& syncConfig)
 {
     if ASCEND_IS_AIC {
         return;

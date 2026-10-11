@@ -33,7 +33,7 @@ __aicore__ inline void TPipeSetWaitFlag()
 
 // blockAlign 32B
 template <typename DataType, int64_t blockSize = 32>
-__aicore__ inline int64_t AlignBlock(const int64_t &t)
+__aicore__ inline int64_t AlignBlock(const int64_t& t)
 {
     return AscendC::Align(t, static_cast<int64_t>(blockSize / sizeof(DataType)));
 }

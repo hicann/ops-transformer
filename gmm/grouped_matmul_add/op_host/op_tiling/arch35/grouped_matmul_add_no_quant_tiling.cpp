@@ -17,7 +17,7 @@
 
 namespace optiling {
 
-bool GroupedMatmulAddNoQuantTiling::SetTiling(gert::TilingContext *context)
+bool GroupedMatmulAddNoQuantTiling::SetTiling(gert::TilingContext* context)
 {
     auto compileInfoPtr = context->GetCompileInfo<GMMCompileInfo>();
     OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "compileInfoPtr is nullptr."), return false);
@@ -33,7 +33,7 @@ bool GroupedMatmulAddNoQuantTiling::SetTiling(gert::TilingContext *context)
     return true;
 }
 
-bool GroupedMatmulAddNoQuantTiling::Init(const gert::TilingContext *context)
+bool GroupedMatmulAddNoQuantTiling::Init(const gert::TilingContext* context)
 {
     OP_CHECK_IF(!GetAttrs(context), OP_LOGE(context->GetNodeName(), "Unable to calculate matmul-tiling"), return false);
 
@@ -75,15 +75,15 @@ bool GroupedMatmulAddNoQuantTiling::Init(const gert::TilingContext *context)
     return false;
 }
 
-bool GroupedMatmulAddNoQuantTiling::GetAttrs(const gert::TilingContext *context)
+bool GroupedMatmulAddNoQuantTiling::GetAttrs(const gert::TilingContext* context)
 {
     auto attr = context->GetAttrs();
     OP_CHECK_IF(attr == nullptr, OP_LOGE(context->GetNodeName(), "attr is nullptr."),
                 return false); // check attr is not null
-    const bool *transposeWeightPtr = attr->GetAttrPointer<bool>(ATTR_IDX_TRANS_W);
-    const bool *transposeXPtr = attr->GetAttrPointer<bool>(ATTR_IDX_TRANS_X);
-    const int32_t *groupTypePtr = attr->GetAttrPointer<int32_t>(ATTR_IDX_GROUPTYPE);
-    const uint32_t *groupListTypePtr = attr->GetAttrPointer<uint32_t>(ATTR_IDX_GROUP_LIST_TYPE);
+    const bool* transposeWeightPtr = attr->GetAttrPointer<bool>(ATTR_IDX_TRANS_W);
+    const bool* transposeXPtr = attr->GetAttrPointer<bool>(ATTR_IDX_TRANS_X);
+    const int32_t* groupTypePtr = attr->GetAttrPointer<int32_t>(ATTR_IDX_GROUPTYPE);
+    const uint32_t* groupListTypePtr = attr->GetAttrPointer<uint32_t>(ATTR_IDX_GROUP_LIST_TYPE);
     transposeWeight_ = transposeWeightPtr != nullptr ? *transposeWeightPtr : false;
     transposeX_ = transposeXPtr != nullptr ? *transposeXPtr : false;
     groupType_ = groupTypePtr != nullptr ? *groupTypePtr : SPLIT_K;
@@ -120,7 +120,7 @@ bool GroupedMatmulAddNoQuantTiling::GetAttrs(const gert::TilingContext *context)
     return true;
 }
 
-void GroupedMatmulAddNoQuantTiling::FormulateBasicBlock(const GMMCompileInfo *compileInfoPtr, uint32_t remainCoreNum)
+void GroupedMatmulAddNoQuantTiling::FormulateBasicBlock(const GMMCompileInfo* compileInfoPtr, uint32_t remainCoreNum)
 {
     uint64_t mCnt = CeilDiv(m_, baseM_);
     uint64_t nCnt = CeilDiv(n_, baseN_);
@@ -166,7 +166,7 @@ void GroupedMatmulAddNoQuantTiling::FormulateBasicBlock(const GMMCompileInfo *co
     usedCoreNum_ = std::min(static_cast<uint32_t>(mCnt * nCnt * groupNum_), compileInfoPtr->aicNum);
 }
 
-void GroupedMatmulAddNoQuantTiling::CalAswtL1Tiling(const GMMCompileInfo *compileInfoPtr)
+void GroupedMatmulAddNoQuantTiling::CalAswtL1Tiling(const GMMCompileInfo* compileInfoPtr)
 {
     uint64_t totalL1Size = compileInfoPtr->l1Size;
     depthA1_ = totalL1Size / NUM_TWO / baseM_ / baseK_ / GetSizeByDataType(xDType_);      // 2: half of l1
@@ -193,7 +193,7 @@ void GroupedMatmulAddNoQuantTiling::CalAswtL1Tiling(const GMMCompileInfo *compil
     return;
 }
 
-void GroupedMatmulAddNoQuantTiling::CalcTailBasicBlock(const GMMCompileInfo *compileInfoPtr)
+void GroupedMatmulAddNoQuantTiling::CalcTailBasicBlock(const GMMCompileInfo* compileInfoPtr)
 {
     uint64_t mCnt = CeilDiv(m_, baseM_);
     uint64_t nCnt = CeilDiv(n_, baseN_);
@@ -211,8 +211,8 @@ void GroupedMatmulAddNoQuantTiling::CalcTailBasicBlock(const GMMCompileInfo *com
     }
 }
 
-bool GroupedMatmulAddNoQuantTiling::CalMatMulTiling(const gert::TilingContext *context,
-                                                    const GMMCompileInfo *compileInfoPtr)
+bool GroupedMatmulAddNoQuantTiling::CalMatMulTiling(const gert::TilingContext* context,
+                                                    const GMMCompileInfo* compileInfoPtr)
 {
     OP_CHECK_IF(groupNum_ < 1U || groupNum_ > MAX_TENSOR,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -265,7 +265,7 @@ void GroupedMatmulAddNoQuantTiling::SetMatMulTiling()
 
 /** @brief split K single-single-single
  */
-bool GroupedMatmulAddNoQuantTiling::SplitKSingleXSingleWeightSingleY(const gert::TilingContext *context,
+bool GroupedMatmulAddNoQuantTiling::SplitKSingleXSingleWeightSingleY(const gert::TilingContext* context,
                                                                      const gert::Shape xShape, const gert::Shape wShape)
 {
     auto groupListTensor = context->GetDynamicInputTensor(INDEX_GROUPLIST, 0);
@@ -279,9 +279,9 @@ bool GroupedMatmulAddNoQuantTiling::SplitKSingleXSingleWeightSingleY(const gert:
     return true;
 }
 
-bool GroupedMatmulAddNoQuantTiling::SetCustomParam(gert::TilingContext *context)
+bool GroupedMatmulAddNoQuantTiling::SetCustomParam(gert::TilingContext* context)
 {
-    size_t *workspaces = context->GetWorkspaceSizes(1); // get second variable
+    size_t* workspaces = context->GetWorkspaceSizes(1); // get second variable
     OP_CHECK_IF(workspaces == nullptr, OP_LOGE(context->GetNodeName(), "workspaces is nullptr."),
                 return false); // check workspaces is not null
     workspaces[0] = 32U;       // 32: default workspace size
@@ -290,7 +290,7 @@ bool GroupedMatmulAddNoQuantTiling::SetCustomParam(gert::TilingContext *context)
     OP_CHECK_IF(context->GetRawTilingData() == nullptr, OP_LOGE(context->GetNodeName(), "RawTilingData is nullptr."),
                 return false);
     errno_t ret = memcpy_s(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), sizeof(tilingData_));
+                           reinterpret_cast<void*>(&tilingData_), sizeof(tilingData_));
     if (ret != EOK) {
         OP_LOGE(context->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return false;
@@ -299,7 +299,7 @@ bool GroupedMatmulAddNoQuantTiling::SetCustomParam(gert::TilingContext *context)
     return true;
 }
 
-void GroupedMatmulAddNoQuantTiling::SetTilingKey(gert::TilingContext *context) const
+void GroupedMatmulAddNoQuantTiling::SetTilingKey(gert::TilingContext* context) const
 {
     uint8_t gmmTrans = static_cast<uint8_t>(transposeX_) | (static_cast<uint8_t>(transposeWeight_) << 1);
     constexpr uint64_t TILINGKEYOFFSETGMM = 10000900009000090000UL; // means base tiling template
@@ -308,7 +308,7 @@ void GroupedMatmulAddNoQuantTiling::SetTilingKey(gert::TilingContext *context) c
     context->SetTilingKey(tilingKey);
 }
 
-void GroupedMatmulAddNoQuantTiling::PrintTilingResult(const gert::TilingContext *context)
+void GroupedMatmulAddNoQuantTiling::PrintTilingResult(const gert::TilingContext* context)
 {
     OP_LOGI(context->GetNodeName(), "GMM Tiling result: groupNum: %u, groupListType: %u, mTailCnt: %u, nTailCnt: %u",
             tilingData_.gmmAddParams.groupNum, tilingData_.gmmAddParams.groupListType,

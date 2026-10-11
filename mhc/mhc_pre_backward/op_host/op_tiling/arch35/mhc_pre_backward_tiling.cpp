@@ -88,7 +88,7 @@ REGISTER_OPS_TILING_TEMPLATE(MhcPreBackward, MhcPreBackwardTiling, DEFAULT_TILIN
 
 ge::graphStatus MhcPreBackwardTiling::GetPlatformInfo()
 {
-    const auto *compileInfo = context_->GetCompileInfo<MhcPreBackwardCompileInfo>();
+    const auto* compileInfo = context_->GetCompileInfo<MhcPreBackwardCompileInfo>();
     OP_CHECK_IF(compileInfo == nullptr, OP_LOGE(context_->GetNodeName(), "get compile info failed"),
                 return ge::GRAPH_FAILED);
 
@@ -128,9 +128,9 @@ ge::graphStatus MhcPreBackwardTiling::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MhcPreBackwardTiling::GetInputTensors(const gert::Tensor *&gradHInTensor,
-                                                      const gert::Tensor *&gradHPostTensor,
-                                                      const gert::Tensor *&gradHResTensor)
+ge::graphStatus MhcPreBackwardTiling::GetInputTensors(const gert::Tensor*& gradHInTensor,
+                                                      const gert::Tensor*& gradHPostTensor,
+                                                      const gert::Tensor*& gradHResTensor)
 {
     gradHInTensor = context_->GetDynamicInputTensor(GRAD_H_IN_INDEX, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context_, gradHInTensor);
@@ -170,9 +170,9 @@ ge::graphStatus MhcPreBackwardTiling::ValidateInputDims(int64_t gradHInDims, int
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MhcPreBackwardTiling::ParseBSDFormat(const gert::Tensor *gradHInTensor,
-                                                     const gert::Tensor *gradHPostTensor,
-                                                     const gert::Tensor *gradHResTensor)
+ge::graphStatus MhcPreBackwardTiling::ParseBSDFormat(const gert::Tensor* gradHInTensor,
+                                                     const gert::Tensor* gradHPostTensor,
+                                                     const gert::Tensor* gradHResTensor)
 {
     uint64_t batch = gradHInTensor->GetStorageShape().GetDim(INDEX_B);
     uint64_t sequence = gradHInTensor->GetStorageShape().GetDim(INDEX_S);
@@ -202,9 +202,9 @@ ge::graphStatus MhcPreBackwardTiling::ParseBSDFormat(const gert::Tensor *gradHIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MhcPreBackwardTiling::ParseTNDFormat(const gert::Tensor *gradHInTensor,
-                                                     const gert::Tensor *gradHPostTensor,
-                                                     const gert::Tensor *gradHResTensor)
+ge::graphStatus MhcPreBackwardTiling::ParseTNDFormat(const gert::Tensor* gradHInTensor,
+                                                     const gert::Tensor* gradHPostTensor,
+                                                     const gert::Tensor* gradHResTensor)
 {
     uint64_t t = gradHInTensor->GetStorageShape().GetDim(INDEX_T);
     D_ = gradHInTensor->GetStorageShape().GetDim(INDEX_D_TND);
@@ -269,8 +269,8 @@ void MhcPreBackwardTiling::SetMmConfig()
 
 ge::graphStatus MhcPreBackwardTiling::ValidateMmConfig()
 {
-    MMConfig &mmConfigC0_ = tilingData_.mmConfigC0;
-    MMConfig &mmConfigC1_ = tilingData_.mmConfigC1;
+    MMConfig& mmConfigC0_ = tilingData_.mmConfigC0;
+    MMConfig& mmConfigC1_ = tilingData_.mmConfigC1;
     constexpr uint64_t elementSize = sizeof(float);
 
     uint64_t c0A1SingleBufferBytes =
@@ -329,9 +329,9 @@ ge::graphStatus MhcPreBackwardTiling::ValidateMmConfig()
 
 ge::graphStatus MhcPreBackwardTiling::GetInputShape()
 {
-    const gert::Tensor *gradHInTensor = nullptr;
-    const gert::Tensor *gradHPostTensor = nullptr;
-    const gert::Tensor *gradHResTensor = nullptr;
+    const gert::Tensor* gradHInTensor = nullptr;
+    const gert::Tensor* gradHPostTensor = nullptr;
+    const gert::Tensor* gradHResTensor = nullptr;
 
     auto ret = GetInputTensors(gradHInTensor, gradHPostTensor, gradHResTensor);
     if (ret != ge::GRAPH_SUCCESS) {
@@ -512,7 +512,7 @@ ge::graphStatus MhcPreBackwardTiling::PostTiling()
     context_->SetBlockDim(tilingData_.get_coreNum());
     context_->SetScheduleMode(SCHEDULE_MODE);
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     OP_CHECK_IF(workspaces == nullptr, OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(), "workspaces is null"),
                 return ge::GRAPH_FAILED);
 

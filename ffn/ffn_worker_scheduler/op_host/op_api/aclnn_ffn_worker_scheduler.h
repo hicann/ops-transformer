@@ -21,9 +21,9 @@ extern "C" {
  * @brief aclnnFfnWorkerScheduler的第一段接口，根据具体的计算流程，计算workspace大小。
  * @domain aclnn_ops_infer
  */
-ACLNN_API aclnnStatus aclnnInplaceFfnWorkerSchedulerGetWorkspaceSize(aclTensor* scheduleContextRef, int32_t syncGroupSize,
-                                                                     int32_t executeMode, uint64_t* workspaceSize,
-                                                                     aclOpExecutor** executor);
+ACLNN_API aclnnStatus aclnnInplaceFfnWorkerSchedulerGetWorkspaceSize(aclTensor* scheduleContextRef,
+                                                                     int32_t syncGroupSize, int32_t executeMode,
+                                                                     uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnFfnWorkerScheduler的第二段接口，用于执行计算。
@@ -35,4 +35,4 @@ ACLNN_API aclnnStatus aclnnInplaceFfnWorkerScheduler(void* workspace, uint64_t w
 }
 #endif
 
-#endif  // OP_API_INC_FFN_WORKER_SCHEDULER_H_
+#endif // OP_API_INC_FFN_WORKER_SCHEDULER_H_

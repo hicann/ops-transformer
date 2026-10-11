@@ -42,39 +42,39 @@ using ops::ut::Trim;
 
 constexpr size_t kCsvColumnCount = 52;
 
-uint64_t ParseU64(const string &value)
+uint64_t ParseU64(const string& value)
 {
     const string trimmed = Trim(value);
     return trimmed.empty() ? 0UL : static_cast<uint64_t>(stoull(trimmed));
 }
 
-float ParseFloat(const string &value)
+float ParseFloat(const string& value)
 {
     const string trimmed = Trim(value);
     return trimmed.empty() ? 0.0F : stof(trimmed);
 }
 
-vector<int64_t> ParseDims(const string &value)
+vector<int64_t> ParseDims(const string& value)
 {
     return ops::ut::ParseDims(value);
 }
 
-ge::DataType ParseDtype(const string &dtype)
+ge::DataType ParseDtype(const string& dtype)
 {
     return ops::ut::ParseGeDtype(dtype);
 }
 
-ge::Format ParseFormat(const string &format)
+ge::Format ParseFormat(const string& format)
 {
     return ops::ut::ParseGeFormat(format);
 }
 
-ge::graphStatus ParseGraphStatus(const string &status)
+ge::graphStatus ParseGraphStatus(const string& status)
 {
     return Trim(status) == "SUCCESS" ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED;
 }
 
-platform_ascendc::SocVersion ParseSocVersion(const string &socVersion)
+platform_ascendc::SocVersion ParseSocVersion(const string& socVersion)
 {
     const string trimmed = Trim(socVersion);
     if (trimmed == "Ascend910B") {
@@ -86,7 +86,7 @@ platform_ascendc::SocVersion ParseSocVersion(const string &socVersion)
     return static_cast<platform_ascendc::SocVersion>(0);
 }
 
-NpuArch ParseNpuArch(const string &npuArch)
+NpuArch ParseNpuArch(const string& npuArch)
 {
     return Trim(npuArch) == "DAV_3510" ? NpuArch::DAV_3510 : static_cast<NpuArch>(0);
 }
@@ -201,14 +201,14 @@ struct GroupedMatmulFinalizeRoutingTilingCase {
         platformInfo.SetPlatformRes("AICoreSpec", aicoreSpec);
         platformInfo.SetPlatformRes("AICoreintrinsicDtypeMap", intrinsics);
 
-        const char *compileJsonStr = "{}";
+        const char* compileJsonStr = "{}";
         gert::OpTilingParseContextBuilder builder;
         builder.OpType("GroupedMatmulFinalizeRouting")
             .OpName("GroupedMatmulFinalizeRouting")
             .IONum(2, 1)
             .CompiledJson(compileJsonStr)
-            .CompiledInfo(reinterpret_cast<void *>(&compileInfo))
-            .PlatformInfo(reinterpret_cast<void *>(&platformInfo));
+            .CompiledInfo(reinterpret_cast<void*>(&compileInfo))
+            .PlatformInfo(reinterpret_cast<void*>(&platformInfo));
         auto holder = builder.Build();
         auto parseContext = holder.GetContext();
 
@@ -218,7 +218,7 @@ struct GroupedMatmulFinalizeRoutingTilingCase {
         ASSERT_NE(opImpl, nullptr);
         ASSERT_NE(opImpl->tiling_parse, nullptr);
 
-        auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext *>(parseContext));
+        auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext*>(parseContext));
         EXPECT_EQ(ret, ParseGraphStatus(expectResult));
     }
 
@@ -319,7 +319,7 @@ struct GroupedMatmulFinalizeRoutingTilingCase {
     string caseType;
 };
 
-vector<GroupedMatmulFinalizeRoutingTilingCase> LoadCases(const string &csvPath)
+vector<GroupedMatmulFinalizeRoutingTilingCase> LoadCases(const string& csvPath)
 {
     vector<GroupedMatmulFinalizeRoutingTilingCase> cases;
     ifstream csvData(csvPath, ios::in);
@@ -408,7 +408,7 @@ vector<GroupedMatmulFinalizeRoutingTilingCase> LoadCases(const string &csvPath)
     return cases;
 }
 
-const vector<GroupedMatmulFinalizeRoutingTilingCase> &GetCases()
+const vector<GroupedMatmulFinalizeRoutingTilingCase>& GetCases()
 {
     static const auto cases =
         LoadCases(ops::ut::ResolveCsvPath("test_grouped_matmul_finalize_routing_tiling.csv",
@@ -416,7 +416,7 @@ const vector<GroupedMatmulFinalizeRoutingTilingCase> &GetCases()
     return cases;
 }
 
-string MakeParamName(const testing::TestParamInfo<GroupedMatmulFinalizeRoutingTilingCase> &info)
+string MakeParamName(const testing::TestParamInfo<GroupedMatmulFinalizeRoutingTilingCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }

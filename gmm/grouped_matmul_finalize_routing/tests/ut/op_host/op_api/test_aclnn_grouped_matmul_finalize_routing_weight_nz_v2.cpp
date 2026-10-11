@@ -32,22 +32,22 @@ using ops::ut::Trim;
 
 constexpr size_t kWeightNzV2CsvColumnCount = 53;
 
-vector<int64_t> ParseDims(const string &value)
+vector<int64_t> ParseDims(const string& value)
 {
     return ops::ut::ParseDims(value);
 }
 
-vector<int64_t> ParseI64List(const string &value)
+vector<int64_t> ParseI64List(const string& value)
 {
     return ops::ut::ParseI64List(value);
 }
 
-aclDataType ParseDtype(const string &dtype)
+aclDataType ParseDtype(const string& dtype)
 {
     return ops::ut::ParseAclDtype(dtype);
 }
 
-aclFormat ParseFormat(const string &format)
+aclFormat ParseFormat(const string& format)
 {
     static const map<string, aclFormat> extraFormatMap = {
         {"FRACTAL_NZ_C0_8", ACL_FORMAT_FRACTAL_NZ_C0_8},
@@ -61,7 +61,7 @@ aclFormat ParseFormat(const string &format)
     return ops::ut::ParseAclFormat(format);
 }
 
-aclnnStatus ParseStatus(const string &status)
+aclnnStatus ParseStatus(const string& status)
 {
     static const map<string, aclnnStatus> statusMap = {
         {"SUCCESS", ACLNN_SUCCESS},
@@ -72,7 +72,7 @@ aclnnStatus ParseStatus(const string &status)
     return it == statusMap.end() ? ACLNN_SUCCESS : it->second;
 }
 
-void SetupPlatformForCase(const string &socVersion)
+void SetupPlatformForCase(const string& socVersion)
 {
     static const map<string, SocVersion> socMap = {
         {"Ascend910B", SocVersion::ASCEND910B},
@@ -82,13 +82,14 @@ void SetupPlatformForCase(const string &socVersion)
     SetPlatformSocVersion(it == socMap.end() ? SocVersion::ASCEND910B : it->second);
 }
 
-TensorDesc MakeTensorDesc(const vector<int64_t> &shape, aclDataType dtype, aclFormat format,
-                          const vector<int64_t> &storageShape, bool fillRange = true)
+TensorDesc MakeTensorDesc(const vector<int64_t>& shape, aclDataType dtype, aclFormat format,
+                          const vector<int64_t>& storageShape, bool fillRange = true)
 {
     if (fillRange) {
         return ops::ut::MakeAclTensorDesc(shape, dtype, format, storageShape).ValueRange(-1, 1);
     }
-    return storageShape.empty() ? TensorDesc(shape, dtype, format) : TensorDesc(shape, dtype, format, {}, 0, storageShape);
+    return storageShape.empty() ? TensorDesc(shape, dtype, format) :
+                                  TensorDesc(shape, dtype, format, {}, 0, storageShape);
 }
 
 struct GroupedMatmulFinalizeRoutingWeightNzV2Case {
@@ -96,7 +97,8 @@ struct GroupedMatmulFinalizeRoutingWeightNzV2Case {
     {
         SetupPlatformForCase(socVersion);
 
-        TensorDesc x1 = MakeTensorDesc(ParseDims(x1Shape), ParseDtype(x1Dtype), ACL_FORMAT_ND, {}, ParseBool(x1UseRange));
+        TensorDesc x1 =
+            MakeTensorDesc(ParseDims(x1Shape), ParseDtype(x1Dtype), ACL_FORMAT_ND, {}, ParseBool(x1UseRange));
         TensorDesc x2 = MakeTensorDesc(ParseDims(x2Shape), ParseDtype(x2Dtype), ParseFormat(x2Format),
                                        ParseDims(x2StorageShape), ParseBool(x2UseRange));
         TensorDesc scale =
@@ -106,9 +108,8 @@ struct GroupedMatmulFinalizeRoutingWeightNzV2Case {
         }
         TensorDesc bias = MakeTensorDesc(ParseDims(biasShape), ParseDtype(biasDtype), ACL_FORMAT_ND, {}, true);
         TensorDesc offset = MakeTensorDesc(ParseDims(offsetShape), ParseDtype(offsetDtype), ACL_FORMAT_ND, {}, true);
-        TensorDesc perTokenScale =
-            MakeTensorDesc(ParseDims(perTokenScaleShape), ParseDtype(perTokenScaleDtype), ACL_FORMAT_ND, {},
-                           ParseBool(perTokenScaleUseRange));
+        TensorDesc perTokenScale = MakeTensorDesc(ParseDims(perTokenScaleShape), ParseDtype(perTokenScaleDtype),
+                                                  ACL_FORMAT_ND, {}, ParseBool(perTokenScaleUseRange));
         if (ParseBool(perTokenScaleUseRange)) {
             perTokenScale.ValueRange(0, 3);
         }
@@ -121,18 +122,19 @@ struct GroupedMatmulFinalizeRoutingWeightNzV2Case {
         if (!groupListVals.empty()) {
             groupList.Value(groupListVals);
         }
-        TensorDesc sharedInput =
-            MakeTensorDesc(ParseDims(sharedInputShape), ParseDtype(sharedInputDtype), ACL_FORMAT_ND, {}, ParseBool(sharedInputUseRange));
-        TensorDesc logits =
-            MakeTensorDesc(ParseDims(logitsShape), ParseDtype(logitsDtype), ACL_FORMAT_ND, {}, ParseBool(logitsUseRange));
-        TensorDesc rowIndex =
-            MakeTensorDesc(ParseDims(rowIndexShape), ParseDtype(rowIndexDtype), ACL_FORMAT_ND, {}, ParseBool(rowIndexUseRange));
-        TensorDesc out = MakeTensorDesc(ParseDims(outShape), ParseDtype(outDtype), ACL_FORMAT_ND, {}, ParseBool(outUseRange));
+        TensorDesc sharedInput = MakeTensorDesc(ParseDims(sharedInputShape), ParseDtype(sharedInputDtype),
+                                                ACL_FORMAT_ND, {}, ParseBool(sharedInputUseRange));
+        TensorDesc logits = MakeTensorDesc(ParseDims(logitsShape), ParseDtype(logitsDtype), ACL_FORMAT_ND, {},
+                                           ParseBool(logitsUseRange));
+        TensorDesc rowIndex = MakeTensorDesc(ParseDims(rowIndexShape), ParseDtype(rowIndexDtype), ACL_FORMAT_ND, {},
+                                             ParseBool(rowIndexUseRange));
+        TensorDesc out =
+            MakeTensorDesc(ParseDims(outShape), ParseDtype(outDtype), ACL_FORMAT_ND, {}, ParseBool(outUseRange));
 
         const vector<int64_t> tuningVals = ParseI64List(tuningConfig);
-        aclIntArray *tuningConfigPtr = nullptr;
+        aclIntArray* tuningConfigPtr = nullptr;
         if (ParseBool(hasTuningConfig)) {
-            tuningConfigPtr = aclCreateIntArray(const_cast<int64_t *>(tuningVals.data()), tuningVals.size());
+            tuningConfigPtr = aclCreateIntArray(const_cast<int64_t*>(tuningVals.data()), tuningVals.size());
         }
 
         uint64_t workspaceSize = 0;
@@ -248,7 +250,7 @@ struct GroupedMatmulFinalizeRoutingWeightNzV2Case {
     string hasAntiquantOffset;
 };
 
-vector<GroupedMatmulFinalizeRoutingWeightNzV2Case> LoadCases(const string &csvFilePath)
+vector<GroupedMatmulFinalizeRoutingWeightNzV2Case> LoadCases(const string& csvFilePath)
 {
     ifstream in(csvFilePath);
     EXPECT_TRUE(in.is_open()) << "Failed to open CSV file: " << csvFilePath;
@@ -328,7 +330,7 @@ vector<GroupedMatmulFinalizeRoutingWeightNzV2Case> LoadCases(const string &csvFi
             c.hasAntiquantScale = Trim(cols[i++]);
             c.hasAntiquantOffset = Trim(cols[i++]);
             cases.emplace_back(c);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvFilePath, lineNo, caseName, error);
         }
     }
@@ -336,7 +338,7 @@ vector<GroupedMatmulFinalizeRoutingWeightNzV2Case> LoadCases(const string &csvFi
     return cases;
 }
 
-const vector<GroupedMatmulFinalizeRoutingWeightNzV2Case> &GetWeightNzV2Cases()
+const vector<GroupedMatmulFinalizeRoutingWeightNzV2Case>& GetWeightNzV2Cases()
 {
     static const auto cases =
         LoadCases(ops::ut::ResolveCsvPath("test_aclnn_grouped_matmul_finalize_routing_weight_nz_v2.csv",
@@ -344,7 +346,7 @@ const vector<GroupedMatmulFinalizeRoutingWeightNzV2Case> &GetWeightNzV2Cases()
     return cases;
 }
 
-string MakeWeightNzV2ParamName(const testing::TestParamInfo<GroupedMatmulFinalizeRoutingWeightNzV2Case> &info)
+string MakeWeightNzV2ParamName(const testing::TestParamInfo<GroupedMatmulFinalizeRoutingWeightNzV2Case>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.socVersion + "_" + info.param.caseName);
 }
@@ -362,8 +364,8 @@ INSTANTIATE_TEST_SUITE_P(GMMFR_WEIGHT_NZ_V2_CSV, grouped_matmul_finalize_routing
 
 constexpr size_t kWeightNzV2Mxa8w4CsvColumnCount = 30;
 
-TensorDesc MakeMxa8w4TensorDesc(const vector<int64_t> &shape, aclDataType dtype, aclFormat format,
-                                const vector<int64_t> &storageShape = {}, const vector<int64_t> &stride = {})
+TensorDesc MakeMxa8w4TensorDesc(const vector<int64_t>& shape, aclDataType dtype, aclFormat format,
+                                const vector<int64_t>& storageShape = {}, const vector<int64_t>& stride = {})
 {
     if (!stride.empty()) {
         return TensorDesc(shape, dtype, format, stride, 0, storageShape);
@@ -394,8 +396,8 @@ struct GroupedMatmulFinalizeRoutingWeightNzV2Mxa8w4Case {
         const vector<int64_t> outDims = ParseDims(outShape);
 
         TensorDesc x1 = MakeMxa8w4TensorDesc(x1Dims, ParseDtype(x1Dtype), ParseFormat(x1Format));
-        TensorDesc x2 = MakeMxa8w4TensorDesc(x2Dims, ParseDtype(x2Dtype), ParseFormat(x2Format), x2StorageDims,
-                                             x2StrideDims);
+        TensorDesc x2 =
+            MakeMxa8w4TensorDesc(x2Dims, ParseDtype(x2Dtype), ParseFormat(x2Format), x2StorageDims, x2StrideDims);
         TensorDesc scale = MakeMxa8w4TensorDesc(scaleDims, ParseDtype(scaleDtype), ParseFormat(scaleFormat));
         TensorDesc groupList = MakeMxa8w4TensorDesc(groupListDims, ACL_INT64, ACL_FORMAT_ND);
         TensorDesc logits = MakeMxa8w4TensorDesc(logitsDims, ACL_FLOAT, ACL_FORMAT_ND);
@@ -415,67 +417,66 @@ struct GroupedMatmulFinalizeRoutingWeightNzV2Mxa8w4Case {
 
         std::optional<TensorDesc> sharedInput;
         if (!sharedInputDims.empty()) {
-            sharedInput.emplace(
-                MakeMxa8w4TensorDesc(sharedInputDims, ParseDtype(sharedInputDtype), ACL_FORMAT_ND));
+            sharedInput.emplace(MakeMxa8w4TensorDesc(sharedInputDims, ParseDtype(sharedInputDtype), ACL_FORMAT_ND));
         }
 
         uint64_t workspaceSize = 0;
         aclnnStatus ret = ACLNN_SUCCESS;
         if (bias.has_value() && perTokenScale.has_value() && sharedInput.has_value()) {
-            auto ut = OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
-                                INPUT(x1, x2, scale, *bias, nullptr, nullptr, nullptr, *perTokenScale, groupList,
-                                      *sharedInput, logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW,
-                                      groupListType, nullptr),
-                                OUTPUT(out));
+            auto ut = OP_API_UT(
+                aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
+                INPUT(x1, x2, scale, *bias, nullptr, nullptr, nullptr, *perTokenScale, groupList, *sharedInput, logits,
+                      rowIndex, 0, 1.0, sharedInputOffset, false, transposeW, groupListType, nullptr),
+                OUTPUT(out));
             ret = ut.TestGetWorkspaceSize(&workspaceSize);
         } else if (bias.has_value() && perTokenScale.has_value()) {
-            auto ut = OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
-                                INPUT(x1, x2, scale, *bias, nullptr, nullptr, nullptr, *perTokenScale, groupList,
-                                      nullptr, logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW,
-                                      groupListType, nullptr),
-                                OUTPUT(out));
+            auto ut =
+                OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
+                          INPUT(x1, x2, scale, *bias, nullptr, nullptr, nullptr, *perTokenScale, groupList, nullptr,
+                                logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW, groupListType, nullptr),
+                          OUTPUT(out));
             ret = ut.TestGetWorkspaceSize(&workspaceSize);
         } else if (bias.has_value() && sharedInput.has_value()) {
-            auto ut = OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
-                                INPUT(x1, x2, scale, *bias, nullptr, nullptr, nullptr, nullptr, groupList,
-                                      *sharedInput, logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW,
-                                      groupListType, nullptr),
-                                OUTPUT(out));
+            auto ut =
+                OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
+                          INPUT(x1, x2, scale, *bias, nullptr, nullptr, nullptr, nullptr, groupList, *sharedInput,
+                                logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW, groupListType, nullptr),
+                          OUTPUT(out));
             ret = ut.TestGetWorkspaceSize(&workspaceSize);
         } else if (bias.has_value()) {
-            auto ut = OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
-                                INPUT(x1, x2, scale, *bias, nullptr, nullptr, nullptr, nullptr, groupList, nullptr,
-                                      logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW, groupListType,
-                                      nullptr),
-                                OUTPUT(out));
+            auto ut =
+                OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
+                          INPUT(x1, x2, scale, *bias, nullptr, nullptr, nullptr, nullptr, groupList, nullptr, logits,
+                                rowIndex, 0, 1.0, sharedInputOffset, false, transposeW, groupListType, nullptr),
+                          OUTPUT(out));
             ret = ut.TestGetWorkspaceSize(&workspaceSize);
         } else if (perTokenScale.has_value() && sharedInput.has_value()) {
-            auto ut = OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
-                                INPUT(x1, x2, scale, nullptr, nullptr, nullptr, nullptr, *perTokenScale, groupList,
-                                      *sharedInput, logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW,
-                                      groupListType, nullptr),
-                                OUTPUT(out));
+            auto ut = OP_API_UT(
+                aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
+                INPUT(x1, x2, scale, nullptr, nullptr, nullptr, nullptr, *perTokenScale, groupList, *sharedInput,
+                      logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW, groupListType, nullptr),
+                OUTPUT(out));
             ret = ut.TestGetWorkspaceSize(&workspaceSize);
         } else if (perTokenScale.has_value()) {
-            auto ut = OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
-                                INPUT(x1, x2, scale, nullptr, nullptr, nullptr, nullptr, *perTokenScale, groupList,
-                                      nullptr, logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW,
-                                      groupListType, nullptr),
-                                OUTPUT(out));
+            auto ut =
+                OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
+                          INPUT(x1, x2, scale, nullptr, nullptr, nullptr, nullptr, *perTokenScale, groupList, nullptr,
+                                logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW, groupListType, nullptr),
+                          OUTPUT(out));
             ret = ut.TestGetWorkspaceSize(&workspaceSize);
         } else if (sharedInput.has_value()) {
-            auto ut = OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
-                                INPUT(x1, x2, scale, nullptr, nullptr, nullptr, nullptr, nullptr, groupList,
-                                      *sharedInput, logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW,
-                                      groupListType, nullptr),
-                                OUTPUT(out));
+            auto ut =
+                OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
+                          INPUT(x1, x2, scale, nullptr, nullptr, nullptr, nullptr, nullptr, groupList, *sharedInput,
+                                logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW, groupListType, nullptr),
+                          OUTPUT(out));
             ret = ut.TestGetWorkspaceSize(&workspaceSize);
         } else {
-            auto ut = OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
-                                INPUT(x1, x2, scale, nullptr, nullptr, nullptr, nullptr, nullptr, groupList, nullptr,
-                                      logits, rowIndex, 0, 1.0, sharedInputOffset, false, transposeW, groupListType,
-                                      nullptr),
-                                OUTPUT(out));
+            auto ut =
+                OP_API_UT(aclnnGroupedMatmulFinalizeRoutingWeightNzV2,
+                          INPUT(x1, x2, scale, nullptr, nullptr, nullptr, nullptr, nullptr, groupList, nullptr, logits,
+                                rowIndex, 0, 1.0, sharedInputOffset, false, transposeW, groupListType, nullptr),
+                          OUTPUT(out));
             ret = ut.TestGetWorkspaceSize(&workspaceSize);
         }
         EXPECT_EQ(ret, ParseStatus(expectRet));
@@ -513,7 +514,7 @@ struct GroupedMatmulFinalizeRoutingWeightNzV2Mxa8w4Case {
     string comment;
 };
 
-vector<GroupedMatmulFinalizeRoutingWeightNzV2Mxa8w4Case> LoadMxa8w4Cases(const string &csvFilePath)
+vector<GroupedMatmulFinalizeRoutingWeightNzV2Mxa8w4Case> LoadMxa8w4Cases(const string& csvFilePath)
 {
     ifstream in(csvFilePath);
     EXPECT_TRUE(in.is_open()) << "Failed to open CSV file: " << csvFilePath;
@@ -573,7 +574,7 @@ vector<GroupedMatmulFinalizeRoutingWeightNzV2Mxa8w4Case> LoadMxa8w4Cases(const s
             c.expectRet = Trim(cols[i++]);
             c.comment = Trim(cols[i++]);
             cases.emplace_back(c);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvFilePath, lineNo, caseName, error);
         }
     }
@@ -581,7 +582,7 @@ vector<GroupedMatmulFinalizeRoutingWeightNzV2Mxa8w4Case> LoadMxa8w4Cases(const s
     return cases;
 }
 
-const vector<GroupedMatmulFinalizeRoutingWeightNzV2Mxa8w4Case> &GetMxa8w4Cases()
+const vector<GroupedMatmulFinalizeRoutingWeightNzV2Mxa8w4Case>& GetMxa8w4Cases()
 {
     static const auto cases = LoadMxa8w4Cases(
         ops::ut::ResolveCsvPath("test_aclnn_grouped_matmul_finalize_routing_weight_nz_v2_mxa8w4.csv",
@@ -589,8 +590,7 @@ const vector<GroupedMatmulFinalizeRoutingWeightNzV2Mxa8w4Case> &GetMxa8w4Cases()
     return cases;
 }
 
-string MakeMxa8w4ParamName(
-    const testing::TestParamInfo<GroupedMatmulFinalizeRoutingWeightNzV2Mxa8w4Case> &info)
+string MakeMxa8w4ParamName(const testing::TestParamInfo<GroupedMatmulFinalizeRoutingWeightNzV2Mxa8w4Case>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.socVersion + "_" + info.param.caseName);
 }
@@ -603,7 +603,6 @@ TEST_P(grouped_matmul_finalize_routing_weight_nz_v2_mxa8w4_csv_test, csvDrivenCa
     GetParam().Run();
 }
 
-INSTANTIATE_TEST_SUITE_P(GMMFR_WEIGHT_NZ_V2_MXA8W4_CSV,
-                         grouped_matmul_finalize_routing_weight_nz_v2_mxa8w4_csv_test,
+INSTANTIATE_TEST_SUITE_P(GMMFR_WEIGHT_NZ_V2_MXA8W4_CSV, grouped_matmul_finalize_routing_weight_nz_v2_mxa8w4_csv_test,
                          testing::ValuesIn(GetMxa8w4Cases()), MakeMxa8w4ParamName);
 } // namespace

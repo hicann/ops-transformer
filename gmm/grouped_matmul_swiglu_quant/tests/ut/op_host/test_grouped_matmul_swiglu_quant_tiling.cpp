@@ -62,10 +62,9 @@ TEST_F(GroupedMatmulSwigluQuantTiling_TEST, grouped_matmul_swiglu_quant_tiling_s
          {"dequant_mod", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
         &compileInfo);
     uint64_t expectTilingKey = 0;
-    string expectTilingData = 
-        "85899345924 2199023255808 549755813904 70368744177920 0 1 17179869225 512 68719476737 "
-        "1099511628288 549755814144 1099511628032 1099511627904 4294967552 4294967297 1 0 "
-        "211106232532992 131072 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 0 0 0 ";
+    string expectTilingData = "85899345924 2199023255808 549755813904 70368744177920 0 1 17179869225 512 68719476737 "
+                              "1099511628288 549755814144 1099511628032 1099511627904 4294967552 4294967297 1 0 "
+                              "211106232532992 131072 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {16809984};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -91,10 +90,9 @@ TEST_F(GroupedMatmulSwigluQuantTiling_TEST, grouped_matmul_swiglu_quant_tiling_s
          {"dequant_mod", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
         &compileInfo);
     uint64_t expectTilingKey = 0;
-    string expectTilingData = 
-        "85899345936 17592186044672 549755813904 8796093022464 0 1 68719476740 4096 68719476737 "
-        "1099511631872 549755814144 1099511628032 1099511627904 4294967552 4294967297 1 0 "
-        "211106232532992 131072 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 0 0 0 ";
+    string expectTilingData = "85899345936 17592186044672 549755813904 8796093022464 0 1 68719476740 4096 68719476737 "
+                              "1099511631872 549755814144 1099511628032 1099511627904 4294967552 4294967297 1 0 "
+                              "211106232532992 131072 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {17039360};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }

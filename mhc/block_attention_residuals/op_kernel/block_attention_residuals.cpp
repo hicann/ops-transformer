@@ -28,8 +28,8 @@ using namespace BlockAttentionResiduals;
 #endif
 
 template <typename D_IN>
-__aicore__ inline void RunReload(TPipe *pipe, const BlockAttentionResidualsTilingData &tilingData,
-                                 const BlockAttentionResidualsInitParams &initParams)
+__aicore__ inline void RunReload(TPipe* pipe, const BlockAttentionResidualsTilingData& tilingData,
+                                 const BlockAttentionResidualsInitParams& initParams)
 {
     BlockAttentionResidualsReload<D_IN> op(pipe, &tilingData);
     op.Init(initParams);
@@ -37,8 +37,8 @@ __aicore__ inline void RunReload(TPipe *pipe, const BlockAttentionResidualsTilin
 }
 
 template <typename D_IN>
-__aicore__ inline void RunResident(TPipe *pipe, const BlockAttentionResidualsTilingData &tilingData,
-                                   const BlockAttentionResidualsInitParams &initParams)
+__aicore__ inline void RunResident(TPipe* pipe, const BlockAttentionResidualsTilingData& tilingData,
+                                   const BlockAttentionResidualsInitParams& initParams)
 {
     BlockAttentionResidualsResident<D_IN> op(pipe, &tilingData);
     op.Init(initParams);
@@ -46,8 +46,8 @@ __aicore__ inline void RunResident(TPipe *pipe, const BlockAttentionResidualsTil
 }
 
 template <typename D_IN>
-__aicore__ inline void RunHSlice(TPipe *pipe, const BlockAttentionResidualsTilingData &tilingData,
-                                 const BlockAttentionResidualsInitParams &initParams)
+__aicore__ inline void RunHSlice(TPipe* pipe, const BlockAttentionResidualsTilingData& tilingData,
+                                 const BlockAttentionResidualsInitParams& initParams)
 {
     BlockAttentionResidualsHSlice<D_IN> op(pipe, &tilingData);
     op.Init(initParams);

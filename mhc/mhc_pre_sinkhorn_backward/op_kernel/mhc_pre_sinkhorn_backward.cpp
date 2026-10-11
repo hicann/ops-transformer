@@ -20,12 +20,13 @@
 
 using namespace AscendC;
 
-template<bool TILINGKEY>
-__global__ __aicore__ void
-mhc_pre_sinkhorn_backward(GM_ADDR grad_hin, GM_ADDR grad_h_post, GM_ADDR grad_h_res, GM_ADDR x, GM_ADDR phi,
-                          GM_ADDR alpha, GM_ADDR bias, GM_ADDR h_pre, GM_ADDR hc_before_norm, GM_ADDR inv_rms,
-                          GM_ADDR sum_out, GM_ADDR norm_out, GM_ADDR grad_x, GM_ADDR grad_phi, GM_ADDR grad_alpha,
-                          GM_ADDR grad_bias, GM_ADDR workspace, GM_ADDR tiling)
+template <bool TILINGKEY>
+__global__ __aicore__ void mhc_pre_sinkhorn_backward(GM_ADDR grad_hin, GM_ADDR grad_h_post, GM_ADDR grad_h_res,
+                                                     GM_ADDR x, GM_ADDR phi, GM_ADDR alpha, GM_ADDR bias, GM_ADDR h_pre,
+                                                     GM_ADDR hc_before_norm, GM_ADDR inv_rms, GM_ADDR sum_out,
+                                                     GM_ADDR norm_out, GM_ADDR grad_x, GM_ADDR grad_phi,
+                                                     GM_ADDR grad_alpha, GM_ADDR grad_bias, GM_ADDR workspace,
+                                                     GM_ADDR tiling)
 {
     REGISTER_TILING_DEFAULT(MhcPreSinkhornBackwardArch22TilingData);
     GET_TILING_DATA_WITH_STRUCT(MhcPreSinkhornBackwardArch22TilingData, tilingData, tiling);

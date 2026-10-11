@@ -115,9 +115,9 @@ public:
     };
 
 public:
-    __aicore__ inline void Init(const Params &params);
-    __aicore__ inline void Run(const Params &params);
-    __aicore__ inline void operator()(const Params &params)
+    __aicore__ inline void Init(const Params& params);
+    __aicore__ inline void Run(const Params& params);
+    __aicore__ inline void operator()(const Params& params)
     {
         if ASCEND_IS_AIV {
             return;
@@ -126,12 +126,12 @@ public:
     }
 
 private:
-    __aicore__ inline void ProcessSingleGroup(const Params &params, BlockSchedulerOp &bs, uint32_t groupIdx);
+    __aicore__ inline void ProcessSingleGroup(const Params& params, BlockSchedulerOp& bs, uint32_t groupIdx);
     __aicore__ inline void UpdateOffset(uint32_t groupIdx);
     __aicore__ inline int32_t GetSplitValueFromGroupList(uint32_t groupIdx);
     __aicore__ inline void UpdateMMGlobalAddr();
     __aicore__ inline void Iterate(int64_t singleCoreM, int64_t singleCoreN);
-    __aicore__ inline bool IsLastGroupAndNeedSplit(const BlockSchedulerOp &bs, uint32_t groupIdx);
+    __aicore__ inline bool IsLastGroupAndNeedSplit(const BlockSchedulerOp& bs, uint32_t groupIdx);
 
 private:
     BlockMmad mmadOp_;
@@ -162,7 +162,7 @@ private:
 
 QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS
 __aicore__ inline void KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::Run(
-    const Params &params)
+    const Params& params)
 {
     Init(params);
     BlockSchedulerOp bs(params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
@@ -192,7 +192,7 @@ __aicore__ inline void KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPI
 
 QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS
 __aicore__ inline void KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::Init(
-    const Params &params)
+    const Params& params)
 {
     xTensorPtr_ = params.mmadParams.aGmAddr;
     wTensorPtr_ = params.mmadParams.bGmAddr;
@@ -208,7 +208,7 @@ __aicore__ inline void KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPI
     Get<MNK_K>(problemShape_) = params.gmmParams.k;
 
     if (groupListPtr_ != nullptr) {
-        groupListGlobal_.SetGlobalBuffer((__gm__ int64_t *)groupListPtr_);
+        groupListGlobal_.SetGlobalBuffer((__gm__ int64_t*)groupListPtr_);
     }
     TupleShape l0Shape{static_cast<int64_t>(params.gmmParams.baseM), static_cast<int64_t>(params.gmmParams.baseN),
                        static_cast<int64_t>(params.gmmParams.baseK)};
@@ -219,7 +219,7 @@ __aicore__ inline void KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPI
 
 QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS
 __aicore__ inline bool KernelQGmmInplaceAddFixpipeDequant<
-    QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::IsLastGroupAndNeedSplit(const BlockSchedulerOp &bs, uint32_t groupIdx)
+    QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::IsLastGroupAndNeedSplit(const BlockSchedulerOp& bs, uint32_t groupIdx)
 {
     // Consider tail split only when at least half of the cores are still available.
     return groupIdx == groupNum_ - 1 && (bs.GetEndBlockIdx() + 1) <= AscendC::GetBlockNum() >> 1;
@@ -249,7 +249,7 @@ __aicore__ inline void KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPI
 QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS
 __aicore__ inline void
 KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::ProcessSingleGroup(
-    const Params &params, BlockSchedulerOp &bs, uint32_t groupIdx)
+    const Params& params, BlockSchedulerOp& bs, uint32_t groupIdx)
 {
     CoordClass coord(Get<MNK_M>(problemShape_), Get<MNK_N>(problemShape_), Get<MNK_K>(problemShape_),
                      static_cast<int64_t>(params.gmmParams.baseM), params.gmmParams.baseN, params.gmmParams.baseK);
@@ -282,15 +282,15 @@ __aicore__ inline void
 KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::UpdateMMGlobalAddr()
 {
     // Update global tensor addresses for the current grouped matmul instance.
-    aGlobal_.SetGlobalBuffer((__gm__ AType *)xTensorPtr_ + Get<IDX_A_OFFSET>(baseOffset_));
-    bGlobal_.SetGlobalBuffer((__gm__ BType *)wTensorPtr_ + Get<IDX_B_OFFSET>(baseOffset_));
-    x1ScaleGlobal_.SetGlobalBuffer((__gm__ float *)x1ScaleTensorPtr_ + Get<IDX_X1SCALE_OFFSET>(baseOffset_));
-    x2ScaleGlobal_.SetGlobalBuffer((__gm__ float *)x2ScaleTensorPtr_ + Get<IDX_X2SCALE_OFFSET>(baseOffset_));
+    aGlobal_.SetGlobalBuffer((__gm__ AType*)xTensorPtr_ + Get<IDX_A_OFFSET>(baseOffset_));
+    bGlobal_.SetGlobalBuffer((__gm__ BType*)wTensorPtr_ + Get<IDX_B_OFFSET>(baseOffset_));
+    x1ScaleGlobal_.SetGlobalBuffer((__gm__ float*)x1ScaleTensorPtr_ + Get<IDX_X1SCALE_OFFSET>(baseOffset_));
+    x2ScaleGlobal_.SetGlobalBuffer((__gm__ float*)x2ScaleTensorPtr_ + Get<IDX_X2SCALE_OFFSET>(baseOffset_));
     float deqScale = x1ScaleGlobal_.GetValue(0) * x2ScaleGlobal_.GetValue(0);
-    uint32_t uint32Scale = *(reinterpret_cast<uint32_t *>(&deqScale));
+    uint32_t uint32Scale = *(reinterpret_cast<uint32_t*>(&deqScale));
     scaleScalar_ = static_cast<uint64_t>(uint32Scale & DEQSCALE_HIGH19_MASK);
 
-    yGlobal_.SetGlobalBuffer((__gm__ CType *)yTensorPtr_ + Get<IDX_C_OFFSET>(baseOffset_));
+    yGlobal_.SetGlobalBuffer((__gm__ CType*)yTensorPtr_ + Get<IDX_C_OFFSET>(baseOffset_));
     yGlobal_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
 }
 

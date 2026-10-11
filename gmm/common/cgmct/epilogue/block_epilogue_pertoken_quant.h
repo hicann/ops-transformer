@@ -80,7 +80,7 @@ constexpr float NEG_INFINITY = -INFINITY;
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
 class BlockEpiloguePertokenQuant {
 public:
-    __aicore__ inline BlockEpiloguePertokenQuant(TPipe *pipe)
+    __aicore__ inline BlockEpiloguePertokenQuant(TPipe* pipe)
         : pPipe_(pipe)
     {}
 
@@ -99,11 +99,11 @@ public:
     using XDtype = XDtype_;
     using YDtype = YDtype_;
     using YCopyDtype = std::conditional_t<IsSameType<YDtype_, int4b_t>::value, uint8_t, YDtype_>;
-    __aicore__ inline void Init(Params const &params);
+    __aicore__ inline void Init(Params const& params);
     __aicore__ inline void operator()(uint32_t realM);
 
 private:
-    const Params *params_;
+    const Params* params_;
     __aicore__ inline void CalParams(uint32_t realM);
     __aicore__ inline void InitParams();
     __aicore__ inline void InitCommonParams();
@@ -112,14 +112,14 @@ private:
     __aicore__ inline void CopyIn(int32_t multiRow, int32_t loopNum);
     __aicore__ inline void Compute(int32_t multiRow);
     __aicore__ inline void CopyOut(int32_t multiRow, int32_t loopCount);
-    __aicore__ inline void DataCopyInputVF(__local_mem__ XDtype *xAddr, AscendC::Reg::RegTensor<float> &vregRes,
+    __aicore__ inline void DataCopyInputVF(__local_mem__ XDtype* xAddr, AscendC::Reg::RegTensor<float>& vregRes,
                                            AscendC::Reg::MaskReg pregMask);
-    __aicore__ inline void ComputeYVF(__local_mem__ XDtype *xAddr, __local_mem__ YCopyDtype *yAddr,
-                                      AscendC::Reg::RegTensor<float> &vregDupScale, int32_t indexRow);
-    __aicore__ inline void ComputeScaleVF(__local_mem__ XDtype *xAddr, __local_mem__ float *scaleAddr,
-                                          AscendC::Reg::RegTensor<float> &vregDupScale, int32_t indexRow);
-    __aicore__ inline void ComputeVF(__local_mem__ XDtype *xAddr, __local_mem__ YCopyDtype *yAddr,
-                                     __local_mem__ float *scaleAddr, int32_t multiRow);
+    __aicore__ inline void ComputeYVF(__local_mem__ XDtype* xAddr, __local_mem__ YCopyDtype* yAddr,
+                                      AscendC::Reg::RegTensor<float>& vregDupScale, int32_t indexRow);
+    __aicore__ inline void ComputeScaleVF(__local_mem__ XDtype* xAddr, __local_mem__ float* scaleAddr,
+                                          AscendC::Reg::RegTensor<float>& vregDupScale, int32_t indexRow);
+    __aicore__ inline void ComputeVF(__local_mem__ XDtype* xAddr, __local_mem__ YCopyDtype* yAddr,
+                                     __local_mem__ float* scaleAddr, int32_t multiRow);
     __aicore__ inline void SetMaxValue();
 
     TQue<QuePosition::VECIN, USE_BUFFER_NUM> inQueue;
@@ -146,12 +146,12 @@ private:
     uint32_t multiRowNumHeadCore_ = 0;
     uint32_t multiRowNumTailCore_ = 0;
     bool isPad_ = false;
-    TPipe *pPipe_ = nullptr;
+    TPipe* pPipe_ = nullptr;
 };
 
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::Init(
-    Params const &params)
+    Params const& params)
 {
     if ASCEND_IS_AIC {
         return;
@@ -267,19 +267,18 @@ BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>:
     if (blockIdx_ < headCoreNum_) {
         baseRow_ = blockIdx_ * rowPerHeadCore_;
         // headCore处理的元素总数lenHead、outLenHead。如果输出是INT4，这边outLenHead数量是lenHead一半
-        inGm_.SetGlobalBuffer((__gm__ XDtype *)x + blockIdx_ * lenHead_, lenHead_);
-        outGm_.SetGlobalBuffer((__gm__ YCopyDtype *)y + blockIdx_ * outLenHead_, outLenHead_);
+        inGm_.SetGlobalBuffer((__gm__ XDtype*)x + blockIdx_ * lenHead_, lenHead_);
+        outGm_.SetGlobalBuffer((__gm__ YCopyDtype*)y + blockIdx_ * outLenHead_, outLenHead_);
         // scale每次偏移每个核处理的row数量的地址
-        yScaleGm_.SetGlobalBuffer((__gm__ float *)scale + blockIdx_ * rowPerHeadCore_, rowPerHeadCore_);
+        yScaleGm_.SetGlobalBuffer((__gm__ float*)scale + blockIdx_ * rowPerHeadCore_, rowPerHeadCore_);
         // tailCoreGM申请
     } else {
         baseRow_ = headCoreNum_ * rowPerHeadCore_ + (blockIdx_ - headCoreNum_) * rowPerTailCore_;
-        inGm_.SetGlobalBuffer((__gm__ XDtype *)x + headCoreNum_ * lenHead_ + (blockIdx_ - headCoreNum_) * lenTail_,
+        inGm_.SetGlobalBuffer((__gm__ XDtype*)x + headCoreNum_ * lenHead_ + (blockIdx_ - headCoreNum_) * lenTail_,
                               lenTail_);
         outGm_.SetGlobalBuffer(
-            (__gm__ YCopyDtype *)y + headCoreNum_ * outLenHead_ + (blockIdx_ - headCoreNum_) * outLenTail_,
-            outLenTail_);
-        yScaleGm_.SetGlobalBuffer((__gm__ float *)scale + baseRow_, rowPerTailCore_);
+            (__gm__ YCopyDtype*)y + headCoreNum_ * outLenHead_ + (blockIdx_ - headCoreNum_) * outLenTail_, outLenTail_);
+        yScaleGm_.SetGlobalBuffer((__gm__ float*)scale + baseRow_, rowPerTailCore_);
     }
 
     // 申请Buffer大小inQueue，outQueue，scaleQueue
@@ -322,10 +321,10 @@ __aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QU
     LocalTensor<YCopyDtype> yLocal = outQueue.template AllocTensor<YCopyDtype>();
     LocalTensor<XDtype> xLocal = inQueue.template DeQue<XDtype>();
 
-    __local_mem__ XDtype *xAddr = (__local_mem__ XDtype *)xLocal.GetPhyAddr();
+    __local_mem__ XDtype* xAddr = (__local_mem__ XDtype*)xLocal.GetPhyAddr();
 
-    __local_mem__ YCopyDtype *yAddr = (__local_mem__ YCopyDtype *)yLocal.GetPhyAddr();
-    __local_mem__ float *scaleAddr = (__local_mem__ float *)scaleLocal.GetPhyAddr();
+    __local_mem__ YCopyDtype* yAddr = (__local_mem__ YCopyDtype*)yLocal.GetPhyAddr();
+    __local_mem__ float* scaleAddr = (__local_mem__ float*)scaleLocal.GetPhyAddr();
 
     ComputeVF(xAddr, yAddr, scaleAddr, multiRow);
 
@@ -359,7 +358,7 @@ __aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QU
 
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::DataCopyInputVF(
-    __local_mem__ XDtype *xAddr, AscendC::Reg::RegTensor<float> &vregRes, AscendC::Reg::MaskReg pregMask)
+    __local_mem__ XDtype* xAddr, AscendC::Reg::RegTensor<float>& vregRes, AscendC::Reg::MaskReg pregMask)
 {
     AscendC::Reg::RegTensor<XDtype> vregX;
 
@@ -374,7 +373,7 @@ __aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QU
 
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::ComputeYVF(
-    __local_mem__ XDtype *xAddr, __local_mem__ YCopyDtype *yAddr, AscendC::Reg::RegTensor<float> &vregDupScale,
+    __local_mem__ XDtype* xAddr, __local_mem__ YCopyDtype* yAddr, AscendC::Reg::RegTensor<float>& vregDupScale,
     int32_t indexRow)
 {
     AscendC::Reg::RegTensor<float> vregInput;
@@ -406,9 +405,9 @@ __aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QU
             AscendC::Reg::RegTensor<uint16_t> vreg20;
             AscendC::Reg::Cast<int16_t, float, castTraitF32ToI16>(vregYInt16, vregYFp32, preg2);
             AscendC::Reg::Cast<half, int16_t, castTraitI16ToF16>(vregYFp16, vregYInt16, preg2);
-            AscendC::Reg::Pack(vreg20, (AscendC::Reg::RegTensor<uint32_t> &)vregYFp16);
-            AscendC::Reg::Cast<int4x2_t, half, castTraitF16ToI8>((AscendC::Reg::RegTensor<int4x2_t> &)vregY,
-                                                                 (AscendC::Reg::RegTensor<half> &)vreg20, preg2);
+            AscendC::Reg::Pack(vreg20, (AscendC::Reg::RegTensor<uint32_t>&)vregYFp16);
+            AscendC::Reg::Cast<int4x2_t, half, castTraitF16ToI8>((AscendC::Reg::RegTensor<int4x2_t>&)vregY,
+                                                                 (AscendC::Reg::RegTensor<half>&)vreg20, preg2);
             addr = yAddr + (indexRow * outAlignLen_ + j * vlForHalfNumber_) / 2;
         }
         if constexpr (IsSameType<YDtype, int4b_t>::value) {
@@ -421,7 +420,7 @@ __aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QU
 
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::ComputeScaleVF(
-    __local_mem__ XDtype *xAddr, __local_mem__ float *scaleAddr, AscendC::Reg::RegTensor<float> &vregDupScale,
+    __local_mem__ XDtype* xAddr, __local_mem__ float* scaleAddr, AscendC::Reg::RegTensor<float>& vregDupScale,
     int32_t indexRow)
 {
     AscendC::Reg::RegTensor<float> vregInput;
@@ -468,7 +467,7 @@ __aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QU
 
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::ComputeVF(
-    __local_mem__ XDtype *xAddr, __local_mem__ YCopyDtype *yAddr, __local_mem__ float *scaleAddr, int32_t multiRow)
+    __local_mem__ XDtype* xAddr, __local_mem__ YCopyDtype* yAddr, __local_mem__ float* scaleAddr, int32_t multiRow)
 {
     __VEC_SCOPE__
     {

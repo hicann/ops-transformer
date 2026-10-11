@@ -38,18 +38,18 @@ static constexpr size_t SECOND_TO_LAST_OFFSET = 2;
 static constexpr int64_t UNKNOWN_RANK_DIM_VALUE = -2LL;
 static constexpr int64_t UNKNOWN_DIM_VALUE = -1LL;
 
-static void SetUnknownRank(gert::Shape &shape)
+static void SetUnknownRank(gert::Shape& shape)
 {
     shape.SetDimNum(0);
     shape.AppendDim(UNKNOWN_RANK_DIM_VALUE);
 }
 
-static bool IsUnknownRank(const gert::Shape &shape)
+static bool IsUnknownRank(const gert::Shape& shape)
 {
     return shape.GetDimNum() == 1 && shape.GetDim(0) == UNKNOWN_RANK_DIM_VALUE;
 }
 
-static bool IsUnknownShape(const gert::Shape &shape)
+static bool IsUnknownShape(const gert::Shape& shape)
 {
     size_t dimNum = shape.GetDimNum();
     for (size_t i = 0; i < dimNum; i++) {
@@ -60,7 +60,7 @@ static bool IsUnknownShape(const gert::Shape &shape)
     return false;
 }
 
-static void CopyShape(const gert::Shape *&src, gert::Shape *&dst)
+static void CopyShape(const gert::Shape*& src, gert::Shape*& dst)
 {
     size_t dimNum = src->GetDimNum();
     dst->SetDimNum(dimNum);
@@ -69,7 +69,7 @@ static void CopyShape(const gert::Shape *&src, gert::Shape *&dst)
     }
 }
 
-static ge::graphStatus SetAllUnknownDim(const int64_t rank, gert::Shape *outputShape)
+static ge::graphStatus SetAllUnknownDim(const int64_t rank, gert::Shape* outputShape)
 {
     outputShape->SetDimNum(rank);
     for (int64_t i = 0; i < rank; i++) {
@@ -78,9 +78,9 @@ static ge::graphStatus SetAllUnknownDim(const int64_t rank, gert::Shape *outputS
     return ge::GRAPH_SUCCESS;
 }
 
-static void ShowInputShapeInfo(gert::InferShapeContext *context, const gert::Shape *gradYShape,
-                               const gert::Shape *xShape, const gert::Shape *hResShape, const gert::Shape *hOutShape,
-                               const gert::Shape *hPostShape)
+static void ShowInputShapeInfo(gert::InferShapeContext* context, const gert::Shape* gradYShape,
+                               const gert::Shape* xShape, const gert::Shape* hResShape, const gert::Shape* hOutShape,
+                               const gert::Shape* hPostShape)
 {
     OP_LOGD(context, "gradYShape is: %s.", Ops::Base::ToString(*gradYShape).c_str());
     OP_LOGD(context, "xShape is: %s.", Ops::Base::ToString(*xShape).c_str());
@@ -90,9 +90,9 @@ static void ShowInputShapeInfo(gert::InferShapeContext *context, const gert::Sha
 }
 
 // ShowOutputShapeInfo(context, gradXShape, gradHresShape, gradHoutShape, gradHpostShape)
-static void ShowOutputShapeInfo(gert::InferShapeContext *context, const gert::Shape *gradXShape,
-                                const gert::Shape *gradHresShape, const gert::Shape *gradHoutShape,
-                                const gert::Shape *gradHpostShape)
+static void ShowOutputShapeInfo(gert::InferShapeContext* context, const gert::Shape* gradXShape,
+                                const gert::Shape* gradHresShape, const gert::Shape* gradHoutShape,
+                                const gert::Shape* gradHpostShape)
 {
     OP_LOGD(context, "gradXShape is: %s.", Ops::Base::ToString(*gradXShape).c_str());
     OP_LOGD(context, "gradHresShape is: %s.", Ops::Base::ToString(*gradHresShape).c_str());
@@ -100,26 +100,26 @@ static void ShowOutputShapeInfo(gert::InferShapeContext *context, const gert::Sh
     OP_LOGD(context, "gradHpostShape is: %s.", Ops::Base::ToString(*gradHpostShape).c_str());
 }
 
-static ge::graphStatus InferShapeForMhcPostBackward(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeForMhcPostBackward(gert::InferShapeContext* context)
 {
     OP_LOGD(context, "Begin to do MhcPostInfershape.");
-    const gert::Shape *gradYShape = context->GetInputShape(INDEX_GRADY);
+    const gert::Shape* gradYShape = context->GetInputShape(INDEX_GRADY);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradYShape);
-    const gert::Shape *xShape = context->GetInputShape(INDEX_X);
+    const gert::Shape* xShape = context->GetInputShape(INDEX_X);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
-    const gert::Shape *hResShape = context->GetInputShape(INDEX_HRES);
+    const gert::Shape* hResShape = context->GetInputShape(INDEX_HRES);
     OP_CHECK_NULL_WITH_CONTEXT(context, hResShape);
-    const gert::Shape *hOutShape = context->GetInputShape(INDEX_HOUT);
+    const gert::Shape* hOutShape = context->GetInputShape(INDEX_HOUT);
     OP_CHECK_NULL_WITH_CONTEXT(context, hOutShape);
-    const gert::Shape *hPostShape = context->GetInputShape(INDEX_HPOST);
+    const gert::Shape* hPostShape = context->GetInputShape(INDEX_HPOST);
     OP_CHECK_NULL_WITH_CONTEXT(context, hPostShape);
-    gert::Shape *gradXShape = context->GetOutputShape(INDEX_GRADX);
+    gert::Shape* gradXShape = context->GetOutputShape(INDEX_GRADX);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradXShape);
-    gert::Shape *gradHresShape = context->GetOutputShape(INDEX_GRADHRES);
+    gert::Shape* gradHresShape = context->GetOutputShape(INDEX_GRADHRES);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradHresShape);
-    gert::Shape *gradHoutShape = context->GetOutputShape(INDEX_GRADHOUT);
+    gert::Shape* gradHoutShape = context->GetOutputShape(INDEX_GRADHOUT);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradHoutShape);
-    gert::Shape *gradHpostShape = context->GetOutputShape(INDEX_GRADHPOST);
+    gert::Shape* gradHpostShape = context->GetOutputShape(INDEX_GRADHPOST);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradHpostShape);
 
     if (IsUnknownRank(*gradYShape) || IsUnknownRank(*xShape) || IsUnknownRank(*hResShape) ||
@@ -171,7 +171,7 @@ static ge::graphStatus InferShapeForMhcPostBackward(gert::InferShapeContext *con
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeForMhcPostBackward(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeForMhcPostBackward(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do MhcPostInferDataType.");
     if (context == nullptr) {

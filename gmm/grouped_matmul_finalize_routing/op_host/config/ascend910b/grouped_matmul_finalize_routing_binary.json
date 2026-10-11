@@ -47,7 +47,7 @@
                         -2
                     ],
                     "format_match_mode": "FormatDefault"
-                },                
+                },
                 {
                     "name": "pertoken_scale",
                     "index": 4,
@@ -58,7 +58,7 @@
                         -2
                     ],
                     "format_match_mode": "FormatDefault"
-                },                
+                },
                 {
                     "name": "group_list",
                     "index": 5,
@@ -80,7 +80,7 @@
                         -2
                     ],
                     "format_match_mode": "FormatDefault"
-                },      
+                },
                 {
                     "name": "logit",
                     "index": 7,
@@ -91,7 +91,7 @@
                         -2
                     ],
                     "format_match_mode": "FormatDefault"
-                },        
+                },
                 {
                     "name": "row_index",
                     "index": 8,
@@ -113,7 +113,7 @@
                         -2
                     ],
                     "format_match_mode": "FormatDefault"
-                }                    
+                }
             ],
             "outputs": [
                 {
@@ -143,7 +143,7 @@
                     "name": "shared_input_offset",
                     "dtype": "int32",
                     "value": 0
-                },                
+                },
                 {
                     "name": "transpose_x",
                     "dtype": "bool",
@@ -217,7 +217,7 @@
                         -2
                     ],
                     "format_match_mode": "FormatDefault"
-                },                
+                },
                 {
                     "name": "pertoken_scale",
                     "index": 4,
@@ -228,7 +228,7 @@
                         -2
                     ],
                     "format_match_mode": "FormatDefault"
-                },                
+                },
                 {
                     "name": "group_list",
                     "index": 5,
@@ -250,7 +250,7 @@
                         -2
                     ],
                     "format_match_mode": "FormatDefault"
-                },      
+                },
                 {
                     "name": "logit",
                     "index": 7,
@@ -261,7 +261,7 @@
                         -2
                     ],
                     "format_match_mode": "FormatDefault"
-                },        
+                },
                 {
                     "name": "row_index",
                     "index": 8,
@@ -283,7 +283,7 @@
                         -2
                     ],
                     "format_match_mode": "FormatDefault"
-                }                    
+                }
             ],
             "outputs": [
                 {
@@ -313,7 +313,7 @@
                     "name": "shared_input_offset",
                     "dtype": "int32",
                     "value": 0
-                },                
+                },
                 {
                     "name": "transpose_x",
                     "dtype": "bool",

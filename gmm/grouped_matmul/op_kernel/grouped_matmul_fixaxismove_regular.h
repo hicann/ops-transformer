@@ -77,7 +77,7 @@ public:
         uint32_t n;
         uint32_t problemCount;
         uint32_t workspaceStages;
-        __gm__ ElementGroupList *ptrGroupList;
+        __gm__ ElementGroupList* ptrGroupList;
         GM_ADDR ptrA;
         LayoutA layoutA;
         GM_ADDR ptrB;
@@ -85,7 +85,7 @@ public:
         // __gm__ ElementScale *ptrScale;
         GM_ADDR ptrScale;
         LayoutScale layoutScale;
-        __gm__ ElementPerTokenScale *ptrPerTokenScale;
+        __gm__ ElementPerTokenScale* ptrPerTokenScale;
         // GM_ADDR ptrPerTokenScale;
         LayoutPerTokenScale layoutPerTokenScale;
         GM_ADDR ptrD;
@@ -106,14 +106,14 @@ public:
               n(n_),
               problemCount(problemCount_),
               workspaceStages(workspaceStages_),
-              ptrGroupList(reinterpret_cast<__gm__ ElementGroupList *>(ptrGroupList_)),
+              ptrGroupList(reinterpret_cast<__gm__ ElementGroupList*>(ptrGroupList_)),
               ptrA((ptrA_)),
               layoutA(layoutA_),
               ptrB((ptrB_)),
               layoutB(layoutB_),
               ptrScale((ptrScale_)),
               layoutScale(layoutScale_),
-              ptrPerTokenScale(reinterpret_cast<__gm__ ElementPerTokenScale *>(ptrPerTokenScale_)),
+              ptrPerTokenScale(reinterpret_cast<__gm__ ElementPerTokenScale*>(ptrPerTokenScale_)),
               layoutPerTokenScale(layoutPerTokenScale_),
               ptrD((ptrD_)),
               layoutD(layoutD_),
@@ -129,27 +129,27 @@ public:
     ~GroupedMatmulSliceMPerTokenDequantFixAxisMove() {}
 
     template <typename T>
-    CATLASS_DEVICE __gm__ T *GetTensorAddr(uint16_t index, GM_ADDR tensorPtr)
+    CATLASS_DEVICE __gm__ T* GetTensorAddr(uint16_t index, GM_ADDR tensorPtr)
     {
-        __gm__ uint64_t *dataAddr = reinterpret_cast<__gm__ uint64_t *>(tensorPtr);
+        __gm__ uint64_t* dataAddr = reinterpret_cast<__gm__ uint64_t*>(tensorPtr);
         uint64_t tensorPtrOffset = *dataAddr; // The offset of the data address from the first address.
         // Moving 3 bits to the right means dividing by sizeof(uint64 t).
-        __gm__ uint64_t *retPtr = dataAddr + (tensorPtrOffset >> 3);
-        return reinterpret_cast<__gm__ T *>(*(retPtr + index));
+        __gm__ uint64_t* retPtr = dataAddr + (tensorPtrOffset >> 3);
+        return reinterpret_cast<__gm__ T*>(*(retPtr + index));
     }
 
     template <int32_t CORE_TYPE = g_coreType>
-    CATLASS_DEVICE void operator()(Params const &params);
+    CATLASS_DEVICE void operator()(Params const& params);
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const& params)
     {
         BlockScheduler blockScheduler;
         BlockMmad blockMmad(resource);
 
         // Represent the full gm
         AscendC::GlobalTensor<ElementC> gmC;
-        gmC.SetGlobalBuffer(reinterpret_cast<__gm__ ElementC *>(params.ptrWorkspace));
+        gmC.SetGlobalBuffer(reinterpret_cast<__gm__ ElementC*>(params.ptrWorkspace));
 
         AscendC::GlobalTensor<ElementGroupList> groupList;
         groupList.SetGlobalBuffer(params.ptrGroupList);
@@ -277,7 +277,7 @@ public:
     }
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIV>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIV>(Params const& params)
     {
         BlockScheduler blockScheduler;
         BlockEpilogue blockEpilogue(resource);
@@ -295,7 +295,7 @@ public:
         int64_t gmGroupOffsetD = 0;
 
         AscendC::GlobalTensor<ElementC> gmC;
-        gmC.SetGlobalBuffer(reinterpret_cast<__gm__ ElementC *>(params.ptrWorkspace));
+        gmC.SetGlobalBuffer(reinterpret_cast<__gm__ ElementC*>(params.ptrWorkspace));
         auto layoutC = layout::RowMajor{L1TileShape::M * coreNum * params.workspaceStages, L1TileShape::N};
 
         AscendC::GlobalTensor<ElementGroupList> groupList;
@@ -380,7 +380,7 @@ private:
             Arch::CrossCoreWaitFlag(ptr->flagAivFinishComputeList);
         }
 
-        MatmulKernel *ptr{nullptr};
+        MatmulKernel* ptr{nullptr};
         uint32_t stageId;
     };
 
@@ -397,7 +397,7 @@ private:
             Arch::CrossCoreSetFlag<0x2, PIPE_FIX>(ptr->flagAicFinishStoreList[stageId]);
         }
 
-        MatmulKernel *ptr{nullptr};
+        MatmulKernel* ptr{nullptr};
         uint32_t stageId;
     };
 

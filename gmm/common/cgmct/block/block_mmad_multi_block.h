@@ -82,7 +82,7 @@ public:
      * @param [out] OutputCType: output data type of matrix C
      * @param [in] InputBiasType: input data type of the bias
      */
-    template <const auto &MM_CFG, typename Impl, typename InputAType, typename InputBType, typename OutputCType,
+    template <const auto& MM_CFG, typename Impl, typename InputAType, typename InputBType, typename OutputCType,
               typename InputBiasType>
     struct MatmulPolicyCustom
         : public AscendC::Impl::Detail::MatmulPolicy<MM_CFG, Impl, InputAType, InputBType, OutputCType, InputBiasType> {
@@ -111,7 +111,7 @@ public:
      * @param [in] cubeTiling: configuration parameters for matrix multiplication
      * @param [in] tpipe: the pipe object, default is nullptr
      */
-    __aicore__ inline void Init(TCubeTiling *__restrict cubeTiling, AscendC::TPipe *tpipe = nullptr)
+    __aicore__ inline void Init(TCubeTiling* __restrict cubeTiling, AscendC::TPipe* tpipe = nullptr)
     {
         matmul_.Init(cubeTiling, tpipe);
     }
@@ -140,7 +140,7 @@ public:
      * @param [in] gm: global tensor for matrix A
      * @param [in] isTransposeA: whether to transpose matrix A, default is false
      */
-    __aicore__ inline void SetTensorA(const AscendC::GlobalTensor<typename AType::T> &gm, bool isTransposeA = false)
+    __aicore__ inline void SetTensorA(const AscendC::GlobalTensor<typename AType::T>& gm, bool isTransposeA = false)
     {
         matmul_.SetTensorA(gm, isTransposeA);
     }
@@ -149,7 +149,7 @@ public:
      * @param [in] gm: global tensor for matrix B
      * @param [in] isTransposeB: whether to transpose matrix B, default is false
      */
-    __aicore__ inline void SetTensorB(const AscendC::GlobalTensor<typename BType::T> &gm, bool isTransposeB = false)
+    __aicore__ inline void SetTensorB(const AscendC::GlobalTensor<typename BType::T>& gm, bool isTransposeB = false)
     {
         matmul_.SetTensorB(gm, isTransposeB);
     }
@@ -166,7 +166,7 @@ public:
      * @param [in] gm: global memory tensor
      * @param [in] enAtomic: whether to enable atomic operations
      */
-    __aicore__ inline void IterateAll(const AscendC::GlobalTensor<typename CType::T> &gm, uint8_t enAtomic = 0)
+    __aicore__ inline void IterateAll(const AscendC::GlobalTensor<typename CType::T>& gm, uint8_t enAtomic = 0)
     {
         matmul_.IterateAll(gm, enAtomic);
     }
@@ -175,7 +175,7 @@ public:
      * @param [in] ubCmatrix: local memory tensor
      * @param [in] enAtomic: whether to enable atomic operations
      */
-    __aicore__ inline void IterateAll(const AscendC::LocalTensor<typename CType::T> &ubCmatrix, uint8_t enAtomic = 0)
+    __aicore__ inline void IterateAll(const AscendC::LocalTensor<typename CType::T>& ubCmatrix, uint8_t enAtomic = 0)
     {
         matmul_.IterateAll(ubCmatrix, enAtomic);
     }
@@ -193,7 +193,7 @@ public:
      * @param [in] gm: global memory tensor
      * @param [in] enAtomic: whether to enable atomic operations
      */
-    __aicore__ inline void GetTensorC(const AscendC::GlobalTensor<typename CType::T> &gm, uint8_t enAtomic = 0)
+    __aicore__ inline void GetTensorC(const AscendC::GlobalTensor<typename CType::T>& gm, uint8_t enAtomic = 0)
     {
         matmul_.GetTensorC(gm, enAtomic);
     }
@@ -206,10 +206,10 @@ public:
      * @param [in] isTransposeA: whether to transpose matrix A
      * @param [in] isTransposeB: whether to transpose matrix B
      */
-    __aicore__ inline void operator()(const AscendC::GlobalTensor<typename AType::T> &aGlobal,
-                                      const AscendC::GlobalTensor<typename BType::T> &bGlobal,
-                                      const AscendC::LocalTensor<typename CType::T> &ubCmatrix,
-                                      const AscendC::Std::tuple<int32_t, int32_t, int32_t> &singleShape,
+    __aicore__ inline void operator()(const AscendC::GlobalTensor<typename AType::T>& aGlobal,
+                                      const AscendC::GlobalTensor<typename BType::T>& bGlobal,
+                                      const AscendC::LocalTensor<typename CType::T>& ubCmatrix,
+                                      const AscendC::Std::tuple<int32_t, int32_t, int32_t>& singleShape,
                                       bool isTransposeA = false, bool isTransposeB = false)
     {
         matmul_.SetSingleShape(Get<0>(singleShape), Get<1>(singleShape), Get<2>(singleShape)); // 2: idx of k

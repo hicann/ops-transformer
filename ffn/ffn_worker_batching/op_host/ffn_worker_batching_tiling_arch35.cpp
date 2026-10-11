@@ -127,7 +127,7 @@ constexpr int64_t EXTRACT_FIXED_BYTES = Arch35Config::EXTRACT_BUFFER_COUNT * ONE
 
 class FfnWorkerBatchingTilingArch35 : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit FfnWorkerBatchingTilingArch35(gert::TilingContext *context)
+    explicit FfnWorkerBatchingTilingArch35(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {}
     ~FfnWorkerBatchingTilingArch35() override = default;
@@ -148,14 +148,14 @@ protected:
 private:
     ge::graphStatus CheckInputParam();
     ge::graphStatus GetAttrsInfo();
-    ge::graphStatus ParseMaxOutShape(const gert::RuntimeAttrs *attrs);
-    ge::graphStatus ParseOptionalAttrs(const gert::RuntimeAttrs *attrs, int64_t expertNum);
+    ge::graphStatus ParseMaxOutShape(const gert::RuntimeAttrs* attrs);
+    ge::graphStatus ParseOptionalAttrs(const gert::RuntimeAttrs* attrs, int64_t expertNum);
     void SplitPrepare();
     void SplitSortAndMerge();
     void SplitGroupList();
     void LayoutWorkspace();
 
-    FfnWorkerBatchingArch35TilingData *tilingDataPtr_ = nullptr;
+    FfnWorkerBatchingArch35TilingData* tilingDataPtr_ = nullptr;
     int64_t A_ = 0;
     int64_t BS_ = 0;
     int64_t K_ = 0;
@@ -245,7 +245,7 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::GetAttrsInfo()
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
-    const int64_t *expertNumPtr = attrs->GetAttrPointer<int64_t>(EXPERT_NUM_ATTR);
+    const int64_t* expertNumPtr = attrs->GetAttrPointer<int64_t>(EXPERT_NUM_ATTR);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expertNumPtr);
     OP_CHECK_IF(*expertNumPtr > EXPERT_IDX_MAX || *expertNumPtr <= 0,
                 OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expert_num", std::to_string(*expertNumPtr),
@@ -263,15 +263,15 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::GetAttrsInfo()
 }
 
 // max_out_shape 是 [A, BS, K, H] 四元组:既定形状上界,也是输出 shape 的静态推导依据。
-ge::graphStatus FfnWorkerBatchingTilingArch35::ParseMaxOutShape(const gert::RuntimeAttrs *attrs)
+ge::graphStatus FfnWorkerBatchingTilingArch35::ParseMaxOutShape(const gert::RuntimeAttrs* attrs)
 {
-    const gert::ContinuousVector *maxOutShapePtr = attrs->GetAttrPointer<gert::ContinuousVector>(MAX_OUT_SHAPE_ATTR);
+    const gert::ContinuousVector* maxOutShapePtr = attrs->GetAttrPointer<gert::ContinuousVector>(MAX_OUT_SHAPE_ATTR);
     OP_CHECK_NULL_WITH_CONTEXT(context_, maxOutShapePtr);
     OP_CHECK_IF(maxOutShapePtr->GetSize() != static_cast<size_t>(NUM_FOUR),
                 OP_LOGE_WITH_INVALID_ATTR_SIZE(context_->GetNodeName(), "max_out_shape",
                                                std::to_string(maxOutShapePtr->GetSize()), std::to_string(NUM_FOUR)),
                 return ge::GRAPH_FAILED);
-    const int64_t *maxOutShapeArray = reinterpret_cast<const int64_t *>(maxOutShapePtr->GetData());
+    const int64_t* maxOutShapeArray = reinterpret_cast<const int64_t*>(maxOutShapePtr->GetData());
     A_ = maxOutShapeArray[INDEX_ZERO];
     BS_ = maxOutShapeArray[INDEX_ONE];
     K_ = maxOutShapeArray[INDEX_TWO];
@@ -318,9 +318,9 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::ParseMaxOutShape(const gert::Runt
 }
 
 // 可选属性:缺省时保留成员初值,给出即逐个校验取值域。
-ge::graphStatus FfnWorkerBatchingTilingArch35::ParseOptionalAttrs(const gert::RuntimeAttrs *attrs, int64_t expertNum)
+ge::graphStatus FfnWorkerBatchingTilingArch35::ParseOptionalAttrs(const gert::RuntimeAttrs* attrs, int64_t expertNum)
 {
-    const int64_t *tokenDtype = attrs->GetAttrPointer<int64_t>(TOKEN_DTYPE_ATTR);
+    const int64_t* tokenDtype = attrs->GetAttrPointer<int64_t>(TOKEN_DTYPE_ATTR);
     if (tokenDtype != nullptr) {
         OP_CHECK_IF((*tokenDtype < Arch35Config::TOKEN_FP16 || *tokenDtype > Arch35Config::TOKEN_FP4_E2M1),
                     OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "token_dtype", std::to_string(*tokenDtype),
@@ -333,7 +333,7 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::ParseOptionalAttrs(const gert::Ru
         tokenDtype_ = *tokenDtype;
     }
 
-    const int64_t *needSchedulePtr = attrs->GetAttrPointer<int64_t>(NEED_SCHEDULE_ATTR);
+    const int64_t* needSchedulePtr = attrs->GetAttrPointer<int64_t>(NEED_SCHEDULE_ATTR);
     if (needSchedulePtr != nullptr) {
         OP_CHECK_IF((*needSchedulePtr < 0 || *needSchedulePtr > 1),
                     OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "need_schedule",
@@ -343,11 +343,11 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::ParseOptionalAttrs(const gert::Ru
     }
 
     // 未提供时默认 false，兼容旧图的同步接收语义。
-    const bool *syncFlagPtr = attrs->GetAttrPointer<bool>(SYNC_FLAG_ATTR);
+    const bool* syncFlagPtr = attrs->GetAttrPointer<bool>(SYNC_FLAG_ATTR);
     if (syncFlagPtr != nullptr) {
         syncFlag_ = *syncFlagPtr;
     }
-    const int64_t *layNumPtr = attrs->GetAttrPointer<int64_t>(LAY_NUM_ATTR);
+    const int64_t* layNumPtr = attrs->GetAttrPointer<int64_t>(LAY_NUM_ATTR);
     if (layNumPtr != nullptr) {
         OP_CHECK_IF((*layNumPtr < 0 || *layNumPtr > expertNum),
                     OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "layer_num", std::to_string(*layNumPtr),
@@ -631,7 +631,7 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::PostTiling()
     context_->SetBlockDim(coreNum_);
     context_->SetScheduleMode(BATCH_MODE);
 
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, currentWorkspace);
     currentWorkspace[0] = static_cast<size_t>(workspaceSize_);
 

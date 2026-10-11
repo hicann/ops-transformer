@@ -36,13 +36,13 @@ public:
     __aicore__ inline S8S4RowSumPreprocess() {}
     __aicore__ inline ~S8S4RowSumPreprocess() {}
 
-    __aicore__ inline void Init(const Params &params, AscendC::TPipe *pipe)
+    __aicore__ inline void Init(const Params& params, AscendC::TPipe* pipe)
     {
         m_ = params.m;
         k_ = params.k;
         enabled_ = params.enabled;
-        xGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(params.xGmAddr));
-        rowSumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(params.rowSumGmAddr));
+        xGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(params.xGmAddr));
+        rowSumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(params.rowSumGmAddr));
         if ASCEND_IS_AIV {
             pipe->InitBuffer(xBuffer_, k_ * sizeof(int8_t));
             pipe->InitBuffer(halfBuffer_, k_ * sizeof(half));
@@ -70,7 +70,7 @@ public:
         }
     }
 
-    __aicore__ inline void operator()(const Params &params, AscendC::TPipe *pipe)
+    __aicore__ inline void operator()(const Params& params, AscendC::TPipe* pipe)
     {
         Init(params, pipe);
         Process();

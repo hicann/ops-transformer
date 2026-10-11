@@ -30,7 +30,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -39,7 +39,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<float> resultData(size, 0);
@@ -51,7 +51,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -64,8 +64,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -113,23 +113,23 @@ int main()
     std::vector<int64_t> outShape = {M, N};
     std::vector<int64_t> groupListShape = {G};
 
-    void *xDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *weightScaleDeviceAddr = nullptr;
-    void *groupListDeviceAddr = nullptr;
-    void *xScaleDeviceAddr = nullptr;
-    void *smoothScaleDeviceAddr = nullptr;
-    void *outDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* weightScaleDeviceAddr = nullptr;
+    void* groupListDeviceAddr = nullptr;
+    void* xScaleDeviceAddr = nullptr;
+    void* smoothScaleDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *weight = nullptr;
-    aclTensor *weightScale = nullptr;
-    aclTensor *groupList = nullptr;
-    aclTensor *bias = nullptr;
-    aclTensor *xScale = nullptr;
-    aclTensor *xOffset = nullptr;
-    aclTensor *smoothScale = nullptr;
-    aclTensor *out = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* weight = nullptr;
+    aclTensor* weightScale = nullptr;
+    aclTensor* groupList = nullptr;
+    aclTensor* bias = nullptr;
+    aclTensor* xScale = nullptr;
+    aclTensor* xOffset = nullptr;
+    aclTensor* smoothScale = nullptr;
+    aclTensor* out = nullptr;
 
     std::vector<uint16_t> xHostData(GetShapeSize(xShape));
     std::vector<uint8_t> weightHostData(GetShapeSize(weightShape));
@@ -162,7 +162,7 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 调用aclnnQuantGroupedMatmulDequant第一段接口
     ret = aclnnQuantGroupedMatmulDequantGetWorkspaceSize(x, weight, weightScale, groupList, bias, xScale, xOffset,
@@ -172,7 +172,7 @@ int main()
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

@@ -19,7 +19,7 @@
 namespace op_api {
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
-MhcPreSinkhorn(const at::Tensor &x, const at::Tensor &phi, const at::Tensor &alpha, const at::Tensor &bias,
+MhcPreSinkhorn(const at::Tensor& x, const at::Tensor& phi, const at::Tensor& alpha, const at::Tensor& bias,
                int64_t hcMult, int64_t numIters, double hcEps, double normEps, bool outFlag)
 {
     TORCH_CHECK(x.dim() == 3 || x.dim() == 4, "x dim must be 3 (t, n, d) or 4 (b, s, n, d), but got ", x.dim());

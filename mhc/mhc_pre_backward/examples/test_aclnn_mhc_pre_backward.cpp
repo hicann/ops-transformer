@@ -35,7 +35,7 @@ constexpr uint32_t NUMBER_TWO = 2U;
 constexpr uint32_t BF16_TO_FP32_SHIFT = 16U;
 constexpr int64_t DISPLAY_ELEMENT_COUNT = 10;
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -44,7 +44,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr, const char *name, size_t elemSize = sizeof(float))
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr, const char* name, size_t elemSize = sizeof(float))
 {
     auto size = GetShapeSize(shape);
     size_t copyBytes = size * elemSize;
@@ -74,7 +74,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr, const char *
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 固定写法，AscendCL初始化
     auto ret = aclInit(nullptr);
@@ -91,8 +91,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -143,41 +143,41 @@ int main()
     std::vector<int64_t> gradBiasShape = {24};         // T, N, D (grad_x_post)
     std::vector<int64_t> gradXPostOptionalShape = {1024, 4, 512};
 
-    void *xDeviceAddr = nullptr;
-    void *phiDeviceAddr = nullptr;
-    void *alphaDeviceAddr = nullptr;
-    void *gradHInDeviceAddr = nullptr;
-    void *gradHPostDeviceAddr = nullptr;
-    void *gradHResDeviceAddr = nullptr;
-    void *invRmsDeviceAddr = nullptr;
-    void *hMixDeviceAddr = nullptr;
-    void *hPreDeviceAddr = nullptr;
-    void *hPostDeviceAddr = nullptr;
-    void *gammaDeviceAddr = nullptr;
-    void *gradXDeviceAddr = nullptr;
-    void *gradPhiDeviceAddr = nullptr;
-    void *gradAlphaDeviceAddr = nullptr;
-    void *gradBiasDeviceAddr = nullptr;
-    void *gradGammaDeviceAddr = nullptr;
-    void *gradXPostOptionalDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* phiDeviceAddr = nullptr;
+    void* alphaDeviceAddr = nullptr;
+    void* gradHInDeviceAddr = nullptr;
+    void* gradHPostDeviceAddr = nullptr;
+    void* gradHResDeviceAddr = nullptr;
+    void* invRmsDeviceAddr = nullptr;
+    void* hMixDeviceAddr = nullptr;
+    void* hPreDeviceAddr = nullptr;
+    void* hPostDeviceAddr = nullptr;
+    void* gammaDeviceAddr = nullptr;
+    void* gradXDeviceAddr = nullptr;
+    void* gradPhiDeviceAddr = nullptr;
+    void* gradAlphaDeviceAddr = nullptr;
+    void* gradBiasDeviceAddr = nullptr;
+    void* gradGammaDeviceAddr = nullptr;
+    void* gradXPostOptionalDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *phi = nullptr;
-    aclTensor *alpha = nullptr;
-    aclTensor *gradHIn = nullptr;
-    aclTensor *gradHPost = nullptr;
-    aclTensor *gradHRes = nullptr;
-    aclTensor *invRms = nullptr;
-    aclTensor *hMix = nullptr;
-    aclTensor *hPre = nullptr;
-    aclTensor *hPost = nullptr;
-    aclTensor *gamma = nullptr;
-    aclTensor *gradX = nullptr;
-    aclTensor *gradPhi = nullptr;
-    aclTensor *gradAlpha = nullptr;
-    aclTensor *gradBias = nullptr;
-    aclTensor *gradGamma = nullptr;
-    aclTensor *gradXPostOptional = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* phi = nullptr;
+    aclTensor* alpha = nullptr;
+    aclTensor* gradHIn = nullptr;
+    aclTensor* gradHPost = nullptr;
+    aclTensor* gradHRes = nullptr;
+    aclTensor* invRms = nullptr;
+    aclTensor* hMix = nullptr;
+    aclTensor* hPre = nullptr;
+    aclTensor* hPost = nullptr;
+    aclTensor* gamma = nullptr;
+    aclTensor* gradX = nullptr;
+    aclTensor* gradPhi = nullptr;
+    aclTensor* gradAlpha = nullptr;
+    aclTensor* gradBias = nullptr;
+    aclTensor* gradGamma = nullptr;
+    aclTensor* gradXPostOptional = nullptr;
 
     std::vector<short> xHostData(1024 * 4 * 512, 1.0);
     std::vector<float> phiHostData(24 * 2048, 1.0);
@@ -237,7 +237,7 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 调用aclnnMhcPreBackward第一段接口
     ret = aclnnMhcPreBackwardGetWorkspaceSize(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost,
@@ -247,7 +247,7 @@ int main()
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

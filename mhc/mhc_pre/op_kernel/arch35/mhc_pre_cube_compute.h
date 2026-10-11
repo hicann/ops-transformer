@@ -56,15 +56,15 @@ public:
         return bL1BufferID_;
     }
 
-    __aicore__ inline void CopyInA1Nd2Nz(uint64_t m, uint64_t currentK, const AscendC::GlobalTensor<float> &aGlobal,
-                                         const AscendC::LocalTensor<float> &al1Local)
+    __aicore__ inline void CopyInA1Nd2Nz(uint64_t m, uint64_t currentK, const AscendC::GlobalTensor<float>& aGlobal,
+                                         const AscendC::LocalTensor<float>& al1Local)
     {
         CopyInA1Nd2Nz(m, currentK, currentK, aGlobal, al1Local);
     }
 
     __aicore__ inline void CopyInA1Nd2Nz(uint64_t m, uint64_t currentK, uint64_t srcDValue,
-                                         const AscendC::GlobalTensor<float> &aGlobal,
-                                         const AscendC::LocalTensor<float> &al1Local)
+                                         const AscendC::GlobalTensor<float>& aGlobal,
+                                         const AscendC::LocalTensor<float>& al1Local)
     {
         AscendC::Nd2NzParams nd2nzParam;
         nd2nzParam.ndNum = 1;
@@ -112,8 +112,8 @@ public:
     }
 
     __aicore__ inline void CopyInB1Nd2Nz(uint64_t k, uint64_t currentK, uint64_t baseN,
-                                         const AscendC::GlobalTensor<float> &bGlobal,
-                                         const AscendC::LocalTensor<float> &bl1Local)
+                                         const AscendC::GlobalTensor<float>& bGlobal,
+                                         const AscendC::LocalTensor<float>& bl1Local)
     {
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(bL1BufferID_);
         k_ = k;
@@ -134,8 +134,8 @@ public:
     }
 
     __aicore__ inline void Process(uint64_t m, uint64_t n, uint64_t baseM, uint64_t baseK, bool isFirstKL1,
-                                   bool isLastKL1, const AscendC::LocalTensor<float> &al1Local,
-                                   const AscendC::LocalTensor<float> &bl1Local)
+                                   bool isLastKL1, const AscendC::LocalTensor<float>& al1Local,
+                                   const AscendC::LocalTensor<float>& bl1Local)
     {
         m_ = m;
         n_ = n;
@@ -165,11 +165,11 @@ public:
     __aicore__ inline void ProcessKRange(uint64_t m, uint64_t n, uint64_t k, uint64_t baseM, uint64_t baseK,
                                          uint64_t kStart, uint64_t kEnd, uint64_t kL1Size, bool useSequentialPartials,
                                          uint64_t partialK, bool useGmStage, uint64_t stageSlotElements,
-                                         uint64_t stageCoreOffset, const AscendC::GlobalTensor<float> &phiGlobal,
-                                         const AscendC::GlobalTensor<float> &xStageGlobal,
-                                         const AscendC::GlobalTensor<float> &dstGlobal, uint64_t dstGroupStride,
-                                         const AscendC::LocalTensor<float> &al1Local,
-                                         const AscendC::LocalTensor<float> &bl1Local)
+                                         uint64_t stageCoreOffset, const AscendC::GlobalTensor<float>& phiGlobal,
+                                         const AscendC::GlobalTensor<float>& xStageGlobal,
+                                         const AscendC::GlobalTensor<float>& dstGlobal, uint64_t dstGroupStride,
+                                         const AscendC::LocalTensor<float>& al1Local,
+                                         const AscendC::LocalTensor<float>& bl1Local)
     {
         uint8_t aL1BufferId = 0;
         for (uint64_t kOffset = kStart; kOffset < kEnd; kOffset += kL1Size) {
@@ -206,7 +206,7 @@ public:
             aL1BufferId ^= 1U;
         }
     }
-    __aicore__ inline void CopyInA2(uint64_t kOffset, uint64_t kAL1Offset, const AscendC::LocalTensor<float> &al1Local)
+    __aicore__ inline void CopyInA2(uint64_t kOffset, uint64_t kAL1Offset, const AscendC::LocalTensor<float>& al1Local)
     {
         uint64_t mAL1 = BasicApiAlign(baseM_, AscendC::BLOCK_CUBE);
         uint64_t offsetAL1 = BasicApiAlign(kAL1Offset, MHC_PRE_BASIC_API_C0_SIZE) * mAL1;
@@ -223,7 +223,7 @@ public:
         AscendC::LoadData(l0PingPongID_ == 0 ? aL0Ping_ : aL0Pong_, al1Local[offsetAL1], loadData2dParams);
     }
 
-    __aicore__ inline void CopyInB2(uint64_t kOffset, uint64_t kBL1Offset, const AscendC::LocalTensor<float> &bl1Local)
+    __aicore__ inline void CopyInB2(uint64_t kOffset, uint64_t kBL1Offset, const AscendC::LocalTensor<float>& bl1Local)
     {
         uint64_t nBL1 = BasicApiAlign(baseN_, AscendC::BLOCK_CUBE);
         uint64_t offsetBL1 = BasicApiAlign(kBL1Offset, MHC_PRE_BASIC_API_C0_SIZE) * nBL1;
@@ -265,7 +265,7 @@ public:
         }
     }
 
-    __aicore__ inline void CopyOut(const AscendC::LocalTensor<float> &dstLocal)
+    __aicore__ inline void CopyOut(const AscendC::LocalTensor<float>& dstLocal)
     {
         // Direct L0C-to-UB removes the hMix GM write/read round trip when the caller has aligned UB space.
         AscendC::SetFlag<AscendC::HardEvent::M_FIX>(cl0PingPongID_);
@@ -290,7 +290,7 @@ public:
         cl0PingPongID_ ^= 1;
     }
 
-    __aicore__ inline void CopyOut(const AscendC::GlobalTensor<float> &dstGlobal, uint32_t dstStride)
+    __aicore__ inline void CopyOut(const AscendC::GlobalTensor<float>& dstGlobal, uint32_t dstStride)
     {
         AscendC::SetFlag<AscendC::HardEvent::M_FIX>(cl0PingPongID_);
         AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(cl0PingPongID_);

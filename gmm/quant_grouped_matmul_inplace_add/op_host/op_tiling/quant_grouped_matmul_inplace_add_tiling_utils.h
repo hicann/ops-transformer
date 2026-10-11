@@ -28,29 +28,29 @@ namespace QuantGroupedMatmulInplaceAdd {
 // 抽成自由函数避免两条继承路径复制逻辑，同时保持两边继承链独立（前者继承 GroupedQmmTiling，
 // 后者继承 GroupedQmmBasicApiTiling）。
 
-bool AnalyzeAttrsForInplaceAdd(const gert::TilingContext *context, optiling::GQmmInputInfo &inputParams);
+bool AnalyzeAttrsForInplaceAdd(const gert::TilingContext* context, optiling::GQmmInputInfo& inputParams);
 
 // 只读取 GQmmInputInfo 的 dtype 字段，合法性校验由 CheckDtypeForInplaceAdd 负责
-bool AnalyzeDtypeForInplaceAdd(const gert::TilingContext *context, optiling::GQmmInputInfo &inputParams);
+bool AnalyzeDtypeForInplaceAdd(const gert::TilingContext* context, optiling::GQmmInputInfo& inputParams);
 
 // 校验 HIFLOAT8+HIFLOAT8 (T-T/T-C) 或 FP8_E4M3FN/E5M2+FP8_E4M3FN/E5M2 (MX) 组合
-bool CheckDtypeForInplaceAdd(const optiling::GQmmInputInfo &inputParams);
+bool CheckDtypeForInplaceAdd(const optiling::GQmmInputInfo& inputParams);
 
-bool CheckCoreNumForInplaceAdd(const gert::TilingContext *context, const optiling::GQmmInputInfo &inputParams);
+bool CheckCoreNumForInplaceAdd(const gert::TilingContext* context, const optiling::GQmmInputInfo& inputParams);
 
 // HIFLOAT8 量化 (T-T / T-C 合并)：
 //   scale1: (g,) 或 (g, 1)
 //   scale2: (g,)、(g, 1) 或 (g, n)，末轴 1 走 T-T，n 走 T-C
 // 与 aclnn 的 CheckHif8QuantParamsShape 语义对齐。
-bool CheckShapeForHif8Quant(const gert::Shape &x1ScaleShape, const gert::Shape &x2ScaleShape,
-                            const optiling::GQmmInputInfo &inputParams);
+bool CheckShapeForHif8Quant(const gert::Shape& x1ScaleShape, const gert::Shape& x2ScaleShape,
+                            const optiling::GQmmInputInfo& inputParams);
 
 // MX 量化：scale1/scale2 均为 3D，末轴 = MXFP_MULTI_BASE_SIZE
-bool CheckShapeForMxQuant(const gert::Shape &x1ScaleShape, const gert::Shape &x2ScaleShape,
-                          const optiling::GQmmInputInfo &inputParams);
+bool CheckShapeForMxQuant(const gert::Shape& x1ScaleShape, const gert::Shape& x2ScaleShape,
+                          const optiling::GQmmInputInfo& inputParams);
 
 // 由 (transB, transA, kernelType) 三元组生成 tiling key，BasicApi 与 普通路径共用
-uint64_t GetTilingKeyForInplaceAdd(const optiling::GQmmInputInfo &inputParams);
+uint64_t GetTilingKeyForInplaceAdd(const optiling::GQmmInputInfo& inputParams);
 
 } // namespace QuantGroupedMatmulInplaceAdd
 

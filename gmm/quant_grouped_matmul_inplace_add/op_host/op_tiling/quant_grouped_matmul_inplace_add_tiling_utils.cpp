@@ -25,11 +25,11 @@ using namespace optiling::GmmConstant;
 
 namespace QuantGroupedMatmulInplaceAdd {
 
-bool AnalyzeAttrsForInplaceAdd(const gert::TilingContext *context, GQmmInputInfo &inputParams)
+bool AnalyzeAttrsForInplaceAdd(const gert::TilingContext* context, GQmmInputInfo& inputParams)
 {
     auto attrs = context->GetAttrs();
     if (attrs != nullptr) {
-        const int64_t *groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE);
+        const int64_t* groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE);
         if (groupListTypePtr != nullptr) {
             OP_CHECK_IF(*groupListTypePtr != 0 && *groupListTypePtr != 1,
                         OP_LOGE_FOR_INVALID_VALUE(inputParams.opType, "groupListType",
@@ -37,7 +37,7 @@ bool AnalyzeAttrsForInplaceAdd(const gert::TilingContext *context, GQmmInputInfo
                         return false);
             inputParams.groupListType = static_cast<int8_t>(*groupListTypePtr);
         }
-        const int64_t *groupSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_SIZE);
+        const int64_t* groupSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_SIZE);
         if (groupSizePtr != nullptr) {
             OP_CHECK_IF(*groupSizePtr != 0,
                         OP_LOGE_FOR_INVALID_VALUE(inputParams.opType, "groupSize", std::to_string(*groupSizePtr), "0"),
@@ -48,7 +48,7 @@ bool AnalyzeAttrsForInplaceAdd(const gert::TilingContext *context, GQmmInputInfo
     return true;
 }
 
-bool AnalyzeDtypeForInplaceAdd(const gert::TilingContext *context, GQmmInputInfo &inputParams)
+bool AnalyzeDtypeForInplaceAdd(const gert::TilingContext* context, GQmmInputInfo& inputParams)
 {
     auto xDesc = context->GetInputDesc(X_INDEX);
     OP_CHECK_IF(xDesc == nullptr,
@@ -77,7 +77,7 @@ bool AnalyzeDtypeForInplaceAdd(const gert::TilingContext *context, GQmmInputInfo
     return true;
 }
 
-bool CheckDtypeForInplaceAdd(const GQmmInputInfo &inputParams)
+bool CheckDtypeForInplaceAdd(const GQmmInputInfo& inputParams)
 {
     OP_CHECK_IF(inputParams.cDtype != ge::DT_FLOAT,
                 OP_LOGE_FOR_INVALID_DTYPE(inputParams.opType, "yRef",
@@ -124,7 +124,7 @@ bool CheckDtypeForInplaceAdd(const GQmmInputInfo &inputParams)
     return false;
 }
 
-bool CheckCoreNumForInplaceAdd(const gert::TilingContext *context, const GQmmInputInfo &inputParams)
+bool CheckCoreNumForInplaceAdd(const gert::TilingContext* context, const GQmmInputInfo& inputParams)
 {
     auto compileInfo = context->GetCompileInfo<GMMCompileInfo>();
     OP_CHECK_IF(compileInfo == nullptr, OP_LOGE(inputParams.opName, "compileInfo is nullptr."), return false);
@@ -139,8 +139,8 @@ bool CheckCoreNumForInplaceAdd(const gert::TilingContext *context, const GQmmInp
     return true;
 }
 
-bool CheckShapeForHif8Quant(const gert::Shape &x1ScaleShape, const gert::Shape &x2ScaleShape,
-                            const GQmmInputInfo &inputParams)
+bool CheckShapeForHif8Quant(const gert::Shape& x1ScaleShape, const gert::Shape& x2ScaleShape,
+                            const GQmmInputInfo& inputParams)
 {
     // T-T / T-C 合并校验，与 aclnn CheckHif8QuantParamsShape 对齐：
     //   scale1 (x1Scale/perToken): 1D 或 2D；firstDim == groupNum；若 2D 则 lastDim == 1
@@ -190,8 +190,8 @@ bool CheckShapeForHif8Quant(const gert::Shape &x1ScaleShape, const gert::Shape &
     return true;
 }
 
-bool CheckShapeForMxQuant(const gert::Shape &x1ScaleShape, const gert::Shape &x2ScaleShape,
-                          const GQmmInputInfo &inputParams)
+bool CheckShapeForMxQuant(const gert::Shape& x1ScaleShape, const gert::Shape& x2ScaleShape,
+                          const GQmmInputInfo& inputParams)
 {
     auto x2ScaleDimNum = x2ScaleShape.GetDimNum();
     OP_CHECK_IF(x2ScaleDimNum != MXFP_TYPE_K_SCALE_DIM_NUM,
@@ -221,7 +221,7 @@ bool CheckShapeForMxQuant(const gert::Shape &x1ScaleShape, const gert::Shape &x2
     return true;
 }
 
-uint64_t GetTilingKeyForInplaceAdd(const GQmmInputInfo &inputParams)
+uint64_t GetTilingKeyForInplaceAdd(const GQmmInputInfo& inputParams)
 {
     return GET_TPL_TILING_KEY(static_cast<uint64_t>(inputParams.transB), static_cast<uint64_t>(inputParams.transA),
                               static_cast<uint64_t>(inputParams.kernelType));

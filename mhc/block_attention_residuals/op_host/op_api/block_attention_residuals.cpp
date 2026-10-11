@@ -25,10 +25,10 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(BlockAttentionResiduals);
 
-const std::array<const aclTensor *, 3> BlockAttentionResiduals(const aclTensor *partialBlock, const aclTensor *blockRes,
-                                                               const aclTensor *projWeight, const aclTensor *normWeight,
-                                                               int64_t validBlockNum, double normEps, bool needBackward,
-                                                               aclOpExecutor *executor)
+const std::array<const aclTensor*, 3> BlockAttentionResiduals(const aclTensor* partialBlock, const aclTensor* blockRes,
+                                                              const aclTensor* projWeight, const aclTensor* normWeight,
+                                                              int64_t validBlockNum, double normEps, bool needBackward,
+                                                              aclOpExecutor* executor)
 {
     L0_DFX(BlockAttentionResiduals, partialBlock, blockRes, projWeight, normWeight, validBlockNum, normEps,
            needBackward);

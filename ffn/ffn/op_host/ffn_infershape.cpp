@@ -20,7 +20,7 @@
 using namespace ge;
 namespace ops {
 
-static ge::graphStatus InferShapeFFN(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeFFN(gert::InferShapeContext* context)
 {
     auto in_shape = context->GetInputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, in_shape);
@@ -30,12 +30,12 @@ static ge::graphStatus InferShapeFFN(gert::InferShapeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeFFN(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeFFN(gert::InferDataTypeContext* context)
 {
     auto input_x_dtype = context->GetInputDataType(0);
     if (input_x_dtype == ge::DT_INT8) {
         auto attrs = context->GetAttrs();
-        const int64_t *output_dtype = attrs->GetInt(2);
+        const int64_t* output_dtype = attrs->GetInt(2);
         if (output_dtype != nullptr && *output_dtype == 1) {
             context->SetOutputDataType(0, ge::DT_BF16);
         } else {

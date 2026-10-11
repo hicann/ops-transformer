@@ -23,8 +23,7 @@
 using namespace std;
 using namespace op;
 
-class l2_GroupedMatmulFinalizeRouting_test : public testing::Test
-{
+class l2_GroupedMatmulFinalizeRouting_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -189,7 +188,6 @@ TEST_F(l2_GroupedMatmulFinalizeRouting_test, ascend910B2_test_not_support_k_n_ca
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
 
-
 TEST_F(l2_GroupedMatmulFinalizeRouting_test, ascend910B2_test_scale_dim_not_3_case)
 {
     int64_t m = 192;
@@ -259,7 +257,6 @@ TEST_F(l2_GroupedMatmulFinalizeRouting_test, ascend910B2_test_null_ptr_case)
     int64_t bs = 24;
     int64_t bsdp = 8;
     int64_t quantGroupSize = 256;
-
 
     TensorDesc x2_desc =
         TensorDesc({e, k, n / 8}, ACL_INT32, ACL_FORMAT_ND, {}, 0, {e, n / 32, k / 16, 16, 32}).ValueRange(-1, 1);

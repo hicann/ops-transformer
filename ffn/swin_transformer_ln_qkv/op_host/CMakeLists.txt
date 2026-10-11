@@ -23,5 +23,5 @@ if (BUILD_OPEN_PROJECT)
         add_modules_sources(OPTYPE swin_transformer_ln_qkv ACLNNTYPE aclnn_exclude)
     endif()
 else() # 回黄host
-    add_modules_sources(OPTYPE swin_transformer_ln_qkv ACLNNTYPE aclnn_exclude)  
+    add_modules_sources(OPTYPE swin_transformer_ln_qkv ACLNNTYPE aclnn_exclude)
 endif()

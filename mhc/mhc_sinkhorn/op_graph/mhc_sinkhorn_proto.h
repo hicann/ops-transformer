@@ -12,7 +12,7 @@
  * \file mhc_sinkhorn_proto.h
  * \brief mhc_sinkhorn
  */
- 
+
 #ifndef OPS_BUILT_IN_OP_PROTO_INC_MHC_SINKHORN_H_
 #define OPS_BUILT_IN_OP_PROTO_INC_MHC_SINKHORN_H_
 #include "graph/operator_reg.h"

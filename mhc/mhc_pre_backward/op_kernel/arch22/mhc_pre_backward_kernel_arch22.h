@@ -76,8 +76,8 @@ constexpr MatmulConfig MHC_PRE_GRAD_MM1_CFG = GetMDLConfig(true, false, 0, false
 constexpr MatmulConfig MHC_PRE_GRAD_MM2_CFG = GetMDLConfig(true, false, 0, false, false, false, false);
 
 template <typename T>
-__aicore__ inline void kahanCustom(LocalTensor<T> &inputTensor, LocalTensor<T> sumTensorList[2], const int32_t len,
-                                   int32_t &outPos)
+__aicore__ inline void kahanCustom(LocalTensor<T>& inputTensor, LocalTensor<T> sumTensorList[2], const int32_t len,
+                                   int32_t& outPos)
 {
     LocalTensor<T> sumTensor = sumTensorList[outPos];
     LocalTensor<T> eTensor = sumTensorList[1 - outPos];
@@ -110,7 +110,7 @@ public:
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR phi, GM_ADDR h_pre, GM_ADDR h_post, GM_ADDR grad_h_in,
                                 GM_ADDR grad_h_post, GM_ADDR grad_h_res, GM_ADDR alpha, GM_ADDR h_mix, GM_ADDR inv_rms,
                                 GM_ADDR grad_x, GM_ADDR grad_phi, GM_ADDR grad_alpha, GM_ADDR grad_bias,
-                                GM_ADDR workspace, const MhcPreBackwardArch22TilingData *tilingData, TPipe *pipe,
+                                GM_ADDR workspace, const MhcPreBackwardArch22TilingData* tilingData, TPipe* pipe,
                                 GM_ADDR gamma, GM_ADDR grad_x_post_optional, GM_ADDR grad_gamma)
     {
         pipe_ = pipe;
@@ -125,7 +125,7 @@ public:
 
 protected:
     int64_t blkIdx_ = 0, aivNum_ = 0, aicNum_ = 0;
-    TPipe *pipe_;
+    TPipe* pipe_;
     int64_t batchSize_ = 0, seqLength_ = 0, totalTasks_ = 0, totalTasksAligned_ = 0, BSN = 0;
     int64_t c_ = 0, n_ = 0, factN_ = 0, fusionSize_ = 0, isBSNN_ = 0;
     int64_t c0_ = 0, c1_ = 0, cTail_ = 0, c0RepeatTime_ = 0, cTailAlign_ = 0, cTailBlockStride_ = 0, c1Align_ = 0;
@@ -204,7 +204,7 @@ private:
         return result;
     }
 
-    __aicore__ inline void InitTiling(const MhcPreBackwardArch22TilingData *tilingData)
+    __aicore__ inline void InitTiling(const MhcPreBackwardArch22TilingData* tilingData)
     {
         batchSize_ = tilingData->batchSize;
         seqLength_ = tilingData->seqLength;
@@ -252,55 +252,55 @@ private:
                                   GM_ADDR grad_bias, GM_ADDR workspace, GM_ADDR gamma, GM_ADDR grad_x_post_optional,
                                   GM_ADDR grad_gamma)
     {
-        xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X *>(x));
-        gradWeightGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(grad_phi));
+        xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X*>(x));
+        gradWeightGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(grad_phi));
         if (withGamma_) {
-            gammaGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(gamma));
-            gradGammaGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(grad_gamma));
+            gammaGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(gamma));
+            gradGammaGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(grad_gamma));
         }
         if (withGradXPost_) {
-            gradXPostGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X *>(grad_x_post_optional));
+            gradXPostGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X*>(grad_x_post_optional));
         }
         int64_t workspaceOffset = 0;
-        gradH2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset);
+        gradH2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset);
         workspaceOffset += batchSize_ * seqLength_ * fusionSize_;
-        xWorkspaceGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset);
+        xWorkspaceGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset);
         workspaceOffset += batchSize_ * seqLength_ * (n_ * c_);
-        gradXCubeGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset);
+        gradXCubeGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset);
         workspaceOffset += batchSize_ * seqLength_ * (n_ * c_);
         if constexpr (DETERMINISTIC == true) {
-            gradWeightWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset);
+            gradWeightWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset);
             workspaceOffset += aicNum_ * fusionSize_ * (n_ * c_);
         }
 
-        weightGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(phi));
-        gradXGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X *>(grad_x));
+        weightGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(phi));
+        gradXGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X*>(grad_x));
 
         if ASCEND_IS_AIV {
-            preGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(h_pre));
-            hPostGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(h_post));
-            gradYGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X *>(grad_h_in));
+            preGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(h_pre));
+            hPostGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(h_post));
+            gradYGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X*>(grad_h_in));
 
-            gradPostGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(grad_h_post));
+            gradPostGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(grad_h_post));
 
-            hcScaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(alpha));
+            hcScaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(alpha));
 
-            rsqrtGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(inv_rms));
-            gradHcScaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(grad_alpha));
-            gradHcBaseGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(grad_bias));
+            rsqrtGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(inv_rms));
+            gradHcScaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(grad_alpha));
+            gradHcBaseGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(grad_bias));
             if constexpr (DETERMINISTIC == true) {
-                gradHcScaleWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset);
+                gradHcScaleWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset);
                 workspaceOffset += aivNum_ * (ELEMENTS_SIZE_PER_BLOCK);
-                gradHcBaseWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset);
+                gradHcBaseWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset);
                 workspaceOffset += aivNum_ * fusionSize_;
                 if (withGamma_) {
-                    gradGammaWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset);
+                    gradGammaWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset);
                     workspaceOffset += aivNum_ * (n_ * c_);
                 }
             }
-            h2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(h_mix));
+            h2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(h_mix));
 
-            gradHResGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(grad_h_res));
+            gradHResGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(grad_h_res));
             if constexpr (DETERMINISTIC == false) {
                 if (blkIdx_ == aivNum_ - 1) {
                     InitOutput<T>(gradHcBaseGlobal_, fusionSize_, 0);
@@ -418,7 +418,7 @@ private:
     __aicore__ inline void ProcessMatmul1(const int64_t taskOffset, const int32_t mm1M);
     __aicore__ inline void ProcessMatmul2(const int64_t taskOffset, const int32_t mm2K);
     __aicore__ inline void ComputeScaleBias();
-    __aicore__ inline void ComputeDeterministic(GlobalTensor<float> &inputGm, GlobalTensor<float> &outputGm,
+    __aicore__ inline void ComputeDeterministic(GlobalTensor<float>& inputGm, GlobalTensor<float>& outputGm,
                                                 const int64_t dimR, const int64_t dimA);
 };
 
@@ -856,7 +856,7 @@ __aicore__ inline void MhcPreBackwardKernelArch22<TYPE_X, T, DETERMINISTIC>::Com
 
 template <typename TYPE_X, typename T, bool DETERMINISTIC>
 __aicore__ inline void MhcPreBackwardKernelArch22<TYPE_X, T, DETERMINISTIC>::ComputeDeterministic(
-    GlobalTensor<float> &inputGm, GlobalTensor<float> &outputGm, const int64_t dimR, const int64_t dimA)
+    GlobalTensor<float>& inputGm, GlobalTensor<float>& outputGm, const int64_t dimR, const int64_t dimA)
 {
     int64_t queMaxLen = tileCoreBS_ * n_ * c0_ / 8;
     int64_t totalLen = dimR * dimA;

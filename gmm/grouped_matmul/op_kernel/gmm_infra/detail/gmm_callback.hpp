@@ -22,8 +22,8 @@ namespace Catlass {
 /// the callable structure it carries like std::function<void(void)>, so it is necessary to ensure
 /// that it is used within the life cycle of the callable structure.
 struct Callback {
-    void const *func{nullptr};
-    void (*caller)(void const *){nullptr};
+    void const* func{nullptr};
+    void (*caller)(void const*){nullptr};
 
     Callback() = default;
 
@@ -43,14 +43,14 @@ struct Callback {
 };
 
 template <typename Func>
-CATLASS_DEVICE static void FuncWrapper(void const *func)
+CATLASS_DEVICE static void FuncWrapper(void const* func)
 {
-    (*static_cast<Func const *>(func))();
+    (*static_cast<Func const*>(func))();
 }
 
 // Use this to make a callback
 template <typename Func>
-CATLASS_DEVICE Callback MakeCallback(Func *func)
+CATLASS_DEVICE Callback MakeCallback(Func* func)
 {
     Callback callback;
     callback.func = func;

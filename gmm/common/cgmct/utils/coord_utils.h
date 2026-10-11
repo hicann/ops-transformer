@@ -196,7 +196,7 @@ public:
     template <GroupedMatmul::QuantMode aQuantMode>
     __aicore__ inline void CalOffsetOfAIV(
         int64_t mOffset, int64_t nOffset,
-        AscendC::Std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> &offset)
+        AscendC::Std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>& offset)
     {
         int64_t x1ScaleMOffset = mOffset;
         if constexpr (aQuantMode == GroupedMatmul::QuantMode::PERBLOCK_MODE) {
@@ -215,7 +215,7 @@ public:
     }
 
     template <int64_t C0Size>
-    __aicore__ inline void CalBOffset4LowerBits(int64_t nOffset, int64_t &offsetB)
+    __aicore__ inline void CalBOffset4LowerBits(int64_t nOffset, int64_t& offsetB)
     {
         if constexpr (layoutB == CubeFormat::NZ) {
             if constexpr (isTransB) {

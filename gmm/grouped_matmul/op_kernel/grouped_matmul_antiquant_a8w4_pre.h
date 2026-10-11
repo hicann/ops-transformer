@@ -32,7 +32,7 @@ class GMMA8W4FakeQuantPreProcess {
 public:
     __aicore__ inline GMMA8W4FakeQuantPreProcess(){};
     __aicore__ inline void Init(GM_ADDR weight, GM_ADDR y, GM_ADDR groupList, GM_ADDR workspace,
-                                const GMMBaseParams &tilingData, TPipe *pipe);
+                                const GMMBaseParams& tilingData, TPipe* pipe);
     __aicore__ inline void Process();
 
 private:
@@ -56,25 +56,25 @@ private:
     const int EIGHT = 8;
     const int DATA_BLOCK_SIZE_32 = 32;
     const uint32_t WITH_OFFSET = 0;
-    const GMMBaseParams *tiling;
+    const GMMBaseParams* tiling;
 };
 
 template <CubeFormat wFormat>
 __aicore__ inline void GMMA8W4FakeQuantPreProcess<wFormat>::Init(GM_ADDR weight, GM_ADDR y, GM_ADDR scale,
-                                                                 GM_ADDR workspace, const GMMBaseParams &tilingData,
-                                                                 TPipe *pipe)
+                                                                 GM_ADDR workspace, const GMMBaseParams& tilingData,
+                                                                 TPipe* pipe)
 {
     this->tiling = &tilingData;
     isSingleTensor = tilingData.isSingleTensor;
     weightTensorPtr = weight;
     scaleTensorPtr = scale;
     weightGm.SetGlobalBuffer(GetTensorAddr<int4b_t>(0, weight));
-    yGm.SetGlobalBuffer((__gm__ int8_t *)workspace);
+    yGm.SetGlobalBuffer((__gm__ int8_t*)workspace);
     if (tiling->quantGroupNum == 1) { // per channel
         this->isPerchannel = true;
         scaleGm.SetGlobalBuffer(GetTensorAddr<int64_t>(0, scale));
         scaleOutGm.SetGlobalBuffer(
-            (__gm__ DTYPE_SCALE_OUT *)((__gm__ int8_t *)workspace + tiling->groupNum * tiling->n * tiling->k));
+            (__gm__ DTYPE_SCALE_OUT*)((__gm__ int8_t*)workspace + tiling->groupNum * tiling->n * tiling->k));
     }
 }
 template <CubeFormat wFormat>

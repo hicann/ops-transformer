@@ -44,8 +44,8 @@ constexpr size_t TYPEM_SCALE_K_DIM_INDEX = 1;
 constexpr size_t TYPEM_SCALE_N_DIM_INDEX = 2;
 constexpr size_t DIM_TWO = 2;
 
-static bool SetShapeAndStrideForMXFPTypeMForGMMFinalizeRouting(std::vector<int64_t> &viewShape,
-                                                               std::vector<int64_t> &strides)
+static bool SetShapeAndStrideForMXFPTypeMForGMMFinalizeRouting(std::vector<int64_t>& viewShape,
+                                                               std::vector<int64_t>& strides)
 {
     OP_CHECK_IF(viewShape.size() < MXFP_TPYEM_SCALE_DIM_NUM,
                 OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback",
@@ -60,8 +60,8 @@ static bool SetShapeAndStrideForMXFPTypeMForGMMFinalizeRouting(std::vector<int64
     return true;
 }
 
-static bool SetShapeAndStrideForLastTwoDimForGMMFinalizeRouting(std::vector<int64_t> &viewShape,
-                                                                std::vector<int64_t> &strides)
+static bool SetShapeAndStrideForLastTwoDimForGMMFinalizeRouting(std::vector<int64_t>& viewShape,
+                                                                std::vector<int64_t>& strides)
 {
     OP_CHECK_IF(viewShape.size() < DIM_TWO,
                 OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback",
@@ -76,8 +76,8 @@ static bool SetShapeAndStrideForLastTwoDimForGMMFinalizeRouting(std::vector<int6
     return true;
 }
 
-static void InitShapeAndStrideForGMMFinalizeRouting(const gert::Shape &originShape, std::vector<int64_t> &viewShape,
-                                                    std::vector<int64_t> &strides)
+static void InitShapeAndStrideForGMMFinalizeRouting(const gert::Shape& originShape, std::vector<int64_t>& viewShape,
+                                                    std::vector<int64_t>& strides)
 {
     for (size_t i = 0; i < originShape.GetDimNum(); ++i) {
         viewShape.push_back(originShape.GetDim(i));
@@ -108,7 +108,7 @@ static inline aclDataType ToAclDataTypeForGMMFinalizeRouting(ge::DataType dtype)
     return static_cast<aclDataType>(dtype);
 }
 
-static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool enableTranspose, size_t index,
+static inline aclTensor* GeTensor2AclTensor(const gert::Tensor* geTensor, bool enableTranspose, size_t index,
                                             bool enableNZ = false)
 {
     OP_CHECK_IF(geTensor == nullptr, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The geTensor nullptr"),
@@ -126,7 +126,7 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
     OP_CHECK_IF(aclCreateTensor == nullptr,
                 OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The aclCreateTensor nullptr"), return nullptr);
 
-    void *deviceAddr = const_cast<void *>(geTensor->GetAddr());
+    void* deviceAddr = const_cast<void*>(geTensor->GetAddr());
     // convert data type
     auto dataTypeGE = geTensor->GetDataType();
     aclDataType dataType = ACL_DT_UNDEFINED;
@@ -136,7 +136,7 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
         dataType = ToAclDataType(dataTypeGE);
     }
     // convert view shape
-    const gert::Shape &origin_shape = geTensor->GetOriginShape();
+    const gert::Shape& origin_shape = geTensor->GetOriginShape();
     std::vector<int64_t> viewShape;
     std::vector<int64_t> strides;
     InitShapeAndStrideForGMMFinalizeRouting(origin_shape, viewShape, strides);
@@ -159,7 +159,7 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
     if (enableNZ && GetPrimaryFormat(geTensor->GetStorageFormat()) == ge::Format::FORMAT_FRACTAL_NZ) {
         aclFormat = aclFormat::ACL_FORMAT_FRACTAL_NZ;
     }
-    aclTensor *out = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides.data(), 0, aclFormat,
+    aclTensor* out = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides.data(), 0, aclFormat,
                                      storageShapeVec.data(), storageShapeVec.size(), deviceAddr);
     OP_CHECK_IF(out == nullptr,
                 OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The GeTensor2AclTensor out nullptr"),
@@ -167,7 +167,7 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
     return out;
 }
 
-static void PrepareAclTensor(const OpExecuteContext *host_api_ctx, const aclTensor *&tensor, size_t index,
+static void PrepareAclTensor(const OpExecuteContext* host_api_ctx, const aclTensor*& tensor, size_t index,
                              bool enableTranspose, bool enableNZ)
 {
     if (index == INDEX_INPUT_X || index == INDEX_INPUT_WEIGHT) {
@@ -181,7 +181,7 @@ static void PrepareAclTensor(const OpExecuteContext *host_api_ctx, const aclTens
     return;
 }
 
-static void PrepareOutputTensor(const OpExecuteContext *host_api_ctx, const gert::Tensor *&tensor, size_t index)
+static void PrepareOutputTensor(const OpExecuteContext* host_api_ctx, const gert::Tensor*& tensor, size_t index)
 {
     tensor = host_api_ctx->GetOutputTensor(index);
     if (tensor == nullptr) {
@@ -190,69 +190,69 @@ static void PrepareOutputTensor(const OpExecuteContext *host_api_ctx, const gert
     return;
 }
 
-static graphStatus GroupedMatmulFinalizeRoutingExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus GroupedMatmulFinalizeRoutingExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_CHECK_IF(host_api_ctx == nullptr,
                 OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The host_api_ctx is null"), return GRAPH_FAILED);
     auto attrs = host_api_ctx->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The attrs is null"),
                 return GRAPH_FAILED);
-    const int64_t *dtypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_DTYPE);
+    const int64_t* dtypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_DTYPE);
     OP_CHECK_IF(dtypeGe == nullptr, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The dtypeGe is null"),
                 return GRAPH_FAILED);
-    const float *sharedInputWeightGe = attrs->GetAttrPointer<float>(INDEX_ATTR_SHAREDINPUT_WEIGHT);
+    const float* sharedInputWeightGe = attrs->GetAttrPointer<float>(INDEX_ATTR_SHAREDINPUT_WEIGHT);
     OP_CHECK_IF(sharedInputWeightGe == nullptr,
                 OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The sharedInputWeightGe is null"),
                 return GRAPH_FAILED);
-    const int64_t *sharedInputOffsetGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_SHAREDINPUT_OFFSET);
+    const int64_t* sharedInputOffsetGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_SHAREDINPUT_OFFSET);
     OP_CHECK_IF(sharedInputOffsetGe == nullptr,
                 OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The sharedInputOffsetGe is null"),
                 return GRAPH_FAILED);
-    const bool *transXGe = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANSPOSE_X);
+    const bool* transXGe = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANSPOSE_X);
     OP_CHECK_IF(transXGe == nullptr, OP_LOGE("aclnnfallback", "transXGe is null"), return GRAPH_FAILED);
-    const bool *transWeightGe = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANSPOSE_WEIGHT);
+    const bool* transWeightGe = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANSPOSE_WEIGHT);
     OP_CHECK_IF(transWeightGe == nullptr, OP_LOGE("aclnnfallback", "transWeightGe is null"), return GRAPH_FAILED);
-    const int64_t *groupListTypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_GROUP_LIST_TYPE);
+    const int64_t* groupListTypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_GROUP_LIST_TYPE);
     OP_CHECK_IF(groupListTypeGe == nullptr,
                 OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The groupListTypeGe is null"),
                 return GRAPH_FAILED);
 
-    const aclTensor *aclTensorX = nullptr;
+    const aclTensor* aclTensorX = nullptr;
     PrepareAclTensor(host_api_ctx, aclTensorX, INDEX_INPUT_X, false, false);
 
-    const aclTensor *aclTensorWeight = nullptr;
+    const aclTensor* aclTensorWeight = nullptr;
     PrepareAclTensor(host_api_ctx, aclTensorWeight, INDEX_INPUT_WEIGHT, false, false);
 
-    const aclTensor *aclTensorWeightScale = nullptr;
+    const aclTensor* aclTensorWeightScale = nullptr;
     PrepareAclTensor(host_api_ctx, aclTensorWeightScale, INDEX_INPUT_WEIGHT_SCALE, false, false);
 
-    const aclTensor *aclTensorBias = nullptr;
+    const aclTensor* aclTensorBias = nullptr;
     PrepareAclTensor(host_api_ctx, aclTensorBias, INDEX_INPUT_BIAS, false, false);
 
-    const aclTensor *aclTensorXScale = nullptr;
+    const aclTensor* aclTensorXScale = nullptr;
     PrepareAclTensor(host_api_ctx, aclTensorXScale, INDEX_INPUT_X_SCALE, false, false);
 
-    const aclTensor *aclTensorGroupList = nullptr;
+    const aclTensor* aclTensorGroupList = nullptr;
     PrepareAclTensor(host_api_ctx, aclTensorGroupList, INDEX_INPUT_GROUP_LIST, false, false);
 
-    const aclTensor *aclTensorSharedInput = nullptr;
+    const aclTensor* aclTensorSharedInput = nullptr;
     PrepareAclTensor(host_api_ctx, aclTensorSharedInput, INDEX_INPUT_SHARED_INPUT, false, false);
 
-    const aclTensor *aclTensorLogit = nullptr;
+    const aclTensor* aclTensorLogit = nullptr;
     PrepareAclTensor(host_api_ctx, aclTensorLogit, INDEX_INPUT_LOGIT, false, false);
 
-    const aclTensor *aclTensorRowIndex = nullptr;
+    const aclTensor* aclTensorRowIndex = nullptr;
     PrepareAclTensor(host_api_ctx, aclTensorRowIndex, INDEX_INPUT_ROW_INDEX, false, false);
 
-    const aclTensor *aclTensorOffset = nullptr;
+    const aclTensor* aclTensorOffset = nullptr;
     PrepareAclTensor(host_api_ctx, aclTensorOffset, INDEX_INPUT_OFFSET, false, false);
 
-    const gert::Tensor *geTensorY = nullptr;
+    const gert::Tensor* geTensorY = nullptr;
     PrepareOutputTensor(host_api_ctx, geTensorY, INDEX_OUTPUT_Y);
 
-    aclTensor *aclTensorAntiQuantScaleOptional = nullptr;
-    aclTensor *aclTensorAntiQunatOffsetOptional = nullptr;
-    aclIntArray *tuningConfig = nullptr;
+    aclTensor* aclTensorAntiQuantScaleOptional = nullptr;
+    aclTensor* aclTensorAntiQunatOffsetOptional = nullptr;
+    aclIntArray* tuningConfig = nullptr;
 
     // execute opapi
     auto apiRet = EXEC_OPAPI_CMD(

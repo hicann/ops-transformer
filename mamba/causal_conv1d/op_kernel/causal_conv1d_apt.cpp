@@ -22,7 +22,7 @@ template <typename T, uint32_t inputModeKey, uint32_t widthKey, uint32_t hasBias
 __aicore__ inline void RunCausalConv1d(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates, GM_ADDR bias,
                                        GM_ADDR queryStartLoc, GM_ADDR cacheIndices, GM_ADDR initialStateMode,
                                        GM_ADDR numAcceptedTokens, GM_ADDR convStatesOut, GM_ADDR y, GM_ADDR workspace,
-                                       const CausalConv1dTilingData *tilingData)
+                                       const CausalConv1dTilingData* tilingData)
 {
     if constexpr (CausalConv1d::IsFnInputModeKey(inputModeKey)) {
         CausalConv1d::RunCausalConv1dFn<T, inputModeKey, widthKey, hasBiasKey, activationKey>(

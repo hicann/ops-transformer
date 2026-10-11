@@ -48,12 +48,12 @@ __attribute__((
         "aclnnGroupedMatmulV2GetWorkspaceSize is scheduled to be deprecated in a post-December 2026 version update, "
         "and will be replaced by the aclnnGroupedMatmulV5GetWorkspaceSize. We apologize for any inconvenience caused "
         "and appreciate your timely migration to the new interface."))) aclnnStatus
-aclnnGroupedMatmulV2GetWorkspaceSize(const aclTensorList *x, const aclTensorList *weight,
-                                     const aclTensorList *biasOptional, const aclTensorList *scaleOptional,
-                                     const aclTensorList *offsetOptional, const aclTensorList *antiquantScaleOptional,
-                                     const aclTensorList *antiquantOffsetOptional, const aclIntArray *groupListOptional,
-                                     int64_t splitItem, int64_t groupType, const aclTensorList *y,
-                                     uint64_t *workspaceSize, aclOpExecutor **executor);
+aclnnGroupedMatmulV2GetWorkspaceSize(const aclTensorList* x, const aclTensorList* weight,
+                                     const aclTensorList* biasOptional, const aclTensorList* scaleOptional,
+                                     const aclTensorList* offsetOptional, const aclTensorList* antiquantScaleOptional,
+                                     const aclTensorList* antiquantOffsetOptional, const aclIntArray* groupListOptional,
+                                     int64_t splitItem, int64_t groupType, const aclTensorList* y,
+                                     uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnGroupedMatmulV2的第二段接口，用于执行计算。
@@ -67,7 +67,7 @@ __attribute__((visibility("default"),
                deprecated("aclnnGroupedMatmulV2 is scheduled to be deprecated in a post-December 2026 version update, "
                           "and will be replaced by the aclnnGroupedMatmulV5. We apologize for any inconvenience caused "
                           "and appreciate your timely migration to the new interface."))) aclnnStatus
-aclnnGroupedMatmulV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+aclnnGroupedMatmulV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

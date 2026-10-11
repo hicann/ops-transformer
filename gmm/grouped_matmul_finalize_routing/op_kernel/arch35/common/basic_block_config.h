@@ -110,7 +110,7 @@ struct UbBufferInfo {
     uint32_t antiQuantScaleMaskBufferSize;
 };
 
-template <const VecAntiQuantConfig &vecConfig>
+template <const VecAntiQuantConfig& vecConfig>
 __aicore__ constexpr UbBufferInfo GetMxA8W4NzBufferInfo()
 {
     return {.ubWeightOutputHighBitBufferNum = QUADRUPLE_BUFFER_NUM,
@@ -131,7 +131,7 @@ __aicore__ constexpr UbBufferInfo GetMxA8W4NzBufferInfo()
             .antiQuantScaleMaskBufferSize = 0};
 }
 
-template <typename xType, const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+template <typename xType, const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ constexpr UbBufferInfo GetBufferConfig()
 {
     return GetMxA8W4NzBufferInfo<vecConfig>();
@@ -142,7 +142,7 @@ struct VfConfig {
     uint64_t vfKStandardLen;
 };
 
-template <typename xType, const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+template <typename xType, const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ constexpr VfConfig GetVfConfig()
 {
     return {.vfNStandardLen = 256, .vfKStandardLen = 64};

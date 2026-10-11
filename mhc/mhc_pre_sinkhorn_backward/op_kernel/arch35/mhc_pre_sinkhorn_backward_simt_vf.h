@@ -25,9 +25,9 @@ constexpr int32_t WARP_SIZE = 32;
 
 template <typename T>
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void SinkhornKnoppSimt(
-    __ubuf__ T *gradHRes2Local, __ubuf__ T *gradInvRmsLocal, __gm__ T *gradAlphaGlobal, __gm__ T *gradBiasGlobal,
-    __gm__ T *skSumGlobal, __gm__ T *skNormGlobal_, __ubuf__ T *gradResLocal, __ubuf__ T *hRes2Local,
-    __ubuf__ T *invRmsLocal, __ubuf__ T *biasLocal, __ubuf__ T *tmpLocal, const T hcScaleRes, const int32_t totalTasks,
+    __ubuf__ T* gradHRes2Local, __ubuf__ T* gradInvRmsLocal, __gm__ T* gradAlphaGlobal, __gm__ T* gradBiasGlobal,
+    __gm__ T* skSumGlobal, __gm__ T* skNormGlobal_, __ubuf__ T* gradResLocal, __ubuf__ T* hRes2Local,
+    __ubuf__ T* invRmsLocal, __ubuf__ T* biasLocal, __ubuf__ T* tmpLocal, const T hcScaleRes, const int32_t totalTasks,
     const int32_t taskOffset, const int32_t taskCount, const int32_t skIterCount, const int32_t n)
 {
     int32_t xTid = threadIdx.x;   // 16

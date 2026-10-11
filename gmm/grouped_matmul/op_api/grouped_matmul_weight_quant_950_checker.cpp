@@ -40,8 +40,8 @@ std::string AclnnGroupedMatmulWeightQuantDAV3510Checker::GetDataFlowString() con
            std::string(op::ToString(weightDtype_).GetString());
 }
 
-aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::GetDimFromEnd(const aclTensor *tensor, size_t posFromEnd,
-                                                                       size_t &out, const std::string &tensorName) const
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::GetDimFromEnd(const aclTensor* tensor, size_t posFromEnd,
+                                                                       size_t& out, const std::string& tensorName) const
 {
     auto shape = tensor->GetViewShape();
     if (unlikely(posFromEnd == 0 || posFromEnd > shape.GetDimNum())) {
@@ -60,7 +60,7 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::GetDimFromEnd(const acl
 }
 
 // 根据 apiVersion 返回对应的 aclnn 函数名字符串
-const char *AclnnGroupedMatmulWeightQuantDAV3510Checker::GetAclnnName() const
+const char* AclnnGroupedMatmulWeightQuantDAV3510Checker::GetAclnnName() const
 {
     switch (gmmParams_.apiVersion) {
         case gmm::GMMApiVersion::V1:
@@ -135,7 +135,7 @@ bool AclnnGroupedMatmulWeightQuantDAV3510Checker::IsS8S4AsymmetricQuant() const
         (*gmmParams_.offsetOptional)[0] == nullptr) {
         return false;
     }
-    const op::Shape &offsetShape = (*gmmParams_.offsetOptional)[0]->GetViewShape();
+    const op::Shape& offsetShape = (*gmmParams_.offsetOptional)[0]->GetViewShape();
     return !(offsetShape.GetDimNum() == 1 && offsetShape.GetDim(0) == 0);
 }
 
@@ -148,15 +148,15 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckS8S4GroupListType(
 
 aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckS8S4ScaleShape() const
 {
-    const aclTensor *x = (*gmmParams_.x)[0];
-    const aclTensor *weight = (*gmmParams_.weight)[0];
-    const aclTensor *scale = (*gmmParams_.scaleOptional)[0];
-    const aclTensor *perTokenScale = (*gmmParams_.perTokenScaleOptional)[0];
-    const aclTensor *out = (*gmmParams_.y)[0];
+    const aclTensor* x = (*gmmParams_.x)[0];
+    const aclTensor* weight = (*gmmParams_.weight)[0];
+    const aclTensor* scale = (*gmmParams_.scaleOptional)[0];
+    const aclTensor* perTokenScale = (*gmmParams_.perTokenScaleOptional)[0];
+    const aclTensor* out = (*gmmParams_.y)[0];
 
-    const op::Shape &xShape = x->GetViewShape();
-    const op::Shape &weightShape = weight->GetViewShape();
-    const op::Shape &outShape = out->GetViewShape();
+    const op::Shape& xShape = x->GetViewShape();
+    const op::Shape& weightShape = weight->GetViewShape();
+    const op::Shape& outShape = out->GetViewShape();
     CHECK_COND(xShape.GetDimNum() == S8S4_MATRIX_DIM_NUM && weightShape.GetDimNum() == S8S4_WEIGHT_DIM_NUM &&
                    outShape.GetDimNum() == S8S4_MATRIX_DIM_NUM,
                ACLNN_ERR_PARAM_INVALID,
@@ -175,8 +175,8 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckS8S4ScaleShape() c
                ACLNN_ERR_PARAM_INVALID, "In op [%s], when S8S4, M, E, K and N must be positive and compatible.",
                GetAclnnName());
 
-    const op::Shape &scaleShape = scale->GetViewShape();
-    const op::Shape &perTokenScaleShape = perTokenScale->GetViewShape();
+    const op::Shape& scaleShape = scale->GetViewShape();
+    const op::Shape& perTokenScaleShape = perTokenScale->GetViewShape();
     CHECK_COND(perTokenScaleShape.GetDimNum() == 1 && perTokenScaleShape.GetDim(0) == m, ACLNN_ERR_PARAM_INVALID,
                "In op [%s], when S8S4, perTokenScale shape must be [M].", GetAclnnName());
     CHECK_COND(scaleShape.GetDimNum() == S8S4_WEIGHT_DIM_NUM && scaleShape.GetDim(0) == e &&
@@ -184,8 +184,8 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckS8S4ScaleShape() c
                ACLNN_ERR_PARAM_INVALID, "In op [%s], when S8S4, scale shape must be [E,Q,N].", GetAclnnName());
 
     if (IsS8S4AsymmetricQuant()) {
-        const aclTensor *offset = (*gmmParams_.offsetOptional)[0];
-        const op::Shape &offsetShape = offset->GetViewShape();
+        const aclTensor* offset = (*gmmParams_.offsetOptional)[0];
+        const op::Shape& offsetShape = offset->GetViewShape();
         CHECK_COND(offsetShape.GetDimNum() == S8S4_OFFSET_DIM_NUM && offsetShape.GetDim(0) == e &&
                        offsetShape.GetDim(S8S4_WEIGHT_K_DIM) == 1 && offsetShape.GetDim(S8S4_WEIGHT_N_DIM) == n &&
                        scaleShape.GetDim(S8S4_WEIGHT_K_DIM) == 1,
@@ -245,11 +245,11 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorNotNull(size
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorNotNullPtr(const aclTensorList *tensorList,
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorNotNullPtr(const aclTensorList* tensorList,
                                                                                size_t idx,
-                                                                               const std::string &tensorType) const
+                                                                               const std::string& tensorType) const
 {
-    const aclTensor *tensor = (*tensorList)[idx];
+    const aclTensor* tensor = (*tensorList)[idx];
     if (unlikely(tensor == nullptr)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             GetAclnnName(), tensorType, "nullptr",
@@ -259,11 +259,11 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorNotNullPtr(c
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorDtype(const aclTensorList *tensorList,
-                                                                          const DataType &tensorDtype, size_t idx,
-                                                                          const std::string &tensorType) const
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorDtype(const aclTensorList* tensorList,
+                                                                          const DataType& tensorDtype, size_t idx,
+                                                                          const std::string& tensorType) const
 {
-    const aclTensor *tensor = (*tensorList)[idx];
+    const aclTensor* tensor = (*tensorList)[idx];
     if (unlikely(tensor->GetDataType() != tensorDtype)) {
         std::string incorrectDtypes = std::string(op::ToString(tensor->GetDataType()).GetString());
         std::string reason = "The dtype of each tensor in " + tensorType + " tensor list must be consistent. " +
@@ -276,8 +276,8 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorDtype(const 
 }
 
 aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::GetExpectedDimNum(
-    const AclnnGroupedMatmulWeightQuantDAV3510Checker &checker, const std::string &tensorType, size_t tensorDimNum,
-    size_t &expectedDimNum)
+    const AclnnGroupedMatmulWeightQuantDAV3510Checker& checker, const std::string& tensorType, size_t tensorDimNum,
+    size_t& expectedDimNum)
 {
     if ((checker.IsA16MxFp4NZ() || checker.IsS8S4NZ()) && tensorType.find("antiquant") != std::string::npos) {
         expectedDimNum = 3; // Mx / PerGroup量化，仅支持antiquantSacle/antiquantOffset维度为3
@@ -308,8 +308,8 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::GetExpectedDimNum(
 }
 
 aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckBatchSizeConsistency(
-    const AclnnGroupedMatmulWeightQuantDAV3510Checker &checker, const op::Shape &tensorShape,
-    const op::Shape &weightShape, const std::string &tensorType)
+    const AclnnGroupedMatmulWeightQuantDAV3510Checker& checker, const op::Shape& tensorShape,
+    const op::Shape& weightShape, const std::string& tensorType)
 {
     if (checker.gmmParams_.groupType == SPLIT_M && !checker.IsMultiTensorWeight()) {
         uint64_t groupNum = weightShape.GetDim(0);
@@ -327,8 +327,8 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckBatchSizeConsisten
 
 // Check tensor’s Ndim must match weight’s Ndim.
 aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckNDimConsistency(
-    const AclnnGroupedMatmulWeightQuantDAV3510Checker &checker, const op::Shape &tensorShape,
-    const op::Shape &weightShape, size_t tensorDimNum, const std::string &tensorType)
+    const AclnnGroupedMatmulWeightQuantDAV3510Checker& checker, const op::Shape& tensorShape,
+    const op::Shape& weightShape, size_t tensorDimNum, const std::string& tensorType)
 {
     uint64_t weightNDimIdx = checker.IsS8S4SpecialWeightFormat() ? S8S4_WEIGHT_K_DIM : weightShape.GetDimNum() - 1;
     int64_t weightNDimValue = weightShape.GetDim(weightNDimIdx);
@@ -349,8 +349,8 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckNDimConsistency(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorShape(const aclTensorList *tensorList, size_t idx,
-                                                                          const std::string &tensorType) const
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorShape(const aclTensorList* tensorList, size_t idx,
+                                                                          const std::string& tensorType) const
 {
     // 校验bias、antiquantScale和antiquantOffset的dim和shape
     auto tensorShape = (*tensorList)[idx]->GetViewShape();
@@ -838,9 +838,9 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckAntiQuantShape(siz
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckDimValueAllOne(const aclTensorList *tensorList,
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckDimValueAllOne(const aclTensorList* tensorList,
                                                                              const size_t idx,
-                                                                             const std::string &paramName) const
+                                                                             const std::string& paramName) const
 {
     auto viewShape = (*tensorList)[idx]->GetViewShape();
     auto viewShapeDimNum = viewShape.GetDimNum();
@@ -1061,8 +1061,8 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckUnsupportedApi() c
 aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckS8S4GroupSize(size_t idx) const
 {
     if (!IsS8S4AsymmetricQuant()) {
-        const op::Shape &weightShape = (*gmmParams_.weight)[idx]->GetViewShape();
-        const op::Shape &scaleShape = (*gmmParams_.scaleOptional)[idx]->GetViewShape();
+        const op::Shape& weightShape = (*gmmParams_.weight)[idx]->GetViewShape();
+        const op::Shape& scaleShape = (*gmmParams_.scaleOptional)[idx]->GetViewShape();
         const size_t weightKDim = IsS8S4SpecialWeightFormat() ? S8S4_WEIGHT_N_DIM : S8S4_WEIGHT_K_DIM;
         const int64_t kSize = weightShape.GetDim(weightKDim);
         const int64_t groupNum = scaleShape.GetDim(S8S4_WEIGHT_K_DIM);
@@ -1248,11 +1248,11 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckGroupListAndSplitI
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckOptionalListSize(const aclTensorList *optional,
-                                                                               const aclTensorList *reference,
-                                                                               const char *optionalName,
-                                                                               const char *referenceName,
-                                                                               const char *opName)
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckOptionalListSize(const aclTensorList* optional,
+                                                                               const aclTensorList* reference,
+                                                                               const char* optionalName,
+                                                                               const char* referenceName,
+                                                                               const char* opName)
 {
     if (optional == nullptr) {
         return ACLNN_SUCCESS;

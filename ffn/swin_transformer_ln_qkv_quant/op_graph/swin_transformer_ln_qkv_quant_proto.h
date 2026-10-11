@@ -71,6 +71,6 @@ REG_OP(SwinTransformerLnQkvQuant)
     .REQUIRED_ATTR(weight_transpose, Bool)
     .OP_END_FACTORY_REG(SwinTransformerLnQkvQuant)
 
-}  // namespace ge
+} // namespace ge
 
-#endif  // SWIN_TRANSFORMER_LN_QKV_QUANT_PROTO_H
+#endif // SWIN_TRANSFORMER_LN_QKV_QUANT_PROTO_H

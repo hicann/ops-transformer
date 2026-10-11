@@ -89,9 +89,9 @@ protected:
     /**
      * @brief Obtain a reference to the derived class
      */
-    __aicore__ inline Derived &AsDerived()
+    __aicore__ inline Derived& AsDerived()
     {
-        return static_cast<Derived &>(*this);
+        return static_cast<Derived&>(*this);
     }
 
 public:

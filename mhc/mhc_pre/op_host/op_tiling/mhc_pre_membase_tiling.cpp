@@ -65,7 +65,7 @@ constexpr int64_t MAX_BS_PER_LOOP = 32;
 constexpr int64_t MAX_REDUCE_SIZE = 256;
 } // namespace
 
-int8_t CheckOptionalParamsExisting(const gert::StorageShape *checkShape)
+int8_t CheckOptionalParamsExisting(const gert::StorageShape* checkShape)
 {
     OP_CHECK_IF(nullptr == checkShape, OP_LOGD("CheckOptionalParamsExisting", "Get nullptr checkShape"), return 0);
     int64_t checkShapeSize = checkShape->GetOriginShape().GetShapeSize();
@@ -96,7 +96,7 @@ ge::graphStatus MhcPreTiling::GetPlatformInfo()
 
 ge::graphStatus MhcPreTiling::GetAttr()
 {
-    auto *attrs = context_->GetAttrs();
+    auto* attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
     auto outFlagAttr = attrs->GetAttrPointer<int64_t>(OUT_FLAG_ATTR_IDX);
@@ -110,7 +110,7 @@ ge::graphStatus MhcPreTiling::GetAttr()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MhcPreTiling::GetShapeAttrsInfoInner(int8_t &gammaExist)
+ge::graphStatus MhcPreTiling::GetShapeAttrsInfoInner(int8_t& gammaExist)
 {
     auto xShape = context_->GetInputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context_, xShape);
@@ -394,7 +394,7 @@ ge::graphStatus MhcPreTiling::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-static void PrintTilingData(const gert::TilingContext *context, MhcPreMembaseTilingData &tiling)
+static void PrintTilingData(const gert::TilingContext* context, MhcPreMembaseTilingData& tiling)
 {
     OP_LOGD(context->GetNodeName(), ">>>>>>>>>> Start to print MhcPre tiling data <<<<<<<<<<");
     OP_LOGD(context->GetNodeName(), "MhcPre_tiling: bs is %ld.", tiling.get_bs());
@@ -540,7 +540,7 @@ ge::graphStatus MhcPreTiling::PostTiling()
     }
     context_->SetTilingKey(tilingKey);
     context_->SetBlockDim(aicCoreNum_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = workspaceSize_;
 
     PrintTilingData(context_, tilingData_);
@@ -550,13 +550,13 @@ ge::graphStatus MhcPreTiling::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingPrepareForMhcPre(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForMhcPre(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingForMhcPre(gert::TilingContext *context)
+ge::graphStatus TilingForMhcPre(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("MhcPre", "Tiling context is null"), return ge::GRAPH_FAILED);
 

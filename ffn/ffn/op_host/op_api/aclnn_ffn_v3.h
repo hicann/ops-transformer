@@ -77,12 +77,12 @@ extern "C" {
  * @return      aclnnStatus: 返回状态码
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnFFNV3GetWorkspaceSize(
-    const aclTensor *x, const aclTensor *weight1, const aclTensor *weight2, const aclTensor *expertTokensOptional,
-    const aclTensor *bias1Optional, const aclTensor *bias2Optional, const aclTensor *scaleOptional,
-    const aclTensor *offsetOptional, const aclTensor *deqScale1Optional, const aclTensor *deqScale2Optional,
-    const aclTensor *antiquantScale1Optional, const aclTensor *antiquantScale2Optional,
-    const aclTensor *antiquantOffset1Optional, const aclTensor *antiquantOffset2Optional, const char *activation,
-    int64_t innerPrecise, bool tokensIndexFlag, const aclTensor *y, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* x, const aclTensor* weight1, const aclTensor* weight2, const aclTensor* expertTokensOptional,
+    const aclTensor* bias1Optional, const aclTensor* bias2Optional, const aclTensor* scaleOptional,
+    const aclTensor* offsetOptional, const aclTensor* deqScale1Optional, const aclTensor* deqScale2Optional,
+    const aclTensor* antiquantScale1Optional, const aclTensor* antiquantScale2Optional,
+    const aclTensor* antiquantOffset1Optional, const aclTensor* antiquantOffset2Optional, const char* activation,
+    int64_t innerPrecise, bool tokensIndexFlag, const aclTensor* y, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnFFNV3的第二段接口，用于执行计算。
@@ -92,8 +92,8 @@ __attribute__((visibility("default"))) aclnnStatus aclnnFFNV3GetWorkspaceSize(
  * @param [in] stream: 指定执行任务的AscendCL stream流。
  * @return     aclnnStatus: 返回状态码
  */
-__attribute__((visibility("default"))) aclnnStatus aclnnFFNV3(void *workspace, uint64_t workspaceSize,
-                                                              aclOpExecutor *executor, aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnFFNV3(void* workspace, uint64_t workspaceSize,
+                                                              aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

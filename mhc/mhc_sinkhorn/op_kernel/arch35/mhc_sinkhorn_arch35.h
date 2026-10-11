@@ -41,7 +41,7 @@ static const int64_t N_VALID_8 = 8;
 template <typename T, bool OUT_FLAG>
 class MhcSinkhornSimd {
 public:
-    __aicore__ inline MhcSinkhornSimd(TPipe &pipe, const MhcSinkhornTilingData &tilingData)
+    __aicore__ inline MhcSinkhornSimd(TPipe& pipe, const MhcSinkhornTilingData& tilingData)
         : pipe_(pipe),
           tilingData_(tilingData){};
     __aicore__ inline void Init(GM_ADDR h_res, GM_ADDR y, GM_ADDR norm_out, GM_ADDR sum_out, GM_ADDR tiling);
@@ -61,7 +61,7 @@ private:
     GlobalTensor<float> normOut_;
     GlobalTensor<float> sumOut_;
 
-    TPipe &pipe_;
+    TPipe& pipe_;
     TQue<QuePosition::VECIN, 1> inputQue_;
     TQue<QuePosition::VECOUT, 1> outputQue_;
     TQue<QuePosition::VECOUT, 1> normOutQue_;
@@ -72,7 +72,7 @@ private:
     TBuf<TPosition::VECCALC> midBuffer_;
     TBuf<TPosition::VECCALC> sumBuffer_;
 
-    const MhcSinkhornTilingData &tilingData_;
+    const MhcSinkhornTilingData& tilingData_;
     int64_t blockIdx_{0};
     int64_t loop_{0};
     int64_t tailHandelSize_{0};
@@ -94,10 +94,10 @@ __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::Init(GM_ADDR h_res, GM_ADDR
     nnSize_ = tilingData_.n * tilingData_.n;
     nnAligSize_ = tilingData_.n * nAlign_;
 
-    hRes_.SetGlobalBuffer((__gm__ float *)h_res + GetBlockIdx() * tilingData_.tNormCore * nnSize_);
-    y_.SetGlobalBuffer((__gm__ float *)y + GetBlockIdx() * tilingData_.tNormCore * nnSize_);
-    normOut_.SetGlobalBuffer((__gm__ float *)norm_out);
-    sumOut_.SetGlobalBuffer((__gm__ float *)sum_out);
+    hRes_.SetGlobalBuffer((__gm__ float*)h_res + GetBlockIdx() * tilingData_.tNormCore * nnSize_);
+    y_.SetGlobalBuffer((__gm__ float*)y + GetBlockIdx() * tilingData_.tNormCore * nnSize_);
+    normOut_.SetGlobalBuffer((__gm__ float*)norm_out);
+    sumOut_.SetGlobalBuffer((__gm__ float*)sum_out);
 
     pipe_.InitBuffer(maskBuffer_, MASK_BUFFER_SIZE);
     pipe_.InitBuffer(midBuffer_, MAX_BUFFER_SIZE);
@@ -154,15 +154,15 @@ __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::CalcSoftmax(int32_t handleN
     LocalTensor<float> sumResLocal = sumBuffer_.Get<float>();
     LocalTensor<uint32_t> maskLocal = maskBuffer_.Get<uint32_t>();
 
-    __ubuf__ float *inputAddr = (__ubuf__ float *)inputLocal.GetPhyAddr();
-    __ubuf__ float *midResAddr = (__ubuf__ float *)midResLocal.GetPhyAddr();
-    __ubuf__ float *sumResAddr = (__ubuf__ float *)sumResLocal.GetPhyAddr();
-    __ubuf__ uint32_t *maskAddr = (__ubuf__ uint32_t *)maskLocal.GetPhyAddr();
+    __ubuf__ float* inputAddr = (__ubuf__ float*)inputLocal.GetPhyAddr();
+    __ubuf__ float* midResAddr = (__ubuf__ float*)midResLocal.GetPhyAddr();
+    __ubuf__ float* sumResAddr = (__ubuf__ float*)sumResLocal.GetPhyAddr();
+    __ubuf__ uint32_t* maskAddr = (__ubuf__ uint32_t*)maskLocal.GetPhyAddr();
 
     LocalTensor<float> normOutLocal = normOutQue_.AllocTensor<float>();
     LocalTensor<float> sumOutLocal = sumColQue_.AllocTensor<float>();
-    __ubuf__ float *normOutAddr = (__ubuf__ float *)normOutLocal.GetPhyAddr();
-    __ubuf__ float *sumOutAddr = (__ubuf__ float *)sumOutLocal.GetPhyAddr();
+    __ubuf__ float* normOutAddr = (__ubuf__ float*)normOutLocal.GetPhyAddr();
+    __ubuf__ float* sumOutAddr = (__ubuf__ float*)sumOutLocal.GetPhyAddr();
 
     uint16_t vflen = Ops::Base::GetVRegSize() / sizeof(float);
     uint16_t blockCnt = Ops::Base::GetVRegSize() / Ops::Base::GetUbBlockSize();
@@ -212,7 +212,7 @@ __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::CalcSoftmax(int32_t handleN
             Reg::Duplicate(sumoutReg, static_cast<float>(0));
             for (uint16_t nIdx = 0; nIdx < static_cast<uint16_t>(tilingData_.n); nIdx++) {
                 auto inputOfset = inputAddr + (i * blockCnt * nnSize_) + nIdx * tilingData_.n;
-                Reg::DataCopyGather(inputReg, inputOfset, (Reg::RegTensor<uint32_t> &)(rowIndexReg), maskRegCalc);
+                Reg::DataCopyGather(inputReg, inputOfset, (Reg::RegTensor<uint32_t>&)(rowIndexReg), maskRegCalc);
                 Reg::ReduceMaxWithDataBlock(midReg, inputReg, maskRegCalc);
                 Reg::LocalMemBar<AscendC::Reg::MemType::VEC_LOAD, AscendC::Reg::MemType::VEC_STORE>();
                 Reg::DataCopy(midResAddr, midReg, maskReg);
@@ -250,13 +250,13 @@ __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::CalcColNorm(int32_t handleN
 {
     LocalTensor<float> normOutLocal = normOutQue_.DeQue<float>();
     LocalTensor<float> sumOutLocal = sumColQue_.DeQue<float>();
-    __ubuf__ float *normOutAddr = (__ubuf__ float *)normOutLocal.GetPhyAddr();
-    __ubuf__ float *sumOutAddr = (__ubuf__ float *)sumOutLocal.GetPhyAddr();
+    __ubuf__ float* normOutAddr = (__ubuf__ float*)normOutLocal.GetPhyAddr();
+    __ubuf__ float* sumOutAddr = (__ubuf__ float*)sumOutLocal.GetPhyAddr();
 
     LocalTensor<float> midResLocal = midBuffer_.Get<float>();
     LocalTensor<uint32_t> maskLocal = maskBuffer_.Get<uint32_t>();
-    __ubuf__ float *midResAddr = (__ubuf__ float *)midResLocal.GetPhyAddr();
-    __ubuf__ uint32_t *maskAddr = (__ubuf__ uint32_t *)maskLocal.GetPhyAddr();
+    __ubuf__ float* midResAddr = (__ubuf__ float*)midResLocal.GetPhyAddr();
+    __ubuf__ uint32_t* maskAddr = (__ubuf__ uint32_t*)maskLocal.GetPhyAddr();
 
     uint16_t vflen = Ops::Base::GetVRegSize() / sizeof(float);
     uint16_t blockCnt = Ops::Base::GetVRegSize() / Ops::Base::GetUbBlockSize();
@@ -312,14 +312,14 @@ __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::CalcRowNorm(int32_t handleN
     LocalTensor<float> sumColLocal = sumColQue_.DeQue<float>();
     LocalTensor<float> sumRowLocal = sumRowQue_.AllocTensor<float>();
 
-    __ubuf__ float *normOutAddr = (__ubuf__ float *)normOutLocal.GetPhyAddr();
-    __ubuf__ float *sumRowOutAddr = (__ubuf__ float *)sumRowLocal.GetPhyAddr();
-    __ubuf__ float *sumColOutAddr = (__ubuf__ float *)sumColLocal.GetPhyAddr();
+    __ubuf__ float* normOutAddr = (__ubuf__ float*)normOutLocal.GetPhyAddr();
+    __ubuf__ float* sumRowOutAddr = (__ubuf__ float*)sumRowLocal.GetPhyAddr();
+    __ubuf__ float* sumColOutAddr = (__ubuf__ float*)sumColLocal.GetPhyAddr();
 
     LocalTensor<float> midResLocal = midBuffer_.Get<float>();
     LocalTensor<uint32_t> maskLocal = maskBuffer_.Get<uint32_t>();
-    __ubuf__ float *midResAddr = (__ubuf__ float *)midResLocal.GetPhyAddr();
-    __ubuf__ uint32_t *maskAddr = (__ubuf__ uint32_t *)maskLocal.GetPhyAddr();
+    __ubuf__ float* midResAddr = (__ubuf__ float*)midResLocal.GetPhyAddr();
+    __ubuf__ uint32_t* maskAddr = (__ubuf__ uint32_t*)maskLocal.GetPhyAddr();
 
     uint16_t vflen = Ops::Base::GetVRegSize() / sizeof(float);
     uint16_t blockCnt = Ops::Base::GetVRegSize() / Ops::Base::GetUbBlockSize();
@@ -388,11 +388,11 @@ __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::ScatterOutFromNorm(int32_t 
 {
     LocalTensor<float> outputLocal = outputQue_.AllocTensor<float>();
     LocalTensor<float> normOutLocal = normOutQue_.DeQue<float>();
-    __ubuf__ float *normOutAddr = (__ubuf__ float *)normOutLocal.GetPhyAddr();
-    __ubuf__ float *outputAddr = (__ubuf__ float *)outputLocal.GetPhyAddr();
+    __ubuf__ float* normOutAddr = (__ubuf__ float*)normOutLocal.GetPhyAddr();
+    __ubuf__ float* outputAddr = (__ubuf__ float*)outputLocal.GetPhyAddr();
 
     LocalTensor<uint32_t> maskLocal = maskBuffer_.Get<uint32_t>();
-    __ubuf__ uint32_t *maskAddr = (__ubuf__ uint32_t *)maskLocal.GetPhyAddr();
+    __ubuf__ uint32_t* maskAddr = (__ubuf__ uint32_t*)maskLocal.GetPhyAddr();
 
     uint16_t vflen = Ops::Base::GetVRegSize() / sizeof(float);
     uint16_t blockCnt = Ops::Base::GetVRegSize() / Ops::Base::GetUbBlockSize();
@@ -431,7 +431,7 @@ __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::ScatterOutFromNorm(int32_t 
                 auto outOfset = outputAddr + (i * blockCnt * nnSize_) + nIdx * tilingData_.n;
                 normAddrReg = Reg::CreateAddrReg<uint32_t>(i, vflen, nIdx, handleLen);
                 Reg::DataCopy(normReg, normOutAddr, normAddrReg);
-                Reg::DataCopyScatter(outOfset, normReg, (Reg::RegTensor<uint32_t> &)(indexReg), maskRegCalc);
+                Reg::DataCopyScatter(outOfset, normReg, (Reg::RegTensor<uint32_t>&)(indexReg), maskRegCalc);
             }
         }
     }

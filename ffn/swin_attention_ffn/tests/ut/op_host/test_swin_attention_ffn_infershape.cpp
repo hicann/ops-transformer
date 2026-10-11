@@ -15,11 +15,13 @@
 #include "base/registry/op_impl_space_registry_v2.h"
 class swin_attention_ffn : public testing::Test {
 protected:
-    static void SetUpTestCase() {
+    static void SetUpTestCase()
+    {
         std::cout << "SwinAttentionFFN Proto Test SetUp" << std::endl;
     }
 
-    static void TearDownTestCase() {
+    static void TearDownTestCase()
+    {
         std::cout << "SwinAttentionFFN Proto Test TearDown" << std::endl;
     }
 };
@@ -27,19 +29,18 @@ protected:
 TEST_F(swin_attention_ffn, swin_attention_ffn_test_1)
 {
     gert::InfershapeContextPara infershapeContextPara(
-    "SwinAttentionFFN",
-    { // input info
-        {{{4096, 64, 128}, {4096, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{128, 128}, {128, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{128}, {128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{4096, 64, 128}, {4096, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}
-    }, 
-    { // output info
-        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}
-    }, 
-    { // attr
-        {"shifts",Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({4, 4})}
-    });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{4096, 64, 128},}; // 预期输出shape
+        "SwinAttentionFFN",
+        {// input info
+         {{{4096, 64, 128}, {4096, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{128, 128}, {128, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{128}, {128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{4096, 64, 128}, {4096, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        {// output info
+         {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        {// attr
+         {"shifts", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({4, 4})}});
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {4096, 64, 128},
+    }; // 预期输出shape
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape); // 框架中已提供该接口
 }

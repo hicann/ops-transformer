@@ -41,8 +41,8 @@ namespace WeightQuantBatchMatmulV2::Arch35 {
 
 #define GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM \
     template <typename xType, typename wType, typename antiQuantScaleType, typename scaleType, \
-              typename perTokenScaleType, typename biasType, typename yType, const WqmmConfig &wqmmConfig, \
-              const VecAntiQuantConfig &vecConfig>
+              typename perTokenScaleType, typename biasType, typename yType, const WqmmConfig& wqmmConfig, \
+              const VecAntiQuantConfig& vecConfig>
 
 #define GMM_WQ_BASIC_BLOCK_CLASS \
     WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, scaleType, perTokenScaleType, biasType, yType, \
@@ -53,29 +53,29 @@ class WeightQuantMatmulBasicBlock : public WeightQuantMatmulBasicBlockBaseClass 
 public:
     __aicore__ inline WeightQuantMatmulBasicBlock(){};
     __aicore__ inline void Init(bool hasBias, uint64_t antiQuantGroupSize, uint64_t aPrefetchSize,
-                                const TCubeTiling *__restrict matmulTiling, TPipe *tPipe);
-    __aicore__ inline void UpdateGlobalAddr(__gm__ xType *x, __gm__ wType *weight,
-                                            __gm__ antiQuantScaleType *antiquantScale, __gm__ xType *antiquantOffset,
-                                            __gm__ scaleType *scale, __gm__ perTokenScaleType *perTokenScale,
-                                            __gm__ biasType *bias, __gm__ yType *y, const bool hasBias,
+                                const TCubeTiling* __restrict matmulTiling, TPipe* tPipe);
+    __aicore__ inline void UpdateGlobalAddr(__gm__ xType* x, __gm__ wType* weight,
+                                            __gm__ antiQuantScaleType* antiquantScale, __gm__ xType* antiquantOffset,
+                                            __gm__ scaleType* scale, __gm__ perTokenScaleType* perTokenScale,
+                                            __gm__ biasType* bias, __gm__ yType* y, const bool hasBias,
                                             const bool weightL2Cacheable);
-    __aicore__ inline void ComputeBasicBlock(const BasicBlockOffsetParam &offsetParam,
-                                             const BasicBlockOffsetParam &lastOffsetParam);
+    __aicore__ inline void ComputeBasicBlock(const BasicBlockOffsetParam& offsetParam,
+                                             const BasicBlockOffsetParam& lastOffsetParam);
     __aicore__ inline void PrefetchA(uint64_t aPrefetchSize, uint64_t xSizeLimit);
-    __aicore__ inline void End(const BasicBlockOffsetParam &offsetParam);
+    __aicore__ inline void End(const BasicBlockOffsetParam& offsetParam);
 
 protected:
     __aicore__ inline void SetAivToAic();
     __aicore__ inline void WaitAivToAic();
     __aicore__ inline void SetAicToAiv();
     __aicore__ inline void WaitAicToAiv();
-    __aicore__ inline void ComputeBasicBlockAivNdNkNzKn(const BasicBlockOffsetParam &offsetParam);
-    __aicore__ inline void ComputeBasicBlockAivNdKnNzNk(const BasicBlockOffsetParam &offsetParam);
-    __aicore__ inline void mxBiasSetParamAndGmtoUb(const BasicBlockOffsetParam &offsetParam,
-                                                   L1ConsumeConfig &l1ConsumeConfig, UbConsumeConfig &ubConsumeConfig,
+    __aicore__ inline void ComputeBasicBlockAivNdNkNzKn(const BasicBlockOffsetParam& offsetParam);
+    __aicore__ inline void ComputeBasicBlockAivNdKnNzNk(const BasicBlockOffsetParam& offsetParam);
+    __aicore__ inline void mxBiasSetParamAndGmtoUb(const BasicBlockOffsetParam& offsetParam,
+                                                   L1ConsumeConfig& l1ConsumeConfig, UbConsumeConfig& ubConsumeConfig,
                                                    const uint64_t kMte2Offset, const uint64_t mte2RealK);
-    __aicore__ inline void ComputeBasicBlockAic(const BasicBlockOffsetParam &offsetParam);
-    __aicore__ inline void HandleMxA8W4Scale(const BasicBlockOffsetParam &offsetParam, const uint64_t kMte2Offset);
+    __aicore__ inline void ComputeBasicBlockAic(const BasicBlockOffsetParam& offsetParam);
+    __aicore__ inline void HandleMxA8W4Scale(const BasicBlockOffsetParam& offsetParam, const uint64_t kMte2Offset);
 
     BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig, vecConfig>
         vectorCompute_;
@@ -112,7 +112,7 @@ protected:
 
 GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::Init(bool hasBias, uint64_t antiQuantGroupSize, uint64_t aPrefetchSize,
-                                                      const TCubeTiling *__restrict matmulTiling, TPipe *tPipe)
+                                                      const TCubeTiling* __restrict matmulTiling, TPipe* tPipe)
 {
     hasBias_ = hasBias;
     biasL1DbOffset_ = 0;
@@ -159,8 +159,8 @@ __aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::Init(bool hasBias, uint64_t ant
 
 GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::UpdateGlobalAddr(
-    __gm__ xType *x, __gm__ wType *weight, __gm__ antiQuantScaleType *antiquantScale, __gm__ xType *antiquantOffset,
-    __gm__ scaleType *scale, __gm__ perTokenScaleType *perTokenScale, __gm__ biasType *bias, __gm__ yType *y,
+    __gm__ xType* x, __gm__ wType* weight, __gm__ antiQuantScaleType* antiquantScale, __gm__ xType* antiquantOffset,
+    __gm__ scaleType* scale, __gm__ perTokenScaleType* perTokenScale, __gm__ biasType* bias, __gm__ yType* y,
     const bool hasBias, const bool weightL2Cacheable)
 {
     if ASCEND_IS_AIC {
@@ -177,7 +177,7 @@ __aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::UpdateGlobalAddr(
  * NZ TransB = False 两个vec核的mte2搬运量为 (CeilDiv(curVecCoreMte2RealN,16), CeilDiv(curVecCoreMte2RealK,16), 16 ,16)
  */
 GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::ComputeBasicBlockAivNdNkNzKn(const BasicBlockOffsetParam &offsetParam)
+__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::ComputeBasicBlockAivNdNkNzKn(const BasicBlockOffsetParam& offsetParam)
 {
     UbConsumeConfig ubConsumeConfig;
     L1ConsumeConfig l1ConsumeConfig;
@@ -230,9 +230,9 @@ __aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::ComputeBasicBlockAivNdNkNzKn(co
  * calcMxBias = True 表示需要对Bias进行计算核搬运
  */
 GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::mxBiasSetParamAndGmtoUb(const BasicBlockOffsetParam &offsetParam,
-                                                                         L1ConsumeConfig &l1ConsumeConfig,
-                                                                         UbConsumeConfig &ubConsumeConfig,
+__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::mxBiasSetParamAndGmtoUb(const BasicBlockOffsetParam& offsetParam,
+                                                                         L1ConsumeConfig& l1ConsumeConfig,
+                                                                         UbConsumeConfig& ubConsumeConfig,
                                                                          const uint64_t kMte2Offset,
                                                                          const uint64_t mte2RealK)
 {
@@ -264,7 +264,7 @@ __aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::mxBiasSetParamAndGmtoUb(const B
  * NZ TransB = True 两个vec核的mte2搬运量为 (CeilDiv(curVecCoreMte2RealK, C0), CeilDiv(curVecCoreMte2RealN, 16), 16, C0)
  */
 GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::ComputeBasicBlockAivNdKnNzNk(const BasicBlockOffsetParam &offsetParam)
+__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::ComputeBasicBlockAivNdKnNzNk(const BasicBlockOffsetParam& offsetParam)
 {
     // c:v为1：2, cube所需数据由两个v提供
     uint64_t kMte2BaseSize = offsetParam.kbL1Size / VEC_CORE_NUM;
@@ -317,7 +317,7 @@ __aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::ComputeBasicBlockAivNdKnNzNk(co
 }
 
 GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::ComputeBasicBlockAic(const BasicBlockOffsetParam &offsetParam)
+__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::ComputeBasicBlockAic(const BasicBlockOffsetParam& offsetParam)
 {
     // 当前方案下，不会出现N方向计算量小于载入量的情况，所以没有N的循环
     for (uint64_t kbGmOffset = 0; kbGmOffset < offsetParam.kSize; kbGmOffset += offsetParam.kbL1Size, cvLoopIdx_++) {
@@ -344,8 +344,8 @@ __aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::ComputeBasicBlockAic(const Basi
 }
 
 GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::ComputeBasicBlock(const BasicBlockOffsetParam &offsetParam,
-                                                                   const BasicBlockOffsetParam &lastOffsetParam)
+__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::ComputeBasicBlock(const BasicBlockOffsetParam& offsetParam,
+                                                                   const BasicBlockOffsetParam& lastOffsetParam)
 {
     if ASCEND_IS_AIV {
         if constexpr ((wqmmConfig.weightFormat != CubeFormat::NZ && !wqmmConfig.bTrans) ||
@@ -360,7 +360,7 @@ __aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::ComputeBasicBlock(const BasicBl
 }
 
 GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::HandleMxA8W4Scale(const BasicBlockOffsetParam &offsetParam,
+__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::HandleMxA8W4Scale(const BasicBlockOffsetParam& offsetParam,
                                                                    const uint64_t kMte2Offset)
 {
     if (kMte2Offset % MX_SCALE_K_L1_SIZE != 0) {
@@ -399,7 +399,7 @@ __aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::PrefetchA(uint64_t aPrefetchSiz
 }
 
 GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::End(const BasicBlockOffsetParam &offsetParam)
+__aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::End(const BasicBlockOffsetParam& offsetParam)
 {
     if ASCEND_IS_AIC {
         cubeCompute_.EndSync();

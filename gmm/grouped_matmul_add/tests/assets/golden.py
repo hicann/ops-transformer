@@ -10,12 +10,8 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ----------------------------------------------------------------------------
 __golden__ = {
-        "kernel": {
-            "grouped_matmul_add": "grouped_matmul_add_golden"
-        },
-        "e2e": {
-            "torch_npu.npu_grouped_matmul_add_": "torch_grouped_matmul_add_golden"
-        }
+    "kernel": {"grouped_matmul_add": "grouped_matmul_add_golden"},
+    "e2e": {"torch_npu.npu_grouped_matmul_add_": "torch_grouped_matmul_add_golden"},
 }
 
 import ml_dtypes
@@ -23,11 +19,19 @@ import torch
 import numpy as np
 
 
-def grouped_matmul_add_golden(x, weight, group_list, y, transpose_x: bool = True, transpose_weight: bool = False,
-                              group_type: int = 2, group_list_type: int = 0, **kwargs):
-
+def grouped_matmul_add_golden(
+    x,
+    weight,
+    group_list,
+    y,
+    transpose_x: bool = True,
+    transpose_weight: bool = False,
+    group_type: int = 2,
+    group_list_type: int = 0,
+    **kwargs,
+):
     # group_list_type 0: cumsum, 1: count
-    output_dtypes = kwargs['output_dtypes']
+    output_dtypes = kwargs["output_dtypes"]
     out_dtype = output_dtypes[0]
     outs = []
     group_num = len(group_list)
@@ -41,7 +45,7 @@ def grouped_matmul_add_golden(x, weight, group_list, y, transpose_x: bool = True
         N = weight.shape[-1]
         pre = 0 if i == 0 else group_list[i - 1]
         cur = group_list[i]
-        if cur - pre == 0: # k is 0
+        if cur - pre == 0:  # k is 0
             out = np.zeros((M, N), dtype=out_dtype)
             outs.append(out)
             continue
@@ -57,8 +61,18 @@ def grouped_matmul_add_golden(x, weight, group_list, y, transpose_x: bool = True
     return real_out
 
 
-def torch_grouped_matmul_add_golden(self_ref, x, weight, group_list, *, transpose_x=None, transpose_weight=None,
-                                    group_type=None, group_list_type=None, **kwargs):
+def torch_grouped_matmul_add_golden(
+    self_ref,
+    x,
+    weight,
+    group_list,
+    *,
+    transpose_x=None,
+    transpose_weight=None,
+    group_type=None,
+    group_list_type=None,
+    **kwargs,
+):
     self_ref = torch_to_numpy(self_ref)
     x = torch_to_numpy(x)
     weight = torch_to_numpy(weight)
@@ -66,15 +80,23 @@ def torch_grouped_matmul_add_golden(self_ref, x, weight, group_list, *, transpos
     param_group_list = group_list
     x_dtype = x.dtype
     weight_dtype = weight.dtype
-    group_tensor_new, _, group_list_cumsum = group_list_diff_cumsum_process(group_list_type, param_group_list)
+    group_tensor_new, _, group_list_cumsum = group_list_diff_cumsum_process(
+        group_list_type, param_group_list
+    )
     if group_list_cumsum[-1] > x.shape[0]:
-        raise Exception("Sum of grouplist ({}) exceeds the first dim of x[0]:({})".format(group_list_cumsum[-1], x.shape[0]))
+        raise Exception(
+            "Sum of grouplist ({}) exceeds the first dim of x[0]:({})".format(
+                group_list_cumsum[-1], x.shape[0]
+            )
+        )
 
     x = transpose_last_two_dim(x, transpose_x)
     x = input_convert_to_high_precision(x, x_dtype)
     weight = transpose_last_two_dim(weight, transpose_weight)
     weight = input_convert_to_high_precision(weight, weight_dtype)
-    x, w, _ = gmm_non_quant_data_split_per_expect(x, weight, group_type, group_list_cumsum)
+    x, w, _ = gmm_non_quant_data_split_per_expect(
+        x, weight, group_type, group_list_cumsum
+    )
     output = gmm_non_quant_cpu_golden_calculation(x, w)
     params_out_dtype = self_ref.dtype
     # golden结果处理
@@ -84,7 +106,7 @@ def torch_grouped_matmul_add_golden(self_ref, x, weight, group_list, *, transpos
     return y_input
 
 
-#获取Count和Comsum两种Group_List
+# 获取Count和Comsum两种Group_List
 def group_list_diff_cumsum_process(group_list_type, param_group_list, group_idx=None):
     if group_idx is None:
         group_idx = [0]
@@ -99,9 +121,14 @@ def group_list_diff_cumsum_process(group_list_type, param_group_list, group_idx=
     elif group_list_type == 2:
         group_list_tensor = torch.tensor(param_group_list)
         group_idx_tensor = torch.tensor(group_idx)
-        group_tensor_new = torch.stack((group_idx_tensor, group_list_tensor), dim=1).to(torch.int64)
+        group_tensor_new = torch.stack((group_idx_tensor, group_list_tensor), dim=1).to(
+            torch.int64
+        )
 
-        sorted_group_list = [param_group_list[i] for i in sorted(range(len(group_idx)), key=lambda k: group_idx[k])]
+        sorted_group_list = [
+            param_group_list[i]
+            for i in sorted(range(len(group_idx)), key=lambda k: group_idx[k])
+        ]
         count = sorted_group_list.copy()
         cumsum = np.cumsum(sorted_group_list)
 
@@ -110,7 +137,7 @@ def group_list_diff_cumsum_process(group_list_type, param_group_list, group_idx=
         count = param_group_list
         cumsum = np.cumsum(param_group_list)
         group_tensor_new = torch.tensor(count)
-    
+
     return group_tensor_new, count, cumsum
 
 
@@ -151,7 +178,7 @@ def torch_transpose_last_two_dim(input, transpose_flag):
         return input
 
 
-#升精度
+# 升精度
 def input_convert_to_high_precision(input, dtype):
     if isinstance(input, torch.Tensor):
         return torch_convert_to_high_precision(input, dtype)
@@ -162,7 +189,15 @@ def input_convert_to_high_precision(input, dtype):
 
 
 def np_convert_to_high_precision(input, dtype):
-    if dtype in ("float8_e4m3fn", "float8_e5m2", "float4_e2m1", "float4_e1m2", "hifloat8", "float16", "bfloat16"):
+    if dtype in (
+        "float8_e4m3fn",
+        "float8_e5m2",
+        "float4_e2m1",
+        "float4_e1m2",
+        "hifloat8",
+        "float16",
+        "bfloat16",
+    ):
         return torch.from_numpy(input.astype(np.float32))
     elif dtype in ("int4",):
         return torch.from_numpy(input.astype(np.int32)).to(torch.int32)
@@ -171,28 +206,30 @@ def np_convert_to_high_precision(input, dtype):
 
 
 def torch_convert_to_high_precision(input, dtype):
-    if dtype == 'int8':
+    if dtype == "int8":
         return input.to(torch.int8).numpy()
-    elif dtype == 'int32':
+    elif dtype == "int32":
         return input.to(torch.int32).numpy()
-    elif dtype in ('float8_e4m3fn', 'float8_e5m2'):
+    elif dtype in ("float8_e4m3fn", "float8_e5m2"):
         return input.to(torch.float32).numpy()
-    elif dtype in ('hifloat8',):
+    elif dtype in ("hifloat8",):
         return input.to(torch.float32).numpy()
-    elif dtype in ('bf16', 'bfloat16'):
+    elif dtype in ("bf16", "bfloat16"):
         return input.to(torch.float32).numpy()
     else:
         return input.to(torch.float32).numpy()
 
 
 # 对X、W、Bias进行切分
-def get_x_weight_bias(x_input, w_input, group_type, group_list_cumsum, biass=None, has_bias=0):
+def get_x_weight_bias(
+    x_input, w_input, group_type, group_list_cumsum, biass=None, has_bias=0
+):
     Xs, Ws, Bs = [], [], []
     if group_type == 0:
         # M分组
         offset = 0
         for i in range(len(group_list_cumsum)):
-            Xs.append(x_input[offset: group_list_cumsum[i], :])
+            Xs.append(x_input[offset : group_list_cumsum[i], :])
             Ws.append(w_input[i])
             offset = group_list_cumsum[i]
 
@@ -200,8 +237,8 @@ def get_x_weight_bias(x_input, w_input, group_type, group_list_cumsum, biass=Non
         # K分组
         offset = 0
         for i in range(len(group_list_cumsum)):
-            Xs.append(x_input[:, offset: group_list_cumsum[i]])
-            Ws.append(w_input[offset: group_list_cumsum[i], :])
+            Xs.append(x_input[:, offset : group_list_cumsum[i]])
+            Ws.append(w_input[offset : group_list_cumsum[i], :])
             offset = group_list_cumsum[i]
     else:
         Xs.append(x_input)
@@ -214,7 +251,9 @@ def get_x_weight_bias(x_input, w_input, group_type, group_list_cumsum, biass=Non
 
 
 # 非量化：对输入进行切分
-def gmm_non_quant_data_split_per_expect(x1, x2, group_type, grouplist, bias=None, has_bias=0):
+def gmm_non_quant_data_split_per_expect(
+    x1, x2, group_type, grouplist, bias=None, has_bias=0
+):
     return get_x_weight_bias(x1, x2, group_type, grouplist, bias, has_bias)
 
 
@@ -232,22 +271,28 @@ def gmm_non_quant_golden_calculate(x, weight, bias=None, has_bias=0):
     return output
 
 
-#------------------------输出合并
+# ------------------------输出合并
 def output_dtype_post_process(output, dtype):
     output_new = [None] * len(output)
     for i in range(len(output)):
-        if dtype == 'bfloat16':
+        if dtype == "bfloat16":
             output_new[i] = output[i].to(torch.bfloat16)
-        elif dtype == 'float16':
+        elif dtype == "float16":
             output_new[i] = output[i].half()
-        elif dtype == 'int8':
+        elif dtype == "int8":
             output_new[i] = output[i].to(torch.int8)
         else:
             output_new[i] = output[i].float()
     return output_new
 
 
-def golden_output_process(output, param_split_item, group_type, activation_feature_out=None, dyn_scale_out=None):
+def golden_output_process(
+    output,
+    param_split_item,
+    group_type,
+    activation_feature_out=None,
+    dyn_scale_out=None,
+):
     golden = []
 
     if param_split_item in [2, 3]:
@@ -262,7 +307,11 @@ def golden_output_process(output, param_split_item, group_type, activation_featu
         # 检查inf、nan的数量
         num_inf = torch.isinf(golden[0]).sum().item()
         num_nan = torch.isnan(golden[0]).sum().item()
-        ratio = 100 * ((num_inf + num_nan) / (ret.shape[0] * ret.shape[1])) if ret.shape[0] * ret.shape[1] != 0 else 0
+        ratio = (
+            100 * ((num_inf + num_nan) / (ret.shape[0] * ret.shape[1]))
+            if ret.shape[0] * ret.shape[1] != 0
+            else 0
+        )
     else:
         golden = output
     return golden

@@ -30,12 +30,12 @@ constexpr uint32_t GROUP_LIST_SPARSE_M = 2U;
 class GMMPreTilingProcess {
 public:
     __aicore__ inline GMMPreTilingProcess(){};
-    __aicore__ inline void Init(GM_ADDR groupList, GMMBaseParams &tilingData, TCubeTiling &mmTilingData, TPipe *pipe);
-    __aicore__ inline void Process(GMMBaseParams &tilingData, TCubeTiling &mmTilingData);
+    __aicore__ inline void Init(GM_ADDR groupList, GMMBaseParams& tilingData, TCubeTiling& mmTilingData, TPipe* pipe);
+    __aicore__ inline void Process(GMMBaseParams& tilingData, TCubeTiling& mmTilingData);
 
 private:
     __aicore__ inline void GetTokensPerGroup();
-    __aicore__ inline void FullLoadA(const int32_t baseM, TCubeTiling &mmTilingData);
+    __aicore__ inline void FullLoadA(const int32_t baseM, TCubeTiling& mmTilingData);
     GlobalTensor<int64_t> groupListGm;
     uint32_t groupListType = 0;
     int32_t groupType = 0;
@@ -68,13 +68,13 @@ __aicore__ inline void GMMPreTilingProcess::GetTokensPerGroup()
     return;
 }
 
-__aicore__ inline void GMMPreTilingProcess::Init(GM_ADDR groupList, GMMBaseParams &tilingData,
-                                                 TCubeTiling &mmTilingData, TPipe *pipe)
+__aicore__ inline void GMMPreTilingProcess::Init(GM_ADDR groupList, GMMBaseParams& tilingData,
+                                                 TCubeTiling& mmTilingData, TPipe* pipe)
 {
 #if ORIG_DTYPE_X != DT_INT8 || ORIG_DTYPE_WEIGHT != DT_INT8
     return;
 #else
-    groupListGm.SetGlobalBuffer((__gm__ int64_t *)groupList);
+    groupListGm.SetGlobalBuffer((__gm__ int64_t*)groupList);
     groupListType = tilingData.groupListType;
     groupType = tilingData.groupType;
     groupNum = tilingData.groupNum;
@@ -92,7 +92,7 @@ __aicore__ inline void GMMPreTilingProcess::Init(GM_ADDR groupList, GMMBaseParam
 #endif
 }
 
-__aicore__ inline void GMMPreTilingProcess::Process(GMMBaseParams &tilingData, TCubeTiling &mmTilingData)
+__aicore__ inline void GMMPreTilingProcess::Process(GMMBaseParams& tilingData, TCubeTiling& mmTilingData)
 {
 #if ORIG_DTYPE_X != DT_INT8 || ORIG_DTYPE_WEIGHT != DT_INT8
     return;
@@ -154,7 +154,7 @@ __aicore__ inline void GMMPreTilingProcess::Process(GMMBaseParams &tilingData, T
 #endif
 }
 
-__aicore__ inline void GMMPreTilingProcess::FullLoadA(const int32_t curBaseM, TCubeTiling &mmTilingData)
+__aicore__ inline void GMMPreTilingProcess::FullLoadA(const int32_t curBaseM, TCubeTiling& mmTilingData)
 {
     int32_t A1FullLoadSize = curBaseM * AlignUp(k, baseK) + baseN * baseK * depthB1;
     if (A1FullLoadSize < L1_SIZE) {

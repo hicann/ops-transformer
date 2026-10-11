@@ -31,7 +31,7 @@ constexpr uint32_t BUFFER_NUM_RESIDENT = 1;
 template <typename D_IN>
 class BlockAttentionResidualsResident {
 public:
-    __aicore__ inline BlockAttentionResidualsResident(TPipe *pipe, const BlockAttentionResidualsTilingData *tilingData)
+    __aicore__ inline BlockAttentionResidualsResident(TPipe* pipe, const BlockAttentionResidualsTilingData* tilingData)
     {
         pipe_ = pipe;
         tiling_ = tilingData;
@@ -47,7 +47,7 @@ public:
         hiddenSizeAlignFp32_ = (hiddenSize_ + ELEM_PER_BLK_FP32 - 1U) / ELEM_PER_BLK_FP32 * ELEM_PER_BLK_FP32;
     }
 
-    __aicore__ inline void Init(const BlockAttentionResidualsInitParams &params)
+    __aicore__ inline void Init(const BlockAttentionResidualsInitParams& params)
     {
         blockIdx_ = GetBlockIdx();
         blockNum_ = GetBlockNum();
@@ -65,14 +65,14 @@ public:
             tokenNum_ = numTokens_ - tokenStart_;
         }
 
-        partialBlockGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.partialBlock));
-        blockResGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.blockRes));
-        projWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.projWeight));
-        normWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.normWeight));
-        hiddenStatesGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN *>(params.hiddenStates));
+        partialBlockGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.partialBlock));
+        blockResGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.blockRes));
+        projWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.projWeight));
+        normWeightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.normWeight));
+        hiddenStatesGm_.SetGlobalBuffer(reinterpret_cast<__gm__ D_IN*>(params.hiddenStates));
         if (needBackward_) {
-            invNormGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(params.invNorm));
-            probsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(params.probs));
+            invNormGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(params.invNorm));
+            probsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(params.probs));
         }
 
         InitBuffers();
@@ -121,7 +121,7 @@ private:
         }
     }
 
-    __aicore__ inline LocalTensor<D_IN> CopyInRow(const GlobalTensor<D_IN> &srcGm, int64_t srcOffset)
+    __aicore__ inline LocalTensor<D_IN> CopyInRow(const GlobalTensor<D_IN>& srcGm, int64_t srcOffset)
     {
         LocalTensor<D_IN> inLocal = inQue_.AllocTensor<D_IN>();
         DataCopyExtParams copyParams{1, static_cast<uint32_t>(hiddenSize_ * sizeof(D_IN)), 0, 0, 0};
@@ -132,7 +132,7 @@ private:
         return inLocal;
     }
 
-    __aicore__ inline void FreeInRow(LocalTensor<D_IN> &inLocal)
+    __aicore__ inline void FreeInRow(LocalTensor<D_IN>& inLocal)
     {
         inQue_.FreeTensor(inLocal);
     }
@@ -271,8 +271,8 @@ private:
     }
 
 private:
-    TPipe *pipe_{nullptr};
-    const BlockAttentionResidualsTilingData *tiling_{nullptr};
+    TPipe* pipe_{nullptr};
+    const BlockAttentionResidualsTilingData* tiling_{nullptr};
 
     GlobalTensor<D_IN> partialBlockGm_;
     GlobalTensor<D_IN> blockResGm_;

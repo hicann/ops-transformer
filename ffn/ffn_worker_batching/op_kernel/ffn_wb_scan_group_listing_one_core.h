@@ -31,7 +31,7 @@ using namespace AscendC;
 class KernelFfnWBScanGroupListingOneCore {
 public:
     __aicore__ inline KernelFfnWBScanGroupListingOneCore(){};
-    __aicore__ inline void Init(GM_ADDR x, GM_ADDR groupList, ScheduleContextInfo *scheduleContext, TPipe *tPipe)
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR groupList, ScheduleContextInfo* scheduleContext, TPipe* tPipe)
     {
         int64_t outQueSize = 1024 * NUM_TWO * sizeof(int64_t) * NUM_TWO; // 1024个数, key & value, doblebuffer
         int64_t ubMaxRows = Align((scheduleContext->ubSize - outQueSize) / sizeof(int32_t) / NUM_TWO, sizeof(int32_t));
@@ -46,8 +46,8 @@ public:
         pipe = tPipe;
         expertNum = scheduleContext->expertNum;
         blockIdx = GetBlockIdx() - (scheduleContext->coreNum - GROUP_LISTING_SCAN_AIV_NUM);
-        expandedExpertIdsGm.SetGlobalBuffer((__gm__ int32_t *)x);
-        groupListGm.SetGlobalBuffer((__gm__ int64_t *)groupList, expertNum * NUM_TWO);
+        expandedExpertIdsGm.SetGlobalBuffer((__gm__ int32_t*)x);
+        groupListGm.SetGlobalBuffer((__gm__ int64_t*)groupList, expertNum * NUM_TWO);
 
         pipe->InitBuffer(copyInQueue, 1, perLoopRows * sizeof(int32_t));
         pipe->InitBuffer(copyOutQueue, 1,
@@ -159,7 +159,7 @@ private:
     }
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> copyInQueue;
     TQue<QuePosition::VECOUT, 1> copyOutQueue;
     TBuf<TPosition::VECCALC> maskBuf;

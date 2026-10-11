@@ -32,11 +32,11 @@
 #if defined(CONST_TILING)
 #define GET_TILING_DATA_MEMBER_ADDR(tilingType, member, var, tiling) \
     GET_TILING_DATA_MEMBER(tilingType, member, obj, tiling); \
-    const int32_t *(var) = (const int32_t *)((const uint8_t *)&obj);
+    const int32_t*(var) = (const int32_t*)((const uint8_t*)&obj);
 #else
 #define GET_TILING_DATA_MEMBER_ADDR(tilingType, member, var, tiling) \
-    size_t offset##var = (size_t)(&((tilingType *)0)->member); \
-    __gm__ int32_t *(var) = (__gm__ int32_t *)((tiling) + (offset##var));
+    size_t offset##var = (size_t)(&((tilingType*)0)->member); \
+    __gm__ int32_t*(var) = (__gm__ int32_t*)((tiling) + (offset##var));
 #endif
 
 #endif // QGMM_INPLACE_ADD_UTILS_H

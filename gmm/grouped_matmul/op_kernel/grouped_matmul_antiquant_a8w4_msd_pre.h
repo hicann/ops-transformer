@@ -31,7 +31,7 @@ class GMMA8W4PreProcess {
 public:
     __aicore__ inline GMMA8W4PreProcess(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR y, GM_ADDR groupList, GM_ADDR workspace,
-                                const GMMBaseParams &tilingData, TPipe *pipe);
+                                const GMMBaseParams& tilingData, TPipe* pipe);
     __aicore__ inline void Process();
 
 private:
@@ -77,11 +77,11 @@ private:
 };
 
 __aicore__ inline void GMMA8W4PreProcess::Init(GM_ADDR x, GM_ADDR y, GM_ADDR groupList, GM_ADDR workspace,
-                                               const GMMBaseParams &tilingData, TPipe *pipe)
+                                               const GMMBaseParams& tilingData, TPipe* pipe)
 {
     xGm.SetGlobalBuffer(GetTensorAddr<int8_t>(0, x));
     yGm.SetGlobalBuffer(GetTensorAddr<int8_t>(0, y));
-    groupListGm.SetGlobalBuffer((__gm__ int64_t *)groupList);
+    groupListGm.SetGlobalBuffer((__gm__ int64_t*)groupList);
 
     vK = tilingData.k;
     withOffset = tilingData.withOffset;
@@ -102,7 +102,7 @@ __aicore__ inline void GMMA8W4PreProcess::Init(GM_ADDR x, GM_ADDR y, GM_ADDR gro
     pipe->InitBuffer(vecInWork, BUFFER_NUM_A8W4_PRE, BUFFER_SIZE_256B * sizeof(float));
 
     if (withOffset == WITH_OFFSET) {
-        xRowSumGm.SetGlobalBuffer((__gm__ float *)workspace);
+        xRowSumGm.SetGlobalBuffer((__gm__ float*)workspace);
         pipe->InitBuffer(vecOutQueueRowSum, BUFFER_NUM_A8W4_PRE, 1 * sizeof(float));
     }
 

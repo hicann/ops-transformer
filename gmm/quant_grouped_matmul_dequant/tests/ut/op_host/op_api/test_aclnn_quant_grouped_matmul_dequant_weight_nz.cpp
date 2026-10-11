@@ -23,8 +23,7 @@
 using namespace std;
 using namespace op;
 
-class aclnnQuantGroupedMatmulDequantWeightNz_test : public testing::Test
-{
+class aclnnQuantGroupedMatmulDequantWeightNz_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -49,18 +48,17 @@ TEST_F(aclnnQuantGroupedMatmulDequantWeightNz_test, ascend310P_test_opapi_nz_nor
     auto weight_desc = TensorDesc({g, k / 32, n / 16, 16, 32}, ACL_INT8, ACL_FORMAT_FRACTAL_NZ);
     auto weight_scale_desc = TensorDesc({g, n}, ACL_FLOAT, ACL_FORMAT_ND);
     auto group_list_desc = TensorDesc({g}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{7, 29, 31, 64});
-    aclTensor *bias_desc = nullptr;
+    aclTensor* bias_desc = nullptr;
     auto x_scale_desc = TensorDesc({m}, ACL_FLOAT, ACL_FORMAT_ND);
-    aclTensor *x_offset_desc = nullptr;
+    aclTensor* x_offset_desc = nullptr;
     auto smooth_scale_desc = TensorDesc({k}, ACL_FLOAT16, ACL_FORMAT_ND);
     auto out_desc = TensorDesc({m, n}, ACL_FLOAT16, ACL_FORMAT_ND);
     char* quantMode = "pertoken";
     bool weightTrans = true;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatmulDequantWeightNZ,
-                        INPUT(x_desc, weight_desc, weight_scale_desc, group_list_desc,
-                              bias_desc, x_scale_desc, x_offset_desc, smooth_scale_desc,
-                              quantMode, weightTrans),
+                        INPUT(x_desc, weight_desc, weight_scale_desc, group_list_desc, bias_desc, x_scale_desc,
+                              x_offset_desc, smooth_scale_desc, quantMode, weightTrans),
                         OUTPUT(out_desc));
 
     uint64_t workspace_size = 0;
@@ -79,18 +77,17 @@ TEST_F(aclnnQuantGroupedMatmulDequantWeightNz_test, ascend310P_test_opapi_nz_int
     auto weight_desc = TensorDesc({g, k / 32, n / 16, 16, 32}, ACL_INT8, ACL_FORMAT_FRACTAL_NZ);
     auto weight_scale_desc = TensorDesc({g, n}, ACL_INT64, ACL_FORMAT_ND);
     auto group_list_desc = TensorDesc({g}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{7, 29, 31, 64});
-    aclTensor *bias_desc = nullptr;
+    aclTensor* bias_desc = nullptr;
     auto x_scale_desc = TensorDesc({m}, ACL_FLOAT16, ACL_FORMAT_ND);
-    aclTensor *x_offset_desc = nullptr;
+    aclTensor* x_offset_desc = nullptr;
     auto smooth_scale_desc = TensorDesc({k}, ACL_FLOAT16, ACL_FORMAT_ND);
     auto out_desc = TensorDesc({m, n}, ACL_FLOAT16, ACL_FORMAT_ND);
     char* quantMode = "pertoken";
     bool weightTrans = true;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatmulDequantWeightNZ,
-                        INPUT(x_desc, weight_desc, weight_scale_desc, group_list_desc,
-                              bias_desc, x_scale_desc, x_offset_desc, smooth_scale_desc,
-                              quantMode, weightTrans),
+                        INPUT(x_desc, weight_desc, weight_scale_desc, group_list_desc, bias_desc, x_scale_desc,
+                              x_offset_desc, smooth_scale_desc, quantMode, weightTrans),
                         OUTPUT(out_desc));
 
     uint64_t workspace_size = 0;

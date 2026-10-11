@@ -85,26 +85,26 @@ public:
     using ProblemShape = AscendC::Shape<int64_t, int64_t, int64_t>;
 
 public:
-    __aicore__ inline void Init(Params const &params);
+    __aicore__ inline void Init(Params const& params);
     __aicore__ inline auto GetFirstL0c2UbTensor();
     __aicore__ inline auto GetSecondL0c2UbTensor();
-    __aicore__ inline void operator()(const BlockShape &blockShape, const BlockCoord &blockCoord);
-    __aicore__ inline void UpdateGlobalAddr(const BlockCoord &baseOffset);
-    __aicore__ inline void UpdateNextProblem(const ProblemShape &problemShape);
+    __aicore__ inline void operator()(const BlockShape& blockShape, const BlockCoord& blockCoord);
+    __aicore__ inline void UpdateGlobalAddr(const BlockCoord& baseOffset);
+    __aicore__ inline void UpdateNextProblem(const ProblemShape& problemShape);
 
 private:
     __aicore__ inline void CopyOutputFromUb2Gm(uint64_t blockCount, uint64_t offset,
-                                               AscendC::LocalTensor<DataTypeOut> &src);
-    __aicore__ inline void VFDoSwiglu(__ubuf__ float *firstSrc, __ubuf__ float *secondSrc, uint16_t mSize,
+                                               AscendC::LocalTensor<DataTypeOut>& src);
+    __aicore__ inline void VFDoSwiglu(__ubuf__ float* firstSrc, __ubuf__ float* secondSrc, uint16_t mSize,
                                       uint16_t nSize);
-    __aicore__ inline void VFDoDequantWithX1X2Scale(__ubuf__ float *l0cOutUbFirstFloatAddr,
-                                                    __ubuf__ float *l0cOutUbSecondFloatAddr, uint16_t mSize);
-    __aicore__ inline void VFDoDequant(__ubuf__ float *dst, __ubuf__ DataTypeIn *l0cOut,
-                                       __ubuf__ DataTypeX2Scale *scale2, __ubuf__ DataTypeX1Scale *x1Scale,
+    __aicore__ inline void VFDoDequantWithX1X2Scale(__ubuf__ float* l0cOutUbFirstFloatAddr,
+                                                    __ubuf__ float* l0cOutUbSecondFloatAddr, uint16_t mSize);
+    __aicore__ inline void VFDoDequant(__ubuf__ float* dst, __ubuf__ DataTypeIn* l0cOut,
+                                       __ubuf__ DataTypeX2Scale* scale2, __ubuf__ DataTypeX1Scale* x1Scale,
                                        uint16_t mSize, uint16_t nSize);
-    __aicore__ inline void CopyX1ScaleFromGm2Ub(AscendC::LocalTensor<DataTypeX1Scale> &dst, uint64_t blockLen,
+    __aicore__ inline void CopyX1ScaleFromGm2Ub(AscendC::LocalTensor<DataTypeX1Scale>& dst, uint64_t blockLen,
                                                 uint64_t offset);
-    __aicore__ inline void CopyX2ScaleFromGm2Ub(AscendC::LocalTensor<DataTypeX2Scale> &dst, uint64_t offset);
+    __aicore__ inline void CopyX2ScaleFromGm2Ub(AscendC::LocalTensor<DataTypeX2Scale>& dst, uint64_t offset);
     __aicore__ inline void CopyDataFromGm2Ub(uint64_t halfSingleM, uint64_t singleMInVec);
     __aicore__ inline void VFDoPertokenDequantAndSwiglu(uint16_t mSize);
     // GM ADDR
@@ -122,7 +122,7 @@ private:
     AscendC::LocalTensor<DataTypeX2Scale> x2ScaleUbFirst_;
     AscendC::LocalTensor<DataTypeX2Scale> x2ScaleUbSecond_;
     AscendC::LocalTensor<DataTypeX1Scale> x1ScaleUb_;
-    const Params *params_;
+    const Params* params_;
     int64_t n_;
     uint32_t subBlockIdx_ = AscendC::GetSubBlockIdx();
     uint32_t singleM_; // cur singleShapeM
@@ -132,7 +132,7 @@ private:
 
 QMM_BLOCK_EPILOGUE_DEQUANT_SWIGLU_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Init(
-    Params const &params)
+    Params const& params)
 {
     if ASCEND_IS_AIC {
         return;
@@ -151,11 +151,11 @@ __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUN
 
 QMM_BLOCK_EPILOGUE_DEQUANT_SWIGLU_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(
-    const BlockCoord &baseOffset)
+    const BlockCoord& baseOffset)
 {
     if ASCEND_IS_AIV {
-        gluResGlobal_.SetGlobalBuffer((__gm__ DataTypeOut *)params_->workSpaceGMAddr + Get<Y_INDEX>(baseOffset));
-        x1ScaleGlobal_.SetGlobalBuffer((__gm__ DataTypeX1Scale *)params_->x1ScaleGmAddr + Get<X1SCALE_IDX>(baseOffset));
+        gluResGlobal_.SetGlobalBuffer((__gm__ DataTypeOut*)params_->workSpaceGMAddr + Get<Y_INDEX>(baseOffset));
+        x1ScaleGlobal_.SetGlobalBuffer((__gm__ DataTypeX1Scale*)params_->x1ScaleGmAddr + Get<X1SCALE_IDX>(baseOffset));
         x2ScaleGlobal_.SetGlobalBuffer(GetTensorAddr<DataTypeX2Scale>(0, params_->x2ScaleGmAddr) +
                                        Get<X2SCALE_IDX>(baseOffset));
     }
@@ -163,14 +163,14 @@ __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUN
 
 QMM_BLOCK_EPILOGUE_DEQUANT_SWIGLU_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateNextProblem(
-    const ProblemShape &problemShape)
+    const ProblemShape& problemShape)
 {
     n_ = Get<MNK_N>(problemShape);
 }
 
 QMM_BLOCK_EPILOGUE_DEQUANT_SWIGLU_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::CopyOutputFromUb2Gm(
-    uint64_t blockCount, uint64_t offset, AscendC::LocalTensor<DataTypeOut> &src)
+    uint64_t blockCount, uint64_t offset, AscendC::LocalTensor<DataTypeOut>& src)
 {
     AscendC::DataCopyExtParams ub2GmParams{1, 0, 0, 0, 0};
     ub2GmParams.blockCount = blockCount;
@@ -181,14 +181,14 @@ __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUN
 
 QMM_BLOCK_EPILOGUE_DEQUANT_SWIGLU_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoSwiglu(
-    __ubuf__ float *firstSrc, __ubuf__ float *secondSrc, uint16_t mSize, uint16_t nSize)
+    __ubuf__ float* firstSrc, __ubuf__ float* secondSrc, uint16_t mSize, uint16_t nSize)
 {
     constexpr uint16_t sizePerRepeat = AscendC::VECTOR_REG_WIDTH / sizeof(DataTypeIn);
     uint16_t OneRowRepeatTimes = CeilDiv(static_cast<uint64_t>(nSize), static_cast<uint64_t>(sizePerRepeat));
     uint32_t nSrcUbAligned = CeilAlign(nSize, AscendC::ONE_BLK_SIZE / sizeof(DataTypeIn));
     uint32_t nDstUbAligned = CeilAlign(nSize, AscendC::ONE_BLK_SIZE / sizeof(DataTypeOut));
     const float scalarOne = 1.0;
-    __ubuf__ DataTypeOut *gluResAddr = (__ubuf__ DataTypeOut *)gluRes_.GetPhyAddr();
+    __ubuf__ DataTypeOut* gluResAddr = (__ubuf__ DataTypeOut*)gluRes_.GetPhyAddr();
     // swiglu
     __VEC_SCOPE__
     {
@@ -232,21 +232,21 @@ __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUN
 QMM_BLOCK_EPILOGUE_DEQUANT_SWIGLU_CLASS_LOCAL_PARAMS
 __aicore__ inline void
 BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoDequantWithX1X2Scale(
-    __ubuf__ float *l0cOutUbFirstFloatAddr, __ubuf__ float *l0cOutUbSecondFloatAddr, uint16_t mSize)
+    __ubuf__ float* l0cOutUbFirstFloatAddr, __ubuf__ float* l0cOutUbSecondFloatAddr, uint16_t mSize)
 {
-    __ubuf__ DataTypeIn *l0cOutUbFirstAddr = (__ubuf__ DataTypeIn *)l0cOutUbFirst_.GetPhyAddr();
-    __ubuf__ DataTypeIn *l0cOutUbSecondAddr = (__ubuf__ DataTypeIn *)l0cOutUbSecond_.GetPhyAddr();
-    __ubuf__ DataTypeX1Scale *ptScaleUbAddr = (__ubuf__ DataTypeX1Scale *)x1ScaleUb_.GetPhyAddr();
-    VFDoDequant(l0cOutUbFirstFloatAddr, l0cOutUbFirstAddr, (__ubuf__ DataTypeX2Scale *)x2ScaleUbFirst_.GetPhyAddr(),
+    __ubuf__ DataTypeIn* l0cOutUbFirstAddr = (__ubuf__ DataTypeIn*)l0cOutUbFirst_.GetPhyAddr();
+    __ubuf__ DataTypeIn* l0cOutUbSecondAddr = (__ubuf__ DataTypeIn*)l0cOutUbSecond_.GetPhyAddr();
+    __ubuf__ DataTypeX1Scale* ptScaleUbAddr = (__ubuf__ DataTypeX1Scale*)x1ScaleUb_.GetPhyAddr();
+    VFDoDequant(l0cOutUbFirstFloatAddr, l0cOutUbFirstAddr, (__ubuf__ DataTypeX2Scale*)x2ScaleUbFirst_.GetPhyAddr(),
                 ptScaleUbAddr, mSize, singleN_);
-    VFDoDequant(l0cOutUbSecondFloatAddr, l0cOutUbSecondAddr, (__ubuf__ DataTypeX2Scale *)x2ScaleUbSecond_.GetPhyAddr(),
+    VFDoDequant(l0cOutUbSecondFloatAddr, l0cOutUbSecondAddr, (__ubuf__ DataTypeX2Scale*)x2ScaleUbSecond_.GetPhyAddr(),
                 ptScaleUbAddr, mSize, singleN_);
 }
 
 QMM_BLOCK_EPILOGUE_DEQUANT_SWIGLU_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoDequant(
-    __ubuf__ float *dst, __ubuf__ DataTypeIn *l0cOut, __ubuf__ DataTypeX2Scale *scale2,
-    __ubuf__ DataTypeX1Scale *x1Scale, uint16_t mSize, uint16_t nSize)
+    __ubuf__ float* dst, __ubuf__ DataTypeIn* l0cOut, __ubuf__ DataTypeX2Scale* scale2,
+    __ubuf__ DataTypeX1Scale* x1Scale, uint16_t mSize, uint16_t nSize)
 {
     uint32_t eleNumPerVf = AscendC::VECTOR_REG_WIDTH / sizeof(DataTypeIn);
     uint32_t nSrcUbAligned = Align(nSize, static_cast<uint16_t>(UB_ALIGN_SIZE / sizeof(DataTypeIn)));
@@ -298,7 +298,7 @@ __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUN
 
 QMM_BLOCK_EPILOGUE_DEQUANT_SWIGLU_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::CopyX1ScaleFromGm2Ub(
-    AscendC::LocalTensor<DataTypeX1Scale> &dst, uint64_t blockLen, uint64_t offset)
+    AscendC::LocalTensor<DataTypeX1Scale>& dst, uint64_t blockLen, uint64_t offset)
 {
     DataCopyParams ptScale2UbParams{1, 0, 0, 0};
     DataCopyPadParams padParams;
@@ -308,7 +308,7 @@ __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUN
 
 QMM_BLOCK_EPILOGUE_DEQUANT_SWIGLU_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::CopyX2ScaleFromGm2Ub(
-    AscendC::LocalTensor<DataTypeX2Scale> &dst, uint64_t offset)
+    AscendC::LocalTensor<DataTypeX2Scale>& dst, uint64_t offset)
 {
     DataCopyParams scale2UbParams{1, 0, 0, 0};
     DataCopyPadParams padParams;
@@ -344,15 +344,15 @@ QMM_BLOCK_EPILOGUE_DEQUANT_SWIGLU_CLASS_LOCAL_PARAMS
 __aicore__ inline void
 BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoPertokenDequantAndSwiglu(uint16_t mSize)
 {
-    __ubuf__ float *l0cOutUbFirstFloatAddr = (__ubuf__ float *)l0cOutUbFirstFloat_.GetPhyAddr();
-    __ubuf__ float *l0cOutUbSecondFloatAddr = (__ubuf__ float *)l0cOutUbSecondFloat_.GetPhyAddr();
+    __ubuf__ float* l0cOutUbFirstFloatAddr = (__ubuf__ float*)l0cOutUbFirstFloat_.GetPhyAddr();
+    __ubuf__ float* l0cOutUbSecondFloatAddr = (__ubuf__ float*)l0cOutUbSecondFloat_.GetPhyAddr();
     VFDoDequantWithX1X2Scale(l0cOutUbFirstFloatAddr, l0cOutUbSecondFloatAddr, mSize);
     VFDoSwiglu(l0cOutUbFirstFloatAddr, l0cOutUbSecondFloatAddr, mSize, singleN_);
 }
 
 QMM_BLOCK_EPILOGUE_DEQUANT_SWIGLU_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequantSwiglu<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::operator()(
-    const BlockShape &blockShape, const BlockCoord &blockCoord)
+    const BlockShape& blockShape, const BlockCoord& blockCoord)
 {
     singleM_ = Get<MNK_M>(blockShape);
     singleN_ = Get<MNK_N>(blockShape);

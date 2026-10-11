@@ -31,7 +31,7 @@ AclnnQGMMInplaceAddParam::AclnnQGMMInplaceAddParam(std::vector<Tensor> inputs, s
                                                    int32_t groupListType, int32_t groupSize)
     : Param({}, Tensor(), Tensor(), std::move(groupListData), groupListType, groupSize)
 {
-    for (auto &tensor : inputs) {
+    for (auto& tensor : inputs) {
         mTensors[tensor.Name()] = tensor;
     }
 }
@@ -76,16 +76,15 @@ bool AclnnQGMMInplaceAddParam::Init()
     aclnnScale1 = ops::adv::tests::utils::AclnnTensor(mTensors["scale1"]);
     auto ret = InitGroupList();
     LOG_IF_EXPR(ret == false, LOG_ERR("InitGroupList failed"), return false);
-    auto *cs = static_cast<ops::adv::tests::utils::Case *>(ops::adv::tests::utils::Case::GetCurrentCase());
+    auto* cs = static_cast<ops::adv::tests::utils::Case*>(ops::adv::tests::utils::Case::GetCurrentCase());
     LOG_IF_EXPR(cs == nullptr, LOG_ERR("Can't get current case"), return false);
-    for (auto *t :
-         std::vector<TensorIntf *>{&aclnnX1, &aclnnX2, &aclnnScale2, &aclnnGroupList, &aclnnY, &aclnnScale1}) {
+    for (auto* t : std::vector<TensorIntf*>{&aclnnX1, &aclnnX2, &aclnnScale2, &aclnnGroupList, &aclnnY, &aclnnScale1}) {
         t->FreeDevData();
         auto tFormat = t->GetFormat();
         if (t->GetExpDataSize() <= 0) {
             continue;
         }
-        uint8_t *devData = nullptr;
+        uint8_t* devData = nullptr;
         if (tFormat == ge::Format::FORMAT_FRACTAL_NZ) {
             devData = t->AllocDevDataNz(0, 0);
         } else {

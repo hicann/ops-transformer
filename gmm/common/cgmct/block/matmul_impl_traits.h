@@ -77,7 +77,7 @@ __aicore__ inline constexpr auto GetStaticTiling()
 
 template <class DispatchPolicy, class L1Shape, class L0Shape, class AType, class BType, class CType, class BiasType,
           class TileCopy,
-          template <const auto &, typename, typename, typename, typename, typename> class MatmulPolicyClass,
+          template <const auto&, typename, typename, typename, typename, typename> class MatmulPolicyClass,
           typename Enable = void>
 struct MatmulImplTraits {
     static_assert(AscendC::Std::always_false_v<DispatchPolicy>,
@@ -94,12 +94,12 @@ struct MatmulImplTraits<DispatchPolicy, L1Shape, L0Shape, AType, BType, CType, B
 };
 
 template <class DispatchPolicy, class L1Shape, class L0Shape, class AType, class BType, class CType, class BiasType,
-          template <const auto &, typename, typename, typename, typename, typename> class MatmulPolicyClass>
+          template <const auto&, typename, typename, typename, typename, typename> class MatmulPolicyClass>
 struct MatmulImplTraits<DispatchPolicy, L1Shape, L0Shape, AType, BType, CType, BiasType, void, MatmulPolicyClass> {
     constexpr static auto STATIC_TILING =
         Detail::GetStaticTiling<DispatchPolicy, L1Shape, L0Shape, AType, BType, CType, BiasType>();
 
-    template <const auto &MM_CFG, typename Impl, typename AT, typename BT, typename CT, typename BiasT>
+    template <const auto& MM_CFG, typename Impl, typename AT, typename BT, typename CT, typename BiasT>
     struct MatmulPolicyCustom : public MatmulPolicyClass<MM_CFG, Impl, AT, BT, CT, BiasT> {};
 
     using Type = AscendC::MatmulImpl<AType, BType, CType, BiasType, STATIC_TILING,
@@ -108,7 +108,7 @@ struct MatmulImplTraits<DispatchPolicy, L1Shape, L0Shape, AType, BType, CType, B
 
 template <class DispatchPolicy, class L1Shape, class L0Shape, class AType, class BType, class CType, class BiasType,
           class TileCopy,
-          template <const auto &, typename, typename, typename, typename, typename> class MatmulPolicyClass>
+          template <const auto&, typename, typename, typename, typename, typename> class MatmulPolicyClass>
 struct MatmulImplTraits<DispatchPolicy, L1Shape, L0Shape, AType, BType, CType, BiasType, TileCopy, MatmulPolicyClass> {
     /**
      * @brief Define a custom matrix multiplication policy
@@ -119,7 +119,7 @@ struct MatmulImplTraits<DispatchPolicy, L1Shape, L0Shape, AType, BType, CType, B
      * @param [out] OutputCType: output data type of matrix C
      * @param [in] InputBiasType: input data type of the bias
      */
-    template <const auto &MM_CFG, typename Impl, typename AT, typename BT, typename CT, typename BiasT>
+    template <const auto& MM_CFG, typename Impl, typename AT, typename BT, typename CT, typename BiasT>
     struct MatmulPolicyCustom : public MatmulPolicyClass<MM_CFG, Impl, AT, BT, CT, BiasT> {
     private:
         using Base = MatmulPolicyClass<MM_CFG, Impl, AT, BT, CT, BiasT>;
@@ -161,7 +161,7 @@ struct MatmulImplTraits<DispatchPolicy, L1Shape, L0Shape, AType, BType, CType, B
 
 template <class DispatchPolicy, class L1Shape, class L0Shape, class AType, class BType, class CType, class BiasType,
           class TileCopy = void,
-          template <const auto &, typename, typename, typename, typename, typename> class MatmulPolicyClass =
+          template <const auto&, typename, typename, typename, typename, typename> class MatmulPolicyClass =
               AscendC::Impl::Detail::MatmulPolicy>
 using MatmulImplTraitsT = typename MatmulImplTraits<DispatchPolicy, L1Shape, L0Shape, AType, BType, CType, BiasType,
                                                     TileCopy, MatmulPolicyClass>::Type;

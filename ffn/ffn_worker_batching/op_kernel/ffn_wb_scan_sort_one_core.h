@@ -30,8 +30,8 @@ using namespace AscendC;
 class KernelScanSortMaskOneCore : public SortMaskBase {
 public:
     __aicore__ inline KernelScanSortMaskOneCore(){};
-    __aicore__ inline void Init(GM_ADDR tokenInfoGm, GM_ADDR workspace, SortCustomTilingDataKernel *tilingData,
-                                const ScheduleContextInfo *contextInfo, TPipe *tPipe);
+    __aicore__ inline void Init(GM_ADDR tokenInfoGm, GM_ADDR workspace, SortCustomTilingDataKernel* tilingData,
+                                const ScheduleContextInfo* contextInfo, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -45,7 +45,7 @@ private:
     int32_t validCnt = 0;
     int32_t needCoreNum_ = 0;
     int64_t F_ = 0;
-    const ScheduleContextInfo *contextInfo_ = nullptr;
+    const ScheduleContextInfo* contextInfo_ = nullptr;
 };
 
 __aicore__ inline void KernelScanSortMaskOneCore::CopyInAndClear()
@@ -172,8 +172,8 @@ __aicore__ inline void KernelScanSortMaskOneCore::CopyOut()
 }
 
 __aicore__ inline void KernelScanSortMaskOneCore::Init(GM_ADDR tokenInfoGm, GM_ADDR workspace,
-                                                       SortCustomTilingDataKernel *tilingData,
-                                                       const ScheduleContextInfo *contextInfo, TPipe *tPipe)
+                                                       SortCustomTilingDataKernel* tilingData,
+                                                       const ScheduleContextInfo* contextInfo, TPipe* tPipe)
 {
     this->pipe = tPipe;
     contextInfo_ = contextInfo;
@@ -184,12 +184,12 @@ __aicore__ inline void KernelScanSortMaskOneCore::Init(GM_ADDR tokenInfoGm, GM_A
     this->totalLength = tilingData->totalLengthWithPad;
     this->sortNum = Ceil(this->totalLength, ONE_REPEAT_SORT_NUM) * ONE_REPEAT_SORT_NUM;
 
-    expertIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(tokenInfoGm));
-    rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace), OFFSET_SORTED_EXPERT_IDS);
+    expertIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(tokenInfoGm));
+    rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace), OFFSET_SORTED_EXPERT_IDS);
     sortedexpertIdsGm.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace,
+        reinterpret_cast<__gm__ int32_t*>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace,
         this->totalLength);
-    sortedRowIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS +
+    sortedRowIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace) + OFFSET_SORTED_EXPERT_IDS +
                                        contextInfo_->sortNumWorkSpace + this->totalLength,
                                    this->totalLength);
 

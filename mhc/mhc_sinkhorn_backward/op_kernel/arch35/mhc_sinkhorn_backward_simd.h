@@ -47,24 +47,24 @@ __aicore__ inline int64_t Ceil(int64_t a, int64_t b)
 
 class MhcSinkhornBackwardSimd {
 public:
-    __aicore__ inline MhcSinkhornBackwardSimd(TPipe &pipe, const MhcSinkhornBackwardTilingData &tilingData)
+    __aicore__ inline MhcSinkhornBackwardSimd(TPipe& pipe, const MhcSinkhornBackwardTilingData& tilingData)
         : pipe_(pipe),
           tilingData_(tilingData){};
     __aicore__ inline void Init(GM_ADDR gradY, GM_ADDR norm, GM_ADDR sum, GM_ADDR gradInput, GM_ADDR tiling);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void CalcSoftmaxBackward(__local_mem__ float *gradYAddr, __local_mem__ float *normAddr,
-                                               __local_mem__ float *gradInputAddr, __local_mem__ uint32_t *maskAddr,
-                                               __local_mem__ float *tempAddr, uint32_t n, uint16_t repeatTimes,
+    __aicore__ inline void CalcSoftmaxBackward(__local_mem__ float* gradYAddr, __local_mem__ float* normAddr,
+                                               __local_mem__ float* gradInputAddr, __local_mem__ uint32_t* maskAddr,
+                                               __local_mem__ float* tempAddr, uint32_t n, uint16_t repeatTimes,
                                                uint32_t perloopSize, uint32_t repeatSize);
-    __aicore__ inline void CalcColBackward(__local_mem__ float *gradYAddr, __local_mem__ float *normAddr,
-                                           __local_mem__ float *sumAddr, __local_mem__ uint32_t *maskAddr,
-                                           __local_mem__ float *tempAddr, uint32_t n, uint16_t repeatTimes,
+    __aicore__ inline void CalcColBackward(__local_mem__ float* gradYAddr, __local_mem__ float* normAddr,
+                                           __local_mem__ float* sumAddr, __local_mem__ uint32_t* maskAddr,
+                                           __local_mem__ float* tempAddr, uint32_t n, uint16_t repeatTimes,
                                            uint32_t perloopSize, uint32_t repeatSize);
-    __aicore__ inline void CalcRowBackward(__local_mem__ float *gradYAddr, __local_mem__ float *normAddr,
-                                           __local_mem__ float *sumAddr, __local_mem__ uint32_t *maskAddr,
-                                           __local_mem__ float *tempAddr, uint32_t n, uint16_t repeatTimes,
+    __aicore__ inline void CalcRowBackward(__local_mem__ float* gradYAddr, __local_mem__ float* normAddr,
+                                           __local_mem__ float* sumAddr, __local_mem__ uint32_t* maskAddr,
+                                           __local_mem__ float* tempAddr, uint32_t n, uint16_t repeatTimes,
                                            uint32_t perloopSize, uint32_t perloopSizePad, uint32_t repeatSize);
 
     __aicore__ inline void CopyInNormAndSumPad(const uint64_t normOffset, const uint32_t normProcessNum,
@@ -88,8 +88,8 @@ private:
     GlobalTensor<float> norm_;
     GlobalTensor<float> sum_;
     GlobalTensor<float> gradInput_;
-    TPipe &pipe_;
-    const MhcSinkhornBackwardTilingData &tilingData_;
+    TPipe& pipe_;
+    const MhcSinkhornBackwardTilingData& tilingData_;
     int64_t blockIdx_;      // 核id
     int64_t loop_;          // 循环次数,单次处理normCorePerLoopTSize个矩阵，需要loop_次
     int64_t loopTSize_;     // 整核/尾核 整块处理的矩阵数量
@@ -111,10 +111,10 @@ __aicore__ inline void MhcSinkhornBackwardSimd::Init(GM_ADDR gradY, GM_ADDR norm
                                                      GM_ADDR tiling)
 {
     blockIdx_ = GetBlockIdx();
-    gradY_.SetGlobalBuffer((__gm__ float *)gradY);
-    norm_.SetGlobalBuffer((__gm__ float *)norm);
-    sum_.SetGlobalBuffer((__gm__ float *)sum);
-    gradInput_.SetGlobalBuffer((__gm__ float *)gradInput);
+    gradY_.SetGlobalBuffer((__gm__ float*)gradY);
+    norm_.SetGlobalBuffer((__gm__ float*)norm);
+    sum_.SetGlobalBuffer((__gm__ float*)sum);
+    gradInput_.SetGlobalBuffer((__gm__ float*)gradInput);
 
     num_iters = tilingData_.numIters;
     // num_iters = 1;
@@ -147,14 +147,14 @@ __aicore__ inline void MhcSinkhornBackwardSimd::Init(GM_ADDR gradY, GM_ADDR norm
 }
 
 __aicore__ inline void MhcSinkhornBackwardSimd::CalcRowBackward(
-    __local_mem__ float *gradYAddr, __local_mem__ float *normAddr, __local_mem__ float *sumAddr,
-    __local_mem__ uint32_t *maskAddr, __local_mem__ float *tempAddr, uint32_t n, uint16_t repeatTimes,
+    __local_mem__ float* gradYAddr, __local_mem__ float* normAddr, __local_mem__ float* sumAddr,
+    __local_mem__ uint32_t* maskAddr, __local_mem__ float* tempAddr, uint32_t n, uint16_t repeatTimes,
     uint32_t perloopSize, uint32_t perloopSizePad, uint32_t repeatSize)
 {
     LocalTensor<int32_t> indexLocal = indexBuffer_.Get<int32_t>();
-    __local_mem__ int32_t *indexAddr = (__local_mem__ int32_t *)indexLocal.GetPhyAddr();
+    __local_mem__ int32_t* indexAddr = (__local_mem__ int32_t*)indexLocal.GetPhyAddr();
     LocalTensor<int32_t> broadcastLocal = broadcastBuffer_.Get<int32_t>();
-    __local_mem__ int32_t *broadcastAddr = (__local_mem__ int32_t *)broadcastLocal.GetPhyAddr();
+    __local_mem__ int32_t* broadcastAddr = (__local_mem__ int32_t*)broadcastLocal.GetPhyAddr();
     __VEC_SCOPE__
     {
         Reg::MaskReg maskReg = Reg::CreateMask<uint32_t>();
@@ -181,19 +181,19 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CalcRowBackward(
             for (uint16_t k = 0; k < static_cast<uint16_t>(nSize_); k++) {
                 // 根据索引位置将输入gradYAddr对应元素搬入gradYReg
                 Reg::DataCopyGather(gradYReg, gradYAddr + j * repeatSize * nSize_ * nSize_ + k * nSize_,
-                                    (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                                    (Reg::RegTensor<uint32_t>&)(indexReg), CalcMaskReg);
                 Reg::DataCopy(normReg, normAddr + k * perloopSize * nAlignSize_ + j * repeatSize * nAlignSize_);
                 Reg::DataCopy<float, Reg::LoadDist::DIST_E2B_B32>(sumReg,
                                                                   sumAddr + k * perloopSizePad + j * repeatSize);
 
                 Reg::Mul(dotProdReg, gradYReg, normReg, CalcMaskReg);
                 Reg::ReduceSumWithDataBlock(sumGradYReg, dotProdReg, CalcMaskReg);
-                Reg::Gather(sumBrcbReg, sumGradYReg, (Reg::RegTensor<uint32_t> &)(broadcastReg));
+                Reg::Gather(sumBrcbReg, sumGradYReg, (Reg::RegTensor<uint32_t>&)(broadcastReg));
                 Reg::Sub(dotProdReg, gradYReg, sumBrcbReg, CalcMaskReg);
                 Reg::Div(dotProdReg, dotProdReg, sumReg, CalcMaskReg);
 
                 Reg::DataCopyScatter(gradYAddr + j * repeatSize * nSize_ * nSize_ + k * nSize_, dotProdReg,
-                                     (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                                     (Reg::RegTensor<uint32_t>&)(indexReg), CalcMaskReg);
             }
         }
         Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
@@ -201,12 +201,12 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CalcRowBackward(
 }
 
 __aicore__ inline void MhcSinkhornBackwardSimd::CalcColBackward(
-    __local_mem__ float *gradYAddr, __local_mem__ float *normAddr, __local_mem__ float *sumAddr,
-    __local_mem__ uint32_t *maskAddr, __local_mem__ float *tempAddr, uint32_t n, uint16_t repeatTimes,
+    __local_mem__ float* gradYAddr, __local_mem__ float* normAddr, __local_mem__ float* sumAddr,
+    __local_mem__ uint32_t* maskAddr, __local_mem__ float* tempAddr, uint32_t n, uint16_t repeatTimes,
     uint32_t perloopSize, uint32_t repeatSize)
 {
     LocalTensor<int32_t> indexLocal = indexBuffer_.Get<int32_t>();
-    __local_mem__ int32_t *indexAddr = (__local_mem__ int32_t *)indexLocal.GetPhyAddr();
+    __local_mem__ int32_t* indexAddr = (__local_mem__ int32_t*)indexLocal.GetPhyAddr();
     __VEC_SCOPE__
     {
         Reg::MaskReg maskReg = Reg::CreateMask<uint32_t>();
@@ -233,18 +233,18 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CalcColBackward(
             Reg::DataCopy(sumReg, sumAddr + j * repeatSize * nAlignSize_);
             for (uint16_t i = 0; i < static_cast<uint16_t>(n); i++) {
                 Reg::DataCopyGather(gradYReg, gradYAddr + j * repeatSize * nSize_ * nSize_ + i * n,
-                                    (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                                    (Reg::RegTensor<uint32_t>&)(indexReg), CalcMaskReg);
                 Reg::DataCopy(normReg, normAddr + j * repeatSize * nAlignSize_ + i * nAlignSize_ * perloopSize);
                 Reg::Mul(mulResultReg, gradYReg, normReg, CalcMaskReg);
                 Reg::Add(sumColReg, sumColReg, mulResultReg, CalcMaskReg);
             }
             for (uint16_t i = 0; i < static_cast<uint16_t>(n); i++) {
                 Reg::DataCopyGather(gradYReg, gradYAddr + j * repeatSize * nSize_ * nSize_ + i * n,
-                                    (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                                    (Reg::RegTensor<uint32_t>&)(indexReg), CalcMaskReg);
                 Reg::Sub(gradInputReg, gradYReg, sumColReg, CalcMaskReg);
                 Reg::Div(gradInputReg, gradInputReg, sumReg, CalcMaskReg);
                 Reg::DataCopyScatter(gradYAddr + j * repeatSize * nSize_ * nSize_ + i * n, gradInputReg,
-                                     (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                                     (Reg::RegTensor<uint32_t>&)(indexReg), CalcMaskReg);
             }
         }
         Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
@@ -252,14 +252,14 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CalcColBackward(
 }
 
 __aicore__ inline void MhcSinkhornBackwardSimd::CalcSoftmaxBackward(
-    __local_mem__ float *gradYAddr, __local_mem__ float *normAddr, __local_mem__ float *gradInputAddr,
-    __local_mem__ uint32_t *maskAddr, __local_mem__ float *tempAddr, uint32_t n, uint16_t repeatTimes,
+    __local_mem__ float* gradYAddr, __local_mem__ float* normAddr, __local_mem__ float* gradInputAddr,
+    __local_mem__ uint32_t* maskAddr, __local_mem__ float* tempAddr, uint32_t n, uint16_t repeatTimes,
     uint32_t perloopSize, uint32_t repeatSize)
 {
     LocalTensor<int32_t> indexLocal = indexBuffer_.Get<int32_t>();
-    __local_mem__ int32_t *indexAddr = (__local_mem__ int32_t *)indexLocal.GetPhyAddr();
+    __local_mem__ int32_t* indexAddr = (__local_mem__ int32_t*)indexLocal.GetPhyAddr();
     LocalTensor<int32_t> broadcastLocal = broadcastBuffer_.Get<int32_t>();
-    __local_mem__ int32_t *broadcastAddr = (__local_mem__ int32_t *)broadcastLocal.GetPhyAddr();
+    __local_mem__ int32_t* broadcastAddr = (__local_mem__ int32_t*)broadcastLocal.GetPhyAddr();
     __VEC_SCOPE__
     {
         Reg::MaskReg maskReg = Reg::CreateMask<uint32_t>();
@@ -290,18 +290,18 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CalcSoftmaxBackward(
 
                 // 按照indeReg中存储索引的顺序将数据搬到gradYReg,此时gradYReg [n, t, align_n]
                 Reg::DataCopyGather(gradYReg, gradYAddr + j * repeatSize * nSize_ * nSize_ + k * nSize_,
-                                    (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                                    (Reg::RegTensor<uint32_t>&)(indexReg), CalcMaskReg);
 
                 Reg::DataCopy(normReg, normAddr + k * perloopSize * nAlignSize_ + j * repeatSize * nAlignSize_);
 
                 Reg::Mul(mulResultReg, gradYReg, normReg, CalcMaskReg);
                 Reg::ReduceSumWithDataBlock(dotProdReg, mulResultReg, CalcMaskReg);
-                Reg::Gather(dotProdBrcbReg, dotProdReg, (Reg::RegTensor<uint32_t> &)(broadcastReg));
+                Reg::Gather(dotProdBrcbReg, dotProdReg, (Reg::RegTensor<uint32_t>&)(broadcastReg));
                 Reg::Sub(gradInputReg, gradYReg, dotProdBrcbReg, CalcMaskReg);
                 Reg::Mul(gradInputReg, gradInputReg, normReg, CalcMaskReg);
 
                 Reg::DataCopyScatter(gradInputAddr + +j * repeatSize * nSize_ * nSize_ + k * nSize_, gradInputReg,
-                                     (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                                     (Reg::RegTensor<uint32_t>&)(indexReg), CalcMaskReg);
             }
         }
         Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
@@ -390,14 +390,14 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CalcCol(uint32_t repeatSize, uin
     LocalTensor<float> gradYLocal = inputGradYQue_.DeQue<float>();
     LocalTensor<uint32_t> maskLocal = maskBuffer_.Get<uint32_t>();
     LocalTensor<uint32_t> tempLocal = tempBuffer_.Get<uint32_t>();
-    __local_mem__ float *gradYAddr = (__local_mem__ float *)gradYLocal.GetPhyAddr();
-    __local_mem__ uint32_t *maskAddr = (__local_mem__ uint32_t *)maskLocal.GetPhyAddr();
-    __local_mem__ float *tempAddr = (__local_mem__ float *)tempLocal.GetPhyAddr();
+    __local_mem__ float* gradYAddr = (__local_mem__ float*)gradYLocal.GetPhyAddr();
+    __local_mem__ uint32_t* maskAddr = (__local_mem__ uint32_t*)maskLocal.GetPhyAddr();
+    __local_mem__ float* tempAddr = (__local_mem__ float*)tempLocal.GetPhyAddr();
 
     LocalTensor<float> normLocal = inputNormQue_.DeQue<float>();
     LocalTensor<float> sumLocal = inputSumQue_.DeQue<float>();
-    __local_mem__ float *normAddr = (__local_mem__ float *)normLocal.GetPhyAddr();
-    __local_mem__ float *sumAddr = (__local_mem__ float *)sumLocal.GetPhyAddr();
+    __local_mem__ float* normAddr = (__local_mem__ float*)normLocal.GetPhyAddr();
+    __local_mem__ float* sumAddr = (__local_mem__ float*)sumLocal.GetPhyAddr();
 
     CalcColBackward(gradYAddr, normAddr, sumAddr, maskAddr, tempAddr, static_cast<uint32_t>(nSize_), repeatTimes,
                     perloopSize, repeatSize);
@@ -428,14 +428,14 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CalcRow(uint32_t repeatSize, uin
     LocalTensor<float> gradYLocal = inputGradYQue_.DeQue<float>();
     LocalTensor<uint32_t> maskLocal = maskBuffer_.Get<uint32_t>();
     LocalTensor<uint32_t> tempLocal = tempBuffer_.Get<uint32_t>();
-    __local_mem__ float *gradYAddr = (__local_mem__ float *)gradYLocal.GetPhyAddr();
-    __local_mem__ uint32_t *maskAddr = (__local_mem__ uint32_t *)maskLocal.GetPhyAddr();
-    __local_mem__ float *tempAddr = (__local_mem__ float *)tempLocal.GetPhyAddr();
+    __local_mem__ float* gradYAddr = (__local_mem__ float*)gradYLocal.GetPhyAddr();
+    __local_mem__ uint32_t* maskAddr = (__local_mem__ uint32_t*)maskLocal.GetPhyAddr();
+    __local_mem__ float* tempAddr = (__local_mem__ float*)tempLocal.GetPhyAddr();
 
     LocalTensor<float> normLocal = inputNormQue_.DeQue<float>();
     LocalTensor<float> sumLocal = inputSumQue_.DeQue<float>();
-    __local_mem__ float *normAddr = (__local_mem__ float *)normLocal.GetPhyAddr();
-    __local_mem__ float *sumAddr = (__local_mem__ float *)sumLocal.GetPhyAddr();
+    __local_mem__ float* normAddr = (__local_mem__ float*)normLocal.GetPhyAddr();
+    __local_mem__ float* sumAddr = (__local_mem__ float*)sumLocal.GetPhyAddr();
 
     CalcRowBackward(gradYAddr, normAddr, sumAddr, maskAddr, tempAddr, static_cast<uint32_t>(nSize_), repeatTimes,
                     perloopSize, perloopSizePad, repeatSize);
@@ -457,13 +457,13 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CalcSoftmax(uint32_t repeatSize,
     LocalTensor<uint32_t> maskLocal = maskBuffer_.Get<uint32_t>();
     LocalTensor<uint32_t> tempLocal = tempBuffer_.Get<uint32_t>();
     LocalTensor<float> gradInputLocal = outputQue_.AllocTensor<float>();
-    __local_mem__ float *gradYAddr = (__local_mem__ float *)gradYLocal.GetPhyAddr();
-    __local_mem__ uint32_t *maskAddr = (__local_mem__ uint32_t *)maskLocal.GetPhyAddr();
-    __local_mem__ float *tempAddr = (__local_mem__ float *)tempLocal.GetPhyAddr();
-    __local_mem__ float *gradInputAddr = (__local_mem__ float *)gradInputLocal.GetPhyAddr();
+    __local_mem__ float* gradYAddr = (__local_mem__ float*)gradYLocal.GetPhyAddr();
+    __local_mem__ uint32_t* maskAddr = (__local_mem__ uint32_t*)maskLocal.GetPhyAddr();
+    __local_mem__ float* tempAddr = (__local_mem__ float*)tempLocal.GetPhyAddr();
+    __local_mem__ float* gradInputAddr = (__local_mem__ float*)gradInputLocal.GetPhyAddr();
 
     LocalTensor<float> normLocal = inputNormQue_.DeQue<float>();
-    __local_mem__ float *normAddr = (__local_mem__ float *)normLocal.GetPhyAddr();
+    __local_mem__ float* normAddr = (__local_mem__ float*)normLocal.GetPhyAddr();
 
     CalcSoftmaxBackward(gradYAddr, normAddr, gradInputAddr, maskAddr, tempAddr, static_cast<uint32_t>(nSize_),
                         repeatTimes, perloopSize, repeatSize);
@@ -478,9 +478,9 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CreateGatherIndex(uint32_t n)
     LocalTensor<int32_t> indexLocal = indexBuffer_.Get<int32_t>();
     LocalTensor<int32_t> broadcastLocal = broadcastBuffer_.Get<int32_t>();
     LocalTensor<uint32_t> maskLocal = maskBuffer_.Get<uint32_t>();
-    __local_mem__ int32_t *indexAddr = (__local_mem__ int32_t *)indexLocal.GetPhyAddr();
-    __local_mem__ int32_t *broadcastAddr = (__local_mem__ int32_t *)broadcastLocal.GetPhyAddr();
-    __local_mem__ uint32_t *maskAddr = (__local_mem__ uint32_t *)maskLocal.GetPhyAddr();
+    __local_mem__ int32_t* indexAddr = (__local_mem__ int32_t*)indexLocal.GetPhyAddr();
+    __local_mem__ int32_t* broadcastAddr = (__local_mem__ int32_t*)broadcastLocal.GetPhyAddr();
+    __local_mem__ uint32_t* maskAddr = (__local_mem__ uint32_t*)maskLocal.GetPhyAddr();
 
     __VEC_SCOPE__
     {

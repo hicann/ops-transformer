@@ -116,38 +116,38 @@ public:
     using ProblemShape = Shape<int64_t, int64_t, int64_t>;
 
 public:
-    __aicore__ inline void Init(Params const &params, ProblemShape &problemShape);
-    __aicore__ inline void UpdateGlobalBuffer(Params const &params);
-    __aicore__ inline void UpdateGroupedParams(Params const &params, BaseOffset const &offset, uint32_t groupIdx);
-    __aicore__ inline void UpdateBatchParams(Params const &params, BaseOffset const &offset, uint32_t bacthIdx);
-    __aicore__ inline void Run(BlockShape &blockShape, BlockCoord &blockCoord);
+    __aicore__ inline void Init(Params const& params, ProblemShape& problemShape);
+    __aicore__ inline void UpdateGlobalBuffer(Params const& params);
+    __aicore__ inline void UpdateGroupedParams(Params const& params, BaseOffset const& offset, uint32_t groupIdx);
+    __aicore__ inline void UpdateBatchParams(Params const& params, BaseOffset const& offset, uint32_t bacthIdx);
+    __aicore__ inline void Run(BlockShape& blockShape, BlockCoord& blockCoord);
     __aicore__ inline auto GetL0c2UbTensor();
     __aicore__ inline void SetOutL2CacheHint();
-    __aicore__ inline void operator()(BlockShape &blockShape, BlockCoord &blockCoord);
+    __aicore__ inline void operator()(BlockShape& blockShape, BlockCoord& blockCoord);
 
 private:
-    __aicore__ inline void UpdateTensorListGlobalBuffer(Params const &params);
-    __aicore__ inline void UpdateTensorGlobalBuffer(Params const &params);
+    __aicore__ inline void UpdateTensorListGlobalBuffer(Params const& params);
+    __aicore__ inline void UpdateTensorGlobalBuffer(Params const& params);
     __aicore__ inline void CopyDataFromGm2Ub();
-    __aicore__ inline void CopyX1ScaleFromGm2Ub(AscendC::LocalTensor<DataTypeX1Scale> &dst, uint64_t blockLen,
+    __aicore__ inline void CopyX1ScaleFromGm2Ub(AscendC::LocalTensor<DataTypeX1Scale>& dst, uint64_t blockLen,
                                                 uint64_t offset);
-    __aicore__ inline void CopyX2ScaleFromGm2Ub(AscendC::LocalTensor<DataTypeX2Scale> &dst);
+    __aicore__ inline void CopyX2ScaleFromGm2Ub(AscendC::LocalTensor<DataTypeX2Scale>& dst);
     template <class BiasDtype>
-    __aicore__ inline void CopyBiasFromGm2Ub(AscendC::LocalTensor<BiasDtype> &dst);
+    __aicore__ inline void CopyBiasFromGm2Ub(AscendC::LocalTensor<BiasDtype>& dst);
     __aicore__ inline void CopyDequantResFromUb2Gm(uint64_t blockCount, uint64_t offset,
-                                                   AscendC::LocalTensor<DataTypeOut> &src);
+                                                   AscendC::LocalTensor<DataTypeOut>& src);
     __aicore__ inline void UbSetFlag();
-    __aicore__ inline void VFDoDequantWithX1Pertoken(__ubuf__ DataTypeOut *dequantOutInUbAddr,
-                                                     __ubuf__ DataTypeIn *l0cOutUbAddr, uint64_t offsetPtScale,
+    __aicore__ inline void VFDoDequantWithX1Pertoken(__ubuf__ DataTypeOut* dequantOutInUbAddr,
+                                                     __ubuf__ DataTypeIn* l0cOutUbAddr, uint64_t offsetPtScale,
                                                      uint16_t mSize);
-    __aicore__ inline void VFDoDequantWithX1Pertensor(__ubuf__ DataTypeOut *dequantOutInUbAddr,
-                                                      __ubuf__ DataTypeIn *l0cOutUbAddr, uint16_t mSize);
-    __aicore__ inline void VFDoDequantWithoutX1Scale(__ubuf__ DataTypeOut *dequantOutInUbAddr,
-                                                     __ubuf__ DataTypeIn *l0cOutUbAddr, uint16_t mSize);
+    __aicore__ inline void VFDoDequantWithX1Pertensor(__ubuf__ DataTypeOut* dequantOutInUbAddr,
+                                                      __ubuf__ DataTypeIn* l0cOutUbAddr, uint16_t mSize);
+    __aicore__ inline void VFDoDequantWithoutX1Scale(__ubuf__ DataTypeOut* dequantOutInUbAddr,
+                                                     __ubuf__ DataTypeIn* l0cOutUbAddr, uint16_t mSize);
     template <bool isPertensor, Qmm::QuantMode x1QuantMode, bool isBiasEpilogue, class BiasDtype>
-    __aicore__ inline void VFDoDequant(__ubuf__ DataTypeOut *dst, __ubuf__ DataTypeIn *l0cOut,
-                                       __ubuf__ DataTypeX2Scale *scale2, __ubuf__ DataTypeX1Scale *x1Scale,
-                                       __ubuf__ BiasDtype *bias, uint16_t mSize, uint16_t nSize);
+    __aicore__ inline void VFDoDequant(__ubuf__ DataTypeOut* dst, __ubuf__ DataTypeIn* l0cOut,
+                                       __ubuf__ DataTypeX2Scale* scale2, __ubuf__ DataTypeX1Scale* x1Scale,
+                                       __ubuf__ BiasDtype* bias, uint16_t mSize, uint16_t nSize);
 
     // GM ADDR
     AscendC::GlobalTensor<DataTypeOut> yGlobal_;
@@ -165,7 +165,7 @@ private:
     AscendC::LocalTensor<DataTypeOut> dequantOutInUBPong_;
     float x2ScaleScalar_;
     float x1ScaleScalar_;
-    const Qmm::DequantTiling *dequantTiling_;
+    const Qmm::DequantTiling* dequantTiling_;
     ProblemShape problemShape_;
     uint32_t biasDtype_ = DT_FLOAT;
     uint32_t groupIdx_ = 0;
@@ -209,11 +209,11 @@ __aicore__ inline BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PAR
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateTensorListGlobalBuffer(
-    Params const &params)
+    Params const& params)
 {
     if (dequantTiling_->x2QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
         DataTypeX2Scale x2ScaleValue =
-            *((__gm__ DataTypeX2Scale *)(GetTensorAddr<DataTypeX2Scale>(0, params.x2ScaleGmAddr) + groupIdx_));
+            *((__gm__ DataTypeX2Scale*)(GetTensorAddr<DataTypeX2Scale>(0, params.x2ScaleGmAddr) + groupIdx_));
         if constexpr (AscendC::IsSameType<DataTypeX2Scale, bfloat16_t>::value) {
             x2ScaleScalar_ = AscendC::ToFloat(x2ScaleValue);
         } else {
@@ -224,9 +224,9 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
                                        Get<X2SCALE_IDX>(baseOffset_));
     }
     if (dequantTiling_->x1QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
-        x1ScaleScalar_ = *((__gm__ DataTypeX1Scale *)params.x1ScaleGmAddr + groupIdx_);
+        x1ScaleScalar_ = *((__gm__ DataTypeX1Scale*)params.x1ScaleGmAddr + groupIdx_);
     } else if (dequantTiling_->x1QuantMode == Qmm::QuantMode::PERTOKEN_MODE) {
-        x1ScaleGlobal_.SetGlobalBuffer((__gm__ DataTypeX1Scale *)params.x1ScaleGmAddr + Get<X1SCALE_IDX>(baseOffset_));
+        x1ScaleGlobal_.SetGlobalBuffer((__gm__ DataTypeX1Scale*)params.x1ScaleGmAddr + Get<X1SCALE_IDX>(baseOffset_));
     }
     if (isBiasEpilogue_) {
         if (biasDtype_ == DT_FLOAT) {
@@ -241,37 +241,37 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateTensorGlobalBuffer(
-    Params const &params)
+    Params const& params)
 {
     if (dequantTiling_->x2QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
-        DataTypeX2Scale x2ScaleValue = *((__gm__ DataTypeX2Scale *)params.x2ScaleGmAddr + groupIdx_);
+        DataTypeX2Scale x2ScaleValue = *((__gm__ DataTypeX2Scale*)params.x2ScaleGmAddr + groupIdx_);
         if constexpr (AscendC::IsSameType<DataTypeX2Scale, bfloat16_t>::value) {
             x2ScaleScalar_ = AscendC::ToFloat(x2ScaleValue);
         } else {
             x2ScaleScalar_ = x2ScaleValue;
         }
     } else {
-        x2ScaleGlobal_.SetGlobalBuffer((__gm__ DataTypeX2Scale *)params.x2ScaleGmAddr + Get<X2SCALE_IDX>(baseOffset_));
+        x2ScaleGlobal_.SetGlobalBuffer((__gm__ DataTypeX2Scale*)params.x2ScaleGmAddr + Get<X2SCALE_IDX>(baseOffset_));
     }
     if (dequantTiling_->x1QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
-        x1ScaleScalar_ = *((__gm__ DataTypeX1Scale *)params.x1ScaleGmAddr + groupIdx_);
+        x1ScaleScalar_ = *((__gm__ DataTypeX1Scale*)params.x1ScaleGmAddr + groupIdx_);
     } else if (dequantTiling_->x1QuantMode == Qmm::QuantMode::PERTOKEN_MODE) {
-        x1ScaleGlobal_.SetGlobalBuffer((__gm__ DataTypeX1Scale *)params.x1ScaleGmAddr + Get<X1SCALE_IDX>(baseOffset_));
+        x1ScaleGlobal_.SetGlobalBuffer((__gm__ DataTypeX1Scale*)params.x1ScaleGmAddr + Get<X1SCALE_IDX>(baseOffset_));
     }
     // ub res + biasAdd
     if (isBiasEpilogue_) {
         if (biasDtype_ == DT_FLOAT) {
-            biasGlobalFloat_.SetGlobalBuffer((__gm__ float *)params.biasGmAddr + Get<BIAS_IDX>(baseOffset_));
+            biasGlobalFloat_.SetGlobalBuffer((__gm__ float*)params.biasGmAddr + Get<BIAS_IDX>(baseOffset_));
         } else {
-            biasGlobalB16_.SetGlobalBuffer((__gm__ bfloat16_t *)params.biasGmAddr + Get<BIAS_IDX>(baseOffset_));
+            biasGlobalB16_.SetGlobalBuffer((__gm__ bfloat16_t*)params.biasGmAddr + Get<BIAS_IDX>(baseOffset_));
         }
     }
-    yGlobal_.SetGlobalBuffer((__gm__ DataTypeOut *)params.yGmAddr + Get<Y_IDX>(baseOffset_));
+    yGlobal_.SetGlobalBuffer((__gm__ DataTypeOut*)params.yGmAddr + Get<Y_IDX>(baseOffset_));
 }
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGlobalBuffer(
-    Params const &params)
+    Params const& params)
 {
     if constexpr (IsTensorList_) {
         UpdateTensorListGlobalBuffer(params);
@@ -281,8 +281,8 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 }
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS __aicore__ inline void
-BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Init(Params const &params,
-                                                                         ProblemShape &problemShape)
+BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Init(Params const& params,
+                                                                         ProblemShape& problemShape)
 {
     dequantTiling_ = &params.dequantTiling;
     uint64_t mForSingleVec = CeilDiv(dequantTiling_->baseM, AscendC::GetTaskRation());
@@ -326,7 +326,7 @@ BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Init(Params 
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGroupedParams(
-    Params const &params, BaseOffset const &offset, uint32_t groupIdx)
+    Params const& params, BaseOffset const& offset, uint32_t groupIdx)
 {
     baseOffset_ = offset;
     groupIdx_ = groupIdx;
@@ -335,7 +335,7 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateBatchParams(
-    Params const &params, BaseOffset const &offset, uint32_t bacthIdx)
+    Params const& params, BaseOffset const& offset, uint32_t bacthIdx)
 {
     UpdateGroupedParams(params, offset, bacthIdx);
 }
@@ -378,7 +378,7 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::CopyX1ScaleFromGm2Ub(
-    AscendC::LocalTensor<DataTypeX1Scale> &dst, uint64_t blockLen, uint64_t offset)
+    AscendC::LocalTensor<DataTypeX1Scale>& dst, uint64_t blockLen, uint64_t offset)
 {
     DataCopyParams ptScale2UbParams{1, 0, 0, 0};
     DataCopyPadParams padParams;
@@ -388,7 +388,7 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::CopyX2ScaleFromGm2Ub(
-    AscendC::LocalTensor<DataTypeX2Scale> &dst)
+    AscendC::LocalTensor<DataTypeX2Scale>& dst)
 {
     DataCopyParams scale2UbParams{1, 0, 0, 0};
     DataCopyPadParams padParams;
@@ -399,7 +399,7 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 template <class BiasDtype>
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::CopyBiasFromGm2Ub(
-    AscendC::LocalTensor<BiasDtype> &dst)
+    AscendC::LocalTensor<BiasDtype>& dst)
 {
     DataCopyParams bias2UbParams{1, 0, 0, 0};
     DataCopyPadParams padParams;
@@ -414,7 +414,7 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::CopyDequantResFromUb2Gm(
-    uint64_t blockCount, uint64_t offset, AscendC::LocalTensor<DataTypeOut> &src)
+    uint64_t blockCount, uint64_t offset, AscendC::LocalTensor<DataTypeOut>& src)
 {
     DataCopyExtParams ub2GmParams{1, 0, 0, 0, 0};
     ub2GmParams.blockLen = singleN_ * sizeof(DataTypeOut);
@@ -445,9 +445,9 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoDequantWithX1Pertoken(
-    __ubuf__ DataTypeOut *dequantOutInUbAddr, __ubuf__ DataTypeIn *l0cOutUbAddr, uint64_t offsetPtScale, uint16_t mSize)
+    __ubuf__ DataTypeOut* dequantOutInUbAddr, __ubuf__ DataTypeIn* l0cOutUbAddr, uint64_t offsetPtScale, uint16_t mSize)
 {
-    __ubuf__ DataTypeX1Scale *ptScaleUbAddr = (__ubuf__ DataTypeX1Scale *)x1ScaleUb_.GetPhyAddr();
+    __ubuf__ DataTypeX1Scale* ptScaleUbAddr = (__ubuf__ DataTypeX1Scale*)x1ScaleUb_.GetPhyAddr();
     ptScaleUbAddr = ptScaleUbAddr + offsetPtScale;
     if (!isBiasEpilogue_) {
         if (dequantTiling_->x2QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
@@ -455,7 +455,7 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
                                                                            ptScaleUbAddr, nullptr, mSize, singleN_);
         } else {
             VFDoDequant<false, Qmm::QuantMode::PERTOKEN_MODE, false, float>(
-                dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale *)x2ScaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale*)x2ScaleUb_.GetPhyAddr(), ptScaleUbAddr,
                 nullptr, mSize, singleN_);
         }
     } else {
@@ -463,31 +463,31 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
             if (dequantTiling_->x2QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
                 VFDoDequant<true, Qmm::QuantMode::PERTOKEN_MODE, true, float>(
                     dequantOutInUbAddr, l0cOutUbAddr, nullptr, ptScaleUbAddr,
-                    (__ubuf__ float *)biasUbFloat_.GetPhyAddr(), mSize, singleN_);
+                    (__ubuf__ float*)biasUbFloat_.GetPhyAddr(), mSize, singleN_);
             } else {
                 VFDoDequant<false, Qmm::QuantMode::PERTOKEN_MODE, true, float>(
-                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale *)x2ScaleUb_.GetPhyAddr(),
-                    ptScaleUbAddr, (__ubuf__ float *)biasUbFloat_.GetPhyAddr(), mSize, singleN_);
+                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale*)x2ScaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                    (__ubuf__ float*)biasUbFloat_.GetPhyAddr(), mSize, singleN_);
             }
         } else if (biasDtype_ == DT_BF16) {
             if (dequantTiling_->x2QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
                 VFDoDequant<true, Qmm::QuantMode::PERTOKEN_MODE, true, bfloat16_t>(
                     dequantOutInUbAddr, l0cOutUbAddr, nullptr, ptScaleUbAddr,
-                    (__ubuf__ bfloat16_t *)biasUbB16_.GetPhyAddr(), mSize, singleN_);
+                    (__ubuf__ bfloat16_t*)biasUbB16_.GetPhyAddr(), mSize, singleN_);
             } else {
                 VFDoDequant<false, Qmm::QuantMode::PERTOKEN_MODE, true, bfloat16_t>(
-                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale *)x2ScaleUb_.GetPhyAddr(),
-                    ptScaleUbAddr, (__ubuf__ bfloat16_t *)biasUbB16_.GetPhyAddr(), mSize, singleN_);
+                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale*)x2ScaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                    (__ubuf__ bfloat16_t*)biasUbB16_.GetPhyAddr(), mSize, singleN_);
             }
         } else if (biasDtype_ == DT_FLOAT16) {
             if (dequantTiling_->x2QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
                 VFDoDequant<true, Qmm::QuantMode::PERTOKEN_MODE, true, half>(
-                    dequantOutInUbAddr, l0cOutUbAddr, nullptr, ptScaleUbAddr, (__ubuf__ half *)biasUbB16_.GetPhyAddr(),
+                    dequantOutInUbAddr, l0cOutUbAddr, nullptr, ptScaleUbAddr, (__ubuf__ half*)biasUbB16_.GetPhyAddr(),
                     mSize, singleN_);
             } else {
                 VFDoDequant<false, Qmm::QuantMode::PERTOKEN_MODE, true, half>(
-                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale *)x2ScaleUb_.GetPhyAddr(),
-                    ptScaleUbAddr, (__ubuf__ half *)biasUbB16_.GetPhyAddr(), mSize, singleN_);
+                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale*)x2ScaleUb_.GetPhyAddr(), ptScaleUbAddr,
+                    (__ubuf__ half*)biasUbB16_.GetPhyAddr(), mSize, singleN_);
             }
         }
     }
@@ -495,41 +495,41 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoDequantWithX1Pertensor(
-    __ubuf__ DataTypeOut *dequantOutInUbAddr, __ubuf__ DataTypeIn *l0cOutUbAddr, uint16_t mSize)
+    __ubuf__ DataTypeOut* dequantOutInUbAddr, __ubuf__ DataTypeIn* l0cOutUbAddr, uint16_t mSize)
 {
-    VFDoDequant<false, Qmm::QuantMode::PERTENSOR_MODE, false, float>(
-        dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale *)x2ScaleUb_.GetPhyAddr(), nullptr, nullptr, mSize,
-        singleN_);
+    VFDoDequant<false, Qmm::QuantMode::PERTENSOR_MODE, false, float>(dequantOutInUbAddr, l0cOutUbAddr,
+                                                                     (__ubuf__ DataTypeX2Scale*)x2ScaleUb_.GetPhyAddr(),
+                                                                     nullptr, nullptr, mSize, singleN_);
 }
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoDequantWithoutX1Scale(
-    __ubuf__ DataTypeOut *dequantOutInUbAddr, __ubuf__ DataTypeIn *l0cOutUbAddr, uint16_t mSize)
+    __ubuf__ DataTypeOut* dequantOutInUbAddr, __ubuf__ DataTypeIn* l0cOutUbAddr, uint16_t mSize)
 {
     if (!isBiasEpilogue_) {
         VFDoDequant<false, Qmm::QuantMode::DEFAULT, false, float>(dequantOutInUbAddr, l0cOutUbAddr,
-                                                                  (__ubuf__ DataTypeX2Scale *)x2ScaleUb_.GetPhyAddr(),
+                                                                  (__ubuf__ DataTypeX2Scale*)x2ScaleUb_.GetPhyAddr(),
                                                                   nullptr, nullptr, mSize, singleN_);
     } else {
         if (biasDtype_ == DT_FLOAT) {
             if (dequantTiling_->x2QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
                 VFDoDequant<true, Qmm::QuantMode::DEFAULT, true, float>(
-                    dequantOutInUbAddr, l0cOutUbAddr, nullptr, nullptr, (__ubuf__ float *)biasUbFloat_.GetPhyAddr(),
+                    dequantOutInUbAddr, l0cOutUbAddr, nullptr, nullptr, (__ubuf__ float*)biasUbFloat_.GetPhyAddr(),
                     mSize, singleN_);
             } else {
                 VFDoDequant<false, Qmm::QuantMode::DEFAULT, true, float>(
-                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale *)x2ScaleUb_.GetPhyAddr(), nullptr,
-                    (__ubuf__ float *)biasUbFloat_.GetPhyAddr(), mSize, singleN_);
+                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale*)x2ScaleUb_.GetPhyAddr(), nullptr,
+                    (__ubuf__ float*)biasUbFloat_.GetPhyAddr(), mSize, singleN_);
             }
         } else if (biasDtype_ == DT_BF16) {
             if (dequantTiling_->x2QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
                 VFDoDequant<true, Qmm::QuantMode::DEFAULT, true, bfloat16_t>(
-                    dequantOutInUbAddr, l0cOutUbAddr, nullptr, nullptr, (__ubuf__ bfloat16_t *)biasUbB16_.GetPhyAddr(),
+                    dequantOutInUbAddr, l0cOutUbAddr, nullptr, nullptr, (__ubuf__ bfloat16_t*)biasUbB16_.GetPhyAddr(),
                     mSize, singleN_);
             } else {
                 VFDoDequant<false, Qmm::QuantMode::DEFAULT, true, bfloat16_t>(
-                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale *)x2ScaleUb_.GetPhyAddr(), nullptr,
-                    (__ubuf__ bfloat16_t *)biasUbB16_.GetPhyAddr(), mSize, singleN_);
+                    dequantOutInUbAddr, l0cOutUbAddr, (__ubuf__ DataTypeX2Scale*)x2ScaleUb_.GetPhyAddr(), nullptr,
+                    (__ubuf__ bfloat16_t*)biasUbB16_.GetPhyAddr(), mSize, singleN_);
             }
         }
     }
@@ -538,8 +538,8 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 template <bool isPertensor, Qmm::QuantMode x1QuantMode, bool isBiasEpilogue, class BiasDtype>
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoDequant(
-    __ubuf__ DataTypeOut *dst, __ubuf__ DataTypeIn *l0cOut, __ubuf__ DataTypeX2Scale *scale2,
-    __ubuf__ DataTypeX1Scale *x1Scale, __ubuf__ BiasDtype *bias, uint16_t mSize, uint16_t nSize)
+    __ubuf__ DataTypeOut* dst, __ubuf__ DataTypeIn* l0cOut, __ubuf__ DataTypeX2Scale* scale2,
+    __ubuf__ DataTypeX1Scale* x1Scale, __ubuf__ BiasDtype* bias, uint16_t mSize, uint16_t nSize)
 {
     uint32_t eleNumPerVf = AscendC::VECTOR_REG_WIDTH / sizeof(DataTypeIn);
     uint32_t nSrcUbAligned = Align(nSize, static_cast<uint16_t>(UB_ALIGN_SIZE / sizeof(DataTypeIn)));
@@ -629,8 +629,8 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 }
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Run(BlockShape &blockShape,
-                                                                                               BlockCoord &blockCoord)
+__aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Run(BlockShape& blockShape,
+                                                                                               BlockCoord& blockCoord)
 {
     singleM_ = Get<M_IDX>(blockShape);
     singleN_ = Get<N_IDX>(blockShape);
@@ -653,12 +653,12 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
             break;
         }
         auto mSize = singleMInVec - i * mSizeForOnce >= mSizeForOnce ? mSizeForOnce : singleMInVec - i * mSizeForOnce;
-        AscendC::LocalTensor<DataTypeOut> &dequantOutInUB =
+        AscendC::LocalTensor<DataTypeOut>& dequantOutInUB =
             (dequantOutInUBPingPongID_ == 0) ? dequantOutInUBPing_ : dequantOutInUBPong_;
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(dequantOutInUBPingPongID_);
 
-        __ubuf__ DataTypeOut *dequantOutInUbAddr = (__ubuf__ DataTypeOut *)dequantOutInUB.GetPhyAddr();
-        __ubuf__ DataTypeIn *l0cOutUbAddr = (__ubuf__ DataTypeIn *)l0cOutUb_.GetPhyAddr();
+        __ubuf__ DataTypeOut* dequantOutInUbAddr = (__ubuf__ DataTypeOut*)dequantOutInUB.GetPhyAddr();
+        __ubuf__ DataTypeIn* l0cOutUbAddr = (__ubuf__ DataTypeIn*)l0cOutUb_.GetPhyAddr();
         l0cOutUbAddr = l0cOutUbAddr + offsetL0c;
 
         switch (dequantTiling_->x1QuantMode) {
@@ -699,7 +699,7 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::operator()(
-    BlockShape &blockShape, BlockCoord &blockCoord)
+    BlockShape& blockShape, BlockCoord& blockCoord)
 {
     Run(blockShape, blockCoord);
     return;

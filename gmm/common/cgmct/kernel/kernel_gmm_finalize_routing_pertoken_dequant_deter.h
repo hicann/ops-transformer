@@ -118,18 +118,18 @@ public:
         Params() = default;
     };
 
-    __aicore__ inline void InitParamsAndTensor(const Params &params)
+    __aicore__ inline void InitParamsAndTensor(const Params& params)
     {
         Get<MNK_N>(problemShape_) = params.gmmParams.matmulTiling->N;
         Get<MNK_K>(problemShape_) = params.gmmParams.matmulTiling->Ka;
-        groupListGm_.SetGlobalBuffer((__gm__ int64_t *)params.mmadParams.groupListGmAddr);
+        groupListGm_.SetGlobalBuffer((__gm__ int64_t*)params.mmadParams.groupListGmAddr);
     }
 
-    __aicore__ inline void UpdateGlobalBuffer(const Params &params)
+    __aicore__ inline void UpdateGlobalBuffer(const Params& params)
     {
         if ASCEND_IS_AIC {
-            aGlobal_.SetGlobalBuffer((__gm__ AType *)params.mmadParams.aGmAddr + Get<IDX_A_OFFSETS>(baseOffset_));
-            bGlobal_.SetGlobalBuffer((__gm__ BType *)params.mmadParams.bGmAddr + Get<IDX_B_OFFSETS>(baseOffset_));
+            aGlobal_.SetGlobalBuffer((__gm__ AType*)params.mmadParams.aGmAddr + Get<IDX_A_OFFSETS>(baseOffset_));
+            bGlobal_.SetGlobalBuffer((__gm__ BType*)params.mmadParams.bGmAddr + Get<IDX_B_OFFSETS>(baseOffset_));
         }
         if ASCEND_IS_AIV {
             AscendC::Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> vecBaseOffset{
@@ -143,7 +143,7 @@ public:
         }
     }
 
-    __aicore__ inline bool UpdateGroupParams(const Params &params, uint32_t groupIdx)
+    __aicore__ inline bool UpdateGroupParams(const Params& params, uint32_t groupIdx)
     {
         UpdateOffset(groupIdx);
         int32_t splitValue = GetSplitValueFromGroupList(groupIdx, params.gmmParams.groupListType);
@@ -154,7 +154,7 @@ public:
         return true;
     }
 
-    __aicore__ inline void FRDeterministic(const Params &params)
+    __aicore__ inline void FRDeterministic(const Params& params)
     {
         uint64_t totalM = deterSync_.curGroupM - deterSync_.windowStartM;
         if (totalM == 0) {
@@ -176,7 +176,7 @@ public:
         }
     }
 
-    __aicore__ inline void ProcessSingleGroup(const Params &params, BlockSchedulerOp &bs, uint32_t groupIdx)
+    __aicore__ inline void ProcessSingleGroup(const Params& params, BlockSchedulerOp& bs, uint32_t groupIdx)
     {
         int64_t m = Get<MNK_M>(problemShape_);
         int64_t n = Get<MNK_N>(problemShape_);
@@ -235,14 +235,14 @@ public:
         }
     }
 
-    __aicore__ inline void operator()(const Params &params)
+    __aicore__ inline void operator()(const Params& params)
     {
         if ASCEND_IS_AIV {
             prologueOp_.Init(params.prologueParams);
             prologueOp_();
         }
         if ASCEND_IS_AIC {
-            mmadOp_.Init(const_cast<TCubeTiling *__restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
+            mmadOp_.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
             l0cOutUb_ = epilogueDequantOp_.GetL0c2UbTensor();
         }
         InitParamsAndTensor(params);

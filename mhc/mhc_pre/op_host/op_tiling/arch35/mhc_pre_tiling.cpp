@@ -124,8 +124,8 @@ static constexpr size_t DIM_NUM_4 = 4;
 static constexpr uint32_t HAS_GAMMA_TRUE = 1;
 
 // Diagnostic tensor names.
-static constexpr const char *INPUT_NAMES[] = {"x", "phi", "alpha", "bias", "gamma"};
-static constexpr const char *OUTPUT_NAMES[] = {"hIn", "hPost", "hRes", "invRms", "hMix", "hPre"};
+static constexpr const char* INPUT_NAMES[] = {"x", "phi", "alpha", "bias", "gamma"};
+static constexpr const char* OUTPUT_NAMES[] = {"hIn", "hPost", "hRes", "invRms", "hMix", "hPre"};
 
 static std::string ShapeToString(std::initializer_list<uint64_t> dims)
 {
@@ -440,7 +440,7 @@ ge::graphStatus MhcPreBaseTiling::CheckDataRange()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MhcPreBaseTiling::ParseBsndFormat(const gert::Tensor *xTensor)
+ge::graphStatus MhcPreBaseTiling::ParseBsndFormat(const gert::Tensor* xTensor)
 {
     uint64_t batch = xTensor->GetStorageShape().GetDim(INDEX_B_BSND);
     uint64_t sequence = xTensor->GetStorageShape().GetDim(INDEX_S_BSND);
@@ -455,7 +455,7 @@ ge::graphStatus MhcPreBaseTiling::ParseBsndFormat(const gert::Tensor *xTensor)
     return ValidateAndSetTilingParams(xTensor);
 }
 
-ge::graphStatus MhcPreBaseTiling::ParseTndFormat(const gert::Tensor *xTensor)
+ge::graphStatus MhcPreBaseTiling::ParseTndFormat(const gert::Tensor* xTensor)
 {
     totalLength_ = xTensor->GetStorageShape().GetDim(INDEX_T_TND);
     uint64_t numsResidual = xTensor->GetStorageShape().GetDim(INDEX_N_TND);
@@ -468,7 +468,7 @@ ge::graphStatus MhcPreBaseTiling::ParseTndFormat(const gert::Tensor *xTensor)
     return ValidateAndSetTilingParams(xTensor);
 }
 
-ge::graphStatus MhcPreBaseTiling::ValidateAndSetTilingParams(const gert::Tensor *xTensor)
+ge::graphStatus MhcPreBaseTiling::ValidateAndSetTilingParams(const gert::Tensor* xTensor)
 {
     auto phiTensor = context_->GetDynamicInputTensor(PHI_INDEX, 0);
     auto phiDims = phiTensor->GetStorageShape().GetDimNum();
@@ -929,7 +929,7 @@ ge::graphStatus MhcPreBaseTiling::PostTiling()
     context_->SetBlockDim(tilingData_.get_coreNum());
     context_->SetScheduleMode(SCHEDULE_MODE);
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(workspaces == nullptr, OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(), "Workspaces is null"),
                 return ge::GRAPH_FAILED);
 

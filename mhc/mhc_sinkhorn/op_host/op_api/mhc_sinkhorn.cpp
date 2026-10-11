@@ -7,7 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
- 
+
 /*!
  * \file mhc_sinkhorn.cpp
  * \brief mhc_sinkhorn
@@ -29,9 +29,9 @@ namespace l0op {
 OP_TYPE_REGISTER(MhcSinkhorn);
 
 // AICORE算子kernel
-static const aclTensor *MhcSinkhornAiCore(const aclTensor *x, int64_t outFlag, float eps, int64_t numIters,
-                                          aclTensor *output, aclTensor *normOut, aclTensor *sumOut,
-                                          aclOpExecutor *executor)
+static const aclTensor* MhcSinkhornAiCore(const aclTensor* x, int64_t outFlag, float eps, int64_t numIters,
+                                          aclTensor* output, aclTensor* normOut, aclTensor* sumOut,
+                                          aclOpExecutor* executor)
 {
     L0_DFX(MhcSinkhornAiCore, x, eps, numIters, outFlag, output, normOut, sumOut);
     // 使用框架宏 ADD_TO_LAUNCHER_LIST_AICORE，将MhcSinkhorn算子加入任务队列
@@ -42,8 +42,8 @@ static const aclTensor *MhcSinkhornAiCore(const aclTensor *x, int64_t outFlag, f
     return output;
 }
 
-const aclTensor *MhcSinkhorn(const aclTensor *x, int64_t outFlag, float eps, int64_t numIters, aclTensor *output,
-                             aclTensor *normOut, aclTensor *sumOut, aclOpExecutor *executor)
+const aclTensor* MhcSinkhorn(const aclTensor* x, int64_t outFlag, float eps, int64_t numIters, aclTensor* output,
+                             aclTensor* normOut, aclTensor* sumOut, aclOpExecutor* executor)
 {
     return MhcSinkhornAiCore(x, outFlag, eps, numIters, output, normOut, sumOut, executor);
 }

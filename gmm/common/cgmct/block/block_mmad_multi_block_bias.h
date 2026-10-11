@@ -69,7 +69,7 @@ public:
      * @param [in] gm: global tensor for matrix A
      * @param [in] isTransposeA: whether to transpose matrix A, default is false
      */
-    __aicore__ inline void SetTensorA(const AscendC::GlobalTensor<typename AType::T> &gm, bool isTransposeA = false)
+    __aicore__ inline void SetTensorA(const AscendC::GlobalTensor<typename AType::T>& gm, bool isTransposeA = false)
     {
         matmul_.SetTensorA(gm, isTransposeA);
     }
@@ -78,7 +78,7 @@ public:
      * @param [in] gm: global tensor for matrix B
      * @param [in] isTransposeB: whether to transpose matrix B, default is false
      */
-    __aicore__ inline void SetTensorB(const AscendC::GlobalTensor<typename BType::T> &gm, bool isTransposeB = false)
+    __aicore__ inline void SetTensorB(const AscendC::GlobalTensor<typename BType::T>& gm, bool isTransposeB = false)
     {
         matmul_.SetTensorB(gm, isTransposeB);
     }
@@ -86,7 +86,7 @@ public:
      * @brief Set tensor bias for matrix multiplication
      * @param [in] biasGlobal: global tensor for matrix bias
      */
-    __aicore__ inline void SetBias(const AscendC::GlobalTensor<typename BiasType::T> &biasGlobal)
+    __aicore__ inline void SetBias(const AscendC::GlobalTensor<typename BiasType::T>& biasGlobal)
     {
         matmul_.SetBias(biasGlobal);
     }
@@ -95,7 +95,7 @@ public:
      * @param [out] cGm: global memory tensor C
      * @param [in] enAtomic: whether to enable atomic operations
      */
-    __aicore__ inline void IterateAll(const AscendC::GlobalTensor<typename CType::T> &cGm, uint8_t enAtomic = 0)
+    __aicore__ inline void IterateAll(const AscendC::GlobalTensor<typename CType::T>& cGm, uint8_t enAtomic = 0)
     {
         matmul_.IterateAll(cGm, enAtomic);
     }
@@ -104,7 +104,7 @@ public:
      * @param [out] ubCmatrix: local memory tensor C matrix
      * @param [in] enAtomic: whether to enable atomic operations
      */
-    __aicore__ inline void IterateAll(const AscendC::LocalTensor<typename CType::T> &ubCmatrix, uint8_t enAtomic = 0)
+    __aicore__ inline void IterateAll(const AscendC::LocalTensor<typename CType::T>& ubCmatrix, uint8_t enAtomic = 0)
     {
         matmul_.IterateAll(ubCmatrix, enAtomic);
     }

@@ -33,7 +33,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -42,7 +42,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -62,8 +62,8 @@ void Finalize(int32_t deviceId, aclrtStream stream)
 }
 
 template <typename T>
-int CreateAclTensor_New(const std::vector<int64_t> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                        aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor_New(const std::vector<int64_t>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                        aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请Device侧内存
@@ -87,7 +87,7 @@ int CreateAclTensor_New(const std::vector<int64_t> &hostData, const std::vector<
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<int64_t> &shape, void **deviceAddr, aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<int64_t>& shape, void** deviceAddr, aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请Device侧内存
@@ -111,11 +111,11 @@ int CreateAclTensor(const std::vector<int64_t> &shape, void **deviceAddr, aclDat
     return 0;
 }
 
-int CreateAclTensorList(const std::vector<std::vector<int64_t>> &shapes, void **deviceAddr, aclDataType dataType,
-                        aclTensorList **tensor)
+int CreateAclTensorList(const std::vector<std::vector<int64_t>>& shapes, void** deviceAddr, aclDataType dataType,
+                        aclTensorList** tensor)
 {
     int size = shapes.size();
-    aclTensor *tensors[size];
+    aclTensor* tensors[size];
     for (int i = 0; i < size; i++) {
         int ret = CreateAclTensor<uint16_t>(shapes[i], deviceAddr + i, dataType, tensors + i);
         CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -124,7 +124,7 @@ int CreateAclTensorList(const std::vector<std::vector<int64_t>> &shapes, void **
     return ACL_SUCCESS;
 }
 
-int aclnnGroupedMatmulAddV2Test(aclrtStream &stream, int groupListType)
+int aclnnGroupedMatmulAddV2Test(aclrtStream& stream, int groupListType)
 {
     // 2. 构造输入与输出，需要根据API的接口自定义构造
     std::vector<int64_t> xShape = {512, 256};
@@ -139,16 +139,16 @@ int aclnnGroupedMatmulAddV2Test(aclrtStream &stream, int groupListType)
         // 1: count
         groupListData = {256, 256};
     }
-    void *xDeviceAddr;
-    void *weightDeviceAddr;
-    void *yDeviceAddr;
+    void* xDeviceAddr;
+    void* weightDeviceAddr;
+    void* yDeviceAddr;
 
-    void *groupListDeviceAddr;
-    aclTensor *x = nullptr;
-    aclTensor *weight = nullptr;
-    aclTensor *groupedList = nullptr;
-    aclTensor *y = nullptr;
-    aclTensor *yRef = nullptr;
+    void* groupListDeviceAddr;
+    aclTensor* x = nullptr;
+    aclTensor* weight = nullptr;
+    aclTensor* groupedList = nullptr;
+    aclTensor* y = nullptr;
+    aclTensor* yRef = nullptr;
 
     bool transpose_x = true;
     bool transpose_weight = false;
@@ -173,7 +173,7 @@ int aclnnGroupedMatmulAddV2Test(aclrtStream &stream, int groupListType)
     yRef = y;
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 3. 调用CANN算子库API
     // 调用aclnnGroupedMatmulAdd第一段接口
@@ -182,7 +182,7 @@ int aclnnGroupedMatmulAddV2Test(aclrtStream &stream, int groupListType)
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulAddV2GetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

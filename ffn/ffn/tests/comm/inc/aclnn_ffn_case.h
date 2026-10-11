@@ -37,7 +37,7 @@ public:
 
 public:
     AclnnFFNCase();
-    AclnnFFNCase(const char *name, bool enable, const char *dbgInfo, OpInfo opInfo, AclnnFFNParam param,
+    AclnnFFNCase(const char* name, bool enable, const char* dbgInfo, OpInfo opInfo, AclnnFFNParam param,
                  int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
     bool Run() override;
 

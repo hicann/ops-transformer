@@ -23,14 +23,14 @@ template <typename T, typename mm1Type, typename mm2Type, typename c1T, typename
           typename dequantT, bool isSmooth = false>
 class FFNQuant {
 public:
-    __aicore__ inline FFNQuant(mm1Type &mm1_, mm2Type &mm2_)
+    __aicore__ inline FFNQuant(mm1Type& mm1_, mm2Type& mm2_)
         : mm1(mm1_),
           mm2(mm2_){};
-    __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
-                                __gm__ uint8_t *expertTokens, __gm__ uint8_t *bias1, __gm__ uint8_t *bias2,
-                                __gm__ uint8_t *scale, __gm__ uint8_t *offset, __gm__ uint8_t *deqScale1,
-                                __gm__ uint8_t *deqScale2, __gm__ uint8_t *y, __gm__ uint8_t *workSpace,
-                                const FFNTilingData *__restrict tiling, TPipe *tPipe)
+    __aicore__ inline void Init(__gm__ uint8_t* x, __gm__ uint8_t* weight1, __gm__ uint8_t* weight2,
+                                __gm__ uint8_t* expertTokens, __gm__ uint8_t* bias1, __gm__ uint8_t* bias2,
+                                __gm__ uint8_t* scale, __gm__ uint8_t* offset, __gm__ uint8_t* deqScale1,
+                                __gm__ uint8_t* deqScale2, __gm__ uint8_t* y, __gm__ uint8_t* workSpace,
+                                const FFNTilingData* __restrict tiling, TPipe* tPipe)
     {
         curBlockIdx = GetBlockIdx();
         subBlockIdx = GetSubBlockIdx();
@@ -40,28 +40,28 @@ public:
         InitTilingData();
 
         // init global buffer
-        xGm.SetGlobalBuffer((__gm__ T *)x);
-        weight1Gm.SetGlobalBuffer((__gm__ T *)weight1);
+        xGm.SetGlobalBuffer((__gm__ T*)x);
+        weight1Gm.SetGlobalBuffer((__gm__ T*)weight1);
         if (bias1 != nullptr) {
             hasBias1 = true;
-            bias1Gm.SetGlobalBuffer((__gm__ biasT *)bias1);
+            bias1Gm.SetGlobalBuffer((__gm__ biasT*)bias1);
         }
-        weight2Gm.SetGlobalBuffer((__gm__ T *)weight2);
+        weight2Gm.SetGlobalBuffer((__gm__ T*)weight2);
         if (bias2 != nullptr) {
             hasBias2 = true;
-            bias2Gm.SetGlobalBuffer((__gm__ biasT *)bias2);
+            bias2Gm.SetGlobalBuffer((__gm__ biasT*)bias2);
         }
-        yGm.SetGlobalBuffer((__gm__ c2T *)y);
-        mm1WorkspaceGm.SetGlobalBuffer((__gm__ c1T *)workSpace);
-        mm2WorkspaceGm.SetGlobalBuffer((__gm__ T *)workSpace);
-        mm2OutWorkspaceGm.SetGlobalBuffer((__gm__ c1T *)workSpace);
+        yGm.SetGlobalBuffer((__gm__ c2T*)y);
+        mm1WorkspaceGm.SetGlobalBuffer((__gm__ c1T*)workSpace);
+        mm2WorkspaceGm.SetGlobalBuffer((__gm__ T*)workSpace);
+        mm2OutWorkspaceGm.SetGlobalBuffer((__gm__ c1T*)workSpace);
 
         if constexpr (isSmooth) {
-            ScaleGm.SetGlobalBuffer((__gm__ float *)scale);
+            ScaleGm.SetGlobalBuffer((__gm__ float*)scale);
         } else {
-            quantScale = (__gm__ float *)scale;
+            quantScale = (__gm__ float*)scale;
         }
-        quantOffset = (__gm__ float *)offset;
+        quantOffset = (__gm__ float*)offset;
 
         InitDequantScale(workSpace, deqScale1, deqScale2);
 
@@ -138,12 +138,12 @@ public:
     }
 
     // define matmul
-    mm1Type &mm1;
-    mm2Type &mm2;
+    mm1Type& mm1;
+    mm2Type& mm2;
 
 protected:
-    const FFNTilingData *__restrict tilingData;
-    TPipe *pipe;
+    const FFNTilingData* __restrict tilingData;
+    TPipe* pipe;
     // define the que
     TQue<QuePosition::VECIN, 1> vecInQueue;
     TQue<QuePosition::VECOUT, 1> vecOutQueue;
@@ -181,8 +181,8 @@ protected:
     GlobalTensor<uint32_t> deqScale1GmVector;
     GlobalTensor<uint32_t> deqScale2GmVector;
 
-    __gm__ float *quantScale;
-    __gm__ float *quantOffset;
+    __gm__ float* quantScale;
+    __gm__ float* quantOffset;
     GlobalTensor<float> ScaleGm;
 
     // tiling data
@@ -256,19 +256,19 @@ protected:
 
     /** init function for dequantscale.
      */
-    __aicore__ inline void InitDequantScale(__gm__ uint8_t *workSpace, __gm__ uint8_t *deqScale1,
-                                            __gm__ uint8_t *deqScale2)
+    __aicore__ inline void InitDequantScale(__gm__ uint8_t* workSpace, __gm__ uint8_t* deqScale1,
+                                            __gm__ uint8_t* deqScale2)
     {
         if constexpr (IsSameType<dequantT, float>::value) {
-            deqScale1GmVector.SetGlobalBuffer((__gm__ uint32_t *)deqScale1);
-            deqScale2GmVector.SetGlobalBuffer((__gm__ uint32_t *)deqScale2);
-            deqScale1UInt64Gm.SetGlobalBuffer((__gm__ uint64_t *)workSpace);
-            deqScale2UInt64Gm.SetGlobalBuffer((__gm__ uint64_t *)workSpace);
-            deqScale1FloatGm.SetGlobalBuffer((__gm__ uint32_t *)workSpace);
-            deqScale2FloatGm.SetGlobalBuffer((__gm__ uint32_t *)workSpace);
+            deqScale1GmVector.SetGlobalBuffer((__gm__ uint32_t*)deqScale1);
+            deqScale2GmVector.SetGlobalBuffer((__gm__ uint32_t*)deqScale2);
+            deqScale1UInt64Gm.SetGlobalBuffer((__gm__ uint64_t*)workSpace);
+            deqScale2UInt64Gm.SetGlobalBuffer((__gm__ uint64_t*)workSpace);
+            deqScale1FloatGm.SetGlobalBuffer((__gm__ uint32_t*)workSpace);
+            deqScale2FloatGm.SetGlobalBuffer((__gm__ uint32_t*)workSpace);
         }
-        deqScale1Gm.SetGlobalBuffer((__gm__ dequantT *)deqScale1);
-        deqScale2Gm.SetGlobalBuffer((__gm__ dequantT *)deqScale2);
+        deqScale1Gm.SetGlobalBuffer((__gm__ dequantT*)deqScale1);
+        deqScale2Gm.SetGlobalBuffer((__gm__ dequantT*)deqScale2);
     }
 
     /** init function for Queue.
@@ -351,8 +351,8 @@ protected:
      * @param baseM: baseM for mm;
      * @param expertParalInfo: expert parallel info
      */
-    __aicore__ inline void ComputeExpertParallNum(const uint32_t &expertI, const uint32_t &baseM,
-                                                  ExpertParallInfo &expertParallInfo)
+    __aicore__ inline void ComputeExpertParallNum(const uint32_t& expertI, const uint32_t& baseM,
+                                                  ExpertParallInfo& expertParallInfo)
     {
         if (expertI == expertNum) {
             expertParallInfo.expertParallelism = Min(expertParallInfo.size, expertParallInfo.maxExpertParallelism);
@@ -368,7 +368,7 @@ protected:
      * @param maxMM1ExpertParallelism: max mm1 expert parallel num.
      * @param maxMM2ExpertParallelism: max mm2 expert parallel num.
      */
-    __aicore__ inline void WhetherSyncBeforeMM1(MNConfig &mnConfig, uint32_t maxMM1ExpertParallelism,
+    __aicore__ inline void WhetherSyncBeforeMM1(MNConfig& mnConfig, uint32_t maxMM1ExpertParallelism,
                                                 uint32_t maxMM2ExpertParallelism)
     {
         UpdateKernelTilingInfo info{n1, n2, expertNum, maxMM1ExpertParallelism};
@@ -414,7 +414,7 @@ protected:
      * @param tokensOffset: token offset for current expert.
      * @param outRowOffset: out offset for mm1.
      */
-    __aicore__ inline void MM1Compute(MNConfig &mnConfig, uint32_t baseBlockIdx, uint32_t expertIdx,
+    __aicore__ inline void MM1Compute(MNConfig& mnConfig, uint32_t baseBlockIdx, uint32_t expertIdx,
                                       uint32_t tokensOffset, uint32_t outRowOffset)
     {
         uint32_t mIdx = baseBlockIdx / mnConfig.blockDimN;
@@ -461,7 +461,7 @@ protected:
      * @param mnConfig: M and N config info for matmul..
      * @param whetherFirstMM1: whether the first mm1 for calculation.
      */
-    __aicore__ inline void MM1Process(ExpertParallInfo &mm1ExpertParallInfo, MNConfig &mnConfig, bool &whetherFirstMM1)
+    __aicore__ inline void MM1Process(ExpertParallInfo& mm1ExpertParallInfo, MNConfig& mnConfig, bool& whetherFirstMM1)
     {
         uint32_t coreNumEachExpert = cubeCoreNum / mm1ExpertParallInfo.expertParallelism;
         mnConfig.SetConstriant(tokens, n1, tilingData->mm1TilingData.baseM,
@@ -562,7 +562,7 @@ protected:
     }
 
     __aicore__ inline void CopyFromWorkspaceMM1(uint32_t curBaseM, uint32_t curBaseN1, uint32_t computeBaseN1,
-                                                uint64_t offsetWorkspace, const DataCopyPadExtParams<c1T> &padParams)
+                                                uint64_t offsetWorkspace, const DataCopyPadExtParams<c1T>& padParams)
     {
         LocalTensor<c1T> inLocal = vecInQueue.AllocTensor<c1T>();
 
@@ -707,7 +707,7 @@ protected:
 
     /**  mm2 computation function
      */
-    __aicore__ inline void MM2Compute(MNConfig &mnConfig, uint32_t baseBlockIdx, uint32_t expertIdx,
+    __aicore__ inline void MM2Compute(MNConfig& mnConfig, uint32_t baseBlockIdx, uint32_t expertIdx,
                                       uint32_t tokensRowOffset, uint32_t outRowOffset)
     {
         uint32_t mIdx = baseBlockIdx / mnConfig.blockDimN;
@@ -750,7 +750,7 @@ protected:
 
     /**  mm2 process function
      */
-    __aicore__ inline void MM2Process(ExpertParallInfo &mm2ExpertParallInfo, MNConfig &mnConfig, bool &whetherWaitMM2)
+    __aicore__ inline void MM2Process(ExpertParallInfo& mm2ExpertParallInfo, MNConfig& mnConfig, bool& whetherWaitMM2)
     {
         for (uint32_t i = mm2ExpertParallInfo.start; i < mm2ExpertParallInfo.size;
              i += mm2ExpertParallInfo.expertParallelism) {
@@ -895,7 +895,7 @@ protected:
     }
 
     __aicore__ inline void DequantDataCopyForZeroN1(uint32_t curBaseN2, uint32_t offset,
-                                                    const DataCopyPadParams &padParams)
+                                                    const DataCopyPadParams& padParams)
     {
         LocalTensor<dequantT> dequantLocal = scaleQueue.AllocTensor<dequantT>();
         DataCopyParams copyParams;

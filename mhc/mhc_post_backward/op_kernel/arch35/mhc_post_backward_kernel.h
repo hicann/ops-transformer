@@ -37,7 +37,7 @@ public:
     __aicore__ inline MhcPostBackwardKernel() {}
     __aicore__ inline void Init(GM_ADDR gradOutput, GM_ADDR x, GM_ADDR hRes, GM_ADDR hOut, GM_ADDR hPost, GM_ADDR gradX,
                                 GM_ADDR gradHRes, GM_ADDR gradHOut, GM_ADDR gradHPost, GM_ADDR workspace,
-                                const MhcPostBackwardTilingDataArch35 *tilingData, TPipe *tPipe);
+                                const MhcPostBackwardTilingDataArch35* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -49,7 +49,7 @@ private:
     __aicore__ inline void CopyOutGradX(uint32_t globalItemIdx, uint32_t tileId);
     __aicore__ inline void CopyOutWeightGrads(uint32_t globalItemIdx);
     __aicore__ inline void SetMMParaAndCompute(uint32_t globalItemIdx);
-    __aicore__ inline float HierarchicalReduceSum(const LocalTensor<float> &srcLocal, LocalTensor<float> &workLocal,
+    __aicore__ inline float HierarchicalReduceSum(const LocalTensor<float>& srcLocal, LocalTensor<float>& workLocal,
                                                   uint32_t count);
     __aicore__ inline void ComputeGradHOutTile(LocalTensor<float> gradOutF32UB, LocalTensor<float> hPostLocalUB,
                                                LocalTensor<T> gradHOutTileUB, uint32_t actualTileD);
@@ -57,7 +57,7 @@ private:
                                             LocalTensor<T> gradXTileUB, uint32_t actualTileD);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     constexpr static AscendC::Reg::CastTrait castB32ToB16 = {
         AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::NO_SAT, AscendC::Reg::MaskMergeMode::ZEROING,
         AscendC::RoundMode::CAST_RINT};
@@ -129,8 +129,8 @@ __aicore__ inline void MhcPostBackwardKernel<T, IS_HRES>::Init(GM_ADDR gradOutpu
                                                                GM_ADDR hOut, GM_ADDR hPost, GM_ADDR gradX,
                                                                GM_ADDR gradHRes, GM_ADDR gradHOut, GM_ADDR gradHPost,
                                                                GM_ADDR workspace,
-                                                               const MhcPostBackwardTilingDataArch35 *tilingData,
-                                                               TPipe *tPipe)
+                                                               const MhcPostBackwardTilingDataArch35* tilingData,
+                                                               TPipe* tPipe)
 {
     pipe_ = tPipe;
 
@@ -157,21 +157,21 @@ __aicore__ inline void MhcPostBackwardKernel<T, IS_HRES>::Init(GM_ADDR gradOutpu
     blockIdx_ = GetBlockIdx();
 
     // Set global memory buffers for inputs (bf16/fp16)
-    gradOutputGm_.SetGlobalBuffer((__gm__ T *)gradOutput, totalItems_ * n_ * D_);
-    hOutGm_.SetGlobalBuffer((__gm__ T *)hOut, totalItems_ * D_);
-    xGm_.SetGlobalBuffer((__gm__ T *)x, totalItems_ * n_ * D_);
+    gradOutputGm_.SetGlobalBuffer((__gm__ T*)gradOutput, totalItems_ * n_ * D_);
+    hOutGm_.SetGlobalBuffer((__gm__ T*)hOut, totalItems_ * D_);
+    xGm_.SetGlobalBuffer((__gm__ T*)x, totalItems_ * n_ * D_);
     // Set global memory buffers for inputs (float32)
-    hPostGm_.SetGlobalBuffer((__gm__ float *)hPost, totalItems_ * n_);
+    hPostGm_.SetGlobalBuffer((__gm__ float*)hPost, totalItems_ * n_);
     if constexpr (IS_HRES) {
-        hResGm_.SetGlobalBuffer((__gm__ float *)hRes, totalItems_ * n_ * n_);
+        hResGm_.SetGlobalBuffer((__gm__ float*)hRes, totalItems_ * n_ * n_);
     }
 
     // Set global memory buffers for outputs (bf16/fp16)
-    gradHOutGm_.SetGlobalBuffer((__gm__ T *)gradHOut, totalItems_ * D_);
-    gradXGm_.SetGlobalBuffer((__gm__ T *)gradX, totalItems_ * n_ * D_);
+    gradHOutGm_.SetGlobalBuffer((__gm__ T*)gradHOut, totalItems_ * D_);
+    gradXGm_.SetGlobalBuffer((__gm__ T*)gradX, totalItems_ * n_ * D_);
     // Set global memory buffers for outputs (float32)
-    gradHPostGm_.SetGlobalBuffer((__gm__ float *)gradHPost, totalItems_ * n_);
-    gradHResGm_.SetGlobalBuffer((__gm__ float *)gradHRes, totalItems_ * n_ * n_);
+    gradHPostGm_.SetGlobalBuffer((__gm__ float*)gradHPost, totalItems_ * n_);
+    gradHResGm_.SetGlobalBuffer((__gm__ float*)gradHRes, totalItems_ * n_ * n_);
 
     if ASCEND_IS_AIV {
         // Calculate work distribution with remainder handling
@@ -384,14 +384,14 @@ __aicore__ inline void MhcPostBackwardKernel<T, IS_HRES>::ComputeTile(uint32_t t
 }
 
 template <typename T, bool IS_HRES>
-__aicore__ inline float MhcPostBackwardKernel<T, IS_HRES>::HierarchicalReduceSum(const LocalTensor<float> &srcLocal,
-                                                                                 LocalTensor<float> &workLocal,
+__aicore__ inline float MhcPostBackwardKernel<T, IS_HRES>::HierarchicalReduceSum(const LocalTensor<float>& srcLocal,
+                                                                                 LocalTensor<float>& workLocal,
                                                                                  uint32_t count)
 {
     constexpr uint32_t BLOCK_SIZE = 64; // 64 float elements = 256 bytes
 
     // Cast away const for in-place modification
-    LocalTensor<float> &src = const_cast<LocalTensor<float> &>(srcLocal);
+    LocalTensor<float>& src = const_cast<LocalTensor<float>&>(srcLocal);
 
     // Align count to 8 upfront and zero-pad to avoid alignment issues in reduction loop
     uint32_t alignedCount = ((count + 7) / 8) * 8;
@@ -472,9 +472,9 @@ __aicore__ inline void MhcPostBackwardKernel<T, IS_HRES>::ComputeGradHOutTile(Lo
     uint16_t repeatTimes = (actualTileD + vfLen - 1) / vfLen;
     uint16_t ntimes = n_;
 
-    auto gradOutTileAddr = (__ubuf__ float *)gradOutF32UB.GetPhyAddr();
-    auto hPostLocalAddr = (__ubuf__ float *)hPostLocalUB.GetPhyAddr();
-    auto gradHOutTileAddr = (__ubuf__ T *)gradHOutTileUB.GetPhyAddr();
+    auto gradOutTileAddr = (__ubuf__ float*)gradOutF32UB.GetPhyAddr();
+    auto hPostLocalAddr = (__ubuf__ float*)hPostLocalUB.GetPhyAddr();
+    auto gradHOutTileAddr = (__ubuf__ T*)gradHOutTileUB.GetPhyAddr();
     __VEC_SCOPE__
     {
         uint32_t gradOutDealNum = static_cast<uint32_t>(actualTileD);
@@ -511,9 +511,9 @@ __aicore__ inline void MhcPostBackwardKernel<T, IS_HRES>::ComputeGradXTile(Local
     uint16_t repeatTimes = (actualTileD + vfLen - 1) / vfLen;
     uint16_t ntimes = n_;
 
-    auto gradOutTileAddr = (__ubuf__ float *)gradOutF32UB.GetPhyAddr();
-    auto hResLocalAddr = (__ubuf__ float *)hResLocalUB.GetPhyAddr();
-    auto gradXTileAddr = (__ubuf__ T *)gradXTileUB.GetPhyAddr();
+    auto gradOutTileAddr = (__ubuf__ float*)gradOutF32UB.GetPhyAddr();
+    auto hResLocalAddr = (__ubuf__ float*)hResLocalUB.GetPhyAddr();
+    auto gradXTileAddr = (__ubuf__ T*)gradXTileUB.GetPhyAddr();
 
     __VEC_SCOPE__
     {

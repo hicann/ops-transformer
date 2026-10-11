@@ -272,22 +272,22 @@ REGISTER_TILING_DATA_CLASS(QuantGroupedMatmulDequant, QuantMatmulDequantTilingDa
 
 class QuantMatmulDequantTiling {
 public:
-    ge::graphStatus runTiling(gert::TilingContext *context, bool is_grouped = false);
+    ge::graphStatus runTiling(gert::TilingContext* context, bool is_grouped = false);
 
 private:
-    bool GetPlatformInfo(gert::TilingContext *context);
+    bool GetPlatformInfo(gert::TilingContext* context);
 
-    bool GetCheckAttr(gert::TilingContext *context);
+    bool GetCheckAttr(gert::TilingContext* context);
 
-    bool CheckInOutShapes(gert::TilingContext *context);
+    bool CheckInOutShapes(gert::TilingContext* context);
 
-    bool GetTilingData(gert::TilingContext *context);
+    bool GetTilingData(gert::TilingContext* context);
 
-    bool GetOptimizedPertokenDynamicTilingData(gert::TilingContext *context);
+    bool GetOptimizedPertokenDynamicTilingData(gert::TilingContext* context);
 
-    bool SetTilingData(gert::TilingContext *context);
+    bool SetTilingData(gert::TilingContext* context);
 
-    bool SetLaunchInfo(gert::TilingContext *context);
+    bool SetLaunchInfo(gert::TilingContext* context);
 
     bool isGrouped;
     QuantMatmulDequantTilingKey tilingKey;

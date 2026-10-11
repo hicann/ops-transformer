@@ -19,13 +19,13 @@ namespace QGmmInPlaceAdd {
 template <typename T>
 class AclnnQuantGroupedMatmulInplaceAddDAV3510Checker {
 public:
-    explicit AclnnQuantGroupedMatmulInplaceAddDAV3510Checker(const gmm::GroupedMatmulParamsBase<T> &gmmParams)
+    explicit AclnnQuantGroupedMatmulInplaceAddDAV3510Checker(const gmm::GroupedMatmulParamsBase<T>& gmmParams)
         : gmmParams_(gmmParams) {};
     ~AclnnQuantGroupedMatmulInplaceAddDAV3510Checker() {};
     aclnnStatus CheckQuantGroupedMatmulInplaceAddDAV3510() const;
     aclnnStatus CheckHif8QuantParamsShape() const;
-    void SetInputName(const std::string &xName, const std::string &weightName, const std::string &perTokenScaleName,
-                      const std::string &scaleName, const std::string &groupTensorName);
+    void SetInputName(const std::string& xName, const std::string& weightName, const std::string& perTokenScaleName,
+                      const std::string& scaleName, const std::string& groupTensorName);
 
 private:
     aclnnStatus CheckGeneralQuantShape() const;

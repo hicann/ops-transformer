@@ -33,7 +33,7 @@ using namespace AscendC;
 TEMPLATE_DECLARE
 class MhcPostKernel {
 public:
-    __aicore__ inline MhcPostKernel(TPipe *tPipe, const MhcPostTilingData *__restrict tilingData)
+    __aicore__ inline MhcPostKernel(TPipe* tPipe, const MhcPostTilingData* __restrict tilingData)
         : pipe_(tPipe),
           tilingData_(tilingData){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hRes, GM_ADDR hOut, GM_ADDR hPost, GM_ADDR output,
@@ -48,8 +48,8 @@ private:
     __aicore__ inline void CopyInX(int64_t bsIdx, int64_t dIdx, int64_t nJ, int64_t dNum);
 
 private:
-    TPipe *pipe_;
-    const MhcPostTilingData *tilingData_;
+    TPipe* pipe_;
+    const MhcPostTilingData* tilingData_;
 
     // Input queues - Double Buffer enabled (queue depth = DOUBLE_BUFFER_DEPTH)
     TQue<QuePosition::VECIN, DOUBLE_BUFFER_DEPTH> hOutTileQueue_;
@@ -102,11 +102,11 @@ __aicore__ inline void MhcPostKernel<TEMPLATE_ARGS>::Init(GM_ADDR x, GM_ADDR hRe
     }
 
     // Set global memory buffers
-    xGm_.SetGlobalBuffer((__gm__ T *)x);
-    hOutGm_.SetGlobalBuffer((__gm__ T *)hOut);
-    hResGm_.SetGlobalBuffer((__gm__ float *)hRes);
-    hPostGm_.SetGlobalBuffer((__gm__ float *)hPost);
-    outputGm_.SetGlobalBuffer((__gm__ T *)output);
+    xGm_.SetGlobalBuffer((__gm__ T*)x);
+    hOutGm_.SetGlobalBuffer((__gm__ T*)hOut);
+    hResGm_.SetGlobalBuffer((__gm__ float*)hRes);
+    hPostGm_.SetGlobalBuffer((__gm__ float*)hPost);
+    outputGm_.SetGlobalBuffer((__gm__ T*)output);
 
     // Initialize input queues - Double Buffer with depth=DOUBLE_BUFFER_DEPTH for data tiles
     pipe_->InitBuffer(hOutTileQueue_, DOUBLE_BUFFER_DEPTH, tilingData_->dInner * sizeof(T));

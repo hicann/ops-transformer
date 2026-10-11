@@ -32,9 +32,9 @@ static constexpr size_t INDEX_Y = 0;
 static constexpr size_t DIMS_THREE = 3;
 static constexpr size_t DIMS_FOUR = 4;
 
-static void ShowInputShapeInfo(gert::InferShapeContext *context, const gert::Shape *xShape,
-                               const gert::Shape *hResShape, const gert::Shape *hOutShape,
-                               const gert::Shape *hPostShape)
+static void ShowInputShapeInfo(gert::InferShapeContext* context, const gert::Shape* xShape,
+                               const gert::Shape* hResShape, const gert::Shape* hOutShape,
+                               const gert::Shape* hPostShape)
 {
     OP_LOGD(context, "xShape is: %s.", Ops::Base::ToString(*xShape).c_str());
     OP_LOGD(context, "hResShape is: %s.", Ops::Base::ToString(*hResShape).c_str());
@@ -42,23 +42,23 @@ static void ShowInputShapeInfo(gert::InferShapeContext *context, const gert::Sha
     OP_LOGD(context, "hPostShape is: %s.", Ops::Base::ToString(*hPostShape).c_str());
 }
 
-static void ShowOutputShapeInfo(gert::InferShapeContext *context, const gert::Shape *yShape)
+static void ShowOutputShapeInfo(gert::InferShapeContext* context, const gert::Shape* yShape)
 {
     OP_LOGD(context, "yShape is: %s.", Ops::Base::ToString(*yShape).c_str());
 }
 
-static ge::graphStatus InferShapeForMhcPost(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeForMhcPost(gert::InferShapeContext* context)
 {
     OP_LOGD(context, "Begin to do MhcPostInfershape.");
-    const gert::Shape *xShape = context->GetInputShape(INDEX_X);
+    const gert::Shape* xShape = context->GetInputShape(INDEX_X);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
-    const gert::Shape *hResShape = context->GetInputShape(INDEX_HRES);
+    const gert::Shape* hResShape = context->GetInputShape(INDEX_HRES);
     OP_CHECK_NULL_WITH_CONTEXT(context, hResShape);
-    const gert::Shape *hOutShape = context->GetInputShape(INDEX_HOUT);
+    const gert::Shape* hOutShape = context->GetInputShape(INDEX_HOUT);
     OP_CHECK_NULL_WITH_CONTEXT(context, hOutShape);
-    const gert::Shape *hPostShape = context->GetInputShape(INDEX_HPOST);
+    const gert::Shape* hPostShape = context->GetInputShape(INDEX_HPOST);
     OP_CHECK_NULL_WITH_CONTEXT(context, hPostShape);
-    gert::Shape *yShape = context->GetOutputShape(INDEX_Y);
+    gert::Shape* yShape = context->GetOutputShape(INDEX_Y);
     OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
 
     if (Ops::Base::IsUnknownRank(*xShape)) {
@@ -87,7 +87,7 @@ static ge::graphStatus InferShapeForMhcPost(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeForMhcPost(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeForMhcPost(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         return GRAPH_FAILED;

@@ -89,7 +89,7 @@ constexpr float DEFAULT_DST_TYPE_MAX = 0.0f;
 constexpr float FP4_E2M1_DST_TYPE_MAX_MIN = 6.0f;
 constexpr float FP4_E2M1_DST_TYPE_MAX_MAX = 12.0f;
 
-std::string ShapeToDebugString(const gert::Shape &shape)
+std::string ShapeToDebugString(const gert::Shape& shape)
 {
     std::string result = "[";
     for (size_t i = 0; i < shape.GetDimNum(); ++i) {
@@ -133,10 +133,10 @@ bool GroupedMatmulActivationQuantTiling950::AnalyzeAttrs()
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is nullptr."), return false);
-    const bool *transposeWeightPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANS_W);
+    const bool* transposeWeightPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANS_W);
     inputParams_.transB = transposeWeightPtr != nullptr ? *transposeWeightPtr : false;
     inputParams_.transA = false;
-    const int64_t *groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE);
+    const int64_t* groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE);
     inputParams_.groupListType = groupListTypePtr != nullptr ? *groupListTypePtr : inputParams_.groupListType;
     OP_CHECK_IF(inputParams_.groupListType != 0 && inputParams_.groupListType != 1,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "group_list_type",
@@ -144,12 +144,12 @@ bool GroupedMatmulActivationQuantTiling950::AnalyzeAttrs()
                                                       "group_list_type must be 0 or 1"),
                 return false);
 
-    const char *quantModePtr = attrs->GetAttrPointer<char>(ATTR_INDEX_QUANT_MODE);
-    const int64_t *yDtypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_Y_DTYPE);
-    const char *roundModePtr = attrs->GetAttrPointer<char>(ATTR_INDEX_ROUND_MODE);
-    const int64_t *scaleAlgPtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_SCALE_ALG);
-    const float *dstTypeMaxPtr = attrs->GetAttrPointer<float>(ATTR_INDEX_DST_TYPE_MAX);
-    const char *activationTypePtr = attrs->GetAttrPointer<char>(ATTR_INDEX_ACTIVATION_TYPE);
+    const char* quantModePtr = attrs->GetAttrPointer<char>(ATTR_INDEX_QUANT_MODE);
+    const int64_t* yDtypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_Y_DTYPE);
+    const char* roundModePtr = attrs->GetAttrPointer<char>(ATTR_INDEX_ROUND_MODE);
+    const int64_t* scaleAlgPtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_SCALE_ALG);
+    const float* dstTypeMaxPtr = attrs->GetAttrPointer<float>(ATTR_INDEX_DST_TYPE_MAX);
+    const char* activationTypePtr = attrs->GetAttrPointer<char>(ATTR_INDEX_ACTIVATION_TYPE);
     OP_CHECK_IF(yDtypePtr == nullptr || roundModePtr == nullptr || scaleAlgPtr == nullptr || dstTypeMaxPtr == nullptr ||
                     activationTypePtr == nullptr,
                 OP_LOGE(context_->GetNodeName(), "quant attrs must not be nullptr."), return false);
@@ -289,7 +289,7 @@ bool GroupedMatmulActivationQuantTiling950::AnalyzeDtype()
                 OP_LOGE(context_->GetNodeName(), "input or output desc is nullptr."), return false);
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is nullptr."), return false);
-    const int64_t *yDtypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_Y_DTYPE);
+    const int64_t* yDtypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_Y_DTYPE);
     OP_CHECK_IF(yDtypePtr == nullptr, OP_LOGE(context_->GetNodeName(), "y_dtype must not be nullptr."), return false);
     inputParams_.aDtype = xDesc->GetDataType();
     yDtype_ = static_cast<ge::DataType>(*yDtypePtr);
@@ -303,8 +303,8 @@ bool GroupedMatmulActivationQuantTiling950::AnalyzeDtype()
     return CheckDtype();
 }
 
-bool GroupedMatmulActivationQuantTiling950::CheckMxScaleShape(const gert::Shape &xScaleShape,
-                                                              const gert::Shape &wScaleShape) const
+bool GroupedMatmulActivationQuantTiling950::CheckMxScaleShape(const gert::Shape& xScaleShape,
+                                                              const gert::Shape& wScaleShape) const
 {
     OP_CHECK_IF(
         xScaleShape.GetDimNum() != MXFP_PER_TOKEN_SCALE_DIM_NUM || wScaleShape.GetDimNum() != MXFP_TYPE_M_SCALE_DIM_NUM,
@@ -337,7 +337,7 @@ bool GroupedMatmulActivationQuantTiling950::CheckMxScaleShape(const gert::Shape 
     return true;
 }
 
-bool GroupedMatmulActivationQuantTiling950::CheckWeightNzShape(const gert::Shape &wStorageShape) const
+bool GroupedMatmulActivationQuantTiling950::CheckWeightNzShape(const gert::Shape& wStorageShape) const
 {
     OP_CHECK_IF(inputParams_.bFormat != ge::FORMAT_FRACTAL_NZ,
                 OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
@@ -401,12 +401,12 @@ bool GroupedMatmulActivationQuantTiling950::AnalyzeInputs()
                     wScaleStorageShape == nullptr,
                 OP_LOGE(context_->GetNodeName(), "input shape is nullptr."), return false);
     OP_CHECK_IF(!SetGroupNum(GROUP_LIST_INDEX), OP_LOGE(inputParams_.opName, "SetGroupNum failed."), return false);
-    const auto &xShape = xStorageShape->GetOriginShape();
-    const auto &wShape = wStorageShape->GetOriginShape();
-    const auto &weightStorageShape = wStorageShape->GetStorageShape();
-    const auto &xScaleShape = xScaleStorageShape->GetOriginShape();
-    const auto &wScaleShape = wScaleStorageShape->GetOriginShape();
-    const auto &weightScaleStorageShape = wScaleStorageShape->GetStorageShape();
+    const auto& xShape = xStorageShape->GetOriginShape();
+    const auto& wShape = wStorageShape->GetOriginShape();
+    const auto& weightStorageShape = wStorageShape->GetStorageShape();
+    const auto& xScaleShape = xScaleStorageShape->GetOriginShape();
+    const auto& wScaleShape = wScaleStorageShape->GetOriginShape();
+    const auto& weightScaleStorageShape = wScaleStorageShape->GetStorageShape();
     OP_CHECK_IF(!SetMKN(xShape, wShape), OP_LOGE(inputParams_.opName, "SetMKN failed."), return false);
     OP_CHECK_IF(IsFp4(inputParams_.aDtype) &&
                     (inputParams_.kSize % MXFP4_PACK_FACTOR != 0 || inputParams_.kSize == MXFP4_PACK_FACTOR),
@@ -555,7 +555,7 @@ ge::graphStatus GroupedMatmulActivationQuantTiling950::GetWorkspaceSize()
         context_ == nullptr,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("GroupedMatmulActivationQuant", "context", "does not support nullptr"),
         return ge::GRAPH_FAILED);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = SYS_WORKSPACE_SIZES;
     return ge::GRAPH_SUCCESS;
@@ -568,7 +568,7 @@ ge::graphStatus GroupedMatmulActivationQuantTiling950::PostTiling()
 
 REGISTER_OPS_TILING_TEMPLATE(GroupedMatmulActivationQuant, GroupedMatmulActivationQuantTiling950, 0);
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForGroupedMatmulActivationQuant(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForGroupedMatmulActivationQuant(gert::TilingParseContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     auto platformInfoPtr = context->GetPlatformInfo();
@@ -589,7 +589,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForGroupedMatmulActivationQuant(ge
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus GroupedMatmulActivationQuantTilingFunc(gert::TilingContext *context)
+static ge::graphStatus GroupedMatmulActivationQuantTilingFunc(gert::TilingContext* context)
 {
     OP_CHECK_IF(
         context == nullptr,

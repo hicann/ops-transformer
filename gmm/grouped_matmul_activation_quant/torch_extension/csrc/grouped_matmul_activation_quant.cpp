@@ -57,7 +57,7 @@ int64_t NormalizeGeDtype(int64_t dtype)
     return dtype;
 }
 
-const char *GetDtypeName(int64_t dtype)
+const char* GetDtypeName(int64_t dtype)
 {
     switch (NormalizeGeDtype(dtype)) {
         case GE_DTYPE_FLOAT:
@@ -92,7 +92,7 @@ aclDataType GetAclDataTypeFromValue(int64_t dtype)
     return GetAclDataType(dtype);
 }
 
-aclDataType GetTensorAclDataType(const c10::optional<int64_t> &dtypeOptional, const at::Tensor &tensor)
+aclDataType GetTensorAclDataType(const c10::optional<int64_t>& dtypeOptional, const at::Tensor& tensor)
 {
     if (dtypeOptional.has_value()) {
         return GetAclDataTypeFromValue(dtypeOptional.value());
@@ -123,7 +123,7 @@ bool IsFp4GeDtype(int64_t dtype)
     return geDtype == GE_DTYPE_FLOAT4_E2M1 || geDtype == GE_DTYPE_FLOAT4_E1M2;
 }
 
-int64_t ResolveYGeDtype(const c10::optional<int64_t> &yDtype, aclDataType xAclDtype)
+int64_t ResolveYGeDtype(const c10::optional<int64_t>& yDtype, aclDataType xAclDtype)
 {
     if (yDtype.has_value()) {
         return NormalizeGeDtype(yDtype.value());
@@ -145,14 +145,14 @@ int64_t CeilDiv(int64_t value, int64_t factor)
     return (value + factor - 1) / factor;
 }
 
-int64_t InferNzLogicalN(const at::Tensor &weightScaleTensor)
+int64_t InferNzLogicalN(const at::Tensor& weightScaleTensor)
 {
     // Both the non-transposed scale and the view produced by
     // scaleSource.transpose(-3, -2) are [E, ceil(K / 64), N, 2].
     return weightScaleTensor.size(DIM_2);
 }
 
-void CheckTensorListIndexable(const std::vector<at::Tensor> &tensorList, const char *name)
+void CheckTensorListIndexable(const std::vector<at::Tensor>& tensorList, const char* name)
 {
     TORCH_CHECK(!tensorList.empty(), name, " must contain at least one tensor for torch output allocation.");
     TORCH_CHECK(tensorList[0].defined(), name, "[0] must be a defined tensor for torch output allocation.");
@@ -160,10 +160,10 @@ void CheckTensorListIndexable(const std::vector<at::Tensor> &tensorList, const c
 } // namespace
 
 std::tuple<at::Tensor, at::Tensor> grouped_matmul_activation_quant(
-    const at::Tensor &x, const at::Tensor &groupList, const std::vector<at::Tensor> &weight,
-    const std::vector<at::Tensor> &weightScale, std::string activationType,
-    const c10::optional<std::vector<at::Tensor>> &biasOptional, const c10::optional<at::Tensor> &xScaleOptional,
-    int64_t groupListType, const c10::optional<std::vector<int64_t>> &tuningConfig,
+    const at::Tensor& x, const at::Tensor& groupList, const std::vector<at::Tensor>& weight,
+    const std::vector<at::Tensor>& weightScale, std::string activationType,
+    const c10::optional<std::vector<at::Tensor>>& biasOptional, const c10::optional<at::Tensor>& xScaleOptional,
+    int64_t groupListType, const c10::optional<std::vector<int64_t>>& tuningConfig,
     c10::optional<c10::string_view> quantModeOptional, c10::optional<int64_t> yDtype, std::string roundMode,
     int64_t scaleAlg, float dstTypeMax, c10::optional<int64_t> xDtype, c10::optional<int64_t> weightDtype,
     c10::optional<int64_t> weightScaleDtype, c10::optional<int64_t> xScaleDtype)
@@ -173,9 +173,9 @@ std::tuple<at::Tensor, at::Tensor> grouped_matmul_activation_quant(
     TORCH_CHECK(xScaleOptional.has_value() && xScaleOptional.value().defined(),
                 "x_scale must be provided for torch wrapper tensor conversion.");
 
-    const at::Tensor &weightTensor = weight[0];
-    const at::Tensor &weightScaleTensor = weightScale[0];
-    const at::Tensor &xScale = xScaleOptional.value();
+    const at::Tensor& weightTensor = weight[0];
+    const at::Tensor& weightScaleTensor = weightScale[0];
+    const at::Tensor& xScale = xScaleOptional.value();
     TORCH_CHECK(x.dim() > DIM_0, "x must have at least one dimension for torch output allocation.");
     TORCH_CHECK(weightScaleTensor.dim() > DIM_2,
                 "weight_scale must have at least 3 dimensions for torch output allocation.");
@@ -204,7 +204,7 @@ std::tuple<at::Tensor, at::Tensor> grouped_matmul_activation_quant(
     at::TensorList weightRef = weight;
     at::TensorList weightScaleRef = weightScale;
     const std::vector<at::Tensor> emptyBias;
-    const std::vector<at::Tensor> &bias = biasOptional.has_value() ? biasOptional.value() : emptyBias;
+    const std::vector<at::Tensor>& bias = biasOptional.has_value() ? biasOptional.value() : emptyBias;
     at::TensorList biasRef = bias;
     c10::optional<at::IntArrayRef> tuningConfigRef = c10::nullopt;
     if (tuningConfig.has_value()) {
@@ -217,9 +217,9 @@ std::tuple<at::Tensor, at::Tensor> grouped_matmul_activation_quant(
     TensorListWrapper weightScaleWrapper = {weightScaleRef, weightScaleAclDtype};
     TensorWrapper yWrapper = {y, static_cast<aclDataType>(yDtypeValue)};
     TensorWrapper yScaleWrapper = {yScale, ACL_FLOAT8_E8M0};
-    char *activationTypePtr = const_cast<char *>(activationType.c_str());
-    char *quantModePtr = const_cast<char *>(quantMode.c_str());
-    char *roundModePtr = const_cast<char *>(roundMode.c_str());
+    char* activationTypePtr = const_cast<char*>(activationType.c_str());
+    char* quantModePtr = const_cast<char*>(quantMode.c_str());
+    char* roundModePtr = const_cast<char*>(roundMode.c_str());
 
     ACLNN_CMD(aclnnGroupedMatmulActivationQuantWeightNz, xWrapper, groupList, weightWrapper, weightScaleWrapper,
               biasRef, xScaleWrapper, activationTypePtr, groupListType, tuningConfigRef, quantModePtr, roundModePtr,

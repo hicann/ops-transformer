@@ -26,14 +26,14 @@ using namespace AscendC;
 class MhcPreSinkhornMPMDSinkhorn {
 public:
     __aicore__ inline void Init(GM_ADDR scale, GM_ADDR bias, GM_ADDR output, GM_ADDR workspace,
-                                const MhcPreSinkhornRegbaseTilingData *data, TPipe *pipe)
+                                const MhcPreSinkhornRegbaseTilingData* data, TPipe* pipe)
     {
         td = data;
-        scaleGm.SetGlobalBuffer((__gm__ float *)scale);
-        biasGm.SetGlobalBuffer((__gm__ float *)bias);
-        outputGm.SetGlobalBuffer((__gm__ float *)output);
-        mmGm.SetGlobalBuffer((__gm__ float *)workspace);
-        rmsGm.SetGlobalBuffer((__gm__ float *)workspace + td->kBlockFactor * td->bs * td->hcMix);
+        scaleGm.SetGlobalBuffer((__gm__ float*)scale);
+        biasGm.SetGlobalBuffer((__gm__ float*)bias);
+        outputGm.SetGlobalBuffer((__gm__ float*)output);
+        mmGm.SetGlobalBuffer((__gm__ float*)workspace);
+        rmsGm.SetGlobalBuffer((__gm__ float*)workspace + td->kBlockFactor * td->bs * td->hcMix);
         mmLocalSize = td->kBlockFactor * td->sinkhornRowFactor * MATRIX_ELEMENTS;
         int64_t rmsLocalSize = td->kBlockFactor * RoundUp<float>(td->sinkhornRowFactor);
         pipe->InitBuffer(partialQue, 2, (mmLocalSize + rmsLocalSize) * sizeof(float));
@@ -78,7 +78,7 @@ public:
 
 private:
     static constexpr int64_t MATRIX_ELEMENTS = 16;
-    const MhcPreSinkhornRegbaseTilingData *td;
+    const MhcPreSinkhornRegbaseTilingData* td;
     int64_t mmLocalSize;
     GlobalTensor<float> scaleGm, biasGm, outputGm, mmGm, rmsGm;
     TQue<QuePosition::VECIN, 1> partialQue;
@@ -92,15 +92,14 @@ public:
     __aicore__ inline MhcPreSinkhornMKSplitCorePart1() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hcFn, GM_ADDR workspace,
-                                const MhcPreSinkhornRegbaseTilingData *tilingDataPtr, TPipe *pipePtr)
+                                const MhcPreSinkhornRegbaseTilingData* tilingDataPtr, TPipe* pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
-        xGm.SetGlobalBuffer((__gm__ T *)x);
-        hcFnGm.SetGlobalBuffer((__gm__ float *)hcFn);
-        mmGm.SetGlobalBuffer((__gm__ float *)workspace);
-        rmsGm.SetGlobalBuffer((__gm__ float *)workspace +
-                              tilingData->kBlockFactor * tilingData->bs * tilingData->hcMix);
+        xGm.SetGlobalBuffer((__gm__ T*)x);
+        hcFnGm.SetGlobalBuffer((__gm__ float*)hcFn);
+        mmGm.SetGlobalBuffer((__gm__ float*)workspace);
+        rmsGm.SetGlobalBuffer((__gm__ float*)workspace + tilingData->kBlockFactor * tilingData->bs * tilingData->hcMix);
 
         TBuf<TPosition::A1> l1Buffer;
         pipe->InitBuffer(l1Buffer, L1_ALLOC_SIZE);
@@ -309,8 +308,8 @@ public:
     }
 
 private:
-    TPipe *pipe;
-    const MhcPreSinkhornRegbaseTilingData *tilingData;
+    TPipe* pipe;
+    const MhcPreSinkhornRegbaseTilingData* tilingData;
     // (M, K) * (N, K)
 
     GlobalTensor<T> xGm;
@@ -347,7 +346,7 @@ public:
     __aicore__ inline MhcPreSinkhornMKSplitCorePart2() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hcScale, GM_ADDR hcBase, GM_ADDR y, GM_ADDR post, GM_ADDR combFrag,
-                                GM_ADDR workspace, const MhcPreSinkhornRegbaseTilingData *tilingDataPtr, TPipe *pipePtr)
+                                GM_ADDR workspace, const MhcPreSinkhornRegbaseTilingData* tilingDataPtr, TPipe* pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
@@ -361,15 +360,14 @@ public:
             }
         }
 
-        xGm.SetGlobalBuffer((__gm__ T *)x);
-        hcScaleGm.SetGlobalBuffer((__gm__ float *)hcScale);
-        hcBaseGm.SetGlobalBuffer((__gm__ float *)hcBase);
-        yGm.SetGlobalBuffer((__gm__ T *)y);
-        postGm.SetGlobalBuffer((__gm__ float *)post);
-        combFragGm.SetGlobalBuffer((__gm__ float *)combFrag);
-        mmGm.SetGlobalBuffer((__gm__ float *)workspace);
-        rmsGm.SetGlobalBuffer((__gm__ float *)workspace +
-                              tilingData->kBlockFactor * tilingData->bs * tilingData->hcMix);
+        xGm.SetGlobalBuffer((__gm__ T*)x);
+        hcScaleGm.SetGlobalBuffer((__gm__ float*)hcScale);
+        hcBaseGm.SetGlobalBuffer((__gm__ float*)hcBase);
+        yGm.SetGlobalBuffer((__gm__ T*)y);
+        postGm.SetGlobalBuffer((__gm__ float*)post);
+        combFragGm.SetGlobalBuffer((__gm__ float*)combFrag);
+        mmGm.SetGlobalBuffer((__gm__ float*)workspace);
+        rmsGm.SetGlobalBuffer((__gm__ float*)workspace + tilingData->kBlockFactor * tilingData->bs * tilingData->hcMix);
 
         // InQue
         pipe->InitBuffer(
@@ -514,8 +512,8 @@ public:
 
 private:
     MhcPreSinkhornMPMDSinkhorn sinkhorn;
-    TPipe *pipe;
-    const MhcPreSinkhornRegbaseTilingData *tilingData;
+    TPipe* pipe;
+    const MhcPreSinkhornRegbaseTilingData* tilingData;
     GlobalTensor<float> hcScaleGm;
     GlobalTensor<float> hcBaseGm;
     GlobalTensor<T> xGm;

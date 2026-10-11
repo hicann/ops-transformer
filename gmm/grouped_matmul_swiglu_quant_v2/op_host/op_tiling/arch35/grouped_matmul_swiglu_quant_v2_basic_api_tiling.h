@@ -29,21 +29,21 @@
 namespace optiling {
 class GroupedMatmulSwigluQuantV2BasicApiTiling950 : public GroupedQmmBasicApiTiling {
 public:
-    explicit GroupedMatmulSwigluQuantV2BasicApiTiling950(gert::TilingContext *context)
+    explicit GroupedMatmulSwigluQuantV2BasicApiTiling950(gert::TilingContext* context)
         : GroupedQmmBasicApiTiling(context)
     {
         Reset();
     }
     ~GroupedMatmulSwigluQuantV2BasicApiTiling950() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         Ops::Transformer::OpTiling::TilingBaseClass::Reset(context);
         Reset();
     }
 
 protected:
-    const char *GetOpType() const override
+    const char* GetOpType() const override
     {
         return "GroupedMatmulSwigluQuantV2";
     }

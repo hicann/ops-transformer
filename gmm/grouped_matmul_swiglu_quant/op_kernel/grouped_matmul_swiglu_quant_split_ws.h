@@ -33,64 +33,64 @@ public:
     constexpr static bool transposeW = mmType::BT::isTrans;
 
     /** @brief constructor */
-    __aicore__ inline GMMSwigluSplitWorkSpaceCompute(typename mmType::MT &mm_)
+    __aicore__ inline GMMSwigluSplitWorkSpaceCompute(typename mmType::MT& mm_)
         : mm(mm_)
     {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR perChannelScale, GM_ADDR perTokenScale,
                                 GM_ADDR groupList, GM_ADDR quantOutput, GM_ADDR quantScaleOutput, GM_ADDR workspace,
-                                const GMMSwigluBaseParams *__restrict gmmBaseParamsIN,
-                                const TCubeTiling *__restrict mmTilingDataIN, const GMMSwiglu *__restrict gmmSwigluIN,
-                                TPipe *tPipeIN);
+                                const GMMSwigluBaseParams* __restrict gmmBaseParamsIN,
+                                const TCubeTiling* __restrict mmTilingDataIN, const GMMSwiglu* __restrict gmmSwigluIN,
+                                TPipe* tPipeIN);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig &mnConfig, uint32_t coreIdx,
-                                     GlobalTensor<int32_t> &mmOutGM);
+    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig& mnConfig, uint32_t coreIdx,
+                                     GlobalTensor<int32_t>& mmOutGM);
 
-    __aicore__ inline void UpdateMnConfig(MNConfig &mnConfig);
+    __aicore__ inline void UpdateMnConfig(MNConfig& mnConfig);
 
-    __aicore__ inline void SetMNConfig(const int32_t splitValue, const uint32_t groupIdx, MNConfig &mnConfig);
+    __aicore__ inline void SetMNConfig(const int32_t splitValue, const uint32_t groupIdx, MNConfig& mnConfig);
 
-    __aicore__ inline void SetMKN(const int32_t splitValue, const uint32_t groupIdx, MNConfig &mnConfig);
+    __aicore__ inline void SetMKN(const int32_t splitValue, const uint32_t groupIdx, MNConfig& mnConfig);
 
     __aicore__ inline uint64_t GetWOffset(uint32_t tailN, uint32_t k);
 
-    __aicore__ inline void MNBlockIdxCompute(MNConfig &mnConfig, const uint32_t curBlock, const uint32_t count,
+    __aicore__ inline void MNBlockIdxCompute(MNConfig& mnConfig, const uint32_t curBlock, const uint32_t count,
                                              const uint32_t thresholdM_dimN);
 
     template <typename DTYPE_CS>
-    __aicore__ inline void UpdateChannelScale(uint32_t loopidx, VecConfig &vecConfig);
+    __aicore__ inline void UpdateChannelScale(uint32_t loopidx, VecConfig& vecConfig);
 
-    __aicore__ inline void VectorCompute(uint32_t loopidx, VecConfig &vecConfig);
+    __aicore__ inline void VectorCompute(uint32_t loopidx, VecConfig& vecConfig);
 
     template <typename DTYPE_CS>
-    __aicore__ inline void PreLoadTokenAndChannel(LocalTensor<float> &channelScaleLocal, VecConfig &vecConfig);
+    __aicore__ inline void PreLoadTokenAndChannel(LocalTensor<float>& channelScaleLocal, VecConfig& vecConfig);
 
-    __aicore__ inline void UpdateVecConfig(uint32_t blockIdx, VecConfig &vecConfig);
+    __aicore__ inline void UpdateVecConfig(uint32_t blockIdx, VecConfig& vecConfig);
 
-    __aicore__ inline void UpdateWorkSpaceSplitConfig(WorkSpaceSplitConfig &workspaceSplitConfig,
+    __aicore__ inline void UpdateWorkSpaceSplitConfig(WorkSpaceSplitConfig& workspaceSplitConfig,
                                                       int32_t workspaceSplitLoopIdx);
 
-    __aicore__ inline void InitWorkSpaceSplitConfig(WorkSpaceSplitConfig &workspaceSplitConfig);
+    __aicore__ inline void InitWorkSpaceSplitConfig(WorkSpaceSplitConfig& workspaceSplitConfig);
 
-    __aicore__ inline void customDataCopyIn(uint32_t outLoopIdx, GlobalTensor<int32_t> &mmOutGM, VecConfig &vecConfig);
+    __aicore__ inline void customDataCopyIn(uint32_t outLoopIdx, GlobalTensor<int32_t>& mmOutGM, VecConfig& vecConfig);
 
-    __aicore__ inline void customDataCopyOut(VecConfig &vecConfig);
+    __aicore__ inline void customDataCopyOut(VecConfig& vecConfig);
 
-    __aicore__ inline void Dequant(uint32_t loopidx, VecConfig &vecConfig);
+    __aicore__ inline void Dequant(uint32_t loopidx, VecConfig& vecConfig);
 
-    __aicore__ inline void Quant(uint32_t loopidx, VecConfig &vecConfig);
+    __aicore__ inline void Quant(uint32_t loopidx, VecConfig& vecConfig);
 
-    __aicore__ inline void Swiglu(uint32_t loopidx, VecConfig &vecConfig);
+    __aicore__ inline void Swiglu(uint32_t loopidx, VecConfig& vecConfig);
 
 private:
-    typename mmType::MT &mm;
-    const GMMSwigluBaseParams *__restrict gmmBaseParams;
-    const GMMSwiglu *__restrict gmmSwiglu;
-    const TCubeTiling *__restrict mmTilingData;
+    typename mmType::MT& mm;
+    const GMMSwigluBaseParams* __restrict gmmBaseParams;
+    const GMMSwiglu* __restrict gmmSwiglu;
+    const TCubeTiling* __restrict mmTilingData;
     WorkSpaceSplitConfig workspaceSplitConfig;
-    TPipe *pipe;
+    TPipe* pipe;
     GlobalTensor<int8_t> xGM;
     GlobalTensor<int8_t> weightGM;
     GlobalTensor<CHANNELDTYPE> perChannelScaleGM;
@@ -116,8 +116,8 @@ private:
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::Init(
     GM_ADDR x, GM_ADDR weight, GM_ADDR perChannelScale, GM_ADDR perTokenScale, GM_ADDR groupList, GM_ADDR quantOutput,
-    GM_ADDR quantScaleOutput, GM_ADDR workspace, const GMMSwigluBaseParams *__restrict gmmSwigluBaseParamsIn,
-    const TCubeTiling *__restrict mmTilingDataIN, const GMMSwiglu *__restrict gmmSwigluIN, TPipe *tPipeIN)
+    GM_ADDR quantScaleOutput, GM_ADDR workspace, const GMMSwigluBaseParams* __restrict gmmSwigluBaseParamsIn,
+    const TCubeTiling* __restrict mmTilingDataIN, const GMMSwiglu* __restrict gmmSwigluIN, TPipe* tPipeIN)
 {
     aicCoreNum = GetBlockNum();
     aivCoreNum = aicCoreNum * 2;
@@ -128,23 +128,23 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
     mmTilingData = mmTilingDataIN;
     gmmBaseParams = gmmSwigluBaseParamsIn;
     gmmSwiglu = gmmSwigluIN;
-    groupListGM.SetGlobalBuffer((__gm__ int64_t *)groupList, gmmSwiglu->groupListLen);
-    mmOutGM1.SetGlobalBuffer((__gm__ int32_t *)workspace, gmmBaseParams->mLimit * gmmSwiglu->tokenLen);
-    mmOutGM2.SetGlobalBuffer((__gm__ int32_t *)workspace + gmmBaseParams->mLimit * gmmSwiglu->tokenLen,
+    groupListGM.SetGlobalBuffer((__gm__ int64_t*)groupList, gmmSwiglu->groupListLen);
+    mmOutGM1.SetGlobalBuffer((__gm__ int32_t*)workspace, gmmBaseParams->mLimit * gmmSwiglu->tokenLen);
+    mmOutGM2.SetGlobalBuffer((__gm__ int32_t*)workspace + gmmBaseParams->mLimit * gmmSwiglu->tokenLen,
                              gmmBaseParams->mLimit * gmmSwiglu->tokenLen);
     if ASCEND_IS_AIV {
-        perChannelScaleGM.SetGlobalBuffer((__gm__ CHANNELDTYPE *)perChannelScale,
+        perChannelScaleGM.SetGlobalBuffer((__gm__ CHANNELDTYPE*)perChannelScale,
                                           gmmSwiglu->groupListLen * gmmSwiglu->tokenLen);
-        perTokenScaleGM.SetGlobalBuffer((__gm__ float *)perTokenScale, gmmBaseParams->M);
-        quantOutputGM.SetGlobalBuffer((__gm__ int8_t *)quantOutput,
+        perTokenScaleGM.SetGlobalBuffer((__gm__ float*)perTokenScale, gmmBaseParams->M);
+        quantOutputGM.SetGlobalBuffer((__gm__ int8_t*)quantOutput,
                                       gmmBaseParams->M * gmmSwiglu->tokenLen / SWIGLU_REDUCE_FACTOR);
-        quantScaleOutputGM.SetGlobalBuffer((__gm__ float *)quantScaleOutput, gmmBaseParams->M);
+        quantScaleOutputGM.SetGlobalBuffer((__gm__ float*)quantScaleOutput, gmmBaseParams->M);
     }
 }
 
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::InitWorkSpaceSplitConfig(
-    WorkSpaceSplitConfig &workspaceSplitConfig)
+    WorkSpaceSplitConfig& workspaceSplitConfig)
 {
     workspaceSplitConfig.M = groupListGM.GetValue(gmmSwiglu->groupListLen - 1);
     workspaceSplitConfig.loopCount = Ceil(workspaceSplitConfig.M, gmmBaseParams->mLimit);
@@ -159,7 +159,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::UpdateWorkSpaceSplitConfig(
-    WorkSpaceSplitConfig &workspaceSplitConfig, int32_t workspaceSplitLoopIdx)
+    WorkSpaceSplitConfig& workspaceSplitConfig, int32_t workspaceSplitLoopIdx)
 {
     workspaceSplitConfig.leftMatrixStartIndex = workspaceSplitLoopIdx * gmmBaseParams->mLimit;
     workspaceSplitConfig.rightMatrixExpertStartIndex = workspaceSplitConfig.rightMatrixExpertNextStartIndex;
@@ -293,7 +293,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 template <typename DTYPE_CS>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::PreLoadTokenAndChannel(
-    LocalTensor<float> &channelScaleLocal, VecConfig &vecConfig)
+    LocalTensor<float>& channelScaleLocal, VecConfig& vecConfig)
 {
     DataCopyExtParams copyChannelParams{1, static_cast<uint32_t>(gmmSwiglu->tokenLen * sizeof(DTYPE_CS)), 0, 0, 0};
     DataCopyPadExtParams<DTYPE_CS> padParams{false, 0, 0, 0};
@@ -314,7 +314,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::MMCompute(
-    uint32_t groupIdx, MNConfig &mnConfig, uint32_t coreIdx, GlobalTensor<int32_t> &mmOutGM)
+    uint32_t groupIdx, MNConfig& mnConfig, uint32_t coreIdx, GlobalTensor<int32_t>& mmOutGM)
 {
     uint32_t tailN = mnConfig.nIdx * mnConfig.singleN;
     uint32_t curSingleN = mnConfig.nIdx < mnConfig.blockDimN - 1 ? mnConfig.singleN : mnConfig.n - tailN;
@@ -325,9 +325,9 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
         xOffset = mnConfig.mIdx * mnConfig.singleM;
     }
     uint64_t outOffset = mnConfig.mIdx * mnConfig.singleM * mnConfig.n + tailN;
-    xGM.SetGlobalBuffer((__gm__ int8_t *)xTensorPtr + mnConfig.xBaseOffset +
+    xGM.SetGlobalBuffer((__gm__ int8_t*)xTensorPtr + mnConfig.xBaseOffset +
                         workspaceSplitConfig.leftMatrixStartIndex * mnConfig.k);
-    weightGM.SetGlobalBuffer((__gm__ int8_t *)weightTensorPtr + groupIdx * mnConfig.k * mnConfig.n +
+    weightGM.SetGlobalBuffer((__gm__ int8_t*)weightTensorPtr + groupIdx * mnConfig.k * mnConfig.n +
                              GetWOffset(tailN, mnConfig.k));
     if (mnConfig.blockDimM == 1) {
         weightGM.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
@@ -343,7 +343,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 }
 
 template <typename mmType, bool sync, typename CHANNELDTYPE>
-__aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::UpdateMnConfig(MNConfig &mnConfig)
+__aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::UpdateMnConfig(MNConfig& mnConfig)
 {
     if constexpr (B::format == CubeFormat::NZ) {
         mnConfig.wBaseOffset +=
@@ -360,7 +360,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::SetMNConfig(const int32_t splitValue,
                                                                                                const uint32_t groupIdx,
-                                                                                               MNConfig &mnConfig)
+                                                                                               MNConfig& mnConfig)
 {
     SetMKN(splitValue, groupIdx, mnConfig);
     mnConfig.baseM = BASIC_M;
@@ -372,7 +372,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::SetMKN(const int32_t splitValue,
                                                                                           const uint32_t groupIdx,
-                                                                                          MNConfig &mnConfig)
+                                                                                          MNConfig& mnConfig)
 {
     mnConfig.m = static_cast<int64_t>(splitValue);
     mnConfig.k = gmmBaseParams->K; // tilingData
@@ -394,7 +394,7 @@ __aicore__ inline uint64_t GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELD
 
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::MNBlockIdxCompute(
-    MNConfig &mnConfig, const uint32_t curBlock, const uint32_t count, const uint32_t thresholdM_dimN)
+    MNConfig& mnConfig, const uint32_t curBlock, const uint32_t count, const uint32_t thresholdM_dimN)
 {
     mnConfig.mIdx = (curBlock - count) / mnConfig.blockDimN;
     mnConfig.nIdx = (curBlock - count) % mnConfig.blockDimN;
@@ -402,7 +402,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::UpdateVecConfig(uint32_t blockIdx,
-                                                                                                   VecConfig &vecConfig)
+                                                                                                   VecConfig& vecConfig)
 {
     // 第一步 读取grouplist reduceSum 计算总数据个数
     vecConfig.M =
@@ -450,7 +450,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::customDataCopyIn(
-    uint32_t outLoopIdx, GlobalTensor<int32_t> &mmOutGM, VecConfig &vecConfig)
+    uint32_t outLoopIdx, GlobalTensor<int32_t>& mmOutGM, VecConfig& vecConfig)
 {
     LocalTensor<int32_t> _inMMLocal_0 = mmOutQueue.DeQue<int32_t>();
     DataCopyExtParams copyParams_0{
@@ -489,7 +489,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 template <typename DTYPE_CS>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::UpdateChannelScale(
-    uint32_t loopIdx, VecConfig &vecConfig)
+    uint32_t loopIdx, VecConfig& vecConfig)
 {
     // 更新perChannel
     if (unlikely(vecConfig.nextUpadteInterVal == 0)) {
@@ -524,7 +524,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::VectorCompute(uint32_t loopIdx,
-                                                                                                 VecConfig &vecConfig)
+                                                                                                 VecConfig& vecConfig)
 {
     Dequant(loopIdx, vecConfig);
     Swiglu(loopIdx, vecConfig);
@@ -533,7 +533,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::Dequant(uint32_t loopIdx,
-                                                                                           VecConfig &vecConfig)
+                                                                                           VecConfig& vecConfig)
 {
     // perChanelScale * perTokenScale
     LocalTensor<float> mmLocal = mmOutQueue.DeQue<float>();
@@ -548,7 +548,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::Swiglu(uint32_t loopIdx,
-                                                                                          VecConfig &vecConfig)
+                                                                                          VecConfig& vecConfig)
 {
     // 高阶API swiglu
     LocalTensor<float> _inMMLocal = mmOutQueue.DeQue<float>();
@@ -568,7 +568,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::Quant(uint32_t loopIdx,
-                                                                                         VecConfig &vecConfig)
+                                                                                         VecConfig& vecConfig)
 {
     LocalTensor<float> _inMMLocal = mmOutQueue.DeQue<float>();
     uint64_t preOffset = loopIdx * gmmSwiglu->tokenLen;
@@ -610,7 +610,7 @@ __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE
 
 template <typename mmType, bool sync, typename CHANNELDTYPE>
 __aicore__ inline void GMMSwigluSplitWorkSpaceCompute<mmType, sync, CHANNELDTYPE>::customDataCopyOut(
-    VecConfig &vecConfig)
+    VecConfig& vecConfig)
 {
     LocalTensor<float> quantScaleLocal = quantScaleOutQueue.DeQue<float>();
     DataCopyParams copyParams_0{1, (uint16_t)(vecConfig.innerLoopNum * sizeof(float)), 0, 0};

@@ -30,12 +30,12 @@ struct BlockAttentionResidualsCompileInfo {
 };
 
 struct BlockAttentionResidualsInfo {
-    const char *opName = "BlockAttentionResiduals";
+    const char* opName = "BlockAttentionResiduals";
 };
 
 class BlockAttentionResidualsTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit BlockAttentionResidualsTiling(gert::TilingContext *context)
+    explicit BlockAttentionResidualsTiling(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {
         InitCompileInfo();

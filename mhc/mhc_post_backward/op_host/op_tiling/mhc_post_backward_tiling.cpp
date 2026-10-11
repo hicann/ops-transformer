@@ -24,7 +24,7 @@ using Ops::Transformer::OpTiling::TilingRegistryNew;
 using Ops::Transformer::OpTiling::TilingRegistryArch;
 
 namespace optiling {
-static ge::graphStatus Tiling4MhcPostBackward(gert::TilingContext *context)
+static ge::graphStatus Tiling4MhcPostBackward(gert::TilingContext* context)
 {
     auto platformInfo = context->GetPlatformInfo();
     platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
@@ -35,8 +35,7 @@ static ge::graphStatus Tiling4MhcPostBackward(gert::TilingContext *context)
     return TilingRegistryNew::GetInstance().DoTilingImpl(context);
 }
 
-
-static ge::graphStatus TilingPrepareForMhcPostBackward(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForMhcPostBackward(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

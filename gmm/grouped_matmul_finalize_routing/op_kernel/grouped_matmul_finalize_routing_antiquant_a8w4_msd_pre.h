@@ -44,7 +44,7 @@ template <class P>
 class GMMA8W4PreProcess {
 public:
     __aicore__ inline GMMA8W4PreProcess(){};
-    __aicore__ inline void Init(MMPreInitParams &preInitParams, const GroupMatmulFRTilingData &tilingData, TPipe *pipe);
+    __aicore__ inline void Init(MMPreInitParams& preInitParams, const GroupMatmulFRTilingData& tilingData, TPipe* pipe);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessLoop();
     __aicore__ inline void ProcessPerToken(uint32_t xloop);
@@ -95,12 +95,12 @@ private:
 };
 
 template <class P>
-__aicore__ inline void GMMA8W4PreProcess<P>::Init(MMPreInitParams &preInitParams,
-                                                  const GroupMatmulFRTilingData &tilingData, TPipe *pipe)
+__aicore__ inline void GMMA8W4PreProcess<P>::Init(MMPreInitParams& preInitParams,
+                                                  const GroupMatmulFRTilingData& tilingData, TPipe* pipe)
 {
-    xGm.SetGlobalBuffer((__gm__ int8_t *)preInitParams.x);
-    yGm.SetGlobalBuffer((__gm__ int8_t *)preInitParams.y);
-    groupListGm.SetGlobalBuffer((__gm__ int64_t *)preInitParams.groupList);
+    xGm.SetGlobalBuffer((__gm__ int8_t*)preInitParams.x);
+    yGm.SetGlobalBuffer((__gm__ int8_t*)preInitParams.y);
+    groupListGm.SetGlobalBuffer((__gm__ int64_t*)preInitParams.groupList);
 
     vK = tilingData.k;
     withOffset = tilingData.withOffset;
@@ -122,7 +122,7 @@ __aicore__ inline void GMMA8W4PreProcess<P>::Init(MMPreInitParams &preInitParams
                      Ceil(groupNum * sizeof(float), DATA_BLOCK_SIZE_32) * DATA_BLOCK_SIZE_32);
     pipe->InitBuffer(vecInWork, BUFFER_NUM_A8W4_PRE, BUFFER_SIZE_256B * sizeof(float));
     if (withOffset == uint32_t(1)) {
-        xRowSumGm.SetGlobalBuffer((__gm__ float *)preInitParams.workspace);
+        xRowSumGm.SetGlobalBuffer((__gm__ float*)preInitParams.workspace);
         xRowSumRepeatNum = (vK * sizeof(float) + ROW_SUM_REPEAT_LEN - 1) / ROW_SUM_REPEAT_LEN;
         pipe->InitBuffer(vecOutQueueRowSum, BUFFER_NUM_A8W4_PRE, 1 * sizeof(float));
     }

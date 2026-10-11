@@ -33,8 +33,8 @@ struct MxA8W4NzParams {
     uint64_t loopKDstStride;
     uint64_t innerDstStride;
     uint64_t nRealSizeAlign;
-    __ubuf__ wType *weightLowBitPhyAddr;
-    __ubuf__ xType *weightHighBitPhyAddr;
+    __ubuf__ wType* weightLowBitPhyAddr;
+    __ubuf__ xType* weightHighBitPhyAddr;
 };
 
 static constexpr uint32_t E2M1_SHIFT_RIGHT_SIZE = 0x2;

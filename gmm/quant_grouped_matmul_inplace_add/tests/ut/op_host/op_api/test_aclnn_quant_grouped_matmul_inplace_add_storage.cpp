@@ -19,7 +19,7 @@
 
 namespace {
 
-using TensorPtr = std::unique_ptr<aclTensor, void (*)(aclTensor *)>;
+using TensorPtr = std::unique_ptr<aclTensor, void (*)(aclTensor*)>;
 
 struct StorageTestInputs {
     TensorPtr x1 = TensorDesc({3, 2}, ACL_HIFLOAT8, ACL_FORMAT_ND, {1, 3}, 0, {2, 3}).ToAclType();
@@ -29,17 +29,17 @@ struct StorageTestInputs {
     TensorPtr groupList = TensorDesc({1}, ACL_INT64, ACL_FORMAT_ND).ToAclType();
     TensorPtr y = TensorDesc({1, 3, 4}, ACL_FLOAT, ACL_FORMAT_ND).ToAclType();
 
-    std::array<aclTensor *, 6> Tensors()
+    std::array<aclTensor*, 6> Tensors()
     {
         return {x1.get(), x2.get(), scale1.get(), scale2.get(), groupList.get(), y.get()};
     }
 };
 
-void ExpectWorkspaceError(std::array<aclTensor *, 6> tensors, aclnnStatus expectedStatus)
+void ExpectWorkspaceError(std::array<aclTensor*, 6> tensors, aclnnStatus expectedStatus)
 {
     op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
     uint64_t workspaceSize = 12345;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     const auto status = aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize(
         tensors[0], tensors[1], tensors[2], tensors[3], tensors[4], tensors[5], 0, 0, &workspaceSize, &executor);
     EXPECT_EQ(status, expectedStatus);
@@ -94,7 +94,7 @@ TEST(QuantGroupedMatmulInplaceAddStorage, ValidEmptyFastPathIsPreserved)
     inputs.x1 = TensorDesc({0, 2}, ACL_HIFLOAT8, ACL_FORMAT_ND).ToAclType();
     inputs.y = TensorDesc({1, 0, 4}, ACL_FLOAT, ACL_FORMAT_ND).ToAclType();
     uint64_t workspaceSize = 12345;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     EXPECT_EQ(aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize(inputs.x1.get(), inputs.x2.get(), inputs.scale1.get(),
                                                                 inputs.scale2.get(), inputs.groupList.get(),
                                                                 inputs.y.get(), 0, 0, &workspaceSize, &executor),

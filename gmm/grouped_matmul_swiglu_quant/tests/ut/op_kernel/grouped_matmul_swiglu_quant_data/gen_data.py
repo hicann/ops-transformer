@@ -13,7 +13,9 @@ import sys
 import os
 import numpy as np
 import random
+
 np.random.seed(0)
+
 
 def gen_input_data(group_num, e, m, k, n):
     e = int(e)
@@ -23,21 +25,30 @@ def gen_input_data(group_num, e, m, k, n):
     group_num = int(group_num)
     x = np.random.uniform(-5, 5, [m, k]).astype(np.int8)
     weight = np.random.uniform(-5, 5, [e, k, n]).astype(np.int8)
-    xScale = np.random.uniform(-5, 5, [m,]).astype(np.float32)
+    xScale = np.random.uniform(
+        -5,
+        5,
+        [
+            m,
+        ],
+    ).astype(np.float32)
     weightScale = np.random.uniform(-5, 5, [e, n]).astype(np.float32)
     groupedList = np.linspace(1, m, group_num, dtype=np.int64)
     return x, weight, xScale, weightScale, y, groupedList
 
-def gen_golden_data(group_num, e, m, k, n):
-    x, weight, xScale, weightScale, y, groupedList = gen_input_data(group_num, e, m, k, n)
-    x.tofile(f"x.bin")
-    weight.tofile(f"weight.bin")
-    weightScale.tofile(f"weightScale.bin")
-    xScale.tofile(f"xScale.bin")
-    y.tofile(f"y.bin")
-    groupedList.tofile(f"groupedList.bin")
 
-if __name__ == "__main__": 
+def gen_golden_data(group_num, e, m, k, n):
+    x, weight, xScale, weightScale, y, groupedList = gen_input_data(
+        group_num, e, m, k, n
+    )
+    x.tofile("x.bin")
+    weight.tofile("weight.bin")
+    weightScale.tofile("weightScale.bin")
+    xScale.tofile("xScale.bin")
+    y.tofile("y.bin")
+    groupedList.tofile("groupedList.bin")
+
+
+if __name__ == "__main__":
     os.system("rm -rf *.bin")
     gen_golden_data(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
-

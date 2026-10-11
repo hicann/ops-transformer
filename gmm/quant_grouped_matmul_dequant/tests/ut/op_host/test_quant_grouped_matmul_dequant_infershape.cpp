@@ -27,55 +27,55 @@ constexpr int64_t kN = 256;
 constexpr int64_t kG = 16;
 
 class QuantGroupedMatmulDequantInfershapeTest : public testing::Test {
- protected:
-  static void SetUpTestCase() {
-    cout << "QuantGroupedMatmulDequantInfershapeTest SetUp" << endl;
-  }
-  static void TearDownTestCase() {
-    cout << "QuantGroupedMatmulDequantInfershapeTest TearDown" << endl;
-  }
+protected:
+    static void SetUpTestCase()
+    {
+        cout << "QuantGroupedMatmulDequantInfershapeTest SetUp" << endl;
+    }
+    static void TearDownTestCase()
+    {
+        cout << "QuantGroupedMatmulDequantInfershapeTest TearDown" << endl;
+    }
 };
 
-TEST_F(QuantGroupedMatmulDequantInfershapeTest, test_float16_pertoken_all_inputs) {
+TEST_F(QuantGroupedMatmulDequantInfershapeTest, test_float16_pertoken_all_inputs)
+{
     gert::InfershapeContextPara para(
         "QuantGroupedMatmulDequant",
-        {
-            {{{kM, kK}, {kM, kK}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{kG, kK / 32, kN / 16, 16, 32}, {kG, kK / 32, kN / 16, 16, 32}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ},
-            {{{kG, kN}, {kG, kN}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{kG}, {kG}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{kN}, {kN}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{kM}, {kM}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{kM}, {kM}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{kK}, {kK}}, ge::DT_FLOAT16, ge::FORMAT_ND}
-        },
+        {{{{kM, kK}, {kM, kK}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{kG, kK / 32, kN / 16, 16, 32}, {kG, kK / 32, kN / 16, 16, 32}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ},
+         {{{kG, kN}, {kG, kN}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{kG}, {kG}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{kN}, {kN}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{kM}, {kM}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{kM}, {kM}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{kK}, {kK}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
         {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
         {{"x_quant_mode", Ops::Transformer::AnyValue::CreateFrom<string>("pertoken")},
          {"transpose_weight", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}});
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, {{kM, kN}});
 }
 
-TEST_F(QuantGroupedMatmulDequantInfershapeTest, test_float16_pertensor_minimal) {
+TEST_F(QuantGroupedMatmulDequantInfershapeTest, test_float16_pertensor_minimal)
+{
     constexpr int64_t M = 128;
     constexpr int64_t K = 1344;
     constexpr int64_t N = 512;
     constexpr int64_t G = 8;
     gert::InfershapeContextPara para(
         "QuantGroupedMatmulDequant",
-        {
-            {{{M, K}, {M, K}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{G, K / 32, N / 16, 16, 32}, {G, K / 32, N / 16, 16, 32}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ},
-            {{{G, N}, {G, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{G}, {G}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{K}, {K}}, ge::DT_FLOAT16, ge::FORMAT_ND}
-        },
+        {{{{M, K}, {M, K}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{G, K / 32, N / 16, 16, 32}, {G, K / 32, N / 16, 16, 32}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ},
+         {{{G, N}, {G, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{G}, {G}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{K}, {K}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
         {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
         {{"x_quant_mode", Ops::Transformer::AnyValue::CreateFrom<string>("pertensor")},
          {"transpose_weight", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}});
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, {{M, N}});
 }
 
-}  // namespace
+} // namespace

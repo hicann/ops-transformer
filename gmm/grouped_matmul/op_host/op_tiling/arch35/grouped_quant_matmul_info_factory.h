@@ -25,9 +25,9 @@ public:
     GroupedQuantMatmulInfoFactory() = default;
     ~GroupedQuantMatmulInfoFactory() = default;
 
-    GQmmInputInfo *Get()
+    GQmmInputInfo* Get()
     {
-        GQmmInputInfo *ptr = nullptr;
+        GQmmInputInfo* ptr = nullptr;
         auto threadId = pthread_self();
         lock_.lock_shared();
         auto it = inst_.find(threadId);

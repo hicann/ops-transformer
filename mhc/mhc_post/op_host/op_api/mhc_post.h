@@ -32,8 +32,8 @@ namespace l0op {
  * @param [in] executor: Op executor
  * @return aclTensor*: Output tensor x_{l+1}
  */
-const aclTensor *MhcPost(const aclTensor *x, const aclTensor *h_res, const aclTensor *h_out, const aclTensor *h_post,
-                         aclOpExecutor *executor);
+const aclTensor* MhcPost(const aclTensor* x, const aclTensor* h_res, const aclTensor* h_out, const aclTensor* h_post,
+                         aclOpExecutor* executor);
 
 } // namespace l0op
 

@@ -15,14 +15,14 @@
 
 namespace Catlass {
 template <uint32_t ALIGN, typename T>
-CATLASS_HOST_DEVICE constexpr T RoundUp(const T &val)
+CATLASS_HOST_DEVICE constexpr T RoundUp(const T& val)
 {
     static_assert(ALIGN != 0, "ALIGN must not be 0");
     return (val + ALIGN - 1) / ALIGN * ALIGN;
 }
 
 template <class T, class U>
-CATLASS_HOST_DEVICE constexpr auto RoundUp(T const &val, U const &align)
+CATLASS_HOST_DEVICE constexpr auto RoundUp(T const& val, U const& align)
 {
     if (align == 0)
         return (val + align - 1);
@@ -37,7 +37,7 @@ CATLASS_HOST_DEVICE constexpr T RoundDown(const T val)
 }
 
 template <class T, class U>
-CATLASS_HOST_DEVICE constexpr auto RoundDown(T const &val, U const &align)
+CATLASS_HOST_DEVICE constexpr auto RoundDown(T const& val, U const& align)
 {
     if (align == 0)
         return val;
@@ -52,7 +52,7 @@ CATLASS_HOST_DEVICE constexpr T CeilDiv(const T dividend)
 }
 
 template <class T, class U>
-CATLASS_HOST_DEVICE constexpr auto CeilDiv(T const &dividend, U const &divisor)
+CATLASS_HOST_DEVICE constexpr auto CeilDiv(T const& dividend, U const& divisor)
 {
     if (divisor == 0)
         return (dividend + divisor - 1);
@@ -60,7 +60,7 @@ CATLASS_HOST_DEVICE constexpr auto CeilDiv(T const &dividend, U const &divisor)
 }
 
 template <class T, class U>
-CATLASS_HOST_DEVICE constexpr auto Max(T const &a, U const &b)
+CATLASS_HOST_DEVICE constexpr auto Max(T const& a, U const& b)
 {
     if (a > b) {
         return a;
@@ -70,7 +70,7 @@ CATLASS_HOST_DEVICE constexpr auto Max(T const &a, U const &b)
 }
 
 template <class T, class U>
-CATLASS_HOST_DEVICE constexpr auto Min(T const &a, U const &b)
+CATLASS_HOST_DEVICE constexpr auto Min(T const& a, U const& b)
 {
     if (a < b) {
         return a;

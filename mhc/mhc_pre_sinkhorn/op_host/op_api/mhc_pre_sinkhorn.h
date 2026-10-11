@@ -47,11 +47,11 @@ namespace l0op {
  * @param [in] executor: Op executor
  * @return aclTensor*: Output tensor hin
  */
-const aclTensor *MhcPreSinkhorn(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias,
+const aclTensor* MhcPreSinkhorn(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias,
                                 int64_t hcMult, int64_t numIters, double hcEps, double normEps, bool needBackward,
-                                aclTensor *hin, aclTensor *hPost, aclTensor *hRes, aclTensor *hPre,
-                                aclTensor *hcBeforeNorm, aclTensor *invRms, aclTensor *sumOut, aclTensor *normOut,
-                                aclOpExecutor *executor);
+                                aclTensor* hin, aclTensor* hPost, aclTensor* hRes, aclTensor* hPre,
+                                aclTensor* hcBeforeNorm, aclTensor* invRms, aclTensor* sumOut, aclTensor* normOut,
+                                aclOpExecutor* executor);
 
 } // namespace l0op
 

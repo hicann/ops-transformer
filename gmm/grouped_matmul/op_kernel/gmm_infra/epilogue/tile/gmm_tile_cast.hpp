@@ -32,7 +32,7 @@ struct TileCast {
     TileCast() {}
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<ElementDst> const &ubOut, AscendC::LocalTensor<ElementSrc> const &ubIn)
+    void operator()(AscendC::LocalTensor<ElementDst> const& ubOut, AscendC::LocalTensor<ElementSrc> const& ubIn)
     {
         AscendC::Cast(ubOut, ubIn, AscendC::RoundMode::CAST_RINT, TileShape::COUNT);
     }

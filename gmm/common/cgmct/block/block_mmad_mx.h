@@ -140,7 +140,7 @@ public:
     }
 
 public:
-    __aicore__ inline void Init(const TupleShape &problemShape, const BlockShape &l0TileShape, const L1Params &l1Params,
+    __aicore__ inline void Init(const TupleShape& problemShape, const BlockShape& l0TileShape, const L1Params& l1Params,
                                 bool isBias, bool dbL0C)
     {
         m_ = Get<IDX_M_IDX>(problemShape);
@@ -184,15 +184,15 @@ public:
         }
     }
 
-    __aicore__ inline void UpdateParamsForNextProblem(const TupleShape &problemShape)
+    __aicore__ inline void UpdateParamsForNextProblem(const TupleShape& problemShape)
     {
         m_ = Get<IDX_M_IDX>(problemShape);
         n_ = Get<IDX_N_IDX>(problemShape);
         k_ = Get<IDX_K_IDX>(problemShape);
     }
 
-    __aicore__ inline void CopyInA1(const AscendC::GlobalTensor<AType> &aGlobal,
-                                    const AscendC::LocalTensor<AType> &al1Local, const TileL1L0Param &tileL1L0Param)
+    __aicore__ inline void CopyInA1(const AscendC::GlobalTensor<AType>& aGlobal,
+                                    const AscendC::LocalTensor<AType>& al1Local, const TileL1L0Param& tileL1L0Param)
     {
         AscendC::Nd2NzParams nd2nzParams;
         nd2nzParams.ndNum = 1;
@@ -212,8 +212,8 @@ public:
         AscendC::DataCopy(al1Local, aGlobal, nd2nzParams);
     }
 
-    __aicore__ inline void CopyInB1(const AscendC::GlobalTensor<BType> &bGlobal,
-                                    const AscendC::LocalTensor<BType> &bl1Local, const TileL1L0Param &tileL1L0Param)
+    __aicore__ inline void CopyInB1(const AscendC::GlobalTensor<BType>& bGlobal,
+                                    const AscendC::LocalTensor<BType>& bl1Local, const TileL1L0Param& tileL1L0Param)
     {
         AscendC::Nd2NzParams nd2nzParams;
         nd2nzParams.ndNum = 1;
@@ -233,9 +233,9 @@ public:
         AscendC::DataCopy(bl1Local, bGlobal, nd2nzParams);
     }
 
-    __aicore__ inline void CopyInB1WeightNz(const AscendC::GlobalTensor<BType> &bGlobal,
-                                            const AscendC::LocalTensor<BType> &bl1Local,
-                                            const TileL1L0Param &tileL1L0Param)
+    __aicore__ inline void CopyInB1WeightNz(const AscendC::GlobalTensor<BType>& bGlobal,
+                                            const AscendC::LocalTensor<BType>& bl1Local,
+                                            const TileL1L0Param& tileL1L0Param)
     {
         AscendC::DataCopyExtParams dataCopyParams;
         AscendC::DataCopyPadExtParams<uint8_t> padParams;
@@ -267,7 +267,7 @@ public:
                              dataCopyParams, padParams);
     }
 
-    __aicore__ inline void InitA1(const AscendC::LocalTensor<AType> &al1Local, const TileL1L0Param &tileL1L0Param)
+    __aicore__ inline void InitA1(const AscendC::LocalTensor<AType>& al1Local, const TileL1L0Param& tileL1L0Param)
     {
         AscendC::InitConstValueParams<half> initConstValueParams;
         uint64_t offset = 0;
@@ -296,7 +296,7 @@ public:
         AscendC::InitConstValue(al1Local.template ReinterpretCast<half>()[offset], initConstValueParams);
     }
 
-    __aicore__ inline void InitB1(const AscendC::LocalTensor<BType> &bl1Local, const TileL1L0Param &tileL1L0Param)
+    __aicore__ inline void InitB1(const AscendC::LocalTensor<BType>& bl1Local, const TileL1L0Param& tileL1L0Param)
     {
         AscendC::InitConstValueParams<half> initConstValueParams;
         uint64_t offset = 0;
@@ -329,8 +329,8 @@ public:
         AscendC::InitConstValue(bl1Local.template ReinterpretCast<half>()[offset], initConstValueParams);
     }
 
-    __aicore__ inline void CopyInBias(const AscendC::GlobalTensor<BiasType> &biasGlobal,
-                                      const AscendC::LocalTensor<BiasType> &cl1Local, uint64_t curNL1)
+    __aicore__ inline void CopyInBias(const AscendC::GlobalTensor<BiasType>& biasGlobal,
+                                      const AscendC::LocalTensor<BiasType>& cl1Local, uint64_t curNL1)
     {
         AscendC::DataCopyPadParams padParams;
         // 单位为Byte
@@ -338,8 +338,8 @@ public:
         AscendC::DataCopyPad(cl1Local, biasGlobal, biasParam, padParams);
     }
 
-    __aicore__ inline void CopyInScaleA(const AscendC::GlobalTensor<fp8_e8m0_t> &aScaleGlobal,
-                                        const AscendC::LocalTensor<fp8_e8m0_t> &aScaleL1Local, uint64_t curML1,
+    __aicore__ inline void CopyInScaleA(const AscendC::GlobalTensor<fp8_e8m0_t>& aScaleGlobal,
+                                        const AscendC::LocalTensor<fp8_e8m0_t>& aScaleL1Local, uint64_t curML1,
                                         uint64_t kL1Offset)
     {
         uint64_t curScaleKL1 = scaleKL1_;
@@ -348,7 +348,7 @@ public:
         }
 
         AscendC::GlobalTensor<half> aScaleGlobalB16;
-        aScaleGlobalB16.SetGlobalBuffer(((__gm__ half *)(aScaleGlobal.GetPhyAddr())));
+        aScaleGlobalB16.SetGlobalBuffer(((__gm__ half*)(aScaleGlobal.GetPhyAddr())));
         auto aScaleL1LocalImpl = aScaleL1Local.template ReinterpretCast<half>();
 
         if constexpr (!transA) {
@@ -376,8 +376,8 @@ public:
         }
     }
 
-    __aicore__ inline void CopyInScaleB(const AscendC::GlobalTensor<fp8_e8m0_t> &bScaleGlobal,
-                                        const AscendC::LocalTensor<fp8_e8m0_t> &bScaleL1Local, uint64_t curNL1,
+    __aicore__ inline void CopyInScaleB(const AscendC::GlobalTensor<fp8_e8m0_t>& bScaleGlobal,
+                                        const AscendC::LocalTensor<fp8_e8m0_t>& bScaleL1Local, uint64_t curNL1,
                                         uint64_t kL1Offset)
     {
         uint64_t curScaleKL1 = scaleKL1_;
@@ -386,7 +386,7 @@ public:
         }
 
         AscendC::GlobalTensor<half> bScaleGlobalB16;
-        bScaleGlobalB16.SetGlobalBuffer(((__gm__ half *)(bScaleGlobal.GetPhyAddr())));
+        bScaleGlobalB16.SetGlobalBuffer(((__gm__ half*)(bScaleGlobal.GetPhyAddr())));
         auto bScaleL1LocalImpl = bScaleL1Local.template ReinterpretCast<half>();
 
         if constexpr (transB) {
@@ -414,8 +414,8 @@ public:
         }
     }
 
-    __aicore__ inline void CopyInC2(const AscendC::LocalTensor<BiasType> &biasL1Local,
-                                    const AscendC::LocalTensor<float> &biasBt, uint64_t nl1Align, bool needBias)
+    __aicore__ inline void CopyInC2(const AscendC::LocalTensor<BiasType>& biasL1Local,
+                                    const AscendC::LocalTensor<float>& biasBt, uint64_t nl1Align, bool needBias)
     {
         if (!needBias) {
             return;
@@ -428,10 +428,10 @@ public:
         AscendC::DataCopy(biasBt, biasL1Local, biasParam);
     }
 
-    __aicore__ inline void CopyInL0A(const AscendC::LocalTensor<MxL0AType> &l0aLocal,
-                                     const AscendC::LocalTensor<AType> &al1Local,
-                                     const AscendC::LocalTensor<fp8_e8m0_t> &scaleAl1Local,
-                                     const TileL1L0Param &tileL1L0Param, uint64_t kL0L1Off)
+    __aicore__ inline void CopyInL0A(const AscendC::LocalTensor<MxL0AType>& l0aLocal,
+                                     const AscendC::LocalTensor<AType>& al1Local,
+                                     const AscendC::LocalTensor<fp8_e8m0_t>& scaleAl1Local,
+                                     const TileL1L0Param& tileL1L0Param, uint64_t kL0L1Off)
     {
         AscendC::LoadData2DParamsV2 loadDataParams;
         AscendC::LoadData2DMxParams loadData2DMxParams;
@@ -499,10 +499,10 @@ public:
         }
     }
 
-    __aicore__ inline void CopyInL0B(const AscendC::LocalTensor<MxL0BType> &l0bLocal,
-                                     const AscendC::LocalTensor<BType> &bl1Local,
-                                     const AscendC::LocalTensor<fp8_e8m0_t> &scaleBl1Local,
-                                     const TileL1L0Param &tileL1L0Param, uint64_t kL0L1Off)
+    __aicore__ inline void CopyInL0B(const AscendC::LocalTensor<MxL0BType>& l0bLocal,
+                                     const AscendC::LocalTensor<BType>& bl1Local,
+                                     const AscendC::LocalTensor<fp8_e8m0_t>& scaleBl1Local,
+                                     const TileL1L0Param& tileL1L0Param, uint64_t kL0L1Off)
     {
         AscendC::LoadData2DParamsV2 loadDataParams;
         AscendC::LoadData2DMxParams loadData2DMxParams;
@@ -570,8 +570,8 @@ public:
         }
     }
 
-    __aicore__ inline void CopyOut(const AscendC::GlobalTensor<CType> &cGlobal,
-                                   const AscendC::LocalTensor<float> &c1Local, uint64_t baseM, uint64_t baseN)
+    __aicore__ inline void CopyOut(const AscendC::GlobalTensor<CType>& cGlobal,
+                                   const AscendC::LocalTensor<float>& c1Local, uint64_t baseM, uint64_t baseN)
     {
         AscendC::DataCopyCO12DstParams intriParams;
         intriParams.nSize = baseN;
@@ -592,8 +592,8 @@ public:
         AscendC::DataCopy(cGlobal, c1Local, intriParams);
     }
 
-    __aicore__ inline void CopyOut(const AscendC::LocalTensor<CType> &cLocal,
-                                   const AscendC::LocalTensor<float> &c1Local, uint64_t baseM, uint64_t baseN)
+    __aicore__ inline void CopyOut(const AscendC::LocalTensor<CType>& cLocal,
+                                   const AscendC::LocalTensor<float>& c1Local, uint64_t baseM, uint64_t baseN)
     {
         AscendC::FixpipeParamsC310<AscendC::CO2Layout::ROW_MAJOR> fixpipeParams;
         fixpipeParams.mSize = static_cast<uint16_t>(Cgmct::Gemm::Align(baseM, EVEN_FACTOR));
@@ -606,19 +606,19 @@ public:
         AscendC::Fixpipe<CType, CType, AscendC::Impl::CFG_ROW_MAJOR_UB>(cLocal, c1Local, fixpipeParams);
     }
 
-    __aicore__ inline void UpdateKAL1(TileL1L0Param &tileL1L0Param, uint64_t offsetKAL1)
+    __aicore__ inline void UpdateKAL1(TileL1L0Param& tileL1L0Param, uint64_t offsetKAL1)
     {
         tileL1L0Param.curGmAKL1 = Min(kAL1_, k_ - offsetKAL1);
         tileL1L0Param.curPadAKL1 = Align64(tileL1L0Param.curGmAKL1);
     }
 
-    __aicore__ inline void UpdateKBL1(TileL1L0Param &tileL1L0Param, uint64_t offsetKBL1)
+    __aicore__ inline void UpdateKBL1(TileL1L0Param& tileL1L0Param, uint64_t offsetKBL1)
     {
         tileL1L0Param.curGmBKL1 = Min(kBL1_, k_ - offsetKBL1);
         tileL1L0Param.curPadBKL1 = Align64(tileL1L0Param.curGmBKL1);
     }
 
-    __aicore__ inline void GetAlignMN(TileL1L0Param &tileL1L0Param)
+    __aicore__ inline void GetAlignMN(TileL1L0Param& tileL1L0Param)
     {
         if constexpr (transA) {
             tileL1L0Param.curAlignM = IS_FP4 ? Align64(tileL1L0Param.curM) : Align32(tileL1L0Param.curM);
@@ -632,9 +632,9 @@ public:
         }
     }
 
-    __aicore__ inline void CopyScalesInL1(const AscendC::GlobalTensor<fp8_e8m0_t> &scaleAGlobal,
-                                          const AscendC::GlobalTensor<fp8_e8m0_t> &scaleBGlobal,
-                                          const TileL1L0Param &tileL1L0Param, uint64_t kL1Offset, uint64_t scaleL1BufId)
+    __aicore__ inline void CopyScalesInL1(const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
+                                          const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                          const TileL1L0Param& tileL1L0Param, uint64_t kL1Offset, uint64_t scaleL1BufId)
     {
         if (kL1Offset % scaleKL1_ == 0) {
             AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SCALE_BUFFER_FLAG_0 + (scaleL1BufId));
@@ -645,7 +645,7 @@ public:
         }
     }
 
-    __aicore__ inline void CopyAInL1(const AscendC::GlobalTensor<AType> &aGlobal, const TileL1L0Param &tileL1L0Param,
+    __aicore__ inline void CopyAInL1(const AscendC::GlobalTensor<AType>& aGlobal, const TileL1L0Param& tileL1L0Param,
                                      uint64_t l1BufId, uint64_t kL1Offset)
     {
         if constexpr (!(IS_FP4 && !transA)) {
@@ -655,7 +655,7 @@ public:
         CopyInA1(aGlobal[offsetA], aL1Local_[l1BufferAOffset_[l1BufId]], tileL1L0Param);
     }
 
-    __aicore__ inline void CopyBInL1(const AscendC::GlobalTensor<BType> &bGlobal, const TileL1L0Param &tileL1L0Param,
+    __aicore__ inline void CopyBInL1(const AscendC::GlobalTensor<BType>& bGlobal, const TileL1L0Param& tileL1L0Param,
                                      uint64_t l1BufId, uint64_t kL1Offset)
     {
         if constexpr (!(IS_FP4 && transB)) {
@@ -670,7 +670,7 @@ public:
         }
     }
 
-    __aicore__ inline void Iterate(TileL1L0Param &tileL1L0Param, AscendC::MmadParams &mmadParams, uint64_t kL1Offset,
+    __aicore__ inline void Iterate(TileL1L0Param& tileL1L0Param, AscendC::MmadParams& mmadParams, uint64_t kL1Offset,
                                    uint64_t al1BufId, uint64_t bl1BufId, uint64_t scaleL1BufId, uint64_t l0cOffset,
                                    uint64_t kaL1Offset, uint64_t kbL1Offset)
     {
@@ -702,12 +702,12 @@ public:
             l0PingPong_++;
         }
     }
-    __aicore__ inline void IterBL1AL1(TileL1L0Param &tileL1L0Param, AscendC::MmadParams &mmadParams, uint64_t l0cOffset,
-                                      const AscendC::GlobalTensor<AType> &aGlobal,
-                                      const AscendC::GlobalTensor<BType> &bGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t> &scaleAGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t> &scaleBGlobal,
-                                      const AscendC::GlobalTensor<BiasType> &biasGlobal)
+    __aicore__ inline void IterBL1AL1(TileL1L0Param& tileL1L0Param, AscendC::MmadParams& mmadParams, uint64_t l0cOffset,
+                                      const AscendC::GlobalTensor<AType>& aGlobal,
+                                      const AscendC::GlobalTensor<BType>& bGlobal,
+                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::GlobalTensor<BiasType>& biasGlobal)
     {
         for (uint64_t kOuter = 0; kOuter < k_; kOuter += kBL1_) {
             uint64_t scaleL1BufId = scaleLoopCnt_ & 1;
@@ -742,12 +742,12 @@ public:
         }
     }
 
-    __aicore__ inline void IterAL1BL1(TileL1L0Param &tileL1L0Param, AscendC::MmadParams &mmadParams, uint64_t l0cOffset,
-                                      const AscendC::GlobalTensor<AType> &aGlobal,
-                                      const AscendC::GlobalTensor<BType> &bGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t> &scaleAGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t> &scaleBGlobal,
-                                      const AscendC::GlobalTensor<BiasType> &biasGlobal)
+    __aicore__ inline void IterAL1BL1(TileL1L0Param& tileL1L0Param, AscendC::MmadParams& mmadParams, uint64_t l0cOffset,
+                                      const AscendC::GlobalTensor<AType>& aGlobal,
+                                      const AscendC::GlobalTensor<BType>& bGlobal,
+                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::GlobalTensor<BiasType>& biasGlobal)
     {
         for (uint64_t kOuter = 0; kOuter < k_; kOuter += kAL1_) {
             uint64_t scaleL1BufId = scaleLoopCnt_ & 1;
@@ -782,11 +782,11 @@ public:
         }
     }
 
-    __aicore__ inline void run(const AscendC::GlobalTensor<AType> &aGlobal, const AscendC::GlobalTensor<BType> &bGlobal,
-                               const AscendC::GlobalTensor<fp8_e8m0_t> &scaleAGlobal,
-                               const AscendC::GlobalTensor<fp8_e8m0_t> &scaleBGlobal,
-                               const AscendC::GlobalTensor<BiasType> &biasGlobal,
-                               const AscendC::GlobalTensor<CType> &cGlobal, const BlockShape &singleShape)
+    __aicore__ inline void run(const AscendC::GlobalTensor<AType>& aGlobal, const AscendC::GlobalTensor<BType>& bGlobal,
+                               const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
+                               const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                               const AscendC::GlobalTensor<BiasType>& biasGlobal,
+                               const AscendC::GlobalTensor<CType>& cGlobal, const BlockShape& singleShape)
     {
         AscendC::MmadParams mmParams;
         uint64_t l0cOffset = 0;
@@ -796,11 +796,11 @@ public:
         UpdateL0cPingPong();
     }
 
-    __aicore__ inline void run(const AscendC::GlobalTensor<AType> &aGlobal, const AscendC::GlobalTensor<BType> &bGlobal,
-                               const AscendC::GlobalTensor<fp8_e8m0_t> &scaleAGlobal,
-                               const AscendC::GlobalTensor<fp8_e8m0_t> &scaleBGlobal,
-                               const AscendC::GlobalTensor<BiasType> &biasGlobal,
-                               const AscendC::LocalTensor<CType> &cLocal, const BlockShape &singleShape)
+    __aicore__ inline void run(const AscendC::GlobalTensor<AType>& aGlobal, const AscendC::GlobalTensor<BType>& bGlobal,
+                               const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
+                               const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                               const AscendC::GlobalTensor<BiasType>& biasGlobal,
+                               const AscendC::LocalTensor<CType>& cLocal, const BlockShape& singleShape)
     {
         AscendC::MmadParams mmParams;
         uint64_t l0cOffset = 0;
@@ -810,42 +810,42 @@ public:
         UpdateL0cPingPong();
     }
 
-    __aicore__ inline void operator()(const AscendC::GlobalTensor<AType> &aGlobal,
-                                      const AscendC::GlobalTensor<BType> &bGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t> &scaleAGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t> &scaleBGlobal,
-                                      const AscendC::GlobalTensor<CType> &cGlobal, const BlockShape &singleShape)
+    __aicore__ inline void operator()(const AscendC::GlobalTensor<AType>& aGlobal,
+                                      const AscendC::GlobalTensor<BType>& bGlobal,
+                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::GlobalTensor<CType>& cGlobal, const BlockShape& singleShape)
     {
         AscendC::GlobalTensor<BiasType> biasGlobal;
         run(aGlobal, bGlobal, scaleAGlobal, scaleBGlobal, biasGlobal, cGlobal, singleShape);
     }
 
-    __aicore__ inline void operator()(const AscendC::GlobalTensor<AType> &aGlobal,
-                                      const AscendC::GlobalTensor<BType> &bGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t> &scaleAGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t> &scaleBGlobal,
-                                      const AscendC::GlobalTensor<BiasType> &biasGlobal,
-                                      const AscendC::GlobalTensor<CType> &cGlobal, const BlockShape &singleShape)
+    __aicore__ inline void operator()(const AscendC::GlobalTensor<AType>& aGlobal,
+                                      const AscendC::GlobalTensor<BType>& bGlobal,
+                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::GlobalTensor<BiasType>& biasGlobal,
+                                      const AscendC::GlobalTensor<CType>& cGlobal, const BlockShape& singleShape)
     {
         run(aGlobal, bGlobal, scaleAGlobal, scaleBGlobal, biasGlobal, cGlobal, singleShape);
     }
 
-    __aicore__ inline void operator()(const AscendC::GlobalTensor<AType> &aGlobal,
-                                      const AscendC::GlobalTensor<BType> &bGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t> &scaleAGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t> &scaleBGlobal,
-                                      const AscendC::LocalTensor<CType> &cLocal, const BlockShape &singleShape)
+    __aicore__ inline void operator()(const AscendC::GlobalTensor<AType>& aGlobal,
+                                      const AscendC::GlobalTensor<BType>& bGlobal,
+                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::LocalTensor<CType>& cLocal, const BlockShape& singleShape)
     {
         AscendC::GlobalTensor<BiasType> biasGlobal;
         run(aGlobal, bGlobal, scaleAGlobal, scaleBGlobal, biasGlobal, cLocal, singleShape);
     }
 
-    __aicore__ inline void operator()(const AscendC::GlobalTensor<AType> &aGlobal,
-                                      const AscendC::GlobalTensor<BType> &bGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t> &scaleAGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t> &scaleBGlobal,
-                                      const AscendC::GlobalTensor<BiasType> &biasGlobal,
-                                      const AscendC::LocalTensor<CType> &cLocal, const BlockShape &singleShape)
+    __aicore__ inline void operator()(const AscendC::GlobalTensor<AType>& aGlobal,
+                                      const AscendC::GlobalTensor<BType>& bGlobal,
+                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::GlobalTensor<BiasType>& biasGlobal,
+                                      const AscendC::LocalTensor<CType>& cLocal, const BlockShape& singleShape)
     {
         run(aGlobal, bGlobal, scaleAGlobal, scaleBGlobal, biasGlobal, cLocal, singleShape);
     }
@@ -856,12 +856,12 @@ private:
         return isBias_ && kL0Offset == 0;
     }
 
-    __aicore__ inline void RunMmadLoop(const AscendC::GlobalTensor<AType> &aGlobal,
-                                       const AscendC::GlobalTensor<BType> &bGlobal,
-                                       const AscendC::GlobalTensor<fp8_e8m0_t> &scaleAGlobal,
-                                       const AscendC::GlobalTensor<fp8_e8m0_t> &scaleBGlobal,
-                                       const AscendC::GlobalTensor<BiasType> &biasGlobal, const BlockShape &singleShape,
-                                       AscendC::MmadParams &mmParams, uint64_t &l0cOffset)
+    __aicore__ inline void RunMmadLoop(const AscendC::GlobalTensor<AType>& aGlobal,
+                                       const AscendC::GlobalTensor<BType>& bGlobal,
+                                       const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
+                                       const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                       const AscendC::GlobalTensor<BiasType>& biasGlobal, const BlockShape& singleShape,
+                                       AscendC::MmadParams& mmParams, uint64_t& l0cOffset)
     {
         TileL1L0Param tileL1L0Param;
         tileL1L0Param.curM = Get<IDX_M_TILE_IDX>(singleShape);
@@ -885,7 +885,7 @@ private:
         }
     }
 
-    __aicore__ inline void Mmad(AscendC::MmadParams &mmadParams, uint64_t l0cOffset, uint64_t l0abOffset,
+    __aicore__ inline void Mmad(AscendC::MmadParams& mmadParams, uint64_t l0cOffset, uint64_t l0abOffset,
                                 uint64_t biasOffset, bool needBias)
     {
         mmadParams.cmatrixSource = needBias;

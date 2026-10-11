@@ -23,7 +23,13 @@ from atk.tasks.backends.lib_interface.acl_wrapper import TensorPtr
 from atk.tasks.backends.lib_interface.acl_wrapper import AclFormat
 
 
-def GMM_Swiglu_quant(x: torch.Tensor, weight: torch.Tensor, perChannelScale: torch.Tensor, perTokenScale: torch.Tensor, m: int):
+def GMM_Swiglu_quant(
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    perChannelScale: torch.Tensor,
+    perTokenScale: torch.Tensor,
+    m: int,
+):
     """
     执行量化的 GMM(通用矩阵乘法)操作,并使用 SwiGLU 激活函数。
 
@@ -54,14 +60,21 @@ def GMM_Swiglu_quant(x: torch.Tensor, weight: torch.Tensor, perChannelScale: tor
     # 对输出进行量化
     max = torch.max(torch.abs(c_temp6), -1).values  # 找到最大绝对值以计算缩放因子
     quantScaleOutput = 127 / max  # 计算量化缩放因子
-    quantOutput = torch.round(
-        c_temp6 * quantScaleOutput.reshape(m, 1)).to(torch.int8)  # 量化为 int8
+    quantOutput = torch.round(c_temp6 * quantScaleOutput.reshape(m, 1)).to(
+        torch.int8
+    )  # 量化为 int8
     quantScaleOutput = 1 / quantScaleOutput  # 反向量化缩放因子以便后续反量化
 
     return quantOutput, quantScaleOutput
 
 
-def process_groups(x: torch.Tensor, weight: torch.Tensor, perChannelScale: torch.Tensor, perTokenScale: torch.Tensor, groupList: torch.Tensor):
+def process_groups(
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    perChannelScale: torch.Tensor,
+    perTokenScale: torch.Tensor,
+    groupList: torch.Tensor,
+):
     """
     按组处理输入数据,并调用 GMM_Swiglu_quant 函数进行量化计算。
 
@@ -88,14 +101,18 @@ def process_groups(x: torch.Tensor, weight: torch.Tensor, perChannelScale: torch
         currV = v
         tempV = currV - preV  # 计算当前组的 token 数量
         preV = currV  # 更新前一个组的 token 数量
-        if (tempV > 0):
+        if tempV > 0:
             # 调用 GMM_Swiglu_quant 处理当前组
-            quantOutput[start_idx:start_idx + tempV], quantScaleOutput[start_idx:start_idx + tempV] = \
-                GMM_Swiglu_quant(x[start_idx:start_idx + tempV],
-                                 weight[i],
-                                 perChannelScale[i],
-                                 perTokenScale[start_idx:start_idx + tempV],
-                                 tempV)
+            (
+                quantOutput[start_idx : start_idx + tempV],
+                quantScaleOutput[start_idx : start_idx + tempV],
+            ) = GMM_Swiglu_quant(
+                x[start_idx : start_idx + tempV],
+                weight[i],
+                perChannelScale[i],
+                perTokenScale[start_idx : start_idx + tempV],
+                tempV,
+            )
 
         start_idx += tempV  # 更新起始索引以处理下一组
     return quantOutput, quantScaleOutput
@@ -134,17 +151,16 @@ class AclnnGroupedMatmulSwigluQuant(BaseApi):
         :param input_data:
         :return:
         """
-        x = input_data.kwargs['x']
-        weight = input_data.kwargs['weight']
-        seed = input_data.kwargs['seed']
-        groupList = generate_non_decreasing_sequence(
-            weight.shape[0], x.shape[0], seed)
-        if self.device == 'pyaclnn':
-            input_data.kwargs['groupList'] = groupList.npu()
+        x = input_data.kwargs["x"]
+        weight = input_data.kwargs["weight"]
+        seed = input_data.kwargs["seed"]
+        groupList = generate_non_decreasing_sequence(weight.shape[0], x.shape[0], seed)
+        if self.device == "pyaclnn":
+            input_data.kwargs["groupList"] = groupList.npu()
         else:
-            input_data.kwargs['groupList'] = groupList.cpu()
-        input_data.kwargs.pop('seed')
-        input_data.kwargs.pop('case')
+            input_data.kwargs["groupList"] = groupList.cpu()
+        input_data.kwargs.pop("seed")
+        input_data.kwargs.pop("case")
 
     def __call__(self, input_data: InputDataset, with_output: bool = False):
         if self.device == "gpu":
@@ -154,19 +170,21 @@ class AclnnGroupedMatmulSwigluQuant(BaseApi):
         else:
             device = "cpu"
 
-        x = input_data.kwargs['x']
-        weight = input_data.kwargs['weight']
-        E, N, K = weight.shape[0], weight.shape[1] * \
-            weight.shape[4], weight.shape[2] * weight.shape[3]
+        x = input_data.kwargs["x"]
+        weight = input_data.kwargs["weight"]
+        E, N, K = (
+            weight.shape[0],
+            weight.shape[1] * weight.shape[4],
+            weight.shape[2] * weight.shape[3],
+        )
         weight = weight.permute(0, 2, 3, 1, 4).reshape(E, K, N).contiguous()
-        weightScale = input_data.kwargs['weightScale']
-        xScale = input_data.kwargs['xScale']
-        groupList = input_data.kwargs['groupList']
+        weightScale = input_data.kwargs["weightScale"]
+        xScale = input_data.kwargs["xScale"]
+        groupList = input_data.kwargs["groupList"]
 
-        output0, output1 = process_groups(
-            x, weight, weightScale, xScale, groupList)
+        output0, output1 = process_groups(x, weight, weightScale, xScale, groupList)
 
-        real0, real1 = output0[:groupList[-1], :], output1[:groupList[-1]]
+        real0, real1 = output0[: groupList[-1], :], output1[: groupList[-1]]
         # 将标杆的脏数据部分改成全0
         group_index = groupList[-1]
         output0[group_index:, :] = 0
@@ -183,7 +201,7 @@ class AclnnGroupedMatmulSwigluQuant(BaseApi):
         :return:
         format at this index or name
         """
-        if name == 'weight':
+        if name == "weight":
             if input_data.kwargs["format"] == "FRACTAL_NZ":
                 return AclFormat.ACL_FORMAT_FRACTAL_NZ
 
@@ -192,8 +210,8 @@ class AclnnGroupedMatmulSwigluQuant(BaseApi):
 
 @register("function_pyaclnn_grouped_matmul_swiglu_quant")
 class AclnnGroupedMatmulSwigluQuant(AclnnBaseApi):  # SampleApi类型仅需设置唯一即可。
-    def __init__(self,task_result:TaskResult,backend):
-        super().__init__(task_result,backend)
+    def __init__(self, task_result: TaskResult, backend):
+        super().__init__(task_result, backend)
         self.input_args = None
         self.groupList = None
 

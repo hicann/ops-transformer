@@ -17,7 +17,7 @@
 #include "lib/matmul_intf.h"
 
 namespace WeightQuantBatchMatmulV2::Arch35 {
-template <typename IMPL, class A_TYPE, class B_TYPE, class C_TYPE, const auto &MM_CFG,
+template <typename IMPL, class A_TYPE, class B_TYPE, class C_TYPE, const auto& MM_CFG,
           typename = std::enable_if_t<!AscendC::Impl::Detail::MatmulFeatureTrait<MM_CFG>::IsNeedUB()>>
 class WQBmmCustomCopyCubeOut {
     using DstT = typename C_TYPE::T;
@@ -32,9 +32,9 @@ public:
     __aicore__ inline WQBmmCustomCopyCubeOut() = default;
 
     template <bool enSequentialWrite = false, typename ScheduleContext = int>
-    __aicore__ inline void Copy(const GlobalTensor<DstT> &gm, const LocalTensor<SrcT> &co1Local, int32_t curRow,
+    __aicore__ inline void Copy(const GlobalTensor<DstT>& gm, const LocalTensor<SrcT>& co1Local, int32_t curRow,
                                 int32_t curCol, int32_t baseHeight, int32_t baseWidth, int32_t baseBlockHeight,
-                                int32_t baseBlockWidth, const ScheduleContext &context = 0)
+                                int32_t baseBlockWidth, const ScheduleContext& context = 0)
     {
         if constexpr (ToMatmulConfig(MM_CFG).intraBlockPartSum) {
             if (!MATMUL_MODULE(MatmulSubBlockInfo)->GetFakeMsg()) {
@@ -48,9 +48,9 @@ public:
     }
 
     template <bool enSequentialWrite = false, typename ScheduleContext = int>
-    __aicore__ inline void Copy(const LocalTensor<DstT> &co2Local, const LocalTensor<SrcT> &co1Local, int32_t curRow,
+    __aicore__ inline void Copy(const LocalTensor<DstT>& co2Local, const LocalTensor<SrcT>& co1Local, int32_t curRow,
                                 int32_t curCol, int32_t baseHeight, int32_t baseWidth, int32_t baseBlockHeight,
-                                int32_t baseBlockWidth, const ScheduleContext &context = 0)
+                                int32_t baseBlockWidth, const ScheduleContext& context = 0)
     {
         baseHeight = (baseHeight + 1) / 2 * 2; // 2含义：指令要求m必须是偶数，向上对齐到偶数
         CopyOutImpl<enSequentialWrite, const LocalTensor<DstT>>(co2Local, co1Local, curRow, curCol, baseHeight,
@@ -59,7 +59,7 @@ public:
 
 private:
     template <bool enSequentialWrite, class T, bool IS_INTRA_BLOCK = false>
-    __aicore__ inline void CopyOutImpl(const T &dst, const LocalTensor<SrcT> &co1Local, int32_t curRow, int32_t curCol,
+    __aicore__ inline void CopyOutImpl(const T& dst, const LocalTensor<SrcT>& co1Local, int32_t curRow, int32_t curCol,
                                        int32_t baseHeight, int32_t baseWidth, int32_t baseBlockHeight,
                                        int32_t baseBlockWidth)
     {
@@ -75,7 +75,7 @@ private:
     }
 
     template <bool enSequentialWrite, class T, bool IS_INTRA_BLOCK = false>
-    __aicore__ inline void CopyOutNZ2ND(const T &dst, const LocalTensor<SrcT> &co1Local, int32_t curRow, int32_t curCol,
+    __aicore__ inline void CopyOutNZ2ND(const T& dst, const LocalTensor<SrcT>& co1Local, int32_t curRow, int32_t curCol,
                                         int32_t baseHeight, int32_t baseWidth, int32_t baseBlockHeight,
                                         int32_t baseBlockWidth)
     {

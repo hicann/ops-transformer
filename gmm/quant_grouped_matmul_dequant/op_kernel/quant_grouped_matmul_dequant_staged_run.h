@@ -30,8 +30,8 @@ namespace AscendC {
 
 // Map our TilingData → master staged struct. Derived fields recomputed with
 // master tiling.cpp GROUPED-branch formulas (UB=256KB constant on 310P).
-__aicore__ inline void BuildStagedTiling(const QuantMatmulDequantTilingData *__restrict td,
-                                         qgmmd_staged::QuantGroupedMatmulDequantTilingData &s)
+__aicore__ inline void BuildStagedTiling(const QuantMatmulDequantTilingData* __restrict td,
+                                         qgmmd_staged::QuantGroupedMatmulDequantTilingData& s)
 {
     constexpr uint32_t UB = 256u * 1024u;
     constexpr uint32_t REDUCE_THRES = 32u * 1024u;
@@ -103,7 +103,7 @@ __aicore__ inline __attribute__((noinline)) void RunStagedB0(GM_ADDR x, GM_ADDR 
                                                              GM_ADDR group_list, GM_ADDR bias, GM_ADDR x_scale,
                                                              GM_ADDR x_offset, GM_ADDR smooth_scale, GM_ADDR y,
                                                              GM_ADDR usr_workspace,
-                                                             const QuantMatmulDequantTilingData *__restrict td)
+                                                             const QuantMatmulDequantTilingData* __restrict td)
 {
     qgmmd_staged::QuantGroupedMatmulDequantTilingData s;
     BuildStagedTiling(td, s);

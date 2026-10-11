@@ -41,7 +41,7 @@ struct MhcSinkhornSplitCoreInfo {
 
 class MhcSinkhornBaseTiling : public TilingBaseClass {
 public:
-    explicit MhcSinkhornBaseTiling(gert::TilingContext *context)
+    explicit MhcSinkhornBaseTiling(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
@@ -49,9 +49,9 @@ public:
 
 protected:
     void BackwardSplitCore(uint64_t ubSize, int64_t totalCoreNum, int64_t tSize, int64_t nSize, int64_t xDtypeSize,
-                           MhcSinkhornSplitCoreInfo &splitInfo);
+                           MhcSinkhornSplitCoreInfo& splitInfo);
     void ForwardSplitCore(uint64_t ubSize, int64_t totalCoreNum, int64_t tSize, int64_t nSize, int64_t xDtypeSize,
-                          int64_t outFlag, MhcSinkhornSplitCoreInfo &splitInfo);
+                          int64_t outFlag, MhcSinkhornSplitCoreInfo& splitInfo);
     int64_t BackwardCalOccupySize(int64_t ubFactor, int64_t nSize, int64_t xDtypeSize);
     int64_t ForwardCalOccupySize(int64_t ubFactor, int64_t nSize, int64_t xDtypeSize, int64_t outFlag);
 };

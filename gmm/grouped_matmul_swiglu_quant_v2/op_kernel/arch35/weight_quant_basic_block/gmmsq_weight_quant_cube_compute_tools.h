@@ -76,9 +76,9 @@ __aicore__ inline constexpr uint64_t GetC0Size()
  */
 
 template <typename DstType, typename SrcType, typename XScaleType>
-__aicore__ inline void LoadAAndScaleL1ToL0(const LocalTensor<DstType> &aL0Tensor, const LocalTensor<SrcType> &aL1Tensor,
-                                           const LocalTensor<XScaleType> &scaleL1Tensor,
-                                           const L0CopyAndCalcParams &l0CopyAndCalcParams)
+__aicore__ inline void LoadAAndScaleL1ToL0(const LocalTensor<DstType>& aL0Tensor, const LocalTensor<SrcType>& aL1Tensor,
+                                           const LocalTensor<XScaleType>& scaleL1Tensor,
+                                           const L0CopyAndCalcParams& l0CopyAndCalcParams)
 {
     uint64_t mL0AlignSize = Ops::Base::CeilAlign(l0CopyAndCalcParams.mL0Size, static_cast<uint64_t>(BLOCK_CUBE));
     uint64_t mL1AlignSize = Ops::Base::CeilAlign(l0CopyAndCalcParams.mL1Size, static_cast<uint64_t>(BLOCK_CUBE));
@@ -113,9 +113,9 @@ __aicore__ inline void LoadAAndScaleL1ToL0(const LocalTensor<DstType> &aL0Tensor
  */
 
 template <typename DstType, typename SrcType, typename WScaleType>
-__aicore__ inline void LoadBAndScaleL1ToL0(const LocalTensor<DstType> &bL0Tensor, const LocalTensor<SrcType> &bL1Tensor,
-                                           const LocalTensor<WScaleType> &scaleL1Tensor,
-                                           const L0CopyAndCalcParams &l0CopyAndCalcParams)
+__aicore__ inline void LoadBAndScaleL1ToL0(const LocalTensor<DstType>& bL0Tensor, const LocalTensor<SrcType>& bL1Tensor,
+                                           const LocalTensor<WScaleType>& scaleL1Tensor,
+                                           const L0CopyAndCalcParams& l0CopyAndCalcParams)
 {
     uint64_t nL0AlignSize = Ops::Base::CeilAlign(l0CopyAndCalcParams.nL0Size, static_cast<uint64_t>(BLOCK_CUBE));
     uint64_t nL1AlignSize = Ops::Base::CeilAlign(l0CopyAndCalcParams.nL1Size, static_cast<uint64_t>(BLOCK_CUBE));
@@ -154,9 +154,9 @@ __aicore__ inline void LoadBAndScaleL1ToL0(const LocalTensor<DstType> &bL0Tensor
  */
 
 template <typename DstType, typename SrcAType, typename SrcBType>
-__aicore__ inline void MmadCompute(const LocalTensor<DstType> &cL0Tensor, const LocalTensor<SrcAType> &aL0Tensor,
-                                   const LocalTensor<SrcBType> &bL0Tensor,
-                                   const L0CopyAndCalcParams &l0CopyAndCalcParams)
+__aicore__ inline void MmadCompute(const LocalTensor<DstType>& cL0Tensor, const LocalTensor<SrcAType>& aL0Tensor,
+                                   const LocalTensor<SrcBType>& bL0Tensor,
+                                   const L0CopyAndCalcParams& l0CopyAndCalcParams)
 {
     AscendC::MmadParams mmadParams;
     mmadParams.m = Ops::Base::CeilAlign(l0CopyAndCalcParams.mL0Size, 2UL);
@@ -179,8 +179,8 @@ __aicore__ inline void MmadCompute(const LocalTensor<DstType> &cL0Tensor, const 
  */
 
 template <typename DstType, typename SrcType>
-__aicore__ inline void FixL0CToDst(const LocalTensor<DstType> &outTensor, const LocalTensor<SrcType> &cL0Tensor,
-                                   const FixL0CToDstParams &fixL0CToDstParams)
+__aicore__ inline void FixL0CToDst(const LocalTensor<DstType>& outTensor, const LocalTensor<SrcType>& cL0Tensor,
+                                   const FixL0CToDstParams& fixL0CToDstParams)
 {
     AscendC::FixpipeParamsC310<AscendC::CO2Layout::ROW_MAJOR> fixParams;
     fixParams.params.ndNum = 1;

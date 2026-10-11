@@ -32,7 +32,7 @@ const int64_t MX_A8W4_GROUP_FACTOR = 2; // MX A8W4格式groupNum计算因子（k
 const int64_t B4_NUMS_IN_B32 = 8;
 const int64_t MX_GROUP_SIZE = 32;
 
-static bool inline IsNonEmpty(const gert::Shape *shape)
+static bool inline IsNonEmpty(const gert::Shape* shape)
 {
     return (shape != nullptr && !(shape->GetDimNum() == 1 && shape->GetDim(0) == 0));
 }
@@ -72,7 +72,7 @@ bool GroupedMatmulWeightQuantChecker::IsA16W4(const ge::DataType xDtype, const g
 }
 
 bool GroupedMatmulWeightQuantChecker::IsA16W4Pergroup(const ge::DataType xDtype, const ge::DataType weightDtype,
-                                                      const gert::InferShapeContext *context,
+                                                      const gert::InferShapeContext* context,
                                                       const size_t tensorIdx) const
 {
     if (!IsA16W4(xDtype, weightDtype)) {
@@ -85,7 +85,7 @@ bool GroupedMatmulWeightQuantChecker::IsA16W4Pergroup(const ge::DataType xDtype,
     return antiquantScaleDimNum == ANTIQUANT_PARAM_DIM_NUM_PER_GROUP_SINGLE;
 }
 
-bool GroupedMatmulWeightQuantChecker::IsMultiTensorWeight(const gert::InferShapeContext *context) const
+bool GroupedMatmulWeightQuantChecker::IsMultiTensorWeight(const gert::InferShapeContext* context) const
 {
     auto weightShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
     if (weightShape == nullptr) {
@@ -94,7 +94,7 @@ bool GroupedMatmulWeightQuantChecker::IsMultiTensorWeight(const gert::InferShape
     return weightShape->GetDimNum() == GMM_SEPARATED_WEIGHT_DIM;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::GetXandWeightDtype(const gert::InferShapeContext *context)
+ge::graphStatus GroupedMatmulWeightQuantChecker::GetXandWeightDtype(const gert::InferShapeContext* context)
 {
     auto xDesc = context->GetDynamicInputDesc(GMM_INDEX_IN_X, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, xDesc);
@@ -111,8 +111,8 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::GetXandWeightDtype(const gert::
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::GetXAndWeightDimValue(const gert::InferShapeContext *context,
-                                                                       const GMMAttrs &gmmAttrs)
+ge::graphStatus GroupedMatmulWeightQuantChecker::GetXAndWeightDimValue(const gert::InferShapeContext* context,
+                                                                       const GMMAttrs& gmmAttrs)
 {
     OP_CHECK_IF(GetXandWeightDtype(context) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context->GetNodeName(), "GetXandWeightDtype failed."), return ge::GRAPH_FAILED);
@@ -164,7 +164,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::GetXAndWeightDimValue(const ger
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForXAndWeight(const gert::InferShapeContext *context) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForXAndWeight(const gert::InferShapeContext* context) const
 {
     OP_CHECK_IF(xKDim_ != weightKDim_,
                 OP_LOGE(context->GetNodeName(),
@@ -218,8 +218,8 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForXAndWeight(const g
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckTensorDimEqualOne(const gert::InferShapeContext *context,
-                                                                        const gert::Shape *shape,
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckTensorDimEqualOne(const gert::InferShapeContext* context,
+                                                                        const gert::Shape* shape,
                                                                         const std::string paramName,
                                                                         const size_t index) const
 {
@@ -235,10 +235,10 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckTensorDimEqualOne(const ge
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckDimNumNoSplit(const gert::InferShapeContext *context,
-                                                                    const GMMInputParamsInfo &paramsInputInfo) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckDimNumNoSplit(const gert::InferShapeContext* context,
+                                                                    const GMMInputParamsInfo& paramsInputInfo) const
 {
-    const size_t &tensorListLength = paramsInputInfo.numX;
+    const size_t& tensorListLength = paramsInputInfo.numX;
     auto wShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, wShape);
     // check dimension
@@ -303,10 +303,10 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckDimNumNoSplit(const gert::
 }
 
 ge::graphStatus GroupedMatmulWeightQuantChecker::CheckXWeightYGroupSizeMultiScenario(
-    const gert::InferShapeContext *context, const GMMInputParamsInfo &paramsInputInfo) const
+    const gert::InferShapeContext* context, const GMMInputParamsInfo& paramsInputInfo) const
 {
-    const size_t &xSize = paramsInputInfo.numX;
-    const size_t &weightSize = paramsInputInfo.numWeight;
+    const size_t& xSize = paramsInputInfo.numX;
+    const size_t& weightSize = paramsInputInfo.numWeight;
     size_t numY = context->GetComputeNodeOutputNum();
     // check group size
     OP_CHECK_IF(xSize != numY,
@@ -320,7 +320,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckXWeightYGroupSizeMultiScen
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckTensorNDimMultiScenario(const gert::InferShapeContext *context,
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckTensorNDimMultiScenario(const gert::InferShapeContext* context,
                                                                               const size_t wNDimIdx,
                                                                               const int64_t weightNDimValue,
                                                                               const size_t index) const
@@ -373,7 +373,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckTensorNDimMultiScenario(co
 }
 
 ge::graphStatus GroupedMatmulWeightQuantChecker::CheckPerTensorShapeMultiScenario(
-    const gert::InferShapeContext *context, size_t wKDimIdx, size_t wNDimIdx, size_t xSize) const
+    const gert::InferShapeContext* context, size_t wKDimIdx, size_t wNDimIdx, size_t xSize) const
 {
     auto xShape = context->GetDynamicInputShape(GMM_INDEX_IN_X, 0);
     auto wShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
@@ -419,7 +419,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckPerTensorShapeMultiScenari
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckA16W4PergroupMultiScenario(const gert::InferShapeContext *context,
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckA16W4PergroupMultiScenario(const gert::InferShapeContext* context,
                                                                                  size_t wKDimIdx, size_t xSize) const
 {
     for (size_t i = 0; i < xSize; i++) {
@@ -448,11 +448,11 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckA16W4PergroupMultiScenario
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckCaseMultiScenario(const gert::InferShapeContext *context,
-                                                                        const GMMAttrs &gmmAttrs,
-                                                                        const GMMInputParamsInfo &paramsInputInfo) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckCaseMultiScenario(const gert::InferShapeContext* context,
+                                                                        const GMMAttrs& gmmAttrs,
+                                                                        const GMMInputParamsInfo& paramsInputInfo) const
 {
-    const size_t &xSize = paramsInputInfo.numX;
+    const size_t& xSize = paramsInputInfo.numX;
     // check group size
     OP_CHECK_IF(CheckXWeightYGroupSizeMultiScenario(context, paramsInputInfo) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context->GetNodeName(), "The size of X, Y and weight are not equal."), return ge::GRAPH_FAILED);
@@ -478,8 +478,8 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckCaseMultiScenario(const ge
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckScenarioValid(const gert::InferShapeContext *context,
-                                                                    const GMMAttrs &gmmAttrs) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckScenarioValid(const gert::InferShapeContext* context,
+                                                                    const GMMAttrs& gmmAttrs) const
 {
     auto xSecondTensorShape = context->GetDynamicInputShape(GMM_INDEX_IN_X, 1);
     auto weightSecondTensorShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 1);
@@ -524,12 +524,12 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckScenarioValid(const gert::
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForGrouplist(const gert::InferShapeContext *context,
-                                                                        const gert::Shape *groupListShape) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForGrouplist(const gert::InferShapeContext* context,
+                                                                        const gert::Shape* groupListShape) const
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *groupListTypePtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_GROUP_LIST_TYPE);
+    const int64_t* groupListTypePtr = attrs->GetAttrPointer<int64_t>(GMM_INDEX_ATTR_GROUP_LIST_TYPE);
     OP_CHECK_NULL_WITH_CONTEXT(context, groupListTypePtr);
     const size_t expectedDimNum = (*groupListTypePtr == GROUP_LIST_SPARSE) ? GROUP_LIST_SPARSE_DIM_NUM : 1;
     OP_CHECK_IF(groupListShape->GetDimNum() != expectedDimNum,
@@ -551,7 +551,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForGrouplist(const ge
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckPertokenScaleForA8W4(const gert::InferShapeContext *context) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckPertokenScaleForA8W4(const gert::InferShapeContext* context) const
 {
     auto tensorShape = context->GetDynamicInputShape(GMM_INDEX_IN_PERTOKEN_SCALE, 0);
     size_t tensorDimNum = tensorShape->GetDimNum();
@@ -582,10 +582,10 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckPertokenScaleForA8W4(const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForTensorList(const gert::InferShapeContext *context,
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForTensorList(const gert::InferShapeContext* context,
                                                                          size_t gmm_index,
-                                                                         const std::string &tensorType,
-                                                                         const GMMAttrs &gmmAttrs) const
+                                                                         const std::string& tensorType,
+                                                                         const GMMAttrs& gmmAttrs) const
 {
     // 校验单单单场景antiquantScale/antiquantOffset/bias/scale的shape
     // A16MxF4/S8S4校验antiquant params的Shape为(g, k/groupSize, n)/(g, n, k/groupsize)，维度数为3
@@ -650,9 +650,9 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForTensorList(const g
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForTensorListAtIndex(const gert::InferShapeContext *context,
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForTensorListAtIndex(const gert::InferShapeContext* context,
                                                                                 size_t gmm_index,
-                                                                                const std::string &tensorType,
+                                                                                const std::string& tensorType,
                                                                                 size_t tensorIdx) const
 {
     auto tensorShape = context->GetDynamicInputShape(gmm_index, tensorIdx);
@@ -687,8 +687,8 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForTensorListAtIndex(
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForWeightQuantParam(const gert::InferShapeContext *context,
-                                                                               const GMMAttrs &gmmAttrs) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForWeightQuantParam(const gert::InferShapeContext* context,
+                                                                               const GMMAttrs& gmmAttrs) const
 {
     auto scaleShape = context->GetDynamicInputShape(GMM_INDEX_IN_SCALE, 0);
     auto offsetShape = context->GetDynamicInputShape(GMM_INDEX_IN_OFFSET, 0);
@@ -740,8 +740,8 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForWeightQuantParam(c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckGroupSize(const gert::InferShapeContext *context,
-                                                                const GMMAttrs &gmmAttrs, const size_t tensorIdx) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckGroupSize(const gert::InferShapeContext* context,
+                                                                const GMMAttrs& gmmAttrs, const size_t tensorIdx) const
 {
     if (!(IsA16MxFp4NZ(xDtype_, weightDtype_) || IsMxA8W4NZ(xDtype_, weightDtype_) || IsS8S4NZ(xDtype_, weightDtype_) ||
           IsA16W4Pergroup(xDtype_, weightDtype_, context, tensorIdx))) {
@@ -796,15 +796,15 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckGroupSize(const gert::Infe
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::GetNumOfInputs(const gert::InferShapeContext *context,
-                                                                GMMInputParamsInfo &paramsInputInfo) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::GetNumOfInputs(const gert::InferShapeContext* context,
+                                                                GMMInputParamsInfo& paramsInputInfo) const
 {
     ge::graphStatus res = ge::GRAPH_SUCCESS;
-    const gert::Shape *shape = nullptr;
+    const gert::Shape* shape = nullptr;
     struct ParamInfoTmp {
         int index;
-        size_t &count;
-        const char *name;
+        size_t& count;
+        const char* name;
     };
     ParamInfoTmp params[] = {{GMM_INDEX_IN_X, paramsInputInfo.numX, "numX"},
                              {GMM_INDEX_IN_WEIGHT, paramsInputInfo.numWeight, "numWeight"},
@@ -812,7 +812,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::GetNumOfInputs(const gert::Infe
                              {GMM_INDEX_IN_ANTIQUANT_SCALE, paramsInputInfo.numAntiquantScale, "numAntiquantScale"},
                              {GMM_INDEX_IN_ANTIQUANT_OFFSET, paramsInputInfo.numAntiquantOffset, "numAntiquantOffset"}};
 
-    for (auto &param : params) {
+    for (auto& param : params) {
         param.count = 0;
         for (int i = 0; i < GMM_MAX_GROUP_LIST_SIZE_ARRAY; i++) {
             shape = context->GetDynamicInputShape(param.index, param.count);
@@ -831,7 +831,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::GetNumOfInputs(const gert::Infe
 }
 
 ge::graphStatus GroupedMatmulWeightQuantChecker::CheckTensorListSizeMultiScenario(
-    const gert::InferShapeContext *context, const GMMInputParamsInfo &paramsInputInfo) const
+    const gert::InferShapeContext* context, const GMMInputParamsInfo& paramsInputInfo) const
 {
     // 检测 bias antiquantScale antiquantOffset的 tensorListsize 需要等于 weightSize
     if (hasBias_) {
@@ -858,8 +858,8 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckTensorListSizeMultiScenari
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeValidNoSplit(const gert::InferShapeContext *context,
-                                                                        const GMMAttrs &gmmAttrs)
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeValidNoSplit(const gert::InferShapeContext* context,
+                                                                        const GMMAttrs& gmmAttrs)
 {
     // 多多多场景校验
     GMMInputParamsInfo paramsInputInfo{0, 0, 0, 0, 0, 0, 0};
@@ -880,8 +880,8 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeValidNoSplit(const ge
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeValidSplitM(const gert::InferShapeContext *context,
-                                                                       const GMMAttrs &gmmAttrs)
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeValidSplitM(const gert::InferShapeContext* context,
+                                                                       const GMMAttrs& gmmAttrs)
 {
     auto groupListShape = context->GetOptionalInputShape(GMM_INDEX_IN_GROUP_LIST);
     OP_CHECK_NULL_WITH_CONTEXT(context, groupListShape);
@@ -917,8 +917,8 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeValidSplitM(const ger
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeValid(const gert::InferShapeContext *context,
-                                                                 const GMMAttrs &gmmAttrs)
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeValid(const gert::InferShapeContext* context,
+                                                                 const GMMAttrs& gmmAttrs)
 {
     if (gmmAttrs.groupType == GMM_NO_SPLIT) {
         return CheckShapeValidNoSplit(context, gmmAttrs);
@@ -928,7 +928,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeValid(const gert::Inf
     return ge::GRAPH_SUCCESS;
 }
 
-bool IsUnknownShape(const gert::Shape *shape)
+bool IsUnknownShape(const gert::Shape* shape)
 {
     if (IsNonEmpty(shape)) {
         size_t size = shape->GetDimNum();
@@ -942,7 +942,7 @@ bool IsUnknownShape(const gert::Shape *shape)
     return false;
 }
 
-bool CheckUnknownShape(const gert::InferShapeContext *context)
+bool CheckUnknownShape(const gert::InferShapeContext* context)
 {
     bool hasUnknownShape = false;
     auto xShape = context->GetDynamicInputShape(GMM_INDEX_IN_X, 0);
@@ -962,8 +962,8 @@ bool CheckUnknownShape(const gert::InferShapeContext *context)
     return hasUnknownShape;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShape(const gert::InferShapeContext *context,
-                                                            const GroupedMatmulCommonUtil &commonUtil)
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShape(const gert::InferShapeContext* context,
+                                                            const GroupedMatmulCommonUtil& commonUtil)
 {
     if (CheckUnknownShape(context)) {
         return ge::GRAPH_SUCCESS;
@@ -987,10 +987,10 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShape(const gert::InferSha
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::UpdateShapeY(gert::InferShapeContext *context, size_t idxY,
-                                                              std::vector<int64_t> &yDims) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::UpdateShapeY(gert::InferShapeContext* context, size_t idxY,
+                                                              std::vector<int64_t>& yDims) const
 {
-    gert::Shape *yShape = context->GetOutputShape(idxY);
+    gert::Shape* yShape = context->GetOutputShape(idxY);
     OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
     yShape->SetDimNum(yDims.size());
     for (size_t dim = 0; dim < yDims.size(); ++dim) {
@@ -999,18 +999,18 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::UpdateShapeY(gert::InferShapeCo
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::UpdateShapeYMultiDim(gert::InferShapeContext *context, size_t idxY,
-                                                                      const gert::Shape *xShape,
-                                                                      const gert::Shape *weightShape) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::UpdateShapeYMultiDim(gert::InferShapeContext* context, size_t idxY,
+                                                                      const gert::Shape* xShape,
+                                                                      const gert::Shape* weightShape) const
 {
-    gert::Shape *yShape = context->GetOutputShape(idxY);
+    gert::Shape* yShape = context->GetOutputShape(idxY);
     OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
     *yShape = *xShape;
     size_t dimY = yShape->GetDimNum();
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const bool *transposeWPtr = attrs->GetAttrPointer<bool>(GMM_INDEX_ATTR_TRANSPOSE_W);
-    const bool *transposeXPtr = attrs->GetAttrPointer<bool>(GMM_INDEX_ATTR_TRANSPOSE_X);
+    const bool* transposeWPtr = attrs->GetAttrPointer<bool>(GMM_INDEX_ATTR_TRANSPOSE_W);
+    const bool* transposeXPtr = attrs->GetAttrPointer<bool>(GMM_INDEX_ATTR_TRANSPOSE_X);
 
     OP_CHECK_NULL_WITH_CONTEXT(context, weightShape);
     if (transposeWPtr != nullptr && *transposeWPtr) {
@@ -1024,21 +1024,21 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::UpdateShapeYMultiDim(gert::Infe
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::InferOutShape(gert::InferShapeContext *context,
-                                                               const GMMAttrs &gmmAttrs) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::InferOutShape(gert::InferShapeContext* context,
+                                                               const GMMAttrs& gmmAttrs) const
 {
     if (gmmAttrs.groupType == GMM_NO_SPLIT) {
         size_t idx = 0;
         size_t idw = 0;
-        const gert::Shape *w0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
+        const gert::Shape* w0Shape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
         OP_CHECK_NULL_WITH_CONTEXT(context, w0Shape);
         for (int i = 0; i < GMM_MAX_GROUP_LIST_SIZE_ARRAY; i++) {
-            const gert::Shape *xShape = context->GetDynamicInputShape(GMM_INDEX_IN_X, idx);
+            const gert::Shape* xShape = context->GetDynamicInputShape(GMM_INDEX_IN_X, idx);
             if (xShape == nullptr) {
                 break;
             }
             ++idx;
-            const gert::Shape *wShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, idw);
+            const gert::Shape* wShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, idw);
             if (wShape) {
                 ++idw;
             } else {
@@ -1056,7 +1056,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::InferOutShape(gert::InferShapeC
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckScaleDtypeForS8S4(const gert::InferDataTypeContext *context) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckScaleDtypeForS8S4(const gert::InferDataTypeContext* context) const
 {
     auto perTokenScaleDtype = context->GetDynamicInputDataType(GMM_INDEX_IN_PERTOKEN_SCALE, 0);
     auto scaleDtype = context->GetDynamicInputDataType(GMM_INDEX_IN_SCALE, 0);
@@ -1076,7 +1076,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckScaleDtypeForS8S4(const ge
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckBiasDtype(const gert::InferDataTypeContext *context) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckBiasDtype(const gert::InferDataTypeContext* context) const
 {
     auto xDtype = context->GetDynamicInputDataType(GMM_INDEX_IN_X, 0);
     auto biasDtype = context->GetDynamicInputDataType(GMM_INDEX_IN_BIAS, 0);
@@ -1092,7 +1092,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckBiasDtype(const gert::Infe
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckTensorListDataType(const gert::InferDataTypeContext *context,
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckTensorListDataType(const gert::InferDataTypeContext* context,
                                                                          uint32_t index, const ge::DataType dtype) const
 {
     size_t inIdx = 0;
@@ -1110,7 +1110,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckTensorListDataType(const g
 }
 
 ge::graphStatus GroupedMatmulWeightQuantChecker::CheckMatmulDataType(
-    const gert::InferDataTypeContext *context, const ge::DataType xDtype, const ge::DataType weightDtype,
+    const gert::InferDataTypeContext* context, const ge::DataType xDtype, const ge::DataType weightDtype,
     const ge::DataType biasDtype, const ge::DataType antiquantScaleDtype, const ge::DataType antiquantOffsetDtype) const
 {
     // 单单单/多多多常规参数通用校验，PerTokenScale和scale当前仅支持单单单，暂不在此处校验
@@ -1139,7 +1139,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckMatmulDataType(
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::CheckDtype(const gert::InferDataTypeContext *context) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::CheckDtype(const gert::InferDataTypeContext* context) const
 {
     auto xDtype = context->GetDynamicInputDataType(GMM_INDEX_IN_X, 0);
     auto weightDtype = context->GetDynamicInputDataType(GMM_INDEX_IN_WEIGHT, 0);
@@ -1194,11 +1194,11 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckDtype(const gert::InferDat
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulWeightQuantChecker::InferOutDtype(gert::InferDataTypeContext *context) const
+ge::graphStatus GroupedMatmulWeightQuantChecker::InferOutDtype(gert::InferDataTypeContext* context) const
 {
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *outputDtype = attrs->GetInt(GMM_INDEX_ATTR_OUTPUT_DTYPE);
+    const int64_t* outputDtype = attrs->GetInt(GMM_INDEX_ATTR_OUTPUT_DTYPE);
     ge::DataType yDtype = context->GetDynamicInputDataType(GMM_INDEX_IN_X, 0);
     auto it = GMM_OUTPUT_DTYPE_MAP.find(*outputDtype);
     OP_CHECK_IF(it == GMM_OUTPUT_DTYPE_MAP.end(),

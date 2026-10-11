@@ -14,8 +14,8 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void grouped_matmul_add(
-    GM_ADDR x, GM_ADDR weight, GM_ADDR groupList, GM_ADDR y, GM_ADDR yRef, GM_ADDR workspace, GM_ADDR tiling);
+extern "C" __global__ __aicore__ void grouped_matmul_add(GM_ADDR x, GM_ADDR weight, GM_ADDR groupList, GM_ADDR y,
+                                                         GM_ADDR yRef, GM_ADDR workspace, GM_ADDR tiling);
 class grouped_matmul_add_test : public testing::Test {
 protected:
     static void SetUpTestCase()
@@ -136,7 +136,6 @@ TEST_F(grouped_matmul_add_test, test_case_fp16)
     tilingData->mmTilingData.dbL0A = true;
     tilingData->mmTilingData.dbL0B = true;
     tilingData->mmTilingData.dbL0C = false;
-
 
     ICPU_SET_TILING_KEY(0);
     int groupedListTypeMode = 2;

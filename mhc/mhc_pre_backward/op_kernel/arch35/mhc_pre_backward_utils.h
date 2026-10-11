@@ -118,8 +118,8 @@ struct InitParams {
     GM_ADDR grad_bias;
     GM_ADDR grad_gamma;
     GM_ADDR workspace;
-    TPipe *tPipeIn;
-    const MhcPreBackwardTilingData *tilingData;
+    TPipe* tPipeIn;
+    const MhcPreBackwardTilingData* tilingData;
 };
 
 struct OpRunInfo {

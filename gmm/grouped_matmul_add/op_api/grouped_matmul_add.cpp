@@ -18,9 +18,9 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(GroupedMatmulAdd);
 
-aclTensor *GroupedMatmulAdd(const aclTensor *x1, const aclTensor *x2, const aclTensor *groupList, aclTensor *yRef,
+aclTensor* GroupedMatmulAdd(const aclTensor* x1, const aclTensor* x2, const aclTensor* groupList, aclTensor* yRef,
                             bool transposeX, bool transposeWeight, int64_t groupType, int64_t groupListType,
-                            aclOpExecutor *executor)
+                            aclOpExecutor* executor)
 {
     L0_DFX(GroupedMatmulAdd, x1, x2, groupList, yRef);
     auto ret = INFER_SHAPE(GroupedMatmulAdd, OP_INPUT(x1, x2, groupList, yRef), OP_OUTPUT(yRef),

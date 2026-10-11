@@ -61,36 +61,36 @@ class HcCubeComputeSplitK {
 public:
     __aicore__ inline HcCubeComputeSplitK(){};
 
-    __aicore__ inline void Init(const GlobalTensor<float> &xGm, const GlobalTensor<float> &phiGm, TPipe *tpipe);
-    __aicore__ inline void ComputeDecode(const AscendC::GlobalTensor<float> &xGm,
-                                         const AscendC::GlobalTensor<float> &workspaceGlobalA2,
-                                         const AscendC::GlobalTensor<float> &workspaceGlobalAB,
-                                         const MmParams &mmParams);
-    __aicore__ inline void CopyInB1(uint64_t mGmOffset, uint64_t kGmOffset, uint64_t kL1Size, const MmParams &mmParams);
+    __aicore__ inline void Init(const GlobalTensor<float>& xGm, const GlobalTensor<float>& phiGm, TPipe* tpipe);
+    __aicore__ inline void ComputeDecode(const AscendC::GlobalTensor<float>& xGm,
+                                         const AscendC::GlobalTensor<float>& workspaceGlobalA2,
+                                         const AscendC::GlobalTensor<float>& workspaceGlobalAB,
+                                         const MmParams& mmParams);
+    __aicore__ inline void CopyInB1(uint64_t mGmOffset, uint64_t kGmOffset, uint64_t kL1Size, const MmParams& mmParams);
     __aicore__ inline void SetBL1Mte1ToMte2Flag();
     __aicore__ inline void WaitBL1Mte1ToMte2Flag();
     __aicore__ inline void End();
 
 private:
-    __aicore__ inline void CopyInA1(uint64_t kL1Size, const GlobalTensor<float> &aGlobal,
-                                    const LocalTensor<float> &al1Local, const MmParams &mmParams);
+    __aicore__ inline void CopyInA1(uint64_t kL1Size, const GlobalTensor<float>& aGlobal,
+                                    const LocalTensor<float>& al1Local, const MmParams& mmParams);
     //__aicore__ inline void DataCopyGmToL1(uint64_t kGmOffset, uint64_t l1LoopIdx, const MmParams &mmParams);
-    __aicore__ inline void CopyOut(const AscendC::GlobalTensor<float> &workspaceGlobal,
-                                   const AscendC::LocalTensor<float> &c1Local, uint64_t baseM, uint64_t baseN,
+    __aicore__ inline void CopyOut(const AscendC::GlobalTensor<float>& workspaceGlobal,
+                                   const AscendC::LocalTensor<float>& c1Local, uint64_t baseM, uint64_t baseN,
                                    bool enableNz2Nd, uint64_t N);
-    __aicore__ inline void Fixp(const AscendC::GlobalTensor<float> &workspaceGlobalA2,
-                                const AscendC::GlobalTensor<float> &workspaceGlobalAB, const MmParams &mmParams);
+    __aicore__ inline void Fixp(const AscendC::GlobalTensor<float>& workspaceGlobalA2,
+                                const AscendC::GlobalTensor<float>& workspaceGlobalAB, const MmParams& mmParams);
     __aicore__ inline void LoadAToL0A(uint64_t kL1Offset, uint64_t kL0Size, uint64_t l1LoopIdx,
-                                      const MmParams &mmParams);
+                                      const MmParams& mmParams);
     __aicore__ inline void LoadAToL0B(uint64_t kL1Offset, uint64_t kL0Size, uint64_t l1LoopIdx,
-                                      const MmParams &mmParams);
-    __aicore__ inline void MmadA2(uint64_t kGmOffset, uint64_t kL0Size, bool isLastK, const MmParams &mmParams);
+                                      const MmParams& mmParams);
+    __aicore__ inline void MmadA2(uint64_t kGmOffset, uint64_t kL0Size, bool isLastK, const MmParams& mmParams);
     __aicore__ inline void LoadBToL0B(uint64_t kL1Offset, uint64_t kL0Size, uint64_t l1LoopIdx,
-                                      const MmParams &mmParams);
-    __aicore__ inline void MmadAB(uint64_t kGmOffset, uint64_t kL0Size, bool isLastK, const MmParams &mmParams);
+                                      const MmParams& mmParams);
+    __aicore__ inline void MmadAB(uint64_t kGmOffset, uint64_t kL0Size, bool isLastK, const MmParams& mmParams);
 
-    TPipe *pipe_;
-    const MhcPreSinkhornTilingData *tiling_;
+    TPipe* pipe_;
+    const MhcPreSinkhornTilingData* tiling_;
 
     int32_t blkIdx_ = -1;
     int64_t batch_ = 0;
@@ -147,9 +147,9 @@ private:
 };
 
 MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_PARAM
-__aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::Init(const GlobalTensor<float> &xGm,
-                                                                                  const GlobalTensor<float> &phiGm,
-                                                                                  TPipe *tpipe)
+__aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::Init(const GlobalTensor<float>& xGm,
+                                                                                  const GlobalTensor<float>& phiGm,
+                                                                                  TPipe* tpipe)
 {
     phiGm_ = phiGm;
 
@@ -186,7 +186,7 @@ __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::Ini
 
 MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_PARAM
 __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::CopyInA1(
-    uint64_t kL1Size, const GlobalTensor<float> &aGlobal, const LocalTensor<float> &al1Local, const MmParams &mmParams)
+    uint64_t kL1Size, const GlobalTensor<float>& aGlobal, const LocalTensor<float>& al1Local, const MmParams& mmParams)
 {
     Nd2NzParams nd2nzParams;
     nd2nzParams.ndNum = 1;
@@ -204,7 +204,7 @@ MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_PARAM
 __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::CopyInB1(uint64_t mGmOffset,
                                                                                       uint64_t kGmOffset,
                                                                                       uint64_t kL1Size,
-                                                                                      const MmParams &mmParams)
+                                                                                      const MmParams& mmParams)
 {
     AscendC::Nd2NzParams nd2nzParams;
     nd2nzParams.ndNum = 1;
@@ -221,7 +221,7 @@ __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::Cop
 
 MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_PARAM
 __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::CopyOut(
-    const AscendC::GlobalTensor<float> &workspaceGlobal, const AscendC::LocalTensor<float> &c1Local, uint64_t baseM,
+    const AscendC::GlobalTensor<float>& workspaceGlobal, const AscendC::LocalTensor<float>& c1Local, uint64_t baseM,
     uint64_t baseN, bool enableNz2Nd, uint64_t N)
 {
     AscendC::DataCopyCO12DstParams intriParams;
@@ -245,8 +245,8 @@ __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::Cop
 
 MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_PARAM
 __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::Fixp(
-    const AscendC::GlobalTensor<float> &workspaceGlobalA2, const AscendC::GlobalTensor<float> &workspaceGlobalAB,
-    const MmParams &mmParams)
+    const AscendC::GlobalTensor<float>& workspaceGlobalA2, const AscendC::GlobalTensor<float>& workspaceGlobalAB,
+    const MmParams& mmParams)
 {
     // Copy MmadA2
     CopyOut(workspaceGlobalA2, l0c_[(l0cLoopIdx_ % L0C_BUF_NUM) * L0C_BUF_OFFSET], mmParams.curML1, BLOCK_CUBE, false,
@@ -272,8 +272,8 @@ __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::Wai
 
 MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_PARAM
 __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::ComputeDecode(
-    const AscendC::GlobalTensor<float> &xGm, const AscendC::GlobalTensor<float> &workspaceGlobalA2,
-    const AscendC::GlobalTensor<float> &workspaceGlobalAB, const MmParams &mmParams)
+    const AscendC::GlobalTensor<float>& xGm, const AscendC::GlobalTensor<float>& workspaceGlobalA2,
+    const AscendC::GlobalTensor<float>& workspaceGlobalAB, const MmParams& mmParams)
 {
     WaitFlag<HardEvent::MTE1_MTE2>(X_MTE1_MTE2_EVENT + l1aLoopIdx_ % L1_BUF_NUM);
     uint64_t kGmOffset = 0;
@@ -363,7 +363,7 @@ MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_PARAM
 __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::LoadAToL0A(uint64_t kL1Offset,
                                                                                         uint64_t kL0Size,
                                                                                         uint64_t l1LoopIdx,
-                                                                                        const MmParams &mmParams)
+                                                                                        const MmParams& mmParams)
 {
     static constexpr IsResetLoad3dConfig LOAD3DV2_CONFIG = {true, true};
     LoadData3DParamsV2<float> loadData3DParams;
@@ -403,7 +403,7 @@ MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_PARAM
 __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::LoadAToL0B(uint64_t kL1Offset,
                                                                                         uint64_t kL0Size,
                                                                                         uint64_t l1LoopIdx,
-                                                                                        const MmParams &mmParams)
+                                                                                        const MmParams& mmParams)
 {
     // mk nz -> m,k zz
     for (uint64_t mL0Offset = 0; mL0Offset < mmParams.curML1; mL0Offset += BLOCK_CUBE) {
@@ -424,7 +424,7 @@ __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::Loa
 MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_PARAM
 __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::MmadA2(uint64_t kGmOffset,
                                                                                     uint64_t kL0Size, bool isLastK,
-                                                                                    const MmParams &mmParams)
+                                                                                    const MmParams& mmParams)
 {
     SetFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
     WaitFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
@@ -447,7 +447,7 @@ MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_PARAM
 __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::LoadBToL0B(uint64_t kL1Offset,
                                                                                         uint64_t kL0Size,
                                                                                         uint64_t l1LoopIdx,
-                                                                                        const MmParams &mmParams)
+                                                                                        const MmParams& mmParams)
 {
     LoadData2DParams l1ToL0bParams;
     l1ToL0bParams.startIndex = 0;
@@ -465,7 +465,7 @@ __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::Loa
 MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_PARAM
 __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::MmadAB(uint64_t kGmOffset,
                                                                                     uint64_t kL0Size, bool isLastK,
-                                                                                    const MmParams &mmParams)
+                                                                                    const MmParams& mmParams)
 {
     SetFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
     WaitFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
@@ -490,8 +490,8 @@ MHC_PRE_SINKHORN_CUBE_COMPUTE_TEMPLATE_PARAM
 class HcCubeCompute {
 public:
     __aicore__ inline HcCubeCompute(){};
-    __aicore__ inline void Init(const GlobalTensor<float> &xGm, const GlobalTensor<float> &phiGm,
-                                const GlobalTensor<float> &workspaceGlobalAB, int64_t bs, int64_t n, int64_t c,
+    __aicore__ inline void Init(const GlobalTensor<float>& xGm, const GlobalTensor<float>& phiGm,
+                                const GlobalTensor<float>& workspaceGlobalAB, int64_t bs, int64_t n, int64_t c,
                                 int64_t vecCoreNum);
     __aicore__ inline void ProcessMatmulXPhi(const int32_t taskOffset, const int32_t mm1M);
 
@@ -513,9 +513,9 @@ public:
 };
 
 MHC_PRE_SINKHORN_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_TEMPLATE_CLASS::Init(const GlobalTensor<float> &xGm,
-                                                                          const GlobalTensor<float> &phiGm,
-                                                                          const GlobalTensor<float> &workspaceGlobalAB,
+__aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_TEMPLATE_CLASS::Init(const GlobalTensor<float>& xGm,
+                                                                          const GlobalTensor<float>& phiGm,
+                                                                          const GlobalTensor<float>& workspaceGlobalAB,
                                                                           int64_t bs, int64_t n, int64_t c,
                                                                           int64_t vecCoreNum)
 {

@@ -103,7 +103,7 @@ public:
     static constexpr auto L1B_LAYOUT = LayoutBInL1::template MakeLayout<ElementB>(L1TileShape::K, L1TileShape::N);
 
     CATLASS_DEVICE
-    BlockMmad(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart = 0)
+    BlockMmad(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart = 0)
     {
         InitL1(resource, l1BufAddrStart);
         InitL0A(resource);
@@ -132,11 +132,11 @@ public:
 
     // 左矩阵分四块copy
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementA> const &gmBlockA, LayoutA const &layoutA,
-                    AscendC::GlobalTensor<ElementB> const &gmBlockB, LayoutB const &layoutB,
-                    AscendC::GlobalTensor<ElementC> const &gmBlockC, LayoutC const &layoutC,
-                    GemmCoord const &actualShape, int needCopyL1Left, int needAtomicAdd, uint8_t needLeftCopyFlag,
-                    uint8_t isFisrtBlock, Callback const &callbackBeforeFixpipe, Callback const &callbackAfterFixpipe)
+    void operator()(AscendC::GlobalTensor<ElementA> const& gmBlockA, LayoutA const& layoutA,
+                    AscendC::GlobalTensor<ElementB> const& gmBlockB, LayoutB const& layoutB,
+                    AscendC::GlobalTensor<ElementC> const& gmBlockC, LayoutC const& layoutC,
+                    GemmCoord const& actualShape, int needCopyL1Left, int needAtomicAdd, uint8_t needLeftCopyFlag,
+                    uint8_t isFisrtBlock, Callback const& callbackBeforeFixpipe, Callback const& callbackAfterFixpipe)
     {
         uint32_t kaTileCount = CeilDiv<L1TileShape::K>(actualShape.k());
 
@@ -196,7 +196,7 @@ public:
                 uint32_t preloadL1TileMmadParamsId = (l1TileMmadParamsId + preloadCount < PRELOAD_STAGES) ?
                                                          (l1TileMmadParamsId + preloadCount) :
                                                          (l1TileMmadParamsId + preloadCount - PRELOAD_STAGES);
-                auto &l1TileMmadParams = l1TileMmadParamsList[preloadL1TileMmadParamsId];
+                auto& l1TileMmadParams = l1TileMmadParamsList[preloadL1TileMmadParamsId];
                 l1TileMmadParams.l1AListId = l1AListId;
                 l1TileMmadParams.l1AOffset = kbLoopIdx;
                 l1TileMmadParams.l1BListId = l1BListId;
@@ -275,7 +275,7 @@ private:
     };
 
     CATLASS_DEVICE
-    void InitL1(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart)
+    void InitL1(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart)
     {
         uint32_t l1AOffset = l1BufAddrStart;
         uint32_t l1BOffset = l1BufAddrStart + L1A_TILE_SIZE * L1A_STAGES;
@@ -294,7 +294,7 @@ private:
     }
 
     CATLASS_DEVICE
-    void InitL0A(Arch::Resource<ArchTag> &resource)
+    void InitL0A(Arch::Resource<ArchTag>& resource)
     {
         for (uint32_t i = 0; i < L0A_STAGES; ++i) {
             l0ATensorList[i] = resource.l0ABuf.template GetBufferByByte<ElementA>(L0A_TILE_SIZE * i);
@@ -304,7 +304,7 @@ private:
     }
 
     CATLASS_DEVICE
-    void InitL0B(Arch::Resource<ArchTag> &resource)
+    void InitL0B(Arch::Resource<ArchTag>& resource)
     {
         for (uint32_t i = 0; i < L0B_STAGES; ++i) {
             l0BTensorList[i] = resource.l0BBuf.template GetBufferByByte<ElementB>(L0B_TILE_SIZE * i);
@@ -314,7 +314,7 @@ private:
     }
 
     CATLASS_DEVICE
-    void InitL0C(Arch::Resource<ArchTag> &resource)
+    void InitL0C(Arch::Resource<ArchTag>& resource)
     {
         for (uint32_t i = 0; i < L0C_STAGES; ++i) {
             l0CTensorList[i] = resource.l0CBuf.template GetBufferByByte<ElementAccumulator>(L0C_TILE_SIZE * i);
@@ -324,15 +324,15 @@ private:
     }
 
     CATLASS_DEVICE
-    void L1TileMmad(L1TileMmadParams const &params)
+    void L1TileMmad(L1TileMmadParams const& params)
     {
         uint32_t mPartLoop = CeilDiv<L0TileShape::M>(params.mRound);
         uint32_t nPartLoop = CeilDiv<L0TileShape::N>(params.nRound);
         uint32_t kPartLoop = CeilDiv<L0TileShape::K>(params.kActualRight);
-        auto &l1ATensor = l1ATensorList[params.l1AListId];
-        auto &l1BTensor = l1BTensorList[params.l1BListId];
+        auto& l1ATensor = l1ATensorList[params.l1AListId];
+        auto& l1BTensor = l1BTensorList[params.l1BListId];
 
-        auto &l0CTensor = l0CTensorList[l0CListId];
+        auto& l0CTensor = l0CTensorList[l0CListId];
         LayoutCInL0 layoutCInL0 = LayoutCInL0::MakeLayoutInL0C(MakeCoord(params.mRound, params.nRound));
 
         if constexpr (!ENABLE_UNIT_FLAG) {
@@ -348,7 +348,7 @@ private:
                 uint32_t kPartActual =
                     (kPartIdx < kPartLoop - 1) ? L0TileShape::K : (params.kActualRight - kPartIdx * L0TileShape::K);
 
-                auto &l0ATile = l0ATensorList[l0AListId];
+                auto& l0ATile = l0ATensorList[l0AListId];
                 auto layoutAInL0 = LayoutAInL0::template MakeLayout<ElementA>(mPartActual, kPartActual);
                 auto l1AOffset =
                     MakeCoord(mPartIdx, kPartIdx + params.l1AOffset * kPartLoop) * L0TileShape::ToCoordMK();
@@ -369,7 +369,7 @@ private:
                     uint32_t nPartActual =
                         (nPartIdx < nPartLoop - 1) ? L0TileShape::N : (params.nRound - nPartIdx * L0TileShape::N);
 
-                    auto &l0BTile = l0BTensorList[l0BListId];
+                    auto& l0BTile = l0BTensorList[l0BListId];
                     auto layoutBInL0 = LayoutBInL0::template MakeLayout<ElementB>(kPartActual, nPartActual);
                     auto l1BOffset = MakeCoord(kPartIdx, nPartIdx) * L0TileShape::ToCoordKN();
                     auto l1BTile = l1BTensor[L1B_LAYOUT.GetOffset(l1BOffset)];

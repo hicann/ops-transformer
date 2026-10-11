@@ -39,7 +39,7 @@ extern "C" {
 
 namespace {
 
-constexpr const char *ACLNN_OP_NAME = "aclnnMhcPreGetWorkspaceSize";
+constexpr const char* ACLNN_OP_NAME = "aclnnMhcPreGetWorkspaceSize";
 constexpr size_t DIM_NUM_1 = 1UL;
 constexpr size_t DIM_NUM_2 = 2UL;
 constexpr size_t DIM_NUM_3 = 3UL;
@@ -69,12 +69,12 @@ static int64_t Factorial(int64_t n)
     return r;
 }
 
-static bool CheckAlphaShape(const aclTensor *alphaTensor);
+static bool CheckAlphaShape(const aclTensor* alphaTensor);
 static bool ValidateNDParams(int64_t n, int64_t d);
 static bool ValidateNDParamsA2(int64_t n, int64_t d);
-static bool CheckTensorShape(const aclTensor *tensor, std::initializer_list<int64_t> expectedShape, const char *name);
+static bool CheckTensorShape(const aclTensor* tensor, std::initializer_list<int64_t> expectedShape, const char* name);
 
-static std::string TensorShapeToString(const aclTensor *tensor)
+static std::string TensorShapeToString(const aclTensor* tensor)
 {
     const auto shape = tensor->GetViewShape();
     std::string result = "[";
@@ -94,7 +94,7 @@ static std::string ExpectedShapeToString(std::initializer_list<int64_t> shape)
     return result + "]";
 }
 
-static bool CheckRequiredTensor(const aclTensor *tensor, const char *name, const char *reason)
+static bool CheckRequiredTensor(const aclTensor* tensor, const char* name, const char* reason)
 {
     if (tensor == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, name, "nullptr", reason);
@@ -103,7 +103,7 @@ static bool CheckRequiredTensor(const aclTensor *tensor, const char *name, const
     return true;
 }
 
-static bool CheckNonEmptyTensor(const aclTensor *tensor, const char *name)
+static bool CheckNonEmptyTensor(const aclTensor* tensor, const char* name)
 {
     if (tensor->IsEmpty()) {
         const std::string actualShape = TensorShapeToString(tensor);
@@ -113,7 +113,7 @@ static bool CheckNonEmptyTensor(const aclTensor *tensor, const char *name)
     return true;
 }
 
-static bool CheckTensorRank(const aclTensor *tensor, const char *name, size_t expectedRank)
+static bool CheckTensorRank(const aclTensor* tensor, const char* name, size_t expectedRank)
 {
     const size_t actualRank = tensor->GetViewShape().GetDimNum();
     if (actualRank != expectedRank) {
@@ -124,7 +124,7 @@ static bool CheckTensorRank(const aclTensor *tensor, const char *name, size_t ex
     return true;
 }
 
-static bool CheckTensorDtype(const aclTensor *tensor, const char *name, DataType expectedDtype)
+static bool CheckTensorDtype(const aclTensor* tensor, const char* name, DataType expectedDtype)
 {
     const auto actualDtype = tensor->GetDataType();
     if (actualDtype != expectedDtype) {
@@ -136,28 +136,28 @@ static bool CheckTensorDtype(const aclTensor *tensor, const char *name, DataType
 }
 
 struct MhcParamsBase {
-    const aclTensor *x = nullptr;
-    const aclTensor *phi = nullptr;
-    const aclTensor *alpha = nullptr;
-    const aclTensor *bias = nullptr;
-    const aclTensor *gammaOptional = nullptr;
+    const aclTensor* x = nullptr;
+    const aclTensor* phi = nullptr;
+    const aclTensor* alpha = nullptr;
+    const aclTensor* bias = nullptr;
+    const aclTensor* gammaOptional = nullptr;
     double normEps;
     double hcEps;
     int64_t opImplMode = MHC_PRE_USE_FP32;
-    aclTensor *hIn = nullptr;
-    aclTensor *hPost = nullptr;
-    aclTensor *hRes = nullptr;
-    aclTensor *invRmsOptional = nullptr;
-    aclTensor *hMixOptional = nullptr;
-    aclTensor *hPreOptional = nullptr;
+    aclTensor* hIn = nullptr;
+    aclTensor* hPost = nullptr;
+    aclTensor* hRes = nullptr;
+    aclTensor* invRmsOptional = nullptr;
+    aclTensor* hMixOptional = nullptr;
+    aclTensor* hPreOptional = nullptr;
     bool hasResi = true;
 
     // 用于存储转换后的连续tensor（在ConvertDataContiguous中使用）
-    const aclTensor *xContiguous = nullptr;
-    const aclTensor *phiContiguous = nullptr;
-    const aclTensor *alphaContiguous = nullptr;
-    const aclTensor *biasContiguous = nullptr;
-    const aclTensor *gammaOptionalContiguous = nullptr;
+    const aclTensor* xContiguous = nullptr;
+    const aclTensor* phiContiguous = nullptr;
+    const aclTensor* alphaContiguous = nullptr;
+    const aclTensor* biasContiguous = nullptr;
+    const aclTensor* gammaOptionalContiguous = nullptr;
 };
 
 class MhcBuilder {
@@ -169,8 +169,8 @@ public:
         return obj;
     }
 
-    MhcBuilder &SetInput(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias,
-                         const aclTensor *gammaOptional)
+    MhcBuilder& SetInput(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias,
+                         const aclTensor* gammaOptional)
     {
         obj_.x = x;
         obj_.phi = phi;
@@ -180,7 +180,7 @@ public:
         return *this;
     }
 
-    MhcBuilder &SetAttr(double normEps, double hcEps, int64_t opImplMode)
+    MhcBuilder& SetAttr(double normEps, double hcEps, int64_t opImplMode)
     {
         obj_.normEps = normEps;
         obj_.hcEps = hcEps;
@@ -188,7 +188,7 @@ public:
         return *this;
     }
 
-    MhcBuilder &SetOutput(aclTensor *hIn, aclTensor *hPost, aclTensor *hRes)
+    MhcBuilder& SetOutput(aclTensor* hIn, aclTensor* hPost, aclTensor* hRes)
     {
         obj_.hIn = hIn;
         obj_.hPost = hPost;
@@ -196,7 +196,7 @@ public:
         return *this;
     }
 
-    MhcBuilder &SetOptionalOutput(aclTensor *invRmsOptional, aclTensor *hMixOptional, aclTensor *hPreOptional)
+    MhcBuilder& SetOptionalOutput(aclTensor* invRmsOptional, aclTensor* hMixOptional, aclTensor* hPreOptional)
     {
         obj_.invRmsOptional = invRmsOptional;
         obj_.hMixOptional = hMixOptional;
@@ -214,7 +214,7 @@ private:
     MhcParamsBase obj_;
 };
 
-static bool CheckNotNull(const MhcParamsBase &params)
+static bool CheckNotNull(const MhcParamsBase& params)
 {
     return CheckRequiredTensor(params.x, "x", "required input tensor must not be nullptr") &&
            CheckRequiredTensor(params.phi, "phi", "required input tensor must not be nullptr") &&
@@ -224,7 +224,7 @@ static bool CheckNotNull(const MhcParamsBase &params)
            CheckRequiredTensor(params.hPost, "hPost", "required output tensor must not be nullptr");
 }
 
-static bool CheckRequiredHRes(const MhcParamsBase &params)
+static bool CheckRequiredHRes(const MhcParamsBase& params)
 {
     if (params.alpha->GetViewShape().GetDim(DIM_IDX_0) == ALPHA_DIM_SIZE_3 && params.hRes == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "hRes", "nullptr",
@@ -234,13 +234,13 @@ static bool CheckRequiredHRes(const MhcParamsBase &params)
     return true;
 }
 
-static bool CheckEmptyTensor(const MhcParamsBase &params)
+static bool CheckEmptyTensor(const MhcParamsBase& params)
 {
     return CheckNonEmptyTensor(params.x, "x") && CheckNonEmptyTensor(params.phi, "phi") &&
            CheckNonEmptyTensor(params.alpha, "alpha") && CheckNonEmptyTensor(params.bias, "bias");
 }
 
-static bool CheckInputDims(const MhcParamsBase &params)
+static bool CheckInputDims(const MhcParamsBase& params)
 {
     // x dims must be 3 or 4
     auto xDimNum = params.x->GetViewShape().GetDimNum();
@@ -256,7 +256,7 @@ static bool CheckInputDims(const MhcParamsBase &params)
     return params.gammaOptional == nullptr || CheckTensorRank(params.gammaOptional, "gammaOptional", DIM_NUM_2);
 }
 
-static bool CheckInputDimsA2(const MhcParamsBase &params)
+static bool CheckInputDimsA2(const MhcParamsBase& params)
 {
     // x dims must be 3 or 4
     auto xDimNum = params.x->GetViewShape().GetDimNum();
@@ -283,7 +283,7 @@ static bool CheckInputDimsA2(const MhcParamsBase &params)
     return true;
 }
 
-static bool CheckOutputDims(const MhcParamsBase &params)
+static bool CheckOutputDims(const MhcParamsBase& params)
 {
     auto xDimNum = params.x->GetViewShape().GetDimNum();
     size_t outputDimNum = xDimNum == DIM_NUM_4 ? DIM_NUM_3 : DIM_NUM_2;
@@ -294,7 +294,7 @@ static bool CheckOutputDims(const MhcParamsBase &params)
     return alphaSize != ALPHA_DIM_SIZE_3 || CheckTensorRank(params.hRes, "hRes", xDimNum);
 }
 
-static bool CheckOutputDimsA2(const MhcParamsBase &params)
+static bool CheckOutputDimsA2(const MhcParamsBase& params)
 {
     auto xShape = params.x->GetViewShape();
     auto phiShape = params.phi->GetViewShape();
@@ -328,7 +328,7 @@ static bool CheckOutputDimsA2(const MhcParamsBase &params)
     return true;
 }
 
-static bool CheckOptionalOutputGroup(const MhcParamsBase &params)
+static bool CheckOptionalOutputGroup(const MhcParamsBase& params)
 {
     bool hasAnyOptional =
         params.invRmsOptional != nullptr || params.hMixOptional != nullptr || params.hPreOptional != nullptr;
@@ -347,7 +347,7 @@ static bool CheckOptionalOutputGroup(const MhcParamsBase &params)
     return true;
 }
 
-static bool CheckOptionalOutputDims(const MhcParamsBase &params)
+static bool CheckOptionalOutputDims(const MhcParamsBase& params)
 {
     if (params.invRmsOptional == nullptr) {
         return true;
@@ -360,7 +360,7 @@ static bool CheckOptionalOutputDims(const MhcParamsBase &params)
            CheckTensorRank(params.hPreOptional, "hPreOptional", outputDimNum);
 }
 
-static bool CheckOptionalOutputDimsA2(const MhcParamsBase &params)
+static bool CheckOptionalOutputDimsA2(const MhcParamsBase& params)
 {
     if (params.invRmsOptional == nullptr) {
         return true;
@@ -380,12 +380,12 @@ static bool CheckOptionalOutputDimsA2(const MhcParamsBase &params)
     return true;
 }
 
-static bool CheckOutputAndOptionalDims(const MhcParamsBase &params)
+static bool CheckOutputAndOptionalDims(const MhcParamsBase& params)
 {
     return CheckOutputDims(params) && CheckOptionalOutputGroup(params) && CheckOptionalOutputDims(params);
 }
 
-static void GetXShapeInfo(const MhcParamsBase &params, int64_t &n, int64_t &d, int64_t &nD)
+static void GetXShapeInfo(const MhcParamsBase& params, int64_t& n, int64_t& d, int64_t& nD)
 {
     auto xShape = params.x->GetViewShape();
     auto xDimNum = xShape.GetDimNum();
@@ -394,7 +394,7 @@ static void GetXShapeInfo(const MhcParamsBase &params, int64_t &n, int64_t &d, i
     nD = n * d;
 }
 
-static bool CheckParamShapes(const MhcParamsBase &params, int64_t n, int64_t d, int64_t nD, int64_t expectedParamRows)
+static bool CheckParamShapes(const MhcParamsBase& params, int64_t n, int64_t d, int64_t nD, int64_t expectedParamRows)
 {
     if (!ValidateNDParams(n, d) || !CheckTensorShape(params.phi, {expectedParamRows, nD}, "phi") ||
         !CheckTensorShape(params.bias, {expectedParamRows}, "bias")) {
@@ -403,7 +403,7 @@ static bool CheckParamShapes(const MhcParamsBase &params, int64_t n, int64_t d, 
     return params.gammaOptional == nullptr || CheckTensorShape(params.gammaOptional, {n, d}, "gammaOptional");
 }
 
-static bool CheckParamShapesA2(const MhcParamsBase &params, int64_t n, int64_t d, int64_t nD, int64_t alphaSize,
+static bool CheckParamShapesA2(const MhcParamsBase& params, int64_t n, int64_t d, int64_t nD, int64_t alphaSize,
                                int64_t expectedPhiRows_factorial, int64_t expectedPhiRows_pow, int64_t phiShape_dim0)
 {
     // n,d must bigger than 0  || n must be 4,6,8 ||  d must align to 16/128
@@ -447,7 +447,7 @@ static bool CheckParamShapesA2(const MhcParamsBase &params, int64_t n, int64_t d
     return true;
 }
 
-static bool CheckOutputShape4D(const MhcParamsBase &params, int64_t n, int64_t d, int64_t expectedPhiRows)
+static bool CheckOutputShape4D(const MhcParamsBase& params, int64_t n, int64_t d, int64_t expectedPhiRows)
 {
     auto xShape = params.x->GetViewShape();
     int64_t alphaSize = params.alpha->GetViewShape().GetDim(0);
@@ -467,7 +467,7 @@ static bool CheckOutputShape4D(const MhcParamsBase &params, int64_t n, int64_t d
            CheckTensorShape(params.hPreOptional, {b, s, n}, "hPreOptional");
 }
 
-static bool CheckOutputShape4DA2(const MhcParamsBase &params, int64_t b, int64_t s, int64_t n, int64_t d,
+static bool CheckOutputShape4DA2(const MhcParamsBase& params, int64_t b, int64_t s, int64_t n, int64_t d,
                                  int64_t alphaSize, int64_t expectedPhiRows_factorial, int64_t expectedPhiRows_pow,
                                  int64_t phiShape_dim0)
 {
@@ -505,7 +505,7 @@ static bool CheckOutputShape4DA2(const MhcParamsBase &params, int64_t b, int64_t
     return true;
 }
 
-static bool CheckOutputShape3D(const MhcParamsBase &params, int64_t n, int64_t d, int64_t expectedPhiRows)
+static bool CheckOutputShape3D(const MhcParamsBase& params, int64_t n, int64_t d, int64_t expectedPhiRows)
 {
     auto xShape = params.x->GetViewShape();
     int64_t alphaSize = params.alpha->GetViewShape().GetDim(0);
@@ -524,7 +524,7 @@ static bool CheckOutputShape3D(const MhcParamsBase &params, int64_t n, int64_t d
            CheckTensorShape(params.hPreOptional, {t, n}, "hPreOptional");
 }
 
-static bool CheckOutputShape3DA2(const MhcParamsBase &params, int64_t t, int64_t n, int64_t d, int64_t alphaSize,
+static bool CheckOutputShape3DA2(const MhcParamsBase& params, int64_t t, int64_t n, int64_t d, int64_t alphaSize,
                                  int64_t expectedPhiRows_factorial, int64_t expectedPhiRows_pow, int64_t phiShape_dim0)
 {
     if (!CheckTensorShape(params.hIn, {t, d}, "hIn")) {
@@ -567,7 +567,7 @@ static bool CheckOutputShape3DA2(const MhcParamsBase &params, int64_t t, int64_t
     return true;
 }
 
-static bool CheckInputOutShape(const MhcParamsBase &params)
+static bool CheckInputOutShape(const MhcParamsBase& params)
 {
     int64_t n = 0;
     int64_t d = 0;
@@ -584,7 +584,7 @@ static bool CheckInputOutShape(const MhcParamsBase &params)
     return CheckOutputShape3D(params, n, d, expectedParamRows);
 }
 
-static bool CheckInputOutShapeA2(const MhcParamsBase &params)
+static bool CheckInputOutShapeA2(const MhcParamsBase& params)
 {
     int64_t n = 0;
     int64_t d = 0;
@@ -616,7 +616,7 @@ static bool CheckInputOutShapeA2(const MhcParamsBase &params)
     return true;
 }
 
-static bool CheckTensorShape(const aclTensor *tensor, std::initializer_list<int64_t> expectedShape, const char *name)
+static bool CheckTensorShape(const aclTensor* tensor, std::initializer_list<int64_t> expectedShape, const char* name)
 {
     const auto tensorShape = tensor->GetViewShape();
     const size_t actualRank = tensorShape.GetDimNum();
@@ -637,7 +637,7 @@ static bool CheckTensorShape(const aclTensor *tensor, std::initializer_list<int6
     return true;
 }
 
-static bool CheckAlphaShape(const aclTensor *alphaTensor)
+static bool CheckAlphaShape(const aclTensor* alphaTensor)
 {
     auto alphaShape = alphaTensor->GetViewShape();
     int64_t alphaSize = alphaShape.GetDim(0);
@@ -707,12 +707,12 @@ static bool ValidateNDParamsA2(int64_t n, int64_t d)
     return true;
 }
 
-static bool CheckInputDtype(const MhcParamsBase &params)
+static bool CheckInputDtype(const MhcParamsBase& params)
 {
     const std::initializer_list<DataType> X_SUPPORT_DTYPE_LIST = {DataType::DT_BF16, DataType::DT_FLOAT16};
     auto xDtype = params.x->GetDataType();
     bool xDtypeValid = false;
-    for (const auto &dtype : X_SUPPORT_DTYPE_LIST) {
+    for (const auto& dtype : X_SUPPORT_DTYPE_LIST) {
         if (xDtype == dtype) {
             xDtypeValid = true;
             break;
@@ -738,7 +738,7 @@ static bool CheckInputDtype(const MhcParamsBase &params)
     return true;
 }
 
-static bool CheckOutputDtype(const MhcParamsBase &params)
+static bool CheckOutputDtype(const MhcParamsBase& params)
 {
     if (!CheckTensorDtype(params.hIn, "hIn", params.x->GetDataType())) {
         return false;
@@ -752,7 +752,7 @@ static bool CheckOutputDtype(const MhcParamsBase &params)
     return true;
 }
 
-static bool CheckOptionalOutputDtype(const MhcParamsBase &params)
+static bool CheckOptionalOutputDtype(const MhcParamsBase& params)
 {
     if (params.invRmsOptional == nullptr) {
         return true;
@@ -769,7 +769,7 @@ static bool CheckOptionalOutputDtype(const MhcParamsBase &params)
     return true;
 }
 
-static bool CheckDtypeValid(const MhcParamsBase &params)
+static bool CheckDtypeValid(const MhcParamsBase& params)
 {
     return CheckInputDtype(params) && CheckOutputDtype(params) && CheckOptionalOutputDtype(params);
 }
@@ -784,7 +784,7 @@ static bool IsPrivateFormat(ge::Format format)
     return false;
 }
 
-static bool CheckTensorFormat(const aclTensor *tensor, const char *name)
+static bool CheckTensorFormat(const aclTensor* tensor, const char* name)
 {
     if (IsPrivateFormat(tensor->GetViewFormat())) {
         OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(ACLNN_OP_NAME, name, op::ToString(tensor->GetViewFormat()).GetString(),
@@ -794,7 +794,7 @@ static bool CheckTensorFormat(const aclTensor *tensor, const char *name)
     return true;
 }
 
-static bool CheckInputFormat(const MhcParamsBase &params)
+static bool CheckInputFormat(const MhcParamsBase& params)
 {
     if (!CheckTensorFormat(params.x, "x")) {
         return false;
@@ -814,7 +814,7 @@ static bool CheckInputFormat(const MhcParamsBase &params)
     return true;
 }
 
-static bool CheckOutputFormat(const MhcParamsBase &params)
+static bool CheckOutputFormat(const MhcParamsBase& params)
 {
     if (!CheckTensorFormat(params.hIn, "hIn")) {
         return false;
@@ -828,7 +828,7 @@ static bool CheckOutputFormat(const MhcParamsBase &params)
     return true;
 }
 
-static bool CheckOptionalOutputFormat(const MhcParamsBase &params)
+static bool CheckOptionalOutputFormat(const MhcParamsBase& params)
 {
     if (params.invRmsOptional == nullptr) {
         return true;
@@ -845,12 +845,12 @@ static bool CheckOptionalOutputFormat(const MhcParamsBase &params)
     return true;
 }
 
-static bool CheckFormat(const MhcParamsBase &params)
+static bool CheckFormat(const MhcParamsBase& params)
 {
     return CheckInputFormat(params) && CheckOutputFormat(params) && CheckOptionalOutputFormat(params);
 }
 
-static bool CheckOpImplMode(const MhcParamsBase &params)
+static bool CheckOpImplMode(const MhcParamsBase& params)
 {
     if (params.opImplMode != MHC_PRE_USE_FP32 && params.opImplMode != MHC_PRE_USE_HF32) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "opImplMode", std::to_string(params.opImplMode).c_str(),
@@ -860,7 +860,7 @@ static bool CheckOpImplMode(const MhcParamsBase &params)
     return true;
 }
 
-static aclnnStatus CheckParams(const MhcParamsBase &params)
+static aclnnStatus CheckParams(const MhcParamsBase& params)
 {
     CHECK_RET(CheckNotNull(params), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckEmptyTensor(params), ACLNN_ERR_PARAM_INVALID);
@@ -886,7 +886,7 @@ static aclnnStatus CheckParams(const MhcParamsBase &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ConvertDataContiguous(MhcParamsBase &params, aclOpExecutor *executor)
+static aclnnStatus ConvertDataContiguous(MhcParamsBase& params, aclOpExecutor* executor)
 {
     // Convert input tensors to contiguous tensors.
     params.xContiguous = l0op::Contiguous(params.x, executor);
@@ -909,8 +909,8 @@ static aclnnStatus ConvertDataContiguous(MhcParamsBase &params, aclOpExecutor *e
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CopyRequiredOutputs(const aclTensor *hInOut, const aclTensor *hPostOut, const aclTensor *hResOut,
-                                       MhcParamsBase &params, aclOpExecutor *executor)
+static aclnnStatus CopyRequiredOutputs(const aclTensor* hInOut, const aclTensor* hPostOut, const aclTensor* hResOut,
+                                       MhcParamsBase& params, aclOpExecutor* executor)
 {
     auto ret0 = l0op::ViewCopy(hInOut, params.hIn, executor);
     CHECK_RET(ret0 != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -923,8 +923,8 @@ static aclnnStatus CopyRequiredOutputs(const aclTensor *hInOut, const aclTensor 
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CopyOptionalOutputs(const aclTensor *invRmsOut, const aclTensor *hMixOut, const aclTensor *hPreOut,
-                                       MhcParamsBase &params, aclOpExecutor *executor)
+static aclnnStatus CopyOptionalOutputs(const aclTensor* invRmsOut, const aclTensor* hMixOut, const aclTensor* hPreOut,
+                                       MhcParamsBase& params, aclOpExecutor* executor)
 {
     if (params.invRmsOptional == nullptr) {
         return ACLNN_SUCCESS;
@@ -938,7 +938,7 @@ static aclnnStatus CopyOptionalOutputs(const aclTensor *invRmsOut, const aclTens
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus mHCPreCommonProcess(MhcParamsBase &params, aclOpExecutor *executor)
+static aclnnStatus mHCPreCommonProcess(MhcParamsBase& params, aclOpExecutor* executor)
 {
     auto ret = CheckParams(params);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -958,12 +958,12 @@ static aclnnStatus mHCPreCommonProcess(MhcParamsBase &params, aclOpExecutor *exe
                                executor);
 }
 
-static aclnnStatus MhcPreGetWorkspaceSizeCommon(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha,
-                                                const aclTensor *bias, const aclTensor *gammaOptional, double normEps,
-                                                double hcEps, int64_t opImplMode, aclTensor *hIn, aclTensor *hPost,
-                                                aclTensor *hRes, aclTensor *invRmsOptional, aclTensor *hMixOptional,
-                                                aclTensor *hPreOptional, uint64_t *workspaceSize,
-                                                aclOpExecutor **executor)
+static aclnnStatus MhcPreGetWorkspaceSizeCommon(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha,
+                                                const aclTensor* bias, const aclTensor* gammaOptional, double normEps,
+                                                double hcEps, int64_t opImplMode, aclTensor* hIn, aclTensor* hPost,
+                                                aclTensor* hRes, aclTensor* invRmsOptional, aclTensor* hMixOptional,
+                                                aclTensor* hPreOptional, uint64_t* workspaceSize,
+                                                aclOpExecutor** executor)
 {
     if (workspaceSize == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "workspaceSize", "nullptr",
@@ -992,11 +992,11 @@ static aclnnStatus MhcPreGetWorkspaceSizeCommon(const aclTensor *x, const aclTen
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMhcPreGetWorkspaceSize(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha,
-                                        const aclTensor *bias, const aclTensor *gammaOptional, double normEps,
-                                        double hcEps, aclTensor *hIn, aclTensor *hPost, aclTensor *hRes,
-                                        aclTensor *invRmsOptional, aclTensor *hMixOptional, aclTensor *hPreOptional,
-                                        uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnMhcPreGetWorkspaceSize(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha,
+                                        const aclTensor* bias, const aclTensor* gammaOptional, double normEps,
+                                        double hcEps, aclTensor* hIn, aclTensor* hPost, aclTensor* hRes,
+                                        aclTensor* invRmsOptional, aclTensor* hMixOptional, aclTensor* hPreOptional,
+                                        uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnMhcPre, DFX_IN(x, phi, alpha, bias, gammaOptional, normEps, hcEps),
                    DFX_OUT(hIn, hPost, hRes, invRmsOptional, hMixOptional, hPreOptional));
@@ -1005,24 +1005,24 @@ aclnnStatus aclnnMhcPreGetWorkspaceSize(const aclTensor *x, const aclTensor *phi
                                         executor);
 }
 
-aclnnStatus aclnnMhcPreV2GetWorkspaceSize(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha,
-                                          const aclTensor *bias, const aclTensor *gammaOptional, double normEps,
-                                          double hcEps, int64_t opImplMode, aclTensor *hIn, aclTensor *hPost,
-                                          aclTensor *hRes, aclTensor *invRmsOptional, aclTensor *hMixOptional,
-                                          aclTensor *hPreOptional, uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnMhcPreV2GetWorkspaceSize(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha,
+                                          const aclTensor* bias, const aclTensor* gammaOptional, double normEps,
+                                          double hcEps, int64_t opImplMode, aclTensor* hIn, aclTensor* hPost,
+                                          aclTensor* hRes, aclTensor* invRmsOptional, aclTensor* hMixOptional,
+                                          aclTensor* hPreOptional, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnMhcPreV2, DFX_IN(x, phi, alpha, bias, gammaOptional, normEps, hcEps, opImplMode),
                    DFX_OUT(hIn, hPost, hRes, invRmsOptional, hMixOptional, hPreOptional));
     return MhcPreGetWorkspaceSizeCommon(x, phi, alpha, bias, gammaOptional, normEps, hcEps, opImplMode, hIn, hPost,
                                         hRes, invRmsOptional, hMixOptional, hPreOptional, workspaceSize, executor);
 }
-aclnnStatus aclnnMhcPre(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMhcPre(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMhcPre);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
 }
 
-aclnnStatus aclnnMhcPreV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMhcPreV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMhcPreV2);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);

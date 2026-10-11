@@ -31,42 +31,42 @@ GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
 class GMMA16W4MsdVecService {
 public:
     __aicore__ inline GMMA16W4MsdVecService(){};
-    __aicore__ inline void PostProcess(uint64_t cvLoopIdx, const A16W4MsdConstParam &constParams,
-                                       const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
-    __aicore__ inline void UpdateGlobalAddr(__gm__ float *aMaxWs, __gm__ xType *scaleGm, __gm__ wType *weight,
-                                            __gm__ xType *output);
-    __aicore__ inline void CastW4ToW8(uint64_t cvLoopIdx, const A16W4MsdConstParam &constParams,
-                                      const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
-    __aicore__ inline void InitPreProcess(TPipe *tPipe);
-    __aicore__ inline void InitMsd(__gm__ int8_t *wS8WsAddr, __gm__ float *cF32WsAddr, TPipe *tPipe);
+    __aicore__ inline void PostProcess(uint64_t cvLoopIdx, const A16W4MsdConstParam& constParams,
+                                       const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
+    __aicore__ inline void UpdateGlobalAddr(__gm__ float* aMaxWs, __gm__ xType* scaleGm, __gm__ wType* weight,
+                                            __gm__ xType* output);
+    __aicore__ inline void CastW4ToW8(uint64_t cvLoopIdx, const A16W4MsdConstParam& constParams,
+                                      const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
+    __aicore__ inline void InitPreProcess(TPipe* tPipe);
+    __aicore__ inline void InitMsd(__gm__ int8_t* wS8WsAddr, __gm__ float* cF32WsAddr, TPipe* tPipe);
     __aicore__ inline void EndMsd();
     __aicore__ inline void PreProcess(uint64_t curMSize, uint64_t mPreOffset, uint64_t mIdx,
-                                      const A16W4MsdConstParam &constParams, const GlobalTensor<xType> &xGlobal,
-                                      const GlobalTensor<float> &aMaxWorkspaceGm,
-                                      const GlobalTensor<int8_t> &aUnfoldGlobal);
+                                      const A16W4MsdConstParam& constParams, const GlobalTensor<xType>& xGlobal,
+                                      const GlobalTensor<float>& aMaxWorkspaceGm,
+                                      const GlobalTensor<int8_t>& aUnfoldGlobal);
 
 private:
-    __aicore__ inline void CopyInAOrigin(uint64_t mIdx, const A16W4MsdConstParam &constParams,
-                                         const GlobalTensor<xType> &xGlobal);
-    __aicore__ inline void ComputeMaxA(uint64_t mPreSum, const A16W4MsdConstParam &constParams,
-                                       const GlobalTensor<float> &aMaxWorkspaceGm);
-    __aicore__ inline uint32_t ComputeMaxAOnce(LocalTensor<float> &dst, LocalTensor<float> &src, uint32_t numRepeatK);
+    __aicore__ inline void CopyInAOrigin(uint64_t mIdx, const A16W4MsdConstParam& constParams,
+                                         const GlobalTensor<xType>& xGlobal);
+    __aicore__ inline void ComputeMaxA(uint64_t mPreSum, const A16W4MsdConstParam& constParams,
+                                       const GlobalTensor<float>& aMaxWorkspaceGm);
+    __aicore__ inline uint32_t ComputeMaxAOnce(LocalTensor<float>& dst, LocalTensor<float>& src, uint32_t numRepeatK);
     __aicore__ inline void UnfoldAMatrix(uint64_t curMSize, uint64_t mPreOffset, uint64_t mIdx,
-                                         const A16W4MsdConstParam &constParams,
-                                         const GlobalTensor<int8_t> &aUnfoldGlobal);
+                                         const A16W4MsdConstParam& constParams,
+                                         const GlobalTensor<int8_t>& aUnfoldGlobal);
     __aicore__ inline void TransToS8(uint64_t unfoldATimes, uint64_t defaultOffset, uint64_t mainRepeatK,
-                                     float multiFactors, const BinaryRepeatParams &f32BinaryRepeatParams,
-                                     const UnaryRepeatParams &f32UnaryRepeatParams,
-                                     const UnaryRepeatParams &f32ToF16RepeatParams,
-                                     const A16W4MsdConstParam &constParams);
-    __aicore__ inline void SetRepeatParams(BinaryRepeatParams &repeatParams, UnaryRepeatParams &f32UnaryRepeatParams,
-                                           UnaryRepeatParams &f32ToF16RepeatParams);
-    __aicore__ inline void ReduceCFp32(uint64_t realQuantGroup, uint64_t curMSize, const LocalTensor<float> &cF32Ub,
-                                       const LocalTensor<xType> &scaleF16Ub,
-                                       const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
-    __aicore__ inline void CopyOutResult(uint64_t mOffset, uint64_t curMSize, const LocalTensor<float> &aMaxUb,
-                                         const A16W4MsdConstParam &constParams,
-                                         const A16W4MsdBasicBlockOffsetParam &curOffsetParam);
+                                     float multiFactors, const BinaryRepeatParams& f32BinaryRepeatParams,
+                                     const UnaryRepeatParams& f32UnaryRepeatParams,
+                                     const UnaryRepeatParams& f32ToF16RepeatParams,
+                                     const A16W4MsdConstParam& constParams);
+    __aicore__ inline void SetRepeatParams(BinaryRepeatParams& repeatParams, UnaryRepeatParams& f32UnaryRepeatParams,
+                                           UnaryRepeatParams& f32ToF16RepeatParams);
+    __aicore__ inline void ReduceCFp32(uint64_t realQuantGroup, uint64_t curMSize, const LocalTensor<float>& cF32Ub,
+                                       const LocalTensor<xType>& scaleF16Ub,
+                                       const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
+    __aicore__ inline void CopyOutResult(uint64_t mOffset, uint64_t curMSize, const LocalTensor<float>& aMaxUb,
+                                         const A16W4MsdConstParam& constParams,
+                                         const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
 
     GlobalTensor<wType> wS4Gm_;
     GlobalTensor<int8_t> wS8Gm_;
@@ -125,7 +125,7 @@ private:
 };
 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::InitPreProcess(TPipe *tPipe)
+__aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::InitPreProcess(TPipe* tPipe)
 {
     tPipe->InitBuffer(ubBuffer_, 192 * 1024);
     aF32TmpTensor_ = ubBuffer_.Get<float>();                              // 49k 0-49k分配给float的aTmp矩阵
@@ -149,10 +149,10 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::InitPreProcess(TPipe 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::PreProcess(uint64_t curMSize, uint64_t mPreOffset,
                                                                       uint64_t mIdx,
-                                                                      const A16W4MsdConstParam &constParams,
-                                                                      const GlobalTensor<xType> &xGlobal,
-                                                                      const GlobalTensor<float> &aMaxWorkspaceGm,
-                                                                      const GlobalTensor<int8_t> &aUnfoldGlobal)
+                                                                      const A16W4MsdConstParam& constParams,
+                                                                      const GlobalTensor<xType>& xGlobal,
+                                                                      const GlobalTensor<float>& aMaxWorkspaceGm,
+                                                                      const GlobalTensor<int8_t>& aUnfoldGlobal)
 {
     CopyInAOrigin(mIdx, constParams, xGlobal);
 
@@ -169,8 +169,8 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::PreProcess(uint64_t c
 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::CopyInAOrigin(uint64_t mIdx,
-                                                                         const A16W4MsdConstParam &constParams,
-                                                                         const GlobalTensor<xType> &xGlobal)
+                                                                         const A16W4MsdConstParam& constParams,
+                                                                         const GlobalTensor<xType>& xGlobal)
 {
     DataCopyPad2D(aOriginTensor_, xGlobal[mIdx * constParams.kSize], 1, constParams.kSize, constParams.kSize,
                   constParams.kSize);
@@ -187,8 +187,8 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::CopyInAOrigin(uint64_
 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::ComputeMaxA(uint64_t mPreSum,
-                                                                       const A16W4MsdConstParam &constParams,
-                                                                       const GlobalTensor<float> &aMaxWorkspaceGm)
+                                                                       const A16W4MsdConstParam& constParams,
+                                                                       const GlobalTensor<float>& aMaxWorkspaceGm)
 {
     UnaryRepeatParams commonUnaryRepeatParams_;
     commonUnaryRepeatParams_.dstBlkStride = 1;
@@ -234,8 +234,8 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::ComputeMaxA(uint64_t 
 }
 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
-__aicore__ inline uint32_t GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::ComputeMaxAOnce(LocalTensor<float> &dst,
-                                                                               LocalTensor<float> &src,
+__aicore__ inline uint32_t GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::ComputeMaxAOnce(LocalTensor<float>& dst,
+                                                                               LocalTensor<float>& src,
                                                                                uint32_t numRepeatK)
 {
     uint32_t numProcessK = numRepeatK >> 1;
@@ -265,8 +265,8 @@ __aicore__ inline uint32_t GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::ComputeMaxAOnce(L
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::UnfoldAMatrix(uint64_t curMSize, uint64_t mPreOffset,
                                                                          uint64_t mIdx,
-                                                                         const A16W4MsdConstParam &constParams,
-                                                                         const GlobalTensor<int8_t> &aUnfoldGlobal)
+                                                                         const A16W4MsdConstParam& constParams,
+                                                                         const GlobalTensor<int8_t>& aUnfoldGlobal)
 {
     // 避免bank冲突，tensor使用时每次额外往前偏移一个repeat的数据量
     uint32_t defaultOffset = 2 * FP32_MAX_MASK_SIZE;
@@ -290,9 +290,9 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::UnfoldAMatrix(uint64_
 }
 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::SetRepeatParams(BinaryRepeatParams &repeatParams,
-                                                                           UnaryRepeatParams &f32UnaryRepeatParams,
-                                                                           UnaryRepeatParams &f32ToF16RepeatParams)
+__aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::SetRepeatParams(BinaryRepeatParams& repeatParams,
+                                                                           UnaryRepeatParams& f32UnaryRepeatParams,
+                                                                           UnaryRepeatParams& f32ToF16RepeatParams)
 {
     repeatParams.dstBlkStride = 1;
     repeatParams.src0BlkStride = 1;
@@ -315,10 +315,10 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::SetRepeatParams(Binar
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::TransToS8(uint64_t unfoldATimes, uint64_t defaultOffset,
                                                                      uint64_t mainRepeatK, float multiFactors,
-                                                                     const BinaryRepeatParams &f32BinaryRepeatParams,
-                                                                     const UnaryRepeatParams &f32UnaryRepeatParams,
-                                                                     const UnaryRepeatParams &f32ToF16RepeatParams,
-                                                                     const A16W4MsdConstParam &constParams)
+                                                                     const BinaryRepeatParams& f32BinaryRepeatParams,
+                                                                     const UnaryRepeatParams& f32UnaryRepeatParams,
+                                                                     const UnaryRepeatParams& f32ToF16RepeatParams,
+                                                                     const A16W4MsdConstParam& constParams)
 {
     if (likely(unfoldATimes > 0)) {
         Sub(aF32TmpTensor_[defaultOffset], aF32Tensor_, aF32TmpTensor_[defaultOffset + FP32_MAX_MASK_SIZE],
@@ -347,8 +347,8 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::TransToS8(uint64_t un
 }
 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::InitMsd(__gm__ int8_t *wS8WsAddr, __gm__ float *cF32WsAddr,
-                                                                   TPipe *tPipe)
+__aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::InitMsd(__gm__ int8_t* wS8WsAddr, __gm__ float* cF32WsAddr,
+                                                                   TPipe* tPipe)
 {
     cF32Gm_.SetGlobalBuffer(cF32WsAddr);
     wS8Gm_.SetGlobalBuffer(wS8WsAddr);
@@ -375,15 +375,15 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::InitMsd(__gm__ int8_t
 }
 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::UpdateGlobalAddr(__gm__ float *aMaxWs, __gm__ xType *scaleGm,
-                                                                            __gm__ wType *weight, __gm__ xType *output)
+__aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::UpdateGlobalAddr(__gm__ float* aMaxWs, __gm__ xType* scaleGm,
+                                                                            __gm__ wType* weight, __gm__ xType* output)
 {
     wS4Gm_.SetGlobalBuffer(weight);
 }
 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::CastW4ToW8(
-    uint64_t cvLoopIdx, const A16W4MsdConstParam &constParams, const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t cvLoopIdx, const A16W4MsdConstParam& constParams, const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     for (uint64_t ubMte2NOffset = GetSubBlockIdx() * WEIGHT_UB_CAST_N; ubMte2NOffset < curOffsetParam.nL1Size;
          ubMte2NOffset += 2 * WEIGHT_UB_CAST_N) {
@@ -430,7 +430,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::CastW4ToW8(
 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::PostProcess(
-    uint64_t cvLoopIdx, const A16W4MsdConstParam &constParams, const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t cvLoopIdx, const A16W4MsdConstParam& constParams, const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     // 按m分核
     uint64_t mOffset = GetSubBlockIdx() == 0 ? 0 : curOffsetParam.mL1Size / 2;
@@ -445,15 +445,15 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::PostProcess(
     // c:shape g*m*n, scale shape: g*n total shape: (m+1)*n
     LocalTensor<float> aMaxUb = aMaxUb_[(mte2BufIdx_ % WEIGHT_BUFFER_NUM) * 256];
     if (curOffsetParam.kOffset + BASE_KUB_SIZE >= constParams.kSize) {
-        aMaxGm_.SetGlobalBuffer((__gm__ float *)curOffsetParam.aMaxGmAddr);
+        aMaxGm_.SetGlobalBuffer((__gm__ float*)curOffsetParam.aMaxGmAddr);
         DataCopyPad2D(aMaxUb, aMaxGm_[curOffsetParam.mOffset + mOffset * 8], 1, curMSize * 8, curMSize * 8,
                       curMSize * 8);
     }
 
     uint64_t groupNumBatch = C_F32_UB_OFFSET / curOffsetParam.nL1Size / (curMSize + 1);
     uint64_t scaleBufOffset = groupNumBatch * curOffsetParam.nL1Size;
-    outputGm_.SetGlobalBuffer((__gm__ xType *)curOffsetParam.yGmAddr);
-    scaleGm_.SetGlobalBuffer((__gm__ xType *)curOffsetParam.antiquantScaleGm);
+    outputGm_.SetGlobalBuffer((__gm__ xType*)curOffsetParam.yGmAddr);
+    scaleGm_.SetGlobalBuffer((__gm__ xType*)curOffsetParam.antiquantScaleGm);
     for (uint64_t quantGroupOffset = 0; quantGroupOffset < BASE_KUB_SIZE / 32; quantGroupOffset += groupNumBatch) {
         uint64_t realQuantGroup = quantGroupOffset + groupNumBatch > BASE_KUB_SIZE / 32 ?
                                       BASE_KUB_SIZE / 32 - quantGroupOffset :
@@ -486,8 +486,8 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::PostProcess(
 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::ReduceCFp32(
-    uint64_t realQuantGroup, uint64_t curMSize, const LocalTensor<float> &cF32Ub, const LocalTensor<xType> &scaleF16Ub,
-    const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t realQuantGroup, uint64_t curMSize, const LocalTensor<float>& cF32Ub, const LocalTensor<xType>& scaleF16Ub,
+    const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     // dato算法修正c的值, 需要加的系数为-10485760
     Adds(cF32Ub, cF32Ub, (float)-10485760.0, realQuantGroup * curMSize * curOffsetParam.nL1Size);
@@ -515,8 +515,8 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::ReduceCFp32(
 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::CopyOutResult(
-    uint64_t mOffset, uint64_t curMSize, const LocalTensor<float> &aMaxUb, const A16W4MsdConstParam &constParams,
-    const A16W4MsdBasicBlockOffsetParam &curOffsetParam)
+    uint64_t mOffset, uint64_t curMSize, const LocalTensor<float>& aMaxUb, const A16W4MsdConstParam& constParams,
+    const A16W4MsdBasicBlockOffsetParam& curOffsetParam)
 {
     // m,n * m,8 2032 = msd的c1系数127 * 修正cast时乘的16
     Muls(aMaxUb, aMaxUb, (float)1 / (float)2032.0, curMSize * 8);

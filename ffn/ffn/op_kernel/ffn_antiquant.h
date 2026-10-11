@@ -41,46 +41,46 @@ template <typename T, typename wT, typename mm1Type, typename mm2Type = mm1Type,
           typename biasT = T, bool isPerGroup = false>
 class FFNAntiQuant {
 public:
-    __aicore__ inline FFNAntiQuant(mm1Type &mm1_, mm2Type &mm2_)
+    __aicore__ inline FFNAntiQuant(mm1Type& mm1_, mm2Type& mm2_)
         : mm1(mm1_),
           mm2(mm2_)
     {}
-    __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
-                                __gm__ uint8_t *expertTokens, __gm__ uint8_t *bias1, __gm__ uint8_t *bias2,
-                                __gm__ uint8_t *antiQuantScale1, __gm__ uint8_t *antiQuantScale2,
-                                __gm__ uint8_t *antiQuantOffset1, __gm__ uint8_t *antiQuantOffset2, __gm__ uint8_t *y,
-                                __gm__ uint8_t *workSpace, const FFNTilingData *__restrict tiling, TPipe *tPipe)
+    __aicore__ inline void Init(__gm__ uint8_t* x, __gm__ uint8_t* weight1, __gm__ uint8_t* weight2,
+                                __gm__ uint8_t* expertTokens, __gm__ uint8_t* bias1, __gm__ uint8_t* bias2,
+                                __gm__ uint8_t* antiQuantScale1, __gm__ uint8_t* antiQuantScale2,
+                                __gm__ uint8_t* antiQuantOffset1, __gm__ uint8_t* antiQuantOffset2, __gm__ uint8_t* y,
+                                __gm__ uint8_t* workSpace, const FFNTilingData* __restrict tiling, TPipe* tPipe)
     {
         tilingData = tiling;
         pipe = tPipe;
         InitTilingData();
 
         // init global buffer
-        xGm.SetGlobalBuffer((__gm__ T *)x);
-        weight1Gm.SetGlobalBuffer((__gm__ int8_t *)weight1);
+        xGm.SetGlobalBuffer((__gm__ T*)x);
+        weight1Gm.SetGlobalBuffer((__gm__ int8_t*)weight1);
         if (bias1 != nullptr) {
-            bias1Gm.SetGlobalBuffer((__gm__ biasT *)bias1);
+            bias1Gm.SetGlobalBuffer((__gm__ biasT*)bias1);
             hasBias1 = true;
         }
-        weight2Gm.SetGlobalBuffer((__gm__ int8_t *)weight2);
+        weight2Gm.SetGlobalBuffer((__gm__ int8_t*)weight2);
         if (bias2 != nullptr) {
-            bias2Gm.SetGlobalBuffer((__gm__ biasT *)bias2);
+            bias2Gm.SetGlobalBuffer((__gm__ biasT*)bias2);
             hasBias2 = true;
         }
 
-        scale1WorkspaceGm.SetGlobalBuffer((__gm__ T *)antiQuantScale1);
-        scale2WorkspaceGm.SetGlobalBuffer((__gm__ T *)antiQuantScale2);
-        offset1WorkspaceGm.SetGlobalBuffer((__gm__ T *)antiQuantOffset1);
-        offset2WorkspaceGm.SetGlobalBuffer((__gm__ T *)antiQuantOffset2);
+        scale1WorkspaceGm.SetGlobalBuffer((__gm__ T*)antiQuantScale1);
+        scale2WorkspaceGm.SetGlobalBuffer((__gm__ T*)antiQuantScale2);
+        offset1WorkspaceGm.SetGlobalBuffer((__gm__ T*)antiQuantOffset1);
+        offset2WorkspaceGm.SetGlobalBuffer((__gm__ T*)antiQuantOffset2);
 
-        yGm.SetGlobalBuffer((__gm__ c2T *)y);
-        mm1WorkspaceGm.SetGlobalBuffer((__gm__ c1T *)workSpace);
-        mm2WorkspaceGm.SetGlobalBuffer((__gm__ T *)workSpace);
+        yGm.SetGlobalBuffer((__gm__ c2T*)y);
+        mm1WorkspaceGm.SetGlobalBuffer((__gm__ c1T*)workSpace);
+        mm2WorkspaceGm.SetGlobalBuffer((__gm__ T*)workSpace);
         // init w1 and w2 workspace
         uint64_t offAddr = workspace1Size + workspace2Size;
-        w1WorkspaceGm.SetGlobalBuffer((__gm__ T *)(workSpace + offAddr));
+        w1WorkspaceGm.SetGlobalBuffer((__gm__ T*)(workSpace + offAddr));
         offAddr += (k1 * n1 * dataTypeSize * 2);
-        w2WorkspaceGm.SetGlobalBuffer((__gm__ T *)(workSpace + offAddr));
+        w2WorkspaceGm.SetGlobalBuffer((__gm__ T*)(workSpace + offAddr));
 
         InitLocalBuff(expertTokens, tPipe);
     }
@@ -100,12 +100,12 @@ public:
     }
 
     // define matmul
-    mm1Type &mm1;
-    mm2Type &mm2;
+    mm1Type& mm1;
+    mm2Type& mm2;
 
 protected:
-    const FFNTilingData *__restrict tilingData;
-    TPipe *pipe;
+    const FFNTilingData* __restrict tilingData;
+    TPipe* pipe;
     // define the que
     TQue<QuePosition::VECIN, 1> vecInQueue;
     TQue<QuePosition::VECOUT, 1> vecOutQueue;
@@ -211,7 +211,7 @@ protected:
     uint32_t bestCopySize = FP16_INT8_BEST_DATACOPY_BASE_SIZE;
     uint32_t reciprocalOfOneByteMultiple = 1;
 
-    __aicore__ inline void InitLocalBuff(__gm__ uint8_t *expertTokens, TPipe *tPipe)
+    __aicore__ inline void InitLocalBuff(__gm__ uint8_t* expertTokens, TPipe* tPipe)
     {
         pipe = tPipe;
 
@@ -264,8 +264,8 @@ protected:
         }
     }
 
-    __aicore__ inline void FindCoreSplit(uint32_t m, uint32_t n, uint32_t tilingCoreNum, uint32_t &nLoops,
-                                         uint32_t &mLoops)
+    __aicore__ inline void FindCoreSplit(uint32_t m, uint32_t n, uint32_t tilingCoreNum, uint32_t& nLoops,
+                                         uint32_t& mLoops)
     {
         uint32_t baseN = nLoops;
         uint32_t baseM = mLoops;
@@ -555,7 +555,7 @@ protected:
     }
 
     __aicore__ inline void DataCopyAndComputeW(uint32_t offsetN, uint32_t offsetK, GlobalTensor<int8_t> weightGm,
-                                               GlobalTensor<T> wWorkspaceGm, CastWeightConfig &castWeightCfg)
+                                               GlobalTensor<T> wWorkspaceGm, CastWeightConfig& castWeightCfg)
     {
         // copy mm1 output from workspace
         LocalTensor<int8_t> inLocal = vecInQueue.AllocTensor<int8_t>();
@@ -589,7 +589,7 @@ protected:
 
     __aicore__ inline void SelectCastWeight(GlobalTensor<int8_t> weightGm, GlobalTensor<T> wWorkspaceGm,
                                             GlobalTensor<T> scaleWorkspaceGm, GlobalTensor<T> offsetWorkspaceGm,
-                                            CastWeightConfig &castWeightCfg)
+                                            CastWeightConfig& castWeightCfg)
     {
         if constexpr (isPerGroup == true) {
             CastWeightPerGroup(weightGm, wWorkspaceGm, scaleWorkspaceGm, offsetWorkspaceGm, castWeightCfg);
@@ -600,7 +600,7 @@ protected:
 
     __aicore__ inline void CastWeightPerGroup(GlobalTensor<int8_t> weightGm, GlobalTensor<T> wWorkspaceGm,
                                               GlobalTensor<T> scaleWorkspaceGm, GlobalTensor<T> offsetWorkspaceGm,
-                                              CastWeightConfig &castWeightCfg)
+                                              CastWeightConfig& castWeightCfg)
     {
         uint32_t newBaseN = bestCopySize;
         // ensure when cast weight, newBaseN align to 32, compute size will not larger than ubCalSize
@@ -644,7 +644,7 @@ protected:
 
     __aicore__ inline void CastWeightNormal(GlobalTensor<int8_t> weightGm, GlobalTensor<T> wWorkspaceGm,
                                             GlobalTensor<T> scaleWorkspaceGm, GlobalTensor<T> offsetWorkspaceGm,
-                                            CastWeightConfig &castWeightCfg)
+                                            CastWeightConfig& castWeightCfg)
     {
         uint32_t newBaseN = bestCopySize;
         // ensure when cast weight, newBaseN align to 32, compute size will not larger than ubCalSize
@@ -730,7 +730,7 @@ protected:
     }
 
     __aicore__ inline void DataCopyScaleAndOffset(uint32_t offsetN, uint32_t offsetK, GlobalTensor<T> scaleWorkspaceGm,
-                                                  GlobalTensor<T> offsetWorkspaceGm, CastWeightConfig &castWeightCfg)
+                                                  GlobalTensor<T> offsetWorkspaceGm, CastWeightConfig& castWeightCfg)
     {
         uint64_t realScaleOffset = castWeightCfg.scaleOffset + offsetN;
         if constexpr (isPerGroup == true) {

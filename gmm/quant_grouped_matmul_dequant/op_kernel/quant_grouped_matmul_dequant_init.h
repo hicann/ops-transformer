@@ -28,7 +28,7 @@ __aicore__ inline void
 QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_, UseXZNStage_>::Init(
     GM_ADDR x, GM_ADDR quantized_weight, GM_ADDR weight_scale, GM_ADDR group_list, GM_ADDR bias, GM_ADDR x_scale,
     GM_ADDR x_offset, GM_ADDR smooth_scale, GM_ADDR y, GM_ADDR usr_workspace,
-    const QuantMatmulDequantTilingData *__restrict tiling, TPipe *pipe)
+    const QuantMatmulDequantTilingData* __restrict tiling, TPipe* pipe)
 {
     (void)bias;
     (void)x_offset;
@@ -69,27 +69,27 @@ QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM
     // L0C half holds Mb*Nb int32 elements (used as the offset for ping-pong).
     l0cHalfElems_ = dbL0c_ ? static_cast<uint32_t>(Mb_) * Nb_ : 0u;
 
-    xGm_.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(x));
-    weightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(quantized_weight));
+    xGm_.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(x));
+    weightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(quantized_weight));
     if constexpr (ScaleIsU64) {
-        weightScaleU64Gm_.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t *>(weight_scale));
+        weightScaleU64Gm_.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t*>(weight_scale));
     } else {
-        weightScaleFp32Gm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(weight_scale));
+        weightScaleFp32Gm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(weight_scale));
     }
-    groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(group_list));
+    groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(group_list));
     if constexpr (!HasPertoken) {
         // Static-quant path (x_scale provided by caller).
-        xScaleFp32Gm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(x_scale));
-        xScaleHalfGm_.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(x_scale));
+        xScaleFp32Gm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(x_scale));
+        xScaleHalfGm_.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(x_scale));
     } else {
         (void)x_scale;
     }
     if constexpr (HasSmooth) {
-        smoothScaleGm_.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(smooth_scale));
+        smoothScaleGm_.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(smooth_scale));
     } else {
         (void)smooth_scale;
     }
-    yGm_.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(y));
+    yGm_.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(y));
     if constexpr (UseXZNStage_) {
         usrWs_ = usr_workspace;
     }
@@ -338,7 +338,7 @@ QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM
     const uint64_t xZNBytes = alignedM * tiling_->originKAligned32;
     const uint32_t syncCount = coreNum_ * 8u; // int32 elements (= 32 B per core)
     GlobalTensor<int32_t> syncGm;
-    syncGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(usrWs_ + SYS_WS_BYTES + xZNBytes), syncCount);
+    syncGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(usrWs_ + SYS_WS_BYTES + xZNBytes), syncCount);
     LocalTensor<int32_t> syncUb = ubArena_.Get<uint8_t>().ReinterpretCast<int32_t>();
     Duplicate<int32_t>(syncUb, 0, syncCount);
     SetFlag<HardEvent::V_MTE3>(EVENT_ID3);
@@ -359,7 +359,7 @@ QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM
     const uint64_t alignedM = ((static_cast<uint64_t>(M_) + M_FRACTAL - 1) / M_FRACTAL) * M_FRACTAL;
     const uint64_t xZNBytes = alignedM * tiling_->originKAligned32;
     GlobalTensor<int32_t> syncGm;
-    syncGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(usrWs_ + SYS_WS_BYTES + xZNBytes),
+    syncGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(usrWs_ + SYS_WS_BYTES + xZNBytes),
                            static_cast<uint64_t>(coreNum_) * 8u);
     LocalTensor<int32_t> syncUb = ubArena_.Get<uint8_t>().ReinterpretCast<int32_t>();
     AscendC::SyncAll<false>(syncGm, syncUb, coreNum_);

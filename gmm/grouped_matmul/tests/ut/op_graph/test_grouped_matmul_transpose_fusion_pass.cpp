@@ -90,23 +90,23 @@ struct TensorWithDesc {
 
 class TestGroupedMatmulTransposeFusionPass : public ops::GroupedMatmulTransFusionPass {
 public:
-    Status RunForTest(GraphPtr &graph, CustomPassContext &passContext)
+    Status RunForTest(GraphPtr& graph, CustomPassContext& passContext)
     {
         return Run(graph, passContext);
     }
 };
 
-std::vector<std::string> SplitCsvLine(const std::string &line)
+std::vector<std::string> SplitCsvLine(const std::string& line)
 {
     std::vector<std::string> fields;
     ops::ut::SplitStr2Vec(line, ",", fields);
-    for (auto &field : fields) {
+    for (auto& field : fields) {
         field = ops::ut::Trim(field);
     }
     return fields;
 }
 
-DataType ParseDataType(const std::string &value)
+DataType ParseDataType(const std::string& value)
 {
     if (value == "DT_FLOAT16") {
         return DT_FLOAT16;
@@ -135,7 +135,7 @@ DataType ParseDataType(const std::string &value)
     throw std::runtime_error("Unsupported data type: " + value);
 }
 
-Status ParseStatus(const std::string &value)
+Status ParseStatus(const std::string& value)
 {
     if (value == "SUCCESS") {
         return SUCCESS;
@@ -149,7 +149,7 @@ Status ParseStatus(const std::string &value)
     throw std::runtime_error("Unsupported status: " + value);
 }
 
-GroupedMatmulTransposeFusionPassParam ParseParam(const std::vector<std::string> &fields)
+GroupedMatmulTransposeFusionPassParam ParseParam(const std::vector<std::string>& fields)
 {
     if (fields.size() != kCaseFieldNum) {
         throw std::runtime_error("Invalid csv column size: " + std::to_string(fields.size()));
@@ -211,7 +211,7 @@ std::vector<GroupedMatmulTransposeFusionPassParam> GetParams()
         }
         try {
             params.emplace_back(ParseParam(fields));
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             throw std::runtime_error(
                 ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, fields.empty() ? "" : fields[0], error));
         }
@@ -226,7 +226,7 @@ std::vector<GroupedMatmulTransposeFusionPassParam> GetParams()
     return params;
 }
 
-void SetPlatformSupport(const std::string &socVersion)
+void SetPlatformSupport(const std::string& socVersion)
 {
     fe::PlatformInfo platformInfo;
     fe::OptionalInfo optionalInfo;
@@ -242,7 +242,7 @@ void ClearPlatformSupport()
     fe::PlatformInfoManager::Instance().platform_info_map_.clear();
 }
 
-std::vector<std::pair<int64_t, int64_t>> MakeShapeRange(const std::vector<int64_t> &shape)
+std::vector<std::pair<int64_t, int64_t>> MakeShapeRange(const std::vector<int64_t>& shape)
 {
     std::vector<std::pair<int64_t, int64_t>> shapeRange;
     shapeRange.reserve(shape.size());
@@ -252,7 +252,7 @@ std::vector<std::pair<int64_t, int64_t>> MakeShapeRange(const std::vector<int64_
     return shapeRange;
 }
 
-TensorDesc MakeTensorDesc(const std::vector<int64_t> &shape, DataType dtype)
+TensorDesc MakeTensorDesc(const std::vector<int64_t>& shape, DataType dtype)
 {
     TensorDesc desc(Shape(shape), FORMAT_ND, dtype);
     desc.SetOriginFormat(FORMAT_ND);
@@ -261,7 +261,7 @@ TensorDesc MakeTensorDesc(const std::vector<int64_t> &shape, DataType dtype)
     return desc;
 }
 
-std::vector<int64_t> PermuteShape(const std::vector<int64_t> &shape, const std::vector<int64_t> &perm)
+std::vector<int64_t> PermuteShape(const std::vector<int64_t>& shape, const std::vector<int64_t>& perm)
 {
     if (shape.size() != perm.size()) {
         throw std::runtime_error("Shape and perm ranks are different.");
@@ -277,8 +277,8 @@ std::vector<int64_t> PermuteShape(const std::vector<int64_t> &shape, const std::
     return outputShape;
 }
 
-GNode BuildTransposeNode(Graph *graph, const char *opType, const char *name, const TensorDesc &outputDesc,
-                         const std::vector<int64_t> &perm)
+GNode BuildTransposeNode(Graph* graph, const char* opType, const char* name, const TensorDesc& outputDesc,
+                         const std::vector<int64_t>& perm)
 {
     auto builder = ge::es::CompliantNodeBuilder(graph);
     builder.OpType(opType).Name(name);
@@ -306,15 +306,15 @@ GNode BuildTransposeNode(Graph *graph, const char *opType, const char *name, con
                          .IrDefOutputs({{"y", ge::es::CompliantNodeBuilder::kEsIrOutputRequired, ""}})
                          .Build();
     constNode.UpdateOutputDesc(0, permDesc);
-    Tensor permTensor(permDesc, reinterpret_cast<const uint8_t *>(perm.data()), perm.size() * sizeof(int64_t));
+    Tensor permTensor(permDesc, reinterpret_cast<const uint8_t*>(perm.data()), perm.size() * sizeof(int64_t));
     constNode.SetAttr("value", permTensor);
     ge::es::AddEdgeAndUpdatePeerDesc(*graph, constNode, 0, transposeNode, 1);
     transposeNode.UpdateInputDesc(1, permDesc);
     return transposeNode;
 }
 
-void LinkUnaryNode(Graph *graph, ge::es::EsGraphBuilder &graphBuilder, TensorWithDesc &input, GNode &node,
-                   const TensorDesc &outputDesc)
+void LinkUnaryNode(Graph* graph, ge::es::EsGraphBuilder& graphBuilder, TensorWithDesc& input, GNode& node,
+                   const TensorDesc& outputDesc)
 {
     ge::es::AddEdgeAndUpdatePeerDesc(*graph, *input.tensor.GetProducer(), input.tensor.GetProducerOutIndex(), node, 0);
     node.UpdateInputDesc(0, input.desc);
@@ -323,7 +323,7 @@ void LinkUnaryNode(Graph *graph, ge::es::EsGraphBuilder &graphBuilder, TensorWit
     input.desc = outputDesc;
 }
 
-GNode BuildUnaryNode(Graph *graph, const char *opType, const char *name, const TensorDesc &outputDesc)
+GNode BuildUnaryNode(Graph* graph, const char* opType, const char* name, const TensorDesc& outputDesc)
 {
     return ge::es::CompliantNodeBuilder(graph)
         .OpType(opType)
@@ -336,14 +336,14 @@ GNode BuildUnaryNode(Graph *graph, const char *opType, const char *name, const T
         .Build();
 }
 
-void AddUnaryNode(Graph *graph, ge::es::EsGraphBuilder &graphBuilder, TensorWithDesc &input, const char *opType,
-                  const char *name, const TensorDesc &outputDesc)
+void AddUnaryNode(Graph* graph, ge::es::EsGraphBuilder& graphBuilder, TensorWithDesc& input, const char* opType,
+                  const char* name, const TensorDesc& outputDesc)
 {
     auto node = BuildUnaryNode(graph, opType, name, outputDesc);
     LinkUnaryNode(graph, graphBuilder, input, node, outputDesc);
 }
 
-GNode BuildInt64ScalarConst(Graph *graph, const char *name, int64_t value)
+GNode BuildInt64ScalarConst(Graph* graph, const char* name, int64_t value)
 {
     auto desc = MakeTensorDesc({}, DT_INT64);
     auto constNode = ge::es::CompliantNodeBuilder(graph)
@@ -352,12 +352,12 @@ GNode BuildInt64ScalarConst(Graph *graph, const char *name, int64_t value)
                          .IrDefOutputs({{"y", ge::es::CompliantNodeBuilder::kEsIrOutputRequired, ""}})
                          .Build();
     constNode.UpdateOutputDesc(0, desc);
-    Tensor tensor(desc, reinterpret_cast<const uint8_t *>(&value), sizeof(value));
+    Tensor tensor(desc, reinterpret_cast<const uint8_t*>(&value), sizeof(value));
     constNode.SetAttr("value", tensor);
     return constNode;
 }
 
-void AddDynamicSwapReshape(Graph *graph, ge::es::EsGraphBuilder &graphBuilder, TensorWithDesc &input, bool validSwap)
+void AddDynamicSwapReshape(Graph* graph, ge::es::EsGraphBuilder& graphBuilder, TensorWithDesc& input, bool validSwap)
 {
     auto shapeDesc = MakeTensorDesc({2}, DT_INT64);
     auto shapeNode = ge::es::CompliantNodeBuilder(graph)
@@ -418,8 +418,8 @@ void AddDynamicSwapReshape(Graph *graph, ge::es::EsGraphBuilder &graphBuilder, T
     input.desc = outputDesc;
 }
 
-void AddTransposeIfNeeded(Graph *graph, ge::es::EsGraphBuilder &graphBuilder, TensorWithDesc &input, bool enabled,
-                          const char *opType, const char *name, const std::vector<int64_t> &perm)
+void AddTransposeIfNeeded(Graph* graph, ge::es::EsGraphBuilder& graphBuilder, TensorWithDesc& input, bool enabled,
+                          const char* opType, const char* name, const std::vector<int64_t>& perm)
 {
     if (!enabled) {
         return;
@@ -429,17 +429,17 @@ void AddTransposeIfNeeded(Graph *graph, ge::es::EsGraphBuilder &graphBuilder, Te
     LinkUnaryNode(graph, graphBuilder, input, transposeNode, outputDesc);
 }
 
-void LinkGroupedMatmulInput(Graph *graph, GNode &groupedMatmulNode, const TensorWithDesc &input, int32_t inputIndex)
+void LinkGroupedMatmulInput(Graph* graph, GNode& groupedMatmulNode, const TensorWithDesc& input, int32_t inputIndex)
 {
     ge::es::AddEdgeAndUpdatePeerDesc(*graph, *input.tensor.GetProducer(), input.tensor.GetProducerOutIndex(),
                                      groupedMatmulNode, inputIndex);
     groupedMatmulNode.UpdateInputDesc(inputIndex, input.desc);
 }
 
-GraphPtr BuildGraph(const GroupedMatmulTransposeFusionPassParam &param)
+GraphPtr BuildGraph(const GroupedMatmulTransposeFusionPassParam& param)
 {
     auto graphBuilder = ge::es::EsGraphBuilder(param.caseName.c_str());
-    auto *graph = graphBuilder.GetCGraphBuilder()->GetGraph();
+    auto* graph = graphBuilder.GetCGraphBuilder()->GetGraph();
 
     auto xDesc = MakeTensorDesc(param.xShape, param.xDtype);
     auto weightDesc = MakeTensorDesc(param.weightShape, param.weightDtype);
@@ -579,13 +579,13 @@ GraphPtr BuildGraph(const GroupedMatmulTransposeFusionPassParam &param)
                                  .InstanceOutputFormat("y", FORMAT_ND)
                                  .Build();
     int32_t physicalInputIndex = 0;
-    for (const auto &input : xInputs) {
+    for (const auto& input : xInputs) {
         LinkGroupedMatmulInput(graph, groupedMatmulNode, input, physicalInputIndex++);
     }
-    for (const auto &input : weightInputs) {
+    for (const auto& input : weightInputs) {
         LinkGroupedMatmulInput(graph, groupedMatmulNode, input, physicalInputIndex++);
     }
-    for (const auto &optionalInput : optionalInputs) {
+    for (const auto& optionalInput : optionalInputs) {
         int32_t inputIndex = -1;
         if (groupedMatmulNode.GetInputIndexByName(optionalInput.first.c_str(), inputIndex) != GRAPH_SUCCESS) {
             throw std::runtime_error("Failed to get GroupedMatmul optional input index: " + optionalInput.first);
@@ -605,7 +605,7 @@ GraphPtr BuildGraph(const GroupedMatmulTransposeFusionPassParam &param)
     return graphBuilder.BuildAndReset(outputs);
 }
 
-int CountNodes(const GraphPtr &graph, const char *type)
+int CountNodes(const GraphPtr& graph, const char* type)
 {
     int count = 0;
     for (auto node : graph->GetAllNodes()) {
@@ -617,7 +617,7 @@ int CountNodes(const GraphPtr &graph, const char *type)
     return count;
 }
 
-GNode FindGroupedMatmulNode(const GraphPtr &graph)
+GNode FindGroupedMatmulNode(const GraphPtr& graph)
 {
     for (auto node : graph->GetAllNodes()) {
         AscendString nodeType;
@@ -628,13 +628,13 @@ GNode FindGroupedMatmulNode(const GraphPtr &graph)
     throw std::runtime_error("GroupedMatmul node is not found.");
 }
 
-std::string TestName(const testing::TestParamInfo<GroupedMatmulTransposeFusionPassParam> &info)
+std::string TestName(const testing::TestParamInfo<GroupedMatmulTransposeFusionPassParam>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.caseName);
 }
 } // namespace
 
-extern "C" aclError aclsysGetVersionNum(char *name, int32_t *version)
+extern "C" aclError aclsysGetVersionNum(char* name, int32_t* version)
 {
     gVersionKeyValid = name != nullptr && std::strcmp(name, "ge-compiler") == 0;
     if (version != nullptr) {
@@ -659,7 +659,7 @@ TEST(GroupedMatmulTransposeFusionPassVersionTest, SkipUnsupportedRuntime)
 
 TEST_P(GroupedMatmulTransposeFusionPassTest, RunFusionPass)
 {
-    const auto &param = GetParam();
+    const auto& param = GetParam();
     auto graph = BuildGraph(param);
     ASSERT_NE(graph, nullptr);
 

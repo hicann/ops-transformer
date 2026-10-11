@@ -19,7 +19,8 @@
 #include "grouped_matmul_kernel.h"
 
 #include "kernel_operator.h"
-#if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
+#if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) || \
+    (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
 
 #include "grouped_matmul_antiquant_a16w8_msd.h"
 #include "grouped_matmul_antiquant_a8w4_msd_pre.h"
@@ -43,9 +44,8 @@ using namespace AscendC;
 using namespace matmul;
 using namespace GROUPED_MATMUL;
 
-
 #ifndef FORMAT_FRACTAL_NZ
-    #define FORMAT_FRACTAL_NZ
+#define FORMAT_FRACTAL_NZ
 #endif
 
 namespace {
@@ -59,14 +59,15 @@ constexpr MatmulConfig matmulCFG = CFG_MDL;
 
 #if defined(GMM_ANTI_QUANT_A8W4_MSD)
 constexpr MatmulConfig A8W4_GMM_CFG_MDL = GetNormalConfig();
-constexpr auto GetMmCFG() {
+constexpr auto GetMmCFG()
+{
     auto CFG = CFG_MDL;
     CFG.isPartialOutput = true;
     return CFG;
 }
 constexpr MatmulConfig A8W4_GMM_CFG_MDL_NEW = GetMmCFG();
 #endif
-}
+} // namespace
 
 template <bool trans = false>
 using xType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X, trans>;
@@ -87,311 +88,310 @@ using yTypeMSD = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, int32_t>;
 using biasType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_BIAS>;
 
 namespace {
-    __aicore__ inline static constexpr MatmulApiStaticTiling GetGmmMatmulApiTiling(bool isND2NZ, bool transB) {
-        MatmulConfig conf = GenGmmConf(isND2NZ);
-        MatmulApiStaticTiling staticTilingTmp;
-        if (transB) {
-            staticTilingTmp = GetMatmulApiTiling<xType<false>, weightType<true>, yType, biasType>(conf);
-        } else {
-            staticTilingTmp = GetMatmulApiTiling<xType<false>, weightType<false>, yType, biasType>(conf);
-        }
-        staticTilingTmp.depthA1 = STATIC_TILING_DEPTH_A1_B1;
-        staticTilingTmp.depthB1 = STATIC_TILING_DEPTH_A1_B1;
-        staticTilingTmp.stepM = 1;
-        staticTilingTmp.stepN = 1;
-        staticTilingTmp.stepKa = STATIC_TILING_STEP_KA_KB;
-        staticTilingTmp.stepKb = STATIC_TILING_STEP_KA_KB;
-        staticTilingTmp.dbL0A = DOUBLE_BUFFER_L0A_L0B;
-        staticTilingTmp.dbL0B = DOUBLE_BUFFER_L0A_L0B;
-        staticTilingTmp.dbL0C = 1;
-        return staticTilingTmp;
+__aicore__ inline static constexpr MatmulApiStaticTiling GetGmmMatmulApiTiling(bool isND2NZ, bool transB)
+{
+    MatmulConfig conf = GenGmmConf(isND2NZ);
+    MatmulApiStaticTiling staticTilingTmp;
+    if (transB) {
+        staticTilingTmp = GetMatmulApiTiling<xType<false>, weightType<true>, yType, biasType>(conf);
+    } else {
+        staticTilingTmp = GetMatmulApiTiling<xType<false>, weightType<false>, yType, biasType>(conf);
     }
+    staticTilingTmp.depthA1 = STATIC_TILING_DEPTH_A1_B1;
+    staticTilingTmp.depthB1 = STATIC_TILING_DEPTH_A1_B1;
+    staticTilingTmp.stepM = 1;
+    staticTilingTmp.stepN = 1;
+    staticTilingTmp.stepKa = STATIC_TILING_STEP_KA_KB;
+    staticTilingTmp.stepKb = STATIC_TILING_STEP_KA_KB;
+    staticTilingTmp.dbL0A = DOUBLE_BUFFER_L0A_L0B;
+    staticTilingTmp.dbL0B = DOUBLE_BUFFER_L0A_L0B;
+    staticTilingTmp.dbL0C = 1;
+    return staticTilingTmp;
+}
 #if defined(FORMAT_WEIGHT) && FORMAT_WEIGHT == FORMAT_FRACTAL_NZ
-    constexpr bool isWeightNZ = true;
+constexpr bool isWeightNZ = true;
 #else
-    constexpr bool isWeightNZ = false;
+constexpr bool isWeightNZ = false;
 #endif
-    constexpr static auto staticCFG = GetGmmMatmulApiTiling(isWeightNZ, false);
-    constexpr static auto staticCFGtransB = GetGmmMatmulApiTiling(isWeightNZ, true);
+constexpr static auto staticCFG = GetGmmMatmulApiTiling(isWeightNZ, false);
+constexpr static auto staticCFGtransB = GetGmmMatmulApiTiling(isWeightNZ, true);
 } // namespace
 
-
-#define GMM_IMP(computeClass, processClass, transA, transB, sync, cfg)                                             \
-    do {                                                                                                           \
-        using matmulType = MMType<xType<transA>, weightType<transB>, yType, biasType, cfg>;                        \
-        matmulType::MT mm;                                                                                         \
-        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling);                              \
-        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling);                                \
-        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling);                               \
-        REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), mm, &mmTilingData_);                                       \
-        computeClass<matmulType, sync> computeOp(mm);                                                              \
-        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale,  \
-                       y, user1, &gmmBaseParams_, &mmTilingData_, &tPipe);                                         \
-        processClass<decltype(computeOp)> op(computeOp);                                                           \
-        op.Init(&gmmBaseParams_, &mmTilingData_, gmmArrayAddr_, groupList, tiling);                                \
-        op.Process();                                                                                              \
+#define GMM_IMP(computeClass, processClass, transA, transB, sync, cfg) \
+    do { \
+        using matmulType = MMType<xType<transA>, weightType<transB>, yType, biasType, cfg>; \
+        matmulType::MT mm; \
+        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
+        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling); \
+        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling); \
+        REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), mm, &mmTilingData_); \
+        computeClass<matmulType, sync> computeOp(mm); \
+        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale, y, \
+                       user1, &gmmBaseParams_, &mmTilingData_, &tPipe); \
+        processClass<decltype(computeOp)> op(computeOp); \
+        op.Init(&gmmBaseParams_, &mmTilingData_, gmmArrayAddr_, groupList, tiling); \
+        op.Process(); \
     } while (0)
 
-#define GMM_CUBE_STATIC_TILING_IMP(processClass, transA, transB, sync, cfg)                                        \
-    do {                                                                                                           \
-        if ASCEND_IS_AIV {                                                                                         \
-            return;                                                                                                \
-        }                                                                                                          \
-        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling);                              \
-        using matmulType = MMImplType<xType<transA>, weightType<transB>, yType, biasType, cfg>;                    \
-        matmulType::MT mm;                                                                                         \
-        mm.SetSubBlockIdx(0);                                                                                      \
-        mm.Init((TCubeTiling*)nullptr, &tPipe);                                                                    \
-        GMMCompute<matmulType, sync> computeOp(mm);                                                                \
-        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale,  \
-                       y, user1,  &gmmBaseParams_, nullptr, &tPipe);                                               \
-        processClass<decltype(computeOp)> op(computeOp);                                                           \
-        op.Init(&gmmBaseParams_, nullptr, 0, groupList, tiling);                                                   \
-        op.InitStaticTiling((cfg).baseM, (cfg).baseN);                                                             \
-        op.Process();                                                                                              \
+#define GMM_CUBE_STATIC_TILING_IMP(processClass, transA, transB, sync, cfg) \
+    do { \
+        if ASCEND_IS_AIV { \
+            return; \
+        } \
+        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
+        using matmulType = MMImplType<xType<transA>, weightType<transB>, yType, biasType, cfg>; \
+        matmulType::MT mm; \
+        mm.SetSubBlockIdx(0); \
+        mm.Init((TCubeTiling*)nullptr, &tPipe); \
+        GMMCompute<matmulType, sync> computeOp(mm); \
+        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale, y, \
+                       user1, &gmmBaseParams_, nullptr, &tPipe); \
+        processClass<decltype(computeOp)> op(computeOp); \
+        op.Init(&gmmBaseParams_, nullptr, 0, groupList, tiling); \
+        op.InitStaticTiling((cfg).baseM, (cfg).baseN); \
+        op.Process(); \
     } while (0)
 
 #define GMM_CV_SPLIT_STATIC_TILING_IMP(computeClass, processClass, transA, transB, sync, cfg, aType, bType, cType) \
-    do {                                                                                                           \
-        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling);                              \
-        using matmulType = MMImplType<aType<transA>, bType<transB>, cType, biasType, cfg>;                         \
-        matmulType::MT mm;                                                                                         \
-        if ASCEND_IS_AIC {                                                                                         \
-            mm.SetSubBlockIdx(0);                                                                                  \
-            mm.Init((TCubeTiling*)nullptr, &tPipe);                                                                \
-        }                                                                                                          \
-        computeClass<matmulType, sync> computeOp(mm);                                                              \
-        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale,  \
-                       y, user1, &gmmBaseParams_, nullptr, &tPipe);                                                \
-        computeOp.InitStaticTiling(&gmmBaseParams_, user1, (cfg).baseM, (cfg).baseN);                              \
-        processClass<decltype(computeOp)> op(computeOp);                                                           \
-        op.Init(&gmmBaseParams_, nullptr, 0, groupList, tiling);                                                   \
-        op.InitStaticTiling((cfg).baseM, (cfg).baseN);                                                             \
-        op.Process();                                                                                              \
+    do { \
+        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
+        using matmulType = MMImplType<aType<transA>, bType<transB>, cType, biasType, cfg>; \
+        matmulType::MT mm; \
+        if ASCEND_IS_AIC { \
+            mm.SetSubBlockIdx(0); \
+            mm.Init((TCubeTiling*)nullptr, &tPipe); \
+        } \
+        computeClass<matmulType, sync> computeOp(mm); \
+        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale, y, \
+                       user1, &gmmBaseParams_, nullptr, &tPipe); \
+        computeOp.InitStaticTiling(&gmmBaseParams_, user1, (cfg).baseM, (cfg).baseN); \
+        processClass<decltype(computeOp)> op(computeOp); \
+        op.Init(&gmmBaseParams_, nullptr, 0, groupList, tiling); \
+        op.InitStaticTiling((cfg).baseM, (cfg).baseN); \
+        op.Process(); \
     } while (0)
 
-#define GMM_CUBE_IMP(processClass, transA, transB, sync, cfg)                                                      \
-    do {                                                                                                           \
-        if ASCEND_IS_AIV {                                                                                         \
-            return;                                                                                                \
-        }                                                                                                          \
-        using matmulType = MMImplType<xType<transA>, weightType<transB>, yType, biasType, cfg>;                    \
-        matmulType::MT mm;                                                                                         \
-        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling);                              \
-        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling);                                \
-        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling);                               \
-        mm.SetSubBlockIdx(0);                                                                                      \
-        mm.Init(&mmTilingData_, &tPipe);                                                                           \
-        GMMCompute<matmulType, sync> computeOp(mm);                                                                \
-        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale,  \
-                       y, user1,  &gmmBaseParams_, &mmTilingData_, &tPipe);                                        \
-        processClass<decltype(computeOp)> op(computeOp);                                                           \
-        op.Init(&gmmBaseParams_, &mmTilingData_, gmmArrayAddr_, groupList, tiling);                                \
-        op.Process();                                                                                              \
+#define GMM_CUBE_IMP(processClass, transA, transB, sync, cfg) \
+    do { \
+        if ASCEND_IS_AIV { \
+            return; \
+        } \
+        using matmulType = MMImplType<xType<transA>, weightType<transB>, yType, biasType, cfg>; \
+        matmulType::MT mm; \
+        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
+        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling); \
+        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling); \
+        mm.SetSubBlockIdx(0); \
+        mm.Init(&mmTilingData_, &tPipe); \
+        GMMCompute<matmulType, sync> computeOp(mm); \
+        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale, y, \
+                       user1, &gmmBaseParams_, &mmTilingData_, &tPipe); \
+        processClass<decltype(computeOp)> op(computeOp); \
+        op.Init(&gmmBaseParams_, &mmTilingData_, gmmArrayAddr_, groupList, tiling); \
+        op.Process(); \
     } while (0)
 
 #if defined(CONST_TILING)
-#define GMM_CV_SPLIT_IMP(computeClass, processClass, transA, transB, sync, cfg, aType, bType, cType)               \
-    do {                                                                                                           \
-        using matmulType = MMImplType<aType<transA>, bType<transB>, cType, biasType, cfg>;                         \
-        matmulType::MT mm;                                                                                         \
-        GMMTilingData gmmTilingData;                                                                               \
-        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling);                              \
-        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling);                                \
-        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling);                               \
-        if ASCEND_IS_AIC {                                                                                         \
-            mm.SetSubBlockIdx(0);                                                                                  \
-            mm.Init(&mmTilingData_, &tPipe);                                                                       \
-        }                                                                                                          \
-        computeClass<matmulType, sync> computeOp(mm);                                                              \
-        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale,  \
-                       y, user1, &gmmBaseParams_, &mmTilingData_, &tPipe);                                         \
-        processClass<decltype(computeOp)> op(computeOp);                                                           \
-        op.Init(&gmmBaseParams_, &mmTilingData_, gmmArrayAddr_, groupList, tiling);                                \
-        op.Process();                                                                                              \
+#define GMM_CV_SPLIT_IMP(computeClass, processClass, transA, transB, sync, cfg, aType, bType, cType) \
+    do { \
+        using matmulType = MMImplType<aType<transA>, bType<transB>, cType, biasType, cfg>; \
+        matmulType::MT mm; \
+        GMMTilingData gmmTilingData; \
+        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
+        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling); \
+        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling); \
+        if ASCEND_IS_AIC { \
+            mm.SetSubBlockIdx(0); \
+            mm.Init(&mmTilingData_, &tPipe); \
+        } \
+        computeClass<matmulType, sync> computeOp(mm); \
+        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale, y, \
+                       user1, &gmmBaseParams_, &mmTilingData_, &tPipe); \
+        processClass<decltype(computeOp)> op(computeOp); \
+        op.Init(&gmmBaseParams_, &mmTilingData_, gmmArrayAddr_, groupList, tiling); \
+        op.Process(); \
     } while (0)
 #else
-    #define GMM_CV_SPLIT_IMP(computeClass, processClass, transA, transB, sync, cfg, aType, bType, cType)           \
-    do {                                                                                                           \
-        using matmulType = MMImplType<aType<transA>, bType<transB>, cType, biasType, cfg>;                         \
-        matmulType::MT mm;                                                                                         \
-        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling);                              \
-        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling);                                \
-        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling);                               \
-        GMMPreTilingProcess preTiling;                                                                             \
-        preTiling.Init(groupList, gmmBaseParams_, mmTilingData_, &tPipe);                                          \
-        preTiling.Process(gmmBaseParams_, mmTilingData_);                                                          \
-        if ASCEND_IS_AIC {                                                                                         \
-            mm.SetSubBlockIdx(0);                                                                                  \
-            mm.Init(&mmTilingData_, &tPipe);                                                                       \
-        }                                                                                                          \
-        computeClass<matmulType, sync> computeOp(mm);                                                              \
-        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale,  \
-                       y, user1, &gmmBaseParams_, &mmTilingData_, &tPipe);                                         \
-        processClass<decltype(computeOp)> op(computeOp);                                                           \
-        op.Init(&gmmBaseParams_, &mmTilingData_, gmmArrayAddr_, groupList, tiling);                                \
-        op.Process();                                                                                              \
+#define GMM_CV_SPLIT_IMP(computeClass, processClass, transA, transB, sync, cfg, aType, bType, cType) \
+    do { \
+        using matmulType = MMImplType<aType<transA>, bType<transB>, cType, biasType, cfg>; \
+        matmulType::MT mm; \
+        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
+        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling); \
+        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling); \
+        GMMPreTilingProcess preTiling; \
+        preTiling.Init(groupList, gmmBaseParams_, mmTilingData_, &tPipe); \
+        preTiling.Process(gmmBaseParams_, mmTilingData_); \
+        if ASCEND_IS_AIC { \
+            mm.SetSubBlockIdx(0); \
+            mm.Init(&mmTilingData_, &tPipe); \
+        } \
+        computeClass<matmulType, sync> computeOp(mm); \
+        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale, y, \
+                       user1, &gmmBaseParams_, &mmTilingData_, &tPipe); \
+        processClass<decltype(computeOp)> op(computeOp); \
+        op.Init(&gmmBaseParams_, &mmTilingData_, gmmArrayAddr_, groupList, tiling); \
+        op.Process(); \
     } while (0)
 #endif
 
-#define GMM_A4W4_IMP(computeClass, transA, transB, cfg, aType, bType, cType)                                       \
-    do {                                                                                                           \
-        using matmulType = MMImplType<aType<transA>, bType<transB>, cType, biasType, cfg>;                         \
-        matmulType::MT mm;                                                                                         \
-        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling);                              \
-        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling);                                \
-        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling);                               \
-        if ASCEND_IS_AIC {                                                                                         \
-            mm.SetSubBlockIdx(0);                                                                                  \
-            mm.Init(&mmTilingData_, &tPipe);                                                                       \
-        }                                                                                                          \
-        computeClass<matmulType> computeOp(mm);                                                                    \
-        computeOp.Init(x, weight, scale, groupList, perTokenScale,                                                 \
-                    y, user1, &gmmBaseParams_, &mmTilingData_, &tPipe);                                            \
-        computeOp.Process();                                                                                       \
-    } while (0)
-
-#define GMM_CV_SPLIT_IMP_A8W4_MSD(computeClass, cfg)                                                               \
-    do {                                                                                                           \
-        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling);                              \
-        if ASCEND_IS_AIV {                                                                                         \
-            if (gmmBaseParams_.isA8W4MSDPreNZ == 1) {                                                              \
-                GMMA8W4PreProcessNZ op1;                                                                           \
-                op1.Init(x, user1, groupList, user1, gmmBaseParams_, &tPipe);                                      \
-                op1.Process();                                                                                     \
-            } else{                                                                                                \
-                GMMA8W4PreProcess op1;                                                                             \
-                op1.Init(x, x, groupList, user1, gmmBaseParams_, &tPipe);                                          \
-                op1.Process();                                                                                     \
-            }                                                                                                      \
-            tPipe.Reset();                                                                                         \
-            tPipe.Destroy();                                                                                       \
-            tPipe.Init();                                                                                          \
-        }                                                                                                          \
-        if (gmmBaseParams_.isA8W4MSDPreNZ == 1) {                                                                  \
-            using aT = MatmulType<TPosition::GM, CubeFormat::NZ, DTYPE_X_DEV_A8W4MSD, false>;                      \
-            using bT = MatmulType<TPosition::GM, wFormat, int4b_t, false>;                                         \
-            using biasT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>;                                   \
-            using cT = MatmulType<TPosition::GM, CubeFormat::ND, half, false>;                                         \
-            using matmulType = MMImplType<aT, bT, cT, biasT, cfg>;                                                     \
-            matmulType::MT mm;                                                                                         \
-            GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling);                                \
-            GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling);                               \
-            if ASCEND_IS_AIC {                                                                                         \
-                mm.SetSubBlockIdx(0);                                                                                  \
-                mm.Init(&mmTilingData_, &tPipe);                                                                       \
-            }                                                                                                          \
-            computeClass<matmulType> op(mm);                                                                           \
-            auto userCV = user1 + AlignUp<8>(gmmBaseParams_.m) * gmmBaseParams_.k ;                                    \
-            op.Init(user1, weight, bias, groupList, scale, perTokenScale, offset, nullptr, nullptr, nullptr,           \
-                    y, userCV, &gmmBaseParams_, &mmTilingData_, &tPipe);                                               \
-            op.Process();                                                                                              \
-        } else {                                                                                                       \
-            using aT = MatmulType<TPosition::GM, CubeFormat::ND, DTYPE_X_DEV_A8W4MSD, false>;                          \
-            using bT = MatmulType<TPosition::GM, wFormat, DTYPE_WEIGHT_DEV_A8W4MSD, false>;                                             \
-            using biasT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>;                                   \
-            using cT = MatmulType<TPosition::GM, CubeFormat::ND, half, false>;                                         \
-            using matmulType = MMImplType<aT, bT, cT, biasT, cfg>;                                                     \
-            matmulType::MT mm;                                                                                         \
-            GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling);                                \
-            GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling);                               \
-            if ASCEND_IS_AIC {                                                                                         \
-                mm.SetSubBlockIdx(0);                                                                                  \
-                mm.Init(&mmTilingData_, &tPipe);                                                                       \
-            }                                                                                                          \
-            computeClass<matmulType> op(mm);                                                                           \
-            op.Init(x, weight, bias, groupList, scale, perTokenScale, offset, nullptr, nullptr, nullptr,               \
-                    y, user1, &gmmBaseParams_, &mmTilingData_, &tPipe);                                                \
-            op.Process();                                                                                              \
-        }                                                                                              \
-    } while (0)
-
-#define GMM_CV_SPLIT_IMP_A8W4(computeClass, cfg)                                                                   \
-    do {                                                                                                           \
-        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling);                              \
-        if ASCEND_IS_AIV {                                                                                         \
-            GMMA8W4FakeQuantPreProcess<wFormat> op1;                                                               \
-            op1.Init(weight, y, groupList, user1, gmmBaseParams_, &tPipe);                                         \
-            op1.Process();                                                                                         \
-            tPipe.Reset();                                                                                         \
-            tPipe.Destroy();                                                                                       \
-            tPipe.Init();                                                                                          \
-        }                                                                                                          \
-        SyncAll<false>();                                                                                          \
-        using aT = MatmulType<TPosition::GM, CubeFormat::ND, int8_t, false>;                                       \
-        using bT = MatmulType<TPosition::GM, wFormat, int8_t, false>;                                              \
-        using biasT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>;                                   \
-        using cT = MatmulType<TPosition::GM, CubeFormat::ND, half, false>;                                         \
-        using matmulType = MMImplType<aT, bT, cT, biasT, cfg>;                                                     \
-        matmulType::MT mm;                                                                                         \
-        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling);                                \
-        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling);                               \
-        if ASCEND_IS_AIC {                                                                                         \
-            mm.SetSubBlockIdx(0);                                                                                  \
-            mm.Init(&mmTilingData_, &tPipe);                                                                       \
-        }                                                                                                          \
-        computeClass<matmulType> op(mm);                                                                           \
-        op.Init(x, weight, bias, groupList, scale, perTokenScale, offset, nullptr, nullptr, nullptr,               \
-                    y, user1, &gmmBaseParams_, &mmTilingData_, &tPipe);                                            \
-        op.Process();                                                                                              \
-    } while (0)
-
-#define GMM_CV_SPLIT_IMP_A8W4_FAKEA8W8(computeClass, cfg)                                                          \
-    do {                                                                                                           \
-        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling);                              \
-        if ASCEND_IS_AIV {                                                                                         \
-            GMMA8W4FakeQuantPreProcess<wFormat> op1;                                                               \
-            op1.Init(weight, y, scale, user1, gmmBaseParams_, &tPipe);                                             \
-            op1.Process();                                                                                         \
-            tPipe.Reset();                                                                                         \
-            tPipe.Destroy();                                                                                       \
-            tPipe.Init();                                                                                          \
-        }                                                                                                          \
-        SyncAll<false>();                                                                                          \
-        GlobalTensor<int8_t> yGm;                                                                                  \
-        yGm.SetGlobalBuffer((__gm__ int8_t *)workspace);                                                           \
-        using aT = MatmulType<TPosition::GM, CubeFormat::ND, int8_t, false>;                                       \
-        using bT = MatmulType<TPosition::GM, wFormat, int8_t, false>;                                              \
-        using biasT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>;                                   \
-        using cT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>;                                      \
-        using matmulType = MMImplType<aT, bT, cT, biasT, matmulCFG>;                                               \
-        matmulType::MT mm;                                                                                         \
-        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling);                                \
-        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling);                               \
-        if ASCEND_IS_AIC {                                                                                         \
-            mm.SetSubBlockIdx(0);                                                                                  \
-            mm.Init(&mmTilingData_, &tPipe);                                                                       \
-        }                                                                                                          \
-        GMMQuantMixCoreCompute<matmulType, false> computeOp(mm);                                                   \
-        computeOp.isA8W4FakeQuant = true;                                                                          \
-        computeOp.Init(x, user1, bias, user1, offset, antiquantScale, antiquantOffset, groupList, perTokenScale,   \
-                       y, user1, &gmmBaseParams_, &mmTilingData_, &tPipe);                                         \
-        GMMProcess<decltype(computeOp)> op(computeOp);                                                             \
-        op.Init(&gmmBaseParams_, &mmTilingData_, gmmArrayAddr_, groupList, tiling);                                \
-        op.Process();                                                                                              \
-    } while (0)
-
-#define GMM_CV_SPLIT_IMP_A16W4_MSD(computeClass, ...)                                 \
-    do {                                                                              \
+#define GMM_A4W4_IMP(computeClass, transA, transB, cfg, aType, bType, cType) \
+    do { \
+        using matmulType = MMImplType<aType<transA>, bType<transB>, cType, biasType, cfg>; \
+        matmulType::MT mm; \
         GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
-        computeClass<DTYPE_X, DTYPE_WEIGHT, DTYPE_BIAS, GROUP_LIST_TYPE> op;          \
-        op.Init(x, weight, antiquantScale, bias, groupList, y, &gmmBaseParams_);        \
-        op.Process(workspace, &tPipe);                                                                 \
+        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling); \
+        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling); \
+        if ASCEND_IS_AIC { \
+            mm.SetSubBlockIdx(0); \
+            mm.Init(&mmTilingData_, &tPipe); \
+        } \
+        computeClass<matmulType> computeOp(mm); \
+        computeOp.Init(x, weight, scale, groupList, perTokenScale, y, user1, &gmmBaseParams_, &mmTilingData_, &tPipe); \
+        computeOp.Process(); \
     } while (0)
 
-template <int D_T_A, int D_T_B, int D_T_Y, int TRANS_A, int TRANS_B, int GROUP_LIST_TYPE,
-          int IS_STATIC_TILING_API, int A8W4_KERNEL_TEMPLATE, int A16W8_KERNEL_TEMPLATE, int AIV_AIC_RATIO, bool IS_ENABLE_FIXED_AXIS>
-__global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale,
-                                                     GM_ADDR offset, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
-                                                     GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR y,
-                                                     GM_ADDR workspace, GM_ADDR tiling)
+#define GMM_CV_SPLIT_IMP_A8W4_MSD(computeClass, cfg) \
+    do { \
+        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
+        if ASCEND_IS_AIV { \
+            if (gmmBaseParams_.isA8W4MSDPreNZ == 1) { \
+                GMMA8W4PreProcessNZ op1; \
+                op1.Init(x, user1, groupList, user1, gmmBaseParams_, &tPipe); \
+                op1.Process(); \
+            } else { \
+                GMMA8W4PreProcess op1; \
+                op1.Init(x, x, groupList, user1, gmmBaseParams_, &tPipe); \
+                op1.Process(); \
+            } \
+            tPipe.Reset(); \
+            tPipe.Destroy(); \
+            tPipe.Init(); \
+        } \
+        if (gmmBaseParams_.isA8W4MSDPreNZ == 1) { \
+            using aT = MatmulType<TPosition::GM, CubeFormat::NZ, DTYPE_X_DEV_A8W4MSD, false>; \
+            using bT = MatmulType<TPosition::GM, wFormat, int4b_t, false>; \
+            using biasT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>; \
+            using cT = MatmulType<TPosition::GM, CubeFormat::ND, half, false>; \
+            using matmulType = MMImplType<aT, bT, cT, biasT, cfg>; \
+            matmulType::MT mm; \
+            GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling); \
+            GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling); \
+            if ASCEND_IS_AIC { \
+                mm.SetSubBlockIdx(0); \
+                mm.Init(&mmTilingData_, &tPipe); \
+            } \
+            computeClass<matmulType> op(mm); \
+            auto userCV = user1 + AlignUp<8>(gmmBaseParams_.m) * gmmBaseParams_.k; \
+            op.Init(user1, weight, bias, groupList, scale, perTokenScale, offset, nullptr, nullptr, nullptr, y, \
+                    userCV, &gmmBaseParams_, &mmTilingData_, &tPipe); \
+            op.Process(); \
+        } else { \
+            using aT = MatmulType<TPosition::GM, CubeFormat::ND, DTYPE_X_DEV_A8W4MSD, false>; \
+            using bT = MatmulType<TPosition::GM, wFormat, DTYPE_WEIGHT_DEV_A8W4MSD, false>; \
+            using biasT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>; \
+            using cT = MatmulType<TPosition::GM, CubeFormat::ND, half, false>; \
+            using matmulType = MMImplType<aT, bT, cT, biasT, cfg>; \
+            matmulType::MT mm; \
+            GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling); \
+            GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling); \
+            if ASCEND_IS_AIC { \
+                mm.SetSubBlockIdx(0); \
+                mm.Init(&mmTilingData_, &tPipe); \
+            } \
+            computeClass<matmulType> op(mm); \
+            op.Init(x, weight, bias, groupList, scale, perTokenScale, offset, nullptr, nullptr, nullptr, y, user1, \
+                    &gmmBaseParams_, &mmTilingData_, &tPipe); \
+            op.Process(); \
+        } \
+    } while (0)
+
+#define GMM_CV_SPLIT_IMP_A8W4(computeClass, cfg) \
+    do { \
+        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
+        if ASCEND_IS_AIV { \
+            GMMA8W4FakeQuantPreProcess<wFormat> op1; \
+            op1.Init(weight, y, groupList, user1, gmmBaseParams_, &tPipe); \
+            op1.Process(); \
+            tPipe.Reset(); \
+            tPipe.Destroy(); \
+            tPipe.Init(); \
+        } \
+        SyncAll<false>(); \
+        using aT = MatmulType<TPosition::GM, CubeFormat::ND, int8_t, false>; \
+        using bT = MatmulType<TPosition::GM, wFormat, int8_t, false>; \
+        using biasT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>; \
+        using cT = MatmulType<TPosition::GM, CubeFormat::ND, half, false>; \
+        using matmulType = MMImplType<aT, bT, cT, biasT, cfg>; \
+        matmulType::MT mm; \
+        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling); \
+        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling); \
+        if ASCEND_IS_AIC { \
+            mm.SetSubBlockIdx(0); \
+            mm.Init(&mmTilingData_, &tPipe); \
+        } \
+        computeClass<matmulType> op(mm); \
+        op.Init(x, weight, bias, groupList, scale, perTokenScale, offset, nullptr, nullptr, nullptr, y, user1, \
+                &gmmBaseParams_, &mmTilingData_, &tPipe); \
+        op.Process(); \
+    } while (0)
+
+#define GMM_CV_SPLIT_IMP_A8W4_FAKEA8W8(computeClass, cfg) \
+    do { \
+        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
+        if ASCEND_IS_AIV { \
+            GMMA8W4FakeQuantPreProcess<wFormat> op1; \
+            op1.Init(weight, y, scale, user1, gmmBaseParams_, &tPipe); \
+            op1.Process(); \
+            tPipe.Reset(); \
+            tPipe.Destroy(); \
+            tPipe.Init(); \
+        } \
+        SyncAll<false>(); \
+        GlobalTensor<int8_t> yGm; \
+        yGm.SetGlobalBuffer((__gm__ int8_t*)workspace); \
+        using aT = MatmulType<TPosition::GM, CubeFormat::ND, int8_t, false>; \
+        using bT = MatmulType<TPosition::GM, wFormat, int8_t, false>; \
+        using biasT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>; \
+        using cT = MatmulType<TPosition::GM, CubeFormat::ND, int32_t, false>; \
+        using matmulType = MMImplType<aT, bT, cT, biasT, matmulCFG>; \
+        matmulType::MT mm; \
+        GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling); \
+        GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling); \
+        if ASCEND_IS_AIC { \
+            mm.SetSubBlockIdx(0); \
+            mm.Init(&mmTilingData_, &tPipe); \
+        } \
+        GMMQuantMixCoreCompute<matmulType, false> computeOp(mm); \
+        computeOp.isA8W4FakeQuant = true; \
+        computeOp.Init(x, user1, bias, user1, offset, antiquantScale, antiquantOffset, groupList, perTokenScale, y, \
+                       user1, &gmmBaseParams_, &mmTilingData_, &tPipe); \
+        GMMProcess<decltype(computeOp)> op(computeOp); \
+        op.Init(&gmmBaseParams_, &mmTilingData_, gmmArrayAddr_, groupList, tiling); \
+        op.Process(); \
+    } while (0)
+
+#define GMM_CV_SPLIT_IMP_A16W4_MSD(computeClass, ...) \
+    do { \
+        GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
+        computeClass<DTYPE_X, DTYPE_WEIGHT, DTYPE_BIAS, GROUP_LIST_TYPE> op; \
+        op.Init(x, weight, antiquantScale, bias, groupList, y, &gmmBaseParams_); \
+        op.Process(workspace, &tPipe); \
+    } while (0)
+
+template <int D_T_A, int D_T_B, int D_T_Y, int TRANS_A, int TRANS_B, int GROUP_LIST_TYPE, int IS_STATIC_TILING_API,
+          int A8W4_KERNEL_TEMPLATE, int A16W8_KERNEL_TEMPLATE, int AIV_AIC_RATIO, bool IS_ENABLE_FIXED_AXIS>
+__global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR offset,
+                                          GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR groupList,
+                                          GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling)
 {
     TPipe tPipe;
     AscendCUtils::SetOverflow(1);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIC_ONLY);
     GM_ADDR user1 = GetUserWorkspace(workspace);
 
-#if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
+#if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) || \
+    (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
 #if defined(GMM_ANTI_QUANT_A8W4_MSD)
     // ANTIQUANT_A8W4
     if constexpr (D_T_A == GMM_TPL_INT8 && D_T_B == GMM_TPL_INT4) {
@@ -416,7 +416,7 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
             GM_ADDR workspaceDevice = user1;
 
             GMMA4W8AutotilingCompute op(A, B, C, groupListOptional, bias_, offset_, sa, sw, workspaceDevice,
-                                        const_cast<A8W4HPTiling *>(&tilingData), &tPipe);
+                                        const_cast<A8W4HPTiling*>(&tilingData), &tPipe);
             op.Init();
             op.Process();
         }
@@ -459,19 +459,19 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
                   A16W8_KERNEL_TEMPLATE == GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_MSD) {
         if constexpr (TRANS_B == 0) {
             if constexpr (GROUP_LIST_TYPE == GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
-                GMM_CV_SPLIT_IMP(GMMA16W8MSDCompute, GMMA16W8MSDMSparseProcess, false, false, false,
-                                 matmulCFG, xTypeMSD, weightTypeMSD, yTypeMSD);
+                GMM_CV_SPLIT_IMP(GMMA16W8MSDCompute, GMMA16W8MSDMSparseProcess, false, false, false, matmulCFG,
+                                 xTypeMSD, weightTypeMSD, yTypeMSD);
             } else {
-                GMM_CV_SPLIT_IMP(GMMA16W8MSDCompute, GMMA16W8MSDProcess, false, false, false,
-                                 matmulCFG, xTypeMSD, weightTypeMSD, yTypeMSD);
+                GMM_CV_SPLIT_IMP(GMMA16W8MSDCompute, GMMA16W8MSDProcess, false, false, false, matmulCFG, xTypeMSD,
+                                 weightTypeMSD, yTypeMSD);
             }
         } else if constexpr (TRANS_B == 1) {
             if constexpr (GROUP_LIST_TYPE == GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
-                GMM_CV_SPLIT_IMP(GMMA16W8MSDCompute, GMMA16W8MSDMSparseProcess, false, true, false,
-                                 matmulCFG, xTypeMSD, weightTypeMSD, yTypeMSD);
+                GMM_CV_SPLIT_IMP(GMMA16W8MSDCompute, GMMA16W8MSDMSparseProcess, false, true, false, matmulCFG, xTypeMSD,
+                                 weightTypeMSD, yTypeMSD);
             } else {
-                GMM_CV_SPLIT_IMP(GMMA16W8MSDCompute, GMMA16W8MSDProcess, false, true, false,
-                                 matmulCFG, xTypeMSD, weightTypeMSD, yTypeMSD);
+                GMM_CV_SPLIT_IMP(GMMA16W8MSDCompute, GMMA16W8MSDProcess, false, true, false, matmulCFG, xTypeMSD,
+                                 weightTypeMSD, yTypeMSD);
             }
         }
     }
@@ -479,23 +479,27 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
 
 #elif defined(GMM_QUANT_BF16) || defined(GMM_QUANT_FLOAT16)
     // QUANT_A8W8O16
-    if constexpr (D_T_A == GMM_TPL_INT8 && D_T_B == GMM_TPL_INT8 && (D_T_Y == GMM_TPL_BF16 || D_T_Y == GMM_TPL_FLOAT16) &&
-                  TRANS_A == 0 && A8W4_KERNEL_TEMPLATE == GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_NONE) {
+    if constexpr (D_T_A == GMM_TPL_INT8 && D_T_B == GMM_TPL_INT8 &&
+                  (D_T_Y == GMM_TPL_BF16 || D_T_Y == GMM_TPL_FLOAT16) && TRANS_A == 0 &&
+                  A8W4_KERNEL_TEMPLATE == GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_NONE) {
         if constexpr (IS_STATIC_TILING_API == 0) {
             if constexpr (AIV_AIC_RATIO == GROUPED_MATMUL_AIV_AIC_RATIO_1) {
-                if constexpr(IS_ENABLE_FIXED_AXIS == 0) {
+                if constexpr (IS_ENABLE_FIXED_AXIS == 0) {
                     if constexpr (TRANS_B == 0 && GROUP_LIST_TYPE != GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
-                    GMM_CV_SPLIT_IMP(GMMQuantMixCoreCompute, GMMProcess, false, false, false, matmulCFG, xType, weightType, yType);
+                        GMM_CV_SPLIT_IMP(GMMQuantMixCoreCompute, GMMProcess, false, false, false, matmulCFG, xType,
+                                         weightType, yType);
                     } else if constexpr (TRANS_B == 1 && GROUP_LIST_TYPE != GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
-                        GMM_CV_SPLIT_IMP(GMMQuantMixCoreCompute, GMMProcess, false, true, false, matmulCFG, xType, weightType, yType);
-                    } else if constexpr(TRANS_B == 0 && GROUP_LIST_TYPE == GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
-                        GMM_CV_SPLIT_IMP(GMMQuantMixCoreCompute, GMMGroupMSparseProcess, false, false, false, matmulCFG, xType,
-                                    weightType, yType);
+                        GMM_CV_SPLIT_IMP(GMMQuantMixCoreCompute, GMMProcess, false, true, false, matmulCFG, xType,
+                                         weightType, yType);
+                    } else if constexpr (TRANS_B == 0 && GROUP_LIST_TYPE == GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
+                        GMM_CV_SPLIT_IMP(GMMQuantMixCoreCompute, GMMGroupMSparseProcess, false, false, false, matmulCFG,
+                                         xType, weightType, yType);
                     } else if constexpr (TRANS_B == 1 && GROUP_LIST_TYPE == GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
-                        GMM_CV_SPLIT_IMP(GMMQuantMixCoreCompute, GMMGroupMSparseProcess, false, true, false, matmulCFG, xType,
-                                    weightType, yType);
+                        GMM_CV_SPLIT_IMP(GMMQuantMixCoreCompute, GMMGroupMSparseProcess, false, true, false, matmulCFG,
+                                         xType, weightType, yType);
                     }
-                } else if constexpr(IS_ENABLE_FIXED_AXIS == 1 && TRANS_B == 0 && GROUP_LIST_TYPE == GROUPED_MATMUL_GROUP_LIST_TYPE_CUMSUM) {
+                } else if constexpr (IS_ENABLE_FIXED_AXIS == 1 && TRANS_B == 0 &&
+                                     GROUP_LIST_TYPE == GROUPED_MATMUL_GROUP_LIST_TYPE_CUMSUM) {
                     tPipe.Destroy();
                     AscendC::SetMMLayoutTransform(true);
                     GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling)
@@ -507,31 +511,34 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
                     using PerTokenScaleDType = float;
                     using YDType = half;
 #ifndef __CCE_KT_TEST__
-                    Catlass::grouped_matmul_fixaxismove<XDType, WeightDType, CDType, ScaleDType, GrouplistDType, PerTokenScaleDType, YDType>(
-                        gmmBaseParams_.m, gmmBaseParams_.k, gmmBaseParams_.n, gmmBaseParams_.groupNum,
-                        x, weight, scale, groupList, perTokenScale, y, user1, gmmBaseParams_.coreNum);
+                    Catlass::grouped_matmul_fixaxismove<XDType, WeightDType, CDType, ScaleDType, GrouplistDType,
+                                                        PerTokenScaleDType, YDType>(
+                        gmmBaseParams_.m, gmmBaseParams_.k, gmmBaseParams_.n, gmmBaseParams_.groupNum, x, weight, scale,
+                        groupList, perTokenScale, y, user1, gmmBaseParams_.coreNum);
 #endif
                 }
             } else if constexpr (AIV_AIC_RATIO == GROUPED_MATMUL_AIV_AIC_RATIO_2) {
                 if constexpr (TRANS_B == 0) {
-                    GMM_CV_SPLIT_IMP(GMMQuantMixCoreCompute, GMMProcess, false, false, false, matmulCFG, xType, weightType, yType);
+                    GMM_CV_SPLIT_IMP(GMMQuantMixCoreCompute, GMMProcess, false, false, false, matmulCFG, xType,
+                                     weightType, yType);
                 } else if constexpr (TRANS_B == 1) {
-                    GMM_CV_SPLIT_IMP(GMMQuantMixCoreCompute, GMMProcess, false, true, false, matmulCFG, xType, weightType, yType);
+                    GMM_CV_SPLIT_IMP(GMMQuantMixCoreCompute, GMMProcess, false, true, false, matmulCFG, xType,
+                                     weightType, yType);
                 }
             }
         } else if (IS_STATIC_TILING_API == 1) {
             if constexpr (TRANS_B == 0 && GROUP_LIST_TYPE != GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
-                GMM_CV_SPLIT_STATIC_TILING_IMP(GMMQuantMixCoreCompute, GMMProcess,
-                                            false, false, false, staticCFG, xType, weightType, yType);
+                GMM_CV_SPLIT_STATIC_TILING_IMP(GMMQuantMixCoreCompute, GMMProcess, false, false, false, staticCFG,
+                                               xType, weightType, yType);
             } else if constexpr (TRANS_B == 1 && GROUP_LIST_TYPE != GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
-                GMM_CV_SPLIT_STATIC_TILING_IMP(GMMQuantMixCoreCompute, GMMProcess,
-                                            false, true, false, staticCFGtransB, xType, weightType, yType);
+                GMM_CV_SPLIT_STATIC_TILING_IMP(GMMQuantMixCoreCompute, GMMProcess, false, true, false, staticCFGtransB,
+                                               xType, weightType, yType);
             } else if constexpr (TRANS_B == 0 && GROUP_LIST_TYPE == GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
-                GMM_CV_SPLIT_STATIC_TILING_IMP(GMMQuantMixCoreCompute, GMMGroupMSparseProcess,
-                                            false, false, false, staticCFG, xType, weightType, yType);
+                GMM_CV_SPLIT_STATIC_TILING_IMP(GMMQuantMixCoreCompute, GMMGroupMSparseProcess, false, false, false,
+                                               staticCFG, xType, weightType, yType);
             } else if constexpr (TRANS_B == 1 && GROUP_LIST_TYPE == GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
-                GMM_CV_SPLIT_STATIC_TILING_IMP(GMMQuantMixCoreCompute, GMMGroupMSparseProcess,
-                                            false, true, false, staticCFGtransB, xType, weightType, yType);
+                GMM_CV_SPLIT_STATIC_TILING_IMP(GMMQuantMixCoreCompute, GMMGroupMSparseProcess, false, true, false,
+                                               staticCFGtransB, xType, weightType, yType);
             }
         }
     }
@@ -542,11 +549,11 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
             GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling);
             if (gmmBaseParams_.isA4W4Optimize) {
                 tPipe.Destroy();
-                AscendC::SetMMLayoutTransform(true);                                                                                                                                                                                                         
+                AscendC::SetMMLayoutTransform(true);
 #ifndef __CCE_KT_TEST__
-                Catlass::grouped_matmul_a4w4_catlass(
-                    gmmBaseParams_.m, gmmBaseParams_.k, gmmBaseParams_.n, gmmBaseParams_.groupNum, gmmBaseParams_.quantGroupNum,
-                    x, weight, scale, groupList, perTokenScale, y, user1, gmmBaseParams_.coreNum);
+                Catlass::grouped_matmul_a4w4_catlass(gmmBaseParams_.m, gmmBaseParams_.k, gmmBaseParams_.n,
+                                                     gmmBaseParams_.groupNum, gmmBaseParams_.quantGroupNum, x, weight,
+                                                     scale, groupList, perTokenScale, y, user1, gmmBaseParams_.coreNum);
 #endif
                 AscendC::SetMMLayoutTransform(false);
             } else {
@@ -579,7 +586,7 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
             } else if constexpr (TRANS_B == 1 && GROUP_LIST_TYPE == GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
                 GMM_CUBE_IMP(GMMGroupMSparseProcess, false, true, false, matmulCFGUnitFlag);
             }
-        } else if constexpr (IS_STATIC_TILING_API == 1){
+        } else if constexpr (IS_STATIC_TILING_API == 1) {
             if constexpr (TRANS_B == 0 && GROUP_LIST_TYPE != GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {
                 GMM_CUBE_STATIC_TILING_IMP(GMMProcess, false, false, false, staticCFG);
             } else if constexpr (TRANS_B == 1 && GROUP_LIST_TYPE != GROUPED_MATMUL_GROUP_LIST_TYPE_SPARSEM) {

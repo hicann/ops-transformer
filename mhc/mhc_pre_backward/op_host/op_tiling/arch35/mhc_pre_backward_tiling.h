@@ -68,7 +68,7 @@ REGISTER_TILING_DATA_CLASS(MhcPreBackward, MhcPreBackwardTilingData);
 
 class MhcPreBackwardTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MhcPreBackwardTiling(gert::TilingContext *context)
+    explicit MhcPreBackwardTiling(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context) {};
 
     ~MhcPreBackwardTiling() override = default;
@@ -103,13 +103,13 @@ protected:
     ge::graphStatus PostTiling() override;
 
     ge::graphStatus GetInputShape();
-    ge::graphStatus GetInputTensors(const gert::Tensor *&gradHInTensor, const gert::Tensor *&gradHPostTensor,
-                                    const gert::Tensor *&gradHResTensor);
+    ge::graphStatus GetInputTensors(const gert::Tensor*& gradHInTensor, const gert::Tensor*& gradHPostTensor,
+                                    const gert::Tensor*& gradHResTensor);
     ge::graphStatus ValidateInputDims(int64_t gradHInDims, int64_t gradHPostDims, int64_t gradHResDims);
-    ge::graphStatus ParseBSDFormat(const gert::Tensor *gradHInTensor, const gert::Tensor *gradHPostTensor,
-                                   const gert::Tensor *gradHResTensor);
-    ge::graphStatus ParseTNDFormat(const gert::Tensor *gradHInTensor, const gert::Tensor *gradHPostTensor,
-                                   const gert::Tensor *gradHResTensor);
+    ge::graphStatus ParseBSDFormat(const gert::Tensor* gradHInTensor, const gert::Tensor* gradHPostTensor,
+                                   const gert::Tensor* gradHResTensor);
+    ge::graphStatus ParseTNDFormat(const gert::Tensor* gradHInTensor, const gert::Tensor* gradHPostTensor,
+                                   const gert::Tensor* gradHResTensor);
     ge::graphStatus ValidateShapeParams();
     void SetMmConfig();
     ge::graphStatus ValidateMmConfig();

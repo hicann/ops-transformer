@@ -31,11 +31,11 @@ constexpr uint32_t MHC_PRE_MK_SEQUENTIAL_PARTIAL_THRESHOLD = 2048U;
 // Flat vector reduction thresholds for large workloads.
 constexpr uint32_t MHC_PRE_MK_FLAT_REDUCE_MIN_M = 2048U;
 constexpr uint32_t MHC_PRE_MK_FLAT_REDUCE_MIN_GROUP_K = 20U;
-__aicore__ inline void MhcPreMkVFTransND2NZ(const LocalTensor<float> &dstLocal, const LocalTensor<float> &srcLocal,
+__aicore__ inline void MhcPreMkVFTransND2NZ(const LocalTensor<float>& dstLocal, const LocalTensor<float>& srcLocal,
                                             uint16_t rowCount, uint16_t columnCount)
 {
-    __local_mem__ float *dst = (__local_mem__ float *)dstLocal.GetPhyAddr();
-    __local_mem__ float *src = (__local_mem__ float *)srcLocal.GetPhyAddr();
+    __local_mem__ float* dst = (__local_mem__ float*)dstLocal.GetPhyAddr();
+    __local_mem__ float* src = (__local_mem__ float*)srcLocal.GetPhyAddr();
     uint16_t rowAlign = BasicApiAlign(rowCount, MHC_PRE_BASIC_API_C0_SIZE);
     uint16_t dataBlockElements = MHC_PRE_BASIC_API_BLOCK_SIZE / sizeof(float);
     uint16_t columnAlign = BasicApiRoundUp<float>(columnCount);
@@ -91,16 +91,16 @@ __aicore__ inline void MhcPreMkVFTransND2NZ(const LocalTensor<float> &dstLocal, 
 }
 
 template <typename T, bool INIT_RMS>
-__aicore__ inline void MhcPreMkVFProcessXInGammaLoops(const LocalTensor<float> &xOutLocal,
-                                                      const LocalTensor<float> &rmsLocal,
-                                                      const LocalTensor<T> &xInLocal,
-                                                      const LocalTensor<float> &gammaLocal, uint16_t rowCount,
+__aicore__ inline void MhcPreMkVFProcessXInGammaLoops(const LocalTensor<float>& xOutLocal,
+                                                      const LocalTensor<float>& rmsLocal,
+                                                      const LocalTensor<T>& xInLocal,
+                                                      const LocalTensor<float>& gammaLocal, uint16_t rowCount,
                                                       uint16_t columnCount, uint16_t loopStart, uint16_t processLoops)
 {
-    __local_mem__ float *xOut = (__local_mem__ float *)xOutLocal.GetPhyAddr();
-    __local_mem__ float *rms = (__local_mem__ float *)rmsLocal.GetPhyAddr();
-    __local_mem__ T *xIn = (__local_mem__ T *)xInLocal.GetPhyAddr();
-    __local_mem__ float *gamma = (__local_mem__ float *)gammaLocal.GetPhyAddr();
+    __local_mem__ float* xOut = (__local_mem__ float*)xOutLocal.GetPhyAddr();
+    __local_mem__ float* rms = (__local_mem__ float*)rmsLocal.GetPhyAddr();
+    __local_mem__ T* xIn = (__local_mem__ T*)xInLocal.GetPhyAddr();
+    __local_mem__ float* gamma = (__local_mem__ float*)gammaLocal.GetPhyAddr();
     uint32_t srcStride = BasicApiRoundUp<T>(columnCount);
     uint32_t dstStride = BasicApiRoundUp<float>(columnCount);
     uint16_t loopEnd = loopStart + processLoops;
@@ -140,16 +140,16 @@ __aicore__ inline void MhcPreMkVFProcessXInGammaLoops(const LocalTensor<float> &
     }
 }
 template <typename T, bool IS_FIRST_K>
-__aicore__ inline void MhcPreMkVFProcessXInGammaSmallRows(const LocalTensor<float> &xOutLocal,
-                                                          const LocalTensor<float> &rmsLocal,
-                                                          const LocalTensor<T> &xInLocal,
-                                                          const LocalTensor<float> &gammaLocal, uint16_t rowCount,
+__aicore__ inline void MhcPreMkVFProcessXInGammaSmallRows(const LocalTensor<float>& xOutLocal,
+                                                          const LocalTensor<float>& rmsLocal,
+                                                          const LocalTensor<T>& xInLocal,
+                                                          const LocalTensor<float>& gammaLocal, uint16_t rowCount,
                                                           uint16_t columnCount)
 {
-    __local_mem__ float *xOut = (__local_mem__ float *)xOutLocal.GetPhyAddr();
-    __local_mem__ float *rms = (__local_mem__ float *)rmsLocal.GetPhyAddr();
-    __local_mem__ T *xIn = (__local_mem__ T *)xInLocal.GetPhyAddr();
-    __local_mem__ float *gamma = (__local_mem__ float *)gammaLocal.GetPhyAddr();
+    __local_mem__ float* xOut = (__local_mem__ float*)xOutLocal.GetPhyAddr();
+    __local_mem__ float* rms = (__local_mem__ float*)rmsLocal.GetPhyAddr();
+    __local_mem__ T* xIn = (__local_mem__ T*)xInLocal.GetPhyAddr();
+    __local_mem__ float* gamma = (__local_mem__ float*)gammaLocal.GetPhyAddr();
     uint32_t srcStride = BasicApiRoundUp<T>(columnCount);
     uint32_t dstStride = BasicApiRoundUp<float>(columnCount);
     uint16_t loopCount = BasicApiCeilDiv(columnCount, MHC_PRE_BASIC_API_VL_FP32);
@@ -190,15 +190,15 @@ __aicore__ inline void MhcPreMkVFProcessXInGammaSmallRows(const LocalTensor<floa
 }
 
 template <typename T, bool IS_FIRST_K>
-__aicore__ inline void MhcPreMkVFProcessXInGammaFull128(const LocalTensor<float> &xOutLocal,
-                                                        const LocalTensor<float> &rmsLocal,
-                                                        const LocalTensor<T> &xInLocal,
-                                                        const LocalTensor<float> &gammaLocal, uint16_t rowCount)
+__aicore__ inline void MhcPreMkVFProcessXInGammaFull128(const LocalTensor<float>& xOutLocal,
+                                                        const LocalTensor<float>& rmsLocal,
+                                                        const LocalTensor<T>& xInLocal,
+                                                        const LocalTensor<float>& gammaLocal, uint16_t rowCount)
 {
-    __local_mem__ float *xOut = (__local_mem__ float *)xOutLocal.GetPhyAddr();
-    __local_mem__ float *rms = (__local_mem__ float *)rmsLocal.GetPhyAddr();
-    __local_mem__ T *xIn = (__local_mem__ T *)xInLocal.GetPhyAddr();
-    __local_mem__ float *gamma = (__local_mem__ float *)gammaLocal.GetPhyAddr();
+    __local_mem__ float* xOut = (__local_mem__ float*)xOutLocal.GetPhyAddr();
+    __local_mem__ float* rms = (__local_mem__ float*)rmsLocal.GetPhyAddr();
+    __local_mem__ T* xIn = (__local_mem__ T*)xInLocal.GetPhyAddr();
+    __local_mem__ float* gamma = (__local_mem__ float*)gammaLocal.GetPhyAddr();
     constexpr uint32_t columnCount = 128U;
     constexpr uint32_t vectorOffset = MHC_PRE_BASIC_API_VL_FP32;
     constexpr uint32_t srcStride = columnCount;
@@ -252,9 +252,9 @@ __aicore__ inline void MhcPreMkVFProcessXInGammaFull128(const LocalTensor<float>
 }
 
 template <typename T, bool IS_FIRST_K>
-__aicore__ inline void MhcPreMkVFProcessXInGamma(const LocalTensor<float> &xOutLocal,
-                                                 const LocalTensor<float> &rmsLocal, const LocalTensor<T> &xInLocal,
-                                                 const LocalTensor<float> &gammaLocal, uint16_t rowCount,
+__aicore__ inline void MhcPreMkVFProcessXInGamma(const LocalTensor<float>& xOutLocal,
+                                                 const LocalTensor<float>& rmsLocal, const LocalTensor<T>& xInLocal,
+                                                 const LocalTensor<float>& gammaLocal, uint16_t rowCount,
                                                  uint16_t columnCount)
 {
     // Hot-shape specializations keep RMS sums in registers and avoid repeated Reduce/load/store work.
@@ -280,19 +280,19 @@ __aicore__ inline void MhcPreMkVFProcessXInGamma(const LocalTensor<float> &xOutL
                                                  loopCount);
     }
 }
-__aicore__ inline void MhcPreMkVFReducePartials(const LocalTensor<float> &mmOutLocal,
-                                                const LocalTensor<float> &invRmsOutLocal,
-                                                const LocalTensor<float> &mmPartialLocal,
+__aicore__ inline void MhcPreMkVFReducePartials(const LocalTensor<float>& mmOutLocal,
+                                                const LocalTensor<float>& invRmsOutLocal,
+                                                const LocalTensor<float>& mmPartialLocal,
 
-                                                const LocalTensor<float> &rmsPartialLocal, uint16_t groupK,
+                                                const LocalTensor<float>& rmsPartialLocal, uint16_t groupK,
                                                 uint16_t rowCount, uint16_t fusionSize, uint16_t mmSegmentOffset,
                                                 uint16_t mmSegmentSize, uint16_t rmsStride, float scaleMean,
                                                 float normEps)
 {
-    __local_mem__ float *mmOut = (__local_mem__ float *)mmOutLocal.GetPhyAddr();
-    __local_mem__ float *invRmsOut = (__local_mem__ float *)invRmsOutLocal.GetPhyAddr();
-    __local_mem__ float *mmPartial = (__local_mem__ float *)mmPartialLocal.GetPhyAddr();
-    __local_mem__ float *rmsPartial = (__local_mem__ float *)rmsPartialLocal.GetPhyAddr();
+    __local_mem__ float* mmOut = (__local_mem__ float*)mmOutLocal.GetPhyAddr();
+    __local_mem__ float* invRmsOut = (__local_mem__ float*)invRmsOutLocal.GetPhyAddr();
+    __local_mem__ float* mmPartial = (__local_mem__ float*)mmPartialLocal.GetPhyAddr();
+    __local_mem__ float* rmsPartial = (__local_mem__ float*)rmsPartialLocal.GetPhyAddr();
     uint16_t fourLoopCount = groupK / 4U;
     uint16_t tailLoopCount = groupK % 4U;
     uint32_t mmGroupStride = BasicApiRoundUp<float>(static_cast<uint32_t>(rowCount) * fusionSize);
@@ -387,15 +387,15 @@ __aicore__ inline void MhcPreMkVFReducePartials(const LocalTensor<float> &mmOutL
 }
 
 __aicore__ inline void MhcPreMkVFReducePartialsSequentialGeneral(
-    const LocalTensor<float> &mmOutLocal, const LocalTensor<float> &invRmsOutLocal,
-    const LocalTensor<float> &mmPartialLocal, const LocalTensor<float> &rmsPartialLocal, uint16_t mmGroupK,
+    const LocalTensor<float>& mmOutLocal, const LocalTensor<float>& invRmsOutLocal,
+    const LocalTensor<float>& mmPartialLocal, const LocalTensor<float>& rmsPartialLocal, uint16_t mmGroupK,
     uint16_t rmsGroupK, uint16_t rowCount, uint16_t fusionSize, uint16_t mmSegmentOffset, uint16_t mmSegmentSize,
     uint16_t rmsStride, float scaleMean, float normEps)
 {
-    __local_mem__ float *mmOut = (__local_mem__ float *)mmOutLocal.GetPhyAddr();
-    __local_mem__ float *invRmsOut = (__local_mem__ float *)invRmsOutLocal.GetPhyAddr();
-    __local_mem__ float *mmPartial = (__local_mem__ float *)mmPartialLocal.GetPhyAddr();
-    __local_mem__ float *rmsPartial = (__local_mem__ float *)rmsPartialLocal.GetPhyAddr();
+    __local_mem__ float* mmOut = (__local_mem__ float*)mmOutLocal.GetPhyAddr();
+    __local_mem__ float* invRmsOut = (__local_mem__ float*)invRmsOutLocal.GetPhyAddr();
+    __local_mem__ float* mmPartial = (__local_mem__ float*)mmPartialLocal.GetPhyAddr();
+    __local_mem__ float* rmsPartial = (__local_mem__ float*)rmsPartialLocal.GetPhyAddr();
     uint16_t fourLoopCount = rmsGroupK / 4U;
     uint16_t tailLoopCount = rmsGroupK % 4U;
     uint32_t mmGroupStride = BasicApiRoundUp<float>(static_cast<uint32_t>(rowCount) * fusionSize);
@@ -464,14 +464,14 @@ __aicore__ inline void MhcPreMkVFReducePartialsSequentialGeneral(
 }
 
 __aicore__ inline void MhcPreMkVFReducePartialsSequentialFlat(
-    const LocalTensor<float> &mmOutLocal, const LocalTensor<float> &invRmsOutLocal,
-    const LocalTensor<float> &mmPartialLocal, const LocalTensor<float> &rmsPartialLocal, uint16_t mmGroupK,
+    const LocalTensor<float>& mmOutLocal, const LocalTensor<float>& invRmsOutLocal,
+    const LocalTensor<float>& mmPartialLocal, const LocalTensor<float>& rmsPartialLocal, uint16_t mmGroupK,
     uint16_t rmsGroupK, uint16_t rowCount, uint16_t fusionSize, uint16_t rmsStride, float scaleMean, float normEps)
 {
-    __local_mem__ float *mmOut = (__local_mem__ float *)mmOutLocal.GetPhyAddr();
-    __local_mem__ float *invRmsOut = (__local_mem__ float *)invRmsOutLocal.GetPhyAddr();
-    __local_mem__ float *mmPartial = (__local_mem__ float *)mmPartialLocal.GetPhyAddr();
-    __local_mem__ float *rmsPartial = (__local_mem__ float *)rmsPartialLocal.GetPhyAddr();
+    __local_mem__ float* mmOut = (__local_mem__ float*)mmOutLocal.GetPhyAddr();
+    __local_mem__ float* invRmsOut = (__local_mem__ float*)invRmsOutLocal.GetPhyAddr();
+    __local_mem__ float* mmPartial = (__local_mem__ float*)mmPartialLocal.GetPhyAddr();
+    __local_mem__ float* rmsPartial = (__local_mem__ float*)rmsPartialLocal.GetPhyAddr();
     uint16_t fourLoopCount = rmsGroupK / 4U;
     uint16_t tailLoopCount = rmsGroupK % 4U;
     uint32_t mmElements = static_cast<uint32_t>(rowCount) * fusionSize;
@@ -556,12 +556,12 @@ public:
         vector_.InitMNConfig();
         vector_.pipe_ = initParams.tPipeIn;
         partialMmGm_.SetGlobalBuffer(
-            reinterpret_cast<__gm__ P *>(initParams.workspace + vector_.tiling_->mkWorkspaceMmOffset));
+            reinterpret_cast<__gm__ P*>(initParams.workspace + vector_.tiling_->mkWorkspaceMmOffset));
         partialRmsGm_.SetGlobalBuffer(
-            reinterpret_cast<__gm__ P *>(initParams.workspace + vector_.tiling_->mkWorkspaceRmsOffset));
+            reinterpret_cast<__gm__ P*>(initParams.workspace + vector_.tiling_->mkWorkspaceRmsOffset));
         if (UseGmStage()) {
             xStageGm_.SetGlobalBuffer(
-                reinterpret_cast<__gm__ P *>(initParams.workspace + vector_.tiling_->mkWorkspaceFinalOffset));
+                reinterpret_cast<__gm__ P*>(initParams.workspace + vector_.tiling_->mkWorkspaceFinalOffset));
         }
 
         vector_.pipe_->InitBuffer(l1Buffer_, MHC_PRE_BASIC_API_L1_ALLOC_SIZE);
@@ -724,12 +724,12 @@ private:
                 vector_.gammaInQueue_.FreeTensor(currentGammaLocal);
             } else if (initializeRms) {
                 vector_.template VFDoV0ProcessXIn<false, true>(
-                    (__ubuf__ P *)xFloatLocal.GetPhyAddr(), (__ubuf__ P *)vector_.invRmsUb_.GetPhyAddr(),
-                    (__ubuf__ T *)currentXLocal.GetPhyAddr(), nullptr, rowCount, currentK);
+                    (__ubuf__ P*)xFloatLocal.GetPhyAddr(), (__ubuf__ P*)vector_.invRmsUb_.GetPhyAddr(),
+                    (__ubuf__ T*)currentXLocal.GetPhyAddr(), nullptr, rowCount, currentK);
             } else {
                 vector_.template VFDoV0ProcessXIn<false, false>(
-                    (__ubuf__ P *)xFloatLocal.GetPhyAddr(), (__ubuf__ P *)vector_.invRmsUb_.GetPhyAddr(),
-                    (__ubuf__ T *)currentXLocal.GetPhyAddr(), nullptr, rowCount, currentK);
+                    (__ubuf__ P*)xFloatLocal.GetPhyAddr(), (__ubuf__ P*)vector_.invRmsUb_.GetPhyAddr(),
+                    (__ubuf__ T*)currentXLocal.GetPhyAddr(), nullptr, rowCount, currentK);
             }
             vector_.xInQueue_.FreeTensor(currentXLocal);
 
@@ -807,11 +807,11 @@ public:
         vector_.InitMNConfig();
         vector_.pipe_ = initParams.tPipeIn;
         partialMmGm_.SetGlobalBuffer(
-            reinterpret_cast<__gm__ P *>(initParams.workspace + vector_.tiling_->mkWorkspaceMmOffset));
+            reinterpret_cast<__gm__ P*>(initParams.workspace + vector_.tiling_->mkWorkspaceMmOffset));
         partialRmsGm_.SetGlobalBuffer(
-            reinterpret_cast<__gm__ P *>(initParams.workspace + vector_.tiling_->mkWorkspaceRmsOffset));
+            reinterpret_cast<__gm__ P*>(initParams.workspace + vector_.tiling_->mkWorkspaceRmsOffset));
         if (vector_.outFlag_) {
-            vector_.hMixGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P *>(initParams.h_mix));
+            vector_.hMixGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.h_mix));
         }
         vector_.InitUbBuffers(false, kPart2MaxRows);
 

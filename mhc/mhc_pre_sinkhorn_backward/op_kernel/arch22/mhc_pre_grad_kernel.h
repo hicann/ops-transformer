@@ -42,8 +42,8 @@ constexpr int32_t INNER_SPILT_NUM = 8;
 constexpr MatmulConfig MHC_PRE_GRAD_MM1_CFG = GetMDLConfig(true, false, 0, false, false, false, true);
 constexpr MatmulConfig MHC_PRE_GRAD_MM2_CFG = GetMDLConfig(true, false, 0, false, false, false, true);
 template <typename T>
-__aicore__ inline void kahanCustom(LocalTensor<T> &inputTensor, LocalTensor<T> sumTensorList[2], const int32_t len,
-                                   int32_t &outPos)
+__aicore__ inline void kahanCustom(LocalTensor<T>& inputTensor, LocalTensor<T> sumTensorList[2], const int32_t len,
+                                   int32_t& outPos)
 {
     LocalTensor<T> sumTensor = sumTensorList[outPos];
     LocalTensor<T> eTensor = sumTensorList[1 - outPos];
@@ -77,7 +77,7 @@ public:
                                 GM_ADDR grad_comb, GM_ADDR hc_scale, GM_ADDR hc_base, GM_ADDR h_hat2, GM_ADDR rsqrt,
                                 GM_ADDR sum_out, GM_ADDR norm_out, GM_ADDR grad_x, GM_ADDR grad_hc_fn,
                                 GM_ADDR grad_hc_scale, GM_ADDR grad_hc_base, GM_ADDR workspace,
-                                const MhcPreSinkhornBackwardArch22TilingData *tilingData, TPipe *pipe)
+                                const MhcPreSinkhornBackwardArch22TilingData* tilingData, TPipe* pipe)
     {
         pipe_ = pipe;
         blkIdx_ = GetBlockIdx();
@@ -91,7 +91,7 @@ public:
 
 protected:
     int64_t blkIdx_ = 0, aivNum_ = 0, aicNum_ = 0;
-    TPipe *pipe_;
+    TPipe* pipe_;
     int64_t batchSize_ = 0, seqLength_ = 0, totalTasks_ = 0, totalTasksAligned_ = 0, BSNN = 0, BSN = 0;
     int64_t c_ = 0, n_ = 0, c0_ = 0, c1_ = 0, cTail_ = 0, c0RepeatTime_ = 0, cTailAlign_ = 0, cTailBlockStride_ = 0,
             c1Align_ = 0;
@@ -151,7 +151,7 @@ protected:
     GlobalTensor<T> gradXCubeGlobal_;
 
 private:
-    __aicore__ inline void InitTiling(const MhcPreSinkhornBackwardArch22TilingData *tilingData)
+    __aicore__ inline void InitTiling(const MhcPreSinkhornBackwardArch22TilingData* tilingData)
     {
         batchSize_ = tilingData->batchSize;
         seqLength_ = tilingData->seqLength;
@@ -193,47 +193,47 @@ private:
                                   GM_ADDR grad_hc_scale, GM_ADDR grad_hc_base, GM_ADDR workspace)
     {
         // cube 和 vector 共用
-        xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X *>(x));              // fp32
-        gradWeightGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(grad_hc_fn)); // fp32
+        xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X*>(x));              // fp32
+        gradWeightGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(grad_hc_fn)); // fp32
         int64_t workspaceOffset = 0;
-        gradH2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset); // fp32
+        gradH2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset); // fp32
         workspaceOffset += batchSize_ * seqLength_ * (n_ * PRE_POST_NUM + n_ * n_);
-        xWorkspaceGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset); // fp32
+        xWorkspaceGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset); // fp32
         workspaceOffset += batchSize_ * seqLength_ * (n_ * c_);
-        gradXCubeGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset);
+        gradXCubeGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset);
         workspaceOffset += batchSize_ * seqLength_ * (n_ * c_);
         if constexpr (DETERMINISTIC == true) {
-            gradWeightWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset);
+            gradWeightWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset);
             workspaceOffset += aicNum_ * (n_ * PRE_POST_NUM + n_ * n_) * (n_ * c_);
         }
 
-        weightGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(hc_fn));      // fp32
-        gradXGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X *>(grad_x)); // fp32
+        weightGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(hc_fn));      // fp32
+        gradXGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X*>(grad_x)); // fp32
 
         if ASCEND_IS_AIV {
-            preGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(pre));           // fp32
-            gradYGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X *>(grad_y)); // fp32
+            preGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(pre));           // fp32
+            gradYGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE_X*>(grad_y)); // fp32
 
-            gradPostGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(grad_post)); // fp32
+            gradPostGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(grad_post)); // fp32
 
-            hcScaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(hc_scale)); // fp32
-            hcBaseGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(hc_base));   // fp32
+            hcScaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(hc_scale)); // fp32
+            hcBaseGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(hc_base));   // fp32
 
-            rsqrtGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(rsqrt)); // fp32
-            gradHcScaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(grad_hc_scale));
-            gradHcBaseGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(grad_hc_base));
+            rsqrtGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(rsqrt)); // fp32
+            gradHcScaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(grad_hc_scale));
+            gradHcBaseGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(grad_hc_base));
             if constexpr (DETERMINISTIC == true) {
-                gradHcScaleWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset);
+                gradHcScaleWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset);
                 workspaceOffset += aivNum_ * (ELEMENTS_SIZE_PER_BLOCK);
-                gradHcBaseWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + workspaceOffset);
+                gradHcBaseWSGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + workspaceOffset);
                 workspaceOffset += aivNum_ * (n_ * PRE_POST_NUM + n_ * n_);
             }
-            h2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(h_hat2)); // fp32
+            h2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(h_hat2)); // fp32
 
-            skNormGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(norm_out)); // fp32
-            skSumGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(sum_out));   // fp32
+            skNormGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(norm_out)); // fp32
+            skSumGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(sum_out));   // fp32
 
-            gradHResGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(grad_comb)); // fp32
+            gradHResGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(grad_comb)); // fp32
             if constexpr (DETERMINISTIC == false) {
                 if (blkIdx_ == aivNum_ - 1) {
                     InitOutput<T>(gradHcBaseGlobal_, (n_ * n_ + PRE_POST_NUM * n_), 0);
@@ -346,7 +346,7 @@ private:
     __aicore__ inline void ProcessMatmul1(const int64_t taskOffset, const int32_t mm1M);
     __aicore__ inline void ProcessMatmul2(const int64_t taskOffset, const int32_t mm2K);
     __aicore__ inline void ComputeScaleBias();
-    __aicore__ inline void ComputeDeterministic(GlobalTensor<float> &inputGm, GlobalTensor<float> &outputGm,
+    __aicore__ inline void ComputeDeterministic(GlobalTensor<float>& inputGm, GlobalTensor<float>& outputGm,
                                                 const int64_t dimR, const int64_t dimA);
 };
 
@@ -783,8 +783,8 @@ __aicore__ inline void MhcPreGradKernel<TYPE_X, T, DETERMINISTIC>::ComputeGradX1
 }
 
 template <typename TYPE_X, typename T, bool DETERMINISTIC>
-__aicore__ inline void MhcPreGradKernel<TYPE_X, T, DETERMINISTIC>::ComputeDeterministic(GlobalTensor<float> &inputGm,
-                                                                                        GlobalTensor<float> &outputGm,
+__aicore__ inline void MhcPreGradKernel<TYPE_X, T, DETERMINISTIC>::ComputeDeterministic(GlobalTensor<float>& inputGm,
+                                                                                        GlobalTensor<float>& outputGm,
                                                                                         const int64_t dimR,
                                                                                         const int64_t dimA)
 {

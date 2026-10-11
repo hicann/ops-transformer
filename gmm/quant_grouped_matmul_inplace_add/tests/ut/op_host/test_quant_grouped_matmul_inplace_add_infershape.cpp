@@ -94,7 +94,7 @@ struct QGmmInplaceAddInfershapeCase {
     }
 };
 
-vector<QGmmInplaceAddInfershapeCase> LoadCases(const string &socVersion)
+vector<QGmmInplaceAddInfershapeCase> LoadCases(const string& socVersion)
 {
     vector<QGmmInplaceAddInfershapeCase> cases;
     string csvPath = ops::ut::ResolveCsvPath("test_quant_grouped_matmul_inplace_add_infershape.csv",
@@ -149,7 +149,7 @@ vector<QGmmInplaceAddInfershapeCase> LoadCases(const string &socVersion)
             tc.groupListType = stoll(Trim(items[idx++]));
             tc.groupSize = stoll(Trim(items[idx++]));
             cases.push_back(tc);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
@@ -157,7 +157,7 @@ vector<QGmmInplaceAddInfershapeCase> LoadCases(const string &socVersion)
     return cases;
 }
 
-string MakeParamName(const testing::TestParamInfo<QGmmInplaceAddInfershapeCase> &info)
+string MakeParamName(const testing::TestParamInfo<QGmmInplaceAddInfershapeCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
@@ -166,7 +166,7 @@ string MakeParamName(const testing::TestParamInfo<QGmmInplaceAddInfershapeCase> 
 
 namespace QuantGroupedMatmulInplaceAddInfershapeUT {
 
-const vector<QGmmInplaceAddInfershapeCase> &GetAscend950Params()
+const vector<QGmmInplaceAddInfershapeCase>& GetAscend950Params()
 {
     static const vector<QGmmInplaceAddInfershapeCase> params = LoadCases("Ascend950");
     return params;
@@ -179,8 +179,7 @@ TEST_P(TestQuantGroupedMatmulInplaceAddInfershape, csvDrivenCase)
     GetParam().Run();
 }
 
-INSTANTIATE_TEST_SUITE_P(QUANT_GROUPED_MATMUL_INPLACE_ADD_INFERSHAPE_CSV,
-                         TestQuantGroupedMatmulInplaceAddInfershape,
+INSTANTIATE_TEST_SUITE_P(QUANT_GROUPED_MATMUL_INPLACE_ADD_INFERSHAPE_CSV, TestQuantGroupedMatmulInplaceAddInfershape,
                          testing::ValuesIn(GetAscend950Params()), MakeParamName);
 
 } // namespace QuantGroupedMatmulInplaceAddInfershapeUT

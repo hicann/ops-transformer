@@ -34,15 +34,15 @@ struct GroupedMatmulAddTilingData {
     TCubeTiling mmTilingData;
 };
 #ifdef __NPU_TILING__
-inline void InitGroupedMatmulAddTilingData(uint8_t *tiling, GroupedMatmulAddTilingData *const_data)
+inline void InitGroupedMatmulAddTilingData(uint8_t* tiling, GroupedMatmulAddTilingData* const_data)
 {
-    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
-    uint32_t *dst = (uint32_t *)const_data;
+    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
+    uint32_t* dst = (uint32_t*)const_data;
     for (auto i = 0; i < sizeof(GroupedMatmulAddTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitGroupedMatmulAddTilingData(uint8_t *tiling, GroupedMatmulAddTilingData *const_data)
+inline void InitGroupedMatmulAddTilingData(uint8_t* tiling, GroupedMatmulAddTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(GroupedMatmulAddTilingData));
 }
@@ -54,8 +54,8 @@ inline void InitGroupedMatmulAddTilingData(uint8_t *tiling, GroupedMatmulAddTili
     }
 
 #define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
-    __ubuf__ tilingStruct *tilingDataPointer = \
-        reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
+    __ubuf__ tilingStruct* tilingDataPointer = \
+        reinterpret_cast<__ubuf__ tilingStruct*>((__ubuf__ uint8_t*)(tilingPointer));
 
 #define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);

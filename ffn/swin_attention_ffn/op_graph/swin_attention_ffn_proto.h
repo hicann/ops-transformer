@@ -48,7 +48,7 @@ REG_OP(SwinAttentionFFN)
     .OUTPUT(y, TensorType({DT_FLOAT16}))
     .ATTR(shifts, ListInt, {})
     .OP_END_FACTORY_REG(SwinAttentionFFN)
-    
+
 } // namespace ge
 
-#endif  // OPS_BUILT_IN_OP_PROTO_INC_MATRIX_CALCULATION_OPS_H_
+#endif // OPS_BUILT_IN_OP_PROTO_INC_MATRIX_CALCULATION_OPS_H_

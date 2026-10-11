@@ -28,7 +28,7 @@ public:
     __aicore__ inline MhcPreSinkhornStage1() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR phi, GM_ADDR invRms, GM_ADDR hcBeforeNorm, GM_ADDR workspace,
-                                const MhcPreSinkhornTilingData *tilingDataPtr, TPipe *pipePtr)
+                                const MhcPreSinkhornTilingData* tilingDataPtr, TPipe* pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
@@ -56,19 +56,19 @@ public:
         }
 
         // 设置 GM 地址
-        xGm.SetGlobalBuffer((__gm__ T *)x);
-        phiGm.SetGlobalBuffer((__gm__ float *)phi);
-        xCastWsGm.SetGlobalBuffer((__gm__ float *)workspace);
+        xGm.SetGlobalBuffer((__gm__ T*)x);
+        phiGm.SetGlobalBuffer((__gm__ float*)phi);
+        xCastWsGm.SetGlobalBuffer((__gm__ float*)workspace);
 
         // 设置额外的 workspace 地址（needGrad=false 时使用）
         if (needGrad_) {
-            invRmsGm.SetGlobalBuffer((__gm__ float *)invRms);
-            hcBeforeNormGm.SetGlobalBuffer((__gm__ float *)hcBeforeNorm);
+            invRmsGm.SetGlobalBuffer((__gm__ float*)invRms);
+            hcBeforeNormGm.SetGlobalBuffer((__gm__ float*)hcBeforeNorm);
         } else {
             int64_t xCastWsTotalSize = tilingData->stage1XCastWsSize / sizeof(float);
-            invRmsWsGm.SetGlobalBuffer((__gm__ float *)workspace + xCastWsTotalSize);
+            invRmsWsGm.SetGlobalBuffer((__gm__ float*)workspace + xCastWsTotalSize);
             int64_t invRmsWsTotalSize = tilingData->bs * sizeof(float) / sizeof(float);
-            hcBeforeNormWsGm.SetGlobalBuffer((__gm__ float *)workspace + xCastWsTotalSize + invRmsWsTotalSize);
+            hcBeforeNormWsGm.SetGlobalBuffer((__gm__ float*)workspace + xCastWsTotalSize + invRmsWsTotalSize);
         }
 
         // 初始化 Cube Compute
@@ -208,8 +208,8 @@ public:
     }
 
 public:
-    TPipe *pipe;
-    const MhcPreSinkhornTilingData *tilingData;
+    TPipe* pipe;
+    const MhcPreSinkhornTilingData* tilingData;
 
     // GM 地址
     GlobalTensor<T> xGm;                  // 输入 X (BF16)
@@ -249,31 +249,31 @@ public:
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hcScale, GM_ADDR hcBase, GM_ADDR y, GM_ADDR post, GM_ADDR combFrag,
                                 GM_ADDR hPre, GM_ADDR hcBeforeNorm, GM_ADDR invRms, GM_ADDR sumOut, GM_ADDR normOut,
-                                GM_ADDR workspace, const MhcPreSinkhornTilingData *tilingDataPtr, TPipe *pipePtr)
+                                GM_ADDR workspace, const MhcPreSinkhornTilingData* tilingDataPtr, TPipe* pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
         needGrad_ = tilingData->needGrad;
 
-        xGm.SetGlobalBuffer((__gm__ T *)x);
-        hcScaleGm.SetGlobalBuffer((__gm__ float *)hcScale);
-        hcBaseGm.SetGlobalBuffer((__gm__ float *)hcBase);
-        yGm.SetGlobalBuffer((__gm__ T *)y);
-        postGm.SetGlobalBuffer((__gm__ float *)post);
-        combFragGm.SetGlobalBuffer((__gm__ float *)combFrag);
-        workspaceGm.SetGlobalBuffer((__gm__ float *)workspace);
+        xGm.SetGlobalBuffer((__gm__ T*)x);
+        hcScaleGm.SetGlobalBuffer((__gm__ float*)hcScale);
+        hcBaseGm.SetGlobalBuffer((__gm__ float*)hcBase);
+        yGm.SetGlobalBuffer((__gm__ T*)y);
+        postGm.SetGlobalBuffer((__gm__ float*)post);
+        combFragGm.SetGlobalBuffer((__gm__ float*)combFrag);
+        workspaceGm.SetGlobalBuffer((__gm__ float*)workspace);
 
         if (needGrad_) {
-            hPreGm.SetGlobalBuffer((__gm__ float *)hPre);
-            hcBeforeNormGm.SetGlobalBuffer((__gm__ float *)hcBeforeNorm);
-            invRmsGm.SetGlobalBuffer((__gm__ float *)invRms);
-            sumOutGm.SetGlobalBuffer((__gm__ float *)sumOut);
-            normOutGm.SetGlobalBuffer((__gm__ float *)normOut);
+            hPreGm.SetGlobalBuffer((__gm__ float*)hPre);
+            hcBeforeNormGm.SetGlobalBuffer((__gm__ float*)hcBeforeNorm);
+            invRmsGm.SetGlobalBuffer((__gm__ float*)invRms);
+            sumOutGm.SetGlobalBuffer((__gm__ float*)sumOut);
+            normOutGm.SetGlobalBuffer((__gm__ float*)normOut);
         } else {
             int64_t xCastWsTotalSize = tilingData->stage1XCastWsSize / sizeof(float);
-            invRmsGm.SetGlobalBuffer((__gm__ float *)workspace + xCastWsTotalSize);
+            invRmsGm.SetGlobalBuffer((__gm__ float*)workspace + xCastWsTotalSize);
             int64_t invRmsWsTotalSize = tilingData->bs * sizeof(float) / sizeof(float);
-            hcBeforeNormGm.SetGlobalBuffer((__gm__ float *)workspace + xCastWsTotalSize + invRmsWsTotalSize);
+            hcBeforeNormGm.SetGlobalBuffer((__gm__ float*)workspace + xCastWsTotalSize + invRmsWsTotalSize);
         }
         // InQue
         int64_t mixesQue01Size = tilingData->stage2RowFactor * tilingData->hcMultAlign * NUM_TWO * sizeof(float);
@@ -575,8 +575,8 @@ public:
     }
 
 private:
-    TPipe *pipe;
-    const MhcPreSinkhornTilingData *tilingData;
+    TPipe* pipe;
+    const MhcPreSinkhornTilingData* tilingData;
     GlobalTensor<float> mixesGm;
     GlobalTensor<float> rsqrtGm;
     GlobalTensor<float> hcScaleGm;

@@ -70,7 +70,7 @@ int64_t MhcSinkhornBaseTiling::BackwardCalOccupySize(int64_t ubFactor, int64_t n
 }
 
 void MhcSinkhornBaseTiling::BackwardSplitCore(uint64_t ubSize, int64_t totalCoreNum, int64_t tSize, int64_t nSize,
-                                              int64_t xDtypeSize, MhcSinkhornSplitCoreInfo &splitInfo)
+                                              int64_t xDtypeSize, MhcSinkhornSplitCoreInfo& splitInfo)
 {
     splitInfo.tNormCore = Ops::Base::CeilDiv(tSize, totalCoreNum);
     splitInfo.usedCoreNum = Ops::Base::CeilDiv(tSize, splitInfo.tNormCore);
@@ -120,7 +120,7 @@ int64_t MhcSinkhornBaseTiling::ForwardCalOccupySize(int64_t ubFactor, int64_t nS
 }
 
 void MhcSinkhornBaseTiling::ForwardSplitCore(uint64_t ubSize, int64_t totalCoreNum, int64_t tSize, int64_t nSize,
-                                             int64_t xDtypeSize, int64_t outFlag, MhcSinkhornSplitCoreInfo &splitInfo)
+                                             int64_t xDtypeSize, int64_t outFlag, MhcSinkhornSplitCoreInfo& splitInfo)
 {
     splitInfo.tNormCore = Ops::Base::CeilDiv(tSize, totalCoreNum);
     splitInfo.usedCoreNum = Ops::Base::CeilDiv(tSize, splitInfo.tNormCore);

@@ -73,16 +73,16 @@ public:
     using ProblemShape = AscendC::Shape<int64_t, int64_t, int64_t>;           // m, n, k
 
 public:
-    __aicore__ inline void Init(Params const &params);
+    __aicore__ inline void Init(Params const& params);
     __aicore__ inline auto GetL0c2UbTensor();
-    __aicore__ inline void operator()(const BlockShape &blockShape, const BlockCoord &blockCoord);
-    __aicore__ inline void UpdateNextProblem(const ProblemShape &problemShape);
-    __aicore__ inline void UpdateGlobalAddr(const BlockCoord &baseOffset);
+    __aicore__ inline void operator()(const BlockShape& blockShape, const BlockCoord& blockCoord);
+    __aicore__ inline void UpdateNextProblem(const ProblemShape& problemShape);
+    __aicore__ inline void UpdateGlobalAddr(const BlockCoord& baseOffset);
 
 private:
     __aicore__ inline void CopyInLogit(uint32_t curBaseM, uint64_t offsetM, LocalTensor<float> logitUb);
     __aicore__ inline void VFDoLogitMuls(uint32_t offsetRe, uint32_t offsetLogit, uint16_t repeatTimesLogit,
-                                         uint16_t repeatTimesRe, __ubuf__ DataTypeOut *outUbAddr,
+                                         uint16_t repeatTimesRe, __ubuf__ DataTypeOut* outUbAddr,
                                          LocalTensor<float> logitUb);
     __aicore__ inline void VectorAtomicProcess(uint32_t curBaseN, uint32_t curVecBaseM, uint64_t offsetM,
                                                uint64_t yOffset, LocalTensor<DataTypeOut> yLocal);
@@ -99,7 +99,7 @@ private:
     AscendC::LocalTensor<DataTypeOut> outUbPing_;
     AscendC::LocalTensor<DataTypeOut> outUbPong_;
 
-    const Params *params_;
+    const Params* params_;
     int64_t n_;
     uint32_t subBlockIdx_ = AscendC::GetSubBlockIdx();
     uint64_t singleM_;
@@ -113,13 +113,13 @@ private:
 
 GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::Init(
-    Params const &params)
+    Params const& params)
 {
     if ASCEND_IS_AIC {
         return;
     }
     params_ = &params;
-    yGlobal_.SetGlobalBuffer((__gm__ DataTypeOut *)params_->yGMAddr);
+    yGlobal_.SetGlobalBuffer((__gm__ DataTypeOut*)params_->yGMAddr);
     // input
     uint32_t afterFirstIn = MAX_SINGLE_MN * sizeof(DataTypeOut);
     logitUbPing_ = AscendC::LocalTensor<float>(AscendC::TPosition::VECIN, afterFirstIn, BLOCK_BYTES);
@@ -141,18 +141,18 @@ BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARA
 
 GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueFinalizeRouting<
-    GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::UpdateNextProblem(const ProblemShape &problemShape)
+    GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::UpdateNextProblem(const ProblemShape& problemShape)
 {
     n_ = Get<MNK_N>(problemShape);
 }
 
 GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueFinalizeRouting<
-    GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(const BlockCoord &baseOffset)
+    GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(const BlockCoord& baseOffset)
 {
     if ASCEND_IS_AIV {
-        logitGlobal_.SetGlobalBuffer((__gm__ float *)params_->logitGmAddr + Get<LOGIT_INDEX>(baseOffset));
-        rowIndexGlobal_.SetGlobalBuffer((__gm__ int64_t *)params_->rowIndexGmAddr + Get<LOGIT_INDEX>(baseOffset));
+        logitGlobal_.SetGlobalBuffer((__gm__ float*)params_->logitGmAddr + Get<LOGIT_INDEX>(baseOffset));
+        rowIndexGlobal_.SetGlobalBuffer((__gm__ int64_t*)params_->rowIndexGmAddr + Get<LOGIT_INDEX>(baseOffset));
     }
 }
 
@@ -184,10 +184,10 @@ GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
 __aicore__ inline void
 BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::VFDoLogitMuls(
     uint32_t offsetRe, uint32_t offsetLogit, uint16_t repeatTimesLogit, uint16_t repeatTimesRe,
-    __ubuf__ DataTypeOut *outUbAddr, LocalTensor<float> logitUb)
+    __ubuf__ DataTypeOut* outUbAddr, LocalTensor<float> logitUb)
 {
-    __ubuf__ DataTypeOut *l0cOutUbAddr = (__ubuf__ DataTypeOut *)l0cOutUb_.GetPhyAddr();
-    __ubuf__ DataTypeOut *logitUbAddr = (__ubuf__ DataTypeOut *)logitUb.GetPhyAddr();
+    __ubuf__ DataTypeOut* l0cOutUbAddr = (__ubuf__ DataTypeOut*)l0cOutUb_.GetPhyAddr();
+    __ubuf__ DataTypeOut* logitUbAddr = (__ubuf__ DataTypeOut*)logitUb.GetPhyAddr();
     l0cOutUbAddr += offsetRe;
     logitUbAddr += offsetLogit;
     __VEC_SCOPE__
@@ -210,7 +210,7 @@ BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARA
 
 GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::operator()(
-    const BlockShape &blockShape, const BlockCoord &blockCoord)
+    const BlockShape& blockShape, const BlockCoord& blockCoord)
 {
     singleM_ = Get<MNK_M>(blockShape);
     singleN_ = Get<MNK_N>(blockShape);
@@ -238,8 +238,8 @@ __aicore__ inline void BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_
     for (int32_t i = 0; i < loopNumY; i++) {
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(yCrossPingPongID_);
         repeatTimesLine_ = (i == loopNumY - 1) ? remainRepeatTimesLogit : MAX_OUTPUT_M_UB;
-        __ubuf__ DataTypeOut *outUbAddr = yCrossPingPongID_ == 0 ? (__ubuf__ DataTypeOut *)outUbPing_.GetPhyAddr() :
-                                                                   (__ubuf__ DataTypeOut *)outUbPong_.GetPhyAddr();
+        __ubuf__ DataTypeOut* outUbAddr = yCrossPingPongID_ == 0 ? (__ubuf__ DataTypeOut*)outUbPing_.GetPhyAddr() :
+                                                                   (__ubuf__ DataTypeOut*)outUbPong_.GetPhyAddr();
         VFDoLogitMuls(i * MAX_OUTPUT_M_UB * alignN_, i * MAX_OUTPUT_M_UB, repeatTimesLine_, repeatTimesRe, outUbAddr,
                       logitUb);
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(yCrossPingPongID_);

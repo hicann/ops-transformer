@@ -13,36 +13,43 @@
 #include "infer_shape_case_executor.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 class SwinTransformerLnQKV : public testing::Test {
- protected:
-  static void SetUpTestCase() {
-    std::cout << "SwinTransformerLnQKV Proto Test SetUp" << std::endl;
-  }
+protected:
+    static void SetUpTestCase()
+    {
+        std::cout << "SwinTransformerLnQKV Proto Test SetUp" << std::endl;
+    }
 
-  static void TearDownTestCase() {
-    std::cout << "SwinTransformerLnQKV Proto Test TearDown" << std::endl;
-  }
+    static void TearDownTestCase()
+    {
+        std::cout << "SwinTransformerLnQKV Proto Test TearDown" << std::endl;
+    }
 };
 
 TEST_F(SwinTransformerLnQKV, swin_transformer_ln_qkv_test_1)
 {
-    gert::InfershapeContextPara infershapeContextPara("SwinTransformerLnQKV",
-    { // input info
-        {{{2, 2048, 64}, {2, 2048, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{2, 2048, 64}, {2, 2048, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-    }, 
-    { // output info
-        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-    }, 
-    { // attr
-        {"epsilon",Ops::Transformer::AnyValue::CreateFrom<float>(0.001)},
-        {"head_dim",Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-        {"head_num",Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-        {"seq_length",Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-        {"shifts",Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({0})},
-    }
-    );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{32, 4, 64, 32},}; // 预期输出shape
+    gert::InfershapeContextPara infershapeContextPara(
+        "SwinTransformerLnQKV",
+        {
+            // input info
+            {{{2, 2048, 64}, {2, 2048, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 2048, 64}, {2, 2048, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            // output info
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            // attr
+            {"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(0.001)},
+            {"head_dim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"seq_length", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+            {"shifts", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({0})},
+        });
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {32, 4, 64, 32},
+    }; // 预期输出shape
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape); // 框架中已提供该接口
 }

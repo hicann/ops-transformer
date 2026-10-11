@@ -70,7 +70,7 @@ gert::StorageShape MakeEmptyShape()
     return gert::StorageShape();
 }
 
-gert::TilingContextPara::TensorDescription MakeTensorDesc(const vector<int64_t> &dims, ge::DataType dtype,
+gert::TilingContextPara::TensorDescription MakeTensorDesc(const vector<int64_t>& dims, ge::DataType dtype,
                                                           ge::Format format = ge::FORMAT_ND)
 {
     return {ops::ut::MakeGertStorageShape(dims, dims), dtype, format};
@@ -91,7 +91,7 @@ vector<gert::TilingContextPara::OpAttr> GetS4S4Attrs(bool transposeWeight)
 }
 
 bool RunS4S4Tiling(int64_t m, int64_t k, int64_t n, int64_t e, int64_t groupSize, bool isPergroup,
-                   TilingInfo &tilingInfo)
+                   TilingInfo& tilingInfo)
 {
     auto compileInfo = MakeAscend950CompileInfo();
     const int64_t G = isPergroup ? (k / groupSize) : 0;
@@ -126,9 +126,9 @@ bool RunS4S4Tiling(int64_t m, int64_t k, int64_t n, int64_t e, int64_t groupSize
     return ExecuteTiling(ctx, tilingInfo);
 }
 
-const GroupedMatmulTilingData::GMMBaseParamsS4S4 *GetS4S4Params(const TilingInfo &info)
+const GroupedMatmulTilingData::GMMBaseParamsS4S4* GetS4S4Params(const TilingInfo& info)
 {
-    return &reinterpret_cast<const GroupedMatmulTilingData::GMMS4S4IntQuantTilingData *>(info.tilingData.get())
+    return &reinterpret_cast<const GroupedMatmulTilingData::GMMS4S4IntQuantTilingData*>(info.tilingData.get())
                 ->gmmS4S4Params;
 }
 
@@ -145,7 +145,7 @@ TEST_F(TestGroupedS4S4QuantPergroupArch35Tiling, pergroupGroupSize256Accepted)
     TilingInfo info;
     ASSERT_TRUE(RunS4S4Tiling(/*m=*/128, /*k=*/1024, /*n=*/256, /*e=*/2, /*groupSize=*/256, true, info));
     ASSERT_EQ(info.tilingDataSize, sizeof(GroupedMatmulTilingData::GMMS4S4IntQuantTilingData));
-    const auto *p = GetS4S4Params(info);
+    const auto* p = GetS4S4Params(info);
     EXPECT_EQ(p->quantGroupNum, 4U);
     EXPECT_EQ(p->baseK, 128U);
     EXPECT_EQ(p->k, 1024U);
@@ -157,7 +157,7 @@ TEST_F(TestGroupedS4S4QuantPergroupArch35Tiling, pergroupGroupSize512Accepted)
     TilingInfo info;
     ASSERT_TRUE(RunS4S4Tiling(128, 1024, 256, 2, /*groupSize=*/512, true, info));
     ASSERT_EQ(info.tilingDataSize, sizeof(GroupedMatmulTilingData::GMMS4S4IntQuantTilingData));
-    const auto *p = GetS4S4Params(info);
+    const auto* p = GetS4S4Params(info);
     EXPECT_EQ(p->quantGroupNum, 2U);
     EXPECT_EQ(p->baseK, 128U);
 }
@@ -166,7 +166,7 @@ TEST_F(TestGroupedS4S4QuantPergroupArch35Tiling, pergroupGroupSize128BaselineAcc
 {
     TilingInfo info;
     ASSERT_TRUE(RunS4S4Tiling(128, 1024, 256, 2, /*groupSize=*/128, true, info));
-    const auto *p = GetS4S4Params(info);
+    const auto* p = GetS4S4Params(info);
     EXPECT_EQ(p->quantGroupNum, 8U);
     EXPECT_EQ(p->baseK, 128U);
 }
@@ -175,7 +175,7 @@ TEST_F(TestGroupedS4S4QuantPergroupArch35Tiling, pergroupGroupSize192EvenAccepte
 {
     TilingInfo info;
     ASSERT_TRUE(RunS4S4Tiling(128, /*k=*/960, 256, 2, /*groupSize=*/192, true, info));
-    const auto *p = GetS4S4Params(info);
+    const auto* p = GetS4S4Params(info);
     EXPECT_EQ(p->quantGroupNum, 5U);
     EXPECT_EQ(p->baseK, 128U);
 }
@@ -184,7 +184,7 @@ TEST_F(TestGroupedS4S4QuantPergroupArch35Tiling, pergroupGroupSize64EvenAccepted
 {
     TilingInfo info;
     ASSERT_TRUE(RunS4S4Tiling(128, /*k=*/512, 256, 2, /*groupSize=*/64, true, info));
-    const auto *p = GetS4S4Params(info);
+    const auto* p = GetS4S4Params(info);
     EXPECT_EQ(p->quantGroupNum, 8U); // G = 512/64
     EXPECT_EQ(p->baseK, 128U);
 }
@@ -193,7 +193,7 @@ TEST_F(TestGroupedS4S4QuantPergroupArch35Tiling, pergroupGroupSize2MinEvenAccept
 {
     TilingInfo info;
     ASSERT_TRUE(RunS4S4Tiling(128, /*k=*/1024, 256, 2, /*groupSize=*/2, true, info));
-    const auto *p = GetS4S4Params(info);
+    const auto* p = GetS4S4Params(info);
     EXPECT_EQ(p->quantGroupNum, 512U); // G = 1024/2
     EXPECT_EQ(p->baseK, 128U);
 }
@@ -215,7 +215,7 @@ TEST_F(TestGroupedS4S4QuantPergroupArch35Tiling, perchannelScale2DQuantGroupNumO
     TilingInfo info;
     ASSERT_TRUE(RunS4S4Tiling(128, 1024, 256, 2, /*groupSize=*/0, /*isPergroup=*/false, info));
     ASSERT_EQ(info.tilingDataSize, sizeof(GroupedMatmulTilingData::GMMS4S4IntQuantTilingData));
-    const auto *p = GetS4S4Params(info);
+    const auto* p = GetS4S4Params(info);
     EXPECT_EQ(p->quantGroupNum, 1U); // perchannel
     EXPECT_EQ(p->baseK, 128U);       // min(1024,128)
 }

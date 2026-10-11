@@ -51,7 +51,7 @@ public:
     __aicore__ inline FfnWbA5Gather() {}
     __aicore__ inline void Init(GM_ADDR expertid_idx, GM_ADDR y, GM_ADDR session_ids, GM_ADDR micro_batch_ids,
                                 GM_ADDR token_ids, GM_ADDR expert_offsets, GM_ADDR dynamic_scale,
-                                const ScheduleContextInfo *contextInfo, TPipe *pipe, uint32_t usedCoreNum)
+                                const ScheduleContextInfo* contextInfo, TPipe* pipe, uint32_t usedCoreNum)
     {
         contextInfo_ = contextInfo;
         curMicroBatchID = contextInfo_->curMicroBatchID;
@@ -102,34 +102,34 @@ public:
         GM_ADDR sessionIdsBufAddr = reinterpret_cast<GM_ADDR>(contextInfo_->bufferPtr.sessionIdsBuf);
         GM_ADDR microBatchIdsBufAddr = reinterpret_cast<GM_ADDR>(contextInfo_->bufferPtr.microBatchIdsBuf);
 
-        tokenDataBufGm_.SetGlobalBuffer((__gm__ int8_t *)tokenDataBufAddr);
+        tokenDataBufGm_.SetGlobalBuffer((__gm__ int8_t*)tokenDataBufAddr);
 
         // 排序的后的  对应gather_index
-        expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertid_idx + blockIdx * perCoreRows);
+        expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertid_idx + blockIdx * perCoreRows);
 
-        sessionIdsInGm_.SetGlobalBuffer((__gm__ int32_t *)sessionIdsBufAddr, activeSessionNum_);
-        microBatchIdsInGm_.SetGlobalBuffer((__gm__ int32_t *)microBatchIdsBufAddr, activeSessionNum_);
+        sessionIdsInGm_.SetGlobalBuffer((__gm__ int32_t*)sessionIdsBufAddr, activeSessionNum_);
+        microBatchIdsInGm_.SetGlobalBuffer((__gm__ int32_t*)microBatchIdsBufAddr, activeSessionNum_);
 
         // 输出空间
-        yOutGm_.SetGlobalBuffer((__gm__ int8_t *)y + blockIdx * SplitY);
+        yOutGm_.SetGlobalBuffer((__gm__ int8_t*)y + blockIdx * SplitY);
 
-        sessionIdsOutGm_.SetGlobalBuffer((__gm__ int32_t *)session_ids + blockIdx * perCoreRows);
-        microBatchIdsOutGm_.SetGlobalBuffer((__gm__ int32_t *)micro_batch_ids + blockIdx * perCoreRows);
-        tokenIdsOutGm_.SetGlobalBuffer((__gm__ int32_t *)token_ids + blockIdx * perCoreRows);
-        expertOffsetsOutGm_.SetGlobalBuffer((__gm__ int32_t *)expert_offsets + blockIdx * perCoreRows);
+        sessionIdsOutGm_.SetGlobalBuffer((__gm__ int32_t*)session_ids + blockIdx * perCoreRows);
+        microBatchIdsOutGm_.SetGlobalBuffer((__gm__ int32_t*)micro_batch_ids + blockIdx * perCoreRows);
+        tokenIdsOutGm_.SetGlobalBuffer((__gm__ int32_t*)token_ids + blockIdx * perCoreRows);
+        expertOffsetsOutGm_.SetGlobalBuffer((__gm__ int32_t*)expert_offsets + blockIdx * perCoreRows);
         if (contextInfo_->tokenDtype == TOKEN_KIND_TWO) {
-            dynamicScaleOutGm_.SetGlobalBuffer((__gm__ float *)dynamic_scale + blockIdx * perCoreRows);
+            dynamicScaleOutGm_.SetGlobalBuffer((__gm__ float*)dynamic_scale + blockIdx * perCoreRows);
         }
 
         if (scaleRowBytes_ > 0) {
-            mxScaleOutGm_.SetGlobalBuffer((__gm__ int8_t *)dynamic_scale + blockIdx * perCoreRows * scaleRowBytes_);
+            mxScaleOutGm_.SetGlobalBuffer((__gm__ int8_t*)dynamic_scale + blockIdx * perCoreRows * scaleRowBytes_);
         }
 
         InitBuffers(pipe);
     }
 
     // 各缓冲的开辟:块大小已由上面按可用 UB 逐项扣除算好,这里只做分配。
-    __aicore__ inline void InitBuffers(TPipe *pipe)
+    __aicore__ inline void InitBuffers(TPipe* pipe)
     {
         int64_t blockBufferSize = maxBlockSize_ + (contextInfo_->tokenDtype == TOKEN_KIND_TWO ? BLOCK_BYTES : 0);
         pipe->InitBuffer(inQueueX_, BUFFER_NUM, blockBufferSize);
@@ -220,10 +220,10 @@ public:
     }
 
     // 逐 token:从三路分道取出 (a, bs, k),算出源地址搬 H 字节,并填四个 id 输出。
-    __aicore__ inline void EmitTokens(const LocalTensor<int32_t> &outAllLocal, int64_t curLoopElements,
+    __aicore__ inline void EmitTokens(const LocalTensor<int32_t>& outAllLocal, int64_t curLoopElements,
                                       int64_t currentOuterStart, int64_t strideSession, int64_t strideMicroBatch,
-                                      int64_t strideBs, int64_t strideK, const LocalTensor<int32_t> &aIdxAll,
-                                      const LocalTensor<int32_t> &bsIdxAll, const LocalTensor<int32_t> &kIdxAll)
+                                      int64_t strideBs, int64_t strideK, const LocalTensor<int32_t>& aIdxAll,
+                                      const LocalTensor<int32_t>& bsIdxAll, const LocalTensor<int32_t>& kIdxAll)
     {
         for (int64_t indicesIndex = 0; indicesIndex < curLoopElements; indicesIndex++) {
             int64_t aIndices = aIdxAll.GetValue(indicesIndex); // 三个下标均取自上面算好的向量分道
@@ -263,7 +263,7 @@ public:
 private:
     // 把扁平 gatherIdx 拆成 (aIdx, bsIdx, kIdx) 三路分道:整块向量运算,
     // 避免逐 token 做两次整数除法。三路结果供下方标量循环逐元素取用。
-    __aicore__ inline void DecomposeIndices(const LocalTensor<int32_t> &expertIdxLocal, int64_t bskProduct,
+    __aicore__ inline void DecomposeIndices(const LocalTensor<int32_t>& expertIdxLocal, int64_t bskProduct,
                                             int64_t curLoopElements)
     {
         // ---- 索引换算(向量):把逐 token 的两次整数除法整块算完 ----
@@ -345,8 +345,8 @@ private:
 
     // 倒数乘法得到的商可能差 1,用余数把商与余数一起拉回正确值。
     // quot/rem 传入传出均为整数值的 fp32;t0/t1 是临时分道,调用后内容作废。
-    __aicore__ inline void CorrectQuotient(const LocalTensor<float> &quot, const LocalTensor<float> &rem,
-                                           const LocalTensor<float> &t0, const LocalTensor<float> &t1, float divisor,
+    __aicore__ inline void CorrectQuotient(const LocalTensor<float>& quot, const LocalTensor<float>& rem,
+                                           const LocalTensor<float>& t0, const LocalTensor<float>& t1, float divisor,
                                            int64_t count)
     {
         Adds(t0, rem, 1.0f - divisor, count); // rem - divisor + 1
@@ -398,7 +398,7 @@ private:
     }
 
     __aicore__ inline void CopyXIn(int64_t xSrcOffset, int64_t curLoopCols, int64_t indicesIndex,
-                                   const LocalTensor<int32_t> &dynamicScaleLocal, bool isLastBlock)
+                                   const LocalTensor<int32_t>& dynamicScaleLocal, bool isLastBlock)
     {
         LocalTensor<int8_t> xLocal = inQueueX_.AllocTensor<int8_t>();
         uint32_t copySize = curLoopCols;
@@ -478,7 +478,7 @@ private:
     LocalTensor<int32_t> sessionIdsLocal_;
     LocalTensor<int32_t> microBatchIdsLocal_;
 
-    const ScheduleContextInfo *contextInfo_ = nullptr;
+    const ScheduleContextInfo* contextInfo_ = nullptr;
 
     int64_t needCoreNum_ = 0;
     int64_t lastLoopRows_ = 0;

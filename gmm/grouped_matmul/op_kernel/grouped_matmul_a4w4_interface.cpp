@@ -50,16 +50,14 @@ struct TileCopyGMMPTD : public Catlass::Gemm::Tile::QuantTileCopy<ArchTag, AType
     using CopyGmToL1Scale = typename Base::CopyGmToL1Scale;
     using CopyL1ToFP = typename Base::CopyL1ToFP;
 };
-template <typename XDType = AscendC::int4b_t,
-          typename WeightDType = AscendC::int4b_t,
-          typename CDType = half,
-          typename ScaleDType = uint64_t,
-          typename GrouplistDType = int64_t,
-          typename PerTokenScaleDType = float,
+template <typename XDType = AscendC::int4b_t, typename WeightDType = AscendC::int4b_t, typename CDType = half,
+          typename ScaleDType = uint64_t, typename GrouplistDType = int64_t, typename PerTokenScaleDType = float,
           typename YDType = bfloat16_t>
-CATLASS_DEVICE void grouped_matmul_a4w4_catlass(uint32_t m, uint32_t k, uint32_t n, uint32_t groupNum, uint64_t quantGroupNum,
-                                        GM_ADDR gmA, GM_ADDR gmB, GM_ADDR gmScale, GM_ADDR group_list, 
-                                        GM_ADDR per_token_scale, GM_ADDR y, GM_ADDR workspace, uint32_t aicCoreNum) {
+CATLASS_DEVICE void grouped_matmul_a4w4_catlass(uint32_t m, uint32_t k, uint32_t n, uint32_t groupNum,
+                                                uint64_t quantGroupNum, GM_ADDR gmA, GM_ADDR gmB, GM_ADDR gmScale,
+                                                GM_ADDR group_list, GM_ADDR per_token_scale, GM_ADDR y,
+                                                GM_ADDR workspace, uint32_t aicCoreNum)
+{
     using LayoutA = Catlass::layout::RowMajor;
     using LayoutB = Catlass::layout::zN;
     using LayoutD = Catlass::layout::RowMajor;
@@ -74,21 +72,23 @@ CATLASS_DEVICE void grouped_matmul_a4w4_catlass(uint32_t m, uint32_t k, uint32_t
     constexpr uint32_t l1Stages = 2;
     constexpr uint32_t l0AStages = 2;
     constexpr uint32_t l0BStages = 2;
-    constexpr uint32_t l0CStages = 1;   // L0CDB: 2
+    constexpr uint32_t l0CStages = 1; // L0CDB: 2
     constexpr uint32_t workspaceStages = 2;
     constexpr bool enableUnitFlag = true; // L0CDB: false
     constexpr bool enableRiffleShuffle = true;
-    using DispatchPolicy = Gemm::MmadAtlasA2PreloadAsyncWithCallbackPerGroup<                       
-        preloadStages, l1Stages, l0AStages, l0BStages, l0CStages, enableUnitFlag, enableRiffleShuffle>;
+    using DispatchPolicy =
+        Gemm::MmadAtlasA2PreloadAsyncWithCallbackPerGroup<preloadStages, l1Stages, l0AStages, l0BStages, l0CStages,
+                                                          enableUnitFlag, enableRiffleShuffle>;
     using L1TileShape = GemmShape<128, 256, 1024>; // max: 128 256 1280
-    using L0TileShape = GemmShape<128, 256, 256>; // L0CDB: 128 128 256
+    using L0TileShape = GemmShape<128, 256, 256>;  // L0CDB: 128 128 256
 
     using AType = Gemm::GemmType<XDType, layout::RowMajor>;
     using BType = Gemm::GemmType<WeightDType, LayoutB>;
     using CType = Gemm::GemmType<CDType, layout::RowMajor>;
     using ScaleType = Gemm::GemmType<ScaleDType, layout::VectorLayout>;
 
-    using TileCopyMmad = TileCopyGMMPTD<ArchTag, AType, BType, CType, void, Catlass::Gemm::Tile::ScaleGranularity::PER_CHANNEL>;
+    using TileCopyMmad =
+        TileCopyGMMPTD<ArchTag, AType, BType, CType, void, Catlass::Gemm::Tile::ScaleGranularity::PER_CHANNEL>;
     using BlockMmad =
         Gemm::Block::BlockMmad<DispatchPolicy, L1TileShape, L0TileShape, AType, BType, CType, void, TileCopyMmad>;
 
@@ -109,28 +109,23 @@ CATLASS_DEVICE void grouped_matmul_a4w4_catlass(uint32_t m, uint32_t k, uint32_t
     using TileCopy = Epilogue::Tile::TileCopy<ArchTag, CType, ScaleType, PerTokenScaleType, DType>;
     using TileScheduler = Epilogue::Tile::EpilogueHorizontalTileSwizzle;
 
-    using BlockEpilogue = Epilogue::Block::BlockEpilogue<
-        EpilogueDispatchPolicy, CType, PerTokenScaleType, DType, TileBroadcastOneBlk,
-        TileOneBlkColumnBroadcastMul, TileCopy, TileScheduler>;
+    using BlockEpilogue =
+        Epilogue::Block::BlockEpilogue<EpilogueDispatchPolicy, CType, PerTokenScaleType, DType, TileBroadcastOneBlk,
+                                       TileOneBlkColumnBroadcastMul, TileCopy, TileScheduler>;
 
     using BlockScheduler = typename Gemm::Block::GemmIdentityBlockSwizzle<3, 0>;
 
     // kernel level
     using ElementGroupList = GrouplistDType;
-    using MatmulKernel = GroupedMatmulSliceMPerTokenDequantMultiStageWorkspacePerGroup<
-        BlockMmad, BlockEpilogue, BlockScheduler, workspaceStages, ElementGroupList>;
+    using MatmulKernel =
+        GroupedMatmulSliceMPerTokenDequantMultiStageWorkspacePerGroup<BlockMmad, BlockEpilogue, BlockScheduler,
+                                                                      workspaceStages, ElementGroupList>;
 
     typename MatmulKernel::Params params{
-        m, k, n, groupNum, quantGroupNum, 
-        group_list, 
-        gmA, layoutA,
-        gmB, layoutB,
-        gmScale, layoutScale,
-        per_token_scale, layoutPerTokenScale,
-        y, layoutD, workspace
-    };
+        m,       k,       n,           groupNum,        quantGroupNum,       group_list, gmA,     layoutA,  gmB,
+        layoutB, gmScale, layoutScale, per_token_scale, layoutPerTokenScale, y,          layoutD, workspace};
 
     MatmulKernel matmul;
     matmul(params);
 }
-}  // namespace Catlass
+} // namespace Catlass

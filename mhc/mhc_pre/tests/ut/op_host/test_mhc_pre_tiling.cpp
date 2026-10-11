@@ -32,10 +32,10 @@ protected:
 };
 
 template <typename T>
-static string TilingData2Str(void *buf, size_t size)
+static string TilingData2Str(void* buf, size_t size)
 {
     string result;
-    const T *data = reinterpret_cast<const T *>(buf);
+    const T* data = reinterpret_cast<const T*>(buf);
     size_t len = size / sizeof(T);
     for (size_t i = 0; i < len; i++) {
         result += std::to_string(data[i]);
@@ -1527,22 +1527,22 @@ TEST_F(MhcPreTiling, Ut_Check_MK_N4_M1024_D5120_HasResi)
         return value;
     };
 
-    uint32_t mDim = readField(fieldOffset([](auto &data, uint32_t value) { data.set_cubeBlockDimM(value); }));
-    uint32_t kDim = readField(fieldOffset([](auto &data, uint32_t value) { data.set_cubeBlockDimK(value); }));
-    uint32_t splitK = readField(fieldOffset([](auto &data, uint32_t value) { data.set_multCoreSplitKSize(value); }));
-    uint32_t mL1Size = readField(fieldOffset([](auto &data, uint32_t value) { data.set_mL1Size(value); }));
-    uint32_t kL1Size = readField(fieldOffset([](auto &data, uint32_t value) { data.set_kL1Size(value); }));
-    uint32_t kUbSize = readField(fieldOffset([](auto &data, uint32_t value) { data.set_kUbSize(value); }));
-    uint32_t mmOffset = readField(fieldOffset([](auto &data, uint32_t value) { data.set_mkWorkspaceMmOffset(value); }));
+    uint32_t mDim = readField(fieldOffset([](auto& data, uint32_t value) { data.set_cubeBlockDimM(value); }));
+    uint32_t kDim = readField(fieldOffset([](auto& data, uint32_t value) { data.set_cubeBlockDimK(value); }));
+    uint32_t splitK = readField(fieldOffset([](auto& data, uint32_t value) { data.set_multCoreSplitKSize(value); }));
+    uint32_t mL1Size = readField(fieldOffset([](auto& data, uint32_t value) { data.set_mL1Size(value); }));
+    uint32_t kL1Size = readField(fieldOffset([](auto& data, uint32_t value) { data.set_kL1Size(value); }));
+    uint32_t kUbSize = readField(fieldOffset([](auto& data, uint32_t value) { data.set_kUbSize(value); }));
+    uint32_t mmOffset = readField(fieldOffset([](auto& data, uint32_t value) { data.set_mkWorkspaceMmOffset(value); }));
     uint32_t rmsOffset =
-        readField(fieldOffset([](auto &data, uint32_t value) { data.set_mkWorkspaceRmsOffset(value); }));
+        readField(fieldOffset([](auto& data, uint32_t value) { data.set_mkWorkspaceRmsOffset(value); }));
     uint32_t finalOffset =
-        readField(fieldOffset([](auto &data, uint32_t value) { data.set_mkWorkspaceFinalOffset(value); }));
-    uint32_t mkUseGmStage = readField(fieldOffset([](auto &data, uint32_t value) { data.set_mkUseGmStage(value); }));
+        readField(fieldOffset([](auto& data, uint32_t value) { data.set_mkWorkspaceFinalOffset(value); }));
+    uint32_t mkUseGmStage = readField(fieldOffset([](auto& data, uint32_t value) { data.set_mkUseGmStage(value); }));
     uint32_t stage2UsedAivNum =
-        readField(fieldOffset([](auto &data, uint32_t value) { data.set_stage2UsedAivNum(value); }));
+        readField(fieldOffset([](auto& data, uint32_t value) { data.set_stage2UsedAivNum(value); }));
     uint32_t stage2RowsPerCore =
-        readField(fieldOffset([](auto &data, uint32_t value) { data.set_stage2RowsPerCore(value); }));
+        readField(fieldOffset([](auto& data, uint32_t value) { data.set_stage2RowsPerCore(value); }));
 
     auto ceilDiv = [](uint32_t value, uint32_t divisor) -> uint32_t { return (value + divisor - 1U) / divisor; };
     auto roundUp = [&ceilDiv](uint32_t value, uint32_t align) -> uint32_t { return ceilDiv(value, align) * align; };
@@ -1745,17 +1745,17 @@ static void CheckMkGeneralizedTiling(uint32_t totalLength, uint32_t n, uint32_t 
         std::memcpy(&value, tilingInfo.tilingData.get() + offset, sizeof(value));
         return value;
     };
-    uint32_t kL1Size = readField(fieldOffset([](auto &data, uint32_t value) { data.set_kL1Size(value); }));
-    uint32_t mDim = readField(fieldOffset([](auto &data, uint32_t value) { data.set_cubeBlockDimM(value); }));
-    uint32_t kDim = readField(fieldOffset([](auto &data, uint32_t value) { data.set_cubeBlockDimK(value); }));
-    uint32_t splitK = readField(fieldOffset([](auto &data, uint32_t value) { data.set_multCoreSplitKSize(value); }));
-    uint32_t fusionAlign = readField(fieldOffset([](auto &data, uint32_t value) { data.set_fusionAlign(value); }));
+    uint32_t kL1Size = readField(fieldOffset([](auto& data, uint32_t value) { data.set_kL1Size(value); }));
+    uint32_t mDim = readField(fieldOffset([](auto& data, uint32_t value) { data.set_cubeBlockDimM(value); }));
+    uint32_t kDim = readField(fieldOffset([](auto& data, uint32_t value) { data.set_cubeBlockDimK(value); }));
+    uint32_t splitK = readField(fieldOffset([](auto& data, uint32_t value) { data.set_multCoreSplitKSize(value); }));
+    uint32_t fusionAlign = readField(fieldOffset([](auto& data, uint32_t value) { data.set_fusionAlign(value); }));
     uint32_t stage2UsedAivNum =
-        readField(fieldOffset([](auto &data, uint32_t value) { data.set_stage2UsedAivNum(value); }));
+        readField(fieldOffset([](auto& data, uint32_t value) { data.set_stage2UsedAivNum(value); }));
     uint32_t stage2RowsPerCore =
-        readField(fieldOffset([](auto &data, uint32_t value) { data.set_stage2RowsPerCore(value); }));
-    uint32_t actualImplMode = readField(fieldOffset([](auto &data, uint32_t value) { data.set_implMode(value); }));
-    uint32_t mkUseGmStage = readField(fieldOffset([](auto &data, uint32_t value) { data.set_mkUseGmStage(value); }));
+        readField(fieldOffset([](auto& data, uint32_t value) { data.set_stage2RowsPerCore(value); }));
+    uint32_t actualImplMode = readField(fieldOffset([](auto& data, uint32_t value) { data.set_implMode(value); }));
+    uint32_t mkUseGmStage = readField(fieldOffset([](auto& data, uint32_t value) { data.set_mkUseGmStage(value); }));
     EXPECT_EQ(actualImplMode, static_cast<uint32_t>(implMode));
     bool expectL1Stage = (implMode == 0 && totalLength >= 512U) || (n == 8U && totalLength < 1536U);
     EXPECT_EQ(mkUseGmStage, expectL1Stage ? 0U : 1U);

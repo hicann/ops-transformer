@@ -45,7 +45,7 @@ public:
     AclnnTensor aclnnX, aclnnWeight1, aclnnWeight2, aclnnExpertTokens, aclnnBias1, aclnnBias2, aclnnScale, aclnnOffset,
         aclnnDeqScale1, aclnnDeqScale2, aclnnAntiquantScale1, aclnnAntiquantScale2, aclnnAntiquantOffset1,
         aclnnAntiquantOffset2, aclnnY;
-    aclIntArray *aclnnExpertTokensIntAry = nullptr;
+    aclIntArray* aclnnExpertTokensIntAry = nullptr;
 
 public:
     AclnnFFNParam() = default;

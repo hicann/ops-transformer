@@ -19,8 +19,8 @@
 #include "opdev/op_executor.h"
 namespace l0op {
 
-const aclTensor *MhcSinkhornBackward(const aclTensor *gradOutput, const aclTensor *normOut, const aclTensor *sumOut,
-                                     aclTensor *out, aclOpExecutor *executor);
+const aclTensor* MhcSinkhornBackward(const aclTensor* gradOutput, const aclTensor* normOut, const aclTensor* sumOut,
+                                     aclTensor* out, aclOpExecutor* executor);
 }
 
 #endif // PTA_NPU_OP_API_INC_LEVEL0_OP_MHC_SINKHORN_BACKWARD_OP_H_

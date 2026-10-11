@@ -38,7 +38,7 @@ using ops::ut::ParseBool;
 using ops::ut::SplitStr2Vec;
 using ops::ut::Trim;
 
-gert::StorageShape MakeShape(const vector<int64_t> &dims)
+gert::StorageShape MakeShape(const vector<int64_t>& dims)
 {
     return ops::ut::MakeGertStorageShape(dims);
 }
@@ -68,7 +68,15 @@ struct QGmmInplaceAddArch35Param {
     void Test() const
     {
         optiling::GMMCompileInfo compileInfo = {
-            32, 64, 262144, 524288, 134217728, 262144, 65536, 65536, platform_ascendc::SocVersion::ASCEND950,
+            32,
+            64,
+            262144,
+            524288,
+            134217728,
+            262144,
+            65536,
+            65536,
+            platform_ascendc::SocVersion::ASCEND950,
             NpuArch::DAV_3510,
         };
 
@@ -92,8 +100,7 @@ struct QGmmInplaceAddArch35Param {
             {{yShape, yDtype, ge::FORMAT_ND}},
             {{"group_list_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(groupListType)},
              {"group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
-            &compileInfo,
-            "3510", compileInfo.aicNum, compileInfo.ubSize, actualTilingDataSize);
+            &compileInfo, "3510", compileInfo.aicNum, compileInfo.ubSize, actualTilingDataSize);
 
         TilingInfo tilingInfo;
         bool tilingResult = ExecuteTiling(tilingContextPara, tilingInfo);
@@ -112,7 +119,7 @@ struct QGmmInplaceAddArch35Param {
     }
 };
 
-vector<QGmmInplaceAddArch35Param> GetParams(const string &socVersion)
+vector<QGmmInplaceAddArch35Param> GetParams(const string& socVersion)
 {
     vector<QGmmInplaceAddArch35Param> params;
     string csvPath = ops::ut::ResolveCsvPath("test_quant_grouped_matmul_inplace_add_arch35_tiling.csv",
@@ -168,28 +175,27 @@ vector<QGmmInplaceAddArch35Param> GetParams(const string &socVersion)
             p.scale1Shape = ops::ut::ParseDims(items[idx++]);
             p.tilingDataSize = static_cast<uint64_t>(stoull(Trim(items[idx++])));
             params.push_back(p);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
     return params;
 }
 
-string MakeParamName(const testing::TestParamInfo<QGmmInplaceAddArch35Param> &info)
+string MakeParamName(const testing::TestParamInfo<QGmmInplaceAddArch35Param>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
 } // namespace
 
 namespace QuantGroupedMatmulInplaceAddArch35TilingUT {
-const vector<QGmmInplaceAddArch35Param> &GetAscend950Params()
+const vector<QGmmInplaceAddArch35Param>& GetAscend950Params()
 {
     static const vector<QGmmInplaceAddArch35Param> params = GetParams("Ascend950");
     return params;
 }
 
-class TestQuantGroupedMatmulInplaceAddArch35Tiling : public testing::TestWithParam<QGmmInplaceAddArch35Param> {
-};
+class TestQuantGroupedMatmulInplaceAddArch35Tiling : public testing::TestWithParam<QGmmInplaceAddArch35Param> {};
 
 TEST_P(TestQuantGroupedMatmulInplaceAddArch35Tiling, csvDrivenCase)
 {

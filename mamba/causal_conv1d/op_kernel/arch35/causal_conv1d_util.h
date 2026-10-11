@@ -19,9 +19,15 @@
 
 namespace CausalConv1dUtil {
 
-__aicore__ inline int32_t CurrSlot(int32_t t, int32_t width) { return (t + width - 1) % (width + 1); }
+__aicore__ inline int32_t CurrSlot(int32_t t, int32_t width)
+{
+    return (t + width - 1) % (width + 1);
+}
 
-__aicore__ inline int32_t NextSlot(int32_t t, int32_t width) { return (t + width) % (width + 1); }
+__aicore__ inline int32_t NextSlot(int32_t t, int32_t width)
+{
+    return (t + width) % (width + 1);
+}
 
 __aicore__ inline constexpr bool IsFnInputModeKey(uint32_t inputModeKey)
 {

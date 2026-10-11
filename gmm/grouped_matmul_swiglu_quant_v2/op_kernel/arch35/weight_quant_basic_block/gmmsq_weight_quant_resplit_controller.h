@@ -34,7 +34,7 @@ using namespace WeightQuantBatchMatmulV2::Arch35;
 namespace GMMSQWeightQuant {
 #define GMMSQ_WQ_RESPLIT_CONTROLLER_TEMPLATE_PARAM \
     template <typename xType, typename wType, typename weightScaleType, typename xScaleType, typename yType, \
-              typename yScaleType, const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig, \
+              typename yScaleType, const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig, \
               bool isSingleMultiSingle>
 
 #define GMMSQ_WQ_RESPLIT_CONTROLLER_CLASS \
@@ -46,33 +46,33 @@ class GMMSQWeightQuantResplitController {
 public:
     __aicore__ inline GMMSQWeightQuantResplitController(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR weightScale, GM_ADDR groupList, GM_ADDR xScale,
-                                GM_ADDR y, GM_ADDR yScale, const GMMSQWeightQuantTilingData *__restrict baseTiling);
+                                GM_ADDR y, GM_ADDR yScale, const GMMSQWeightQuantTilingData* __restrict baseTiling);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void InitOffsetParam(BasicBlockOffsetParam offsetParam[BASIC_BLOCK_PROCESS_NUM]);
     __aicore__ inline void SplitNByMultiCore(BasicBlockOffsetParam offsetParam[BASIC_BLOCK_PROCESS_NUM],
-                                             BasicBlockControlParam &ctrlParam, uint64_t basicBlockCount,
+                                             BasicBlockControlParam& ctrlParam, uint64_t basicBlockCount,
                                              uint64_t basicBlockSize);
     __aicore__ inline uint64_t GetSplitValueFromGroupList(uint64_t groupIdx);
     __aicore__ inline void UpdateGmAddr(uint64_t groupIdx, uint64_t mSize, uint64_t kSize, uint64_t nSize);
-    __aicore__ inline uint64_t GetSwitchedProcessId(const BasicBlockControlParam &ctrlParam);
+    __aicore__ inline uint64_t GetSwitchedProcessId(const BasicBlockControlParam& ctrlParam);
 
     template <typename T>
-    __aicore__ inline __gm__ T *GetTensorAddr(uint64_t groupIdx, GM_ADDR tensorPtr)
+    __aicore__ inline __gm__ T* GetTensorAddr(uint64_t groupIdx, GM_ADDR tensorPtr)
     {
-        ListTensorDesc listTensorDesc(reinterpret_cast<__gm__ void *>(tensorPtr));
+        ListTensorDesc listTensorDesc(reinterpret_cast<__gm__ void*>(tensorPtr));
         return listTensorDesc.GetDataPtr<T>(groupIdx);
     }
 
-    const GMMSQWeightQuantTilingData *tiling_;
+    const GMMSQWeightQuantTilingData* tiling_;
 
-    __gm__ xType *xGm_;
-    __gm__ wType *weightGm_;
-    __gm__ weightScaleType *weightScaleGm_;
-    __gm__ yType *yGm_;
-    __gm__ xScaleType *xScaleGm_;
-    __gm__ yScaleType *yScaleGm_;
+    __gm__ xType* xGm_;
+    __gm__ wType* weightGm_;
+    __gm__ weightScaleType* weightScaleGm_;
+    __gm__ yType* yGm_;
+    __gm__ xScaleType* xScaleGm_;
+    __gm__ yScaleType* yScaleGm_;
     GM_ADDR weightTensorPtr_;
     GM_ADDR weightScaleTensorPtr_;
     GlobalTensor<int64_t> groupListGm_;
@@ -95,19 +95,19 @@ GMMSQ_WQ_RESPLIT_CONTROLLER_TEMPLATE_PARAM
 __aicore__ inline void GMMSQ_WQ_RESPLIT_CONTROLLER_CLASS::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR weightScale,
                                                                GM_ADDR groupList, GM_ADDR xScale, GM_ADDR y,
                                                                GM_ADDR yScale,
-                                                               const GMMSQWeightQuantTilingData *__restrict baseTiling)
+                                                               const GMMSQWeightQuantTilingData* __restrict baseTiling)
 {
     tiling_ = baseTiling;
 
-    xGm_ = reinterpret_cast<__gm__ xType *>(x);
+    xGm_ = reinterpret_cast<__gm__ xType*>(x);
     weightTensorPtr_ = weight;
     weightScaleTensorPtr_ = weightScale;
     weightGm_ = GetTensorAddr<wType>(0, weightTensorPtr_);
     weightScaleGm_ = GetTensorAddr<weightScaleType>(0, weightScaleTensorPtr_);
-    xScaleGm_ = reinterpret_cast<__gm__ xScaleType *>(xScale);
-    yGm_ = reinterpret_cast<__gm__ yType *>(y);
-    yScaleGm_ = reinterpret_cast<__gm__ yScaleType *>(yScale);
-    groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(groupList));
+    xScaleGm_ = reinterpret_cast<__gm__ xScaleType*>(xScale);
+    yGm_ = reinterpret_cast<__gm__ yType*>(y);
+    yScaleGm_ = reinterpret_cast<__gm__ yScaleType*>(yScale);
+    groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(groupList));
     basicBlock_.Init();
 }
 
@@ -177,7 +177,7 @@ __aicore__ inline void GMMSQ_WQ_RESPLIT_CONTROLLER_CLASS::InitOffsetParam(
 
 GMMSQ_WQ_RESPLIT_CONTROLLER_TEMPLATE_PARAM
 __aicore__ inline void GMMSQ_WQ_RESPLIT_CONTROLLER_CLASS::SplitNByMultiCore(
-    BasicBlockOffsetParam offsetParam[BASIC_BLOCK_PROCESS_NUM], BasicBlockControlParam &ctrlParam,
+    BasicBlockOffsetParam offsetParam[BASIC_BLOCK_PROCESS_NUM], BasicBlockControlParam& ctrlParam,
     uint64_t basicBlockCount, uint64_t basicBlockSize)
 {
     for (; ctrlParam.curBasicBlockId < ctrlParam.basicBlockLimit + basicBlockCount;
@@ -261,7 +261,7 @@ __aicore__ inline uint64_t GMMSQ_WQ_RESPLIT_CONTROLLER_CLASS::GetSplitValueFromG
 
 GMMSQ_WQ_RESPLIT_CONTROLLER_TEMPLATE_PARAM
 __aicore__ inline uint64_t GMMSQ_WQ_RESPLIT_CONTROLLER_CLASS::GetSwitchedProcessId(
-    const BasicBlockControlParam &ctrlParam)
+    const BasicBlockControlParam& ctrlParam)
 {
     return 1 - ctrlParam.processId;
 }

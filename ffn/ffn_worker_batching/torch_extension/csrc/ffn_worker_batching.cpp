@@ -36,8 +36,8 @@ using Outputs =
     std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>;
 } // namespace
 
-Outputs ffn_worker_batching(const at::Tensor &schedule_context, int64_t expert_num,
-                            const std::vector<int64_t> &max_out_shape, int64_t token_dtype, int64_t need_schedule,
+Outputs ffn_worker_batching(const at::Tensor& schedule_context, int64_t expert_num,
+                            const std::vector<int64_t>& max_out_shape, int64_t token_dtype, int64_t need_schedule,
                             int64_t layer_num, bool sync_flag, bool mx_output_uint8)
 {
     // Inspect metadata only. Copying a noncontiguous context to a temporary
@@ -72,7 +72,7 @@ Outputs ffn_worker_batching(const at::Tensor &schedule_context, int64_t expert_n
         // Guard allocations AND ACLNN_CMD: the macro allocates workspace and
         // submits work to the current device's current stream.
         const c10::OptionalDeviceGuard device_guard(schedule_context.device());
-        const char *soc = aclrtGetSocName();
+        const char* soc = aclrtGetSocName();
         TORCH_CHECK(soc != nullptr && std::strncmp(soc, "Ascend950", std::strlen("Ascend950")) == 0,
                     "ffn_worker_batching supports arch35/Ascend950 only, got ", soc == nullptr ? "unknown" : soc);
         const at::ScalarType token_types[] = {at::kHalf,

@@ -29,10 +29,10 @@ protected:
 };
 
 template <typename T>
-static string TilingData2Str(void *buf, size_t size)
+static string TilingData2Str(void* buf, size_t size)
 {
     string result;
-    const T *data = reinterpret_cast<const T *>(buf);
+    const T* data = reinterpret_cast<const T*>(buf);
     size_t len = size / sizeof(T);
     for (size_t i = 0; i < len; i++) {
         result += std::to_string(data[i]);

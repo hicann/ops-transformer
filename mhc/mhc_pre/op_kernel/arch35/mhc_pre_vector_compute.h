@@ -40,14 +40,14 @@ constexpr Reg::CastTrait MHC_PRE_CAST_B16_TO_FP32 = {Reg::RegLayout::ZERO, Reg::
 constexpr Reg::DivSpecificMode MHC_PRE_DIV_ZEROING_MODE = {Reg::MaskMergeMode::ZEROING, true};
 
 template <class P>
-__aicore__ inline void MhcPreLoadHInValue(Reg::RegTensor<P> &dst, __ubuf__ P *src, uint32_t offset)
+__aicore__ inline void MhcPreLoadHInValue(Reg::RegTensor<P>& dst, __ubuf__ P* src, uint32_t offset)
 {
     Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(dst, src + offset);
 }
 
 template <class T, class P>
-__aicore__ inline void MhcPreAccumulateHIn(Reg::RegTensor<P> &acc, Reg::RegTensor<P> &xFp32, Reg::RegTensor<T> &xIn,
-                                           Reg::RegTensor<P> &hPre, __ubuf__ T *x, uint32_t offset, Reg::MaskReg mask)
+__aicore__ inline void MhcPreAccumulateHIn(Reg::RegTensor<P>& acc, Reg::RegTensor<P>& xFp32, Reg::RegTensor<T>& xIn,
+                                           Reg::RegTensor<P>& hPre, __ubuf__ T* x, uint32_t offset, Reg::MaskReg mask)
 {
     Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(xIn, x + offset);
     Reg::Cast<P, T, MHC_PRE_CAST_B16_TO_FP32>(xFp32, xIn, mask);
@@ -56,21 +56,21 @@ __aicore__ inline void MhcPreAccumulateHIn(Reg::RegTensor<P> &acc, Reg::RegTenso
 }
 
 template <class P, uint32_t HEAD_NUM, bool HAS_RESI_VALUE>
-__aicore__ inline void MhcPreVFPostSegments(const LocalTensor<P> &hPreLocal, const LocalTensor<P> &hPostLocal,
-                                            const LocalTensor<P> &hResLocal, const LocalTensor<P> &mmLocal,
-                                            const LocalTensor<P> &invRmsLocal, const LocalTensor<P> &alphaLocal,
-                                            const LocalTensor<P> &biasLocal, uint16_t rowCount, uint32_t invRmsOffset,
+__aicore__ inline void MhcPreVFPostSegments(const LocalTensor<P>& hPreLocal, const LocalTensor<P>& hPostLocal,
+                                            const LocalTensor<P>& hResLocal, const LocalTensor<P>& mmLocal,
+                                            const LocalTensor<P>& invRmsLocal, const LocalTensor<P>& alphaLocal,
+                                            const LocalTensor<P>& biasLocal, uint16_t rowCount, uint32_t invRmsOffset,
                                             uint32_t mmRowStride)
 {
-    __ubuf__ P *hPre = (__ubuf__ P *)hPreLocal.GetPhyAddr();
-    __ubuf__ P *hPost = (__ubuf__ P *)hPostLocal.GetPhyAddr();
-    __ubuf__ P *mm = (__ubuf__ P *)mmLocal.GetPhyAddr();
-    __ubuf__ P *invRms = (__ubuf__ P *)invRmsLocal.GetPhyAddr();
-    __ubuf__ P *alpha = (__ubuf__ P *)alphaLocal.GetPhyAddr();
-    __ubuf__ P *bias = (__ubuf__ P *)biasLocal.GetPhyAddr();
-    __ubuf__ P *hRes = nullptr;
+    __ubuf__ P* hPre = (__ubuf__ P*)hPreLocal.GetPhyAddr();
+    __ubuf__ P* hPost = (__ubuf__ P*)hPostLocal.GetPhyAddr();
+    __ubuf__ P* mm = (__ubuf__ P*)mmLocal.GetPhyAddr();
+    __ubuf__ P* invRms = (__ubuf__ P*)invRmsLocal.GetPhyAddr();
+    __ubuf__ P* alpha = (__ubuf__ P*)alphaLocal.GetPhyAddr();
+    __ubuf__ P* bias = (__ubuf__ P*)biasLocal.GetPhyAddr();
+    __ubuf__ P* hRes = nullptr;
     if constexpr (HAS_RESI_VALUE) {
-        hRes = (__ubuf__ P *)hResLocal.GetPhyAddr();
+        hRes = (__ubuf__ P*)hResLocal.GetPhyAddr();
     }
 
     __VEC_SCOPE__
@@ -128,9 +128,9 @@ __aicore__ inline void MhcPreVFPostSegments(const LocalTensor<P> &hPreLocal, con
     }
 }
 template <class P, uint32_t HEAD_NUM, bool HAS_RESI_VALUE>
-__aicore__ inline void MhcPreVFExpandAlpha(const LocalTensor<P> &alphaLocal)
+__aicore__ inline void MhcPreVFExpandAlpha(const LocalTensor<P>& alphaLocal)
 {
-    __ubuf__ P *alpha = (__ubuf__ P *)alphaLocal.GetPhyAddr();
+    __ubuf__ P* alpha = (__ubuf__ P*)alphaLocal.GetPhyAddr();
     __VEC_SCOPE__
     {
         Reg::RegTensor<P> alphaPreReg;
@@ -181,7 +181,7 @@ public:
 
     __aicore__ inline MhcPreVectorCompute() = default;
 
-    __aicore__ inline void InitPipeAndCoreIdx(TPipe *pipe)
+    __aicore__ inline void InitPipeAndCoreIdx(TPipe* pipe)
     {
         pipe_ = pipe;
         coreIdx_ = GetBlockIdx();
@@ -190,20 +190,20 @@ public:
 
     __aicore__ inline void BindGlobalTensors(InitParams initParams)
     {
-        xGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(initParams.x));
-        phiGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P *>(initParams.phi));
-        alphaGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P *>(initParams.alpha));
-        biasGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P *>(initParams.bias));
-        gammaGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P *>(initParams.gamma));
-        hinGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(initParams.hin));
-        hPostGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P *>(initParams.h_post));
-        hResGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P *>(initParams.h_res));
-        invRmsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P *>(initParams.inv_rms));
-        hPreGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P *>(initParams.h_pre));
-        xFloatGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P *>(initParams.workspace));
+        xGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(initParams.x));
+        phiGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.phi));
+        alphaGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.alpha));
+        biasGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.bias));
+        gammaGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.gamma));
+        hinGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(initParams.hin));
+        hPostGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.h_post));
+        hResGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.h_res));
+        invRmsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.inv_rms));
+        hPreGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.h_pre));
+        xFloatGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.workspace));
     }
 
-    __aicore__ inline void InitFromTilingData(const MhcPreTilingData *tilingData)
+    __aicore__ inline void InitFromTilingData(const MhcPreTilingData* tilingData)
     {
         tiling_ = tilingData;
         matrixInfo_.totalLength = tiling_->totalLength;
@@ -242,11 +242,11 @@ public:
     __aicore__ inline void InitHMixBuffer(InitParams initParams)
     {
         if (outFlag_) {
-            hMixGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P *>(initParams.h_mix));
+            hMixGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.h_mix));
         } else {
             hMixGm_.SetGlobalBuffer(
-                reinterpret_cast<__gm__ P *>(initParams.workspace + mnConfig_.singleCoreM * mnConfig_.singleCoreK *
-                                                                        PARALLEL_NUM * sizeof(P) * coreNum_));
+                reinterpret_cast<__gm__ P*>(initParams.workspace + mnConfig_.singleCoreM * mnConfig_.singleCoreK *
+                                                                       PARALLEL_NUM * sizeof(P) * coreNum_));
         }
     }
 
@@ -315,20 +315,20 @@ public:
             LocalTensor<P> aL1Ub = outQueue_.template AllocTensor<P>();
             if (hasGamma_) {
                 if (offsetNd == 0U) {
-                    VFDoV0ProcessXIn<true, true>((__ubuf__ P *)aL1Ub.GetPhyAddr(), (__ubuf__ P *)invRmsUb.GetPhyAddr(),
-                                                 (__ubuf__ T *)xLocal_.GetPhyAddr(),
-                                                 (__ubuf__ P *)gammaUb_.GetPhyAddr(), curMLen, curNdLen);
+                    VFDoV0ProcessXIn<true, true>((__ubuf__ P*)aL1Ub.GetPhyAddr(), (__ubuf__ P*)invRmsUb.GetPhyAddr(),
+                                                 (__ubuf__ T*)xLocal_.GetPhyAddr(), (__ubuf__ P*)gammaUb_.GetPhyAddr(),
+                                                 curMLen, curNdLen);
                 } else {
-                    VFDoV0ProcessXIn<true, false>((__ubuf__ P *)aL1Ub.GetPhyAddr(), (__ubuf__ P *)invRmsUb.GetPhyAddr(),
-                                                  (__ubuf__ T *)xLocal_.GetPhyAddr(),
-                                                  (__ubuf__ P *)gammaUb_.GetPhyAddr(), curMLen, curNdLen);
+                    VFDoV0ProcessXIn<true, false>((__ubuf__ P*)aL1Ub.GetPhyAddr(), (__ubuf__ P*)invRmsUb.GetPhyAddr(),
+                                                  (__ubuf__ T*)xLocal_.GetPhyAddr(), (__ubuf__ P*)gammaUb_.GetPhyAddr(),
+                                                  curMLen, curNdLen);
                 }
             } else if (offsetNd == 0U) {
-                VFDoV0ProcessXIn<false, true>((__ubuf__ P *)aL1Ub.GetPhyAddr(), (__ubuf__ P *)invRmsUb.GetPhyAddr(),
-                                              (__ubuf__ T *)xLocal_.GetPhyAddr(), nullptr, curMLen, curNdLen);
+                VFDoV0ProcessXIn<false, true>((__ubuf__ P*)aL1Ub.GetPhyAddr(), (__ubuf__ P*)invRmsUb.GetPhyAddr(),
+                                              (__ubuf__ T*)xLocal_.GetPhyAddr(), nullptr, curMLen, curNdLen);
             } else {
-                VFDoV0ProcessXIn<false, false>((__ubuf__ P *)aL1Ub.GetPhyAddr(), (__ubuf__ P *)invRmsUb.GetPhyAddr(),
-                                               (__ubuf__ T *)xLocal_.GetPhyAddr(), nullptr, curMLen, curNdLen);
+                VFDoV0ProcessXIn<false, false>((__ubuf__ P*)aL1Ub.GetPhyAddr(), (__ubuf__ P*)invRmsUb.GetPhyAddr(),
+                                               (__ubuf__ T*)xLocal_.GetPhyAddr(), nullptr, curMLen, curNdLen);
             }
             outQueue_.template EnQue<P>(aL1Ub);
             aL1Ub = outQueue_.template DeQue<P>();
@@ -347,7 +347,7 @@ public:
         if (vectorOffset_.singleCoreM == 0U) {
             return;
         }
-        VFDoV0ProcessInvRms((__ubuf__ P *)invRmsUb_.GetPhyAddr(), vectorOffset_.singleCoreM, scaleMean_,
+        VFDoV0ProcessInvRms((__ubuf__ P*)invRmsUb_.GetPhyAddr(), vectorOffset_.singleCoreM, scaleMean_,
                             matrixInfo_.normEps);
         DataCopyOutInvRmsUb(vectorOffset_.singleCoreM, vectorOffset_.offsetMStart);
     }
@@ -367,7 +367,7 @@ public:
     }
 
     template <bool hasGamma, bool isFirstND>
-    __aicore__ inline void VFDoV0ProcessXIn(__ubuf__ P *xDst, __ubuf__ P *invRmsDst, __ubuf__ T *xIn, __ubuf__ P *gamma,
+    __aicore__ inline void VFDoV0ProcessXIn(__ubuf__ P* xDst, __ubuf__ P* invRmsDst, __ubuf__ T* xIn, __ubuf__ P* gamma,
                                             uint16_t mSize, uint16_t nSize)
     {
         uint32_t nSrcUbAligned = MhcPreAlign(nSize, static_cast<uint16_t>(MHC_PRE_UB_ALIGN_SIZE / sizeof(T)));
@@ -413,7 +413,7 @@ public:
         }
     }
 
-    __aicore__ inline void VFDoV0ProcessInvRms(__ubuf__ P *invRms, uint16_t nSize, float scaleMean, float normEps)
+    __aicore__ inline void VFDoV0ProcessInvRms(__ubuf__ P* invRms, uint16_t nSize, float scaleMean, float normEps)
     {
         uint32_t nUbAligned = MhcPreAlign(nSize, static_cast<uint16_t>(MHC_PRE_UB_ALIGN_SIZE / sizeof(P)));
         uint16_t nLoopCnt = MhcPreCeilDiv(nSize, eleNumPerVf_);
@@ -501,7 +501,7 @@ public:
         DataCopyPad(invRmsGm_[offset], invRmsUb_, copyParams);
     }
 
-    __aicore__ inline void DataCopyOutToWorkSpace(LocalTensor<P> &x, uint32_t curMLen, uint32_t curNdLen,
+    __aicore__ inline void DataCopyOutToWorkSpace(LocalTensor<P>& x, uint32_t curMLen, uint32_t curNdLen,
                                                   uint32_t offsetM, uint32_t offsetNd)
     {
         DataCopyParams copyParams;
@@ -581,7 +581,7 @@ public:
 
     __aicore__ inline void AIV1ProcessHPre(uint64_t offsetT, uint64_t lenT)
     {
-        __ubuf__ P *hPreBuffAddr = (__ubuf__ P *)hPreBuff_.GetPhyAddr();
+        __ubuf__ P* hPreBuffAddr = (__ubuf__ P*)hPreBuff_.GetPhyAddr();
         uint32_t totalElem = lenT * N_;
         uint16_t nLoopCnt = Ceil(totalElem, eleNumPerVf_);
         uint32_t curElemCnt = totalElem;
@@ -614,8 +614,8 @@ public:
     {
         uint64_t offset = globalOffsetM_ + offsetT;
         LocalTensor<P> hPostOutLocal = outQueue_.AllocTensor<P>();
-        __ubuf__ P *hPostBuffAddr = (__ubuf__ P *)hPostBuff_.GetPhyAddr();
-        __ubuf__ P *hPostOutAddr = (__ubuf__ P *)hPostOutLocal.GetPhyAddr();
+        __ubuf__ P* hPostBuffAddr = (__ubuf__ P*)hPostBuff_.GetPhyAddr();
+        __ubuf__ P* hPostOutAddr = (__ubuf__ P*)hPostOutLocal.GetPhyAddr();
         uint32_t totalElem = lenT * N_;
         uint32_t regCapacityFp32 = 64;
         uint16_t nLoopCnt = Ceil(totalElem, regCapacityFp32);
@@ -656,7 +656,7 @@ public:
     }
 
     template <uint32_t HEAD_NUM>
-    __aicore__ inline void VFDoV1ProcessHInRows(__ubuf__ T *xInAddr, __ubuf__ T *hinOutAddr, __ubuf__ P *hPreAddr,
+    __aicore__ inline void VFDoV1ProcessHInRows(__ubuf__ T* xInAddr, __ubuf__ T* hinOutAddr, __ubuf__ P* hPreAddr,
                                                 uint16_t rowCount, uint32_t lenD, uint32_t localStride)
     {
         uint16_t dLoopCnt = (lenD + eleNumPerVf_ - 1) / eleNumPerVf_;
@@ -765,9 +765,9 @@ public:
                 xIn = xInQueue_.DeQue<T>();
 
                 LocalTensor<T> hinOut = outQueue_.AllocTensor<T>();
-                __ubuf__ T *xInAddr = (__ubuf__ T *)xIn.GetPhyAddr();
-                __ubuf__ T *hinOutAddr = (__ubuf__ T *)hinOut.GetPhyAddr();
-                __ubuf__ P *hPreAddr = (__ubuf__ P *)hPreBuff_[rowOffset * N_].GetPhyAddr();
+                __ubuf__ T* xInAddr = (__ubuf__ T*)xIn.GetPhyAddr();
+                __ubuf__ T* hinOutAddr = (__ubuf__ T*)hinOut.GetPhyAddr();
+                __ubuf__ P* hPreAddr = (__ubuf__ P*)hPreBuff_[rowOffset * N_].GetPhyAddr();
                 if (N_ == kSupportedN4) {
                     VFDoV1ProcessHInRows<kSupportedN4>(xInAddr, hinOutAddr, hPreAddr, rowCount, lenD, localStride);
                 } else if (N_ == kSupportedN6) {
@@ -791,7 +791,7 @@ public:
     }
 
     template <bool WAIT_HRES_COPY = false>
-    __aicore__ inline void AIV1PostProcessTile(const LocalTensor<P> &hMixLocal, uint64_t offsetT, uint64_t lenT,
+    __aicore__ inline void AIV1PostProcessTile(const LocalTensor<P>& hMixLocal, uint64_t offsetT, uint64_t lenT,
                                                uint32_t invRmsOffset, uint32_t hMixRowStride,
                                                uint32_t xBufferBytes = kXInQueueBufferBytes,
                                                uint32_t outBufferBytes = kOutQueueBufferBytes)
@@ -892,11 +892,11 @@ private:
     LocalTensor<P> invRmsUb_;
     LocalTensor<P> gammaUb_;
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     MatrixInfo matrixInfo_;
     VectorOffsetParams vectorOffset_;
 
-    const MhcPreTilingData *tiling_;
+    const MhcPreTilingData* tiling_;
 
     uint32_t chunkTSize_ = 64;
     uint32_t v1ChunkDSize_ = 5120;

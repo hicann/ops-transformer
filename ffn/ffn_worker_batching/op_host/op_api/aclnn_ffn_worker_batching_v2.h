@@ -24,14 +24,14 @@ extern "C" {
  * @domain aclnn_ops_infer
  */
 ACLNN_API aclnnStatus aclnnFfnWorkerBatchingV2GetWorkspaceSize(
-    const aclTensor *scheduleContext, int64_t expertNum, const aclIntArray *maxOutShape, int64_t tokenDtype,
-    int64_t needSchedule, int64_t layerNum, bool syncFlag, const aclTensor *y, const aclTensor *groupList,
-    const aclTensor *sessionIds, const aclTensor *microBatchIds, const aclTensor *tokenIds,
-    const aclTensor *expertOffsets, const aclTensor *dynamicScale, const aclTensor *actualTokenNum,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* scheduleContext, int64_t expertNum, const aclIntArray* maxOutShape, int64_t tokenDtype,
+    int64_t needSchedule, int64_t layerNum, bool syncFlag, const aclTensor* y, const aclTensor* groupList,
+    const aclTensor* sessionIds, const aclTensor* microBatchIds, const aclTensor* tokenIds,
+    const aclTensor* expertOffsets, const aclTensor* dynamicScale, const aclTensor* actualTokenNum,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /** @brief 执行第一段接口构造的任务。 */
-ACLNN_API aclnnStatus aclnnFfnWorkerBatchingV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnFfnWorkerBatchingV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                aclrtStream stream);
 
 #ifdef __cplusplus

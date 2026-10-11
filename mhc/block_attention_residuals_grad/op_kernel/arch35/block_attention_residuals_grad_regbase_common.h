@@ -64,7 +64,7 @@ __aicore__ inline int32_t ArgFindPowerTwo(int32_t n)
  * Kahan compensated summation over at most REDUCE_FOLD_LANE_NUM lanes,
  * matching the final step of the arch22 ReduceSumHalfInterval helper.
  */
-__aicore__ inline float ReduceSumKahan(const LocalTensor<float> &srcLocal, int32_t count)
+__aicore__ inline float ReduceSumKahan(const LocalTensor<float>& srcLocal, int32_t count)
 {
     float sum = 0.0f;
     float comp = 0.0f;
@@ -78,9 +78,9 @@ __aicore__ inline float ReduceSumKahan(const LocalTensor<float> &srcLocal, int32
 }
 
 /*! buf[0, len) += buf[srcOffset, srcOffset + len), register-level vector fold. */
-__aicore__ inline void AddFoldHalf(const LocalTensor<float> &buf, uint32_t len, uint32_t srcOffset)
+__aicore__ inline void AddFoldHalf(const LocalTensor<float>& buf, uint32_t len, uint32_t srcOffset)
 {
-    __local_mem__ float *bufAddr = (__local_mem__ float *)buf.GetPhyAddr();
+    __local_mem__ float* bufAddr = (__local_mem__ float*)buf.GetPhyAddr();
     const uint16_t repeatTimes = static_cast<uint16_t>((len + kVlFp32 - 1U) / kVlFp32);
     uint32_t sreg = len;
     __VEC_SCOPE__
@@ -103,7 +103,7 @@ __aicore__ inline void AddFoldHalf(const LocalTensor<float> &buf, uint32_t len, 
  * The products are folded with the half-interval tree used by arch22 (tail into
  * head, halve until 64 lanes), then combined with a Kahan summation.
  */
-__aicore__ inline void ReduceMulSumTree(const LocalTensor<float> &dstScalar, const LocalTensor<float> &productBuf,
+__aicore__ inline void ReduceMulSumTree(const LocalTensor<float>& dstScalar, const LocalTensor<float>& productBuf,
                                         uint32_t elemCount, event_t eventSV, event_t eventVS)
 {
     if (elemCount == 0U) {
@@ -135,8 +135,8 @@ __aicore__ inline void ReduceMulSumTree(const LocalTensor<float> &dstScalar, con
  * sumTensorList[outPos] holds the running sum and the other slot the
  * compensation; roles swap after each update (same scheme as arch22).
  */
-__aicore__ inline void KahanSumUpdate(LocalTensor<float> &inputTensor, LocalTensor<float> sumTensorList[2], int32_t len,
-                                      int32_t &outPos)
+__aicore__ inline void KahanSumUpdate(LocalTensor<float>& inputTensor, LocalTensor<float> sumTensorList[2], int32_t len,
+                                      int32_t& outPos)
 {
     LocalTensor<float> sumTensor = sumTensorList[outPos];
     LocalTensor<float> eTensor = sumTensorList[1 - outPos];
@@ -148,12 +148,12 @@ __aicore__ inline void KahanSumUpdate(LocalTensor<float> &inputTensor, LocalTens
 }
 
 /*! sum += src * scalarSrc[0]; plain accumulation to keep the A5 UB footprint small. */
-__aicore__ inline void FusedMulAddAccumulate(const LocalTensor<float> &sum, const LocalTensor<float> &src,
-                                             const LocalTensor<float> &scalarSrc, uint32_t elemCount)
+__aicore__ inline void FusedMulAddAccumulate(const LocalTensor<float>& sum, const LocalTensor<float>& src,
+                                             const LocalTensor<float>& scalarSrc, uint32_t elemCount)
 {
-    __local_mem__ float *sumAddr = (__local_mem__ float *)sum.GetPhyAddr();
-    __local_mem__ float *srcAddr = (__local_mem__ float *)src.GetPhyAddr();
-    __local_mem__ float *scAddr = (__local_mem__ float *)scalarSrc.GetPhyAddr();
+    __local_mem__ float* sumAddr = (__local_mem__ float*)sum.GetPhyAddr();
+    __local_mem__ float* srcAddr = (__local_mem__ float*)src.GetPhyAddr();
+    __local_mem__ float* scAddr = (__local_mem__ float*)scalarSrc.GetPhyAddr();
     uint32_t sreg = elemCount;
     const uint16_t repeatTimes = static_cast<uint16_t>((elemCount + kVlFp32 - 1U) / kVlFp32);
     __VEC_SCOPE__
@@ -173,7 +173,7 @@ __aicore__ inline void FusedMulAddAccumulate(const LocalTensor<float> &sum, cons
 }
 
 /*! Copy one float between compact meta slots without requiring 32B alignment. */
-__aicore__ inline void CopyScalarToDense(const LocalTensor<float> &dst, const LocalTensor<float> &src)
+__aicore__ inline void CopyScalarToDense(const LocalTensor<float>& dst, const LocalTensor<float>& src)
 {
     // DIST_BRC_B32 / DIST_FIRST_ELEMENT_B32 按 32B 块搬运，而 gradProb/probs/
     // gradScore/invRms 都是 4B 步进的紧凑标量槽，非 32B 对齐时会被硬件取整到
@@ -187,15 +187,15 @@ __aicore__ inline void CopyScalarToDense(const LocalTensor<float> &dst, const Lo
  * gradV = gradHiddenState * prob + scoreWeight * sc + vRow * varScale
  * scalarBase[0] = prob, scalarBase[24] = sc, scalarBase[32] = varScale
  */
-__aicore__ inline void FusedGradVF(const LocalTensor<float> &dst, const LocalTensor<float> &gradHiddenState,
-                                   const LocalTensor<float> &vRow, const LocalTensor<float> &scoreWeight,
-                                   const LocalTensor<float> &scalarBase, uint32_t hiddenSize)
+__aicore__ inline void FusedGradVF(const LocalTensor<float>& dst, const LocalTensor<float>& gradHiddenState,
+                                   const LocalTensor<float>& vRow, const LocalTensor<float>& scoreWeight,
+                                   const LocalTensor<float>& scalarBase, uint32_t hiddenSize)
 {
-    __local_mem__ float *dstAddr = (__local_mem__ float *)dst.GetPhyAddr();
-    __local_mem__ float *gradHiddenStateAddr = (__local_mem__ float *)gradHiddenState.GetPhyAddr();
-    __local_mem__ float *vAddr = (__local_mem__ float *)vRow.GetPhyAddr();
-    __local_mem__ float *swAddr = (__local_mem__ float *)scoreWeight.GetPhyAddr();
-    __local_mem__ float *scalarAddr = (__local_mem__ float *)scalarBase.GetPhyAddr();
+    __local_mem__ float* dstAddr = (__local_mem__ float*)dst.GetPhyAddr();
+    __local_mem__ float* gradHiddenStateAddr = (__local_mem__ float*)gradHiddenState.GetPhyAddr();
+    __local_mem__ float* vAddr = (__local_mem__ float*)vRow.GetPhyAddr();
+    __local_mem__ float* swAddr = (__local_mem__ float*)scoreWeight.GetPhyAddr();
+    __local_mem__ float* scalarAddr = (__local_mem__ float*)scalarBase.GetPhyAddr();
 
     // The dual-half path is only enabled when both halves are whole vectors
     // (H is a multiple of 2*kVlFp32). Every other shape, including odd H and
@@ -203,10 +203,10 @@ __aicore__ inline void FusedGradVF(const LocalTensor<float> &dst, const LocalTen
     if ((hiddenSize & (2U * kVlFp32 - 1U)) == 0U) {
         const uint32_t halfCount = hiddenSize >> 1;
         const uint16_t repeatTimes = static_cast<uint16_t>(halfCount / kVlFp32);
-        __local_mem__ float *dstAddr2 = dstAddr + halfCount;
-        __local_mem__ float *gradHiddenStateAddr2 = gradHiddenStateAddr + halfCount;
-        __local_mem__ float *vAddr2 = vAddr + halfCount;
-        __local_mem__ float *swAddr2 = swAddr + halfCount;
+        __local_mem__ float* dstAddr2 = dstAddr + halfCount;
+        __local_mem__ float* gradHiddenStateAddr2 = gradHiddenStateAddr + halfCount;
+        __local_mem__ float* vAddr2 = vAddr + halfCount;
+        __local_mem__ float* swAddr2 = swAddr + halfCount;
         __VEC_SCOPE__
         {
             RegTensor<float> probReg, scReg, varReg;
@@ -259,14 +259,14 @@ __aicore__ inline void FusedGradVF(const LocalTensor<float> &dst, const LocalTen
 }
 
 /*! gradScore = probs*gradProb - probs*scalar, matching _softmax_backward_data. */
-__aicore__ inline void SoftmaxBackwardVf(const LocalTensor<float> &gradScore, const LocalTensor<float> &probs,
-                                         const LocalTensor<float> &gradProb, const LocalTensor<float> &scalar,
+__aicore__ inline void SoftmaxBackwardVf(const LocalTensor<float>& gradScore, const LocalTensor<float>& probs,
+                                         const LocalTensor<float>& gradProb, const LocalTensor<float>& scalar,
                                          uint32_t blockCount)
 {
-    __local_mem__ float *gsAddr = (__local_mem__ float *)gradScore.GetPhyAddr();
-    __local_mem__ float *pAddr = (__local_mem__ float *)probs.GetPhyAddr();
-    __local_mem__ float *gpAddr = (__local_mem__ float *)gradProb.GetPhyAddr();
-    __local_mem__ float *scalarAddr = (__local_mem__ float *)scalar.GetPhyAddr();
+    __local_mem__ float* gsAddr = (__local_mem__ float*)gradScore.GetPhyAddr();
+    __local_mem__ float* pAddr = (__local_mem__ float*)probs.GetPhyAddr();
+    __local_mem__ float* gpAddr = (__local_mem__ float*)gradProb.GetPhyAddr();
+    __local_mem__ float* scalarAddr = (__local_mem__ float*)scalar.GetPhyAddr();
     uint32_t sreg = blockCount;
     const uint16_t repeatTimes = static_cast<uint16_t>((blockCount + kVlFp32 - 1U) / kVlFp32);
     __VEC_SCOPE__

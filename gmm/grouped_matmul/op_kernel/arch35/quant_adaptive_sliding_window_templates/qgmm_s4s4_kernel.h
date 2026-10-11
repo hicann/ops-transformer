@@ -28,8 +28,8 @@ template <class xType, class wType, class biasType, class scaleType, class ptSca
           class wLayout, class yLayout, class l0cType>
 __aicore__ inline void GmmS4S4Kernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR groupList,
                                      GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR user1,
-                                     const GroupedMatmulTilingData::GMMBaseParamsS4S4 *gmmBaseParams,
-                                     const TCubeTiling *mmTilingData, AscendC::TPipe *que)
+                                     const GroupedMatmulTilingData::GMMBaseParamsS4S4* gmmBaseParams,
+                                     const TCubeTiling* mmTilingData, AscendC::TPipe* que)
 {
     using AType = int8_t;
     using BType = int8_t;

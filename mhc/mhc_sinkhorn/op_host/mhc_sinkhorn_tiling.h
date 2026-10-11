@@ -38,7 +38,7 @@ struct MhcSinkhornCompileInfo {
 
 class MhcSinkhornTiling : public MhcSinkhornBaseTiling {
 public:
-    explicit MhcSinkhornTiling(gert::TilingContext *context)
+    explicit MhcSinkhornTiling(gert::TilingContext* context)
         : MhcSinkhornBaseTiling(context)
     {}
 
@@ -81,7 +81,7 @@ private:
     gert::Shape outputShape_;
     ge::DataType xDtype_ = ge::DT_UNDEFINED;
     MhcSinkhornTilingData tilingData_;
-    const char *opName_ = "MhcSinkhorn";
+    const char* opName_ = "MhcSinkhorn";
 };
 } // namespace optiling
 #endif // AIR_CXX_RUNTIME_V2_OP_IMPL_MHC_SINKHORN_TILING_H_

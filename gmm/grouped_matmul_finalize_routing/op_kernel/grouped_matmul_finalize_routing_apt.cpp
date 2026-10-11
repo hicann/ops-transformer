@@ -140,7 +140,7 @@ __global__ __aicore__ void grouped_matmul_finalize_routing(GM_ADDR x, GM_ADDR w,
     REGISTER_TILING_DEFAULT(GMMFinalizeRoutingArch35Tiling::GMMFinalizeRoutingWeightQuantTilingData);
     GET_TILING_DATA_WITH_STRUCT(GMMFinalizeRoutingArch35Tiling::GMMFinalizeRoutingWeightQuantTilingData, tilingData,
                                 tilingGM);
-    const GMMFinalizeRoutingArch35Tiling::GMMFinalizeRoutingWeightQuantTilingData *tiling = &tilingData;
+    const GMMFinalizeRoutingArch35Tiling::GMMFinalizeRoutingWeightQuantTilingData* tiling = &tilingData;
 
     // Use pre-defined MXA8W4_NZNK config for FP8+FP4 MX (Microscaling) format
     // Config values: aTrans=false, bTrans=true, antiQuantType=MX, hasAntiQuantOffset=false, quantType=NONE,

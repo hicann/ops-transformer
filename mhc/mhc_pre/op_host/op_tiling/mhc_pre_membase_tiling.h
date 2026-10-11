@@ -31,13 +31,13 @@
 namespace optiling {
 
 struct TilingRequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct TilingOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 BEGIN_TILING_DATA_DEF(MhcPreMembaseTilingData)
@@ -102,7 +102,7 @@ struct MhcPreMembaseCompileInfo {
 
 class MhcPreTiling {
 public:
-    explicit MhcPreTiling(gert::TilingContext *tilingContext)
+    explicit MhcPreTiling(gert::TilingContext* tilingContext)
         : context_(tilingContext)
     {}
     ~MhcPreTiling() = default;
@@ -112,7 +112,7 @@ public:
     ge::graphStatus GetWorkspaceSize();
     ge::graphStatus PostTiling();
     ge::graphStatus GetAttr();
-    ge::graphStatus GetShapeAttrsInfoInner(int8_t &gammaExist);
+    ge::graphStatus GetShapeAttrsInfoInner(int8_t& gammaExist);
     ge::graphStatus CalcOpTiling();
     ge::graphStatus CalcMembaseOpTiling();
     ge::graphStatus CalcMKSplitCoreMembasePart2Tiling();
@@ -121,7 +121,7 @@ public:
     ge::graphStatus CalcStage1Tiling();
 
 private:
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     uint64_t tilingKey_ = 0;
     MhcPreMembaseTilingData tilingData_;
     uint64_t aivCoreNum_ = 0;

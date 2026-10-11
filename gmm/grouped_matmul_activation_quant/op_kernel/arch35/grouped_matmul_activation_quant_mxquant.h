@@ -27,12 +27,12 @@ namespace {
 constexpr int64_t DEFAULT_PROBLEM_SHAPE_VALUE = 1;
 
 template <typename T>
-__aicore__ inline __gm__ T *GetFirstTensorAddr(GM_ADDR tensorListAddr)
+__aicore__ inline __gm__ T* GetFirstTensorAddr(GM_ADDR tensorListAddr)
 {
     AscendC::GlobalTensor<uint64_t> tensorList;
-    tensorList.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t *>(tensorListAddr));
+    tensorList.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t*>(tensorListAddr));
     const int64_t addressTableOffset = static_cast<int64_t>(tensorList.GetValue(0));
-    return reinterpret_cast<__gm__ T *>(tensorList.GetValue(addressTableOffset >> 3));
+    return reinterpret_cast<__gm__ T*>(tensorList.GetValue(addressTableOffset >> 3));
 }
 } // namespace
 
@@ -44,8 +44,8 @@ __aicore__ inline void GmmActivationMxQuant(GM_ADDR x, GM_ADDR weight, GM_ADDR w
 {
     (void)workspace;
     GET_TILING_DATA_WITH_STRUCT(GMMActivationQuantTilingDataParams, tilingData, tiling);
-    const auto &gmmActivationQuantParams_ = tilingData.gmmActivationQuantParams;
-    const auto &mmTilingData_ = tilingData.mmTilingData;
+    const auto& gmmActivationQuantParams_ = tilingData.gmmActivationQuantParams;
+    const auto& mmTilingData_ = tilingData.mmTilingData;
     using AType = DTYPE_X;
     using BType = DTYPE_WEIGHT;
     using OutputType = DTYPE_Y;

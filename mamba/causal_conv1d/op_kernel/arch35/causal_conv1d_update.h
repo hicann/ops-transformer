@@ -37,11 +37,11 @@ public:
     // ---- Init: 绑定 GM buffer + 分配 UB buffer --------------------------
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates, GM_ADDR bias, GM_ADDR queryStartLoc,
                                 GM_ADDR cacheIndices, GM_ADDR, GM_ADDR numAcceptedTokens, GM_ADDR convStatesOut,
-                                GM_ADDR y, GM_ADDR workspace, const CausalConv1dTilingData *tilingData)
+                                GM_ADDR y, GM_ADDR workspace, const CausalConv1dTilingData* tilingData)
     {
         (void)workspace;
         this->InitGlobalBuffers(x, weight, convStates, bias, queryStartLoc, cacheIndices, y, convStatesOut, tilingData);
-        this->numAcceptedTokensGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(numAcceptedTokens));
+        this->numAcceptedTokensGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(numAcceptedTokens));
         this->InitBuffers(); // 分配 inBuf / outBuf / calcBuf，并初始化 dimBufferSize_
     }
 
@@ -79,7 +79,7 @@ protected:
     // coBatch 语义: 每个 batch 组包含 coBatch 个连续 batch，
     // seqStart/seqEnd 以"组"为单位，batchIdx * coBatch 得到真实 batch 起始。
     template <int32_t kWindowMode>
-    __aicore__ inline bool InitBlock(int64_t &dimStart, int32_t &curBaseDim, int64_t &seqStart, int64_t &seqEnd)
+    __aicore__ inline bool InitBlock(int64_t& dimStart, int32_t& curBaseDim, int64_t& seqStart, int64_t& seqEnd)
     {
         const int64_t dim = this->tilingData_->dim;
         const int64_t batch = this->tilingData_->batch;
@@ -337,7 +337,7 @@ template <typename T, uint32_t inputModeKey, uint32_t widthKey, uint32_t hasBias
 __aicore__ inline void RunCausalConv1dUpdate(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates, GM_ADDR bias,
                                              GM_ADDR queryStartLoc, GM_ADDR cacheIndices, GM_ADDR initialStateMode,
                                              GM_ADDR numAcceptedTokens, GM_ADDR convStatesOut, GM_ADDR y,
-                                             GM_ADDR workspace, const CausalConv1dTilingData *tilingData)
+                                             GM_ADDR workspace, const CausalConv1dTilingData* tilingData)
 {
     CausalConv1dUpdate<T, inputModeKey, widthKey, hasBiasKey, activationKey> op;
     op.Init(x, weight, convStates, bias, queryStartLoc, cacheIndices, initialStateMode, numAcceptedTokens,

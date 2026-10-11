@@ -25,8 +25,8 @@ aclnnStatus AclnnGroupedMatmulNoQuantDAV3510Checker::CheckGroupedMatmulGroupSize
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus AclnnGroupedMatmulNoQuantDAV3510Checker::CheckTensorListLength(const aclTensorList *tensorList,
-                                                                           const char *paramName) const
+aclnnStatus AclnnGroupedMatmulNoQuantDAV3510Checker::CheckTensorListLength(const aclTensorList* tensorList,
+                                                                           const char* paramName) const
 {
     size_t groupSize = 0;
     if (tensorList != nullptr) {

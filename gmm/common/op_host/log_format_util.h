@@ -19,7 +19,7 @@ namespace Transformer {
 namespace Gmm {
 constexpr std::size_t FORMAT_STRING_BUFFER_SIZE = 1024U;
 
-inline std::string FormatString(const char *format, ...)
+inline std::string FormatString(const char* format, ...)
 {
     char buffer[FORMAT_STRING_BUFFER_SIZE] = {};
     va_list args;

@@ -38,11 +38,9 @@ static_assert(sizeof(S8S4TilingData) % sizeof(uint64_t) == 0);
 uint64_t GetExpectedS8S4TilingKey(ge::Format weightFormat, uint64_t cQuantType)
 {
     if (weightFormat == ge::FORMAT_FRACTAL_NZ) {
-        return cQuantType == WQGMM_PER_GROUP ? S8S4_NZ_PERGROUP_TILING_KEY :
-                                              S8S4_NZ_PERCHANNEL_TILING_KEY;
+        return cQuantType == WQGMM_PER_GROUP ? S8S4_NZ_PERGROUP_TILING_KEY : S8S4_NZ_PERCHANNEL_TILING_KEY;
     }
-    return cQuantType == WQGMM_PER_GROUP ? S8S4_ND_PERGROUP_TILING_KEY :
-                                          S8S4_ND_PERCHANNEL_TILING_KEY;
+    return cQuantType == WQGMM_PER_GROUP ? S8S4_ND_PERGROUP_TILING_KEY : S8S4_ND_PERCHANNEL_TILING_KEY;
 }
 
 struct S8S4Case {
@@ -74,19 +72,18 @@ gert::StorageShape EmptyShape()
     return gert::StorageShape();
 }
 
-TensorDescription MakeTensor(const std::vector<int64_t> &shape, ge::DataType dtype,
-                             ge::Format format = ge::FORMAT_ND)
+TensorDescription MakeTensor(const std::vector<int64_t>& shape, ge::DataType dtype, ge::Format format = ge::FORMAT_ND)
 {
     return {ops::ut::MakeGertStorageShape(shape), dtype, format};
 }
 
-TensorDescription MakeTensor(const std::vector<int64_t> &originShape, const std::vector<int64_t> &storageShape,
+TensorDescription MakeTensor(const std::vector<int64_t>& originShape, const std::vector<int64_t>& storageShape,
                              ge::DataType dtype, ge::Format format)
 {
     return {ops::ut::MakeGertStorageShape(originShape, storageShape), dtype, format};
 }
 
-std::vector<OpAttr> MakeAttrs(const S8S4Case &param)
+std::vector<OpAttr> MakeAttrs(const S8S4Case& param)
 {
     return {
         {"split_item", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.splitItem)},
@@ -116,7 +113,7 @@ optiling::GMMCompileInfo MakeCompileInfo()
     };
 }
 
-gert::TilingContextPara MakeContext(const S8S4Case &param, optiling::GMMCompileInfo *compileInfo)
+gert::TilingContextPara MakeContext(const S8S4Case& param, optiling::GMMCompileInfo* compileInfo)
 {
     const std::string socInfoString =
         std::string(R"({"hardware_info":{"BT_SIZE":0,"load3d_constraints":"1",)"
@@ -128,10 +125,9 @@ gert::TilingContextPara MakeContext(const S8S4Case &param, optiling::GMMCompileI
         std::to_string(compileInfo->l0ASize) + R"(,"L0B_SIZE":)" + std::to_string(compileInfo->l0BSize) +
         R"(,"L0C_SIZE":)" + std::to_string(compileInfo->l0CSize) + R"(,"CORE_NUM":)" +
         std::to_string(compileInfo->aicNum) + R"(,"socVersion":"3510"}})";
-    std::vector<int64_t> weightOriginShape =
-        param.specialWeightFormat ?
-            std::vector<int64_t>{param.groupNum, param.n, param.k} :
-            std::vector<int64_t>{param.groupNum, param.k, param.n};
+    std::vector<int64_t> weightOriginShape = param.specialWeightFormat ?
+                                                 std::vector<int64_t>{param.groupNum, param.n, param.k} :
+                                                 std::vector<int64_t>{param.groupNum, param.k, param.n};
     std::vector<int64_t> weightStorageShape = weightOriginShape;
     if (param.weightFormat == ge::FORMAT_FRACTAL_NZ) {
         weightStorageShape =
@@ -149,19 +145,16 @@ gert::TilingContextPara MakeContext(const S8S4Case &param, optiling::GMMCompileI
     }
 
     const gert::StorageShape offsetShape =
-        param.hasOffset
-            ? ops::ut::MakeGertStorageShape(std::vector<int64_t>{param.groupNum, 1, param.n})
-            : EmptyShape();
+        param.hasOffset ? ops::ut::MakeGertStorageShape(std::vector<int64_t>{param.groupNum, 1, param.n}) :
+                          EmptyShape();
     const gert::StorageShape biasShape =
         param.hasBias ? ops::ut::MakeGertStorageShape(std::vector<int64_t>{param.groupNum, param.n}) : EmptyShape();
     const gert::StorageShape antiquantScaleShape =
-        param.hasAntiquantScale
-            ? ops::ut::MakeGertStorageShape(std::vector<int64_t>{param.groupNum, 1, param.n})
-            : EmptyShape();
+        param.hasAntiquantScale ? ops::ut::MakeGertStorageShape(std::vector<int64_t>{param.groupNum, 1, param.n}) :
+                                  EmptyShape();
     const gert::StorageShape antiquantOffsetShape =
-        param.hasAntiquantOffset
-            ? ops::ut::MakeGertStorageShape(std::vector<int64_t>{param.groupNum, 1, param.n})
-            : EmptyShape();
+        param.hasAntiquantOffset ? ops::ut::MakeGertStorageShape(std::vector<int64_t>{param.groupNum, 1, param.n}) :
+                                   EmptyShape();
     std::vector<TensorDescription> inputs = {
         MakeTensor({param.m, param.k}, ge::DT_INT8), // x
         MakeTensor(weightOriginShape, weightStorageShape, param.weightDtype, param.weightFormat),
@@ -171,20 +164,20 @@ gert::TilingContextPara MakeContext(const S8S4Case &param, optiling::GMMCompileI
         inputs.emplace_back(biasShape, ge::DT_FLOAT, ge::FORMAT_ND);
     }
     inputs.insert(inputs.end(), {
-        MakeTensor({param.groupNum, param.scaleGroupNum, param.n}, ge::DT_UINT64), // scale
-        {offsetShape, ge::DT_FLOAT, ge::FORMAT_ND},                                 // offset
-    });
+                                    MakeTensor({param.groupNum, param.scaleGroupNum, param.n}, ge::DT_UINT64), // scale
+                                    {offsetShape, ge::DT_FLOAT, ge::FORMAT_ND},                                // offset
+                                });
     if (param.multiOffset) {
         inputs.emplace_back(offsetShape, ge::DT_FLOAT, ge::FORMAT_ND);
     }
     inputs.insert(inputs.end(), {
-        {antiquantScaleShape, ge::DT_FLOAT, ge::FORMAT_ND},                        // antiquantScale
-        {antiquantOffsetShape, ge::DT_FLOAT, ge::FORMAT_ND},                       // antiquantOffset
-        MakeTensor(param.groupListTypeAttr == 2 ? std::vector<int64_t>{param.groupNum, 2} :
-                                                  std::vector<int64_t>{param.groupNum},
-                   ge::DT_INT64),                                                  // groupList
-        MakeTensor({param.m}, ge::DT_FLOAT),                                       // perTokenScale
-    });
+                                    {antiquantScaleShape, ge::DT_FLOAT, ge::FORMAT_ND},  // antiquantScale
+                                    {antiquantOffsetShape, ge::DT_FLOAT, ge::FORMAT_ND}, // antiquantOffset
+                                    MakeTensor(param.groupListTypeAttr == 2 ? std::vector<int64_t>{param.groupNum, 2} :
+                                                                              std::vector<int64_t>{param.groupNum},
+                                               ge::DT_INT64),            // groupList
+                                    MakeTensor({param.m}, ge::DT_FLOAT), // perTokenScale
+                                });
     std::vector<TensorDescription> outputs = {
         MakeTensor({param.m, param.n}, param.outDtype),
     };
@@ -213,69 +206,65 @@ gert::TilingContextPara MakeContext(const S8S4Case &param, optiling::GMMCompileI
         if (param.hasAntiquantOffset) {
             flatInputs.emplace_back(antiquantOffsetShape, ge::DT_FLOAT, ge::FORMAT_ND);
         }
-        flatInputs.emplace_back(MakeTensor(param.groupListTypeAttr == 2 ?
-                                               std::vector<int64_t>{param.groupNum, 2} :
-                                               std::vector<int64_t>{param.groupNum},
+        flatInputs.emplace_back(MakeTensor(param.groupListTypeAttr == 2 ? std::vector<int64_t>{param.groupNum, 2} :
+                                                                          std::vector<int64_t>{param.groupNum},
                                            ge::DT_INT64));
         flatInputs.emplace_back(MakeTensor({param.m}, ge::DT_FLOAT));
-        const std::vector<uint32_t> inputInstanceNum = {
-            1U, 1U, param.multiBias ? 2U : 1U, 1U,
-            param.hasOffset ? (param.multiOffset ? 2U : 1U) : 0U,
-            param.hasAntiquantScale ? 1U : 0U, param.hasAntiquantOffset ? 1U : 0U, 1U, 1U};
+        const std::vector<uint32_t> inputInstanceNum = {1U,
+                                                        1U,
+                                                        param.multiBias ? 2U : 1U,
+                                                        1U,
+                                                        param.hasOffset ? (param.multiOffset ? 2U : 1U) : 0U,
+                                                        param.hasAntiquantScale ? 1U : 0U,
+                                                        param.hasAntiquantOffset ? 1U : 0U,
+                                                        1U,
+                                                        1U};
         const std::vector<uint32_t> outputInstanceNum = {param.multiOutput ? 2U : 1U};
         return gert::TilingContextPara("GroupedMatmul", flatInputs, outputs, MakeAttrs(param), inputInstanceNum,
                                        outputInstanceNum, compileInfo, "3510", 32, 262144, 4096, socInfoString);
     }
-    return gert::TilingContextPara("GroupedMatmul", inputs, outputs, MakeAttrs(param), compileInfo, "3510", 32,
-                                   262144, 4096, socInfoString);
+    return gert::TilingContextPara("GroupedMatmul", inputs, outputs, MakeAttrs(param), compileInfo, "3510", 32, 262144,
+                                   4096, socInfoString);
 }
 
-bool ExecuteS8S4Tiling(const S8S4Case &param, TilingInfo &tilingInfo)
+bool ExecuteS8S4Tiling(const S8S4Case& param, TilingInfo& tilingInfo)
 {
     auto compileInfo = MakeCompileInfo();
     auto context = MakeContext(param, &compileInfo);
     return ExecuteTiling(context, tilingInfo);
 }
 
-bool ExecuteS8S4TilingWithCompileInfo(
-    const S8S4Case &param, optiling::GMMCompileInfo &compileInfo, TilingInfo &tilingInfo)
+bool ExecuteS8S4TilingWithCompileInfo(const S8S4Case& param, optiling::GMMCompileInfo& compileInfo,
+                                      TilingInfo& tilingInfo)
 {
     auto context = MakeContext(param, &compileInfo);
     return ExecuteTiling(context, tilingInfo);
 }
 
-const S8S4TilingData *GetTilingData(const TilingInfo &tilingInfo)
+const S8S4TilingData* GetTilingData(const TilingInfo& tilingInfo)
 {
     EXPECT_EQ(tilingInfo.tilingDataSize, sizeof(S8S4TilingData));
-    return reinterpret_cast<const S8S4TilingData *>(tilingInfo.tilingData.get());
+    return reinterpret_cast<const S8S4TilingData*>(tilingInfo.tilingData.get());
 }
 
 TEST(GroupedS8S4BasicApiArch35Tiling, ExactTilingKeys)
 {
-    EXPECT_EQ(
-        GET_TPL_TILING_KEY(
-            WQGMM_ND, WQGMM_ANTIQUANT_OFFSET_NOT_EXIST_BIAS_NOT_EXIST, WQGMM_PER_GROUP, WQGMM_NONE,
-            WQGMM_NO_TRANS, WQGMM_NO_TRANS, WQGMM_S8S4_FIXED_TEMPLATE, WQGMM_NOT_SINGLE_MULTI_SINGLE,
-            WQGMM_VDEFAULT, WQGMM_MULTI_SCALE_DEQUANT),
-        S8S4_ND_PERGROUP_TILING_KEY);
-    EXPECT_EQ(
-        GET_TPL_TILING_KEY(
-            WQGMM_ND, WQGMM_ANTIQUANT_OFFSET_NOT_EXIST_BIAS_NOT_EXIST, WQGMM_PER_CHANNEL, WQGMM_NONE,
-            WQGMM_NO_TRANS, WQGMM_NO_TRANS, WQGMM_S8S4_FIXED_TEMPLATE, WQGMM_NOT_SINGLE_MULTI_SINGLE,
-            WQGMM_VDEFAULT, WQGMM_MULTI_SCALE_DEQUANT),
-        S8S4_ND_PERCHANNEL_TILING_KEY);
-    EXPECT_EQ(
-        GET_TPL_TILING_KEY(
-            WQGMM_FRACTAL_NZ, WQGMM_ANTIQUANT_OFFSET_NOT_EXIST_BIAS_NOT_EXIST, WQGMM_PER_GROUP, WQGMM_NONE,
-            WQGMM_NO_TRANS, WQGMM_NO_TRANS, WQGMM_S8S4_FIXED_TEMPLATE, WQGMM_NOT_SINGLE_MULTI_SINGLE,
-            WQGMM_VDEFAULT, WQGMM_MULTI_SCALE_DEQUANT),
-        S8S4_NZ_PERGROUP_TILING_KEY);
-    EXPECT_EQ(
-        GET_TPL_TILING_KEY(
-            WQGMM_FRACTAL_NZ, WQGMM_ANTIQUANT_OFFSET_NOT_EXIST_BIAS_NOT_EXIST, WQGMM_PER_CHANNEL, WQGMM_NONE,
-            WQGMM_NO_TRANS, WQGMM_NO_TRANS, WQGMM_S8S4_FIXED_TEMPLATE, WQGMM_NOT_SINGLE_MULTI_SINGLE,
-            WQGMM_VDEFAULT, WQGMM_MULTI_SCALE_DEQUANT),
-        S8S4_NZ_PERCHANNEL_TILING_KEY);
+    EXPECT_EQ(GET_TPL_TILING_KEY(WQGMM_ND, WQGMM_ANTIQUANT_OFFSET_NOT_EXIST_BIAS_NOT_EXIST, WQGMM_PER_GROUP, WQGMM_NONE,
+                                 WQGMM_NO_TRANS, WQGMM_NO_TRANS, WQGMM_S8S4_FIXED_TEMPLATE,
+                                 WQGMM_NOT_SINGLE_MULTI_SINGLE, WQGMM_VDEFAULT, WQGMM_MULTI_SCALE_DEQUANT),
+              S8S4_ND_PERGROUP_TILING_KEY);
+    EXPECT_EQ(GET_TPL_TILING_KEY(WQGMM_ND, WQGMM_ANTIQUANT_OFFSET_NOT_EXIST_BIAS_NOT_EXIST, WQGMM_PER_CHANNEL,
+                                 WQGMM_NONE, WQGMM_NO_TRANS, WQGMM_NO_TRANS, WQGMM_S8S4_FIXED_TEMPLATE,
+                                 WQGMM_NOT_SINGLE_MULTI_SINGLE, WQGMM_VDEFAULT, WQGMM_MULTI_SCALE_DEQUANT),
+              S8S4_ND_PERCHANNEL_TILING_KEY);
+    EXPECT_EQ(GET_TPL_TILING_KEY(WQGMM_FRACTAL_NZ, WQGMM_ANTIQUANT_OFFSET_NOT_EXIST_BIAS_NOT_EXIST, WQGMM_PER_GROUP,
+                                 WQGMM_NONE, WQGMM_NO_TRANS, WQGMM_NO_TRANS, WQGMM_S8S4_FIXED_TEMPLATE,
+                                 WQGMM_NOT_SINGLE_MULTI_SINGLE, WQGMM_VDEFAULT, WQGMM_MULTI_SCALE_DEQUANT),
+              S8S4_NZ_PERGROUP_TILING_KEY);
+    EXPECT_EQ(GET_TPL_TILING_KEY(WQGMM_FRACTAL_NZ, WQGMM_ANTIQUANT_OFFSET_NOT_EXIST_BIAS_NOT_EXIST, WQGMM_PER_CHANNEL,
+                                 WQGMM_NONE, WQGMM_NO_TRANS, WQGMM_NO_TRANS, WQGMM_S8S4_FIXED_TEMPLATE,
+                                 WQGMM_NOT_SINGLE_MULTI_SINGLE, WQGMM_VDEFAULT, WQGMM_MULTI_SCALE_DEQUANT),
+              S8S4_NZ_PERCHANNEL_TILING_KEY);
 }
 
 TEST(GroupedS8S4BasicApiArch35Tiling, V5SymmetricPergroupUsesProductionRouter)
@@ -285,10 +274,9 @@ TEST(GroupedS8S4BasicApiArch35Tiling, V5SymmetricPergroupUsesProductionRouter)
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, S8S4_ND_PERGROUP_TILING_KEY);
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
-    EXPECT_EQ(tilingData->gmmQuantParams.bQuantMode,
-              static_cast<uint32_t>(optiling::QuantMode::PERGROUP_MODE));
+    EXPECT_EQ(tilingData->gmmQuantParams.bQuantMode, static_cast<uint32_t>(optiling::QuantMode::PERGROUP_MODE));
 }
 
 TEST(GroupedS8S4BasicApiArch35Tiling, MapsA3CompatibleWeightFormatsToNd)
@@ -323,10 +311,9 @@ TEST(GroupedS8S4BasicApiArch35Tiling, V5AsymmetricPerchannelUsesProductionRouter
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, S8S4_ND_PERCHANNEL_TILING_KEY);
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
-    EXPECT_EQ(tilingData->gmmQuantParams.bQuantMode,
-              static_cast<uint32_t>(optiling::QuantMode::PERCHANNEL_MODE));
+    EXPECT_EQ(tilingData->gmmQuantParams.bQuantMode, static_cast<uint32_t>(optiling::QuantMode::PERCHANNEL_MODE));
     EXPECT_EQ(tilingData->mmTilingData.k, 1001U);
 }
 
@@ -340,7 +327,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, V5ApiNormalizedPackedInt32UsesProductionRo
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, S8S4_ND_PERGROUP_TILING_KEY);
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->s8s4Params.weightPackedInt32, 1U);
 }
@@ -353,11 +340,10 @@ TEST(GroupedS8S4BasicApiArch35Tiling, SymmetricPergroupUsesOneQuantGroupPerL1Win
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, GetExpectedS8S4TilingKey(param.weightFormat, WQGMM_PER_GROUP));
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->gmmQuantParams.groupListType, 1);
-    EXPECT_EQ(tilingData->gmmQuantParams.bQuantMode,
-              static_cast<uint32_t>(optiling::QuantMode::PERGROUP_MODE));
+    EXPECT_EQ(tilingData->gmmQuantParams.bQuantMode, static_cast<uint32_t>(optiling::QuantMode::PERGROUP_MODE));
     EXPECT_EQ(tilingData->s8s4Params.quantGroupSize, 256U);
     EXPECT_EQ(tilingData->s8s4Params.quantGroupNum, 4U);
     EXPECT_EQ(tilingData->s8s4Params.dequantMode, 0U);
@@ -388,7 +374,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, AcceptsCountGroupListType)
     S8S4Case param;
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->gmmQuantParams.groupListType, 1);
 }
@@ -413,16 +399,14 @@ TEST(GroupedS8S4BasicApiArch35Tiling, AsymmetricPerchannelUsesOffsetAndTilePipel
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, GetExpectedS8S4TilingKey(param.weightFormat, WQGMM_PER_CHANNEL));
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
-    EXPECT_EQ(tilingData->gmmQuantParams.bQuantMode,
-              static_cast<uint32_t>(optiling::QuantMode::PERCHANNEL_MODE));
+    EXPECT_EQ(tilingData->gmmQuantParams.bQuantMode, static_cast<uint32_t>(optiling::QuantMode::PERCHANNEL_MODE));
     EXPECT_EQ(tilingData->s8s4Params.quantGroupNum, 1U);
     EXPECT_EQ(tilingData->s8s4Params.dequantMode, 1U);
     EXPECT_EQ(tilingData->s8s4Params.hasOffset, 1U);
     EXPECT_EQ(tilingData->s8s4Params.enableWeightPreprocess, 1U);
-    EXPECT_EQ(tilingData->s8s4Params.expandedWeightStrideBytes,
-              static_cast<uint64_t>(param.k * param.n));
+    EXPECT_EQ(tilingData->s8s4Params.expandedWeightStrideBytes, static_cast<uint64_t>(param.k * param.n));
     EXPECT_EQ(tilingData->mmTilingData.baseM, 256U);
     EXPECT_EQ(tilingData->mmTilingData.kAL1, 256U);
     EXPECT_EQ(tilingData->mmTilingData.kBL1, 256U);
@@ -476,7 +460,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, PerchannelNTailsUseLogicalTileAndPhysicalN
 
         TilingInfo tilingInfo;
         ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo)) << "N=" << n;
-        const auto *tilingData = GetTilingData(tilingInfo);
+        const auto* tilingData = GetTilingData(tilingInfo);
         ASSERT_NE(tilingData, nullptr);
         const uint64_t expectedBaseN =
             GroupedMatmul::CeilAlign(static_cast<uint64_t>(n), optiling::GmmConstant::CUBE_BLOCK);
@@ -536,8 +520,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, FixedTileRejectsInsufficientOnChipMemory)
             compileInfo.ubSize = 130UL * 1024UL - 1UL;
         }
         TilingInfo tilingInfo;
-        EXPECT_FALSE(ExecuteS8S4TilingWithCompileInfo(param, compileInfo, tilingInfo))
-            << "resource=" << resource;
+        EXPECT_FALSE(ExecuteS8S4TilingWithCompileInfo(param, compileInfo, tilingInfo)) << "resource=" << resource;
     }
 }
 
@@ -554,7 +537,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, AsymmetricPerchannelNzUsesNzTilingKey)
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, S8S4_NZ_PERCHANNEL_TILING_KEY);
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     constexpr uint64_t expectedStride = 1008UL * 256UL;
     EXPECT_EQ(tilingData->s8s4Params.expandedWeightStrideBytes, expectedStride);
@@ -582,8 +565,8 @@ TEST(GroupedS8S4BasicApiArch35Tiling, PerchannelInt4AndPackedInt32ShareWorkspace
     ASSERT_TRUE(ExecuteS8S4Tiling(packedParam, packedTilingInfo));
     EXPECT_EQ(int4TilingInfo.tilingKey, packedTilingInfo.tilingKey);
     EXPECT_EQ(int4TilingInfo.workspaceSizes, packedTilingInfo.workspaceSizes);
-    const auto *int4TilingData = GetTilingData(int4TilingInfo);
-    const auto *packedTilingData = GetTilingData(packedTilingInfo);
+    const auto* int4TilingData = GetTilingData(int4TilingInfo);
+    const auto* packedTilingData = GetTilingData(packedTilingInfo);
     ASSERT_NE(int4TilingData, nullptr);
     ASSERT_NE(packedTilingData, nullptr);
     EXPECT_EQ(int4TilingData->s8s4Params.expandedWeightStrideBytes,
@@ -600,7 +583,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, Float16WithoutOffsetStillUsesPergroup)
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, GetExpectedS8S4TilingKey(param.weightFormat, WQGMM_PER_GROUP));
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->s8s4Params.dequantMode, 0U);
     EXPECT_EQ(tilingData->s8s4Params.quantGroupNum, 4U);
@@ -614,7 +597,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, PackedInt32KeepsLogicalOriginShape)
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, GetExpectedS8S4TilingKey(param.weightFormat, WQGMM_PER_GROUP));
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->s8s4Params.weightPackedInt32, 1U);
     EXPECT_EQ(tilingData->mmTilingData.k, static_cast<uint32_t>(param.k));
@@ -633,8 +616,8 @@ TEST(GroupedS8S4BasicApiArch35Tiling, Int4AndPackedInt32ShareKeyAndLogicalTiling
     ASSERT_TRUE(ExecuteS8S4Tiling(packedParam, packedTilingInfo));
     EXPECT_EQ(int4TilingInfo.tilingKey, packedTilingInfo.tilingKey);
 
-    const auto *int4TilingData = GetTilingData(int4TilingInfo);
-    const auto *packedTilingData = GetTilingData(packedTilingInfo);
+    const auto* int4TilingData = GetTilingData(int4TilingInfo);
+    const auto* packedTilingData = GetTilingData(packedTilingInfo);
     ASSERT_NE(int4TilingData, nullptr);
     ASSERT_NE(packedTilingData, nullptr);
     EXPECT_EQ(int4TilingData->mmTilingData.m, packedTilingData->mmTilingData.m);
@@ -650,7 +633,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, PackedInt32StorageIsEightToOne)
     param.weightDtype = ge::DT_INT32;
     auto compileInfo = MakeCompileInfo();
     const auto context = MakeContext(param, &compileInfo);
-    const auto &weightShape = context.inputTensorDesc_[1].shape_;
+    const auto& weightShape = context.inputTensorDesc_[1].shape_;
     EXPECT_EQ(weightShape.GetOriginShape().GetDim(2), param.n);
     EXPECT_EQ(weightShape.GetStorageShape().GetDim(2), param.n / 8);
 }
@@ -664,13 +647,13 @@ TEST(GroupedS8S4BasicApiArch35Tiling, PackedInt32NzStorageIsEightToOne)
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, S8S4_NZ_PERGROUP_TILING_KEY);
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->s8s4Params.weightPackedInt32, 1U);
 
     auto compileInfo = MakeCompileInfo();
     const auto context = MakeContext(param, &compileInfo);
-    const auto &storageShape = context.inputTensorDesc_[1].shape_.GetStorageShape();
+    const auto& storageShape = context.inputTensorDesc_[1].shape_.GetStorageShape();
     ASSERT_EQ(storageShape.GetDimNum(), 5U);
     EXPECT_EQ(storageShape.GetDim(1), (param.n + 31) / 32);
     EXPECT_EQ(storageShape.GetDim(2), (param.k + 15) / 16);
@@ -717,12 +700,12 @@ TEST(GroupedS8S4BasicApiArch35Tiling, PerchannelSpecialEnkUsesStandardW8NzWorksp
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, S8S4_NZ_PERCHANNEL_TILING_KEY);
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->s8s4Params.specialWeightFormat, 1U);
     auto compileInfo = MakeCompileInfo();
     const auto context = MakeContext(param, &compileInfo);
-    const auto &storageShape = context.inputTensorDesc_[1].shape_.GetStorageShape();
+    const auto& storageShape = context.inputTensorDesc_[1].shape_.GetStorageShape();
     ASSERT_EQ(storageShape.GetDimNum(), 5U);
     EXPECT_EQ(storageShape.GetDim(1), (param.k + 31) / 32);
     EXPECT_EQ(storageShape.GetDim(2), (param.n + 15) / 16);
@@ -745,7 +728,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, ExpectedTokensKeepRequiredWeightPreprocess
 
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->s8s4Params.expectedTokenNum, 128U);
     EXPECT_EQ(tilingData->s8s4Params.enableWeightPreprocess, 1U);
@@ -790,7 +773,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, AsymmetricPerchannelAcceptsUnalignedLogica
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, S8S4_ND_PERCHANNEL_TILING_KEY);
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->mmTilingData.k, 1001U);
     EXPECT_EQ(tilingData->s8s4Params.quantGroupNum, 1U);
@@ -806,7 +789,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, AsymmetricPerchannelPadsSmallKTilingWindow
 
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteS8S4Tiling(param, tilingInfo));
-    const auto *tilingData = GetTilingData(tilingInfo);
+    const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->mmTilingData.k, 127U);
     EXPECT_EQ(tilingData->mmTilingData.kAL1, 256U);

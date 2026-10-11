@@ -13,11 +13,11 @@
 
 extern "C" {
 ACLNN_API aclnnStatus aclnnFfnWorkerBatchingV2GetWorkspaceSize(
-    const aclTensor *scheduleContext, int64_t expertNum, const aclIntArray *maxOutShape, int64_t tokenDtype,
-    int64_t needSchedule, int64_t layerNum, bool syncFlag, const aclTensor *y, const aclTensor *groupList,
-    const aclTensor *sessionIds, const aclTensor *microBatchIds, const aclTensor *tokenIds,
-    const aclTensor *expertOffsets, const aclTensor *dynamicScale, const aclTensor *actualTokenNum,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* scheduleContext, int64_t expertNum, const aclIntArray* maxOutShape, int64_t tokenDtype,
+    int64_t needSchedule, int64_t layerNum, bool syncFlag, const aclTensor* y, const aclTensor* groupList,
+    const aclTensor* sessionIds, const aclTensor* microBatchIds, const aclTensor* tokenIds,
+    const aclTensor* expertOffsets, const aclTensor* dynamicScale, const aclTensor* actualTokenNum,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     // 只有V2公共接口接收syncFlag。内部接口随OpDef生成，集中处理参数校验、
     // workspace和执行器，不复制scheduleContext，保留内核对调度状态的原地更新。
@@ -26,7 +26,7 @@ ACLNN_API aclnnStatus aclnnFfnWorkerBatchingV2GetWorkspaceSize(
         microBatchIds, tokenIds, expertOffsets, dynamicScale, actualTokenNum, workspaceSize, executor);
 }
 
-ACLNN_API aclnnStatus aclnnFfnWorkerBatchingV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnFfnWorkerBatchingV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                aclrtStream stream)
 {
     return aclnnInnerFfnWorkerBatching(workspace, workspaceSize, executor, stream);

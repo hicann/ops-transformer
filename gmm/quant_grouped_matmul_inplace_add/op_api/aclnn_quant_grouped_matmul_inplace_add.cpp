@@ -44,9 +44,9 @@ extern "C" {
 #endif
 
 namespace {
-constexpr const char *QGMM_INPLACE_ADD_ACLNN_OP_NAME = "aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize";
+constexpr const char* QGMM_INPLACE_ADD_ACLNN_OP_NAME = "aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize";
 
-std::string ShapeToStringWithoutBracket(const op::Shape &shape)
+std::string ShapeToStringWithoutBracket(const op::Shape& shape)
 {
     std::ostringstream oss;
     for (size_t i = 0; i < shape.GetDimNum(); ++i) {
@@ -58,7 +58,7 @@ std::string ShapeToStringWithoutBracket(const op::Shape &shape)
     return oss.str();
 }
 
-std::string ViewShapeToString(const aclTensor *tensor)
+std::string ViewShapeToString(const aclTensor* tensor)
 {
     return "[" + ShapeToStringWithoutBracket(tensor->GetViewShape()) + "]";
 }
@@ -286,7 +286,7 @@ static aclnnStatus CheckParams(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParam
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus SetTransViewShape(const aclTensor *&inputTensor, aclOpExecutor *executor)
+static aclnnStatus SetTransViewShape(const aclTensor*& inputTensor, aclOpExecutor* executor)
 {
     op::Shape viewShape = inputTensor->GetViewShape();
     uint32_t viewShapeDimsNum = viewShape.GetDimNum();
@@ -305,7 +305,7 @@ static aclnnStatus SetTransViewShape(const aclTensor *&inputTensor, aclOpExecuto
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus SetTransViewShapeForPertoken(const aclTensor *&inputTensor, aclOpExecutor *executor)
+static aclnnStatus SetTransViewShapeForPertoken(const aclTensor*& inputTensor, aclOpExecutor* executor)
 {
     op::Shape viewShape = inputTensor->GetViewShape();
     op::Shape shape;
@@ -325,15 +325,15 @@ static aclnnStatus SetTransViewShapeForPertoken(const aclTensor *&inputTensor, a
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus DataContiguous(const aclTensor *&tensor, aclOpExecutor *executor)
+static aclnnStatus DataContiguous(const aclTensor*& tensor, aclOpExecutor* executor)
 {
     tensor = l0op::Contiguous(tensor, executor);
     CHECK_RET(tensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ParamsDataContiguous(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams &params,
-                                        aclOpExecutor *executorPtr)
+static aclnnStatus ParamsDataContiguous(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams& params,
+                                        aclOpExecutor* executorPtr)
 {
     CHECK_COND(DataContiguous(params.x1, executorPtr) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID,
                "Contiguous x1 failed.");
@@ -348,7 +348,7 @@ static aclnnStatus ParamsDataContiguous(QGmmInPlaceAdd::QuantGroupedMatmulInplac
     return ACLNN_SUCCESS;
 }
 
-static bool IsSpecialTranspose(const aclTensor *const inputTensor)
+static bool IsSpecialTranspose(const aclTensor* const inputTensor)
 {
     const auto inputShape = inputTensor->GetViewShape();
     int64_t dim1 = inputShape.GetDimNum() - gmm::LAST_FIRST_DIM_INDEX;
@@ -357,7 +357,7 @@ static bool IsSpecialTranspose(const aclTensor *const inputTensor)
 }
 
 static aclnnStatus aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSizeCommon(
-    QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams params, uint64_t *workspaceSize, aclOpExecutor **executor)
+    QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams params, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     // 固定写法，创建OpExecutor
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
@@ -423,11 +423,11 @@ static aclnnStatus aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSizeCommon(
 
 #undef QGMM_INPLACE_ADD_CHECK_REPORT
 
-aclnnStatus aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize(const aclTensor *x1, const aclTensor *x2,
-                                                              const aclTensor *scale1Optional, const aclTensor *scale2,
-                                                              const aclTensor *groupList, aclTensor *yRef,
+aclnnStatus aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize(const aclTensor* x1, const aclTensor* x2,
+                                                              const aclTensor* scale1Optional, const aclTensor* scale2,
+                                                              const aclTensor* groupList, aclTensor* yRef,
                                                               int64_t groupListType, int64_t groupSize,
-                                                              uint64_t *workspaceSize, aclOpExecutor **executor)
+                                                              uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (!gmm::CheckTensorStorageBounds(x1, QGMM_INPLACE_ADD_ACLNN_OP_NAME, "x1") ||
         !gmm::CheckTensorStorageBounds(x2, QGMM_INPLACE_ADD_ACLNN_OP_NAME, "x2") ||
@@ -445,7 +445,7 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize(const aclTensor *x
     return aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSizeCommon(params, workspaceSize, executor);
 }
 
-aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                               aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnQuantGroupedMatmulInplaceAdd);

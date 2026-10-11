@@ -48,17 +48,17 @@ public:
 
     __aicore__ inline void InitGlobalBuffers(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates, GM_ADDR bias,
                                              GM_ADDR queryStartLoc, GM_ADDR cacheIndices, GM_ADDR y,
-                                             GM_ADDR convStatesOut, const CausalConv1dTilingData *tilingData)
+                                             GM_ADDR convStatesOut, const CausalConv1dTilingData* tilingData)
     {
         ResetRuntimeState(tilingData);
-        this->xGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(x));
-        this->weightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(weight));
-        this->biasGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(bias));
-        this->convStatesGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(convStates));
-        this->convStatesOutGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(convStatesOut));
-        this->queryStartLocGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(queryStartLoc));
-        this->cacheIndicesGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(cacheIndices));
-        this->yGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(y));
+        this->xGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(x));
+        this->weightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(weight));
+        this->biasGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(bias));
+        this->convStatesGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(convStates));
+        this->convStatesOutGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(convStatesOut));
+        this->queryStartLocGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(queryStartLoc));
+        this->cacheIndicesGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(cacheIndices));
+        this->yGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(y));
     }
 
 protected:
@@ -67,7 +67,7 @@ protected:
     static constexpr bool kHasActivation = (activationKey != 0);
     static constexpr uint32_t kUbBlockSize = 32;
 
-    __aicore__ inline void ResetRuntimeState(const CausalConv1dTilingData *tilingData)
+    __aicore__ inline void ResetRuntimeState(const CausalConv1dTilingData* tilingData)
     {
         this->tilingData_ = tilingData;
     }
@@ -111,13 +111,13 @@ protected:
         const int32_t dimBufSize = this->dimBufferSize_;
         const int32_t baseDimLocal = baseDim;
         const int32_t rowStrideSrc = dimBufSize * static_cast<int32_t>(sizeof(float) / sizeof(T));
-        __ubuf__ T *weightSrc = reinterpret_cast<__ubuf__ T *>(weightF.GetPhyAddr()) + this->weightBiasOffset_;
-        __ubuf__ float *weightDst = (__ubuf__ float *)weightF.GetPhyAddr();
-        __ubuf__ T *biasSrc = nullptr;
-        __ubuf__ float *biasDst = nullptr;
+        __ubuf__ T* weightSrc = reinterpret_cast<__ubuf__ T*>(weightF.GetPhyAddr()) + this->weightBiasOffset_;
+        __ubuf__ float* weightDst = (__ubuf__ float*)weightF.GetPhyAddr();
+        __ubuf__ T* biasSrc = nullptr;
+        __ubuf__ float* biasDst = nullptr;
         if constexpr (kHasBias) {
-            biasSrc = reinterpret_cast<__ubuf__ T *>(biasF.GetPhyAddr()) + this->weightBiasOffset_;
-            biasDst = (__ubuf__ float *)biasF.GetPhyAddr();
+            biasSrc = reinterpret_cast<__ubuf__ T*>(biasF.GetPhyAddr()) + this->weightBiasOffset_;
+            biasDst = (__ubuf__ float*)biasF.GetPhyAddr();
         }
 
         __VEC_SCOPE__
@@ -156,8 +156,8 @@ protected:
     {
         const int64_t dim = this->tilingData_->dim;
         const int32_t width = static_cast<int32_t>(this->tilingData_->kernelWidth);
-        LocalTensor<float> &weightCalc = this->pool_.weight;
-        LocalTensor<float> &biasCalc = this->pool_.bias;
+        LocalTensor<float>& weightCalc = this->pool_.weight;
+        LocalTensor<float>& biasCalc = this->pool_.bias;
         LocalTensor<T> weightDma;
         LocalTensor<T> biasDma;
 
@@ -210,18 +210,18 @@ protected:
                                                uint32_t dataCount)
     {
         const uint16_t ringSize = static_cast<uint16_t>(kTemplateWidth + 1);
-        __ubuf__ T *ringAddr = reinterpret_cast<__ubuf__ T *>(ring.GetPhyAddr());
-        __ubuf__ float *weightAddr = reinterpret_cast<__ubuf__ float *>(weight.GetPhyAddr());
-        __ubuf__ float *biasAddr = reinterpret_cast<__ubuf__ float *>(bias.GetPhyAddr());
-        __ubuf__ T *outAddr = reinterpret_cast<__ubuf__ T *>(out.GetPhyAddr());
-        __ubuf__ T *ring0 = ringAddr + static_cast<int32_t>((static_cast<uint16_t>(t) + 0) % ringSize) * baseDim;
-        __ubuf__ T *ring1 = ringAddr + static_cast<int32_t>((static_cast<uint16_t>(t) + 1) % ringSize) * baseDim;
-        __ubuf__ T *ring2 = ringAddr + static_cast<int32_t>((static_cast<uint16_t>(t) + 2) % ringSize) * baseDim;
-        __ubuf__ T *ring3 = ringAddr + static_cast<int32_t>((static_cast<uint16_t>(t) + 3) % ringSize) * baseDim;
-        __ubuf__ float *wPtr0 = weightAddr + static_cast<int32_t>(0) * baseDim;
-        __ubuf__ float *wPtr1 = weightAddr + static_cast<int32_t>(1) * baseDim;
-        __ubuf__ float *wPtr2 = weightAddr + static_cast<int32_t>(2) * baseDim;
-        __ubuf__ float *wPtr3 = weightAddr + static_cast<int32_t>(3) * baseDim;
+        __ubuf__ T* ringAddr = reinterpret_cast<__ubuf__ T*>(ring.GetPhyAddr());
+        __ubuf__ float* weightAddr = reinterpret_cast<__ubuf__ float*>(weight.GetPhyAddr());
+        __ubuf__ float* biasAddr = reinterpret_cast<__ubuf__ float*>(bias.GetPhyAddr());
+        __ubuf__ T* outAddr = reinterpret_cast<__ubuf__ T*>(out.GetPhyAddr());
+        __ubuf__ T* ring0 = ringAddr + static_cast<int32_t>((static_cast<uint16_t>(t) + 0) % ringSize) * baseDim;
+        __ubuf__ T* ring1 = ringAddr + static_cast<int32_t>((static_cast<uint16_t>(t) + 1) % ringSize) * baseDim;
+        __ubuf__ T* ring2 = ringAddr + static_cast<int32_t>((static_cast<uint16_t>(t) + 2) % ringSize) * baseDim;
+        __ubuf__ T* ring3 = ringAddr + static_cast<int32_t>((static_cast<uint16_t>(t) + 3) % ringSize) * baseDim;
+        __ubuf__ float* wPtr0 = weightAddr + static_cast<int32_t>(0) * baseDim;
+        __ubuf__ float* wPtr1 = weightAddr + static_cast<int32_t>(1) * baseDim;
+        __ubuf__ float* wPtr2 = weightAddr + static_cast<int32_t>(2) * baseDim;
+        __ubuf__ float* wPtr3 = weightAddr + static_cast<int32_t>(3) * baseDim;
         __VEC_SCOPE__
         {
             RegTensor<T> ringTmp;
@@ -272,10 +272,10 @@ protected:
         if constexpr (kTemplateWidth >= 2 && kTemplateWidth <= 4) {
             ComputeConv1dUnroll(ring, weight, bias, out, baseDim, t, colLoopTimes, dataCount);
         } else {
-            __ubuf__ T *ringAddr = reinterpret_cast<__ubuf__ T *>(ring.GetPhyAddr());
-            __ubuf__ float *weightAddr = reinterpret_cast<__ubuf__ float *>(weight.GetPhyAddr());
-            __ubuf__ float *biasAddr = reinterpret_cast<__ubuf__ float *>(bias.GetPhyAddr());
-            __ubuf__ T *outAddr = reinterpret_cast<__ubuf__ T *>(out.GetPhyAddr());
+            __ubuf__ T* ringAddr = reinterpret_cast<__ubuf__ T*>(ring.GetPhyAddr());
+            __ubuf__ float* weightAddr = reinterpret_cast<__ubuf__ float*>(weight.GetPhyAddr());
+            __ubuf__ float* biasAddr = reinterpret_cast<__ubuf__ float*>(bias.GetPhyAddr());
+            __ubuf__ T* outAddr = reinterpret_cast<__ubuf__ T*>(out.GetPhyAddr());
             const int32_t kernelWidth = kTemplateWidth;
             const uint16_t ringSize = static_cast<uint16_t>(kernelWidth + 1);
             __VEC_SCOPE__
@@ -381,8 +381,8 @@ protected:
     }
 
     template <int32_t kWindowMode>
-    __aicore__ inline void GetSeqWindow(int32_t groupIdx, int64_t seqLen, int32_t coBatch, int64_t &curSeqStart,
-                                        int64_t &curSeqEnd) const
+    __aicore__ inline void GetSeqWindow(int32_t groupIdx, int64_t seqLen, int32_t coBatch, int64_t& curSeqStart,
+                                        int64_t& curSeqEnd) const
     {
         if constexpr (kWindowMode == SEQ_PARTITION_MODE_VARLEN) {
             curSeqStart = this->queryStartLocGm_.GetValue(groupIdx);
@@ -396,7 +396,7 @@ protected:
     // 查询 batchId 对应的物理 cache slot，用于多请求复用 conv_states 的场景。
     // cacheIndices 是 1D tensor，shape (batch,)，每个元素告知对应 batch 读哪个 slot。
     // 当 cacheIndices[batchId] == nullBlockId 时返回 false，表示该 batch 为填充位应跳过。
-    __aicore__ inline bool ResolveBatchCacheIndex(int32_t batchId, bool hasCacheIndices, int32_t &cacheIdx) const
+    __aicore__ inline bool ResolveBatchCacheIndex(int32_t batchId, bool hasCacheIndices, int32_t& cacheIdx) const
     {
         cacheIdx = batchId;
         if (!hasCacheIndices) {
@@ -416,7 +416,7 @@ protected:
         return hasInitialStateMode ? (this->initialStateModeGm_.GetValue(batchId) != 0) : false;
     }
 
-    __aicore__ inline const CausalConv1dTilingData *GetTilingData() const
+    __aicore__ inline const CausalConv1dTilingData* GetTilingData() const
     {
         return tilingData_;
     }
@@ -439,7 +439,7 @@ protected:
     GlobalTensor<int32_t> numAcceptedTokensGm_;
     GlobalTensor<T> yGm_;
 
-    const CausalConv1dTilingData *tilingData_{nullptr};
+    const CausalConv1dTilingData* tilingData_{nullptr};
 
     int32_t dimBufferSize_{0};
     int32_t weightBiasOffset_{0};

@@ -18,9 +18,9 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(QuantGroupedMatmulInplaceAdd);
 
-aclTensor *QuantGroupedMatmulInplaceAdd(const aclTensor *x1, const aclTensor *x2, const aclTensor *scale1Optional,
-                                        const aclTensor *scale2, const aclTensor *groupList, aclTensor *yRef,
-                                        int64_t groupListType, int64_t groupSize, aclOpExecutor *executor)
+aclTensor* QuantGroupedMatmulInplaceAdd(const aclTensor* x1, const aclTensor* x2, const aclTensor* scale1Optional,
+                                        const aclTensor* scale2, const aclTensor* groupList, aclTensor* yRef,
+                                        int64_t groupListType, int64_t groupSize, aclOpExecutor* executor)
 {
     L0_DFX(QuantGroupedMatmulInplaceAdd, x1, x2, scale1Optional, scale2, groupList, yRef);
     auto ret = INFER_SHAPE(QuantGroupedMatmulInplaceAdd, OP_INPUT(x1, x2, scale2, groupList, yRef, scale1Optional),

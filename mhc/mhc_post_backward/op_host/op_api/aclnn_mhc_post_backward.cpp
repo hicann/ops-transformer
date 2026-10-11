@@ -50,20 +50,20 @@ static const int64_t D_MAX = 100000;
 static const int64_t N_VALUE = 4;
 
 struct MhcPostBackwardParams {
-    const aclTensor *gradOutput = nullptr;
-    const aclTensor *x = nullptr;
-    const aclTensor *hRes = nullptr;
-    const aclTensor *hOut = nullptr;
-    const aclTensor *hPost = nullptr;
-    aclTensor *gradX = nullptr;
-    aclTensor *gradHres = nullptr;
-    aclTensor *gradHout = nullptr;
-    aclTensor *gradHpost = nullptr;
+    const aclTensor* gradOutput = nullptr;
+    const aclTensor* x = nullptr;
+    const aclTensor* hRes = nullptr;
+    const aclTensor* hOut = nullptr;
+    const aclTensor* hPost = nullptr;
+    aclTensor* gradX = nullptr;
+    aclTensor* gradHres = nullptr;
+    aclTensor* gradHout = nullptr;
+    aclTensor* gradHpost = nullptr;
 };
 
-static aclnnStatus CheckNotNull(const aclTensor *gradOutput, const aclTensor *x, const aclTensor *hRes,
-                                const aclTensor *hOut, const aclTensor *hPost, aclTensor *gradX, aclTensor *gradHres,
-                                aclTensor *gradHout, aclTensor *gradHpost)
+static aclnnStatus CheckNotNull(const aclTensor* gradOutput, const aclTensor* x, const aclTensor* hRes,
+                                const aclTensor* hOut, const aclTensor* hPost, aclTensor* gradX, aclTensor* gradHres,
+                                aclTensor* gradHout, aclTensor* gradHpost)
 {
     CHECK_COND(gradOutput != nullptr, ACLNN_ERR_PARAM_NULLPTR, "gradOutput must not be nullptr.");
     CHECK_COND(x != nullptr, ACLNN_ERR_PARAM_NULLPTR, "x must not be nullptr.");
@@ -81,7 +81,7 @@ static aclnnStatus CheckNotNull(const aclTensor *gradOutput, const aclTensor *x,
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckDtype(const MhcPostBackwardParams &params)
+static aclnnStatus CheckDtype(const MhcPostBackwardParams& params)
 {
     // x , gradOutput: FP16 or BF16
     const std::initializer_list<op::DataType> SupportDtypeList = {op::DataType::DT_FLOAT16, op::DataType::DT_BF16};
@@ -137,7 +137,7 @@ static aclnnStatus CheckDimD(int64_t dimD)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckShape3D(const MhcPostBackwardParams &params)
+static aclnnStatus CheckShape3D(const MhcPostBackwardParams& params)
 {
     // x shape: [T, n, D]
     auto xDim0 = params.x->GetViewShape().GetDim(DIM_IDX_0);
@@ -237,7 +237,7 @@ static aclnnStatus CheckShape3D(const MhcPostBackwardParams &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckShape4D(const MhcPostBackwardParams &params)
+static aclnnStatus CheckShape4D(const MhcPostBackwardParams& params)
 {
     // x shape: [B, S, n, D]
     auto xDim0 = params.x->GetViewShape().GetDim(DIM_IDX_0);
@@ -365,7 +365,7 @@ static aclnnStatus CheckShape4D(const MhcPostBackwardParams &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckShape(const MhcPostBackwardParams &params)
+static aclnnStatus CheckShape(const MhcPostBackwardParams& params)
 {
     auto gradOutputDimNum = params.gradOutput->GetViewShape().GetDimNum();
     auto xDimNum = params.x->GetViewShape().GetDimNum();
@@ -445,7 +445,7 @@ static aclnnStatus CheckShape(const MhcPostBackwardParams &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckFormat(const MhcPostBackwardParams &params)
+static aclnnStatus CheckFormat(const MhcPostBackwardParams& params)
 {
     op::Format gradOutputFormat = params.gradOutput->GetStorageFormat();
     op::Format xFormat = params.x->GetStorageFormat();
@@ -467,7 +467,7 @@ static aclnnStatus CheckFormat(const MhcPostBackwardParams &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckParam(const MhcPostBackwardParams &params)
+static aclnnStatus CheckParam(const MhcPostBackwardParams& params)
 {
     CHECK_COND(CheckFormat(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "invalid format.");
     CHECK_COND(CheckDtype(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "invalid dtype.");
@@ -476,10 +476,10 @@ static aclnnStatus CheckParam(const MhcPostBackwardParams &params)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMhcPostBackwardGetWorkspaceSize(const aclTensor *gradOutput, const aclTensor *x, const aclTensor *hRes,
-                                                 const aclTensor *hOut, const aclTensor *hPost, aclTensor *gradX,
-                                                 aclTensor *gradHres, aclTensor *gradHout, aclTensor *gradHpost,
-                                                 uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnMhcPostBackwardGetWorkspaceSize(const aclTensor* gradOutput, const aclTensor* x, const aclTensor* hRes,
+                                                 const aclTensor* hOut, const aclTensor* hPost, aclTensor* gradX,
+                                                 aclTensor* gradHres, aclTensor* gradHout, aclTensor* gradHpost,
+                                                 uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnMhcPostBackward, DFX_IN(gradOutput, x, hRes, hOut, hPost),
                    DFX_OUT(gradX, gradHres, gradHout, gradHpost));
@@ -499,17 +499,17 @@ aclnnStatus aclnnMhcPostBackwardGetWorkspaceSize(const aclTensor *gradOutput, co
     // Create OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-    aclTensor *outGradX = nullptr;
-    aclTensor *outGradHres = nullptr;
-    aclTensor *outGradHout = nullptr;
-    aclTensor *outGradHpost = nullptr;
+    aclTensor* outGradX = nullptr;
+    aclTensor* outGradHres = nullptr;
+    aclTensor* outGradHout = nullptr;
+    aclTensor* outGradHpost = nullptr;
 
     // Convert input tensors to contiguous
     auto reformatedGradOutput = l0op::Contiguous(gradOutput, uniqueExecutor.get());
     CHECK_COND(reformatedGradOutput != nullptr, ACLNN_ERR_INNER_NULLPTR, "reformatedGradOutput Contiguous failed.");
     auto reformatedX = l0op::Contiguous(x, uniqueExecutor.get());
     CHECK_COND(reformatedX != nullptr, ACLNN_ERR_INNER_NULLPTR, "x Contiguous failed.");
-    const aclTensor *reformatedHRes = nullptr;
+    const aclTensor* reformatedHRes = nullptr;
     if (hRes != nullptr) {
         reformatedHRes = l0op::Contiguous(hRes, uniqueExecutor.get());
         CHECK_COND(reformatedHRes != nullptr, ACLNN_ERR_INNER_NULLPTR, "hRes Contiguous failed.");
@@ -551,7 +551,7 @@ aclnnStatus aclnnMhcPostBackwardGetWorkspaceSize(const aclTensor *gradOutput, co
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMhcPostBackward(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMhcPostBackward(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMhcPostBackward);
     auto ret = CommonOpExecutorRun(workspace, workspaceSize, executor, stream);

@@ -12,7 +12,11 @@
 import numpy as np
 
 try:
-    from ttk.utilities.dtypes import numpy_bfloat16, numpy_to_torch_tensor, torch_to_numpy_tensor
+    from ttk.utilities.dtypes import (
+        numpy_bfloat16,
+        numpy_to_torch_tensor,
+        torch_to_numpy_tensor,
+    )
 except ImportError:
     numpy_bfloat16 = None
     numpy_to_torch_tensor = None
@@ -62,7 +66,9 @@ def _to_output(value, template, use_torch=False):
             result = torch.as_tensor(value, device=template.device)
         except TypeError:
             # PyTorch cannot construct a tensor directly from NumPy's custom BF16 dtype.
-            result = torch.as_tensor(np.asarray(value, dtype=np.float32), device=template.device)
+            result = torch.as_tensor(
+                np.asarray(value, dtype=np.float32), device=template.device
+            )
         return result.to(dtype=template.dtype)
     if isinstance(template, np.ndarray):
         return np.asarray(value).astype(template.dtype, copy=False)
@@ -78,7 +84,9 @@ def _fill_tensor(tensor, value):
     if tensor is None:
         return
     if isinstance(tensor, np.ndarray):
-        tensor[...] = np.asarray(value, dtype=np.float32).astype(tensor.dtype, copy=False)
+        tensor[...] = np.asarray(value, dtype=np.float32).astype(
+            tensor.dtype, copy=False
+        )
         return
     tensor.fill_(value)
 
@@ -95,8 +103,17 @@ def _empty_outputs():
     return [np.empty((0,), dtype=np.float32) for _ in range(5)]
 
 
-def _compute(x, phi, alpha, bias, hc_mult=4, num_iters=20, hc_eps=1e-6,
-             norm_eps=1e-6, need_backward=True):
+def _compute(
+    x,
+    phi,
+    alpha,
+    bias,
+    hc_mult=4,
+    num_iters=20,
+    hc_eps=1e-6,
+    norm_eps=1e-6,
+    need_backward=True,
+):
     x_np = _to_numpy(x)
     x_dtype = x_np.dtype
     x_f32 = x_np.astype(np.float32)
@@ -116,18 +133,21 @@ def _compute(x, phi, alpha, bias, hc_mult=4, num_iters=20, hc_eps=1e-6,
     hc_before_norm = np.matmul(flat_x, phi_f32.T)
     normalized = hc_before_norm * inv_rms
 
-    h_pre = _sigmoid(normalized[..., :hc_mult] * alpha_f32[0] + bias_f32[:hc_mult]) + hc_eps
+    h_pre = (
+        _sigmoid(normalized[..., :hc_mult] * alpha_f32[0] + bias_f32[:hc_mult]) + hc_eps
+    )
     h_post = 2.0 * _sigmoid(
-        normalized[..., hc_mult:2 * hc_mult] * alpha_f32[1]
-        + bias_f32[hc_mult:2 * hc_mult]
+        normalized[..., hc_mult : 2 * hc_mult] * alpha_f32[1]
+        + bias_f32[hc_mult : 2 * hc_mult]
     )
     residual_logits = (
-        normalized[..., 2 * hc_mult:] * alpha_f32[2]
-        + bias_f32[2 * hc_mult:]
+        normalized[..., 2 * hc_mult :] * alpha_f32[2] + bias_f32[2 * hc_mult :]
     ).reshape(*batch_shape, hc_mult, hc_mult)
 
     sum_out = np.empty((2 * num_iters, *batch_shape, hc_mult), dtype=np.float32)
-    norm_out = np.empty((2 * num_iters, *batch_shape, hc_mult, hc_mult), dtype=np.float32)
+    norm_out = np.empty(
+        (2 * num_iters, *batch_shape, hc_mult, hc_mult), dtype=np.float32
+    )
     row_max = np.max(residual_logits, axis=-1, keepdims=True)
     row_exp = np.exp(residual_logits - row_max)
     row_sum = np.sum(row_exp, axis=-1)
@@ -173,12 +193,22 @@ def _compute(x, phi, alpha, bias, hc_mult=4, num_iters=20, hc_eps=1e-6,
     )
 
 
-def mhc_pre_sinkhorn_golden(x, phi, alpha, bias, hc_mult=4, num_iters=20,
-                            hc_eps=1e-6, norm_eps=1e-6, need_backward=True,
-                            **kwargs):
+def mhc_pre_sinkhorn_golden(
+    x,
+    phi,
+    alpha,
+    bias,
+    hc_mult=4,
+    num_iters=20,
+    hc_eps=1e-6,
+    norm_eps=1e-6,
+    need_backward=True,
+    **kwargs,
+):
     del kwargs
-    return _compute(x, phi, alpha, bias, hc_mult, num_iters, hc_eps,
-                    norm_eps, need_backward)
+    return _compute(
+        x, phi, alpha, bias, hc_mult, num_iters, hc_eps, norm_eps, need_backward
+    )
 
 
 def mhc_pre_sinkhorn_input(x, phi, alpha, bias, hc_mult=4, **kwargs):
@@ -188,20 +218,63 @@ def mhc_pre_sinkhorn_input(x, phi, alpha, bias, hc_mult=4, **kwargs):
 
 
 def aclnn_mhc_pre_sinkhorn_golden(
-    x, phi, alpha, bias, hcMult, numIters, hcEps, normEps, needBackward,
-    hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut, **kwargs
+    x,
+    phi,
+    alpha,
+    bias,
+    hcMult,
+    numIters,
+    hcEps,
+    normEps,
+    needBackward,
+    hin,
+    hPost,
+    hRes,
+    hPre,
+    hcBeforeNorm,
+    invRms,
+    sumOut,
+    normOut,
+    **kwargs,
 ):
     use_torch = kwargs.get("use_torch", False)
-    result = _compute(x, phi, alpha, bias, int(hcMult), int(numIters),
-                      float(hcEps), float(normEps), bool(needBackward))
+    result = _compute(
+        x,
+        phi,
+        alpha,
+        bias,
+        int(hcMult),
+        int(numIters),
+        float(hcEps),
+        float(normEps),
+        bool(needBackward),
+    )
     templates = (hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut)
-    return tuple(_to_output(value, template, use_torch)
-                 for value, template in zip(result, templates))
+    return tuple(
+        _to_output(value, template, use_torch)
+        for value, template in zip(result, templates)
+    )
 
 
 def aclnn_mhc_pre_sinkhorn_input(
-    x, phi, alpha, bias, hcMult, numIters, hcEps, normEps, needBackward,
-    hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut, **kwargs
+    x,
+    phi,
+    alpha,
+    bias,
+    hcMult,
+    numIters,
+    hcEps,
+    normEps,
+    needBackward,
+    hin,
+    hPost,
+    hRes,
+    hPre,
+    hcBeforeNorm,
+    invRms,
+    sumOut,
+    normOut,
+    **kwargs,
 ):
     del numIters, hcEps, normEps, needBackward, hin, hPost, hRes
     del hPre, hcBeforeNorm, invRms, sumOut, normOut, kwargs

@@ -168,12 +168,12 @@ ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::ParseInputAndAttr()
 
     auto attr = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attr); // check attr is not null
-    const int64_t *dequantModePtr = attr->GetAttrPointer<int64_t>(ATTR_INDEX_DEQUANT_MODE);
+    const int64_t* dequantModePtr = attr->GetAttrPointer<int64_t>(ATTR_INDEX_DEQUANT_MODE);
     auto dequantMode = dequantModePtr != nullptr ? *dequantModePtr : 0;
     OP_CHECK_IF(!(dequantMode == 0 || dequantMode == 1),
                 OP_LOGE(context_->GetNodeName(), "dequantMode must be 0 or 1, but actual value is %ld.", dequantMode),
                 return ge::GRAPH_FAILED);
-    const int64_t *groupListTypePtr = attr->GetAttrPointer<int64_t>(ATTR_INDEX_GROUPLIST_TYPE);
+    const int64_t* groupListTypePtr = attr->GetAttrPointer<int64_t>(ATTR_INDEX_GROUPLIST_TYPE);
     groupListType_ = groupListTypePtr != nullptr ? *groupListTypePtr : 0;
     OP_CHECK_IF(
         !(groupListType_ == 0 || groupListType_ == 1),
@@ -208,7 +208,7 @@ ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::ParseInputAndAttr()
     }
     const auto tuningConfigPtr = attr->GetAttrPointer<gert::ContinuousVector>(ATTR_INDEX_TUNING_CONFIG);
     tuningConfig_ = tuningConfigPtr != nullptr && tuningConfigPtr->GetSize() > 1 ?
-                        (reinterpret_cast<const int64_t *>(tuningConfigPtr->GetData()))[0] :
+                        (reinterpret_cast<const int64_t*>(tuningConfigPtr->GetData()))[0] :
                         0;
 
     if (isA4W4_) {
@@ -226,7 +226,7 @@ ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::ParseInputAndAttr()
         }
     }
 
-    const bool *transposeWeightPtr = attr->GetAttrPointer<bool>(ATTR_INDEX_TRANSPOSE_WEIGHT);
+    const bool* transposeWeightPtr = attr->GetAttrPointer<bool>(ATTR_INDEX_TRANSPOSE_WEIGHT);
     isWeightTrans_ = transposeWeightPtr != nullptr ? *transposeWeightPtr : false;
 
     if (dequantMode == 1) { // perGroup量化模式：单tensor场景[E, KGroupCount, N]，多tensor场景[KGroupCount, N]
@@ -247,7 +247,7 @@ ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::ParseInputAndAttr()
     return ge::GRAPH_SUCCESS;
 }
 
-int32_t GroupedMatmulSwigluQuantV2BaseTiling::FindBestSingleN(const uint32_t &aicNum, int64_t baseM,
+int32_t GroupedMatmulSwigluQuantV2BaseTiling::FindBestSingleN(const uint32_t& aicNum, int64_t baseM,
                                                               int64_t baseN) const
 {
     uint64_t quantGroupNum = quantGroupNum_;
@@ -302,8 +302,8 @@ bool GroupedMatmulSwigluQuantV2BaseTiling::TryFullLoadA(int32_t baseM, int64_t b
     return false;
 }
 
-ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::DynamicTilingSingleN(const gert::TilingContext *context,
-                                                                           const uint32_t &aicNum, int64_t baseM,
+ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::DynamicTilingSingleN(const gert::TilingContext* context,
+                                                                           const uint32_t& aicNum, int64_t baseM,
                                                                            int64_t baseN, int64_t baseK)
 {
     // get info
@@ -495,7 +495,7 @@ ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::PostTiling()
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
     context_->SetBlockDim(blockDim_);
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     OP_CHECK_IF(workspaces == nullptr, OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(), "workspaces is null"),
                 return ge::GRAPH_FAILED);
     workspaces[0] = workspaceSize_;

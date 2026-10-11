@@ -47,7 +47,7 @@ template <typename ComputeType>
 class GMMAntiquantProcess : public GMMProcess<ComputeType> {
 public:
     /** @brief constructor */
-    __aicore__ inline GMMAntiquantProcess(ComputeType &computeOp_)
+    __aicore__ inline GMMAntiquantProcess(ComputeType& computeOp_)
         : GMMProcess<ComputeType>(computeOp_)
     {}
 
@@ -56,19 +56,19 @@ public:
 protected:
     constexpr static bool antiquantPerformance = ComputeType::antiquantPerformanceFlag;
 
-    __aicore__ inline void ProcessCommon(MNConfig &mnConfig, CastWeightConfig &castConfig, uint32_t groupIdx,
-                                         uint32_t &count, uint32_t coreNum, uint32_t listIndex = 0);
+    __aicore__ inline void ProcessCommon(MNConfig& mnConfig, CastWeightConfig& castConfig, uint32_t groupIdx,
+                                         uint32_t& count, uint32_t coreNum, uint32_t listIndex = 0);
     __aicore__ inline void SetAntiquantMNConfig(const uint64_t singleWorkSpaceSize, const uint32_t curBlock,
-                                                bool &validCore, CastWeightConfig &castConfig, MNConfig &mnConfig);
-    __aicore__ inline void SetAntiquantCastConfig(uint32_t &curCount, MNConfig mnConfig, CastWeightConfig &castConfig);
-    __aicore__ inline void AntiquantUpdateSingleM(MNConfig &mnConfig, uint32_t &dimM, uint32_t dimN);
+                                                bool& validCore, CastWeightConfig& castConfig, MNConfig& mnConfig);
+    __aicore__ inline void SetAntiquantCastConfig(uint32_t& curCount, MNConfig mnConfig, CastWeightConfig& castConfig);
+    __aicore__ inline void AntiquantUpdateSingleM(MNConfig& mnConfig, uint32_t& dimM, uint32_t dimN);
 };
 
 template <typename ComputeType>
 __aicore__ inline void GMMAntiquantProcess<ComputeType>::SetAntiquantMNConfig(const uint64_t singleWorkSpaceSize,
-                                                                              const uint32_t curBlock, bool &validCore,
-                                                                              CastWeightConfig &castConfig,
-                                                                              MNConfig &mnConfig)
+                                                                              const uint32_t curBlock, bool& validCore,
+                                                                              CastWeightConfig& castConfig,
+                                                                              MNConfig& mnConfig)
 {
     mnConfig.workSpaceOffset = castConfig.workSpaceIdx * singleWorkSpaceSize;
     castConfig.workSpaceIdx = castConfig.workSpaceIdx == 0 ? 1 : 0; // next round use another workspace
@@ -89,8 +89,8 @@ __aicore__ inline void GMMAntiquantProcess<ComputeType>::SetAntiquantMNConfig(co
 }
 
 template <typename ComputeType>
-__aicore__ inline void GMMAntiquantProcess<ComputeType>::SetAntiquantCastConfig(uint32_t &curCount, MNConfig mnConfig,
-                                                                                CastWeightConfig &castConfig)
+__aicore__ inline void GMMAntiquantProcess<ComputeType>::SetAntiquantCastConfig(uint32_t& curCount, MNConfig mnConfig,
+                                                                                CastWeightConfig& castConfig)
 {
     if (mnConfig.blockDimM > 0 && mnConfig.blockDimN > 0) {
         // 16M and 10M is obtained by tests. When N is greater than 5120, the cache uses 10 MB for better performance
@@ -106,7 +106,7 @@ __aicore__ inline void GMMAntiquantProcess<ComputeType>::SetAntiquantCastConfig(
 }
 
 template <typename ComputeType>
-__aicore__ inline void GMMAntiquantProcess<ComputeType>::AntiquantUpdateSingleM(MNConfig &mnConfig, uint32_t &dimM,
+__aicore__ inline void GMMAntiquantProcess<ComputeType>::AntiquantUpdateSingleM(MNConfig& mnConfig, uint32_t& dimM,
                                                                                 uint32_t dimN)
 {
     if (dimM > 1 && dimN < this->gmmBaseParams->coreNum) {
@@ -143,8 +143,8 @@ __aicore__ inline void GMMAntiquantProcess<ComputeType>::Process()
 
 // for split core
 template <typename ComputeType>
-__aicore__ inline void GMMAntiquantProcess<ComputeType>::ProcessCommon(MNConfig &mnConfig, CastWeightConfig &castConfig,
-                                                                       uint32_t groupIdx, uint32_t &count,
+__aicore__ inline void GMMAntiquantProcess<ComputeType>::ProcessCommon(MNConfig& mnConfig, CastWeightConfig& castConfig,
+                                                                       uint32_t groupIdx, uint32_t& count,
                                                                        uint32_t coreNum, uint32_t listIndex)
 {
     bool validCore = true;
@@ -202,29 +202,29 @@ public:
     constexpr static bool transposeW = mmType::BT::isTrans;
     constexpr static bool antiquantPerformanceFlag = antiquantPerformance;
 
-    __aicore__ inline GMMAntiquantCompute(typename mmType::MT &mm_)
+    __aicore__ inline GMMAntiquantCompute(typename mmType::MT& mm_)
         : GMMCompute<mmType, sync>(mm_)
     {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR offset,
                                 GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR groupList,
                                 GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                const GMMBaseParams *__restrict gmmBaseParams,
-                                const TCubeTiling *__restrict mmTilingData, TPipe *tPipe);
+                                const GMMBaseParams* __restrict gmmBaseParams,
+                                const TCubeTiling* __restrict mmTilingData, TPipe* tPipe);
 
-    __aicore__ inline void PreCompute(uint32_t groupIdx, uint32_t coreIdx, MNConfig &mnConfig,
-                                      CastWeightConfig &castConfig);
+    __aicore__ inline void PreCompute(uint32_t groupIdx, uint32_t coreIdx, MNConfig& mnConfig,
+                                      CastWeightConfig& castConfig);
 
     __aicore__ inline void MMSync();
 
 private:
-    __aicore__ inline void CastWeightProcess(MNConfig &mnConfig, CastWeightConfig &castConfig);
+    __aicore__ inline void CastWeightProcess(MNConfig& mnConfig, CastWeightConfig& castConfig);
     __aicore__ inline void SetAntiQuantGlobalBuffer(uint32_t groupIdx, const MNConfig mnConfig);
     __aicore__ inline void SetGmToUbDataCopyParams(const uint32_t curBaseN, const uint32_t curBaseK,
-                                                   const MNConfig &mnConfig, DataCopyExtParams &intriParams);
+                                                   const MNConfig& mnConfig, DataCopyExtParams& intriParams);
     __aicore__ inline void SetUbToGmDataCopyParams(const uint32_t curBaseN, const uint32_t alignRowLen,
-                                                   const uint32_t curBaseK, const MNConfig &mnConfig,
-                                                   DataCopyExtParams &intriParams);
+                                                   const uint32_t curBaseK, const MNConfig& mnConfig,
+                                                   DataCopyExtParams& intriParams);
     __aicore__ inline void CastWeightCompute(uint32_t curCalcK, uint32_t curCalcAlignN);
     __aicore__ inline void DataCopyScaleAndOffset(uint32_t curBaseN, uint32_t alignBaseN, uint64_t realScaleOffset);
     __aicore__ inline void DataCopyScale(uint32_t curBaseN, uint32_t alignBaseN, uint64_t scaleOffset);
@@ -232,8 +232,8 @@ private:
     __aicore__ inline void PerTokenDequant(uint32_t curBaseM, uint32_t alignBaseN);
     __aicore__ inline void SetPerTokenQuantRefreshedBuffer(const MNConfig mnConfig);
     __aicore__ inline void ComputeUbBaseK(uint32_t curSingleK, uint32_t offsetK, uint32_t newBaseK,
-                                          uint32_t &curUsedGroupSize, uint32_t &curBaseK);
-    __aicore__ inline void FreeScaleAndOffset(bool &firstLoop);
+                                          uint32_t& curUsedGroupSize, uint32_t& curBaseK);
+    __aicore__ inline void FreeScaleAndOffset(bool& firstLoop);
 
     GlobalTensor<int8_t> weightAntiQuantGm;
     GM_ADDR antiScaleTensorPtr;
@@ -258,7 +258,7 @@ template <class mmType, bool sync, bool antiquantPerformance>
 __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::Init(
     GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR offset, GM_ADDR antiquantScale,
     GM_ADDR antiquantOffset, GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-    const GMMBaseParams *__restrict gmmBaseParams, const TCubeTiling *__restrict mmTilingData, TPipe *tPipe)
+    const GMMBaseParams* __restrict gmmBaseParams, const TCubeTiling* __restrict mmTilingData, TPipe* tPipe)
 {
     this->GMMCompute<mmType, sync>::Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList,
                                          perTokenScale, y, workspace, gmmBaseParams, mmTilingData, tPipe);
@@ -266,7 +266,7 @@ __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::
     antiOffsetTensorPtr = antiquantOffset;
     perGroupSize = gmmBaseParams->quantParam;
     isPerGroup = perGroupSize > 0;
-    this->weightGm.SetGlobalBuffer((__gm__ BT *)workspace);
+    this->weightGm.SetGlobalBuffer((__gm__ BT*)workspace);
     uint32_t maxUbBaseN = BEST_UB_BASEN;
     if constexpr (transposeW) {
         maxUbBaseN = this->ubBaseN;
@@ -284,8 +284,8 @@ __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::
 template <class mmType, bool sync, bool antiquantPerformance>
 __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::PreCompute(uint32_t groupIdx,
                                                                                            uint32_t coreIdx,
-                                                                                           MNConfig &mnConfig,
-                                                                                           CastWeightConfig &castConfig)
+                                                                                           MNConfig& mnConfig,
+                                                                                           CastWeightConfig& castConfig)
 {
     if constexpr (!antiquantPerformance) {
         if (this->subBlockIdx != 0) {
@@ -363,7 +363,7 @@ __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::
 
 template <class mmType, bool sync, bool antiquantPerformance>
 __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::ComputeUbBaseK(
-    uint32_t curSingleK, uint32_t offsetK, uint32_t newBaseK, uint32_t &curUsedGroupSize, uint32_t &curBaseK)
+    uint32_t curSingleK, uint32_t offsetK, uint32_t newBaseK, uint32_t& curUsedGroupSize, uint32_t& curBaseK)
 {
     if (unlikely(offsetK + newBaseK >= curUsedGroupSize)) {
         curBaseK = curUsedGroupSize - offsetK;
@@ -379,7 +379,7 @@ __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::
 }
 
 template <class mmType, bool sync, bool antiquantPerformance>
-__aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::FreeScaleAndOffset(bool &firstLoop)
+__aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::FreeScaleAndOffset(bool& firstLoop)
 {
     if (firstLoop) {
         firstLoop = false;
@@ -391,12 +391,12 @@ __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::
 
 template <class mmType, bool sync, bool antiquantPerformance>
 __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::CastWeightProcess(
-    MNConfig &mnConfig, CastWeightConfig &castConfig)
+    MNConfig& mnConfig, CastWeightConfig& castConfig)
 {
     uint64_t wInOffset = castConfig.wInNOffset + static_cast<uint64_t>(castConfig.wInKOffset) * mnConfig.n;
-    const uint32_t &curSingleK = castConfig.curSingleK;
-    const uint32_t &curSingleN = castConfig.curSingleN;
-    const uint32_t &scaleOffset = castConfig.tailN;
+    const uint32_t& curSingleK = castConfig.curSingleK;
+    const uint32_t& curSingleN = castConfig.curSingleN;
+    const uint32_t& scaleOffset = castConfig.tailN;
     uint32_t newBaseK = this->ubBaseK;
     uint32_t newBaseN = this->ubBaseN;
     uint32_t usedGroupSize = mnConfig.k;
@@ -518,7 +518,7 @@ __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::
 
 template <class mmType, bool sync, bool antiquantPerformance>
 __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::SetGmToUbDataCopyParams(
-    const uint32_t curBaseN, const uint32_t curBaseK, const MNConfig &mnConfig, DataCopyExtParams &intriParams)
+    const uint32_t curBaseN, const uint32_t curBaseK, const MNConfig& mnConfig, DataCopyExtParams& intriParams)
 {
     if constexpr (transposeW) {
         intriParams.blockLen = Ceil(curBaseK * GetTypeBits<WT>(), INT8_BITS);
@@ -535,8 +535,8 @@ __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::
 
 template <class mmType, bool sync, bool antiquantPerformance>
 __aicore__ inline void GMMAntiquantCompute<mmType, sync, antiquantPerformance>::SetUbToGmDataCopyParams(
-    const uint32_t curBaseN, const uint32_t alignRowLen, const uint32_t curBaseK, const MNConfig &mnConfig,
-    DataCopyExtParams &intriParams)
+    const uint32_t curBaseN, const uint32_t alignRowLen, const uint32_t curBaseK, const MNConfig& mnConfig,
+    DataCopyExtParams& intriParams)
 {
     if constexpr (transposeW) {
         uint32_t alignBaseK = AlignUp(curBaseK, UB_BLOCK_UNIT_SIZE);
@@ -585,7 +585,7 @@ template <typename ComputeType>
 class GMMAntiquantSparseProcess : public GMMAntiquantProcess<ComputeType> {
 public:
     /** @brief constructor */
-    __aicore__ inline GMMAntiquantSparseProcess(ComputeType &computeOp_)
+    __aicore__ inline GMMAntiquantSparseProcess(ComputeType& computeOp_)
         : GMMAntiquantProcess<ComputeType>(computeOp_){};
 
     __aicore__ inline void Process();

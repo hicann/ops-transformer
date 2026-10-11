@@ -58,12 +58,14 @@ struct TensorDescParam {
     ge::Format format = ge::FORMAT_ND;
     TensorDescParam() = default;
     TensorDescParam(vector<int64_t> o, vector<int64_t> s, ge::DataType d, ge::Format f)
-        : originDims(std::move(o)), storageDims(std::move(s)), dtype(d), format(f)
-    {
-    }
+        : originDims(std::move(o)),
+          storageDims(std::move(s)),
+          dtype(d),
+          format(f)
+    {}
 };
 
-vector<string> ParseTensorSpecs(const string &value)
+vector<string> ParseTensorSpecs(const string& value)
 {
     const string trimmed = Trim(value);
     if (trimmed.empty() || trimmed == "NONE") {
@@ -71,23 +73,23 @@ vector<string> ParseTensorSpecs(const string &value)
     }
     vector<string> specs;
     SplitStr2Vec(trimmed, ";", specs);
-    for (auto &spec : specs) {
+    for (auto& spec : specs) {
         spec = Trim(spec);
     }
     return specs;
 }
 
-vector<int64_t> ParseDims(const string &value, const map<string, int64_t> &symbols = {})
+vector<int64_t> ParseDims(const string& value, const map<string, int64_t>& symbols = {})
 {
     return ops::ut::ParseDims(value, symbols);
 }
 
-vector<int64_t> ParseIntList(const string &value, const map<string, int64_t> &symbols = {})
+vector<int64_t> ParseIntList(const string& value, const map<string, int64_t>& symbols = {})
 {
     return ParseDims(value, symbols);
 }
 
-ge::DataType ParseDtype(const string &dtype)
+ge::DataType ParseDtype(const string& dtype)
 {
     const auto parsed = ops::ut::ParseGeDtype(dtype);
     if (parsed == ge::DT_UNDEFINED && Trim(dtype) != "UNDEFINED") {
@@ -96,12 +98,12 @@ ge::DataType ParseDtype(const string &dtype)
     return parsed;
 }
 
-ge::Format ParseFormat(const string &format)
+ge::Format ParseFormat(const string& format)
 {
     return ops::ut::ParseGeFormat(format);
 }
 
-map<string, int64_t> BuildSymbols(const RawTensorFields &xFields, const RawTensorFields &weightFields, bool transposeX,
+map<string, int64_t> BuildSymbols(const RawTensorFields& xFields, const RawTensorFields& weightFields, bool transposeX,
                                   bool transposeWeight)
 {
     map<string, int64_t> symbols;
@@ -150,13 +152,13 @@ map<string, int64_t> BuildSymbols(const RawTensorFields &xFields, const RawTenso
     return symbols;
 }
 
-TensorDescParam ParseTensorDesc(const RawTensorFields &rawFields, const map<string, int64_t> &symbols)
+TensorDescParam ParseTensorDesc(const RawTensorFields& rawFields, const map<string, int64_t>& symbols)
 {
     return {ParseDims(rawFields.origin, symbols), ParseDims(rawFields.storage, symbols), ParseDtype(rawFields.dtype),
             ParseFormat(rawFields.format)};
 }
 
-platform_ascendc::SocVersion ParseSocVersion(const string &socVersion)
+platform_ascendc::SocVersion ParseSocVersion(const string& socVersion)
 {
     const string trimmed = Trim(socVersion);
     if (trimmed == "Ascend950") {
@@ -168,7 +170,7 @@ platform_ascendc::SocVersion ParseSocVersion(const string &socVersion)
     return platform_ascendc::SocVersion::ASCEND910B;
 }
 
-NpuArch ParseNpuArch(const string &socVersion)
+NpuArch ParseNpuArch(const string& socVersion)
 {
     const string trimmed = Trim(socVersion);
     return trimmed == "Ascend950" ? NpuArch::DAV_3510 : NpuArch::DAV_2201;
@@ -238,7 +240,7 @@ struct GroupedMatmulTilingCase {
                                   tuningConfig.empty() ? vector<int64_t>{0} : tuningConfig)},
         };
 
-        auto runTest = [&](gert::TilingContextPara &para) {
+        auto runTest = [&](gert::TilingContextPara& para) {
             ExecuteTestCase(para, expectSuccess ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED,
                             expectSuccess ? expectTilingKey : 0);
         };
@@ -246,7 +248,7 @@ struct GroupedMatmulTilingCase {
         if (hasMultiInstance) {
             vector<gert::TilingContextPara::TensorDescription> flatInputDescs;
             for (size_t i = 0; i < kInputTensorCount; ++i) {
-                for (const auto &tensor : inputs[i]) {
+                for (const auto& tensor : inputs[i]) {
                     flatInputDescs.emplace_back(BuildTensorDesc(tensor));
                 }
             }
@@ -272,13 +274,13 @@ struct GroupedMatmulTilingCase {
     }
 
 private:
-    static gert::TilingContextPara::TensorDescription BuildTensorDesc(const TensorDescParam &tensor)
+    static gert::TilingContextPara::TensorDescription BuildTensorDesc(const TensorDescParam& tensor)
     {
         return {ops::ut::MakeGertStorageShape(tensor.originDims, tensor.storageDims), tensor.dtype, tensor.format};
     }
 };
 
-vector<GroupedMatmulTilingCase> LoadCases(const string &socVersion)
+vector<GroupedMatmulTilingCase> LoadCases(const string& socVersion)
 {
     vector<GroupedMatmulTilingCase> cases;
 
@@ -362,8 +364,8 @@ vector<GroupedMatmulTilingCase> LoadCases(const string &socVersion)
                     tc.inputs[tensorIdx] = {};
                 } else {
                     for (size_t specIdx = 0; specIdx < originSpecs.size(); ++specIdx) {
-                        const string &originSpec = originSpecs[specIdx];
-                        const string &storageSpec = specIdx < storageSpecs.size() ? storageSpecs[specIdx] : originSpec;
+                        const string& originSpec = originSpecs[specIdx];
+                        const string& storageSpec = specIdx < storageSpecs.size() ? storageSpecs[specIdx] : originSpec;
                         tc.inputs[tensorIdx].emplace_back(
                             ParseDims(originSpec, symbols), ParseDims(storageSpec, symbols),
                             ParseDtype(rawInputs[tensorIdx].dtype), ParseFormat(rawInputs[tensorIdx].format));
@@ -372,7 +374,7 @@ vector<GroupedMatmulTilingCase> LoadCases(const string &socVersion)
             }
             tc.output = ParseTensorDesc(rawOutput, symbols);
             cases.push_back(tc);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
@@ -380,7 +382,7 @@ vector<GroupedMatmulTilingCase> LoadCases(const string &socVersion)
     return cases;
 }
 
-string MakeParamName(const testing::TestParamInfo<GroupedMatmulTilingCase> &info)
+string MakeParamName(const testing::TestParamInfo<GroupedMatmulTilingCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.socVersion + "_" + info.param.prefix);
 }
@@ -392,13 +394,13 @@ namespace GroupedMatmulTilingUT {
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TestGroupedMatmulAscend950Tiling);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TestGroupedMatmulAscend910BTiling);
 
-const vector<GroupedMatmulTilingCase> &GetAscend950Cases()
+const vector<GroupedMatmulTilingCase>& GetAscend950Cases()
 {
     static const vector<GroupedMatmulTilingCase> cases = LoadCases("Ascend950");
     return cases;
 }
 
-const vector<GroupedMatmulTilingCase> &GetAscend910BCases()
+const vector<GroupedMatmulTilingCase>& GetAscend910BCases()
 {
     static const vector<GroupedMatmulTilingCase> cases = LoadCases("Ascend910B");
     return cases;

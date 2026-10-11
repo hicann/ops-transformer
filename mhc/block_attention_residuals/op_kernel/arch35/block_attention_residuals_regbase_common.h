@@ -55,14 +55,14 @@ __aicore__ inline bool CanSplitAlignedDual(uint32_t hiddenSize)
 
 /*! UB→UB 精确拷贝，按 RegBase VL 自动分段，支持 BF16/FP16/FP32 与任意元素数。 */
 template <typename T>
-__aicore__ inline void CopyLocalExact(const LocalTensor<T> &dst, const LocalTensor<T> &src, uint32_t count)
+__aicore__ inline void CopyLocalExact(const LocalTensor<T>& dst, const LocalTensor<T>& src, uint32_t count)
 {
     if (count == 0U) {
         return;
     }
     constexpr uint32_t vl = AscendC::VECTOR_REG_WIDTH / static_cast<uint32_t>(sizeof(T));
-    __local_mem__ T *dstAddr = (__local_mem__ T *)dst.GetPhyAddr();
-    __local_mem__ T *srcAddr = (__local_mem__ T *)src.GetPhyAddr();
+    __local_mem__ T* dstAddr = (__local_mem__ T*)dst.GetPhyAddr();
+    __local_mem__ T* srcAddr = (__local_mem__ T*)src.GetPhyAddr();
     uint32_t sreg = count;
     const uint16_t repeatTimes = static_cast<uint16_t>((count + vl - 1U) / vl);
     __VEC_SCOPE__
@@ -82,19 +82,19 @@ __aicore__ inline void CopyLocalExact(const LocalTensor<T> &dst, const LocalTens
  * even H：半分双发；odd H：单路。
  */
 template <typename D_IN>
-__aicore__ inline void WeightedMulAddFromB16(const LocalTensor<float> &outFp32, const LocalTensor<D_IN> &srcB16,
-                                             const LocalTensor<float> &brcOneBlock, uint32_t hiddenSize)
+__aicore__ inline void WeightedMulAddFromB16(const LocalTensor<float>& outFp32, const LocalTensor<D_IN>& srcB16,
+                                             const LocalTensor<float>& brcOneBlock, uint32_t hiddenSize)
 {
-    __local_mem__ D_IN *srcAddr = (__local_mem__ D_IN *)srcB16.GetPhyAddr();
-    __local_mem__ float *dstAddr = (__local_mem__ float *)outFp32.GetPhyAddr();
-    __local_mem__ float *brcAddr = (__local_mem__ float *)brcOneBlock.GetPhyAddr();
+    __local_mem__ D_IN* srcAddr = (__local_mem__ D_IN*)srcB16.GetPhyAddr();
+    __local_mem__ float* dstAddr = (__local_mem__ float*)outFp32.GetPhyAddr();
+    __local_mem__ float* brcAddr = (__local_mem__ float*)brcOneBlock.GetPhyAddr();
 
     if (CanSplitAlignedDual<D_IN>(hiddenSize)) {
         const uint32_t halfCount = hiddenSize >> 1;
         uint32_t sreg = halfCount;
         const uint16_t repeatTimes = static_cast<uint16_t>((halfCount + kVlFp32 - 1U) / kVlFp32);
-        __local_mem__ D_IN *srcAddr2 = srcAddr + halfCount;
-        __local_mem__ float *dstAddr2 = dstAddr + halfCount;
+        __local_mem__ D_IN* srcAddr2 = srcAddr + halfCount;
+        __local_mem__ float* dstAddr2 = dstAddr + halfCount;
 
         __VEC_SCOPE__
         {
@@ -163,11 +163,11 @@ __aicore__ inline void WeightedMulAddFromB16(const LocalTensor<float> &outFp32, 
 
 /*! BF16/FP16 → FP32，半分双发写入 dstFp32 */
 template <typename D_IN>
-__aicore__ inline void CastB16ToFp32Dual(const LocalTensor<float> &dstFp32, const LocalTensor<D_IN> &srcB16,
+__aicore__ inline void CastB16ToFp32Dual(const LocalTensor<float>& dstFp32, const LocalTensor<D_IN>& srcB16,
                                          uint32_t hiddenSize)
 {
-    __local_mem__ D_IN *srcAddr = (__local_mem__ D_IN *)srcB16.GetPhyAddr();
-    __local_mem__ float *dstAddr = (__local_mem__ float *)dstFp32.GetPhyAddr();
+    __local_mem__ D_IN* srcAddr = (__local_mem__ D_IN*)srcB16.GetPhyAddr();
+    __local_mem__ float* dstAddr = (__local_mem__ float*)dstFp32.GetPhyAddr();
 
     if constexpr (IsSameType<D_IN, float>::value) {
         // fp32 直拷：DataCopy 计数需 32B 整段（8 float），尾部由 RoundUpFp32 覆盖（缓冲按 8 对齐分配）
@@ -179,8 +179,8 @@ __aicore__ inline void CastB16ToFp32Dual(const LocalTensor<float> &dstFp32, cons
         const uint32_t halfCount = hiddenSize >> 1;
         uint32_t sreg = halfCount;
         const uint16_t repeatTimes = static_cast<uint16_t>((halfCount + kVlFp32 - 1U) / kVlFp32);
-        __local_mem__ D_IN *srcAddr2 = srcAddr + halfCount;
-        __local_mem__ float *dstAddr2 = dstAddr + halfCount;
+        __local_mem__ D_IN* srcAddr2 = srcAddr + halfCount;
+        __local_mem__ float* dstAddr2 = dstAddr + halfCount;
         __VEC_SCOPE__
         {
             RegTensor<D_IN> xIn0, xIn1;
@@ -216,11 +216,11 @@ __aicore__ inline void CastB16ToFp32Dual(const LocalTensor<float> &dstFp32, cons
 
 /*! FP32 → BF16/FP16 CAST_RINT，半分双发 */
 template <typename D_OUT>
-__aicore__ inline void CastFp32ToB16Dual(const LocalTensor<D_OUT> &dstB16, const LocalTensor<float> &srcFp32,
+__aicore__ inline void CastFp32ToB16Dual(const LocalTensor<D_OUT>& dstB16, const LocalTensor<float>& srcFp32,
                                          uint32_t hiddenSize)
 {
-    __local_mem__ float *srcAddr = (__local_mem__ float *)srcFp32.GetPhyAddr();
-    __local_mem__ D_OUT *dstAddr = (__local_mem__ D_OUT *)dstB16.GetPhyAddr();
+    __local_mem__ float* srcAddr = (__local_mem__ float*)srcFp32.GetPhyAddr();
+    __local_mem__ D_OUT* dstAddr = (__local_mem__ D_OUT*)dstB16.GetPhyAddr();
 
     if constexpr (IsSameType<D_OUT, float>::value) {
         // fp32 直拷：DataCopy 计数需 32B 整段（8 float），尾部由 RoundUpFp32 覆盖（缓冲按 8 对齐分配）
@@ -232,8 +232,8 @@ __aicore__ inline void CastFp32ToB16Dual(const LocalTensor<D_OUT> &dstB16, const
         const uint32_t halfCount = hiddenSize >> 1;
         uint32_t sreg = halfCount;
         const uint16_t repeatTimes = static_cast<uint16_t>((halfCount + kVlFp32 - 1U) / kVlFp32);
-        __local_mem__ float *srcAddr2 = srcAddr + halfCount;
-        __local_mem__ D_OUT *dstAddr2 = dstAddr + halfCount;
+        __local_mem__ float* srcAddr2 = srcAddr + halfCount;
+        __local_mem__ D_OUT* dstAddr2 = dstAddr + halfCount;
         __VEC_SCOPE__
         {
             RegTensor<float> x0, x1;
@@ -268,16 +268,16 @@ __aicore__ inline void CastFp32ToB16Dual(const LocalTensor<D_OUT> &dstB16, const
 }
 
 /*! dst = src * src（半分双发） */
-__aicore__ inline void MulSquareDual(const LocalTensor<float> &dst, const LocalTensor<float> &src, uint32_t hiddenSize)
+__aicore__ inline void MulSquareDual(const LocalTensor<float>& dst, const LocalTensor<float>& src, uint32_t hiddenSize)
 {
-    __local_mem__ float *srcAddr = (__local_mem__ float *)src.GetPhyAddr();
-    __local_mem__ float *dstAddr = (__local_mem__ float *)dst.GetPhyAddr();
+    __local_mem__ float* srcAddr = (__local_mem__ float*)src.GetPhyAddr();
+    __local_mem__ float* dstAddr = (__local_mem__ float*)dst.GetPhyAddr();
     if (CanSplitAlignedDual<float>(hiddenSize)) {
         const uint32_t halfCount = hiddenSize >> 1;
         uint32_t sreg = halfCount;
         const uint16_t repeatTimes = static_cast<uint16_t>((halfCount + kVlFp32 - 1U) / kVlFp32);
-        __local_mem__ float *srcAddr2 = srcAddr + halfCount;
-        __local_mem__ float *dstAddr2 = dstAddr + halfCount;
+        __local_mem__ float* srcAddr2 = srcAddr + halfCount;
+        __local_mem__ float* dstAddr2 = dstAddr + halfCount;
         __VEC_SCOPE__
         {
             RegTensor<float> x0, x1, y0, y1;
@@ -310,19 +310,19 @@ __aicore__ inline void MulSquareDual(const LocalTensor<float> &dst, const LocalT
 }
 
 /*! dst = src0 * src1（半分双发） */
-__aicore__ inline void MulDual(const LocalTensor<float> &dst, const LocalTensor<float> &src0,
-                               const LocalTensor<float> &src1, uint32_t hiddenSize)
+__aicore__ inline void MulDual(const LocalTensor<float>& dst, const LocalTensor<float>& src0,
+                               const LocalTensor<float>& src1, uint32_t hiddenSize)
 {
-    __local_mem__ float *aAddr = (__local_mem__ float *)src0.GetPhyAddr();
-    __local_mem__ float *bAddr = (__local_mem__ float *)src1.GetPhyAddr();
-    __local_mem__ float *dstAddr = (__local_mem__ float *)dst.GetPhyAddr();
+    __local_mem__ float* aAddr = (__local_mem__ float*)src0.GetPhyAddr();
+    __local_mem__ float* bAddr = (__local_mem__ float*)src1.GetPhyAddr();
+    __local_mem__ float* dstAddr = (__local_mem__ float*)dst.GetPhyAddr();
     if (CanSplitAlignedDual<float>(hiddenSize)) {
         const uint32_t halfCount = hiddenSize >> 1;
         uint32_t sreg = halfCount;
         const uint16_t repeatTimes = static_cast<uint16_t>((halfCount + kVlFp32 - 1U) / kVlFp32);
-        __local_mem__ float *aAddr2 = aAddr + halfCount;
-        __local_mem__ float *bAddr2 = bAddr + halfCount;
-        __local_mem__ float *dstAddr2 = dstAddr + halfCount;
+        __local_mem__ float* aAddr2 = aAddr + halfCount;
+        __local_mem__ float* bAddr2 = bAddr + halfCount;
+        __local_mem__ float* dstAddr2 = dstAddr + halfCount;
         __VEC_SCOPE__
         {
             RegTensor<float> a0, a1, b0, b1, y0, y1;
@@ -358,18 +358,18 @@ __aicore__ inline void MulDual(const LocalTensor<float> &dst, const LocalTensor<
 }
 
 /*! dst = src * broadcast(scalarSrc[0])；scalar 来自已 Brcb 的 1 block 或直接 DIST_BRC */
-__aicore__ inline void MulByBrcBlockDual(const LocalTensor<float> &dst, const LocalTensor<float> &src,
-                                         const LocalTensor<float> &brcOneBlock, uint32_t hiddenSize)
+__aicore__ inline void MulByBrcBlockDual(const LocalTensor<float>& dst, const LocalTensor<float>& src,
+                                         const LocalTensor<float>& brcOneBlock, uint32_t hiddenSize)
 {
-    __local_mem__ float *srcAddr = (__local_mem__ float *)src.GetPhyAddr();
-    __local_mem__ float *dstAddr = (__local_mem__ float *)dst.GetPhyAddr();
-    __local_mem__ float *brcAddr = (__local_mem__ float *)brcOneBlock.GetPhyAddr();
+    __local_mem__ float* srcAddr = (__local_mem__ float*)src.GetPhyAddr();
+    __local_mem__ float* dstAddr = (__local_mem__ float*)dst.GetPhyAddr();
+    __local_mem__ float* brcAddr = (__local_mem__ float*)brcOneBlock.GetPhyAddr();
     if (CanSplitAlignedDual<float>(hiddenSize)) {
         const uint32_t halfCount = hiddenSize >> 1;
         uint32_t sreg = halfCount;
         const uint16_t repeatTimes = static_cast<uint16_t>((halfCount + kVlFp32 - 1U) / kVlFp32);
-        __local_mem__ float *srcAddr2 = srcAddr + halfCount;
-        __local_mem__ float *dstAddr2 = dstAddr + halfCount;
+        __local_mem__ float* srcAddr2 = srcAddr + halfCount;
+        __local_mem__ float* dstAddr2 = dstAddr + halfCount;
         __VEC_SCOPE__
         {
             RegTensor<float> wReg, x0, x1, y0, y1;
@@ -407,23 +407,23 @@ __aicore__ inline void MulByBrcBlockDual(const LocalTensor<float> &dst, const Lo
  * dst = src * broadcast(scalarSrc[0])
  * 用 DIST_BRC 直接从 scalar 槽广播，省 Level2 Brcb（scalarSrc 需为 32B 对齐且 [0] 有效）。
  */
-__aicore__ inline void BroadcastScalarMulDual(const LocalTensor<float> &dst, const LocalTensor<float> &src,
-                                              const LocalTensor<float> &scalarSrc, uint32_t hiddenSize)
+__aicore__ inline void BroadcastScalarMulDual(const LocalTensor<float>& dst, const LocalTensor<float>& src,
+                                              const LocalTensor<float>& scalarSrc, uint32_t hiddenSize)
 {
     MulByBrcBlockDual(dst, src, scalarSrc, hiddenSize);
 }
 
 /*! dst[0] = sum(src * src)，src 不被破坏；偶数长度拆成两个独立累加链，便于指令双发。 */
-__aicore__ inline void ReduceSquareSum(const LocalTensor<float> &dstScalar, const LocalTensor<float> &src,
+__aicore__ inline void ReduceSquareSum(const LocalTensor<float>& dstScalar, const LocalTensor<float>& src,
                                        uint32_t hiddenSize)
 {
-    __local_mem__ float *srcAddr = (__local_mem__ float *)src.GetPhyAddr();
-    __local_mem__ float *dstAddr = (__local_mem__ float *)dstScalar.GetPhyAddr();
+    __local_mem__ float* srcAddr = (__local_mem__ float*)src.GetPhyAddr();
+    __local_mem__ float* dstAddr = (__local_mem__ float*)dstScalar.GetPhyAddr();
     if (CanSplitAlignedDual<float>(hiddenSize)) {
         const uint32_t halfCount = hiddenSize >> 1;
         uint32_t sreg = halfCount;
         const uint16_t repeatTimes = static_cast<uint16_t>((halfCount + kVlFp32 - 1U) / kVlFp32);
-        __local_mem__ float *srcAddr2 = srcAddr + halfCount;
+        __local_mem__ float* srcAddr2 = srcAddr + halfCount;
         __VEC_SCOPE__
         {
             RegTensor<float> x0, x1, prod0, prod1, part0, part1, acc0, acc1;
@@ -467,18 +467,18 @@ __aicore__ inline void ReduceSquareSum(const LocalTensor<float> &dstScalar, cons
 }
 
 /*! dst[0] = sum(src0 * src1)，src 不被破坏；偶数长度拆成两个独立累加链，便于指令双发。 */
-__aicore__ inline void ReduceMulSum(const LocalTensor<float> &dstScalar, const LocalTensor<float> &src0,
-                                    const LocalTensor<float> &src1, uint32_t hiddenSize)
+__aicore__ inline void ReduceMulSum(const LocalTensor<float>& dstScalar, const LocalTensor<float>& src0,
+                                    const LocalTensor<float>& src1, uint32_t hiddenSize)
 {
-    __local_mem__ float *aAddr = (__local_mem__ float *)src0.GetPhyAddr();
-    __local_mem__ float *bAddr = (__local_mem__ float *)src1.GetPhyAddr();
-    __local_mem__ float *dstAddr = (__local_mem__ float *)dstScalar.GetPhyAddr();
+    __local_mem__ float* aAddr = (__local_mem__ float*)src0.GetPhyAddr();
+    __local_mem__ float* bAddr = (__local_mem__ float*)src1.GetPhyAddr();
+    __local_mem__ float* dstAddr = (__local_mem__ float*)dstScalar.GetPhyAddr();
     if (CanSplitAlignedDual<float>(hiddenSize)) {
         const uint32_t halfCount = hiddenSize >> 1;
         uint32_t sreg = halfCount;
         const uint16_t repeatTimes = static_cast<uint16_t>((halfCount + kVlFp32 - 1U) / kVlFp32);
-        __local_mem__ float *aAddr2 = aAddr + halfCount;
-        __local_mem__ float *bAddr2 = bAddr + halfCount;
+        __local_mem__ float* aAddr2 = aAddr + halfCount;
+        __local_mem__ float* bAddr2 = bAddr + halfCount;
         __VEC_SCOPE__
         {
             RegTensor<float> a0, a1, b0, b1, prod0, prod1, part0, part1, acc0, acc1;
@@ -525,9 +525,9 @@ __aicore__ inline void ReduceMulSum(const LocalTensor<float> &dstScalar, const L
 }
 
 /*! invNorm：dst[0] = 1 / sqrt(dst[0] * invH + eps)，与 Level2 InvRmsInPlace 同语义 */
-__aicore__ inline void InvRmsScalar(const LocalTensor<float> &dstScalar, float invHiddenSize, float normEps)
+__aicore__ inline void InvRmsScalar(const LocalTensor<float>& dstScalar, float invHiddenSize, float normEps)
 {
-    __local_mem__ float *dstAddr = (__local_mem__ float *)dstScalar.GetPhyAddr();
+    __local_mem__ float* dstAddr = (__local_mem__ float*)dstScalar.GetPhyAddr();
     __VEC_SCOPE__
     {
         RegTensor<float> v, one;
@@ -546,13 +546,13 @@ __aicore__ inline void InvRmsScalar(const LocalTensor<float> &dstScalar, float i
  * UB→UB 精确拷贝 count 个 float。dst/src 基址须 32B 对齐；count∈(0,64]。
  * RegBase UpdateMask；避免 Level2 DataCopy(非整段) 漏写 / 非对齐 CopyMetaScalar→507035。
  */
-__aicore__ inline void CopyFloatsUbExact(const LocalTensor<float> &dst, const LocalTensor<float> &src, uint32_t count)
+__aicore__ inline void CopyFloatsUbExact(const LocalTensor<float>& dst, const LocalTensor<float>& src, uint32_t count)
 {
     if (count == 0U) {
         return;
     }
-    __local_mem__ float *dstAddr = (__local_mem__ float *)dst.GetPhyAddr();
-    __local_mem__ float *srcAddr = (__local_mem__ float *)src.GetPhyAddr();
+    __local_mem__ float* dstAddr = (__local_mem__ float*)dst.GetPhyAddr();
+    __local_mem__ float* srcAddr = (__local_mem__ float*)src.GetPhyAddr();
     uint32_t sreg = count;
     __VEC_SCOPE__
     {
@@ -571,9 +571,9 @@ __aicore__ inline void CopyFloatsUbExact(const LocalTensor<float> &dst, const Lo
  * - Sum：两段 WholeReduceSum
  * - rem：CopyFloatsUbExact（VF UpdateMask）
  */
-__aicore__ inline void SoftmaxSmallRegBase(const LocalTensor<float> &vecMeta, uint32_t blockCount, uint32_t metaAlign,
-                                           const LocalTensor<float> &workScalar, const LocalTensor<float> &brcMeta,
-                                           const LocalTensor<float> &brcPack)
+__aicore__ inline void SoftmaxSmallRegBase(const LocalTensor<float>& vecMeta, uint32_t blockCount, uint32_t metaAlign,
+                                           const LocalTensor<float>& workScalar, const LocalTensor<float>& brcMeta,
+                                           const LocalTensor<float>& brcPack)
 {
     if (blockCount == 0U) {
         return;

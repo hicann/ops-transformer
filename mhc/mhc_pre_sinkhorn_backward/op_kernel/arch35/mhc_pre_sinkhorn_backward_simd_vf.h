@@ -31,13 +31,13 @@ __aicore__ inline void ComputeGradSigmoidVf(LocalTensor<T> gradSigmoidLocal1, Lo
                                             LocalTensor<T> alphaLocal, LocalTensor<T> biasLocal, uint16_t repeatTimes,
                                             uint32_t totalElements)
 {
-    __local_mem__ T *gradSigmoidPtr1 = (__local_mem__ T *)gradSigmoidLocal1.GetPhyAddr();
-    __local_mem__ T *gradSigmoidPtr2 = (__local_mem__ T *)gradSigmoidLocal2.GetPhyAddr();
+    __local_mem__ T* gradSigmoidPtr1 = (__local_mem__ T*)gradSigmoidLocal1.GetPhyAddr();
+    __local_mem__ T* gradSigmoidPtr2 = (__local_mem__ T*)gradSigmoidLocal2.GetPhyAddr();
 
-    __local_mem__ T *invRmsPtr = (__local_mem__ T *)invRmsLocal.GetPhyAddr();
-    __local_mem__ T *fusedHPre2AndHPost2Ptr = (__local_mem__ T *)fusedHPre2AndHPost2Local.GetPhyAddr();
-    __local_mem__ T *alphaPtr = (__local_mem__ T *)alphaLocal.GetPhyAddr();
-    __local_mem__ T *biasPtr = (__local_mem__ T *)biasLocal.GetPhyAddr();
+    __local_mem__ T* invRmsPtr = (__local_mem__ T*)invRmsLocal.GetPhyAddr();
+    __local_mem__ T* fusedHPre2AndHPost2Ptr = (__local_mem__ T*)fusedHPre2AndHPost2Local.GetPhyAddr();
+    __local_mem__ T* alphaPtr = (__local_mem__ T*)alphaLocal.GetPhyAddr();
+    __local_mem__ T* biasPtr = (__local_mem__ T*)biasLocal.GetPhyAddr();
 
     __VEC_SCOPE__
     {
@@ -102,9 +102,9 @@ template <typename T, typename U>
 __aicore__ inline void ComputeGradPreVf(LocalTensor<T> gradHPreLocal, LocalTensor<U> xLocal,
                                         LocalTensor<U> gradHinLocal, int32_t n, uint16_t repeatTimes)
 {
-    __local_mem__ U *xPtr = (__local_mem__ U *)xLocal.GetPhyAddr();
-    __local_mem__ U *hinGradPtr = (__local_mem__ U *)gradHinLocal.GetPhyAddr();
-    __local_mem__ T *gradHPrePtr = (__local_mem__ T *)gradHPreLocal.GetPhyAddr();
+    __local_mem__ U* xPtr = (__local_mem__ U*)xLocal.GetPhyAddr();
+    __local_mem__ U* hinGradPtr = (__local_mem__ U*)gradHinLocal.GetPhyAddr();
+    __local_mem__ T* gradHPrePtr = (__local_mem__ T*)gradHPreLocal.GetPhyAddr();
 
     __VEC_SCOPE__
     {
@@ -172,10 +172,10 @@ __aicore__ inline void ComputeGradXVf(LocalTensor<U> gradXLocal, LocalTensor<U> 
                                       LocalTensor<T> hPreLocal, const T gradInvRmsVal, const T gradRMSNormVal,
                                       const int32_t c, uint16_t repeatTimes)
 {
-    __local_mem__ U *gradXPtr = (__local_mem__ U *)gradXLocal.GetPhyAddr();
-    __local_mem__ U *xPtr = (__local_mem__ U *)xLocal.GetPhyAddr();
-    __local_mem__ U *gradHinPtr = (__local_mem__ U *)gradHinLocal.GetPhyAddr();
-    __local_mem__ T *hPrePtr = (__local_mem__ T *)hPreLocal.GetPhyAddr();
+    __local_mem__ U* gradXPtr = (__local_mem__ U*)gradXLocal.GetPhyAddr();
+    __local_mem__ U* xPtr = (__local_mem__ U*)xLocal.GetPhyAddr();
+    __local_mem__ U* gradHinPtr = (__local_mem__ U*)gradHinLocal.GetPhyAddr();
+    __local_mem__ T* hPrePtr = (__local_mem__ T*)hPreLocal.GetPhyAddr();
 
     __VEC_SCOPE__
     {

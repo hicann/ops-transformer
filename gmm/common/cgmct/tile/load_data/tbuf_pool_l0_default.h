@@ -51,7 +51,7 @@ public:
      * @brief Allocate an L0 buffer
      * @return Reference to the current TBufPoolL0 instance
      */
-    __aicore__ inline TBufPoolL0 &Allocate()
+    __aicore__ inline TBufPoolL0& Allocate()
     {
         AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0PingPongFlag_);
         return *this;

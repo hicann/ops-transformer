@@ -31,17 +31,13 @@ namespace l0op {
 OP_TYPE_REGISTER(MhcPost);
 
 // AICORE算子kernel
-const aclTensor* MhcPostAICore(
-    const aclTensor* x, const aclTensor* hRes, const aclTensor* hOut, const aclTensor* hPost,
-    const aclTensor* output, aclOpExecutor* executor)
+const aclTensor* MhcPostAICore(const aclTensor* x, const aclTensor* hRes, const aclTensor* hOut, const aclTensor* hPost,
+                               const aclTensor* output, aclOpExecutor* executor)
 {
     L0_DFX(MhcPostAICore, x, hRes, hOut, hPost, output);
 
     // 使用框架宏 ADD_TO_LAUNCHER_LIST_AICORE，将算子加入任务队列
-    auto retAicore = ADD_TO_LAUNCHER_LIST_AICORE(
-        MhcPost,
-        OP_INPUT(x, hRes, hOut, hPost),
-        OP_OUTPUT(output));
+    auto retAicore = ADD_TO_LAUNCHER_LIST_AICORE(MhcPost, OP_INPUT(x, hRes, hOut, hPost), OP_OUTPUT(output));
     if (retAicore != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MhcPost launch kernel failed.");
         return nullptr;
@@ -49,9 +45,8 @@ const aclTensor* MhcPostAICore(
     return output;
 }
 
-const aclTensor* MhcPost(
-    const aclTensor* x, const aclTensor* hRes, const aclTensor* hOut, const aclTensor* hPost,
-    aclOpExecutor* executor)
+const aclTensor* MhcPost(const aclTensor* x, const aclTensor* hRes, const aclTensor* hOut, const aclTensor* hPost,
+                         aclOpExecutor* executor)
 {
     auto output = executor->AllocTensor(x->GetViewShape(), x->GetDataType(), x->GetViewFormat());
     if (output == nullptr) {

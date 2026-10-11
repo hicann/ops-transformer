@@ -38,7 +38,7 @@
 
 #define CEIL_DIV(x, y) (((x) + (y) - 1) / (y))
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto dim : shape) {
@@ -66,7 +66,7 @@ public:
         }
     }
 
-    int Init(aclrtStream *stream)
+    int Init(aclrtStream* stream)
     {
         auto ret = aclInit(nullptr);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -88,9 +88,9 @@ private:
 };
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &viewShape,
-                    const std::vector<int64_t> &viewStrides, const std::vector<int64_t> &storageShape,
-                    aclDataType dataType, aclFormat format, void **deviceAddr, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& viewShape,
+                    const std::vector<int64_t>& viewStrides, const std::vector<int64_t>& storageShape,
+                    aclDataType dataType, aclFormat format, void** deviceAddr, aclTensor** tensor)
 {
     auto size = hostData.size() * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -98,22 +98,22 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
 
-    const int64_t *strides = viewStrides.empty() ? nullptr : viewStrides.data();
+    const int64_t* strides = viewStrides.empty() ? nullptr : viewStrides.data();
     *tensor = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides, 0, format, storageShape.data(),
                               storageShape.size(), *deviceAddr);
     CHECK_RET(*tensor != nullptr, LOG_PRINT("aclCreateTensor failed.\n"); return ACL_ERROR_INVALID_PARAM);
     return ACL_SUCCESS;
 }
 
-int CreateSingleTensorList(aclTensor *tensor, aclTensorList **tensorList)
+int CreateSingleTensorList(aclTensor* tensor, aclTensorList** tensorList)
 {
-    aclTensor *tensors[] = {tensor};
+    aclTensor* tensors[] = {tensor};
     *tensorList = aclCreateTensorList(tensors, 1);
     CHECK_RET(*tensorList != nullptr, LOG_PRINT("aclCreateTensorList failed.\n"); return ACL_ERROR_INVALID_PARAM);
     return ACL_SUCCESS;
 }
 
-std::vector<uint8_t> PackFp4(const std::vector<float> &data)
+std::vector<uint8_t> PackFp4(const std::vector<float>& data)
 {
     std::vector<uint8_t> packedData((data.size() + 1) / 2, 0);
     for (size_t i = 0; i < data.size(); i += 2) {
@@ -173,111 +173,111 @@ int AclnnGroupedMatmulWeightNzMxA8W4PreprocessTest(int32_t deviceId)
     std::vector<uint16_t> outHostData(GetShapeSize(outShape), 0);
     std::vector<int64_t> groupListHostData = {m / groupNum, m};
 
-    void *xDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *xScaleDeviceAddr = nullptr;
-    void *weightScaleDeviceAddr = nullptr;
-    void *outWeightDeviceAddr = nullptr;
-    void *outWeightScaleDeviceAddr = nullptr;
-    void *outDeviceAddr = nullptr;
-    void *groupListDeviceAddr = nullptr;
-    aclTensor *xTensor = nullptr;
-    aclTensor *weightTensor = nullptr;
-    aclTensor *xScaleTensor = nullptr;
-    aclTensor *weightScaleTensor = nullptr;
-    aclTensor *outWeightTensor = nullptr;
-    aclTensor *outWeightScaleTensor = nullptr;
-    aclTensor *outTensor = nullptr;
-    aclTensor *groupListTensor = nullptr;
-    aclTensorList *x = nullptr;
-    aclTensorList *weight = nullptr;
-    aclTensorList *perTokenScale = nullptr;
-    aclTensorList *antiquantScale = nullptr;
-    aclTensorList *out = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* xScaleDeviceAddr = nullptr;
+    void* weightScaleDeviceAddr = nullptr;
+    void* outWeightDeviceAddr = nullptr;
+    void* outWeightScaleDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
+    void* groupListDeviceAddr = nullptr;
+    aclTensor* xTensor = nullptr;
+    aclTensor* weightTensor = nullptr;
+    aclTensor* xScaleTensor = nullptr;
+    aclTensor* weightScaleTensor = nullptr;
+    aclTensor* outWeightTensor = nullptr;
+    aclTensor* outWeightScaleTensor = nullptr;
+    aclTensor* outTensor = nullptr;
+    aclTensor* groupListTensor = nullptr;
+    aclTensorList* x = nullptr;
+    aclTensorList* weight = nullptr;
+    aclTensorList* perTokenScale = nullptr;
+    aclTensorList* antiquantScale = nullptr;
+    aclTensorList* out = nullptr;
 
     ret =
         CreateAclTensor(xHostData, xShape, xStrides, xShape, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND, &xDeviceAddr, &xTensor);
-    std::unique_ptr<void, aclError (*)(void *)> xDeviceAddrPtr(xDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> xTensorGuard(xTensor, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> xDeviceAddrPtr(xDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> xTensorGuard(xTensor, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateSingleTensorList(xTensor, &x);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> xPtr(x, aclDestroyTensorList);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> xPtr(x, aclDestroyTensorList);
     xTensorGuard.release();
 
     ret = CreateAclTensor(weightHostData, weightViewShape, weightStrides, weightStorageShape, ACL_FLOAT4_E2M1,
                           ACL_FORMAT_ND, &weightDeviceAddr, &weightTensor);
-    std::unique_ptr<void, aclError (*)(void *)> weightDeviceAddrPtr(weightDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> weightTensorPtr(weightTensor, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> weightDeviceAddrPtr(weightDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> weightTensorPtr(weightTensor, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor(xScaleHostData, xScaleShape, xScaleStrides, xScaleShape, ACL_FLOAT8_E8M0, ACL_FORMAT_ND,
                           &xScaleDeviceAddr, &xScaleTensor);
-    std::unique_ptr<void, aclError (*)(void *)> xScaleDeviceAddrPtr(xScaleDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> xScaleTensorGuard(xScaleTensor, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> xScaleDeviceAddrPtr(xScaleDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> xScaleTensorGuard(xScaleTensor, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateSingleTensorList(xScaleTensor, &perTokenScale);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> perTokenScalePtr(perTokenScale,
-                                                                                            aclDestroyTensorList);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> perTokenScalePtr(perTokenScale,
+                                                                                           aclDestroyTensorList);
     xScaleTensorGuard.release();
 
     ret = CreateAclTensor(weightScaleHostData, weightScaleViewShape, weightScaleStrides, weightScaleStorageShape,
                           ACL_FLOAT8_E8M0, ACL_FORMAT_ND, &weightScaleDeviceAddr, &weightScaleTensor);
-    std::unique_ptr<void, aclError (*)(void *)> weightScaleDeviceAddrPtr(weightScaleDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> weightScaleTensorPtr(weightScaleTensor,
-                                                                                        aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> weightScaleDeviceAddrPtr(weightScaleDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> weightScaleTensorPtr(weightScaleTensor,
+                                                                                       aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor(outWeightHostData, weightViewShape, weightStrides, outWeightStorageShape, ACL_FLOAT4_E2M1,
                           ACL_FORMAT_FRACTAL_NZ_C0_32, &outWeightDeviceAddr, &outWeightTensor);
-    std::unique_ptr<void, aclError (*)(void *)> outWeightDeviceAddrPtr(outWeightDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> outWeightTensorGuard(outWeightTensor,
-                                                                                        aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> outWeightDeviceAddrPtr(outWeightDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> outWeightTensorGuard(outWeightTensor,
+                                                                                       aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateSingleTensorList(outWeightTensor, &weight);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> outWeightPtr(weight, aclDestroyTensorList);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> outWeightPtr(weight, aclDestroyTensorList);
     outWeightTensorGuard.release();
 
     ret = CreateAclTensor(outWeightScaleHostData, weightScaleViewShape, weightScaleStrides, weightScaleStorageShape,
                           ACL_FLOAT8_E8M0, ACL_FORMAT_ND, &outWeightScaleDeviceAddr, &outWeightScaleTensor);
-    std::unique_ptr<void, aclError (*)(void *)> outWeightScaleDeviceAddrPtr(outWeightScaleDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> outWeightScaleTensorGuard(outWeightScaleTensor,
-                                                                                             aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> outWeightScaleDeviceAddrPtr(outWeightScaleDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> outWeightScaleTensorGuard(outWeightScaleTensor,
+                                                                                            aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateSingleTensorList(outWeightScaleTensor, &antiquantScale);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> outWeightScalePtr(antiquantScale,
-                                                                                             aclDestroyTensorList);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> outWeightScalePtr(antiquantScale,
+                                                                                            aclDestroyTensorList);
     outWeightScaleTensorGuard.release();
 
     ret = CreateAclTensor(outHostData, outShape, outStrides, outShape, ACL_BF16, ACL_FORMAT_ND, &outDeviceAddr,
                           &outTensor);
-    std::unique_ptr<void, aclError (*)(void *)> outDeviceAddrPtr(outDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> outTensorGuard(outTensor, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> outDeviceAddrPtr(outDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> outTensorGuard(outTensor, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateSingleTensorList(outTensor, &out);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> outPtr(out, aclDestroyTensorList);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> outPtr(out, aclDestroyTensorList);
     outTensorGuard.release();
 
     ret = CreateAclTensor(groupListHostData, groupListShape, groupListStrides, groupListShape, ACL_INT64, ACL_FORMAT_ND,
                           &groupListDeviceAddr, &groupListTensor);
-    std::unique_ptr<void, aclError (*)(void *)> groupListDeviceAddrPtr(groupListDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> groupListPtr(groupListTensor, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> groupListDeviceAddrPtr(groupListDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> groupListPtr(groupListTensor, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     ret = aclnnWeightQuantPreprocessGetWorkspaceSize(weightTensor, weightScaleTensor, nullptr, nullptr,
                                                      ACL_FLOAT8_E4M3FN, ACL_FLOAT8_E8M0, kGroupSize, outWeightTensor,
                                                      outWeightScaleTensor, nullptr, nullptr, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnWeightQuantPreprocessGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *preprocessWorkspaceAddr = nullptr;
-    std::unique_ptr<void, aclError (*)(void *)> preprocessWorkspacePtr(nullptr, aclrtFree);
+    void* preprocessWorkspaceAddr = nullptr;
+    std::unique_ptr<void, aclError (*)(void*)> preprocessWorkspacePtr(nullptr, aclrtFree);
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&preprocessWorkspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate preprocess workspace failed. ERROR: %d\n", ret); return ret);
@@ -297,8 +297,8 @@ int AclnnGroupedMatmulWeightNzMxA8W4PreprocessTest(int32_t deviceId)
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulWeightNzGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *groupedMatmulWorkspaceAddr = nullptr;
-    std::unique_ptr<void, aclError (*)(void *)> groupedMatmulWorkspacePtr(nullptr, aclrtFree);
+    void* groupedMatmulWorkspaceAddr = nullptr;
+    std::unique_ptr<void, aclError (*)(void*)> groupedMatmulWorkspacePtr(nullptr, aclrtFree);
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&groupedMatmulWorkspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate grouped matmul workspace failed. ERROR: %d\n", ret);

@@ -88,7 +88,7 @@ __aicore__ inline int64_t MMLcm(int64_t m, int64_t n)
 }
 
 // device -> kernel -> scheduler
-static int64_t DoGetBlockNum(int64_t l1M, int64_t l1N, const MatmulShape &shape)
+static int64_t DoGetBlockNum(int64_t l1M, int64_t l1N, const MatmulShape& shape)
 {
     int maxCoreNum = GetCoreNum();
     int64_t mTotalCnt = Cgmct::Gemm::CeilDiv(shape.m, l1M);
@@ -106,7 +106,7 @@ static int64_t DoGetBlockNum(int64_t l1M, int64_t l1N, const MatmulShape &shape)
 }
 
 template <class ProblemShape_>
-__host_aicore__ static Status DoCheckArgs(const ProblemShape_ &shape, int64_t l1M, int64_t l1N, int64_t l1K,
+__host_aicore__ static Status DoCheckArgs(const ProblemShape_& shape, int64_t l1M, int64_t l1N, int64_t l1K,
                                           int64_t l0M, int64_t l0N, int64_t l0K)
 {
     if (l1M > 128 || l0M > 128 || l1N > 256 || l0N > 256) { // 128,256: input limit

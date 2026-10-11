@@ -62,7 +62,7 @@ static inline uint32_t SixteenAlign(uint32_t a, bool up = false)
     return a & ~15U; // ~15: 16 bytes down-align
 };
 
-static ge::graphStatus CalTCubeTiling(const gert::TilingContext *context, GroupedMatmulAddTilingData &tiling, int32_t m,
+static ge::graphStatus CalTCubeTiling(const gert::TilingContext* context, GroupedMatmulAddTilingData& tiling, int32_t m,
                                       int32_t k, int32_t n, int32_t baseM, int32_t baseN, int32_t baseK)
 {
     auto xType = context->GetInputDesc(INDEX_IN_X)->GetDataType();
@@ -120,7 +120,7 @@ static ge::graphStatus CalTCubeTiling(const gert::TilingContext *context, Groupe
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CalMmTiling(gert::TilingContext *context, GroupedMatmulAddTilingData &tiling, int32_t m,
+static ge::graphStatus CalMmTiling(gert::TilingContext* context, GroupedMatmulAddTilingData& tiling, int32_t m,
                                    int32_t k, int32_t n)
 {
     int32_t baseN = BEST_BASEN;
@@ -176,7 +176,7 @@ static ge::graphStatus CalMmTiling(gert::TilingContext *context, GroupedMatmulAd
     return ge::GRAPH_SUCCESS;
 }
 
-static void PrintInfo(const gert::TilingContext *context, GroupedMatmulAddTilingData &tiling)
+static void PrintInfo(const gert::TilingContext* context, GroupedMatmulAddTilingData& tiling)
 {
     auto nodeName = context->GetNodeName();
     OP_LOGD(nodeName, ">>>>>>>>>>>>>>> Start to print GroupedMatmulAdd tiling data <<<<<<<<<<<<<<<<");
@@ -212,7 +212,7 @@ static void PrintInfo(const gert::TilingContext *context, GroupedMatmulAddTiling
     OP_LOGD(nodeName, ">>>>>>>>>>>>>>> Print GroupedMatmulAdd tiling data end <<<<<<<<<<<<<<<<");
 }
 
-static ge::graphStatus TilingCheck4GroupedMatmulAdd(const gert::TilingContext *context)
+static ge::graphStatus TilingCheck4GroupedMatmulAdd(const gert::TilingContext* context)
 {
     auto xShape = context->GetInputShape(INDEX_IN_X);
     auto wShape = context->GetInputShape(INDEX_IN_W);
@@ -252,7 +252,7 @@ static ge::graphStatus TilingCheck4GroupedMatmulAdd(const gert::TilingContext *c
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext *context)
+static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext* context)
 {
     if (IsAdvancedNpuArch(context)) {
         GroupedMatmulAddNoQuantTiling gmmAddTiling;
@@ -286,7 +286,7 @@ static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext *context)
     // set groupListType attr.
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_GROUP_LIST_TYPE_INDEX_3);
+    const int64_t* groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_GROUP_LIST_TYPE_INDEX_3);
     int64_t groupListType = groupListTypePtr != nullptr ? *groupListTypePtr : GROUP_LIST_TYPE_CUMSUM_0;
     tiling.gmmBaseParams.set_groupListType(groupListType);
 
@@ -303,7 +303,7 @@ static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext *context)
     auto baseM = tiling.mmTilingData.get_baseM();
     auto baseN = tiling.mmTilingData.get_baseN();
     uint32_t userWorkspaceSize = baseM * baseN * FP32_DATATYPE_SIZE * aicNum * DOUBLE_BUFFER_L0A_L0B;
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
     workspaces[0] = static_cast<size_t>(sysWorkspaceSize + userWorkspaceSize);
 
     PrintInfo(context, tiling);
@@ -311,7 +311,7 @@ static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingPrepare4GroupedMatmulAdd(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepare4GroupedMatmulAdd(gert::TilingParseContext* context)
 {
     if (IsAdvancedNpuArch(context)) {
         return gmm_add_advanced::InitCompileInfo(context);

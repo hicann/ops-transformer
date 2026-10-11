@@ -90,8 +90,8 @@ public:
     }
 
     __aicore__ inline void CopyInB1Nd2Nz(uint64_t k, uint64_t currentK, uint64_t baseN,
-                                         const AscendC::GlobalTensor<float> &bGlobal,
-                                         const AscendC::LocalTensor<float> &bl1Local)
+                                         const AscendC::GlobalTensor<float>& bGlobal,
+                                         const AscendC::LocalTensor<float>& bl1Local)
     {
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(bL1BufferID_);
         k_ = k;
@@ -113,8 +113,8 @@ public:
 
     // note: baseM * baseK must <= 256 * 32; baseN * baseK must <= 256 * 32; baseM * baseN must <= 256 * 128
     __aicore__ inline void Process(uint64_t m, uint64_t n, uint64_t baseM, uint64_t baseK, bool isFirstKL1,
-                                   bool isLastKL1, const AscendC::LocalTensor<float> &al1Local,
-                                   const AscendC::LocalTensor<float> &bl1Local)
+                                   bool isLastKL1, const AscendC::LocalTensor<float>& al1Local,
+                                   const AscendC::LocalTensor<float>& bl1Local)
     {
         m_ = m;
         n_ = n;
@@ -137,7 +137,7 @@ public:
         bL1BufferID_ ^= 1;
     }
 
-    __aicore__ inline void CopyInA2(uint64_t kOffset, uint64_t kAL1Offset, const AscendC::LocalTensor<float> &al1Local_)
+    __aicore__ inline void CopyInA2(uint64_t kOffset, uint64_t kAL1Offset, const AscendC::LocalTensor<float>& al1Local_)
     {
         uint64_t mAL1 = Align(baseM_, AscendC::BLOCK_CUBE);
         uint64_t offsetAL1 = Align(kAL1Offset, C0_SIZE) * mAL1;
@@ -155,7 +155,7 @@ public:
         AscendC::LoadData(l0PingPongID_ == 0 ? aL0Ping_ : aL0Pong_, al1Local_[offsetAL1], loadData2dParams);
     }
 
-    __aicore__ inline void CopyInB2(uint64_t kOffset, uint64_t kBL1Offset, const AscendC::LocalTensor<float> &bl1Local_)
+    __aicore__ inline void CopyInB2(uint64_t kOffset, uint64_t kBL1Offset, const AscendC::LocalTensor<float>& bl1Local_)
     {
         uint64_t nBL1 = Align(baseN_, AscendC::BLOCK_CUBE);
         uint64_t offsetBL1 = Align(kBL1Offset, C0_SIZE) * nBL1;
@@ -190,7 +190,7 @@ public:
     }
 
     // fixpipe CopyOut实现c01拷贝到UB
-    __aicore__ inline void CopyOut(const AscendC::LocalTensor<float> &dstLocal)
+    __aicore__ inline void CopyOut(const AscendC::LocalTensor<float>& dstLocal)
     {
         AscendC::FixpipeParamsC310<AscendC::CO2Layout::ROW_MAJOR> fixpipeParams; // ROW_MAJOR默认使能NZ2ND
         uint64_t c0 = AscendC::AuxGetC0Size<float>();
@@ -213,7 +213,7 @@ public:
     }
 
     // fixpipe CopyOut实现c01拷贝到GM
-    __aicore__ inline void CopyOut(const AscendC::GlobalTensor<float> &cGlobal)
+    __aicore__ inline void CopyOut(const AscendC::GlobalTensor<float>& cGlobal)
     {
         AscendC::DataCopyCO12DstParams intriParams;
         intriParams.nSize = baseN_;

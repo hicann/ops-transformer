@@ -13,10 +13,10 @@
 
 extern "C" {
 ACLNN_API aclnnStatus aclnnFfnWorkerBatchingGetWorkspaceSize(
-    const aclTensor *scheduleContext, int64_t expertNum, const aclIntArray *maxOutShape, int64_t tokenDtype,
-    int64_t needSchedule, int64_t layerNum, const aclTensor *y, const aclTensor *groupList, const aclTensor *sessionIds,
-    const aclTensor *microBatchIds, const aclTensor *tokenIds, const aclTensor *expertOffsets,
-    const aclTensor *dynamicScale, const aclTensor *actualTokenNum, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* scheduleContext, int64_t expertNum, const aclIntArray* maxOutShape, int64_t tokenDtype,
+    int64_t needSchedule, int64_t layerNum, const aclTensor* y, const aclTensor* groupList, const aclTensor* sessionIds,
+    const aclTensor* microBatchIds, const aclTensor* tokenIds, const aclTensor* expertOffsets,
+    const aclTensor* dynamicScale, const aclTensor* actualTokenNum, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     // 公共V1符号必须保留旧参数布局。不能将syncFlag插入该签名，否则旧二进制的
     // y指针会被解释为属性，后续输出参数全部错位。仅在转发到内部接口时补默认值。
@@ -26,7 +26,7 @@ ACLNN_API aclnnStatus aclnnFfnWorkerBatchingGetWorkspaceSize(
         sessionIds, microBatchIds, tokenIds, expertOffsets, dynamicScale, actualTokenNum, workspaceSize, executor);
 }
 
-ACLNN_API aclnnStatus aclnnFfnWorkerBatching(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnFfnWorkerBatching(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                              aclrtStream stream)
 {
     return aclnnInnerFfnWorkerBatching(workspace, workspaceSize, executor, stream);

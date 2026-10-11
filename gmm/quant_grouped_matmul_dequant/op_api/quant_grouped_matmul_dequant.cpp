@@ -29,21 +29,20 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(QuantGroupedMatmulDequant);
 
-const aclTensor *QuantGroupedMatmulDequant(const aclTensor *x, const aclTensor *weight, const aclTensor *weightScale,
-    const aclTensor *groupList, const aclTensor *bias, const aclTensor *xScale,
-    const aclTensor *xOffset, const aclTensor *smoothScale, char *xQuantMode,
-    bool transposeWeight, const aclTensor *out, aclOpExecutor *executor)
+const aclTensor* QuantGroupedMatmulDequant(const aclTensor* x, const aclTensor* weight, const aclTensor* weightScale,
+                                           const aclTensor* groupList, const aclTensor* bias, const aclTensor* xScale,
+                                           const aclTensor* xOffset, const aclTensor* smoothScale, char* xQuantMode,
+                                           bool transposeWeight, const aclTensor* out, aclOpExecutor* executor)
 {
-    L0_DFX(QuantGroupedMatmulDequant, x, weight, weightScale, groupList, bias, xScale, xOffset,
-           smoothScale, xQuantMode, transposeWeight, out);
+    L0_DFX(QuantGroupedMatmulDequant, x, weight, weightScale, groupList, bias, xScale, xOffset, smoothScale, xQuantMode,
+           transposeWeight, out);
 
-    auto ret = ADD_TO_LAUNCHER_LIST_AICORE(QuantGroupedMatmulDequant,
-        OP_INPUT(x, weight, weightScale, groupList, bias, xScale, xOffset, smoothScale),
-        OP_OUTPUT(out),
-        OP_ATTR(xQuantMode, transposeWeight));
-    OP_CHECK(ret ==  ACLNN_SUCCESS, OP_LOGE(ACLNN_ERR_INNER_NULLPTR,
-        "QuantGroupedMatmulDequantAiCore ADD_TO_LAUNCHER_LIST_AICORE failed."),
-        return nullptr);
+    auto ret = ADD_TO_LAUNCHER_LIST_AICORE(
+        QuantGroupedMatmulDequant, OP_INPUT(x, weight, weightScale, groupList, bias, xScale, xOffset, smoothScale),
+        OP_OUTPUT(out), OP_ATTR(xQuantMode, transposeWeight));
+    OP_CHECK(ret == ACLNN_SUCCESS,
+             OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "QuantGroupedMatmulDequantAiCore ADD_TO_LAUNCHER_LIST_AICORE failed."),
+             return nullptr);
     return out;
 }
-}  // namespace l0op
+} // namespace l0op
