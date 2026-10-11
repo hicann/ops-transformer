@@ -25,10 +25,10 @@ namespace FaVectorApi {
 template <typename T, typename T2, typename OUTPUT_T, uint32_t s1BaseSize = 16, uint32_t s2BaseSize = 512,
           bool hasAtten = 0, PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0>
 __simd_vf__ void ProcessVec1UpdateGeneralImpl1024VF(
-    __ubuf__ T2 *expUb1, __ubuf__ T2 *expUb2, __ubuf__ T2 *expUb3, __ubuf__ T2 *expUb4, __ubuf__ T2 *expUb5,
-    __ubuf__ T2 *expUb6, __ubuf__ T2 *expUb7, __ubuf__ T2 *expUb8, __ubuf__ OUTPUT_T *pseUb, __ubuf__ T *maxUb,
-    __ubuf__ T *srcUb, __ubuf__ T *expMaxUb, __ubuf__ T *inMaxUb, __ubuf__ T *tmpExpSumUb, __ubuf__ T *tmpMaxUb,
-    __ubuf__ T *tmpMaxUb2, VREG_FLOAT_MASKUB_16_DECL, const uint32_t nPadding, const uint32_t blockStride,
+    __ubuf__ T2* expUb1, __ubuf__ T2* expUb2, __ubuf__ T2* expUb3, __ubuf__ T2* expUb4, __ubuf__ T2* expUb5,
+    __ubuf__ T2* expUb6, __ubuf__ T2* expUb7, __ubuf__ T2* expUb8, __ubuf__ OUTPUT_T* pseUb, __ubuf__ T* maxUb,
+    __ubuf__ T* srcUb, __ubuf__ T* expMaxUb, __ubuf__ T* inMaxUb, __ubuf__ T* tmpExpSumUb, __ubuf__ T* tmpMaxUb,
+    __ubuf__ T* tmpMaxUb2, VREG_FLOAT_MASKUB_16_DECL, const uint32_t nPadding, const uint32_t blockStride,
     const uint32_t repeatStride, const uint32_t oriTailN1, const uint32_t oriTailN2, const uint32_t oriTailN3,
     const uint32_t oriTailN4, const uint32_t oriTailN5, const uint32_t oriTailN6, const uint32_t oriTailN7,
     const uint32_t oriTailN8, const uint32_t tailN1, const uint32_t tailN2, const uint32_t tailN3,
@@ -97,13 +97,13 @@ __simd_vf__ void ProcessVec1UpdateGeneralImpl1024VF(
         maskUb11, maskUb12, maskUb13, maskUb14, maskUb15, maskUb16, minValue, m, slopes, scale, posShift, pseStride,
         nPadding, ureg_max);
 
-    StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)tmpMaxUb), ureg_max, 0);
+    StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T*&)tmpMaxUb), ureg_max, 0);
     LoadAlign(vreg_in_max, inMaxUb);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     LoadAlign(vreg_input_max, tmpMaxUb2);
 
     Max(vreg_max_new, vreg_input_max, vreg_in_max, preg_all);
-    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)tmpMaxUb2, vreg_max_new, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)tmpMaxUb2, vreg_max_new, preg_all);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
     for (uint16_t i = 0; i < m; ++i) {
@@ -129,17 +129,17 @@ __simd_vf__ void ProcessVec1UpdateGeneralImpl1024VF(
             CastStoreExpF16_1024<T2>(ARG_FLOAT_CAST_STORE_EXP_1024);
         }
     }
-    StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)tmpExpSumUb), ureg_exp_sum, 0);
+    StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T*&)tmpExpSumUb), ureg_exp_sum, 0);
 }
 
 // noupdate, 512 < originN <= 1024
 template <typename T, typename T2, typename OUTPUT_T, uint32_t s1BaseSize = 16, uint32_t s2BaseSize = 512,
           bool hasAtten = 0, PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0>
 __aicore__ inline void ProcessVec1UpdateGeneralImpl1024(
-    const LocalTensor<T2> &dstTensor, const LocalTensor<T> &expSumTensor, const LocalTensor<T> &maxTensor,
-    const LocalTensor<T> &srcTensor, const LocalTensor<T> &expMaxTensor, const LocalTensor<T> &inExpSumTensor,
-    const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &maskTensor, const LocalTensor<OUTPUT_T> &pseTensor,
-    const LocalTensor<uint8_t> &dropTensor, const LocalTensor<uint8_t> &sharedTmpBuffer, const uint16_t m,
+    const LocalTensor<T2>& dstTensor, const LocalTensor<T>& expSumTensor, const LocalTensor<T>& maxTensor,
+    const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor, const LocalTensor<T>& inExpSumTensor,
+    const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& maskTensor, const LocalTensor<OUTPUT_T>& pseTensor,
+    const LocalTensor<uint8_t>& dropTensor, const LocalTensor<uint8_t>& sharedTmpBuffer, const uint16_t m,
     const uint32_t originN, const uint32_t pseStride, const float slopes, const float posShift, const T scale,
     const T minValue, float keepProb)
 {
@@ -185,23 +185,23 @@ __aicore__ inline void ProcessVec1UpdateGeneralImpl1024(
     float divValue = 1.0f / keepProb;
     uint32_t pltN = s2BaseSize;
 
-    __ubuf__ T2 *expUb1 = (__ubuf__ T2 *)dstTensor.GetPhyAddr();
-    __ubuf__ T2 *expUb2 = (__ubuf__ T2 *)dstTensor.GetPhyAddr() + ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
-    __ubuf__ T2 *expUb3 = (__ubuf__ T2 *)dstTensor.GetPhyAddr() + 2 * ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
-    __ubuf__ T2 *expUb4 = (__ubuf__ T2 *)dstTensor.GetPhyAddr() + 3 * ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
-    __ubuf__ T2 *expUb5 = (__ubuf__ T2 *)dstTensor.GetPhyAddr() + 4 * ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
-    __ubuf__ T2 *expUb6 = (__ubuf__ T2 *)dstTensor.GetPhyAddr() + 5 * ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
-    __ubuf__ T2 *expUb7 = (__ubuf__ T2 *)dstTensor.GetPhyAddr() + 6 * ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
-    __ubuf__ T2 *expUb8 = (__ubuf__ T2 *)dstTensor.GetPhyAddr() + 7 * ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
+    __ubuf__ T2* expUb1 = (__ubuf__ T2*)dstTensor.GetPhyAddr();
+    __ubuf__ T2* expUb2 = (__ubuf__ T2*)dstTensor.GetPhyAddr() + ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
+    __ubuf__ T2* expUb3 = (__ubuf__ T2*)dstTensor.GetPhyAddr() + 2 * ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
+    __ubuf__ T2* expUb4 = (__ubuf__ T2*)dstTensor.GetPhyAddr() + 3 * ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
+    __ubuf__ T2* expUb5 = (__ubuf__ T2*)dstTensor.GetPhyAddr() + 4 * ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
+    __ubuf__ T2* expUb6 = (__ubuf__ T2*)dstTensor.GetPhyAddr() + 5 * ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
+    __ubuf__ T2* expUb7 = (__ubuf__ T2*)dstTensor.GetPhyAddr() + 6 * ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
+    __ubuf__ T2* expUb8 = (__ubuf__ T2*)dstTensor.GetPhyAddr() + 7 * ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
 
-    __ubuf__ OUTPUT_T *pseUb = (__ubuf__ OUTPUT_T *)pseTensor.GetPhyAddr();
-    __ubuf__ T *maxUb = (__ubuf__ T *)maxTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
-    __ubuf__ T *expMaxUb = (__ubuf__ T *)expMaxTensor.GetPhyAddr();
-    __ubuf__ T *inMaxUb = (__ubuf__ T *)inMaxTensor.GetPhyAddr();
-    __ubuf__ T *tmpExpSumUb = (__ubuf__ T *)sharedTmpBuffer.GetPhyAddr();
-    __ubuf__ T *tmpMaxUb = (__ubuf__ T *)sharedTmpBuffer.GetPhyAddr() + 64;
-    __ubuf__ T *tmpMaxUb2 = (__ubuf__ T *)sharedTmpBuffer.GetPhyAddr() + 64;
+    __ubuf__ OUTPUT_T* pseUb = (__ubuf__ OUTPUT_T*)pseTensor.GetPhyAddr();
+    __ubuf__ T* maxUb = (__ubuf__ T*)maxTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
+    __ubuf__ T* expMaxUb = (__ubuf__ T*)expMaxTensor.GetPhyAddr();
+    __ubuf__ T* inMaxUb = (__ubuf__ T*)inMaxTensor.GetPhyAddr();
+    __ubuf__ T* tmpExpSumUb = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr();
+    __ubuf__ T* tmpMaxUb = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr() + 64;
+    __ubuf__ T* tmpMaxUb2 = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr() + 64;
 
     DO_MASKUB_INIT_16(maskTensor);
 

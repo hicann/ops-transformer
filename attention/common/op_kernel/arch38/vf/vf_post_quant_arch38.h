@@ -27,15 +27,15 @@ static constexpr Reg::CastTrait castTraitP1 = {Reg::RegLayout::ZERO, Reg::SatMod
 
 // with offset
 template <typename T, typename OUTPUT_T, typename POSTQUANT_PARAMS_T>
-__aicore__ inline void PostQuantPerChnlVF(const LocalTensor<OUTPUT_T> &dstTensor, const LocalTensor<T> &srcTensor,
-                                          const LocalTensor<POSTQUANT_PARAMS_T> &scaleTensor,
-                                          const LocalTensor<POSTQUANT_PARAMS_T> &offsetTensor, const uint16_t gRowCount,
+__aicore__ inline void PostQuantPerChnlVF(const LocalTensor<OUTPUT_T>& dstTensor, const LocalTensor<T>& srcTensor,
+                                          const LocalTensor<POSTQUANT_PARAMS_T>& scaleTensor,
+                                          const LocalTensor<POSTQUANT_PARAMS_T>& offsetTensor, const uint16_t gRowCount,
                                           const uint16_t s1RowCount, const uint32_t dSizeV, const uint16_t srcD)
 {
-    __ubuf__ OUTPUT_T *dstUb = (__ubuf__ OUTPUT_T *)dstTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
-    __ubuf__ POSTQUANT_PARAMS_T *scaleUb = (__ubuf__ POSTQUANT_PARAMS_T *)scaleTensor.GetPhyAddr();
-    __ubuf__ POSTQUANT_PARAMS_T *offsetUb = (__ubuf__ POSTQUANT_PARAMS_T *)offsetTensor.GetPhyAddr();
+    __ubuf__ OUTPUT_T* dstUb = (__ubuf__ OUTPUT_T*)dstTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
+    __ubuf__ POSTQUANT_PARAMS_T* scaleUb = (__ubuf__ POSTQUANT_PARAMS_T*)scaleTensor.GetPhyAddr();
+    __ubuf__ POSTQUANT_PARAMS_T* offsetUb = (__ubuf__ POSTQUANT_PARAMS_T*)offsetTensor.GetPhyAddr();
 
     constexpr uint16_t floatRepSize = 64;
     uint16_t dLoops = dSizeV / floatRepSize;
@@ -134,13 +134,13 @@ __aicore__ inline void PostQuantPerChnlVF(const LocalTensor<OUTPUT_T> &dstTensor
 
 // without offset
 template <typename T, typename OUTPUT_T, typename POSTQUANT_PARAMS_T>
-__aicore__ inline void PostQuantPerChnlVF(const LocalTensor<OUTPUT_T> &dstTensor, const LocalTensor<T> &srcTensor,
-                                          const LocalTensor<POSTQUANT_PARAMS_T> &scaleTensor, const uint16_t gRowCount,
+__aicore__ inline void PostQuantPerChnlVF(const LocalTensor<OUTPUT_T>& dstTensor, const LocalTensor<T>& srcTensor,
+                                          const LocalTensor<POSTQUANT_PARAMS_T>& scaleTensor, const uint16_t gRowCount,
                                           const uint16_t s1RowCount, const uint32_t dSizeV, const uint16_t srcD)
 {
-    __ubuf__ OUTPUT_T *dstUb = (__ubuf__ OUTPUT_T *)dstTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
-    __ubuf__ POSTQUANT_PARAMS_T *scaleUb = (__ubuf__ POSTQUANT_PARAMS_T *)scaleTensor.GetPhyAddr();
+    __ubuf__ OUTPUT_T* dstUb = (__ubuf__ OUTPUT_T*)dstTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
+    __ubuf__ POSTQUANT_PARAMS_T* scaleUb = (__ubuf__ POSTQUANT_PARAMS_T*)scaleTensor.GetPhyAddr();
 
     constexpr uint16_t floatRepSize = 64;
     uint16_t dLoops = dSizeV / floatRepSize;
@@ -224,12 +224,12 @@ __aicore__ inline void PostQuantPerChnlVF(const LocalTensor<OUTPUT_T> &dstTensor
 }
 
 template <typename T, typename OUTPUT_T, bool hasOffset>
-__aicore__ inline void PostQuantPerTensorVF(const LocalTensor<OUTPUT_T> &dstTensor, const LocalTensor<T> &srcTensor,
+__aicore__ inline void PostQuantPerTensorVF(const LocalTensor<OUTPUT_T>& dstTensor, const LocalTensor<T>& srcTensor,
                                             const float postQuantScaleValue, const float postQuantOffsetValue,
                                             const uint16_t dealRowCount, const uint32_t dSizeV, const uint16_t srcD)
 {
-    __ubuf__ OUTPUT_T *dstUb = (__ubuf__ OUTPUT_T *)dstTensor.GetPhyAddr();
-    __ubuf__ float *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
+    __ubuf__ OUTPUT_T* dstUb = (__ubuf__ OUTPUT_T*)dstTensor.GetPhyAddr();
+    __ubuf__ float* srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
 
     constexpr uint16_t floatRepSize = 64;
     uint16_t dLoops = dSizeV / floatRepSize;

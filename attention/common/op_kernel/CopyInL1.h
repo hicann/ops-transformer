@@ -48,8 +48,8 @@ struct Position {
 };
 
 template <typename L1Type>
-__aicore__ inline void GmCopyInToL1(LocalTensor<L1Type> &L1Tensor, GlobalTensor<L1Type> &GmTensor,
-                                    const CopyParam &mmCopyParam)
+__aicore__ inline void GmCopyInToL1(LocalTensor<L1Type>& L1Tensor, GlobalTensor<L1Type>& GmTensor,
+                                    const CopyParam& mmCopyParam)
 {
     Nd2NzParams Gm2L1Nd2NzParams;
     Gm2L1Nd2NzParams.ndNum = 1;                   // ND矩阵的个数
@@ -69,7 +69,7 @@ __aicore__ inline void GmCopyInToL1(LocalTensor<L1Type> &L1Tensor, GlobalTensor<
 // L1按NZ格式存储
 // GM的行、列、列的stride（D or ND）BNSD 和 BSH的区别
 template <typename L1Type>
-__aicore__ inline void DataCopyGmNDToL1(LocalTensor<L1Type> &l1Tensor, GlobalTensor<L1Type> &gmTensor, uint32_t rowAct,
+__aicore__ inline void DataCopyGmNDToL1(LocalTensor<L1Type>& l1Tensor, GlobalTensor<L1Type>& gmTensor, uint32_t rowAct,
                                         uint32_t rowAlign,
                                         uint32_t col,       // D
                                         uint32_t colStride) // D or N*D
@@ -88,7 +88,7 @@ __aicore__ inline void DataCopyGmNDToL1(LocalTensor<L1Type> &l1Tensor, GlobalTen
 }
 
 template <typename L1Type>
-__aicore__ inline void DataCopyGmScaleNDToL1(LocalTensor<L1Type> &l1Tensor, GlobalTensor<L1Type> &gmTensor,
+__aicore__ inline void DataCopyGmScaleNDToL1(LocalTensor<L1Type>& l1Tensor, GlobalTensor<L1Type>& gmTensor,
                                              uint32_t rowAct, uint32_t rowAlign, uint32_t col, uint32_t colStride)
 {
     Nd2NzParams nd2nzPara;
@@ -103,12 +103,12 @@ __aicore__ inline void DataCopyGmScaleNDToL1(LocalTensor<L1Type> &l1Tensor, Glob
 
     LocalTensor<bfloat16_t> l1TensorCast = l1Tensor.template ReinterpretCast<bfloat16_t>();
     GlobalTensor<bfloat16_t> gmTensorCast;
-    gmTensorCast.SetGlobalBuffer(((__gm__ bfloat16_t *)(gmTensor.GetPhyAddr())));
+    gmTensorCast.SetGlobalBuffer(((__gm__ bfloat16_t*)(gmTensor.GetPhyAddr())));
     DataCopy(l1TensorCast, gmTensorCast, nd2nzPara);
 }
 
 template <typename L1Type>
-__aicore__ inline void DataCopyGmScaleDNToL1(LocalTensor<L1Type> &l1Tensor, GlobalTensor<L1Type> &gmTensor,
+__aicore__ inline void DataCopyGmScaleDNToL1(LocalTensor<L1Type>& l1Tensor, GlobalTensor<L1Type>& gmTensor,
                                              uint32_t rowAct, uint32_t rowAlign, uint32_t col, uint32_t colStride)
 {
     Dn2NzParams dn2nzPara;
@@ -123,12 +123,12 @@ __aicore__ inline void DataCopyGmScaleDNToL1(LocalTensor<L1Type> &l1Tensor, Glob
 
     LocalTensor<bfloat16_t> l1TensorCast = l1Tensor.template ReinterpretCast<bfloat16_t>();
     GlobalTensor<bfloat16_t> gmTensorCast;
-    gmTensorCast.SetGlobalBuffer(((__gm__ bfloat16_t *)(gmTensor.GetPhyAddr())));
+    gmTensorCast.SetGlobalBuffer(((__gm__ bfloat16_t*)(gmTensor.GetPhyAddr())));
     DataCopy(l1TensorCast, gmTensorCast, dn2nzPara);
 }
 
 template <typename L1Type>
-__aicore__ inline void DataCopyGmNZToL1(LocalTensor<L1Type> &l1Tensor, GlobalTensor<L1Type> &gmTensor, uint32_t rowAct,
+__aicore__ inline void DataCopyGmNZToL1(LocalTensor<L1Type>& l1Tensor, GlobalTensor<L1Type>& gmTensor, uint32_t rowAct,
                                         uint32_t dstRowStride, uint32_t srcRowStride, uint32_t col)
 {
     uint32_t blockElementCnt = 32U / sizeof(L1Type);
@@ -144,12 +144,12 @@ __aicore__ inline void DataCopyGmNZToL1(LocalTensor<L1Type> &l1Tensor, GlobalTen
 }
 
 template <typename L1Type>
-__aicore__ inline void GmCopyInToL1HasRopePANoContinue(LocalTensor<L1Type> &nopeTensor, LocalTensor<L1Type> &ropeTensor,
-                                                       GlobalTensor<L1Type> &nopeGmTensor,
-                                                       GlobalTensor<L1Type> &ropeGmTensor,
-                                                       GlobalTensor<int32_t> &blockTableGm, KVLAYOUT kvLayout,
-                                                       const PAShape &shape, const PAShape &ropeShape,
-                                                       const Position &startPos)
+__aicore__ inline void GmCopyInToL1HasRopePANoContinue(LocalTensor<L1Type>& nopeTensor, LocalTensor<L1Type>& ropeTensor,
+                                                       GlobalTensor<L1Type>& nopeGmTensor,
+                                                       GlobalTensor<L1Type>& ropeGmTensor,
+                                                       GlobalTensor<int32_t>& blockTableGm, KVLAYOUT kvLayout,
+                                                       const PAShape& shape, const PAShape& ropeShape,
+                                                       const Position& startPos)
 {
     uint32_t copyFinishRowCnt = 0;
     uint64_t blockTableBaseOffset = startPos.bIdx * shape.maxblockNumPerBatch; // 块表的基偏移量
@@ -223,10 +223,10 @@ __aicore__ inline void GmCopyInToL1HasRopePANoContinue(LocalTensor<L1Type> &nope
 }
 
 template <typename L1Type>
-__aicore__ inline void GmCopyInToL1HasRopePA(LocalTensor<L1Type> &nopeTensor, LocalTensor<L1Type> &ropeTensor,
-                                             GlobalTensor<L1Type> &nopeGmTensor, GlobalTensor<L1Type> &ropeGmTensor,
-                                             GlobalTensor<int32_t> &blockTableGm, KVLAYOUT kvLayout,
-                                             const PAShape &shape, const PAShape &ropeShape, const Position &startPos)
+__aicore__ inline void GmCopyInToL1HasRopePA(LocalTensor<L1Type>& nopeTensor, LocalTensor<L1Type>& ropeTensor,
+                                             GlobalTensor<L1Type>& nopeGmTensor, GlobalTensor<L1Type>& ropeGmTensor,
+                                             GlobalTensor<int32_t>& blockTableGm, KVLAYOUT kvLayout,
+                                             const PAShape& shape, const PAShape& ropeShape, const Position& startPos)
 {
     uint32_t copyFinishRowCnt = 0;
     uint64_t blockTableOffset = startPos.bIdx * shape.maxblockNumPerBatch; // 块表的基偏移量
@@ -319,9 +319,9 @@ __aicore__ inline void GmCopyInToL1HasRopePA(LocalTensor<L1Type> &nopeTensor, Lo
 }
 
 template <typename L1Type>
-__aicore__ inline void GmCopyInToL1PA(LocalTensor<L1Type> &l1Tensor, GlobalTensor<L1Type> &gmTensor,
-                                      GlobalTensor<int32_t> &blockTableGm, KVLAYOUT kvLayout, const PAShape &shape,
-                                      const Position &startPos)
+__aicore__ inline void GmCopyInToL1PA(LocalTensor<L1Type>& l1Tensor, GlobalTensor<L1Type>& gmTensor,
+                                      GlobalTensor<int32_t>& blockTableGm, KVLAYOUT kvLayout, const PAShape& shape,
+                                      const Position& startPos)
 {
     uint32_t copyFinishRowCnt = 0;
     uint64_t blockTableBaseOffset = startPos.bIdx * shape.maxblockNumPerBatch; // 块表的基偏移量
@@ -380,9 +380,9 @@ __aicore__ inline void GmCopyInToL1PA(LocalTensor<L1Type> &l1Tensor, GlobalTenso
 }
 
 template <typename L1Type>
-__aicore__ inline void GmScaleCopyInToL1PAForND(LocalTensor<L1Type> &l1Tensor, GlobalTensor<L1Type> &gmTensor,
-                                                GlobalTensor<int32_t> &blockTableGm, KVLAYOUT kvLayout,
-                                                const PAShape &shape, const Position &startPos)
+__aicore__ inline void GmScaleCopyInToL1PAForND(LocalTensor<L1Type>& l1Tensor, GlobalTensor<L1Type>& gmTensor,
+                                                GlobalTensor<int32_t>& blockTableGm, KVLAYOUT kvLayout,
+                                                const PAShape& shape, const Position& startPos)
 {
     uint32_t copyFinishRowCnt = 0;
     uint64_t blockTableBaseOffset = startPos.bIdx * shape.maxblockNumPerBatch;
@@ -426,9 +426,9 @@ __aicore__ inline void GmScaleCopyInToL1PAForND(LocalTensor<L1Type> &l1Tensor, G
 }
 
 template <typename L1Type>
-__aicore__ inline void GmScaleCopyInToL1PAForDN(LocalTensor<L1Type> &l1Tensor, GlobalTensor<L1Type> &gmTensor,
-                                                GlobalTensor<int32_t> &blockTableGm, KVLAYOUT kvLayout,
-                                                const PAShape &shape, const Position &startPos)
+__aicore__ inline void GmScaleCopyInToL1PAForDN(LocalTensor<L1Type>& l1Tensor, GlobalTensor<L1Type>& gmTensor,
+                                                GlobalTensor<int32_t>& blockTableGm, KVLAYOUT kvLayout,
+                                                const PAShape& shape, const Position& startPos)
 {
     uint32_t copyFinishRowCnts = 0;
     uint64_t blockTableBaseOffset = startPos.bIdx * shape.maxblockNumPerBatch;
@@ -472,7 +472,7 @@ __aicore__ inline void GmScaleCopyInToL1PAForDN(LocalTensor<L1Type> &l1Tensor, G
 }
 
 template <typename INPUT_T>
-__aicore__ inline void CopyToL1Nd2Nz(const LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmTensor,
+__aicore__ inline void CopyToL1Nd2Nz(const LocalTensor<INPUT_T>& l1Tensor, const GlobalTensor<INPUT_T>& gmTensor,
                                      uint32_t nValue, uint32_t dValue, uint32_t srcDValue)
 {
     Nd2NzParams gm2L1Nd2NzParams;
@@ -497,7 +497,7 @@ __aicore__ inline void CopyToL1Nd2Nz(const LocalTensor<INPUT_T> &l1Tensor, const
 }
 
 template <typename INPUT_T>
-__aicore__ inline void CopyScaleToL1Nd2Nz(const LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmTensor,
+__aicore__ inline void CopyScaleToL1Nd2Nz(const LocalTensor<INPUT_T>& l1Tensor, const GlobalTensor<INPUT_T>& gmTensor,
                                           uint32_t nValue, uint32_t dValue, uint32_t srcDValue)
 {
     Nd2NzParams gm2L1Nd2NzParams;
@@ -512,12 +512,12 @@ __aicore__ inline void CopyScaleToL1Nd2Nz(const LocalTensor<INPUT_T> &l1Tensor, 
 
     LocalTensor<bfloat16_t> l1TensorCast = l1Tensor.template ReinterpretCast<bfloat16_t>();
     GlobalTensor<bfloat16_t> gmTensorCast;
-    gmTensorCast.SetGlobalBuffer(((__gm__ bfloat16_t *)(gmTensor.GetPhyAddr())));
+    gmTensorCast.SetGlobalBuffer(((__gm__ bfloat16_t*)(gmTensor.GetPhyAddr())));
     DataCopy(l1TensorCast, gmTensorCast, gm2L1Nd2NzParams);
 }
 
 template <typename INPUT_T>
-__aicore__ inline void CopyScaleToL1Dn2Nz(const LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmTensor,
+__aicore__ inline void CopyScaleToL1Dn2Nz(const LocalTensor<INPUT_T>& l1Tensor, const GlobalTensor<INPUT_T>& gmTensor,
                                           uint32_t nValue, uint32_t dValue, uint32_t srcDValue)
 {
     Dn2NzParams gm2L1Dn2NzParams;
@@ -532,13 +532,13 @@ __aicore__ inline void CopyScaleToL1Dn2Nz(const LocalTensor<INPUT_T> &l1Tensor, 
 
     LocalTensor<bfloat16_t> l1TensorCast = l1Tensor.template ReinterpretCast<bfloat16_t>();
     GlobalTensor<bfloat16_t> gmTensorCast;
-    gmTensorCast.SetGlobalBuffer(((__gm__ bfloat16_t *)(gmTensor.GetPhyAddr())));
+    gmTensorCast.SetGlobalBuffer(((__gm__ bfloat16_t*)(gmTensor.GetPhyAddr())));
     DataCopy(l1TensorCast, gmTensorCast, gm2L1Dn2NzParams);
 }
 
 template <typename INPUT_T>
-__aicore__ inline void CopyToL1Nd2NzGS1Merge(const LocalTensor<INPUT_T> &l1Tensor,
-                                             const GlobalTensor<INPUT_T> &gmTensor, uint32_t ndNum, uint32_t nValue,
+__aicore__ inline void CopyToL1Nd2NzGS1Merge(const LocalTensor<INPUT_T>& l1Tensor,
+                                             const GlobalTensor<INPUT_T>& gmTensor, uint32_t ndNum, uint32_t nValue,
                                              uint32_t dValue, uint32_t srcNdMatrixStride, uint32_t srcDValue,
                                              uint32_t dstNzC0Stride) // BSNGD 合轴拷贝
 {

@@ -46,7 +46,7 @@ struct Axis {
         return (((ALIGN_SIZE) == 0) ? 0 : (((sizeAct) + (ALIGN_SIZE)-1) / (ALIGN_SIZE) * (ALIGN_SIZE)));
     }
 
-    __aicore__ inline bool IsTailOf(const Axis &parent) const
+    __aicore__ inline bool IsTailOf(const Axis& parent) const
     {
         return (start + sizeAct) >= parent.sizeAct;
     }
@@ -61,25 +61,25 @@ struct AxisSlices {
         uint32_t tSizeAct_;
         uint32_t splitSize_;
 
-        __aicore__ inline Iterator(const AxisSlices &slices)
+        __aicore__ inline Iterator(const AxisSlices& slices)
             : cur_(Min(slices.splitSize_, slices.sizeAct_)),
               tSizeAct_(slices.sizeAct_),
               splitSize_(slices.splitSize_)
         {}
 
-        __aicore__ inline Axis &operator*()
+        __aicore__ inline Axis& operator*()
         {
             return cur_;
         }
 
-        __aicore__ inline Iterator &operator++()
+        __aicore__ inline Iterator& operator++()
         {
             cur_.start += splitSize_;
             cur_.sizeAct = Min(splitSize_, tSizeAct_ - cur_.start);
             return *this;
         }
 
-        __aicore__ inline bool operator!=(const Sentinel &end) const
+        __aicore__ inline bool operator!=(const Sentinel& end) const
         {
             return cur_.start < end.end_;
         }

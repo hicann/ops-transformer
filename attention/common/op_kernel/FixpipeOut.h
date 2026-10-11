@@ -29,8 +29,8 @@ struct fixpipeOutParams {
 };
 
 template <typename mmOutputType, typename computeType, typename l0cType>
-__aicore__ inline void FixpipeMmCopyOutToUB(LocalTensor<mmOutputType> &mmResUb, LocalTensor<l0cType> &L0CTensor,
-                                            const fixpipeOutParams &fixpOutParam)
+__aicore__ inline void FixpipeMmCopyOutToUB(LocalTensor<mmOutputType>& mmResUb, LocalTensor<l0cType>& L0CTensor,
+                                            const fixpipeOutParams& fixpOutParam)
 {
     FixpipeParamsC310<CO2Layout::ROW_MAJOR> L0C2UbFixpParams; // L0C->UB
     L0C2UbFixpParams.nSize = (fixpOutParam.fixpOutNSize + 7) >>
@@ -54,8 +54,8 @@ __aicore__ inline void FixpipeMmCopyOutToUB(LocalTensor<mmOutputType> &mmResUb, 
 }
 
 template <typename mmOutputType, typename computeType, typename l0cType>
-__aicore__ inline void FixpipeMmCopyOutToGm(GlobalTensor<mmOutputType> &mmResGm, LocalTensor<l0cType> &L0CTensor,
-                                            const fixpipeOutParams &fixpOutParam)
+__aicore__ inline void FixpipeMmCopyOutToGm(GlobalTensor<mmOutputType>& mmResGm, LocalTensor<l0cType>& L0CTensor,
+                                            const fixpipeOutParams& fixpOutParam)
 {
     FixpipeParamsC310<CO2Layout::ROW_MAJOR> L0C2GmFixpParams; // L0C->Gm
     L0C2GmFixpParams.nSize =

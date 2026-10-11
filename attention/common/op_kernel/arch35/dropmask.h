@@ -46,8 +46,8 @@ struct DropMaskInfo {
     bool boolMode;
 };
 template <bool hasDrop, bool hasRope = false>
-__aicore__ inline uint64_t ComputeDropOffset(RunInfo<false> &runInfo, ConstInfo<false, hasRope> &constInfo,
-                                             DropMaskInfo &dropMaskInfo)
+__aicore__ inline uint64_t ComputeDropOffset(RunInfo<false>& runInfo, ConstInfo<false, hasRope>& constInfo,
+                                             DropMaskInfo& dropMaskInfo)
 {
     int64_t s2SizeAligned = CeilDiv(runInfo.actualS2Size, philoxRandomNumAlignSize) * philoxRandomNumAlignSize;
     // boidx * n2 * g* s1 * s2
@@ -77,7 +77,7 @@ __simd_vf__ inline void GenIndexAlign(const uint64_t indexVecDstLocalInt, const 
     Arange(inc_idx, 0);
     for (uint16_t s1Idx = 0; s1Idx < static_cast<uint16_t>(rowNums); s1Idx++) {
         StoreAlign<int32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B32>(
-            (__ubuf__ int32_t *&)indexVecDstLocalInt, inc_idx, eachRowIndexNum, preg);
+            (__ubuf__ int32_t*&)indexVecDstLocalInt, inc_idx, eachRowIndexNum, preg);
         Adds(inc_idx, inc_idx, eachRowOffset, preg);
     }
 }
@@ -93,11 +93,11 @@ __simd_vf__ inline void GenIndexUnAling(const uint64_t indexVecDstLocalInt, cons
 
     Arange(inc_idx, 0);
     for (uint16_t s1Idx = 0; s1Idx < static_cast<uint16_t>(rowNums); s1Idx++) {
-        StoreUnAlign<int32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ int32_t *&)indexVecDstLocalInt, inc_idx,
+        StoreUnAlign<int32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ int32_t*&)indexVecDstLocalInt, inc_idx,
                                                                   ureg, eachRowIndexNum);
         Adds(inc_idx, inc_idx, eachRowOffset, preg);
     }
-    StoreUnAlignPost<int32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ int32_t *&)indexVecDstLocalInt, ureg, 0);
+    StoreUnAlignPost<int32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ int32_t*&)indexVecDstLocalInt, ureg, 0);
 }
 
 /*
@@ -109,7 +109,7 @@ __simd_vf__ inline void GenIndexUnAling(const uint64_t indexVecDstLocalInt, cons
  * only support less equal 64
  * @param [in] eachRowOffset, each row index need add offset, eachRowOffset = CeilDiv(inputParams.s2Size, 16)
  */
-__aicore__ inline void GenIndexVec(LocalTensor<int32_t> &dropmaskIndexVec, uint32_t rowNums, uint32_t eachRowIndexNum,
+__aicore__ inline void GenIndexVec(LocalTensor<int32_t>& dropmaskIndexVec, uint32_t rowNums, uint32_t eachRowIndexNum,
                                    uint32_t eachRowOffset)
 {
     uint64_t indexVecDstLocalInt = reinterpret_cast<uint64_t>(dropmaskIndexVec.GetPhyAddr());
@@ -120,7 +120,7 @@ __aicore__ inline void GenIndexVec(LocalTensor<int32_t> &dropmaskIndexVec, uint3
     }
 }
 
-__simd_vf__ inline void GenMaskVF(__ubuf__ uint32_t *mask, const uint64_t indexVecLocalInt, const uint32_t key0,
+__simd_vf__ inline void GenMaskVF(__ubuf__ uint32_t* mask, const uint64_t indexVecLocalInt, const uint32_t key0,
                                   const uint32_t key1, const uint32_t counter0, const uint32_t counter1,
                                   const uint32_t counter2, const uint32_t counter3, const uint16_t count,
                                   const uint8_t probValueUint8Scalar, const uint16_t mainLoop)
@@ -146,14 +146,14 @@ __simd_vf__ inline void GenMaskVF(__ubuf__ uint32_t *mask, const uint64_t indexV
     Duplicate(v_const_mul_1, (uint32_t)PHILOX_CONST_MUL_1);
 
     for (uint16_t i = 0; i < mainLoop; i++) {
-        LoadAlign<int32_t, Reg::PostLiteral::POST_MODE_UPDATE>(inc_idx, ((__ubuf__ int32_t *&)indexVecLocalInt),
+        LoadAlign<int32_t, Reg::PostLiteral::POST_MODE_UPDATE>(inc_idx, ((__ubuf__ int32_t*&)indexVecLocalInt),
                                                                ELE_CNT_B32);
 
         RegTensor<uint32_t> tmp_ctr_0 = ctr_0;
         RegTensor<uint32_t> tmp_ctr_1 = ctr_1;
         RegTensor<uint32_t> tmp_ctr_2 = ctr_2;
         RegTensor<uint32_t> tmp_ctr_3 = ctr_3;
-        AddCarryOut(pd, tmp_ctr_0, ctr_0, (RegTensor<uint32_t> &)inc_idx, pg);
+        AddCarryOut(pd, tmp_ctr_0, ctr_0, (RegTensor<uint32_t>&)inc_idx, pg);
         AddCarryOuts(pd, tmp_ctr_1, ctr_1, v_zero, pd, pg);
         AddCarryOuts(pd, tmp_ctr_2, ctr_2, v_zero, pd, pg);
         AddCarryOuts(pd, tmp_ctr_3, ctr_3, v_zero, pd, pg);
@@ -179,20 +179,20 @@ __simd_vf__ inline void GenMaskVF(__ubuf__ uint32_t *mask, const uint64_t indexV
         Interleave(tmp_ctr_2, tmp_ctr_3, tmp_ctr_2, tmp_ctr_3);
 
         // uint32转成4个uint8与keepprob比较得到mask
-        RegTensor<uint8_t> tmp_ctr_0_u8 = (RegTensor<uint8_t> &)tmp_ctr_0;
-        RegTensor<uint8_t> tmp_ctr_1_u8 = (RegTensor<uint8_t> &)tmp_ctr_1;
-        RegTensor<uint8_t> tmp_ctr_2_u8 = (RegTensor<uint8_t> &)tmp_ctr_2;
-        RegTensor<uint8_t> tmp_ctr_3_u8 = (RegTensor<uint8_t> &)tmp_ctr_3;
+        RegTensor<uint8_t> tmp_ctr_0_u8 = (RegTensor<uint8_t>&)tmp_ctr_0;
+        RegTensor<uint8_t> tmp_ctr_1_u8 = (RegTensor<uint8_t>&)tmp_ctr_1;
+        RegTensor<uint8_t> tmp_ctr_2_u8 = (RegTensor<uint8_t>&)tmp_ctr_2;
+        RegTensor<uint8_t> tmp_ctr_3_u8 = (RegTensor<uint8_t>&)tmp_ctr_3;
 
         CompareScalar<uint8_t, CMPMODE::LE>(pm_0, tmp_ctr_0_u8, probValueUint8Scalar, preg);
         CompareScalar<uint8_t, CMPMODE::LE>(pm_1, tmp_ctr_1_u8, probValueUint8Scalar, preg);
         CompareScalar<uint8_t, CMPMODE::LE>(pm_2, tmp_ctr_2_u8, probValueUint8Scalar, preg);
         CompareScalar<uint8_t, CMPMODE::LE>(pm_3, tmp_ctr_3_u8, probValueUint8Scalar, preg);
         // pm是256bit，32Byte，偏移是按照Byte来的
-        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)mask, pm_0, 32);
-        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)mask, pm_1, 32);
-        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)mask, pm_2, 32);
-        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)mask, pm_3, 32);
+        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t*&)mask, pm_0, 32);
+        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t*&)mask, pm_1, 32);
+        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t*&)mask, pm_2, 32);
+        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t*&)mask, pm_3, 32);
     }
 }
 
@@ -206,11 +206,11 @@ __simd_vf__ inline void GenMaskVF(__ubuf__ uint32_t *mask, const uint64_t indexV
  * @param [in] count, The number of uint32 random numbers expected to be generated， 4 aligned
  * @param [in] probValueUint8Scalar, keepprob*MAX_UINT8
  */
-__aicore__ inline void GenMaskByIndexVec(const LocalTensor<uint8_t> &dstLocal, const LocalTensor<int32_t> &indexUb,
-                                         const PhiloxKey &philoxkey, const PhiloxCounter &philoxCounter, uint16_t count,
+__aicore__ inline void GenMaskByIndexVec(const LocalTensor<uint8_t>& dstLocal, const LocalTensor<int32_t>& indexUb,
+                                         const PhiloxKey& philoxkey, const PhiloxCounter& philoxCounter, uint16_t count,
                                          uint8_t probValueUint8Scalar)
 {
-    __ubuf__ uint32_t *mask = (__ubuf__ uint32_t *)dstLocal.GetPhyAddr();
+    __ubuf__ uint32_t* mask = (__ubuf__ uint32_t*)dstLocal.GetPhyAddr();
     uint64_t indexVecLocalInt = reinterpret_cast<uint64_t>(indexUb.GetPhyAddr());
 
     // 一次可以生成256个uint32的随机数, 如果不够256，生成的mask后面有一部分脏数据，dropout计算中只使用前面的有效数据
@@ -221,9 +221,9 @@ __aicore__ inline void GenMaskByIndexVec(const LocalTensor<uint8_t> &dstLocal, c
 }
 
 template <bool hasRope = false>
-__aicore__ inline void GenDropMask(TBuf<> &dropMaskBuf, TBuf<> &maskIndexBuf, uint64_t maskOffset,
-                                   RunInfo<false> &runInfo, ConstInfo<false, hasRope> &constInfo,
-                                   DropMaskInfo &dropMaskInfo)
+__aicore__ inline void GenDropMask(TBuf<>& dropMaskBuf, TBuf<>& maskIndexBuf, uint64_t maskOffset,
+                                   RunInfo<false>& runInfo, ConstInfo<false, hasRope>& constInfo,
+                                   DropMaskInfo& dropMaskInfo)
 {
     // 一次philox算法可以生成16个uint8的随机数
     uint64_t dropMaskOffset = CeilDiv(maskOffset, philoxRandomNumAlignSize);
@@ -259,8 +259,8 @@ __aicore__ inline void GenDropMask(TBuf<> &dropMaskBuf, TBuf<> &maskIndexBuf, ui
 }
 
 template <bool hasDrop, bool hasRope = false>
-__aicore__ inline void GenDropMask(TBuf<> &dropMaskBuf, TBuf<> &maskIndexBuf, RunInfo<false> &runInfo,
-                                   ConstInfo<false, hasRope> &constInfo, DropMaskInfo &dropMaskInfo)
+__aicore__ inline void GenDropMask(TBuf<>& dropMaskBuf, TBuf<>& maskIndexBuf, RunInfo<false>& runInfo,
+                                   ConstInfo<false, hasRope>& constInfo, DropMaskInfo& dropMaskInfo)
 {
     if constexpr (hasDrop == true) {
         int64_t dropMaskOffset = ComputeDropOffset<hasDrop>(runInfo, constInfo, dropMaskInfo);
@@ -269,7 +269,7 @@ __aicore__ inline void GenDropMask(TBuf<> &dropMaskBuf, TBuf<> &maskIndexBuf, Ru
     }
 }
 
-__aicore__ inline void BoolCopyIn(LocalTensor<uint8_t> &dstTensor, GlobalTensor<uint8_t> &srcTensor, int64_t srcOffset,
+__aicore__ inline void BoolCopyIn(LocalTensor<uint8_t>& dstTensor, GlobalTensor<uint8_t>& srcTensor, int64_t srcOffset,
                                   uint32_t s1Size, uint32_t s2Size, int64_t totalS2Size, int64_t s2BaseSize)
 {
     if (s1Size == 0 || s2Size == 0) {
@@ -291,7 +291,7 @@ __aicore__ inline void BoolCopyIn(LocalTensor<uint8_t> &dstTensor, GlobalTensor<
     }
 }
 
-__aicore__ inline void Bit2Int8CopyIn(LocalTensor<uint8_t> &dstTensor, GlobalTensor<uint8_t> &srcTensor,
+__aicore__ inline void Bit2Int8CopyIn(LocalTensor<uint8_t>& dstTensor, GlobalTensor<uint8_t>& srcTensor,
                                       int64_t srcOffset, uint32_t s1Size, uint32_t s2Size, int64_t totalS2Size,
                                       int64_t s2BaseSize)
 {
@@ -317,8 +317,8 @@ __aicore__ inline void Bit2Int8CopyIn(LocalTensor<uint8_t> &dstTensor, GlobalTen
 }
 
 template <bool hasDrop, bool hasRope = false>
-__aicore__ inline int64_t ComputeOuterDropOffset(RunInfo<false> &runInfo, ConstInfo<false, hasRope> &constInfo,
-                                                 DropMaskInfo &dropMaskInfo)
+__aicore__ inline int64_t ComputeOuterDropOffset(RunInfo<false>& runInfo, ConstInfo<false, hasRope>& constInfo,
+                                                 DropMaskInfo& dropMaskInfo)
 {
     if constexpr (hasDrop == true) {
         // boidx * n2 * g* s1 * s2
@@ -344,14 +344,14 @@ __simd_vf__ inline void DropMaskBool2BitVF(const uint64_t srcUb, const uint64_t 
     MaskReg preg_all = CreateMask<uint8_t, MaskPattern::ALL>();
 
     for (uint16_t i = 0; i < loopCount; ++i) {
-        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>(vreg_drop, (__ubuf__ uint32_t *&)srcUb, OFFSET_64);
-        RegTensor<uint8_t> vreg_tmp = (RegTensor<uint8_t> &)vreg_drop;
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>(vreg_drop, (__ubuf__ uint32_t*&)srcUb, OFFSET_64);
+        RegTensor<uint8_t> vreg_tmp = (RegTensor<uint8_t>&)vreg_drop;
         CompareScalar<uint8_t, CMPMODE::EQ>(vreg_cmp, vreg_tmp, 1, preg_all);
-        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)dstUb, vreg_cmp, OFFSET_32);
+        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t*&)dstUb, vreg_cmp, OFFSET_32);
     }
 }
 
-__aicore__ inline void DropMaskBool2Bit(LocalTensor<uint8_t> &dstTensor, LocalTensor<uint8_t> &srcTensor,
+__aicore__ inline void DropMaskBool2Bit(LocalTensor<uint8_t>& dstTensor, LocalTensor<uint8_t>& srcTensor,
                                         int32_t halfS1RealSize, int64_t s2BaseSize)
 {
     uint64_t srcUb = reinterpret_cast<uint64_t>(srcTensor.GetPhyAddr());
@@ -374,16 +374,16 @@ __simd_vf__ inline void DropMaskPadDelVF(const uint64_t srcUb, const uint64_t ds
         // srcUb: 12340000 srcUb: 56780000
         // preg1: 11223344 preg2: 55667788
         LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_US>(
-            preg1, (__ubuf__ uint32_t *&)srcUb, OFFSET_32);
+            preg1, (__ubuf__ uint32_t*&)srcUb, OFFSET_32);
         LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_US>(
-            preg2, (__ubuf__ uint32_t *&)srcUb, OFFSET_32);
+            preg2, (__ubuf__ uint32_t*&)srcUb, OFFSET_32);
         // preg3: 12345678
         MaskDeInterleave<uint8_t>(preg3, preg4, preg1, preg2);
-        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)dstUb, preg3, OFFSET_32);
+        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t*&)dstUb, preg3, OFFSET_32);
     }
 }
 
-__aicore__ inline void DropMaskPadDel(LocalTensor<uint8_t> &dstTensor, LocalTensor<uint8_t> &srcTensor,
+__aicore__ inline void DropMaskPadDel(LocalTensor<uint8_t>& dstTensor, LocalTensor<uint8_t>& srcTensor,
                                       int32_t halfS1RealSize, int64_t s2BaseSize)
 {
     uint64_t srcUb = reinterpret_cast<uint64_t>(srcTensor.GetPhyAddr());
@@ -394,9 +394,9 @@ __aicore__ inline void DropMaskPadDel(LocalTensor<uint8_t> &dstTensor, LocalTens
 }
 
 template <bool hasDrop, bool hasRope = false>
-__aicore__ inline void CopyInDropOuter(TBuf<> &dropMaskBuf, TQue<QuePosition::VECIN, 1> &dropMaskInQue,
-                                       GlobalTensor<uint8_t> &srcTensor, RunInfo<false> &runInfo,
-                                       ConstInfo<false, hasRope> &constInfo, DropMaskInfo &dropMaskInfo)
+__aicore__ inline void CopyInDropOuter(TBuf<>& dropMaskBuf, TQue<QuePosition::VECIN, 1>& dropMaskInQue,
+                                       GlobalTensor<uint8_t>& srcTensor, RunInfo<false>& runInfo,
+                                       ConstInfo<false, hasRope>& constInfo, DropMaskInfo& dropMaskInfo)
 {
     if constexpr (hasDrop == true) {
         int64_t dropMaskOffset = ComputeOuterDropOffset<hasDrop>(runInfo, constInfo, dropMaskInfo);

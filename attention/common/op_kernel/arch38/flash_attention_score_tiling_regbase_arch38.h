@@ -796,11 +796,11 @@ public:
     {
         this->splitFactorTailSize = splitFactorTailSizeParam;
     }
-    uint32_t *get_bnStartIdxPtr()
+    uint32_t* get_bnStartIdxPtr()
     {
         return bnStartIdx;
     }
-    int64_t *get_sparseStartIdxPtr()
+    int64_t* get_sparseStartIdxPtr()
     {
         return sparseStartIdx;
     }
@@ -880,7 +880,7 @@ public:
     {
         this->isOneN = isOneNParam;
     }
-    uint8_t *get_rsvdPtr()
+    uint8_t* get_rsvdPtr()
     {
         return rsvd;
     }

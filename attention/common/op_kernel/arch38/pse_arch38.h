@@ -51,7 +51,7 @@ struct PseInfo {
 };
 
 template <typename INPUT_T, bool hasPse>
-__aicore__ inline void DataCopyInCommon(LocalTensor<INPUT_T> &dstTensor, GlobalTensor<INPUT_T> &srcTensor,
+__aicore__ inline void DataCopyInCommon(LocalTensor<INPUT_T>& dstTensor, GlobalTensor<INPUT_T>& srcTensor,
                                         int64_t offset, int64_t s1Size, int64_t s2Size, int64_t actualS2Len,
                                         int32_t s2BaseSize)
 {
@@ -81,7 +81,7 @@ __aicore__ inline void DataCopyInCommon(LocalTensor<INPUT_T> &dstTensor, GlobalT
 }
 
 template <typename INPUT_T, bool hasPse>
-__aicore__ inline void DataCopyIn(LocalTensor<INPUT_T> &dstTensor, GlobalTensor<INPUT_T> &srcTensor, int64_t offset,
+__aicore__ inline void DataCopyIn(LocalTensor<INPUT_T>& dstTensor, GlobalTensor<INPUT_T>& srcTensor, int64_t offset,
                                   int64_t s1Size, int64_t s2Size, int64_t s2BaseSize, int64_t actualS2Len)
 {
     if constexpr (hasPse == true) {
@@ -90,7 +90,7 @@ __aicore__ inline void DataCopyIn(LocalTensor<INPUT_T> &dstTensor, GlobalTensor<
 }
 
 template <typename INPUT_T, bool hasPse>
-__aicore__ inline void DataCopyInAlign8(LocalTensor<INPUT_T> &dstTensor, GlobalTensor<INPUT_T> &srcTensor,
+__aicore__ inline void DataCopyInAlign8(LocalTensor<INPUT_T>& dstTensor, GlobalTensor<INPUT_T>& srcTensor,
                                         int64_t offset, int64_t s1Size, int64_t s2Size, int64_t actualS2Len)
 {
     if constexpr (hasPse == true) {
@@ -104,8 +104,8 @@ __aicore__ inline void DataCopyInAlign8(LocalTensor<INPUT_T> &dstTensor, GlobalT
 }
 
 template <bool hasPse, bool isInfer = false, bool hasRope = false>
-__aicore__ inline int64_t PseComputeOffset(const RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo,
-                                           PseInfo &pseInfo)
+__aicore__ inline int64_t PseComputeOffset(const RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo,
+                                           PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         if constexpr (isInfer) {
@@ -140,8 +140,8 @@ __aicore__ inline int64_t PseComputeOffset(const RunInfo<isInfer> &runInfo, Cons
 }
 
 template <bool hasPse, bool isInfer = false, bool hasRope = false>
-__aicore__ inline int64_t PseAlibiComputeOffset(const RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo,
-                                                PseInfo &pseInfo)
+__aicore__ inline int64_t PseAlibiComputeOffset(const RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo,
+                                                PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         int64_t bOffset = (runInfo.boIdx % pseInfo.pseBSize) * constInfo.n2G * pseInfo.pseS2Size * pseInfo.pseS1Size;
@@ -188,8 +188,8 @@ __aicore__ inline int64_t PseAlibiComputeOffset(const RunInfo<isInfer> &runInfo,
 }
 
 template <bool hasPse, bool isInfer = false, bool hasRope = false>
-__aicore__ inline bool NeedPseAlibiCompute(const RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo,
-                                           PseInfo &pseInfo)
+__aicore__ inline bool NeedPseAlibiCompute(const RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo,
+                                           PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         // Alibi编码只计算下三角
@@ -204,9 +204,9 @@ __aicore__ inline bool NeedPseAlibiCompute(const RunInfo<isInfer> &runInfo, Cons
 }
 
 template <typename T, typename INPUT_T, bool hasPse, bool isInfer = false, bool hasRope = false>
-__aicore__ inline void PseAlibiCopyIn(LocalTensor<INPUT_T> &dstTensor, GlobalTensor<INPUT_T> &srcTensor,
-                                      const RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo,
-                                      PseInfo &pseInfo)
+__aicore__ inline void PseAlibiCopyIn(LocalTensor<INPUT_T>& dstTensor, GlobalTensor<INPUT_T>& srcTensor,
+                                      const RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo,
+                                      PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         if (!NeedPseAlibiCompute<hasPse>(runInfo, constInfo, pseInfo)) {
@@ -226,9 +226,9 @@ __aicore__ inline void PseAlibiCopyIn(LocalTensor<INPUT_T> &dstTensor, GlobalTen
 }
 
 template <typename T, typename INPUT_T, bool hasPse, bool isInfer = false, bool hasRope = false>
-__aicore__ inline void PseCopyIn(LocalTensor<INPUT_T> &dstTensor, GlobalTensor<INPUT_T> &srcTensor,
-                                 const RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo,
-                                 PseInfo &pseInfo)
+__aicore__ inline void PseCopyIn(LocalTensor<INPUT_T>& dstTensor, GlobalTensor<INPUT_T>& srcTensor,
+                                 const RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo,
+                                 PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         if (pseInfo.pseEncodeType == pseEncodeALibiS2Full) {
@@ -254,9 +254,9 @@ __aicore__ inline void PseCopyIn(LocalTensor<INPUT_T> &dstTensor, GlobalTensor<I
 }
 
 template <typename T, typename INPUT_T, bool hasPse, bool isInfer = false, bool hasRope = false>
-__aicore__ inline void PseCopyIn(TQue<QuePosition::VECIN, 1> &pseInQue, GlobalTensor<INPUT_T> &srcTensor,
-                                 const RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo,
-                                 PseInfo &pseInfo)
+__aicore__ inline void PseCopyIn(TQue<QuePosition::VECIN, 1>& pseInQue, GlobalTensor<INPUT_T>& srcTensor,
+                                 const RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo,
+                                 PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         LocalTensor<INPUT_T> pseUb = pseInQue.template AllocTensor<INPUT_T>();
@@ -287,9 +287,9 @@ __aicore__ inline void PseCopyIn(TQue<QuePosition::VECIN, 1> &pseInQue, GlobalTe
 }
 
 template <typename T, typename INPUT_T, bool hasPse, bool isInfer = false, bool hasRope = false>
-__aicore__ inline void ComputeInnerPseOffset(float &slopes, float &posShift, const RunInfo<isInfer> &runInfo,
-                                             ConstInfo<isInfer, hasRope> &constInfo, PseInfo &pseInfo,
-                                             __gm__ uint8_t *pseSlope)
+__aicore__ inline void ComputeInnerPseOffset(float& slopes, float& posShift, const RunInfo<isInfer>& runInfo,
+                                             ConstInfo<isInfer, hasRope>& constInfo, PseInfo& pseInfo,
+                                             __gm__ uint8_t* pseSlope)
 {
     if constexpr (hasPse) {
         if (pseInfo.pseType != (uint32_t)PseTypeEnum::PSE_INNER_MUL_ADD_TYPE &&
@@ -303,7 +303,7 @@ __aicore__ inline void ComputeInnerPseOffset(float &slopes, float &posShift, con
             bOffset = runInfo.boIdx * constInfo.n2G;
         }
         int64_t offset = bOffset + n2Offset + gOffset;
-        slopes = ((__gm__ T *)pseSlope)[offset] * -1;
+        slopes = ((__gm__ T*)pseSlope)[offset] * -1;
         int64_t s1Offset = runInfo.s1oIdx * constInfo.s1BaseSize + runInfo.vecCoreOffset;
         int64_t s2Offset = runInfo.s2StartIdx + runInfo.s2LoopCount * constInfo.s2BaseSize;
         if constexpr (isInfer) {

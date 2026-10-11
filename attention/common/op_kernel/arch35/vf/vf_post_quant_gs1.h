@@ -16,7 +16,7 @@
 #include "vf_post_quant_common.h"
 namespace FaVectorApi {
 
-__simd_vf__ inline void CastBf16ToFp32VF(__ubuf__ float *dstFp32Ub, __ubuf__ bfloat16_t *srcBf16Ub,
+__simd_vf__ inline void CastBf16ToFp32VF(__ubuf__ float* dstFp32Ub, __ubuf__ bfloat16_t* srcBf16Ub,
                                          uint32_t elementCount)
 {
     RegTensor<bfloat16_t> vregSrc;
@@ -41,8 +41,8 @@ __simd_vf__ inline void CastBf16ToFp32VF(__ubuf__ float *dstFp32Ub, __ubuf__ bfl
 }
 
 template <typename T, typename OUTPUT_T, typename POSTQUANT_PARAMS_T>
-__simd_vf__ inline void PostQuantPerChnlNoOffsetImplVF(__ubuf__ OUTPUT_T *dstUb, __ubuf__ T *srcUb,
-                                                       __ubuf__ POSTQUANT_PARAMS_T *scaleUb, uint32_t src1Offset,
+__simd_vf__ inline void PostQuantPerChnlNoOffsetImplVF(__ubuf__ OUTPUT_T* dstUb, __ubuf__ T* srcUb,
+                                                       __ubuf__ POSTQUANT_PARAMS_T* scaleUb, uint32_t src1Offset,
                                                        uint32_t src0Offset, uint32_t floatRepSize, uint32_t mask_all,
                                                        uint32_t dLoops, uint32_t dTailLoop, uint32_t maskTail,
                                                        uint32_t loopsOffset)
@@ -76,9 +76,9 @@ __simd_vf__ inline void PostQuantPerChnlNoOffsetImplVF(__ubuf__ OUTPUT_T *dstUb,
 }
 
 template <typename T, typename OUTPUT_T, typename POSTQUANT_PARAMS_T>
-__simd_vf__ inline void PostQuantPerChnlOffsetImplVF(__ubuf__ OUTPUT_T *dstUb, __ubuf__ T *srcUb,
-                                                     __ubuf__ POSTQUANT_PARAMS_T *scaleUb,
-                                                     __ubuf__ POSTQUANT_PARAMS_T *offsetUb, uint32_t src1Offset,
+__simd_vf__ inline void PostQuantPerChnlOffsetImplVF(__ubuf__ OUTPUT_T* dstUb, __ubuf__ T* srcUb,
+                                                     __ubuf__ POSTQUANT_PARAMS_T* scaleUb,
+                                                     __ubuf__ POSTQUANT_PARAMS_T* offsetUb, uint32_t src1Offset,
                                                      uint32_t src0Offset, uint32_t floatRepSize, uint32_t mask_all,
                                                      uint32_t dLoops, uint32_t dTailLoop, uint32_t maskTail,
                                                      uint32_t loopsOffset)
@@ -119,16 +119,16 @@ __simd_vf__ inline void PostQuantPerChnlOffsetImplVF(__ubuf__ OUTPUT_T *dstUb, _
 }
 
 template <typename T, typename OUTPUT_T, typename POSTQUANT_PARAMS_T>
-__aicore__ inline void PostQuantPerChnlNoOffsetS1GImpl(const LocalTensor<OUTPUT_T> &dstTensor,
-                                                       const LocalTensor<T> &srcTensor,
-                                                       const LocalTensor<POSTQUANT_PARAMS_T> &scaleTensor,
+__aicore__ inline void PostQuantPerChnlNoOffsetS1GImpl(const LocalTensor<OUTPUT_T>& dstTensor,
+                                                       const LocalTensor<T>& srcTensor,
+                                                       const LocalTensor<POSTQUANT_PARAMS_T>& scaleTensor,
                                                        uint32_t gSize, uint32_t s1Size, uint32_t dSize, uint32_t gS1Idx,
                                                        uint32_t gS1DealSize, uint32_t colCount)
 
 {
-    __ubuf__ OUTPUT_T *dstUb = (__ubuf__ OUTPUT_T *)dstTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
-    __ubuf__ POSTQUANT_PARAMS_T *scaleUb = (__ubuf__ POSTQUANT_PARAMS_T *)scaleTensor.GetPhyAddr();
+    __ubuf__ OUTPUT_T* dstUb = (__ubuf__ OUTPUT_T*)dstTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
+    __ubuf__ POSTQUANT_PARAMS_T* scaleUb = (__ubuf__ POSTQUANT_PARAMS_T*)scaleTensor.GetPhyAddr();
     const uint16_t floatRepSize = 64;
     uint16_t preg_all = 64;
     uint16_t preg_tail = colCount % 64;
@@ -179,15 +179,15 @@ __aicore__ inline void PostQuantPerChnlNoOffsetS1GImpl(const LocalTensor<OUTPUT_
 }
 
 template <typename T, typename OUTPUT_T, typename POSTQUANT_PARAMS_T>
-__aicore__ inline void PostQuantPerChnlNoOffsetGS1Impl(const LocalTensor<OUTPUT_T> &dstTensor,
-                                                       const LocalTensor<T> &srcTensor,
-                                                       const LocalTensor<POSTQUANT_PARAMS_T> &scaleTensor,
+__aicore__ inline void PostQuantPerChnlNoOffsetGS1Impl(const LocalTensor<OUTPUT_T>& dstTensor,
+                                                       const LocalTensor<T>& srcTensor,
+                                                       const LocalTensor<POSTQUANT_PARAMS_T>& scaleTensor,
                                                        uint32_t gSize, uint32_t s1Size, uint32_t dSize, uint32_t gS1Idx,
                                                        uint32_t gS1DealSize, uint32_t colCount)
 {
-    __ubuf__ OUTPUT_T *dstUb = (__ubuf__ OUTPUT_T *)dstTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
-    __ubuf__ POSTQUANT_PARAMS_T *scaleUb = (__ubuf__ POSTQUANT_PARAMS_T *)scaleTensor.GetPhyAddr();
+    __ubuf__ OUTPUT_T* dstUb = (__ubuf__ OUTPUT_T*)dstTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
+    __ubuf__ POSTQUANT_PARAMS_T* scaleUb = (__ubuf__ POSTQUANT_PARAMS_T*)scaleTensor.GetPhyAddr();
     uint16_t preg_all = 64;
     uint16_t preg_tail = colCount % 64;
     const uint16_t floatRepSize = 64;
@@ -232,17 +232,17 @@ __aicore__ inline void PostQuantPerChnlNoOffsetGS1Impl(const LocalTensor<OUTPUT_
 }
 
 template <typename T, typename OUTPUT_T, typename POSTQUANT_PARAMS_T>
-__aicore__ inline void PostQuantPerChnlWithOffsetS1GImpl(const LocalTensor<OUTPUT_T> &dstTensor,
-                                                         const LocalTensor<T> &srcTensor,
-                                                         const LocalTensor<POSTQUANT_PARAMS_T> &scaleTensor,
-                                                         const LocalTensor<POSTQUANT_PARAMS_T> &offsetTensor,
+__aicore__ inline void PostQuantPerChnlWithOffsetS1GImpl(const LocalTensor<OUTPUT_T>& dstTensor,
+                                                         const LocalTensor<T>& srcTensor,
+                                                         const LocalTensor<POSTQUANT_PARAMS_T>& scaleTensor,
+                                                         const LocalTensor<POSTQUANT_PARAMS_T>& offsetTensor,
                                                          uint32_t gSize, uint32_t s1Size, uint32_t dSize,
                                                          uint32_t gS1Idx, uint32_t gS1DealSize, uint32_t colCount)
 {
-    __ubuf__ OUTPUT_T *dstUb = (__ubuf__ OUTPUT_T *)dstTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
-    __ubuf__ POSTQUANT_PARAMS_T *scaleUb = (__ubuf__ POSTQUANT_PARAMS_T *)scaleTensor.GetPhyAddr();
-    __ubuf__ POSTQUANT_PARAMS_T *offsetUb = (__ubuf__ POSTQUANT_PARAMS_T *)offsetTensor.GetPhyAddr();
+    __ubuf__ OUTPUT_T* dstUb = (__ubuf__ OUTPUT_T*)dstTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
+    __ubuf__ POSTQUANT_PARAMS_T* scaleUb = (__ubuf__ POSTQUANT_PARAMS_T*)scaleTensor.GetPhyAddr();
+    __ubuf__ POSTQUANT_PARAMS_T* offsetUb = (__ubuf__ POSTQUANT_PARAMS_T*)offsetTensor.GetPhyAddr();
     const uint16_t floatRepSize = 64;
     uint16_t preg_all = 64;
     uint16_t preg_tail = colCount % 64;
@@ -293,17 +293,17 @@ __aicore__ inline void PostQuantPerChnlWithOffsetS1GImpl(const LocalTensor<OUTPU
 }
 
 template <typename T, typename OUTPUT_T, typename POSTQUANT_PARAMS_T>
-__aicore__ inline void PostQuantPerChnlWithOffsetGS1Impl(const LocalTensor<OUTPUT_T> &dstTensor,
-                                                         const LocalTensor<T> &srcTensor,
-                                                         const LocalTensor<POSTQUANT_PARAMS_T> &scaleTensor,
-                                                         const LocalTensor<POSTQUANT_PARAMS_T> &offsetTensor,
+__aicore__ inline void PostQuantPerChnlWithOffsetGS1Impl(const LocalTensor<OUTPUT_T>& dstTensor,
+                                                         const LocalTensor<T>& srcTensor,
+                                                         const LocalTensor<POSTQUANT_PARAMS_T>& scaleTensor,
+                                                         const LocalTensor<POSTQUANT_PARAMS_T>& offsetTensor,
                                                          uint32_t gSize, uint32_t s1Size, uint32_t dSize,
                                                          uint32_t gS1Idx, uint32_t gS1DealSize, uint32_t colCount)
 {
-    __ubuf__ OUTPUT_T *dstUb = (__ubuf__ OUTPUT_T *)dstTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
-    __ubuf__ POSTQUANT_PARAMS_T *offsetUb = (__ubuf__ POSTQUANT_PARAMS_T *)offsetTensor.GetPhyAddr();
-    __ubuf__ POSTQUANT_PARAMS_T *scaleUb = (__ubuf__ POSTQUANT_PARAMS_T *)scaleTensor.GetPhyAddr();
+    __ubuf__ OUTPUT_T* dstUb = (__ubuf__ OUTPUT_T*)dstTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
+    __ubuf__ POSTQUANT_PARAMS_T* offsetUb = (__ubuf__ POSTQUANT_PARAMS_T*)offsetTensor.GetPhyAddr();
+    __ubuf__ POSTQUANT_PARAMS_T* scaleUb = (__ubuf__ POSTQUANT_PARAMS_T*)scaleTensor.GetPhyAddr();
     const uint16_t floatRepSize = 64;
     uint16_t preg_all = 64;
     uint16_t preg_tail = colCount % 64;
@@ -348,11 +348,11 @@ __aicore__ inline void PostQuantPerChnlWithOffsetGS1Impl(const LocalTensor<OUTPU
 }
 
 template <typename T, typename OUTPUT_T, typename POSTQUANT_PARAMS_T, bool isS1G>
-__aicore__ inline void PostQuantPerChnlOffsetImpl(const LocalTensor<OUTPUT_T> &dstTensor,
-                                                  const LocalTensor<T> &srcTensor,
-                                                  const LocalTensor<POSTQUANT_PARAMS_T> &scaleTensor,
-                                                  const LocalTensor<POSTQUANT_PARAMS_T> &offsetTensor,
-                                                  PostQuantInfo_V2 &postQuantInfo)
+__aicore__ inline void PostQuantPerChnlOffsetImpl(const LocalTensor<OUTPUT_T>& dstTensor,
+                                                  const LocalTensor<T>& srcTensor,
+                                                  const LocalTensor<POSTQUANT_PARAMS_T>& scaleTensor,
+                                                  const LocalTensor<POSTQUANT_PARAMS_T>& offsetTensor,
+                                                  PostQuantInfo_V2& postQuantInfo)
 {
     uint32_t gS1Idx = postQuantInfo.gS1Idx;
     uint32_t colCount = postQuantInfo.colCount;
@@ -370,10 +370,10 @@ __aicore__ inline void PostQuantPerChnlOffsetImpl(const LocalTensor<OUTPUT_T> &d
 }
 
 template <typename T, typename OUTPUT_T, typename POSTQUANT_PARAMS_T, bool isS1G>
-__aicore__ inline void PostQuantPerChnlNoOffsetImpl(const LocalTensor<OUTPUT_T> &dstTensor,
-                                                    const LocalTensor<T> &srcTensor,
-                                                    const LocalTensor<POSTQUANT_PARAMS_T> &scaleTensor,
-                                                    PostQuantInfo_V2 &postQuantInfo)
+__aicore__ inline void PostQuantPerChnlNoOffsetImpl(const LocalTensor<OUTPUT_T>& dstTensor,
+                                                    const LocalTensor<T>& srcTensor,
+                                                    const LocalTensor<POSTQUANT_PARAMS_T>& scaleTensor,
+                                                    PostQuantInfo_V2& postQuantInfo)
 {
     uint32_t gS1Idx = postQuantInfo.gS1Idx;
     uint32_t colCount = postQuantInfo.colCount;

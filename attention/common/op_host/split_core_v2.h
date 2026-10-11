@@ -177,12 +177,12 @@ struct CostInfo {
 
 // 分核功能模块内部使用：分核过程中，case基本信息的上下文信息，组合以减少接口传参数量
 struct SplitContext {
-    const BaseInfo &baseInfo{0U};
+    const BaseInfo& baseInfo{0U};
     SplitParam splitParam{};
     SplitInfo splitInfo{0U};
     CostInfo costInfo{0U};
 
-    explicit SplitContext(const BaseInfo &info, SplitParam param)
+    explicit SplitContext(const BaseInfo& info, SplitParam param)
         : baseInfo(info),
           splitParam(param),
           splitInfo(info.bSize),
@@ -240,43 +240,43 @@ struct AssignContext {
 };
 
 // util
-uint32_t GetS1SeqSize(uint32_t bIdx, const BaseInfo &baseInfo);
-uint32_t GetS2SeqSize(uint32_t bIdx, const BaseInfo &baseInfo);
-int64_t CalcPreTokenLeftUp(uint32_t s1Size, uint32_t s2Size, const BaseInfo &baseInfo);
-int64_t CalcNextTokenLeftUp(uint32_t s1Size, uint32_t s2Size, const BaseInfo &baseInfo);
-Range<uint32_t> CalcS2Range(uint32_t mIdx, const BaseInfo &baseInfo, const SplitParam &splitParam,
-                            const BatchCache &batchCache);
+uint32_t GetS1SeqSize(uint32_t bIdx, const BaseInfo& baseInfo);
+uint32_t GetS2SeqSize(uint32_t bIdx, const BaseInfo& baseInfo);
+int64_t CalcPreTokenLeftUp(uint32_t s1Size, uint32_t s2Size, const BaseInfo& baseInfo);
+int64_t CalcNextTokenLeftUp(uint32_t s1Size, uint32_t s2Size, const BaseInfo& baseInfo);
+Range<uint32_t> CalcS2Range(uint32_t mIdx, const BaseInfo& baseInfo, const SplitParam& splitParam,
+                            const BatchCache& batchCache);
 int64_t CalcCost(uint32_t basicM, uint32_t basicS2);
 BlockCost<int64_t> CalcCostTable(uint32_t s1NormalSize, uint32_t s2NormalSize, uint32_t mTailSize, uint32_t s2TailSize);
 
 // cache calculation
-void CalcBatchCache(uint32_t bIdx, const SplitContext &splitContext, BatchCache &batchCache);
-void CalcMCache(uint32_t mIdx, const SplitContext &splitContext, const BatchCache &batchCache, MCache &mCache);
-void CopyTmpResult(FAMetaData &tmpRes, FAMetaData &splitRes);
-void ClearTmpResult(FAMetaData &tmpResult);
+void CalcBatchCache(uint32_t bIdx, const SplitContext& splitContext, BatchCache& batchCache);
+void CalcMCache(uint32_t mIdx, const SplitContext& splitContext, const BatchCache& batchCache, MCache& mCache);
+void CopyTmpResult(FAMetaData& tmpRes, FAMetaData& splitRes);
+void ClearTmpResult(FAMetaData& tmpResult);
 
 // preprocess
-void CalcSplitInfo(SplitContext &splitContext);
-void CalcBatchCost(uint32_t bIdx, const SplitContext &splitContext, CostInfo &costInfo);
-void CalcCostInfo(SplitContext &splitContext);
+void CalcSplitInfo(SplitContext& splitContext);
+void CalcBatchCost(uint32_t bIdx, const SplitContext& splitContext, CostInfo& costInfo);
+void CalcCostInfo(SplitContext& splitContext);
 
 // assign
-void UpdateCursor(const SplitContext &splitContext, AssignContext &assignContext);
-void AssignByBatch(const SplitContext &splitContext, AssignContext &assignContext);
-void AssignByRow(const SplitContext &splitContext, AssignContext &assignContext);
-void AssignByBlock(const SplitContext &splitContext, AssignContext &assignContext);
-void ForceAssign(const SplitContext &splitContext, AssignContext &assignContext);
+void UpdateCursor(const SplitContext& splitContext, AssignContext& assignContext);
+void AssignByBatch(const SplitContext& splitContext, AssignContext& assignContext);
+void AssignByRow(const SplitContext& splitContext, AssignContext& assignContext);
+void AssignByBlock(const SplitContext& splitContext, AssignContext& assignContext);
+void ForceAssign(const SplitContext& splitContext, AssignContext& assignContext);
 
 // FD
-bool IsNeedRecordFDInfo(const AssignContext &assignContext, const FAMetaData &splitRes);
-void RecordFDInfo(const SplitContext &splitContext, const AssignContext &assignContext, FAMetaData &result);
+bool IsNeedRecordFDInfo(const AssignContext& assignContext, const FAMetaData& splitRes);
+void RecordFDInfo(const SplitContext& splitContext, const AssignContext& assignContext, FAMetaData& result);
 
 // main
-void SplitFD(FAMetaData &result);
-void CalcSplitPlan(uint32_t coreNum, int64_t costLimit, const SplitContext &splitContext, FAMetaData &result);
-bool CheckChooseWithFd(int64_t noFdCost, int64_t withFdCost, uint32_t actualMFdsize, const SplitParam &param);
-void LogSplitCoreInput(const BaseInfo &baseInfo, const SplitParam &param);
-void LogSplitCoreResult(const FAMetaData &result);
-void SplitCore(uint32_t coreNum, const BaseInfo &baseInfo, const SplitParam &param, FAMetaData &result);
+void SplitFD(FAMetaData& result);
+void CalcSplitPlan(uint32_t coreNum, int64_t costLimit, const SplitContext& splitContext, FAMetaData& result);
+bool CheckChooseWithFd(int64_t noFdCost, int64_t withFdCost, uint32_t actualMFdsize, const SplitParam& param);
+void LogSplitCoreInput(const BaseInfo& baseInfo, const SplitParam& param);
+void LogSplitCoreResult(const FAMetaData& result);
+void SplitCore(uint32_t coreNum, const BaseInfo& baseInfo, const SplitParam& param, FAMetaData& result);
 } // namespace split_core_v2
 #endif

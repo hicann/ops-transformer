@@ -68,8 +68,8 @@ __aicore__ inline bool IsExistInvalidRows(int64_t nextTokensPerBatch, int64_t pr
     return false;
 }
 
-__aicore__ inline void GetSafeActToken(int64_t actSeqLensQ, int64_t actSeqLensKv, int64_t &safePreToken,
-                                       int64_t &safeNextToken, uint32_t mode)
+__aicore__ inline void GetSafeActToken(int64_t actSeqLensQ, int64_t actSeqLensKv, int64_t& safePreToken,
+                                       int64_t& safeNextToken, uint32_t mode)
 {
     if (mode == DEFAULT_MASK) {
         safePreToken = AttentionCommon::Max(-actSeqLensKv, safePreToken);
@@ -402,7 +402,7 @@ __aicore__ inline void RowMuls(LocalTensor<T> dstUb, LocalTensor<T> src0Ub, Loca
     }
 }
 
-__aicore__ inline void RowSum(LocalTensor<float> &dstUb, LocalTensor<float> srcUb, uint32_t dealRowCount,
+__aicore__ inline void RowSum(LocalTensor<float>& dstUb, LocalTensor<float> srcUb, uint32_t dealRowCount,
                               uint32_t columnCount, uint32_t actualColumnCount)
 {
     // sum by row, 按行求和
@@ -446,7 +446,7 @@ __aicore__ inline uint32_t GetMinPowerTwo(uint32_t cap)
     return i;
 }
 
-__aicore__ inline void RowSumForLongColumnCount(LocalTensor<float> &dstUb, LocalTensor<float> srcUb,
+__aicore__ inline void RowSumForLongColumnCount(LocalTensor<float>& dstUb, LocalTensor<float> srcUb,
                                                 uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
 {
     // sum by row, 按行求和
@@ -493,7 +493,7 @@ __aicore__ inline void RowSumForLongColumnCount(LocalTensor<float> &dstUb, Local
     RowSum(dstUb, srcUb, dealRowCount, newColumnCount, newActualColumnCount);
 }
 
-__aicore__ inline void RowMax(LocalTensor<float> &dstUb, LocalTensor<float> &srcUb, uint32_t dealRowCount,
+__aicore__ inline void RowMax(LocalTensor<float>& dstUb, LocalTensor<float>& srcUb, uint32_t dealRowCount,
                               uint32_t columnCount, uint32_t actualColumnCount)
 {
     // max by row, 按行求最大值
@@ -528,7 +528,7 @@ __aicore__ inline void RowMax(LocalTensor<float> &dstUb, LocalTensor<float> &src
                    columnCount / AttentionCommon::FP32_BLOCK_ELEMENT_NUM, ReduceOrder::ORDER_ONLY_VALUE);
 }
 
-__aicore__ inline void RowMaxForLongColumnCount(LocalTensor<float> &dstUb, LocalTensor<float> srcUb,
+__aicore__ inline void RowMaxForLongColumnCount(LocalTensor<float>& dstUb, LocalTensor<float> srcUb,
                                                 uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
 {
     // max by row, 按行求最大值
@@ -683,8 +683,8 @@ __aicore__ inline void ColAdd(LocalTensor<float> dstUb, LocalTensor<float> src0U
 }
 
 template <typename T>
-__aicore__ inline void ComputeSoftMaxLse(LocalTensor<T> &softmaxlseUb, LocalTensor<T> &softmaxSumUb,
-                                         LocalTensor<T> &softmaxMaxUb, uint32_t dealRowCount)
+__aicore__ inline void ComputeSoftMaxLse(LocalTensor<T>& softmaxlseUb, LocalTensor<T>& softmaxSumUb,
+                                         LocalTensor<T>& softmaxMaxUb, uint32_t dealRowCount)
 {
     uint32_t blockNum = AttentionCommon::FP32_BLOCK_ELEMENT_NUM;
     if constexpr (std::is_same<T, half>::value) {
@@ -736,7 +736,7 @@ struct MaskInfo {
     uint64_t s2LeftPaddingSize = 0;
 };
 
-__aicore__ inline uint64_t ComputeAttenMaskOffsetNoCompress(MaskInfo &info, uint32_t s1StartIdx)
+__aicore__ inline uint64_t ComputeAttenMaskOffsetNoCompress(MaskInfo& info, uint32_t s1StartIdx)
 {
     uint64_t bOffset = static_cast<uint64_t>(info.batchIdx) * static_cast<uint64_t>(info.attenMaskBatchStride);
     uint64_t s1Offset = (info.s1LeftPaddingSize + s1StartIdx % info.s1Size) * info.attenMaskStride;
@@ -744,7 +744,7 @@ __aicore__ inline uint64_t ComputeAttenMaskOffsetNoCompress(MaskInfo &info, uint
     return bOffset + s1Offset + s2Offset;
 }
 
-__aicore__ inline uint64_t ComputeAttenMaskOffsetCompress(MaskInfo &info, uint32_t s1StartIdx)
+__aicore__ inline uint64_t ComputeAttenMaskOffsetCompress(MaskInfo& info, uint32_t s1StartIdx)
 {
     int64_t nextToken = 0; // sparse2 本身原点就是左上角
     if (info.sparseMode == RIGHT_DOWN_CAUSAL) {
@@ -765,7 +765,7 @@ __aicore__ inline uint64_t ComputeAttenMaskOffsetCompress(MaskInfo &info, uint32
     return offset;
 }
 
-__aicore__ inline uint64_t ComputeAttenMaskOffsetCompressPre(MaskInfo &info, uint32_t s1StartIdx)
+__aicore__ inline uint64_t ComputeAttenMaskOffsetCompressPre(MaskInfo& info, uint32_t s1StartIdx)
 {
     int64_t preToken = info.preToken + static_cast<int64_t>(info.s1Size) -
                        static_cast<int64_t>(info.s2Size); // 统一以左上角为原点计算token
@@ -782,7 +782,7 @@ __aicore__ inline uint64_t ComputeAttenMaskOffsetCompressPre(MaskInfo &info, uin
 }
 
 template <bool ENABLE_TREE = false>
-__aicore__ inline uint64_t ComputeAttenMaskOffset(MaskInfo &info, uint32_t s1StartIdx = 0, uint64_t treeMaskStart = 0,
+__aicore__ inline uint64_t ComputeAttenMaskOffset(MaskInfo& info, uint32_t s1StartIdx = 0, uint64_t treeMaskStart = 0,
                                                   bool isPre = false)
 {
     if (isPre) {
@@ -802,7 +802,7 @@ __aicore__ inline uint64_t ComputeAttenMaskOffset(MaskInfo &info, uint32_t s1Sta
 }
 
 template <typename T, bool ENABLE_TREE = false>
-__aicore__ inline void AttentionmaskDataCopy(LocalTensor<T> &attenMaskUb, GlobalTensor<T> &srcGmAddr, MaskInfo &info,
+__aicore__ inline void AttentionmaskDataCopy(LocalTensor<T>& attenMaskUb, GlobalTensor<T>& srcGmAddr, MaskInfo& info,
                                              uint32_t s1StartIdx, uint32_t s1EndIdx, bool isPre = false)
 {
     uint32_t treeMaskStart = 0;
@@ -850,8 +850,8 @@ __aicore__ inline void AttentionmaskDataCopy(LocalTensor<T> &attenMaskUb, Global
 }
 
 template <typename T, typename U, bool ENABLE_TREE = false>
-__aicore__ inline void AttentionmaskCopyInForGsLayout(LocalTensor<T> &attenMaskUb, GlobalTensor<T> &srcGmAddr,
-                                                      LocalTensor<U> &tmpBuf, MaskInfo &info, bool isPre = false)
+__aicore__ inline void AttentionmaskCopyInForGsLayout(LocalTensor<T>& attenMaskUb, GlobalTensor<T>& srcGmAddr,
+                                                      LocalTensor<U>& tmpBuf, MaskInfo& info, bool isPre = false)
 {
     int32_t s1StartIdx = info.gs1StartIdx % info.s1Size;
     int32_t s1EndIdx = (info.gs1StartIdx + info.gs1dealNum - 1) % info.s1Size + 1;
@@ -901,8 +901,8 @@ __aicore__ inline void AttentionmaskCopyInForGsLayout(LocalTensor<T> &attenMaskU
 }
 
 template <typename T, typename U, bool ENABLE_TREE = false>
-__aicore__ inline void AttentionmaskCopyInForSgLayout(LocalTensor<T> &attenMaskUb, GlobalTensor<T> &srcGmAddr,
-                                                      LocalTensor<U> &tmpBuf, MaskInfo &info, bool isPre = false)
+__aicore__ inline void AttentionmaskCopyInForSgLayout(LocalTensor<T>& attenMaskUb, GlobalTensor<T>& srcGmAddr,
+                                                      LocalTensor<U>& tmpBuf, MaskInfo& info, bool isPre = false)
 {
     uint32_t s1StartIdx = info.gs1StartIdx / info.gSize;
     uint32_t s1EndIdx = (info.gs1StartIdx + info.gs1dealNum - 1) / info.gSize;
@@ -950,7 +950,7 @@ __aicore__ inline void AttentionmaskCopyInForSgLayout(LocalTensor<T> &attenMaskU
 }
 
 template <bool ENABLE_TREE = false>
-__aicore__ inline bool IsSkipAttentionmask(MaskInfo &info)
+__aicore__ inline bool IsSkipAttentionmask(MaskInfo& info)
 {
     if (info.sparseMode == DEFAULT_MASK || info.sparseMode == ALL_MASK) {
         return false;
@@ -985,7 +985,7 @@ __aicore__ inline bool IsSkipAttentionmask(MaskInfo &info)
     return false;
 }
 
-__aicore__ inline bool IsSkipAttentionmaskForPre(MaskInfo &info)
+__aicore__ inline bool IsSkipAttentionmaskForPre(MaskInfo& info)
 {
     if (info.sparseMode != BAND) {
         return true;
@@ -1008,8 +1008,8 @@ __aicore__ inline bool IsSkipAttentionmaskForPre(MaskInfo &info)
 }
 
 template <typename T, typename U, bool ENABLE_TREE = false>
-__aicore__ inline void AttentionmaskCopyIn(LocalTensor<T> &attenMaskUb, GlobalTensor<T> &srcGmAddr,
-                                           LocalTensor<U> &tmpBuf, MaskInfo &info, bool isPre = false)
+__aicore__ inline void AttentionmaskCopyIn(LocalTensor<T>& attenMaskUb, GlobalTensor<T>& srcGmAddr,
+                                           LocalTensor<U>& tmpBuf, MaskInfo& info, bool isPre = false)
 {
     if (info.layout == GS) {
         AttentionmaskCopyInForGsLayout<T, U, ENABLE_TREE>(attenMaskUb, srcGmAddr, tmpBuf, info, isPre);
@@ -1077,8 +1077,8 @@ __aicore__ inline void AttentionmaskCopyIn(LocalTensor<T> &attenMaskUb, GlobalTe
 }
 
 template <typename T, typename M, typename U>
-__aicore__ inline void AttentionMaskCompute(LocalTensor<T> &dstUb, LocalTensor<T> &srcUb, LocalTensor<M> &attenMaskUb,
-                                            LocalTensor<U> &tmpBuf, MaskInfo &info, bool isPre = false)
+__aicore__ inline void AttentionMaskCompute(LocalTensor<T>& dstUb, LocalTensor<T>& srcUb, LocalTensor<M>& attenMaskUb,
+                                            LocalTensor<U>& tmpBuf, MaskInfo& info, bool isPre = false)
 {
     uint32_t dealRowCount = info.gs1dealNum;
     uint32_t columnCount = AttentionCommon::Align(info.s2dealNum, 32U);
@@ -1092,10 +1092,10 @@ __aicore__ inline void AttentionMaskCompute(LocalTensor<T> &dstUb, LocalTensor<T
         attenMaskUb.SetSize(dealRowCount * attenMaskSizeAlign); // Select接口要求mask size与参数匹配
         srcUb.SetSize(dealRowCount * columnCount);              // Select接口要求src size与参数匹配
         if (isPre) {
-            SelectWithBytesMask(dstUb, *((T *)&info.maskValue), srcUb, attenMaskUb, tmpBuf,
+            SelectWithBytesMask(dstUb, *((T*)&info.maskValue), srcUb, attenMaskUb, tmpBuf,
                                 selectWithBytesMaskShapeInfo);
         } else {
-            SelectWithBytesMask(dstUb, srcUb, *((T *)&info.maskValue), attenMaskUb, tmpBuf,
+            SelectWithBytesMask(dstUb, srcUb, *((T*)&info.maskValue), attenMaskUb, tmpBuf,
                                 selectWithBytesMaskShapeInfo);
         }
         constexpr uint32_t BUFFER_SIZE_BYTE_32K = 32768;
@@ -1121,7 +1121,7 @@ struct InvalidRowParams {
 template <typename T, UbInputFormat UB_INPUTFORMAT>
 class InvalidRows {
 public:
-    __aicore__ inline void operator()(LocalTensor<T> &attenOutUb, InvalidRowParams &params)
+    __aicore__ inline void operator()(LocalTensor<T>& attenOutUb, InvalidRowParams& params)
     {
         if (params.preTokensPerBatch < 0) { // 下方存在行无效
             DealInvalidRowsBelow(attenOutUb, params);
@@ -1134,13 +1134,13 @@ public:
     }
 
 private:
-    __aicore__ inline void DealInvalidRowsAbove(LocalTensor<T> &attenOutUb, InvalidRowParams &params);
-    __aicore__ inline void DealInvalidRowsBelow(LocalTensor<T> &attenOutUb, InvalidRowParams &params);
+    __aicore__ inline void DealInvalidRowsAbove(LocalTensor<T>& attenOutUb, InvalidRowParams& params);
+    __aicore__ inline void DealInvalidRowsBelow(LocalTensor<T>& attenOutUb, InvalidRowParams& params);
 };
 
 template <typename T, UbInputFormat UB_INPUTFORMAT>
-__aicore__ inline void InvalidRows<T, UB_INPUTFORMAT>::DealInvalidRowsBelow(LocalTensor<T> &attenOutUb,
-                                                                            InvalidRowParams &params)
+__aicore__ inline void InvalidRows<T, UB_INPUTFORMAT>::DealInvalidRowsBelow(LocalTensor<T>& attenOutUb,
+                                                                            InvalidRowParams& params)
 {
     if constexpr (UB_INPUTFORMAT == UbInputFormat::GS1) {
         int32_t s1BottomPos = params.actS1Size + params.preTokensPerBatch - 1;
@@ -1187,8 +1187,8 @@ __aicore__ inline void InvalidRows<T, UB_INPUTFORMAT>::DealInvalidRowsBelow(Loca
 }
 
 template <typename T, UbInputFormat UB_INPUTFORMAT>
-__aicore__ inline void InvalidRows<T, UB_INPUTFORMAT>::DealInvalidRowsAbove(LocalTensor<T> &attenOutUb,
-                                                                            InvalidRowParams &params)
+__aicore__ inline void InvalidRows<T, UB_INPUTFORMAT>::DealInvalidRowsAbove(LocalTensor<T>& attenOutUb,
+                                                                            InvalidRowParams& params)
 {
     uint32_t s1Tok = -params.nextTokensPerBatch;
     if constexpr (UB_INPUTFORMAT == UbInputFormat::GS1) {
@@ -1228,8 +1228,8 @@ __aicore__ inline void InvalidRows<T, UB_INPUTFORMAT>::DealInvalidRowsAbove(Loca
 
 template <typename OUT_T, typename SOFTMAX_T, const bool SOFTMAX_WITH_BRC>
 __aicore__ inline void InvalidMaskRows(uint32_t softmaxOutOffset, uint32_t dealRowCount, uint32_t columnCount,
-                                       LocalTensor<SOFTMAX_T> &softmaxMaxUb, uint32_t softmaxMinSaclar,
-                                       LocalTensor<OUT_T> &bmm2ResUb)
+                                       LocalTensor<SOFTMAX_T>& softmaxMaxUb, uint32_t softmaxMinSaclar,
+                                       LocalTensor<OUT_T>& bmm2ResUb)
 {
     SoftMaxShapeInfo softmaxShapeInfo{static_cast<uint32_t>(dealRowCount), static_cast<uint32_t>(columnCount),
                                       static_cast<uint32_t>(dealRowCount), static_cast<uint32_t>(columnCount)};

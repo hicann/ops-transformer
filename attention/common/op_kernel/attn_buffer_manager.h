@@ -32,7 +32,7 @@ class BufferManager {
     using TensorType = std::conditional_t<bufferType == BufferType::GM, GlobalTensor<uint8_t>, LocalTensor<uint8_t>>;
 
 public:
-    __aicore__ inline void Init(TPipe *pipe, uint32_t size)
+    __aicore__ inline void Init(TPipe* pipe, uint32_t size)
     {
         static_assert(bufferType != BufferType::GM, "GM should use workspace.");
         TBuf<BufferInfo<bufferType>::Position> tbuf;
@@ -47,10 +47,10 @@ public:
         mem_ = LocalTensor<uint8_t>(BufferInfo<bufferType>::Position, 0, size);
     }
 
-    __aicore__ inline void Init(__gm__ uint8_t *workspace)
+    __aicore__ inline void Init(__gm__ uint8_t* workspace)
     {
         static_assert(bufferType == BufferType::GM, "BufferType should be GM.");
-        mem_.SetGlobalBuffer((__gm__ uint8_t *)workspace);
+        mem_.SetGlobalBuffer((__gm__ uint8_t*)workspace);
     }
 
     template <SyncType syncType = SyncType::INNER_CORE_SYNC, SyncMode syncMode = SyncMode::SET_WAIT_FLAG>
@@ -62,7 +62,7 @@ public:
     }
 
     template <SyncType syncType = SyncType::INNER_CORE_SYNC, SyncMode syncMode = SyncMode::SET_WAIT_FLAG>
-    __aicore__ inline void FreeBuffer(Buffer<bufferType, syncType, syncMode> &buffer)
+    __aicore__ inline void FreeBuffer(Buffer<bufferType, syncType, syncMode>& buffer)
     {}
 
 private:
@@ -74,7 +74,7 @@ template <BufferType bufferType>
 class DualBankBufferManager {
 public:
     BufferManager<bufferType> bank[2];
-    __aicore__ inline void Init(TPipe *pipe, uint32_t size)
+    __aicore__ inline void Init(TPipe* pipe, uint32_t size)
     {
         bank[0].Init(pipe, size / 2);
         bank[1].Init(pipe, size / 2);

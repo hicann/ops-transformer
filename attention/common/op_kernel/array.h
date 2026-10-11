@@ -28,7 +28,7 @@ private:
     T elems[N];
 
 public:
-    __aicore__ inline T &operator[](uint32_t i)
+    __aicore__ inline T& operator[](uint32_t i)
     {
         return elems[i];
     }
@@ -40,7 +40,7 @@ private:
     LocalTensor<T> tensor;
 
 public:
-    __aicore__ inline void Init(const LocalTensor<T> &tensor)
+    __aicore__ inline void Init(const LocalTensor<T>& tensor)
     {
         this->tensor = tensor;
     }
@@ -57,7 +57,7 @@ private:
     uint64_t stride = 0;
 
 public:
-    __aicore__ inline void Init(const GlobalTensor<T> &tensor, uint64_t splitSize)
+    __aicore__ inline void Init(const GlobalTensor<T>& tensor, uint64_t splitSize)
     {
         this->tensor = tensor;
         this->stride = splitSize;

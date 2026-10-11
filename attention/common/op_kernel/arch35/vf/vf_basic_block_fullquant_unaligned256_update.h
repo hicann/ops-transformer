@@ -22,10 +22,10 @@ using namespace regbaseutil;
 namespace FaVectorApi {
 template <typename T, typename T2, typename OUTPUT_T, uint32_t s1BaseSize = 16, uint32_t s2BaseSize = 512,
           bool hasAtten = 0, PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0>
-__simd_vf__ void ProcessVec1UpdateGeneralImpl256GqaFullquantVF(__ubuf__ T2 *expUb, __ubuf__ T *srcUb, __ubuf__ T *maxUb,
-                                                               __ubuf__ T *inMaxUb, __ubuf__ T *tmpExpSumUb,
-                                                               __ubuf__ T *tmpMaxUb, __ubuf__ T *tmpMaxUb2,
-                                                               __ubuf__ uint8_t *indexesUb, const uint16_t m,
+__simd_vf__ void ProcessVec1UpdateGeneralImpl256GqaFullquantVF(__ubuf__ T2* expUb, __ubuf__ T* srcUb, __ubuf__ T* maxUb,
+                                                               __ubuf__ T* inMaxUb, __ubuf__ T* tmpExpSumUb,
+                                                               __ubuf__ T* tmpMaxUb, __ubuf__ T* tmpMaxUb2,
+                                                               __ubuf__ uint8_t* indexesUb, const uint16_t m,
                                                                const uint32_t n, const T minValue, const uint32_t tailN,
                                                                const int64_t tailNOffset, const float pScale)
 {
@@ -86,7 +86,7 @@ __simd_vf__ void ProcessVec1UpdateGeneralImpl256GqaFullquantVF(__ubuf__ T2 *expU
     Duplicate(vreg_p_scale, static_cast<half>(pScale));
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_all_half);
     for (uint16_t i = 0; i < m / 8; ++i) {
-        StoreAlign<half, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ half *&)srcUb + tailNOffset + i * 128, vreg_min,
+        StoreAlign<half, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ half*&)srcUb + tailNOffset + i * 128, vreg_min,
                                                         preg_all_half);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
@@ -108,17 +108,17 @@ __simd_vf__ void ProcessVec1UpdateGeneralImpl256GqaFullquantVF(__ubuf__ T2 *expU
         ReduceDataBlock<AscendC::Reg::ReduceType::MAX>(vreg_max_tmp_unroll, vreg_max_tmp_unroll, preg_all_half);
         Sub(vreg_max_tmp, vreg_max_tmp, vreg_ln_p_scale, preg_all_half);
         Sub(vreg_max_tmp_unroll, vreg_max_tmp_unroll, vreg_ln_p_scale, preg_all_half);
-        StoreUnAlign<half, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), vreg_max_tmp, ureg_max, 8);
-        StoreUnAlign<half, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), vreg_max_tmp_unroll,
+        StoreUnAlign<half, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half*&)tmpMaxUb), vreg_max_tmp, ureg_max, 8);
+        StoreUnAlign<half, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half*&)tmpMaxUb), vreg_max_tmp_unroll,
                                                                ureg_max, 8);
     }
-    StoreUnAlignPost<half, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), ureg_max, 0);
+    StoreUnAlignPost<half, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half*&)tmpMaxUb), ureg_max, 0);
 
     LoadAlign(vreg_in_max, inMaxUb); // 旧max
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     LoadAlign(vreg_input_max, tmpMaxUb2);                          // 当前max
     Max(vreg_max_new, vreg_input_max, vreg_in_max, preg_all_half); // 新max
-    StoreAlign<half, Reg::StoreDist::DIST_NORM_B16>(((__ubuf__ half *&)tmpMaxUb2), vreg_max_new, preg_all_half);
+    StoreAlign<half, Reg::StoreDist::DIST_NORM_B16>(((__ubuf__ half*&)tmpMaxUb2), vreg_max_new, preg_all_half);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
     for (uint16_t i = 0; i < 4; ++i) {
@@ -163,12 +163,12 @@ __simd_vf__ void ProcessVec1UpdateGeneralImpl256GqaFullquantVF(__ubuf__ T2 *expU
             Cast<T2, float, castTraitOne>(vreg_exp_1_f8_1, vreg_exp_1_1, preg_all_half);
             Cast<T2, float, castTraitThree>(vreg_exp_3_f8_1, vreg_exp_3_1, preg_all_half);
 
-            Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_1, (RegTensor<uint8_t> &)vreg_exp_0_f8_1,
-               (RegTensor<uint8_t> &)vreg_exp_2_f8_1, preg_all_b8);
-            Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_2, (RegTensor<uint8_t> &)vreg_exp_1_f8_1,
-               (RegTensor<uint8_t> &)vreg_exp_3_f8_1, preg_all_b8);
-            Or((RegTensor<uint8_t> &)vreg_exp_merge_f8_1, (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_1,
-               (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_2, preg_all_b8);
+            Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_1, (RegTensor<uint8_t>&)vreg_exp_0_f8_1,
+               (RegTensor<uint8_t>&)vreg_exp_2_f8_1, preg_all_b8);
+            Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_2, (RegTensor<uint8_t>&)vreg_exp_1_f8_1,
+               (RegTensor<uint8_t>&)vreg_exp_3_f8_1, preg_all_b8);
+            Or((RegTensor<uint8_t>&)vreg_exp_merge_f8_1, (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_1,
+               (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_2, preg_all_b8);
 
             LoadAlign(vreg_exp_merge_f8_index, indexesUb);
             Gather(vreg_exp_merge_f8_1, vreg_exp_merge_f8_1, vreg_exp_merge_f8_index);
@@ -180,46 +180,46 @@ __simd_vf__ void ProcessVec1UpdateGeneralImpl256GqaFullquantVF(__ubuf__ T2 *expU
             Cast<T2, float, castTraitOne>(vreg_exp_1_f8_2, vreg_exp_1_2, preg_all_half);
             Cast<T2, float, castTraitThree>(vreg_exp_3_f8_2, vreg_exp_3_2, preg_all_half);
 
-            Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_1, (RegTensor<uint8_t> &)vreg_exp_0_f8_2,
-               (RegTensor<uint8_t> &)vreg_exp_2_f8_2, preg_all_b8); // or
-            Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_2, (RegTensor<uint8_t> &)vreg_exp_1_f8_2,
-               (RegTensor<uint8_t> &)vreg_exp_3_f8_2, preg_all_b8);
-            Or((RegTensor<uint8_t> &)vreg_exp_merge_f8_2, (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_1,
-               (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_2, preg_all_b8);
+            Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_1, (RegTensor<uint8_t>&)vreg_exp_0_f8_2,
+               (RegTensor<uint8_t>&)vreg_exp_2_f8_2, preg_all_b8); // or
+            Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_2, (RegTensor<uint8_t>&)vreg_exp_1_f8_2,
+               (RegTensor<uint8_t>&)vreg_exp_3_f8_2, preg_all_b8);
+            Or((RegTensor<uint8_t>&)vreg_exp_merge_f8_2, (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_1,
+               (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_2, preg_all_b8);
 
             Gather(vreg_exp_merge_f8_2, vreg_exp_merge_f8_2, vreg_exp_merge_f8_index);
             StoreAlign(expUb + i * 16 * 32 + j * 64 * 32 + 256, vreg_exp_merge_f8_2, preg_all_b8);
         }
         ReduceDataBlock<AscendC::Reg::ReduceType::SUM>(vreg_exp_sum_0, vreg_exp_sum_0, preg_all_half);
         ReduceDataBlock<AscendC::Reg::ReduceType::SUM>(vreg_exp_sum_1, vreg_exp_sum_1, preg_all_half);
-        StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), vreg_exp_sum_0,
+        StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)tmpExpSumUb), vreg_exp_sum_0,
                                                                 ureg_exp_sum, 8);
-        StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), vreg_exp_sum_1,
+        StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)tmpExpSumUb), vreg_exp_sum_1,
                                                                 ureg_exp_sum, 8);
     }
-    StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), ureg_max, 0);
+    StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)tmpExpSumUb), ureg_max, 0);
 }
 
 template <typename T, typename T2, typename OUTPUT_T, uint32_t s1BaseSize = 16, uint32_t s2BaseSize = 512,
           bool hasAtten = 0, PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0>
 __aicore__ inline void ProcessVec1UpdateGeneralImpl256GqaFullquant(
-    const LocalTensor<T2> &dstTensor, const LocalTensor<T> &srcTensor, const LocalTensor<T> &maxTensor,
-    const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &sharedTmpBuffer,
-    const LocalTensor<uint8_t> &indexesTensor, const uint16_t m, const uint32_t originN, const T scale,
+    const LocalTensor<T2>& dstTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& maxTensor,
+    const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& sharedTmpBuffer,
+    const LocalTensor<uint8_t>& indexesTensor, const uint16_t m, const uint32_t originN, const T scale,
     const float dScaleQK, const T minValue, const float pScale)
 {
     const uint32_t n = (originN + 31) >> 5 << 5;
     const uint32_t tailN = n - originN;
     const int64_t tailNOffset = 64 * ((originN + 15) >> 4 << 4);
 
-    __ubuf__ half *tmpExpSumUb = (__ubuf__ half *)sharedTmpBuffer.GetPhyAddr();
-    __ubuf__ half *tmpMaxUb = (__ubuf__ half *)sharedTmpBuffer.GetPhyAddr() + halfRepSize;
-    __ubuf__ half *tmpMaxUb2 = (__ubuf__ half *)sharedTmpBuffer.GetPhyAddr() + halfRepSize;
-    __ubuf__ half *srcUb = (__ubuf__ half *)srcTensor.GetPhyAddr();
-    __ubuf__ T2 *expUb = (__ubuf__ T2 *)dstTensor.GetPhyAddr();
-    __ubuf__ half *maxUb = (__ubuf__ half *)maxTensor.GetPhyAddr();
-    __ubuf__ half *inMaxUb = (__ubuf__ half *)inMaxTensor.GetPhyAddr();
-    __ubuf__ uint8_t *indexesUb = (__ubuf__ uint8_t *)indexesTensor.GetPhyAddr();
+    __ubuf__ half* tmpExpSumUb = (__ubuf__ half*)sharedTmpBuffer.GetPhyAddr();
+    __ubuf__ half* tmpMaxUb = (__ubuf__ half*)sharedTmpBuffer.GetPhyAddr() + halfRepSize;
+    __ubuf__ half* tmpMaxUb2 = (__ubuf__ half*)sharedTmpBuffer.GetPhyAddr() + halfRepSize;
+    __ubuf__ half* srcUb = (__ubuf__ half*)srcTensor.GetPhyAddr();
+    __ubuf__ T2* expUb = (__ubuf__ T2*)dstTensor.GetPhyAddr();
+    __ubuf__ half* maxUb = (__ubuf__ half*)maxTensor.GetPhyAddr();
+    __ubuf__ half* inMaxUb = (__ubuf__ half*)inMaxTensor.GetPhyAddr();
+    __ubuf__ uint8_t* indexesUb = (__ubuf__ uint8_t*)indexesTensor.GetPhyAddr();
 
     ProcessVec1UpdateGeneralImpl256GqaFullquantVF<T, T2, OUTPUT_T, s1BaseSize, s2BaseSize, hasAtten, pseMode, hasDrop>(
         expUb, srcUb, maxUb, inMaxUb, tmpExpSumUb, tmpMaxUb, tmpMaxUb2, indexesUb, m, n, minValue, tailN, tailNOffset,

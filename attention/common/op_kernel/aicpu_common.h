@@ -38,8 +38,8 @@ static auto AlignUp(T num1, T num2) -> T
 }
 
 template <typename T>
-inline typename std::enable_if<std::is_integral_v<T>, bool>::type GetAttrValue(CpuKernelContext &ctx,
-                                                                               const std::string &name, T &value)
+inline typename std::enable_if<std::is_integral_v<T>, bool>::type GetAttrValue(CpuKernelContext& ctx,
+                                                                               const std::string& name, T& value)
 {
     auto attr = ctx.GetAttr(name);
     if (!attr) {
@@ -50,7 +50,7 @@ inline typename std::enable_if<std::is_integral_v<T>, bool>::type GetAttrValue(C
     return true;
 }
 
-inline bool GetAttrValue(CpuKernelContext &ctx, const std::string &name, std::string &value)
+inline bool GetAttrValue(CpuKernelContext& ctx, const std::string& name, std::string& value)
 {
     auto attr = ctx.GetAttr(name);
     if (!attr) {
@@ -61,7 +61,7 @@ inline bool GetAttrValue(CpuKernelContext &ctx, const std::string &name, std::st
     return true;
 }
 
-inline bool GetAttrValue(CpuKernelContext &ctx, const std::string &name, bool &value)
+inline bool GetAttrValue(CpuKernelContext& ctx, const std::string& name, bool& value)
 {
     auto attr = ctx.GetAttr(name);
     if (!attr) {
@@ -73,8 +73,8 @@ inline bool GetAttrValue(CpuKernelContext &ctx, const std::string &name, bool &v
 }
 
 template <typename T>
-inline typename std::enable_if<std::is_integral_v<T>, void>::type GetAttrValueOpt(CpuKernelContext &ctx,
-                                                                                  const std::string &name, T &value)
+inline typename std::enable_if<std::is_integral_v<T>, void>::type GetAttrValueOpt(CpuKernelContext& ctx,
+                                                                                  const std::string& name, T& value)
 {
     auto attr = ctx.GetAttr(name);
     if (attr != nullptr) {
@@ -82,7 +82,7 @@ inline typename std::enable_if<std::is_integral_v<T>, void>::type GetAttrValueOp
     }
 }
 
-inline void GetAttrValueOpt(CpuKernelContext &ctx, const std::string &name, std::string &value)
+inline void GetAttrValueOpt(CpuKernelContext& ctx, const std::string& name, std::string& value)
 {
     auto attr = ctx.GetAttr(name);
     if (attr != nullptr) {
@@ -90,7 +90,7 @@ inline void GetAttrValueOpt(CpuKernelContext &ctx, const std::string &name, std:
     }
 }
 
-inline void GetAttrValueOpt(CpuKernelContext &ctx, const std::string &name, bool &value)
+inline void GetAttrValueOpt(CpuKernelContext& ctx, const std::string& name, bool& value)
 {
     auto attr = ctx.GetAttr(name);
     if (attr != nullptr) {
@@ -98,12 +98,12 @@ inline void GetAttrValueOpt(CpuKernelContext &ctx, const std::string &name, bool
     }
 }
 
-inline bool IsTensorExists(const Tensor *tensor)
+inline bool IsTensorExists(const Tensor* tensor)
 {
     return (tensor != nullptr && tensor->GetData() != nullptr);
 }
 
-inline std::vector<int64_t> GetTensorDataAsInt64(const Tensor *tensor)
+inline std::vector<int64_t> GetTensorDataAsInt64(const Tensor* tensor)
 {
     std::vector<int64_t> result{};
 
@@ -114,29 +114,29 @@ inline std::vector<int64_t> GetTensorDataAsInt64(const Tensor *tensor)
     int64_t size = tensor->NumElements();
     result.resize(size);
 
-    void *data = tensor->GetData();
+    void* data = tensor->GetData();
     switch (tensor->GetDataType()) {
         case DT_INT32:
-            std::transform(static_cast<int32_t *>(data), static_cast<int32_t *>(data) + size, result.begin(),
+            std::transform(static_cast<int32_t*>(data), static_cast<int32_t*>(data) + size, result.begin(),
                            [](int32_t v) { return static_cast<int64_t>(v); });
             break;
         case DT_INT64:
-            std::copy(static_cast<int64_t *>(data), static_cast<int64_t *>(data) + size, result.begin());
+            std::copy(static_cast<int64_t*>(data), static_cast<int64_t*>(data) + size, result.begin());
             break;
         case DT_INT16:
-            std::transform(static_cast<int16_t *>(data), static_cast<int16_t *>(data) + size, result.begin(),
+            std::transform(static_cast<int16_t*>(data), static_cast<int16_t*>(data) + size, result.begin(),
                            [](int16_t v) { return static_cast<int64_t>(v); });
             break;
         case DT_UINT32:
-            std::transform(static_cast<uint32_t *>(data), static_cast<uint32_t *>(data) + size, result.begin(),
+            std::transform(static_cast<uint32_t*>(data), static_cast<uint32_t*>(data) + size, result.begin(),
                            [](uint32_t v) { return static_cast<int64_t>(v); });
             break;
         case DT_UINT64:
-            std::transform(static_cast<uint64_t *>(data), static_cast<uint64_t *>(data) + size, result.begin(),
+            std::transform(static_cast<uint64_t*>(data), static_cast<uint64_t*>(data) + size, result.begin(),
                            [](uint64_t v) { return static_cast<int64_t>(v); });
             break;
         case DT_UINT16:
-            std::transform(static_cast<uint16_t *>(data), static_cast<uint16_t *>(data) + size, result.begin(),
+            std::transform(static_cast<uint16_t*>(data), static_cast<uint16_t*>(data) + size, result.begin(),
                            [](uint16_t v) { return static_cast<int64_t>(v); });
             break;
         default:

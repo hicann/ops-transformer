@@ -26,12 +26,12 @@
 namespace optiling {
 
 template <typename T>
-std::unique_ptr<FiaTilingBase> TILING_CLASS(gert::TilingContext *context)
+std::unique_ptr<FiaTilingBase> TILING_CLASS(gert::TilingContext* context)
 {
     return std::unique_ptr<T>(new (std::nothrow) T(context));
 }
 
-using FiaTilingClassCase = std::unique_ptr<FiaTilingBase> (*)(gert::TilingContext *);
+using FiaTilingClassCase = std::unique_ptr<FiaTilingBase> (*)(gert::TilingContext*);
 
 class FiaTilingCases {
 public:
@@ -51,7 +51,7 @@ public:
             return);
     }
 
-    const std::map<int32_t, FiaTilingClassCase> &GetTilingCases()
+    const std::map<int32_t, FiaTilingClassCase>& GetTilingCases()
     {
         return cases_;
     }
@@ -66,13 +66,13 @@ class FiaTilingRegistry {
 public:
     FiaTilingRegistry() = default;
 
-    static FiaTilingRegistry &GetInstance()
+    static FiaTilingRegistry& GetInstance()
     {
         static FiaTilingRegistry registry_impl_;
         return registry_impl_;
     }
 
-    std::shared_ptr<FiaTilingCases> RegisterOp(const std::string &op_type, int32_t soc_version)
+    std::shared_ptr<FiaTilingCases> RegisterOp(const std::string& op_type, int32_t soc_version)
     {
         auto soc_iter = registry_map_.find(soc_version);
         if (soc_iter == registry_map_.end()) {
@@ -91,11 +91,11 @@ public:
         return registry_map_[soc_version][op_type];
     }
 
-    ge::graphStatus DoTilingImpl(gert::TilingContext *context, TilingInfo *tilingInfo)
+    ge::graphStatus DoTilingImpl(gert::TilingContext* context, TilingInfo* tilingInfo)
     {
         int32_t npuArch = static_cast<int32_t>(NpuArch::DAV_RESV);
-        const char *op_type = context->GetNodeType();
-        fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+        const char* op_type = context->GetNodeType();
+        fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
         if (platformInfoPtr == nullptr) {
             OPS_REPORT_VECTOR_INNER_ERR(op_type, "Do op tiling failed, platformInfoPtr is nullptr.");
             return ge::GRAPH_FAILED;
@@ -125,7 +125,7 @@ public:
         return ge::GRAPH_FAILED;
     }
 
-    const std::map<int32_t, FiaTilingClassCase> &GetTilingTemplates(const std::string &op_type, int32_t soc_version)
+    const std::map<int32_t, FiaTilingClassCase>& GetTilingTemplates(const std::string& op_type, int32_t soc_version)
     {
         auto soc_iter = registry_map_.find(soc_version);
         OP_CHECK_IF(soc_iter == registry_map_.end(),
@@ -151,7 +151,7 @@ public:
     {}
 
     template <typename T>
-    FiaRegister &tiling(int32_t priority, int32_t soc_version)
+    FiaRegister& tiling(int32_t priority, int32_t soc_version)
     {
         auto tilingCases = FiaTilingRegistry::GetInstance().RegisterOp(op_type_, soc_version);
         OP_CHECK_IF(tilingCases == nullptr,
@@ -162,7 +162,7 @@ public:
     }
 
     template <typename T>
-    FiaRegister &tiling(int32_t priority, const std::vector<int32_t> &soc_versions)
+    FiaRegister& tiling(int32_t priority, const std::vector<int32_t>& soc_versions)
     {
         for (int32_t soc_version : soc_versions) {
             auto tilingCases = FiaTilingRegistry::GetInstance().RegisterOp(op_type_, soc_version);

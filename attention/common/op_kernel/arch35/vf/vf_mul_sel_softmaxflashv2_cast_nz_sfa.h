@@ -38,10 +38,10 @@ enum class OriginNRange {
 };
 template <typename T, typename T2, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 128,
           OriginNRange oriNRange = OriginNRange::EQ_128_SFA>
-__aicore__ inline void ProcessVec1NoUpdate(const LocalTensor<T2> &dstTensor, const LocalTensor<T> &srcTensor,
-                                           const LocalTensor<T> &expSumTensor, const LocalTensor<T> &maxTensor,
-                                           const LocalTensor<T> &inMaxTensor, const LocalTensor<T> &sharedTmpBuffer,
-                                           TBuf<> *vselrIndexesBuf, const uint16_t m, const uint32_t originN,
+__aicore__ inline void ProcessVec1NoUpdate(const LocalTensor<T2>& dstTensor, const LocalTensor<T>& srcTensor,
+                                           const LocalTensor<T>& expSumTensor, const LocalTensor<T>& maxTensor,
+                                           const LocalTensor<T>& inMaxTensor, const LocalTensor<T>& sharedTmpBuffer,
+                                           TBuf<>* vselrIndexesBuf, const uint16_t m, const uint32_t originN,
                                            const T scale, const T minValue)
 {
     if constexpr (oriNRange == OriginNRange::EQ_128_SFA) {
@@ -79,10 +79,10 @@ __aicore__ inline void ProcessVec1NoUpdate(const LocalTensor<T2> &dstTensor, con
 
 template <typename T, typename T2, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 128,
           OriginNRange oriNRange = OriginNRange::EQ_128_SFA>
-__aicore__ inline void ProcessVec1Update(const LocalTensor<T2> &dstTensor, const LocalTensor<T> &srcTensor,
-                                         const LocalTensor<T> &expSumTensor, const LocalTensor<T> &maxTensor,
-                                         const LocalTensor<T> &inMaxTensor, const LocalTensor<T> &sharedTmpBuffer,
-                                         TBuf<> *vselrIndexesBuf, const uint16_t m, const uint32_t originN,
+__aicore__ inline void ProcessVec1Update(const LocalTensor<T2>& dstTensor, const LocalTensor<T>& srcTensor,
+                                         const LocalTensor<T>& expSumTensor, const LocalTensor<T>& maxTensor,
+                                         const LocalTensor<T>& inMaxTensor, const LocalTensor<T>& sharedTmpBuffer,
+                                         TBuf<>* vselrIndexesBuf, const uint16_t m, const uint32_t originN,
                                          const T scale, const T minValue)
 {
     if constexpr (oriNRange == OriginNRange::EQ_128_SFA) {
@@ -117,10 +117,10 @@ __aicore__ inline void ProcessVec1Update(const LocalTensor<T2> &dstTensor, const
 
 template <typename T, typename T2, bool isUpdate = false, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 128,
           OriginNRange oriNRange = OriginNRange::EQ_128_SFA>
-__aicore__ inline void ProcessVec1Vf(const LocalTensor<T2> &dstTensor, const LocalTensor<T> &srcTensor,
-                                     const LocalTensor<T> &expSumTensor, const LocalTensor<T> &maxTensor,
-                                     const LocalTensor<T> &inMaxTensor, const LocalTensor<T> &sharedTmpBuffer,
-                                     TBuf<> *vselrIndexesBuf, const uint16_t m, const uint32_t originN, const T scale,
+__aicore__ inline void ProcessVec1Vf(const LocalTensor<T2>& dstTensor, const LocalTensor<T>& srcTensor,
+                                     const LocalTensor<T>& expSumTensor, const LocalTensor<T>& maxTensor,
+                                     const LocalTensor<T>& inMaxTensor, const LocalTensor<T>& sharedTmpBuffer,
+                                     TBuf<>* vselrIndexesBuf, const uint16_t m, const uint32_t originN, const T scale,
                                      const T minValue)
 {
     static_assert(IsSameType<T, float>::value, "VF mul_sel_softmaxflashv2_cast_nz, T must be float");
@@ -140,9 +140,9 @@ __aicore__ inline void ProcessVec1Vf(const LocalTensor<T2> &dstTensor, const Loc
 }
 
 template <typename T>
-__simd_vf__ inline void UpdateExpSumAndExpMaxVF(__ubuf__ T *maxUb, __ubuf__ T *inMaxUb, __ubuf__ T *expMaxUb,
-                                                __ubuf__ T *expSumUb, __ubuf__ T *inExpSumUb, __ubuf__ T *tmpExpSumUb,
-                                                __ubuf__ T *tmpMaxUb, const uint32_t m)
+__simd_vf__ inline void UpdateExpSumAndExpMaxVF(__ubuf__ T* maxUb, __ubuf__ T* inMaxUb, __ubuf__ T* expMaxUb,
+                                                __ubuf__ T* expSumUb, __ubuf__ T* inExpSumUb, __ubuf__ T* tmpExpSumUb,
+                                                __ubuf__ T* tmpMaxUb, const uint32_t m)
 {
     RegTensor<float> vreg_input_x;
     RegTensor<float> vreg_input_x_unroll;
@@ -158,38 +158,38 @@ __simd_vf__ inline void UpdateExpSumAndExpMaxVF(__ubuf__ T *maxUb, __ubuf__ T *i
     LoadAlign(vreg_max, tmpMaxUb);
     LoadAlign(vreg_in_max, inMaxUb);
     FusedExpSub(vreg_exp_max, vreg_in_max, vreg_max, preg_all);
-    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)expMaxUb, vreg_exp_max, preg_all);
-    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)maxUb, vreg_max, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)expMaxUb, vreg_exp_max, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)maxUb, vreg_max, preg_all);
     LoadAlign(vreg_in_exp_sum, inExpSumUb);
 
     // x_sum = exp_max * insum + x_sum
     LoadAlign(vreg_exp_sum_brc, tmpExpSumUb);
     Mul(vreg_exp_sum_update, vreg_exp_max, vreg_in_exp_sum, preg_all);
     Add(vreg_exp_sum_update, vreg_exp_sum_update, vreg_exp_sum_brc, preg_all);
-    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)expSumUb, vreg_exp_sum_update, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)expSumUb, vreg_exp_sum_update, preg_all);
 }
 
 template <typename T>
-__aicore__ inline void SFAUpdateExpSumAndExpMax(const LocalTensor<T> &expSumTensor, const LocalTensor<T> &maxTensor,
-                                                const LocalTensor<T> &expMaxTensor,
-                                                const LocalTensor<T> &inExpSumTensor, const LocalTensor<T> &inMaxTensor,
-                                                const LocalTensor<T> &sharedTmpBuffer, const uint32_t m)
+__aicore__ inline void SFAUpdateExpSumAndExpMax(const LocalTensor<T>& expSumTensor, const LocalTensor<T>& maxTensor,
+                                                const LocalTensor<T>& expMaxTensor,
+                                                const LocalTensor<T>& inExpSumTensor, const LocalTensor<T>& inMaxTensor,
+                                                const LocalTensor<T>& sharedTmpBuffer, const uint32_t m)
 {
-    __ubuf__ T *maxUb = (__ubuf__ T *)maxTensor.GetPhyAddr();
-    __ubuf__ T *inMaxUb = (__ubuf__ T *)inMaxTensor.GetPhyAddr();
+    __ubuf__ T* maxUb = (__ubuf__ T*)maxTensor.GetPhyAddr();
+    __ubuf__ T* inMaxUb = (__ubuf__ T*)inMaxTensor.GetPhyAddr();
 
-    __ubuf__ T *expMaxUb = (__ubuf__ T *)expMaxTensor.GetPhyAddr();
-    __ubuf__ T *expSumUb = (__ubuf__ T *)expSumTensor.GetPhyAddr();
-    __ubuf__ T *inExpSumUb = (__ubuf__ T *)inExpSumTensor.GetPhyAddr();
+    __ubuf__ T* expMaxUb = (__ubuf__ T*)expMaxTensor.GetPhyAddr();
+    __ubuf__ T* expSumUb = (__ubuf__ T*)expSumTensor.GetPhyAddr();
+    __ubuf__ T* inExpSumUb = (__ubuf__ T*)inExpSumTensor.GetPhyAddr();
 
-    __ubuf__ T *tmpExpSumUb = (__ubuf__ T *)sharedTmpBuffer.GetPhyAddr();
-    __ubuf__ T *tmpMaxUb = (__ubuf__ T *)sharedTmpBuffer.GetPhyAddr() + 64;
+    __ubuf__ T* tmpExpSumUb = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr();
+    __ubuf__ T* tmpMaxUb = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr() + 64;
 
     UpdateExpSumAndExpMaxVF<T>(maxUb, inMaxUb, expMaxUb, expSumUb, inExpSumUb, tmpExpSumUb, tmpMaxUb, m);
 }
 
 template <typename T>
-__simd_vf__ inline void InitSoftmaxFromSinksVF(__ubuf__ T *sumUb, __ubuf__ T *maxUb, __ubuf__ T *sinksUb,
+__simd_vf__ inline void InitSoftmaxFromSinksVF(__ubuf__ T* sumUb, __ubuf__ T* maxUb, __ubuf__ T* sinksUb,
                                                uint32_t sinksOffset, const T R0, uint32_t m)
 {
     AscendC::Reg::RegTensor<T> vreg_sinks;
@@ -205,18 +205,18 @@ __simd_vf__ inline void InitSoftmaxFromSinksVF(__ubuf__ T *sumUb, __ubuf__ T *ma
 }
 
 template <typename T>
-__aicore__ inline void InitSoftmaxFromSinks(const LocalTensor<T> &sumTensor, const LocalTensor<T> &maxTensor,
-                                            const LocalTensor<T> &sinksTensor, uint32_t sinksOffset, const T R0,
+__aicore__ inline void InitSoftmaxFromSinks(const LocalTensor<T>& sumTensor, const LocalTensor<T>& maxTensor,
+                                            const LocalTensor<T>& sinksTensor, uint32_t sinksOffset, const T R0,
                                             uint32_t m)
 {
-    __ubuf__ T *sumUb = (__ubuf__ T *)sumTensor.GetPhyAddr();
-    __ubuf__ T *maxUb = (__ubuf__ T *)maxTensor.GetPhyAddr();
-    __ubuf__ T *sinksUb = (__ubuf__ T *)sinksTensor.GetPhyAddr();
+    __ubuf__ T* sumUb = (__ubuf__ T*)sumTensor.GetPhyAddr();
+    __ubuf__ T* maxUb = (__ubuf__ T*)maxTensor.GetPhyAddr();
+    __ubuf__ T* sinksUb = (__ubuf__ T*)sinksTensor.GetPhyAddr();
     InitSoftmaxFromSinksVF<T>(sumUb, maxUb, sinksUb, sinksOffset, R0, m);
 }
 
 template <typename T>
-__simd_vf__ inline void ComputeLseVF(__ubuf__ T *outLseUb, __ubuf__ T *sumUb, __ubuf__ T *maxUb, uint32_t m)
+__simd_vf__ inline void ComputeLseVF(__ubuf__ T* outLseUb, __ubuf__ T* sumUb, __ubuf__ T* maxUb, uint32_t m)
 {
     AscendC::Reg::RegTensor<T> vreg_outLse;
     AscendC::Reg::RegTensor<T> vreg_sum;
@@ -232,12 +232,12 @@ __simd_vf__ inline void ComputeLseVF(__ubuf__ T *outLseUb, __ubuf__ T *sumUb, __
 }
 
 template <typename T>
-__aicore__ inline void ComputeLse(const LocalTensor<T> &outLseTensor, const LocalTensor<T> &sumTensor,
-                                  const LocalTensor<T> &maxTensor, uint32_t m)
+__aicore__ inline void ComputeLse(const LocalTensor<T>& outLseTensor, const LocalTensor<T>& sumTensor,
+                                  const LocalTensor<T>& maxTensor, uint32_t m)
 {
-    __ubuf__ T *outLseUb = (__ubuf__ T *)outLseTensor.GetPhyAddr();
-    __ubuf__ T *sumUb = (__ubuf__ T *)sumTensor.GetPhyAddr();
-    __ubuf__ T *maxUb = (__ubuf__ T *)maxTensor.GetPhyAddr();
+    __ubuf__ T* outLseUb = (__ubuf__ T*)outLseTensor.GetPhyAddr();
+    __ubuf__ T* sumUb = (__ubuf__ T*)sumTensor.GetPhyAddr();
+    __ubuf__ T* maxUb = (__ubuf__ T*)maxTensor.GetPhyAddr();
     ComputeLseVF<T>(outLseUb, sumUb, maxUb, m);
 }
 } // namespace FaVectorApi

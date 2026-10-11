@@ -20,9 +20,9 @@
 
 namespace optiling {
 
-uint32_t GetS1SeqSize(uint32_t bIdx, const BaseInfo &baseInfo)
+uint32_t GetS1SeqSize(uint32_t bIdx, const BaseInfo& baseInfo)
 {
-    const auto &actualSeqS1 = baseInfo.actualSeqS1Size;
+    const auto& actualSeqS1 = baseInfo.actualSeqS1Size;
 
     if (actualSeqS1.empty()) {
         return baseInfo.s1Size;
@@ -40,9 +40,9 @@ uint32_t GetS1SeqSize(uint32_t bIdx, const BaseInfo &baseInfo)
                           static_cast<uint32_t>(actualSeqS1[bIdx] - actualSeqS1[bIdx - 1U]);
 }
 
-uint32_t GetS2SeqSize(uint32_t bIdx, const BaseInfo &baseInfo)
+uint32_t GetS2SeqSize(uint32_t bIdx, const BaseInfo& baseInfo)
 {
-    const auto &actualSeqS2 = baseInfo.actualSeqS2Size;
+    const auto& actualSeqS2 = baseInfo.actualSeqS2Size;
     uint32_t prefix = static_cast<uint32_t>(baseInfo.actualSeqPrefixSize);
     if (actualSeqS2.empty()) {
         return prefix + baseInfo.s2Size;
@@ -60,7 +60,7 @@ uint32_t GetS2SeqSize(uint32_t bIdx, const BaseInfo &baseInfo)
                           prefix + static_cast<uint32_t>(actualSeqS2[bIdx] - actualSeqS2[bIdx - 1U]);
 }
 
-int64_t CalcNextTokenLeftUp(uint32_t s1Size, uint32_t s2Size, const BaseInfo &baseInfo)
+int64_t CalcNextTokenLeftUp(uint32_t s1Size, uint32_t s2Size, const BaseInfo& baseInfo)
 {
     auto mode = static_cast<SparseMode>(baseInfo.sparseMode);
     switch (mode) {
@@ -78,7 +78,7 @@ int64_t CalcNextTokenLeftUp(uint32_t s1Size, uint32_t s2Size, const BaseInfo &ba
     }
 }
 
-int64_t CalcPreTokenLeftUp(uint32_t s1Size, uint32_t s2Size, const BaseInfo &baseInfo)
+int64_t CalcPreTokenLeftUp(uint32_t s1Size, uint32_t s2Size, const BaseInfo& baseInfo)
 {
     auto mode = static_cast<SparseMode>(baseInfo.sparseMode);
     if (mode == SparseMode::BAND) {
@@ -107,8 +107,8 @@ BlockCost<int64_t> CalcCostTable(uint32_t s1NormalSize, uint32_t s2NormalSize, u
     return typeCost;
 }
 
-Range<uint32_t> CalcS2Range(uint32_t s1GIdx, const BaseInfo &baseInfo, const SplitParam &splitParam,
-                            const BatchCache &batchCache)
+Range<uint32_t> CalcS2Range(uint32_t s1GIdx, const BaseInfo& baseInfo, const SplitParam& splitParam,
+                            const BatchCache& batchCache)
 {
     uint32_t s2Start = 0U;
     uint32_t s2End = 0U;
@@ -168,13 +168,13 @@ Range<uint32_t> CalcS2Range(uint32_t s1GIdx, const BaseInfo &baseInfo, const Spl
     return std::make_pair(s2Start, s2End);
 }
 
-void CalcSplitInfo(SplitContext &splitContext)
+void CalcSplitInfo(SplitContext& splitContext)
 {
-    const SplitParam &splitParam = splitContext.splitParam;
-    const BaseInfo &baseInfo = splitContext.baseInfo;
+    const SplitParam& splitParam = splitContext.splitParam;
+    const BaseInfo& baseInfo = splitContext.baseInfo;
 
     // 计算每个batch的切分，统计是否为空batch，记录最后有效batch（每个batch的每个N2切分是一样的）
-    SplitInfo &splitInfo = splitContext.splitInfo;
+    SplitInfo& splitInfo = splitContext.splitInfo;
     for (uint32_t bIdx = 0; bIdx < baseInfo.bSize; bIdx++) {
         uint32_t s1Size = GetS1SeqSize(bIdx, baseInfo);
         uint32_t s2Size = GetS2SeqSize(bIdx, baseInfo);
@@ -197,11 +197,11 @@ void CalcSplitInfo(SplitContext &splitContext)
     }
 }
 
-void CalcBatchCache(uint32_t bIdx, const SplitContext &splitContext, BatchCache &batchCache)
+void CalcBatchCache(uint32_t bIdx, const SplitContext& splitContext, BatchCache& batchCache)
 {
-    const BaseInfo &baseInfo = splitContext.baseInfo;
-    const SplitInfo &splitInfo = splitContext.splitInfo;
-    const SplitParam &splitParam = splitContext.splitParam;
+    const BaseInfo& baseInfo = splitContext.baseInfo;
+    const SplitInfo& splitInfo = splitContext.splitInfo;
+    const SplitParam& splitParam = splitContext.splitParam;
 
     batchCache.bIdx = bIdx;
     batchCache.s1Size = GetS1SeqSize(bIdx, baseInfo);
@@ -212,11 +212,11 @@ void CalcBatchCache(uint32_t bIdx, const SplitContext &splitContext, BatchCache 
                                         splitInfo.s2TailSize[bIdx]);
 }
 
-void CalcS1GCache(uint32_t s1GIdx, const SplitContext &splitContext, const BatchCache &batchCache, S1GCache &s1GCache)
+void CalcS1GCache(uint32_t s1GIdx, const SplitContext& splitContext, const BatchCache& batchCache, S1GCache& s1GCache)
 {
-    const BaseInfo &baseInfo = splitContext.baseInfo;
-    const SplitParam &splitParam = splitContext.splitParam;
-    const SplitInfo &splitInfo = splitContext.splitInfo;
+    const BaseInfo& baseInfo = splitContext.baseInfo;
+    const SplitParam& splitParam = splitContext.splitParam;
+    const SplitInfo& splitInfo = splitContext.splitInfo;
 
     s1GCache.bIdx = batchCache.bIdx;
     s1GCache.s1GIdx = s1GIdx;
@@ -258,7 +258,7 @@ void CalcS1GCache(uint32_t s1GIdx, const SplitContext &splitContext, const Batch
     }
 }
 
-void CopyTmpResult(SplitResult &tmpRes, SplitResult &splitRes)
+void CopyTmpResult(SplitResult& tmpRes, SplitResult& splitRes)
 {
     uint64_t len = tmpRes.bN2End.size();
     splitRes.usedCoreNum = tmpRes.usedCoreNum;
@@ -280,7 +280,7 @@ void CopyTmpResult(SplitResult &tmpRes, SplitResult &splitRes)
     }
 }
 
-void ClearTmpResult(SplitResult &tmpResult)
+void ClearTmpResult(SplitResult& tmpResult)
 {
     uint64_t len = tmpResult.bN2End.size();
     tmpResult.usedCoreNum = 0U;
@@ -302,10 +302,10 @@ void ClearTmpResult(SplitResult &tmpResult)
     }
 }
 
-void CalcBatchCost(uint32_t bIdx, const SplitContext &splitContext, CostInfo &costInfo)
+void CalcBatchCost(uint32_t bIdx, const SplitContext& splitContext, CostInfo& costInfo)
 {
-    const BaseInfo &baseInfo = splitContext.baseInfo;
-    const SplitInfo &splitInfo = splitContext.splitInfo;
+    const BaseInfo& baseInfo = splitContext.baseInfo;
+    const SplitInfo& splitInfo = splitContext.splitInfo;
 
     costInfo.bN2CostOfEachBatch[bIdx] = 0;
     costInfo.bN2BlockOfEachBatch[bIdx] = 0U;
@@ -329,12 +329,12 @@ void CalcBatchCost(uint32_t bIdx, const SplitContext &splitContext, CostInfo &co
     }
 }
 
-void CalcCostInfo(SplitContext &splitContext)
+void CalcCostInfo(SplitContext& splitContext)
 {
-    const BaseInfo &baseInfo = splitContext.baseInfo;
-    const SplitInfo &splitInfo = splitContext.splitInfo;
+    const BaseInfo& baseInfo = splitContext.baseInfo;
+    const SplitInfo& splitInfo = splitContext.splitInfo;
 
-    CostInfo &costInfo = splitContext.costInfo;
+    CostInfo& costInfo = splitContext.costInfo;
 
     if (splitInfo.isKvSeqAllZero) {
         costInfo.totalCost = 0;
@@ -358,11 +358,11 @@ void CalcCostInfo(SplitContext &splitContext)
     }
 }
 
-void UpdateCursor(const SplitContext &splitContext, AssignContext &assignContext)
+void UpdateCursor(const SplitContext& splitContext, AssignContext& assignContext)
 {
-    const BaseInfo &baseInfo = splitContext.baseInfo;
-    const SplitInfo &splitInfo = splitContext.splitInfo;
-    const CostInfo &costInfo = splitContext.costInfo;
+    const BaseInfo& baseInfo = splitContext.baseInfo;
+    const SplitInfo& splitInfo = splitContext.splitInfo;
+    const CostInfo& costInfo = splitContext.costInfo;
 
     bool UpdateS1G = false;
     bool UpdateBatch = false;
@@ -408,14 +408,14 @@ void UpdateCursor(const SplitContext &splitContext, AssignContext &assignContext
     }
 }
 
-void AssignByBatch(const SplitContext &splitContext, AssignContext &assignContext)
+void AssignByBatch(const SplitContext& splitContext, AssignContext& assignContext)
 {
     if (assignContext.isFinished) {
         return;
     }
 
-    const CostInfo &costInfo = splitContext.costInfo;
-    const BaseInfo &baseInfo = splitContext.baseInfo;
+    const CostInfo& costInfo = splitContext.costInfo;
+    const BaseInfo& baseInfo = splitContext.baseInfo;
 
     while (assignContext.bN2Cost == 0 ||
            IsWithinTolerance(assignContext.coreCache.costLimit,
@@ -447,7 +447,7 @@ void AssignByBatch(const SplitContext &splitContext, AssignContext &assignContex
     }
 }
 
-void AssignByRow(const SplitContext &splitContext, AssignContext &assignContext)
+void AssignByRow(const SplitContext& splitContext, AssignContext& assignContext)
 {
     if (assignContext.isFinished) {
         return;
@@ -475,7 +475,7 @@ void AssignByRow(const SplitContext &splitContext, AssignContext &assignContext)
     }
 }
 
-void AssignByBlock(AssignContext &assignContext)
+void AssignByBlock(AssignContext& assignContext)
 {
     if (assignContext.isFinished) {
         return;
@@ -501,7 +501,7 @@ void AssignByBlock(AssignContext &assignContext)
     }
 }
 
-void ForceAssign(const SplitContext &splitContext, AssignContext &assignContext)
+void ForceAssign(const SplitContext& splitContext, AssignContext& assignContext)
 {
     if (assignContext.isFinished) {
         return;
@@ -524,7 +524,7 @@ void ForceAssign(const SplitContext &splitContext, AssignContext &assignContext)
     UpdateCursor(splitContext, assignContext);
 }
 
-bool IsNeedRecordFDInfo(const AssignContext &assignContext, const SplitResult &splitRes)
+bool IsNeedRecordFDInfo(const AssignContext& assignContext, const SplitResult& splitRes)
 {
     // 切分点大概率不会刚好在行尾，因此滞后处理归约信息的统计，到下一个切分点再判断是否需要归约
     // 核0无需处理
@@ -543,11 +543,11 @@ bool IsNeedRecordFDInfo(const AssignContext &assignContext, const SplitResult &s
     return true;
 }
 
-void RecordFDInfo(const SplitContext &splitContext, const AssignContext &assignContext, SplitResult &result)
+void RecordFDInfo(const SplitContext& splitContext, const AssignContext& assignContext, SplitResult& result)
 {
-    const BaseInfo &baseInfo = splitContext.baseInfo;
-    const SplitParam &splitParam = splitContext.splitParam;
-    const SplitInfo &splitInfo = splitContext.splitInfo;
+    const BaseInfo& baseInfo = splitContext.baseInfo;
+    const SplitParam& splitParam = splitContext.splitParam;
+    const SplitInfo& splitInfo = splitContext.splitInfo;
     // 需要规约的行是上一个核的切分点所在位置
     uint32_t splitBIdx = result.bN2End[assignContext.curCoreIdx - 1U] / baseInfo.n2Size;
     uint32_t splitS1GIdx = result.gS1End[assignContext.curCoreIdx - 1U];
@@ -570,7 +570,7 @@ void RecordFDInfo(const SplitContext &splitContext, const AssignContext &assignC
     result.numOfFdHead++;
 }
 
-void LogAssignContext(const char *phase, const AssignContext &assignContext)
+void LogAssignContext(const char* phase, const AssignContext& assignContext)
 {
     OP_LOGD("assignContext",
             "[%s] curCoreIdx: %u, unassignedCost: %ld, "
@@ -583,9 +583,9 @@ void LogAssignContext(const char *phase, const AssignContext &assignContext)
             assignContext.s1GCache.s2End);
 }
 
-void CalcSplitPlan(uint32_t coreNum, int64_t costLimit, const SplitContext &splitContext, SplitResult &result)
+void CalcSplitPlan(uint32_t coreNum, int64_t costLimit, const SplitContext& splitContext, SplitResult& result)
 {
-    const CostInfo &costInfo = splitContext.costInfo;
+    const CostInfo& costInfo = splitContext.costInfo;
 
     if (coreNum == 0U) {
         return;
@@ -656,7 +656,7 @@ void CalcSplitPlan(uint32_t coreNum, int64_t costLimit, const SplitContext &spli
     result.usedCoreNum = assignContext.curCoreIdx + 1;
 }
 
-void SplitFD(SplitResult &result)
+void SplitFD(SplitResult& result)
 {
     uint32_t totalFDLoad = 0;
     uint32_t totalFDHeadSplit = 0;
@@ -699,7 +699,7 @@ void SplitFD(SplitResult &result)
     result.usedVecNumOfFd = curCoreIndex + 1;
 }
 
-void LogSplitCoreInput(const BaseInfo &baseInfo, const SplitParam &param)
+void LogSplitCoreInput(const BaseInfo& baseInfo, const SplitParam& param)
 {
     OP_LOGI("BaseInfo", "========== BaseInfo ==========");
     OP_LOGI("BaseInfo", "bSize: %u", baseInfo.bSize);
@@ -720,7 +720,7 @@ void LogSplitCoreInput(const BaseInfo &baseInfo, const SplitParam &param)
     OP_LOGI("SplitParam", "mBaseSize: %u", param.mBaseSize);
     OP_LOGI("SplitParam", "s2BaseSize: %u", param.s2BaseSize);
 }
-void LogSplitCoreResult(const SplitResult &result)
+void LogSplitCoreResult(const SplitResult& result)
 {
     OP_LOGI("SplitRes", "splitRes.usedCoreNum: %d", result.usedCoreNum);
     OP_LOGI("SplitRes", "splitRes.maxCost: %d", result.maxCost);
@@ -746,7 +746,7 @@ void LogSplitCoreResult(const SplitResult &result)
     }
 }
 
-void SplitCore(uint32_t coreNum, const BaseInfo &baseInfo, const SplitParam &param, SplitResult &result)
+void SplitCore(uint32_t coreNum, const BaseInfo& baseInfo, const SplitParam& param, SplitResult& result)
 {
     // 打印baseInfo,param信息
     LogSplitCoreInput(baseInfo, param);

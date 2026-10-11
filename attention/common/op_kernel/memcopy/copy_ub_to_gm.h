@@ -55,11 +55,11 @@ template <typename OUT_T, GmFormat GM_FORMAT>
 class CopyAttenOutUbToGm<OUT_T, GM_FORMAT, UbFormat::GS1> {
 public:
     template <typename FaGmTensorType, bool ROW_PAD = true>
-    __aicore__ inline void operator()(FaGmTensorType &dstTensor, FaUbTensor<OUT_T, ROW_PAD> &srcTensor,
-                                      GmCoordGs1Merge &gmCoord)
+    __aicore__ inline void operator()(FaGmTensorType& dstTensor, FaUbTensor<OUT_T, ROW_PAD>& srcTensor,
+                                      GmCoordGs1Merge& gmCoord)
     {
         uint32_t s1Size = 0;
-        auto &offsetCalculator = dstTensor.offsetCalculator;
+        auto& offsetCalculator = dstTensor.offsetCalculator;
         if constexpr (GmLayoutParams<GM_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_TND) {
             s1Size = offsetCalculator.actualSeqLensQParser.GetActualSeqLength(gmCoord.bIdx);
         } else {
@@ -118,10 +118,10 @@ template <typename OUT_T, GmFormat GM_FORMAT>
 class CopyAttenOutUbToGm<OUT_T, GM_FORMAT, UbFormat::S1G> {
 public:
     template <typename FaGmTensorType, bool ROW_PAD = true>
-    __aicore__ inline void operator()(FaGmTensorType &dstTensor, FaUbTensor<OUT_T, ROW_PAD> &srcTensor,
-                                      GmCoordGs1Merge &gmCoord)
+    __aicore__ inline void operator()(FaGmTensorType& dstTensor, FaUbTensor<OUT_T, ROW_PAD>& srcTensor,
+                                      GmCoordGs1Merge& gmCoord)
     {
-        auto &offsetCalculator = dstTensor.offsetCalculator;
+        auto& offsetCalculator = dstTensor.offsetCalculator;
         uint32_t s1IdxStart = gmCoord.gS1Idx / offsetCalculator.GetDimG();
         uint32_t gIdxStart = gmCoord.gS1Idx % offsetCalculator.GetDimG();
         uint32_t s1IdxEnd = (gmCoord.gS1Idx + gmCoord.gS1DealSize) / offsetCalculator.GetDimG();
@@ -185,10 +185,10 @@ template <typename OUT_T, GmFormat GM_FORMAT>
 class CopyAttenOutUbToGm<OUT_T, GM_FORMAT, UbFormat::S1_ONLY> {
 public:
     template <typename FaGmTensorType, bool ROW_PAD = true>
-    __aicore__ inline void operator()(FaGmTensorType &dstTensor, FaUbTensor<OUT_T, ROW_PAD> &srcTensor,
-                                      GmCoordS1Only &gmCoord)
+    __aicore__ inline void operator()(FaGmTensorType& dstTensor, FaUbTensor<OUT_T, ROW_PAD>& srcTensor,
+                                      GmCoordS1Only& gmCoord)
     {
-        auto &offsetCalculator = dstTensor.offsetCalculator;
+        auto& offsetCalculator = dstTensor.offsetCalculator;
         uint64_t gmOffset = offsetCalculator.GetOffset(gmCoord.bIdx, gmCoord.n2Idx, gmCoord.gIdx, gmCoord.s1Idx, 0);
         uint32_t blockCount = gmCoord.s1DealSize;
         uint32_t blockLen = gmCoord.dDealSize * sizeof(OUT_T);

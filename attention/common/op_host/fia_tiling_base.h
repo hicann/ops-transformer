@@ -45,7 +45,7 @@ class FiaTilingBase {
 public:
     FiaTilingBase() = default;
 
-    explicit FiaTilingBase(gert::TilingContext *context)
+    explicit FiaTilingBase(gert::TilingContext* context)
         : context_(context)
     {}
 
@@ -55,7 +55,7 @@ public:
     //     1、GRAPH_SUCCESS: 成功，并且不需要继续执行后续Tiling类的实现
     //     2、GRAPH_FAILED: 失败，中止整个Tiling流程
     //     3、GRAPH_PARAM_INVALID: 本类不支持，需要继续往下执行其他Tiling类的实现
-    ge::graphStatus DoTiling(TilingInfo *tilingInfo)
+    ge::graphStatus DoTiling(TilingInfo* tilingInfo)
     {
         InitTilingInfo(tilingInfo);
         if (!IsCapable()) {
@@ -68,8 +68,8 @@ public:
     }
 
 protected:
-    gert::TilingContext *context_ = nullptr;
-    virtual void InitTilingInfo(TilingInfo *tilingInfo) = 0;
+    gert::TilingContext* context_ = nullptr;
+    virtual void InitTilingInfo(TilingInfo* tilingInfo) = 0;
     virtual bool IsCapable() = 0;
     virtual ge::graphStatus DoOpTiling() = 0;
 
@@ -90,12 +90,12 @@ protected:
         OP_CHECK_IF(context_->GetWorkspaceSizes(1) == nullptr,
                     OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "WorkSpaceSize got from ge is nullptr"),
                     return ge::GRAPH_FAILED);
-        size_t *workSpaces = context_->GetWorkspaceSizes(1);
+        size_t* workSpaces = context_->GetWorkspaceSizes(1);
         workSpaces[0] = workspaceSize;
         return ge::GRAPH_SUCCESS;
     }
 
-    [[nodiscard]] ge::graphStatus SetTilingData(TilingDef &tilingData) const
+    [[nodiscard]] ge::graphStatus SetTilingData(TilingDef& tilingData) const
     {
         OP_CHECK_IF(
             context_->GetRawTilingData() == nullptr,
@@ -114,7 +114,7 @@ protected:
     }
 
     template <typename T>
-    [[nodiscard]] std::string GetShapeDebugStr(const T &shape) const
+    [[nodiscard]] std::string GetShapeDebugStr(const T& shape) const
     {
         std::ostringstream ost;
         ost << "[";
@@ -128,8 +128,8 @@ protected:
         return ost.str();
     }
 
-    [[nodiscard]] std::string GetTensorDebugStr(const gert::StorageShape *shape,
-                                                const gert::CompileTimeTensorDesc *tensor) const
+    [[nodiscard]] std::string GetTensorDebugStr(const gert::StorageShape* shape,
+                                                const gert::CompileTimeTensorDesc* tensor) const
     {
         if (shape == nullptr || tensor == nullptr) {
             return "nil ";
@@ -165,7 +165,7 @@ protected:
     {
         auto rawTilingData = context_->GetRawTilingData();
         auto rawTilingDataSize = rawTilingData->GetDataSize();
-        auto data = reinterpret_cast<const int32_t *>(rawTilingData->GetData());
+        auto data = reinterpret_cast<const int32_t*>(rawTilingData->GetData());
         size_t len = rawTilingDataSize / sizeof(int32_t);
         std::ostringstream oss;
         for (size_t i = 0; i < len; i++) {

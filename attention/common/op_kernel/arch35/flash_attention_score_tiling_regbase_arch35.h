@@ -936,21 +936,21 @@ public:
     {
         this->splitFactorTailSize = splitFactorTailSizeParam;
     }
-    uint32_t *get_bnStartIdxPtr()
+    uint32_t* get_bnStartIdxPtr()
     {
         return bnStartIdx;
     }
-    void set_bnStartIdx(const uint32_t *val)
+    void set_bnStartIdx(const uint32_t* val)
     {
         for (int i = 0; i < 48; ++i) { // 48: coreNum
             this->bnStartIdx[i] = val[i];
         }
     }
-    int64_t *get_sparseStartIdxPtr()
+    int64_t* get_sparseStartIdxPtr()
     {
         return sparseStartIdx;
     }
-    void set_sparseStartIdx(const int64_t *val)
+    void set_sparseStartIdx(const int64_t* val)
     {
         for (int i = 0; i < 48; ++i) { // 48: coreNum
             this->sparseStartIdx[i] = val[i];
@@ -1049,7 +1049,7 @@ public:
     {
         this->isOneN = isOneNParam;
     }
-    uint8_t *get_rsvdPtr()
+    uint8_t* get_rsvdPtr()
     {
         return rsvd;
     }

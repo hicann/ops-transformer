@@ -489,32 +489,32 @@ constexpr static AscendC::Reg::CastTrait castTraitZeroMerge = {
  * ************************************************************************************************* */
 #define DO_OR_2(dst, even, odd, sfx, mask) \
     do { \
-        Or((RegTensor<uint16_t> &)dst##1##sfx, (RegTensor<uint16_t> &)even##1##sfx, \
-           (RegTensor<uint16_t> &)odd##1##sfx, mask); \
-        Or((RegTensor<uint16_t> &)dst##2##sfx, (RegTensor<uint16_t> &)even##2##sfx, \
-           (RegTensor<uint16_t> &)odd##2##sfx, mask); \
+        Or((RegTensor<uint16_t>&)dst##1##sfx, (RegTensor<uint16_t>&)even##1##sfx, (RegTensor<uint16_t>&)odd##1##sfx, \
+           mask); \
+        Or((RegTensor<uint16_t>&)dst##2##sfx, (RegTensor<uint16_t>&)even##2##sfx, (RegTensor<uint16_t>&)odd##2##sfx, \
+           mask); \
     } while (0)
 
 #define DO_OR_4(dst, even, odd, sfx, mask) \
     do { \
         DO_OR_2(dst, even, odd, sfx, mask); \
-        Or((RegTensor<uint16_t> &)dst##3##sfx, (RegTensor<uint16_t> &)even##3##sfx, \
-           (RegTensor<uint16_t> &)odd##3##sfx, mask); \
-        Or((RegTensor<uint16_t> &)dst##4##sfx, (RegTensor<uint16_t> &)even##4##sfx, \
-           (RegTensor<uint16_t> &)odd##4##sfx, mask); \
+        Or((RegTensor<uint16_t>&)dst##3##sfx, (RegTensor<uint16_t>&)even##3##sfx, (RegTensor<uint16_t>&)odd##3##sfx, \
+           mask); \
+        Or((RegTensor<uint16_t>&)dst##4##sfx, (RegTensor<uint16_t>&)even##4##sfx, (RegTensor<uint16_t>&)odd##4##sfx, \
+           mask); \
     } while (0)
 
 #define DO_OR_8(dst, even, odd, sfx, mask) \
     do { \
         DO_OR_4(dst, even, odd, sfx, mask); \
-        Or((RegTensor<uint16_t> &)dst##5##sfx, (RegTensor<uint16_t> &)even##5##sfx, \
-           (RegTensor<uint16_t> &)odd##5##sfx, mask); \
-        Or((RegTensor<uint16_t> &)dst##6##sfx, (RegTensor<uint16_t> &)even##6##sfx, \
-           (RegTensor<uint16_t> &)odd##6##sfx, mask); \
-        Or((RegTensor<uint16_t> &)dst##7##sfx, (RegTensor<uint16_t> &)even##7##sfx, \
-           (RegTensor<uint16_t> &)odd##7##sfx, mask); \
-        Or((RegTensor<uint16_t> &)dst##8##sfx, (RegTensor<uint16_t> &)even##8##sfx, \
-           (RegTensor<uint16_t> &)odd##8##sfx, mask); \
+        Or((RegTensor<uint16_t>&)dst##5##sfx, (RegTensor<uint16_t>&)even##5##sfx, (RegTensor<uint16_t>&)odd##5##sfx, \
+           mask); \
+        Or((RegTensor<uint16_t>&)dst##6##sfx, (RegTensor<uint16_t>&)even##6##sfx, (RegTensor<uint16_t>&)odd##6##sfx, \
+           mask); \
+        Or((RegTensor<uint16_t>&)dst##7##sfx, (RegTensor<uint16_t>&)even##7##sfx, (RegTensor<uint16_t>&)odd##7##sfx, \
+           mask); \
+        Or((RegTensor<uint16_t>&)dst##8##sfx, (RegTensor<uint16_t>&)even##8##sfx, (RegTensor<uint16_t>&)odd##8##sfx, \
+           mask); \
     } while (0)
 
 /* **************************************************************************************************
@@ -649,47 +649,47 @@ constexpr static AscendC::Reg::CastTrait castTraitZeroMerge = {
  * ************************************************************************************************* */
 #define DO_STOREALIGN_6(T, buf, val, stride, idx, mask) \
     do { \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 0 + idx * stride, val##1, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 0 + idx * stride, val##1, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 1 + idx * stride, val##2, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 1 + idx * stride, val##2, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 2 + idx * stride, val##3, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 2 + idx * stride, val##3, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 3 + idx * stride, val##4, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 3 + idx * stride, val##4, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 4 + idx * stride, val##5, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 4 + idx * stride, val##5, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 5 + idx * stride, val##6, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 5 + idx * stride, val##6, \
                                                      mask); \
     } while (0)
 
 #define DO_STOREALIGN_8(T, buf, val, stride, idx, mask) \
     do { \
         DO_STOREALIGN_6(T, buf, val, stride, idx, mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 6 + idx * stride, val##7, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 6 + idx * stride, val##7, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 7 + idx * stride, val##8, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 7 + idx * stride, val##8, \
                                                      mask); \
     } while (0)
 
 #define DO_STOREALIGN_16(T, buf, val, stride, idx, mask) \
     do { \
         DO_STOREALIGN_8(T, buf, val, stride, idx, mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 8 + idx * stride, val##9, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 8 + idx * stride, val##9, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 9 + idx * stride, val##10, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 9 + idx * stride, val##10, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 10 + idx * stride, val##11, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 10 + idx * stride, val##11, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 11 + idx * stride, val##12, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 11 + idx * stride, val##12, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 12 + idx * stride, val##13, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 12 + idx * stride, val##13, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 13 + idx * stride, val##14, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 13 + idx * stride, val##14, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 14 + idx * stride, val##15, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 14 + idx * stride, val##15, \
                                                      mask); \
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 15 + idx * stride, val##16, \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)buf + floatRepSize * 15 + idx * stride, val##16, \
                                                      mask); \
     } while (0)
 /* **************************************************************************************************
@@ -739,25 +739,25 @@ constexpr static AscendC::Reg::CastTrait castTraitZeroMerge = {
  * maskUb local initialization: __ubuf__ uint32_t * maskUbN = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + offset)
  * ************************************************************************************************* */
 #define DO_MASKUB_INIT_8(maskTensor) \
-    __ubuf__ uint32_t *maskUb1 = (__ubuf__ uint32_t *)maskTensor.GetPhyAddr(); \
-    __ubuf__ uint32_t *maskUb2 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize); \
-    __ubuf__ uint32_t *maskUb3 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 2); \
-    __ubuf__ uint32_t *maskUb4 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 3); \
-    __ubuf__ uint32_t *maskUb5 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 4); \
-    __ubuf__ uint32_t *maskUb6 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 5); \
-    __ubuf__ uint32_t *maskUb7 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 6); \
-    __ubuf__ uint32_t *maskUb8 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 7)
+    __ubuf__ uint32_t* maskUb1 = (__ubuf__ uint32_t*)maskTensor.GetPhyAddr(); \
+    __ubuf__ uint32_t* maskUb2 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize); \
+    __ubuf__ uint32_t* maskUb3 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 2); \
+    __ubuf__ uint32_t* maskUb4 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 3); \
+    __ubuf__ uint32_t* maskUb5 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 4); \
+    __ubuf__ uint32_t* maskUb6 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 5); \
+    __ubuf__ uint32_t* maskUb7 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 6); \
+    __ubuf__ uint32_t* maskUb8 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 7)
 
 #define DO_MASKUB_INIT_16(maskTensor) \
     DO_MASKUB_INIT_8(maskTensor); \
-    __ubuf__ uint32_t *maskUb9 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 8); \
-    __ubuf__ uint32_t *maskUb10 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 9); \
-    __ubuf__ uint32_t *maskUb11 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 10); \
-    __ubuf__ uint32_t *maskUb12 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 11); \
-    __ubuf__ uint32_t *maskUb13 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 12); \
-    __ubuf__ uint32_t *maskUb14 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 13); \
-    __ubuf__ uint32_t *maskUb15 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 14); \
-    __ubuf__ uint32_t *maskUb16 = (__ubuf__ uint32_t *)(maskTensor.GetPhyAddr() + floatRepSize * 15)
+    __ubuf__ uint32_t* maskUb9 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 8); \
+    __ubuf__ uint32_t* maskUb10 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 9); \
+    __ubuf__ uint32_t* maskUb11 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 10); \
+    __ubuf__ uint32_t* maskUb12 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 11); \
+    __ubuf__ uint32_t* maskUb13 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 12); \
+    __ubuf__ uint32_t* maskUb14 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 13); \
+    __ubuf__ uint32_t* maskUb15 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 14); \
+    __ubuf__ uint32_t* maskUb16 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 15)
 
 } // namespace FaVectorApi
 

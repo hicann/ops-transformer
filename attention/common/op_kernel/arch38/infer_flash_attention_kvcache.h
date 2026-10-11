@@ -23,8 +23,8 @@
 using namespace matmul;
 
 TEMPLATE_INTF
-__aicore__ inline void InitQueryLeftPaddingSize(RunParamStr<isInfer> &runParam,
-                                                const ConstInfo<isInfer, hasRope> &constInfo, int64_t &actualS1Size)
+__aicore__ inline void InitQueryLeftPaddingSize(RunParamStr<isInfer>& runParam,
+                                                const ConstInfo<isInfer, hasRope>& constInfo, int64_t& actualS1Size)
 {
     if (!constInfo.isQHasLeftPadding) {
         runParam.queryLeftPaddingSize = 0;
@@ -38,8 +38,8 @@ __aicore__ inline void InitQueryLeftPaddingSize(RunParamStr<isInfer> &runParam,
 }
 
 TEMPLATE_INTF
-__aicore__ inline void InitKVLeftPaddingSize(RunParamStr<isInfer> &runParam,
-                                             const ConstInfo<isInfer, hasRope> &constInfo, int64_t &actualS2Size)
+__aicore__ inline void InitKVLeftPaddingSize(RunParamStr<isInfer>& runParam,
+                                             const ConstInfo<isInfer, hasRope>& constInfo, int64_t& actualS2Size)
 {
     if (!constInfo.isKVHasLeftPadding) {
         runParam.kvLeftPaddingSize = 0;
@@ -53,14 +53,14 @@ __aicore__ inline void InitKVLeftPaddingSize(RunParamStr<isInfer> &runParam,
 }
 
 TEMPLATE_INTF
-__aicore__ inline void GetSingleCoreParam(RunParamStr<isInfer> &runParam, const ConstInfo<isInfer, hasRope> &constInfo,
-                                          const AttenMaskInfo &attenMaskInfo, int32_t sIdx,
-                                          GlobalTensor<INPUT_T> &keyGm, __gm__ int64_t *actualSeqQlenAddr,
-                                          __gm__ int64_t *actualSeqKvlenAddr)
+__aicore__ inline void GetSingleCoreParam(RunParamStr<isInfer>& runParam, const ConstInfo<isInfer, hasRope>& constInfo,
+                                          const AttenMaskInfo& attenMaskInfo, int32_t sIdx,
+                                          GlobalTensor<INPUT_T>& keyGm, __gm__ int64_t* actualSeqQlenAddr,
+                                          __gm__ int64_t* actualSeqKvlenAddr)
 {
     // TensorList场景获取不同batch的KvSeq长度
     if (constInfo.isKvContinuous == 0) {
-        ListTensorDesc keyListTensorDesc((__gm__ void *)keyGm.GetPhyAddr());
+        ListTensorDesc keyListTensorDesc((__gm__ void*)keyGm.GetPhyAddr());
         AscendC::TensorDesc<__gm__ uint8_t> kvTensorDesc;
         uint64_t dimInfo[4];
         kvTensorDesc.SetShapeAddr(&dimInfo[0]);
@@ -166,9 +166,9 @@ __aicore__ inline void GetSingleCoreParam(RunParamStr<isInfer> &runParam, const 
 }
 
 TEMPLATE_INTF
-__aicore__ inline void GetKeyCoreOffsetParam(RunParamStr<isInfer> &runParam,
-                                             const ConstInfo<isInfer, hasRope> &constInfo, int32_t sIdx,
-                                             __gm__ int64_t *actualSeqKvlenAddr)
+__aicore__ inline void GetKeyCoreOffsetParam(RunParamStr<isInfer>& runParam,
+                                             const ConstInfo<isInfer, hasRope>& constInfo, int32_t sIdx,
+                                             __gm__ int64_t* actualSeqKvlenAddr)
 {
     uint64_t keyInnerOffsetSize = 0;
     if constexpr (layout == LayOutTypeEnum::LAYOUT_BSH) {
@@ -202,9 +202,9 @@ __aicore__ inline void GetKeyCoreOffsetParam(RunParamStr<isInfer> &runParam,
 }
 
 TEMPLATE_INTF
-__aicore__ inline void GetValueCoreOffsetParam(RunParamStr<isInfer> &runParam,
-                                               const ConstInfo<isInfer, hasRope> &constInfo, int32_t sIdx,
-                                               __gm__ int64_t *actualSeqKvlenAddr)
+__aicore__ inline void GetValueCoreOffsetParam(RunParamStr<isInfer>& runParam,
+                                               const ConstInfo<isInfer, hasRope>& constInfo, int32_t sIdx,
+                                               __gm__ int64_t* actualSeqKvlenAddr)
 {
     uint64_t valueInnerOffsetSize = 0;
     if constexpr (layout == LayOutTypeEnum::LAYOUT_BSH) {
@@ -243,9 +243,9 @@ __aicore__ inline void GetValueCoreOffsetParam(RunParamStr<isInfer> &runParam,
 }
 
 TEMPLATE_INTF
-__aicore__ inline void GetKeyRopeCoreOffsetParam(RunParamStr<isInfer> &runParam,
-                                                 const ConstInfo<isInfer, hasRope> &constInfo, int32_t sIdx,
-                                                 __gm__ int64_t *actualSeqKvlenAddr)
+__aicore__ inline void GetKeyRopeCoreOffsetParam(RunParamStr<isInfer>& runParam,
+                                                 const ConstInfo<isInfer, hasRope>& constInfo, int32_t sIdx,
+                                                 __gm__ int64_t* actualSeqKvlenAddr)
 {
     uint64_t kRopeInnerOffsetSize = 0;
     if constexpr (layout == LayOutTypeEnum::LAYOUT_BSH) {
@@ -268,9 +268,9 @@ __aicore__ inline void GetKeyRopeCoreOffsetParam(RunParamStr<isInfer> &runParam,
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeParamBatch(RunParamStr<isInfer> &runParam, const ConstInfo<isInfer, hasRope> &constInfo,
-                                         const AttenMaskInfo &attenMaskInfo, GlobalTensor<INPUT_T> &keyGm,
-                                         __gm__ int64_t *actualSeqQlenAddr, __gm__ int64_t *actualSeqKvlenAddr)
+__aicore__ inline void ComputeParamBatch(RunParamStr<isInfer>& runParam, const ConstInfo<isInfer, hasRope>& constInfo,
+                                         const AttenMaskInfo& attenMaskInfo, GlobalTensor<INPUT_T>& keyGm,
+                                         __gm__ int64_t* actualSeqQlenAddr, __gm__ int64_t* actualSeqKvlenAddr)
 {
     GetSingleCoreParam<TEMPLATE_INTF_ARGS>(runParam, constInfo, attenMaskInfo, runParam.boIdx, keyGm, actualSeqQlenAddr,
                                            actualSeqKvlenAddr);
@@ -281,7 +281,7 @@ __aicore__ inline void ComputeParamBatch(RunParamStr<isInfer> &runParam, const C
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeS1LoopInfo(RunParamStr<isInfer> &runParam, const ConstInfo<isInfer, hasRope> &constInfo,
+__aicore__ inline void ComputeS1LoopInfo(RunParamStr<isInfer>& runParam, const ConstInfo<isInfer, hasRope>& constInfo,
                                          bool lastBN, int64_t nextGs1Idx)
 {
     constexpr int32_t s1BaseSize = static_cast<int32_t>(s1TemplateType);
@@ -295,7 +295,7 @@ __aicore__ inline void ComputeS1LoopInfo(RunParamStr<isInfer> &runParam, const C
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeSouterParam(RunParamStr<isInfer> &runParam, const ConstInfo<isInfer, hasRope> &constInfo,
+__aicore__ inline void ComputeSouterParam(RunParamStr<isInfer>& runParam, const ConstInfo<isInfer, hasRope>& constInfo,
                                           uint32_t sOuterLoopIdx)
 {
     int64_t cubeSOuterOffset = sOuterLoopIdx * (uint32_t)s1TemplateType;
@@ -324,9 +324,9 @@ __aicore__ inline void ComputeSouterParam(RunParamStr<isInfer> &runParam, const 
 }
 
 TEMPLATE_INTF
-__aicore__ inline void LoopSOuterOffsetInit(RunParamStr<isInfer> &runParam,
-                                            const ConstInfo<isInfer, hasRope> &constInfo, int32_t sIdx,
-                                            __gm__ int64_t *actualSeqQlenAddr, PseInfo &pseInfo)
+__aicore__ inline void LoopSOuterOffsetInit(RunParamStr<isInfer>& runParam,
+                                            const ConstInfo<isInfer, hasRope>& constInfo, int32_t sIdx,
+                                            __gm__ int64_t* actualSeqQlenAddr, PseInfo& pseInfo)
 {
     if constexpr (pseMode != PseTypeEnum::PSE_NONE_TYPE) {
         CalPseShiftCoreOffset<TEMPLATE_INTF_ARGS>(runParam, constInfo, sIdx, runParam.sOuterOffset, pseInfo);
@@ -423,8 +423,8 @@ __aicore__ inline void LoopSOuterOffsetInit(RunParamStr<isInfer> &runParam,
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeParamS1(RunParamStr<isInfer> &runParam, const ConstInfo<isInfer, hasRope> &constInfo,
-                                      uint32_t sOuterLoopIdx, __gm__ int64_t *actualSeqQlenAddr, PseInfo &pseInfo)
+__aicore__ inline bool ComputeParamS1(RunParamStr<isInfer>& runParam, const ConstInfo<isInfer, hasRope>& constInfo,
+                                      uint32_t sOuterLoopIdx, __gm__ int64_t* actualSeqQlenAddr, PseInfo& pseInfo)
 {
     // 后续的函数依赖 sOuterOffset
     ComputeSouterParam<TEMPLATE_INTF_ARGS>(runParam, constInfo, sOuterLoopIdx);
@@ -449,7 +449,7 @@ __aicore__ inline int64_t ClipSInnerTokenCube(int64_t sInnerToken, int64_t minVa
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeS2LoopInfo(RunParamStr<isInfer> &runParam, const ConstInfo<isInfer, hasRope> &constInfo)
+__aicore__ inline bool ComputeS2LoopInfo(RunParamStr<isInfer>& runParam, const ConstInfo<isInfer, hasRope>& constInfo)
 {
     constexpr int32_t s2BaseSize = static_cast<int32_t>(s2TemplateType);
     if constexpr (isFd) {
@@ -476,8 +476,8 @@ __aicore__ inline bool ComputeS2LoopInfo(RunParamStr<isInfer> &runParam, const C
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeOffset(const RunParamStr<isInfer> &runParam, const ConstInfo<isInfer, hasRope> &constInfo,
-                                     uint32_t sInnerLoopIdx, RunInfo<isInfer> &runInfo)
+__aicore__ inline void ComputeOffset(const RunParamStr<isInfer>& runParam, const ConstInfo<isInfer, hasRope>& constInfo,
+                                     uint32_t sInnerLoopIdx, RunInfo<isInfer>& runInfo)
 {
     if constexpr (pseMode != PseTypeEnum::PSE_NONE_TYPE) {
         runInfo.pseShiftOffset =
@@ -520,9 +520,9 @@ __aicore__ inline void ComputeOffset(const RunParamStr<isInfer> &runParam, const
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeOffsetForAntiquant(const RunParamStr<isInfer> &runParam,
-                                                 const ConstInfo<isInfer, hasRope> &constInfo, uint32_t sInnerLoopIdx,
-                                                 RunInfo<isInfer> &runInfo)
+__aicore__ inline void ComputeOffsetForAntiquant(const RunParamStr<isInfer>& runParam,
+                                                 const ConstInfo<isInfer, hasRope>& constInfo, uint32_t sInnerLoopIdx,
+                                                 RunInfo<isInfer>& runInfo)
 {
     if constexpr (layout == LayOutTypeEnum::LAYOUT_BSH || layout == LayOutTypeEnum::LAYOUT_TND) {
         runInfo.valueOffset = runParam.valueCoreOffset + sInnerLoopIdx * constInfo.s2BaseN2Dv;
@@ -546,7 +546,7 @@ __aicore__ inline void ComputeOffsetForAntiquant(const RunParamStr<isInfer> &run
 }
 
 TEMPLATE_INTF
-__aicore__ inline void InitTaskParamByRun(const RunParamStr<isInfer> &runParam, RunInfo<isInfer> &runInfo)
+__aicore__ inline void InitTaskParamByRun(const RunParamStr<isInfer>& runParam, RunInfo<isInfer>& runInfo)
 {
     runInfo.keyOffset = runParam.keyOffset;
     runInfo.boIdx = runParam.boIdx;
@@ -566,17 +566,17 @@ __aicore__ inline void InitTaskParamByRun(const RunParamStr<isInfer> &runParam, 
 }
 
 TEMPLATE_INTF
-__aicore__ inline void IterateAllPreProcess(RunInfo<isInfer> &runInfo, const ConstInfo<isInfer, hasRope> &constInfo,
-                                            GlobalTensor<INPUT_T> &keyValueGm, GlobalTensor<INPUT_T> &tempKeyValueGm)
+__aicore__ inline void IterateAllPreProcess(RunInfo<isInfer>& runInfo, const ConstInfo<isInfer, hasRope>& constInfo,
+                                            GlobalTensor<INPUT_T>& keyValueGm, GlobalTensor<INPUT_T>& tempKeyValueGm)
 {
     if constexpr (isInfer) {
         if (constInfo.isKvContinuous != 0) {
             return;
         }
-        ListTensorDesc keyValueListTensorDesc((__gm__ void *)keyValueGm.GetPhyAddr());
-        __gm__ uint8_t *tempKeyValueGmPtr =
-            (__gm__ uint8_t *)keyValueListTensorDesc.GetDataPtr<__gm__ uint8_t>(runInfo.boIdx);
-        tempKeyValueGm.SetGlobalBuffer((__gm__ INPUT_T *)tempKeyValueGmPtr);
+        ListTensorDesc keyValueListTensorDesc((__gm__ void*)keyValueGm.GetPhyAddr());
+        __gm__ uint8_t* tempKeyValueGmPtr =
+            (__gm__ uint8_t*)keyValueListTensorDesc.GetDataPtr<__gm__ uint8_t>(runInfo.boIdx);
+        tempKeyValueGm.SetGlobalBuffer((__gm__ INPUT_T*)tempKeyValueGmPtr);
     }
 }
 

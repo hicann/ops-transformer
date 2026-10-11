@@ -17,10 +17,10 @@
 
 // 静态布局成员偏移/大小推断（将空指针强制转换后的成员地址作为偏移，用于按偏移重建子Tensor）
 #ifndef OFFSET_OF_MEMBER
-#define OFFSET_OF_MEMBER(TYPE, MEMBER) ((uint64_t) & ((TYPE *)0)->MEMBER)
+#define OFFSET_OF_MEMBER(TYPE, MEMBER) ((uint64_t) & ((TYPE*)0)->MEMBER)
 #endif
 #ifndef SIZE_OF_MEMBER
-#define SIZE_OF_MEMBER(TYPE, MEMBER) (sizeof(((TYPE *)0)->MEMBER))
+#define SIZE_OF_MEMBER(TYPE, MEMBER) (sizeof(((TYPE*)0)->MEMBER))
 #endif
 
 namespace AttentionCommon {

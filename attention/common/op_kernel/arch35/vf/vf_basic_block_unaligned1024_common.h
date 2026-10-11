@@ -23,17 +23,17 @@ using namespace regbaseutil;
 namespace FaVectorApi {
 
 #define VREG_FLOAT_PSE_ALIBI_16_DECL \
-    RegTensor<float> &vreg_pse1, RegTensor<float> &vreg_pse2, RegTensor<float> &vreg_pse3, \
-        RegTensor<float> &vreg_pse4, RegTensor<float> &vreg_pse5, RegTensor<float> &vreg_pse6, \
-        RegTensor<float> &vreg_pse7, RegTensor<float> &vreg_pse8, RegTensor<float> &vreg_pse9, \
-        RegTensor<float> &vreg_pse10, RegTensor<float> &vreg_pse11, RegTensor<float> &vreg_pse12, \
-        RegTensor<float> &vreg_pse13, RegTensor<float> &vreg_pse14, RegTensor<float> &vreg_pse15, \
-        RegTensor<float> &vreg_pse16, RegTensor<float> &vreg_alibi1, RegTensor<float> &vreg_alibi2, \
-        RegTensor<float> &vreg_alibi3, RegTensor<float> &vreg_alibi4, RegTensor<float> &vreg_alibi5, \
-        RegTensor<float> &vreg_alibi6, RegTensor<float> &vreg_alibi7, RegTensor<float> &vreg_alibi8, \
-        RegTensor<float> &vreg_alibi9, RegTensor<float> &vreg_alibi10, RegTensor<float> &vreg_alibi11, \
-        RegTensor<float> &vreg_alibi12, RegTensor<float> &vreg_alibi13, RegTensor<float> &vreg_alibi14, \
-        RegTensor<float> &vreg_alibi15, RegTensor<float> &vreg_alibi16, const float slopes, MaskReg &preg_all
+    RegTensor<float>&vreg_pse1, RegTensor<float>&vreg_pse2, RegTensor<float>&vreg_pse3, RegTensor<float>&vreg_pse4, \
+        RegTensor<float>&vreg_pse5, RegTensor<float>&vreg_pse6, RegTensor<float>&vreg_pse7, \
+        RegTensor<float>&vreg_pse8, RegTensor<float>&vreg_pse9, RegTensor<float>&vreg_pse10, \
+        RegTensor<float>&vreg_pse11, RegTensor<float>&vreg_pse12, RegTensor<float>&vreg_pse13, \
+        RegTensor<float>&vreg_pse14, RegTensor<float>&vreg_pse15, RegTensor<float>&vreg_pse16, \
+        RegTensor<float>&vreg_alibi1, RegTensor<float>&vreg_alibi2, RegTensor<float>&vreg_alibi3, \
+        RegTensor<float>&vreg_alibi4, RegTensor<float>&vreg_alibi5, RegTensor<float>&vreg_alibi6, \
+        RegTensor<float>&vreg_alibi7, RegTensor<float>&vreg_alibi8, RegTensor<float>&vreg_alibi9, \
+        RegTensor<float>&vreg_alibi10, RegTensor<float>&vreg_alibi11, RegTensor<float>&vreg_alibi12, \
+        RegTensor<float>&vreg_alibi13, RegTensor<float>&vreg_alibi14, RegTensor<float>&vreg_alibi15, \
+        RegTensor<float>&vreg_alibi16, const float slopes, MaskReg &preg_all
 
 #define ARG_FLOAT_PSE_ALIBI_16 \
     vreg_pse1, vreg_pse2, vreg_pse3, vreg_pse4, vreg_pse5, vreg_pse6, vreg_pse7, vreg_pse8, vreg_pse9, vreg_pse10, \
@@ -42,25 +42,24 @@ namespace FaVectorApi {
         vreg_alibi12, vreg_alibi13, vreg_alibi14, vreg_alibi15, vreg_alibi16, slopes, preg_all
 
 #define VREG_FLOAT_PSE_16_LOAD_DECL(T) \
-    RegTensor<float> &vreg_pse1, RegTensor<float> &vreg_pse2, RegTensor<float> &vreg_pse3, \
-        RegTensor<float> &vreg_pse4, RegTensor<float> &vreg_pse5, RegTensor<float> &vreg_pse6, \
-        RegTensor<float> &vreg_pse7, RegTensor<float> &vreg_pse8, RegTensor<float> &vreg_pse9, \
-        RegTensor<float> &vreg_pse10, RegTensor<float> &vreg_pse11, RegTensor<float> &vreg_pse12, \
-        RegTensor<float> &vreg_pse13, RegTensor<float> &vreg_pse14, RegTensor<float> &vreg_pse15, \
-        RegTensor<float> &vreg_pse16, __ubuf__ T *&pseUb, const uint32_t i, const uint32_t pseStride, \
-        MaskReg &preg_all_b16
+    RegTensor<float>&vreg_pse1, RegTensor<float>&vreg_pse2, RegTensor<float>&vreg_pse3, RegTensor<float>&vreg_pse4, \
+        RegTensor<float>&vreg_pse5, RegTensor<float>&vreg_pse6, RegTensor<float>&vreg_pse7, \
+        RegTensor<float>&vreg_pse8, RegTensor<float>&vreg_pse9, RegTensor<float>&vreg_pse10, \
+        RegTensor<float>&vreg_pse11, RegTensor<float>&vreg_pse12, RegTensor<float>&vreg_pse13, \
+        RegTensor<float>&vreg_pse14, RegTensor<float>&vreg_pse15, RegTensor<float>&vreg_pse16, __ubuf__ T *&pseUb, \
+        const uint32_t i, const uint32_t pseStride, MaskReg &preg_all_b16
 
 #define ARG_FLOAT_PSE_16_LOAD \
     vreg_pse1, vreg_pse2, vreg_pse3, vreg_pse4, vreg_pse5, vreg_pse6, vreg_pse7, vreg_pse8, vreg_pse9, vreg_pse10, \
         vreg_pse11, vreg_pse12, vreg_pse13, vreg_pse14, vreg_pse15, vreg_pse16, pseUb, i, pseStride, preg_all_b16
 
 #define VREG_FLOAT_CAST_STORE_EXP_1024_DECL \
-    RegTensor<float> &vreg_exp_even1, RegTensor<float> &vreg_exp_odd1, RegTensor<float> &vreg_exp_even2, \
-        RegTensor<float> &vreg_exp_odd2, RegTensor<float> &vreg_exp_even3, RegTensor<float> &vreg_exp_odd3, \
-        RegTensor<float> &vreg_exp_even4, RegTensor<float> &vreg_exp_odd4, RegTensor<float> &vreg_exp_even5, \
-        RegTensor<float> &vreg_exp_odd5, RegTensor<float> &vreg_exp_even6, RegTensor<float> &vreg_exp_odd6, \
-        RegTensor<float> &vreg_exp_even7, RegTensor<float> &vreg_exp_odd7, RegTensor<float> &vreg_exp_even8, \
-        RegTensor<float> &vreg_exp_odd8, __ubuf__ T2 *&expUb1, __ubuf__ T2 *&expUb2, __ubuf__ T2 *&expUb3, \
+    RegTensor<float>&vreg_exp_even1, RegTensor<float>&vreg_exp_odd1, RegTensor<float>&vreg_exp_even2, \
+        RegTensor<float>&vreg_exp_odd2, RegTensor<float>&vreg_exp_even3, RegTensor<float>&vreg_exp_odd3, \
+        RegTensor<float>&vreg_exp_even4, RegTensor<float>&vreg_exp_odd4, RegTensor<float>&vreg_exp_even5, \
+        RegTensor<float>&vreg_exp_odd5, RegTensor<float>&vreg_exp_even6, RegTensor<float>&vreg_exp_odd6, \
+        RegTensor<float>&vreg_exp_even7, RegTensor<float>&vreg_exp_odd7, RegTensor<float>&vreg_exp_even8, \
+        RegTensor<float>&vreg_exp_odd8, __ubuf__ T2 *&expUb1, __ubuf__ T2 *&expUb2, __ubuf__ T2 *&expUb3, \
         __ubuf__ T2 *&expUb4, __ubuf__ T2 *&expUb5, __ubuf__ T2 *&expUb6, __ubuf__ T2 *&expUb7, __ubuf__ T2 *&expUb8, \
         const uint32_t blockStride, const uint32_t repeatStride, MaskReg &preg_all, MaskReg &storeMask
 
@@ -71,12 +70,12 @@ namespace FaVectorApi {
         repeatStride, preg_all, preg_all_b16
 
 #define VREG_FLOAT_INPUT_X_16_DECL \
-    RegTensor<float> &vreg_input_x1, RegTensor<float> &vreg_input_x2, RegTensor<float> &vreg_input_x3, \
-        RegTensor<float> &vreg_input_x4, RegTensor<float> &vreg_input_x5, RegTensor<float> &vreg_input_x6, \
-        RegTensor<float> &vreg_input_x7, RegTensor<float> &vreg_input_x8, RegTensor<float> &vreg_input_x9, \
-        RegTensor<float> &vreg_input_x10, RegTensor<float> &vreg_input_x11, RegTensor<float> &vreg_input_x12, \
-        RegTensor<float> &vreg_input_x13, RegTensor<float> &vreg_input_x14, RegTensor<float> &vreg_input_x15, \
-        RegTensor<float> &vreg_input_x16, __ubuf__ T *&srcUb, const uint16_t i, const uint32_t s2BaseSize
+    RegTensor<float>&vreg_input_x1, RegTensor<float>&vreg_input_x2, RegTensor<float>&vreg_input_x3, \
+        RegTensor<float>&vreg_input_x4, RegTensor<float>&vreg_input_x5, RegTensor<float>&vreg_input_x6, \
+        RegTensor<float>&vreg_input_x7, RegTensor<float>&vreg_input_x8, RegTensor<float>&vreg_input_x9, \
+        RegTensor<float>&vreg_input_x10, RegTensor<float>&vreg_input_x11, RegTensor<float>&vreg_input_x12, \
+        RegTensor<float>&vreg_input_x13, RegTensor<float>&vreg_input_x14, RegTensor<float>&vreg_input_x15, \
+        RegTensor<float>&vreg_input_x16, __ubuf__ T *&srcUb, const uint16_t i, const uint32_t s2BaseSize
 
 #define ARG_FLOAT_INPUT_X_16 \
     vreg_input_x1, vreg_input_x2, vreg_input_x3, vreg_input_x4, vreg_input_x5, vreg_input_x6, vreg_input_x7, \
@@ -84,12 +83,12 @@ namespace FaVectorApi {
         vreg_input_x15, vreg_input_x16, srcUb, i, s2BaseSize
 
 #define VREG_FLOAT_INPUT_X_16_NO_IDX_DECL \
-    RegTensor<float> &vreg_input_x1, RegTensor<float> &vreg_input_x2, RegTensor<float> &vreg_input_x3, \
-        RegTensor<float> &vreg_input_x4, RegTensor<float> &vreg_input_x5, RegTensor<float> &vreg_input_x6, \
-        RegTensor<float> &vreg_input_x7, RegTensor<float> &vreg_input_x8, RegTensor<float> &vreg_input_x9, \
-        RegTensor<float> &vreg_input_x10, RegTensor<float> &vreg_input_x11, RegTensor<float> &vreg_input_x12, \
-        RegTensor<float> &vreg_input_x13, RegTensor<float> &vreg_input_x14, RegTensor<float> &vreg_input_x15, \
-        RegTensor<float> &vreg_input_x16, __ubuf__ T *&srcUb, const uint32_t s2BaseSize
+    RegTensor<float>&vreg_input_x1, RegTensor<float>&vreg_input_x2, RegTensor<float>&vreg_input_x3, \
+        RegTensor<float>&vreg_input_x4, RegTensor<float>&vreg_input_x5, RegTensor<float>&vreg_input_x6, \
+        RegTensor<float>&vreg_input_x7, RegTensor<float>&vreg_input_x8, RegTensor<float>&vreg_input_x9, \
+        RegTensor<float>&vreg_input_x10, RegTensor<float>&vreg_input_x11, RegTensor<float>&vreg_input_x12, \
+        RegTensor<float>&vreg_input_x13, RegTensor<float>&vreg_input_x14, RegTensor<float>&vreg_input_x15, \
+        RegTensor<float>&vreg_input_x16, __ubuf__ T *&srcUb, const uint32_t s2BaseSize
 
 #define ARG_FLOAT_INPUT_X_16_NO_IDX \
     vreg_input_x1, vreg_input_x2, vreg_input_x3, vreg_input_x4, vreg_input_x5, vreg_input_x6, vreg_input_x7, \
@@ -97,67 +96,64 @@ namespace FaVectorApi {
         vreg_input_x15, vreg_input_x16, srcUb, s2BaseSize
 
 #define VREG_FLOAT_INPUT_X_NEW_8_DECL \
-    RegTensor<float> &vreg_input_x9_new, RegTensor<float> &vreg_input_x10_new, RegTensor<float> &vreg_input_x11_new, \
-        RegTensor<float> &vreg_input_x12_new, RegTensor<float> &vreg_input_x13_new, \
-        RegTensor<float> &vreg_input_x14_new, RegTensor<float> &vreg_input_x15_new, \
-        RegTensor<float> &vreg_input_x16_new
+    RegTensor<float>&vreg_input_x9_new, RegTensor<float>&vreg_input_x10_new, RegTensor<float>&vreg_input_x11_new, \
+        RegTensor<float>&vreg_input_x12_new, RegTensor<float>&vreg_input_x13_new, RegTensor<float>&vreg_input_x14_new, \
+        RegTensor<float>&vreg_input_x15_new, RegTensor<float>&vreg_input_x16_new
 
 #define ARG_FLOAT_INPUT_X_NEW_8 \
     vreg_input_x9_new, vreg_input_x10_new, vreg_input_x11_new, vreg_input_x12_new, vreg_input_x13_new, \
         vreg_input_x14_new, vreg_input_x15_new, vreg_input_x16_new
 
 #define VREG_FLOAT_PSE_16_DECL \
-    RegTensor<float> &vreg_pse1, RegTensor<float> &vreg_pse2, RegTensor<float> &vreg_pse3, \
-        RegTensor<float> &vreg_pse4, RegTensor<float> &vreg_pse5, RegTensor<float> &vreg_pse6, \
-        RegTensor<float> &vreg_pse7, RegTensor<float> &vreg_pse8, RegTensor<float> &vreg_pse9, \
-        RegTensor<float> &vreg_pse10, RegTensor<float> &vreg_pse11, RegTensor<float> &vreg_pse12, \
-        RegTensor<float> &vreg_pse13, RegTensor<float> &vreg_pse14, RegTensor<float> &vreg_pse15, \
-        RegTensor<float> &vreg_pse16
+    RegTensor<float>&vreg_pse1, RegTensor<float>&vreg_pse2, RegTensor<float>&vreg_pse3, RegTensor<float>&vreg_pse4, \
+        RegTensor<float>&vreg_pse5, RegTensor<float>&vreg_pse6, RegTensor<float>&vreg_pse7, \
+        RegTensor<float>&vreg_pse8, RegTensor<float>&vreg_pse9, RegTensor<float>&vreg_pse10, \
+        RegTensor<float>&vreg_pse11, RegTensor<float>&vreg_pse12, RegTensor<float>&vreg_pse13, \
+        RegTensor<float>&vreg_pse14, RegTensor<float>&vreg_pse15, RegTensor<float>&vreg_pse16
 
 #define ARG_FLOAT_PSE_16 \
     vreg_pse1, vreg_pse2, vreg_pse3, vreg_pse4, vreg_pse5, vreg_pse6, vreg_pse7, vreg_pse8, vreg_pse9, vreg_pse10, \
         vreg_pse11, vreg_pse12, vreg_pse13, vreg_pse14, vreg_pse15, vreg_pse16
 
 #define VREG_FLOAT_SEL_16_DECL \
-    RegTensor<float> &vreg_sel1, RegTensor<float> &vreg_sel2, RegTensor<float> &vreg_sel3, \
-        RegTensor<float> &vreg_sel4, RegTensor<float> &vreg_sel5, RegTensor<float> &vreg_sel6, \
-        RegTensor<float> &vreg_sel7, RegTensor<float> &vreg_sel8, RegTensor<float> &vreg_sel9, \
-        RegTensor<float> &vreg_sel10, RegTensor<float> &vreg_sel11, RegTensor<float> &vreg_sel12, \
-        RegTensor<float> &vreg_sel13, RegTensor<float> &vreg_sel14, RegTensor<float> &vreg_sel15, \
-        RegTensor<float> &vreg_sel16
+    RegTensor<float>&vreg_sel1, RegTensor<float>&vreg_sel2, RegTensor<float>&vreg_sel3, RegTensor<float>&vreg_sel4, \
+        RegTensor<float>&vreg_sel5, RegTensor<float>&vreg_sel6, RegTensor<float>&vreg_sel7, \
+        RegTensor<float>&vreg_sel8, RegTensor<float>&vreg_sel9, RegTensor<float>&vreg_sel10, \
+        RegTensor<float>&vreg_sel11, RegTensor<float>&vreg_sel12, RegTensor<float>&vreg_sel13, \
+        RegTensor<float>&vreg_sel14, RegTensor<float>&vreg_sel15, RegTensor<float>&vreg_sel16
 
 #define ARG_FLOAT_SEL_16 \
     vreg_sel1, vreg_sel2, vreg_sel3, vreg_sel4, vreg_sel5, vreg_sel6, vreg_sel7, vreg_sel8, vreg_sel9, vreg_sel10, \
         vreg_sel11, vreg_sel12, vreg_sel13, vreg_sel14, vreg_sel15, vreg_sel16
 
 #define VREG_FLOAT_SEL_NEW_8_DECL \
-    RegTensor<float> &vreg_sel9_new, RegTensor<float> &vreg_sel10_new, RegTensor<float> &vreg_sel11_new, \
-        RegTensor<float> &vreg_sel12_new, RegTensor<float> &vreg_sel13_new, RegTensor<float> &vreg_sel14_new, \
-        RegTensor<float> &vreg_sel15_new, RegTensor<float> &vreg_sel16_new
+    RegTensor<float>&vreg_sel9_new, RegTensor<float>&vreg_sel10_new, RegTensor<float>&vreg_sel11_new, \
+        RegTensor<float>&vreg_sel12_new, RegTensor<float>&vreg_sel13_new, RegTensor<float>&vreg_sel14_new, \
+        RegTensor<float>&vreg_sel15_new, RegTensor<float>&vreg_sel16_new
 
 #define ARG_FLOAT_SEL_NEW_8 \
     vreg_sel9_new, vreg_sel10_new, vreg_sel11_new, vreg_sel12_new, vreg_sel13_new, vreg_sel14_new, vreg_sel15_new, \
         vreg_sel16_new
 
 #define VREG_FLOAT_ALIBI_16_VREG_DECL \
-    RegTensor<float> &vreg_alibi1, RegTensor<float> &vreg_alibi2, RegTensor<float> &vreg_alibi3, \
-        RegTensor<float> &vreg_alibi4, RegTensor<float> &vreg_alibi5, RegTensor<float> &vreg_alibi6, \
-        RegTensor<float> &vreg_alibi7, RegTensor<float> &vreg_alibi8, RegTensor<float> &vreg_alibi9, \
-        RegTensor<float> &vreg_alibi10, RegTensor<float> &vreg_alibi11, RegTensor<float> &vreg_alibi12, \
-        RegTensor<float> &vreg_alibi13, RegTensor<float> &vreg_alibi14, RegTensor<float> &vreg_alibi15, \
-        RegTensor<float> &vreg_alibi16
+    RegTensor<float>&vreg_alibi1, RegTensor<float>&vreg_alibi2, RegTensor<float>&vreg_alibi3, \
+        RegTensor<float>&vreg_alibi4, RegTensor<float>&vreg_alibi5, RegTensor<float>&vreg_alibi6, \
+        RegTensor<float>&vreg_alibi7, RegTensor<float>&vreg_alibi8, RegTensor<float>&vreg_alibi9, \
+        RegTensor<float>&vreg_alibi10, RegTensor<float>&vreg_alibi11, RegTensor<float>&vreg_alibi12, \
+        RegTensor<float>&vreg_alibi13, RegTensor<float>&vreg_alibi14, RegTensor<float>&vreg_alibi15, \
+        RegTensor<float>&vreg_alibi16
 
 #define ARG_FLOAT_ALIBI_16_VREG \
     vreg_alibi1, vreg_alibi2, vreg_alibi3, vreg_alibi4, vreg_alibi5, vreg_alibi6, vreg_alibi7, vreg_alibi8, \
         vreg_alibi9, vreg_alibi10, vreg_alibi11, vreg_alibi12, vreg_alibi13, vreg_alibi14, vreg_alibi15, vreg_alibi16
 
 #define VREG_FLOAT_INPUT_X_16_VARS_DECL \
-    RegTensor<float> &vreg_input_x1, RegTensor<float> &vreg_input_x2, RegTensor<float> &vreg_input_x3, \
-        RegTensor<float> &vreg_input_x4, RegTensor<float> &vreg_input_x5, RegTensor<float> &vreg_input_x6, \
-        RegTensor<float> &vreg_input_x7, RegTensor<float> &vreg_input_x8, RegTensor<float> &vreg_input_x9, \
-        RegTensor<float> &vreg_input_x10, RegTensor<float> &vreg_input_x11, RegTensor<float> &vreg_input_x12, \
-        RegTensor<float> &vreg_input_x13, RegTensor<float> &vreg_input_x14, RegTensor<float> &vreg_input_x15, \
-        RegTensor<float> &vreg_input_x16
+    RegTensor<float>&vreg_input_x1, RegTensor<float>&vreg_input_x2, RegTensor<float>&vreg_input_x3, \
+        RegTensor<float>&vreg_input_x4, RegTensor<float>&vreg_input_x5, RegTensor<float>&vreg_input_x6, \
+        RegTensor<float>&vreg_input_x7, RegTensor<float>&vreg_input_x8, RegTensor<float>&vreg_input_x9, \
+        RegTensor<float>&vreg_input_x10, RegTensor<float>&vreg_input_x11, RegTensor<float>&vreg_input_x12, \
+        RegTensor<float>&vreg_input_x13, RegTensor<float>&vreg_input_x14, RegTensor<float>&vreg_input_x15, \
+        RegTensor<float>&vreg_input_x16
 
 #define ARG_FLOAT_INPUT_X_16_VARS \
     vreg_input_x1, vreg_input_x2, vreg_input_x3, vreg_input_x4, vreg_input_x5, vreg_input_x6, vreg_input_x7, \
@@ -223,13 +219,13 @@ __simd_callee__ inline void LoadCastPseF16_16(VREG_FLOAT_PSE_16_LOAD_DECL(half))
     DO_CAST_16(float, half, castTraitZero, vreg_pse, vreg_pse, _f16, preg_all_b16);
 }
 
-__simd_callee__ inline void MaxReduce16(RegTensor<float> &vreg_input_max, RegTensor<float> &vreg_a1,
-                                        RegTensor<float> &vreg_a2, RegTensor<float> &vreg_a3, RegTensor<float> &vreg_a4,
-                                        RegTensor<float> &vreg_a5, RegTensor<float> &vreg_a6, RegTensor<float> &vreg_a7,
-                                        RegTensor<float> &vreg_a8, RegTensor<float> &vreg_b1, RegTensor<float> &vreg_b2,
-                                        RegTensor<float> &vreg_b3, RegTensor<float> &vreg_b4, RegTensor<float> &vreg_b5,
-                                        RegTensor<float> &vreg_b6, RegTensor<float> &vreg_b7, RegTensor<float> &vreg_b8,
-                                        MaskReg &preg_all)
+__simd_callee__ inline void MaxReduce16(RegTensor<float>& vreg_input_max, RegTensor<float>& vreg_a1,
+                                        RegTensor<float>& vreg_a2, RegTensor<float>& vreg_a3, RegTensor<float>& vreg_a4,
+                                        RegTensor<float>& vreg_a5, RegTensor<float>& vreg_a6, RegTensor<float>& vreg_a7,
+                                        RegTensor<float>& vreg_a8, RegTensor<float>& vreg_b1, RegTensor<float>& vreg_b2,
+                                        RegTensor<float>& vreg_b3, RegTensor<float>& vreg_b4, RegTensor<float>& vreg_b5,
+                                        RegTensor<float>& vreg_b6, RegTensor<float>& vreg_b7, RegTensor<float>& vreg_b8,
+                                        MaskReg& preg_all)
 {
     RegTensor<float> vreg_max_tmp1;
     RegTensor<float> vreg_max_tmp2;
@@ -258,16 +254,16 @@ __simd_callee__ inline void MaxReduce16(RegTensor<float> &vreg_input_max, RegTen
 }
 
 template <typename T, typename T2>
-__simd_callee__ inline void ExpSumReduceStore1024(RegTensor<float> &vreg_exp_sum1, RegTensor<float> &vreg_exp_even1,
-                                                  RegTensor<float> &vreg_exp_odd1, RegTensor<float> &vreg_exp_even2,
-                                                  RegTensor<float> &vreg_exp_odd2, RegTensor<float> &vreg_exp_even3,
-                                                  RegTensor<float> &vreg_exp_odd3, RegTensor<float> &vreg_exp_even4,
-                                                  RegTensor<float> &vreg_exp_odd4, RegTensor<float> &vreg_exp_even5,
-                                                  RegTensor<float> &vreg_exp_odd5, RegTensor<float> &vreg_exp_even6,
-                                                  RegTensor<float> &vreg_exp_odd6, RegTensor<float> &vreg_exp_even7,
-                                                  RegTensor<float> &vreg_exp_odd7, RegTensor<float> &vreg_exp_even8,
-                                                  RegTensor<float> &vreg_exp_odd8, UnalignRegForStore &ureg_exp_sum,
-                                                  __ubuf__ T *&expSumUb, MaskReg &preg_all)
+__simd_callee__ inline void ExpSumReduceStore1024(RegTensor<float>& vreg_exp_sum1, RegTensor<float>& vreg_exp_even1,
+                                                  RegTensor<float>& vreg_exp_odd1, RegTensor<float>& vreg_exp_even2,
+                                                  RegTensor<float>& vreg_exp_odd2, RegTensor<float>& vreg_exp_even3,
+                                                  RegTensor<float>& vreg_exp_odd3, RegTensor<float>& vreg_exp_even4,
+                                                  RegTensor<float>& vreg_exp_odd4, RegTensor<float>& vreg_exp_even5,
+                                                  RegTensor<float>& vreg_exp_odd5, RegTensor<float>& vreg_exp_even6,
+                                                  RegTensor<float>& vreg_exp_odd6, RegTensor<float>& vreg_exp_even7,
+                                                  RegTensor<float>& vreg_exp_odd7, RegTensor<float>& vreg_exp_even8,
+                                                  RegTensor<float>& vreg_exp_odd8, UnalignRegForStore& ureg_exp_sum,
+                                                  __ubuf__ T*& expSumUb, MaskReg& preg_all)
 {
     RegTensor<float> vreg_exp_sum2, vreg_exp_sum3, vreg_exp_sum4;
     RegTensor<float> vreg_exp_sum5, vreg_exp_sum6, vreg_exp_sum7, vreg_exp_sum8;
@@ -287,7 +283,7 @@ __simd_callee__ inline void ExpSumReduceStore1024(RegTensor<float> &vreg_exp_sum
     Add(vreg_exp_sum5, vreg_exp_sum5, vreg_exp_sum7, preg_all);
     Add(vreg_exp_sum1, vreg_exp_sum1, vreg_exp_sum5, preg_all);
     Reduce<Reg::ReduceType::SUM, float, float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum1, vreg_exp_sum1, preg_all);
-    StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)expSumUb), vreg_exp_sum1, ureg_exp_sum, 1);
+    StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T*&)expSumUb), vreg_exp_sum1, ureg_exp_sum, 1);
 }
 
 template <typename T2>
@@ -306,21 +302,21 @@ __simd_callee__ inline void CastStoreExpBf16_1024(VREG_FLOAT_CAST_STORE_EXP_1024
     DO_CAST_EVEN_ODD_8(T2, float, vreg_exp_even, vreg_exp_odd, _bf16, preg_all);
     DO_OR_8(vreg_exp, vreg_exp_even, vreg_exp_odd, _bf16, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb1), vreg_exp1_bf16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb1), vreg_exp1_bf16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb2), vreg_exp2_bf16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb2), vreg_exp2_bf16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb3), vreg_exp3_bf16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb3), vreg_exp3_bf16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb4), vreg_exp4_bf16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb4), vreg_exp4_bf16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb5), vreg_exp5_bf16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb5), vreg_exp5_bf16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb6), vreg_exp6_bf16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb6), vreg_exp6_bf16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb7), vreg_exp7_bf16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb7), vreg_exp7_bf16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb8), vreg_exp8_bf16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb8), vreg_exp8_bf16, blockStride, repeatStride, storeMask);
 }
 
 template <typename T2>
@@ -339,32 +335,32 @@ __simd_callee__ inline void CastStoreExpF16_1024(VREG_FLOAT_CAST_STORE_EXP_1024_
     DO_CAST_EVEN_ODD_8(T2, float, vreg_exp_even, vreg_exp_odd, _f16, preg_all);
     DO_OR_8(vreg_exp, vreg_exp_even, vreg_exp_odd, _f16, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb1), vreg_exp1_f16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb1), vreg_exp1_f16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb2), vreg_exp2_f16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb2), vreg_exp2_f16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb3), vreg_exp3_f16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb3), vreg_exp3_f16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb4), vreg_exp4_f16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb4), vreg_exp4_f16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb5), vreg_exp5_f16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb5), vreg_exp5_f16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb6), vreg_exp6_f16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb6), vreg_exp6_f16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb7), vreg_exp7_f16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb7), vreg_exp7_f16, blockStride, repeatStride, storeMask);
     StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-        ((__ubuf__ T2 *&)expUb8), vreg_exp8_f16, blockStride, repeatStride, storeMask);
+        ((__ubuf__ T2*&)expUb8), vreg_exp8_f16, blockStride, repeatStride, storeMask);
 }
 
-__simd_callee__ inline void InitAlibiOffsets(RegTensor<float> &vreg_alibi1, RegTensor<float> &vreg_alibi2,
-                                             RegTensor<float> &vreg_alibi3, RegTensor<float> &vreg_alibi4,
-                                             RegTensor<float> &vreg_alibi5, RegTensor<float> &vreg_alibi6,
-                                             RegTensor<float> &vreg_alibi7, RegTensor<float> &vreg_alibi8,
-                                             RegTensor<float> &vreg_alibi9, RegTensor<float> &vreg_alibi10,
-                                             RegTensor<float> &vreg_alibi11, RegTensor<float> &vreg_alibi12,
-                                             RegTensor<float> &vreg_alibi13, RegTensor<float> &vreg_alibi14,
-                                             RegTensor<float> &vreg_alibi15, RegTensor<float> &vreg_alibi16,
-                                             const float posShift, MaskReg &preg_all)
+__simd_callee__ inline void InitAlibiOffsets(RegTensor<float>& vreg_alibi1, RegTensor<float>& vreg_alibi2,
+                                             RegTensor<float>& vreg_alibi3, RegTensor<float>& vreg_alibi4,
+                                             RegTensor<float>& vreg_alibi5, RegTensor<float>& vreg_alibi6,
+                                             RegTensor<float>& vreg_alibi7, RegTensor<float>& vreg_alibi8,
+                                             RegTensor<float>& vreg_alibi9, RegTensor<float>& vreg_alibi10,
+                                             RegTensor<float>& vreg_alibi11, RegTensor<float>& vreg_alibi12,
+                                             RegTensor<float>& vreg_alibi13, RegTensor<float>& vreg_alibi14,
+                                             RegTensor<float>& vreg_alibi15, RegTensor<float>& vreg_alibi16,
+                                             const float posShift, MaskReg& preg_all)
 {
     Arange(vreg_alibi1, posShift);
     Adds(vreg_alibi2, vreg_alibi1, floatRepSize, preg_all);
@@ -391,14 +387,14 @@ __simd_callee__ inline void LoadInput16(VREG_FLOAT_INPUT_X_16_DECL)
 }
 
 __simd_callee__ inline void ScaleInput16(
-    RegTensor<float> &vreg_input_x1, RegTensor<float> &vreg_input_x2, RegTensor<float> &vreg_input_x3,
-    RegTensor<float> &vreg_input_x4, RegTensor<float> &vreg_input_x5, RegTensor<float> &vreg_input_x6,
-    RegTensor<float> &vreg_input_x7, RegTensor<float> &vreg_input_x8, RegTensor<float> &vreg_input_x9,
-    RegTensor<float> &vreg_input_x10, RegTensor<float> &vreg_input_x11, RegTensor<float> &vreg_input_x12,
-    RegTensor<float> &vreg_input_x13, RegTensor<float> &vreg_input_x14, RegTensor<float> &vreg_input_x15,
-    RegTensor<float> &vreg_input_x16, const float scale, MaskReg &preg_all, MaskReg &preg_ori_tail_n1,
-    MaskReg &preg_ori_tail_n2, MaskReg &preg_ori_tail_n3, MaskReg &preg_ori_tail_n4, MaskReg &preg_ori_tail_n5,
-    MaskReg &preg_ori_tail_n6, MaskReg &preg_ori_tail_n7, MaskReg &preg_ori_tail_n8)
+    RegTensor<float>& vreg_input_x1, RegTensor<float>& vreg_input_x2, RegTensor<float>& vreg_input_x3,
+    RegTensor<float>& vreg_input_x4, RegTensor<float>& vreg_input_x5, RegTensor<float>& vreg_input_x6,
+    RegTensor<float>& vreg_input_x7, RegTensor<float>& vreg_input_x8, RegTensor<float>& vreg_input_x9,
+    RegTensor<float>& vreg_input_x10, RegTensor<float>& vreg_input_x11, RegTensor<float>& vreg_input_x12,
+    RegTensor<float>& vreg_input_x13, RegTensor<float>& vreg_input_x14, RegTensor<float>& vreg_input_x15,
+    RegTensor<float>& vreg_input_x16, const float scale, MaskReg& preg_all, MaskReg& preg_ori_tail_n1,
+    MaskReg& preg_ori_tail_n2, MaskReg& preg_ori_tail_n3, MaskReg& preg_ori_tail_n4, MaskReg& preg_ori_tail_n5,
+    MaskReg& preg_ori_tail_n6, MaskReg& preg_ori_tail_n7, MaskReg& preg_ori_tail_n8)
 {
     Muls(vreg_input_x1, vreg_input_x1, scale, preg_all);
     Muls(vreg_input_x2, vreg_input_x2, scale, preg_all);
@@ -419,18 +415,18 @@ __simd_callee__ inline void ScaleInput16(
 }
 
 __simd_callee__ inline void AddPseToInput16(
-    RegTensor<float> &vreg_input_x1, RegTensor<float> &vreg_input_x2, RegTensor<float> &vreg_input_x3,
-    RegTensor<float> &vreg_input_x4, RegTensor<float> &vreg_input_x5, RegTensor<float> &vreg_input_x6,
-    RegTensor<float> &vreg_input_x7, RegTensor<float> &vreg_input_x8, RegTensor<float> &vreg_input_x9,
-    RegTensor<float> &vreg_input_x10, RegTensor<float> &vreg_input_x11, RegTensor<float> &vreg_input_x12,
-    RegTensor<float> &vreg_input_x13, RegTensor<float> &vreg_input_x14, RegTensor<float> &vreg_input_x15,
-    RegTensor<float> &vreg_input_x16, RegTensor<float> &vreg_pse1, RegTensor<float> &vreg_pse2,
-    RegTensor<float> &vreg_pse3, RegTensor<float> &vreg_pse4, RegTensor<float> &vreg_pse5, RegTensor<float> &vreg_pse6,
-    RegTensor<float> &vreg_pse7, RegTensor<float> &vreg_pse8, RegTensor<float> &vreg_pse9, RegTensor<float> &vreg_pse10,
-    RegTensor<float> &vreg_pse11, RegTensor<float> &vreg_pse12, RegTensor<float> &vreg_pse13,
-    RegTensor<float> &vreg_pse14, RegTensor<float> &vreg_pse15, RegTensor<float> &vreg_pse16, MaskReg &preg_all,
-    MaskReg &preg_ori_tail_n1, MaskReg &preg_ori_tail_n2, MaskReg &preg_ori_tail_n3, MaskReg &preg_ori_tail_n4,
-    MaskReg &preg_ori_tail_n5, MaskReg &preg_ori_tail_n6, MaskReg &preg_ori_tail_n7, MaskReg &preg_ori_tail_n8)
+    RegTensor<float>& vreg_input_x1, RegTensor<float>& vreg_input_x2, RegTensor<float>& vreg_input_x3,
+    RegTensor<float>& vreg_input_x4, RegTensor<float>& vreg_input_x5, RegTensor<float>& vreg_input_x6,
+    RegTensor<float>& vreg_input_x7, RegTensor<float>& vreg_input_x8, RegTensor<float>& vreg_input_x9,
+    RegTensor<float>& vreg_input_x10, RegTensor<float>& vreg_input_x11, RegTensor<float>& vreg_input_x12,
+    RegTensor<float>& vreg_input_x13, RegTensor<float>& vreg_input_x14, RegTensor<float>& vreg_input_x15,
+    RegTensor<float>& vreg_input_x16, RegTensor<float>& vreg_pse1, RegTensor<float>& vreg_pse2,
+    RegTensor<float>& vreg_pse3, RegTensor<float>& vreg_pse4, RegTensor<float>& vreg_pse5, RegTensor<float>& vreg_pse6,
+    RegTensor<float>& vreg_pse7, RegTensor<float>& vreg_pse8, RegTensor<float>& vreg_pse9, RegTensor<float>& vreg_pse10,
+    RegTensor<float>& vreg_pse11, RegTensor<float>& vreg_pse12, RegTensor<float>& vreg_pse13,
+    RegTensor<float>& vreg_pse14, RegTensor<float>& vreg_pse15, RegTensor<float>& vreg_pse16, MaskReg& preg_all,
+    MaskReg& preg_ori_tail_n1, MaskReg& preg_ori_tail_n2, MaskReg& preg_ori_tail_n3, MaskReg& preg_ori_tail_n4,
+    MaskReg& preg_ori_tail_n5, MaskReg& preg_ori_tail_n6, MaskReg& preg_ori_tail_n7, MaskReg& preg_ori_tail_n8)
 {
     Add(vreg_input_x1, vreg_input_x1, vreg_pse1, preg_all);
     Add(vreg_input_x2, vreg_input_x2, vreg_pse2, preg_all);
@@ -450,47 +446,47 @@ __simd_callee__ inline void AddPseToInput16(
     Add(vreg_input_x16, vreg_input_x16, vreg_pse16, preg_ori_tail_n8);
 }
 
-__simd_callee__ inline void LoadAttenMask16(MaskReg &preg_compare1, MaskReg &preg_compare2, MaskReg &preg_compare3,
-                                            MaskReg &preg_compare4, MaskReg &preg_compare5, MaskReg &preg_compare6,
-                                            MaskReg &preg_compare7, MaskReg &preg_compare8, MaskReg &preg_compare9,
-                                            MaskReg &preg_compare10, MaskReg &preg_compare11, MaskReg &preg_compare12,
-                                            MaskReg &preg_compare13, MaskReg &preg_compare14, MaskReg &preg_compare15,
-                                            MaskReg &preg_compare16, VREG_FLOAT_MASKUB_REF_16_DECL,
+__simd_callee__ inline void LoadAttenMask16(MaskReg& preg_compare1, MaskReg& preg_compare2, MaskReg& preg_compare3,
+                                            MaskReg& preg_compare4, MaskReg& preg_compare5, MaskReg& preg_compare6,
+                                            MaskReg& preg_compare7, MaskReg& preg_compare8, MaskReg& preg_compare9,
+                                            MaskReg& preg_compare10, MaskReg& preg_compare11, MaskReg& preg_compare12,
+                                            MaskReg& preg_compare13, MaskReg& preg_compare14, MaskReg& preg_compare15,
+                                            MaskReg& preg_compare16, VREG_FLOAT_MASKUB_REF_16_DECL,
                                             const uint32_t nPadding)
 {
     DO_LOADALIGN_MASK_16(preg_compare, maskUb, nPadding);
 }
 
 __simd_callee__ inline void ApplyAttenMaskSelect16(
-    RegTensor<float> &vreg_sel1, RegTensor<float> &vreg_sel2, RegTensor<float> &vreg_sel3, RegTensor<float> &vreg_sel4,
-    RegTensor<float> &vreg_sel5, RegTensor<float> &vreg_sel6, RegTensor<float> &vreg_sel7, RegTensor<float> &vreg_sel8,
-    RegTensor<float> &vreg_sel9, RegTensor<float> &vreg_sel10, RegTensor<float> &vreg_sel11,
-    RegTensor<float> &vreg_sel12, RegTensor<float> &vreg_sel13, RegTensor<float> &vreg_sel14,
-    RegTensor<float> &vreg_sel15, RegTensor<float> &vreg_sel16, RegTensor<float> &vreg_min,
-    RegTensor<float> &vreg_input_x1, RegTensor<float> &vreg_input_x2, RegTensor<float> &vreg_input_x3,
-    RegTensor<float> &vreg_input_x4, RegTensor<float> &vreg_input_x5, RegTensor<float> &vreg_input_x6,
-    RegTensor<float> &vreg_input_x7, RegTensor<float> &vreg_input_x8, RegTensor<float> &vreg_input_x9,
-    RegTensor<float> &vreg_input_x10, RegTensor<float> &vreg_input_x11, RegTensor<float> &vreg_input_x12,
-    RegTensor<float> &vreg_input_x13, RegTensor<float> &vreg_input_x14, RegTensor<float> &vreg_input_x15,
-    RegTensor<float> &vreg_input_x16, MaskReg &preg_compare1, MaskReg &preg_compare2, MaskReg &preg_compare3,
-    MaskReg &preg_compare4, MaskReg &preg_compare5, MaskReg &preg_compare6, MaskReg &preg_compare7,
-    MaskReg &preg_compare8, MaskReg &preg_compare9, MaskReg &preg_compare10, MaskReg &preg_compare11,
-    MaskReg &preg_compare12, MaskReg &preg_compare13, MaskReg &preg_compare14, MaskReg &preg_compare15,
-    MaskReg &preg_compare16)
+    RegTensor<float>& vreg_sel1, RegTensor<float>& vreg_sel2, RegTensor<float>& vreg_sel3, RegTensor<float>& vreg_sel4,
+    RegTensor<float>& vreg_sel5, RegTensor<float>& vreg_sel6, RegTensor<float>& vreg_sel7, RegTensor<float>& vreg_sel8,
+    RegTensor<float>& vreg_sel9, RegTensor<float>& vreg_sel10, RegTensor<float>& vreg_sel11,
+    RegTensor<float>& vreg_sel12, RegTensor<float>& vreg_sel13, RegTensor<float>& vreg_sel14,
+    RegTensor<float>& vreg_sel15, RegTensor<float>& vreg_sel16, RegTensor<float>& vreg_min,
+    RegTensor<float>& vreg_input_x1, RegTensor<float>& vreg_input_x2, RegTensor<float>& vreg_input_x3,
+    RegTensor<float>& vreg_input_x4, RegTensor<float>& vreg_input_x5, RegTensor<float>& vreg_input_x6,
+    RegTensor<float>& vreg_input_x7, RegTensor<float>& vreg_input_x8, RegTensor<float>& vreg_input_x9,
+    RegTensor<float>& vreg_input_x10, RegTensor<float>& vreg_input_x11, RegTensor<float>& vreg_input_x12,
+    RegTensor<float>& vreg_input_x13, RegTensor<float>& vreg_input_x14, RegTensor<float>& vreg_input_x15,
+    RegTensor<float>& vreg_input_x16, MaskReg& preg_compare1, MaskReg& preg_compare2, MaskReg& preg_compare3,
+    MaskReg& preg_compare4, MaskReg& preg_compare5, MaskReg& preg_compare6, MaskReg& preg_compare7,
+    MaskReg& preg_compare8, MaskReg& preg_compare9, MaskReg& preg_compare10, MaskReg& preg_compare11,
+    MaskReg& preg_compare12, MaskReg& preg_compare13, MaskReg& preg_compare14, MaskReg& preg_compare15,
+    MaskReg& preg_compare16)
 {
     DO_SELECT_16(vreg_sel, vreg_min, vreg_input_x, preg_compare);
 }
 
 template <typename T>
-__simd_callee__ inline void StoreAlign16(RegTensor<float> &vreg_val1, RegTensor<float> &vreg_val2,
-                                         RegTensor<float> &vreg_val3, RegTensor<float> &vreg_val4,
-                                         RegTensor<float> &vreg_val5, RegTensor<float> &vreg_val6,
-                                         RegTensor<float> &vreg_val7, RegTensor<float> &vreg_val8,
-                                         RegTensor<float> &vreg_val9, RegTensor<float> &vreg_val10,
-                                         RegTensor<float> &vreg_val11, RegTensor<float> &vreg_val12,
-                                         RegTensor<float> &vreg_val13, RegTensor<float> &vreg_val14,
-                                         RegTensor<float> &vreg_val15, RegTensor<float> &vreg_val16, __ubuf__ T *&srcUb,
-                                         const uint16_t i, const uint32_t s2BaseSize, MaskReg &preg_all)
+__simd_callee__ inline void StoreAlign16(RegTensor<float>& vreg_val1, RegTensor<float>& vreg_val2,
+                                         RegTensor<float>& vreg_val3, RegTensor<float>& vreg_val4,
+                                         RegTensor<float>& vreg_val5, RegTensor<float>& vreg_val6,
+                                         RegTensor<float>& vreg_val7, RegTensor<float>& vreg_val8,
+                                         RegTensor<float>& vreg_val9, RegTensor<float>& vreg_val10,
+                                         RegTensor<float>& vreg_val11, RegTensor<float>& vreg_val12,
+                                         RegTensor<float>& vreg_val13, RegTensor<float>& vreg_val14,
+                                         RegTensor<float>& vreg_val15, RegTensor<float>& vreg_val16, __ubuf__ T*& srcUb,
+                                         const uint16_t i, const uint32_t s2BaseSize, MaskReg& preg_all)
 {
     DO_STOREALIGN_16(T, srcUb, vreg_val, s2BaseSize, i, preg_all);
 }
@@ -516,17 +512,17 @@ __simd_callee__ inline void LoadInputDinterleave8(VREG_FLOAT_INPUT_X_16_DECL)
 }
 
 __simd_callee__ inline void ExpSub16(
-    RegTensor<float> &vreg_exp_even1, RegTensor<float> &vreg_exp_odd1, RegTensor<float> &vreg_exp_even2,
-    RegTensor<float> &vreg_exp_odd2, RegTensor<float> &vreg_exp_even3, RegTensor<float> &vreg_exp_odd3,
-    RegTensor<float> &vreg_exp_even4, RegTensor<float> &vreg_exp_odd4, RegTensor<float> &vreg_exp_even5,
-    RegTensor<float> &vreg_exp_odd5, RegTensor<float> &vreg_exp_even6, RegTensor<float> &vreg_exp_odd6,
-    RegTensor<float> &vreg_exp_even7, RegTensor<float> &vreg_exp_odd7, RegTensor<float> &vreg_exp_even8,
-    RegTensor<float> &vreg_exp_odd8, RegTensor<float> &vreg_input_x1, RegTensor<float> &vreg_input_x2,
-    RegTensor<float> &vreg_input_x3, RegTensor<float> &vreg_input_x4, RegTensor<float> &vreg_input_x5,
-    RegTensor<float> &vreg_input_x6, RegTensor<float> &vreg_input_x7, RegTensor<float> &vreg_input_x8,
-    RegTensor<float> &vreg_input_x9, RegTensor<float> &vreg_input_x10, RegTensor<float> &vreg_input_x11,
-    RegTensor<float> &vreg_input_x12, RegTensor<float> &vreg_input_x13, RegTensor<float> &vreg_input_x14,
-    RegTensor<float> &vreg_input_x15, RegTensor<float> &vreg_input_x16, RegTensor<float> &vreg_max, MaskReg &preg_all)
+    RegTensor<float>& vreg_exp_even1, RegTensor<float>& vreg_exp_odd1, RegTensor<float>& vreg_exp_even2,
+    RegTensor<float>& vreg_exp_odd2, RegTensor<float>& vreg_exp_even3, RegTensor<float>& vreg_exp_odd3,
+    RegTensor<float>& vreg_exp_even4, RegTensor<float>& vreg_exp_odd4, RegTensor<float>& vreg_exp_even5,
+    RegTensor<float>& vreg_exp_odd5, RegTensor<float>& vreg_exp_even6, RegTensor<float>& vreg_exp_odd6,
+    RegTensor<float>& vreg_exp_even7, RegTensor<float>& vreg_exp_odd7, RegTensor<float>& vreg_exp_even8,
+    RegTensor<float>& vreg_exp_odd8, RegTensor<float>& vreg_input_x1, RegTensor<float>& vreg_input_x2,
+    RegTensor<float>& vreg_input_x3, RegTensor<float>& vreg_input_x4, RegTensor<float>& vreg_input_x5,
+    RegTensor<float>& vreg_input_x6, RegTensor<float>& vreg_input_x7, RegTensor<float>& vreg_input_x8,
+    RegTensor<float>& vreg_input_x9, RegTensor<float>& vreg_input_x10, RegTensor<float>& vreg_input_x11,
+    RegTensor<float>& vreg_input_x12, RegTensor<float>& vreg_input_x13, RegTensor<float>& vreg_input_x14,
+    RegTensor<float>& vreg_input_x15, RegTensor<float>& vreg_input_x16, RegTensor<float>& vreg_max, MaskReg& preg_all)
 {
     DO_EXPSUB_PAIRS_8(vreg_exp_even, vreg_exp_odd, vreg_input_x, vreg_max, preg_all);
 }
@@ -534,12 +530,12 @@ __simd_callee__ inline void ExpSub16(
 template <typename T, typename T2, bool hasAtten, PseTypeEnum pseMode>
 __simd_callee__ inline void ProcessVec1MainLoop1024(
     VREG_FLOAT_INPUT_X_16_NO_IDX_DECL, VREG_FLOAT_INPUT_X_NEW_8_DECL, VREG_FLOAT_PSE_16_DECL, VREG_FLOAT_SEL_16_DECL,
-    VREG_FLOAT_SEL_NEW_8_DECL, VREG_FLOAT_ALIBI_16_VREG_DECL, RegTensor<float> &vreg_input_max, MaskReg &preg_all,
-    MaskReg &preg_all_b16, MaskReg &preg_ori_tail_n1, MaskReg &preg_ori_tail_n2, MaskReg &preg_ori_tail_n3,
-    MaskReg &preg_ori_tail_n4, MaskReg &preg_ori_tail_n5, MaskReg &preg_ori_tail_n6, MaskReg &preg_ori_tail_n7,
-    MaskReg &preg_ori_tail_n8, __ubuf__ T *&maxBuf, __ubuf__ T2 *&pseUb, VREG_FLOAT_MASKUB_REF_16_DECL,
+    VREG_FLOAT_SEL_NEW_8_DECL, VREG_FLOAT_ALIBI_16_VREG_DECL, RegTensor<float>& vreg_input_max, MaskReg& preg_all,
+    MaskReg& preg_all_b16, MaskReg& preg_ori_tail_n1, MaskReg& preg_ori_tail_n2, MaskReg& preg_ori_tail_n3,
+    MaskReg& preg_ori_tail_n4, MaskReg& preg_ori_tail_n5, MaskReg& preg_ori_tail_n6, MaskReg& preg_ori_tail_n7,
+    MaskReg& preg_ori_tail_n8, __ubuf__ T*& maxBuf, __ubuf__ T2*& pseUb, VREG_FLOAT_MASKUB_REF_16_DECL,
     const float minValue, const uint16_t m, const float slopes, const float scale, const float posShift,
-    const uint32_t pseStride, const uint32_t nPadding, UnalignRegForStore &ureg_max)
+    const uint32_t pseStride, const uint32_t nPadding, UnalignRegForStore& ureg_max)
 {
     RegTensor<float> vreg_min;
 
@@ -630,7 +626,7 @@ __simd_callee__ inline void ProcessVec1MainLoop1024(
                         vreg_input_x11_new, vreg_input_x12_new, vreg_input_x13_new, vreg_input_x14_new,
                         vreg_input_x15_new, vreg_input_x16_new, preg_all);
         }
-        StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)maxBuf), vreg_input_max, ureg_max, 1);
+        StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T*&)maxBuf), vreg_input_max, ureg_max, 1);
     }
 }
 

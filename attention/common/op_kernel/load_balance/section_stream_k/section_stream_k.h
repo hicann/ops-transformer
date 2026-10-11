@@ -25,12 +25,12 @@ namespace load_balance {
 
 class SectionStreamK {
 public:
-    inline static uint32_t Compute(const DeviceInfo &deviceInfo, const IBaseInfo &baseInfo,
-                                   const SectionStreamKParam &param, SectionStreamKResult &result);
+    inline static uint32_t Compute(const DeviceInfo& deviceInfo, const IBaseInfo& baseInfo,
+                                   const SectionStreamKParam& param, SectionStreamKResult& result);
 };
 
-inline uint32_t SectionStreamK::Compute(const DeviceInfo &deviceInfo, const IBaseInfo &baseInfo,
-                                        const SectionStreamKParam &param, SectionStreamKResult &result)
+inline uint32_t SectionStreamK::Compute(const DeviceInfo& deviceInfo, const IBaseInfo& baseInfo,
+                                        const SectionStreamKParam& param, SectionStreamKResult& result)
 {
     SectionStreamKImpl impl{};
     auto ret = impl.SetParam(param);

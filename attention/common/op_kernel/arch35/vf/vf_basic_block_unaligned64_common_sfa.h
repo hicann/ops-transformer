@@ -22,9 +22,9 @@ using namespace regbaseutil;
 namespace FaVectorApi {
 
 template <typename T, typename T2>
-__simd_callee__ inline void CastStoreExp64(RegTensor<float> &vreg_exp, __ubuf__ T2 *&expUb, const uint32_t blockStride,
-                                           const uint32_t repeatStride, MaskReg &preg_all, MaskReg &preg_all_b16,
-                                           MaskReg &storeMask, __ubuf__ uint8_t *indexesUb)
+__simd_callee__ inline void CastStoreExp64(RegTensor<float>& vreg_exp, __ubuf__ T2*& expUb, const uint32_t blockStride,
+                                           const uint32_t repeatStride, MaskReg& preg_all, MaskReg& preg_all_b16,
+                                           MaskReg& storeMask, __ubuf__ uint8_t* indexesUb)
 {
     RegTensor<bfloat16_t> vreg_exp_bf16;
     RegTensor<bfloat16_t> vreg_dst_even_bf16;
@@ -39,12 +39,12 @@ __simd_callee__ inline void CastStoreExp64(RegTensor<float> &vreg_exp, __ubuf__ 
         Cast<T2, T, castTraitZero>(vreg_exp_bf16, vreg_exp, preg_all_b16);
         DeInterleave(vreg_dst_even_bf16, vreg_dst_odd_bf16, vreg_exp_bf16, vreg_exp_bf16);
         StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-            ((__ubuf__ T2 *&)expUb), vreg_dst_even_bf16, blockStride, repeatStride, storeMask);
+            ((__ubuf__ T2*&)expUb), vreg_dst_even_bf16, blockStride, repeatStride, storeMask);
     } else if constexpr (IsSameType<T2, half>::value) {
         Cast<T2, T, castTraitZero>(vreg_exp_fp16, vreg_exp, preg_all_b16);
         DeInterleave(vreg_dst_even_fp16, vreg_dst_odd_fp16, vreg_exp_fp16, vreg_exp_fp16);
         StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-            ((__ubuf__ T2 *&)expUb), vreg_dst_even_fp16, blockStride, repeatStride, storeMask);
+            ((__ubuf__ T2*&)expUb), vreg_dst_even_fp16, blockStride, repeatStride, storeMask);
     } else if constexpr (IsSameType<T2, hifloat8_t>::value) {
         RegTensor<hifloat8_t> vreg_exp_hifp8;
         RegTensor<uint8_t> vreg_exp_merge_hifp8_indexes;
@@ -55,17 +55,17 @@ __simd_callee__ inline void CastStoreExp64(RegTensor<float> &vreg_exp, __ubuf__ 
         LoadAlign(vreg_exp_merge_hifp8_indexes, indexesUb);
         Gather(vreg_exp_merge_hifp8, vreg_exp_hifp8, vreg_exp_merge_hifp8_indexes);
         StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-            ((__ubuf__ T2 *&)expUb), vreg_exp_merge_hifp8, blockStride, repeatStride, preg_all_b8_128);
+            ((__ubuf__ T2*&)expUb), vreg_exp_merge_hifp8, blockStride, repeatStride, preg_all_b8_128);
     }
 }
 
 template <typename T>
-__simd_callee__ inline void ExpSumReduceStore64(RegTensor<float> &vreg_exp_sum, RegTensor<float> &vreg_exp,
-                                                UnalignRegForStore &ureg_exp_sum, __ubuf__ T *&expSumUb,
-                                                MaskReg &preg_ori_src_n)
+__simd_callee__ inline void ExpSumReduceStore64(RegTensor<float>& vreg_exp_sum, RegTensor<float>& vreg_exp,
+                                                UnalignRegForStore& ureg_exp_sum, __ubuf__ T*& expSumUb,
+                                                MaskReg& preg_ori_src_n)
 {
     Reduce<Reg::ReduceType::SUM, float, float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp, preg_ori_src_n);
-    StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)expSumUb), vreg_exp_sum, ureg_exp_sum, 1);
+    StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T*&)expSumUb), vreg_exp_sum, ureg_exp_sum, 1);
 }
 
 } // namespace FaVectorApi
