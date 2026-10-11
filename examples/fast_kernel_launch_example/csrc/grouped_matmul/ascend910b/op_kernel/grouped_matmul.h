@@ -32,7 +32,6 @@
 #include "gmm/grouped_matmul/op_kernel/grouped_matmul_utils.h"
 #include "gmm/grouped_matmul/op_kernel/grouped_matmul_tiling_key.h"
 
-
 #include "grouped_matmul_tiling.h"
 
 namespace GROUPED_MATMUL {
@@ -75,7 +74,7 @@ struct MNConfig {
     int64_t scaleIndex = -1;
 };
 
-__aicore__ inline void MNBlockIdxCompute(MNConfig &mnConfig, const uint32_t curBlock, const uint32_t count,
+__aicore__ inline void MNBlockIdxCompute(MNConfig& mnConfig, const uint32_t curBlock, const uint32_t count,
                                          const uint32_t thresholdM_dimN)
 {
     if (mnConfig.blockDimM <= thresholdDimM || thresholdDimM == 1) {
@@ -106,9 +105,9 @@ template <typename ComputeType>
 class GMMProcess {
 protected:
     using B = typename ComputeType::B;
-    ComputeType &computeOp; // inernal computation operator
-    const GMMBaseParams *__restrict gmmBaseParams;
-    const TCubeTiling *__restrict mmTilingData;
+    ComputeType& computeOp; // inernal computation operator
+    const GMMBaseParams* __restrict gmmBaseParams;
+    const TCubeTiling* __restrict mmTilingData;
 
     uint32_t blockIdx;
     uint32_t coreIdx;
@@ -116,36 +115,36 @@ protected:
     int32_t preOffset = 0;
     GM_ADDR groupListPtr;
     GlobalTensor<int64_t> groupListGm;
-    int32_t *mListGm;
-    int32_t *kListGm;
-    int32_t *nListGm;
+    int32_t* mListGm;
+    int32_t* kListGm;
+    int32_t* nListGm;
     uint32_t baseM_ = 0;
     uint32_t baseN_ = 0;
 
 public:
     /** @brief constructor */
-    __aicore__ inline GMMProcess(ComputeType &computeOp_) : computeOp(computeOp_)
-    {
-    }
+    __aicore__ inline GMMProcess(ComputeType& computeOp_)
+        : computeOp(computeOp_)
+    {}
 
-    __aicore__ inline void Init(const GMMBaseParams *__restrict gmmBaseParamsIn,
-                                const TCubeTiling *__restrict mmTilingDataIn, int32_t *gmmArrayAddrIn,
+    __aicore__ inline void Init(const GMMBaseParams* __restrict gmmBaseParamsIn,
+                                const TCubeTiling* __restrict mmTilingDataIn, int32_t* gmmArrayAddrIn,
                                 GM_ADDR groupList);
 
     __aicore__ inline void Process();
 
 protected:
-    __aicore__ inline void SetMNConfig(const int32_t splitValue, const uint32_t groupIdx, MNConfig &mnConfig);
+    __aicore__ inline void SetMNConfig(const int32_t splitValue, const uint32_t groupIdx, MNConfig& mnConfig);
 
-    __aicore__ inline void SetMKN(const int32_t splitValue, const uint32_t groupIdx, MNConfig &mnConfig);
+    __aicore__ inline void SetMKN(const int32_t splitValue, const uint32_t groupIdx, MNConfig& mnConfig);
 
-    __aicore__ inline void UpdateMnConfig(MNConfig &mnConfig);
+    __aicore__ inline void UpdateMnConfig(MNConfig& mnConfig);
 };
 
 template <typename ComputeType>
-__aicore__ inline void GMMProcess<ComputeType>::Init(const GMMBaseParams *__restrict gmmBaseParamsIn,
-                                                     const TCubeTiling *__restrict mmTilingDataIn,
-                                                     int32_t *gmmArrayAddrIn, GM_ADDR groupList)
+__aicore__ inline void GMMProcess<ComputeType>::Init(const GMMBaseParams* __restrict gmmBaseParamsIn,
+                                                     const TCubeTiling* __restrict mmTilingDataIn,
+                                                     int32_t* gmmArrayAddrIn, GM_ADDR groupList)
 {
     blockIdx = GetBlockIdx();
     coreIdx = blockIdx;
@@ -158,7 +157,7 @@ __aicore__ inline void GMMProcess<ComputeType>::Init(const GMMBaseParams *__rest
     groupNum = gmmBaseParams->groupNum;
     groupListPtr = groupList;
     if (groupListPtr != nullptr) {
-        groupListGm.SetGlobalBuffer((__gm__ int64_t *)groupList);
+        groupListGm.SetGlobalBuffer((__gm__ int64_t*)groupList);
     }
     mListGm = gmmArrayAddrIn;
     kListGm = gmmArrayAddrIn + MKN_LIST_LEN;
@@ -167,7 +166,7 @@ __aicore__ inline void GMMProcess<ComputeType>::Init(const GMMBaseParams *__rest
 
 template <typename ComputeType>
 __aicore__ inline void GMMProcess<ComputeType>::SetMNConfig(const int32_t splitValue, const uint32_t groupIdx,
-                                                            MNConfig &mnConfig)
+                                                            MNConfig& mnConfig)
 {
     SetMKN(splitValue, groupIdx, mnConfig);
     if (mmTilingData != nullptr) {
@@ -183,7 +182,7 @@ __aicore__ inline void GMMProcess<ComputeType>::SetMNConfig(const int32_t splitV
 
 template <typename ComputeType>
 __aicore__ inline void GMMProcess<ComputeType>::SetMKN(const int32_t splitValue, const uint32_t groupIdx,
-                                                       MNConfig &mnConfig)
+                                                       MNConfig& mnConfig)
 {
     uint32_t singleWeight = gmmBaseParams->singleWeight;
     uint32_t singleX = gmmBaseParams->singleX;
@@ -218,7 +217,7 @@ __aicore__ inline void GMMProcess<ComputeType>::SetMKN(const int32_t splitValue,
 }
 
 template <typename ComputeType>
-__aicore__ inline void GMMProcess<ComputeType>::UpdateMnConfig(MNConfig &mnConfig)
+__aicore__ inline void GMMProcess<ComputeType>::UpdateMnConfig(MNConfig& mnConfig)
 {
     if constexpr (B::format == CubeFormat::NZ) {
         mnConfig.wBaseOffset += AlignUp<16>(mnConfig.k) * AlignUp<16>(mnConfig.n); // 16: nz format last two dim size
@@ -283,28 +282,26 @@ public:
     constexpr static bool transposeW = mmType::BT::isTrans;
 
     /** @brief constructor */
-    __aicore__ inline GMMCompute(typename mmType::MT &mm_) : mm(mm_)
-    {
-    }
+    __aicore__ inline GMMCompute(typename mmType::MT& mm_)
+        : mm(mm_)
+    {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR offset,
                                 GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR groupList,
                                 GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                const GMMBaseParams *__restrict gmmBaseParams,
-                                const TCubeTiling *__restrict mmTilingData, TPipe *tPipe);
+                                const GMMBaseParams* __restrict gmmBaseParams,
+                                const TCubeTiling* __restrict mmTilingData, TPipe* tPipe);
 
-    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig &mnConfig, uint32_t coreIdx);
-    __aicore__ inline void VectorCompute(MNConfig &mnConfig)
-    {
-    }
+    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig& mnConfig, uint32_t coreIdx);
+    __aicore__ inline void VectorCompute(MNConfig& mnConfig) {}
 
-    __aicore__ inline GlobalTensor<BT> SetGlobalBufferW(uint32_t groupIdx, uint32_t tailN, MNConfig &mnConfig);
+    __aicore__ inline GlobalTensor<BT> SetGlobalBufferW(uint32_t groupIdx, uint32_t tailN, MNConfig& mnConfig);
 
     __aicore__ inline uint64_t SetWOffset(uint32_t tailN, uint32_t k);
 
 protected:
-    TPipe *pipe;
-    typename mmType::MT &mm; // matmul operator
+    TPipe* pipe;
+    typename mmType::MT& mm; // matmul operator
     bool hasBias = false;
     GM_ADDR xTensorPtr;
     GM_ADDR weightTensorPtr;
@@ -331,8 +328,8 @@ template <typename mmType, bool sync>
 __aicore__ inline void GMMCompute<mmType, sync>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale,
                                                       GM_ADDR offset, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                                       GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR y,
-                                                      GM_ADDR workspace, const GMMBaseParams *__restrict gmmBaseParams,
-                                                      const TCubeTiling *__restrict mmTilingData, TPipe *tPipe)
+                                                      GM_ADDR workspace, const GMMBaseParams* __restrict gmmBaseParams,
+                                                      const TCubeTiling* __restrict mmTilingData, TPipe* tPipe)
 {
     xTensorPtr = x;
     weightTensorPtr = weight;
@@ -382,18 +379,19 @@ __aicore__ inline uint64_t GMMCompute<mmType, sync>::SetWOffset(uint32_t tailN, 
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline GlobalTensor<typename mmType::BT::T>
-GMMCompute<mmType, sync>::SetGlobalBufferW(uint32_t groupIdx, uint32_t tailN, MNConfig &mnConfig)
+__aicore__ inline GlobalTensor<typename mmType::BT::T> GMMCompute<mmType, sync>::SetGlobalBufferW(uint32_t groupIdx,
+                                                                                                  uint32_t tailN,
+                                                                                                  MNConfig& mnConfig)
 {
     uint64_t wOffset = SetWOffset(tailN, mnConfig.k);
 
     GlobalTensor<BT> weightGmLocal;
-    weightGmLocal.SetGlobalBuffer((__gm__ bfloat16_t *)weightTensorPtr + mnConfig.wBaseOffset + wOffset);
+    weightGmLocal.SetGlobalBuffer((__gm__ bfloat16_t*)weightTensorPtr + mnConfig.wBaseOffset + wOffset);
     return weightGmLocal;
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMCompute<mmType, sync>::MMCompute(uint32_t groupIdx, MNConfig &mnConfig, uint32_t coreIdx)
+__aicore__ inline void GMMCompute<mmType, sync>::MMCompute(uint32_t groupIdx, MNConfig& mnConfig, uint32_t coreIdx)
 {
     if (subBlockIdx != 0) {
         return;
@@ -407,14 +405,14 @@ __aicore__ inline void GMMCompute<mmType, sync>::MMCompute(uint32_t groupIdx, MN
         xOffset = mnConfig.mIdx * mnConfig.singleM;
     }
     uint64_t outOffset = mnConfig.mIdx * mnConfig.singleM * mnConfig.n + tailN;
-    xGm.SetGlobalBuffer((__gm__ bfloat16_t *)xTensorPtr);
+    xGm.SetGlobalBuffer((__gm__ bfloat16_t*)xTensorPtr);
     GlobalTensor<BT> weightGmLocal = SetGlobalBufferW(groupIdx, tailN, mnConfig);
     mm.SetOrgShape(mnConfig.m, mnConfig.n, mnConfig.k);
     mm.SetSingleShape(curSingleM, curSingleN, mnConfig.k);
     mm.SetTensorA(xGm[xOffset], false);
     mm.SetTensorB(weightGmLocal, transposeW);
 
-    yGm.SetGlobalBuffer((__gm__ bfloat16_t *)yTensorPtr + mnConfig.yBaseOffset);
+    yGm.SetGlobalBuffer((__gm__ bfloat16_t*)yTensorPtr + mnConfig.yBaseOffset);
     mm.template IterateAll<sync>(yGm[outOffset], 0);
 }
 

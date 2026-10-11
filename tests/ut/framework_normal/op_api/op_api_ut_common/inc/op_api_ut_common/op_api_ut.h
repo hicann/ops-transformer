@@ -32,14 +32,14 @@ using namespace nlohmann;
 
 template <typename T>
 int ReloadDataFromBinaryFile([[maybe_unused]] T arg, [[maybe_unused]] size_t index, [[maybe_unused]] size_t total_input,
-                             [[maybe_unused]] const string &file_prefix)
+                             [[maybe_unused]] const string& file_prefix)
 {
     return 0;
 }
 
 template <size_t index, typename... Ts>
 struct ReloadIterator {
-    int operator()(tuple<Ts...> &t, size_t input_count, const string &file_prefix)
+    int operator()(tuple<Ts...>& t, size_t input_count, const string& file_prefix)
     {
         auto ret = ReloadDataFromBinaryFile(get<index>(t), index, input_count, file_prefix);
         if (ret != 0) {
@@ -51,14 +51,14 @@ struct ReloadIterator {
 
 template <typename... Ts>
 struct ReloadIterator<0, Ts...> {
-    int operator()(tuple<Ts...> &t, size_t input_count, const string &file_prefix)
+    int operator()(tuple<Ts...>& t, size_t input_count, const string& file_prefix)
     {
         return ReloadDataFromBinaryFile(get<0>(t), 0, input_count, file_prefix);
     }
 };
 
 template <typename... Ts>
-int ReloadTensorData(tuple<Ts...> &t, size_t input_count, const string &file_prefix)
+int ReloadTensorData(tuple<Ts...>& t, size_t input_count, const string& file_prefix)
 {
     const auto size = tuple_size<tuple<Ts...>>::value;
     ReloadIterator<size - 1, Ts...> it;
@@ -68,7 +68,7 @@ int ReloadTensorData(tuple<Ts...> &t, size_t input_count, const string &file_pre
 ////////////  save result      ///////////////
 
 [[maybe_unused]] static short int GetInplaceOutputIdx(size_t index, size_t input_count,
-                                                      const map<short int, short int> &inplace_map_reserve)
+                                                      const map<short int, short int>& inplace_map_reserve)
 {
     if (index >= input_count) {
         return -1;
@@ -79,23 +79,23 @@ int ReloadTensorData(tuple<Ts...> &t, size_t input_count, const string &file_pre
 
 template <typename T>
 int SaveResultToBinaryFile([[maybe_unused]] T arg, [[maybe_unused]] size_t index, [[maybe_unused]] size_t total_input,
-                           [[maybe_unused]] const string &file_prefix,
-                           [[maybe_unused]] const set<short int> &inplace_output)
+                           [[maybe_unused]] const string& file_prefix,
+                           [[maybe_unused]] const set<short int>& inplace_output)
 {
     return 0;
 }
 
 template <typename T>
 int SaveResultToBinaryFile([[maybe_unused]] T arg, [[maybe_unused]] size_t index,
-                           [[maybe_unused]] const string &file_prefix)
+                           [[maybe_unused]] const string& file_prefix)
 {
     return 0;
 }
 
 template <size_t index, typename... Ts>
 struct SaveIterator {
-    int operator()(tuple<Ts...> &t, size_t input_count, const string &file_prefix,
-                   const map<short int, short int> &inplace_map_reserve, const set<short int> &inplace_output)
+    int operator()(tuple<Ts...>& t, size_t input_count, const string& file_prefix,
+                   const map<short int, short int>& inplace_map_reserve, const set<short int>& inplace_output)
     {
         short int inplace_output_idx = GetInplaceOutputIdx(index, input_count, inplace_map_reserve);
         int ret = 0;
@@ -114,8 +114,8 @@ struct SaveIterator {
 
 template <typename... Ts>
 struct SaveIterator<0, Ts...> {
-    int operator()(tuple<Ts...> &t, size_t input_count, const string &file_prefix,
-                   const map<short int, short int> &inplace_map_reserve, const set<short int> &inplace_output)
+    int operator()(tuple<Ts...>& t, size_t input_count, const string& file_prefix,
+                   const map<short int, short int>& inplace_map_reserve, const set<short int>& inplace_output)
     {
         short int inplace_output_idx = GetInplaceOutputIdx(0, input_count, inplace_map_reserve);
         if (inplace_output_idx < 0) {
@@ -127,8 +127,8 @@ struct SaveIterator<0, Ts...> {
 };
 
 template <typename... Ts>
-int SaveResult(tuple<Ts...> &t, size_t input_count, const string &file_prefix,
-               const map<short int, short int> &inplace_map_reserve, const set<short int> &inplace_output)
+int SaveResult(tuple<Ts...>& t, size_t input_count, const string& file_prefix,
+               const map<short int, short int>& inplace_map_reserve, const set<short int>& inplace_output)
 {
     const auto size = tuple_size<tuple<Ts...>>::value;
     SaveIterator<size - 1, Ts...> it;
@@ -138,7 +138,7 @@ int SaveResult(tuple<Ts...> &t, size_t input_count, const string &file_prefix,
 //////////////////////////////////////////////
 
 struct Enter {
-    Enter(const string &info, void (*cleanup_func)(const string &), const string &cleanup_args)
+    Enter(const string& info, void (*cleanup_func)(const string&), const string& cleanup_args)
         : info_(info),
           cleanup_func_(cleanup_func),
           cleanup_args_(cleanup_args)
@@ -154,7 +154,7 @@ struct Enter {
 
 private:
     string info_;
-    void (*cleanup_func_)(const string &);
+    void (*cleanup_func_)(const string&);
     string cleanup_args_;
 };
 
@@ -165,9 +165,9 @@ private:
 template <typename GET_F, typename API_F, typename INPUT_T, typename OUTPUT_T, typename ACL_ARGS_T, typename EXTRA_T>
 class OpApiUt {
 public:
-    OpApiUt(const string &test_suite_name, const string &test_case_name, const string &op_name,
-            GET_F get_workspace_size_func, API_F api_func, const INPUT_T &inputs, const OUTPUT_T &outputs,
-            [[maybe_unused]] const ACL_ARGS_T &wrapper_args, const EXTRA_T &extra_args)
+    OpApiUt(const string& test_suite_name, const string& test_case_name, const string& op_name,
+            GET_F get_workspace_size_func, API_F api_func, const INPUT_T& inputs, const OUTPUT_T& outputs,
+            [[maybe_unused]] const ACL_ARGS_T& wrapper_args, const EXTRA_T& extra_args)
         : op_name_(op_name),
           case_name_(test_suite_name + "_" + test_case_name),
           api_func_(api_func),
@@ -188,15 +188,15 @@ public:
         }
     }
 
-    OpApiUt &InputGenFunc(const string &input_gen_func)
+    OpApiUt& InputGenFunc(const string& input_gen_func)
     {
         input_gen_func_ = input_gen_func;
         return *this;
     }
 
-    aclnnStatus TestGetWorkspaceSize(uint64_t *workspace_size)
+    aclnnStatus TestGetWorkspaceSize(uint64_t* workspace_size)
     {
-        aclOpExecutor *executor = nullptr;
+        aclOpExecutor* executor = nullptr;
         aclnnStatus ret = GetWorkspaceSize(workspace_size, &executor);
         if (executor != nullptr) {
             delete executor;
@@ -204,7 +204,7 @@ public:
         return ret;
     }
 
-    aclnnStatus TestGetWorkspaceSizeWithNNopbaseInner(uint64_t *workspace_size, aclOpExecutor *executor)
+    aclnnStatus TestGetWorkspaceSizeWithNNopbaseInner(uint64_t* workspace_size, aclOpExecutor* executor)
     {
         aclnnStatus ret = GetWorkspaceSize(workspace_size, &executor);
         return ret;
@@ -223,7 +223,7 @@ public:
 
         cout << "invoke aclnnXGetWorkspaceSize function ..." << endl;
         uint64_t workspace_size = 0;
-        aclOpExecutor *executor = nullptr;
+        aclOpExecutor* executor = nullptr;
         aclnnStatus aclRet = GetWorkspaceSize(&workspace_size, &executor);
         ASSERT_EQ(aclRet, ACL_SUCCESS);
         string env_skip_precision = "false";
@@ -292,7 +292,7 @@ private:
         outFile.close();
     }
 
-    aclnnStatus GetWorkspaceSize(uint64_t *workspace_size, aclOpExecutor **executor)
+    aclnnStatus GetWorkspaceSize(uint64_t* workspace_size, aclOpExecutor** executor)
     {
         ACL_ARGS_T args = GetConvertedAclArgs();
         return InvokeGetWorkspaceSizeFunc(get_workspace_size_func_, args, extra_args_, workspace_size, executor);

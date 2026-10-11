@@ -23,24 +23,24 @@ class Tensor : public ops::adv::tests::utils::TensorIntf {
 public:
     Tensor() = default;
 
-    Tensor(const char *name, const std::initializer_list<int64_t> &shape, const char *shapeType, ge::DataType dType,
+    Tensor(const char* name, const std::initializer_list<int64_t>& shape, const char* shapeType, ge::DataType dType,
            ge::Format format, TensorType type = TensorType::REQUIRED_INPUT);
 
-    Tensor(const char *name, const std::vector<int64_t> &shape, const char *shapeType, ge::DataType dType,
+    Tensor(const char* name, const std::vector<int64_t>& shape, const char* shapeType, ge::DataType dType,
            ge::Format format, TensorType type = TensorType::REQUIRED_INPUT);
 
-    Tensor(const Tensor &o) = default;
+    Tensor(const Tensor& o) = default;
 
-    Tensor &operator=(const Tensor &o) = default;
+    Tensor& operator=(const Tensor& o) = default;
 
     ~Tensor() override;
 
 protected:
-    uint8_t *AllocDevDataImpl(int64_t size) override;
-    void FreeDevDataImpl(uint8_t *devPtr) override;
-    bool MemSetDevDataImpl(uint8_t *devPtr, int64_t devMax, int32_t val, int64_t cnt) override;
-    bool MemCpyHostToDevDataImpl(uint8_t *devPtr, int64_t devMax, const void *hostPtr, int64_t cnt) override;
-    bool MemCpyDevDataToHostImpl(void *hostPtr, int64_t hostMax, const uint8_t *devPtr, int64_t cnt) override;
+    uint8_t* AllocDevDataImpl(int64_t size) override;
+    void FreeDevDataImpl(uint8_t* devPtr) override;
+    bool MemSetDevDataImpl(uint8_t* devPtr, int64_t devMax, int32_t val, int64_t cnt) override;
+    bool MemCpyHostToDevDataImpl(uint8_t* devPtr, int64_t devMax, const void* hostPtr, int64_t cnt) override;
+    bool MemCpyDevDataToHostImpl(void* hostPtr, int64_t hostMax, const uint8_t* devPtr, int64_t cnt) override;
 };
 
 } // namespace ops::adv::tests::utils

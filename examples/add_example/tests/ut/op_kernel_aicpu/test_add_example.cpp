@@ -26,11 +26,11 @@ using namespace aicpu;
 
 class TEST_AddExample_UT : public testing::Test {};
 
-#define CREATE_NODEDEF(shapes, data_types, datas)                                                                      \
-    auto node_def = CpuKernelUtils::CpuKernelUtils::CreateNodeDef();                                                   \
-    NodeDefBuilder(node_def.get(), "AddExampleAicpu", "AddExampleAicpu")                                               \
-        .Input({"x1", data_types[0], shapes[0], datas[0]})                                                             \
-        .Input({"x2", data_types[1], shapes[1], datas[1]})                                                             \
+#define CREATE_NODEDEF(shapes, data_types, datas) \
+    auto node_def = CpuKernelUtils::CpuKernelUtils::CreateNodeDef(); \
+    NodeDefBuilder(node_def.get(), "AddExampleAicpu", "AddExampleAicpu") \
+        .Input({"x1", data_types[0], shapes[0], datas[0]}) \
+        .Input({"x2", data_types[1], shapes[1], datas[1]}) \
         .Output({"y", data_types[2], shapes[2], datas[2]});
 
 TEST_F(TEST_ADD_UT, INT32_VECTOR_ADD_SCALAR_SUCC)
@@ -41,7 +41,7 @@ TEST_F(TEST_ADD_UT, INT32_VECTOR_ADD_SCALAR_SUCC)
     int32_t input1[2] = {2, 5};
     int32_t input2[1] = {3};
     int32_t output[2] = {0};
-    vector<void *> datas = {(void *)input1, (void *)input2, (void *)output};
+    vector<void*> datas = {(void*)input1, (void*)input2, (void*)output};
 
     CREATE_NODEDEF(shapes, data_types, datas);
     RUN_KERNEL(node_def, HOST, KERNEL_STATUS_OK);

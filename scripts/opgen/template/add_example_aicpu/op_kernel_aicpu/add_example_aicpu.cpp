@@ -16,7 +16,7 @@
 #include "aicpu/cust_cpu_utils.h"
 
 namespace {
-const char *const kAddExample = "AddExampleAicpu";
+const char* const kAddExample = "AddExampleAicpu";
 const uint32_t kFirstInputIndex = 0;
 const uint32_t kSecondInputIndex = 1;
 const uint32_t kSuccess = 0;
@@ -24,11 +24,11 @@ const uint32_t kParamInvalid = 1;
 } // namespace
 
 namespace aicpu {
-uint32_t AddExampleCpuKernel::Compute(CpuKernelContext &ctx)
+uint32_t AddExampleCpuKernel::Compute(CpuKernelContext& ctx)
 {
-    Tensor *input0 = ctx.Input(kFirstInputIndex);
-    Tensor *input1 = ctx.Input(kSecondInputIndex);
-    Tensor *output = ctx.Output(0);
+    Tensor* input0 = ctx.Input(kFirstInputIndex);
+    Tensor* input1 = ctx.Input(kSecondInputIndex);
+    Tensor* output = ctx.Output(0);
 
     if (input0 == nullptr || input1 == nullptr || output == nullptr) {
         KERNEL_LOG_ERROR("Invalid argument");

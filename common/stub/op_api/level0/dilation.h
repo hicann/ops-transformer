@@ -14,8 +14,8 @@
 
 namespace l0op {
 // Dilation
-const aclTensor *Dilation(const aclTensor *x, const aclIntArray *dilations, const aclIntArray *pads, float paddingValue,
-                          aclOpExecutor *executor);
+const aclTensor* Dilation(const aclTensor* x, const aclIntArray* dilations, const aclIntArray* pads, float paddingValue,
+                          aclOpExecutor* executor);
 } // namespace l0op
 
 #endif // OP_API_OP_API_COMMON_INC_LEVEL0_OP_DILATION_OP_H_

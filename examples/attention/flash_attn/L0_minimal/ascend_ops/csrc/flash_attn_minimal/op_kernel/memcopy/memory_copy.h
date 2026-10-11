@@ -29,7 +29,7 @@ __aicore__ inline void CopySingleMatrixNDToNZ(LocalTensor<T> l1Tensor, const Glo
     Nd2NzParams nd2nzPara;
     if (unlikely(srcDValue < SRCDVALUE_LIMIT)) {
         nd2nzPara.ndNum = 1;
-        nd2nzPara.nValue = nValue; // nd矩阵的行数
+        nd2nzPara.nValue = nValue;       // nd矩阵的行数
         nd2nzPara.dValue = dValue;       // nd矩阵的列数
         nd2nzPara.srcDValue = srcDValue; // 同一nd矩阵相邻行起始地址间的偏移
         nd2nzPara.dstNzC0Stride = dstNzC0Stride;
@@ -59,14 +59,13 @@ __aicore__ inline void CopySingleMatrixNDToNZ(LocalTensor<T> l1Tensor, const Glo
 }
 
 template <typename INPUT_T, GmFormat GM_FORMAT>
-__aicore__ inline void CopyMatrixGmToL1(FaL1Tensor<INPUT_T> &dstTensor,
-    FaGmTensor<INPUT_T, GM_FORMAT> &srcGm,
-    uint32_t bIdx, uint32_t nIdx, uint32_t sIdx, uint32_t sDealSize)
+__aicore__ inline void CopyMatrixGmToL1(FaL1Tensor<INPUT_T>& dstTensor, FaGmTensor<INPUT_T, GM_FORMAT>& srcGm,
+                                        uint32_t bIdx, uint32_t nIdx, uint32_t sIdx, uint32_t sDealSize)
 {
-    auto &info = srcGm.offsetInfo;
+    auto& info = srcGm.offsetInfo;
     uint64_t offset = GetOffset(info, bIdx, nIdx, sIdx, 0);
-    CopySingleMatrixNDToNZ(dstTensor.tensor, srcGm.gmTensor[offset],
-        sDealSize, info.dimD, info.strideS, dstTensor.rowCount);
+    CopySingleMatrixNDToNZ(dstTensor.tensor, srcGm.gmTensor[offset], sDealSize, info.dimD, info.strideS,
+                           dstTensor.rowCount);
 }
 
 template <typename OUT_T>
@@ -97,11 +96,10 @@ __aicore__ inline void SafeStrideCopy(GlobalTensor<OUT_T> gmTensor, const LocalT
 
 // ----------------------------------------------CopyAttnOutBN1UbToGm--------------------------------
 template <typename OUT_T>
-__aicore__ inline void CopyAttnOutBN1UbToGm(FaGmTensor<OUT_T, GmFormat::BSND> &dstTensor,
-                                            FaUbTensor<OUT_T> &srcTensor, uint32_t bIdx, uint32_t n1Head,
-                                            uint32_t s1Start)
+__aicore__ inline void CopyAttnOutBN1UbToGm(FaGmTensor<OUT_T, GmFormat::BSND>& dstTensor, FaUbTensor<OUT_T>& srcTensor,
+                                            uint32_t bIdx, uint32_t n1Head, uint32_t s1Start)
 {
-    auto &info = dstTensor.offsetInfo;
+    auto& info = dstTensor.offsetInfo;
     uint64_t gmOffset = GetOffset(info, bIdx, n1Head, s1Start, 0);
     uint32_t blockCount = srcTensor.rowCount;
     uint32_t blockLen = srcTensor.colCount * sizeof(OUT_T);

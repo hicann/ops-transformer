@@ -220,36 +220,36 @@ inline uint16_t FloatToBf16(float val)
 // ============================================================
 // Host-side element read/write by hcclDataType
 // ============================================================
-inline float ReadElement(const void *buf, size_t idx, uint32_t hcclType)
+inline float ReadElement(const void* buf, size_t idx, uint32_t hcclType)
 {
     switch (hcclType) {
         case 0:
-            return ((const float *)buf)[idx]; // FP32
+            return ((const float*)buf)[idx]; // FP32
         case 1:
-            return Fp16ToFloat(((const uint16_t *)buf)[idx]); // FP16
+            return Fp16ToFloat(((const uint16_t*)buf)[idx]); // FP16
         case 3:
-            return (float)((const int32_t *)buf)[idx]; // INT32
+            return (float)((const int32_t*)buf)[idx]; // INT32
         case 5:
-            return Bf16ToFloat(((const uint16_t *)buf)[idx]); // BF16
+            return Bf16ToFloat(((const uint16_t*)buf)[idx]); // BF16
         default:
             return 0.0f;
     }
 }
 
-inline void WriteElement(void *buf, size_t idx, float val, uint32_t hcclType)
+inline void WriteElement(void* buf, size_t idx, float val, uint32_t hcclType)
 {
     switch (hcclType) {
         case 0:
-            ((float *)buf)[idx] = val;
+            ((float*)buf)[idx] = val;
             break; // FP32
         case 1:
-            ((uint16_t *)buf)[idx] = FloatToFp16(val);
+            ((uint16_t*)buf)[idx] = FloatToFp16(val);
             break; // FP16
         case 3:
-            ((int32_t *)buf)[idx] = (int32_t)val;
+            ((int32_t*)buf)[idx] = (int32_t)val;
             break; // INT32
         case 5:
-            ((uint16_t *)buf)[idx] = FloatToBf16(val);
+            ((uint16_t*)buf)[idx] = FloatToBf16(val);
             break; // BF16
         default:
             break;
@@ -260,7 +260,7 @@ inline void WriteElement(void *buf, size_t idx, float val, uint32_t hcclType)
 // Host-side reduce: dst = reduce(srcs[0..N-1])
 // All buffers are host memory, count = number of elements.
 // ============================================================
-inline void HostReduce(void *dst, const std::vector<const void *> &srcs, size_t count, uint32_t hcclDataType,
+inline void HostReduce(void* dst, const std::vector<const void*>& srcs, size_t count, uint32_t hcclDataType,
                        uint32_t reduceOp)
 {
     for (size_t i = 0; i < count; i++) {
@@ -292,40 +292,40 @@ inline void HostReduce(void *dst, const std::vector<const void *> &srcs, size_t 
 // ============================================================
 // Device Memory Helper
 // ============================================================
-inline void *DevMalloc(size_t size)
+inline void* DevMalloc(size_t size)
 {
-    void *ptr = nullptr;
+    void* ptr = nullptr;
     if (aclrtMalloc(&ptr, size, ACL_MEM_MALLOC_HUGE_FIRST) != 0)
         return nullptr;
     aclrtMemset(ptr, size, 0, size);
     return ptr;
 }
 
-inline void DevFree(void *ptr)
+inline void DevFree(void* ptr)
 {
     if (ptr)
         aclrtFree(ptr);
 }
 
-inline void *AlignUp512(void *ptr)
+inline void* AlignUp512(void* ptr)
 {
     uint64_t addr = reinterpret_cast<uint64_t>(ptr);
     if (addr & 0x1ff) {
         addr = (addr & (~(uint64_t)0x1ff)) + 0x200;
     }
-    return reinterpret_cast<void *>(addr);
+    return reinterpret_cast<void*>(addr);
 }
 
-inline void *OffsetPtr(void *base, size_t offset)
+inline void* OffsetPtr(void* base, size_t offset)
 {
-    return reinterpret_cast<void *>(reinterpret_cast<uint8_t *>(base) + offset);
+    return reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(base) + offset);
 }
 
 // ============================================================
 // RankData — per-rank input tensor descriptor
 // ============================================================
 struct RankData {
-    void *devicePtr; // device memory pointer
+    void* devicePtr; // device memory pointer
     size_t byteSize; // size in bytes
 };
 
@@ -402,15 +402,15 @@ public:
         devWorkspaceAligned_ = nullptr;
     }
 
-    void *GetContextAddr() const
+    void* GetContextAddr() const
     {
         return devContext_;
     }
-    void *GetWorkspaceAligned() const
+    void* GetWorkspaceAligned() const
     {
         return devWorkspaceAligned_;
     }
-    void *GetWindowMem() const
+    void* GetWindowMem() const
     {
         return devWindowMem_;
     }
@@ -420,10 +420,10 @@ public:
     }
 
 private:
-    void *devContext_{nullptr};
-    void *devWorkspaceRaw_{nullptr};
-    void *devWorkspaceAligned_{nullptr};
-    void *devWindowMem_{nullptr};
+    void* devContext_{nullptr};
+    void* devWorkspaceRaw_{nullptr};
+    void* devWorkspaceAligned_{nullptr};
+    void* devWindowMem_{nullptr};
     uint32_t rankNum_{1};
     uint32_t rankId_{0};
 };
@@ -516,7 +516,7 @@ public:
     {
         for (uint32_t r = 0; r < rankNum_; r++) {
             if (devWindows_[r]) {
-                void *flagArea = OffsetPtr(devWindows_[r], FLAG_OFFSET_BYTES);
+                void* flagArea = OffsetPtr(devWindows_[r], FLAG_OFFSET_BYTES);
                 aclrtMemset(flagArea, FLAG_AREA_SIZE, 0, FLAG_AREA_SIZE);
             }
         }
@@ -536,15 +536,15 @@ public:
         devWindows_.clear();
     }
 
-    void *GetContextAddr(uint32_t rank) const
+    void* GetContextAddr(uint32_t rank) const
     {
         return devContexts_[rank];
     }
-    void *GetWindowMem(uint32_t rank) const
+    void* GetWindowMem(uint32_t rank) const
     {
         return devWindows_[rank];
     }
-    void *GetWorkspaceAligned(uint32_t rank) const
+    void* GetWorkspaceAligned(uint32_t rank) const
     {
         return devWorkspaceAligned_[rank];
     }
@@ -555,10 +555,10 @@ public:
 
 private:
     uint32_t rankNum_{0};
-    std::vector<void *> devWindows_;
-    std::vector<void *> devWorkspaceRaw_;
-    std::vector<void *> devWorkspaceAligned_;
-    std::vector<void *> devContexts_;
+    std::vector<void*> devWindows_;
+    std::vector<void*> devWorkspaceRaw_;
+    std::vector<void*> devWorkspaceAligned_;
+    std::vector<void*> devContexts_;
 };
 
 // ============================================================
@@ -575,7 +575,7 @@ public:
      * @param localRankId       the rank ID of the kernel under test
      * @param deviceId          NPU device ID
      */
-    explicit MockHcclServer(void *workspaceAligned, std::vector<RankData> rankInputs = {}, uint32_t localRankId = 0,
+    explicit MockHcclServer(void* workspaceAligned, std::vector<RankData> rankInputs = {}, uint32_t localRankId = 0,
                             int deviceId = 0)
         : wsBase_(workspaceAligned),
           rankInputs_(std::move(rankInputs)),
@@ -626,7 +626,7 @@ public:
             }
 
             TurnCnt commitCnt;
-            void *commitAddr = OffsetPtr(wsBase_, COMMIT_TURNCNT_OFFSET + slot * TURNCNT_STRIDE);
+            void* commitAddr = OffsetPtr(wsBase_, COMMIT_TURNCNT_OFFSET + slot * TURNCNT_STRIDE);
             if (aclrtMemcpy(&commitCnt, sizeof(TurnCnt), commitAddr, sizeof(TurnCnt), ACL_MEMCPY_DEVICE_TO_HOST) != 0) {
                 usleep(100);
                 continue;
@@ -643,7 +643,7 @@ public:
             TurnCnt finishCnt;
             memset(&finishCnt, 0, sizeof(finishCnt));
             finishCnt.cnt = FINALIZE_FINISH_CNT;
-            void *finishAddr = OffsetPtr(wsBase_, FINISH_TURNCNT_OFFSET + slot * TURNCNT_STRIDE);
+            void* finishAddr = OffsetPtr(wsBase_, FINISH_TURNCNT_OFFSET + slot * TURNCNT_STRIDE);
             aclrtMemcpy(finishAddr, sizeof(TurnCnt), &finishCnt, sizeof(TurnCnt), ACL_MEMCPY_HOST_TO_DEVICE);
 
             // Clear commit
@@ -676,7 +676,7 @@ private:
     {
         // Read commitTurnCnt[slot] from device
         TurnCnt commitCnt;
-        void *commitAddr = OffsetPtr(wsBase_, COMMIT_TURNCNT_OFFSET + slot * TURNCNT_STRIDE);
+        void* commitAddr = OffsetPtr(wsBase_, COMMIT_TURNCNT_OFFSET + slot * TURNCNT_STRIDE);
         if (aclrtMemcpy(&commitCnt, sizeof(TurnCnt), commitAddr, sizeof(TurnCnt), ACL_MEMCPY_DEVICE_TO_HOST) != 0) {
             return;
         }
@@ -688,7 +688,7 @@ private:
 
         // Read the message
         HcclMsg msg;
-        void *msgAddr = OffsetPtr(wsBase_, SEND_MSGS_OFFSET + slot * MSG_STRIDE);
+        void* msgAddr = OffsetPtr(wsBase_, SEND_MSGS_OFFSET + slot * MSG_STRIDE);
         if (aclrtMemcpy(&msg, sizeof(HcclMsg), msgAddr, sizeof(HcclMsg), ACL_MEMCPY_DEVICE_TO_HOST) != 0) {
             return;
         }
@@ -706,7 +706,7 @@ private:
         TurnCnt finishCnt;
         memset(&finishCnt, 0, sizeof(finishCnt));
         finishCnt.cnt = commitCnt.cnt;
-        void *finishAddr = OffsetPtr(wsBase_, FINISH_TURNCNT_OFFSET + slot * TURNCNT_STRIDE);
+        void* finishAddr = OffsetPtr(wsBase_, FINISH_TURNCNT_OFFSET + slot * TURNCNT_STRIDE);
         aclrtMemcpy(finishAddr, sizeof(TurnCnt), &finishCnt, sizeof(TurnCnt), ACL_MEMCPY_HOST_TO_DEVICE);
 
         // Clear commit valid flag
@@ -721,7 +721,7 @@ private:
     // --------------------------------------------------------
     // Message dispatch
     // --------------------------------------------------------
-    void HandleMessage(const HcclMsg &msg)
+    void HandleMessage(const HcclMsg& msg)
     {
         switch (msg.commType) {
             case HCCL_CMD_ALLGATHER:
@@ -747,7 +747,7 @@ private:
     // recvBuf = [rank0_chunk | rank1_chunk | ... | rankN-1_chunk]
     //            ^stride       ^stride
     // --------------------------------------------------------
-    void HandleAllGather(const HcclMsg &msg)
+    void HandleAllGather(const HcclMsg& msg)
     {
         size_t elemSize = HcclDataTypeSize(msg.hcclDataType);
         size_t chunkBytes = msg.dataCnt * elemSize;
@@ -755,11 +755,11 @@ private:
         if (strideBytes == 0)
             strideBytes = chunkBytes; // default: tightly packed
 
-        void *recvBuf = reinterpret_cast<void *>(msg.recvBuffer);
-        void *sendBuf = reinterpret_cast<void *>(msg.sendBuffer);
+        void* recvBuf = reinterpret_cast<void*>(msg.recvBuffer);
+        void* sendBuf = reinterpret_cast<void*>(msg.sendBuffer);
 
         for (uint32_t r = 0; r < rankNum_; r++) {
-            void *dst = OffsetPtr(recvBuf, r * strideBytes);
+            void* dst = OffsetPtr(recvBuf, r * strideBytes);
             if (r == localRankId_) {
                 // Local rank: copy from kernel's sendBuf
                 if (sendBuf && sendBuf != dst) {
@@ -782,7 +782,7 @@ private:
     // element-wise reduce across all ranks, then rank i gets
     // chunk i of the result. Output size = dataCnt / rankNum.
     // --------------------------------------------------------
-    void HandleReduceScatter(const HcclMsg &msg)
+    void HandleReduceScatter(const HcclMsg& msg)
     {
         size_t elemSize = HcclDataTypeSize(msg.hcclDataType);
         size_t totalElems = msg.dataCnt;
@@ -796,7 +796,7 @@ private:
             hostBufs[r].resize(totalBytes, 0);
             if (r == localRankId_) {
                 // Local rank: read from kernel's sendBuf
-                aclrtMemcpy(hostBufs[r].data(), totalBytes, reinterpret_cast<void *>(msg.sendBuffer), totalBytes,
+                aclrtMemcpy(hostBufs[r].data(), totalBytes, reinterpret_cast<void*>(msg.sendBuffer), totalBytes,
                             ACL_MEMCPY_DEVICE_TO_HOST);
             } else if (r < rankInputs_.size() && rankInputs_[r].devicePtr) {
                 size_t readBytes = std::min(totalBytes, rankInputs_[r].byteSize);
@@ -807,13 +807,13 @@ private:
 
         // Host-side element-wise reduce
         std::vector<uint8_t> reducedBuf(totalBytes);
-        std::vector<const void *> srcs(rankNum_);
+        std::vector<const void*> srcs(rankNum_);
         for (uint32_t r = 0; r < rankNum_; r++)
             srcs[r] = hostBufs[r].data();
         HostReduce(reducedBuf.data(), srcs, totalElems, msg.hcclDataType, msg.opType);
 
         // Extract local rank's chunk and H2D to recvBuf
-        aclrtMemcpy(reinterpret_cast<void *>(msg.recvBuffer), chunkBytes, reducedBuf.data() + localRankId_ * chunkBytes,
+        aclrtMemcpy(reinterpret_cast<void*>(msg.recvBuffer), chunkBytes, reducedBuf.data() + localRankId_ * chunkBytes,
                     chunkBytes, ACL_MEMCPY_HOST_TO_DEVICE);
 
         printf("[MockServer]   ReduceScatter: %u ranks × %zu elems → reduce → chunk[%u] %zu elems\n", rankNum_,
@@ -824,7 +824,7 @@ private:
     // AllReduce: each rank has dataCnt elements,
     // element-wise reduce across all ranks, full result to recvBuf.
     // --------------------------------------------------------
-    void HandleAllReduce(const HcclMsg &msg)
+    void HandleAllReduce(const HcclMsg& msg)
     {
         size_t elemSize = HcclDataTypeSize(msg.hcclDataType);
         size_t totalElems = msg.dataCnt;
@@ -835,7 +835,7 @@ private:
         for (uint32_t r = 0; r < rankNum_; r++) {
             hostBufs[r].resize(totalBytes, 0);
             if (r == localRankId_) {
-                aclrtMemcpy(hostBufs[r].data(), totalBytes, reinterpret_cast<void *>(msg.sendBuffer), totalBytes,
+                aclrtMemcpy(hostBufs[r].data(), totalBytes, reinterpret_cast<void*>(msg.sendBuffer), totalBytes,
                             ACL_MEMCPY_DEVICE_TO_HOST);
             } else if (r < rankInputs_.size() && rankInputs_[r].devicePtr) {
                 size_t readBytes = std::min(totalBytes, rankInputs_[r].byteSize);
@@ -846,13 +846,13 @@ private:
 
         // Host-side element-wise reduce
         std::vector<uint8_t> reducedBuf(totalBytes);
-        std::vector<const void *> srcs(rankNum_);
+        std::vector<const void*> srcs(rankNum_);
         for (uint32_t r = 0; r < rankNum_; r++)
             srcs[r] = hostBufs[r].data();
         HostReduce(reducedBuf.data(), srcs, totalElems, msg.hcclDataType, msg.opType);
 
         // H2D full result to recvBuf
-        aclrtMemcpy(reinterpret_cast<void *>(msg.recvBuffer), totalBytes, reducedBuf.data(), totalBytes,
+        aclrtMemcpy(reinterpret_cast<void*>(msg.recvBuffer), totalBytes, reducedBuf.data(), totalBytes,
                     ACL_MEMCPY_HOST_TO_DEVICE);
 
         printf("[MockServer]   AllReduce: %u ranks × %zu elems → reduce → full result\n", rankNum_, totalElems);
@@ -864,7 +864,7 @@ private:
     // dataCnt/rankNum elements each).
     // For local rank: collect block[localRankId] from each rank.
     // --------------------------------------------------------
-    void HandleAlltoAll(const HcclMsg &msg)
+    void HandleAlltoAll(const HcclMsg& msg)
     {
         size_t elemSize = HcclDataTypeSize(msg.hcclDataType);
         size_t totalElems = msg.dataCnt;
@@ -877,7 +877,7 @@ private:
         for (uint32_t r = 0; r < rankNum_; r++) {
             hostBufs[r].resize(totalBytes, 0);
             if (r == localRankId_) {
-                aclrtMemcpy(hostBufs[r].data(), totalBytes, reinterpret_cast<void *>(msg.sendBuffer), totalBytes,
+                aclrtMemcpy(hostBufs[r].data(), totalBytes, reinterpret_cast<void*>(msg.sendBuffer), totalBytes,
                             ACL_MEMCPY_DEVICE_TO_HOST);
             } else if (r < rankInputs_.size() && rankInputs_[r].devicePtr) {
                 size_t readBytes = std::min(totalBytes, rankInputs_[r].byteSize);
@@ -891,13 +891,13 @@ private:
         std::vector<uint8_t> resultBuf(totalBytes);
         for (uint32_t r = 0; r < rankNum_; r++) {
             // rank r sends its block[localRankId_] to us
-            const uint8_t *srcBlock = hostBufs[r].data() + localRankId_ * blockBytes;
-            uint8_t *dstBlock = resultBuf.data() + r * blockBytes;
+            const uint8_t* srcBlock = hostBufs[r].data() + localRankId_ * blockBytes;
+            uint8_t* dstBlock = resultBuf.data() + r * blockBytes;
             memcpy(dstBlock, srcBlock, blockBytes);
         }
 
         // H2D to recvBuf
-        aclrtMemcpy(reinterpret_cast<void *>(msg.recvBuffer), totalBytes, resultBuf.data(), totalBytes,
+        aclrtMemcpy(reinterpret_cast<void*>(msg.recvBuffer), totalBytes, resultBuf.data(), totalBytes,
                     ACL_MEMCPY_HOST_TO_DEVICE);
 
         printf("[MockServer]   AlltoAll: %u ranks × %zu blocks → reassemble for rank %u\n", rankNum_, blockElems,
@@ -907,7 +907,7 @@ private:
     // --------------------------------------------------------
     // Member data
     // --------------------------------------------------------
-    void *wsBase_{nullptr};
+    void* wsBase_{nullptr};
     std::vector<RankData> rankInputs_;
     uint32_t localRankId_{0};
     uint32_t rankNum_{1};

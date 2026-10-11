@@ -14,8 +14,8 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *FaultInjection(const aclTensor *injectObj, const aclTensor *injectPara, aclTensor *out,
-                                aclOpExecutor *executor);
+const aclTensor* FaultInjection(const aclTensor* injectObj, const aclTensor* injectPara, aclTensor* out,
+                                aclOpExecutor* executor);
 } // namespace l0op
 
 #endif // OP_API_INC_LEVEL0_FAULT_INJECTION_H_

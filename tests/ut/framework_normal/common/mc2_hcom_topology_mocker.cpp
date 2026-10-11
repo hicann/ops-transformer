@@ -16,25 +16,25 @@
 #include "mc2_hcom_topo_info.h"
 #include "mc2_hcom_topology_mocker.h"
 namespace Mc2Hcom {
-MC2HcomTopologyMocker &MC2HcomTopologyMocker::GetInstance()
+MC2HcomTopologyMocker& MC2HcomTopologyMocker::GetInstance()
 {
     static MC2HcomTopologyMocker instance;
     return instance;
 }
 
-void MC2HcomTopologyMocker::SetValue(const char *key, uint64_t value)
+void MC2HcomTopologyMocker::SetValue(const char* key, uint64_t value)
 {
     mockValue_[key] = value;
 }
 
-void MC2HcomTopologyMocker::SetValues(const MockValues &values)
+void MC2HcomTopologyMocker::SetValues(const MockValues& values)
 {
-    for (auto &[key, value] : values) {
+    for (auto& [key, value] : values) {
         SetValue(key, value);
     }
 }
 
-uint64_t MC2HcomTopologyMocker::GetValue(const char *key, uint64_t defaultValue) const
+uint64_t MC2HcomTopologyMocker::GetValue(const char* key, uint64_t defaultValue) const
 {
     auto it = mockValue_.find(key);
     if (it == mockValue_.end()) {
@@ -54,7 +54,7 @@ constexpr static uint64_t DEFAULT_CCL_BUFFER_SIZE = 6000ULL * 1024ULL * 1024ULL;
 
 // class MC2HcomTopology
 // public:
-HcclResult MC2HcomTopology::CommGetInstSizeByGroup([[maybe_unused]] const char *group, uint32_t *rankNum)
+HcclResult MC2HcomTopology::CommGetInstSizeByGroup([[maybe_unused]] const char* group, uint32_t* rankNum)
 {
     if (rankNum == nullptr) {
         return HCCL_E_PARA;
@@ -63,7 +63,7 @@ HcclResult MC2HcomTopology::CommGetInstSizeByGroup([[maybe_unused]] const char *
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::TryGetGroupTopoType([[maybe_unused]] const char *group, uint32_t *topoType)
+HcclResult MC2HcomTopology::TryGetGroupTopoType([[maybe_unused]] const char* group, uint32_t* topoType)
 {
     if (topoType == nullptr) {
         return HCCL_E_PARA;
@@ -72,8 +72,8 @@ HcclResult MC2HcomTopology::TryGetGroupTopoType([[maybe_unused]] const char *gro
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::CommGetCclBufferSizeByGroup([[maybe_unused]] const char *group, uint64_t *cclBufferSize,
-                                                        [[maybe_unused]] HcclComm *hcclComm)
+HcclResult MC2HcomTopology::CommGetCclBufferSizeByGroup([[maybe_unused]] const char* group, uint64_t* cclBufferSize,
+                                                        [[maybe_unused]] HcclComm* hcclComm)
 {
     if (cclBufferSize == nullptr) {
         return HCCL_E_PARA;
@@ -82,7 +82,7 @@ HcclResult MC2HcomTopology::CommGetCclBufferSizeByGroup([[maybe_unused]] const c
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::CommGetGroupLocalWindowSize([[maybe_unused]] const char *group, uint64_t *cclBufferSize)
+HcclResult MC2HcomTopology::CommGetGroupLocalWindowSize([[maybe_unused]] const char* group, uint64_t* cclBufferSize)
 {
     if (cclBufferSize == nullptr) {
         return HCCL_E_PARA;
@@ -91,8 +91,8 @@ HcclResult MC2HcomTopology::CommGetGroupLocalWindowSize([[maybe_unused]] const c
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::CommGetHcclBufferByGroup([[maybe_unused]] const char *group, [[maybe_unused]] void **buffer,
-                                                     [[maybe_unused]] uint64_t *size)
+HcclResult MC2HcomTopology::CommGetHcclBufferByGroup([[maybe_unused]] const char* group, [[maybe_unused]] void** buffer,
+                                                     [[maybe_unused]] uint64_t* size)
 {
     if (buffer == nullptr || size == nullptr) {
         return HCCL_E_PARA;
@@ -100,7 +100,7 @@ HcclResult MC2HcomTopology::CommGetHcclBufferByGroup([[maybe_unused]] const char
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::CommGetNetLayersByGroup([[maybe_unused]] const char *group, std::vector<uint32_t> &layers)
+HcclResult MC2HcomTopology::CommGetNetLayersByGroup([[maybe_unused]] const char* group, std::vector<uint32_t>& layers)
 {
     layers.clear();
     uint64_t layerNum = MC2HcomTopologyMocker::GetInstance().GetValue("layerNum", 1);
@@ -111,8 +111,8 @@ HcclResult MC2HcomTopology::CommGetNetLayersByGroup([[maybe_unused]] const char 
     return static_cast<HcclResult>(MC2HcomTopologyMocker::GetInstance().GetValue("getLayersRet", HCCL_SUCCESS));
 }
 
-HcclResult MC2HcomTopology::CommGetTopoTypeByLayer([[maybe_unused]] const char *group, uint32_t layer,
-                                                   uint32_t *topoType)
+HcclResult MC2HcomTopology::CommGetTopoTypeByLayer([[maybe_unused]] const char* group, uint32_t layer,
+                                                   uint32_t* topoType)
 {
     if (topoType == nullptr) {
         return HCCL_E_PARA;
@@ -123,21 +123,21 @@ HcclResult MC2HcomTopology::CommGetTopoTypeByLayer([[maybe_unused]] const char *
 }
 
 // private:
-MC2HcomTopology &MC2HcomTopology::GetInstance()
+MC2HcomTopology& MC2HcomTopology::GetInstance()
 {
     static MC2HcomTopology instance("");
     return instance;
 }
 
-MC2HcomTopology::MC2HcomTopology([[maybe_unused]] const char *libPath) {}
+MC2HcomTopology::MC2HcomTopology([[maybe_unused]] const char* libPath) {}
 
-HcclResult MC2HcomTopology::CallHcomGetCommHandleByGroup([[maybe_unused]] const char *group,
-                                                         [[maybe_unused]] HcclComm *commHandle) const
+HcclResult MC2HcomTopology::CallHcomGetCommHandleByGroup([[maybe_unused]] const char* group,
+                                                         [[maybe_unused]] HcclComm* commHandle) const
 {
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::CallCommGetCCLBufSizeCfg([[maybe_unused]] HcclComm comm, uint64_t *cclBufferSize) const
+HcclResult MC2HcomTopology::CallCommGetCCLBufSizeCfg([[maybe_unused]] HcclComm comm, uint64_t* cclBufferSize) const
 {
     if (cclBufferSize == nullptr) {
         return HCCL_E_PARA;
@@ -146,29 +146,29 @@ HcclResult MC2HcomTopology::CallCommGetCCLBufSizeCfg([[maybe_unused]] HcclComm c
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::CallHcomGetRankSizeEx([[maybe_unused]] const char *group,
-                                                  [[maybe_unused]] uint32_t *ranksize,
+HcclResult MC2HcomTopology::CallHcomGetRankSizeEx([[maybe_unused]] const char* group,
+                                                  [[maybe_unused]] uint32_t* ranksize,
                                                   [[maybe_unused]] uint32_t flag) const
 {
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::CallHcomGetL0TopoTypeEx([[maybe_unused]] const char *group,
-                                                    [[maybe_unused]] CommTopo *topoType,
+HcclResult MC2HcomTopology::CallHcomGetL0TopoTypeEx([[maybe_unused]] const char* group,
+                                                    [[maybe_unused]] CommTopo* topoType,
                                                     [[maybe_unused]] uint32_t flag) const
 {
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::CallCommGetNetLayers([[maybe_unused]] HcclComm comm, uint32_t **netLayer,
-                                                 uint32_t *netLayerNum) const
+HcclResult MC2HcomTopology::CallCommGetNetLayers([[maybe_unused]] HcclComm comm, uint32_t** netLayer,
+                                                 uint32_t* netLayerNum) const
 {
     return HCCL_SUCCESS;
 }
 
 HcclResult MC2HcomTopology::CallCommGetInstTopoTypeByNetLayer([[maybe_unused]] HcclComm comm,
                                                               [[maybe_unused]] uint32_t netLayer,
-                                                              uint32_t *topoType) const
+                                                              uint32_t* topoType) const
 {
     if (topoType == nullptr) {
         return HCCL_E_PARA;

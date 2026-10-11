@@ -19,7 +19,7 @@
 #include "opdev/make_op_executor.h"
 
 namespace l0op {
-const aclTensor *Expand(const aclTensor *self, const aclIntArray *shape, aclOpExecutor *executor);
+const aclTensor* Expand(const aclTensor* self, const aclIntArray* shape, aclOpExecutor* executor);
 }
 
 #endif // PTA_NPU_OP_API_INC_LEVEL0_OP_EXPAND_OP_H_

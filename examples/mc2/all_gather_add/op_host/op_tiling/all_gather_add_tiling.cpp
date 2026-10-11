@@ -31,9 +31,9 @@ const uint32_t WS_SYS_SIZE = 16U * 1024U * 1024U;
 } // namespace
 namespace optiling {
 
-static ge::graphStatus AllGatherParamsCheck(const gert::TilingContext *context)
+static ge::graphStatus AllGatherParamsCheck(const gert::TilingContext* context)
 {
-    const gert::StorageShape *aShape = context->GetInputShape(0);
+    const gert::StorageShape* aShape = context->GetInputShape(0);
     uint64_t inputDim0 = aShape->GetStorageShape().GetDim(0);
     uint64_t inputDim1 = aShape->GetStorageShape().GetDim(1);
 
@@ -51,7 +51,7 @@ static ge::graphStatus AllGatherParamsCheck(const gert::TilingContext *context)
 }
 
 // 设置hccl高阶API Tiling结构体
-static void InitHcclParam(AllGatherAddTilingData *tilingData, const char *group)
+static void InitHcclParam(AllGatherAddTilingData* tilingData, const char* group)
 {
     std::string algConfig = "AllGather=level0:fullmesh";
     Mc2CcTilingConfig mc2CcTilingConfig(group, HCCL_CMD_ALLGATHER, algConfig);
@@ -59,7 +59,7 @@ static void InitHcclParam(AllGatherAddTilingData *tilingData, const char *group)
     mc2CcTilingConfig.GetTiling(tilingData->mc2CcTiling);
 }
 
-static ge::graphStatus AllGatherAddTilingFunc(gert::TilingContext *context)
+static ge::graphStatus AllGatherAddTilingFunc(gert::TilingContext* context)
 {
     // 1.对参数进行校验
     OP_CHECK_IF(AllGatherParamsCheck(context) != ge::GRAPH_SUCCESS, OP_LOGE(context->GetNodeName(), "param is invalid"),
@@ -69,12 +69,12 @@ static ge::graphStatus AllGatherAddTilingFunc(gert::TilingContext *context)
     context->SetBlockDim(ascendcPlatform.GetCoreNumAiv());
 
     // 2.获取WorkspaceSize信息
-    size_t *currentWorkspace = context->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, currentWorkspace);
     currentWorkspace[0] = WS_SYS_SIZE;
 
     // 3.设置TilingData
-    AllGatherAddTilingData *tilingData = context->GetTilingData<AllGatherAddTilingData>();
+    AllGatherAddTilingData* tilingData = context->GetTilingData<AllGatherAddTilingData>();
     OP_CHECK_NULL_WITH_CONTEXT(context, tilingData);
 
     tilingData->commTurn = COMM_TURN; // 通信轮次为1时通算串行，大于1时开启通算掩盖

@@ -21,45 +21,45 @@ namespace gert {
 class InferShapeRangeContextFaker : public OpInferShapeRangeContextBuilder, public KernelRunContextHolder {
 public:
     InferShapeRangeContextFaker() = default;
-    InferShapeRangeContextFaker &operator=(InferShapeRangeContextFaker &&);
-    InferShapeRangeContextFaker(InferShapeRangeContextFaker &&);
+    InferShapeRangeContextFaker& operator=(InferShapeRangeContextFaker&&);
+    InferShapeRangeContextFaker(InferShapeRangeContextFaker&&);
 
-    InferShapeRangeContextFaker &SetOpType(const std::string opType);
+    InferShapeRangeContextFaker& SetOpType(const std::string opType);
 
-    InferShapeRangeContextFaker &IrInputNum(size_t inputNum);
+    InferShapeRangeContextFaker& IrInputNum(size_t inputNum);
 
-    InferShapeRangeContextFaker &NodeIoNum(size_t inputNum, size_t outputNum);
+    InferShapeRangeContextFaker& NodeIoNum(size_t inputNum, size_t outputNum);
 
-    InferShapeRangeContextFaker &IrInstanceNum(const std::vector<uint32_t> &instanceNum);
+    InferShapeRangeContextFaker& IrInstanceNum(const std::vector<uint32_t>& instanceNum);
 
-    InferShapeRangeContextFaker &NodeInputTd(int32_t index, ge::DataType dtype, ge::Format originFormat,
-                                             ge::Format storageFormat, const gert::StorageShape &shape = {});
+    InferShapeRangeContextFaker& NodeInputTd(int32_t index, ge::DataType dtype, ge::Format originFormat,
+                                             ge::Format storageFormat, const gert::StorageShape& shape = {});
 
-    InferShapeRangeContextFaker &NodeOutputTd(int32_t index, ge::DataType dtype, ge::Format originFormat,
+    InferShapeRangeContextFaker& NodeOutputTd(int32_t index, ge::DataType dtype, ge::Format originFormat,
                                               ge::Format storageFormat);
 
     template <typename T>
-    InferShapeRangeContextFaker &Attr(const std::string &attrName, T attr)
+    InferShapeRangeContextFaker& Attr(const std::string& attrName, T attr)
     {
     OpInferShapeRangeContextBuilder:
         AppendAttr(attr);
         return *this;
     }
 
-    InferShapeRangeContextFaker &Attr(const std::string &attrName, const std::string &attr)
+    InferShapeRangeContextFaker& Attr(const std::string& attrName, const std::string& attr)
     {
         OpInferShapeRangeContextBuilder::AppendAttr(ge::AscendString(attr.c_str()));
         return *this;
     }
 
-    InferShapeRangeContextFaker &InputTensors(const std::vector<Range<Tensor> *> &inputTensors);
+    InferShapeRangeContextFaker& InputTensors(const std::vector<Range<Tensor>*>& inputTensors);
 
-    InferShapeRangeContextFaker &InputShapeRanges(const std::vector<Range<Shape> *> &inputShapeRanges);
+    InferShapeRangeContextFaker& InputShapeRanges(const std::vector<Range<Shape>*>& inputShapeRanges);
 
-    InferShapeRangeContextFaker &OutputShapeRanges(const std::vector<Range<Shape> *> &outputShapeRanges);
+    InferShapeRangeContextFaker& OutputShapeRanges(const std::vector<Range<Shape>*>& outputShapeRanges);
 
-    InferShapeRangeContextFaker &NodeAttrs(
-        const std::vector<std::pair<std::string, Ops::Transformer::AnyValue>> &attrs);
+    InferShapeRangeContextFaker& NodeAttrs(
+        const std::vector<std::pair<std::string, Ops::Transformer::AnyValue>>& attrs);
 
     KernelRunContextHolder Build();
 };

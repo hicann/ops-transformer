@@ -13,8 +13,8 @@
 
 #include "infer_shape_context_faker.h"
 
-void ExecuteTestCase(gert::InfershapeContextPara &infershapeContextPara,
+void ExecuteTestCase(gert::InfershapeContextPara& infershapeContextPara,
                      ge::graphStatus expectResult = ge::GRAPH_FAILED,
-                     const std::vector<std::vector<int64_t>> &expectOutputShape = {});
+                     const std::vector<std::vector<int64_t>>& expectOutputShape = {});
 
 #endif // OPS_TRANSFORMER_DEV_TESTS_UT_COMMON_INFER_SHAPE_CASE_EXECUTOR_H

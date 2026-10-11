@@ -27,17 +27,17 @@
 #include "aclnn/opdev/fp16_t.h"
 #include "../op_host/op_api/aclnn_all_gather_add.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            LOG_PRINT("Example failed.\n");                                                                            \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            LOG_PRINT("Example failed.\n"); \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 constexpr int RANK_DIM = 2;
@@ -52,7 +52,7 @@ typedef struct {
     std::vector<op::fp16_t> rank1_c;
 } TestData;
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -69,8 +69,8 @@ const long long aShapeSize = GetShapeSize(aShape);
 const long long bShapeSize = GetShapeSize(bShape);
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -86,7 +86,7 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-int CompareVector(std::vector<op::fp16_t> &vec1, const std::vector<op::fp16_t> &vec2)
+int CompareVector(std::vector<op::fp16_t>& vec1, const std::vector<op::fp16_t>& vec2)
 {
     const float tolerance = 0.001f; // 千分之一
     for (size_t i = 0; i < vec1.size(); ++i) {
@@ -115,7 +115,7 @@ struct Args {
     aclrtStream stream;
 };
 
-int LaunchOneThreadAllGatherAdd(Args &args, const TestData &testData)
+int LaunchOneThreadAllGatherAdd(Args& args, const TestData& testData)
 {
     int ret = aclrtSetDevice(args.rankId);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetDevice failed. ret = %d \n", ret); return ret);
@@ -125,18 +125,18 @@ int LaunchOneThreadAllGatherAdd(Args &args, const TestData &testData)
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetCommName failed. ret: %d\n", ret); return -1);
     LOG_PRINT("[INFO] rank = %d, hcomName = %s, stream = %p\n", args.rankId, hcomName, args.stream);
 
-    void *aDeviceAddr = nullptr;
-    void *bDeviceAddr = nullptr;
-    void *outDeviceAddr = nullptr;
-    void *gatherOutDeviceAddr = nullptr;
-    aclTensor *a = nullptr;
-    aclTensor *b = nullptr;
-    aclTensor *out = nullptr;
-    aclTensor *gatherOut = nullptr;
+    void* aDeviceAddr = nullptr;
+    void* bDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
+    void* gatherOutDeviceAddr = nullptr;
+    aclTensor* a = nullptr;
+    aclTensor* b = nullptr;
+    aclTensor* out = nullptr;
+    aclTensor* gatherOut = nullptr;
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
 
     std::vector<op::fp16_t> aHostData(aShapeSize, 0);
     std::vector<op::fp16_t> bHostData(bShapeSize, 0);
@@ -240,19 +240,19 @@ int LaunchOneThreadAllGatherAdd(Args &args, const TestData &testData)
 }
 
 // 随机生成[-5, 5]之间的数据填充vector
-int RandomVectorGenerator(std::vector<op::fp16_t> &vec, long long size)
+int RandomVectorGenerator(std::vector<op::fp16_t>& vec, long long size)
 {
     unsigned seed = static_cast<unsigned>(std::chrono::system_clock::now().time_since_epoch().count());
     std::mt19937 generator(seed);
     std::uniform_real_distribution<float> distribution(-5.0f, 5.0f);
-    for (auto &elem : vec) {
+    for (auto& elem : vec) {
         elem = static_cast<op::fp16_t>(distribution(generator));
     }
     return 0;
 }
 
 // 拼接两个大小相同的vector
-int GatherVectors(std::vector<op::fp16_t> &vec1, std::vector<op::fp16_t> &vec2, std::vector<op::fp16_t> &vec3)
+int GatherVectors(std::vector<op::fp16_t>& vec1, std::vector<op::fp16_t>& vec2, std::vector<op::fp16_t>& vec3)
 {
     vec3.clear();
     vec3.reserve(vec1.size() + vec2.size());
@@ -262,7 +262,7 @@ int GatherVectors(std::vector<op::fp16_t> &vec1, std::vector<op::fp16_t> &vec2, 
 }
 
 // 对两个大小相同的vector执行加法
-int AddVectors(std::vector<op::fp16_t> &vec1, std::vector<op::fp16_t> &vec2, std::vector<op::fp16_t> &vec3)
+int AddVectors(std::vector<op::fp16_t>& vec1, std::vector<op::fp16_t>& vec2, std::vector<op::fp16_t>& vec3)
 {
     vec3.clear();
     vec3.resize(vec1.size());
@@ -272,7 +272,7 @@ int AddVectors(std::vector<op::fp16_t> &vec1, std::vector<op::fp16_t> &vec2, std
     return 0;
 }
 
-int GenerateTestData(TestData &testData)
+int GenerateTestData(TestData& testData)
 {
     // 随机生成输入
     int ret = RandomVectorGenerator(testData.rank0_a, testData.rank0_a.size());
@@ -299,7 +299,7 @@ int GenerateTestData(TestData &testData)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     // 生成测试数据
     TestData testData = {
@@ -346,7 +346,7 @@ int main(int argc, char *argv[])
     }
 
     int finalRet = 0;
-    for (auto &future : futures) {
+    for (auto& future : futures) {
         int ret = future.get();
         if (ret != 0) {
             finalRet = ret;

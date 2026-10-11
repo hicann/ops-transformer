@@ -19,30 +19,32 @@
 
 using namespace ops::adv::tests::utils;
 
-OpInfo::OpInfo() : OpInfo(ControlInfo(true, false))
-{
-}
+OpInfo::OpInfo()
+    : OpInfo(ControlInfo(true, false))
+{}
 
-OpInfo::OpInfo(const ControlInfo &ctr) : OpInfo(ctr, ExpectInfo())
-{
-}
+OpInfo::OpInfo(const ControlInfo& ctr)
+    : OpInfo(ctr, ExpectInfo())
+{}
 
-OpInfo::OpInfo(const ControlInfo &ctr, const ExpectInfo &exp) : OpInfo("Undefined", ctr, exp)
-{
-}
+OpInfo::OpInfo(const ControlInfo& ctr, const ExpectInfo& exp)
+    : OpInfo("Undefined", ctr, exp)
+{}
 
-OpInfo::OpInfo(const char *name, const ControlInfo &ctr, const ExpectInfo &exp)
-    : mName(name), mCtr(ctr), mExp(exp), mCtx(nullptr)
-{
-}
+OpInfo::OpInfo(const char* name, const ControlInfo& ctr, const ExpectInfo& exp)
+    : mName(name),
+      mCtr(ctr),
+      mExp(exp),
+      mCtx(nullptr)
+{}
 
-bool OpInfo::SetContext(ContextIntf *ctxParam)
+bool OpInfo::SetContext(ContextIntf* ctxParam)
 {
-    this->mCtx = static_cast<ContextIntf *>(ctxParam);
+    this->mCtx = static_cast<ContextIntf*>(ctxParam);
     return true;
 }
 
-bool OpInfo::ProcessTiling(std::string &caseName)
+bool OpInfo::ProcessTiling(std::string& caseName)
 {
     if (mCtr.mRunTiling) {
         if (!this->RunTiling(caseName)) {
@@ -55,7 +57,7 @@ bool OpInfo::ProcessTiling(std::string &caseName)
     return true;
 }
 
-bool OpInfo::ProcessKernel(std::string &caseName)
+bool OpInfo::ProcessKernel(std::string& caseName)
 {
     if (mCtr.mRunKernel) {
         if (!this->RunKernel(caseName)) {
@@ -68,7 +70,7 @@ bool OpInfo::ProcessKernel(std::string &caseName)
     return true;
 }
 
-bool OpInfo::RunTiling(std::string &caseName)
+bool OpInfo::RunTiling(std::string& caseName)
 {
     if (!mCtx->RunTiling(caseName, false)) {
         LOG_IF(mExp.mSuccess, LOG_ERR("Case[%s:%s] Run Tiling Failed.", caseName.c_str(), mName.c_str()));
@@ -77,7 +79,7 @@ bool OpInfo::RunTiling(std::string &caseName)
     return true;
 }
 
-bool OpInfo::ChkTiling(std::string &caseName)
+bool OpInfo::ChkTiling(std::string& caseName)
 {
     if (mExp.mTilingKey != ExpectInfo::kInvalidTilingKey) {
         auto actTilingKey = mCtx->GetTilingKey();
@@ -90,7 +92,7 @@ bool OpInfo::ChkTiling(std::string &caseName)
     if (mExp.mTilingBlockDim != ExpectInfo::kInvalidTilingBlockDim) {
         int64_t expTilingBlockDim = mExp.mTilingBlockDim;
         if (expTilingBlockDim == ExpectInfo::kFullTilingBlockDim) {
-            auto *platform = Platform::GetGlobalPlatform();
+            auto* platform = Platform::GetGlobalPlatform();
             expTilingBlockDim = platform != nullptr ? platform->GetBlockDim() : expTilingBlockDim;
         }
         auto actTilingBlockDim = mCtx->GetTilingBlockDim();
@@ -103,7 +105,7 @@ bool OpInfo::ChkTiling(std::string &caseName)
     return true;
 }
 
-bool OpInfo::RunKernel(std::string &caseName)
+bool OpInfo::RunKernel(std::string& caseName)
 {
     if (!mCtx->RunKernel(caseName)) {
         LOG_IF(mExp.mSuccess, LOG_ERR("Case[%s:%s] Run Kernel Failed.", caseName.c_str(), mName.c_str()));
@@ -112,7 +114,7 @@ bool OpInfo::RunKernel(std::string &caseName)
     return true;
 }
 
-bool OpInfo::ChkKernel(std::string &caseName)
+bool OpInfo::ChkKernel(std::string& caseName)
 {
     LOG_DBG("Case[%s:%s] Run Kernel Finish.", caseName.c_str(), mName.c_str());
     return true;

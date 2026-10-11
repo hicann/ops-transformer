@@ -44,8 +44,8 @@ using Platform = ops::adv::tests::utils::Platform;
 template <class C>
 class Ts : public testing::Test {
 protected:
-    C *case_ = nullptr;
-    Platform *platform_ = nullptr;
+    C* case_ = nullptr;
+    Platform* platform_ = nullptr;
     Platform::SocVersion socVersion_ = Platform::SocVersion::Ascend910B2;
 
 protected:
@@ -134,7 +134,7 @@ class Ts_WithParam : public Ts<C>, public ::testing::WithParamInterface<C> {
 protected:
     void SetUp() override
     {
-        auto &p = ::testing::WithParamInterface<C>::GetParam();
+        auto& p = ::testing::WithParamInterface<C>::GetParam();
         Ts<C>::case_ = new C(p);
         ASSERT_NE(Ts<C>::case_, nullptr);
         Ts<C>::SetUp();

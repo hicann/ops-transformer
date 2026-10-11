@@ -18,8 +18,8 @@ static const std::initializer_list<op::DataType> AICPU_DTYPE_SUPPORT_LIST = {
     op::DataType::DT_INT16, op::DataType::DT_UINT16, op::DataType::DT_UINT8,     op::DataType::DT_INT32,
     op::DataType::DT_INT64, op::DataType::DT_DOUBLE, op::DataType::DT_COMPLEX64, op::DataType::DT_COMPLEX128,
     op::DataType::DT_BF16};
-const aclTensor *OnesLike(const aclTensor *self, aclOpExecutor *executor);
-inline static bool IsAiCpuSupport(const aclTensor *self)
+const aclTensor* OnesLike(const aclTensor* self, aclOpExecutor* executor);
+inline static bool IsAiCpuSupport(const aclTensor* self)
 {
     return op::CheckType(self->GetDataType(), AICPU_DTYPE_SUPPORT_LIST);
 }

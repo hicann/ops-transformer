@@ -31,15 +31,15 @@ enum NnopbaseHcclServerType : uint32_t {
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
 
-extern aclnnStatus aclnnInnerAllGatherAddGetWorkspaceSize(const aclTensor *a, const aclTensor *b, char *group,
-                                                          int64_t rankSize, const aclTensor *cOut,
-                                                          const aclTensor *gatherOutOut, uint64_t *workspaceSize,
-                                                          aclOpExecutor **executor);
-extern aclnnStatus aclnnInnerAllGatherAdd(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerAllGatherAddGetWorkspaceSize(const aclTensor* a, const aclTensor* b, char* group,
+                                                          int64_t rankSize, const aclTensor* cOut,
+                                                          const aclTensor* gatherOutOut, uint64_t* workspaceSize,
+                                                          aclOpExecutor** executor);
+extern aclnnStatus aclnnInnerAllGatherAdd(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                           aclrtStream stream);
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
-static bool CheckNotNull(const aclTensor *a, const aclTensor *b, const aclTensor *gatherout, const aclTensor *output)
+static bool CheckNotNull(const aclTensor* a, const aclTensor* b, const aclTensor* gatherout, const aclTensor* output)
 {
     OP_CHECK_NULL(a, return false);
     OP_CHECK_NULL(b, return false);
@@ -51,7 +51,7 @@ static bool CheckNotNull(const aclTensor *a, const aclTensor *b, const aclTensor
 // 根据API定义，需要列出所能支持的所有dtype
 static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT16};
 
-static bool CheckDtypeValid(const aclTensor *a, const aclTensor *b, const aclTensor *gatherout, const aclTensor *output)
+static bool CheckDtypeValid(const aclTensor* a, const aclTensor* b, const aclTensor* gatherout, const aclTensor* output)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(a, DTYPE_SUPPORT_LIST, return false);
     OP_CHECK_DTYPE_NOT_SUPPORT(b, DTYPE_SUPPORT_LIST, return false);
@@ -60,7 +60,7 @@ static bool CheckDtypeValid(const aclTensor *a, const aclTensor *b, const aclTen
     return true;
 }
 
-static bool CheckShape(const aclTensor *a, const aclTensor *b, const aclTensor *gatherOut, const aclTensor *output,
+static bool CheckShape(const aclTensor* a, const aclTensor* b, const aclTensor* gatherOut, const aclTensor* output,
                        int64_t rankSize)
 {
     OP_CHECK_WRONG_DIMENSION(a, DIMS_NUM, return false);
@@ -80,8 +80,8 @@ static bool CheckShape(const aclTensor *a, const aclTensor *b, const aclTensor *
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *a, const aclTensor *b, const aclTensor *gatherout,
-                               const aclTensor *output, int64_t rankSize)
+static aclnnStatus CheckParams(const aclTensor* a, const aclTensor* b, const aclTensor* gatherout,
+                               const aclTensor* output, int64_t rankSize)
 {
     CHECK_RET(CheckNotNull(a, b, gatherout, output), ACLNN_ERR_PARAM_NULLPTR);
 
@@ -92,9 +92,9 @@ static aclnnStatus CheckParams(const aclTensor *a, const aclTensor *b, const acl
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnAllGatherAddGetWorkspaceSize(const aclTensor *a, const aclTensor *b, char *group, int64_t rankSize,
-                                              const aclTensor *cOut, const aclTensor *gatherOutOut,
-                                              uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnAllGatherAddGetWorkspaceSize(const aclTensor* a, const aclTensor* b, char* group, int64_t rankSize,
+                                              const aclTensor* cOut, const aclTensor* gatherOutOut,
+                                              uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     auto retParam = CheckParams(a, b, gatherOutOut, cOut, rankSize);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
@@ -109,7 +109,7 @@ aclnnStatus aclnnAllGatherAddGetWorkspaceSize(const aclTensor *a, const aclTenso
     return ret;
 }
 
-aclnnStatus aclnnAllGatherAdd(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnAllGatherAdd(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     if (NnopbaseSetHcclServerType) {
         NnopbaseSetHcclServerType(executor, NNOPBASE_HCCL_SERVER_TYPE_AICPU);

@@ -33,12 +33,14 @@ __aicore__ inline int64_t ClipSInnerToken(int64_t sInnerToken, int64_t minValue,
     return sInnerToken;
 }
 
-template <typename T1, typename T2> __aicore__ inline T1 Max(T1 a, T2 b)
+template <typename T1, typename T2>
+__aicore__ inline T1 Max(T1 a, T2 b)
 {
     return (a > b) ? (a) : (b);
 }
 
-template <typename T1, typename T2> __aicore__ inline T1 Min(T1 a, T2 b)
+template <typename T1, typename T2>
+__aicore__ inline T1 Min(T1 a, T2 b)
 {
     return (a > b) ? (b) : (a);
 }

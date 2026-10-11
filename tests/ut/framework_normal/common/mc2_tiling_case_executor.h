@@ -18,11 +18,11 @@
 
 constexpr uint64_t MC2_TILING_DATA_RESERVED_LEN = (sizeof(Mc2InitTiling) + sizeof(Mc2CcTiling)) / sizeof(uint64_t);
 
-inline void Mc2ExecuteTestCase(const gert::TilingContextPara &tilingContextPara,
-                               const Mc2Hcom::MockValues &hcomTopologyMockValues,
+inline void Mc2ExecuteTestCase(const gert::TilingContextPara& tilingContextPara,
+                               const Mc2Hcom::MockValues& hcomTopologyMockValues,
                                ge::graphStatus expectResult = ge::GRAPH_FAILED, uint64_t expectTilingKey = 0,
-                               const std::string &expectTilingData = "",
-                               const std::vector<size_t> &expectWorkspaces = {}, uint64_t tilingDataReservedLen = 0,
+                               const std::string& expectTilingData = "",
+                               const std::vector<size_t>& expectWorkspaces = {}, uint64_t tilingDataReservedLen = 0,
                                bool useHashTilingData = false)
 {
     Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValues(hcomTopologyMockValues);

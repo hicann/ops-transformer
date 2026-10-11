@@ -21,7 +21,7 @@ using namespace std;
 using namespace nlohmann;
 
 #define ARRAY_DESC(TB, TS) \
-    inline void Release(acl##TB##Array *p) \
+    inline void Release(acl##TB##Array* p) \
     { \
         if (p != nullptr) { \
             aclDestroy##TB##Array(p); \
@@ -29,7 +29,7 @@ using namespace nlohmann;
     } \
     class TB##ArrayDesc { \
     public: \
-        TB##ArrayDesc(const vector<TS> &val) \
+        TB##ArrayDesc(const vector<TS>& val) \
         { \
             arr_ = val; \
         } \
@@ -39,9 +39,9 @@ using namespace nlohmann;
             arr_ = move(vector<TS>(duplicate_cnt, single_val)); \
         } \
         ~TB##ArrayDesc() {} \
-        unique_ptr<acl##TB##Array, void (*)(acl##TB##Array *)> ToAclType() const; \
-        acl##TB##Array *ToAclTypeRawPtr() const; \
-        void ToJson(json &root, bool is_input = true) const \
+        unique_ptr<acl##TB##Array, void (*)(acl##TB##Array*)> ToAclType() const; \
+        acl##TB##Array* ToAclTypeRawPtr() const; \
+        void ToJson(json& root, bool is_input = true) const \
         { \
             (void)is_input; \
             json x; \
@@ -67,7 +67,7 @@ using namespace nlohmann;
             x["value"] = ss.str(); \
             root.push_back(x); \
         } \
-        const vector<TS> &Get() const \
+        const vector<TS>& Get() const \
         { \
             return arr_; \
         } \
@@ -75,16 +75,16 @@ using namespace nlohmann;
     private: \
         vector<TS> arr_; \
     }; \
-    inline acl##TB##Array *DescToAclContainer(const TB##ArrayDesc &array_desc) \
+    inline acl##TB##Array* DescToAclContainer(const TB##ArrayDesc& array_desc) \
     { \
         return array_desc.ToAclTypeRawPtr(); \
     } \
-    inline acl##TB##Array *InferAclType(const TB##ArrayDesc &array_desc) \
+    inline acl##TB##Array* InferAclType(const TB##ArrayDesc& array_desc) \
     { \
         (void)array_desc; \
         return nullptr; \
     } \
-    inline void DescToJson(json &root, const TB##ArrayDesc &array_desc, bool is_input = true) \
+    inline void DescToJson(json& root, const TB##ArrayDesc& array_desc, bool is_input = true) \
     { \
         array_desc.ToJson(root, is_input); \
     }

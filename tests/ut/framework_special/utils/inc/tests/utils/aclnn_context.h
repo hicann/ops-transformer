@@ -25,8 +25,8 @@ public:
     /**
      * Tiling 运行回调函数
      */
-    typedef bool (*TilingRunCbf)(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opExecutor);
-    typedef bool (*KernelRunCbf)(void *curCase);
+    typedef bool (*TilingRunCbf)(void* curCase, uint64_t* workSpaceSize, aclOpExecutor** opExecutor);
+    typedef bool (*KernelRunCbf)(void* curCase);
 
 public:
     AclnnContext() = default;
@@ -37,22 +37,22 @@ public:
     [[maybe_unused]] [[nodiscard]] bool SetKernelRunCbf(KernelRunCbf cbf);
 
     aclrtStream GetAclRtStream() const;
-    aclOpExecutor *GetAclOpExecutor() const;
+    aclOpExecutor* GetAclOpExecutor() const;
 
     /* Tiling */
-    bool RunTiling(std::string &caseName, bool withSocversion) override;
+    bool RunTiling(std::string& caseName, bool withSocversion) override;
 
 protected:
     TilingRunCbf tilingRunCbf_ = nullptr;
     KernelRunCbf kernelRunCbf_ = nullptr;
     aclrtStream aclrtStream_ = nullptr;
-    aclOpExecutor *aclOpExecutor_ = nullptr;
+    aclOpExecutor* aclOpExecutor_ = nullptr;
     bool needDestroyExecutor_ = true;
 
 protected:
-    bool RunKernelProcess(std::string &caseName) override;
-    uint8_t *AllocWorkspaceImpl(uint64_t size) override;
-    void FreeWorkspaceImpl(uint8_t *ptr) override;
+    bool RunKernelProcess(std::string& caseName) override;
+    uint8_t* AllocWorkspaceImpl(uint64_t size) override;
+    void FreeWorkspaceImpl(uint8_t* ptr) override;
 
 private:
     void Destroy();

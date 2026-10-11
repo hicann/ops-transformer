@@ -18,9 +18,9 @@
 namespace domi {
 using NodeProto = ge::onnx::NodeProto;
 
-static Status ParseParamsNPUScaledMaskedSoftmax(const Message *op_src, ge::Operator &op_dest)
+static Status ParseParamsNPUScaledMaskedSoftmax(const Message* op_src, ge::Operator& op_dest)
 {
-    const NodeProto *node = dynamic_cast<const NodeProto *>(op_src);
+    const NodeProto* node = dynamic_cast<const NodeProto*>(op_src);
     if (node == nullptr) {
         OP_LOGE(GetOpName(op_dest).c_str(), "Dynamic cast op_src to NodeProto failed!");
         return FAILED;
@@ -28,7 +28,7 @@ static Status ParseParamsNPUScaledMaskedSoftmax(const Message *op_src, ge::Opera
 
     float scale = 1.0;
     bool fixed_triu_mask = false;
-    for (const auto &attr : node->attribute()) {
+    for (const auto& attr : node->attribute()) {
         if (attr.name() == "scale" && attr.type() == ge::onnx::AttributeProto::FLOAT) {
             scale = attr.f();
         } else if (attr.name() == "fixed_triu_mask" && attr.type() == ge::onnx::AttributeProto::INT && attr.i() == 1) {

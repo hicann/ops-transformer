@@ -111,24 +111,24 @@ const std::unordered_map<std::string, ge::Format> GE_FORMAT{
     {"NYUV_A", ge::FORMAT_NYUV_A},
     {"NCL", ge::FORMAT_NCL}};
 
-inline ge::DataType Str2DTypeGE(const std::string &dtypeStr)
+inline ge::DataType Str2DTypeGE(const std::string& dtypeStr)
 {
     return ReadMap(GE_DTYPE, dtypeStr, ge::DT_UNDEFINED);
 }
 
-inline bool StrToBoolIgnoreCase(const std::string &str)
+inline bool StrToBoolIgnoreCase(const std::string& str)
 {
     std::string lowerStr = str;
     std::transform(lowerStr.begin(), lowerStr.end(), lowerStr.begin(), ::tolower);
     return lowerStr == "true" || lowerStr == "1";
 }
 
-inline ge::graphStatus Str2StatusGE(const std::string &statusStr)
+inline ge::graphStatus Str2StatusGE(const std::string& statusStr)
 {
     return statusStr == "SUCCESS" ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED;
 }
 
-inline gert::StorageShape GetStorageShape(const std::string &shapeArrStr)
+inline gert::StorageShape GetStorageShape(const std::string& shapeArrStr)
 {
     gert::StorageShape shape;
     std::vector<int64_t> shapeArr = GetShapeArr(shapeArrStr);
@@ -165,8 +165,8 @@ inline gert::StorageShape GetStorageShape(const std::string &shapeArrStr)
 }
 
 template <typename T>
-inline int GetTensorGE(const csv_map &csvMap, const std::string &shapeKey, const std::string &dtypeKey,
-                       const std::string &formatKey, T &out)
+inline int GetTensorGE(const csv_map& csvMap, const std::string& shapeKey, const std::string& dtypeKey,
+                       const std::string& formatKey, T& out)
 {
     std::string shapeStr = ReadMap(csvMap, shapeKey);
     std::string dtypeStr = ReadMap(csvMap, dtypeKey);
@@ -182,7 +182,7 @@ inline int GetTensorGE(const csv_map &csvMap, const std::string &shapeKey, const
     return 1;
 }
 
-inline gert::Stride ParseStride(const std::string &strideStr, const gert::StorageShape &shape)
+inline gert::Stride ParseStride(const std::string& strideStr, const gert::StorageShape& shape)
 {
     gert::Stride stride;
     if (strideStr.empty()) {
@@ -204,7 +204,7 @@ inline gert::Stride ParseStride(const std::string &strideStr, const gert::Storag
 }
 
 template <typename T>
-inline void ApplyStrideFromCsv(const csv_map &csvMap, const std::string &strideKey, T &desc)
+inline void ApplyStrideFromCsv(const csv_map& csvMap, const std::string& strideKey, T& desc)
 {
     std::string strideStr = ReadMap(csvMap, strideKey);
     if (strideStr.empty()) {
@@ -214,7 +214,7 @@ inline void ApplyStrideFromCsv(const csv_map &csvMap, const std::string &strideK
     desc.hasStride_ = true;
 }
 
-inline std::vector<std::string> SplitByDelim(const std::string &str, char delim)
+inline std::vector<std::string> SplitByDelim(const std::string& str, char delim)
 {
     std::vector<std::string> parts;
     if (str.empty())
@@ -228,8 +228,8 @@ inline std::vector<std::string> SplitByDelim(const std::string &str, char delim)
 }
 
 template <typename T>
-inline std::vector<T> GetTensorListGE(const csv_map &csvMap, const std::string &shapeKey, const std::string &dtypeKey,
-                                      const std::string &formatKey)
+inline std::vector<T> GetTensorListGE(const csv_map& csvMap, const std::string& shapeKey, const std::string& dtypeKey,
+                                      const std::string& formatKey)
 {
     std::string shapeStr = ReadMap(csvMap, shapeKey);
     if (shapeStr.empty())
@@ -253,7 +253,7 @@ inline std::vector<T> GetTensorListGE(const csv_map &csvMap, const std::string &
     return result;
 }
 
-inline int GetDataTypeGE(const csv_map &csvMap, const std::string &dtypeKey, ge::DataType &out)
+inline int GetDataTypeGE(const csv_map& csvMap, const std::string& dtypeKey, ge::DataType& out)
 {
     std::string dtypeStr = ReadMap(csvMap, dtypeKey);
     if (dtypeStr.empty())
@@ -269,14 +269,14 @@ struct HostUtParamBase {
     std::vector<uint32_t> inputInstance;
     std::vector<uint32_t> outputInstance;
 
-    HostUtParamBase(const csv_map &csvMap)
+    HostUtParamBase(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->expectResult = Str2StatusGE(ReadMap(csvMap, "expectResult"));
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const HostUtParamBase &param)
+inline std::ostream& operator<<(std::ostream& os, const HostUtParamBase& param)
 {
     return os << param.case_name;
 }

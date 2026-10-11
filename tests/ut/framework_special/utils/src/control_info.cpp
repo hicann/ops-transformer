@@ -18,6 +18,7 @@
 using namespace ops::adv::tests::utils;
 
 ControlInfo::ControlInfo(bool runTiling, bool runKernel, bool deterministic)
-    : mRunTiling(runTiling), mRunKernel(runKernel), mDeterministic(deterministic)
-{
-}
+    : mRunTiling(runTiling),
+      mRunKernel(runKernel),
+      mDeterministic(deterministic)
+{}

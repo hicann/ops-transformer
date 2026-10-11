@@ -20,8 +20,8 @@
 
 namespace l0op {
 
-const aclTensor *BroadcastTo(const aclTensor *x, const aclTensor *y, const aclTensor *shape, aclOpExecutor *executor);
-const aclTensor *BroadcastTo(const aclTensor *x, const aclIntArray *shape, aclOpExecutor *executor);
+const aclTensor* BroadcastTo(const aclTensor* x, const aclTensor* y, const aclTensor* shape, aclOpExecutor* executor);
+const aclTensor* BroadcastTo(const aclTensor* x, const aclIntArray* shape, aclOpExecutor* executor);
 
 } // namespace l0op
 

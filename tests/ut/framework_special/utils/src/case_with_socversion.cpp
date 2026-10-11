@@ -19,17 +19,19 @@
 
 using namespace ops::adv::tests::utils;
 
-void *CaseWithSocversion::mCurrentCasePtr = nullptr;
+void* CaseWithSocversion::mCurrentCasePtr = nullptr;
 
-CaseWithSocversion::CaseWithSocversion() : CaseWithSocversion("Undefined", true, "", kTilingTemplatePriority_Invalid)
-{
-}
+CaseWithSocversion::CaseWithSocversion()
+    : CaseWithSocversion("Undefined", true, "", kTilingTemplatePriority_Invalid)
+{}
 
-CaseWithSocversion::CaseWithSocversion(const char *name, bool enable, const char *dbgInfo,
+CaseWithSocversion::CaseWithSocversion(const char* name, bool enable, const char* dbgInfo,
                                        int32_t tilingTemplatePriority)
-    : mName(name), mEnable(enable), mDbgInfo(dbgInfo), mTilingTemplatePriority(tilingTemplatePriority)
-{
-}
+    : mName(name),
+      mEnable(enable),
+      mDbgInfo(dbgInfo),
+      mTilingTemplatePriority(tilingTemplatePriority)
+{}
 
 bool CaseWithSocversion::Init(int32_t socVersionIn)
 {
@@ -41,12 +43,12 @@ bool CaseWithSocversion::Init(int32_t socVersionIn)
     return rst;
 }
 
-void *CaseWithSocversion::GetCurrentCase()
+void* CaseWithSocversion::GetCurrentCase()
 {
     return CaseWithSocversion::mCurrentCasePtr;
 }
 
-const char *CaseWithSocversion::GetRootPath()
+const char* CaseWithSocversion::GetRootPath()
 {
     return mRootPath.c_str();
 }

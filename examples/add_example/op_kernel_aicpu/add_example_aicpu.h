@@ -17,9 +17,9 @@ namespace aicpu {
 class AddExampleCpuKernel : public CpuKernel {
 public:
     ~AddExampleCpuKernel() = default;
-    uint32_t Compute(CpuKernelContext &ctx) override;
+    uint32_t Compute(CpuKernelContext& ctx) override;
     template <typename T>
-    uint32_t AddCompute(CpuKernelContext &ctx);
+    uint32_t AddCompute(CpuKernelContext& ctx);
 };
 } // namespace aicpu
 #endif

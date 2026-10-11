@@ -14,9 +14,9 @@
 
 class SoftmaxTilingMocker {
 public:
-    static SoftmaxTilingMocker &GetInstance();
-    void SetSocVersion(const std::string &socVersion);
-    const char *GetSocVersion() const;
+    static SoftmaxTilingMocker& GetInstance();
+    void SetSocVersion(const std::string& socVersion);
+    const char* GetSocVersion() const;
     void Reset();
 
 private:

@@ -42,25 +42,25 @@ public:
     /**
      * 运行上下文
      */
-    ContextIntf *mCtx;
+    ContextIntf* mCtx;
 
 public:
     OpInfo();
-    explicit OpInfo(const ControlInfo &ctr);
-    OpInfo(const ControlInfo &ctr, const ExpectInfo &exp);
-    OpInfo(const char *name, const ControlInfo &ctr, const ExpectInfo &exp);
+    explicit OpInfo(const ControlInfo& ctr);
+    OpInfo(const ControlInfo& ctr, const ExpectInfo& exp);
+    OpInfo(const char* name, const ControlInfo& ctr, const ExpectInfo& exp);
     virtual ~OpInfo() = default;
 
-    bool SetContext(ContextIntf *ctxParam);
+    bool SetContext(ContextIntf* ctxParam);
 
-    virtual bool ProcessTiling(std::string &caseName);
-    virtual bool ProcessKernel(std::string &caseName);
+    virtual bool ProcessTiling(std::string& caseName);
+    virtual bool ProcessKernel(std::string& caseName);
 
-    virtual bool RunTiling(std::string &caseName);
-    virtual bool ChkTiling(std::string &caseName);
+    virtual bool RunTiling(std::string& caseName);
+    virtual bool ChkTiling(std::string& caseName);
 
-    virtual bool RunKernel(std::string &caseName);
-    virtual bool ChkKernel(std::string &caseName);
+    virtual bool RunKernel(std::string& caseName);
+    virtual bool ChkKernel(std::string& caseName);
 };
 
 } // namespace ops::adv::tests::utils

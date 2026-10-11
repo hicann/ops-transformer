@@ -15,11 +15,11 @@
 
 namespace l0op {
 
-const aclTensor *Slice(const aclTensor *x, const aclTensor *y, const aclTensor *offset, const aclTensor *size,
-                       aclOpExecutor *executor);
+const aclTensor* Slice(const aclTensor* x, const aclTensor* y, const aclTensor* offset, const aclTensor* size,
+                       aclOpExecutor* executor);
 
-const aclTensor *Slice(const aclTensor *x, const aclIntArray *offsets, const aclIntArray *size,
-                       aclOpExecutor *executor);
+const aclTensor* Slice(const aclTensor* x, const aclIntArray* offsets, const aclIntArray* size,
+                       aclOpExecutor* executor);
 } // namespace l0op
 
 #endif // COMMON_INC_EXTERNAL_ACLNN_KERNELS_SLICE_H

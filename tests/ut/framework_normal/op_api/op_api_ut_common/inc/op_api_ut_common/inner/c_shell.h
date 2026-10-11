@@ -16,10 +16,10 @@
 
 using namespace std;
 
-int ExecuteShellCmd(const string &cmd, stringstream &ss);
-void SetOpUtSrcPath(const char *p);
-const string &GetOpUtSrcPath();
-const string &GetExePath();
-int GetEnv(const string &name, string &value);
+int ExecuteShellCmd(const string& cmd, stringstream& ss);
+void SetOpUtSrcPath(const char* p);
+const string& GetOpUtSrcPath();
+const string& GetExePath();
+int GetEnv(const string& name, string& value);
 
 #endif

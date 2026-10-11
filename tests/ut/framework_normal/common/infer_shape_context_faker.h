@@ -20,8 +20,8 @@ class InfershapeContextPara {
 public:
     class TensorDescription {
     public:
-        TensorDescription(const gert::StorageShape &shape, ge::DataType dtype, ge::Format format, bool isConst = false,
-                          void *constValue = nullptr)
+        TensorDescription(const gert::StorageShape& shape, ge::DataType dtype, ge::Format format, bool isConst = false,
+                          void* constValue = nullptr)
             : shape_(shape),
               dtype_(dtype),
               format_(format),
@@ -34,12 +34,12 @@ public:
         ge::DataType dtype_ = ge::DT_FLOAT;
         ge::Format format_ = ge::FORMAT_ND;
         bool isConst_ = false;
-        void *constValue_ = nullptr;
+        void* constValue_ = nullptr;
     };
 
     class OpAttr {
     public:
-        OpAttr(const std::string &attrName, const Ops::Transformer::AnyValue &attr)
+        OpAttr(const std::string& attrName, const Ops::Transformer::AnyValue& attr)
             : attrName_(attrName),
               attr_(attr)
         {}
@@ -50,24 +50,24 @@ public:
     };
 
 public:
-    InfershapeContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
-                          const std::vector<TensorDescription> &outputTensorDesc, const std::vector<OpAttr> &attrs)
+    InfershapeContextPara(const std::string& opName, const std::vector<TensorDescription>& inputTensorDesc,
+                          const std::vector<TensorDescription>& outputTensorDesc, const std::vector<OpAttr>& attrs)
         : opName_(opName),
           inputTensorDesc_(inputTensorDesc),
           outputTensorDesc_(outputTensorDesc),
           attrs_(attrs)
     {}
 
-    InfershapeContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
-                          const std::vector<TensorDescription> &outputTensorDesc)
+    InfershapeContextPara(const std::string& opName, const std::vector<TensorDescription>& inputTensorDesc,
+                          const std::vector<TensorDescription>& outputTensorDesc)
         : opName_(opName),
           inputTensorDesc_(inputTensorDesc),
           outputTensorDesc_(outputTensorDesc)
     {}
 
-    InfershapeContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
-                          const std::vector<TensorDescription> &outputTensorDesc, const std::vector<OpAttr> &attrs,
-                          const std::vector<uint32_t> &inputInstanceNum, const std::vector<uint32_t> &outputInstanceNum)
+    InfershapeContextPara(const std::string& opName, const std::vector<TensorDescription>& inputTensorDesc,
+                          const std::vector<TensorDescription>& outputTensorDesc, const std::vector<OpAttr>& attrs,
+                          const std::vector<uint32_t>& inputInstanceNum, const std::vector<uint32_t>& outputInstanceNum)
         : opName_(opName),
           inputTensorDesc_(inputTensorDesc),
           outputTensorDesc_(outputTensorDesc),
@@ -76,9 +76,9 @@ public:
           outputInstanceNum_(outputInstanceNum)
     {}
 
-    InfershapeContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
-                          const std::vector<TensorDescription> &outputTensorDesc,
-                          const std::vector<uint32_t> &inputInstanceNum, const std::vector<uint32_t> &outputInstanceNum)
+    InfershapeContextPara(const std::string& opName, const std::vector<TensorDescription>& inputTensorDesc,
+                          const std::vector<TensorDescription>& outputTensorDesc,
+                          const std::vector<uint32_t>& inputInstanceNum, const std::vector<uint32_t>& outputInstanceNum)
         : opName_(opName),
           inputTensorDesc_(inputTensorDesc),
           outputTensorDesc_(outputTensorDesc),
@@ -97,71 +97,71 @@ public:
 
 class InferShapeContextFaker : public OpInferShapeContextBuilder {
 public:
-    InferShapeContextFaker &SetOpType(const std::string opType);
+    InferShapeContextFaker& SetOpType(const std::string opType);
 
     /* only one can be choosed from IrInstanceNum */
-    InferShapeContextFaker &NodeIoNum(size_t inputNum, size_t outputNum);
+    InferShapeContextFaker& NodeIoNum(size_t inputNum, size_t outputNum);
 
     /* can be used for dynamic inputs/outputs
      * only one can be choosed from NodeIoNum */
-    InferShapeContextFaker &IrInstanceNum(const std::vector<uint32_t> &inputInstanceNum,
-                                          const std::vector<uint32_t> &outputInstanceNum);
+    InferShapeContextFaker& IrInstanceNum(const std::vector<uint32_t>& inputInstanceNum,
+                                          const std::vector<uint32_t>& outputInstanceNum);
 
-    InferShapeContextFaker &NodeInputTd(int32_t index, ge::DataType dtype, ge::Format originFormat,
+    InferShapeContextFaker& NodeInputTd(int32_t index, ge::DataType dtype, ge::Format originFormat,
                                         ge::Format storageFormat);
 
-    InferShapeContextFaker &NodeOutputTd(int32_t index, ge::DataType dtype, ge::Format originFormat,
+    InferShapeContextFaker& NodeOutputTd(int32_t index, ge::DataType dtype, ge::Format originFormat,
                                          ge::Format storageFormat);
 
-    InferShapeContextFaker &Attr(const std::string &attrName, bool attr)
+    InferShapeContextFaker& Attr(const std::string& attrName, bool attr)
     {
         OpInferShapeContextBuilder::AppendAttr(attr);
         return *this;
     }
-    InferShapeContextFaker &Attr(const std::string &attrName, int64_t attr)
+    InferShapeContextFaker& Attr(const std::string& attrName, int64_t attr)
     {
         OpInferShapeContextBuilder::AppendAttr(attr);
         return *this;
     }
-    InferShapeContextFaker &Attr(const std::string &attrName, float attr)
+    InferShapeContextFaker& Attr(const std::string& attrName, float attr)
     {
         OpInferShapeContextBuilder::AppendAttr(attr);
         return *this;
     }
-    InferShapeContextFaker &Attr(const std::string &attrName, const ge::AscendString &attr)
+    InferShapeContextFaker& Attr(const std::string& attrName, const ge::AscendString& attr)
     {
         OpInferShapeContextBuilder::AppendAttr(attr);
         return *this;
     }
-    InferShapeContextFaker &Attr(const std::string &attrName, const std::vector<bool> &attr)
+    InferShapeContextFaker& Attr(const std::string& attrName, const std::vector<bool>& attr)
     {
         OpInferShapeContextBuilder::AppendAttr(attr);
         return *this;
     }
-    InferShapeContextFaker &Attr(const std::string &attrName, const std::vector<int64_t> &attr)
+    InferShapeContextFaker& Attr(const std::string& attrName, const std::vector<int64_t>& attr)
     {
         OpInferShapeContextBuilder::AppendAttr(attr);
         return *this;
     }
-    InferShapeContextFaker &Attr(const std::string &attrName, const std::vector<float> &attr)
+    InferShapeContextFaker& Attr(const std::string& attrName, const std::vector<float>& attr)
     {
         OpInferShapeContextBuilder::AppendAttr(attr);
         return *this;
     }
-    InferShapeContextFaker &Attr(const std::string &attrName, const std::vector<ge::AscendString> &attr)
+    InferShapeContextFaker& Attr(const std::string& attrName, const std::vector<ge::AscendString>& attr)
     {
         OpInferShapeContextBuilder::AppendAttr(attr);
         return *this;
     }
-    InferShapeContextFaker &Attr(const std::string &attrName, const std::vector<std::vector<int64_t>> &attr)
+    InferShapeContextFaker& Attr(const std::string& attrName, const std::vector<std::vector<int64_t>>& attr)
     {
         OpInferShapeContextBuilder::AppendAttr(attr);
         return *this;
     }
 
-    InferShapeContextFaker &InputTensors(const std::vector<Tensor *> &inputTensors);
+    InferShapeContextFaker& InputTensors(const std::vector<Tensor*>& inputTensors);
 
-    InferShapeContextFaker &OutputShapes(const std::vector<StorageShape *> &outputShapes);
+    InferShapeContextFaker& OutputShapes(const std::vector<StorageShape*>& outputShapes);
 
     ContextHolder<InferShapeContext> Build();
 };

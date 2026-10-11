@@ -57,7 +57,7 @@ struct TestConfig {
 // Tensor utilities
 // ============================================================
 struct DevTensor {
-    void *data{nullptr};
+    void* data{nullptr};
     int64_t dims[2]{0, 0};
     size_t elemSize{2}; // FP16
 
@@ -83,7 +83,7 @@ struct DevTensor {
 };
 
 // Fill device tensor with pattern (host-side fill then copy)
-static bool FillPattern(DevTensor &t, uint8_t pattern)
+static bool FillPattern(DevTensor& t, uint8_t pattern)
 {
     size_t sz = t.ByteSize();
     std::vector<uint8_t> host(sz, pattern);
@@ -114,7 +114,7 @@ static bool TestContextBuilder()
     bool ok = (readBack.rankId == 0) && (readBack.rankNum == 1) &&
               (readBack.workSpace == reinterpret_cast<uint64_t>(ctx.GetWorkspaceAligned()));
 
-    printf("  rankId=%u rankNum=%u workSpace=%p\n", readBack.rankId, readBack.rankNum, (void *)readBack.workSpace);
+    printf("  rankId=%u rankNum=%u workSpace=%p\n", readBack.rankId, readBack.rankNum, (void*)readBack.workSpace);
     printf("[%s] Context builder\n", ok ? "PASS" : "FAIL");
     return ok;
 }
@@ -130,7 +130,7 @@ static bool TestServerProtocol()
     if (!ctx.Build(1, 0))
         return false;
 
-    void *wsAligned = ctx.GetWorkspaceAligned();
+    void* wsAligned = ctx.GetWorkspaceAligned();
 
     // Manually write a commit message to slot 0
     // Simulate what the kernel's AllGather() would do:
@@ -145,7 +145,7 @@ static bool TestServerProtocol()
     msg.dataCnt = 100;
     msg.hcclDataType = 1; // FP16
 
-    void *msgAddr = reinterpret_cast<uint8_t *>(wsAligned) + SEND_MSGS_OFFSET;
+    void* msgAddr = reinterpret_cast<uint8_t*>(wsAligned) + SEND_MSGS_OFFSET;
     if (aclrtMemcpy(msgAddr, sizeof(msg), &msg, sizeof(msg), ACL_MEMCPY_HOST_TO_DEVICE) != 0) {
         printf("[FAIL] Write sendMsg\n");
         return false;
@@ -157,7 +157,7 @@ static bool TestServerProtocol()
     commit.valid = COMMIT_VALID_MASK;
     commit.cnt = 1;
 
-    void *commitAddr = reinterpret_cast<uint8_t *>(wsAligned) + COMMIT_TURNCNT_OFFSET;
+    void* commitAddr = reinterpret_cast<uint8_t*>(wsAligned) + COMMIT_TURNCNT_OFFSET;
     if (aclrtMemcpy(commitAddr, sizeof(commit), &commit, sizeof(commit), ACL_MEMCPY_HOST_TO_DEVICE) != 0) {
         printf("[FAIL] Write commitTurnCnt\n");
         return false;
@@ -182,7 +182,7 @@ static bool TestServerProtocol()
 
     // 4. Check finishedTurnCnt[0]
     TurnCnt finish;
-    void *finishAddr = reinterpret_cast<uint8_t *>(wsAligned) + FINISH_TURNCNT_OFFSET;
+    void* finishAddr = reinterpret_cast<uint8_t*>(wsAligned) + FINISH_TURNCNT_OFFSET;
     if (aclrtMemcpy(&finish, sizeof(finish), finishAddr, sizeof(finish), ACL_MEMCPY_DEVICE_TO_HOST) != 0) {
         printf("[FAIL] Read finishedTurnCnt\n");
         return false;
@@ -205,15 +205,15 @@ static bool TestServerDataCopy()
     if (!ctx.Build(1, 0))
         return false;
 
-    void *wsAligned = ctx.GetWorkspaceAligned();
+    void* wsAligned = ctx.GetWorkspaceAligned();
 
     // Allocate source and destination buffers
     const size_t elemCount = 1024;
     const size_t elemSize = 2; // FP16
     const size_t byteCount = elemCount * elemSize;
 
-    void *sendBuf = DevMalloc(byteCount);
-    void *recvBuf = DevMalloc(byteCount);
+    void* sendBuf = DevMalloc(byteCount);
+    void* recvBuf = DevMalloc(byteCount);
     if (!sendBuf || !recvBuf) {
         printf("[FAIL] Buffer alloc\n");
         DevFree(sendBuf);
@@ -234,14 +234,14 @@ static bool TestServerDataCopy()
     msg.dataCnt = elemCount;
     msg.hcclDataType = 1; // FP16
 
-    void *msgAddr = reinterpret_cast<uint8_t *>(wsAligned) + SEND_MSGS_OFFSET;
+    void* msgAddr = reinterpret_cast<uint8_t*>(wsAligned) + SEND_MSGS_OFFSET;
     aclrtMemcpy(msgAddr, sizeof(msg), &msg, sizeof(msg), ACL_MEMCPY_HOST_TO_DEVICE);
 
     TurnCnt commit;
     memset(&commit, 0, sizeof(commit));
     commit.valid = COMMIT_VALID_MASK;
     commit.cnt = 1;
-    void *commitAddr = reinterpret_cast<uint8_t *>(wsAligned) + COMMIT_TURNCNT_OFFSET;
+    void* commitAddr = reinterpret_cast<uint8_t*>(wsAligned) + COMMIT_TURNCNT_OFFSET;
     aclrtMemcpy(commitAddr, sizeof(commit), &commit, sizeof(commit), ACL_MEMCPY_HOST_TO_DEVICE);
 
     // Start server
@@ -274,7 +274,7 @@ static bool TestFinalizeProtocol()
     if (!ctx.Build(1, 0))
         return false;
 
-    void *wsAligned = ctx.GetWorkspaceAligned();
+    void* wsAligned = ctx.GetWorkspaceAligned();
 
     // Start server
     MockHcclServer server(wsAligned);
@@ -288,14 +288,14 @@ static bool TestFinalizeProtocol()
         msg.dataCnt = 64;
         msg.hcclDataType = 1;
 
-        void *msgAddr = reinterpret_cast<uint8_t *>(wsAligned) + SEND_MSGS_OFFSET;
+        void* msgAddr = reinterpret_cast<uint8_t*>(wsAligned) + SEND_MSGS_OFFSET;
         aclrtMemcpy(msgAddr, sizeof(msg), &msg, sizeof(msg), ACL_MEMCPY_HOST_TO_DEVICE);
 
         TurnCnt commit;
         memset(&commit, 0, sizeof(commit));
         commit.valid = COMMIT_VALID_MASK;
         commit.cnt = 1;
-        void *commitAddr = reinterpret_cast<uint8_t *>(wsAligned) + COMMIT_TURNCNT_OFFSET;
+        void* commitAddr = reinterpret_cast<uint8_t*>(wsAligned) + COMMIT_TURNCNT_OFFSET;
         aclrtMemcpy(commitAddr, sizeof(commit), &commit, sizeof(commit), ACL_MEMCPY_HOST_TO_DEVICE);
 
         usleep(200000); // let server process the regular message
@@ -310,7 +310,7 @@ static bool TestFinalizeProtocol()
         memset(&commit, 0, sizeof(commit));
         commit.valid = COMMIT_VALID_MASK;
         commit.cnt = 2;
-        void *commitAddr = reinterpret_cast<uint8_t *>(wsAligned) + COMMIT_TURNCNT_OFFSET;
+        void* commitAddr = reinterpret_cast<uint8_t*>(wsAligned) + COMMIT_TURNCNT_OFFSET;
         aclrtMemcpy(commitAddr, sizeof(commit), &commit, sizeof(commit), ACL_MEMCPY_HOST_TO_DEVICE);
     }
 
@@ -322,7 +322,7 @@ static bool TestFinalizeProtocol()
 
     // Verify finishedTurnCnt[0].cnt == FINALIZE_FINISH_CNT
     TurnCnt finish;
-    void *finishAddr = reinterpret_cast<uint8_t *>(wsAligned) + FINISH_TURNCNT_OFFSET;
+    void* finishAddr = reinterpret_cast<uint8_t*>(wsAligned) + FINISH_TURNCNT_OFFSET;
     aclrtMemcpy(&finish, sizeof(finish), finishAddr, sizeof(finish), ACL_MEMCPY_DEVICE_TO_HOST);
 
     bool ok = finalizeOk && (finish.cnt == FINALIZE_FINISH_CNT);
@@ -336,7 +336,7 @@ static bool TestFinalizeProtocol()
 // ============================================================
 // Main
 // ============================================================
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     printf("========================================\n");
     printf("  Mock HCCL Framework Test\n");

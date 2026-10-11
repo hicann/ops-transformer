@@ -16,9 +16,9 @@
 #include "onnx_common.h"
 
 namespace domi {
-static Status parseParamsFillWindowCache(const Message *op_src, ge::Operator &op_dest)
+static Status parseParamsFillWindowCache(const Message* op_src, ge::Operator& op_dest)
 {
-    const ge::onnx::NodeProto *node = reinterpret_cast<const ge::onnx::NodeProto *>(op_src);
+    const ge::onnx::NodeProto* node = reinterpret_cast<const ge::onnx::NodeProto*>(op_src);
     if (node == nullptr) {
         OP_LOGE(GetOpName(op_dest), "Dynamic fillwindowcache op_src to NodeProto failed.");
         return FAILED;
@@ -26,7 +26,7 @@ static Status parseParamsFillWindowCache(const Message *op_src, ge::Operator &op
 
     int axis = 0;
     int cache_depth = 0;
-    for (const auto &attr : node->attribute()) {
+    for (const auto& attr : node->attribute()) {
         if (attr.name() == "axis") {
             axis = attr.i();
         }

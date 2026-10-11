@@ -14,11 +14,11 @@
 
 namespace l0op {
 
-const aclTensor *GatherV2(const aclTensor *self, int64_t axis, const aclTensor *indices, aclOpExecutor *executor,
+const aclTensor* GatherV2(const aclTensor* self, int64_t axis, const aclTensor* indices, aclOpExecutor* executor,
                           int batchDims = 0, bool negativeIndexSupport = false);
 
-const aclTensor *GatherV2WithImplMode(const aclTensor *self, int64_t axis, const aclTensor *indices, int64_t implMode,
-                                      aclOpExecutor *executor, int batchDims = 0, bool negativeIndexSupport = false);
+const aclTensor* GatherV2WithImplMode(const aclTensor* self, int64_t axis, const aclTensor* indices, int64_t implMode,
+                                      aclOpExecutor* executor, int batchDims = 0, bool negativeIndexSupport = false);
 
 } // namespace l0op
 

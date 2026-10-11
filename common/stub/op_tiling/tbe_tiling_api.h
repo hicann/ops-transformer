@@ -185,11 +185,11 @@ enum OpTypeV2 : size_t {
     kConv3DTransposeV2,
 };
 
-bool GetTbeTiling(const gert::TilingContext *context, Conv3dBpFilterV2RunInfo &runInfoForV2,
-                  Conv3dBackpropV2TBETilingData &tbeTilingForV2);
-bool GetTbeTiling(gert::TilingContext *context, Conv3dBpInputV2RunInfo &runInfoV2,
-                  Conv3dBackpropV2TBETilingData &tbeTilingForV2, const optiling::OpTypeV2 opType);
-bool GetTbeTiling(gert::TilingContext *context, Conv3dBackpropV2TBETilingData &tbeTilingForV2,
+bool GetTbeTiling(const gert::TilingContext* context, Conv3dBpFilterV2RunInfo& runInfoForV2,
+                  Conv3dBackpropV2TBETilingData& tbeTilingForV2);
+bool GetTbeTiling(gert::TilingContext* context, Conv3dBpInputV2RunInfo& runInfoV2,
+                  Conv3dBackpropV2TBETilingData& tbeTilingForV2, const optiling::OpTypeV2 opType);
+bool GetTbeTiling(gert::TilingContext* context, Conv3dBackpropV2TBETilingData& tbeTilingForV2,
                   const optiling::OpTypeV2 opType);
 } // namespace optiling
 #endif // TBE_TILING_API_H

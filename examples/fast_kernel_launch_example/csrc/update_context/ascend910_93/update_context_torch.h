@@ -22,8 +22,6 @@ struct Mc2ContextStru {
     uint64_t epHcclBuffer[1024];
 };
 
-
-std::tuple<at::Tensor, int64_t> update_context(const at::Tensor &x, c10::string_view group_ep, int64_t ep_world_size);
-
+std::tuple<at::Tensor, int64_t> update_context(const at::Tensor& x, c10::string_view group_ep, int64_t ep_world_size);
 
 #endif

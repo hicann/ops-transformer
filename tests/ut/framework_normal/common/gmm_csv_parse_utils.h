@@ -30,7 +30,7 @@
 
 namespace ops::ut {
 
-inline void SplitStr2Vec(const std::string &input, const std::string &delimiter, std::vector<std::string> &output)
+inline void SplitStr2Vec(const std::string& input, const std::string& delimiter, std::vector<std::string>& output)
 {
     const auto delimiterLen = delimiter.size();
     std::string::size_type currPos = 0;
@@ -60,13 +60,13 @@ inline std::string ToLower(std::string value)
     return value;
 }
 
-inline bool ParseBool(const std::string &value)
+inline bool ParseBool(const std::string& value)
 {
     const std::string lower = ToLower(Trim(value));
     return lower == "true" || lower == "1" || lower == "yes";
 }
 
-inline int64_t ParseScalarToken(const std::string &value, const std::map<std::string, int64_t> &symbols = {})
+inline int64_t ParseScalarToken(const std::string& value, const std::map<std::string, int64_t>& symbols = {})
 {
     const std::string trimmed = Trim(value);
     if (trimmed.empty()) {
@@ -88,7 +88,7 @@ inline int64_t ParseScalarToken(const std::string &value, const std::map<std::st
     return std::stoll(trimmed);
 }
 
-inline std::vector<int64_t> ParseDims(const std::string &value, const std::map<std::string, int64_t> &symbols = {},
+inline std::vector<int64_t> ParseDims(const std::string& value, const std::map<std::string, int64_t>& symbols = {},
                                       bool noneAsZero = false)
 {
     const std::string trimmed = Trim(value);
@@ -104,14 +104,14 @@ inline std::vector<int64_t> ParseDims(const std::string &value, const std::map<s
 
     std::vector<int64_t> dims;
     dims.reserve(dimTokens.size());
-    for (const auto &token : dimTokens) {
+    for (const auto& token : dimTokens) {
         dims.emplace_back(ParseScalarToken(token, symbols));
     }
     return dims;
 }
 
-inline std::vector<int64_t> ParseI64List(const std::string &value, const std::string &sep = "|",
-                                         const std::map<std::string, int64_t> &symbols = {})
+inline std::vector<int64_t> ParseI64List(const std::string& value, const std::string& sep = "|",
+                                         const std::map<std::string, int64_t>& symbols = {})
 {
     const std::string trimmed = Trim(value);
     if (trimmed.empty() || trimmed == "NONE") {
@@ -123,13 +123,13 @@ inline std::vector<int64_t> ParseI64List(const std::string &value, const std::st
 
     std::vector<int64_t> out;
     out.reserve(tokens.size());
-    for (const auto &token : tokens) {
+    for (const auto& token : tokens) {
         out.emplace_back(ParseScalarToken(token, symbols));
     }
     return out;
 }
 
-inline std::vector<std::vector<int64_t>> ParseDimsList(const std::string &value)
+inline std::vector<std::vector<int64_t>> ParseDimsList(const std::string& value)
 {
     const std::string trimmed = Trim(value);
     if (trimmed.empty() || trimmed == "NONE") {
@@ -141,7 +141,7 @@ inline std::vector<std::vector<int64_t>> ParseDimsList(const std::string &value)
 
     std::vector<std::vector<int64_t>> out;
     out.reserve(items.size());
-    for (const auto &item : items) {
+    for (const auto& item : items) {
         out.emplace_back(ParseDims(item));
     }
     return out;
@@ -153,7 +153,7 @@ inline std::string NormalizePath(std::string path)
     return path;
 }
 
-inline std::string JoinPath(const std::string &lhs, const std::string &rhs)
+inline std::string JoinPath(const std::string& lhs, const std::string& rhs)
 {
     if (lhs.empty()) {
         return rhs;
@@ -167,7 +167,7 @@ inline std::string JoinPath(const std::string &lhs, const std::string &rhs)
     return lhs + "/" + rhs;
 }
 
-inline bool FileExists(const std::string &path)
+inline bool FileExists(const std::string& path)
 {
     std::ifstream file(path, std::ios::in);
     return file.good();
@@ -197,7 +197,7 @@ inline std::string GetExeDirPath()
 #endif
 }
 
-inline std::string GetCurrentFileDir(const char *file)
+inline std::string GetCurrentFileDir(const char* file)
 {
     return GetDirName(file);
 }
@@ -217,8 +217,8 @@ inline std::string GetCwd()
 #endif
 }
 
-inline std::string ResolveCsvPath(const std::string &csv_name, const std::string &repo_relative_dir,
-                                  const char *current_file)
+inline std::string ResolveCsvPath(const std::string& csv_name, const std::string& repo_relative_dir,
+                                  const char* current_file)
 {
     const std::string exe_dir = GetExeDirPath();
     const std::string cwd = GetCwd();
@@ -229,7 +229,7 @@ inline std::string ResolveCsvPath(const std::string &csv_name, const std::string
     candidates.emplace_back(JoinPath(exe_dir, csv_name));
     candidates.emplace_back(JoinPath(cwd, csv_name));
 
-    const char *code_path = std::getenv("CODE_PATH");
+    const char* code_path = std::getenv("CODE_PATH");
     if (code_path != nullptr) {
         candidates.emplace_back(JoinPath(code_path, JoinPath(repo_relative_dir, csv_name)));
     }
@@ -240,7 +240,7 @@ inline std::string ResolveCsvPath(const std::string &csv_name, const std::string
     candidates.emplace_back(csv_name);
     candidates.emplace_back(JoinPath(".", csv_name));
 
-    for (const auto &candidate : candidates) {
+    for (const auto& candidate : candidates) {
         if (FileExists(candidate)) {
             return candidate;
         }
@@ -255,8 +255,8 @@ inline std::string MakeSafeParamName(std::string name)
     return name;
 }
 
-inline std::string BuildCsvParseErrorMessage(const std::string &csv_path, size_t line_no, const std::string &case_name,
-                                             const std::exception &error)
+inline std::string BuildCsvParseErrorMessage(const std::string& csv_path, size_t line_no, const std::string& case_name,
+                                             const std::exception& error)
 {
     std::ostringstream oss;
     oss << "Failed to parse CSV case. file=" << csv_path << ", line=" << line_no;

@@ -19,8 +19,8 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *Fill(const aclTensor *dims, const aclTensor *value, const aclIntArray *outShape,
-                      aclOpExecutor *executor);
+const aclTensor* Fill(const aclTensor* dims, const aclTensor* value, const aclIntArray* outShape,
+                      aclOpExecutor* executor);
 }
 
 #endif

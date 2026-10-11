@@ -39,12 +39,12 @@ enum class GmFormat {
     PA_BnNBsD = 10,
     PA_NZ = 11,
     NGD = 12, // post_quant
-    ND = 13, //antiquant no PA
+    ND = 13,  // antiquant no PA
     BS2 = 14,
     BNS2 = 15,
-    PA_BnBs = 16, //antiquant PA
+    PA_BnBs = 16, // antiquant PA
     PA_BnNBs = 17,
-    BN2GS1S2 = 18, //PSE_GmFormat
+    BN2GS1S2 = 18, // PSE_GmFormat
     SBNGD = 19,
     SBND = 20,
     NTGD = 21,
@@ -78,7 +78,8 @@ struct FaGmTensor {
 
     __aicore__ inline FaGmTensor() {}
 
-    __aicore__ inline FaGmTensor(__gm__ INPUT_T *gm, uint32_t b, uint32_t n, uint32_t s, uint32_t d) {
+    __aicore__ inline FaGmTensor(__gm__ INPUT_T* gm, uint32_t b, uint32_t n, uint32_t s, uint32_t d)
+    {
         gmTensor.SetGlobalBuffer(gm);
         InitOffset(offsetInfo, b, n, s, d);
     }
@@ -98,7 +99,7 @@ struct FaL1Tensor {
 };
 
 template <typename OffsetInfoT>
-__aicore__ inline void InitOffset(OffsetInfoT &info, uint32_t b, uint32_t n, uint32_t s, uint32_t d)
+__aicore__ inline void InitOffset(OffsetInfoT& info, uint32_t b, uint32_t n, uint32_t s, uint32_t d)
 {
     info.dimB = b;
     info.dimN = n;
@@ -111,8 +112,8 @@ __aicore__ inline void InitOffset(OffsetInfoT &info, uint32_t b, uint32_t n, uin
 }
 
 template <typename OffsetInfoT>
-__aicore__ inline uint64_t GetOffset(const OffsetInfoT &info,
-    uint32_t bIdx, uint32_t nIdx, uint32_t sIdx, uint32_t dIdx)
+__aicore__ inline uint64_t GetOffset(const OffsetInfoT& info, uint32_t bIdx, uint32_t nIdx, uint32_t sIdx,
+                                     uint32_t dIdx)
 {
     return bIdx * info.strideB + nIdx * info.strideN + sIdx * info.strideS + dIdx * info.strideD;
 }

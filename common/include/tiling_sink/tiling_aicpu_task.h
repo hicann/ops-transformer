@@ -19,8 +19,8 @@
 
 namespace tilingsink {
 struct TilingAicpuTask {
-    gert::TilingContext *tilingContext;
-    const char *opType;
+    gert::TilingContext* tilingContext;
+    const char* opType;
     uint64_t notifyAddr;
     uint64_t workspaceAddr;
     uint64_t workspaceSize;

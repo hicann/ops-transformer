@@ -22,23 +22,23 @@ using namespace nlohmann;
 
 class TensorDesc {
 public:
-    TensorDesc(const vector<int64_t> &view_dims = {1, 1, 16, 16}, aclDataType data_type = ACL_FLOAT,
-               aclFormat format = ACL_FORMAT_NCHW, const vector<int64_t> &stride_ = {}, int64_t offset = 0,
-               const vector<int64_t> &storage_dims = {});
-    TensorDesc(const TensorDesc &desc);
+    TensorDesc(const vector<int64_t>& view_dims = {1, 1, 16, 16}, aclDataType data_type = ACL_FLOAT,
+               aclFormat format = ACL_FORMAT_NCHW, const vector<int64_t>& stride_ = {}, int64_t offset = 0,
+               const vector<int64_t>& storage_dims = {});
+    TensorDesc(const TensorDesc& desc);
     ~TensorDesc();
 
-    unique_ptr<aclTensor, void (*)(aclTensor *)> ToAclType() const;
-    aclTensor *ToAclTypeRawPtr() const;
-    void ToJson(json &root, bool is_input = true) const;
+    unique_ptr<aclTensor, void (*)(aclTensor*)> ToAclType() const;
+    aclTensor* ToAclTypeRawPtr() const;
+    void ToJson(json& root, bool is_input = true) const;
 
-    TensorDesc &ViewDims(const vector<int64_t> &view_dims);
-    TensorDesc &Format(aclFormat format);
+    TensorDesc& ViewDims(const vector<int64_t>& view_dims);
+    TensorDesc& Format(aclFormat format);
 
-    TensorDesc &Precision(float relative, float percentage, float absolute = 1e-08);
+    TensorDesc& Precision(float relative, float percentage, float absolute = 1e-08);
 
     template <typename T>
-    TensorDesc &ValueRange(T low, T high)
+    TensorDesc& ValueRange(T low, T high)
     {
         assert(low <= high);
         stringstream ss;
@@ -54,7 +54,7 @@ public:
     }
 
     template <typename T>
-    TensorDesc &Value(const vector<T> &v)
+    TensorDesc& Value(const vector<T>& v)
     {
         stringstream ss;
         ss << "[";
@@ -75,11 +75,11 @@ public:
         return *this;
     }
 
-    TensorDesc &ValueFile(const std::string &binary_file);
+    TensorDesc& ValueFile(const std::string& binary_file);
 
-    TensorDesc &ValidCount(int32_t cnt);
+    TensorDesc& ValidCount(int32_t cnt);
 
-    const std::vector<int64_t> &GetViewDims() const;
+    const std::vector<int64_t>& GetViewDims() const;
 
 private:
     int64_t GetViewCount() const;
@@ -102,38 +102,38 @@ private:
 
 class TensorListDesc {
 public:
-    TensorListDesc(const vector<TensorDesc> &val);
-    TensorListDesc(int duplicate_cnt, const TensorDesc &tensor_desc);
+    TensorListDesc(const vector<TensorDesc>& val);
+    TensorListDesc(int duplicate_cnt, const TensorDesc& tensor_desc);
 
-    unique_ptr<aclTensorList, void (*)(aclTensorList *)> ToAclType() const;
-    aclTensorList *ToAclTypeRawPtr() const;
-    void ToJson(json &root, bool is_input = true) const;
+    unique_ptr<aclTensorList, void (*)(aclTensorList*)> ToAclType() const;
+    aclTensorList* ToAclTypeRawPtr() const;
+    void ToJson(json& root, bool is_input = true) const;
 
 private:
     vector<TensorDesc> arr_;
 };
 
-aclTensor *DescToAclContainer(const TensorDesc &tensor_desc);
-aclTensorList *DescToAclContainer(const TensorListDesc &tensor_list_desc);
+aclTensor* DescToAclContainer(const TensorDesc& tensor_desc);
+aclTensorList* DescToAclContainer(const TensorListDesc& tensor_list_desc);
 
-void Release(aclTensor *p);
-void Release(aclTensorList *p);
+void Release(aclTensor* p);
+void Release(aclTensorList* p);
 
-aclTensor *InferAclType(const TensorDesc &tensor_desc);
-aclTensorList *InferAclType(const TensorListDesc &tensor_list_desc);
+aclTensor* InferAclType(const TensorDesc& tensor_desc);
+aclTensorList* InferAclType(const TensorListDesc& tensor_list_desc);
 
-void DescToJson(json &root, const TensorDesc &tensor_desc, bool is_input = true);
-void DescToJson(json &root, const TensorListDesc &tensor_list_desc, bool is_input = true);
+void DescToJson(json& root, const TensorDesc& tensor_desc, bool is_input = true);
+void DescToJson(json& root, const TensorListDesc& tensor_list_desc, bool is_input = true);
 
-int ReloadDataFromBinaryFile(aclTensor *p, size_t index, size_t total_input, const string &file_prefix);
-int ReloadDataFromBinaryFile(aclTensorList *p, size_t index, size_t total_input, const string &file_prefix);
+int ReloadDataFromBinaryFile(aclTensor* p, size_t index, size_t total_input, const string& file_prefix);
+int ReloadDataFromBinaryFile(aclTensorList* p, size_t index, size_t total_input, const string& file_prefix);
 
-int SaveResultToBinaryFile(aclTensor *p, size_t index, size_t total_input, const string &file_prefix,
-                           const set<short int> &inplace_output);
-int SaveResultToBinaryFile(aclTensorList *p, size_t index, size_t total_input, const string &file_prefix,
-                           const set<short int> &inplace_output);
+int SaveResultToBinaryFile(aclTensor* p, size_t index, size_t total_input, const string& file_prefix,
+                           const set<short int>& inplace_output);
+int SaveResultToBinaryFile(aclTensorList* p, size_t index, size_t total_input, const string& file_prefix,
+                           const set<short int>& inplace_output);
 
-int SaveResultToBinaryFile(aclTensor *p, size_t index, const string &file_prefix);
-int SaveResultToBinaryFile(aclTensorList *p, size_t index, const string &file_prefix);
+int SaveResultToBinaryFile(aclTensor* p, size_t index, const string& file_prefix);
+int SaveResultToBinaryFile(aclTensorList* p, size_t index, const string& file_prefix);
 
 #endif

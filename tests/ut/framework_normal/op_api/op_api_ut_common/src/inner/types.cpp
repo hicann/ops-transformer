@@ -13,7 +13,7 @@
 
 #include <map>
 
-const std::string &String(aclDataType data_type)
+const std::string& String(aclDataType data_type)
 {
     static std::map<aclDataType, std::string> dtype = {{ACL_DT_UNDEFINED, "undefined"},
                                                        {ACL_FLOAT, "float32"},

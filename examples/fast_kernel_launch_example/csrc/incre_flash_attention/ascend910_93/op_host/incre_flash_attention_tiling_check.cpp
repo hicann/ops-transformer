@@ -45,7 +45,7 @@ custom::graphStatus IFATiling::CheckPABlockSize() const
     return custom::graphStatus::GRAPH_SUCCESS;
 }
 
-bool IFATiling::IsZeroDimTensor(const at::IntArrayRef &shape) const
+bool IFATiling::IsZeroDimTensor(const at::IntArrayRef& shape) const
 {
     for (size_t i = 0; i < shape.size(); ++i) {
         if (shape[i] == 0) {
@@ -55,7 +55,7 @@ bool IFATiling::IsZeroDimTensor(const at::IntArrayRef &shape) const
     return false;
 }
 
-std::string IFATiling::GetTensorDimString(const at::IntArrayRef &shape) const
+std::string IFATiling::GetTensorDimString(const at::IntArrayRef& shape) const
 {
     std::stringstream ss;
     ss << "[";
@@ -96,7 +96,7 @@ bool IFATiling::CheckIfRollBack() const
     return true;
 }
 
-bool IFATiling::ShapeEqual(const at::IntArrayRef &aShape, const at::IntArrayRef &bShape) const
+bool IFATiling::ShapeEqual(const at::IntArrayRef& aShape, const at::IntArrayRef& bShape) const
 {
     if (aShape.size() != bShape.size()) {
         return false;
@@ -179,8 +179,8 @@ custom::graphStatus IFATiling::SharedPrefixCheckBasic()
     return custom::graphStatus::GRAPH_SUCCESS;
 }
 
-custom::graphStatus IFATiling::SharedPrefixCheckShapes(const at::IntArrayRef &keyShape,
-                                                       const at::IntArrayRef &valueShape) const
+custom::graphStatus IFATiling::SharedPrefixCheckShapes(const at::IntArrayRef& keyShape,
+                                                       const at::IntArrayRef& valueShape) const
 {
     OP_CHECK_IF(!ShapeEqual(keyShape, valueShape),
                 OP_LOGE(ifaContext_->opName, "tensor shape of key_shared_prefix and value_shared_prefix not equal."),
@@ -407,8 +407,8 @@ bool IFATiling::HasZeroSeqBatch() const
 }
 
 bool IFATiling::IsKvZeroBatchSplit(bool needUpdate, uint32_t lastValidBMoreIdx, uint32_t bSize,
-                                   const std::vector<uint32_t> &s1OuterNum,
-                                   const std::vector<uint32_t> &s2OuterNum) const
+                                   const std::vector<uint32_t>& s1OuterNum,
+                                   const std::vector<uint32_t>& s2OuterNum) const
 {
     if (needUpdate) {
         return false;
@@ -552,7 +552,7 @@ custom::graphStatus IFATiling::ProcessPseShift()
     }
 
     // check pse shift shape (B/1, N, 1, Si)
-    at::IntArrayRef &pseShiftShape = ifaContext_->pseShift.shape;
+    at::IntArrayRef& pseShiftShape = ifaContext_->pseShift.shape;
     uint32_t pseShiftDimNum = pseShiftShape.size();
     OP_CHECK_IF(pseShiftDimNum != 4,
                 OP_LOGE(ifaContext_->opName, "The input shape of pse shift must have 4 dims, current dim num is %u.",
@@ -696,12 +696,12 @@ custom::graphStatus IFATiling::ProcessAttenMask()
     if ((sparseMode_ == 3 || sparseMode_ == 4 || gqaMtpFlag_) &&
         (socVersion_ != IfaSocVersion::SOC_ASCEND_310P)) { // 3 : rightDown, 4 : band
         auto shape = ifaContext_->attenMask.shape;
-        OP_CHECK_IF((sparseMode_ != 0 && sparseMode_ != 1) &&
-                        (shape.size() != 2U || shape[0] != 2048 || shape[1] != 2048), // 2， 只支持2维shape
-                    OP_LOGE(ifaContext_->opName,
-                            "when sparse = %d, atten_mask tensor shape must be [2048, 2048] in MLA.",
-                            static_cast<int32_t>(sparseMode_)),
-                    return custom::graphStatus::GRAPH_FAILED);
+        OP_CHECK_IF(
+            (sparseMode_ != 0 && sparseMode_ != 1) &&
+                (shape.size() != 2U || shape[0] != 2048 || shape[1] != 2048), // 2， 只支持2维shape
+            OP_LOGE(ifaContext_->opName, "when sparse = %d, atten_mask tensor shape must be [2048, 2048] in MLA.",
+                    static_cast<int32_t>(sparseMode_)),
+            return custom::graphStatus::GRAPH_FAILED);
 
         attenMaskFlag_ = true;
         return custom::graphStatus::GRAPH_SUCCESS;
@@ -767,21 +767,21 @@ custom::graphStatus IFATiling::CheckGqaIOTensor() const
         OP_LOGE(ifaContext_->opName, "IFA GQA with KV NZ only support antiquant!");
         return custom::graphStatus::GRAPH_FAILED;
     }
-    OP_CHECK_IF(ifaContext_->query.dType != at::ScalarType::BFloat16,
-                OP_LOGE(ifaContext_->opName,
-                        "In IFA GQA with KV NZ antiquant, query type should be BFLOAT16, but now it's %d!",
-                        ifaContext_->query.dType),
-                return custom::graphStatus::GRAPH_FAILED);
-    OP_CHECK_IF(ifaContext_->key.dType != at::ScalarType::Char,
-                OP_LOGE(ifaContext_->opName,
-                        "In IFA GQA with KV NZ antiquant, key type should be INT8, but now it's %d!",
-                        ifaContext_->key.dType),
-                return custom::graphStatus::GRAPH_FAILED);
-    OP_CHECK_IF(ifaContext_->value.dType != at::ScalarType::Char,
-                OP_LOGE(ifaContext_->opName,
-                        "In IFA GQA with KV NZ antiquant, value type should be INT8, but now it's %d!",
-                        ifaContext_->value.dType),
-                return custom::graphStatus::GRAPH_FAILED);
+    OP_CHECK_IF(
+        ifaContext_->query.dType != at::ScalarType::BFloat16,
+        OP_LOGE(ifaContext_->opName, "In IFA GQA with KV NZ antiquant, query type should be BFLOAT16, but now it's %d!",
+                ifaContext_->query.dType),
+        return custom::graphStatus::GRAPH_FAILED);
+    OP_CHECK_IF(
+        ifaContext_->key.dType != at::ScalarType::Char,
+        OP_LOGE(ifaContext_->opName, "In IFA GQA with KV NZ antiquant, key type should be INT8, but now it's %d!",
+                ifaContext_->key.dType),
+        return custom::graphStatus::GRAPH_FAILED);
+    OP_CHECK_IF(
+        ifaContext_->value.dType != at::ScalarType::Char,
+        OP_LOGE(ifaContext_->opName, "In IFA GQA with KV NZ antiquant, value type should be INT8, but now it's %d!",
+                ifaContext_->value.dType),
+        return custom::graphStatus::GRAPH_FAILED);
     OP_CHECK_IF(ifaContext_->attenOut.dType != at::ScalarType::BFloat16,
                 OP_LOGE(ifaContext_->opName,
                         "In IFA GQA with KV NZ antiquant, attenOut type should be BFLOAT16, but now it's %d!",
@@ -803,20 +803,20 @@ custom::graphStatus IFATiling::CheckGqaIOTensor() const
         uint32_t expected5thDim = 32U; // 32U / sizeof(int8)
         bool isK3rdDimValid = expected3rdDim == ifaContext_->key.shape[2];
         bool isK5thDimValid = expected5thDim == ifaContext_->key.shape[4];
-        OP_CHECK_IF(!isK3rdDimValid || !isK5thDimValid,
-                    OP_LOGE(ifaContext_->opName,
-                            "The shape of K%s should be [%ld, %ld, %u, %ld, %u] in GQA with KV NZ!", kShapeStr.c_str(),
-                            ifaContext_->key.shape[0], ifaContext_->key.shape[1], expected3rdDim,
-                            ifaContext_->key.shape[3], expected5thDim),
-                    return custom::graphStatus::GRAPH_FAILED);
+        OP_CHECK_IF(
+            !isK3rdDimValid || !isK5thDimValid,
+            OP_LOGE(ifaContext_->opName, "The shape of K%s should be [%ld, %ld, %u, %ld, %u] in GQA with KV NZ!",
+                    kShapeStr.c_str(), ifaContext_->key.shape[0], ifaContext_->key.shape[1], expected3rdDim,
+                    ifaContext_->key.shape[3], expected5thDim),
+            return custom::graphStatus::GRAPH_FAILED);
         bool isV3rdDimValid = expected3rdDim == ifaContext_->value.shape[2];
         bool isV5thDimValid = expected5thDim == ifaContext_->value.shape[4];
-        OP_CHECK_IF(!isV3rdDimValid || !isV5thDimValid,
-                    OP_LOGE(ifaContext_->opName,
-                            "The shape of V%s should be [%ld, %ld, %u, %ld, %u] in GQA with KV NZ!", kShapeStr.c_str(),
-                            ifaContext_->value.shape[0], ifaContext_->value.shape[1], expected3rdDim,
-                            ifaContext_->value.shape[3], expected5thDim),
-                    return custom::graphStatus::GRAPH_FAILED);
+        OP_CHECK_IF(
+            !isV3rdDimValid || !isV5thDimValid,
+            OP_LOGE(ifaContext_->opName, "The shape of V%s should be [%ld, %ld, %u, %ld, %u] in GQA with KV NZ!",
+                    kShapeStr.c_str(), ifaContext_->value.shape[0], ifaContext_->value.shape[1], expected3rdDim,
+                    ifaContext_->value.shape[3], expected5thDim),
+            return custom::graphStatus::GRAPH_FAILED);
     }
     return custom::graphStatus::GRAPH_SUCCESS;
 }
@@ -923,11 +923,11 @@ custom::graphStatus IFATiling::CheckGqaSeqSize() const
                         return custom::graphStatus::GRAPH_FAILED);
         }
     } else if (qSeqSize_ > 1U) {
-        OP_CHECK_IF((sparseMode_ != 3), // when qs bigger than 1, sparse mode only support 3
-                    OP_LOGE(ifaContext_->opName,
-                            "SparseMode[%u] only support 3 in IFA GQA with KV NZ when query S is bigger than 1",
-                            sparseMode_),
-                    return custom::graphStatus::GRAPH_FAILED);
+        OP_CHECK_IF(
+            (sparseMode_ != 3), // when qs bigger than 1, sparse mode only support 3
+            OP_LOGE(ifaContext_->opName,
+                    "SparseMode[%u] only support 3 in IFA GQA with KV NZ when query S is bigger than 1", sparseMode_),
+            return custom::graphStatus::GRAPH_FAILED);
     } else {
         OP_LOGE(ifaContext_->opName, "Invalid query S %u", qSeqSize_);
         return custom::graphStatus::GRAPH_FAILED;
@@ -937,8 +937,8 @@ custom::graphStatus IFATiling::CheckGqaSeqSize() const
                     OP_LOGE(ifaContext_->opName, "attenMask should be null for IFA GQA with KV NZ when sparseMode 0!"),
                     return custom::graphStatus::GRAPH_FAILED);
     } else {
-        auto &attenMaskShape = ifaContext_->attenMask.shape;
-        auto &attenMaskTensor = ifaContext_->attenMask;
+        auto& attenMaskShape = ifaContext_->attenMask.shape;
+        auto& attenMaskTensor = ifaContext_->attenMask;
         OP_CHECK_IF(attenMaskShape.size() == 0 || !attenMaskTensor.hasValue, // mask shape: 2048*2048
                     OP_LOGE(ifaContext_->opName,
                             "When sparseMode 3, attenMask shape for IFA GQA with KV NZ should not be null!"),
@@ -993,11 +993,11 @@ custom::graphStatus IFATiling::CheckGqaAttribute() const
                 OP_LOGE(ifaContext_->opName, "blockSize(%u) only support 128 and 512 in GQA.", blockSize_),
                 return custom::graphStatus::GRAPH_FAILED);
 
-    OP_CHECK_IF((innerPrecise_ != IFA_HIGH_PERFORMANCE),
-                OP_LOGE(ifaContext_->opName,
-                        "precision mode[%u] only support 1(hign performance) in GQA antiquant with KV NZ",
-                        innerPrecise_),
-                return custom::graphStatus::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (innerPrecise_ != IFA_HIGH_PERFORMANCE),
+        OP_LOGE(ifaContext_->opName, "precision mode[%u] only support 1(hign performance) in GQA antiquant with KV NZ",
+                innerPrecise_),
+        return custom::graphStatus::GRAPH_FAILED);
 
     OP_CHECK_IF(
         CheckGqaSeqSize() != custom::graphStatus::GRAPH_SUCCESS,
@@ -1014,11 +1014,11 @@ custom::graphStatus IFATiling::CheckGqaAttribute() const
 custom::graphStatus IFATiling::CheckGqaDefault() const
 {
     int64_t queryQuantMode = ifaContext_->queryQuantMode;
-    OP_CHECK_IF(queryQuantMode != DEQUANT_PER_CHANNEL_MODE,
-                OP_LOGE(ifaContext_->opName,
-                        "The query's quant mode(%ld) for IFA GQA with KV NZ should be default value %u!",
-                        queryQuantMode, DEQUANT_PER_CHANNEL_MODE),
-                return custom::graphStatus::GRAPH_FAILED);
+    OP_CHECK_IF(
+        queryQuantMode != DEQUANT_PER_CHANNEL_MODE,
+        OP_LOGE(ifaContext_->opName, "The query's quant mode(%ld) for IFA GQA with KV NZ should be default value %u!",
+                queryQuantMode, DEQUANT_PER_CHANNEL_MODE),
+        return custom::graphStatus::GRAPH_FAILED);
     return custom::graphStatus::GRAPH_SUCCESS;
 }
 } // namespace optiling

@@ -33,9 +33,9 @@ using namespace std;
 using namespace gert;
 using namespace ge;
 
-ge::graphStatus ExecuteOpLaunch(gert::OpExecuteLaunchContext *context)
+ge::graphStatus ExecuteOpLaunch(gert::OpExecuteLaunchContext* context)
 {
-    auto params = reinterpret_cast<OpApiParams *>(context->GetOpApiParams());
+    auto params = reinterpret_cast<OpApiParams*>(context->GetOpApiParams());
     auto workspace_sizes = context->GetWorkspaceSizes();
     auto workspace_addrs = context->GetWorkspaceAddrs();
     OP_CHECK_IF((workspace_sizes->GetSize() == 0) || (workspace_addrs->GetSize() == 0),
@@ -47,7 +47,7 @@ ge::graphStatus ExecuteOpLaunch(gert::OpExecuteLaunchContext *context)
     auto opApiFunc = params->op_api_func;
     OP_CHECK_IF(opApiFunc == nullptr, OP_LOGE("aclnnfallback", "opApiFunc nullptr"), return ge::GRAPH_FAILED);
     auto op_api_ret = opApiFunc(workspace_addr, workspace_size, params->executor, acl_stream);
-    for (auto &av : params->converted_params) {
+    for (auto& av : params->converted_params) {
         if (av.deleter != nullptr) {
             av.deleter(av.pointer);
         }

@@ -39,13 +39,14 @@ static uint32_t groupNum_ = 0;
 class GroupedMatmulTiling {
 public:
     template <typename TensorListType, typename OptionalTensorListType, typename OptionalTensorType>
-    static void
-    GroupedMatmulCommonTiling(const TensorListType &x, const TensorListType &weight, const OptionalTensorListType &bias,
-                              const OptionalTensorListType &scale, const OptionalTensorListType &offset,
-                              const OptionalTensorListType &antiquantScale,
-                              const OptionalTensorListType &antiquantOffset, const OptionalTensorType &groupList,
-                              const OptionalTensorListType &perTokenScale, GroupedMatmulTilingData &tilingData,
-                              uint32_t coreNum, uint64_t ubSize)
+    static void GroupedMatmulCommonTiling(const TensorListType& x, const TensorListType& weight,
+                                          const OptionalTensorListType& bias, const OptionalTensorListType& scale,
+                                          const OptionalTensorListType& offset,
+                                          const OptionalTensorListType& antiquantScale,
+                                          const OptionalTensorListType& antiquantOffset,
+                                          const OptionalTensorType& groupList,
+                                          const OptionalTensorListType& perTokenScale,
+                                          GroupedMatmulTilingData& tilingData, uint32_t coreNum, uint64_t ubSize)
     {
         auto shapeGroupList = getGroupListShape(groupList);
         groupNum_ = shapeGroupList[0];
@@ -61,7 +62,7 @@ public:
         RunFusionKernelTiling(tilingData, coreNum, ubSize);
     }
 
-    static void Init(GroupedMatmulTilingData &tilingData)
+    static void Init(GroupedMatmulTilingData& tilingData)
     {
         // 当前只支持以下组合
         tilingData.gmmBaseParams.set_singleWeight(1);
@@ -75,12 +76,11 @@ public:
         tilingData.gmmBaseParams.set_k(maxK_);
         tilingData.gmmBaseParams.set_n(maxN_);
 
-
         tilingData.gmmArray.kList[0] = maxK_;
         tilingData.gmmArray.nList[0] = maxN_;
     }
 
-    static void InitPlatformInfo(matmul_tiling::PlatformInfo &platformInfo)
+    static void InitPlatformInfo(matmul_tiling::PlatformInfo& platformInfo)
     {
         platformInfo.socVersion = platform_ascendc::SocVersion::ASCEND910B;
         platformInfo.l1Size = 512 * 1024;
@@ -90,8 +90,7 @@ public:
         platformInfo.l0BSize = 64 * 1024;
     }
 
-
-    static bool GMMSetMMTiling(GroupedMatmulTilingData &tilingData, uint64_t ubSize_)
+    static bool GMMSetMMTiling(GroupedMatmulTilingData& tilingData, uint64_t ubSize_)
     {
         matmul_tiling::DataType matmulDtype = matmul_tiling::DataType::DT_BFLOAT16;
         matmul_tiling::PlatformInfo platformInfo;
@@ -130,7 +129,7 @@ public:
         return true;
     }
 
-    static void RunFusionKernelTiling(GroupedMatmulTilingData &tilingData, uint32_t coreNum, uint64_t ubSize)
+    static void RunFusionKernelTiling(GroupedMatmulTilingData& tilingData, uint32_t coreNum, uint64_t ubSize)
     {
         usedCoreNum_ = coreNum;
         if (!CalMMTiling()) {

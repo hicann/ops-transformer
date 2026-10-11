@@ -42,25 +42,25 @@ public:
     /**
      * 运行上下文
      */
-    ContextIntf *mCtx;
+    ContextIntf* mCtx;
 
 public:
     OpInfoWithSocversion();
-    explicit OpInfoWithSocversion(const ControlInfo &ctr);
-    OpInfoWithSocversion(const ControlInfo &ctr, const ExpectInfoWithSocversion &exp);
-    OpInfoWithSocversion(const char *name, const ControlInfo &ctr, const ExpectInfoWithSocversion &exp);
+    explicit OpInfoWithSocversion(const ControlInfo& ctr);
+    OpInfoWithSocversion(const ControlInfo& ctr, const ExpectInfoWithSocversion& exp);
+    OpInfoWithSocversion(const char* name, const ControlInfo& ctr, const ExpectInfoWithSocversion& exp);
     virtual ~OpInfoWithSocversion() = default;
 
-    bool SetContext(ContextIntf *ctxParam);
+    bool SetContext(ContextIntf* ctxParam);
 
-    virtual bool ProcessTiling(std::string &caseName, int32_t socVersion);
-    virtual bool ProcessKernel(std::string &caseName);
+    virtual bool ProcessTiling(std::string& caseName, int32_t socVersion);
+    virtual bool ProcessKernel(std::string& caseName);
 
-    virtual bool RunTiling(std::string &caseName);
-    virtual bool ChkTiling(std::string &caseName, int32_t socVersion);
+    virtual bool RunTiling(std::string& caseName);
+    virtual bool ChkTiling(std::string& caseName, int32_t socVersion);
 
-    virtual bool RunKernel(std::string &caseName);
-    virtual bool ChkKernel(std::string &caseName);
+    virtual bool RunKernel(std::string& caseName);
+    virtual bool ChkKernel(std::string& caseName);
 };
 
 } // namespace ops::adv::tests::utils

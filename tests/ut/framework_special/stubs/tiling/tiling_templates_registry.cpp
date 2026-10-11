@@ -16,19 +16,19 @@
 #include "op_host/tiling_templates_registry.h"
 using namespace Ops::Transformer::OpTiling;
 
-TilingRegistry &TilingRegistry::GetInstance()
+TilingRegistry& TilingRegistry::GetInstance()
 {
     static TilingRegistry registry_impl_;
     return registry_impl_;
 }
 
-TilingRegistryNew &TilingRegistryNew::GetInstance()
+TilingRegistryNew& TilingRegistryNew::GetInstance()
 {
     static TilingRegistryNew registry_impl_;
     return registry_impl_;
 }
 
-TilingRegistryArch &TilingRegistryArch::GetInstance()
+TilingRegistryArch& TilingRegistryArch::GetInstance()
 {
     static TilingRegistryArch registry_impl_;
     return registry_impl_;

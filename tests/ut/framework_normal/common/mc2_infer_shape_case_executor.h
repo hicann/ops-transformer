@@ -15,10 +15,10 @@
 #include "infer_shape_case_executor.h"
 #include "mc2_hcom_topology_mocker.h"
 
-inline void Mc2ExecuteTestCase(gert::InfershapeContextPara &infershapeContextPara,
-                               const Mc2Hcom::MockValues &hcomTopologyMockValues,
+inline void Mc2ExecuteTestCase(gert::InfershapeContextPara& infershapeContextPara,
+                               const Mc2Hcom::MockValues& hcomTopologyMockValues,
                                ge::graphStatus expectResult = ge::GRAPH_FAILED,
-                               const std::vector<std::vector<int64_t>> &expectOutputShape = {})
+                               const std::vector<std::vector<int64_t>>& expectOutputShape = {})
 {
     Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValues(hcomTopologyMockValues);
     ExecuteTestCase(infershapeContextPara, expectResult, expectOutputShape);

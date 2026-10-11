@@ -11,27 +11,25 @@
 #include "nnopbase.h"
 
 extern "C" {
-aclnnStatus NnopbaseRunForWorkspace(void *executor, uint64_t *workspaceLen)
+aclnnStatus NnopbaseRunForWorkspace(void* executor, uint64_t* workspaceLen)
 {
     return OK;
 }
 
-aclnnStatus NnopbaseSetHcomGroup(void *const executor, char *const group)
+aclnnStatus NnopbaseSetHcomGroup(void* const executor, char* const group)
 {
     return OK;
 }
 
-aclnnStatus NnopbaseDisableOptionalInput(void *executor, const size_t irIndex)
+aclnnStatus NnopbaseDisableOptionalInput(void* executor, const size_t irIndex)
 {
     return OK;
 }
 
-aclnnStatus NnopbaseRunWithWorkspace(void *executor, aclrtStream stream, void *workspace, uint64_t workspaceSize)
+aclnnStatus NnopbaseRunWithWorkspace(void* executor, aclrtStream stream, void* workspace, uint64_t workspaceSize)
 {
     return OK;
 }
 
-void NnopbaseSetHcclServerType(void *executor, uint32_t sType)
-{
-}
+void NnopbaseSetHcclServerType(void* executor, uint32_t sType) {}
 }

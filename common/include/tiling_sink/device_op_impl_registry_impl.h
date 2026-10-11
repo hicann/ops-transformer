@@ -23,9 +23,9 @@
 namespace optiling {
 class DeviceOpImplRegistry {
 public:
-    static DeviceOpImplRegistry &GetSingleton();
-    void RegisterSinkTiling(std::string &opType, SinkTilingFunc &func);
-    SinkTilingFunc GetSinkTilingFunc(std::string &opType);
+    static DeviceOpImplRegistry& GetSingleton();
+    void RegisterSinkTiling(std::string& opType, SinkTilingFunc& func);
+    SinkTilingFunc GetSinkTilingFunc(std::string& opType);
 
 private:
     DeviceOpImplRegistry() = default;
@@ -39,7 +39,7 @@ class DeviceOpImplRegisterImpl {
 public:
     DeviceOpImplRegisterImpl() = default;
     ~DeviceOpImplRegisterImpl();
-    std::string &GetOpType();
+    std::string& GetOpType();
 
 private:
     std::string opType_ = "";

@@ -40,8 +40,8 @@ public:
      * \param workspace 运行所需的 workspace 空间
      * \param tilingData TilingData 结果
      */
-    typedef bool (*KernelRunCbf)(void *func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
-                                 std::vector<TensorIntf *> &outputs, uint8_t *workspace, uint8_t *tilingData);
+    typedef bool (*KernelRunCbf)(void* func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf*>& inputs,
+                                 std::vector<TensorIntf*>& outputs, uint8_t* workspace, uint8_t* tilingData);
 
     Context() = default;
     ~Context() override;
@@ -68,7 +68,7 @@ public:
      * 属性设置
      * 修改算子输入属性
      */
-    [[maybe_unused]] [[nodiscard]] bool MdfAttrs(const std::pair<std::string, std::any> &attr);
+    [[maybe_unused]] [[nodiscard]] bool MdfAttrs(const std::pair<std::string, std::any>& attr);
 
     /**
      * 属性设置
@@ -86,7 +86,7 @@ public:
      * 属性设置
      * 设置算子 Kernel 总入口回调函数
      */
-    [[maybe_unused]] [[nodiscard]] bool SetKernelMainFunc(void *func);
+    [[maybe_unused]] [[nodiscard]] bool SetKernelMainFunc(void* func);
 
     /**
      * 属性获取
@@ -98,25 +98,25 @@ public:
      * 属性获取
      * 获取 TilingData 值(无法获取具体结构, 需要调用者进行数据类型转换)
      */
-    [[maybe_unused]] [[nodiscard]] const void *GetTilingData() const;
+    [[maybe_unused]] [[nodiscard]] const void* GetTilingData() const;
 
     /**
      * 属性获取
      * 获取 TilingData 的 string 表示(0x格式)
      */
-    [[maybe_unused]] [[nodiscard]] const std::string &GetTilingDataStr() const;
+    [[maybe_unused]] [[nodiscard]] const std::string& GetTilingDataStr() const;
 
     /**
      * 属性获取
      * 获取 json 表示的 Tiling 结果
      */
-    [[maybe_unused]] [[nodiscard]] const std::string &GetTilingResult() const;
+    [[maybe_unused]] [[nodiscard]] const std::string& GetTilingResult() const;
 
     /**
      * 运行 Tiling
      * \param caseName 当前运行的用例名
      */
-    [[maybe_unused]] [[nodiscard]] bool RunTiling(std::string &caseName, bool withSocversion) override;
+    [[maybe_unused]] [[nodiscard]] bool RunTiling(std::string& caseName, bool withSocversion) override;
 
 protected:
     static constexpr size_t kDefaultTilingResultSize_ = 10 * 1024 * 1024;
@@ -125,7 +125,7 @@ protected:
     std::vector<std::pair<std::string, std::any>> attrs_;
     uint32_t tilingDataMaxLen_ = kDefaultTilingDataMaxSize;
     KernelRunCbf kernelRunCbf_ = nullptr;
-    void *kernelMainFunc_ = nullptr;
+    void* kernelMainFunc_ = nullptr;
     int64_t deterministic_ = 0; /**< 默认不开启确定性计算 */
 
     /* Tiling */
@@ -140,24 +140,24 @@ protected:
     std::string tilingDataStr_;
 
 protected:
-    bool RunKernelProcess(std::string &caseName) override;
-    uint8_t *AllocWorkspaceImpl(uint64_t size) override;
-    void FreeWorkspaceImpl(uint8_t *ptr) override;
+    bool RunKernelProcess(std::string& caseName) override;
+    uint8_t* AllocWorkspaceImpl(uint64_t size) override;
+    void FreeWorkspaceImpl(uint8_t* ptr) override;
 
     bool InitTilingJsonStr();
     bool ParseTilingResult();
 
-    typedef bool (*CheckKernelResultCbf)(std::string &kernelLog);
-    bool CheckKernelResult(bool &ret, std::string &caseName, std::string &path, const char *type,
+    typedef bool (*CheckKernelResultCbf)(std::string& kernelLog);
+    bool CheckKernelResult(bool& ret, std::string& caseName, std::string& path, const char* type,
                            CheckKernelResultCbf cbf, bool detail = true);
-    static bool CheckModelKernelResultStr(std::string &kernelLog);
-    static bool CheckFrameworkKernelResultStr(std::string &kernelLog);
+    static bool CheckModelKernelResultStr(std::string& kernelLog);
+    static bool CheckFrameworkKernelResultStr(std::string& kernelLog);
 
     template <class T>
-    bool DetectField(T &field, const char *fPrefix, const char *fSuffix)
+    bool DetectField(T& field, const char* fPrefix, const char* fSuffix)
     {
-        char *bgn = nullptr;
-        char *end = nullptr;
+        char* bgn = nullptr;
+        char* end = nullptr;
         if (!this->DetectPosit(&bgn, &end, fPrefix, fSuffix)) {
             return false;
         }
@@ -167,11 +167,11 @@ protected:
         return true;
     }
 
-    bool DetectPosit(char **bgn, char **end, const char *fPrefix, const char *fSuffix);
-    [[maybe_unused]] static void DetectValue(std::string &sub, int64_t &value);
-    [[maybe_unused]] static void DetectValue(std::string &sub, uint64_t &value);
-    [[maybe_unused]] static void DetectValue(std::string &sub, bool &value);
-    [[maybe_unused]] static void DetectValue(std::string &sub, std::string &value);
+    bool DetectPosit(char** bgn, char** end, const char* fPrefix, const char* fSuffix);
+    [[maybe_unused]] static void DetectValue(std::string& sub, int64_t& value);
+    [[maybe_unused]] static void DetectValue(std::string& sub, uint64_t& value);
+    [[maybe_unused]] static void DetectValue(std::string& sub, bool& value);
+    [[maybe_unused]] static void DetectValue(std::string& sub, std::string& value);
 
 private:
     void Destroy();

@@ -293,33 +293,33 @@ public:
     int32_t nList[128] = {};
 
     // GroupedMatmulArray 的 getter 和 setter
-    int32_t *get_mList()
+    int32_t* get_mList()
     {
         return this->mList;
     }
-    void set_mList(const int32_t *value)
+    void set_mList(const int32_t* value)
     {
         for (int i = 0; i < 128; i++) {
             mList[i] = value[i];
         }
     }
 
-    int32_t *get_kList()
+    int32_t* get_kList()
     {
         return this->kList;
     }
-    void set_kList(const int32_t *value)
+    void set_kList(const int32_t* value)
     {
         for (int i = 0; i < 128; i++) {
             kList[i] = value[i];
         }
     }
 
-    int32_t *get_nList()
+    int32_t* get_nList()
     {
         return this->nList;
     }
-    void set_nList(const int32_t *value)
+    void set_nList(const int32_t* value)
     {
         for (int i = 0; i < 128; i++) {
             nList[i] = value[i];
@@ -375,11 +375,11 @@ public:
         this->group_type = value;
     }
 
-    uint8_t *get_required_core_numPH()
+    uint8_t* get_required_core_numPH()
     {
         return this->required_core_numPH;
     }
-    void set_required_core_numPH(const uint8_t *value)
+    void set_required_core_numPH(const uint8_t* value)
     {
         for (int i = 0; i < 3; i++) {
             required_core_numPH[i] = value[i];
@@ -431,11 +431,11 @@ public:
         this->numAiv = value;
     }
 
-    uint8_t *get_szUbPH()
+    uint8_t* get_szUbPH()
     {
         return this->szUbPH;
     }
-    void set_szUbPH(const uint8_t *value)
+    void set_szUbPH(const uint8_t* value)
     {
         for (int i = 0; i < 4; i++) {
             szUbPH[i] = value[i];
@@ -487,11 +487,11 @@ public:
         this->kernel_index = value;
     }
 
-    uint8_t *get_splitTimesPH()
+    uint8_t* get_splitTimesPH()
     {
         return this->splitTimesPH;
     }
-    void set_splitTimesPH(const uint8_t *value)
+    void set_splitTimesPH(const uint8_t* value)
     {
         for (int i = 0; i < 2; i++) {
             splitTimesPH[i] = value[i];
@@ -516,88 +516,88 @@ public:
         this->output_type = value;
     }
 
-    uint8_t *get_ori_in0_shapePH()
+    uint8_t* get_ori_in0_shapePH()
     {
         return this->ori_in0_shapePH;
     }
-    void set_ori_in0_shapePH(const uint8_t *value)
+    void set_ori_in0_shapePH(const uint8_t* value)
     {
         for (int i = 0; i < 3; i++) {
             ori_in0_shapePH[i] = value[i];
         }
     }
 
-    uint32_t *get_ori_in0_shape()
+    uint32_t* get_ori_in0_shape()
     {
         return this->ori_in0_shape;
     }
-    void set_ori_in0_shape(const uint32_t *value)
+    void set_ori_in0_shape(const uint32_t* value)
     {
         for (int i = 0; i < 2; i++) {
             ori_in0_shape[i] = value[i];
         }
     }
 
-    uint32_t *get_ori_in1_shape()
+    uint32_t* get_ori_in1_shape()
     {
         return this->ori_in1_shape;
     }
-    void set_ori_in1_shape(const uint32_t *value)
+    void set_ori_in1_shape(const uint32_t* value)
     {
         for (int i = 0; i < 2; i++) {
             ori_in1_shape[i] = value[i];
         }
     }
 
-    uint32_t *get_ori_out_shape()
+    uint32_t* get_ori_out_shape()
     {
         return this->ori_out_shape;
     }
-    void set_ori_out_shape(const uint32_t *value)
+    void set_ori_out_shape(const uint32_t* value)
     {
         for (int i = 0; i < 2; i++) {
             ori_out_shape[i] = value[i];
         }
     }
 
-    uint32_t *get_single_core_tiling()
+    uint32_t* get_single_core_tiling()
     {
         return this->single_core_tiling;
     }
-    void set_single_core_tiling(const uint32_t *value)
+    void set_single_core_tiling(const uint32_t* value)
     {
         for (int i = 0; i < 3; i++) {
             single_core_tiling[i] = value[i];
         }
     }
 
-    uint32_t *get_single_core_base_tiling()
+    uint32_t* get_single_core_base_tiling()
     {
         return this->single_core_base_tiling;
     }
-    void set_single_core_base_tiling(const uint32_t *value)
+    void set_single_core_base_tiling(const uint32_t* value)
     {
         for (int i = 0; i < 2; i++) {
             single_core_base_tiling[i] = value[i];
         }
     }
 
-    uint32_t *get_splitRecord()
+    uint32_t* get_splitRecord()
     {
         return this->splitRecord;
     }
-    void set_splitRecord(const uint32_t *value)
+    void set_splitRecord(const uint32_t* value)
     {
         for (int i = 0; i < 3; i++) {
             splitRecord[i] = value[i];
         }
     }
 
-    uint8_t *get_workspaceOffsetPH()
+    uint8_t* get_workspaceOffsetPH()
     {
         return this->workspaceOffsetPH;
     }
-    void set_workspaceOffsetPH(const uint8_t *value)
+    void set_workspaceOffsetPH(const uint8_t* value)
     {
         for (int i = 0; i < 4; i++) {
             workspaceOffsetPH[i] = value[i];

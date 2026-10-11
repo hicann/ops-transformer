@@ -38,16 +38,17 @@ std::map<ge::DataType, aclDataType> geDtype2AclDtypeMap = {{ge::DataType::DT_FLO
 
 using namespace ops::adv::tests::utils;
 
-AclnnTensor::AclnnTensor(const char *name, const std::initializer_list<int64_t> &shape, const char *shapeType,
+AclnnTensor::AclnnTensor(const char* name, const std::initializer_list<int64_t>& shape, const char* shapeType,
                          ge::DataType dType, ge::Format format, TensorType type)
     : AclnnTensor(name, std::vector<int64_t>(shape), shapeType, dType, format, type)
-{
-}
+{}
 
-AclnnTensor::AclnnTensor(const char *name, const std::vector<int64_t> &shape, const char *shapeType, ge::DataType dType,
+AclnnTensor::AclnnTensor(const char* name, const std::vector<int64_t>& shape, const char* shapeType, ge::DataType dType,
                          ge::Format format, TensorType type)
-    : TensorIntf(name, shape, shapeType, dType, format, type), aclDataType_(ACL_DT_UNDEFINED),
-      aclTensorDataStrides_({}), aclTensor_(nullptr)
+    : TensorIntf(name, shape, shapeType, dType, format, type),
+      aclDataType_(ACL_DT_UNDEFINED),
+      aclTensorDataStrides_({}),
+      aclTensor_(nullptr)
 {
     /* 计算连续 tensor 的 strides */
     aclTensorDataStrides_.resize(shape_.GetDimNum(), 1);
@@ -63,11 +64,10 @@ AclnnTensor::AclnnTensor(const char *name, const std::vector<int64_t> &shape, co
     }
 }
 
-AclnnTensor::AclnnTensor(const Tensor &t)
+AclnnTensor::AclnnTensor(const Tensor& t)
     : AclnnTensor(t.Name().c_str(), t.ShapeView(), t.ShapeType().c_str(), t.GetDataType(), t.GetFormat(),
                   t.GetTensorType())
-{
-}
+{}
 
 AclnnTensor::~AclnnTensor()
 {
@@ -79,12 +79,12 @@ aclDataType AclnnTensor::GetAclDataType() const
     return aclDataType_;
 }
 
-aclTensor *AclnnTensor::GetAclTensor() const
+aclTensor* AclnnTensor::GetAclTensor() const
 {
     return aclTensor_;
 }
 
-uint8_t *AclnnTensor::AllocDevData(int32_t initVal, int64_t minSize)
+uint8_t* AclnnTensor::AllocDevData(int32_t initVal, int64_t minSize)
 {
     if (TensorIntf::AllocDevData(initVal, minSize) == nullptr) {
         return nullptr;
@@ -104,26 +104,26 @@ void AclnnTensor::FreeDevData()
     this->Destroy();
 }
 
-uint8_t *AclnnTensor::AllocDevDataImpl(int64_t size)
+uint8_t* AclnnTensor::AllocDevDataImpl(int64_t size)
 {
     /* 调用 aclrtMalloc 申请 device 侧内存 */
-    void *devPtr = nullptr;
+    void* devPtr = nullptr;
     auto ret = aclrtMalloc(&devPtr, size, ACL_MEM_MALLOC_HUGE_FIRST);
     if (ret != ACL_SUCCESS) {
         LOG_ERR("aclrtMalloc failed, ERROR: %d, Tensor(%s), Size(%ld)", ret, name_.c_str(), size);
     }
     //  LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclrtMalloc failed, ERROR: %d, Tensor(%s), Size(%ld)", ret, name_.c_str(),
     //  size));
-    return (uint8_t *)devPtr;
+    return (uint8_t*)devPtr;
 }
 
-void AclnnTensor::FreeDevDataImpl(uint8_t *devPtr)
+void AclnnTensor::FreeDevDataImpl(uint8_t* devPtr)
 {
     auto ret = aclrtFree(devPtr);
     LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclrtFree failed, ERROR: %d, Tensor(%s))", ret, name_.c_str()));
 }
 
-bool AclnnTensor::MemSetDevDataImpl(uint8_t *devPtr, int64_t devMax, int32_t val, int64_t cnt)
+bool AclnnTensor::MemSetDevDataImpl(uint8_t* devPtr, int64_t devMax, int32_t val, int64_t cnt)
 {
     /* 调用 aclrtMemset 设置值 */
     auto ret = aclrtMemset(devPtr, devMax, val, cnt);
@@ -131,7 +131,7 @@ bool AclnnTensor::MemSetDevDataImpl(uint8_t *devPtr, int64_t devMax, int32_t val
     return ret == ACL_SUCCESS;
 }
 
-bool AclnnTensor::MemCpyHostToDevDataImpl(uint8_t *devPtr, int64_t devMax, const void *hostPtr, int64_t cnt)
+bool AclnnTensor::MemCpyHostToDevDataImpl(uint8_t* devPtr, int64_t devMax, const void* hostPtr, int64_t cnt)
 {
     /* 调用 aclrtMemcpy  */
     auto ret = aclrtMemcpy(devPtr, devMax, hostPtr, cnt, ACL_MEMCPY_HOST_TO_DEVICE);
@@ -139,7 +139,7 @@ bool AclnnTensor::MemCpyHostToDevDataImpl(uint8_t *devPtr, int64_t devMax, const
     return ret == ACL_SUCCESS;
 }
 
-bool AclnnTensor::MemCpyDevDataToHostImpl(void *hostPtr, int64_t hostMax, const uint8_t *devPtr, int64_t cnt)
+bool AclnnTensor::MemCpyDevDataToHostImpl(void* hostPtr, int64_t hostMax, const uint8_t* devPtr, int64_t cnt)
 {
     /* 调用 aclrtMemcpy  */
     auto ret = aclrtMemcpy(hostPtr, hostMax, devPtr, cnt, ACL_MEMCPY_DEVICE_TO_HOST);

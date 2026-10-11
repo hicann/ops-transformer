@@ -21,45 +21,45 @@ namespace gert {
 class InferDataTypeContextFaker : public OpInferDataTypeContextBuilder, public KernelRunContextHolder {
 public:
     InferDataTypeContextFaker() = default;
-    InferDataTypeContextFaker &operator=(InferDataTypeContextFaker &&);
-    InferDataTypeContextFaker(InferDataTypeContextFaker &&);
+    InferDataTypeContextFaker& operator=(InferDataTypeContextFaker&&);
+    InferDataTypeContextFaker(InferDataTypeContextFaker&&);
 
-    InferDataTypeContextFaker &SetOpType(const std::string opType);
+    InferDataTypeContextFaker& SetOpType(const std::string opType);
 
-    InferDataTypeContextFaker &IrInputNum(size_t inputNum);
+    InferDataTypeContextFaker& IrInputNum(size_t inputNum);
 
-    InferDataTypeContextFaker &NodeIoNum(size_t inputNum, size_t outputNum);
+    InferDataTypeContextFaker& NodeIoNum(size_t inputNum, size_t outputNum);
 
-    InferDataTypeContextFaker &IrInstanceNum(const std::vector<uint32_t> &inputInstanceNum,
-                                             const std::vector<uint32_t> &outputInstanceNum);
+    InferDataTypeContextFaker& IrInstanceNum(const std::vector<uint32_t>& inputInstanceNum,
+                                             const std::vector<uint32_t>& outputInstanceNum);
 
-    InferDataTypeContextFaker &IrInstanceNum(const std::vector<uint32_t> &instanceNum);
+    InferDataTypeContextFaker& IrInstanceNum(const std::vector<uint32_t>& instanceNum);
 
-    InferDataTypeContextFaker &NodeInputTd(int32_t index, ge::DataType dtype, ge::Format originFormat,
+    InferDataTypeContextFaker& NodeInputTd(int32_t index, ge::DataType dtype, ge::Format originFormat,
                                            ge::Format storageFormat);
 
-    InferDataTypeContextFaker &NodeOutputTd(int32_t index, ge::Format originFormat, ge::Format storageFormat);
+    InferDataTypeContextFaker& NodeOutputTd(int32_t index, ge::Format originFormat, ge::Format storageFormat);
 
     template <typename T>
-    InferDataTypeContextFaker &Attr(const std::string &attrName, T attr)
+    InferDataTypeContextFaker& Attr(const std::string& attrName, T attr)
     {
         OpInferDataTypeContextBuilder::AppendAttr(attr);
         return *this;
     }
 
-    InferDataTypeContextFaker &Attr(const std::string &attrName, const std::string &attr)
+    InferDataTypeContextFaker& Attr(const std::string& attrName, const std::string& attr)
     {
         OpInferDataTypeContextBuilder::AppendAttr(ge::AscendString(attr.c_str()));
         return *this;
     }
 
-    InferDataTypeContextFaker &InputTensors(const std::vector<Tensor *> &inputTensors);
+    InferDataTypeContextFaker& InputTensors(const std::vector<Tensor*>& inputTensors);
 
-    InferDataTypeContextFaker &InputDataTypes(const std::vector<void *> &inputDataTypes);
+    InferDataTypeContextFaker& InputDataTypes(const std::vector<void*>& inputDataTypes);
 
-    InferDataTypeContextFaker &OutputDataTypes(const std::vector<void *> &outputDataTypes);
+    InferDataTypeContextFaker& OutputDataTypes(const std::vector<void*>& outputDataTypes);
 
-    InferDataTypeContextFaker &NodeAttrs(const std::vector<std::pair<std::string, Ops::Transformer::AnyValue>> &attrs);
+    InferDataTypeContextFaker& NodeAttrs(const std::vector<std::pair<std::string, Ops::Transformer::AnyValue>>& attrs);
 
     KernelRunContextHolder Build();
 };

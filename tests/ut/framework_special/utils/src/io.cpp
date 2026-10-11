@@ -21,13 +21,13 @@
 #include <unistd.h>
 #include "tests/utils/tests_utils_log.h"
 
-[[maybe_unused]] bool ops::adv::tests::utils::FileExist(const std::string &filePath)
+[[maybe_unused]] bool ops::adv::tests::utils::FileExist(const std::string& filePath)
 {
     struct stat s {};
     return stat(filePath.c_str(), &s) == 0;
 }
 
-[[maybe_unused]] bool ops::adv::tests::utils::ReadFile(const std::string &filePath, size_t &fileSize, void *buffer,
+[[maybe_unused]] bool ops::adv::tests::utils::ReadFile(const std::string& filePath, size_t& fileSize, void* buffer,
                                                        size_t bufferSize)
 {
     struct stat sBuf {};
@@ -48,7 +48,7 @@
         return false;
     }
 
-    std::filebuf *buf = file.rdbuf();
+    std::filebuf* buf = file.rdbuf();
     size_t size = buf->pubseekoff(0, std::ios::end, std::ios::in);
     if (size == 0) {
         LOG_ERR("file size is 0");
@@ -62,13 +62,13 @@
     }
 
     buf->pubseekpos(0, std::ios::in);
-    buf->sgetn(static_cast<char *>(buffer), static_cast<std::streamsize>(size));
+    buf->sgetn(static_cast<char*>(buffer), static_cast<std::streamsize>(size));
     fileSize = size;
     file.close();
     return true;
 }
 
-[[maybe_unused]] bool ops::adv::tests::utils::WriteFile(const std::string &filePath, const void *buffer, size_t size)
+[[maybe_unused]] bool ops::adv::tests::utils::WriteFile(const std::string& filePath, const void* buffer, size_t size)
 {
     if (buffer == nullptr) {
         LOG_ERR("Write file failed. buffer is nullptr");

@@ -18,7 +18,7 @@
 
 namespace ops::ut {
 
-inline op::SocVersion ParseOpSocVersion(const std::string &socVersion)
+inline op::SocVersion ParseOpSocVersion(const std::string& socVersion)
 {
     static const std::map<std::string, op::SocVersion> socMap = {
         {"Ascend310P", op::SocVersion::ASCEND310P},
@@ -29,7 +29,7 @@ inline op::SocVersion ParseOpSocVersion(const std::string &socVersion)
     return it == socMap.end() ? op::SocVersion::ASCEND910B : it->second;
 }
 
-inline void SetPlatformSocVersion(const std::string &socVersion)
+inline void SetPlatformSocVersion(const std::string& socVersion)
 {
     op::SetPlatformSocVersion(ParseOpSocVersion(socVersion));
 }

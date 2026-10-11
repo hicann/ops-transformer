@@ -79,7 +79,7 @@ const std::unordered_map<std::string, aclnnStatus> ACR_RET{{"SUCCESS", ACLNN_SUC
                                                            {"PARAM_INVALID", ACLNN_ERR_PARAM_INVALID},
                                                            {"RUNTIME_ERROR", ACLNN_ERR_RUNTIME_ERROR}};
 
-inline op::SocVersion GetCaseSocVersion(const csv_map &csvMap, const std::string &socKey)
+inline op::SocVersion GetCaseSocVersion(const csv_map& csvMap, const std::string& socKey)
 {
     std::string socStr = ReadMap(csvMap, socKey);
     if (socStr.empty()) {
@@ -89,7 +89,7 @@ inline op::SocVersion GetCaseSocVersion(const csv_map &csvMap, const std::string
     return ReadMap(SOC_VERSION, socStr, op::SocVersion::ASCEND910B);
 }
 
-inline aclnnStatus GetAclnnRet(const csv_map &csvMap, const std::string &aclnnRetKey)
+inline aclnnStatus GetAclnnRet(const csv_map& csvMap, const std::string& aclnnRetKey)
 {
     std::string aclnnRetStr = ReadMap(csvMap, aclnnRetKey);
     if (aclnnRetStr.empty()) {
@@ -99,8 +99,8 @@ inline aclnnStatus GetAclnnRet(const csv_map &csvMap, const std::string &aclnnRe
     return ReadMap(ACR_RET, aclnnRetStr);
 }
 
-inline TensorDesc GetTensorACL(const csv_map &csvMap, const std::string &shapeKey, const std::string &dtypeKey,
-                               const std::string &formatKey)
+inline TensorDesc GetTensorACL(const csv_map& csvMap, const std::string& shapeKey, const std::string& dtypeKey,
+                               const std::string& formatKey)
 {
     aclDataType dtype = ReadMap(ACL_DTYPE, ReadMap(csvMap, dtypeKey), ACL_DT_UNDEFINED);
     aclFormat format = ReadMap(ACL_FORMAT, ReadMap(csvMap, formatKey), ACL_FORMAT_UNDEFINED);

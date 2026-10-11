@@ -13,7 +13,7 @@
 
 using namespace std;
 
-vector<string> Split(const string &s, const string &spliter)
+vector<string> Split(const string& s, const string& spliter)
 {
     vector<string> strings;
     size_t i = 0;
@@ -31,7 +31,7 @@ vector<string> Split(const string &s, const string &spliter)
     return strings;
 }
 
-string &Ltrim(string &s)
+string& Ltrim(string& s)
 {
     (void)s.erase(s.begin(), find_if(s.begin(), s.end(), [](const char c) {
                       return static_cast<bool>(isspace(static_cast<unsigned char>(c)) == 0);
@@ -39,7 +39,7 @@ string &Ltrim(string &s)
     return s;
 }
 
-string &Rtrim(string &s)
+string& Rtrim(string& s)
 {
     (void)s.erase(find_if(s.rbegin(), s.rend(),
                           [](const char c) { return static_cast<bool>(isspace(static_cast<unsigned char>(c)) == 0); })
@@ -48,7 +48,7 @@ string &Rtrim(string &s)
     return s;
 }
 
-string Trim(string &s)
+string Trim(string& s)
 {
     return Ltrim(Rtrim(s));
 }

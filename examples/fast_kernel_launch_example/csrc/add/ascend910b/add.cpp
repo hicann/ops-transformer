@@ -32,7 +32,7 @@ TORCH_LIBRARY_FRAGMENT(EXTENSION_MODULE_NAME, m)
 }
 
 // Meta function implementation of Add
-torch::Tensor add_meta(const torch::Tensor &x, const torch::Tensor &y)
+torch::Tensor add_meta(const torch::Tensor& x, const torch::Tensor& y)
 {
     TORCH_CHECK(x.sizes() == y.sizes(), "The shapes of x and y must be the same.");
     auto z = torch::empty_like(x);
@@ -74,9 +74,9 @@ __global__ __aicore__ void add_kernel(GM_ADDR x, GM_ADDR y, GM_ADDR z, int64_t t
     pipe.InitBuffer(inQueueX, PIPELINE_DEPTH, tileSize);
     pipe.InitBuffer(inQueueY, PIPELINE_DEPTH, tileSize);
     pipe.InitBuffer(outQueueZ, PIPELINE_DEPTH, tileSize);
-    xGm.SetGlobalBuffer((__gm__ T *)x + blockLength * AscendC::GetBlockIdx());
-    yGm.SetGlobalBuffer((__gm__ T *)y + blockLength * AscendC::GetBlockIdx());
-    zGm.SetGlobalBuffer((__gm__ T *)z + blockLength * AscendC::GetBlockIdx());
+    xGm.SetGlobalBuffer((__gm__ T*)x + blockLength * AscendC::GetBlockIdx());
+    yGm.SetGlobalBuffer((__gm__ T*)y + blockLength * AscendC::GetBlockIdx());
+    zGm.SetGlobalBuffer((__gm__ T*)z + blockLength * AscendC::GetBlockIdx());
 
     int64_t currentBlockLength = totalLength - AscendC::GetBlockIdx() * blockLength;
     if (currentBlockLength > blockLength) {
@@ -145,7 +145,7 @@ __global__ __aicore__ void add_kernel(GM_ADDR x, GM_ADDR y, GM_ADDR z, int64_t t
     }
 }
 
-torch::Tensor add_npu(const torch::Tensor &x, const torch::Tensor &y)
+torch::Tensor add_npu(const torch::Tensor& x, const torch::Tensor& y)
 {
     // OptionalDeviceGuard 确保后续操作在正确的设备上下文执行
     // 它会记录当前设备状态，执行完作用域代码后自动恢复

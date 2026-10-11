@@ -11,9 +11,9 @@
 #include "runtime_kb_api.h"
 
 namespace RuntimeKb {
-uint32_t QueryBank(const void * /*src*/, size_t /*src_len*/, const std::string & /*op_type*/,
-                   const std::string & /*soc_version*/, uint32_t /*core_num*/,
-                   tuningtiling::TuningTilingDefPtr & /*tiling*/)
+uint32_t QueryBank(const void* /*src*/, size_t /*src_len*/, const std::string& /*op_type*/,
+                   const std::string& /*soc_version*/, uint32_t /*core_num*/,
+                   tuningtiling::TuningTilingDefPtr& /*tiling*/)
 {
     return 0;
 }

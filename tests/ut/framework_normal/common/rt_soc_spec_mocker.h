@@ -12,8 +12,8 @@
 #define RT_SOC_SPEC_MOCKER_H
 
 extern "C" {
-void SetRtSocSpecShortVersion(const char *version);
-void SetRtSocSpecNpuArch(const char *arch);
+void SetRtSocSpecShortVersion(const char* version);
+void SetRtSocSpecNpuArch(const char* arch);
 void SetRtSocSpecFail(bool fail);
 }
 

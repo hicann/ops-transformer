@@ -56,7 +56,7 @@ struct DropMaskInfo {
 };
 
 template <bool hasDrop>
-__aicore__ inline int64_t ComputeDropOffset(DropMaskInfo &dropMaskInfo)
+__aicore__ inline int64_t ComputeDropOffset(DropMaskInfo& dropMaskInfo)
 {
     if constexpr (hasDrop == true) {
         // boidx * n2 * g* s1 * s2
@@ -78,8 +78,8 @@ __aicore__ inline int64_t ComputeDropOffset(DropMaskInfo &dropMaskInfo)
 }
 
 template <bool hasDrop>
-__aicore__ inline void CopyInDropMask(LocalTensor<uint8_t> &dstTensor, GlobalTensor<uint8_t> &srcBoolTensor,
-                                      GlobalTensor<uint8_t> &srcByteTensor, DropMaskInfo &dropMaskInfo,
+__aicore__ inline void CopyInDropMask(LocalTensor<uint8_t>& dstTensor, GlobalTensor<uint8_t>& srcBoolTensor,
+                                      GlobalTensor<uint8_t>& srcByteTensor, DropMaskInfo& dropMaskInfo,
                                       int64_t alignedSize = blockBytes)
 {
     if constexpr (hasDrop == true) {
@@ -96,9 +96,9 @@ __aicore__ inline void CopyInDropMask(LocalTensor<uint8_t> &dstTensor, GlobalTen
 }
 
 template <typename T, bool hasDrop>
-__aicore__ inline void ComputeDropMask(LocalTensor<T> &dstTensor, LocalTensor<T> &srcTensor,
-                                       LocalTensor<uint8_t> &dropoutBuffer, LocalTensor<uint8_t> &tmpDropBuffer,
-                                       DropMaskInfo &dropMaskInfo)
+__aicore__ inline void ComputeDropMask(LocalTensor<T>& dstTensor, LocalTensor<T>& srcTensor,
+                                       LocalTensor<uint8_t>& dropoutBuffer, LocalTensor<uint8_t>& tmpDropBuffer,
+                                       DropMaskInfo& dropMaskInfo)
 {
     if constexpr (hasDrop == true) {
         DropOutShapeInfo dropOutShapeInfo;

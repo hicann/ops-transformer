@@ -22,14 +22,14 @@
 using csv_map = std::unordered_map<std::string, std::string>;
 
 template <typename Map>
-inline typename Map::mapped_type ReadMap(const Map &m, const typename Map::key_type &key,
-                                         const typename Map::mapped_type &defaultValue = typename Map::mapped_type{})
+inline typename Map::mapped_type ReadMap(const Map& m, const typename Map::key_type& key,
+                                         const typename Map::mapped_type& defaultValue = typename Map::mapped_type{})
 {
     auto it = m.find(key);
     return it != m.end() ? it->second : defaultValue;
 }
 
-inline std::vector<int64_t> GetShapeArr(const std::string &shapeArrStr)
+inline std::vector<int64_t> GetShapeArr(const std::string& shapeArrStr)
 {
     std::vector<int64_t> shapeArr;
     std::istringstream iss(shapeArrStr);
@@ -40,13 +40,13 @@ inline std::vector<int64_t> GetShapeArr(const std::string &shapeArrStr)
     return shapeArr;
 }
 
-inline std::string ReplaceFileExtension2Csv(const char *file)
+inline std::string ReplaceFileExtension2Csv(const char* file)
 {
     return std::filesystem::path(file).replace_extension("csv").string();
 }
 
 template <typename T> // T 需要支持 T(const csv_map&) 构造函数
-std::vector<T> GetCasesFromCsv(const std::string &csvPath)
+std::vector<T> GetCasesFromCsv(const std::string& csvPath)
 {
     std::vector<T> cases;
     std::ifstream csvFile(csvPath, std::ios::in);
@@ -94,7 +94,7 @@ std::vector<T> GetCasesFromCsv(const std::string &csvPath)
 }
 
 template <typename T>
-inline std::string PrintCaseInfoString(const testing::TestParamInfo<T> &info)
+inline std::string PrintCaseInfoString(const testing::TestParamInfo<T>& info)
 {
     return info.param.case_name;
 }

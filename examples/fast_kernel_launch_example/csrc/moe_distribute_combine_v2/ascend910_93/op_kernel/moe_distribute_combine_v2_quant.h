@@ -42,8 +42,8 @@ public:
         axisH_ = axisH;
     }
 
-    __aicore__ inline void InitInt8Quant(uint32_t &scaleNum_, uint32_t &hExpandXAlign32Size_,
-                                         uint32_t &hFloatAlign256Size_, uint32_t &tokenScaleCnt_)
+    __aicore__ inline void InitInt8Quant(uint32_t& scaleNum_, uint32_t& hExpandXAlign32Size_,
+                                         uint32_t& hFloatAlign256Size_, uint32_t& tokenScaleCnt_)
     {
         hAlign32Size_ = Ceil(axisH_, UB_ALIGN) * UB_ALIGN;
         scaleValFloat_ = static_cast<float>(1.0f / SCALE_PARAM);
@@ -56,10 +56,10 @@ public:
         tokenScaleCnt_ = hAlign32Size_ / sizeof(ExpandXType) + quantScaleNum_; // int8_align + scale有效个数
     }
 
-    __aicore__ inline void Int8QuantProcess(LocalTensor<ExpandXType> &sendLocalTensor_,
-                                            LocalTensor<float> &winTpSendCountFloatTensor_,
-                                            LocalTensor<ExpandXType> &gmTpSendCountTensor_,
-                                            LocalTensor<half> &fp16CastTensor_, LocalTensor<float> &absFloatTensor_,
+    __aicore__ inline void Int8QuantProcess(LocalTensor<ExpandXType>& sendLocalTensor_,
+                                            LocalTensor<float>& winTpSendCountFloatTensor_,
+                                            LocalTensor<ExpandXType>& gmTpSendCountTensor_,
+                                            LocalTensor<half>& fp16CastTensor_, LocalTensor<float>& absFloatTensor_,
                                             LocalTensor<float> reduceMaxFloatTensor_,
                                             LocalTensor<float> scaleDupLocalTensor_)
     {
@@ -88,8 +88,8 @@ public:
         SyncFunc<AscendC::HardEvent::V_MTE3>();
     }
 
-    __aicore__ inline void Int8DequantProcess(LocalTensor<ExpandXType> &src, LocalTensor<float> scaleDivFloatTensor_,
-                                              LocalTensor<half> &fp16CastTensor_, LocalTensor<float> &absFloatTensor_,
+    __aicore__ inline void Int8DequantProcess(LocalTensor<ExpandXType>& src, LocalTensor<float> scaleDivFloatTensor_,
+                                              LocalTensor<half>& fp16CastTensor_, LocalTensor<float>& absFloatTensor_,
                                               LocalTensor<float> scaleDupLocalTensor_)
     {
         SyncFunc<AscendC::HardEvent::MTE2_V>();

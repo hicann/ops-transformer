@@ -46,9 +46,10 @@ using namespace mock_hccl;
 class MockContext {
 public:
     MockContext(uint32_t rankNum, uint32_t rankId, int deviceId)
-        : rankNum_(rankNum), rankId_(rankId), deviceId_(deviceId)
-    {
-    }
+        : rankNum_(rankNum),
+          rankId_(rankId),
+          deviceId_(deviceId)
+    {}
 
     ~MockContext()
     {
@@ -101,7 +102,7 @@ public:
     {
         if (!devWindowMem_)
             return;
-        void *flagArea = OffsetPtr(devWindowMem_, FLAG_OFFSET_BYTES);
+        void* flagArea = OffsetPtr(devWindowMem_, FLAG_OFFSET_BYTES);
         aclrtMemset(flagArea, FLAG_AREA_SIZE, 0, FLAG_AREA_SIZE);
     }
 
@@ -134,10 +135,10 @@ public:
 private:
     uint32_t rankNum_, rankId_;
     int deviceId_;
-    void *devContext_{nullptr};
-    void *devWorkspaceRaw_{nullptr};
-    void *devWorkspaceAligned_{nullptr};
-    void *devWindowMem_{nullptr};
+    void* devContext_{nullptr};
+    void* devWorkspaceRaw_{nullptr};
+    void* devWorkspaceAligned_{nullptr};
+    void* devWindowMem_{nullptr};
 };
 
 // ============================================================
@@ -163,11 +164,11 @@ public:
         // Extract device pointers → RankData
         std::vector<RankData> rankData;
         rankData.reserve(tensorRefs_.size());
-        for (auto &t : tensorRefs_) {
+        for (auto& t : tensorRefs_) {
             rankData.push_back({t.data_ptr(), (size_t)(t.nbytes())});
         }
 
-        server_ = std::make_unique<MockHcclServer>(reinterpret_cast<void *>(workspacePtr), std::move(rankData),
+        server_ = std::make_unique<MockHcclServer>(reinterpret_cast<void*>(workspacePtr), std::move(rankData),
                                                    localRankId, deviceId);
     }
 
@@ -213,9 +214,10 @@ private:
 // ============================================================
 class PyMultiRankContext {
 public:
-    PyMultiRankContext(uint32_t rankNum, int deviceId) : rankNum_(rankNum), deviceId_(deviceId)
-    {
-    }
+    PyMultiRankContext(uint32_t rankNum, int deviceId)
+        : rankNum_(rankNum),
+          deviceId_(deviceId)
+    {}
 
     ~PyMultiRankContext()
     {
@@ -237,7 +239,7 @@ public:
 
     at::Tensor context_tensor(uint32_t rank)
     {
-        void *addr = ctx_.GetContextAddr(rank);
+        void* addr = ctx_.GetContextAddr(rank);
         if (!addr)
             throw std::runtime_error("Context not built for rank " + std::to_string(rank));
         auto opts = at::TensorOptions().dtype(at::kChar).device(at::kPrivateUse1, deviceId_);
@@ -249,12 +251,12 @@ public:
     std::vector<int32_t> read_flags(uint32_t rank, uint32_t num_flags = 8)
     {
         std::vector<int32_t> result(num_flags, -1);
-        void *win = ctx_.GetWindowMem(rank);
+        void* win = ctx_.GetWindowMem(rank);
         if (!win)
             return result;
         // flags are at (int32_t*)win + FLAG_OFFSET, where FLAG_OFFSET = 180*1024*1024/4
         constexpr int64_t FLAG_OFFSET = 180LL * 1024 * 1024 / sizeof(int32_t);
-        void *flagAddr = reinterpret_cast<void *>(reinterpret_cast<int32_t *>(win) + FLAG_OFFSET);
+        void* flagAddr = reinterpret_cast<void*>(reinterpret_cast<int32_t*>(win) + FLAG_OFFSET);
         size_t bytes = num_flags * sizeof(int32_t);
         aclrtMemcpy(result.data(), bytes, flagAddr, bytes, ACL_MEMCPY_DEVICE_TO_HOST);
         return result;
@@ -264,10 +266,10 @@ public:
     std::vector<uint8_t> read_window_data(uint32_t rank, size_t offset, size_t nbytes)
     {
         std::vector<uint8_t> result(nbytes, 0);
-        void *win = ctx_.GetWindowMem(rank);
+        void* win = ctx_.GetWindowMem(rank);
         if (!win)
             return result;
-        void *src = OffsetPtr(win, offset);
+        void* src = OffsetPtr(win, offset);
         aclrtMemcpy(result.data(), nbytes, src, nbytes, ACL_MEMCPY_DEVICE_TO_HOST);
         return result;
     }

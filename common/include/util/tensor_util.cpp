@@ -20,7 +20,7 @@
 #include "aclnn/aclnn_base.h"
 
 namespace op {
-const aclIntArray *getAllDims(const aclTensor *self, aclOpExecutor *executor)
+const aclIntArray* getAllDims(const aclTensor* self, aclOpExecutor* executor)
 {
     auto input_shape = self->GetViewShape();
     const size_t input_dim_num = input_shape.GetDimNum();
@@ -32,8 +32,8 @@ const aclIntArray *getAllDims(const aclTensor *self, aclOpExecutor *executor)
 }
 
 constexpr size_t MAX_DIM_CNT = 5;
-const aclTensor *ResizeFrom1D(const aclTensor *cdim, const aclTensor *input, bool isSupportNcdhw,
-                              aclOpExecutor *executor)
+const aclTensor* ResizeFrom1D(const aclTensor* cdim, const aclTensor* input, bool isSupportNcdhw,
+                              aclOpExecutor* executor)
 {
     auto cdimContiguous = l0op::Contiguous(cdim, executor);
     if (cdimContiguous == nullptr) {
@@ -48,7 +48,7 @@ const aclTensor *ResizeFrom1D(const aclTensor *cdim, const aclTensor *input, boo
     size_t inputDim = input->GetViewShape().GetDimNum();
 
     const int64_t appendDim[] = {0, 2, 3};
-    aclIntArray *newShape = executor->AllocIntArray(appendDim, sizeof(appendDim) / sizeof(int64_t));
+    aclIntArray* newShape = executor->AllocIntArray(appendDim, sizeof(appendDim) / sizeof(int64_t));
     if (inputDim == MAX_DIM_CNT) {
         const int64_t value[] = {0, 2, 3, 4};
         newShape = executor->AllocIntArray(value, sizeof(value) / sizeof(int64_t));
@@ -71,8 +71,8 @@ const aclTensor *ResizeFrom1D(const aclTensor *cdim, const aclTensor *input, boo
     return cdimFormat;
 }
 
-const aclTensor *ResizeTo1D(const aclTensor *result, const aclTensor *output, bool isSupportNcdhw,
-                            aclOpExecutor *executor)
+const aclTensor* ResizeTo1D(const aclTensor* result, const aclTensor* output, bool isSupportNcdhw,
+                            aclOpExecutor* executor)
 {
     auto resultTransdata = result;
     size_t resultDim = result->GetViewShape().GetDimNum();
@@ -84,7 +84,7 @@ const aclTensor *ResizeTo1D(const aclTensor *result, const aclTensor *output, bo
     }
 
     const int64_t appendDim[] = {0, 2, 3};
-    aclIntArray *newShape = executor->AllocIntArray(appendDim, sizeof(appendDim) / sizeof(int64_t));
+    aclIntArray* newShape = executor->AllocIntArray(appendDim, sizeof(appendDim) / sizeof(int64_t));
     if (resultTransdata->GetViewShape().GetDimNum() == MAX_DIM_CNT) {
         const int64_t value[] = {0, 2, 3, 4};
         newShape = executor->AllocIntArray(value, sizeof(value) / sizeof(int64_t));
@@ -107,7 +107,7 @@ const aclTensor *ResizeTo1D(const aclTensor *result, const aclTensor *output, bo
     return l0op::ViewCopy(resultCast, output, executor);
 }
 
-const aclTensor *ResizeFromND(const aclTensor *input, aclOpExecutor *executor)
+const aclTensor* ResizeFromND(const aclTensor* input, aclOpExecutor* executor)
 {
     const int nchw_dims = 4;
     auto inputShape = input->GetViewShape();
@@ -115,7 +115,7 @@ const aclTensor *ResizeFromND(const aclTensor *input, aclOpExecutor *executor)
     for (size_t i = 0; i < nchw_dims; i++) {
         nchwShape[i] = i < inputShape.GetDimNum() ? inputShape[i] : 1;
     }
-    aclIntArray *nchwArray = executor->AllocIntArray(nchwShape, nchw_dims);
+    aclIntArray* nchwArray = executor->AllocIntArray(nchwShape, nchw_dims);
 
     auto inputReshape = l0op::Reshape(input, nchwArray, executor);
     if (inputReshape == nullptr) {
@@ -125,7 +125,7 @@ const aclTensor *ResizeFromND(const aclTensor *input, aclOpExecutor *executor)
     return l0op::ReFormat(inputReshape, Format::FORMAT_NCHW);
 }
 
-const aclTensor *ResizeToND(const aclTensor *output, const aclTensor *input, aclOpExecutor *executor)
+const aclTensor* ResizeToND(const aclTensor* output, const aclTensor* input, aclOpExecutor* executor)
 {
     auto inputShape = input->GetViewShape();
     size_t dimNum = inputShape.GetDimNum();
@@ -134,7 +134,7 @@ const aclTensor *ResizeToND(const aclTensor *output, const aclTensor *input, acl
     for (size_t i = 0; i < inputShape.GetDimNum(); i++) {
         ndShape[i] = inputShape[i];
     }
-    aclIntArray *ndArray = executor->AllocIntArray(ndShape, dimNum);
+    aclIntArray* ndArray = executor->AllocIntArray(ndShape, dimNum);
 
     auto outputReshape = l0op::Reshape(output, ndArray, executor);
     if (outputReshape == nullptr) {
@@ -144,12 +144,12 @@ const aclTensor *ResizeToND(const aclTensor *output, const aclTensor *input, acl
     return l0op::ReFormat(outputReshape, input->GetViewFormat());
 }
 
-const aclTensor *ResizeFrom5D(const aclTensor *input, aclOpExecutor *executor)
+const aclTensor* ResizeFrom5D(const aclTensor* input, aclOpExecutor* executor)
 {
     auto inputShape = input->GetViewShape();
     // NCDHW -> NDCHW
     const int64_t value[] = {0, 2, 1, 3, 4};
-    aclIntArray *ndchwShape = executor->AllocIntArray(value, MAX_DIM_CNT);
+    aclIntArray* ndchwShape = executor->AllocIntArray(value, MAX_DIM_CNT);
     auto inputTranspose = l0op::Transpose(input, ndchwShape, executor);
     if (inputTranspose == nullptr) {
         return inputTranspose;
@@ -157,7 +157,7 @@ const aclTensor *ResizeFrom5D(const aclTensor *input, aclOpExecutor *executor)
 
     // NDCHW -> NCHW
     const int64_t nchwShape[] = {inputShape[0] * inputShape[2], inputShape[1], inputShape[3], inputShape[4]};
-    aclIntArray *nchwArray = executor->AllocIntArray(nchwShape, sizeof(nchwShape) / sizeof(int64_t));
+    aclIntArray* nchwArray = executor->AllocIntArray(nchwShape, sizeof(nchwShape) / sizeof(int64_t));
     auto inputReshape = l0op::Reshape(inputTranspose, nchwArray, executor);
     if (inputReshape == nullptr) {
         return inputReshape;
@@ -166,12 +166,12 @@ const aclTensor *ResizeFrom5D(const aclTensor *input, aclOpExecutor *executor)
     return l0op::ReFormat(inputReshape, Format::FORMAT_NCHW);
 }
 
-const aclTensor *ResizeTo5D(const aclTensor *output, const aclTensor *input, aclOpExecutor *executor)
+const aclTensor* ResizeTo5D(const aclTensor* output, const aclTensor* input, aclOpExecutor* executor)
 {
     auto inputShape = input->GetViewShape();
     // nchw -> ndchw
     const int64_t ndchwShape[] = {inputShape[0], inputShape[2], inputShape[1], inputShape[3], inputShape[4]};
-    aclIntArray *ndchwArray = executor->AllocIntArray(ndchwShape, MAX_DIM_CNT);
+    aclIntArray* ndchwArray = executor->AllocIntArray(ndchwShape, MAX_DIM_CNT);
     auto outputReshape = l0op::Reshape(output, ndchwArray, executor);
     if (outputReshape == nullptr) {
         return outputReshape;
@@ -183,43 +183,43 @@ const aclTensor *ResizeTo5D(const aclTensor *output, const aclTensor *input, acl
     }
     // ndchw -> ncdhw
     const int64_t ncdhwShape[] = {0, 2, 1, 3, 4};
-    aclIntArray *ncdhwArray = executor->AllocIntArray(ncdhwShape, MAX_DIM_CNT);
+    aclIntArray* ncdhwArray = executor->AllocIntArray(ncdhwShape, MAX_DIM_CNT);
     return l0op::Transpose(outputFormat, ncdhwArray, executor);
 }
 
-aclTensor *FillScalar(int64_t dim, int value, aclOpExecutor *executor)
+aclTensor* FillScalar(int64_t dim, int value, aclOpExecutor* executor)
 {
-    const aclScalar *dimScalar = executor->AllocScalar(dim);
-    const aclTensor *dimTensor = executor->ConvertToTensor(dimScalar, op::DataType::DT_INT32);
-    aclIntArray *outShape = executor->AllocIntArray(&dim, 1);
+    const aclScalar* dimScalar = executor->AllocScalar(dim);
+    const aclTensor* dimTensor = executor->ConvertToTensor(dimScalar, op::DataType::DT_INT32);
+    aclIntArray* outShape = executor->AllocIntArray(&dim, 1);
 
-    const aclScalar *valueScalar = executor->AllocScalar(value);
-    const aclTensor *valueTensor = executor->ConvertToTensor(valueScalar, op::DataType::DT_FLOAT);
+    const aclScalar* valueScalar = executor->AllocScalar(value);
+    const aclTensor* valueTensor = executor->ConvertToTensor(valueScalar, op::DataType::DT_FLOAT);
 
     auto fillTensor = l0op::Fill(dimTensor, valueTensor, outShape, executor);
     if (fillTensor == nullptr) {
         return nullptr;
     }
 
-    return const_cast<aclTensor *>(fillTensor);
+    return const_cast<aclTensor*>(fillTensor);
 }
 
-aclTensor *FillVector(const op::Shape dstShape, const aclTensor *src, float value, aclOpExecutor *executor)
+aclTensor* FillVector(const op::Shape dstShape, const aclTensor* src, float value, aclOpExecutor* executor)
 {
     op::FVector<int64_t, op::MAX_DIM_NUM> fillDims = op::ToShapeVector(dstShape);
     auto shapes = executor->AllocIntArray(fillDims.data(), src->GetViewShape().GetDimNum());
-    const aclTensor *dimTensor = executor->ConvertToTensor(shapes, op::DataType::DT_INT32);
-    const aclScalar *valueScalar = executor->AllocScalar(value);
-    const aclTensor *valueTensor = executor->ConvertToTensor(valueScalar, src->GetDataType());
+    const aclTensor* dimTensor = executor->ConvertToTensor(shapes, op::DataType::DT_INT32);
+    const aclScalar* valueScalar = executor->AllocScalar(value);
+    const aclTensor* valueTensor = executor->ConvertToTensor(valueScalar, src->GetDataType());
     auto fillTensor = l0op::Fill(dimTensor, valueTensor, shapes, executor);
     if (fillTensor == nullptr) {
         return nullptr;
     }
     fillTensor = l0op::ReFormat(fillTensor, op::Format::FORMAT_ND);
-    return const_cast<aclTensor *>(fillTensor);
+    return const_cast<aclTensor*>(fillTensor);
 }
 
-aclnnStatus ProcessEmptyTensorWithValue(aclTensor *src, float initValue, aclOpExecutor *executor)
+aclnnStatus ProcessEmptyTensorWithValue(aclTensor* src, float initValue, aclOpExecutor* executor)
 {
     auto srcShape = src->GetViewShape();
     auto dst = FillVector(srcShape, src, initValue, executor);

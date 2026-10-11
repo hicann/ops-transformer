@@ -18,6 +18,7 @@
 using namespace ops::adv::tests::utils;
 
 ExpectInfo::ExpectInfo(bool success, uint64_t tilingKey, int64_t tilingBlockDim)
-    : mSuccess(success), mTilingKey(tilingKey), mTilingBlockDim(tilingBlockDim)
-{
-}
+    : mSuccess(success),
+      mTilingKey(tilingKey),
+      mTilingBlockDim(tilingBlockDim)
+{}

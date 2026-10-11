@@ -21,7 +21,7 @@ const int32_t NCHW_C_DIM = 1;
 const int32_t NHWC_N_DIM = 0;
 const int32_t NHWC_C_DIM = 3;
 
-static inline bool IsNullptr(const aclTensor *tensor, const char *name)
+static inline bool IsNullptr(const aclTensor* tensor, const char* name)
 {
     if (tensor == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Expected a proper Tensor but got null for argument %s.", name);
@@ -30,7 +30,7 @@ static inline bool IsNullptr(const aclTensor *tensor, const char *name)
     return false;
 }
 
-static inline bool IsNullptr(const aclTensorList *tensorList, const char *name)
+static inline bool IsNullptr(const aclTensorList* tensorList, const char* name)
 {
     if (tensorList == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Expected a proper TensorList but got null for argument %s.", name);
@@ -39,7 +39,7 @@ static inline bool IsNullptr(const aclTensorList *tensorList, const char *name)
     return false;
 }
 
-static inline bool IsNullptr(const aclScalar *scalar, const char *name)
+static inline bool IsNullptr(const aclScalar* scalar, const char* name)
 {
     if (scalar == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Expected a value of type number for argument %s but instead found type null.",
@@ -49,7 +49,7 @@ static inline bool IsNullptr(const aclScalar *scalar, const char *name)
     return false;
 }
 
-static inline bool IsNullptr(const aclIntArray *intArr, const char *name)
+static inline bool IsNullptr(const aclIntArray* intArr, const char* name)
 {
     if (intArr == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
@@ -59,7 +59,7 @@ static inline bool IsNullptr(const aclIntArray *intArr, const char *name)
     return false;
 }
 
-static inline bool IsNullptr(const aclBoolArray *boolArr, const char *name)
+static inline bool IsNullptr(const aclBoolArray* boolArr, const char* name)
 {
     if (boolArr == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
@@ -69,7 +69,7 @@ static inline bool IsNullptr(const aclBoolArray *boolArr, const char *name)
     return false;
 }
 
-static inline bool IsNullptr(const aclFloatArray *floatArr, const char *name)
+static inline bool IsNullptr(const aclFloatArray* floatArr, const char* name)
 {
     if (floatArr == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Expected a value of type List[float] for argument %s but instead found type \
@@ -80,9 +80,9 @@ static inline bool IsNullptr(const aclFloatArray *floatArr, const char *name)
     return false;
 }
 
-static inline bool CheckDims(const aclTensor *tensor)
+static inline bool CheckDims(const aclTensor* tensor)
 {
-    const auto &xShape = tensor->GetViewShape();
+    const auto& xShape = tensor->GetViewShape();
     for (size_t i = 0; i < xShape.GetDimNum(); i++) {
         if (xShape.GetDim(i) > INT32_MAX) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The tensor's shape cannot be larger than %d.", INT32_MAX);
@@ -92,10 +92,10 @@ static inline bool CheckDims(const aclTensor *tensor)
     return true;
 }
 
-static inline bool CheckReduceOutShape(const aclTensor *inferOut, const aclTensor *out)
+static inline bool CheckReduceOutShape(const aclTensor* inferOut, const aclTensor* out)
 {
-    auto const &xShape = inferOut->GetViewShape();
-    auto const &yShape = out->GetViewShape();
+    auto const& xShape = inferOut->GetViewShape();
+    auto const& yShape = out->GetViewShape();
     if (xShape != yShape) {
         if (!(xShape.GetShapeSize() == 1 && yShape.GetShapeSize() == 1)) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The out tensor's shape[%s] is not equal with inferOut shape[%s].",
@@ -106,7 +106,7 @@ static inline bool CheckReduceOutShape(const aclTensor *inferOut, const aclTenso
     return true;
 }
 
-static inline bool CheckNCDimValid(const aclTensor *self, const aclTensor *out)
+static inline bool CheckNCDimValid(const aclTensor* self, const aclTensor* out)
 {
     auto format = self->GetStorageFormat();
     int64_t selfDimN = 0;

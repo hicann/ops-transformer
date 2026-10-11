@@ -15,8 +15,8 @@
 
 namespace l0op {
 
-const aclTensor *Transpose(const aclTensor *x, const aclTensor *y, const aclTensor *perm, aclOpExecutor *executor);
-const aclTensor *Transpose(const aclTensor *x, const aclIntArray *perm, aclOpExecutor *executor);
+const aclTensor* Transpose(const aclTensor* x, const aclTensor* y, const aclTensor* perm, aclOpExecutor* executor);
+const aclTensor* Transpose(const aclTensor* x, const aclIntArray* perm, aclOpExecutor* executor);
 } // namespace l0op
 
 #endif // COMMON_INC_EXTERNAL_ACLNN_KERNELS_TRANSPOSE_H

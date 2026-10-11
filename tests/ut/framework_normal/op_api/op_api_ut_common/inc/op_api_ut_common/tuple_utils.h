@@ -28,7 +28,7 @@ using namespace nlohmann;
 ////////// transfer Acl***Desc to acl*** /////////
 
 template <typename T>
-inline T DescToAclContainer(const T &t)
+inline T DescToAclContainer(const T& t)
 {
     return t;
 }
@@ -65,10 +65,10 @@ template <typename T, typename First, typename... Rest>
 struct IsAny<T, First, Rest...> : integral_constant<bool, is_same_v<T, First> || IsAny<T, Rest...>::value> {};
 
 template <typename... T>
-void ReleaseAclTypes(const tuple<T...> &t)
+void ReleaseAclTypes(const tuple<T...>& t)
 {
     apply(
-        [](const auto &...args) {
+        [](const auto&... args) {
             ((IsAny<remove_const_t<remove_pointer_t<remove_reference_t<decltype(args)>>>, aclTensor, aclScalar,
                     aclTensorList, aclIntArray, aclFloatArray, aclBoolArray>::value ?
                   Release(args) :
@@ -81,7 +81,7 @@ void ReleaseAclTypes(const tuple<T...> &t)
 ////////////  infer acl*** from Acl***Desc  ////////////
 
 template <typename T>
-inline T InferAclType(const T &t)
+inline T InferAclType(const T& t)
 {
     return t;
 }
@@ -102,14 +102,14 @@ inline constexpr auto InferAclTypes(T t, index_sequence<I...>)
 ////////////  build json ////////
 
 template <typename T>
-inline void DescToJson(json &root, const T &t, [[maybe_unused]] bool is_input = true)
+inline void DescToJson(json& root, const T& t, [[maybe_unused]] bool is_input = true)
 {
     json x;
     stringstream ss;
     if constexpr (is_pointer_v<T>) {
         if (t == nullptr) {
             ss << "None";
-        } else if constexpr (std::is_same_v<std::decay_t<T>, char *> || std::is_same_v<std::decay_t<T>, const char *>) {
+        } else if constexpr (std::is_same_v<std::decay_t<T>, char*> || std::is_same_v<std::decay_t<T>, const char*>) {
             ss << t;
         } else {
             assert(false && "Not support yet !!");
@@ -127,23 +127,23 @@ inline void DescToJson(json &root, const T &t, [[maybe_unused]] bool is_input = 
 }
 
 template <typename... T>
-inline void ConvertDescToJson(json &root, const tuple<T...> &t, bool is_input = true)
+inline void ConvertDescToJson(json& root, const tuple<T...>& t, bool is_input = true)
 {
-    apply([&root, &is_input](const auto &...args) { (DescToJson(root, args, is_input), ...); }, t);
+    apply([&root, &is_input](const auto&... args) { (DescToJson(root, args, is_input), ...); }, t);
 }
 
 ////////////  invoke acl***GetWorkspaceSize function ////////
 
 template <typename Function, typename Tuple, typename ExtraT, size_t... I, size_t... EI>
 inline aclnnStatus InvokeGetWorkspaceSizeFunc(Function f, Tuple t, [[maybe_unused]] ExtraT et, index_sequence<I...>,
-                                              index_sequence<EI...>, uint64_t *workspace_size, aclOpExecutor **executor)
+                                              index_sequence<EI...>, uint64_t* workspace_size, aclOpExecutor** executor)
 {
     return f(get<I>(t)..., get<EI>(et)..., workspace_size, executor);
 }
 
 template <typename Function, typename Tuple, typename ExtraT>
-inline aclnnStatus InvokeGetWorkspaceSizeFunc(Function f, Tuple t, ExtraT et, uint64_t *workspace_size,
-                                              aclOpExecutor **executor)
+inline aclnnStatus InvokeGetWorkspaceSizeFunc(Function f, Tuple t, ExtraT et, uint64_t* workspace_size,
+                                              aclOpExecutor** executor)
 {
     constexpr auto s = tuple_size<Tuple>::value;
     constexpr auto es = tuple_size<ExtraT>::value;

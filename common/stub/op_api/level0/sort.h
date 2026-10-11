@@ -19,8 +19,8 @@
 #include "opdev/fast_vector.h"
 
 namespace l0op {
-const std::tuple<aclTensor *, aclTensor *> Sort(const aclTensor *self, int64_t dim, bool descending, bool stable,
-                                                op::DataType indicesType, aclOpExecutor *executor);
+const std::tuple<aclTensor*, aclTensor*> Sort(const aclTensor* self, int64_t dim, bool descending, bool stable,
+                                              op::DataType indicesType, aclOpExecutor* executor);
 }
 
 #endif // PTA_NPU_OP_API_INC_LEVEL0_OP_SORT_OP_H_

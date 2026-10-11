@@ -15,9 +15,7 @@
 #ifndef ASCEND_OPS_GROUPED_MATMUL_KERNEL_H
 #define ASCEND_OPS_GROUPED_MATMUL_KERNEL_H
 
-
 #include "grouped_matmul.h"
-
 
 using namespace AscendC;
 using namespace matmul;
@@ -37,23 +35,22 @@ using yType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, MM_DTYPE_Y>;
 
 using biasType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_BIAS>;
 
-
-#define GMM_CUBE_IMP(processClass, transA, transB, sync, cfg)                                                          \
-    do {                                                                                                               \
-        if ASCEND_IS_AIV {                                                                                             \
-            return;                                                                                                    \
-        }                                                                                                              \
-        using matmulType = MMImplType<xType<transA>, weightType<transB>, yType, biasType, cfg>;                        \
-        matmulType::MT mm;                                                                                             \
-        mm.SetSubBlockIdx(0);                                                                                          \
-        mm.Init(&tilingData->mmTilingData, &tPipe);                                                                    \
-        GMMCompute<matmulType, sync> computeOp(mm);                                                                    \
-        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale, y,   \
-                       user1, &tilingData->gmmBaseParams, &tilingData->mmTilingData, &tPipe);                          \
-        processClass<decltype(computeOp)> op(computeOp);                                                               \
-        op.Init(&tilingData->gmmBaseParams, &tilingData->mmTilingData, (int32_t *)&tilingData->gmmArray.mList[0],      \
-                groupList);                                                                                            \
-        op.Process();                                                                                                  \
+#define GMM_CUBE_IMP(processClass, transA, transB, sync, cfg) \
+    do { \
+        if ASCEND_IS_AIV { \
+            return; \
+        } \
+        using matmulType = MMImplType<xType<transA>, weightType<transB>, yType, biasType, cfg>; \
+        matmulType::MT mm; \
+        mm.SetSubBlockIdx(0); \
+        mm.Init(&tilingData->mmTilingData, &tPipe); \
+        GMMCompute<matmulType, sync> computeOp(mm); \
+        computeOp.Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList, perTokenScale, y, \
+                       user1, &tilingData->gmmBaseParams, &tilingData->mmTilingData, &tPipe); \
+        processClass<decltype(computeOp)> op(computeOp); \
+        op.Init(&tilingData->gmmBaseParams, &tilingData->mmTilingData, (int32_t*)&tilingData->gmmArray.mList[0], \
+                groupList); \
+        op.Process(); \
     } while (0)
 
 template <int D_T_A, int D_T_B, int D_T_Y, int TRANS_A, int TRANS_B, int GROUP_LIST_TYPE, int IS_STATIC_TILING_API,
@@ -61,7 +58,7 @@ template <int D_T_A, int D_T_B, int D_T_Y, int TRANS_A, int TRANS_B, int GROUP_L
 __aicore__ inline void GroupedMatmulKernelImpl(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR offset,
                                                GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR groupList,
                                                GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                               GroupedMatmulTilingData *tilingData)
+                                               GroupedMatmulTilingData* tilingData)
 {
     TPipe tPipe;
     GM_ADDR user1 = GetUserWorkspace(workspace);

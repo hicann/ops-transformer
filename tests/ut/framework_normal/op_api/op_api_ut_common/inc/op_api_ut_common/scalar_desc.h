@@ -74,15 +74,15 @@ public:
     }
     ~ScalarDesc() {}
 
-    unique_ptr<aclScalar, void (*)(aclScalar *)> ToAclType() const;
-    aclScalar *ToAclTypeRawPtr() const;
-    void ToJson(json &root, bool is_input = true) const;
+    unique_ptr<aclScalar, void (*)(aclScalar*)> ToAclType() const;
+    aclScalar* ToAclTypeRawPtr() const;
+    void ToJson(json& root, bool is_input = true) const;
 
 private:
-    void SetInt8Value(void *v);
-    void SetInt16Value(void *v);
-    void SetInt32Value(void *v);
-    void SetInt64Value(void *v);
+    void SetInt8Value(void* v);
+    void SetInt16Value(void* v);
+    void SetInt32Value(void* v);
+    void SetInt64Value(void* v);
 
 private:
     union {
@@ -98,9 +98,9 @@ private:
     aclDataType data_type_;
 };
 
-aclScalar *DescToAclContainer(const ScalarDesc &scalar_desc);
-void Release(aclScalar *p);
-aclScalar *InferAclType(const ScalarDesc &scalar_desc);
-void DescToJson(json &root, const ScalarDesc &scalar_desc, bool is_input = true);
+aclScalar* DescToAclContainer(const ScalarDesc& scalar_desc);
+void Release(aclScalar* p);
+aclScalar* InferAclType(const ScalarDesc& scalar_desc);
+void DescToJson(json& root, const ScalarDesc& scalar_desc, bool is_input = true);
 
 #endif

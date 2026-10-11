@@ -19,10 +19,10 @@
 
 namespace ops::adv::tests::utils {
 
-[[maybe_unused]] bool FileExist(const std::string &filePath);
+[[maybe_unused]] bool FileExist(const std::string& filePath);
 
-[[maybe_unused]] bool ReadFile(const std::string &filePath, size_t &fileSize, void *buffer, size_t bufferSize);
+[[maybe_unused]] bool ReadFile(const std::string& filePath, size_t& fileSize, void* buffer, size_t bufferSize);
 
-[[maybe_unused]] bool WriteFile(const std::string &filePath, const void *buffer, size_t size);
+[[maybe_unused]] bool WriteFile(const std::string& filePath, const void* buffer, size_t size);
 
 } // namespace ops::adv::tests::utils

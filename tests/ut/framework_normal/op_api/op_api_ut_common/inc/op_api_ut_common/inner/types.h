@@ -15,6 +15,6 @@
 
 #define TBE_MODULE_ID 58
 
-const std::string &String(aclDataType data_type);
+const std::string& String(aclDataType data_type);
 
 #endif

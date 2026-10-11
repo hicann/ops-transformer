@@ -21,9 +21,9 @@
 #include "tests/utils/tests_utils_log.h"
 #include "tests/utils/platform.h"
 
-extern "C" int OpTilingForCompile(const char *opType, const char *compileInfo, const char *compileInfoHash,
-                                  const char *inputs, const char *outputs, const char *attrs, char *runInfoJson,
-                                  size_t runInfoLen, uint64_t *elapse, const char *extraInfo);
+extern "C" int OpTilingForCompile(const char* opType, const char* compileInfo, const char* compileInfoHash,
+                                  const char* inputs, const char* outputs, const char* attrs, char* runInfoJson,
+                                  size_t runInfoLen, uint64_t* elapse, const char* extraInfo);
 
 using namespace ops::adv::tests::utils;
 
@@ -50,9 +50,9 @@ bool Context::AddAttrs(std::vector<std::pair<std::string, std::any>> attrs)
     return true;
 }
 
-bool Context::MdfAttrs(const std::pair<std::string, std::any> &attr)
+bool Context::MdfAttrs(const std::pair<std::string, std::any>& attr)
 {
-    for (auto &a : attrs_) {
+    for (auto& a : attrs_) {
         if (a.first == attr.first) {
             a.second = attr.second;
             return true;
@@ -76,7 +76,7 @@ bool Context::SetKernelRunCbf(KernelRunCbf cbf)
     return true;
 }
 
-bool Context::SetKernelMainFunc(void *funcName)
+bool Context::SetKernelMainFunc(void* funcName)
 {
     kernelMainFunc_ = funcName;
     return true;
@@ -87,22 +87,22 @@ int32_t Context::GetTilingDataNum() const
     return tilingDataNum_;
 }
 
-const void *Context::GetTilingData() const
+const void* Context::GetTilingData() const
 {
-    return (const void *)tilingData_.data();
+    return (const void*)tilingData_.data();
 }
 
-const std::string &Context::GetTilingDataStr() const
+const std::string& Context::GetTilingDataStr() const
 {
     return tilingDataStr_;
 }
 
-const std::string &Context::GetTilingResult() const
+const std::string& Context::GetTilingResult() const
 {
     return tilingResult_;
 }
 
-bool Context::RunTiling(std::string &caseName, bool withSocversion)
+bool Context::RunTiling(std::string& caseName, bool withSocversion)
 {
     if (withSocversion) {
         fprintf(stdout, "RunTiling start and withSocversion param value is true.");
@@ -123,7 +123,7 @@ bool Context::RunTiling(std::string &caseName, bool withSocversion)
     return this->ParseTilingResult();
 }
 
-bool Context::RunKernelProcess(std::string &caseName)
+bool Context::RunKernelProcess(std::string& caseName)
 {
     if (kernelRunCbf_ == nullptr) {
         LOG_ERR("[%s:%s] Can't get kernelRunCbf_", opName_.c_str(), caseName.c_str());
@@ -154,9 +154,9 @@ bool Context::RunKernelProcess(std::string &caseName)
     /* Ascend C 框架部分, 重定向 std::cerr/std::clog/std::cout 到同一个文件 */
     std::string fmkFilePath = casePath + "_kernel_" + fmk + ".log";
     std::ofstream fmkFileHdl(fmkFilePath);
-    std::streambuf *stdErr = std::cerr.rdbuf(fmkFileHdl.rdbuf());
-    std::streambuf *stdLog = std::clog.rdbuf(fmkFileHdl.rdbuf());
-    std::streambuf *stdOut = std::cout.rdbuf(fmkFileHdl.rdbuf());
+    std::streambuf* stdErr = std::cerr.rdbuf(fmkFileHdl.rdbuf());
+    std::streambuf* stdLog = std::clog.rdbuf(fmkFileHdl.rdbuf());
+    std::streambuf* stdOut = std::cout.rdbuf(fmkFileHdl.rdbuf());
 #endif
     /* 调用回调函数, 触发具体算子 Kernel 执行 */
     ICPU_SET_TILING_KEY(tilingKey_);
@@ -179,14 +179,14 @@ bool Context::RunKernelProcess(std::string &caseName)
     return ret;
 }
 
-uint8_t *Context::AllocWorkspaceImpl(uint64_t size)
+uint8_t* Context::AllocWorkspaceImpl(uint64_t size)
 {
-    auto *ptr = (uint8_t *)AscendC::GmAlloc(size);
+    auto* ptr = (uint8_t*)AscendC::GmAlloc(size);
     LOG_IF(ptr == nullptr, LOG_ERR("AscendC::GmAlloc failed, Size(%lu)", size));
     return ptr;
 }
 
-void Context::FreeWorkspaceImpl(uint8_t *ptr)
+void Context::FreeWorkspaceImpl(uint8_t* ptr)
 {
     AscendC::GmFree(ptr);
 }
@@ -195,7 +195,7 @@ bool Context::InitTilingJsonStr()
 {
     /* 构造 Input 所需 json */
     inputsJson_ = "[";
-    for (auto &i : inputs_) {
+    for (auto& i : inputs_) {
         inputsJson_ += "\n " + i->GetTilingStr() + ",";
     }
     if (!inputs_.empty()) {
@@ -205,7 +205,7 @@ bool Context::InitTilingJsonStr()
 
     /* 构造 Output 所需 json */
     outputsJson_ = "[";
-    for (auto &o : outputs_) {
+    for (auto& o : outputs_) {
         outputsJson_ += "\n " + o->GetTilingStr() + ",";
     }
     if (!outputs_.empty()) {
@@ -215,7 +215,7 @@ bool Context::InitTilingJsonStr()
 
     /* 构造 Attrs 所需 json */
     attrsJson_ = "[";
-    for (auto &a : attrs_) {
+    for (auto& a : attrs_) {
         attrsJson_ += "\n { \"name\": \"" + a.first + "\", ";
         attrsJson_ += R"("dtype": ")";
         auto value = a.second;
@@ -311,7 +311,7 @@ bool Context::ParseTilingResult()
     return true;
 }
 
-bool Context::CheckKernelResult(bool &ret, std::string &caseName, std::string &path, const char *type,
+bool Context::CheckKernelResult(bool& ret, std::string& caseName, std::string& path, const char* type,
                                 CheckKernelResultCbf cbf, bool detail)
 {
     std::ifstream iFile;
@@ -342,14 +342,14 @@ bool Context::CheckKernelResult(bool &ret, std::string &caseName, std::string &p
     return ret;
 }
 
-bool Context::CheckModelKernelResultStr(std::string &kernelLog)
+bool Context::CheckModelKernelResultStr(std::string& kernelLog)
 {
     auto rst = kernelLog.find("ERROR") == std::string::npos;
     rst = rst && kernelLog.find("error") == std::string::npos;
     return rst;
 }
 
-bool Context::CheckFrameworkKernelResultStr(std::string &kernelLog)
+bool Context::CheckFrameworkKernelResultStr(std::string& kernelLog)
 {
     /* 不存在 Ascend C 框架感知的错误 */
     auto rst = kernelLog.find("error happened! =========") == std::string::npos;
@@ -358,7 +358,7 @@ bool Context::CheckFrameworkKernelResultStr(std::string &kernelLog)
     return rst;
 }
 
-bool Context::DetectPosit(char **bgn, char **end, const char *fPrefix, const char *fSuffix)
+bool Context::DetectPosit(char** bgn, char** end, const char* fPrefix, const char* fSuffix)
 {
     *bgn = nullptr;
     *end = nullptr;
@@ -373,26 +373,26 @@ bool Context::DetectPosit(char **bgn, char **end, const char *fPrefix, const cha
     return true;
 }
 
-void Context::DetectValue(std::string &sub, int64_t &value)
+void Context::DetectValue(std::string& sub, int64_t& value)
 {
     if (!sub.empty()) {
         value = std::stoll(sub);
     }
 }
 
-void Context::DetectValue(std::string &sub, uint64_t &value)
+void Context::DetectValue(std::string& sub, uint64_t& value)
 {
     if (!sub.empty()) {
         value = std::stoul(sub);
     }
 }
 
-void Context::DetectValue(std::string &sub, bool &value)
+void Context::DetectValue(std::string& sub, bool& value)
 {
     value = sub == "true";
 }
 
-void Context::DetectValue(std::string &sub, std::string &value)
+void Context::DetectValue(std::string& sub, std::string& value)
 {
     value = sub;
 }

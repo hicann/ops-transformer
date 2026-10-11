@@ -22,7 +22,7 @@
 #include "tests/utils/tests_utils_log.h"
 
 extern "C" {
-aclError aclrtMalloc(void **devPtr, size_t size, aclrtMemMallocPolicy policy)
+aclError aclrtMalloc(void** devPtr, size_t size, aclrtMemMallocPolicy policy)
 {
     LOG_IF_EXPR(devPtr == nullptr, LOG_ERR("Invalid parameter, devPtr is nullptr"), return ACL_ERROR_INVALID_PARAM);
     LOG_IF_EXPR(size <= 0, LOG_ERR("Invalid parameter, size = %zu", size), return ACL_ERROR_INVALID_PARAM);
@@ -31,14 +31,14 @@ aclError aclrtMalloc(void **devPtr, size_t size, aclrtMemMallocPolicy policy)
     return ACL_SUCCESS;
 }
 
-aclError aclrtFree(void *devPtr)
+aclError aclrtFree(void* devPtr)
 {
     LOG_IF_EXPR(devPtr == nullptr, LOG_ERR("Invalid parameter, devPtr is nullptr"), return ACL_ERROR_INVALID_PARAM);
     free(devPtr);
     return ACL_SUCCESS;
 }
 
-aclError aclrtMemset(void *devPtr, size_t maxCount, int32_t value, size_t count)
+aclError aclrtMemset(void* devPtr, size_t maxCount, int32_t value, size_t count)
 {
     LOG_IF_EXPR(devPtr == nullptr, LOG_ERR("Invalid parameter, devPtr is nullptr"), return ACL_ERROR_INVALID_PARAM);
     auto ret = memset_s(devPtr, maxCount, value, count);
@@ -46,7 +46,7 @@ aclError aclrtMemset(void *devPtr, size_t maxCount, int32_t value, size_t count)
     return ACL_SUCCESS;
 }
 
-aclError aclrtMemcpy(void *dst, size_t destMax, const void *src, size_t count, aclrtMemcpyKind kind)
+aclError aclrtMemcpy(void* dst, size_t destMax, const void* src, size_t count, aclrtMemcpyKind kind)
 {
     LOG_IF_EXPR(dst == nullptr, LOG_ERR("Invalid parameter, dst is nullptr"), return ACL_ERROR_INVALID_PARAM);
     LOG_IF_EXPR(dst == nullptr, LOG_ERR("Invalid parameter, src is nullptr"), return ACL_ERROR_INVALID_PARAM);

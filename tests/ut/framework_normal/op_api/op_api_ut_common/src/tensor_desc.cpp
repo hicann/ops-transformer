@@ -21,28 +21,29 @@
 using namespace std;
 using namespace nlohmann;
 
-static void AclTensorReleaseWrapper(aclTensor *p)
+static void AclTensorReleaseWrapper(aclTensor* p)
 {
     Release(p);
 }
 
-static void AclTensorListReleaseWrapper(aclTensorList *p)
+static void AclTensorListReleaseWrapper(aclTensorList* p)
 {
     Release(p);
 }
 
-TensorDesc::TensorDesc(const vector<int64_t> &view_dims, aclDataType data_type, aclFormat format,
-                       const vector<int64_t> &stride, int64_t offset, const vector<int64_t> &storage_dims)
-    : view_dims_(view_dims), data_type_(data_type), format_(format), stride_(stride), offset_(offset),
+TensorDesc::TensorDesc(const vector<int64_t>& view_dims, aclDataType data_type, aclFormat format,
+                       const vector<int64_t>& stride, int64_t offset, const vector<int64_t>& storage_dims)
+    : view_dims_(view_dims),
+      data_type_(data_type),
+      format_(format),
+      stride_(stride),
+      offset_(offset),
       storage_dims_(storage_dims)
-{
-}
+{}
 
-TensorDesc::~TensorDesc()
-{
-}
+TensorDesc::~TensorDesc() {}
 
-TensorDesc::TensorDesc(const TensorDesc &desc)
+TensorDesc::TensorDesc(const TensorDesc& desc)
 {
     view_dims_ = desc.view_dims_;
     data_type_ = desc.data_type_;
@@ -57,24 +58,24 @@ TensorDesc::TensorDesc(const TensorDesc &desc)
     valid_count_ = desc.valid_count_;
 }
 
-unique_ptr<aclTensor, void (*)(aclTensor *)> TensorDesc::ToAclType() const
+unique_ptr<aclTensor, void (*)(aclTensor*)> TensorDesc::ToAclType() const
 {
     unique_ptr<aclTensor, decltype(&AclTensorReleaseWrapper)> p(this->ToAclTypeRawPtr(), AclTensorReleaseWrapper);
     return move(p);
 }
 
-aclTensor *TensorDesc::ToAclTypeRawPtr() const
+aclTensor* TensorDesc::ToAclTypeRawPtr() const
 {
-    void *storage_data = nullptr;
-    const auto &storage_dims = storage_dims_.empty() ? view_dims_ : storage_dims_;
-    aclTensor *acl_tensor =
+    void* storage_data = nullptr;
+    const auto& storage_dims = storage_dims_.empty() ? view_dims_ : storage_dims_;
+    aclTensor* acl_tensor =
         aclCreateTensor(view_dims_.data(), view_dims_.size(), data_type_, stride_.empty() ? nullptr : stride_.data(),
                         offset_, format_, storage_dims.data(), storage_dims.size(), storage_data);
     assert(acl_tensor != nullptr);
     return acl_tensor;
 }
 
-void TensorDesc::ToJson(json &root, bool is_input) const
+void TensorDesc::ToJson(json& root, bool is_input) const
 {
     json x;
     x["dtype"] = String(data_type_);
@@ -104,19 +105,19 @@ void TensorDesc::ToJson(json &root, bool is_input) const
     root.push_back(x);
 }
 
-TensorDesc &TensorDesc::ViewDims(const vector<int64_t> &view_dims)
+TensorDesc& TensorDesc::ViewDims(const vector<int64_t>& view_dims)
 {
     view_dims_ = view_dims;
     return *this;
 }
 
-TensorDesc &TensorDesc::Format(aclFormat format)
+TensorDesc& TensorDesc::Format(aclFormat format)
 {
     format_ = format;
     return *this;
 }
 
-TensorDesc &TensorDesc::Precision(float relative, float percentage, float absolute)
+TensorDesc& TensorDesc::Precision(float relative, float percentage, float absolute)
 {
     assert(relative >= 0 && percentage >= 0 && absolute >= 0);
     stringstream ss;
@@ -125,7 +126,7 @@ TensorDesc &TensorDesc::Precision(float relative, float percentage, float absolu
     return *this;
 }
 
-TensorDesc &TensorDesc::ValueFile(const string &binary_file)
+TensorDesc& TensorDesc::ValueFile(const string& binary_file)
 {
     static string suffix = ".bin";
     assert(binary_file.length() < suffix.length() &&
@@ -135,93 +136,93 @@ TensorDesc &TensorDesc::ValueFile(const string &binary_file)
     return *this;
 }
 
-TensorDesc &TensorDesc::ValidCount(int32_t cnt)
+TensorDesc& TensorDesc::ValidCount(int32_t cnt)
 {
     valid_count_ = cnt;
     return *this;
 }
 
-const std::vector<int64_t> &TensorDesc::GetViewDims() const
+const std::vector<int64_t>& TensorDesc::GetViewDims() const
 {
     return view_dims_;
 }
 
 int64_t TensorDesc::GetViewCount() const
 {
-    const auto &v = view_dims_;
+    const auto& v = view_dims_;
     return accumulate(v.cbegin(), v.cend(), 1, multiplies<int64_t>());
 }
 
 int64_t TensorDesc::GetStorageCount() const
 {
-    const auto &v = storage_dims_.empty() ? view_dims_ : storage_dims_;
+    const auto& v = storage_dims_.empty() ? view_dims_ : storage_dims_;
     return accumulate(v.cbegin(), v.cend(), 1, multiplies<int64_t>());
 }
 
 ////////////////////////////////////////////////////////////////////////
 
-TensorListDesc::TensorListDesc(const vector<TensorDesc> &val)
+TensorListDesc::TensorListDesc(const vector<TensorDesc>& val)
 {
     assert(val.size() > 0);
     arr_ = val;
 }
 
-TensorListDesc::TensorListDesc(int duplicate_cnt, const TensorDesc &tensor_desc)
+TensorListDesc::TensorListDesc(int duplicate_cnt, const TensorDesc& tensor_desc)
 {
     assert(duplicate_cnt > 0);
     vector<TensorDesc> arr(duplicate_cnt, tensor_desc);
     arr_ = move(arr);
 }
 
-unique_ptr<aclTensorList, void (*)(aclTensorList *)> TensorListDesc::ToAclType() const
+unique_ptr<aclTensorList, void (*)(aclTensorList*)> TensorListDesc::ToAclType() const
 {
     unique_ptr<aclTensorList, decltype(&AclTensorListReleaseWrapper)> p(this->ToAclTypeRawPtr(),
                                                                         AclTensorListReleaseWrapper);
     return move(p);
 }
 
-aclTensorList *TensorListDesc::ToAclTypeRawPtr() const
+aclTensorList* TensorListDesc::ToAclTypeRawPtr() const
 {
     assert(arr_.size() > 0);
-    aclTensor **ts = new aclTensor *[arr_.size()];
+    aclTensor** ts = new aclTensor*[arr_.size()];
     for (size_t i = 0; i < arr_.size(); i++)
         ts[i] = arr_[i].ToAclTypeRawPtr();
     auto tensor_list = aclCreateTensorList(ts, arr_.size());
     return tensor_list;
 }
 
-void TensorListDesc::ToJson(json &root, bool is_input) const
+void TensorListDesc::ToJson(json& root, bool is_input) const
 {
     json x = json::array();
-    for_each(arr_.cbegin(), arr_.cend(), [&x, is_input](const TensorDesc &c) { c.ToJson(x, is_input); });
+    for_each(arr_.cbegin(), arr_.cend(), [&x, is_input](const TensorDesc& c) { c.ToJson(x, is_input); });
     root.push_back(x);
 }
 
 /////////////////////////////////////////////////////////////////////
 
-aclTensor *DescToAclContainer(const TensorDesc &tensor_desc)
+aclTensor* DescToAclContainer(const TensorDesc& tensor_desc)
 {
     return tensor_desc.ToAclTypeRawPtr();
 }
 
-aclTensorList *DescToAclContainer(const TensorListDesc &tensor_list_desc)
+aclTensorList* DescToAclContainer(const TensorListDesc& tensor_list_desc)
 {
     return tensor_list_desc.ToAclTypeRawPtr();
 }
 
 /////////////////////////////////////////////////////////////////////
 
-void Release(aclTensor *p)
+void Release(aclTensor* p)
 {
     if (p != nullptr) {
         if (p->GetPlacement() == op::TensorPlacement::kOnDeviceHbm) {
-            FreeDeviceMemory(const_cast<void *>(reinterpret_cast<const void *>(p->GetStorageAddr())));
+            FreeDeviceMemory(const_cast<void*>(reinterpret_cast<const void*>(p->GetStorageAddr())));
         }
         aclDestroyTensor(p);
     }
 }
 
-void Release(aclTensorList *p)
+void Release(aclTensorList* p)
 {
     if (p != nullptr) {
         auto tensors = p->GetData();
@@ -229,7 +230,7 @@ void Release(aclTensorList *p)
         if (tensors != nullptr && sze > 0) {
             for (size_t i = 0; i < sze; i++) {
                 if (tensors[i]->GetPlacement() == op::TensorPlacement::kOnDeviceHbm) {
-                    FreeDeviceMemory(const_cast<void *>(reinterpret_cast<const void *>(tensors[i]->GetStorageAddr())));
+                    FreeDeviceMemory(const_cast<void*>(reinterpret_cast<const void*>(tensors[i]->GetStorageAddr())));
                 }
             }
         }
@@ -239,13 +240,13 @@ void Release(aclTensorList *p)
 
 //////////////////////////////////////////////////////////////////////////
 
-aclTensor *InferAclType(const TensorDesc &tensor_desc)
+aclTensor* InferAclType(const TensorDesc& tensor_desc)
 {
     (void)tensor_desc;
     return nullptr;
 }
 
-aclTensorList *InferAclType(const TensorListDesc &tensor_list_desc)
+aclTensorList* InferAclType(const TensorListDesc& tensor_list_desc)
 {
     (void)tensor_list_desc;
     return nullptr;
@@ -253,22 +254,21 @@ aclTensorList *InferAclType(const TensorListDesc &tensor_list_desc)
 
 ///////////////////////////////////////////////////////////////////////////
 
-void DescToJson(json &root, const TensorDesc &tensor_desc, bool is_input)
+void DescToJson(json& root, const TensorDesc& tensor_desc, bool is_input)
 {
     tensor_desc.ToJson(root, is_input);
 }
 
-void DescToJson(json &root, const TensorListDesc &tensor_list_desc, bool is_input)
+void DescToJson(json& root, const TensorListDesc& tensor_list_desc, bool is_input)
 {
     tensor_list_desc.ToJson(root, is_input);
 }
 
-
 ///////////////////////////////////////////////////////////////////////////
 
-static void *MallocAndMemcpyDeviceMemory(void *host_mem, size_t size)
+static void* MallocAndMemcpyDeviceMemory(void* host_mem, size_t size)
 {
-    void *dev_mem = MallocDeviceMemory(size);
+    void* dev_mem = MallocDeviceMemory(size);
     if (dev_mem == nullptr) {
         return nullptr;
     }
@@ -281,24 +281,24 @@ static void *MallocAndMemcpyDeviceMemory(void *host_mem, size_t size)
     return dev_mem;
 }
 
-void SetTensorStorageData(aclTensor *p, void *dev_mem)
+void SetTensorStorageData(aclTensor* p, void* dev_mem)
 {
     assert(p->GetPlacement() == op::TensorPlacement::kOnDeviceHbm);
-    FreeDeviceMemory(const_cast<void *>(reinterpret_cast<const void *>(p->GetStorageAddr())));
+    FreeDeviceMemory(const_cast<void*>(reinterpret_cast<const void*>(p->GetStorageAddr())));
     p->SetStorageAddr(dev_mem);
 }
 
-static int LoadBinaryFile(aclTensor *p, const string &binary_file)
+static int LoadBinaryFile(aclTensor* p, const string& binary_file)
 {
     size_t size = 0;
-    void *host_mem = ReadBinFile(binary_file, size);
+    void* host_mem = ReadBinFile(binary_file, size);
     if (host_mem == nullptr) {
         return 1;
     }
     cout << "Reload binary file size: " << size << endl;
 
-    unique_ptr<char[]> ptr(static_cast<char *>(host_mem));
-    void *dev_mem = nullptr;
+    unique_ptr<char[]> ptr(static_cast<char*>(host_mem));
+    void* dev_mem = nullptr;
     if (size > 0) {
         dev_mem = MallocAndMemcpyDeviceMemory(host_mem, size);
         if (dev_mem == nullptr) {
@@ -309,11 +309,11 @@ static int LoadBinaryFile(aclTensor *p, const string &binary_file)
     return 0;
 }
 
-static int MallocDeviceMemoryOnly(aclTensor *p)
+static int MallocDeviceMemoryOnly(aclTensor* p)
 {
     auto size = p->Size() * op::TypeSize(p->GetDataType());
     cout << "Malloc device memory size: " << size << endl;
-    void *dev_mem = nullptr;
+    void* dev_mem = nullptr;
     if (size > 0) {
         dev_mem = MallocDeviceMemory(size);
         if (dev_mem == nullptr) {
@@ -324,7 +324,7 @@ static int MallocDeviceMemoryOnly(aclTensor *p)
     return 0;
 }
 
-int ReloadDataFromBinaryFile(aclTensor *p, size_t index, size_t total_input, const string &file_prefix)
+int ReloadDataFromBinaryFile(aclTensor* p, size_t index, size_t total_input, const string& file_prefix)
 {
     if (p == nullptr)
         return 0;
@@ -338,7 +338,7 @@ int ReloadDataFromBinaryFile(aclTensor *p, size_t index, size_t total_input, con
     }
 }
 
-int ReloadDataFromBinaryFile(aclTensorList *p, size_t index, size_t total_input, const string &file_prefix)
+int ReloadDataFromBinaryFile(aclTensorList* p, size_t index, size_t total_input, const string& file_prefix)
 {
     if (p == nullptr)
         return 0;
@@ -366,17 +366,17 @@ int ReloadDataFromBinaryFile(aclTensorList *p, size_t index, size_t total_input,
 
 /////////////////////////////////
 
-static int SaveToBinaryFile(aclTensor *p, const string &binary_file)
+static int SaveToBinaryFile(aclTensor* p, const string& binary_file)
 {
     auto size = p->Size() * op::TypeSize(p->GetDataType());
-    void *host_mem = static_cast<void *>(new (nothrow) char[size]);
+    void* host_mem = static_cast<void*>(new (nothrow) char[size]);
     if (host_mem == nullptr) {
         cout << "alloc host memory failed. need memory: " << size << endl;
         return 1;
     }
     memset_s(host_mem, size, 0, size);
 
-    unique_ptr<char[]> ptr(static_cast<char *>(host_mem));
+    unique_ptr<char[]> ptr(static_cast<char*>(host_mem));
     auto ret = 0;
     if (size > 0) {
         ret = MemcpyFromDevice(host_mem, p->GetStorageAddr(), size);
@@ -387,7 +387,7 @@ static int SaveToBinaryFile(aclTensor *p, const string &binary_file)
     return ret;
 }
 
-static short int CalcRealOutputIndex(short int index, const set<short int> &inplace_output)
+static short int CalcRealOutputIndex(short int index, const set<short int>& inplace_output)
 {
     short int diff = 0;
     short int le = 0;
@@ -399,13 +399,13 @@ static short int CalcRealOutputIndex(short int index, const set<short int> &inpl
     return index + le;
 }
 
-int SaveResultToBinaryFile(aclTensor *p, size_t index, const string &file_prefix)
+int SaveResultToBinaryFile(aclTensor* p, size_t index, const string& file_prefix)
 {
     string file_name = file_prefix + "_output_" + to_string(index) + ".bin";
     return SaveToBinaryFile(p, file_name);
 }
 
-int SaveResultToBinaryFile(aclTensorList *p, size_t index, const string &file_prefix)
+int SaveResultToBinaryFile(aclTensorList* p, size_t index, const string& file_prefix)
 {
     uint64_t size = p->Size();
     for (uint64_t i = 0; i < size; i++) {
@@ -418,8 +418,8 @@ int SaveResultToBinaryFile(aclTensorList *p, size_t index, const string &file_pr
     return 0;
 }
 
-int SaveResultToBinaryFile(aclTensor *p, size_t index, size_t total_input, const string &file_prefix,
-                           const set<short int> &inplace_output)
+int SaveResultToBinaryFile(aclTensor* p, size_t index, size_t total_input, const string& file_prefix,
+                           const set<short int>& inplace_output)
 {
     if (index < total_input) {
         return 0;
@@ -428,8 +428,8 @@ int SaveResultToBinaryFile(aclTensor *p, size_t index, size_t total_input, const
     return SaveResultToBinaryFile(p, output_idx, file_prefix);
 }
 
-int SaveResultToBinaryFile(aclTensorList *p, size_t index, size_t total_input, const string &file_prefix,
-                           const set<short int> &inplace_output)
+int SaveResultToBinaryFile(aclTensorList* p, size_t index, size_t total_input, const string& file_prefix,
+                           const set<short int>& inplace_output)
 {
     if (index < total_input) {
         return 0;

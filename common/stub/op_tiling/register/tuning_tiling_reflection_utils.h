@@ -64,14 +64,14 @@ struct StructInfo {
 #define FIELD(class, FieldName) std::make_tuple(#FieldName, &class ::FieldName)
 
 template <typename Fn, typename Tuple, typename Field, std::size_t... Is>
-void ForEachTuple(Tuple &&tuple, Field &&fields, Fn &&fn, index_sequence<Is...>)
+void ForEachTuple(Tuple&& tuple, Field&& fields, Fn&& fn, index_sequence<Is...>)
 {
     (void)std::initializer_list<size_t>{
         (fn(std::get<0>(std::get<Is>(fields)), tuple.*std::get<1>(std::get<Is>(fields))), Is)...};
 }
 
 template <typename Fn, typename Tuple>
-void ForEachTuple(Tuple &&tuple, Fn &&fn)
+void ForEachTuple(Tuple&& tuple, Fn&& fn)
 {
     const auto fields = StructInfo<decay_t<Tuple>>::Info();
     ForEachTuple(std::forward<Tuple>(tuple), fields, std::forward<Fn>(fn),
@@ -106,7 +106,7 @@ constexpr bool IsSerializeType()
 }
 
 template <typename T, typename Fn>
-void ForEachField(T &&value, Fn &&fn)
+void ForEachField(T&& value, Fn&& fn)
 {
     ForEachTuple(std::forward<T>(value), std::forward<Fn>(fn));
 }
@@ -114,8 +114,8 @@ void ForEachField(T &&value, Fn &&fn)
 template <typename Fn>
 struct DumpFunctor;
 
-template <typename T, typename Js, enable_if_t<!IsSerializeType<T>()> * = nullptr>
-void DumpObj(T &&obj, const std::string &field_name, Js &j)
+template <typename T, typename Js, enable_if_t<!IsSerializeType<T>()>* = nullptr>
+void DumpObj(T&& obj, const std::string& field_name, Js& j)
 {
     if (field_name.empty()) {
         ForEachField(std::forward<T>(obj), DumpFunctor<Js>(j));
@@ -124,8 +124,8 @@ void DumpObj(T &&obj, const std::string &field_name, Js &j)
     ForEachField(std::forward<T>(obj), DumpFunctor<Js>(j[field_name]));
 }
 
-template <typename T, typename Js, enable_if_t<IsSerializeType<T>()> * = nullptr>
-void DumpObj(T &&obj, const std::string &field_name, Js &j)
+template <typename T, typename Js, enable_if_t<IsSerializeType<T>()>* = nullptr>
+void DumpObj(T&& obj, const std::string& field_name, Js& j)
 {
     if (field_name.empty()) {
         return;
@@ -135,22 +135,22 @@ void DumpObj(T &&obj, const std::string &field_name, Js &j)
 
 template <typename T>
 struct DumpFunctor {
-    explicit DumpFunctor(T &j)
+    explicit DumpFunctor(T& j)
         : js(j)
     {}
     template <typename Name, typename Field>
-    void operator()(Name &&name, Field &&field) const
+    void operator()(Name&& name, Field&& field) const
     {
         DumpObj(std::forward<Field>(field), std::forward<Name>(name), js);
     }
-    T &js;
+    T& js;
 };
 
 template <typename Fn>
 struct FromJsonFunctor;
 
-template <typename T, typename Js, enable_if_t<!IsSerializeType<T>()> * = nullptr>
-void FromJsonImpl(T &&obj, const std::string &field_name, const Js &j)
+template <typename T, typename Js, enable_if_t<!IsSerializeType<T>()>* = nullptr>
+void FromJsonImpl(T&& obj, const std::string& field_name, const Js& j)
 {
     if (field_name.empty()) {
         ForEachField(std::forward<T>(obj), FromJsonFunctor<Js>(j));
@@ -162,8 +162,8 @@ void FromJsonImpl(T &&obj, const std::string &field_name, const Js &j)
     ForEachField(std::forward<T>(obj), FromJsonFunctor<Js>(j[field_name]));
 }
 
-template <typename T, typename Js, enable_if_t<IsSerializeType<T>()> * = nullptr>
-void FromJsonImpl(T &&obj, const std::string &field_name, const Js &j)
+template <typename T, typename Js, enable_if_t<IsSerializeType<T>()>* = nullptr>
+void FromJsonImpl(T&& obj, const std::string& field_name, const Js& j)
 {
     // ignore missing field of optional
     if ((tuningtiling::is_optional_v<decltype(obj)>()) || (j.find(field_name) == j.cend())) {
@@ -174,15 +174,15 @@ void FromJsonImpl(T &&obj, const std::string &field_name, const Js &j)
 
 template <typename Js>
 struct FromJsonFunctor {
-    explicit FromJsonFunctor(const Js &j)
+    explicit FromJsonFunctor(const Js& j)
         : js(j)
     {}
     template <typename Name, typename Field>
-    void operator()(Name &&name, Field &&field) const
+    void operator()(Name&& name, Field&& field) const
     {
         FromJsonImpl(std::forward<Field>(field), std::forward<Name>(name), js);
     }
-    const Js &js;
+    const Js& js;
 };
 } // namespace tuningtiling
 #endif

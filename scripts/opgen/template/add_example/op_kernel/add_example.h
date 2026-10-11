@@ -31,7 +31,7 @@ class AddExample {
 public:
     __aicore__ inline AddExample(){};
 
-    __aicore__ inline void Init(GM_ADDR x, GM_ADDR y, GM_ADDR z, const AddExampleTilingData *tilingData);
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR y, GM_ADDR z, const AddExampleTilingData* tilingData);
     __aicore__ inline void Process();
 
 private:
@@ -55,15 +55,15 @@ private:
 };
 
 template <typename T>
-__aicore__ inline void AddExample<T>::Init(GM_ADDR x, GM_ADDR y, GM_ADDR z, const AddExampleTilingData *tilingData)
+__aicore__ inline void AddExample<T>::Init(GM_ADDR x, GM_ADDR y, GM_ADDR z, const AddExampleTilingData* tilingData)
 {
     blockLength_ = tilingData->totalLength / AscendC::GetBlockNum();
     tileNum_ = tilingData->tileNum;
     tileLength_ = blockLength_ / tileNum_ / BUFFER_NUM;
 
-    inputGMX.SetGlobalBuffer((__gm__ T *)x + blockLength_ * AscendC::GetBlockIdx(), blockLength_);
-    inputGMY.SetGlobalBuffer((__gm__ T *)y + blockLength_ * AscendC::GetBlockIdx(), blockLength_);
-    outputGMZ.SetGlobalBuffer((__gm__ T *)z + blockLength_ * AscendC::GetBlockIdx(), blockLength_);
+    inputGMX.SetGlobalBuffer((__gm__ T*)x + blockLength_ * AscendC::GetBlockIdx(), blockLength_);
+    inputGMY.SetGlobalBuffer((__gm__ T*)y + blockLength_ * AscendC::GetBlockIdx(), blockLength_);
+    outputGMZ.SetGlobalBuffer((__gm__ T*)z + blockLength_ * AscendC::GetBlockIdx(), blockLength_);
 
     pipe.InitBuffer(inputQueueX, BUFFER_NUM, tileLength_ * sizeof(T));
     pipe.InitBuffer(inputQueueY, BUFFER_NUM, tileLength_ * sizeof(T));

@@ -14,10 +14,10 @@
 #include "aclnn/aclnn_base.h"
 
 extern "C" {
-aclnnStatus NnopbaseRunForWorkspace(void *executor, uint64_t *workspaceLen);
-aclnnStatus NnopbaseSetHcomGroup(void *const executor, char *const group);
-aclnnStatus NnopbaseDisableOptionalInput(void *executor, const size_t irIndex);
-aclnnStatus NnopbaseRunWithWorkspace(void *executor, aclrtStream stream, void *workspace, uint64_t workspaceSize);
-void NnopbaseSetHcclServerType(void *executor, uint32_t sType);
+aclnnStatus NnopbaseRunForWorkspace(void* executor, uint64_t* workspaceLen);
+aclnnStatus NnopbaseSetHcomGroup(void* const executor, char* const group);
+aclnnStatus NnopbaseDisableOptionalInput(void* executor, const size_t irIndex);
+aclnnStatus NnopbaseRunWithWorkspace(void* executor, aclrtStream stream, void* workspace, uint64_t workspaceSize);
+void NnopbaseSetHcclServerType(void* executor, uint32_t sType);
 }
 #endif // OPS_TRANSFORMER_DEV_TESTS_UT_OP_API_STUB_OPDEV_NNOPBASE_H

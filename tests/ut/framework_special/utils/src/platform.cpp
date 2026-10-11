@@ -18,12 +18,12 @@
 #include "tests/utils/tests_utils_log.h"
 
 namespace {
-ops::adv::tests::utils::Platform *g_PlatformPtr = nullptr;
+ops::adv::tests::utils::Platform* g_PlatformPtr = nullptr;
 } // namespace
 
 namespace ops::adv::tests::utils {
 
-bool Platform::SocSpec::Get(const char *label, const char *key, std::any &value) const
+bool Platform::SocSpec::Get(const char* label, const char* key, std::any& value) const
 {
     auto kvPair = spec.find(label);
     if (kvPair == spec.end()) {
@@ -39,7 +39,7 @@ bool Platform::SocSpec::Get(const char *label, const char *key, std::any &value)
     return true;
 }
 
-bool Platform::SocSpec::Get(const char *label, const char *key, std::string &value) const
+bool Platform::SocSpec::Get(const char* label, const char* key, std::string& value) const
 {
     std::any any;
     if (this->Get(label, key, any)) {
@@ -58,7 +58,7 @@ bool Platform::SocSpec::Get(const char *label, const char *key, std::string &val
     return false;
 }
 
-bool Platform::SocSpec::Get(const char *label, const char *key, uint32_t &value) const
+bool Platform::SocSpec::Get(const char* label, const char* key, uint32_t& value) const
 {
     std::any any;
     if (this->Get(label, key, any)) {
@@ -73,7 +73,7 @@ bool Platform::SocSpec::Get(const char *label, const char *key, uint32_t &value)
     return false;
 }
 
-bool Platform::SocSpec::Get(const char *label, const char *key, uint64_t &value) const
+bool Platform::SocSpec::Get(const char* label, const char* key, uint64_t& value) const
 {
     std::any any;
     if (this->Get(label, key, any)) {
@@ -88,17 +88,17 @@ bool Platform::SocSpec::Get(const char *label, const char *key, uint64_t &value)
     return false;
 }
 
-void Platform::SetGlobalPlatform(Platform *platform)
+void Platform::SetGlobalPlatform(Platform* platform)
 {
     g_PlatformPtr = platform;
 }
 
-Platform *Platform::GetGlobalPlatform()
+Platform* Platform::GetGlobalPlatform()
 {
     return g_PlatformPtr;
 }
 
-bool Platform::InitArgsInfo(int argc, char **argv)
+bool Platform::InitArgsInfo(int argc, char** argv)
 {
     /**
      * 解析输入, 获取 current work directory
@@ -112,12 +112,12 @@ bool Platform::InitArgsInfo(int argc, char **argv)
     return true;
 }
 
-const char *Platform::GetExeAbsPath()
+const char* Platform::GetExeAbsPath()
 {
     return exeAbsPath_.c_str();
 }
 
-Platform &Platform::SetSocVersion(const SocVersion &socVersion)
+Platform& Platform::SetSocVersion(const SocVersion& socVersion)
 {
     switch (socVersion) {
         case SocVersion::Ascend910B1:
@@ -381,7 +381,7 @@ int64_t Platform::GetBlockDim() const
     return blockDim;
 }
 
-void *Platform::LoadSo(const char *absPath, int mode)
+void* Platform::LoadSo(const char* absPath, int mode)
 {
     auto soHdl = dlopen(absPath, mode);
     if (soHdl == nullptr) {
@@ -391,7 +391,7 @@ void *Platform::LoadSo(const char *absPath, int mode)
     return soHdl;
 }
 
-bool Platform::UnLoadSo(void *hdl)
+bool Platform::UnLoadSo(void* hdl)
 {
     if (dlclose(hdl) != 0) {
         LOG_ERR("dlclose error %s", dlerror());
@@ -400,7 +400,7 @@ bool Platform::UnLoadSo(void *hdl)
     return true;
 }
 
-void *Platform::LoadSoSym(void *hdl, const char *name)
+void* Platform::LoadSoSym(void* hdl, const char* name)
 {
     return dlsym(hdl, name);
 }
@@ -422,7 +422,7 @@ bool Platform::UnLoadOpTilingSo()
     return rst;
 }
 
-void *Platform::LoadOpTilingSoSym(const char *name)
+void* Platform::LoadOpTilingSoSym(const char* name)
 {
     return this->LoadSoSym(tilingSoHdl_, name);
 }

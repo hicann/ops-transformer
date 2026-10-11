@@ -23,7 +23,7 @@ public:
     KernelRunContextHolder() = default;
     ~KernelRunContextHolder() = default;
 
-    KernelRunContextHolder &operator=(KernelRunContextHolder &&holder)
+    KernelRunContextHolder& operator=(KernelRunContextHolder&& holder)
     {
         context_ = holder.context_;
         opType_ = std::move(holder.opType_);
@@ -41,25 +41,25 @@ public:
         inferDataTypeContextHolder_ = std::move(holder.inferDataTypeContextHolder_);
         return *this;
     }
-    KernelRunContextHolder(KernelRunContextHolder &&holder)
+    KernelRunContextHolder(KernelRunContextHolder&& holder)
     {
         KernelRunContextHolder::operator=(std::move(holder));
     }
 
-    void SetContext(void *context)
+    void SetContext(void* context)
     {
         context_ = context;
     }
 
     template <typename T>
-    T *GetContext()
+    T* GetContext()
     {
-        return static_cast<T *>(context_);
+        return static_cast<T*>(context_);
     }
 
 protected:
     // 需要在holder里存储部分数据，避免这些数据在Context析构前就被释放
-    void *context_ = nullptr;
+    void* context_ = nullptr;
     std::string opType_;
     std::vector<StorageShape> outputShapes_;
     std::vector<Tensor> inputTensors_;

@@ -23,11 +23,11 @@ struct TilingInfo {
     size_t blockNum = 0;
 };
 
-void ExecuteTestCase(const gert::TilingContextPara &tilingContextPara, ge::graphStatus expectResult = ge::GRAPH_FAILED,
-                     uint64_t expectTilingKey = 0, const string &expectTilingData = "",
-                     const std::vector<size_t> &expectWorkspaces = {}, uint64_t tilingDataReservedLen = 0,
+void ExecuteTestCase(const gert::TilingContextPara& tilingContextPara, ge::graphStatus expectResult = ge::GRAPH_FAILED,
+                     uint64_t expectTilingKey = 0, const string& expectTilingData = "",
+                     const std::vector<size_t>& expectWorkspaces = {}, uint64_t tilingDataReservedLen = 0,
                      bool useHashTilingData = false);
 
-bool ExecuteTiling(const gert::TilingContextPara &tilingContextPara, TilingInfo &tilingInfo);
+bool ExecuteTiling(const gert::TilingContextPara& tilingContextPara, TilingInfo& tilingInfo);
 
 #endif // OPS_TRANSFORMER_DEV_TESTS_UT_COMMON_TILING_CASE_EXECUTOR_H

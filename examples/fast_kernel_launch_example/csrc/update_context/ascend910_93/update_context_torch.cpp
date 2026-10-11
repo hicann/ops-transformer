@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-
 /*!
  * \file abs.cpp
  * \brief
@@ -33,7 +32,7 @@ TORCH_LIBRARY_FRAGMENT(EXTENSION_MODULE_NAME, m)
     m.def("updateContext(Tensor x, str group_ep, int ep_world_size) -> (Tensor, int)");
 }
 
-static int32_t CreatMc2Context(HcclComm &comm, int64_t worldSize, int64_t &cclBufferSize, Mc2ContextStru *mc2Context)
+static int32_t CreatMc2Context(HcclComm& comm, int64_t worldSize, int64_t& cclBufferSize, Mc2ContextStru* mc2Context)
 {
     uint32_t ctxIndex = 0;
 
@@ -42,7 +41,7 @@ static int32_t CreatMc2Context(HcclComm &comm, int64_t worldSize, int64_t &cclBu
     mc2Context[ctxIndex].epRankId = rankId;
 
     for (uint64_t remoteRankId = 0; remoteRankId < worldSize; remoteRankId++) {
-        void *remoteAddr = nullptr;
+        void* remoteAddr = nullptr;
         uint64_t commSize = 0; // 出参, HCCL_BUFFER_SIZE=, 校验
         HcclResult ret;
         if (rankId == remoteRankId) {
@@ -58,17 +57,16 @@ static int32_t CreatMc2Context(HcclComm &comm, int64_t worldSize, int64_t &cclBu
     return 0;
 }
 
-
-static int32_t CreateHcclContext(HcclComm &commHandle, void *opArgs, int64_t worldSize, const char *groupName,
+static int32_t CreateHcclContext(HcclComm& commHandle, void* opArgs, int64_t worldSize, const char* groupName,
                                  std::string algConfig, uint32_t opType)
 {
-    HcclResult ret = static_cast<HcclResult>(HcclKfcOpArgsSetAlgConfig(opArgs, const_cast<char *>(algConfig.c_str())));
+    HcclResult ret = static_cast<HcclResult>(HcclKfcOpArgsSetAlgConfig(opArgs, const_cast<char*>(algConfig.c_str())));
     TORCH_CHECK(ret == 0, "HcclKfcOpArgsSetAlgConfig failed, ret:", ret);
 
     ret = static_cast<HcclResult>(HcclCommGetHandleWithName(groupName, &commHandle));
     TORCH_CHECK(ret == 0, "HcclGetCommHandle failed, ret:", ret);
 
-    void *opsResCtx;
+    void* opsResCtx;
     ret = static_cast<HcclResult>(HcclCreateOpResCtx(commHandle, opType, opArgs, &opsResCtx)); // 构造Context
     TORCH_CHECK(ret == 0, "HcclCreateOpResCtx failed, ret:", ret);
 
@@ -88,10 +86,10 @@ static int32_t CreateHcclContext(HcclComm &commHandle, void *opArgs, int64_t wor
     return 0;
 }
 
-static int32_t GetMc2Context(Mc2ContextStru *mc2ContextHost, int64_t epWorldSize, int64_t &cclBufferSize,
-                             const char *groupEpStr)
+static int32_t GetMc2Context(Mc2ContextStru* mc2ContextHost, int64_t epWorldSize, int64_t& cclBufferSize,
+                             const char* groupEpStr)
 {
-    void *opArgs = nullptr;
+    void* opArgs = nullptr;
     HcclResult ret = static_cast<HcclResult>(HcclKfcAllocOpArgs(&opArgs));
     TORCH_CHECK(ret == 0, "HcclKfcAllocOpArgs failed, ret:", ret);
 
@@ -117,7 +115,7 @@ static int32_t GetMc2Context(Mc2ContextStru *mc2ContextHost, int64_t epWorldSize
  * @param x Input Tensor (on NPU)
  * @return Result Tensor
  */
-std::tuple<at::Tensor, int64_t> update_context(const at::Tensor &x, c10::string_view group_ep, int64_t ep_world_size)
+std::tuple<at::Tensor, int64_t> update_context(const at::Tensor& x, c10::string_view group_ep, int64_t ep_world_size)
 {
     bool isSameGroup = false;
     std::string new_group_ep_str = std::string(group_ep);
@@ -125,7 +123,6 @@ std::tuple<at::Tensor, int64_t> update_context(const at::Tensor &x, c10::string_
     if (isInit && isSameGroup) {
         return std::make_tuple(output, bufferSize);
     }
-
 
     Mc2ContextStru mc2ContextHost[2];
     int32_t ret = GetMc2Context(mc2ContextHost, ep_world_size, bufferSize, new_group_ep_str.c_str());

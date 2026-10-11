@@ -79,7 +79,7 @@ struct PseInfo {
 };
 
 template <typename INPUT_T, bool hasPse>
-__aicore__ inline void DataCopyInCommon(LocalTensor<INPUT_T> &dstTensor, GlobalTensor<INPUT_T> &srcTensor,
+__aicore__ inline void DataCopyInCommon(LocalTensor<INPUT_T>& dstTensor, GlobalTensor<INPUT_T>& srcTensor,
                                         int64_t offset, int64_t s1Size, int64_t s2Size, int64_t actualS2Len,
                                         int32_t dtypeSize, int32_t alignedS2Size)
 {
@@ -107,7 +107,7 @@ __aicore__ inline void DataCopyInCommon(LocalTensor<INPUT_T> &dstTensor, GlobalT
 }
 
 template <typename INPUT_T, bool hasPse>
-__aicore__ inline void DataCopyIn(LocalTensor<INPUT_T> &dstTensor, GlobalTensor<INPUT_T> &srcTensor, int64_t offset,
+__aicore__ inline void DataCopyIn(LocalTensor<INPUT_T>& dstTensor, GlobalTensor<INPUT_T>& srcTensor, int64_t offset,
                                   int64_t s1Size, int64_t s2Size, int64_t actualS2Len, int64_t alignedSize = 16)
 {
     if constexpr (hasPse == true) {
@@ -119,7 +119,7 @@ __aicore__ inline void DataCopyIn(LocalTensor<INPUT_T> &dstTensor, GlobalTensor<
 }
 
 template <typename INPUT_T, bool hasPse>
-__aicore__ inline void DataCopyInAlign8(LocalTensor<INPUT_T> &dstTensor, GlobalTensor<INPUT_T> &srcTensor,
+__aicore__ inline void DataCopyInAlign8(LocalTensor<INPUT_T>& dstTensor, GlobalTensor<INPUT_T>& srcTensor,
                                         int64_t offset, int64_t s1Size, int64_t s2Size, int64_t actualS2Len)
 {
     if constexpr (hasPse == true) {
@@ -140,7 +140,7 @@ src1 shape: (1, s2)
 dst  shape: (s1, s2)
 */
 template <typename T, bool hasPse>
-__aicore__ inline void BroadcastAdd(const LocalTensor<T> &src0Tensor, const LocalTensor<T> &src1Tensor,
+__aicore__ inline void BroadcastAdd(const LocalTensor<T>& src0Tensor, const LocalTensor<T>& src1Tensor,
                                     int64_t src0Offset, int32_t src1Size, int32_t repeatTimes)
 {
     if constexpr (hasPse == true) {
@@ -172,8 +172,8 @@ __aicore__ inline void BroadcastAdd(const LocalTensor<T> &src0Tensor, const Loca
 }
 
 template <typename T, bool hasPse>
-__aicore__ inline void PseBroadcastAdd(int32_t s1Size, int32_t s2Size, int32_t computeSize, const LocalTensor<T> &pseUb,
-                                       const LocalTensor<T> &dstTensor, uint32_t pseShapeType)
+__aicore__ inline void PseBroadcastAdd(int32_t s1Size, int32_t s2Size, int32_t computeSize, const LocalTensor<T>& pseUb,
+                                       const LocalTensor<T>& dstTensor, uint32_t pseShapeType)
 {
     if constexpr (hasPse == true) {
         if (pseShapeType == pseS1S2 || pseShapeType == pseSlopeBn || pseShapeType == pseSlopeN) {
@@ -195,7 +195,7 @@ __aicore__ inline void PseBroadcastAdd(int32_t s1Size, int32_t s2Size, int32_t c
     }
 }
 template <bool hasPse>
-__aicore__ inline int64_t PseComputeOffset(PseInfo &pseInfo)
+__aicore__ inline int64_t PseComputeOffset(PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         int64_t bOffset = 0;
@@ -227,7 +227,7 @@ __aicore__ inline int64_t PseComputeOffset(PseInfo &pseInfo)
 }
 
 template <LayOutTypeEnum layOutType, bool hasPse>
-__aicore__ inline int64_t PseAlibiComputeOffset(PseInfo &pseInfo)
+__aicore__ inline int64_t PseAlibiComputeOffset(PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         int64_t bOffset = (pseInfo.boIdx % pseInfo.pseBSize) * pseInfo.n2G * pseInfo.pseS2Size * pseInfo.pseS1Size;
@@ -275,7 +275,7 @@ __aicore__ inline int64_t PseAlibiComputeOffset(PseInfo &pseInfo)
 }
 
 template <bool hasPse>
-__aicore__ inline bool NeedPseAlibiCompute(PseInfo &pseInfo)
+__aicore__ inline bool NeedPseAlibiCompute(PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         // Alibi编码只计算下三角
@@ -291,8 +291,8 @@ __aicore__ inline bool NeedPseAlibiCompute(PseInfo &pseInfo)
 }
 
 template <typename INPUT_T, typename T, LayOutTypeEnum layOutType, bool hasPse>
-__aicore__ inline void PseAlibiCopyIn(LocalTensor<T> &dstTensor, LocalTensor<INPUT_T> &tmpTensor,
-                                      GlobalTensor<INPUT_T> &srcTensor, PseInfo &pseInfo, int64_t alignedSize = 16)
+__aicore__ inline void PseAlibiCopyIn(LocalTensor<T>& dstTensor, LocalTensor<INPUT_T>& tmpTensor,
+                                      GlobalTensor<INPUT_T>& srcTensor, PseInfo& pseInfo, int64_t alignedSize = 16)
 {
     if constexpr (hasPse == true) {
         if (!NeedPseAlibiCompute<hasPse>(pseInfo)) {
@@ -323,8 +323,8 @@ __aicore__ inline void PseAlibiCopyIn(LocalTensor<T> &dstTensor, LocalTensor<INP
 }
 
 template <typename T, bool hasPse>
-__aicore__ inline void PseSlopeCopyIn(LocalTensor<T> &dstTensor, LocalTensor<half> &helpTensor,
-                                      __gm__ uint8_t *pseSlope, GlobalTensor<half> &alibiGm, PseInfo &pseInfo,
+__aicore__ inline void PseSlopeCopyIn(LocalTensor<T>& dstTensor, LocalTensor<half>& helpTensor,
+                                      __gm__ uint8_t* pseSlope, GlobalTensor<half>& alibiGm, PseInfo& pseInfo,
                                       int64_t alignedSize = 16)
 {
     if constexpr (hasPse == true) {
@@ -358,7 +358,7 @@ __aicore__ inline void PseSlopeCopyIn(LocalTensor<T> &dstTensor, LocalTensor<hal
             AscendC::PipeBarrier<PIPE_V>();
             Abs(dstTensor, dstTensor, computeSize);
             AscendC::PipeBarrier<PIPE_V>();
-            float slopes = ((__gm__ T *)pseSlope)[offset] * -1;
+            float slopes = ((__gm__ T*)pseSlope)[offset] * -1;
             if (pseInfo.pseType == (uint32_t)PseTypeEnum::PSE_INNER_MUL_ADD_SQRT_TYPE) {
                 Sqrt(dstTensor, dstTensor, computeSize);
                 AscendC::PipeBarrier<PIPE_V>();
@@ -370,8 +370,8 @@ __aicore__ inline void PseSlopeCopyIn(LocalTensor<T> &dstTensor, LocalTensor<hal
 }
 
 template <typename T, bool hasPse>
-__aicore__ inline void PseSlopeCast(LocalTensor<T> &dstTensor, LocalTensor<half> &helpTensor, __gm__ uint8_t *pseSlope,
-                                    PseInfo &pseInfo)
+__aicore__ inline void PseSlopeCast(LocalTensor<T>& dstTensor, LocalTensor<half>& helpTensor, __gm__ uint8_t* pseSlope,
+                                    PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         int64_t bOffset = 0;
@@ -396,7 +396,7 @@ __aicore__ inline void PseSlopeCast(LocalTensor<T> &dstTensor, LocalTensor<half>
         AscendC::PipeBarrier<PIPE_V>();
         Abs(dstTensor, dstTensor, computeSize);
         AscendC::PipeBarrier<PIPE_V>();
-        float slopes = ((__gm__ T *)pseSlope)[offset] * -1;
+        float slopes = ((__gm__ T*)pseSlope)[offset] * -1;
         if (pseInfo.pseType == (uint32_t)PseTypeEnum::PSE_INNER_MUL_ADD_SQRT_TYPE) {
             Sqrt(dstTensor, dstTensor, computeSize);
             AscendC::PipeBarrier<PIPE_V>();
@@ -407,8 +407,8 @@ __aicore__ inline void PseSlopeCast(LocalTensor<T> &dstTensor, LocalTensor<half>
 }
 
 template <typename INPUT_T, typename T, LayOutTypeEnum layOutType, bool hasPse>
-__aicore__ inline void PseCopyIn(LocalTensor<T> &dstTensor, LocalTensor<INPUT_T> &tmpTensor,
-                                 GlobalTensor<INPUT_T> &srcTensor, PseInfo &pseInfo, int64_t alignedSize = 16)
+__aicore__ inline void PseCopyIn(LocalTensor<T>& dstTensor, LocalTensor<INPUT_T>& tmpTensor,
+                                 GlobalTensor<INPUT_T>& srcTensor, PseInfo& pseInfo, int64_t alignedSize = 16)
 {
     if constexpr (hasPse == true) {
         if (pseInfo.pseEncodeType == pseEncodeALibiS2Full) {
@@ -442,7 +442,7 @@ __aicore__ inline void PseCopyIn(LocalTensor<T> &dstTensor, LocalTensor<INPUT_T>
 }
 
 template <typename T, bool hasPse>
-__aicore__ inline void PseAlibiCompute(LocalTensor<T> &dstTensor, LocalTensor<T> &pseTensor, PseInfo &pseInfo)
+__aicore__ inline void PseAlibiCompute(LocalTensor<T>& dstTensor, LocalTensor<T>& pseTensor, PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         if (!NeedPseAlibiCompute<hasPse>(pseInfo)) {
@@ -454,7 +454,7 @@ __aicore__ inline void PseAlibiCompute(LocalTensor<T> &dstTensor, LocalTensor<T>
 }
 
 template <typename T, bool hasPse>
-__aicore__ inline void PseCompute(LocalTensor<T> &dstTensor, LocalTensor<T> &pseTensor, PseInfo &pseInfo)
+__aicore__ inline void PseCompute(LocalTensor<T>& dstTensor, LocalTensor<T>& pseTensor, PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         if (pseInfo.pseEncodeType == pseEncodeALibiS2Full) {
@@ -471,8 +471,8 @@ __aicore__ inline void PseCompute(LocalTensor<T> &dstTensor, LocalTensor<T> &pse
 }
 
 template <bool hasPse>
-__aicore__ inline void PseInnerAlibiCreate(GlobalTensor<half> &dstTensor, LocalTensor<half> &helpTensor,
-                                           PseInfo &pseInfo)
+__aicore__ inline void PseInnerAlibiCreate(GlobalTensor<half>& dstTensor, LocalTensor<half>& helpTensor,
+                                           PseInfo& pseInfo)
 {
     if constexpr (hasPse == true) {
         if (pseInfo.pseType != (uint32_t)PseTypeEnum::PSE_INNER_MUL_ADD_TYPE &&

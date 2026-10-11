@@ -25,7 +25,7 @@
 #define WARN_LOG(fmt, args...) fprintf(stdout, "[WARN]  " fmt "\n", ##args)
 #define ERROR_LOG(fmt, args...) fprintf(stdout, "[ERROR]  " fmt "\n", ##args)
 
-bool ReadFile(const std::string &filePath, size_t &fileSize, void *buffer, size_t bufferSize);
-bool WriteFile(const std::string &filePath, const void *buffer, size_t size);
+bool ReadFile(const std::string& filePath, size_t& fileSize, void* buffer, size_t bufferSize);
+bool WriteFile(const std::string& filePath, const void* buffer, size_t size);
 
 #endif

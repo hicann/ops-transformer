@@ -60,21 +60,21 @@ using aclFloatArray = struct aclFloatArray;
 using aclBoolArray = struct aclBoolArray;
 using aclTensorList = struct aclTensorList;
 
-using _aclCreateTensor = aclTensor *(*)(const int64_t *view_dims, uint64_t view_dims_num, aclDataType data_type,
-                                        const int64_t *stride, int64_t offset, aclFormat format,
-                                        const int64_t *storage_dims, uint64_t storage_dims_num, void *tensor_data);
-using _aclCreateScalar = aclScalar *(*)(void *value, aclDataType data_type);
-using _aclCreateIntArray = aclIntArray *(*)(const int64_t *value, uint64_t size);
-using _aclCreateFloatArray = aclFloatArray *(*)(const float *value, uint64_t size);
-using _aclCreateBoolArray = aclBoolArray *(*)(const bool *value, uint64_t size);
-using _aclCreateTensorList = aclTensorList *(*)(const aclTensor *const *value, uint64_t size);
+using _aclCreateTensor = aclTensor* (*)(const int64_t* view_dims, uint64_t view_dims_num, aclDataType data_type,
+                                        const int64_t* stride, int64_t offset, aclFormat format,
+                                        const int64_t* storage_dims, uint64_t storage_dims_num, void* tensor_data);
+using _aclCreateScalar = aclScalar* (*)(void* value, aclDataType data_type);
+using _aclCreateIntArray = aclIntArray* (*)(const int64_t* value, uint64_t size);
+using _aclCreateFloatArray = aclFloatArray* (*)(const float* value, uint64_t size);
+using _aclCreateBoolArray = aclBoolArray* (*)(const bool* value, uint64_t size);
+using _aclCreateTensorList = aclTensorList* (*)(const aclTensor* const* value, uint64_t size);
 
-using _aclDestroyTensor = int (*)(const aclTensor *tensor);
-using _aclDestroyScalar = int (*)(const aclScalar *scalar);
-using _aclDestroyIntArray = int (*)(const aclIntArray *array);
-using _aclDestroyFloatArray = int (*)(const aclFloatArray *array);
-using _aclDestroyBoolArray = int (*)(const aclBoolArray *array);
-using _aclDestroyTensorList = int (*)(const aclTensorList *array);
+using _aclDestroyTensor = int (*)(const aclTensor* tensor);
+using _aclDestroyScalar = int (*)(const aclScalar* scalar);
+using _aclDestroyIntArray = int (*)(const aclIntArray* array);
+using _aclDestroyFloatArray = int (*)(const aclFloatArray* array);
+using _aclDestroyBoolArray = int (*)(const aclBoolArray* array);
+using _aclDestroyTensorList = int (*)(const aclTensorList* array);
 
 constexpr int kHashBufSize = 8192;
 constexpr int kHashBufMaxSize = kHashBufSize + 1024;
@@ -175,12 +175,12 @@ inline c10::SmallVector<int64_t, SIZE> array_to_small_vector(c10::IntArrayRef sh
 } // namespace op_infer
 
 typedef struct {
-    const at::Tensor &tensor_;
+    const at::Tensor& tensor_;
     aclDataType dtype;
 } TensorWrapper;
 
 typedef struct {
-    const at::TensorList &tensor_list_;
+    const at::TensorList& tensor_list_;
     aclDataType dtype;
 } TensorListWrapper;
 
@@ -189,7 +189,7 @@ inline bool Is4BitDtype(const aclDataType acl_data_type)
     return acl_data_type == ACL_FLOAT4_E2M1 || acl_data_type == ACL_FLOAT4_E1M2 || acl_data_type == ACL_INT4;
 }
 
-inline int64_t ConvertToAclStorageOffset(const at::Tensor &at_tensor, const aclDataType acl_data_type)
+inline int64_t ConvertToAclStorageOffset(const at::Tensor& at_tensor, const aclDataType acl_data_type)
 {
     int64_t storageOffset = at_tensor.storage_offset();
     if (Is4BitDtype(acl_data_type)) {
@@ -204,7 +204,7 @@ inline int64_t ConvertToAclStorageOffset(const at::Tensor &at_tensor, const aclD
 static std::unordered_map<aclFormat, aclFormat> FORMAT_FAKE_TO_REAL{
     {ACL_FORMAT_FRACTAL_NZ_C0_16, ACL_FORMAT_FRACTAL_NZ_C0_32}, {ACL_FORMAT_FRACTAL_NZ, ACL_FORMAT_FRACTAL_NZ}};
 
-static inline bool IsOpInputBaseFormat(const at::Tensor &at_tensor)
+static inline bool IsOpInputBaseFormat(const at::Tensor& at_tensor)
 {
     if (!torch_npu::utils::is_npu(at_tensor)) {
         return true;
@@ -214,8 +214,8 @@ static inline bool IsOpInputBaseFormat(const at::Tensor &at_tensor)
            (format == ACL_FORMAT_NCDHW);
 }
 
-inline void CollectB4ShapeInfo(const at::Tensor &at_tensor, c10::SmallVector<int64_t, MAX_DIM_NUM> &wrapperStride,
-                               c10::SmallVector<int64_t, MAX_DIM_NUM> &wrapperShape)
+inline void CollectB4ShapeInfo(const at::Tensor& at_tensor, c10::SmallVector<int64_t, MAX_DIM_NUM>& wrapperStride,
+                               c10::SmallVector<int64_t, MAX_DIM_NUM>& wrapperShape)
 {
     int64_t nDim = at_tensor.sizes().size();
     if (nDim == 1) {
@@ -265,7 +265,7 @@ enum QuantMode {
     TORCH_CHECK(ret == 0, "memcpy_s failed, error:", ret); \
     g_hashOffset += size_expression;
 
-aclDataType ConvertToAclDataType(const at::ScalarType &data_type)
+aclDataType ConvertToAclDataType(const at::ScalarType& data_type)
 {
     int64_t dtype_index = static_cast<int64_t>(data_type);
     TORCH_CHECK(dtype_index >= 0 && dtype_index < static_cast<int64_t>(at::ScalarType::NumOptions) + 1,
@@ -284,22 +284,22 @@ inline aclDataType GetAclDataType(int64_t t)
     return ConvertToAclDataType(static_cast<at::ScalarType>(t));
 }
 
-inline const char *GetOpApiLibName(void)
+inline const char* GetOpApiLibName(void)
 {
     return "libopapi.so";
 }
 
-inline const char *GetTransformerOpApiLibName(void)
+inline const char* GetTransformerOpApiLibName(void)
 {
     return "libopapi_transformer.so";
 }
 
-inline const char *GetCustOpApiLibName(void)
+inline const char* GetCustOpApiLibName(void)
 {
     return "libcust_opapi.so";
 }
 
-inline void *GetOpApiFuncAddrInLib(void *handler, const char *libName, const char *apiName)
+inline void* GetOpApiFuncAddrInLib(void* handler, const char* libName, const char* apiName)
 {
     auto funcAddr = dlsym(handler, apiName);
     if (funcAddr == nullptr) {
@@ -308,7 +308,7 @@ inline void *GetOpApiFuncAddrInLib(void *handler, const char *libName, const cha
     return funcAddr;
 }
 
-inline void *GetOpApiLibHandler(const char *libName)
+inline void* GetOpApiLibHandler(const char* libName)
 {
     auto handler = dlopen(libName, RTLD_LAZY);
     if (handler == nullptr) {
@@ -317,10 +317,10 @@ inline void *GetOpApiLibHandler(const char *libName)
     return handler;
 }
 
-static inline void TryLoadCustOpApiFromEnv(const char *envName, const std::string &subDir,
-                                           std::vector<void *> &handlers, std::set<std::string> &loadedPaths)
+static inline void TryLoadCustOpApiFromEnv(const char* envName, const std::string& subDir, std::vector<void*>& handlers,
+                                           std::set<std::string>& loadedPaths)
 {
-    const char *env = std::getenv(envName);
+    const char* env = std::getenv(envName);
     if (env == nullptr) {
         return;
     }
@@ -349,9 +349,9 @@ static inline void TryLoadCustOpApiFromEnv(const char *envName, const std::strin
     }
 }
 
-inline std::vector<void *> GetCustOpApiHandlers()
+inline std::vector<void*> GetCustOpApiHandlers()
 {
-    std::vector<void *> handlers;
+    std::vector<void*> handlers;
     std::set<std::string> loadedPaths;
     TryLoadCustOpApiFromEnv("ASCEND_CUSTOM_OPP_PATH", "/op_api/lib/", handlers, loadedPaths);
     TryLoadCustOpApiFromEnv("LD_LIBRARY_PATH", "/", handlers, loadedPaths);
@@ -365,7 +365,7 @@ inline std::vector<void *> GetCustOpApiHandlers()
     return handlers;
 }
 
-inline void *GetOpApiFuncAddr(const char *apiName)
+inline void* GetOpApiFuncAddr(const char* apiName)
 {
     static auto custHandlers = GetCustOpApiHandlers();
     for (auto handler : custHandlers) {
@@ -389,44 +389,44 @@ inline void *GetOpApiFuncAddr(const char *apiName)
     return GetOpApiFuncAddrInLib(opApiHandler, GetOpApiLibName(), apiName);
 }
 
-inline c10::Scalar ConvertTensorToScalar(const at::Tensor &tensor)
+inline c10::Scalar ConvertTensorToScalar(const at::Tensor& tensor)
 {
     c10::Scalar expScalar;
-    const at::Tensor *aclInput = &tensor;
+    const at::Tensor* aclInput = &tensor;
     if (aclInput->scalar_type() == at::ScalarType::Double) {
-        double value = *(double *)aclInput->data_ptr();
+        double value = *(double*)aclInput->data_ptr();
         c10::Scalar scalar(value);
         expScalar = scalar;
     } else if (aclInput->scalar_type() == at::ScalarType::Long) {
-        int64_t value = *(int64_t *)aclInput->data_ptr();
+        int64_t value = *(int64_t*)aclInput->data_ptr();
         c10::Scalar scalar(value);
         expScalar = scalar;
     } else if (aclInput->scalar_type() == at::ScalarType::Float) {
-        float value = *(float *)aclInput->data_ptr();
+        float value = *(float*)aclInput->data_ptr();
         c10::Scalar scalar(value);
         expScalar = scalar;
     } else if (aclInput->scalar_type() == at::ScalarType::Int) {
-        int value = *(int *)aclInput->data_ptr();
+        int value = *(int*)aclInput->data_ptr();
         c10::Scalar scalar(value);
         expScalar = scalar;
     } else if (aclInput->scalar_type() == at::ScalarType::Half) {
-        c10::Half value = *(c10::Half *)aclInput->data_ptr();
+        c10::Half value = *(c10::Half*)aclInput->data_ptr();
         c10::Scalar scalar(value);
         expScalar = scalar;
     } else if (aclInput->scalar_type() == at::ScalarType::Bool) {
-        int8_t value = *(int8_t *)aclInput->data_ptr();
+        int8_t value = *(int8_t*)aclInput->data_ptr();
         c10::Scalar scalar(value);
         expScalar = scalar;
     } else if (aclInput->scalar_type() == at::ScalarType::ComplexDouble) {
-        c10::complex<double> value = *(c10::complex<double> *)aclInput->data_ptr();
+        c10::complex<double> value = *(c10::complex<double>*)aclInput->data_ptr();
         c10::Scalar scalar(value);
         expScalar = scalar;
     } else if (aclInput->scalar_type() == at::ScalarType::ComplexFloat) {
-        c10::complex<float> value = *(c10::complex<float> *)aclInput->data_ptr();
+        c10::complex<float> value = *(c10::complex<float>*)aclInput->data_ptr();
         c10::Scalar scalar(value);
         expScalar = scalar;
     } else if (aclInput->scalar_type() == at::ScalarType::BFloat16) {
-        c10::BFloat16 value = *(c10::BFloat16 *)aclInput->data_ptr();
+        c10::BFloat16 value = *(c10::BFloat16*)aclInput->data_ptr();
         c10::Scalar scalar(value);
         expScalar = scalar;
     } else {
@@ -435,7 +435,7 @@ inline c10::Scalar ConvertTensorToScalar(const at::Tensor &tensor)
     return expScalar;
 }
 
-inline at::Tensor CopyTensorHostToDevice(const at::Tensor &cpu_tensor)
+inline at::Tensor CopyTensorHostToDevice(const at::Tensor& cpu_tensor)
 {
     at::Tensor cpuPinMemTensor = cpu_tensor.pin_memory();
     int deviceIndex = 0;
@@ -443,12 +443,12 @@ inline at::Tensor CopyTensorHostToDevice(const at::Tensor &cpu_tensor)
                               cpuPinMemTensor.scalar_type(), true, true);
 }
 
-inline at::Tensor CopyScalarToDevice(const c10::Scalar &cpu_scalar, at::ScalarType scalar_data_type)
+inline at::Tensor CopyScalarToDevice(const c10::Scalar& cpu_scalar, at::ScalarType scalar_data_type)
 {
     return CopyTensorHostToDevice(scalar_to_tensor(cpu_scalar).to(scalar_data_type));
 }
 
-inline aclTensor *ConvertType(const at::Tensor &at_tensor)
+inline aclTensor* ConvertType(const at::Tensor& at_tensor)
 {
     static const auto aclCreateTensor = GET_OP_API_FUNC(aclCreateTensor);
     if (aclCreateTensor == nullptr) {
@@ -510,23 +510,23 @@ inline aclTensor *ConvertType(const at::Tensor &at_tensor)
         at::Tensor aclInput = CopyScalarToDevice(expScalar, scalar_data_type);
         return aclCreateTensor(aclInput.sizes().data(), aclInput.sizes().size(), acl_data_type,
                                aclInput.strides().data(), aclInput.storage_offset(), format, storageDims.data(),
-                               storageDims.size(), const_cast<void *>(aclInput.storage().data()));
+                               storageDims.size(), const_cast<void*>(aclInput.storage().data()));
     }
 
     auto acl_tensor =
         aclCreateTensor(wrapperShape.data(), at_tensor.sizes().size(), acl_data_type, wrapperStride.data(),
                         ConvertToAclStorageOffset(at_tensor, acl_data_type), format, storageDims.data(),
-                        storageDims.size(), const_cast<void *>(at_tensor.storage().data()));
+                        storageDims.size(), const_cast<void*>(at_tensor.storage().data()));
     return acl_tensor;
 }
 
 typedef struct {
-    const at::Tensor &tensor_;
+    const at::Tensor& tensor_;
 } StorageShapeTensor;
 
-inline aclTensor *ConvertType(const StorageShapeTensor &storage_shape_tensor)
+inline aclTensor* ConvertType(const StorageShapeTensor& storage_shape_tensor)
 {
-    const at::Tensor &at_tensor = storage_shape_tensor.tensor_;
+    const at::Tensor& at_tensor = storage_shape_tensor.tensor_;
     if (!at_tensor.defined()) {
         return nullptr;
     }
@@ -559,10 +559,10 @@ inline aclTensor *ConvertType(const StorageShapeTensor &storage_shape_tensor)
     }
     return aclCreateTensor(wrapperShape.data(), at_tensor.sizes().size(), acl_data_type, wrapperStride.data(),
                            at_tensor.storage_offset(), format, storageDims.data(), storageDims.size(),
-                           const_cast<void *>(at_tensor.storage().data()));
+                           const_cast<void*>(at_tensor.storage().data()));
 }
 
-inline aclScalar *ConvertType(const at::Scalar &at_scalar)
+inline aclScalar* ConvertType(const at::Scalar& at_scalar)
 {
     static const auto aclCreateScalar = GET_OP_API_FUNC(aclCreateScalar);
     if (aclCreateScalar == nullptr) {
@@ -573,7 +573,7 @@ inline aclScalar *ConvertType(const at::Scalar &at_scalar)
     aclDataType acl_data_type = ConvertToAclDataType(scalar_data_type);
     TORCH_CHECK(acl_data_type != ACL_DT_UNDEFINED,
                 std::string(c10::toString(scalar_data_type)) + " has not been supported")
-    aclScalar *acl_scalar = nullptr;
+    aclScalar* acl_scalar = nullptr;
     switch (scalar_data_type) {
         case at::ScalarType::Double: {
             double value = at_scalar.toDouble();
@@ -602,7 +602,7 @@ inline aclScalar *ConvertType(const at::Scalar &at_scalar)
     return acl_scalar;
 }
 
-inline aclIntArray *ConvertType(const at::IntArrayRef &at_array)
+inline aclIntArray* ConvertType(const at::IntArrayRef& at_array)
 {
     static const auto aclCreateIntArray = GET_OP_API_FUNC(aclCreateIntArray);
     if (aclCreateIntArray == nullptr) {
@@ -612,7 +612,7 @@ inline aclIntArray *ConvertType(const at::IntArrayRef &at_array)
     return array;
 }
 
-inline aclFloatArray *ConvertType(const std::vector<float> &value)
+inline aclFloatArray* ConvertType(const std::vector<float>& value)
 {
     static const auto aclCreateFloatArray = GET_OP_API_FUNC(aclCreateFloatArray);
     if (aclCreateFloatArray == nullptr) {
@@ -622,7 +622,7 @@ inline aclFloatArray *ConvertType(const std::vector<float> &value)
 }
 
 template <std::size_t N>
-inline aclBoolArray *ConvertType(const std::array<bool, N> &value)
+inline aclBoolArray* ConvertType(const std::array<bool, N>& value)
 {
     static const auto aclCreateBoolArray = GET_OP_API_FUNC(aclCreateBoolArray);
     if (aclCreateBoolArray == nullptr) {
@@ -633,7 +633,7 @@ inline aclBoolArray *ConvertType(const std::array<bool, N> &value)
     return array;
 }
 
-inline aclBoolArray *ConvertType(const at::ArrayRef<bool> &value)
+inline aclBoolArray* ConvertType(const at::ArrayRef<bool>& value)
 {
     static const auto aclCreateBoolArray = GET_OP_API_FUNC(aclCreateBoolArray);
     if (aclCreateBoolArray == nullptr) {
@@ -644,7 +644,7 @@ inline aclBoolArray *ConvertType(const at::ArrayRef<bool> &value)
     return array;
 }
 
-inline aclTensorList *ConvertType(const at::TensorList &at_tensor_list)
+inline aclTensorList* ConvertType(const at::TensorList& at_tensor_list)
 {
     if (at_tensor_list.size() == 0) {
         return nullptr;
@@ -654,7 +654,7 @@ inline aclTensorList *ConvertType(const at::TensorList &at_tensor_list)
         return nullptr;
     }
 
-    std::vector<const aclTensor *> tensor_list(at_tensor_list.size());
+    std::vector<const aclTensor*> tensor_list(at_tensor_list.size());
     for (size_t i = 0; i < at_tensor_list.size(); i++) {
         tensor_list[i] = ConvertType(at_tensor_list[i]);
     }
@@ -662,7 +662,7 @@ inline aclTensorList *ConvertType(const at::TensorList &at_tensor_list)
     return acl_tensor_list;
 }
 
-inline aclTensor *ConvertType(const c10::optional<at::Tensor> &opt_tensor)
+inline aclTensor* ConvertType(const c10::optional<at::Tensor>& opt_tensor)
 {
     if (opt_tensor.has_value() && opt_tensor.value().defined()) {
         return ConvertType(opt_tensor.value());
@@ -670,7 +670,7 @@ inline aclTensor *ConvertType(const c10::optional<at::Tensor> &opt_tensor)
     return nullptr;
 }
 
-inline aclIntArray *ConvertType(const c10::optional<at::IntArrayRef> &opt_array)
+inline aclIntArray* ConvertType(const c10::optional<at::IntArrayRef>& opt_array)
 {
     if (opt_array.has_value()) {
         return ConvertType(opt_array.value());
@@ -678,7 +678,7 @@ inline aclIntArray *ConvertType(const c10::optional<at::IntArrayRef> &opt_array)
     return nullptr;
 }
 
-inline aclScalar *ConvertType(const c10::optional<at::Scalar> &opt_scalar)
+inline aclScalar* ConvertType(const c10::optional<at::Scalar>& opt_scalar)
 {
     if (opt_scalar.has_value()) {
         return ConvertType(opt_scalar.value());
@@ -691,19 +691,19 @@ inline aclDataType ConvertType(const at::ScalarType scalarType)
     return ConvertToAclDataType(scalarType);
 }
 
-inline const char *ConvertType(const string &str)
+inline const char* ConvertType(const string& str)
 {
     return str.c_str();
 }
 
-aclTensor *ConvertType(const TensorWrapper &tensor_r)
+aclTensor* ConvertType(const TensorWrapper& tensor_r)
 {
     static const auto aclCreateTensor = GET_OP_API_FUNC(aclCreateTensor);
     if (aclCreateTensor == nullptr) {
         return nullptr;
     }
 
-    const at::Tensor &at_tensor = tensor_r.tensor_;
+    const at::Tensor& at_tensor = tensor_r.tensor_;
 
     if (!at_tensor.defined()) {
         return nullptr;
@@ -756,11 +756,11 @@ aclTensor *ConvertType(const TensorWrapper &tensor_r)
     auto acl_tensor =
         aclCreateTensor(wrapperShape.data(), at_tensor.sizes().size(), acl_data_type, wrapperStride.data(),
                         ConvertToAclStorageOffset(at_tensor, acl_data_type), format, storageDims.data(),
-                        storageDims.size(), const_cast<void *>(at_tensor.storage().data()));
+                        storageDims.size(), const_cast<void*>(at_tensor.storage().data()));
     return acl_tensor;
 }
 
-aclTensorList *ConvertType(const TensorListWrapper &tensor_list_wrapper)
+aclTensorList* ConvertType(const TensorListWrapper& tensor_list_wrapper)
 {
     if (tensor_list_wrapper.tensor_list_.size() == 0) {
         return nullptr;
@@ -770,7 +770,7 @@ aclTensorList *ConvertType(const TensorListWrapper &tensor_list_wrapper)
         return nullptr;
     }
 
-    std::vector<const aclTensor *> tensor_list(tensor_list_wrapper.tensor_list_.size());
+    std::vector<const aclTensor*> tensor_list(tensor_list_wrapper.tensor_list_.size());
     for (size_t i = 0; i < tensor_list.size(); i++) {
         tensor_list[i] = ConvertType(TensorWrapper{tensor_list_wrapper.tensor_list_[i], tensor_list_wrapper.dtype});
     }
@@ -785,7 +785,7 @@ T ConvertType(T value)
 }
 
 template <typename Tuple, size_t... I>
-auto ConvertToOpApiFunc(const Tuple &params, void *opApiAddr, std::index_sequence<I...>)
+auto ConvertToOpApiFunc(const Tuple& params, void* opApiAddr, std::index_sequence<I...>)
 {
     using OpApiFunc = int (*)(typename std::decay<decltype(std::get<I>(params))>::type...);
     auto func = reinterpret_cast<OpApiFunc>(opApiAddr);
@@ -793,13 +793,13 @@ auto ConvertToOpApiFunc(const Tuple &params, void *opApiAddr, std::index_sequenc
 }
 
 template <typename Tuple>
-auto ConvertToOpApiFunc(const Tuple &params, void *opApiAddr)
+auto ConvertToOpApiFunc(const Tuple& params, void* opApiAddr)
 {
     static constexpr auto size = std::tuple_size<Tuple>::value;
     return ConvertToOpApiFunc(params, opApiAddr, std::make_index_sequence<size>{});
 }
 
-inline void Release(aclTensor *p)
+inline void Release(aclTensor* p)
 {
     static const auto aclDestroyTensor = GET_OP_API_FUNC(aclDestroyTensor);
     if (aclDestroyTensor == nullptr) {
@@ -808,7 +808,7 @@ inline void Release(aclTensor *p)
     aclDestroyTensor(p);
 }
 
-inline void Release(aclScalar *p)
+inline void Release(aclScalar* p)
 {
     static const auto aclDestroyScalar = GET_OP_API_FUNC(aclDestroyScalar);
     if (aclDestroyScalar == nullptr) {
@@ -817,7 +817,7 @@ inline void Release(aclScalar *p)
     aclDestroyScalar(p);
 }
 
-inline void Release(aclIntArray *p)
+inline void Release(aclIntArray* p)
 {
     static const auto aclDestroyIntArray = GET_OP_API_FUNC(aclDestroyIntArray);
     if (aclDestroyIntArray == nullptr) {
@@ -827,7 +827,7 @@ inline void Release(aclIntArray *p)
     aclDestroyIntArray(p);
 }
 
-inline void Release(aclFloatArray *p)
+inline void Release(aclFloatArray* p)
 {
     static const auto aclDestroyFloatArray = GET_OP_API_FUNC(aclDestroyFloatArray);
     if (aclDestroyFloatArray == nullptr) {
@@ -837,7 +837,7 @@ inline void Release(aclFloatArray *p)
     aclDestroyFloatArray(p);
 }
 
-inline void Release(aclBoolArray *p)
+inline void Release(aclBoolArray* p)
 {
     static const auto aclDestroyBoolArray = GET_OP_API_FUNC(aclDestroyBoolArray);
     if (aclDestroyBoolArray == nullptr) {
@@ -847,7 +847,7 @@ inline void Release(aclBoolArray *p)
     aclDestroyBoolArray(p);
 }
 
-inline void Release(aclTensorList *p)
+inline void Release(aclTensorList* p)
 {
     static const auto aclDestroyTensorList = GET_OP_API_FUNC(aclDestroyTensorList);
     if (aclDestroyTensorList == nullptr) {
@@ -857,7 +857,7 @@ inline void Release(aclTensorList *p)
     aclDestroyTensorList(p);
 }
 
-inline const c10::optional<at::Tensor> get_valid_tensor(const c10::optional<at::Tensor> &tensor_opt, at::Device device)
+inline const c10::optional<at::Tensor> get_valid_tensor(const c10::optional<at::Tensor>& tensor_opt, at::Device device)
 {
     return tensor_opt.has_value() ? tensor_opt : torch::empty({0}, torch::dtype(torch::kInt32).device(device));
 };
@@ -875,14 +875,14 @@ void CallRelease(Tuple t, std::index_sequence<I...>)
 }
 
 template <typename Tuple>
-void ReleaseConvertTypes(Tuple &t)
+void ReleaseConvertTypes(Tuple& t)
 {
     static constexpr auto size = std::tuple_size<Tuple>::value;
     CallRelease(t, std::make_index_sequence<size>{});
 }
 
 template <typename... Ts>
-constexpr auto ConvertTypes(Ts &...args)
+constexpr auto ConvertTypes(Ts&... args)
 {
     return std::make_tuple(ConvertType(args)...);
 }
@@ -901,40 +901,40 @@ auto call(Function f, Tuple t)
 }
 
 template <std::size_t N>
-void AddParamToBuf(const std::array<bool, N> &value)
+void AddParamToBuf(const std::array<bool, N>& value)
 {
     MEMCPY_TO_BUF(value.data(), value.size() * sizeof(bool));
 }
 
 template <typename T>
-void AddParamToBuf(const T &value)
+void AddParamToBuf(const T& value)
 {
     MEMCPY_TO_BUF(&value, sizeof(T));
 }
 
-void AddParamToBuf(const at::Tensor &);
-void AddParamToBuf(const at::Scalar &);
-void AddParamToBuf(const at::IntArrayRef &);
-void AddParamToBuf(const at::ArrayRef<bool> &);
-void AddParamToBuf(const at::TensorList &);
-void AddParamToBuf(const c10::optional<at::Tensor> &);
-void AddParamToBuf(const c10::optional<at::IntArrayRef> &);
-void AddParamToBuf(const c10::optional<at::Scalar> &);
+void AddParamToBuf(const at::Tensor&);
+void AddParamToBuf(const at::Scalar&);
+void AddParamToBuf(const at::IntArrayRef&);
+void AddParamToBuf(const at::ArrayRef<bool>&);
+void AddParamToBuf(const at::TensorList&);
+void AddParamToBuf(const c10::optional<at::Tensor>&);
+void AddParamToBuf(const c10::optional<at::IntArrayRef>&);
+void AddParamToBuf(const c10::optional<at::Scalar>&);
 void AddParamToBuf(const at::ScalarType);
-void AddParamToBuf(const string &);
+void AddParamToBuf(const string&);
 void AddParamToBuf();
 
 template <typename T, typename... Args>
-void AddParamToBuf(const T &arg, Args &...args)
+void AddParamToBuf(const T& arg, Args&... args)
 {
     AddParamToBuf(arg);
     AddParamToBuf(args...);
 }
 
 uint64_t CalcHashId();
-using InitHugeMemThreadLocal = int (*)(void *, bool);
-using UnInitHugeMemThreadLocal = void (*)(void *, bool);
-using ReleaseHugeMem = void (*)(void *, bool);
+using InitHugeMemThreadLocal = int (*)(void*, bool);
+using UnInitHugeMemThreadLocal = void (*)(void*, bool);
+using ReleaseHugeMem = void (*)(void*, bool);
 
 /**
  * check arg is at::Tensor ?
@@ -967,11 +967,11 @@ struct is_tensor_wrapper<StorageShapeTensor> : std::true_type {};
  * find first at::Tensor
  */
 template <std::size_t I = 0, typename... Ts>
-typename std::enable_if<I == sizeof...(Ts), void>::type GetFirstTensor(const std::tuple<Ts...> &t, at::Tensor &res)
+typename std::enable_if<I == sizeof...(Ts), void>::type GetFirstTensor(const std::tuple<Ts...>& t, at::Tensor& res)
 {}
 
 template <std::size_t I = 0, typename... Ts>
-    typename std::enable_if < I<sizeof...(Ts), void>::type GetFirstTensor(const std::tuple<Ts...> &t, at::Tensor &res)
+    typename std::enable_if < I<sizeof...(Ts), void>::type GetFirstTensor(const std::tuple<Ts...>& t, at::Tensor& res)
 {
     if constexpr (is_at_tensor<typename std::tuple_element<I, std::tuple<Ts...>>::type>::value) {
         res = std::get<I>(t);
@@ -990,7 +990,7 @@ template <std::size_t I = 0, typename... Ts>
  * get the device
  */
 template <typename... Ts>
-auto DecodeDevice(Ts &...args) -> at::Device
+auto DecodeDevice(Ts&... args) -> at::Device
 {
     auto tp = std::make_tuple(args...);
     at::Tensor ft;
@@ -1061,9 +1061,9 @@ inline void ApplyDeterministicConfig()
             aclrtUseStreamResInCurrentThread(acl_stream); \
         } \
         uint64_t workspace_size = 0; \
-        uint64_t *workspace_size_addr = &workspace_size; \
-        aclOpExecutor *executor = nullptr; \
-        aclOpExecutor **executor_addr = &executor; \
+        uint64_t* workspace_size_addr = &workspace_size; \
+        aclOpExecutor* executor = nullptr; \
+        aclOpExecutor** executor_addr = &executor; \
         InitHugeMemThreadLocal initMemFunc = reinterpret_cast<InitHugeMemThreadLocal>(initMemAddr); \
         UnInitHugeMemThreadLocal unInitMemFunc = reinterpret_cast<UnInitHugeMemThreadLocal>(unInitMemAddr); \
         if (initMemFunc) { \
@@ -1078,17 +1078,17 @@ inline void ApplyDeterministicConfig()
             TORCH_CHECK(false, "call " #aclnn_api " failed, detail:", aclGetRecentErrMsg()); \
         } \
         at::Tensor workspace_tensor; \
-        void *workspace_addr = nullptr; \
+        void* workspace_addr = nullptr; \
         if (workspace_size != 0) { \
             at::TensorOptions options = at::TensorOptions(torch_npu::utils::get_npu_device_type()); \
             workspace_tensor = at::empty({workspace_size}, options.dtype(at::kByte)); \
-            workspace_addr = const_cast<void *>(workspace_tensor.storage().data()); \
+            workspace_addr = const_cast<void*>(workspace_tensor.storage().data()); \
         } \
         auto acl_call = [converted_params, workspace_addr, workspace_size, acl_stream, executor]() -> int { \
             if (c10_npu::check_dequeue_need_use(acl_stream)) { \
                 aclrtUseStreamResInCurrentThread(acl_stream); \
             } \
-            typedef int (*OpApiFunc)(void *, uint64_t, aclOpExecutor *, const aclrtStream); \
+            typedef int (*OpApiFunc)(void*, uint64_t, aclOpExecutor*, const aclrtStream); \
             OpApiFunc opApiFunc = reinterpret_cast<OpApiFunc>(opApiFuncAddr); \
             auto api_ret = opApiFunc(workspace_addr, workspace_size, executor, acl_stream); \
             ReleaseConvertTypes(converted_params); \

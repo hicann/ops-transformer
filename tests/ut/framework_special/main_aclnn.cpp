@@ -20,7 +20,7 @@
 
 using Platform = ops::adv::tests::utils::Platform;
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     /**
      * 加载 OpProto.so, OpTiling.so

@@ -14,7 +14,7 @@
 #include "opdev/make_op_executor.h"
 
 namespace l0op {
-const aclTensor *Sub(const aclTensor *self, const aclTensor *other, aclOpExecutor *executor);
+const aclTensor* Sub(const aclTensor* self, const aclTensor* other, aclOpExecutor* executor);
 
 }
 

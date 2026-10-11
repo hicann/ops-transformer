@@ -20,24 +20,24 @@
 
 using namespace ops::adv::tests::utils;
 
-[[maybe_unused]] [[nodiscard]] bool ContextIntf::SetOpName(const char *name)
+[[maybe_unused]] [[nodiscard]] bool ContextIntf::SetOpName(const char* name)
 {
     opName_ = name;
     return true;
 }
 
-bool ContextIntf::SetInputs(const std::vector<TensorIntf *> &inputs)
+bool ContextIntf::SetInputs(const std::vector<TensorIntf*>& inputs)
 {
-    if (std::any_of(inputs.begin(), inputs.end(), [](TensorIntf *t) { return t == nullptr; })) {
+    if (std::any_of(inputs.begin(), inputs.end(), [](TensorIntf* t) { return t == nullptr; })) {
         return false;
     }
     inputs_.insert(inputs_.end(), inputs.begin(), inputs.end());
     return true;
 }
 
-bool ContextIntf::SetOutputs(const std::vector<TensorIntf *> &outputs)
+bool ContextIntf::SetOutputs(const std::vector<TensorIntf*>& outputs)
 {
-    if (std::any_of(outputs.begin(), outputs.end(), [](TensorIntf *t) { return t == nullptr; })) {
+    if (std::any_of(outputs.begin(), outputs.end(), [](TensorIntf* t) { return t == nullptr; })) {
         return false;
     }
     outputs_.insert(outputs_.end(), outputs.begin(), outputs.end());
@@ -63,7 +63,7 @@ uint64_t ContextIntf::GetTilingKey() const
     return tilingKey_;
 }
 
-uint8_t *ContextIntf::GetWorkspacePtr() const
+uint8_t* ContextIntf::GetWorkspacePtr() const
 {
     return workspacePtr_;
 }
@@ -73,7 +73,7 @@ size_t ContextIntf::GetWorkspaceSize() const
     return workspaceSize_;
 }
 
-bool ContextIntf::RunKernel(std::string &caseName)
+bool ContextIntf::RunKernel(std::string& caseName)
 {
     platform_ = platform_ == nullptr ? Platform::GetGlobalPlatform() : platform_;
     if (platform_ == nullptr) {
@@ -85,7 +85,7 @@ bool ContextIntf::RunKernel(std::string &caseName)
     return ret;
 }
 
-bool ContextIntf::SaveOutputsToDir(const std::string &dir, const std::string &filePrefix)
+bool ContextIntf::SaveOutputsToDir(const std::string& dir, const std::string& filePrefix)
 {
     for (auto o : outputs_) {
         if (o->GetExpDataSize() <= 0) {
@@ -99,7 +99,7 @@ bool ContextIntf::SaveOutputsToDir(const std::string &dir, const std::string &fi
     return true;
 }
 
-bool ContextIntf::RunKernelPrepare(std::string &caseName)
+bool ContextIntf::RunKernelPrepare(std::string& caseName)
 {
     if (workspaceSize_ > kWorkspaceMaxSize) {
         LOG_ERR("[%s:%s] workspace(%lu) > kWorkspaceMaxSize(%lu)", opName_.c_str(), caseName.c_str(), workspaceSize_,
@@ -128,7 +128,7 @@ bool ContextIntf::RunKernelPrepare(std::string &caseName)
         }
     }
     if (kernelRunPrepareTensorDataCbf_ != nullptr) {
-        auto *cs = static_cast<ops::adv::tests::utils::Case *>(ops::adv::tests::utils::Case::GetCurrentCase());
+        auto* cs = static_cast<ops::adv::tests::utils::Case*>(ops::adv::tests::utils::Case::GetCurrentCase());
         LOG_IF_EXPR(cs == nullptr, LOG_ERR("[%s:%s], Can't get current case", opName_.c_str(), caseName.c_str()),
                     return false);
         LOG_IF_EXPR(!KernelRunPrepareTensorDataCbf(cs),

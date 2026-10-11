@@ -30,16 +30,16 @@ public:
     /**
      * Kernel 运行前设置 TensorData 回调函数
      */
-    typedef bool (*KernelRunPrepareTensorDataCbf)(void *curCase);
+    typedef bool (*KernelRunPrepareTensorDataCbf)(void* curCase);
 
 public:
     ContextIntf() = default;
     virtual ~ContextIntf() = default;
 
     /* 属性设置 */
-    [[maybe_unused]] [[nodiscard]] bool SetOpName(const char *name);
-    [[maybe_unused]] [[nodiscard]] bool SetInputs(const std::vector<TensorIntf *> &inputs);
-    [[maybe_unused]] [[nodiscard]] bool SetOutputs(const std::vector<TensorIntf *> &outputs);
+    [[maybe_unused]] [[nodiscard]] bool SetOpName(const char* name);
+    [[maybe_unused]] [[nodiscard]] bool SetInputs(const std::vector<TensorIntf*>& inputs);
+    [[maybe_unused]] [[nodiscard]] bool SetOutputs(const std::vector<TensorIntf*>& outputs);
     [[maybe_unused]] [[nodiscard]] bool SetKernelRunPrepareTensorDataCbf(KernelRunPrepareTensorDataCbf cbf);
 
     /**
@@ -60,7 +60,7 @@ public:
      *
      * \attention Workspace 在 RunKernelPrepare 回调函数内完成申请
      */
-    [[maybe_unused]] [[nodiscard]] uint8_t *GetWorkspacePtr() const;
+    [[maybe_unused]] [[nodiscard]] uint8_t* GetWorkspacePtr() const;
 
     /**
      * 属性获取
@@ -69,34 +69,34 @@ public:
     [[maybe_unused]] [[nodiscard]] uint64_t GetWorkspaceSize() const;
 
     /* Tiling */
-    virtual bool RunTiling(std::string &caseName, bool withSocversion) = 0;
+    virtual bool RunTiling(std::string& caseName, bool withSocversion) = 0;
 
     /* Kernel */
-    virtual bool RunKernel(std::string &caseName);
+    virtual bool RunKernel(std::string& caseName);
 
     /* Others */
-    bool SaveOutputsToDir(const std::string &dir, const std::string &filePrefix);
+    bool SaveOutputsToDir(const std::string& dir, const std::string& filePrefix);
 
 protected:
-    Platform *platform_ = nullptr;
+    Platform* platform_ = nullptr;
     /* 属性 */
     std::string opName_;
-    std::vector<TensorIntf *> inputs_;
-    std::vector<TensorIntf *> outputs_;
+    std::vector<TensorIntf*> inputs_;
+    std::vector<TensorIntf*> outputs_;
     KernelRunPrepareTensorDataCbf kernelRunPrepareTensorDataCbf_ = nullptr;
 
     /* Tiling & Kernel */
     int64_t tilingBlockDim_ = 0;
     uint64_t tilingKey_ = std::numeric_limits<uint64_t>::max();
     uint64_t workspaceSize_ = 0;
-    uint8_t *workspacePtr_ = nullptr;
+    uint8_t* workspacePtr_ = nullptr;
 
 protected:
-    virtual bool RunKernelPrepare(std::string &caseName);
-    virtual bool RunKernelProcess(std::string &caseName) = 0;
+    virtual bool RunKernelPrepare(std::string& caseName);
+    virtual bool RunKernelProcess(std::string& caseName) = 0;
 
-    virtual uint8_t *AllocWorkspaceImpl(uint64_t size) = 0;
-    virtual void FreeWorkspaceImpl(uint8_t *ptr) = 0;
+    virtual uint8_t* AllocWorkspaceImpl(uint64_t size) = 0;
+    virtual void FreeWorkspaceImpl(uint8_t* ptr) = 0;
 };
 
 } // namespace ops::adv::tests::utils

@@ -40,8 +40,8 @@ public:
      * \param tilingData TilingData 结果
      */
     typedef bool (*KernelRunTemplateCbf)(std::function<void(Args...)> func, uint64_t tilingKey, int64_t blockDim,
-                                         std::vector<TensorIntf *> &inputs, std::vector<TensorIntf *> &outputs,
-                                         uint8_t *workspace, uint8_t *tilingData);
+                                         std::vector<TensorIntf*>& inputs, std::vector<TensorIntf*>& outputs,
+                                         uint8_t* workspace, uint8_t* tilingData);
 
     /**
      * 属性设置
@@ -67,7 +67,7 @@ public:
     }
 
 protected:
-    bool RunKernelProcess(std::string &caseName) override
+    bool RunKernelProcess(std::string& caseName) override
     {
         if (kernelRunTemplateCbf_ == nullptr) {
             LOG_ERR("[%s:%s] Can't get kernelRunCbf_", opName_.c_str(), caseName.c_str());
@@ -98,9 +98,9 @@ protected:
         /* Ascend C 框架部分, 重定向 std::cerr/std::clog/std::cout 到同一个文件 */
         std::string fmkFilePath = casePath + "_kernel_" + fmk + ".log";
         std::ofstream fmkFileHdl(fmkFilePath);
-        std::streambuf *stdErr = std::cerr.rdbuf(fmkFileHdl.rdbuf());
-        std::streambuf *stdLog = std::clog.rdbuf(fmkFileHdl.rdbuf());
-        std::streambuf *stdOut = std::cout.rdbuf(fmkFileHdl.rdbuf());
+        std::streambuf* stdErr = std::cerr.rdbuf(fmkFileHdl.rdbuf());
+        std::streambuf* stdLog = std::clog.rdbuf(fmkFileHdl.rdbuf());
+        std::streambuf* stdOut = std::cout.rdbuf(fmkFileHdl.rdbuf());
 #endif
         /* 调用回调函数, 触发具体算子 Kernel 执行 */
         ICPU_SET_TILING_KEY(tilingKey_);

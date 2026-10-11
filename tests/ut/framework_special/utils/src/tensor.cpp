@@ -19,36 +19,34 @@
 
 using namespace ops::adv::tests::utils;
 
-Tensor::Tensor(const char *name, const std::initializer_list<int64_t> &shape, const char *shapeType, ge::DataType dType,
+Tensor::Tensor(const char* name, const std::initializer_list<int64_t>& shape, const char* shapeType, ge::DataType dType,
                ge::Format format, TensorType type)
     : TensorIntf(name, shape, shapeType, dType, format, type)
-{
-}
+{}
 
-Tensor::Tensor(const char *name, const std::vector<int64_t> &shape, const char *shapeType, ge::DataType dType,
+Tensor::Tensor(const char* name, const std::vector<int64_t>& shape, const char* shapeType, ge::DataType dType,
                ge::Format format, TensorType type)
     : TensorIntf(name, shape, shapeType, dType, format, type)
-{
-}
+{}
 
 Tensor::~Tensor()
 {
     this->FreeDevData();
 }
 
-uint8_t *Tensor::AllocDevDataImpl(int64_t size)
+uint8_t* Tensor::AllocDevDataImpl(int64_t size)
 {
-    auto *ptr = (uint8_t *)AscendC::GmAlloc(size);
+    auto* ptr = (uint8_t*)AscendC::GmAlloc(size);
     LOG_IF(ptr == nullptr, LOG_ERR("AscendC::GmAlloc failed, Size(%ld)", size));
     return ptr;
 }
 
-void Tensor::FreeDevDataImpl(uint8_t *devPtr)
+void Tensor::FreeDevDataImpl(uint8_t* devPtr)
 {
     AscendC::GmFree(devPtr);
 }
 
-bool Tensor::MemSetDevDataImpl(uint8_t *devPtr, int64_t devMax, int32_t val, int64_t cnt)
+bool Tensor::MemSetDevDataImpl(uint8_t* devPtr, int64_t devMax, int32_t val, int64_t cnt)
 {
     auto ret = memset_s(devPtr, devMax, val, cnt);
     LOG_IF(ret != EOK,
@@ -56,7 +54,7 @@ bool Tensor::MemSetDevDataImpl(uint8_t *devPtr, int64_t devMax, int32_t val, int
     return ret == EOK;
 }
 
-bool Tensor::MemCpyHostToDevDataImpl(uint8_t *devPtr, int64_t devMax, const void *hostPtr, int64_t cnt)
+bool Tensor::MemCpyHostToDevDataImpl(uint8_t* devPtr, int64_t devMax, const void* hostPtr, int64_t cnt)
 {
     auto ret = memcpy_s(devPtr, devMax, hostPtr, cnt);
     LOG_IF(ret != EOK,
@@ -64,7 +62,7 @@ bool Tensor::MemCpyHostToDevDataImpl(uint8_t *devPtr, int64_t devMax, const void
     return ret == EOK;
 }
 
-bool Tensor::MemCpyDevDataToHostImpl(void *hostPtr, int64_t hostMax, const uint8_t *devPtr, int64_t cnt)
+bool Tensor::MemCpyDevDataToHostImpl(void* hostPtr, int64_t hostMax, const uint8_t* devPtr, int64_t cnt)
 {
     auto ret = memcpy_s(hostPtr, hostMax, devPtr, cnt);
     LOG_IF(ret != EOK,

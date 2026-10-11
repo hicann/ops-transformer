@@ -29,21 +29,21 @@ static bool IsRegbaseSocVersion(NpuArch npuArch)
     return regbaseArch.find(npuArch) != regbaseArch.end();
 }
 
-bool IsRegbaseSocVersion(const gert::TilingParseContext *context)
+bool IsRegbaseSocVersion(const gert::TilingParseContext* context)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     auto arch = ascendcPlatform.GetCurNpuArch();
     return IsRegbaseSocVersion(arch);
 }
 
-bool IsRegbaseSocVersion(const gert::TilingContext *context)
+bool IsRegbaseSocVersion(const gert::TilingContext* context)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     auto arch = ascendcPlatform.GetCurNpuArch();
     return IsRegbaseSocVersion(arch);
 }
 
-const gert::Shape &EnsureNotScalar(const gert::Shape &inShape)
+const gert::Shape& EnsureNotScalar(const gert::Shape& inShape)
 {
     if (inShape.IsScalar()) {
         return g_vec_1_shape;

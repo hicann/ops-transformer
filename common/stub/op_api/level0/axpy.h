@@ -19,7 +19,7 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *Axpy(const aclTensor *self, const aclTensor *other, float alpha, aclOpExecutor *executor);
+const aclTensor* Axpy(const aclTensor* self, const aclTensor* other, float alpha, aclOpExecutor* executor);
 
 }
 

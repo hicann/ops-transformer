@@ -24,8 +24,8 @@ struct TilingItem {
 
 class TuningTilingDef {
 public:
-    virtual void FromJson(const nlohmann::json &j) = 0;
-    virtual void ToJson(nlohmann::json &j) = 0;
+    virtual void FromJson(const nlohmann::json& j) = 0;
+    virtual void ToJson(nlohmann::json& j) = 0;
     ge::AscendString GetClassName() const;
     virtual std::vector<TilingItem> GetItemInfo() const = 0;
 
@@ -40,12 +40,12 @@ protected:
 #define BEGIN_TUNING_TILING_DEF(class_name) \
     class class_name : public TuningTilingDef { \
     public: \
-        virtual void FromJson(const nlohmann::json &j) \
+        virtual void FromJson(const nlohmann::json& j) \
         { \
             FromJsonImpl(*this, "", j); \
         } \
 \
-        virtual void ToJson(nlohmann::json &j) \
+        virtual void ToJson(nlohmann::json& j) \
         { \
             DumpObj(*this, "", j); \
         } \
@@ -57,7 +57,7 @@ protected:
 \
         class FieldHandler { \
         public: \
-            FieldHandler(class_name *pinstance, const ge::AscendString &dtype, const ge::AscendString &name) \
+            FieldHandler(class_name* pinstance, const ge::AscendString& dtype, const ge::AscendString& name) \
             { \
                 pinstance->field_info_.push_back({dtype, name}); \
             } \
@@ -82,9 +82,9 @@ public: \
 using TuningTilingDefConstructor = std::shared_ptr<TuningTilingDef> (*)();
 class TuningTilingClassFactory {
 public:
-    static std::map<ge::AscendString, TuningTilingDefConstructor> &RegisterInfo();
-    static void RegisterTilingData(const ge::AscendString &optype, TuningTilingDefConstructor const constructor);
-    static std::shared_ptr<TuningTilingDef> CreateTilingDataInstance(const ge::AscendString &optype);
+    static std::map<ge::AscendString, TuningTilingDefConstructor>& RegisterInfo();
+    static void RegisterTilingData(const ge::AscendString& optype, TuningTilingDefConstructor const constructor);
+    static std::shared_ptr<TuningTilingDef> CreateTilingDataInstance(const ge::AscendString& optype);
 };
 
 #define REGISTER_TUNING_TILING_CLASS(optype, class_name) \

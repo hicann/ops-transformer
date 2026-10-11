@@ -16,9 +16,7 @@ using namespace std;
 
 class OpHostUtEnvironment : public testing::Environment {
 public:
-    OpHostUtEnvironment()
-    {
-    }
+    OpHostUtEnvironment() {}
     virtual void SetUp()
     {
         cout << "Global Environment SetpUp." << endl;
@@ -29,7 +27,7 @@ public:
         fe::PlatformInfoManager::GeInstance().SetOptionalCompilationInfo(opti_compilation_infos_ge);
 
         /* load libophost.so for init tiling funcs and infershape funcs */
-        const char *buildPath = std::getenv("BUILD_PATH");
+        const char* buildPath = std::getenv("BUILD_PATH");
         if (buildPath == nullptr) {
             cout << "getenv BUILD_PATH failed." << endl;
             return;
@@ -52,7 +50,7 @@ public:
     }
 };
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     testing::InitGoogleTest(&argc, argv);
     testing::AddGlobalTestEnvironment(new OpHostUtEnvironment());

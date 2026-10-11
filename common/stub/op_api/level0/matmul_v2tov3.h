@@ -15,7 +15,7 @@
 
 namespace l0op {
 
-bool MmCheckHitV3Shape(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const bool transposeX1,
+bool MmCheckHitV3Shape(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const bool transposeX1,
                        const bool transposeX2, op::Format mat2_format, bool supportSplitK);
 }
 

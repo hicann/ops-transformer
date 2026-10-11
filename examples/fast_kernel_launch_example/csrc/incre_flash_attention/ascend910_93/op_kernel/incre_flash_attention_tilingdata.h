@@ -110,7 +110,6 @@ public:
     }
 };
 
-
 class IncreFlashAttentionBaseParams {
 public:
     uint32_t batchSize;
@@ -537,7 +536,6 @@ public:
     }
 };
 
-
 class IncreFlashAttentionCoreParams {
 public:
     uint32_t coreSidxEnd[50];
@@ -545,15 +543,15 @@ public:
     uint32_t coreSposStartRegbase[66];
 
 public:
-    uint32_t *get_coreSidxEnd()
+    uint32_t* get_coreSidxEnd()
     {
         return coreSidxEnd;
     }
-    uint32_t *get_coreSidxEndRegbase()
+    uint32_t* get_coreSidxEndRegbase()
     {
         return coreSidxEndRegbase;
     }
-    uint32_t *get_coreSposStartRegbase()
+    uint32_t* get_coreSposStartRegbase()
     {
         return coreSposStartRegbase;
     }
@@ -658,19 +656,19 @@ public:
         return seqStepKv;
     }
 
-    const uint32_t *get_startBlk() const
+    const uint32_t* get_startBlk() const
     {
         return startBlk;
     }
-    const uint32_t *get_endBlk() const
+    const uint32_t* get_endBlk() const
     {
         return endBlk;
     }
-    const uint32_t *get_startBatch() const
+    const uint32_t* get_startBatch() const
     {
         return startBatch;
     }
-    const uint32_t *get_endBatch() const
+    const uint32_t* get_endBatch() const
     {
         return endBatch;
     }
@@ -771,7 +769,6 @@ public:
         return s1SplitSize;
     }
 };
-
 
 class IncreFlashAttentionSingleCoreTensorSize {
 public:

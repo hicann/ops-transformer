@@ -33,46 +33,46 @@ public:
         VT_LIST_INT = static_cast<int32_t>(VT_LIST_BASE) + static_cast<int32_t>(VT_INT),
     };
 
-    AnyValue(ValueType type, const std::shared_ptr<void> &valuePtr)
+    AnyValue(ValueType type, const std::shared_ptr<void>& valuePtr)
         : type_(type),
           valuePtr_(valuePtr)
     {}
     ~AnyValue() = default;
-    AnyValue(const AnyValue &anyValue)
+    AnyValue(const AnyValue& anyValue)
         : type_(anyValue.type_),
           valuePtr_(anyValue.valuePtr_)
     {}
 
     template <typename T>
-    static inline AnyValue CreateFrom(const T &value);
+    static inline AnyValue CreateFrom(const T& value);
 
     template <typename T>
-    void SetAttr(const std::string &item, T &faker) const
+    void SetAttr(const std::string& item, T& faker) const
     {
         switch (type_) {
             case ValueType::VT_BOOL:
-                faker.Attr(item, *reinterpret_cast<bool *>(valuePtr_.get()));
+                faker.Attr(item, *reinterpret_cast<bool*>(valuePtr_.get()));
                 break;
             case ValueType::VT_INT:
-                faker.Attr(item, *reinterpret_cast<int64_t *>(valuePtr_.get()));
+                faker.Attr(item, *reinterpret_cast<int64_t*>(valuePtr_.get()));
                 break;
             case ValueType::VT_FLOAT:
-                faker.Attr(item, *reinterpret_cast<float *>(valuePtr_.get()));
+                faker.Attr(item, *reinterpret_cast<float*>(valuePtr_.get()));
                 break;
             case ValueType::VT_STRING:
-                faker.Attr(item, ge::AscendString(reinterpret_cast<std::string *>(valuePtr_.get())->c_str()));
+                faker.Attr(item, ge::AscendString(reinterpret_cast<std::string*>(valuePtr_.get())->c_str()));
                 break;
             case ValueType::VT_LIST_BOOL:
-                faker.Attr(item, *reinterpret_cast<std::vector<bool> *>(valuePtr_.get()));
+                faker.Attr(item, *reinterpret_cast<std::vector<bool>*>(valuePtr_.get()));
                 break;
             case ValueType::VT_LIST_INT:
-                faker.Attr(item, *reinterpret_cast<std::vector<int64_t> *>(valuePtr_.get()));
+                faker.Attr(item, *reinterpret_cast<std::vector<int64_t>*>(valuePtr_.get()));
                 break;
             case ValueType::VT_LIST_LIST_INT:
-                faker.Attr(item, *reinterpret_cast<std::vector<std::vector<int64_t>> *>(valuePtr_.get()));
+                faker.Attr(item, *reinterpret_cast<std::vector<std::vector<int64_t>>*>(valuePtr_.get()));
                 break;
             case ValueType::VT_LIST_FLOAT:
-                faker.Attr(item, *reinterpret_cast<std::vector<float> *>(valuePtr_.get()));
+                faker.Attr(item, *reinterpret_cast<std::vector<float>*>(valuePtr_.get()));
                 break;
             default:
                 std::cout << "[ERROR]" << __FILE__ << ":" << __LINE__ << "The ValueType is not supported!" << std::endl;
@@ -84,7 +84,7 @@ public:
 };
 
 template <>
-inline AnyValue AnyValue::CreateFrom<std::string>(const std::string &value)
+inline AnyValue AnyValue::CreateFrom<std::string>(const std::string& value)
 {
     auto valuePtr = new std::string;
     *valuePtr = value;
@@ -92,7 +92,7 @@ inline AnyValue AnyValue::CreateFrom<std::string>(const std::string &value)
 }
 
 template <>
-inline AnyValue AnyValue::CreateFrom<float>(const float &value)
+inline AnyValue AnyValue::CreateFrom<float>(const float& value)
 {
     auto valuePtr = new float;
     *valuePtr = value;
@@ -100,7 +100,7 @@ inline AnyValue AnyValue::CreateFrom<float>(const float &value)
 }
 
 template <>
-inline AnyValue AnyValue::CreateFrom<bool>(const bool &value)
+inline AnyValue AnyValue::CreateFrom<bool>(const bool& value)
 {
     auto valuePtr = new bool;
     *valuePtr = value;
@@ -108,7 +108,7 @@ inline AnyValue AnyValue::CreateFrom<bool>(const bool &value)
 }
 
 template <>
-inline AnyValue AnyValue::CreateFrom<int64_t>(const int64_t &value)
+inline AnyValue AnyValue::CreateFrom<int64_t>(const int64_t& value)
 {
     auto valuePtr = new int64_t;
     *valuePtr = value;
@@ -116,7 +116,7 @@ inline AnyValue AnyValue::CreateFrom<int64_t>(const int64_t &value)
 }
 
 template <>
-inline AnyValue AnyValue::CreateFrom<std::vector<float>>(const std::vector<float> &value)
+inline AnyValue AnyValue::CreateFrom<std::vector<float>>(const std::vector<float>& value)
 {
     auto valuePtr = new std::vector<float>;
     *valuePtr = value;
@@ -124,7 +124,7 @@ inline AnyValue AnyValue::CreateFrom<std::vector<float>>(const std::vector<float
 }
 
 template <>
-inline AnyValue AnyValue::CreateFrom<std::vector<bool>>(const std::vector<bool> &value)
+inline AnyValue AnyValue::CreateFrom<std::vector<bool>>(const std::vector<bool>& value)
 {
     auto valuePtr = new std::vector<bool>;
     *valuePtr = value;
@@ -132,7 +132,7 @@ inline AnyValue AnyValue::CreateFrom<std::vector<bool>>(const std::vector<bool> 
 }
 
 template <>
-inline AnyValue AnyValue::CreateFrom<std::vector<int64_t>>(const std::vector<int64_t> &value)
+inline AnyValue AnyValue::CreateFrom<std::vector<int64_t>>(const std::vector<int64_t>& value)
 {
     auto valuePtr = new std::vector<int64_t>;
     *valuePtr = value;
@@ -140,7 +140,7 @@ inline AnyValue AnyValue::CreateFrom<std::vector<int64_t>>(const std::vector<int
 }
 
 template <>
-inline AnyValue AnyValue::CreateFrom<std::vector<std::vector<int64_t>>>(const std::vector<std::vector<int64_t>> &value)
+inline AnyValue AnyValue::CreateFrom<std::vector<std::vector<int64_t>>>(const std::vector<std::vector<int64_t>>& value)
 {
     auto valuePtr = new std::vector<std::vector<int64_t>>;
     *valuePtr = value;

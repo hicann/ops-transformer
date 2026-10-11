@@ -28,28 +28,28 @@ using namespace fa_base_matmul;
 
 static constexpr uint32_t UB_BMM1_ELEMS = 64 * 128;
 static constexpr uint32_t UB_BMM2_ELEMS = 64 * 128;
-static constexpr uint32_t L0_AB_ELEMS   = 128 * 128;
-static constexpr uint32_t L0C_ELEMS     = 128 * 128;
+static constexpr uint32_t L0_AB_ELEMS = 128 * 128;
+static constexpr uint32_t L0C_ELEMS = 128 * 128;
 
-static constexpr uint32_t FLAG_BMM1_READY  = 0;
-static constexpr uint32_t FLAG_L1P_READY   = 1;
-static constexpr uint32_t FLAG_BMM2_READY  = 2;
+static constexpr uint32_t FLAG_BMM1_READY = 0;
+static constexpr uint32_t FLAG_L1P_READY = 1;
+static constexpr uint32_t FLAG_BMM2_READY = 2;
 
-using IN_T  = bfloat16_t;
-using T     = float;
+using IN_T = bfloat16_t;
+using T = float;
 using OUT_T = bfloat16_t;
 
-static constexpr uint32_t E_L1Q    = 0;
-static constexpr uint32_t E_L1K    = 1;
-static constexpr uint32_t E_L1V    = 2;
-#define             E_L0AB(s)    (3 + (s))
-static constexpr uint32_t E_L0C    = 5;
+static constexpr uint32_t E_L1Q = 0;
+static constexpr uint32_t E_L1K = 1;
+static constexpr uint32_t E_L1V = 2;
+#define E_L0AB(s) (3 + (s))
+static constexpr uint32_t E_L0C = 5;
 
 static constexpr FixpipeConfig COMMON_FP_CFG = {CO2Layout::ROW_MAJOR, true};
 
 template <uint32_t N_BASE, uint32_t D_SIZE>
-__aicore__ inline void FixpipeMm1(const LocalTensor<float> &dst, const LocalTensor<float> &l0C,
-    uint32_t mActual, uint32_t nActual)
+__aicore__ inline void FixpipeMm1(const LocalTensor<float>& dst, const LocalTensor<float>& l0C, uint32_t mActual,
+                                  uint32_t nActual)
 {
     uint32_t nSize = (nActual + 7) >> 3 << 3;
     uint32_t mSize = (mActual + 1) >> 1 << 1;
@@ -66,8 +66,8 @@ __aicore__ inline void FixpipeMm1(const LocalTensor<float> &dst, const LocalTens
 }
 
 template <uint32_t M_BASE, uint32_t D_SIZE>
-__aicore__ inline void FixpipeMm2(const LocalTensor<float> &dst, const LocalTensor<float> &l0C,
-    uint32_t mActual, uint32_t nActual)
+__aicore__ inline void FixpipeMm2(const LocalTensor<float>& dst, const LocalTensor<float>& l0C, uint32_t mActual,
+                                  uint32_t nActual)
 {
     uint32_t nSize = (nActual + 7) >> 3 << 3;
     uint32_t mSize = (mActual + 1) >> 1 << 1;
@@ -84,17 +84,12 @@ __aicore__ inline void FixpipeMm2(const LocalTensor<float> &dst, const LocalTens
 }
 
 template <uint32_t M_BASE, uint32_t N_BASE, uint32_t D_SIZE>
-__aicore__ inline void ComputeMm1(
-    LocalTensor<IN_T> &l1Q, LocalTensor<IN_T> &l1K,
-    LocalTensor<IN_T> &l0A, LocalTensor<IN_T> &l0B,
-    LocalTensor<float> &l0C,
-    LocalTensor<float> &ubBmm1,
-    FaGmTensor<IN_T, GmFormat::BSND> &qGm,
-    FaGmTensor<IN_T, GmFormat::BSND> &kGm,
-    uint32_t bIdx, uint32_t n1Head, uint32_t n2Head,
-    uint32_t s1BlockBase, uint32_t s2BlockBase,
-    uint32_t mActual, uint32_t nActual,
-    bool isFirstS2Loop, bool isLastS2Loop)
+__aicore__ inline void ComputeMm1(LocalTensor<IN_T>& l1Q, LocalTensor<IN_T>& l1K, LocalTensor<IN_T>& l0A,
+                                  LocalTensor<IN_T>& l0B, LocalTensor<float>& l0C, LocalTensor<float>& ubBmm1,
+                                  FaGmTensor<IN_T, GmFormat::BSND>& qGm, FaGmTensor<IN_T, GmFormat::BSND>& kGm,
+                                  uint32_t bIdx, uint32_t n1Head, uint32_t n2Head, uint32_t s1BlockBase,
+                                  uint32_t s2BlockBase, uint32_t mActual, uint32_t nActual, bool isFirstS2Loop,
+                                  bool isLastS2Loop)
 {
     CrossCoreWaitFlag<4, PIPE_FIX>(FLAG_BMM1_READY);
     CrossCoreWaitFlag<4, PIPE_FIX>(FLAG_BMM1_READY + 16);
@@ -118,8 +113,8 @@ __aicore__ inline void ComputeMm1(
     Mutex::Lock<PIPE_M>(E_L0C);
     {
         MMParam param = MakeMMParam(mActual, nActual, (uint32_t)D_SIZE, false, true);
-        MatmulFull<IN_T, IN_T, float, static_cast<uint32_t>(128), static_cast<uint32_t>(128), static_cast<uint32_t>(128), ABLayout::MK, ABLayout::KN>(
-            l1Q, l1K, l0A, l0B, l0C, param, E_L0AB(0));
+        MatmulFull<IN_T, IN_T, float, static_cast<uint32_t>(128), static_cast<uint32_t>(128),
+                   static_cast<uint32_t>(128), ABLayout::MK, ABLayout::KN>(l1Q, l1K, l0A, l0B, l0C, param, E_L0AB(0));
     }
     Mutex::Unlock<PIPE_MTE1>(E_L1K);
     Mutex::Unlock<PIPE_M>(E_L0C);
@@ -137,13 +132,10 @@ __aicore__ inline void ComputeMm1(
 }
 
 template <uint32_t M_BASE, uint32_t N_BASE, uint32_t D_SIZE>
-__aicore__ inline void ComputeMm2(
-    LocalTensor<IN_T> &l1P, LocalTensor<IN_T> &l1V,
-    LocalTensor<IN_T> &l0A, LocalTensor<IN_T> &l0B,
-    LocalTensor<float> &l0C, LocalTensor<float> &ubBmm2,
-    FaGmTensor<IN_T, GmFormat::BSND> &vGm,
-    uint32_t bIdx, uint32_t n2Head, uint32_t s2BlockBase,
-    uint32_t mActual, uint32_t nActual)
+__aicore__ inline void ComputeMm2(LocalTensor<IN_T>& l1P, LocalTensor<IN_T>& l1V, LocalTensor<IN_T>& l0A,
+                                  LocalTensor<IN_T>& l0B, LocalTensor<float>& l0C, LocalTensor<float>& ubBmm2,
+                                  FaGmTensor<IN_T, GmFormat::BSND>& vGm, uint32_t bIdx, uint32_t n2Head,
+                                  uint32_t s2BlockBase, uint32_t mActual, uint32_t nActual)
 {
     CrossCoreWaitFlag<4, PIPE_MTE1>(FLAG_L1P_READY);
     CrossCoreWaitFlag<4, PIPE_MTE1>(FLAG_L1P_READY + 16);
@@ -162,8 +154,8 @@ __aicore__ inline void ComputeMm2(
     {
         MMParam param = MakeMMParam(mActual, (uint32_t)D_SIZE, nActual, false, false);
         param.realM = mActual;
-        MatmulFull<IN_T, IN_T, float, 128, 128, 128, ABLayout::MK, ABLayout::KN>(
-            l1P, l1V, l0A, l0B, l0C, param, E_L0AB(0));
+        MatmulFull<IN_T, IN_T, float, 128, 128, 128, ABLayout::MK, ABLayout::KN>(l1P, l1V, l0A, l0B, l0C, param,
+                                                                                 E_L0AB(0));
     }
     Mutex::Unlock<PIPE_MTE1>(E_L1V);
     Mutex::Unlock<PIPE_M>(E_L0C);
@@ -177,13 +169,12 @@ __aicore__ inline void ComputeMm2(
 }
 
 template <uint32_t M_BASE = 128, uint32_t N_BASE = 128, uint32_t D_SIZE = 128>
-__aicore__ inline void CubeFunc(__gm__ uint8_t *query, __gm__ uint8_t *key,
-                                __gm__ uint8_t *value, __gm__ uint8_t *workspace,
-                                __gm__ uint8_t *tiling, uint32_t blockDim,
-                                uint32_t B, uint32_t N1, uint32_t N2, uint32_t S1, uint32_t S2)
+__aicore__ inline void CubeFunc(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* workspace, __gm__ uint8_t* tiling, uint32_t blockDim, uint32_t B,
+                                uint32_t N1, uint32_t N2, uint32_t S1, uint32_t S2)
 {
-    static constexpr uint32_t L1_P_ELEMS  = M_BASE * N_BASE;
-    static constexpr uint32_t L1_Q_ELEMS  = M_BASE * D_SIZE;
+    static constexpr uint32_t L1_P_ELEMS = M_BASE * N_BASE;
+    static constexpr uint32_t L1_Q_ELEMS = M_BASE * D_SIZE;
     static constexpr uint32_t L1_KV_ELEMS = N_BASE * D_SIZE;
 
     uint32_t bn1Total = B * N1;
@@ -198,9 +189,9 @@ __aicore__ inline void CubeFunc(__gm__ uint8_t *query, __gm__ uint8_t *key,
     uint32_t numS1Blocks = (S1 + M_BASE - 1) / M_BASE;
     uint32_t numS2Blocks = (S2 + N_BASE - 1) / N_BASE;
 
-    FaGmTensor<IN_T, GmFormat::BSND> qGm((__gm__ IN_T *)query, B, N1, S1, (uint32_t)D_SIZE);
-    FaGmTensor<IN_T, GmFormat::BSND> kGm((__gm__ IN_T *)key,   B, N2, S2, (uint32_t)D_SIZE);
-    FaGmTensor<IN_T, GmFormat::BSND> vGm((__gm__ IN_T *)value, B, N2, S2, (uint32_t)D_SIZE);
+    FaGmTensor<IN_T, GmFormat::BSND> qGm((__gm__ IN_T*)query, B, N1, S1, (uint32_t)D_SIZE);
+    FaGmTensor<IN_T, GmFormat::BSND> kGm((__gm__ IN_T*)key, B, N2, S2, (uint32_t)D_SIZE);
+    FaGmTensor<IN_T, GmFormat::BSND> vGm((__gm__ IN_T*)value, B, N2, S2, (uint32_t)D_SIZE);
 
     uint32_t l1Addr = 0;
     LocalTensor<IN_T> l1P = LocalTensor<IN_T>(TPosition::A1, l1Addr, L1_P_ELEMS);
@@ -222,7 +213,7 @@ __aicore__ inline void CubeFunc(__gm__ uint8_t *query, __gm__ uint8_t *key,
     LocalTensor<float> ubBmm2 = LocalTensor<float>(TPosition::VECIN, ubAddr, UB_BMM2_ELEMS);
 
     for (uint32_t bn1 = bn1Start; bn1 < bn1End; bn1++) {
-        uint32_t bIdx   = bn1 / N1;
+        uint32_t bIdx = bn1 / N1;
         uint32_t n1Head = bn1 % N1;
         uint32_t n2Head = n1Head * N2 / N1;
 
@@ -235,16 +226,13 @@ __aicore__ inline void CubeFunc(__gm__ uint8_t *query, __gm__ uint8_t *key,
                 uint32_t s2BlockBase = s2Block * N_BASE;
                 uint32_t nActual = s2BlockBase + N_BASE > S2 ? S2 - s2BlockBase : (uint32_t)N_BASE;
 
-                ComputeMm1<M_BASE, N_BASE, D_SIZE>(l1Q, l1K, l0A, l0B,
-                    l0C, ubBmm1,
-                    qGm, kGm, bIdx, n1Head, n2Head,
-                    s1BlockBase, s2BlockBase, mActual, nActual,
-                    isQFirst, (s2Block + 1) == numS2Blocks);
+                ComputeMm1<M_BASE, N_BASE, D_SIZE>(l1Q, l1K, l0A, l0B, l0C, ubBmm1, qGm, kGm, bIdx, n1Head, n2Head,
+                                                   s1BlockBase, s2BlockBase, mActual, nActual, isQFirst,
+                                                   (s2Block + 1) == numS2Blocks);
                 isQFirst = false;
 
-                ComputeMm2<M_BASE, N_BASE, D_SIZE>(l1P, l1V, l0A, l0B,
-                    l0C, ubBmm2,
-                    vGm, bIdx, n2Head, s2BlockBase, mActual, nActual);
+                ComputeMm2<M_BASE, N_BASE, D_SIZE>(l1P, l1V, l0A, l0B, l0C, ubBmm2, vGm, bIdx, n2Head, s2BlockBase,
+                                                   mActual, nActual);
             }
         }
     }

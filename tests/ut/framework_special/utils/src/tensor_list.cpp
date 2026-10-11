@@ -19,7 +19,7 @@
 
 using namespace ops::adv::tests::utils;
 
-TensorList::TensorList(const char *name, const std::vector<std::vector<int64_t>> &shapes, const char *shapeType,
+TensorList::TensorList(const char* name, const std::vector<std::vector<int64_t>>& shapes, const char* shapeType,
                        ge::DataType dType, ge::Format format, TensorType type)
     : TensorIntf(name, {}, shapeType, dType, format, type)
 {
@@ -36,42 +36,40 @@ TensorList::TensorList(const char *name, const std::vector<std::vector<int64_t>>
     this->isArray_ = true;
 }
 
-TensorList::TensorList(const char *name, const std::initializer_list<int64_t> &shapes, const char *shapeType,
+TensorList::TensorList(const char* name, const std::initializer_list<int64_t>& shapes, const char* shapeType,
                        ge::DataType dType, ge::Format format, TensorType type)
     : TensorIntf(name, shapes, shapeType, dType, format, type)
-{
-}
-
+{}
 
 TensorList::~TensorList()
 {
     this->FreeDevData();
 }
 
-uint8_t *TensorList::AllocDevDataImpl(int64_t size)
+uint8_t* TensorList::AllocDevDataImpl(int64_t size)
 {
-    uint64_t *ptr = (uint64_t *)AscendC::GmAlloc(size);
+    uint64_t* ptr = (uint64_t*)AscendC::GmAlloc(size);
     LOG_IF(ptr == nullptr, LOG_ERR("AscendC::GmAlloc failed, Size(%ld)", size));
-    return (uint8_t *)ptr;
+    return (uint8_t*)ptr;
 }
 
-void TensorList::FreeDevDataImpl(uint8_t *devPtr)
+void TensorList::FreeDevDataImpl(uint8_t* devPtr)
 {
-    uint64_t *ptr = reinterpret_cast<uint64_t *>(devPtr);
+    uint64_t* ptr = reinterpret_cast<uint64_t*>(devPtr);
     uint64_t ptrOffset = (*ptr) >> 3;
 
     for (uint64_t i = 0; i < this->shapes_.size(); i++) {
-        AscendC::GmFree(reinterpret_cast<uint64_t *>(*(ptr + ptrOffset + i)));
+        AscendC::GmFree(reinterpret_cast<uint64_t*>(*(ptr + ptrOffset + i)));
     }
     AscendC::GmFree(devPtr);
 }
 
-bool TensorList::MemSetDevDataImpl(uint8_t *devPtr, int64_t devMax, int32_t val, int64_t cnt)
+bool TensorList::MemSetDevDataImpl(uint8_t* devPtr, int64_t devMax, int32_t val, int64_t cnt)
 {
     const int64_t shiftBits = 32;
     const int64_t byteAlignMent = 8;
     auto ret = EOK;
-    uint64_t *ptr = reinterpret_cast<uint64_t *>(devPtr);
+    uint64_t* ptr = reinterpret_cast<uint64_t*>(devPtr);
     int64_t ptrOffset = 1;
     int64_t indexCur = 1;
     std::vector<int64_t> needSize{};
@@ -87,7 +85,7 @@ bool TensorList::MemSetDevDataImpl(uint8_t *devPtr, int64_t devMax, int32_t val,
     }
     *ptr = ptrOffset * byteAlignMent;
     for (uint64_t i = 0; i < needSize.size(); i++) {
-        uint64_t *dataPtr = (uint64_t *)AscendC::GmAlloc(needSize[i]);
+        uint64_t* dataPtr = (uint64_t*)AscendC::GmAlloc(needSize[i]);
         *(ptr + indexCur + i) = reinterpret_cast<uint64_t>(dataPtr);
         ret = memset_s(dataPtr, needSize[i], val, needSize[i]);
         LOG_IF(ret != EOK,
@@ -97,7 +95,7 @@ bool TensorList::MemSetDevDataImpl(uint8_t *devPtr, int64_t devMax, int32_t val,
     return ret == EOK;
 }
 
-bool TensorList::MemCpyHostToDevDataImpl(uint8_t *devPtr, int64_t devMax, const void *hostPtr, int64_t cnt)
+bool TensorList::MemCpyHostToDevDataImpl(uint8_t* devPtr, int64_t devMax, const void* hostPtr, int64_t cnt)
 {
     auto ret = memcpy_s(devPtr, devMax, hostPtr, cnt);
     LOG_IF(ret != EOK,
@@ -105,7 +103,7 @@ bool TensorList::MemCpyHostToDevDataImpl(uint8_t *devPtr, int64_t devMax, const 
     return ret == EOK;
 }
 
-bool TensorList::MemCpyDevDataToHostImpl(void *hostPtr, int64_t hostMax, const uint8_t *devPtr, int64_t cnt)
+bool TensorList::MemCpyDevDataToHostImpl(void* hostPtr, int64_t hostMax, const uint8_t* devPtr, int64_t cnt)
 {
     auto ret = memcpy_s(hostPtr, hostMax, devPtr, cnt);
     LOG_IF(ret != EOK,

@@ -41,11 +41,13 @@ std::map<ge::DataType, aclDataType> geDtype2AclDtypeMap = {{ge::DataType::DT_FLO
 
 using namespace ops::adv::tests::utils;
 
-AclnnTensorList::AclnnTensorList(const char *name, const std::vector<std::vector<int64_t>> &shapes,
-                                 const char *shapeType, ge::DataType dType, ge::Format format, TensorType type,
+AclnnTensorList::AclnnTensorList(const char* name, const std::vector<std::vector<int64_t>>& shapes,
+                                 const char* shapeType, ge::DataType dType, ge::Format format, TensorType type,
                                  bool isTrans)
-    : TensorIntf(name, {}, shapeType, dType, format, type), aclDataType_(ACL_DT_UNDEFINED),
-      aclTensorListDataStrides_({}), aclTensorList_(nullptr)
+    : TensorIntf(name, {}, shapeType, dType, format, type),
+      aclDataType_(ACL_DT_UNDEFINED),
+      aclTensorListDataStrides_({}),
+      aclTensorList_(nullptr)
 {
     for (auto shape : shapes) {
         std::vector<int64_t> shapeView{};
@@ -87,11 +89,10 @@ AclnnTensorList::AclnnTensorList(const char *name, const std::vector<std::vector
     }
 }
 
-AclnnTensorList::AclnnTensorList(const TensorList &t, bool isTrans)
+AclnnTensorList::AclnnTensorList(const TensorList& t, bool isTrans)
     : AclnnTensorList(t.Name().c_str(), t.ShapesView(), t.ShapeType().c_str(), t.GetDataType(), t.GetFormat(),
                       t.GetTensorType(), isTrans)
-{
-}
+{}
 
 AclnnTensorList::~AclnnTensorList()
 {
@@ -103,23 +104,23 @@ aclDataType AclnnTensorList::GetAclDataType() const
     return aclDataType_;
 }
 
-aclTensorList *AclnnTensorList::GetAclTensorList() const
+aclTensorList* AclnnTensorList::GetAclTensorList() const
 {
     return aclTensorList_;
 }
 
-uint8_t *AclnnTensorList::AllocDevDataNz(int32_t initVal, int64_t minSize)
+uint8_t* AclnnTensorList::AllocDevDataNz(int32_t initVal, int64_t minSize)
 {
     int size = this->shapesView_.size();
     if (size <= 0) {
         return nullptr;
     }
-    aclTensor **tensors = reinterpret_cast<aclTensor **>(malloc(size * sizeof(aclTensor *)));
+    aclTensor** tensors = reinterpret_cast<aclTensor**>(malloc(size * sizeof(aclTensor*)));
     if (tensors == nullptr) {
         return nullptr;
     }
     for (int i = 0; i < size; i++) {
-        aclTensor **tmpTensor = tensors + i;
+        aclTensor** tmpTensor = tensors + i;
         this->shape_ = this->shapes_[i];
         if (TensorIntf::AllocDevData(initVal, minSize) == nullptr) {
             return nullptr;
@@ -138,18 +139,18 @@ uint8_t *AclnnTensorList::AllocDevDataNz(int32_t initVal, int64_t minSize)
     return devData_;
 }
 
-uint8_t *AclnnTensorList::AllocDevData(int32_t initVal, int64_t minSize)
+uint8_t* AclnnTensorList::AllocDevData(int32_t initVal, int64_t minSize)
 {
     int size = this->shapesView_.size();
     if (size <= 0) {
         return nullptr;
     }
-    aclTensor **tensors = reinterpret_cast<aclTensor **>(malloc(size * sizeof(aclTensor *)));
+    aclTensor** tensors = reinterpret_cast<aclTensor**>(malloc(size * sizeof(aclTensor*)));
     if (tensors == nullptr) {
         return nullptr;
     }
     for (int i = 0; i < size; i++) {
-        aclTensor **tmpTensor = tensors + i;
+        aclTensor** tmpTensor = tensors + i;
         this->shape_ = this->shapes_[i];
         if (TensorIntf::AllocDevData(initVal, minSize) == nullptr) {
             return nullptr;
@@ -173,26 +174,26 @@ void AclnnTensorList::FreeDevData()
     this->Destroy();
 }
 
-uint8_t *AclnnTensorList::AllocDevDataImpl(int64_t size)
+uint8_t* AclnnTensorList::AllocDevDataImpl(int64_t size)
 {
     /* 调用 aclrtMalloc 申请 device 侧内存 */
-    void *devPtr = nullptr;
+    void* devPtr = nullptr;
     auto ret = aclrtMalloc(&devPtr, size, ACL_MEM_MALLOC_HUGE_FIRST);
     if (ret != ACL_SUCCESS) {
         LOG_ERR("aclrtMalloc failed, ERROR: %d, Tensor(%s), Size(%ld)", ret, name_.c_str(), size);
     }
     //  LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclrtMalloc failed, ERROR: %d, Tensor(%s), Size(%ld)", ret, name_.c_str(),
     //  size));
-    return (uint8_t *)devPtr;
+    return (uint8_t*)devPtr;
 }
 
-void AclnnTensorList::FreeDevDataImpl(uint8_t *devPtr)
+void AclnnTensorList::FreeDevDataImpl(uint8_t* devPtr)
 {
     auto ret = aclrtFree(devPtr);
     LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclrtFree failed, ERROR: %d, Tensor(%s))", ret, name_.c_str()));
 }
 
-bool AclnnTensorList::MemSetDevDataImpl(uint8_t *devPtr, int64_t devMax, int32_t val, int64_t cnt)
+bool AclnnTensorList::MemSetDevDataImpl(uint8_t* devPtr, int64_t devMax, int32_t val, int64_t cnt)
 {
     /* 调用 aclrtMemset 设置值 */
     auto ret = aclrtMemset(devPtr, devMax, val, cnt);
@@ -200,7 +201,7 @@ bool AclnnTensorList::MemSetDevDataImpl(uint8_t *devPtr, int64_t devMax, int32_t
     return ret == ACL_SUCCESS;
 }
 
-bool AclnnTensorList::MemCpyHostToDevDataImpl(uint8_t *devPtr, int64_t devMax, const void *hostPtr, int64_t cnt)
+bool AclnnTensorList::MemCpyHostToDevDataImpl(uint8_t* devPtr, int64_t devMax, const void* hostPtr, int64_t cnt)
 {
     /* 调用 aclrtMemcpy  */
     auto ret = aclrtMemcpy(devPtr, devMax, hostPtr, cnt, ACL_MEMCPY_HOST_TO_DEVICE);
@@ -208,7 +209,7 @@ bool AclnnTensorList::MemCpyHostToDevDataImpl(uint8_t *devPtr, int64_t devMax, c
     return ret == ACL_SUCCESS;
 }
 
-bool AclnnTensorList::MemCpyDevDataToHostImpl(void *hostPtr, int64_t hostMax, const uint8_t *devPtr, int64_t cnt)
+bool AclnnTensorList::MemCpyDevDataToHostImpl(void* hostPtr, int64_t hostMax, const uint8_t* devPtr, int64_t cnt)
 {
     /* 调用 aclrtMemcpy  */
     auto ret = aclrtMemcpy(hostPtr, hostMax, devPtr, cnt, ACL_MEMCPY_DEVICE_TO_HOST);

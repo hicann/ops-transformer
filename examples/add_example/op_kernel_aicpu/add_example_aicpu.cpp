@@ -15,7 +15,7 @@
 #include "log.h"
 
 namespace {
-const char *const kAddExample = "AddExample";
+const char* const kAddExample = "AddExample";
 const uint32_t kFirstInputIndex = 0;
 const uint32_t kSecondInputIndex = 1;
 const uint32_t kFirstOutputIndex = 0;
@@ -25,11 +25,11 @@ const uint32_t kError = 2;
 } // namespace
 
 namespace aicpu {
-uint32_t AddExampleCpuKernel::Compute(CpuKernelContext &ctx)
+uint32_t AddExampleCpuKernel::Compute(CpuKernelContext& ctx)
 {
-    Tensor *input0 = ctx.Input(kFirstInputIndex);
-    Tensor *input1 = ctx.Input(kSecondInputIndex);
-    Tensor *output = ctx.Output(0);
+    Tensor* input0 = ctx.Input(kFirstInputIndex);
+    Tensor* input1 = ctx.Input(kSecondInputIndex);
+    Tensor* output = ctx.Output(0);
 
     if (input0 == nullptr || input1 == nullptr || output == nullptr) {
         KERNEL_LOG_ERROR("Invalid argument");
@@ -53,21 +53,21 @@ uint32_t AddExampleCpuKernel::Compute(CpuKernelContext &ctx)
 }
 
 template <typename T>
-uint32_t AddExampleCpuKernel::AddCompute(CpuKernelContext &ctx)
+uint32_t AddExampleCpuKernel::AddCompute(CpuKernelContext& ctx)
 {
-    Tensor *input0 = ctx.Input(kFirstInputIndex);
-    Tensor *input1 = ctx.Input(kSecondInputIndex);
-    Tensor *output = ctx.Output(kFirstOutputIndex);
+    Tensor* input0 = ctx.Input(kFirstInputIndex);
+    Tensor* input1 = ctx.Input(kSecondInputIndex);
+    Tensor* output = ctx.Output(kFirstOutputIndex);
 
-    T *x0 = reinterpret_cast<T *>(input0->GetData());
+    T* x0 = reinterpret_cast<T*>(input0->GetData());
     if (x0 == nullptr) {
         return kParamInvalid;
     }
-    T *x1 = reinterpret_cast<T *>(input1->GetData());
+    T* x1 = reinterpret_cast<T*>(input1->GetData());
     if (x1 == nullptr) {
         return kParamInvalid;
     }
-    T *y = reinterpret_cast<T *>(output->GetData());
+    T* y = reinterpret_cast<T*>(output->GetData());
     if (y == nullptr) {
         return kParamInvalid;
     }

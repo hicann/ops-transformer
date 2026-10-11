@@ -18,7 +18,7 @@
 
 class StaticSpaceInitializer {
 public:
-    static StaticSpaceInitializer &GetInstance()
+    static StaticSpaceInitializer& GetInstance()
     {
         static StaticSpaceInitializer instance;
         return instance;

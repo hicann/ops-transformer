@@ -21,7 +21,7 @@ using namespace ge;
 
 static constexpr int64_t IDX_0 = 0;
 
-static ge::graphStatus InferDataTypeAddExample(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeAddExample(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeAddExample");
 

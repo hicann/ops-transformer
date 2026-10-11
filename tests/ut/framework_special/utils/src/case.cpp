@@ -19,16 +19,18 @@
 
 using namespace ops::adv::tests::utils;
 
-void *Case::mCurrentCasePtr = nullptr;
+void* Case::mCurrentCasePtr = nullptr;
 
-Case::Case() : Case("Undefined", true, "", kTilingTemplatePriority_Invalid)
-{
-}
+Case::Case()
+    : Case("Undefined", true, "", kTilingTemplatePriority_Invalid)
+{}
 
-Case::Case(const char *name, bool enable, const char *dbgInfo, int32_t tilingTemplatePriority)
-    : mName(name), mEnable(enable), mDbgInfo(dbgInfo), mTilingTemplatePriority(tilingTemplatePriority)
-{
-}
+Case::Case(const char* name, bool enable, const char* dbgInfo, int32_t tilingTemplatePriority)
+    : mName(name),
+      mEnable(enable),
+      mDbgInfo(dbgInfo),
+      mTilingTemplatePriority(tilingTemplatePriority)
+{}
 
 bool Case::Init()
 {
@@ -39,12 +41,12 @@ bool Case::Init()
     return rst;
 }
 
-void *Case::GetCurrentCase()
+void* Case::GetCurrentCase()
 {
     return Case::mCurrentCasePtr;
 }
 
-const char *Case::GetRootPath()
+const char* Case::GetRootPath()
 {
     return mRootPath.c_str();
 }

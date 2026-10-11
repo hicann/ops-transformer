@@ -20,14 +20,20 @@
 
 using namespace ops::adv::tests::utils;
 
-TensorIntf::TensorIntf(const char *name, const std::initializer_list<int64_t> &shape, const char *shapeType,
+TensorIntf::TensorIntf(const char* name, const std::initializer_list<int64_t>& shape, const char* shapeType,
                        ge::DataType dType, ge::Format format, TensorType type)
-    : name_(name), shape_(shape), shapeView_(shape), shapeType_(shapeType), dType_(dType), format_(format), type_(type),
-      devData_(nullptr), devDataSize_(0)
-{
-}
+    : name_(name),
+      shape_(shape),
+      shapeView_(shape),
+      shapeType_(shapeType),
+      dType_(dType),
+      format_(format),
+      type_(type),
+      devData_(nullptr),
+      devDataSize_(0)
+{}
 
-TensorIntf::TensorIntf(const char *name, const std::vector<int64_t> &shape, const char *shapeType, ge::DataType dType,
+TensorIntf::TensorIntf(const char* name, const std::vector<int64_t>& shape, const char* shapeType, ge::DataType dType,
                        ge::Format format, TensorType type)
     : TensorIntf(name, {}, shapeType, dType, format, type)
 {
@@ -97,27 +103,27 @@ std::string TensorIntf::GetTilingStr() const
     }
 }
 
-const std::string &TensorIntf::Name() const
+const std::string& TensorIntf::Name() const
 {
     return name_;
 }
 
-const gert::Shape &TensorIntf::Shape() const
+const gert::Shape& TensorIntf::Shape() const
 {
     return shape_;
 }
 
-const std::vector<int64_t> &TensorIntf::ShapeView() const
+const std::vector<int64_t>& TensorIntf::ShapeView() const
 {
     return shapeView_;
 }
 
-const std::vector<std::vector<int64_t>> &TensorIntf::ShapesView() const
+const std::vector<std::vector<int64_t>>& TensorIntf::ShapesView() const
 {
     return shapesView_;
 }
 
-const std::string &TensorIntf::ShapeType() const
+const std::string& TensorIntf::ShapeType() const
 {
     return shapeType_;
 }
@@ -160,7 +166,7 @@ int64_t TensorIntf::GetExpDataSize() const
     }
 }
 
-uint8_t *TensorIntf::GetDevData() const
+uint8_t* TensorIntf::GetDevData() const
 {
     return devData_;
 }
@@ -170,7 +176,7 @@ int64_t TensorIntf::GetDevDataSize() const
     return devDataSize_;
 }
 
-uint8_t *TensorIntf::AllocDevDataNz(int32_t initVal, int64_t minSize)
+uint8_t* TensorIntf::AllocDevDataNz(int32_t initVal, int64_t minSize)
 {
     if (devData_ != nullptr) {
         return devData_;
@@ -189,7 +195,7 @@ ErrRet:
     return nullptr;
 }
 
-uint8_t *TensorIntf::AllocDevData(int32_t initVal, int64_t minSize)
+uint8_t* TensorIntf::AllocDevData(int32_t initVal, int64_t minSize)
 {
     if (devData_ != nullptr) {
         return devData_;
@@ -217,7 +223,7 @@ void TensorIntf::FreeDevData()
     devDataSize_ = 0;
 }
 
-bool TensorIntf::CopyHostToDevData(uint8_t *hostBuff, int64_t hostBuffSize)
+bool TensorIntf::CopyHostToDevData(uint8_t* hostBuff, int64_t hostBuffSize)
 {
     if (devData_ == nullptr || hostBuff == nullptr || devDataSize_ < hostBuffSize) {
         LOG_ERR("Tensor(%s), Invalid param, Host[%p, %ld], Device[%p, %ld]", name_.c_str(), hostBuff, hostBuffSize,
@@ -227,7 +233,7 @@ bool TensorIntf::CopyHostToDevData(uint8_t *hostBuff, int64_t hostBuffSize)
     return this->MemCpyHostToDevDataImpl(devData_, devDataSize_, hostBuff, hostBuffSize);
 }
 
-bool TensorIntf::LoadFileToDevData(std::string &filePath)
+bool TensorIntf::LoadFileToDevData(std::string& filePath)
 {
     // 将文件内容读取到host侧
     size_t readSize = 0;
@@ -241,7 +247,7 @@ bool TensorIntf::LoadFileToDevData(std::string &filePath)
     return this->CopyHostToDevData(hostBuff);
 }
 
-bool TensorIntf::CopyDevDataToHost(uint8_t *hostBuff, int64_t hostBuffSize)
+bool TensorIntf::CopyDevDataToHost(uint8_t* hostBuff, int64_t hostBuffSize)
 {
     if (devData_ == nullptr || hostBuff == nullptr || hostBuffSize < devDataSize_) {
         LOG_ERR("Tensor(%s), Invalid param, Host[%p, %ld], Device[%p, %ld]", name_.c_str(), hostBuff, hostBuffSize,
@@ -251,7 +257,7 @@ bool TensorIntf::CopyDevDataToHost(uint8_t *hostBuff, int64_t hostBuffSize)
     return this->MemCpyDevDataToHostImpl(hostBuff, hostBuffSize, devData_, devDataSize_);
 }
 
-bool TensorIntf::SaveDevDataToFile(std::string &filePath)
+bool TensorIntf::SaveDevDataToFile(std::string& filePath)
 {
     // 将dev内容copy到host侧
     std::vector<uint8_t> hostData;
@@ -263,7 +269,7 @@ bool TensorIntf::SaveDevDataToFile(std::string &filePath)
     return WriteFile(filePath, hostData.data(), hostData.size());
 }
 
-std::string TensorIntf::ToString(const ge::DataType &dType)
+std::string TensorIntf::ToString(const ge::DataType& dType)
 {
     switch (dType) {
         case ge::DT_FLOAT:
@@ -307,7 +313,7 @@ std::string TensorIntf::ToString(const ge::DataType &dType)
     }
 }
 
-std::string TensorIntf::ToString(const ge::Format &format)
+std::string TensorIntf::ToString(const ge::Format& format)
 {
     switch (format) {
         case ge::FORMAT_ND:
@@ -319,7 +325,7 @@ std::string TensorIntf::ToString(const ge::Format &format)
     }
 }
 
-std::string TensorIntf::ToString(const gert::Shape &shape)
+std::string TensorIntf::ToString(const gert::Shape& shape)
 {
     size_t shapeSize = shape.GetDimNum();
     std::vector<int64_t> shapeVec(shapeSize, 0);

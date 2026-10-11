@@ -24,7 +24,7 @@
 
 namespace ops::ut {
 
-inline aclDataType ParseAclDtype(const std::string &dtype)
+inline aclDataType ParseAclDtype(const std::string& dtype)
 {
     static const std::map<std::string, aclDataType> dtypeMap = {
         {"FLOAT", ACL_FLOAT},
@@ -47,7 +47,7 @@ inline aclDataType ParseAclDtype(const std::string &dtype)
     return it == dtypeMap.end() ? ACL_DT_UNDEFINED : it->second;
 }
 
-inline aclnnStatus ParseAclnnStatus(const std::string &status)
+inline aclnnStatus ParseAclnnStatus(const std::string& status)
 {
     static const std::map<std::string, aclnnStatus> statusMap = {
         {"ACLNN_SUCCESS", ACLNN_SUCCESS},
@@ -64,7 +64,7 @@ inline aclnnStatus ParseAclnnStatus(const std::string &status)
     return static_cast<aclnnStatus>(std::stoll(trimmed));
 }
 
-inline aclFormat ParseAclFormat(const std::string &format)
+inline aclFormat ParseAclFormat(const std::string& format)
 {
     static const std::map<std::string, aclFormat> formatMap = {
         {"ND", ACL_FORMAT_ND},
@@ -83,7 +83,7 @@ struct AclTensorSpec {
     std::vector<int64_t> storageDims;
 };
 
-inline AclTensorSpec ParseAclTensorSpec(const std::string &value)
+inline AclTensorSpec ParseAclTensorSpec(const std::string& value)
 {
     const std::string trimmed = Trim(value);
     if (trimmed.empty() || trimmed == "NONE") {
@@ -106,19 +106,19 @@ inline AclTensorSpec ParseAclTensorSpec(const std::string &value)
     return spec;
 }
 
-inline std::vector<int64_t> ParseAclTensorViewDims(const std::string &value)
+inline std::vector<int64_t> ParseAclTensorViewDims(const std::string& value)
 {
     return ParseAclTensorSpec(value).viewDims;
 }
 
-inline std::vector<std::string> ParseAclTensorListSpecs(const std::string &value)
+inline std::vector<std::string> ParseAclTensorListSpecs(const std::string& value)
 {
     std::vector<std::string> specs;
     SplitStr2Vec(Trim(value), ";", specs);
     if (specs.empty()) {
         specs.emplace_back("NONE");
     }
-    for (auto &spec : specs) {
+    for (auto& spec : specs) {
         spec = Trim(spec);
         if (spec.empty()) {
             spec = "NONE";
@@ -127,29 +127,29 @@ inline std::vector<std::string> ParseAclTensorListSpecs(const std::string &value
     return specs;
 }
 
-inline TensorDesc MakeAclTensorDesc(const std::vector<int64_t> &shape, aclDataType dtype, aclFormat format,
-                                    const std::vector<int64_t> &storage_shape = {},
-                                    const std::vector<int64_t> &stride = {})
+inline TensorDesc MakeAclTensorDesc(const std::vector<int64_t>& shape, aclDataType dtype, aclFormat format,
+                                    const std::vector<int64_t>& storage_shape = {},
+                                    const std::vector<int64_t>& stride = {})
 {
     return TensorDesc(shape, dtype, format, stride, 0, storage_shape).ValueRange(-10, 10);
 }
 
-inline TensorDesc BuildAclTensorDescFromSpec(const std::string &shape_spec, const std::string &dtype,
-                                             const std::string &format)
+inline TensorDesc BuildAclTensorDescFromSpec(const std::string& shape_spec, const std::string& dtype,
+                                             const std::string& format)
 {
     const AclTensorSpec spec = ParseAclTensorSpec(shape_spec);
     return TensorDesc(spec.viewDims, ParseAclDtype(dtype), ParseAclFormat(format), spec.stride, 0, spec.storageDims);
 }
 
-inline std::vector<int64_t> GetOptionalDims(const std::vector<std::vector<int64_t>> &dims_list, size_t index)
+inline std::vector<int64_t> GetOptionalDims(const std::vector<std::vector<int64_t>>& dims_list, size_t index)
 {
     return index < dims_list.size() ? dims_list[index] : std::vector<int64_t>{};
 }
 
-inline TensorListDesc BuildAclTensorListDesc(const std::vector<std::vector<int64_t>> &shapes, aclDataType dtype,
+inline TensorListDesc BuildAclTensorListDesc(const std::vector<std::vector<int64_t>>& shapes, aclDataType dtype,
                                              aclFormat format,
-                                             const std::vector<std::vector<int64_t>> &storage_shapes = {},
-                                             const std::vector<std::vector<int64_t>> &strides = {})
+                                             const std::vector<std::vector<int64_t>>& storage_shapes = {},
+                                             const std::vector<std::vector<int64_t>>& strides = {})
 {
     std::vector<TensorDesc> tensor_vec;
     tensor_vec.reserve(shapes.size());
@@ -160,11 +160,11 @@ inline TensorListDesc BuildAclTensorListDesc(const std::vector<std::vector<int64
     return TensorListDesc(tensor_vec);
 }
 
-inline TensorListDesc BuildAclTensorListDesc(const std::string &shape_spec_list, const std::string &dtype,
-                                             const std::string &format, bool with_value_range = true)
+inline TensorListDesc BuildAclTensorListDesc(const std::string& shape_spec_list, const std::string& dtype,
+                                             const std::string& format, bool with_value_range = true)
 {
     std::vector<TensorDesc> tensors;
-    for (const auto &shape_spec : ParseAclTensorListSpecs(shape_spec_list)) {
+    for (const auto& shape_spec : ParseAclTensorListSpecs(shape_spec_list)) {
         TensorDesc tensor = BuildAclTensorDescFromSpec(shape_spec, dtype, format);
         if (with_value_range) {
             tensor.ValueRange(-10, 10);

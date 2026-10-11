@@ -25,8 +25,8 @@ static bool ut_tmp_file_switch = false;
 
 void SetUtTmpFileSwitch()
 {
-    constexpr const char *ENV_KEEP_UT_TMP_FILE = "KEEP_UT_TMP_FILE";
-    const char *p = getenv(ENV_KEEP_UT_TMP_FILE);
+    constexpr const char* ENV_KEEP_UT_TMP_FILE = "KEEP_UT_TMP_FILE";
+    const char* p = getenv(ENV_KEEP_UT_TMP_FILE);
     if (p == nullptr) {
         ut_tmp_file_switch = false;
         return;
@@ -44,7 +44,7 @@ bool GetUtTmpFileSwitch()
     return ut_tmp_file_switch;
 }
 
-void *ReadBinFile(const string &file_name, size_t &size)
+void* ReadBinFile(const string& file_name, size_t& size)
 {
     size = 0;
     ifstream file(file_name, ios::in | ios::binary);
@@ -57,7 +57,7 @@ void *ReadBinFile(const string &file_name, size_t &size)
     streampos file_size = file.tellg();
     file.seekg(0, ios_base::beg);
 
-    char *p = new (nothrow) char[file_size];
+    char* p = new (nothrow) char[file_size];
     if (p == nullptr) {
         file.close();
         cout << "Malloc buffer to read binary file failed. size: " << file_size << endl;
@@ -76,7 +76,7 @@ void *ReadBinFile(const string &file_name, size_t &size)
     return p;
 }
 
-int WriteBinFile(const void *host_mem, const string &file_name, size_t size)
+int WriteBinFile(const void* host_mem, const string& file_name, size_t size)
 {
     ofstream file(file_name, ios::out | ios::binary);
     if (!file) {
@@ -84,7 +84,7 @@ int WriteBinFile(const void *host_mem, const string &file_name, size_t size)
         return 1;
     }
 
-    if (!file.write(static_cast<const char *>(host_mem), size)) {
+    if (!file.write(static_cast<const char*>(host_mem), size)) {
         cout << "Failed to write binary file: " << file_name << endl;
         file.close();
         return 1;
@@ -93,13 +93,13 @@ int WriteBinFile(const void *host_mem, const string &file_name, size_t size)
     return 0;
 }
 
-bool FileExists(const string &file_name)
+bool FileExists(const string& file_name)
 {
     struct stat buf;
     return stat(file_name.c_str(), &buf) == 0;
 }
 
-void DeleteUtTmpFiles(const string &file_prefix)
+void DeleteUtTmpFiles(const string& file_prefix)
 {
     if (GetUtTmpFileSwitch()) {
         return;
@@ -110,12 +110,12 @@ void DeleteUtTmpFiles(const string &file_prefix)
         return;
     }
 
-    DIR *dir = opendir(cwd);
+    DIR* dir = opendir(cwd);
     if (dir == NULL) {
         return;
     }
 
-    struct dirent *entry;
+    struct dirent* entry;
     string json_file = file_prefix + ".json";
     string input_file_prefix = file_prefix + "_input_";
     string output_file_prefix = file_prefix + "_output_";
@@ -133,19 +133,19 @@ void DeleteUtTmpFiles(const string &file_prefix)
     return;
 }
 
-void DeleteCwdFilesEndsWith(const string &file_suffix)
+void DeleteCwdFilesEndsWith(const string& file_suffix)
 {
     char cwd[PATH_MAX];
     if (getcwd(cwd, sizeof(cwd)) == NULL) {
         return;
     }
 
-    DIR *dir = opendir(cwd);
+    DIR* dir = opendir(cwd);
     if (dir == NULL) {
         return;
     }
 
-    struct dirent *entry;
+    struct dirent* entry;
     while ((entry = readdir(dir)) != NULL) {
         if (strlen(entry->d_name) < file_suffix.size())
             continue;
@@ -159,13 +159,13 @@ void DeleteCwdFilesEndsWith(const string &file_suffix)
     return;
 }
 
-string RealPath(const string &path)
+string RealPath(const string& path)
 {
     // Nullptr is returned when the path does not exist or there is no permission
     // Return absolute path when path is accessible
     string res;
     char resolved_path[PATH_MAX] = {};
-    const char *p = realpath(path.c_str(), resolved_path);
+    const char* p = realpath(path.c_str(), resolved_path);
     if (p == nullptr) {
         res.assign("");
     } else {
@@ -174,9 +174,9 @@ string RealPath(const string &path)
     return res;
 }
 
-bool IsDir(const string &path)
+bool IsDir(const string& path)
 {
-    DIR *p = opendir(path.c_str());
+    DIR* p = opendir(path.c_str());
     if (p != nullptr) {
         (void)closedir(p);
         return true;
@@ -184,7 +184,7 @@ bool IsDir(const string &path)
     return false;
 }
 
-void GetFilesWithSuffix(const string &path, const string &suffix, vector<string> &files)
+void GetFilesWithSuffix(const string& path, const string& suffix, vector<string>& files)
 {
     if (path.empty()) {
         return;
@@ -199,7 +199,7 @@ void GetFilesWithSuffix(const string &path, const string &suffix, vector<string>
         return;
     }
 
-    struct dirent **entries = nullptr;
+    struct dirent** entries = nullptr;
     const auto file_num = scandir(real_path.c_str(), &entries, nullptr, nullptr);
     if (entries == nullptr) {
         return;
@@ -211,7 +211,7 @@ void GetFilesWithSuffix(const string &path, const string &suffix, vector<string>
     }
 
     for (int i = 0; i < file_num; ++i) {
-        const dirent *const dir_ent = entries[i];
+        const dirent* const dir_ent = entries[i];
         const string name = string(dir_ent->d_name);
         if ((strcmp(name.c_str(), ".") == 0) || (strcmp(name.c_str(), "..") == 0)) {
             continue;
@@ -235,7 +235,7 @@ void GetFilesWithSuffix(const string &path, const string &suffix, vector<string>
     free(entries);
 }
 
-unique_ptr<char[]> GetBinFromFile(const string &path, uint32_t &data_len)
+unique_ptr<char[]> GetBinFromFile(const string& path, uint32_t& data_len)
 {
     ifstream ifs(path, ios::in | ios::binary);
     if (!ifs.is_open()) {
@@ -252,7 +252,7 @@ unique_ptr<char[]> GetBinFromFile(const string &path, uint32_t &data_len)
         return nullptr;
     }
 
-    if (!ifs.read(reinterpret_cast<char *>(p.get()), file_size)) {
+    if (!ifs.read(reinterpret_cast<char*>(p.get()), file_size)) {
         p = nullptr;
     } else {
         data_len = static_cast<uint32_t>(file_size);

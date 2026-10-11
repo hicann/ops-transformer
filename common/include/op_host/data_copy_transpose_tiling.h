@@ -21,8 +21,8 @@
 
 namespace optiling {
 
-inline void GetDataCopyTransposeTiling(const ge::Shape &dstShape, const ge::Shape &srcShape, const uint32_t typeSize,
-                                       optiling::CopyTransposeTiling &tiling)
+inline void GetDataCopyTransposeTiling(const ge::Shape& dstShape, const ge::Shape& srcShape, const uint32_t typeSize,
+                                       optiling::CopyTransposeTiling& tiling)
 {
     constexpr int64_t B_INDEX = 0;
     constexpr int64_t N_INDEX = 1;

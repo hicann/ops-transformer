@@ -27,6 +27,7 @@ pre-commit 是一个 Git Hooks 框架，在 `git commit` 时自动运行代码�
 | **clang-format** | C/C++/asc 代码格式化，遵循 `.clang-format` |
 | **ruff-check / ruff-format** | Python 静态检查（自动修复）+ 格式化 |
 | **codespell** | 拼写检查（CANN/ascend 等术语已加白名单） |
+| **Duplicate Header Check** | 新增/重命名头文件 basename 重名拦截 |
 | **OAT Check** | 开源合规检查（许可证头、二进制/归档文件拦截） |
 
 ## 二、环境要求
@@ -64,8 +65,8 @@ pre-commit run clang-format           # 单个hook
 # 检查指定文件
 pre-commit run --files src/foo.py src/bar.cpp
 
-# 检查指定目录（pre-commit 不支持目录参数，需用 find 展开成文件列表）
-find examples -type f | xargs pre-commit run --files
+# 检查指定目录（pre-commit 不支持目录参数，需展开成文件列表）
+pre-commit run --files $(git ls-files examples)
 
 # 跳过（紧急情况）
 git commit --no-verify -m "msg"
@@ -96,10 +97,12 @@ git pc <commit>^     # 某一笔提交
 ## 七、检查项说明
 
 1. **pre-commit-hooks** (v4.6.0)：trailing-whitespace、end-of-file-fixer、check-yaml/json、check-added-large-files、check-merge-conflict、detect-private-key
-2. **clang-format** (v18.1.8)：遵循项目 `.clang-format`（Google 风格，4 空格缩进，不限列宽不自动拆行，枚举逐行，构造函数初始化列表逐行换行，函数定义大括号换行，指针左对齐 `int* ptr`）
+2. **clang-format** (v18.1.8)：遵循项目 `.clang-format`（Google 风格，4 空格缩进，列宽上限 120，枚举左大括号与 enum 同行，构造函数初始化列表逐行换行，函数定义大括号换行，指针左对齐 `int* ptr`；`build/`、`tests/third_party/`、`*_def.cpp` 不参与格式化）
 3. **ruff** (v0.14.14)：ruff-check（`--fix` 自动修复）+ ruff-format
 4. **codespell** (v2.4.1)：拼写检查，CANN、ascend、EnQue 等术语已加白名单
 5. **OAT**：基于 oat-py，检查许可证头（YAML/CSV 已豁免）、禁止二进制和归档文件
+6. **Duplicate Header Basename Check**（本地脚本）：拦截新增/重命名后 basename 重复的头文件
+7. **Compile Scope Whitelist Check**（本地脚本）：仅当 `tests/compile_scope_whitelist.yaml` 变更时触发，校验编译范围白名单
 
 ## 八、常见问题
 

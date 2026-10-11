@@ -26,7 +26,7 @@ class AllGatherAdd {
 public:
     __aicore__ inline AllGatherAdd(){};
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR gatherGM,
-                                AllGatherAddTilingData *tilingData, TPipe *tPipe);
+                                AllGatherAddTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -38,7 +38,7 @@ private:
     __aicore__ inline void HcclFinalize();
 
 private:
-    AllGatherAddTilingData *tilingData_;
+    AllGatherAddTilingData* tilingData_;
 
     Hccl<HCCL_SERVER_TYPE_AICPU> hccl_;
 
@@ -65,7 +65,7 @@ private:
 };
 
 __aicore__ inline void AllGatherAdd::Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR gatherGM,
-                                          AllGatherAddTilingData *tilingData, TPipe *tPipe)
+                                          AllGatherAddTilingData* tilingData, TPipe* tPipe)
 {
     aGM_ = aGM;
     bGM_ = bGM;
@@ -139,9 +139,9 @@ __aicore__ inline void AllGatherAdd::CalcAddGmAddr(int32_t commTurn)
     uint32_t totalOffset = commOffset + blockOffset +
                            (blockIdx_ % tilingData_->addCoresPerRank) *
                                blockElemNum_; // 3.最终偏移需要再加上当前核在所处理rank数据上的偏移
-    gatherOutGM.SetGlobalBuffer((__gm__ half *)gatherGM_ + totalOffset, blockElemNum_);
-    inputBGM.SetGlobalBuffer((__gm__ half *)bGM_ + totalOffset, blockElemNum_);
-    outputCGM.SetGlobalBuffer((__gm__ half *)cGM_ + totalOffset, blockElemNum_);
+    gatherOutGM.SetGlobalBuffer((__gm__ half*)gatherGM_ + totalOffset, blockElemNum_);
+    inputBGM.SetGlobalBuffer((__gm__ half*)bGM_ + totalOffset, blockElemNum_);
+    outputCGM.SetGlobalBuffer((__gm__ half*)cGM_ + totalOffset, blockElemNum_);
 }
 
 __aicore__ inline void AllGatherAdd::Process()

@@ -20,7 +20,7 @@
 
 namespace l0op {
 
-const aclTensor *Dot(const aclTensor *self, const aclTensor *tensor, aclOpExecutor *executor);
+const aclTensor* Dot(const aclTensor* self, const aclTensor* tensor, aclOpExecutor* executor);
 
 }
 

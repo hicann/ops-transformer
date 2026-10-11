@@ -17,7 +17,7 @@ namespace aicpu {
 class AddExampleCpuKernel : public CpuKernel {
 public:
     ~AddExampleCpuKernel() = default;
-    uint32_t Compute(CpuKernelContext &ctx) override;
+    uint32_t Compute(CpuKernelContext& ctx) override;
     // 如需新增类的成员函数声明，请继续在此处添加
 };
 } // namespace aicpu

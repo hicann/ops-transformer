@@ -19,9 +19,9 @@ using namespace std;
 
 #define MAX_BUFFER_LEN 1024
 
-int ExecuteShellCmd(const string &cmd, stringstream &ss)
+int ExecuteShellCmd(const string& cmd, stringstream& ss)
 {
-    FILE *fp = NULL;
+    FILE* fp = NULL;
     char buffer[MAX_BUFFER_LEN] = {0};
     fp = popen(cmd.c_str(), "r");
     if (fp == nullptr) {
@@ -58,17 +58,17 @@ int ExecuteShellCmd(const string &cmd, stringstream &ss)
 static string op_ut_src_path;
 static string exe_path;
 
-void SetOpUtSrcPath(const char *p)
+void SetOpUtSrcPath(const char* p)
 {
     op_ut_src_path = p;
 }
 
-const string &GetOpUtSrcPath()
+const string& GetOpUtSrcPath()
 {
     return op_ut_src_path;
 }
 
-const string &GetExePath()
+const string& GetExePath()
 {
     if (exe_path.empty()) {
         char path[PATH_MAX];
@@ -83,14 +83,14 @@ const string &GetExePath()
     return exe_path;
 }
 
-int GetEnv(const string &name, string &value)
+int GetEnv(const string& name, string& value)
 {
     if (name.length() == 0) {
         cout << "Invalid input parameter." << endl;
         return 1;
     }
 
-    const char *p = getenv(name.c_str());
+    const char* p = getenv(name.c_str());
     if (p == nullptr) {
         cout << "env parameter " << name << " is not set." << endl;
         return 0;

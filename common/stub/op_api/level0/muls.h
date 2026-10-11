@@ -19,7 +19,7 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *Muls(const aclTensor *self, float alpha, aclOpExecutor *executor);
+const aclTensor* Muls(const aclTensor* self, float alpha, aclOpExecutor* executor);
 
 }
 

@@ -39,51 +39,51 @@
 #endif
 #define NPU_NAME_SPACE at_npu::native
 
-using _HcclKfcAllocOpArgs = HcclResult (*)(void **);                                      // 通信配置对象创建
-using _HcclKfcOpArgsSetAlgConfig = HcclResult (*)(void *, char *);                        // 设置通信类型
-using _HcclKfcOpArgsSetCommEngine = HcclResult (*)(void *, uint8_t);                      // 设置通信方式
-using _HcclCreateOpResCtx = HcclResult (*)(HcclComm, uint8_t, void *, void **);           // 创建HcclContext
-using _HcclGetRemoteIpcHcclBuf = HcclResult (*)(HcclComm, uint64_t, void **, uint64_t *); // 获取远端地址
-using _HcclKfcFreeOpArgs = HcclResult (*)(void *);                                        // 释放通信配置对象
-using _HcclCommGetHandleWithName = HcclResult (*)(const char *, HcclComm *); // 通过groupName获取groupHandle
-using _HcclGetRankSize = HcclResult (*)(HcclComm, uint32_t *);               // 获取通信域大小
-using _HcclGetRankId = HcclResult (*)(HcclComm, uint32_t *);                 // 获取卡号
-using _HcclGetHcclBuffer = HcclResult (*)(HcclComm, void **, uint64_t *);    // 获取本卡地址
+using _HcclKfcAllocOpArgs = HcclResult (*)(void**);                                     // 通信配置对象创建
+using _HcclKfcOpArgsSetAlgConfig = HcclResult (*)(void*, char*);                        // 设置通信类型
+using _HcclKfcOpArgsSetCommEngine = HcclResult (*)(void*, uint8_t);                     // 设置通信方式
+using _HcclCreateOpResCtx = HcclResult (*)(HcclComm, uint8_t, void*, void**);           // 创建HcclContext
+using _HcclGetRemoteIpcHcclBuf = HcclResult (*)(HcclComm, uint64_t, void**, uint64_t*); // 获取远端地址
+using _HcclKfcFreeOpArgs = HcclResult (*)(void*);                                       // 释放通信配置对象
+using _HcclCommGetHandleWithName = HcclResult (*)(const char*, HcclComm*); // 通过groupName获取groupHandle
+using _HcclGetRankSize = HcclResult (*)(HcclComm, uint32_t*);              // 获取通信域大小
+using _HcclGetRankId = HcclResult (*)(HcclComm, uint32_t*);                // 获取卡号
+using _HcclGetHcclBuffer = HcclResult (*)(HcclComm, void**, uint64_t*);    // 获取本卡地址
 
 // 通过group名称获取comm handle
-using _HcomGetCommHandleByGroup = HcclResult (*)(const char *, HcclComm *);
+using _HcomGetCommHandleByGroup = HcclResult (*)(const char*, HcclComm*);
 // 获取rank间通信链路
-using _HcclRankGraphGetLinks = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t, CommLink **, uint32_t *);
+using _HcclRankGraphGetLinks = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t, CommLink**, uint32_t*);
 // 获取网络层信息
-using _HcclRankGraphGetLayers = HcclResult (*)(HcclComm, uint32_t **, uint32_t *);
+using _HcclRankGraphGetLayers = HcclResult (*)(HcclComm, uint32_t**, uint32_t*);
 // 获取每层硬件连接拓扑类型
-using _HcclRankGraphGetTopoTypeByLayer = HcclResult (*)(HcclComm, uint32_t, CommTopo *);
+using _HcclRankGraphGetTopoTypeByLayer = HcclResult (*)(HcclComm, uint32_t, CommTopo*);
 // Query topology instances and their local endpoints within CUSTOM layers.
-using _HcclRankGraphGetTopoInstsByLayer = HcclResult (*)(HcclComm, uint32_t, uint32_t **, uint32_t *);
-using _HcclRankGraphGetTopoType = HcclResult (*)(HcclComm, uint32_t, uint32_t, CommTopo *);
-using _HcclRankGraphGetRanksByTopoInst = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t **, uint32_t *);
-using _HcclRankGraphGetEndpointNum = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t *);
-using _HcclRankGraphGetEndpointDesc = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t *, EndpointDesc *);
+using _HcclRankGraphGetTopoInstsByLayer = HcclResult (*)(HcclComm, uint32_t, uint32_t**, uint32_t*);
+using _HcclRankGraphGetTopoType = HcclResult (*)(HcclComm, uint32_t, uint32_t, CommTopo*);
+using _HcclRankGraphGetRanksByTopoInst = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t**, uint32_t*);
+using _HcclRankGraphGetEndpointNum = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t*);
+using _HcclRankGraphGetEndpointDesc = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t*, EndpointDesc*);
 // 获取每层rank数量
-using _HcclRankGraphGetRankSizeByLayer = HcclResult (*)(HcclComm, uint32_t, uint32_t *);
+using _HcclRankGraphGetRankSizeByLayer = HcclResult (*)(HcclComm, uint32_t, uint32_t*);
 // 初始化channel描述符
-using _HcclRankGraphGetRanksByLayer = HcclResult (*)(HcclComm, uint32_t, uint32_t **, uint32_t *);
+using _HcclRankGraphGetRanksByLayer = HcclResult (*)(HcclComm, uint32_t, uint32_t**, uint32_t*);
 // 获取channel句柄
-using _HcclChannelAcquire = HcclResult (*)(HcclComm, CommEngine, HcclChannelDesc *, uint32_t, ChannelHandle *);
+using _HcclChannelAcquire = HcclResult (*)(HcclComm, CommEngine, HcclChannelDesc*, uint32_t, ChannelHandle*);
 // 通过channel获取buffer
-using _HcclChannelGetHcclBuffer = HcclResult (*)(HcclComm, ChannelHandle, void **, uint64_t *);
+using _HcclChannelGetHcclBuffer = HcclResult (*)(HcclComm, ChannelHandle, void**, uint64_t*);
 // 创建引擎context
-using _HcclEngineCtxCreate = HcclResult (*)(HcclComm, const char *, CommEngine, uint64_t, void **);
+using _HcclEngineCtxCreate = HcclResult (*)(HcclComm, const char*, CommEngine, uint64_t, void**);
 // 获取引擎context
-using _HcclEngineCtxGet = HcclResult (*)(HcclComm, const char *, CommEngine, void **, uint64_t *);
+using _HcclEngineCtxGet = HcclResult (*)(HcclComm, const char*, CommEngine, void**, uint64_t*);
 // 拷贝context
-using _HcclEngineCtxCopy = HcclResult (*)(HcclComm, CommEngine, const char *, void *, uint64_t, uint64_t);
+using _HcclEngineCtxCopy = HcclResult (*)(HcclComm, CommEngine, const char*, void*, uint64_t, uint64_t);
 // HcclBarrier
 using _HcclBarrier = HcclResult (*)(HcclComm, aclrtStream);
 // 注册内存到通信域
-using _HcclCommMemReg = HcclResult (*)(HcclComm, const char *, const CommMem *, HcclMemHandle *);
+using _HcclCommMemReg = HcclResult (*)(HcclComm, const char*, const CommMem*, HcclMemHandle*);
 // 通过channel获取远端注册的内存
-using _HcclChannelGetRemoteMems = HcclResult (*)(HcclComm, ChannelHandle, uint32_t *, CommMem **, char ***);
+using _HcclChannelGetRemoteMems = HcclResult (*)(HcclComm, ChannelHandle, uint32_t*, CommMem**, char***);
 
 static _HcclKfcAllocOpArgs HcclKfcAllocOpArgsFunc = nullptr;
 static _HcclKfcOpArgsSetAlgConfig HcclKfcOpArgsSetAlgConfigFunc = nullptr;
@@ -117,18 +117,18 @@ static _HcclBarrier HcclBarrierFunc = nullptr;
 static _HcclCommMemReg HcclCommMemRegFunc = nullptr;
 static _HcclChannelGetRemoteMems HcclChannelGetRemoteMemsFunc = nullptr;
 
-inline const char *GetHcclLibName(void)
+inline const char* GetHcclLibName(void)
 {
     return "libhccl.so";
 }
 
-inline const char *GetHcclFwkLibName(void)
+inline const char* GetHcclFwkLibName(void)
 {
     return "libhccl_fwk.so";
 }
 
 template <typename T>
-inline T GetFuncAddr(void *opApiHandler, const char *libName, const char *apiName)
+inline T GetFuncAddr(void* opApiHandler, const char* libName, const char* apiName)
 {
     auto funcAddr = GetOpApiFuncAddrInLib(opApiHandler, GetHcclLibName(), apiName);
     if (funcAddr == nullptr) {
@@ -140,7 +140,7 @@ inline T GetFuncAddr(void *opApiHandler, const char *libName, const char *apiNam
 }
 
 template <typename T>
-inline T GetHcclFuncAddr(const char *apiName)
+inline T GetHcclFuncAddr(const char* apiName)
 {
     static auto opApiHandler = GetOpApiLibHandler(GetHcclLibName());
     if (opApiHandler == nullptr) {
@@ -150,7 +150,7 @@ inline T GetHcclFuncAddr(const char *apiName)
 }
 
 template <typename T>
-inline T GetHcclFwkFuncAddr(const char *apiName)
+inline T GetHcclFwkFuncAddr(const char* apiName)
 {
     static auto opApiHandler = GetOpApiLibHandler(GetHcclFwkLibName());
     if (opApiHandler == nullptr) {

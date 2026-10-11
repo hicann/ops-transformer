@@ -17,11 +17,11 @@
 
 #define EXTERN_OP_RESOURCE(kernelName) \
     namespace l0op { \
-    extern void *kernelName##TilingRegisterResource(); \
-    extern void *kernelName##InferShapeRegisterResource(); \
-    extern void *kernelName##TuningRegisterResource(); \
-    extern const OP_BINARY_RES &kernelName##KernelResource(); \
-    extern const OP_RUNTIME_KB_RES &kernelName##TuningResource(); \
+    extern void* kernelName##TilingRegisterResource(); \
+    extern void* kernelName##InferShapeRegisterResource(); \
+    extern void* kernelName##TuningRegisterResource(); \
+    extern const OP_BINARY_RES& kernelName##KernelResource(); \
+    extern const OP_RUNTIME_KB_RES& kernelName##TuningResource(); \
     [[maybe_unused]] uint32_t kernelName##_kernelName_Be_Defined_Multi_Times___; \
     }
 

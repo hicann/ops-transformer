@@ -23,7 +23,7 @@
 
 namespace ops::ut {
 
-inline ge::DataType ParseGeDtype(const std::string &dtype)
+inline ge::DataType ParseGeDtype(const std::string& dtype)
 {
     static const std::map<std::string, ge::DataType> dtypeMap = {
         {"FLOAT", ge::DT_FLOAT},
@@ -49,7 +49,7 @@ inline ge::DataType ParseGeDtype(const std::string &dtype)
     return it == dtypeMap.end() ? ge::DT_UNDEFINED : it->second;
 }
 
-inline ge::Format ParseGeFormat(const std::string &format)
+inline ge::Format ParseGeFormat(const std::string& format)
 {
     static const std::map<std::string, ge::Format> formatMap = {
         {"ND", ge::FORMAT_ND},
@@ -62,7 +62,7 @@ inline ge::Format ParseGeFormat(const std::string &format)
     return it == formatMap.end() ? ge::FORMAT_ND : it->second;
 }
 
-inline gert::Shape BuildGertShape(const std::vector<int64_t> &dims)
+inline gert::Shape BuildGertShape(const std::vector<int64_t>& dims)
 {
     gert::Shape shape;
     shape.SetDimNum(dims.size());
@@ -72,8 +72,8 @@ inline gert::Shape BuildGertShape(const std::vector<int64_t> &dims)
     return shape;
 }
 
-inline gert::StorageShape MakeGertStorageShape(const std::vector<int64_t> &origin_dims,
-                                               const std::vector<int64_t> &storage_dims)
+inline gert::StorageShape MakeGertStorageShape(const std::vector<int64_t>& origin_dims,
+                                               const std::vector<int64_t>& storage_dims)
 {
     gert::StorageShape shape;
     shape.MutableOriginShape() = BuildGertShape(origin_dims);
@@ -81,12 +81,12 @@ inline gert::StorageShape MakeGertStorageShape(const std::vector<int64_t> &origi
     return shape;
 }
 
-inline gert::StorageShape MakeGertStorageShape(const std::vector<int64_t> &dims)
+inline gert::StorageShape MakeGertStorageShape(const std::vector<int64_t>& dims)
 {
     return MakeGertStorageShape(dims, dims);
 }
 
-inline gert::StorageShape MakeGertStorageShape(const std::string &dims)
+inline gert::StorageShape MakeGertStorageShape(const std::string& dims)
 {
     return MakeGertStorageShape(ParseDims(dims));
 }

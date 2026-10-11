@@ -30,7 +30,7 @@ public:
 
 public:
     Case();
-    Case(const char *name, bool enable, const char *dbgInfo,
+    Case(const char* name, bool enable, const char* dbgInfo,
          int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
     virtual ~Case() = default;
 
@@ -44,7 +44,7 @@ public:
      *
      * \attention 若子类需要调用该接口, 需确保已重写 InitCurrentCasePtr 实现, 以确保所获取指针的正确性.
      */
-    static void *GetCurrentCase();
+    static void* GetCurrentCase();
 
     /**
      * 执行用例
@@ -54,7 +54,7 @@ public:
     /**
      * 获取用例根目录
      */
-    const char *GetRootPath();
+    const char* GetRootPath();
 
 protected:
     /**
@@ -88,7 +88,7 @@ protected:
     /**
      * 当前用例
      */
-    static void *mCurrentCasePtr;
+    static void* mCurrentCasePtr;
 
 protected:
     /**

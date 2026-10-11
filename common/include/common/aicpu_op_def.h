@@ -26,7 +26,7 @@ const std::string OP_INFO_SUB_TYPE_OF_INFERSHAPE = "opInfo.subTypeOfInferShape";
 const std::string DEFAULT_SUB_TYPE_OF_INFERSHAPE_1 = "1";
 
 template <typename TOpDef>
-inline void ApplyTransformerAicpuDefaultCfg(TOpDef &opDef)
+inline void ApplyTransformerAicpuDefaultCfg(TOpDef& opDef)
 {
     opDef.AICPU().OpKernelLib(AICPU_OP_KERNEL_LIB.c_str());
     opDef.AICPU().KernelSo(TRANSFORMER_AICPU_KERNEL_SO.c_str());

@@ -15,7 +15,7 @@
 
 namespace l0op {
 
-const aclTensor *GatherV3(const aclTensor *self, int64_t axis, const aclTensor *indices, aclOpExecutor *executor,
+const aclTensor* GatherV3(const aclTensor* self, int64_t axis, const aclTensor* indices, aclOpExecutor* executor,
                           int batchDims = 0, bool negativeIndexSupport = false);
 
 }

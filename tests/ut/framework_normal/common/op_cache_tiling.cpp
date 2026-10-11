@@ -15,30 +15,30 @@
 #include "ops_legacy/op_tiling/op_cache_tiling.h"
 
 namespace optiling {
-bool TilingPrepareForOpCache(gert::TilingContext * /*context*/)
+bool TilingPrepareForOpCache(gert::TilingContext* /*context*/)
 {
     return true;
 }
 
-bool TilingPrepareForOpCache(gert::TilingParseContext * /*context*/)
+bool TilingPrepareForOpCache(gert::TilingParseContext* /*context*/)
 {
     return true;
 }
 
-bool GenTiling(const std::string & /*op_type*/, const BatchmatmulCompileParas & /*compile_params*/,
-               BatchmatmulRunParas & /*run_params*/, CacheTilingData & /*tiling*/, gert::TilingContext * /*context*/)
+bool GenTiling(const std::string& /*op_type*/, const BatchmatmulCompileParas& /*compile_params*/,
+               BatchmatmulRunParas& /*run_params*/, CacheTilingData& /*tiling*/, gert::TilingContext* /*context*/)
 {
     return true;
 }
 
-bool CheckSupportConditionQbmm(QbmmType /*type*/, QuantBatchMatmulRunParas & /*inputParams*/, uint64_t /*aicNum*/,
+bool CheckSupportConditionQbmm(QbmmType /*type*/, QuantBatchMatmulRunParas& /*inputParams*/, uint64_t /*aicNum*/,
                                bool /*supportL0c2Out*/)
 {
     return true;
 }
 
-bool GenWqbmmTiling(const std::string & /*op_type*/, const WeightQuantBatchMatmulCacheTilingParas & /*compile_params*/,
-                    WeightQuantBatchMatmulCacheTilingData & /*cacheTiling*/)
+bool GenWqbmmTiling(const std::string& /*op_type*/, const WeightQuantBatchMatmulCacheTilingParas& /*compile_params*/,
+                    WeightQuantBatchMatmulCacheTilingData& /*cacheTiling*/)
 {
     return true;
 }

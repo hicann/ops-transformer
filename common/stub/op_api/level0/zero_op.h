@@ -13,7 +13,7 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *ZerosLike(const aclTensor *self, aclOpExecutor *executor);
+const aclTensor* ZerosLike(const aclTensor* self, aclOpExecutor* executor);
 
 }
 

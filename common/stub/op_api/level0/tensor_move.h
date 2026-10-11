@@ -20,7 +20,7 @@
 
 namespace l0op {
 
-const aclTensor *TensorMove(const aclTensor *x, const aclTensor *y, aclOpExecutor *executor);
+const aclTensor* TensorMove(const aclTensor* x, const aclTensor* y, aclOpExecutor* executor);
 } // namespace l0op
 
 #endif // OP_API_INC_LEVEL0_TENSOR_MOVE_H

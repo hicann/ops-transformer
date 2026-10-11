@@ -220,7 +220,6 @@ struct TNDFDSplitInfo {
     uint64_t combineTaskPrefixSum = 0;
 };
 
-
 template <typename Q_T, typename KV_T, typename OUT_T, typename ORIGIN_T, const bool PAGE_ATTENTION = false,
           const bool FLASH_DECODE = false, LAYOUT LAYOUT_T = LAYOUT::BSH, const uint8_t ANTIQUANT_MODE = 0,
           const bool SHARED_PREFIX = false, LAYOUT KV_LAYOUT_T = LAYOUT::BSH, const AMLAMODE AMLA = AMLAMODE::NORMAL,
@@ -542,7 +541,7 @@ __aicore__ inline void RowMuls(LocalTensor<T> dstUb, LocalTensor<T> src0Ub, Loca
     }
 }
 
-__aicore__ inline void RowSum(LocalTensor<float> &dstUb, LocalTensor<float> srcUb, uint32_t dealRowCount,
+__aicore__ inline void RowSum(LocalTensor<float>& dstUb, LocalTensor<float> srcUb, uint32_t dealRowCount,
                               uint32_t columnCount, uint32_t actualColumnCount)
 {
     // sum by row, 按行求和
@@ -588,7 +587,7 @@ __aicore__ inline uint32_t GetMinPowerTwo(uint32_t cap)
     return i;
 }
 
-__aicore__ inline void RowSumForLongColumnCount(LocalTensor<float> &dstUb, LocalTensor<float> srcUb,
+__aicore__ inline void RowSumForLongColumnCount(LocalTensor<float>& dstUb, LocalTensor<float> srcUb,
                                                 uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
 {
     // sum by row, 按行求和
@@ -635,7 +634,7 @@ __aicore__ inline void RowSumForLongColumnCount(LocalTensor<float> &dstUb, Local
     RowSum(dstUb, srcUb, dealRowCount, newColumnCount, newActualColumnCount);
 }
 
-__aicore__ inline void RowMax(LocalTensor<float> &dstUb, LocalTensor<float> &srcUb, uint32_t dealRowCount,
+__aicore__ inline void RowMax(LocalTensor<float>& dstUb, LocalTensor<float>& srcUb, uint32_t dealRowCount,
                               uint32_t columnCount, uint32_t actualColumnCount)
 {
     // max by row, 按行求最大值
@@ -670,7 +669,7 @@ __aicore__ inline void RowMax(LocalTensor<float> &dstUb, LocalTensor<float> &src
                    columnCount / FP32_BLOCK_ELEMENT_NUM, ReduceOrder::ORDER_ONLY_VALUE);
 }
 
-__aicore__ inline void RowMaxForLongColumnCount(LocalTensor<float> &dstUb, LocalTensor<float> srcUb,
+__aicore__ inline void RowMaxForLongColumnCount(LocalTensor<float>& dstUb, LocalTensor<float> srcUb,
                                                 uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
 {
     // max by row, 按行求最大值
@@ -725,9 +724,7 @@ __aicore__ inline void RowMaxForLongColumnCount(LocalTensor<float> &dstUb, Local
 template <TPosition pos, uint8_t BUFFER_NUM>
 class BufferManager {
 public:
-    __aicore__ inline BufferManager()
-    {
-    }
+    __aicore__ inline BufferManager() {}
 
     __aicore__ inline void Init()
     {

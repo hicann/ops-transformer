@@ -18,7 +18,6 @@
 
 using namespace std;
 
-
 void PyHolder::Clean()
 {
     if (Ut_Py_IsInitialized()) {
@@ -33,13 +32,11 @@ void PyHolder::Clean()
     }
 }
 
-PyHolder::~PyHolder()
-{
-}
+PyHolder::~PyHolder() {}
 
 int PyHolder::Initialize()
 {
-    void *py_init_func = dlsym(RTLD_DEFAULT, "Py_Initialize");
+    void* py_init_func = dlsym(RTLD_DEFAULT, "Py_Initialize");
     if (py_init_func == nullptr) {
         if (LoadDynamicLib() != 0) {
             return 1;
@@ -79,7 +76,7 @@ int PyHolder::LoadDynamicLib()
     string PY = "Python";
     string pythonLib;
 
-    FILE *fp = popen(cmd.c_str(), "r");
+    FILE* fp = popen(cmd.c_str(), "r");
     if (fp == nullptr) {
         cout << "popen failed to run " << cmd << endl;
         return 1;
@@ -123,12 +120,12 @@ int PyHolder::LoadDynamicLib()
     string temp_Y = to_string(y);
     pythonLib = "libpython" + temp_X + "." + temp_Y + string(y > Y_STD ? "" : "m") + ".so.1.0";
 
-    void *handle = dlopen(pythonLib.c_str(), RTLD_NOW | RTLD_GLOBAL);
+    void* handle = dlopen(pythonLib.c_str(), RTLD_NOW | RTLD_GLOBAL);
     if (handle == nullptr) {
         char line_path[CMD_MAX_SIZE] = {0};
         string pythonLibUpdate;
 
-        FILE *fptr = popen(cmd_path.c_str(), "r");
+        FILE* fptr = popen(cmd_path.c_str(), "r");
         if (fptr == nullptr) {
             cout << "popen failed to run " << cmd_path << endl;
             return 1;
@@ -289,17 +286,16 @@ int PyHolder::LoadFuncs()
         return 1;
     }
 
-
     return 0;
 }
 
-PyObject *PyHolder::ImportModule(const string &moduleName) const
+PyObject* PyHolder::ImportModule(const string& moduleName) const
 {
     if (moduleName.empty()) {
         return nullptr;
     }
 
-    PyObject *pyModule = Ut_PyImport_ImportModule(moduleName.c_str());
+    PyObject* pyModule = Ut_PyImport_ImportModule(moduleName.c_str());
     if (pyModule == nullptr) {
         // python exception occur
         cout << "Import module [" << moduleName << "] failed." << endl;
@@ -309,13 +305,13 @@ PyObject *PyHolder::ImportModule(const string &moduleName) const
     return pyModule;
 }
 
-PyObject *PyHolder::ImportFunction(PyObject *module, const string &funcName) const
+PyObject* PyHolder::ImportFunction(PyObject* module, const string& funcName) const
 {
     if (module == nullptr || funcName.empty()) {
         return nullptr;
     }
 
-    PyObject *pyFunc = Ut_PyObject_GetAttrString(module, funcName.c_str());
+    PyObject* pyFunc = Ut_PyObject_GetAttrString(module, funcName.c_str());
     if (pyFunc == nullptr || !Ut_PyCallable_Check(pyFunc)) {
         cout << "Failed to import function [" << funcName << endl;
         Ut_PyErr_Print();
@@ -324,15 +320,15 @@ PyObject *PyHolder::ImportFunction(PyObject *module, const string &funcName) con
     return pyFunc;
 }
 
-static void PyObjectDecRef(PyObject *pyObj)
+static void PyObjectDecRef(PyObject* pyObj)
 {
-    PyObject *py_decref_tmp = reinterpret_cast<PyObject *>(pyObj);
+    PyObject* py_decref_tmp = reinterpret_cast<PyObject*>(pyObj);
     if (py_decref_tmp != nullptr) {
         PyHolder::GetInstance().Ut_Py_Dealloc(py_decref_tmp);
     }
 }
 
-int PyScripts::Initialize(const string &full_path)
+int PyScripts::Initialize(const string& full_path)
 {
     string full_path_ = RealPath(full_path);
     string sys_append_cmd = "sys.path.append('" + full_path_ + "') \n";
@@ -397,14 +393,12 @@ void PyScripts::Clean()
     }
 }
 
-PyScripts::~PyScripts()
-{
-}
+PyScripts::~PyScripts() {}
 
-int PyScripts::CallFunction(PyObject *pyFunc, PyObject *pyArgs) const
+int PyScripts::CallFunction(PyObject* pyFunc, PyObject* pyArgs) const
 {
     int ret;
-    PyObject *pyRes = PyHolder::GetInstance().Ut_PyObject_CallObject(pyFunc, pyArgs);
+    PyObject* pyRes = PyHolder::GetInstance().Ut_PyObject_CallObject(pyFunc, pyArgs);
     if (!pyRes) {
         PyHolder::GetInstance().Ut_PyErr_Print();
         ret = 1;
@@ -414,7 +408,7 @@ int PyScripts::CallFunction(PyObject *pyFunc, PyObject *pyArgs) const
     return ret;
 }
 
-int PyScripts::GenerateInput(const string &case_json) const
+int PyScripts::GenerateInput(const string& case_json) const
 {
     unique_ptr<PyObject, decltype(&PyObjectDecRef)> pArgs(PyHolder::GetInstance().Ut_PyTuple_New(1), PyObjectDecRef);
     PyHolder::GetInstance().Ut_PyTuple_SetItem(pArgs.get(), 0,
@@ -422,7 +416,7 @@ int PyScripts::GenerateInput(const string &case_json) const
     return CallFunction(PyInputFunc, pArgs.get());
 }
 
-int PyScripts::GenerateGolden(const string &case_json, const string &py_script, const string &golden_func) const
+int PyScripts::GenerateGolden(const string& case_json, const string& py_script, const string& golden_func) const
 {
     unique_ptr<PyObject, decltype(&PyObjectDecRef)> pArgs(PyHolder::GetInstance().Ut_PyTuple_New(3), PyObjectDecRef);
     PyHolder::GetInstance().Ut_PyTuple_SetItem(pArgs.get(), 0,
@@ -434,7 +428,7 @@ int PyScripts::GenerateGolden(const string &case_json, const string &py_script, 
     return CallFunction(PyGoldenFunc, pArgs.get());
 }
 
-int PyScripts::CompareGolden(const string &case_json) const
+int PyScripts::CompareGolden(const string& case_json) const
 {
     unique_ptr<PyObject, decltype(&PyObjectDecRef)> pArgs(PyHolder::GetInstance().Ut_PyTuple_New(1), PyObjectDecRef);
     PyHolder::GetInstance().Ut_PyTuple_SetItem(pArgs.get(), 0,

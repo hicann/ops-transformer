@@ -158,5 +158,4 @@ constexpr uint32_t NUM512 = 512;
 constexpr uint32_t NUM1024 = 1024;
 } // namespace optiling
 
-
 #endif // INCRE_FLASH_ATTENTION_TILING_BASE_H

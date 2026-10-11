@@ -139,7 +139,7 @@ class PlatformInfoImpl;
 class PlatformThreadLockCtx;
 
 class PlatformInfo {
-    friend const PlatformInfo &GetCurrentPlatformInfo();
+    friend const PlatformInfo& GetCurrentPlatformInfo();
     friend class PlatformThreadLockCtx;
 
 public:
@@ -150,7 +150,7 @@ public:
 
     SocVersion GetSocVersion() const;
 
-    const std::string &GetSocLongVersion() const;
+    const std::string& GetSocLongVersion() const;
 
     int32_t GetDeviceId() const;
 
@@ -168,27 +168,27 @@ public:
 
     NpuArch GetCurNpuArch() const;
 
-    fe::PlatFormInfos *GetPlatformInfos() const;
+    fe::PlatFormInfos* GetPlatformInfos() const;
 
 private:
-    PlatformInfo &operator=(const PlatformInfo &other) = delete;
+    PlatformInfo& operator=(const PlatformInfo& other) = delete;
 
-    PlatformInfo &operator=(const PlatformInfo &&other) = delete;
+    PlatformInfo& operator=(const PlatformInfo&& other) = delete;
 
-    PlatformInfo(const PlatformInfo &other) = delete;
+    PlatformInfo(const PlatformInfo& other) = delete;
 
-    PlatformInfo(const PlatformInfo &&other) = delete;
+    PlatformInfo(const PlatformInfo&& other) = delete;
 
-    void SetPlatformImpl(PlatformInfoImpl *impl);
+    void SetPlatformImpl(PlatformInfoImpl* impl);
 
     bool valid_ = false;
     int32_t deviceId_{-1};
-    PlatformInfoImpl *impl_ = nullptr;
+    PlatformInfoImpl* impl_ = nullptr;
 
     ~PlatformInfo();
 };
 
-const PlatformInfo &GetCurrentPlatformInfo();
+const PlatformInfo& GetCurrentPlatformInfo();
 
 ge::AscendString ToString(SocVersion socVersion);
 

@@ -53,8 +53,8 @@ public:
         scalesPadParams_ = {true, 0, 0, 0};
     }
 
-    __aicore__ inline void QuantInit(uint32_t &hAlignSize_, uint32_t &hOutSize_, uint32_t scaleInBytes_,
-                                     int32_t &tokenQuantAlign_, uint32_t &hScaleIdxSize_, uint32_t &scaleOutBytes,
+    __aicore__ inline void QuantInit(uint32_t& hAlignSize_, uint32_t& hOutSize_, uint32_t scaleInBytes_,
+                                     int32_t& tokenQuantAlign_, uint32_t& hScaleIdxSize_, uint32_t& scaleOutBytes,
                                      uint32_t axisH)
     {
         axisH_ = axisH;
@@ -74,9 +74,9 @@ public:
         hScaleIdxSize_ = hScaleSizeAlign + EXPAND_IDX_INFO * sizeof(int32_t);
     }
 
-    __aicore__ inline void QuantProcess(LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal,
+    __aicore__ inline void QuantProcess(LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal,
                                         uint32_t expertIndex, uint32_t scalesCount_,
-                                        GlobalTensor<float> &scalesGMTensor_)
+                                        GlobalTensor<float>& scalesGMTensor_)
     {
         if constexpr (QuantMode == STATIC_QUANT) {
             QuantStatic(outLocal, inLocal, expertIndex, scalesCount_, scalesGMTensor_);
@@ -85,9 +85,9 @@ public:
         }
     }
 
-    __aicore__ inline void QuantStatic(LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal,
+    __aicore__ inline void QuantStatic(LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal,
                                        uint32_t expertIndex, uint32_t scalesCount_,
-                                       GlobalTensor<float> &scalesGMTensor_)
+                                       GlobalTensor<float>& scalesGMTensor_)
     {
         Cast(floatLocalTemp_, inLocal, RoundMode::CAST_NONE, axisH_);
         if constexpr (Std::IsSame<ExpandXOutType, int8_t>::value) {
@@ -115,8 +115,8 @@ public:
         }
     }
 
-    __aicore__ inline void QuantDynamicPerToken(LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal,
-                                                uint32_t expertIndex, GlobalTensor<float> &scalesGMTensor_)
+    __aicore__ inline void QuantDynamicPerToken(LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal,
+                                                uint32_t expertIndex, GlobalTensor<float>& scalesGMTensor_)
     {
         float dynamicScale = 0.0;
         float maxVal = INT8_MAX_VALUE; // 获取输出类型的最大值（AscendC未提供相关接口）
@@ -155,7 +155,7 @@ public:
     }
 
     __aicore__ inline void CopyScalesToOut(uint32_t currentTokenIndex, uint32_t scaleOutBytes,
-                                           LocalTensor<ExpandXOutType> &quantTok, DataCopyExtParams &scaleOutParams)
+                                           LocalTensor<ExpandXOutType>& quantTok, DataCopyExtParams& scaleOutParams)
     {
         if constexpr (((QuantMode > UNQUANT) && (QuantMode != STATIC_QUANT)) ||
                       ((QuantMode == UNQUANT) && IsSmoothScaleExist)) {
@@ -164,7 +164,7 @@ public:
         }
     }
 
-    __aicore__ inline void ReduceMaxInplace(const LocalTensor<float> &srcLocal, uint32_t count)
+    __aicore__ inline void ReduceMaxInplace(const LocalTensor<float>& srcLocal, uint32_t count)
     {
         uint64_t repsFp32 = count >> 6;       // 6 is count / elemPerRefFp32
         uint64_t offsetsFp32 = repsFp32 << 6; // 6 is repsFp32 * elemPerRefFp32

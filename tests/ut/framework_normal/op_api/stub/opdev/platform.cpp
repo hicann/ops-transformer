@@ -14,7 +14,7 @@
 namespace op {
 
 SocVersion g_socVersion = SocVersion::ASCEND910B;
-PlatformInfo *g_platformInfo = new PlatformInfo();
+PlatformInfo* g_platformInfo = new PlatformInfo();
 
 bool PlatformInfo::CheckSupport(SocSpec socSpec, SocSpecAbility ability) const
 {
@@ -33,7 +33,7 @@ bool PlatformInfo::Valid() const
     return valid_;
 }
 
-void PlatformInfo::SetPlatformImpl(PlatformInfoImpl *impl)
+void PlatformInfo::SetPlatformImpl(PlatformInfoImpl* impl)
 {
     impl_ = impl;
     valid_ = true;
@@ -44,7 +44,7 @@ SocVersion PlatformInfo::GetSocVersion() const
     return g_socVersion;
 }
 
-const std::string &PlatformInfo::GetSocLongVersion() const
+const std::string& PlatformInfo::GetSocLongVersion() const
 {
     return "";
 }
@@ -74,12 +74,12 @@ bool PlatformInfo::GetFftsPlusMode() const
     return true;
 }
 
-fe::PlatFormInfos *PlatformInfo::GetPlatformInfos() const
+fe::PlatFormInfos* PlatformInfo::GetPlatformInfos() const
 {
     return nullptr;
 }
 
-const PlatformInfo &GetCurrentPlatformInfo()
+const PlatformInfo& GetCurrentPlatformInfo()
 {
     return *g_platformInfo;
 }

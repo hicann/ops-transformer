@@ -19,8 +19,8 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *Arange(const aclScalar *start, const aclScalar *end, const aclScalar *step, const aclTensor *out,
-                        const bool isClosed, aclOpExecutor *executor);
+const aclTensor* Arange(const aclScalar* start, const aclScalar* end, const aclScalar* step, const aclTensor* out,
+                        const bool isClosed, aclOpExecutor* executor);
 }
 
 #endif

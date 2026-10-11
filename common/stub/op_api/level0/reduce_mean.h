@@ -13,9 +13,9 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *ReduceMean(const aclTensor *self, const aclIntArray *dim, bool keepDim, aclOpExecutor *executor);
-const aclTensor *ReduceMean(const aclTensor *self, const aclIntArray *dim, bool keepDim, bool noopWithEmptyAxes,
-                            aclOpExecutor *executor);
+const aclTensor* ReduceMean(const aclTensor* self, const aclIntArray* dim, bool keepDim, aclOpExecutor* executor);
+const aclTensor* ReduceMean(const aclTensor* self, const aclIntArray* dim, bool keepDim, bool noopWithEmptyAxes,
+                            aclOpExecutor* executor);
 } // namespace l0op
 
 #endif

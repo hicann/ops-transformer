@@ -15,6 +15,6 @@
 #include "opdev/make_op_executor.h"
 
 namespace l0op {
-const aclTensor *Pad(const aclTensor *self, const aclTensor *paddings, aclOpExecutor *executor);
+const aclTensor* Pad(const aclTensor* self, const aclTensor* paddings, aclOpExecutor* executor);
 }
 #endif // COMMON_INC_EXTERNAL_ACLNN_KERNELS_PAD_H

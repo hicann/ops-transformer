@@ -38,14 +38,14 @@ class SplitCore {
 public:
     SplitCore() = default;
     ~SplitCore() = default;
-    uint32_t Compute(aicpu::kernels::IncreFlashAttentionMetadataArgs *args);
-    void AcquireParam(aicpu::kernels::IncreFlashAttentionMetadataArgs *args);
+    uint32_t Compute(aicpu::kernels::IncreFlashAttentionMetadataArgs* args);
+    void AcquireParam(aicpu::kernels::IncreFlashAttentionMetadataArgs* args);
     void ParamsInit();
     bool BalanceSchedule();
 
 private:
     // main
-    bool GenMetaData(aicpu::kernels::IncreFlashAttentionMetadataArgs *args);
+    bool GenMetaData(aicpu::kernels::IncreFlashAttentionMetadataArgs* args);
 
     // util
     bool CheckCoreOkFlag(uint32_t coreNum) const;
@@ -54,14 +54,14 @@ private:
     bool SplitBNS();
     bool SplitBN();
     bool SplitBN_V0();
-    void GetEstimatedLoad(int64_t &estimatedLoad) const;
-    std::vector<int64_t> InitSparseValidArray(int64_t actualLensDim, const int64_t *actualLens) const;
-    bool BalanceLoad(const std::vector<int64_t> &sparseValidArray, int64_t totalSize, int64_t validAivNum,
-                     std::vector<int64_t> &localValue, std::vector<int64_t> &sparseStartIdx) const;
-    void SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray, int64_t totalSize, int64_t validAivNum,
-                           uint32_t *sparseStartIdx, int64_t splitFactorSize) const;
-    void InitLoadValue(const std::vector<int64_t> &sparseValidArray, int64_t totalSize, int64_t validAivNum,
-                       const std::vector<int64_t> &sparseStartIdx, std::vector<int64_t> &localValue) const;
+    void GetEstimatedLoad(int64_t& estimatedLoad) const;
+    std::vector<int64_t> InitSparseValidArray(int64_t actualLensDim, const int64_t* actualLens) const;
+    bool BalanceLoad(const std::vector<int64_t>& sparseValidArray, int64_t totalSize, int64_t validAivNum,
+                     std::vector<int64_t>& localValue, std::vector<int64_t>& sparseStartIdx) const;
+    void SetSparseStartIdx(const std::vector<int64_t>& sparseValidArray, int64_t totalSize, int64_t validAivNum,
+                           uint32_t* sparseStartIdx, int64_t splitFactorSize) const;
+    void InitLoadValue(const std::vector<int64_t>& sparseValidArray, int64_t totalSize, int64_t validAivNum,
+                       const std::vector<int64_t>& sparseStartIdx, std::vector<int64_t>& localValue) const;
 
 public:
     // input
@@ -76,7 +76,7 @@ public:
     uint32_t maxBlockNumPerBatch_ = 0U;
     aicpu::kernels::Layout layoutQuery_ = aicpu::kernels::Layout::BUTT;
     std::string socVersion_ = "";
-    int64_t *actSeqKvLen_ = nullptr;
+    int64_t* actSeqKvLen_ = nullptr;
     int64_t actSeqKvLenDim_ = 0;
 
     // output
@@ -110,7 +110,7 @@ private:
     uint32_t gOuter_ = 1U;
 };
 
-uint32_t SplitCore::Compute(aicpu::kernels::IncreFlashAttentionMetadataArgs *args)
+uint32_t SplitCore::Compute(aicpu::kernels::IncreFlashAttentionMetadataArgs* args)
 {
     AcquireParam(args);
     ParamsInit();
@@ -119,7 +119,7 @@ uint32_t SplitCore::Compute(aicpu::kernels::IncreFlashAttentionMetadataArgs *arg
     return 0;
 }
 
-void SplitCore::AcquireParam(aicpu::kernels::IncreFlashAttentionMetadataArgs *args)
+void SplitCore::AcquireParam(aicpu::kernels::IncreFlashAttentionMetadataArgs* args)
 {
     aicCoreNum_ = args->aicCoreNum;
     aivCoreNum_ = args->aivCoreNum;
@@ -131,7 +131,7 @@ void SplitCore::AcquireParam(aicpu::kernels::IncreFlashAttentionMetadataArgs *ar
     blockSize_ = args->blockSize;
     maxBlockNumPerBatch_ = args->maxBlockNumPerBatch;
 
-    actSeqKvLen_ = (int64_t *)args->actSeqKvLen;
+    actSeqKvLen_ = (int64_t*)args->actSeqKvLen;
     actSeqKvLenDim_ = args->actSeqKvLenDim;
 
     layoutQuery_ = args->layoutQuery;
@@ -279,7 +279,7 @@ bool SplitCore::SplitBN()
         bn = batchSize_ * kvHeadNum_ * gOuter_;
     }
 
-    for (auto &elem : startIdxEachCore_) {
+    for (auto& elem : startIdxEachCore_) {
         elem = bn;
     }
 
@@ -326,7 +326,7 @@ bool SplitCore::SplitBN_V0()
     return true;
 }
 
-std::vector<int64_t> SplitCore::InitSparseValidArray(int64_t actualLensDim, const int64_t *actualLens) const
+std::vector<int64_t> SplitCore::InitSparseValidArray(int64_t actualLensDim, const int64_t* actualLens) const
 {
     uint32_t outer;
     if (layoutQuery_ == aicpu::kernels::Layout::BSH || layoutQuery_ == aicpu::kernels::Layout::BSND ||
@@ -349,7 +349,7 @@ std::vector<int64_t> SplitCore::InitSparseValidArray(int64_t actualLensDim, cons
     return res;
 }
 
-void SplitCore::GetEstimatedLoad(int64_t &estimatedLoad) const
+void SplitCore::GetEstimatedLoad(int64_t& estimatedLoad) const
 {
     constexpr int64_t MSD_VEC_LOAD = 1024;
     if (estimatedLoad < MSD_VEC_LOAD) { // 1024
@@ -360,8 +360,8 @@ void SplitCore::GetEstimatedLoad(int64_t &estimatedLoad) const
     }
 }
 
-void SplitCore::InitLoadValue(const std::vector<int64_t> &sparseValidArray, int64_t totalSize, int64_t validAivNum,
-                              const std::vector<int64_t> &sparseStartIdx, std::vector<int64_t> &localValue) const
+void SplitCore::InitLoadValue(const std::vector<int64_t>& sparseValidArray, int64_t totalSize, int64_t validAivNum,
+                              const std::vector<int64_t>& sparseStartIdx, std::vector<int64_t>& localValue) const
 {
     for (int64_t idx = 0; idx < validAivNum; ++idx) {
         int64_t start = sparseStartIdx[idx];
@@ -374,8 +374,8 @@ void SplitCore::InitLoadValue(const std::vector<int64_t> &sparseValidArray, int6
     }
 }
 
-void SplitCore::SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray, int64_t totalSize, int64_t validAivNum,
-                                  uint32_t *sparseStartIdx, int64_t splitFactorSize) const
+void SplitCore::SetSparseStartIdx(const std::vector<int64_t>& sparseValidArray, int64_t totalSize, int64_t validAivNum,
+                                  uint32_t* sparseStartIdx, int64_t splitFactorSize) const
 {
     // initLoad: 使用均分策略, 保证后续不会比均分差
     std::vector<int64_t> localSparseStartIdx(aicpu::kernels::MAX_CORE_NUM, totalSize);
@@ -430,8 +430,8 @@ void SplitCore::SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray, 
     }
 }
 
-bool SplitCore::BalanceLoad(const std::vector<int64_t> &sparseValidArray, int64_t totalSize, int64_t validAivNum,
-                            std::vector<int64_t> &localValue, std::vector<int64_t> &sparseStartIdx) const
+bool SplitCore::BalanceLoad(const std::vector<int64_t>& sparseValidArray, int64_t totalSize, int64_t validAivNum,
+                            std::vector<int64_t>& localValue, std::vector<int64_t>& sparseStartIdx) const
 {
     // to avoid buffer overflow, or maybe sometimes we want to only verify single core
     int64_t maxVal = *std::max_element(localValue.begin(), localValue.end());
@@ -476,11 +476,11 @@ bool SplitCore::BalanceLoad(const std::vector<int64_t> &sparseValidArray, int64_
     return (tmpMaxVal >= maxVal) ? false : true;
 }
 
-bool SplitCore::GenMetaData(aicpu::kernels::IncreFlashAttentionMetadataArgs *args)
+bool SplitCore::GenMetaData(aicpu::kernels::IncreFlashAttentionMetadataArgs* args)
 {
     constexpr uint32_t BYTE_BLOCK = 32UL;
-    aicpu::kernels::IncreFlashAttentionMetadata *metaData =
-        (aicpu::kernels::IncreFlashAttentionMetadata *)args->metaData;
+    aicpu::kernels::IncreFlashAttentionMetadata* metaData =
+        (aicpu::kernels::IncreFlashAttentionMetadata*)args->metaData;
     metaData->usedCoreNum = usedCoreNum_;
     metaData->formerCoreNum = formerCoreNum_;
     metaData->sInnerLoopTimes = sInnerLoopTimes_;
@@ -516,7 +516,7 @@ bool SplitCore::GenMetaData(aicpu::kernels::IncreFlashAttentionMetadataArgs *arg
     return true;
 }
 
-bool CheckInput(aicpu::kernels::IncreFlashAttentionMetadataArgs *arg_ptr)
+bool CheckInput(aicpu::kernels::IncreFlashAttentionMetadataArgs* arg_ptr)
 {
     KERNEL_CHECK_FALSE(arg_ptr->batchSize > 0, false, "batchSize(%ld) must be greater than 0 !!", arg_ptr->batchSize);
     KERNEL_CHECK_FALSE((arg_ptr->querySeqSize >= 1 && arg_ptr->querySeqSize <= 16), false,
@@ -552,9 +552,9 @@ bool CheckInput(aicpu::kernels::IncreFlashAttentionMetadataArgs *arg_ptr)
     return true;
 }
 
-extern "C" __global__ __aicpu__ uint32_t IncreFlashAttentionMetadataKernel(void *args)
+extern "C" __global__ __aicpu__ uint32_t IncreFlashAttentionMetadataKernel(void* args)
 {
-    aicpu::kernels::IncreFlashAttentionMetadataArgs *arg_ptr = (aicpu::kernels::IncreFlashAttentionMetadataArgs *)args;
+    aicpu::kernels::IncreFlashAttentionMetadataArgs* arg_ptr = (aicpu::kernels::IncreFlashAttentionMetadataArgs*)args;
     if (!CheckInput(arg_ptr)) {
         return 1;
     }

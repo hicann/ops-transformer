@@ -47,9 +47,9 @@ public:
 public:
     ExpectInfoWithSocversion() noexcept;
     ExpectInfoWithSocversion(bool success, uint64_t tilingKey, int64_t tilingBlockDim);
-    ExpectInfoWithSocversion(bool success, const std::map<int32_t, uint64_t> &expTilingKeys, int64_t tilingBlockDim);
-    ExpectInfoWithSocversion(bool success, const std::map<int32_t, uint64_t> &expTilingKeys,
-                             const std::map<int32_t, int64_t> &expTilingBlockDims);
+    ExpectInfoWithSocversion(bool success, const std::map<int32_t, uint64_t>& expTilingKeys, int64_t tilingBlockDim);
+    ExpectInfoWithSocversion(bool success, const std::map<int32_t, uint64_t>& expTilingKeys,
+                             const std::map<int32_t, int64_t>& expTilingBlockDims);
 };
 
 } // namespace ops::adv::tests::utils
