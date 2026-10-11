@@ -25,11 +25,11 @@ template <typename T>
 class MoeV3GatherOutDropPad {
 public:
     __aicore__ inline MoeV3GatherOutDropPad(){};
-    __aicore__ inline void InitBaseData(GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                        TPipe *tPipe);
+    __aicore__ inline void InitBaseData(GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                        TPipe* tPipe);
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR scale, GM_ADDR workspace, GM_ADDR expandedRowIdx, GM_ADDR expandedX,
-                                GM_ADDR expandedScale, const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                TPipe *tPipe);
+                                GM_ADDR expandedScale, const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void CopyExpertIn(int64_t curExpertLoopOffset, int64_t curLoopElements);
     __aicore__ inline void CopyXIn(int64_t xSrcOffset, int64_t scaleSrcOffset, int64_t curLoopCols);
@@ -40,7 +40,7 @@ public:
     __aicore__ inline void CopySourceRowsIn(int64_t outputRowOffset, int64_t curLoopRows);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQueBind<TPosition::VECIN, TPosition::VECOUT, GATHER_OUT_BUFFER_NUM> xCopyInQueue_;
     TQueBind<TPosition::VECIN, TPosition::VECOUT, GATHER_OUT_BUFFER_NUM> scaleCopyInQueue_;
     TQue<QuePosition::VECIN, GATHER_OUT_BUFFER_NUM> expandedRowIdxCopyInQueue_;
@@ -87,8 +87,8 @@ private:
 
 template <typename T>
 __aicore__ inline void MoeV3GatherOutDropPad<T>::InitBaseData(GM_ADDR workspace,
-                                                              const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                                              TPipe *tPipe)
+                                                              const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                                              TPipe* tPipe)
 {
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
@@ -134,23 +134,23 @@ __aicore__ inline void MoeV3GatherOutDropPad<T>::InitBaseData(GM_ADDR workspace,
 template <typename T>
 __aicore__ inline void MoeV3GatherOutDropPad<T>::Init(GM_ADDR x, GM_ADDR scale, GM_ADDR workspace,
                                                       GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR expandedScale,
-                                                      const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+                                                      const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe)
 {
     InitBaseData(workspace, tilingData, tPipe);
 
     if (isInputScale_ == 1) {
-        xGscaleGm_.SetGlobalBuffer((__gm__ float *)scale, n_);
+        xGscaleGm_.SetGlobalBuffer((__gm__ float*)scale, n_);
     }
     if constexpr (IsSameType<T, hifloat8_t>::value) {
-        xUint8tGm_.SetGlobalBuffer((__gm__ uint8_t *)x, n_ * cols_);
+        xUint8tGm_.SetGlobalBuffer((__gm__ uint8_t*)x, n_ * cols_);
     } else {
-        xGm_.SetGlobalBuffer((__gm__ T *)x, n_ * cols_);
+        xGm_.SetGlobalBuffer((__gm__ T*)x, n_ * cols_);
     }
     // DropPad模式：输出expandedX为3D[expertNum, expertCapacity, cols]，所有核共享整个输出区域
     // 写入位置由expandedRowIdx决定，分布在整个输出范围
-    expandedXGm_.SetGlobalBuffer((__gm__ T *)expandedX, tilingData->expertNum * tilingData->expertCapacity * cols_);
+    expandedXGm_.SetGlobalBuffer((__gm__ T*)expandedX, tilingData->expertNum * tilingData->expertCapacity * cols_);
     if (isInputScale_ == 1) {
-        expandedScaleGm_.SetGlobalBuffer((__gm__ float *)expandedScale,
+        expandedScaleGm_.SetGlobalBuffer((__gm__ float*)expandedScale,
                                          tilingData->expertNum * tilingData->expertCapacity);
     }
 
@@ -165,24 +165,24 @@ __aicore__ inline void MoeV3GatherOutDropPad<T>::Init(GM_ADDR x, GM_ADDR scale, 
         max(tilingData->gatherOutComputeParamsOp.xCopyInQueueBufferNum, GATHER_OUT_BUFFER_NUM);
     pipe_->InitBuffer(xCopyInQueue_, xCopyInQueueBufferNum, AlignBytes(perLoopCols_, sizeof(T)));
 
-    sortedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + blockIdx_ * perCoreIndicesElements_,
+    sortedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + blockIdx_ * perCoreIndicesElements_,
                                        Align(curCoreIndicesElements_, sizeof(int32_t)));
 
     int64_t length = Align(n_ * k_, sizeof(int32_t));
-    expandDstToSrcRowGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + length + blockIdx_ * perCoreIndicesElements_,
+    expandDstToSrcRowGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + length + blockIdx_ * perCoreIndicesElements_,
                                          Align(curCoreIndicesElements_, sizeof(int32_t)));
     int64_t actualExpertNumOffset = Align(tilingData->actualExpertNum, sizeof(int32_t));
     if (useCompactOutputRows_ == 1) {
         outputToSrcRowGm_.SetGlobalBuffer(
-            (__gm__ int32_t *)workspace + length * 2 + actualExpertNumOffset + tilingData->coreNum * 2, outputRows_);
+            (__gm__ int32_t*)workspace + length * 2 + actualExpertNumOffset + tilingData->coreNum * 2, outputRows_);
     }
 
     if (rowIdxType_ == SCATTER) {
-        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
+        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
                                           Align(curCoreIndicesElements_, sizeof(int32_t)));
     } else {
         // GATHER模式下，expandedRowIdx以全局排序位置为索引，row_idx_gather_droppad用全局索引写入
-        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, Align(n_ * k_, sizeof(int32_t)));
+        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, Align(n_ * k_, sizeof(int32_t)));
     }
 }
 

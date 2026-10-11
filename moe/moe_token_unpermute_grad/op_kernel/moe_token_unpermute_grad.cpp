@@ -17,9 +17,10 @@
 using namespace AscendC;
 using namespace MoeTokenUnpermuteGrad;
 
-extern "C" __global__ __aicore__ void moe_token_unpermute_grad(
-    GM_ADDR permuted_tokens, GM_ADDR unpermuted_tokens_grad, GM_ADDR sorted_indices, GM_ADDR probs,
-    GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad, GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void moe_token_unpermute_grad(GM_ADDR permuted_tokens, GM_ADDR unpermuted_tokens_grad,
+                                                               GM_ADDR sorted_indices, GM_ADDR probs,
+                                                               GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
+                                                               GM_ADDR workspace, GM_ADDR tiling)
 {
     GET_TILING_DATA(tilingData, tiling);
     GM_ADDR usrWorkspace = AscendC::GetUserWorkspace(workspace);
@@ -29,18 +30,16 @@ extern "C" __global__ __aicore__ void moe_token_unpermute_grad(
     // 11: padded_mode = True, 存在prob
     if (TILING_KEY_IS(0) || TILING_KEY_IS(10)) {
         MoeTokenUnpermuteGradProbNone<DTYPE_PERMUTED_TOKENS, int32_t> moeTokenUnpermuteGradProbNoneOp;
-        moeTokenUnpermuteGradProbNoneOp.Init(
-            permuted_tokens, unpermuted_tokens_grad, sorted_indices, probs, permuted_tokens_grad, probs_grad,
-            tilingData);
+        moeTokenUnpermuteGradProbNoneOp.Init(permuted_tokens, unpermuted_tokens_grad, sorted_indices, probs,
+                                             permuted_tokens_grad, probs_grad, tilingData);
         moeTokenUnpermuteGradProbNoneOp.Process();
     }
 #ifdef DTYPE_PROBS
     if (TILING_KEY_IS(1) || TILING_KEY_IS(11)) {
         MoeTokenUnpermuteGradProbNotNone<DTYPE_PERMUTED_TOKENS, int32_t, DTYPE_PROBS>
             moeTokenUnpermuteGradProbNotNoneOp;
-        moeTokenUnpermuteGradProbNotNoneOp.Init(
-            permuted_tokens, unpermuted_tokens_grad, sorted_indices, probs, permuted_tokens_grad, probs_grad,
-            tilingData);
+        moeTokenUnpermuteGradProbNotNoneOp.Init(permuted_tokens, unpermuted_tokens_grad, sorted_indices, probs,
+                                                permuted_tokens_grad, probs_grad, tilingData);
         moeTokenUnpermuteGradProbNotNoneOp.Process();
     }
 #endif

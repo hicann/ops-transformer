@@ -23,8 +23,7 @@
 
 using namespace std;
 
-class l2_moe_token_permute_with_routing_map_grad_test : public testing::Test
-{
+class l2_moe_token_permute_with_routing_map_grad_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -37,7 +36,8 @@ protected:
     }
 };
 
-TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_true_fp32)
+TEST_F(l2_moe_token_permute_with_routing_map_grad_test,
+       Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_true_fp32)
 {
     auto permutedTokenOutPutGrad = TensorDesc({1024, 7168}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto permutedProbsOutPutGradOptional = TensorDesc({1024}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
@@ -57,7 +57,8 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_pe
     EXPECT_EQ(getWorkspaceResult, 0);
 }
 
-TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_false_fp32)
+TEST_F(l2_moe_token_permute_with_routing_map_grad_test,
+       Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_false_fp32)
 {
     auto permutedTokenOutPutGrad = TensorDesc({8, 64}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto permutedProbsOutPutGradOptional = TensorDesc({8}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
@@ -87,16 +88,17 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_test,
     int64_t numExperts = 2;
     int64_t tokensNum = 8;
     bool paddedNum = false;
-    auto ut = OP_API_UT(aclnnMoeTokenPermuteWithRoutingMapGrad,
-                        INPUT(permutedTokenOutPutGrad, nullptr, sortedIndices, routingMapOptional, numExperts,
-                              tokensNum, paddedNum),
-                        OUTPUT(tokensGradOut, nullptr));
+    auto ut = OP_API_UT(
+        aclnnMoeTokenPermuteWithRoutingMapGrad,
+        INPUT(permutedTokenOutPutGrad, nullptr, sortedIndices, routingMapOptional, numExperts, tokensNum, paddedNum),
+        OUTPUT(tokensGradOut, nullptr));
     uint64_t workspaceSize = 0;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);
     EXPECT_EQ(getWorkspaceResult, 0);
 }
 
-TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_true_fp16)
+TEST_F(l2_moe_token_permute_with_routing_map_grad_test,
+       Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_true_fp16)
 {
     auto permutedTokenOutPutGrad = TensorDesc({1024, 7168}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto permutedProbsOutPutGradOptional = TensorDesc({1024}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
@@ -116,7 +118,8 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_pe
     EXPECT_EQ(getWorkspaceResult, 0);
 }
 
-TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_true_bf16_mix)
+TEST_F(l2_moe_token_permute_with_routing_map_grad_test,
+       Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_true_bf16_mix)
 {
     auto permutedTokenOutPutGrad = TensorDesc({1024, 7168}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto permutedProbsOutPutGradOptional = TensorDesc({1024}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
@@ -136,7 +139,8 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_pe
     EXPECT_EQ(getWorkspaceResult, 0);
 }
 
-TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_false_bf16_mix)
+TEST_F(l2_moe_token_permute_with_routing_map_grad_test,
+       Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_false_bf16_mix)
 {
     auto permutedTokenOutPutGrad = TensorDesc({8, 64}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto permutedProbsOutPutGradOptional = TensorDesc({8}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
@@ -156,7 +160,8 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_pe
     EXPECT_EQ(getWorkspaceResult, 0);
 }
 
-TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_permute_with_routing_map_grad_empty_tensor)
+TEST_F(l2_moe_token_permute_with_routing_map_grad_test,
+       Ascend910B2_moe_token_permute_with_routing_map_grad_empty_tensor)
 {
     auto permutedTokenOutPutGrad = TensorDesc({1024, 0}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto permutedProbsOutPutGradOptional = TensorDesc({1024}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
@@ -205,16 +210,17 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_test,
     int64_t numExperts = 2;
     int64_t tokensNum = 0;
     bool paddedNum = true;
-    auto ut = OP_API_UT(aclnnMoeTokenPermuteWithRoutingMapGrad,
-                        INPUT(permutedTokenOutPutGrad, nullptr, sortedIndices, routingMapOptional, numExperts,
-                              tokensNum, paddedNum),
-                        OUTPUT(tokensGradOut, nullptr));
+    auto ut = OP_API_UT(
+        aclnnMoeTokenPermuteWithRoutingMapGrad,
+        INPUT(permutedTokenOutPutGrad, nullptr, sortedIndices, routingMapOptional, numExperts, tokensNum, paddedNum),
+        OUTPUT(tokensGradOut, nullptr));
     uint64_t workspaceSize = 0;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
 }
 
-TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_permute_with_routing_map_grad_invalid_attr)
+TEST_F(l2_moe_token_permute_with_routing_map_grad_test,
+       Ascend910B2_moe_token_permute_with_routing_map_grad_invalid_attr)
 {
     auto permutedTokenOutPutGrad = TensorDesc({8, 64}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto sortedIndices = TensorDesc({8}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 7);
@@ -223,10 +229,10 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_pe
     int64_t numExperts = 0;
     int64_t tokensNum = 0;
     bool paddedNum = true;
-    auto ut = OP_API_UT(aclnnMoeTokenPermuteWithRoutingMapGrad,
-                        INPUT(permutedTokenOutPutGrad, nullptr, sortedIndices, routingMapOptional, numExperts,
-                              tokensNum, paddedNum),
-                        OUTPUT(tokensGradOut, nullptr));
+    auto ut = OP_API_UT(
+        aclnnMoeTokenPermuteWithRoutingMapGrad,
+        INPUT(permutedTokenOutPutGrad, nullptr, sortedIndices, routingMapOptional, numExperts, tokensNum, paddedNum),
+        OUTPUT(tokensGradOut, nullptr));
     uint64_t workspaceSize = 0;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
@@ -264,7 +270,9 @@ aclTensor* CreateL0AclTensor(const std::vector<int64_t>& shape, aclDataType dtyp
 
 class l2_moe_token_permute_with_routing_map_grad_l0_test : public testing::Test {
 protected:
-    l2_moe_token_permute_with_routing_map_grad_l0_test() : exe(nullptr) {}
+    l2_moe_token_permute_with_routing_map_grad_l0_test()
+        : exe(nullptr)
+    {}
 
     void SetUp() override
     {
@@ -289,8 +297,8 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_l0_test, MoeTokenPermuteWithRo
     auto routingMap = CreateL0AclTensor({3, 8}, ACL_BOOL);
     auto tokensGradOut = CreateL0AclTensor({8, 64}, ACL_FLOAT);
     auto probsGradOut = CreateL0AclTensor({8}, ACL_FLOAT);
-    auto result = l0op::MoeTokenPermuteWithRoutingMapGrad(
-        permutedTokenGrad, nullptr, sortedIndices, routingMap, 3, 8, false, tokensGradOut, probsGradOut, exe);
+    auto result = l0op::MoeTokenPermuteWithRoutingMapGrad(permutedTokenGrad, nullptr, sortedIndices, routingMap, 3, 8,
+                                                          false, tokensGradOut, probsGradOut, exe);
     EXPECT_NE(result[0], nullptr);
     EXPECT_NE(result[1], nullptr);
 }
@@ -302,8 +310,8 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_l0_test,
     auto sortedIndices = CreateL0AclTensor({8}, ACL_INT32);
     auto routingMap = CreateL0AclTensor({3, 8}, ACL_BOOL);
     auto probsGradOut = CreateL0AclTensor({8}, ACL_FLOAT);
-    auto result = l0op::MoeTokenPermuteWithRoutingMapGrad(
-        permutedTokenGrad, nullptr, sortedIndices, routingMap, 3, 8, true, nullptr, probsGradOut, exe);
+    auto result = l0op::MoeTokenPermuteWithRoutingMapGrad(permutedTokenGrad, nullptr, sortedIndices, routingMap, 3, 8,
+                                                          true, nullptr, probsGradOut, exe);
     EXPECT_NE(result[0], nullptr);
     EXPECT_NE(result[1], nullptr);
 }
@@ -317,8 +325,8 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_l0_test,
     auto routingMap = CreateL0AclTensor({3, 8}, ACL_BOOL);
     auto tokensGradOut = CreateL0AclTensor({8, 64}, ACL_FLOAT);
     auto probsGradOut = CreateL0AclTensor({8}, ACL_FLOAT);
-    auto result = l0op::MoeTokenPermuteWithRoutingMapGrad(
-        permutedTokenGrad, permutedProbsGrad, sortedIndices, routingMap, 3, 8, false, tokensGradOut, probsGradOut, exe);
+    auto result = l0op::MoeTokenPermuteWithRoutingMapGrad(permutedTokenGrad, permutedProbsGrad, sortedIndices,
+                                                          routingMap, 3, 8, false, tokensGradOut, probsGradOut, exe);
     EXPECT_NE(result[0], nullptr);
     EXPECT_NE(result[1], nullptr);
 }

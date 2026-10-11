@@ -32,7 +32,7 @@ class MoeGatherOutHif8Quant {
 public:
     __aicore__ inline MoeGatherOutHif8Quant(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR workspace, GM_ADDR expandedRowIdx, GM_ADDR expandedX,
-                                const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void CopyExpertIn(int64_t curExpertLoopOffset, int64_t curLoopElements);
     __aicore__ inline void CopyXIn(int64_t xSrcOffset, int64_t curLoopCols);
@@ -40,7 +40,7 @@ public:
     __aicore__ inline void CopyXOut(int64_t xDstOffset, int64_t curLoopCols);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, GATHER_HIF8_QUANT_BUFFER_NUM> expandedRowIdxCopyInQueue_;
 
     TQueBind<TPosition::GM, TPosition::VECIN, GATHER_HIF8_QUANT_BUFFER_NUM> xCopyInQueue_;
@@ -82,7 +82,7 @@ private:
 template <typename T>
 __aicore__ inline void MoeGatherOutHif8Quant<T>::Init(GM_ADDR x, GM_ADDR workspace, GM_ADDR expandedRowIdx,
                                                       GM_ADDR expandedX,
-                                                      const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+                                                      const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe)
 {
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
@@ -99,8 +99,7 @@ __aicore__ inline void MoeGatherOutHif8Quant<T>::Init(GM_ADDR x, GM_ADDR workspa
 
     actualExpertNum_ = tilingData->actualExpertNum;
     expertTotalCountGm_.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum_, sizeof(int32_t)),
-        1);
+        (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum_, sizeof(int32_t)), 1);
     AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
         expertTotalCountGm_);
     expertTotalCount_ = expertTotalCountGm_.GetValue(0);
@@ -121,9 +120,9 @@ __aicore__ inline void MoeGatherOutHif8Quant<T>::Init(GM_ADDR x, GM_ADDR workspa
     indicesLoops_ = Ceil(curCoreIndicesElements_, curCorePerLoopIndicesElements_);
     curCoreLastLoopIndicesElements_ = curCoreIndicesElements_ - (indicesLoops_ - 1) * curCorePerLoopIndicesElements_;
 
-    xGm_.SetGlobalBuffer((__gm__ T *)x, n_ * cols_);
+    xGm_.SetGlobalBuffer((__gm__ T*)x, n_ * cols_);
 
-    expandedXGm_.SetGlobalBuffer((__gm__ hifloat8_t *)expandedX + blockIdx_ * perCoreIndicesElements_ * cols_,
+    expandedXGm_.SetGlobalBuffer((__gm__ hifloat8_t*)expandedX + blockIdx_ * perCoreIndicesElements_ * cols_,
                                  curCoreIndicesElements_ * cols_);
 
     pipe_->InitBuffer(expandedRowIdxCopyInQueue_, GATHER_HIF8_QUANT_BUFFER_NUM,
@@ -131,15 +130,15 @@ __aicore__ inline void MoeGatherOutHif8Quant<T>::Init(GM_ADDR x, GM_ADDR workspa
     pipe_->InitBuffer(xCopyInQueue_, GATHER_HIF8_QUANT_BUFFER_NUM, AlignBytes(perLoopCols_, sizeof(T)));
     pipe_->InitBuffer(xCopyOutQueue_, GATHER_HIF8_QUANT_BUFFER_NUM, AlignBytes(perLoopCols_, sizeof(hifloat8_t)));
     pipe_->InitBuffer(xLocalFloatTempBuf_, AlignBytes(perLoopCols_, sizeof(float)));
-    sortedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + blockIdx_ * perCoreIndicesElements_,
+    sortedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + blockIdx_ * perCoreIndicesElements_,
                                        Align(curCoreIndicesElements_, sizeof(int32_t)));
 
     if (rowIdxType_ == SCATTER) {
-        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
+        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
                                           Align(curCoreIndicesElements_, sizeof(int32_t)));
     } else {
         expandedRowIdxGm_.SetGlobalBuffer(
-            (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
+            (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
             Align(curCoreIndicesElements_, sizeof(int32_t)));
     }
 }

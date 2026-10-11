@@ -25,22 +25,22 @@ using namespace AscendC;
 class MoeSortMultiCorePerformance : public MoeSortBase {
 public:
     __aicore__ inline MoeSortMultiCorePerformance(){};
-    __aicore__ inline void Init(GM_ADDR expendedRowIdx, GM_ADDR workspace, const MoeInitRoutingV3TilingData *tilingData,
-                                TPipe *tPipe);
+    __aicore__ inline void Init(GM_ADDR expendedRowIdx, GM_ADDR workspace, const MoeInitRoutingV3TilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void VMSProcess();
     __aicore__ inline void SortOutProcess();
-    __aicore__ inline void InitMoeMrgSort(MoeMrgsortPerformance *sorter, int64_t coreOffset);
-    __aicore__ inline void InitMoeMrgSortOut(MoeMrgsortOutPerformance *sorter);
+    __aicore__ inline void InitMoeMrgSort(MoeMrgsortPerformance* sorter, int64_t coreOffset);
+    __aicore__ inline void InitMoeMrgSortOut(MoeMrgsortOutPerformance* sorter);
 
 private:
     GlobalTensor<float> workspaceGms[2];
     GlobalTensor<int32_t> workspaceGatheredSortNumGm_;
 
-    const MoeV3SortOutComputeTilingData *sortOutTilingData;
-    const MoeV3VBSComputeTilingData *vbsTilingData;
+    const MoeV3SortOutComputeTilingData* sortOutTilingData;
+    const MoeV3VBSComputeTilingData* vbsTilingData;
 
     // for MoeMrgsortPerformance
     MoeMrgsortPerformance mrgsorter;
@@ -52,7 +52,7 @@ private:
     int64_t maxPerListElements;
 };
 
-__aicore__ inline void MoeSortMultiCorePerformance::InitMoeMrgSort(MoeMrgsortPerformance *sorter, int64_t coreOffset)
+__aicore__ inline void MoeSortMultiCorePerformance::InitMoeMrgSort(MoeMrgsortPerformance* sorter, int64_t coreOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[0][this->blockIdx * coreOffset]; // 0-3
     LocalTensor<float> inLocal = sortDataCopyInQueue.AllocTensor<float>();
@@ -68,7 +68,7 @@ __aicore__ inline void MoeSortMultiCorePerformance::InitMoeMrgSort(MoeMrgsortPer
     sortDataCopyOutQueue.FreeTensor(outLocal);
 }
 
-__aicore__ inline void MoeSortMultiCorePerformance::InitMoeMrgSortOut(MoeMrgsortOutPerformance *sorter)
+__aicore__ inline void MoeSortMultiCorePerformance::InitMoeMrgSortOut(MoeMrgsortOutPerformance* sorter)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[1];
     LocalTensor<float> inLocal = sortDataCopyInQueue.AllocTensor<float>();
@@ -119,7 +119,7 @@ __aicore__ inline void MoeSortMultiCorePerformance::SortOutProcess()
 }
 
 __aicore__ inline void MoeSortMultiCorePerformance::Init(GM_ADDR expendedRowIdx, GM_ADDR workspace,
-                                                         const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe)
+                                                         const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe)
 {
     this->totalLength = tilingData->n * tilingData->k;
     this->blockIdx = GetBlockIdx();
@@ -135,25 +135,25 @@ __aicore__ inline void MoeSortMultiCorePerformance::Init(GM_ADDR expendedRowIdx,
     rowIdxType_ = tilingData->rowIdxType;
 
     this->pipe = tPipe;
-    sortedexpertIdxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace),
+    sortedexpertIdxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace),
                                       Align(this->totalLength, sizeof(int32_t)));
     if (rowIdxType_ == SCATTER) {
-        expendedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expendedRowIdx, Align(this->totalLength, sizeof(int32_t)));
+        expendedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expendedRowIdx, Align(this->totalLength, sizeof(int32_t)));
     } else {
-        expendedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)),
+        expendedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(this->totalLength, sizeof(int32_t)),
                                          Align(this->totalLength, sizeof(int32_t)));
     }
 
     // key and value
     int64_t kvFactor = 2;
-    workspaceGms[0].SetGlobalBuffer((__gm__ float *)workspace, Align(this->totalLength, sizeof(float)) * kvFactor);
-    workspaceGms[1].SetGlobalBuffer((__gm__ float *)workspace + Align(this->totalLength, sizeof(float)) * kvFactor,
+    workspaceGms[0].SetGlobalBuffer((__gm__ float*)workspace, Align(this->totalLength, sizeof(float)) * kvFactor);
+    workspaceGms[1].SetGlobalBuffer((__gm__ float*)workspace + Align(this->totalLength, sizeof(float)) * kvFactor,
                                     Align(this->totalLength, sizeof(float)) * kvFactor);
     workspaceGatheredSortNumGm_.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)) * kvFactor * kvFactor,
+        (__gm__ int32_t*)workspace + Align(this->totalLength, sizeof(int32_t)) * kvFactor * kvFactor,
         MAX_MRGSORT_LIST_TOTAL);
     // 直方图临时空间
-    expertCountTempGm.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2,
+    expertCountTempGm.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(this->totalLength, sizeof(int32_t)) * 2,
                                       expertEnd_ - expertStart_);
 
     int64_t bufferSize = Ceil(maxPerListElements * MAX_MRGSORT_LIST, ONE_REPEAT_SORT_NUM) * ONE_REPEAT_SORT_NUM *

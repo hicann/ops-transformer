@@ -29,7 +29,7 @@ public:
 
     __aicore__ inline void Init(GM_ADDR permuted_tokens, GM_ADDR sorted_indices, GM_ADDR probs,
                                 GM_ADDR unpermuted_tokens,
-                                const MoeTokenPermuteWithRoutingMapGradUnpermuteTilingData *__restrict tiling_data);
+                                const MoeTokenPermuteWithRoutingMapGradUnpermuteTilingData* __restrict tiling_data);
     __aicore__ inline void Process();
 
 protected:
@@ -75,7 +75,7 @@ protected:
 template <typename T1, typename T2, typename T3, bool PROBS>
 __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::Init(
     GM_ADDR permuted_tokens, GM_ADDR sorted_indices, GM_ADDR probs, GM_ADDR unpermuted_tokens,
-    const MoeTokenPermuteWithRoutingMapGradUnpermuteTilingData *__restrict tiling_data)
+    const MoeTokenPermuteWithRoutingMapGradUnpermuteTilingData* __restrict tiling_data)
 {
     ASSERT(GetBlockNum() != 0 && "block dim can not be zero!");
     // row_input
@@ -116,8 +116,8 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::Init(
         block_offset = block_length * GetBlockIdx();
     }
 
-    this->tokensGM.SetGlobalBuffer((__gm__ T1 *)permuted_tokens);
-    this->indicesGM.SetGlobalBuffer((__gm__ T2 *)sorted_indices + block_offset, block_length);
+    this->tokensGM.SetGlobalBuffer((__gm__ T1*)permuted_tokens);
+    this->indicesGM.SetGlobalBuffer((__gm__ T2*)sorted_indices + block_offset, block_length);
 
     int64_t out_block_offset;
     if (this->tokens_core_remain > 0) {
@@ -132,7 +132,7 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::Init(
         out_block_offset = this->tokens_core_length * GetBlockIdx() * hidden_size;
     }
 
-    this->outGM.SetGlobalBuffer((__gm__ T1 *)unpermuted_tokens + out_block_offset,
+    this->outGM.SetGlobalBuffer((__gm__ T1*)unpermuted_tokens + out_block_offset,
                                 this->tokens_core_length * this->hidden_size);
 
     this->pipe.InitBuffer(tokens_inque, tiling_data->buffer_num, hidden_splited_length_align512 * sizeof(T1));
@@ -147,7 +147,7 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::Init(
     }
 
     if constexpr (PROBS) {
-        this->probsGM.SetGlobalBuffer((__gm__ T3 *)probs + block_offset, block_length);
+        this->probsGM.SetGlobalBuffer((__gm__ T3*)probs + block_offset, block_length);
         this->pipe.InitBuffer(probs_inque, 1, block_splited_length * (sizeof(T3)));
         if constexpr (!IsSameType<T3, float>::value) {
             this->pipe.InitBuffer(temp_buffer2, block_splited_length * sizeof(float));

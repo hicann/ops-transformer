@@ -19,12 +19,12 @@
 using Ops::Transformer::OpTiling::TilingRegistry;
 
 namespace optiling {
-static ge::graphStatus TilingForMoeInitRoutingV3(gert::TilingContext *context)
+static ge::graphStatus TilingForMoeInitRoutingV3(gert::TilingContext* context)
 {
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus TilingPrepareForMoeInitRountingV3(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForMoeInitRountingV3(gert::TilingParseContext* context)
 {
     OP_LOGD(context, "TilingPrepareForMoeInitRoutingV3 enter.");
 

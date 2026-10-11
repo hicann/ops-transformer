@@ -174,14 +174,14 @@ struct PerLoopParams {
 
 class MoeInitRoutingV3TilingArch35 : public TilingBaseClass {
 public:
-    explicit MoeInitRoutingV3TilingArch35(gert::TilingContext *context)
+    explicit MoeInitRoutingV3TilingArch35(gert::TilingContext* context)
         : TilingBaseClass(context)
     {
         Reset();
     }
     ~MoeInitRoutingV3TilingArch35() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
@@ -229,11 +229,11 @@ protected:
 
     // 辅助工具函数（V4 子类需要使用）
     template <bool IS_INPUT_TENSOR = true, bool IS_OPTIONAL_INPUT = false>
-    ge::graphStatus GetTensorShapeDtype(gert::Shape &shape, ge::DataType &dtype, int64_t index)
+    ge::graphStatus GetTensorShapeDtype(gert::Shape& shape, ge::DataType& dtype, int64_t index)
     {
         OP_LOGD(context_, "Entered MoeInitRoutingV3TilingArch35::GetTensorShapeDtype(...)");
-        const gert::StorageShape *shapePtr{nullptr};
-        const gert::CompileTimeTensorDesc *descPtr{nullptr};
+        const gert::StorageShape* shapePtr{nullptr};
+        const gert::CompileTimeTensorDesc* descPtr{nullptr};
         if constexpr (IS_INPUT_TENSOR) {
             if constexpr (IS_OPTIONAL_INPUT) {
                 shapePtr = context_->GetOptionalInputShape(index);
@@ -253,7 +253,7 @@ protected:
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus GetOptionalInputShapeDtype(gert::Shape &shape, ge::DataType &dtype, int64_t &marker, int64_t index)
+    ge::graphStatus GetOptionalInputShapeDtype(gert::Shape& shape, ge::DataType& dtype, int64_t& marker, int64_t index)
     {
         OP_LOGD(context_, "Entered MoeInitRoutingV3TilingArch35::GetOptionalInputShapeDtype(...)");
         if (context_->GetOptionalInputShape(index) != nullptr) {
@@ -267,18 +267,18 @@ protected:
     }
 
     template <typename ATTR_T>
-    ge::graphStatus GetInputAttr(ATTR_T &attr, const gert::RuntimeAttrs *attrsPtr, int64_t index)
+    ge::graphStatus GetInputAttr(ATTR_T& attr, const gert::RuntimeAttrs* attrsPtr, int64_t index)
     {
         OP_LOGD(context_, "Entered MoeInitRoutingV3TilingArch35::GetInputAttr(...)");
-        const auto *attrPtr = attrsPtr->GetAttrPointer<ATTR_T>(index);
+        const auto* attrPtr = attrsPtr->GetAttrPointer<ATTR_T>(index);
         OP_CHECK_NULL_WITH_CONTEXT(context_, attrPtr);
         attr = *attrPtr;
         return ge::GRAPH_SUCCESS;
     }
 
     // op variables
-    const char *opName = "";
-    MoeInitRoutingV3Arch35TilingData *tilingDataPtr_{nullptr};
+    const char* opName = "";
+    MoeInitRoutingV3Arch35TilingData* tilingDataPtr_{nullptr};
 
     // platform infos
     int64_t aivCoreNum_ = 0LL;
@@ -377,7 +377,7 @@ private:
         int64_t dim2 = -1;
     };
     ScaleShapeCheckInfo GetExpectedInputScaleShape() const;
-    ge::graphStatus CheckInputScaleShape(const ScaleShapeCheckInfo &expected);
+    ge::graphStatus CheckInputScaleShape(const ScaleShapeCheckInfo& expected);
     ge::graphStatus CheckInputScaleDtype();
     ge::graphStatus CheckInputOffset();
     ge::graphStatus CheckInputTopkWeight();
@@ -391,19 +391,19 @@ private:
     ge::graphStatus ValidateExpandedXShapeDropPad();
     ge::graphStatus ValidateExpandedXShapeDropless();
     ge::graphStatus ValidateExpandedXDtype();
-    void CalculateExpectedScaleShape(int64_t &expectedRank, int64_t &expectedDim0, int64_t &expectedDim1,
-                                     int64_t &expectedDim2);
+    void CalculateExpectedScaleShape(int64_t& expectedRank, int64_t& expectedDim0, int64_t& expectedDim1,
+                                     int64_t& expectedDim2);
     ge::graphStatus ValidateScaleShape(int64_t expectedRank, int64_t expectedDim0, int64_t expectedDim1,
                                        int64_t expectedDim2);
 
     // 各阶段TilingData计算函数
     MultipleParams GetMultipleParams();
-    PerLoopParams GetPerLoopParams(MultipleParams &multipleParams, int64_t perCoreIndicesElements);
-    void AlignInt4DynamicQuantPerLoopCols(PerLoopParams &perLoopParams) const;
-    void SetPerLoopParams4NoQuantDropPad(const MultipleParams &multipleParams, PerLoopParams &perLoopParams,
+    PerLoopParams GetPerLoopParams(MultipleParams& multipleParams, int64_t perCoreIndicesElements);
+    void AlignInt4DynamicQuantPerLoopCols(PerLoopParams& perLoopParams) const;
+    void SetPerLoopParams4NoQuantDropPad(const MultipleParams& multipleParams, PerLoopParams& perLoopParams,
                                          const int64_t perCoreIndicesElements);
     int64_t GetXBufferNum(const int additionalBufferNum);
-    void SetPerLoopParams4NoQuantDropLess(PerLoopParams &perLoopParams, const int64_t perCoreIndicesElements);
+    void SetPerLoopParams4NoQuantDropLess(PerLoopParams& perLoopParams, const int64_t perCoreIndicesElements);
     void Tiling4GatherOutCompute();
     void Tiling4GatherOutMxFP8NoQuantCompute();
     void Tiling4GatherOutMxQuant();
@@ -412,8 +412,8 @@ private:
     void Tiling4VMSMiddleCompute();
     void Tiling4VBSCompute();
     void Tiling4ExpertTokensCountCompute();
-    void Tiling4VBSOneCoreCompute(MoeV3Arch35VBSComputeTilingData *vbsTiling);
-    void Tiling4VBSMultiCoreCompute(MoeV3Arch35VBSComputeTilingData *vbsTiling);
+    void Tiling4VBSOneCoreCompute(MoeV3Arch35VBSComputeTilingData* vbsTiling);
+    void Tiling4VBSMultiCoreCompute(MoeV3Arch35VBSComputeTilingData* vbsTiling);
     int64_t CalcMaxRowIdxPerLoopMxQuant(int64_t perLoopCols);
     int64_t CalcMaxRowIdxPerLoopFP8Quant(int64_t perLoopCols);
     int64_t CalcMaxRowIdxPerLoopFP8GroupQuant(int64_t perLoopCols);
@@ -422,7 +422,7 @@ private:
     void ComputeUseGatherCopy();
     void SetIndicesLoopParams4GatherOut(int64_t perLoopMaxIndicesElements, int64_t perCoreIndicesElements,
                                         int64_t lastCoreIndicesElements);
-    void SetLastCoreIndicesTiling(MoeV3Arch35GatherOutComputeTilingData *gatherOutTiling,
+    void SetLastCoreIndicesTiling(MoeV3Arch35GatherOutComputeTilingData* gatherOutTiling,
                                   int64_t lastCoreIndicesElements, int64_t perLoopMaxIndicesElements);
 
     // CountingSort 性能模板
@@ -433,13 +433,13 @@ private:
     void ComputeArch35CountingSortCutOriginTiling();
 
     // DropPad模式Tiling计算函数
-    void SetCoreSplitParams4SrcToDstDropPad(int64_t &needCoreNum, int64_t &perCoreRows, int64_t &lastCoreRows);
+    void SetCoreSplitParams4SrcToDstDropPad(int64_t& needCoreNum, int64_t& perCoreRows, int64_t& lastCoreRows);
     void SetLoopParams4SrcToDstDropPad(int64_t perCoreRows, int64_t lastCoreRows);
     void Tiling4SrcToDstDropPadCompute();
     void Tiling4GatherOutDropPadCompute();
     bool UseCompactGatherOutDropPad(int64_t outputRows) const;
-    void SetGatherOutDropPadCoreSplitParams(int64_t &needCoreNum, int64_t &perCoreIndicesElements,
-                                            int64_t &lastCoreIndicesElements);
+    void SetGatherOutDropPadCoreSplitParams(int64_t& needCoreNum, int64_t& perCoreIndicesElements,
+                                            int64_t& lastCoreIndicesElements);
     void SetGatherOutDropPadLoopParams(int64_t perCoreIndicesElements, int64_t lastCoreIndicesElements);
 
     // LogTilingData

@@ -13,7 +13,7 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *MoeGatherV2(const aclTensor *self, int64_t axis, const aclTensor *indices, aclOpExecutor *executor,
+const aclTensor* MoeGatherV2(const aclTensor* self, int64_t axis, const aclTensor* indices, aclOpExecutor* executor,
                              int batchDims = 0, bool negativeIndexSupport = false);
 }
 #endif // OP_API_INC_LEVEL0_OP_MOE_GATHER_V2_H_

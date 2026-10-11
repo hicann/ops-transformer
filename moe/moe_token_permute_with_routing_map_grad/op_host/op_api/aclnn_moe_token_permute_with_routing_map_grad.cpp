@@ -75,7 +75,7 @@ static const std::initializer_list<op::DataType> ARCH3510_AICORE_DTYPE_SUPPORT_L
     op::DataType::DT_INT16, op::DataType::DT_BF16,    op::DataType::DT_INT8,
     op::DataType::DT_UINT8, op::DataType::DT_INT64,   op::DataType::DT_BOOL};
 
-static bool IsAICoreSupport(const aclTensor *self)
+static bool IsAICoreSupport(const aclTensor* self)
 {
     // 根据芯片类型和输入self类型判断是否走aicore
     if (Ops::Transformer::AclnnUtil::IsRegbase()) {
@@ -102,10 +102,10 @@ static const std::initializer_list<DataType> routing_map_dtype_list = {op::DataT
 
 static const std::initializer_list<DataType> indice_dtype_list = {op::DataType::DT_INT32};
 
-static inline bool CheckNotNull(const aclTensor *permutedTokenOutputGrad,
-                                const aclTensor *permutedProbsOutputGradOptional, const aclTensor *sortedIndices,
-                                const aclTensor *routingMapOptional, const aclTensor *tokensGradOut,
-                                const aclTensor *probsGradOutOptional)
+static inline bool CheckNotNull(const aclTensor* permutedTokenOutputGrad,
+                                const aclTensor* permutedProbsOutputGradOptional, const aclTensor* sortedIndices,
+                                const aclTensor* routingMapOptional, const aclTensor* tokensGradOut,
+                                const aclTensor* probsGradOutOptional)
 {
     OP_CHECK_NULL(permutedTokenOutputGrad, return false);
     OP_CHECK_NULL(sortedIndices, return false);
@@ -121,10 +121,10 @@ static inline bool CheckNotNull(const aclTensor *permutedTokenOutputGrad,
     return true;
 }
 
-static inline bool CheckDtypeValid(const aclTensor *permutedTokenOutputGrad,
-                                   const aclTensor *permutedProbsOutputGradOptional, const aclTensor *sortedIndices,
-                                   const aclTensor *routingMapOptional, const aclTensor *tokensGradOut,
-                                   const aclTensor *probsGradOutOptional)
+static inline bool CheckDtypeValid(const aclTensor* permutedTokenOutputGrad,
+                                   const aclTensor* permutedProbsOutputGradOptional, const aclTensor* sortedIndices,
+                                   const aclTensor* routingMapOptional, const aclTensor* tokensGradOut,
+                                   const aclTensor* probsGradOutOptional)
 {
     // 检查permutedTokenOutputGrad的数据类型是否在支持列表内
     OP_CHECK_DTYPE_NOT_SUPPORT(permutedTokenOutputGrad, dtype_list, return false);
@@ -152,8 +152,8 @@ static inline bool CheckDtypeValid(const aclTensor *permutedTokenOutputGrad,
     return true;
 }
 
-static bool CheckShapeValid(const aclTensor *permutedTokenOutputGrad, const aclTensor *routingMap,
-                            const aclTensor *probsOptional)
+static bool CheckShapeValid(const aclTensor* permutedTokenOutputGrad, const aclTensor* routingMap,
+                            const aclTensor* probsOptional)
 {
     if (permutedTokenOutputGrad != nullptr) {
         auto permutedTokenOutputGradDimNum = permutedTokenOutputGrad->GetViewShape().GetDimNum();
@@ -180,8 +180,8 @@ static bool CheckShapeValid(const aclTensor *permutedTokenOutputGrad, const aclT
     return true;
 }
 
-static void CheckFormatValid(const aclTensor *permutedTokenOutputGrad, const aclTensor *permutedProbsOutputGradOptional,
-                             const aclTensor *sortedIndices, const aclTensor *routingMapOptional)
+static void CheckFormatValid(const aclTensor* permutedTokenOutputGrad, const aclTensor* permutedProbsOutputGradOptional,
+                             const aclTensor* sortedIndices, const aclTensor* routingMapOptional)
 {
     // 检查输入张量的格式是否为 ND 格式
     if (permutedTokenOutputGrad != nullptr) {
@@ -230,10 +230,10 @@ static bool checkAttrValid(int64_t numExperts, int64_t tokensNum)
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *permutedTokenOutputGrad,
-                               const aclTensor *permutedProbsOutputGradOptional, const aclTensor *sortedIndices,
-                               const aclTensor *routingMapOptional, int64_t numExperts, int64_t tokensNum,
-                               bool dropAndPad, aclTensor *tokensGradOut, aclTensor *probsGradOutOptional)
+static aclnnStatus CheckParams(const aclTensor* permutedTokenOutputGrad,
+                               const aclTensor* permutedProbsOutputGradOptional, const aclTensor* sortedIndices,
+                               const aclTensor* routingMapOptional, int64_t numExperts, int64_t tokensNum,
+                               bool dropAndPad, aclTensor* tokensGradOut, aclTensor* probsGradOutOptional)
 {
     // 1. 检查Attr是否合法
     CHECK_RET(checkAttrValid(numExperts, tokensNum), ACLNN_ERR_PARAM_INVALID);
@@ -254,24 +254,24 @@ static aclnnStatus CheckParams(const aclTensor *permutedTokenOutputGrad,
     (void)dropAndPad;
     return ACLNN_SUCCESS;
 }
-static void ViewDataType(const aclTensor *input, const op::DataType dtype)
+static void ViewDataType(const aclTensor* input, const op::DataType dtype)
 {
     if (input == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "view data type error! it is null.");
         return;
     }
-    auto tmpTensor = const_cast<aclTensor *>(input);
+    auto tmpTensor = const_cast<aclTensor*>(input);
     tmpTensor->SetDataType(dtype);
     input = tmpTensor;
 }
 } // namespace
 
-aclnnStatus PrepareContiguousTensors(aclOpExecutor *executor, const aclTensor *tokensGradOut,
-                                     aclTensor *probsGradOutOptional, const aclTensor *permutedProbsOutputGradOptional,
-                                     const aclTensor *sortedIndices, const aclTensor *routingMapOptional,
-                                     const aclTensor **zeroTokensGradOut, const aclTensor **zeroPermutedProbsOutputGrad,
-                                     const aclTensor **sortedIndicesContiguous,
-                                     const aclTensor **routingMapOptionalContiguous)
+aclnnStatus PrepareContiguousTensors(aclOpExecutor* executor, const aclTensor* tokensGradOut,
+                                     aclTensor* probsGradOutOptional, const aclTensor* permutedProbsOutputGradOptional,
+                                     const aclTensor* sortedIndices, const aclTensor* routingMapOptional,
+                                     const aclTensor** zeroTokensGradOut, const aclTensor** zeroPermutedProbsOutputGrad,
+                                     const aclTensor** sortedIndicesContiguous,
+                                     const aclTensor** routingMapOptionalContiguous)
 {
     // 处理第一个输出
     auto TokensGradOutContiguous = l0op::Contiguous(tokensGradOut, executor);
@@ -301,14 +301,14 @@ aclnnStatus PrepareContiguousTensors(aclOpExecutor *executor, const aclTensor *t
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus ProcessNonDropAndPadGradients(aclOpExecutor *executor, const aclTensor *permutedProbsOutputGradOptional,
-                                          const aclTensor *permutedTokenOutputGradContiguous,
-                                          const aclTensor *permutedProbsOutputGradOptionalContiguous,
-                                          const aclTensor *sortedIndicesContiguous,
-                                          const aclTensor *routingMapOptionalContiguous, int64_t numExperts,
-                                          int64_t tokensNum, bool dropAndPad, const aclTensor *zeroTokensGradOut,
-                                          const aclTensor *zeroPermutedProbsOutputGrad, aclTensor *tokensGradOut,
-                                          aclTensor *probsGradOutOptional, const aclIntArray *perm)
+aclnnStatus ProcessNonDropAndPadGradients(aclOpExecutor* executor, const aclTensor* permutedProbsOutputGradOptional,
+                                          const aclTensor* permutedTokenOutputGradContiguous,
+                                          const aclTensor* permutedProbsOutputGradOptionalContiguous,
+                                          const aclTensor* sortedIndicesContiguous,
+                                          const aclTensor* routingMapOptionalContiguous, int64_t numExperts,
+                                          int64_t tokensNum, bool dropAndPad, const aclTensor* zeroTokensGradOut,
+                                          const aclTensor* zeroPermutedProbsOutputGrad, aclTensor* tokensGradOut,
+                                          aclTensor* probsGradOutOptional, const aclIntArray* perm)
 {
     // 算子kernel内部只会处理第一个输出，但是第二个输出传空指针时会影响第一个输出，所以这里暂时传zeroTokensGradOut
     auto MoeTokenpermuteGradWithRoutingMapOut = l0op::MoeTokenPermuteWithRoutingMapGrad(
@@ -349,12 +349,12 @@ aclnnStatus ProcessNonDropAndPadGradients(aclOpExecutor *executor, const aclTens
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus ProcessDropAndPadProbsGrad(aclOpExecutor *executor, const aclTensor *permutedTokenOutputGradContiguous,
-                                       const aclTensor *permutedProbsOutputGradOptionalContiguous,
-                                       const aclTensor *sortedIndicesContiguous,
-                                       const aclTensor *routingMapOptionalContiguous, int64_t numExperts,
-                                       int64_t tokensNum, bool dropAndPad, const aclTensor *zeroTokensGradOut,
-                                       const aclTensor *zeroPermutedProbsOutputGrad, aclTensor *probsGradOutOptional)
+aclnnStatus ProcessDropAndPadProbsGrad(aclOpExecutor* executor, const aclTensor* permutedTokenOutputGradContiguous,
+                                       const aclTensor* permutedProbsOutputGradOptionalContiguous,
+                                       const aclTensor* sortedIndicesContiguous,
+                                       const aclTensor* routingMapOptionalContiguous, int64_t numExperts,
+                                       int64_t tokensNum, bool dropAndPad, const aclTensor* zeroTokensGradOut,
+                                       const aclTensor* zeroPermutedProbsOutputGrad, aclTensor* probsGradOutOptional)
 {
     if (nullptr != zeroPermutedProbsOutputGrad) {
         auto MoeTokenpermuteGradWithRoutingMapOut = l0op::MoeTokenPermuteWithRoutingMapGrad(
@@ -369,13 +369,13 @@ aclnnStatus ProcessDropAndPadProbsGrad(aclOpExecutor *executor, const aclTensor 
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus ProcessDropAndPadTokensGrad(aclOpExecutor *executor, const aclTensor *permutedTokenOutputGradContiguous,
-                                        const aclTensor *sortedIndicesContiguous, const aclTensor *zeroTokensGradOut,
-                                        aclTensor *tokensGradOut, int64_t tokensNum)
+aclnnStatus ProcessDropAndPadTokensGrad(aclOpExecutor* executor, const aclTensor* permutedTokenOutputGradContiguous,
+                                        const aclTensor* sortedIndicesContiguous, const aclTensor* zeroTokensGradOut,
+                                        aclTensor* tokensGradOut, int64_t tokensNum)
 {
     constexpr bool descending = false;
     constexpr bool stable = true;
-    const aclTensor *indexAddOut = nullptr;
+    const aclTensor* indexAddOut = nullptr;
     int64_t deterministicValue = 0;
     aclError aclRet = aclrtGetSysParamOpt(ACL_OPT_DETERMINISTIC, &deterministicValue);
     // 当设备类型为A2或A3且index为int32类型时，切为InplaceIndexAddWithSorted算子
@@ -387,7 +387,7 @@ aclnnStatus ProcessDropAndPadTokensGrad(aclOpExecutor *executor, const aclTensor
                      zeroTokensGradOut->GetDataType() == op::DataType::DT_FLOAT16 || deterministicValue);
 #ifdef BUILD_OPEN_PROJECT_API
     if (useNewOp) {
-        const aclTensor *indicesViewFloat =
+        const aclTensor* indicesViewFloat =
             executor->CreateView(sortedIndicesContiguous, sortedIndicesContiguous->GetViewShape(), 0);
         ViewDataType(indicesViewFloat, op::DataType::DT_FLOAT);
         auto sortResult = l0op::Sort(indicesViewFloat, -1, descending, stable, op::DataType::DT_INT32, executor);
@@ -407,7 +407,7 @@ aclnnStatus ProcessDropAndPadTokensGrad(aclOpExecutor *executor, const aclTensor
     }
 #else
     if (useNewOp) {
-        const aclTensor *indicesViewFloat =
+        const aclTensor* indicesViewFloat =
             executor->CreateView(sortedIndicesContiguous, sortedIndicesContiguous->GetViewShape(), 0);
         ViewDataType(indicesViewFloat, op::DataType::DT_FLOAT);
         auto sortResult = l0op::Sort(indicesViewFloat, -1, descending, stable, op::DataType::DT_INT32, executor);
@@ -434,10 +434,10 @@ aclnnStatus ProcessDropAndPadTokensGrad(aclOpExecutor *executor, const aclTensor
 }
 
 aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGradGetWorkspaceSize(
-    const aclTensor *permutedTokenOutputGrad, const aclTensor *permutedProbsOutputGradOptional,
-    const aclTensor *sortedIndices, const aclTensor *routingMapOptional, int64_t numExperts, int64_t tokensNum,
-    bool dropAndPad, aclTensor *tokensGradOut, aclTensor *probsGradOutOptional, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor* permutedTokenOutputGrad, const aclTensor* permutedProbsOutputGradOptional,
+    const aclTensor* sortedIndices, const aclTensor* routingMapOptional, int64_t numExperts, int64_t tokensNum,
+    bool dropAndPad, aclTensor* tokensGradOut, aclTensor* probsGradOutOptional, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnMoeTokenPermuteWithRoutingMapGrad,
                    DFX_IN(permutedTokenOutputGrad, permutedProbsOutputGradOptional, sortedIndices, routingMapOptional,
@@ -461,8 +461,8 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGradGetWorkspaceSize(
 
     auto permutedTokenOutputGradContiguous = l0op::Contiguous(permutedTokenOutputGrad, uniqueExecutor.get());
     CHECK_RET(permutedTokenOutputGradContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *permutedProbsOutputGradOptionalContiguous = nullptr;
-    const aclTensor *zeroPermutedProbsOutputGrad = nullptr;
+    const aclTensor* permutedProbsOutputGradOptionalContiguous = nullptr;
+    const aclTensor* zeroPermutedProbsOutputGrad = nullptr;
     FVector<int64_t> transposeDim = {1, 0};
     auto perm = uniqueExecutor->AllocIntArray(transposeDim.data(), transposeDim.size());
     if (permutedProbsOutputGradOptional != nullptr) {
@@ -470,9 +470,9 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGradGetWorkspaceSize(
             l0op::Contiguous(permutedProbsOutputGradOptional, uniqueExecutor.get());
     }
 
-    const aclTensor *zeroTokensGradOut = nullptr;
-    const aclTensor *sortedIndicesContiguous = nullptr;
-    const aclTensor *routingMapOptionalContiguous = nullptr;
+    const aclTensor* zeroTokensGradOut = nullptr;
+    const aclTensor* sortedIndicesContiguous = nullptr;
+    const aclTensor* routingMapOptionalContiguous = nullptr;
 
     aclnnStatus status =
         PrepareContiguousTensors(uniqueExecutor.get(), tokensGradOut, probsGradOutOptional,
@@ -505,7 +505,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGradGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                    const aclrtStream stream)
 {
     // 固定写法，调用框架能力，完成计算

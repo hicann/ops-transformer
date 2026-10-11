@@ -17,7 +17,12 @@ from atk.tasks.api_execute.base_api import BaseApi
 from atk.tasks.dataset.base_dataset import OpsDataset
 from atk.configs.results_config import TaskResult
 from atk.tasks.api_execute.aclnn_base_api import AclnnBaseApi
-from atk.tasks.backends.lib_interface.acl_wrapper import TensorPtr, AclFormat, AclTensorStruct
+from atk.tasks.backends.lib_interface.acl_wrapper import (
+    TensorPtr,
+    AclFormat,
+    AclTensorStruct,
+)
+
 
 @register("function_aclnn_moe_token_permute_with_ep_grad")
 class FunctionPermuteApi(BaseApi):
@@ -45,7 +50,13 @@ class FunctionPermuteApi(BaseApi):
         return tokens_grad_out, probs_grad_out
 
     def init_by_input_data(self, input_data: InputDataset):
-        def permute(tokens, indices, probs, rangeOptional: list = None, padded_mode: bool = False):
+        def permute(
+            tokens,
+            indices,
+            probs,
+            rangeOptional: list = None,
+            padded_mode: bool = False,
+        ):
             if indices.dim() == 1:
                 topk = 1
             else:
@@ -71,7 +82,11 @@ class FunctionPermuteApi(BaseApi):
         topk = input_data.kwargs["topK"]
         total_len = indices.shape[0]
         # reshape indices
-        indices = indices.reshape(int(total_len / topk), topk).to(torch.int32).to(tokens.device)
+        indices = (
+            indices.reshape(int(total_len / topk), topk)
+            .to(torch.int32)
+            .to(tokens.device)
+        )
         input_data.kwargs["indices"] = indices
 
         # save forward tensor
@@ -85,31 +100,43 @@ class FunctionPermuteApi(BaseApi):
 
         if self.device == "npu":
             device = f"{self.device}:{self.device_id}"
-            self.permuted_tokens, sorted_indices1, self.permuted_probs = permute(self.tokens,
-                                                                                 input_data.kwargs["indices"],
-                                                                                 self.probs,
-                                                                                 input_data.kwargs["rangeOptional"],
-                                                                                 input_data.kwargs["padded_mode"])
+            self.permuted_tokens, sorted_indices1, self.permuted_probs = permute(
+                self.tokens,
+                input_data.kwargs["indices"],
+                self.probs,
+                input_data.kwargs["rangeOptional"],
+                input_data.kwargs["padded_mode"],
+            )
         else:
             device = "cpu"
-            self.permuted_tokens, sorted_indices1, self.permuted_probs = permute(self.tokens,
-                                                                                 input_data.kwargs["indices"],
-                                                                                 self.probs,
-                                                                                 input_data.kwargs["rangeOptional"],
-                                                                                 input_data.kwargs["padded_mode"])
+            self.permuted_tokens, sorted_indices1, self.permuted_probs = permute(
+                self.tokens,
+                input_data.kwargs["indices"],
+                self.probs,
+                input_data.kwargs["rangeOptional"],
+                input_data.kwargs["padded_mode"],
+            )
 
-        input_data.kwargs["tokens"] = torch.ones(self.permuted_tokens.shape).to(self.permuted_tokens.dtype).to(self.permuted_tokens.device)
+        input_data.kwargs["tokens"] = (
+            torch.ones(self.permuted_tokens.shape)
+            .to(self.permuted_tokens.dtype)
+            .to(self.permuted_tokens.device)
+        )
         input_data.kwargs["indices"] = sorted_indices1.to(torch.int32)
         if self.permuted_probs is None:
             input_data.kwargs["probs"] = None
         else:
-            input_data.kwargs["probs"] = torch.ones(self.permuted_probs.shape).to(self.permuted_probs.dtype).to(self.permuted_probs.device)
+            input_data.kwargs["probs"] = (
+                torch.ones(self.permuted_probs.shape)
+                .to(self.permuted_probs.dtype)
+                .to(self.permuted_probs.device)
+            )
 
         OpsDataset.seed_everything()
 
+
 @register("AclnnBaseApi_aclnn_moe_token_permute_with_ep_grad")
 class MoeFunctionApi(AclnnBaseApi):
-
     def init_by_input_data(self, input_data: InputDataset):
         torch.npu.synchronize()
         input_args, output_packages = super().init_by_input_data(input_data)

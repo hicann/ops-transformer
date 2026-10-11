@@ -25,35 +25,35 @@ using namespace op;
 
 namespace l0op {
 OP_TYPE_REGISTER(MoeFinalizeRoutingV2);
-const aclTensor* MoeFinalizeRoutingV2(
-    const aclTensor* expanded_x, const aclTensor* expanded_row_idx, const aclTensor* x1,
-    const aclTensor* x2, const aclTensor* bias, const aclTensor* scales, const aclTensor* expert_idx,
-    const aclTensor* x, const aclTensor* alpha1, const aclTensor* alpha2, const aclTensor* v,
-    int64_t drop_pad_mode, const aclIntArray* zeroExpertRange, const aclIntArray* copyExpertRange,
-    const aclIntArray* constantExpertRange, int64_t k, const aclTensor* out, aclOpExecutor *executor)
+const aclTensor* MoeFinalizeRoutingV2(const aclTensor* expanded_x, const aclTensor* expanded_row_idx,
+                                      const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                      const aclTensor* scales, const aclTensor* expert_idx, const aclTensor* x,
+                                      const aclTensor* alpha1, const aclTensor* alpha2, const aclTensor* v,
+                                      int64_t drop_pad_mode, const aclIntArray* zeroExpertRange,
+                                      const aclIntArray* copyExpertRange, const aclIntArray* constantExpertRange,
+                                      int64_t k, const aclTensor* out, aclOpExecutor* executor)
 {
-    L0_DFX(MoeFinalizeRoutingV2, expanded_x, expanded_row_idx, x1, x2, bias, scales, expert_idx, x, alpha1,
-        alpha2, v, drop_pad_mode, zeroExpertRange, copyExpertRange, constantExpertRange, k, out);
+    L0_DFX(MoeFinalizeRoutingV2, expanded_x, expanded_row_idx, x1, x2, bias, scales, expert_idx, x, alpha1, alpha2, v,
+           drop_pad_mode, zeroExpertRange, copyExpertRange, constantExpertRange, k, out);
 
     auto y = executor->AllocTensor(out->GetViewShape(), out->GetDataType(), Format::FORMAT_ND);
     // 如果输出是空，直接不走算子逻辑
     if (!y->IsEmpty()) {
         if (Ops::Transformer::AclnnUtil::IsRegbase()) {
-            auto ret = ADD_TO_LAUNCHER_LIST_AICORE(MoeFinalizeRoutingV2,
+            auto ret = ADD_TO_LAUNCHER_LIST_AICORE(
+                MoeFinalizeRoutingV2,
                 OP_INPUT(expanded_x, expanded_row_idx, x1, x2, bias, scales, expert_idx, x, alpha1, alpha2, v),
-                OP_OUTPUT(y),
-                OP_ATTR(drop_pad_mode, zeroExpertRange, copyExpertRange, constantExpertRange, k));
+                OP_OUTPUT(y), OP_ATTR(drop_pad_mode, zeroExpertRange, copyExpertRange, constantExpertRange, k));
             OP_CHECK_ADD_TO_LAUNCHER_LIST_AICORE(ret != ACLNN_SUCCESS, return nullptr,
-                                                "MoeFinalizeRoutingV2AiCore ADD_TO_LAUNCHER_LIST_AICORE failed.");
+                                                 "MoeFinalizeRoutingV2AiCore ADD_TO_LAUNCHER_LIST_AICORE failed.");
         } else {
-            auto ret = ADD_TO_LAUNCHER_LIST_AICORE(MoeFinalizeRoutingV2,
-                OP_INPUT(expanded_x, expanded_row_idx, x1, x2, bias, scales, expert_idx),
-                OP_OUTPUT(y),
-                OP_ATTR(drop_pad_mode, zeroExpertRange, copyExpertRange, constantExpertRange, k));
+            auto ret = ADD_TO_LAUNCHER_LIST_AICORE(
+                MoeFinalizeRoutingV2, OP_INPUT(expanded_x, expanded_row_idx, x1, x2, bias, scales, expert_idx),
+                OP_OUTPUT(y), OP_ATTR(drop_pad_mode, zeroExpertRange, copyExpertRange, constantExpertRange, k));
             OP_CHECK_ADD_TO_LAUNCHER_LIST_AICORE(ret != ACLNN_SUCCESS, return nullptr,
-                                                "MoeFinalizeRoutingV2AiCore ADD_TO_LAUNCHER_LIST_AICORE failed.");
+                                                 "MoeFinalizeRoutingV2AiCore ADD_TO_LAUNCHER_LIST_AICORE failed.");
         }
     }
     return y;
 }
-}  // namespace l0op
+} // namespace l0op

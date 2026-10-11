@@ -57,7 +57,7 @@ END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MoeFusedTopk, MoeFusedTopkTilingData);
 
-ge::graphStatus TilingMoeFusedTopk(gert::TilingContext *context);
+ge::graphStatus TilingMoeFusedTopk(gert::TilingContext* context);
 } // namespace optiling
 
 #endif // ASCEND_OPS_MOE_FUSED_TOPK_TILING_H

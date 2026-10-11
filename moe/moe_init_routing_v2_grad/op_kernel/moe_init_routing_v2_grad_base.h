@@ -26,21 +26,21 @@ template <typename T>
 class MoeInitRoutingV2GradBase {
 public:
     __aicore__ inline MoeInitRoutingV2GradBase(){};
-    __aicore__ inline void ParseTilingData(const MoeInitRoutingV2GradTilingData *tilingData);
+    __aicore__ inline void ParseTilingData(const MoeInitRoutingV2GradTilingData* tilingData);
     __aicore__ inline void Process();
 
 protected:
-    __aicore__ inline void CopyIn(int64_t xRow, LocalTensor<T> &xLocal, int64_t colOffset, int64_t cpyCols);
-    __aicore__ inline void CopyInWithCastFloat(int64_t xRow, LocalTensor<float> &xLocal, LocalTensor<T> &xLocalT,
+    __aicore__ inline void CopyIn(int64_t xRow, LocalTensor<T>& xLocal, int64_t colOffset, int64_t cpyCols);
+    __aicore__ inline void CopyInWithCastFloat(int64_t xRow, LocalTensor<float>& xLocal, LocalTensor<T>& xLocalT,
                                                int64_t colOffset, int64_t cpyCols);
-    __aicore__ inline void GradAdd(LocalTensor<float> &dstLocal, LocalTensor<float> srcLocal, int64_t cpyCols);
+    __aicore__ inline void GradAdd(LocalTensor<float>& dstLocal, LocalTensor<float> srcLocal, int64_t cpyCols);
     __aicore__ inline void BinaryAddWithMovIn(int64_t xRow, LocalTensor<float> xLocal, LocalTensor<float> inLocal,
                                               LocalTensor<T> inLocalT, int64_t colOffset, int64_t cpyCols);
     __aicore__ inline void CopyOut(LocalTensor<float> xLocal, LocalTensor<T> tmpLocalT, int64_t cpyCols,
                                    int64_t outOffset);
 
 protected:
-    const MoeV2GradComputeTilingData *gradTilingData;
+    const MoeV2GradComputeTilingData* gradTilingData;
 
     TBuf<QuePosition::VECIN> binBuff;
     TBuf<QuePosition::VECIN> tmpBuff;
@@ -77,7 +77,7 @@ protected:
 };
 
 template <typename T>
-__aicore__ inline void MoeInitRoutingV2GradBase<T>::ParseTilingData(const MoeInitRoutingV2GradTilingData *tilingData)
+__aicore__ inline void MoeInitRoutingV2GradBase<T>::ParseTilingData(const MoeInitRoutingV2GradTilingData* tilingData)
 {
     this->gradTilingData = &(tilingData->MoeV2GradComputeParamsOp);
 
@@ -120,7 +120,7 @@ __aicore__ inline void MoeInitRoutingV2GradBase<T>::ParseTilingData(const MoeIni
 }
 
 template <typename T>
-__aicore__ inline void MoeInitRoutingV2GradBase<T>::CopyIn(int64_t xRow, LocalTensor<T> &xLocal, int64_t colOffset,
+__aicore__ inline void MoeInitRoutingV2GradBase<T>::CopyIn(int64_t xRow, LocalTensor<T>& xLocal, int64_t colOffset,
                                                            int64_t cpyCols)
 {
     DataCopyExtParams dataCopyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(cpyCols * sizeof(T)), 0, 0, 0};
@@ -129,8 +129,8 @@ __aicore__ inline void MoeInitRoutingV2GradBase<T>::CopyIn(int64_t xRow, LocalTe
 }
 
 template <typename T>
-__aicore__ inline void MoeInitRoutingV2GradBase<T>::CopyInWithCastFloat(int64_t xRow, LocalTensor<float> &xLocal,
-                                                                        LocalTensor<T> &xLocalT, int64_t colOffset,
+__aicore__ inline void MoeInitRoutingV2GradBase<T>::CopyInWithCastFloat(int64_t xRow, LocalTensor<float>& xLocal,
+                                                                        LocalTensor<T>& xLocalT, int64_t colOffset,
                                                                         int64_t cpyCols)
 {
     DataCopyExtParams dataCopyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(cpyCols * sizeof(T)), 0, 0, 0};
@@ -146,7 +146,7 @@ __aicore__ inline void MoeInitRoutingV2GradBase<T>::CopyInWithCastFloat(int64_t 
 }
 
 template <typename T>
-__aicore__ inline void MoeInitRoutingV2GradBase<T>::GradAdd(LocalTensor<float> &dstLocal, LocalTensor<float> srcLocal,
+__aicore__ inline void MoeInitRoutingV2GradBase<T>::GradAdd(LocalTensor<float>& dstLocal, LocalTensor<float> srcLocal,
                                                             int64_t cpyCols)
 {
     Add(dstLocal, dstLocal, srcLocal, cpyCols);

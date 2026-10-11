@@ -29,12 +29,8 @@ using namespace MoeInitRoutingV2Grad;
 #define TILINGKEY_REGBASE_DROP_PAD 400002
 #define TILINGKEY_REGBASE_ACTIVE 400003
 
-extern "C" __global__ __aicore__ void moe_init_routing_v2_grad(
-    GM_ADDR gradExpandedX,
-    GM_ADDR expandedRowIdx,
-    GM_ADDR gradX,
-    GM_ADDR workspace,
-    GM_ADDR tiling)
+extern "C" __global__ __aicore__ void moe_init_routing_v2_grad(GM_ADDR gradExpandedX, GM_ADDR expandedRowIdx,
+                                                               GM_ADDR gradX, GM_ADDR workspace, GM_ADDR tiling)
 {
     if (g_coreType == AIC) {
         return;

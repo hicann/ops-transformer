@@ -18,14 +18,14 @@ constexpr size_t INDEX_TWO = 2;
 constexpr size_t DIM_THREE = 3;
 
 at::Tensor MoeFinalizeRouting(
-    const at::Tensor &expandedX, const at::Tensor &expandedRowIdx, const c10::optional<at::Tensor> &x1Optional,
-    const c10::optional<at::Tensor> &x2Optional, const c10::optional<at::Tensor> &biasOptional,
-    const c10::optional<at::Tensor> &scalesOptional, const c10::optional<at::Tensor> &expertIdxOptional,
-    const c10::optional<at::Tensor> &xOptional, const c10::optional<at::Tensor> &alpha1Optional,
-    const c10::optional<at::Tensor> &alpha2Optional, const c10::optional<at::Tensor> &vOptional,
-    c10::optional<int64_t> dropPadMode, const c10::optional<std::vector<int64_t>> &zeroExpertRange,
-    const c10::optional<std::vector<int64_t>> &copyExpertRange,
-    const c10::optional<std::vector<int64_t>> &constantExpertRange, c10::optional<int64_t> k)
+    const at::Tensor& expandedX, const at::Tensor& expandedRowIdx, const c10::optional<at::Tensor>& x1Optional,
+    const c10::optional<at::Tensor>& x2Optional, const c10::optional<at::Tensor>& biasOptional,
+    const c10::optional<at::Tensor>& scalesOptional, const c10::optional<at::Tensor>& expertIdxOptional,
+    const c10::optional<at::Tensor>& xOptional, const c10::optional<at::Tensor>& alpha1Optional,
+    const c10::optional<at::Tensor>& alpha2Optional, const c10::optional<at::Tensor>& vOptional,
+    c10::optional<int64_t> dropPadMode, const c10::optional<std::vector<int64_t>>& zeroExpertRange,
+    const c10::optional<std::vector<int64_t>>& copyExpertRange,
+    const c10::optional<std::vector<int64_t>>& constantExpertRange, c10::optional<int64_t> k)
 {
     int64_t kAttr = c10::value_or_else(k, [] { return 1; });
 
@@ -55,6 +55,9 @@ at::Tensor MoeFinalizeRouting(
     return result;
 }
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) { m.def("moe_finalize_routing", &MoeFinalizeRouting, "moe_finalize_routing"); }
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
+{
+    m.def("moe_finalize_routing", &MoeFinalizeRouting, "moe_finalize_routing");
+}
 
 } // namespace op_api

@@ -17,17 +17,17 @@ import sys
 case0_params = [5120, 8, 49152, 5120, 1, 0, 128, 0, 128, 1, 0, 8]
 case1_params = [10240, 8, 49152, 5120, 1, 0, 128, 0, 128, 1, 0, 1]
 
-params_info = {
-    "case0": case0_params,
-    "case1": case1_params
-}
+params_info = {"case0": case0_params, "case1": case1_params}
+
 
 def main():
-    params_list = params_info[sys.argv[1]]   # python gen_tiling.py case0  sys.argv[1]="case0"
+    params_list = params_info[
+        sys.argv[1]
+    ]  # python gen_tiling.py case0  sys.argv[1]="case0"
     base_params = np.array(params_list, dtype=np.int64)
     tiling_file = open("tiling.bin", "wb")
     base_params.tofile(tiling_file)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

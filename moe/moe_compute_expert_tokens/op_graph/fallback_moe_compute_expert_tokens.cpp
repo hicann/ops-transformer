@@ -19,7 +19,7 @@ using namespace ge;
 using namespace gert;
 static const size_t SORTED_EXPERTS_INDEXQ = 0;
 
-static graphStatus MoeComputeHostExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus MoeComputeHostExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_LOGD("aclnnFallback", "MoeComputeExpertTokens fallback begin");
 
@@ -30,7 +30,7 @@ static graphStatus MoeComputeHostExecuteFunc(OpExecuteContext *host_api_ctx)
 
     auto attrs = host_api_ctx->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE("aclnnfallback", "attrs is null"), return GRAPH_FAILED);
-    const int32_t *num_experts = attrs->GetAttrPointer<int32_t>(0);
+    const int32_t* num_experts = attrs->GetAttrPointer<int32_t>(0);
     OP_CHECK_IF(*num_experts < 1, OP_LOGE("aclnnfallback", "num_experts can not be smaller than 1"),
                 return GRAPH_FAILED);
 

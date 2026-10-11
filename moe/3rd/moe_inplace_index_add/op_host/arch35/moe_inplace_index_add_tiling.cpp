@@ -37,7 +37,7 @@ static int64_t GetCeilInt(int64_t value1, int64_t value2)
     return (value1 + value2 - 1) / value2;
 }
 
-static void PrintTilingParams(const gert::TilingContext *context, const MoeInplaceIndexAddTilingData *tiling_params)
+static void PrintTilingParams(const gert::TilingContext* context, const MoeInplaceIndexAddTilingData* tiling_params)
 {
     OP_LOGD(context->GetNodeName(), "block_num=%ld.", tiling_params->block_num);
     OP_LOGD(context->GetNodeName(), "indices_num=%ld.", tiling_params->indices_num);
@@ -56,20 +56,20 @@ static void PrintTilingParams(const gert::TilingContext *context, const MoeInpla
     OP_LOGD(context->GetNodeName(), "updates_shape_num=%ld.", tiling_params->updates_shape_num);
 }
 
-static void CalRunningCaseGeneral(MoeInplaceIndexAddTilingData *params)
+static void CalRunningCaseGeneral(MoeInplaceIndexAddTilingData* params)
 {
     params->block_num = 1;
     params->full_num_per_block = params->outer_loop;
 }
 
-static void CalRunningCaseBF16(MoeInplaceIndexAddTilingData *params)
+static void CalRunningCaseBF16(MoeInplaceIndexAddTilingData* params)
 {
     params->block_num = 1;
     params->full_num_per_block = params->indices_num;
 }
 
-static bool CalRunningCaseAtomicAdd(const MoeInplaceIndexAddCompileInfo *compile_info,
-                                    MoeInplaceIndexAddTilingData *params)
+static bool CalRunningCaseAtomicAdd(const MoeInplaceIndexAddCompileInfo* compile_info,
+                                    MoeInplaceIndexAddTilingData* params)
 {
     if (params->indices_num < compile_info->core_num) {
         params->block_num = 1;
@@ -89,7 +89,7 @@ static bool CalRunningCaseAtomicAdd(const MoeInplaceIndexAddCompileInfo *compile
     return true;
 }
 
-static bool InitRunningInfo(MoeInplaceIndexAddTilingData *params, const gert::Shape &indices_shape_val,
+static bool InitRunningInfo(MoeInplaceIndexAddTilingData* params, const gert::Shape& indices_shape_val,
                             int32_t axis_val)
 {
     if (params == nullptr) {
@@ -115,8 +115,8 @@ static bool InitRunningInfo(MoeInplaceIndexAddTilingData *params, const gert::Sh
     return true;
 }
 
-static bool CalRunningInfo(const MoeInplaceIndexAddCompileInfo *compile_info, MoeInplaceIndexAddTilingData *params,
-                           const gert::Shape &var_shape_val, const gert::Shape &updates_shape_val, int64_t axis_val,
+static bool CalRunningInfo(const MoeInplaceIndexAddCompileInfo* compile_info, MoeInplaceIndexAddTilingData* params,
+                           const gert::Shape& var_shape_val, const gert::Shape& updates_shape_val, int64_t axis_val,
                            ge::DataType dtype)
 {
     if (compile_info == nullptr || params == nullptr) {
@@ -165,9 +165,9 @@ static bool CalRunningInfo(const MoeInplaceIndexAddCompileInfo *compile_info, Mo
     return true;
 }
 
-ge::graphStatus Tiling4MoeInplaceIndexAdd(gert::TilingContext *context)
+ge::graphStatus Tiling4MoeInplaceIndexAdd(gert::TilingContext* context)
 {
-    auto compile_info = reinterpret_cast<const MoeInplaceIndexAddCompileInfo *>(context->GetCompileInfo());
+    auto compile_info = reinterpret_cast<const MoeInplaceIndexAddCompileInfo*>(context->GetCompileInfo());
     OP_CHECK_NULL_WITH_CONTEXT(context, compile_info);
     if (compile_info->isAscendc) {
         return MoeInplaceIndexAddTilingForAscendC(context);
@@ -178,19 +178,19 @@ ge::graphStatus Tiling4MoeInplaceIndexAdd(gert::TilingContext *context)
 
     auto var_shape = context->GetInputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, var_shape);
-    auto &var_shape_val = Ops::Transformer::OpTiling::EnsureNotScalar(var_shape->GetStorageShape());
+    auto& var_shape_val = Ops::Transformer::OpTiling::EnsureNotScalar(var_shape->GetStorageShape());
 
     auto indices_shape = context->GetInputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, indices_shape);
-    auto &indices_shape_val = Ops::Transformer::OpTiling::EnsureNotScalar(indices_shape->GetStorageShape());
+    auto& indices_shape_val = Ops::Transformer::OpTiling::EnsureNotScalar(indices_shape->GetStorageShape());
 
     auto updates_shape = context->GetInputShape(2);
     OP_CHECK_NULL_WITH_CONTEXT(context, updates_shape);
-    auto &updates_shape_val = Ops::Transformer::OpTiling::EnsureNotScalar(updates_shape->GetStorageShape());
+    auto& updates_shape_val = Ops::Transformer::OpTiling::EnsureNotScalar(updates_shape->GetStorageShape());
 
     auto alpha_shape = context->GetInputShape(3);
     if (alpha_shape != nullptr) {
-        auto &alpha_shape_val = Ops::Transformer::OpTiling::EnsureNotScalar(alpha_shape->GetStorageShape());
+        auto& alpha_shape_val = Ops::Transformer::OpTiling::EnsureNotScalar(alpha_shape->GetStorageShape());
         MOE_OP_TILING_CHECK(
             !(alpha_shape_val.GetDimNum() == 1 && alpha_shape_val.GetDim(0) == 1) || alpha_shape_val.IsScalar(),
             MOE_VECTOR_INNER_ERR_REPORT_TILIING(context->GetNodeName(), "shape of alpha must be (1, )"),
@@ -199,7 +199,7 @@ ge::graphStatus Tiling4MoeInplaceIndexAdd(gert::TilingContext *context)
 
     auto attr_ptr = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attr_ptr);
-    const int64_t *axis = attr_ptr->GetAttrPointer<int64_t>(INDEX_ATTR_AXIS);
+    const int64_t* axis = attr_ptr->GetAttrPointer<int64_t>(INDEX_ATTR_AXIS);
     OP_CHECK_NULL_WITH_CONTEXT(context, axis);
 
     const int64_t updates_dims = updates_shape_val.GetDimNum();
@@ -221,7 +221,7 @@ ge::graphStatus Tiling4MoeInplaceIndexAdd(gert::TilingContext *context)
                         return ge::GRAPH_FAILED);
     PrintTilingParams(context, params);
 
-    size_t *workspaces = context->GetWorkspaceSizes(2);
+    size_t* workspaces = context->GetWorkspaceSizes(2);
     MOE_OP_TILING_CHECK(workspaces == nullptr,
                         MOE_VECTOR_INNER_ERR_REPORT_TILIING(context->GetNodeName(), "workspaces is null."),
                         return ge::GRAPH_FAILED);
@@ -238,7 +238,7 @@ ge::graphStatus Tiling4MoeInplaceIndexAdd(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingPrepareMoeInplaceIndexAddForAscendC(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareMoeInplaceIndexAddForAscendC(gert::TilingParseContext* context)
 {
     OP_LOGD(context->GetNodeName(), "TilingPrepareMoeInplaceIndexAddForAscendC entering.");
     // auto compileInfo = GetCompileInfoPtr<MoeInplaceIndexAddCompileInfo>(context);
@@ -260,7 +260,7 @@ ge::graphStatus TilingPrepareMoeInplaceIndexAddForAscendC(gert::TilingParseConte
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingPrepare4MoeInplaceIndexAdd(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepare4MoeInplaceIndexAdd(gert::TilingParseContext* context)
 {
     // auto compile_info = GetCompileInfoPtr<MoeInplaceIndexAddCompileInfo>(context);
     auto compile_info = context->GetCompiledInfo<MoeInplaceIndexAddCompileInfo>();
@@ -274,7 +274,7 @@ ge::graphStatus TilingPrepare4MoeInplaceIndexAdd(gert::TilingParseContext *conte
         compile_info == nullptr || parsed_object_cinfo == nullptr,
         MOE_VECTOR_INNER_ERR_REPORT_TILIING(context->GetNodeName(), "compile_info or json_str nullptr!"),
         return ge::GRAPH_FAILED);
-    const nlohmann::json &vars = (*parsed_object_cinfo)["vars"];
+    const nlohmann::json& vars = (*parsed_object_cinfo)["vars"];
     MOE_OP_TILING_CHECK(vars.empty(), MOE_VECTOR_INNER_ERR_REPORT_TILIING(context->GetNodeName(), "get vars failed."),
                         return ge::GRAPH_FAILED);
     uint32_t core_num = 0;

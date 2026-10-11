@@ -24,12 +24,12 @@ extern "C" {
 ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2GetWorkspaceSize(
     const aclTensor* expandedX, const aclTensor* expandedRowIdx, const aclTensor* x1Optional,
     const aclTensor* x2Optional, const aclTensor* biasOptional, const aclTensor* scalesOptional,
-    const aclTensor* expertIdxOptional, int64_t dropPadMode, const aclTensor* out,
-    uint64_t* workspaceSize, aclOpExecutor** executor);
+    const aclTensor* expertIdxOptional, int64_t dropPadMode, const aclTensor* out, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
 /* @brief aclnnMoeFinalizeRoutingV2的第二段接口，用于执行计算。 */
-ACLNN_API aclnnStatus
-aclnnMoeFinalizeRoutingV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
+ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                                aclrtStream stream);
 
 #ifdef __cplusplus
 }

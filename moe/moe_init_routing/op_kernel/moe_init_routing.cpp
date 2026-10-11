@@ -24,11 +24,11 @@
 
 using namespace AscendC;
 using namespace MoeInitRouting;
-extern "C" __global__ __aicore__ void moe_init_routing(
-    GM_ADDR x, GM_ADDR rowIdx, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR expandedExpertIdx,
-    GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void moe_init_routing(GM_ADDR x, GM_ADDR rowIdx, GM_ADDR expertIdx, GM_ADDR expandedX,
+                                                       GM_ADDR expandedRowIdx, GM_ADDR expandedExpertIdx,
+                                                       GM_ADDR workspace, GM_ADDR tiling)
 {
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIV_1_0);  
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIV_1_0);
     if (g_coreType == AIC) {
         return;
     }

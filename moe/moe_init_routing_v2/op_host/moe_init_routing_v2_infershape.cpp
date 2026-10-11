@@ -46,7 +46,7 @@ static bool IsSameDim(int64_t dim1, int64_t dim2)
     return dim1 == dim2;
 }
 
-std::string PrintShape(const gert::Shape &shape)
+std::string PrintShape(const gert::Shape& shape)
 {
     std::ostringstream oss;
     oss << "[";
@@ -60,8 +60,8 @@ std::string PrintShape(const gert::Shape &shape)
     return oss.str();
 }
 
-static ge::graphStatus CheckInputShape(const gert::InferShapeContext *context, const gert::Shape *xShape,
-                                       const gert::Shape *expertIdxShape)
+static ge::graphStatus CheckInputShape(const gert::InferShapeContext* context, const gert::Shape* xShape,
+                                       const gert::Shape* expertIdxShape)
 {
     int64_t xN = xShape->GetDimNum() == 1U ? OTHER_SHAPE : xShape->GetDim(0);
     int64_t cols = xShape->GetDimNum() == 1U ? OTHER_SHAPE : xShape->GetDim(1);
@@ -89,8 +89,8 @@ static ge::graphStatus CheckInputShape(const gert::InferShapeContext *context, c
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckInputShapes(const gert::InferShapeContext *context, const gert::Shape *xShape,
-                                        const gert::Shape *expertIdxShape)
+static ge::graphStatus CheckInputShapes(const gert::InferShapeContext* context, const gert::Shape* xShape,
+                                        const gert::Shape* expertIdxShape)
 {
     if (xShape->GetDimNum() == 1U) {
         if (xShape->GetDim(0) != ge::UNKNOWN_DIM_NUM) {
@@ -120,7 +120,7 @@ static ge::graphStatus CheckInputShapes(const gert::InferShapeContext *context, 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckAttrParams(const gert::InferShapeContext *context, const gert::Shape *xShape,
+static ge::graphStatus CheckAttrParams(const gert::InferShapeContext* context, const gert::Shape* xShape,
                                        const int64_t activeNum, const int64_t expertCapacity, const int64_t expertNum,
                                        const int64_t dropPadMode, const int64_t expertTokensCountOrCumsumFlag)
 {
@@ -173,8 +173,8 @@ static ge::graphStatus CheckAttrParams(const gert::InferShapeContext *context, c
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckParm(const gert::InferShapeContext *context, const gert::Shape *xShape,
-                                 const gert::Shape *expertIdxShape, const int64_t activeNum,
+static ge::graphStatus CheckParm(const gert::InferShapeContext* context, const gert::Shape* xShape,
+                                 const gert::Shape* expertIdxShape, const int64_t activeNum,
                                  const int64_t expertCapacity, const int64_t expertNum, const int64_t dropPadMode,
                                  const int64_t expertTokensCountOrCumsumFlag)
 {
@@ -192,9 +192,9 @@ static ge::graphStatus CheckParm(const gert::InferShapeContext *context, const g
     return ge::GRAPH_SUCCESS;
 }
 
-static void InferOutputShape(const gert::Shape *xShape, const gert::Shape *expertIdxShape, gert::Shape *expandedXShape,
-                             gert::Shape *expandedRowIdx, gert::Shape *expertTokensBeforeCapacityShape,
-                             gert::Shape *expertTokensCountOrCumsumShape, const int64_t activeNum,
+static void InferOutputShape(const gert::Shape* xShape, const gert::Shape* expertIdxShape, gert::Shape* expandedXShape,
+                             gert::Shape* expandedRowIdx, gert::Shape* expertTokensBeforeCapacityShape,
+                             gert::Shape* expertTokensCountOrCumsumShape, const int64_t activeNum,
                              const int64_t expertNum, const int64_t expertCapacity, const int64_t dropPadMode,
                              bool expertTokensBeforeCapacityFlag, const int64_t expertTokensCountOrCumsumFlag)
 {
@@ -236,43 +236,43 @@ static void InferOutputShape(const gert::Shape *xShape, const gert::Shape *exper
     }
 }
 
-static ge::graphStatus InferShape4MoeInitRoutingV2(gert::InferShapeContext *context)
+static ge::graphStatus InferShape4MoeInitRoutingV2(gert::InferShapeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do MoeInitRountingV2Infershape.");
     // 获取attr
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *activeNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_ACTIVE_ROWS);
+    const int64_t* activeNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_ACTIVE_ROWS);
     const int64_t activeNum = (activeNumPtr == nullptr) ? 0 : *activeNumPtr;
-    const int64_t *expertCapacityPtr = attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_CAPACITY);
+    const int64_t* expertCapacityPtr = attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_CAPACITY);
     const int64_t expertCapacity = (expertCapacityPtr == nullptr) ? 0 : *expertCapacityPtr;
-    const int64_t *expertNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_NUM);
+    const int64_t* expertNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_NUM);
     const int64_t expertNum = (expertNumPtr == nullptr) ? 0 : *expertNumPtr;
-    const int64_t *dropPadModePtr = attrs->GetAttrPointer<int64_t>(ATTR_DROP_PAD_MODE);
+    const int64_t* dropPadModePtr = attrs->GetAttrPointer<int64_t>(ATTR_DROP_PAD_MODE);
     const int64_t dropPadMode = (dropPadModePtr == nullptr) ? 0 : *dropPadModePtr;
-    const int64_t *expertTokensCountOrCumsumFlagPtr =
+    const int64_t* expertTokensCountOrCumsumFlagPtr =
         attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_TOKENS_COUNT_OR_CUMSUM_FLAG);
     const int64_t expertTokensCountOrCumsumFlag =
         (expertTokensCountOrCumsumFlagPtr == nullptr) ? 0 : *expertTokensCountOrCumsumFlagPtr;
-    const bool *expertTokensBeforeCapacityFlagPtr =
+    const bool* expertTokensBeforeCapacityFlagPtr =
         attrs->GetAttrPointer<bool>(ATTR_EXPERT_TOKENS_BEFORE_CAPACITY_FLAG);
     const bool expertTokensBeforeCapacityFlag =
         (expertTokensBeforeCapacityFlagPtr == nullptr) ? false : *expertTokensBeforeCapacityFlagPtr;
 
     // 获取输入shape
-    const gert::Shape *xShape = context->GetInputShape(INDEX_INPUT_X);
+    const gert::Shape* xShape = context->GetInputShape(INDEX_INPUT_X);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
-    const gert::Shape *expertIdxShape = context->GetInputShape(INDEX_INPUT_EXPERT_IDX);
+    const gert::Shape* expertIdxShape = context->GetInputShape(INDEX_INPUT_EXPERT_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, expertIdxShape);
-    gert::Shape *expandedXShape = context->GetOutputShape(OUTOUT_EXPANDED_X);
+    gert::Shape* expandedXShape = context->GetOutputShape(OUTOUT_EXPANDED_X);
     OP_CHECK_NULL_WITH_CONTEXT(context, expandedXShape);
-    gert::Shape *expandedRowIdx = context->GetOutputShape(OUTOUT_EXPANDED_ROW_IDX);
+    gert::Shape* expandedRowIdx = context->GetOutputShape(OUTOUT_EXPANDED_ROW_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, expandedRowIdx);
-    gert::Shape *expertTokensCountOrCumsumShape = context->GetOutputShape(OUTOUT_EXPERT_TOKENS_COUNT_OR_CUMSUM);
+    gert::Shape* expertTokensCountOrCumsumShape = context->GetOutputShape(OUTOUT_EXPERT_TOKENS_COUNT_OR_CUMSUM);
     if (dropPadMode == 0 && expertTokensCountOrCumsumFlag > 0) {
         OP_CHECK_NULL_WITH_CONTEXT(context, expertTokensCountOrCumsumShape);
     }
-    gert::Shape *expertTokensBeforeCapacityShape = context->GetOutputShape(OUTOUT_EXPERT_TOKENS_BEFORE_CAPACITY);
+    gert::Shape* expertTokensBeforeCapacityShape = context->GetOutputShape(OUTOUT_EXPERT_TOKENS_BEFORE_CAPACITY);
     if (dropPadMode == 1 && expertTokensBeforeCapacityFlag) {
         OP_CHECK_NULL_WITH_CONTEXT(context, expertTokensBeforeCapacityShape);
     }
@@ -292,7 +292,7 @@ static ge::graphStatus InferShape4MoeInitRoutingV2(gert::InferShapeContext *cont
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataType4MoeInitRoutingV2(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataType4MoeInitRoutingV2(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do MoeInitRountingV2InferDataType.");
     auto xDtype = context->GetInputDataType(0);

@@ -30,20 +30,20 @@ static const size_t ALPHA1_INDEX = 8;
 static const size_t ALPHA2_INDEX = 9;
 static const size_t V_INDEX = 10;
 
-static std::vector<int64_t> GetExpertRange(const gert::ContinuousVector *ptr)
+static std::vector<int64_t> GetExpertRange(const gert::ContinuousVector* ptr)
 {
     std::vector<int64_t> range = {-1, -1};
     if (ptr != nullptr) {
-        const int64_t *data = reinterpret_cast<const int64_t *>(ptr->GetData());
+        const int64_t* data = reinterpret_cast<const int64_t*>(ptr->GetData());
         range.assign(data, data + ptr->GetSize());
     }
     return range;
 }
 
-using CreateIntArrayFunc = aclIntArray *(*)(const int64_t *, uint64_t);
-using DestroyIntArrayFunc = int (*)(const aclIntArray *);
+using CreateIntArrayFunc = aclIntArray* (*)(const int64_t*, uint64_t);
+using DestroyIntArrayFunc = int (*)(const aclIntArray*);
 
-static aclIntArray *CreateExpertRange(const std::vector<int64_t> &range)
+static aclIntArray* CreateExpertRange(const std::vector<int64_t>& range)
 {
     if (range.empty()) {
         return nullptr;
@@ -55,7 +55,7 @@ static aclIntArray *CreateExpertRange(const std::vector<int64_t> &range)
 
 class ExpertRangeGuard {
 public:
-    explicit ExpertRangeGuard(const std::vector<int64_t> &range)
+    explicit ExpertRangeGuard(const std::vector<int64_t>& range)
         : range_(CreateExpertRange(range))
     {}
 
@@ -70,16 +70,16 @@ public:
         aclDestroyIntArray(range_);
     }
 
-    aclIntArray *Get() const
+    aclIntArray* Get() const
     {
         return range_;
     }
 
 private:
-    aclIntArray *range_;
+    aclIntArray* range_;
 };
 
-static graphStatus MoeFinalizeRoutingV2HostExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus MoeFinalizeRoutingV2HostExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_LOGD("aclnnFallback", "MoeFinalizeRoutingV2 fallback begin");
 
@@ -113,11 +113,11 @@ static graphStatus MoeFinalizeRoutingV2HostExecuteFunc(OpExecuteContext *host_ap
 
     auto attrs = host_api_ctx->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE("aclnnfallback", "attrs is null"), return GRAPH_FAILED);
-    const int64_t *mode = attrs->GetAttrPointer<int64_t>(0);
-    const gert::ContinuousVector *zero_expert_range_ptr = attrs->GetAttrPointer<gert::ContinuousVector>(1);
-    const gert::ContinuousVector *copy_expert_range_ptr = attrs->GetAttrPointer<gert::ContinuousVector>(2);
-    const gert::ContinuousVector *constant_expert_range_ptr = attrs->GetAttrPointer<gert::ContinuousVector>(3);
-    const int64_t *k = attrs->GetAttrPointer<int64_t>(4);
+    const int64_t* mode = attrs->GetAttrPointer<int64_t>(0);
+    const gert::ContinuousVector* zero_expert_range_ptr = attrs->GetAttrPointer<gert::ContinuousVector>(1);
+    const gert::ContinuousVector* copy_expert_range_ptr = attrs->GetAttrPointer<gert::ContinuousVector>(2);
+    const gert::ContinuousVector* constant_expert_range_ptr = attrs->GetAttrPointer<gert::ContinuousVector>(3);
+    const int64_t* k = attrs->GetAttrPointer<int64_t>(4);
 
     std::vector<int64_t> zeroExpertRangeVec = GetExpertRange(zero_expert_range_ptr);
     std::vector<int64_t> copyExpertRangeVec = GetExpertRange(copy_expert_range_ptr);
@@ -125,9 +125,9 @@ static graphStatus MoeFinalizeRoutingV2HostExecuteFunc(OpExecuteContext *host_ap
     ExpertRangeGuard zeroExpertRangeAcl(zeroExpertRangeVec);
     ExpertRangeGuard copyExpertRangeAcl(copyExpertRangeVec);
     ExpertRangeGuard constantExpertRangeAcl(constantExpertRangeVec);
-    aclIntArray *zeroExpertRange = zeroExpertRangeAcl.Get();
-    aclIntArray *copyExpertRange = copyExpertRangeAcl.Get();
-    aclIntArray *constantExpertRange = constantExpertRangeAcl.Get();
+    aclIntArray* zeroExpertRange = zeroExpertRangeAcl.Get();
+    aclIntArray* copyExpertRange = copyExpertRangeAcl.Get();
+    aclIntArray* constantExpertRange = constantExpertRangeAcl.Get();
 
     auto output = host_api_ctx->GetOutputTensor(0);
     OP_CHECK_IF(output == nullptr, OP_LOGE("aclnnfallback", "output is null"), return GRAPH_FAILED);

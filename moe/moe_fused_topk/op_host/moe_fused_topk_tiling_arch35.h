@@ -28,7 +28,7 @@ namespace optiling {
 // TilingDef object (which contains pointers and bookkeeping fields).
 using MoeFusedTopkArch35TilingData = MoeFusedTopkTilingData;
 
-ge::graphStatus TilingMoeFusedTopkArch35(gert::TilingContext *context);
+ge::graphStatus TilingMoeFusedTopkArch35(gert::TilingContext* context);
 
 } // namespace optiling
 

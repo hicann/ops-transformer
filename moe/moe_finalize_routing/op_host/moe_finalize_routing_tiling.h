@@ -77,9 +77,9 @@ struct MoeFinalizeRoutingCompileInfo {
 
 class MoeFinalizeRoutingTiling {
 public:
-    ge::graphStatus Init(gert::TilingContext *context);
+    ge::graphStatus Init(gert::TilingContext* context);
     ge::graphStatus CalcTilingData();
-    void GetTilingData(MoeFinalizeRoutingTilingData &tilingData) const;
+    void GetTilingData(MoeFinalizeRoutingTilingData& tilingData) const;
     int64_t GetTilingKey() const;
 
 protected:
@@ -93,7 +93,7 @@ protected:
     int64_t GetAllBiasTilingKey() const;
 
 private:
-    gert::TilingContext *context_;
+    gert::TilingContext* context_;
     size_t offset_{0};
     int64_t totalCoreNum_{0};
     int64_t ubSize_{0};

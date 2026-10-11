@@ -38,8 +38,8 @@ static constexpr int64_t DROP_LESS_COL = 0;
 static constexpr int64_t DROP_PAD_COL = 1;
 static constexpr int64_t DROP_LESS_ROW = 2;
 static constexpr int64_t DROP_PAD_ROW = 3;
-static constexpr int64_t INPUT_BUFFER_NUM = 8;  // expaned_x bias x1 x2 x a1 a2 v
-static constexpr int64_t CONST_EXPERT_BUFFER_NUM = 3;  // a1 a2 v
+static constexpr int64_t INPUT_BUFFER_NUM = 8;        // expaned_x bias x1 x2 x a1 a2 v
+static constexpr int64_t CONST_EXPERT_BUFFER_NUM = 3; // a1 a2 v
 static constexpr int64_t CONST_EXPERT_ATTR_LIST_SIZE = 2;
 static constexpr int64_t OUTPUT_BUFFER_NUM = 1; // y
 static constexpr uint64_t FULL_LOAD_H_BASE_TILING_KEY = 10000;
@@ -62,10 +62,10 @@ const static int64_t ATTR_K_IDX = 4LL;
 
 const static int64_t BATCH_COPY_EXPERT_NUM = 4;
 
-class MoeFinalizeRoutingV2Regbase : public MoeFinalizeRoutingTilingV2
-{
+class MoeFinalizeRoutingV2Regbase : public MoeFinalizeRoutingTilingV2 {
 public:
-    explicit MoeFinalizeRoutingV2Regbase(gert::TilingContext* context) : MoeFinalizeRoutingTilingV2(context)
+    explicit MoeFinalizeRoutingV2Regbase(gert::TilingContext* context)
+        : MoeFinalizeRoutingTilingV2(context)
     {}
     ~MoeFinalizeRoutingV2Regbase() override = default;
 
@@ -110,16 +110,16 @@ protected:
     ge::graphStatus DoOpTilingKHFullLoad(int64_t rowOfFormerBlock, int64_t rowOfTailBlock);
     ge::graphStatus DoOpTilingHFullLoad(int64_t rowOfFormerBlock, int64_t rowOfTailBlock);
     ge::graphStatus DoOpTilingSplitH(int64_t rowOfFormerBlock, int64_t rowOfTailBlock);
-    ge::graphStatus CheckRange(int64_t start, int64_t end, const char *rangeName);
-    ge::graphStatus CheckRangeOverlap(int64_t start1, int64_t end1, int64_t start2, int64_t end2, const char *name1,
-                                      const char *name2);
+    ge::graphStatus CheckRange(int64_t start, int64_t end, const char* rangeName);
+    ge::graphStatus CheckRangeOverlap(int64_t start1, int64_t end1, int64_t start2, int64_t end2, const char* name1,
+                                      const char* name2);
     ge::graphStatus CheckExpertRangeValidity();
 
     bool hasX1_{false};
     bool hasX2_{false};
     bool hasScales_{false};
     bool hasBias_{false};
-    bool hasX_{false};   // 有x输入，且constantEnd - constantStart >= 0
+    bool hasX_{false}; // 有x输入，且constantEnd - constantStart >= 0
     bool hasConstantExpert_{false};
     bool rowKHFullLoad_{false};
     bool kHFullLoad_{false};
@@ -155,32 +155,31 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::DoGetPlatformInfo()
 {
     auto compileInfoPtr = reinterpret_cast<const MoeFinalizeRoutingCompileInfoV2*>(context_->GetCompileInfo());
     OP_CHECK_IF(compileInfoPtr == nullptr,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "compile_info", "nullptr",
-            "compile info is null"), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "compile_info", "nullptr",
+                                                      "compile info is null"),
+                return ge::GRAPH_FAILED);
 
     blockSize_ = Ops::Base::GetUbBlockSize(context_);
-    OP_CHECK_IF(
-        blockSize_ == 0,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "block_size",
-            std::to_string(blockSize_).c_str(), "Get blockSize failed."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(blockSize_ == 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "block_size",
+                                                      std::to_string(blockSize_).c_str(), "Get blockSize failed."),
+                return ge::GRAPH_FAILED);
     vlFp32_ = Ops::Base::GetVRegSize(context_) / sizeof(float);
-    OP_CHECK_IF(
-        vlFp32_ == 0, OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "VL32",
-            std::to_string(vlFp32_).c_str(), "Get VL32 failed."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(vlFp32_ == 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "VL32", std::to_string(vlFp32_).c_str(),
+                                                      "Get VL32 failed."),
+                return ge::GRAPH_FAILED);
 
     coreNum_ = static_cast<uint32_t>(compileInfoPtr->aivNum);
-    OP_CHECK_IF(
-        coreNum_ == 0,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "core_num",
-            std::to_string(coreNum_).c_str(), "Get core num failed."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(coreNum_ == 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "core_num",
+                                                      std::to_string(coreNum_).c_str(), "Get core num failed."),
+                return ge::GRAPH_FAILED);
     uint64_t ubSize = compileInfoPtr->ubSize;
-    OP_CHECK_IF(
-        ubSize == 0, OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "ub_size",
-            std::to_string(ubSize).c_str(), "Get ubSize failed."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ubSize == 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "ub_size",
+                                                      std::to_string(ubSize).c_str(), "Get ubSize failed."),
+                return ge::GRAPH_FAILED);
     ubSize_ = static_cast<int64_t>(ubSize);
 
     return ge::GRAPH_SUCCESS;
@@ -199,61 +198,59 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::GetK(const gert::StorageShape* scal
     }
 
     hasScales_ = true;
-    OP_CHECK_IF(
-        scalesShape->GetStorageShape().GetDimNum() != SCALES_DIM_NUM,
-        OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "scales",
-            std::to_string(scalesShape->GetStorageShape().GetDimNum()).c_str(), "2D"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(scalesShape->GetStorageShape().GetDimNum() != SCALES_DIM_NUM,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "scales",
+                                             std::to_string(scalesShape->GetStorageShape().GetDimNum()).c_str(), "2D"),
+                return ge::GRAPH_FAILED);
     int64_t scalesDim1 = scalesShape->GetStorageShape().GetDim(1);
     // k > 1 means user explicitly specified k, need to verify consistency with scales dim1
     if (*attrKPtr > 1) {
-        OP_CHECK_IF(
-            *attrKPtr != scalesDim1,
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "k",
-                std::to_string(*attrKPtr).c_str(), "k must equal scales dim1"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(*attrKPtr != scalesDim1,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        context_->GetNodeName(), "k", std::to_string(*attrKPtr).c_str(), "k must equal scales dim1"),
+                    return ge::GRAPH_FAILED);
     }
     k = scalesDim1;
-    OP_CHECK_IF(
-        k <= 0, OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "k",
-            std::to_string(k).c_str(), "k must be greater than 0."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(k <= 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "k", std::to_string(k).c_str(),
+                                                      "k must be greater than 0."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus MoeFinalizeRoutingV2Regbase::GetECH(const gert::StorageShape* expandedXShape)
 {
     if (dropPadMode == DROP_LESS_ROW || dropPadMode == DROP_LESS_COL) {
-        OP_CHECK_IF(
-            expandedXShape->GetStorageShape().GetDimNum() != DROPLESS_EXPANDED_X_DIM_NUM,
-            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "expanded_x",
-                std::to_string(expandedXShape->GetStorageShape().GetDimNum()).c_str(),
-                "dim num of expanded_x should be 2 in dropless mode."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(expandedXShape->GetStorageShape().GetDimNum() != DROPLESS_EXPANDED_X_DIM_NUM,
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        context_->GetNodeName(), "expanded_x",
+                        std::to_string(expandedXShape->GetStorageShape().GetDimNum()).c_str(),
+                        "dim num of expanded_x should be 2 in dropless mode."),
+                    return ge::GRAPH_FAILED);
         dim0OfExpandedX = expandedXShape->GetStorageShape().GetDim(0);
         h = expandedXShape->GetStorageShape().GetDim(1);
-        OP_CHECK_IF(
-            h <= 0, OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "h",
-                std::to_string(h).c_str(), "h must be greater than 0."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(h <= 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "h", std::to_string(h).c_str(),
+                                                          "h must be greater than 0."),
+                    return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
 
     OP_CHECK_IF(
         expandedXShape->GetStorageShape().GetDimNum() != DROPPAD_EXPANDED_X_DIM_NUM,
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "expanded_x",
-            std::to_string(expandedXShape->GetStorageShape().GetDimNum()).c_str(),
-            "dim num of expanded_x should be 3 in drop pad mode."),
+                                                 std::to_string(expandedXShape->GetStorageShape().GetDimNum()).c_str(),
+                                                 "dim num of expanded_x should be 3 in drop pad mode."),
         return ge::GRAPH_FAILED);
     e = expandedXShape->GetStorageShape().GetDim(0);
     c = expandedXShape->GetStorageShape().GetDim(1);
     h = expandedXShape->GetStorageShape().GetDim(TWO);
-    OP_CHECK_IF(
-        e <= 0 || c <= 0 || h <= 0,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "e,c,h",
-            (std::to_string(e) + "," + std::to_string(c) + "," + std::to_string(h)).c_str(),
-            "e, c and h must be greater than 0."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(e <= 0 || c <= 0 || h <= 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context_->GetNodeName(), "e,c,h",
+                    (std::to_string(e) + "," + std::to_string(c) + "," + std::to_string(h)).c_str(),
+                    "e, c and h must be greater than 0."),
+                return ge::GRAPH_FAILED);
     dim0OfExpandedX = e;
     return ge::GRAPH_SUCCESS;
 }
@@ -263,36 +260,34 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::GetRow(const gert::StorageShape* ex
     OP_CHECK_IF(
         expandedRowIdxShape->GetStorageShape().GetDimNum() != 1,
         OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "expanded_row_idx",
-            std::to_string(expandedRowIdxShape->GetStorageShape().GetDimNum()).c_str(), "1D"),
+                                     std::to_string(expandedRowIdxShape->GetStorageShape().GetDimNum()).c_str(), "1D"),
         return ge::GRAPH_FAILED);
     row = expandedRowIdxShape->GetStorageShape().GetDim(0) / k;
-    OP_CHECK_IF(
-        row <= 0, OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "row",
-            std::to_string(row).c_str(), "row must be greater than 0."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(row <= 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "row", std::to_string(row).c_str(),
+                                                      "row must be greater than 0."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckBiasShape(const gert::StorageShape* biasShape)
 {
-    OP_CHECK_IF(
-        biasShape->GetStorageShape().GetDimNum() != BIAS_DIM_NUM,
-        OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "bias",
-            std::to_string(biasShape->GetStorageShape().GetDimNum()).c_str(), "2D"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(biasShape->GetStorageShape().GetDimNum() != BIAS_DIM_NUM,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "bias",
+                                             std::to_string(biasShape->GetStorageShape().GetDimNum()).c_str(), "2D"),
+                return ge::GRAPH_FAILED);
     e = biasShape->GetStorageShape().GetDim(0);
     if (dropPadMode == DROP_PAD_ROW || dropPadMode == DROP_PAD_COL) {
-        OP_CHECK_IF(
-            dim0OfExpandedX != e,
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "expanded_x and bias",
-                "invalid", "dim 0 of expanded_x should be equal to dim 0 of bias in droppad mode."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(dim0OfExpandedX != e,
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        context_->GetNodeName(), "expanded_x and bias", "invalid",
+                        "dim 0 of expanded_x should be equal to dim 0 of bias in droppad mode."),
+                    return ge::GRAPH_FAILED);
     }
-    OP_CHECK_IF(
-        e < k,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "e",
-            std::to_string(e).c_str(), "e must be greater than or equal to k."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(e < k,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "e", std::to_string(e).c_str(),
+                                                      "e must be greater than or equal to k."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -303,25 +298,21 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckOptionalInputDtype(int64_t idx
     if (desc) {
         OP_CHECK_IF(
             desc->GetDataType() != expectedDtype,
-            OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), name,
-                Ops::Base::ToString(desc->GetDataType()).c_str(),
-                Ops::Base::ToString(expectedDtype).c_str()),
+            OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), name, Ops::Base::ToString(desc->GetDataType()).c_str(),
+                                      Ops::Base::ToString(expectedDtype).c_str()),
             return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckOptionalInputShape(int64_t idx, const char* name,
-                                                                     const gert::Shape& expected,
-                                                                     const char* reason)
+                                                                     const gert::Shape& expected, const char* reason)
 {
     auto shape = context_->GetOptionalInputShape(idx);
     if (shape) {
-        OP_CHECK_IF(
-            shape->GetStorageShape() != expected,
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), name,
-                "invalid", reason),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(shape->GetStorageShape() != expected,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), name, "invalid", reason),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -335,16 +326,14 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckShapeAndDtypeIsValid()
     OP_CHECK_NULL_WITH_CONTEXT(context_, expandedRowIdxDesc);
     auto expandedRowIdxShape = context_->GetInputShape(EXPANDED_ROW_IDX_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expandedRowIdxShape);
-    OP_CHECK_IF(
-        expandedRowIdxDesc->GetDataType() != ge::DataType::DT_INT32,
-        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "expanded_row_idx",
-            Ops::Base::ToString(expandedRowIdxDesc->GetDataType()).c_str(), "INT32"),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        expandedRowIdxShape->GetStorageShape() != rowIdxShape,
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expanded_row_idx",
-            "invalid", "shape of expanded_row_idx must be (bs,k)."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(expandedRowIdxDesc->GetDataType() != ge::DataType::DT_INT32,
+                OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "expanded_row_idx",
+                                          Ops::Base::ToString(expandedRowIdxDesc->GetDataType()).c_str(), "INT32"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(expandedRowIdxShape->GetStorageShape() != rowIdxShape,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expanded_row_idx", "invalid",
+                                                      "shape of expanded_row_idx must be (bs,k)."),
+                return ge::GRAPH_FAILED);
 
     if (CheckOptionalInputDtype(X1_IDX, "x1", dtype) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -356,17 +345,15 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckShapeAndDtypeIsValid()
         return ge::GRAPH_FAILED;
     }
 
-    OP_CHECK_IF(
-        CheckPartShapeAndDtypeIsValid() != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "shape_and_dtype", "GRAPH_FAILED",
-            "CheckPartShapeAndDtypeIsValid failed."),
-        return ge::GRAPH_FAILED);
-    
-    OP_CHECK_IF(
-        FinalCheckShapeAndDtypeIsValid() != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "shape_and_dtype", "GRAPH_FAILED",
-            "FinalCheckShapeAndDtypeIsValid failed."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckPartShapeAndDtypeIsValid() != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "shape_and_dtype", "GRAPH_FAILED",
+                                                      "CheckPartShapeAndDtypeIsValid failed."),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(FinalCheckShapeAndDtypeIsValid() != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "shape_and_dtype", "GRAPH_FAILED",
+                                                      "FinalCheckShapeAndDtypeIsValid failed."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -376,25 +363,22 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckConstExpertPartShapeAndDtypeIs
     constExpertRangeNum = constantExpertEnd - constantExpertStart;
     auto desc = context_->GetOptionalInputDesc(idx);
     if (desc) {
-        OP_CHECK_IF(
-            desc->GetDataType() != dtype,
-            OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "const_expert",
-                Ops::Base::ToString(desc->GetDataType()).c_str(),
-                Ops::Base::ToString(dtype).c_str()),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(desc->GetDataType() != dtype,
+                    OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "const_expert",
+                                              Ops::Base::ToString(desc->GetDataType()).c_str(),
+                                              Ops::Base::ToString(dtype).c_str()),
+                    return ge::GRAPH_FAILED);
     }
     auto shape = context_->GetOptionalInputShape(idx);
     if (shape) {
-        OP_CHECK_IF(
-            shape->GetStorageShape().GetDim(1) != h,
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "const_expert",
-                "invalid", "dim 1 of const expert should be h."),
-            return ge::GRAPH_FAILED);
-        OP_CHECK_IF(
-            shape->GetStorageShape().GetDim(0) != constExpertRangeNum,
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "const_expert",
-                "invalid", "dim 0 of expert should be constExpertRangeNum."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(shape->GetStorageShape().GetDim(1) != h,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "const_expert", "invalid",
+                                                          "dim 1 of const expert should be h."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(shape->GetStorageShape().GetDim(0) != constExpertRangeNum,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "const_expert", "invalid",
+                                                          "dim 0 of expert should be constExpertRangeNum."),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -414,25 +398,23 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckPartShapeAndDtypeIsValid()
     if (biasShape) {
         OP_CHECK_IF(
             CheckBiasShape(biasShape) != ge::GRAPH_SUCCESS,
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "bias", "GRAPH_FAILED",
-                "failed to get e."), return ge::GRAPH_FAILED);
-        OP_CHECK_IF(
-            biasShape->GetStorageShape().GetDim(1) != h,
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "bias",
-                "invalid", "dim 1 of bias should be h."),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "bias", "GRAPH_FAILED", "failed to get e."),
             return ge::GRAPH_FAILED);
+        OP_CHECK_IF(biasShape->GetStorageShape().GetDim(1) != h,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "bias", "invalid",
+                                                          "dim 1 of bias should be h."),
+                    return ge::GRAPH_FAILED);
     }
 
     auto scalesDesc = context_->GetOptionalInputDesc(SCALES_IDX);
     scaleDtypeSize = dtypeSize;
     if (scalesDesc) {
         auto scaleDtype = scalesDesc->GetDataType();
-        OP_CHECK_IF(
-            scaleDtype != ge::DataType::DT_FLOAT && scaleDtype != ge::DataType::DT_FLOAT16 &&
-                scaleDtype != ge::DataType::DT_BF16,
-            OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "scales",
-                Ops::Base::ToString(scaleDtype).c_str(), "FLOAT, FLOAT16 or BF16"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(scaleDtype != ge::DataType::DT_FLOAT && scaleDtype != ge::DataType::DT_FLOAT16 &&
+                        scaleDtype != ge::DataType::DT_BF16,
+                    OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "scales",
+                                              Ops::Base::ToString(scaleDtype).c_str(), "FLOAT, FLOAT16 or BF16"),
+                    return ge::GRAPH_FAILED);
         scaleDtypeSize = (scaleDtype == ge::DataType::DT_FLOAT) ? sizeof(float) : sizeof(short);
         if (scaleDtype == ge::DataType::DT_FLOAT16) {
             scaleDtypeKey = FLOAT16_TILING_KEY;
@@ -481,14 +463,12 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::FinalCheckShapeAndDtypeIsValid()
     OP_CHECK_NULL_WITH_CONTEXT(context_, yShape);
     OP_CHECK_IF(
         yDesc->GetDataType() != dtype,
-        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "y",
-            Ops::Base::ToString(yDesc->GetDataType()).c_str(),
-            Ops::Base::ToString(dtype).c_str()),
-            return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "y", Ops::Base::ToString(yDesc->GetDataType()).c_str(),
+                                  Ops::Base::ToString(dtype).c_str()),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         yShape->GetStorageShape() != bsh,
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "y",
-            "invalid", "shape of y must be (bs,h)."),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "y", "invalid", "shape of y must be (bs,h)."),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -497,9 +477,9 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::DoGetZeroShapeAttrsInfo(int64_t idx
 {
     auto attrsPtr = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrsPtr);
-    const auto *attrPtr = attrsPtr->GetAttrPointer<gert::ContinuousVector>(idx);
+    const auto* attrPtr = attrsPtr->GetAttrPointer<gert::ContinuousVector>(idx);
     if (attrPtr != nullptr && attrPtr->GetSize() == CONST_EXPERT_ATTR_LIST_SIZE) {
-        const int64_t *attrList = static_cast<const int64_t *>(attrPtr->GetData());
+        const int64_t* attrList = static_cast<const int64_t*>(attrPtr->GetData());
         start = attrList[0];
         end = attrList[1];
         OP_LOGD(context_, "Extracted input attrs start = %ld, end = %ld.", start, end);
@@ -507,7 +487,7 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::DoGetZeroShapeAttrsInfo(int64_t idx
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckRange(int64_t start, int64_t end, const char *rangeName)
+ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckRange(int64_t start, int64_t end, const char* rangeName)
 {
     if (start == -1 && end == -1) {
         return ge::GRAPH_SUCCESS;
@@ -528,17 +508,18 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckRange(int64_t start, int64_t e
 }
 
 ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckRangeOverlap(int64_t start1, int64_t end1, int64_t start2,
-                                                               int64_t end2, const char *name1, const char *name2)
+                                                               int64_t end2, const char* name1, const char* name2)
 {
     if (start1 == -1 || start2 == -1) {
         return ge::GRAPH_SUCCESS;
     }
     if (!(end1 <= start2 || end2 <= start1)) {
-        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
-            context_->GetNodeName(), (std::string(name1) + " range and " + name2 + " range").c_str(),
-            ("[" + std::to_string(start1) + ", " + std::to_string(end1) + ") and [" +
-             std::to_string(start2) + ", " + std::to_string(end2) + ")").c_str(),
-            "Ranges should not overlap.");
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context_->GetNodeName(),
+                                               (std::string(name1) + " range and " + name2 + " range").c_str(),
+                                               ("[" + std::to_string(start1) + ", " + std::to_string(end1) + ") and [" +
+                                                std::to_string(start2) + ", " + std::to_string(end2) + ")")
+                                                   .c_str(),
+                                               "Ranges should not overlap.");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -581,12 +562,11 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::GetDropPadModeAndExpertRangeAttrs()
     auto dropPadModePtr = attrsPtr->GetAttrPointer<int64_t>(ATTR_DROP_PAD_MODE_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, dropPadModePtr);
     dropPadMode = *dropPadModePtr;
-    OP_CHECK_IF(
-        dropPadMode != DROP_LESS_ROW && dropPadMode != DROP_LESS_COL && dropPadMode != DROP_PAD_COL &&
-            dropPadMode != DROP_PAD_ROW,
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "drop_pad_mode",
-            std::to_string(dropPadMode).c_str(), "0, 1, 2 or 3"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(dropPadMode != DROP_LESS_ROW && dropPadMode != DROP_LESS_COL && dropPadMode != DROP_PAD_COL &&
+                    dropPadMode != DROP_PAD_ROW,
+                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "drop_pad_mode", std::to_string(dropPadMode).c_str(),
+                                          "0, 1, 2 or 3"),
+                return ge::GRAPH_FAILED);
 
     DoGetZeroShapeAttrsInfo(ATTR_ZERO_EXPERT_RANGE_IDX, zeroExpertStart, zeroExpertEnd);
     DoGetZeroShapeAttrsInfo(ATTR_COPY_EXPERT_RANGE_IDX, copyExpertStart, copyExpertEnd);
@@ -599,31 +579,28 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::GetRequiredInputInfo()
     auto expandedXDesc = context_->GetInputDesc(EXPANDED_X_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expandedXDesc);
     dtype = expandedXDesc->GetDataType();
-    OP_CHECK_IF(
-        dtype != ge::DataType::DT_FLOAT && dtype != ge::DataType::DT_FLOAT16 && dtype != ge::DataType::DT_BF16,
-        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "expanded_x",
-            Ops::Base::ToString(dtype).c_str(), "FLOAT, FLOAT16 or BF16"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(dtype != ge::DataType::DT_FLOAT && dtype != ge::DataType::DT_FLOAT16 && dtype != ge::DataType::DT_BF16,
+                OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "expanded_x", Ops::Base::ToString(dtype).c_str(),
+                                          "FLOAT, FLOAT16 or BF16"),
+                return ge::GRAPH_FAILED);
     dtypeSize = (dtype == ge::DataType::DT_FLOAT) ? sizeof(float) : sizeof(short);
     auto expandedXShape = context_->GetInputShape(EXPANDED_X_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expandedXShape);
-    OP_CHECK_IF(
-        GetECH(expandedXShape) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "H", "GRAPH_FAILED",
-            "failed to get H."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetECH(expandedXShape) != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "H", "GRAPH_FAILED", "failed to get H."),
+                return ge::GRAPH_FAILED);
 
     auto scalesShape = context_->GetOptionalInputShape(SCALES_IDX);
-    OP_CHECK_IF(
-        GetK(scalesShape) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "K", "GRAPH_FAILED",
-            "failed to get K."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetK(scalesShape) != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "K", "GRAPH_FAILED", "failed to get K."),
+                return ge::GRAPH_FAILED);
 
     auto expandedRowIdxShape = context_->GetInputShape(EXPANDED_ROW_IDX_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expandedRowIdxShape);
     OP_CHECK_IF(
         GetRow(expandedRowIdxShape) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "row", "GRAPH_FAILED",
-            "failed to get row."), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "row", "GRAPH_FAILED", "failed to get row."),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -635,18 +612,18 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::GetOptionalInputFlags()
     hasX2_ = x2Desc != nullptr;
     auto biasDesc = context_->GetOptionalInputDesc(BIAS_IDX);
     hasBias_ = biasDesc != nullptr;
-    OP_CHECK_IF(
-        hasX2_ && !hasX1_, OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "x1",
-            "nullptr", "x1 must exist when x2 exists."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(hasX2_ && !hasX1_,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "x1", "nullptr",
+                                                      "x1 must exist when x2 exists."),
+                return ge::GRAPH_FAILED);
 
     auto xDesc = context_->GetOptionalInputDesc(X_IDX);
     hasX_ = xDesc != nullptr;
     auto constExpertAlpha1Desc = context_->GetOptionalInputDesc(CONST_EXPERT_ALPHA1_IDX);
     auto constExpertAlpha2Desc = context_->GetOptionalInputDesc(CONST_EXPERT_ALPHA2_IDX);
     auto constExpertVDesc = context_->GetOptionalInputDesc(CONST_EXPERT_V_IDX);
-    hasConstantExpert_ =  constExpertVDesc != nullptr && constExpertAlpha1Desc != nullptr &&
-        constExpertAlpha2Desc != nullptr;
+    hasConstantExpert_ =
+        constExpertVDesc != nullptr && constExpertAlpha1Desc != nullptr && constExpertAlpha2Desc != nullptr;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -675,7 +652,7 @@ int64_t MoeFinalizeRoutingV2Regbase::RowsHSize(int64_t rowFactor, bool scalesInU
     return (static_cast<int64_t>(hasX1_) + static_cast<int64_t>(hasX2_) + static_cast<int64_t>(hasX_)) *
                Ops::Base::CeilDiv(static_cast<uint64_t>(rowFactor * h * dtypeSize), blockSize_) * blockSize_ +
            (hasConstantExpert_ ? 1 : 0) * CONST_EXPERT_BUFFER_NUM *
-                Ops::Base::CeilDiv(static_cast<uint64_t>(h * dtypeSize), blockSize_) * blockSize_ +
+               Ops::Base::CeilDiv(static_cast<uint64_t>(h * dtypeSize), blockSize_) * blockSize_ +
            (scalesInUb && hasScales_ ? 1 : 0) *
                Ops::Base::CeilDiv(static_cast<uint64_t>(rowFactor * k * scaleDtypeSize), blockSize_) * blockSize_ +
            /* y */ Ops::Base::CeilDiv(static_cast<uint64_t>(rowFactor * h * sizeof(float)), blockSize_) * blockSize_;
@@ -687,12 +664,12 @@ int64_t MoeFinalizeRoutingV2Regbase::RowsHSizeForKHFullLoad(int64_t rowFactor, b
                Ops::Base::CeilDiv(static_cast<uint64_t>(rowFactor * h * dtypeSize), blockSize_) * blockSize_ +
            (scalesInUb && hasScales_ ? 1 : 0) *
                Ops::Base::CeilDiv(static_cast<uint64_t>(rowFactor * k * scaleDtypeSize), blockSize_) * blockSize_ +
-           (hasBias_ ? 1 : 0) * rowFactor * k * hAligned * dtypeSize + 
+           (hasBias_ ? 1 : 0) * rowFactor * k * hAligned * dtypeSize +
            (hasConstantExpert_ ? 1 : 0) * constExpertRangeNum * hAligned * dtypeSize * CONST_EXPERT_BUFFER_NUM +
-               rowFactor * k * hAligned * dtypeSize +
-               Ops::Base::CeilDiv(static_cast<uint64_t>(rowFactor * k * sizeof(int32_t)), blockSize_) * blockSize_ +
-               Ops::Base::CeilDiv(static_cast<uint64_t>(rowFactor * k * sizeof(int32_t)), blockSize_) * blockSize_ +
-               Ops::Base::CeilDiv(static_cast<uint64_t>(rowFactor * h * sizeof(float)), blockSize_) * blockSize_;
+           rowFactor * k * hAligned * dtypeSize +
+           Ops::Base::CeilDiv(static_cast<uint64_t>(rowFactor * k * sizeof(int32_t)), blockSize_) * blockSize_ +
+           Ops::Base::CeilDiv(static_cast<uint64_t>(rowFactor * k * sizeof(int32_t)), blockSize_) * blockSize_ +
+           Ops::Base::CeilDiv(static_cast<uint64_t>(rowFactor * h * sizeof(float)), blockSize_) * blockSize_;
 }
 
 int64_t MoeFinalizeRoutingV2Regbase::CalcRowFactorForKHFullLoad(int64_t ubSizeRemained, bool scalesInUb)
@@ -741,8 +718,8 @@ int64_t MoeFinalizeRoutingV2Regbase::CalcRowFactor(int64_t ubSizeRemained, bool 
     return rowFactor;
 }
 
-void MoeFinalizeRoutingV2Regbase::SetFullLoadTilingData(
-    int64_t rowOfFormerBlock, int64_t rowOfTailBlock, int64_t rowFactor)
+void MoeFinalizeRoutingV2Regbase::SetFullLoadTilingData(int64_t rowOfFormerBlock, int64_t rowOfTailBlock,
+                                                        int64_t rowFactor)
 {
     int64_t rowLoopOfFormerBlock = Ops::Base::CeilDiv(rowOfFormerBlock, rowFactor);
     rowFactor = Ops::Base::CeilDiv(rowOfFormerBlock, rowLoopOfFormerBlock);
@@ -776,9 +753,11 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::DoOpTilingRowKHFullLoad(int64_t row
 {
     int64_t expandedXAlignedByte;
     if (dropPadMode == DROP_LESS_COL || dropPadMode == DROP_LESS_ROW) {
-        expandedXAlignedByte = Ops::Base::CeilDiv(static_cast<uint64_t>(row * k * h * dtypeSize), blockSize_) * blockSize_;
+        expandedXAlignedByte =
+            Ops::Base::CeilDiv(static_cast<uint64_t>(row * k * h * dtypeSize), blockSize_) * blockSize_;
     } else {
-        expandedXAlignedByte = Ops::Base::CeilDiv(static_cast<uint64_t>(e * c * h * dtypeSize), blockSize_) * blockSize_;
+        expandedXAlignedByte =
+            Ops::Base::CeilDiv(static_cast<uint64_t>(e * c * h * dtypeSize), blockSize_) * blockSize_;
     }
     int64_t eHAlignedByte = Ops::Base::CeilDiv(static_cast<uint64_t>(e * h * dtypeSize), blockSize_) * blockSize_;
     int64_t hasBiasvalue = hasBias_ ? eHAlignedByte : 0;
@@ -795,12 +774,12 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::DoOpTilingKHFullLoad(int64_t rowOfF
         int64_t ubSizeRemained = ubSize_ / DOUBLE_BUFFER;
         rowFactor = CalcRowFactorForKHFullLoad(ubSizeRemained, true);
     } else {
-        int64_t kHAlignedByte = k * hAligned * dtypeSize;	
+        int64_t kHAlignedByte = k * hAligned * dtypeSize;
         int64_t hasBiasvalue = hasBias_ ? kHAlignedByte : 0;
         int64_t ubSizeRemained = ubSize_ / DOUBLE_BUFFER - kHAlignedByte - hasBiasvalue;
         rowFactor = CalcRowFactor(ubSizeRemained, true);
     }
-    SetFullLoadTilingData(rowOfFormerBlock, rowOfTailBlock, rowFactor);	
+    SetFullLoadTilingData(rowOfFormerBlock, rowOfTailBlock, rowFactor);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -813,8 +792,8 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::DoOpTilingHFullLoad(int64_t rowOfFo
     int64_t blockSize = static_cast<int64_t>(blockSize_);
     while (upper - lower > 1) {
         int64_t mid = (lower + upper) / TWO;
-        int64_t useUbSize =
-            mid * expandedXAndBiasSize + Ops::Base::CeilDiv(mid * dtypeSize, blockSize) * blockSize + RowsHSize(1, false);
+        int64_t useUbSize = mid * expandedXAndBiasSize + Ops::Base::CeilDiv(mid * dtypeSize, blockSize) * blockSize +
+                            RowsHSize(1, false);
         if (useUbSize > ubSize_ / DOUBLE_BUFFER) {
             upper = mid;
         } else {
@@ -861,19 +840,19 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::DoOpTilingSplitH(int64_t rowOfForme
 
 void MoeFinalizeRoutingV2Regbase::PrintTilingData()
 {
-    OP_LOGI(
-        context_->GetNodeName(),
-        "MoeFinalizeRoutingV2 tiling data: numBlocks[%ld] row[%ld] e[%ld] c[%ld] h[%ld] hAligned[%ld] k[%ld]"
-        "rowOfFormerBlock[%ld] rowOfTailBlock[%ld] rowLoopOfFormerBlock[%ld] rowLoopOfTailBlock[%ld] "
-        "rowFactor[%ld] tailRowFactorOfFormerBlock[%ld] tailRowFactorOfTailBlock[%ld] "
-        "hLoop[%ld] hFactor[%ld] tailHFactor[%ld] zeroExpertStart[%ld] zeroExpertEnd[%ld] copyExpertStart[%ld] "
-        "copyExpertEnd[%ld] constantExpertStart[%ld] constantExpertEnd[%ld] constExpertRangeNum[%ld]",
-        usedCoreNum_, tilingData->row, tilingData->e, tilingData->c, tilingData->h, tilingData->hAligned, tilingData->k,
-        tilingData->rowOfFormerBlock, tilingData->rowOfTailBlock, tilingData->rowLoopOfFormerBlock,
-        tilingData->rowLoopOfTailBlock, tilingData->rowFactor, tilingData->tailRowFactorOfFormerBlock,
-        tilingData->tailRowFactorOfTailBlock, tilingData->hLoop, tilingData->hFactor, tilingData->tailHFactor,
-        tilingData->zeroExpertStart, tilingData->zeroExpertEnd, tilingData->copyExpertStart, tilingData->copyExpertEnd,
-        tilingData->constantExpertStart, tilingData->constantExpertEnd, tilingData->constExpertRangeNum);
+    OP_LOGI(context_->GetNodeName(),
+            "MoeFinalizeRoutingV2 tiling data: numBlocks[%ld] row[%ld] e[%ld] c[%ld] h[%ld] hAligned[%ld] k[%ld]"
+            "rowOfFormerBlock[%ld] rowOfTailBlock[%ld] rowLoopOfFormerBlock[%ld] rowLoopOfTailBlock[%ld] "
+            "rowFactor[%ld] tailRowFactorOfFormerBlock[%ld] tailRowFactorOfTailBlock[%ld] "
+            "hLoop[%ld] hFactor[%ld] tailHFactor[%ld] zeroExpertStart[%ld] zeroExpertEnd[%ld] copyExpertStart[%ld] "
+            "copyExpertEnd[%ld] constantExpertStart[%ld] constantExpertEnd[%ld] constExpertRangeNum[%ld]",
+            usedCoreNum_, tilingData->row, tilingData->e, tilingData->c, tilingData->h, tilingData->hAligned,
+            tilingData->k, tilingData->rowOfFormerBlock, tilingData->rowOfTailBlock, tilingData->rowLoopOfFormerBlock,
+            tilingData->rowLoopOfTailBlock, tilingData->rowFactor, tilingData->tailRowFactorOfFormerBlock,
+            tilingData->tailRowFactorOfTailBlock, tilingData->hLoop, tilingData->hFactor, tilingData->tailHFactor,
+            tilingData->zeroExpertStart, tilingData->zeroExpertEnd, tilingData->copyExpertStart,
+            tilingData->copyExpertEnd, tilingData->constantExpertStart, tilingData->constantExpertEnd,
+            tilingData->constExpertRangeNum);
 }
 
 ge::graphStatus MoeFinalizeRoutingV2Regbase::CalcOpTiling()
@@ -914,8 +893,8 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CalcOpTiling()
     }
 
     OP_CHECK_IF(
-        ret != ge::GRAPH_SUCCESS, OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "tiling",
-            "GRAPH_FAILED", "failed to do tiling"),
+        ret != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "tiling", "GRAPH_FAILED", "failed to do tiling"),
         return ge::GRAPH_FAILED);
     PrintTilingData();
     return ge::GRAPH_SUCCESS;
@@ -925,9 +904,11 @@ bool MoeFinalizeRoutingV2Regbase::IsRowKHFullLoad()
 {
     int64_t expandedXAlignedByte;
     if (dropPadMode == DROP_LESS_COL || dropPadMode == DROP_LESS_ROW) {
-        expandedXAlignedByte = Ops::Base::CeilDiv(static_cast<uint64_t>(row * k * h * dtypeSize), blockSize_) * blockSize_;
+        expandedXAlignedByte =
+            Ops::Base::CeilDiv(static_cast<uint64_t>(row * k * h * dtypeSize), blockSize_) * blockSize_;
     } else {
-        expandedXAlignedByte = Ops::Base::CeilDiv(static_cast<uint64_t>(e * c * h * dtypeSize), blockSize_) * blockSize_;
+        expandedXAlignedByte =
+            Ops::Base::CeilDiv(static_cast<uint64_t>(e * c * h * dtypeSize), blockSize_) * blockSize_;
     }
     int64_t eHAlignedByte = Ops::Base::CeilDiv(static_cast<uint64_t>(e * h * dtypeSize), blockSize_) * blockSize_;
     int64_t scalesAlignedByte = Ops::Base::CeilDiv(static_cast<uint64_t>(k * scaleDtypeSize), blockSize_) * blockSize_;
@@ -938,9 +919,11 @@ bool MoeFinalizeRoutingV2Regbase::IsRowKHFullLoad()
     int64_t hasScalevalue = hasScales_ ? scalesAlignedByte : 0;
     int64_t totalSize =
         expandedXAlignedByte + hasBiasvalue +
-        DOUBLE_BUFFER * (hasScalevalue + (static_cast<int64_t>(hasX1_) + static_cast<int64_t>(hasX2_) +
-        static_cast<int64_t>(hasX_) + static_cast<int64_t>(hasConstantExpert_) * CONST_EXPERT_BUFFER_NUM) *
-        hAlignedByte + hAligned32Byte * OUTPUT_BUFFER_NUM);
+        DOUBLE_BUFFER * (hasScalevalue +
+                         (static_cast<int64_t>(hasX1_) + static_cast<int64_t>(hasX2_) + static_cast<int64_t>(hasX_) +
+                          static_cast<int64_t>(hasConstantExpert_) * CONST_EXPERT_BUFFER_NUM) *
+                             hAlignedByte +
+                         hAligned32Byte * OUTPUT_BUFFER_NUM);
 
     return totalSize <= ubSize_;
 }
@@ -954,16 +937,18 @@ bool MoeFinalizeRoutingV2Regbase::IsKHFullLoad()
     int64_t hAligned32Byte = Ops::Base::CeilDiv(static_cast<uint64_t>(h * sizeof(float)), blockSize_) * blockSize_;
     int64_t hasBiasvalue = hasBias_ ? kHAlignedByte : 0;
     int64_t hasScalevalue = hasScales_ ? scalesAlignedByte : 0;
-    int64_t expandedRowIdxAlignedByte = 
+    int64_t expandedRowIdxAlignedByte =
         Ops::Base::CeilDiv(static_cast<uint64_t>(k * sizeof(int32_t)), blockSize_) * blockSize_;
     int64_t hasExpandedRowIdxValue = k == 1 ? expandedRowIdxAlignedByte : 0;
-    int64_t expertIdxAlignedByte = 
+    int64_t expertIdxAlignedByte =
         Ops::Base::CeilDiv(static_cast<uint64_t>(k * sizeof(int32_t)), blockSize_) * blockSize_;
     int64_t hasExpertIdxValue = (hasBias_ && k == 1) ? expertIdxAlignedByte : 0;
-    int64_t totalSize = DOUBLE_BUFFER * (kHAlignedByte + hasBiasvalue + hasScalevalue + hasExpandedRowIdxValue +
-                        hasExpertIdxValue + (static_cast<int64_t>(hasX1_) + static_cast<int64_t>(hasX2_) +
-                        static_cast<int64_t>(hasX_) + static_cast<int64_t>(hasConstantExpert_) *
-                        CONST_EXPERT_BUFFER_NUM) * hAlignedByte + hAligned32Byte * OUTPUT_BUFFER_NUM);
+    int64_t totalSize =
+        DOUBLE_BUFFER * (kHAlignedByte + hasBiasvalue + hasScalevalue + hasExpandedRowIdxValue + hasExpertIdxValue +
+                         (static_cast<int64_t>(hasX1_) + static_cast<int64_t>(hasX2_) + static_cast<int64_t>(hasX_) +
+                          static_cast<int64_t>(hasConstantExpert_) * CONST_EXPERT_BUFFER_NUM) *
+                             hAlignedByte +
+                         hAligned32Byte * OUTPUT_BUFFER_NUM);
 
     return totalSize <= ubSize_;
 }
@@ -989,7 +974,8 @@ bool MoeFinalizeRoutingV2Regbase::IsCapable()
     if (!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_)) {
         return false;
     }
-    // IsRowKHFullLoad（全维度）→ IsKHFullLoad（K-H 维度）→ IsHFullLoad（仅 H 维度），粒度由粗到细，适配不同 MoE 子任务；
+    // IsRowKHFullLoad（全维度）→ IsKHFullLoad（K-H 维度）→ IsHFullLoad（仅 H 维度），粒度由粗到细，适配不同 MoE
+    // 子任务；
     rowKHFullLoad_ = IsRowKHFullLoad();
     if (rowKHFullLoad_) {
         return true;

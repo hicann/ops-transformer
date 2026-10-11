@@ -72,7 +72,7 @@ struct MoeTokenUnpermuteParam {
     TilingParam tokenPerCore;
     CoreParam core;
 };
-ge::graphStatus TilingCompute(gert::TilingContext *context, const int64_t topK);
+ge::graphStatus TilingCompute(gert::TilingContext* context, const int64_t topK);
 BEGIN_TILING_DATA_DEF(MoeTokenUnpermuteTilingData)
 TILING_DATA_FIELD_DEF(int64_t, hidden_size);
 TILING_DATA_FIELD_DEF(int64_t, top_k);

@@ -22,33 +22,33 @@
 using namespace op;
 
 namespace {
-    static const int64_t OUT_TOPK_INDEX = 1;
+static const int64_t OUT_TOPK_INDEX = 1;
 }
 
 namespace l0op {
 OP_TYPE_REGISTER(MoeFusedTopk);
 
-const std::array<const aclTensor *, 2> MoeFusedTopk(
-        const aclTensor* x, const aclTensor* addNum, const aclTensor* mappingNum, const aclTensor* mappingTable,
-        uint32_t groupNum, uint32_t groupTopk, uint32_t topN, uint32_t topK, uint32_t activateType, 
-        bool isNorm, float scale, bool enableExpertMapping, aclOpExecutor *executor) {
-    L0_DFX(MoeFusedTopk, x, addNum, mappingNum, mappingTable, groupNum, groupTopk, topN, topK, activateType,
-                            isNorm, scale, enableExpertMapping);
-    
+const std::array<const aclTensor*, 2> MoeFusedTopk(const aclTensor* x, const aclTensor* addNum,
+                                                   const aclTensor* mappingNum, const aclTensor* mappingTable,
+                                                   uint32_t groupNum, uint32_t groupTopk, uint32_t topN, uint32_t topK,
+                                                   uint32_t activateType, bool isNorm, float scale,
+                                                   bool enableExpertMapping, aclOpExecutor* executor)
+{
+    L0_DFX(MoeFusedTopk, x, addNum, mappingNum, mappingTable, groupNum, groupTopk, topN, topK, activateType, isNorm,
+           scale, enableExpertMapping);
+
     op::Shape outShape = x->GetViewShape();
     outShape.SetDim(OUT_TOPK_INDEX, topK);
     auto y = executor->AllocTensor(outShape, op::DataType::DT_FLOAT, op::Format::FORMAT_ND);
     auto indices = executor->AllocTensor(outShape, op::DataType::DT_INT32, op::Format::FORMAT_ND);
 
-    auto ret = ADD_TO_LAUNCHER_LIST_AICORE(MoeFusedTopk,
-                              OP_INPUT(x, addNum, mappingNum, mappingTable),
-                              OP_OUTPUT(y, indices),
-                              OP_ATTR(groupNum, groupTopk, topN, topK, activateType,
-                            isNorm, scale, enableExpertMapping));
-    if (ret !=  ACL_SUCCESS) {
+    auto ret = ADD_TO_LAUNCHER_LIST_AICORE(
+        MoeFusedTopk, OP_INPUT(x, addNum, mappingNum, mappingTable), OP_OUTPUT(y, indices),
+        OP_ATTR(groupNum, groupTopk, topN, topK, activateType, isNorm, scale, enableExpertMapping));
+    if (ret != ACL_SUCCESS) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "MoeFusedTopkAiCore ADD_TO_LAUNCHER_LIST_AICORE failed.");
         return {nullptr, nullptr};
     }
     return {y, indices};
 }
-}  // namespace l0op
+} // namespace l0op

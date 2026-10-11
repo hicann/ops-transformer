@@ -46,9 +46,9 @@ static const std::initializer_list<DataType> routing_map_dtype_list = {op::DataT
 
 static const std::initializer_list<DataType> indice_dtype_list = {op::DataType::DT_INT32};
 
-static inline bool CheckNotNull(const aclTensor *tokens, const aclTensor *routingMap, const aclTensor *probsOptional,
-                                const aclTensor *permuteTokensOut, const aclTensor *permuteProbsOutOptional,
-                                const aclTensor *sortedIndicesOut)
+static inline bool CheckNotNull(const aclTensor* tokens, const aclTensor* routingMap, const aclTensor* probsOptional,
+                                const aclTensor* permuteTokensOut, const aclTensor* permuteProbsOutOptional,
+                                const aclTensor* sortedIndicesOut)
 {
     OP_CHECK_NULL(tokens, return false);
     OP_CHECK_NULL(routingMap, return false);
@@ -61,9 +61,9 @@ static inline bool CheckNotNull(const aclTensor *tokens, const aclTensor *routin
     return true;
 }
 
-static inline bool CheckDtypeValid(const aclTensor *tokens, const aclTensor *routingMap, const aclTensor *probsOptional,
-                                   const aclTensor *permuteTokensOut, const aclTensor *permuteProbsOutOptional,
-                                   const aclTensor *sortedIndicesOut)
+static inline bool CheckDtypeValid(const aclTensor* tokens, const aclTensor* routingMap, const aclTensor* probsOptional,
+                                   const aclTensor* permuteTokensOut, const aclTensor* permuteProbsOutOptional,
+                                   const aclTensor* sortedIndicesOut)
 {
     // 检查gradY的数据类型是否在支持列表内
     OP_CHECK_DTYPE_NOT_SUPPORT(tokens, dtype_list, return false);
@@ -91,7 +91,7 @@ static inline bool CheckDtypeValid(const aclTensor *tokens, const aclTensor *rou
     return true;
 }
 
-static bool CheckShapeValid(const aclTensor *routingMap, const aclTensor *probsOptional)
+static bool CheckShapeValid(const aclTensor* routingMap, const aclTensor* probsOptional)
 {
     auto routingMapDimNum = routingMap->GetViewShape().GetDimNum();
     OP_CHECK(routingMapDimNum == TRANSPOSE_SHAPE_SIZE,
@@ -119,7 +119,7 @@ static bool CheckShapeValid(const aclTensor *routingMap, const aclTensor *probsO
     return true;
 }
 
-static bool CheckTokensValid(const aclTensor *tokens)
+static bool CheckTokensValid(const aclTensor* tokens)
 {
     auto tokensDimNum = tokens->GetViewShape().GetDimNum();
     OP_CHECK(tokensDimNum == TOKENS_SHAPE_SIZE,
@@ -129,9 +129,9 @@ static bool CheckTokensValid(const aclTensor *tokens)
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *tokens, const aclTensor *routingMap, const aclTensor *probsOptional,
-                               const aclTensor *permuteTokensOut, const aclTensor *permuteProbsOutOptional,
-                               const aclTensor *sortedIndicesOut, int64_t &numOutTokens, bool dropAndPad)
+static aclnnStatus CheckParams(const aclTensor* tokens, const aclTensor* routingMap, const aclTensor* probsOptional,
+                               const aclTensor* permuteTokensOut, const aclTensor* permuteProbsOutOptional,
+                               const aclTensor* sortedIndicesOut, int64_t& numOutTokens, bool dropAndPad)
 {
     // 1. 检查参数是否为空指针
     CHECK_RET(
@@ -181,8 +181,8 @@ static aclnnStatus CheckParams(const aclTensor *tokens, const aclTensor *routing
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ProbsOptionalHandler(const aclTensor *probsOptional, const aclTensor *permuteProbsOpOut,
-                                        aclTensor *permuteProbsOutOptional, aclOpExecutor *executor)
+static aclnnStatus ProbsOptionalHandler(const aclTensor* probsOptional, const aclTensor* permuteProbsOpOut,
+                                        aclTensor* permuteProbsOutOptional, aclOpExecutor* executor)
 {
     if (probsOptional != nullptr) {
         CHECK_RET(permuteProbsOpOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -196,12 +196,12 @@ static aclnnStatus ProbsOptionalHandler(const aclTensor *probsOptional, const ac
 
 } // namespace
 
-aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGetWorkspaceSize(const aclTensor *tokens, const aclTensor *routingMap,
-                                                               const aclTensor *probsOptional, int64_t numOutTokens,
-                                                               bool dropAndPad, aclTensor *permuteTokensOut,
-                                                               aclTensor *permuteProbsOutOptional,
-                                                               aclTensor *sortedIndicesOut, uint64_t *workspaceSize,
-                                                               aclOpExecutor **executor)
+aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGetWorkspaceSize(const aclTensor* tokens, const aclTensor* routingMap,
+                                                               const aclTensor* probsOptional, int64_t numOutTokens,
+                                                               bool dropAndPad, aclTensor* permuteTokensOut,
+                                                               aclTensor* permuteProbsOutOptional,
+                                                               aclTensor* sortedIndicesOut, uint64_t* workspaceSize,
+                                                               aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnMoeTokenPermuteWithRoutingMap,
                    DFX_IN(tokens, routingMap, probsOptional, numOutTokens, dropAndPad),
@@ -264,7 +264,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGetWorkspaceSize(const aclTensor *
         CHECK_RET(permuteProbsResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor *permuteTokensOpOut;
+    const aclTensor* permuteTokensOpOut;
     bool isRegbase = Ops::Transformer::AclnnUtil::IsRegbase();
     if (isRegbase) { // regbase 场景在算子内部进行gather，其余场景由gather算子计算
         permuteTokensOpOut = MoeTokenPermuteWithRoutingMapOut[0];
@@ -294,7 +294,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGetWorkspaceSize(const aclTensor *
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMoeTokenPermuteWithRoutingMap(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMoeTokenPermuteWithRoutingMap(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                aclrtStream stream)
 {
     // 固定写法，调用框架能力，完成计算

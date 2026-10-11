@@ -84,10 +84,10 @@ static uint32_t GenValuesMask(int64_t k)
     return mask;
 }
 
-class MoeGatingTopKSoftmaxPerfTiling : public MoeGatingTopKSoftmaxBaseTiling
-{
+class MoeGatingTopKSoftmaxPerfTiling : public MoeGatingTopKSoftmaxBaseTiling {
 public:
-    explicit MoeGatingTopKSoftmaxPerfTiling(gert::TilingContext* context) : MoeGatingTopKSoftmaxBaseTiling(context)
+    explicit MoeGatingTopKSoftmaxPerfTiling(gert::TilingContext* context)
+        : MoeGatingTopKSoftmaxBaseTiling(context)
     {}
 
 protected:
@@ -108,11 +108,10 @@ private:
     uint32_t gatingAlignCol;
     MoeGatingTopKSoftmaxPerfTilingData tilingData;
 
-    uint32_t calcMaxRowInUb(
-        const int64_t ubSize_, const uint32_t k_, const uint32_t blockRow);
+    uint32_t calcMaxRowInUb(const int64_t ubSize_, const uint32_t k_, const uint32_t blockRow);
 
-    bool isBufferSizeEnough(
-        const uint32_t curRowInUb, const uint32_t gatingAlignCol_, const int64_t tmpUbSize, const uint32_t k_);
+    bool isBufferSizeEnough(const uint32_t curRowInUb, const uint32_t gatingAlignCol_, const int64_t tmpUbSize,
+                            const uint32_t k_);
 };
 
 bool MoeGatingTopKSoftmaxPerfTiling::IsCapable()
@@ -141,11 +140,11 @@ ge::graphStatus MoeGatingTopKSoftmaxPerfTiling::DoOpTiling()
     tilingData.set_colAlign(gatingAlignCol);
     tilingData.set_ubLoopOfFormerBlock(CeilDiv(tilingData.get_blockFormer(), maxRow));
     tilingData.set_ubFormer(maxRow);
-    tilingData.set_ubTailOfFormerBlock(
-        tilingData.get_blockFormer() - (tilingData.get_ubLoopOfFormerBlock() - 1) * tilingData.get_ubFormer());
+    tilingData.set_ubTailOfFormerBlock(tilingData.get_blockFormer() -
+                                       (tilingData.get_ubLoopOfFormerBlock() - 1) * tilingData.get_ubFormer());
     tilingData.set_ubLoopOfTailBlock(CeilDiv(tilingData.get_blockTail(), maxRow));
-    tilingData.set_ubTailOfTailBlock(
-        tilingData.get_blockTail() - (tilingData.get_ubLoopOfTailBlock() - 1) * tilingData.get_ubFormer());
+    tilingData.set_ubTailOfTailBlock(tilingData.get_blockTail() -
+                                     (tilingData.get_ubLoopOfTailBlock() - 1) * tilingData.get_ubFormer());
     tilingData.set_topKValuesMask(GenValuesMask(k));
     tilingData.set_topKIndicesMask(GenIndicesMask(k));
     tilingData.set_bufferElemSize(maxRow * gatingAlignCol);
@@ -214,8 +213,8 @@ ge::graphStatus MoeGatingTopKSoftmaxPerfTiling::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-bool MoeGatingTopKSoftmaxPerfTiling::isBufferSizeEnough(
-    const uint32_t curRowInUb, const uint32_t gatingAlignCol_, const int64_t tmpUbSize, const uint32_t k_)
+bool MoeGatingTopKSoftmaxPerfTiling::isBufferSizeEnough(const uint32_t curRowInUb, const uint32_t gatingAlignCol_,
+                                                        const int64_t tmpUbSize, const uint32_t k_)
 {
     // 输出row_idx使用的内存
     int64_t rowIdxOutBufferSize = calcUbAlignBufferSize(curRowInUb, k_, INT32_SIZE);
@@ -236,8 +235,8 @@ bool MoeGatingTopKSoftmaxPerfTiling::isBufferSizeEnough(
     return true;
 }
 
-uint32_t MoeGatingTopKSoftmaxPerfTiling::calcMaxRowInUb(
-    const int64_t ubSize_, const uint32_t k_, const uint32_t blockRow)
+uint32_t MoeGatingTopKSoftmaxPerfTiling::calcMaxRowInUb(const int64_t ubSize_, const uint32_t k_,
+                                                        const uint32_t blockRow)
 {
     uint32_t ubOuter = 1;
     int64_t tmpUbSize = ubSize_;

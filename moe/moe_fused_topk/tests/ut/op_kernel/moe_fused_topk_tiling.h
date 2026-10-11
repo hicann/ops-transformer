@@ -45,10 +45,10 @@ struct MoeFusedTopkTilingData {
 };
 #pragma pack()
 
-inline void InitMoeFusedTopkTilingData(uint8_t *tiling, MoeFusedTopkTilingData *const_data)
+inline void InitMoeFusedTopkTilingData(uint8_t* tiling, MoeFusedTopkTilingData* const_data)
 {
-    uint32_t *src = (uint32_t *)tiling;
-    uint32_t *dst = (uint32_t *)const_data;
+    uint32_t* src = (uint32_t*)tiling;
+    uint32_t* dst = (uint32_t*)const_data;
     for (auto i = 0; i < sizeof(MoeFusedTopkTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }

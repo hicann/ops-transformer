@@ -42,7 +42,7 @@ class Gatherv2SimtTwoDim {
 public:
     __aicore__ inline Gatherv2SimtTwoDim(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR indices, GM_ADDR y,
-                                const MoeTokenPermuteWithRoutingMapTilingData *tilingData, bool isprob);
+                                const MoeTokenPermuteWithRoutingMapTilingData* tilingData, bool isprob);
     __aicore__ inline void Process();
     __aicore__ inline void ProbProcess();
 
@@ -50,17 +50,17 @@ private:
     template <const bool NIS>
     static __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND_TWO_DIM) inline void GatherSimt(
         const INDEX_SIZE_T yIndexBase, INDEX_SIZE_T currentCoreElements, INDEX_SIZE_T m0, INDEX_SIZE_T shift0,
-        INDEX_SIZE_T innerSize, __gm__ X_T *x, __gm__ INDICES_T *indices, __gm__ volatile X_T *y);
+        INDEX_SIZE_T innerSize, __gm__ X_T* x, __gm__ INDICES_T* indices, __gm__ volatile X_T* y);
     template <const bool NIS>
     static __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND_TWO_DIM) inline void GatherSimtProb(
         const INDEX_SIZE_T yIndexBase, INDEX_SIZE_T currentCoreElements, INDEX_SIZE_T m0, INDEX_SIZE_T shift0,
-        INDEX_SIZE_T tokenNum, __gm__ X_T *x, __gm__ INDICES_T *indices, __gm__ volatile X_T *y);
+        INDEX_SIZE_T tokenNum, __gm__ X_T* x, __gm__ INDICES_T* indices, __gm__ volatile X_T* y);
 
 private:
     GlobalTensor<X_T> xGm_;
     GlobalTensor<INDICES_T> indicesGm_;
     GlobalTensor<X_T> yGm_;
-    const IndexCopyComputeRMTilingData *tilingData_ = nullptr;
+    const IndexCopyComputeRMTilingData* tilingData_ = nullptr;
     int32_t blockIdxVal = 0;
     int32_t needCoreNum = 0;
     uint32_t threadNum = 0;
@@ -78,7 +78,7 @@ template <const bool NIS>
 __simt_vf__ __aicore__
 LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND_TWO_DIM) inline void Gatherv2SimtTwoDim<X_T, INDICES_T, INDEX_SIZE_T>::GatherSimt(
     const INDEX_SIZE_T yIndexBase, INDEX_SIZE_T currentCoreElements, INDEX_SIZE_T m0, INDEX_SIZE_T shift0,
-    INDEX_SIZE_T innerSize, __gm__ X_T *x, __gm__ INDICES_T *indices, __gm__ volatile X_T *y)
+    INDEX_SIZE_T innerSize, __gm__ X_T* x, __gm__ INDICES_T* indices, __gm__ volatile X_T* y)
 {
     for (INDEX_SIZE_T index = static_cast<INDEX_SIZE_T>(threadIdx.x); index < currentCoreElements;
          index += static_cast<INDEX_SIZE_T>(blockDim.x)) {
@@ -99,7 +99,7 @@ template <const bool NIS>
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND_TWO_DIM) inline void Gatherv2SimtTwoDim<
     X_T, INDICES_T, INDEX_SIZE_T>::GatherSimtProb(const INDEX_SIZE_T yIndexBase, INDEX_SIZE_T currentCoreElements,
                                                   INDEX_SIZE_T m0, INDEX_SIZE_T shift0, INDEX_SIZE_T tokenNum,
-                                                  __gm__ X_T *x, __gm__ INDICES_T *indices, __gm__ volatile X_T *y)
+                                                  __gm__ X_T* x, __gm__ INDICES_T* indices, __gm__ volatile X_T* y)
 {
     for (INDEX_SIZE_T index = static_cast<INDEX_SIZE_T>(threadIdx.x); index < currentCoreElements;
          index += static_cast<INDEX_SIZE_T>(blockDim.x)) {
@@ -117,13 +117,13 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND_TWO_DIM) inline void
 
 template <typename X_T, typename INDICES_T, typename INDEX_SIZE_T>
 __aicore__ inline void Gatherv2SimtTwoDim<X_T, INDICES_T, INDEX_SIZE_T>::Init(
-    GM_ADDR x, GM_ADDR indices, GM_ADDR y, const MoeTokenPermuteWithRoutingMapTilingData *tilingData, bool isprob)
+    GM_ADDR x, GM_ADDR indices, GM_ADDR y, const MoeTokenPermuteWithRoutingMapTilingData* tilingData, bool isprob)
 {
     this->tilingData_ = &(tilingData->indexCopyComputeParamsOp);
 
-    xGm_.SetGlobalBuffer((__gm__ X_T *)x);
-    indicesGm_.SetGlobalBuffer((__gm__ INDICES_T *)indices);
-    yGm_.SetGlobalBuffer((__gm__ X_T *)y);
+    xGm_.SetGlobalBuffer((__gm__ X_T*)x);
+    indicesGm_.SetGlobalBuffer((__gm__ INDICES_T*)indices);
+    yGm_.SetGlobalBuffer((__gm__ X_T*)y);
     blockIdxVal = static_cast<int32_t>(GetBlockIdx());
     if (isprob) {
         needCoreNum = static_cast<int32_t>(tilingData_->frontCoreNum);
@@ -160,8 +160,8 @@ __aicore__ inline void Gatherv2SimtTwoDim<X_T, INDICES_T, INDEX_SIZE_T>::Process
         INDEX_SIZE_T yIndexBase = blockIdxVal * CoreElements;
 
         asc_vf_call<GatherSimt<false>>(dim3(threadNum), yIndexBase, currentCoreElements, m0, shift0, innerSize,
-                                       (__gm__ X_T *)(xGm_.GetPhyAddr()), (__gm__ INDICES_T *)(indicesGm_.GetPhyAddr()),
-                                       (__gm__ volatile X_T *)(yGm_.GetPhyAddr()));
+                                       (__gm__ X_T*)(xGm_.GetPhyAddr()), (__gm__ INDICES_T*)(indicesGm_.GetPhyAddr()),
+                                       (__gm__ volatile X_T*)(yGm_.GetPhyAddr()));
     }
 }
 
@@ -172,8 +172,8 @@ __aicore__ inline void Gatherv2SimtTwoDim<X_T, INDICES_T, INDEX_SIZE_T>::ProbPro
         INDEX_SIZE_T yIndexBase = blockIdxVal * CoreElements;
 
         asc_vf_call<GatherSimtProb<false>>(
-            dim3(threadNum), yIndexBase, currentCoreElements, m0, shift0, tokenNum, (__gm__ X_T *)(xGm_.GetPhyAddr()),
-            (__gm__ INDICES_T *)(indicesGm_.GetPhyAddr()), (__gm__ volatile X_T *)(yGm_.GetPhyAddr()));
+            dim3(threadNum), yIndexBase, currentCoreElements, m0, shift0, tokenNum, (__gm__ X_T*)(xGm_.GetPhyAddr()),
+            (__gm__ INDICES_T*)(indicesGm_.GetPhyAddr()), (__gm__ volatile X_T*)(yGm_.GetPhyAddr()));
     }
 }
 } // namespace gatherv2

@@ -125,7 +125,7 @@ extern "C" __global__ __aicore__ void moe_init_routing_v3(GM_ADDR x, GM_ADDR exp
             TBuf<TPosition::VECCALC> zeroBuf;
             TPipe pipe;
             int32_t expertCountElements = t->expertCountElements;
-            expertTokensCountGm.SetGlobalBuffer((__gm__ int64_t *)expertTokensCountOrCumsum, expertCountElements);
+            expertTokensCountGm.SetGlobalBuffer((__gm__ int64_t*)expertTokensCountOrCumsum, expertCountElements);
             pipe.InitBuffer(zeroBuf, AlignBytes(expertCountElements, sizeof(int64_t)));
 
             LocalTensor<int64_t> zeroLocal = zeroBuf.Get<int64_t>();

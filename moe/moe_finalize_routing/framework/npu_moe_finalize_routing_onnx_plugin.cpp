@@ -15,23 +15,25 @@ using namespace ge;
 using json = nlohmann::json;
 
 namespace domi {
-static Status ParseParamsMoeFinalizeRouting(const ge::Operator& op_src, ge::Operator& op_dest) {
+static Status ParseParamsMoeFinalizeRouting(const ge::Operator& op_src, ge::Operator& op_dest)
+{
     return SUCCESS;
 }
 
 // register npu_moe_finalize_routing op info to GE
 REGISTER_CUSTOM_OP("MoeFinalizeRouting")
-  .FrameworkType(ONNX)
-  .OriginOpType({ge::AscendString("npu::1::NPUMoeFinalizeRouting"),
-                 ge::AscendString("ai.onnx::11::NPUMoeFinalizeRouting"),
-                 ge::AscendString("ai.onnx::12::NPUMoeFinalizeRouting"),
-                 ge::AscendString("ai.onnx::13::NPUMoeFinalizeRouting"),
-                 ge::AscendString("ai.onnx::14::NPUMoeFinalizeRouting"),
-                 ge::AscendString("ai.onnx::15::NPUMoeFinalizeRouting"),
-                 ge::AscendString("ai.onnx::16::NPUMoeFinalizeRouting"),
-                 ge::AscendString("ai.onnx::17::NPUMoeFinalizeRouting"),
-                 ge::AscendString("ai.onnx::18::NPUMoeFinalizeRouting"),
-                })
-  .ParseParamsByOperatorFn(ParseParamsMoeFinalizeRouting)
-  .ImplyType(ImplyType::TVM);
+    .FrameworkType(ONNX)
+    .OriginOpType({
+        ge::AscendString("npu::1::NPUMoeFinalizeRouting"),
+        ge::AscendString("ai.onnx::11::NPUMoeFinalizeRouting"),
+        ge::AscendString("ai.onnx::12::NPUMoeFinalizeRouting"),
+        ge::AscendString("ai.onnx::13::NPUMoeFinalizeRouting"),
+        ge::AscendString("ai.onnx::14::NPUMoeFinalizeRouting"),
+        ge::AscendString("ai.onnx::15::NPUMoeFinalizeRouting"),
+        ge::AscendString("ai.onnx::16::NPUMoeFinalizeRouting"),
+        ge::AscendString("ai.onnx::17::NPUMoeFinalizeRouting"),
+        ge::AscendString("ai.onnx::18::NPUMoeFinalizeRouting"),
+    })
+    .ParseParamsByOperatorFn(ParseParamsMoeFinalizeRouting)
+    .ImplyType(ImplyType::TVM);
 } // namespace domi

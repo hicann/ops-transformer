@@ -31,18 +31,19 @@ protected:
 TEST_F(MoeTokenPermuteWithEpInferShape, MoeTokenPermuteWithEp_infershape_case_0)
 {
     std::vector<int64_t> range({1, 5});
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenPermuteWithEp",
-                                                      {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                       {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                       {{{2, 3}, {2, 3}}, ge::DT_INT32, ge::FORMAT_ND}},
-                                                      {
-                                                          {{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                          {{{6}, {6}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                          {{{4}, {4}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                       {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-                                                       {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {
+            {{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{6}, {6}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4}, {4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
     std::vector<std::vector<int64_t>> expectOutputShape = {{4, 5}, {6}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
@@ -50,18 +51,19 @@ TEST_F(MoeTokenPermuteWithEpInferShape, MoeTokenPermuteWithEp_infershape_case_0)
 TEST_F(MoeTokenPermuteWithEpInferShape, MoeTokenPermuteWithEp_infershape_1d_indices)
 {
     std::vector<int64_t> range({0, 4});
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenPermuteWithEp",
-                                                      {{{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                       {{{4}, {4}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                       {{{4}, {4}}, ge::DT_BF16, ge::FORMAT_ND}},
-                                                      {
-                                                          {{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                          {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                          {{{4}, {4}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                       {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-                                                       {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {
+            {{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{4}, {4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
     std::vector<std::vector<int64_t>> expectOutputShape = {{4, 5}, {4}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
@@ -69,35 +71,37 @@ TEST_F(MoeTokenPermuteWithEpInferShape, MoeTokenPermuteWithEp_infershape_1d_indi
 TEST_F(MoeTokenPermuteWithEpInferShape, MoeTokenPermuteWithEp_infershape_indices_dim_invalid)
 {
     std::vector<int64_t> range({0, 6});
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenPermuteWithEp",
-                                                      {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                       {{{2, 3, 1}, {2, 3, 1}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                       {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
-                                                      {
-                                                          {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                          {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                          {{{4}, {4}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                       {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                       {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3, 1}, {2, 3, 1}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {
+            {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{4}, {4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED);
 }
 
 TEST_F(MoeTokenPermuteWithEpInferShape, MoeTokenPermuteWithEp_infershape_unknownshape)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenPermuteWithEp",
-                                                      {{{{-2}, {-2}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                       {{{-2}, {-2}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                       {{{-2}, {-2}}, ge::DT_BF16, ge::FORMAT_ND}},
-                                                      {
-                                                          {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(std::vector<int64_t>{0, 4})},
-                                                       {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-                                                       {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{-2}, {-2}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{-2}, {-2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{-2}, {-2}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(std::vector<int64_t>{0, 4})},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
     std::vector<std::vector<int64_t>> expectOutputShape = {{-2}, {-1}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
@@ -105,18 +109,19 @@ TEST_F(MoeTokenPermuteWithEpInferShape, MoeTokenPermuteWithEp_infershape_unknown
 TEST_F(MoeTokenPermuteWithEpInferShape, MoeTokenPermuteWithEp_infershape_range_start_ge_end)
 {
     std::vector<int64_t> range({5, 1});
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenPermuteWithEp",
-                                                      {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                       {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                       {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
-                                                      {
-                                                          {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                          {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                          {{{4}, {4}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                       {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-                                                       {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {
+            {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{4}, {4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
     std::vector<std::vector<int64_t>> expectOutputShape = {{2, 5}, {6}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }

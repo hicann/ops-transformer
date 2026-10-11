@@ -64,12 +64,12 @@ static const size_t ATTR_K_IDX = 4;
 
 class MoeFinalizeRoutingV2Membase : public MoeFinalizeRoutingTilingV2 {
 public:
-    explicit MoeFinalizeRoutingV2Membase(gert::TilingContext *context)
+    explicit MoeFinalizeRoutingV2Membase(gert::TilingContext* context)
         : MoeFinalizeRoutingTilingV2(context)
     {}
     ~MoeFinalizeRoutingV2Membase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         MoeFinalizeRoutingTilingV2::Reset(context);
     }
@@ -218,7 +218,7 @@ ge::graphStatus MoeFinalizeRoutingV2Membase::DoGetShapeAttrsInfo()
                                              std::to_string(expandedRowIdxShape.GetDimNum()).c_str(), "1D"),
                 return ge::GRAPH_FAILED);
     int64_t nk = expandedRowIdxShape.GetDim(DIM_INDEX_0);
-    const int64_t *attrKPtr = attrsPtr->GetAttrPointer<int64_t>(ATTR_K_IDX);
+    const int64_t* attrKPtr = attrsPtr->GetAttrPointer<int64_t>(ATTR_K_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrKPtr);
     int64_t attrK = *attrKPtr;
     k_ = attrK;
@@ -635,7 +635,7 @@ ge::graphStatus MoeFinalizeRoutingV2Membase::OptimizedCutH()
 
 bool MoeFinalizeRoutingV2Membase::IsUnpermuteFastPath() const
 {
-    auto isEmptyOptional = [](const gert::StorageShape *shape) {
+    auto isEmptyOptional = [](const gert::StorageShape* shape) {
         return shape == nullptr || shape->GetStorageShape().GetShapeSize() == 0;
     };
     bool isA2OrA3 = socVersion_ == platform_ascendc::SocVersion::ASCEND910B ||
@@ -664,7 +664,7 @@ ge::graphStatus MoeFinalizeRoutingV2Membase::CalcUnpermuteFastTiling()
     if (h_ <= 0) {
         return ge::GRAPH_FAILED;
     }
-    const auto &expandedXShape = params.expandedXShape->GetStorageShape();
+    const auto& expandedXShape = params.expandedXShape->GetStorageShape();
     int64_t expandedXRowNum = expandedXShape.GetShapeSize() / h_;
     if (expandedXRowNum <= 0) {
         return ge::GRAPH_FAILED;

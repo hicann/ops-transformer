@@ -30,10 +30,10 @@ struct MoeV2MrgsortParam {
 class MoeV2Mrgsort {
 public:
     __aicore__ inline MoeV2Mrgsort(){};
-    __aicore__ inline void Init(MoeV2MrgsortParam *param);
+    __aicore__ inline void Init(MoeV2MrgsortParam* param);
     __aicore__ inline void Process();
-    __aicore__ inline void SetInput(GlobalTensor<float> &gmInput, LocalTensor<float> &ubInput);
-    __aicore__ inline void SetOutput(GlobalTensor<float> &gmOutput, LocalTensor<float> &ubOutput);
+    __aicore__ inline void SetInput(GlobalTensor<float>& gmInput, LocalTensor<float>& ubInput);
+    __aicore__ inline void SetOutput(GlobalTensor<float>& gmOutput, LocalTensor<float>& ubOutput);
 
 private:
     __aicore__ inline void CopyIn();
@@ -44,7 +44,7 @@ private:
     __aicore__ inline void ClearCache();
 
 private:
-    MoeV2MrgsortParam *param = nullptr;
+    MoeV2MrgsortParam* param = nullptr;
 
     GlobalTensor<float> gmInputs[4];
     GlobalTensor<float> gmOutput;
@@ -75,14 +75,14 @@ __aicore__ inline void MoeV2Mrgsort::ClearCache()
     this->outOffset = 0;
 }
 
-__aicore__ inline void MoeV2Mrgsort::SetInput(GlobalTensor<float> &gmInput, LocalTensor<float> &ubInput)
+__aicore__ inline void MoeV2Mrgsort::SetInput(GlobalTensor<float>& gmInput, LocalTensor<float>& ubInput)
 {
     this->gmInputs[listNum] = gmInput;
     this->ubInputs[listNum] = ubInput;
     this->listNum += 1;
 }
 
-__aicore__ inline void MoeV2Mrgsort::SetOutput(GlobalTensor<float> &gmOutput, LocalTensor<float> &ubOutput)
+__aicore__ inline void MoeV2Mrgsort::SetOutput(GlobalTensor<float>& gmOutput, LocalTensor<float>& ubOutput)
 {
     this->gmOutput = gmOutput;
     this->ubOutput = ubOutput;
@@ -178,7 +178,7 @@ __aicore__ inline void MoeV2Mrgsort::CopyOut()
     outOffset += GetSortLen<float>(curLoopSortedNum);
 }
 
-__aicore__ inline void MoeV2Mrgsort::Init(MoeV2MrgsortParam *param)
+__aicore__ inline void MoeV2Mrgsort::Init(MoeV2MrgsortParam* param)
 {
     this->param = param;
     this->remainListNum = listNum;

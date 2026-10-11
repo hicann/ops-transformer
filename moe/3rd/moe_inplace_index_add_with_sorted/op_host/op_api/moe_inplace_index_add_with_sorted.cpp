@@ -25,17 +25,18 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(MoeInplaceIndexAddWithSorted);
 // 排序后AICORE算子kernel
-const aclTensor *MoeInplaceIndexAddWithSorted(const aclTensor *self, const int64_t dim, const aclTensor *sortedIndices,
-                                           const aclTensor *pos, const aclTensor *value, const aclTensor *alphaTensor,
-                                           aclOpExecutor *executor) {
+const aclTensor* MoeInplaceIndexAddWithSorted(const aclTensor* self, const int64_t dim, const aclTensor* sortedIndices,
+                                              const aclTensor* pos, const aclTensor* value,
+                                              const aclTensor* alphaTensor, aclOpExecutor* executor)
+{
     L0_DFX(MoeInplaceIndexAddWithSorted, self, dim, value, sortedIndices, pos, alphaTensor);
     auto indexAddOut = const_cast<aclTensor*>(self);
     auto ret = ADD_TO_LAUNCHER_LIST_AICORE(MoeInplaceIndexAddWithSorted,
                                            OP_INPUT(self, value, sortedIndices, pos, alphaTensor),
-                                           OP_OUTPUT(indexAddOut),
-                                           OP_ATTR(dim));
-    OP_CHECK(ret == ACLNN_SUCCESS, OP_LOGE(ACLNN_ERR_INNER_NULLPTR,
-             "MoeInplaceIndexAddWithSortedAiCore ADD_TO_LAUNCHER_LIST_AICORE failed."), return nullptr);
+                                           OP_OUTPUT(indexAddOut), OP_ATTR(dim));
+    OP_CHECK(ret == ACLNN_SUCCESS,
+             OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "MoeInplaceIndexAddWithSortedAiCore ADD_TO_LAUNCHER_LIST_AICORE failed."),
+             return nullptr);
     return indexAddOut;
 }
-}  // namespace l0op
+} // namespace l0op

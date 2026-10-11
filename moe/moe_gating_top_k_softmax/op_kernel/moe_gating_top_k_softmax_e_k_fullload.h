@@ -34,26 +34,25 @@ public:
     __aicore__ inline MoeGatingTopKSoftmaxEKFullLoad(){};
     __aicore__ inline void Init(GM_ADDR gating, GM_ADDR finished, GM_ADDR out, GM_ADDR indicesOut,
                                 GM_ADDR sourceRowsOut, GM_ADDR workspace,
-                                const MoeGatingTopKSoftmaxEKFullLoadTilingData *__restrict tilingData)
+                                const MoeGatingTopKSoftmaxEKFullLoadTilingData* __restrict tilingData)
     {
         ParesTiling(tilingData);
         //   计算核块大小，获取当前核的起始索引
         int64_t formerblockLength = blockFormer * col;
         int64_t blockLength = (GetBlockIdx() != blockNum - 1) ? formerblockLength : blockTail * col;
-        gatingTensorGM.SetGlobalBuffer((__gm__ T *)gating + formerblockLength * GetBlockIdx(), blockLength);
+        gatingTensorGM.SetGlobalBuffer((__gm__ T*)gating + formerblockLength * GetBlockIdx(), blockLength);
         if (finished != nullptr) {
             exitFinished = true;
             int64_t blockLengthFinished = (GetBlockIdx() != blockNum - 1) ? blockFormer : blockTail;
-            finishedTensorGM.SetGlobalBuffer((__gm__ bool *)finished + blockFormer * GetBlockIdx(),
-                                             blockLengthFinished);
+            finishedTensorGM.SetGlobalBuffer((__gm__ bool*)finished + blockFormer * GetBlockIdx(), blockLengthFinished);
         }
 
         int64_t outFormerBlockLength = blockFormer * k;
         int64_t outBlockLength = (GetBlockIdx() != blockNum - 1) ? outFormerBlockLength : blockTail * k;
-        outTensorGM.SetGlobalBuffer((__gm__ T *)out + outFormerBlockLength * GetBlockIdx(), outBlockLength);
-        indicesOutTensorGM.SetGlobalBuffer((__gm__ int32_t *)indicesOut + outFormerBlockLength * GetBlockIdx(),
+        outTensorGM.SetGlobalBuffer((__gm__ T*)out + outFormerBlockLength * GetBlockIdx(), outBlockLength);
+        indicesOutTensorGM.SetGlobalBuffer((__gm__ int32_t*)indicesOut + outFormerBlockLength * GetBlockIdx(),
                                            outBlockLength);
-        sourceRowsOutTensorGM.SetGlobalBuffer((__gm__ int32_t *)sourceRowsOut + outFormerBlockLength * GetBlockIdx(),
+        sourceRowsOutTensorGM.SetGlobalBuffer((__gm__ int32_t*)sourceRowsOut + outFormerBlockLength * GetBlockIdx(),
                                               outBlockLength);
 
         if constexpr (IsSameType<T, bfloat16_t>::value) {
@@ -75,8 +74,8 @@ public:
     {
         int64_t ubLoopCount;
         int32_t curRowNum = ubFormer;
-        SoftMaxTiling *softmaxTilingData = &formerSoftmaxTilingData;
-        TopkTiling *topKTilingData = &formerTopkTilingData;
+        SoftMaxTiling* softmaxTilingData = &formerSoftmaxTilingData;
+        TopkTiling* topKTilingData = &formerTopkTilingData;
         ubLoopCount = (GetBlockIdx() == blockNum - 1) ? ubLoopOfTailBlock : ubLoopOfFormerBlock;
 
         for (int64_t i = 0; i < ubLoopCount - 1; i++) {
@@ -100,7 +99,7 @@ public:
     }
 
 private:
-    __aicore__ inline void CastComputeAlignmentBefore(LocalTensor<float> &dst, LocalTensor<bfloat16_t> &src,
+    __aicore__ inline void CastComputeAlignmentBefore(LocalTensor<float>& dst, LocalTensor<bfloat16_t>& src,
                                                       const int32_t rowCount, const int32_t colCount)
     {
         int32_t repeatTimesOneRow = (colCount * sizeof(float) + COUNTINUOUS_DATA - 1) / COUNTINUOUS_DATA;
@@ -150,7 +149,7 @@ private:
                  repeatParams);
         }
     }
-    __aicore__ inline void CastComputeAlignmentAfter(LocalTensor<bfloat16_t> &dst, LocalTensor<float> &src,
+    __aicore__ inline void CastComputeAlignmentAfter(LocalTensor<bfloat16_t>& dst, LocalTensor<float>& src,
                                                      const int32_t rowCount, const int32_t colCount)
     {
         int32_t repeatTimesOneRow = (colCount * sizeof(float) + COUNTINUOUS_DATA - 1) / COUNTINUOUS_DATA;
@@ -197,7 +196,7 @@ private:
     }
 
     template <typename U>
-    __aicore__ inline void VectorDup(LocalTensor<U> &dst, const int32_t rowCount, const int32_t colCount)
+    __aicore__ inline void VectorDup(LocalTensor<U>& dst, const int32_t rowCount, const int32_t colCount)
     {
         if (colAlign - colCount != 0) {
             // 当对齐后大小与实际大小不一致，需要将 colCount到colAlign之间的数据掩成-1
@@ -214,7 +213,7 @@ private:
         }
     }
 
-    __aicore__ inline void AddsComputeAlignment(LocalTensor<int32_t> &dst, LocalTensor<int32_t> &src,
+    __aicore__ inline void AddsComputeAlignment(LocalTensor<int32_t>& dst, LocalTensor<int32_t>& src,
                                                 const int32_t rowCount, const int32_t colCount)
     {
         int32_t repeatTimesOneRow = (colCount * FLOAT_BYTES + COUNTINUOUS_DATA - 1) / COUNTINUOUS_DATA;
@@ -269,8 +268,8 @@ private:
         }
     }
 
-    __aicore__ inline void Compute(int32_t progress, int32_t curRowsNum, const SoftMaxTiling *softmaxTilingData,
-                                   const TopkTiling *topKTilingData)
+    __aicore__ inline void Compute(int32_t progress, int32_t curRowsNum, const SoftMaxTiling* softmaxTilingData,
+                                   const TopkTiling* topKTilingData)
     {
         SoftMaxShapeInfo softmaxShapeInfoData;
         softmaxShapeInfoData.srcK = colAlign;
@@ -394,7 +393,7 @@ private:
         sourceRowsOutQueue.FreeTensor(sourceRowsOutLocal);
     }
 
-    __aicore__ inline void ParesTiling(const MoeGatingTopKSoftmaxEKFullLoadTilingData *__restrict tilingData)
+    __aicore__ inline void ParesTiling(const MoeGatingTopKSoftmaxEKFullLoadTilingData* __restrict tilingData)
     {
         tilingKey = tilingData->tilingKey;
         row = tilingData->row;

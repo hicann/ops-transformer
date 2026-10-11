@@ -23,15 +23,13 @@
 
 using namespace op;
 
-static aclnnStatus CheckV2(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
-                           const aclTensor *x1Optional, const aclTensor *x2Optional,
-                           const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                           const aclTensor *expertIdxOptional, const aclTensor *out, int64_t dropPadMode)
+static aclnnStatus CheckV2(const aclTensor* expandedX, const aclTensor* expandedRowIdx, const aclTensor* x1Optional,
+                           const aclTensor* x2Optional, const aclTensor* biasOptional, const aclTensor* scalesOptional,
+                           const aclTensor* expertIdxOptional, const aclTensor* out, int64_t dropPadMode)
 {
     if (MoeFinalizeRoutingCheck::Is310P()) {
-        return MoeFinalizeRoutingCheck::CheckParams310P(expandedX, expandedRowIdx, x1Optional, x2Optional,
-                                                        biasOptional, scalesOptional, expertIdxOptional, out,
-                                                        dropPadMode);
+        return MoeFinalizeRoutingCheck::CheckParams310P(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional,
+                                                        scalesOptional, expertIdxOptional, out, dropPadMode);
     } else if (MoeFinalizeRoutingCheck::IsCommonValidationChip()) {
         return MoeFinalizeRoutingCheck::CheckParams(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional,
                                                     scalesOptional, expertIdxOptional, nullptr, nullptr, nullptr,
@@ -45,10 +43,10 @@ extern "C" {
 #endif
 
 ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2GetWorkspaceSize(
-    const aclTensor *expandedX, const aclTensor *expandedRowIdx, const aclTensor *x1Optional,
-    const aclTensor *x2Optional, const aclTensor *biasOptional, const aclTensor *scalesOptional,
-    const aclTensor *expertIdxOptional, int64_t dropPadMode, const aclTensor *out, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor* expandedX, const aclTensor* expandedRowIdx, const aclTensor* x1Optional,
+    const aclTensor* x2Optional, const aclTensor* biasOptional, const aclTensor* scalesOptional,
+    const aclTensor* expertIdxOptional, int64_t dropPadMode, const aclTensor* out, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     L2_DFX_PHASE_1(aclnnMoeFinalizeRoutingV2,
@@ -69,31 +67,31 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2GetWorkspaceSize(
     auto expandedRowIdxContiguous = l0op::Contiguous(expandedRowIdx, uniqueExecutor.get());
     CHECK_RET(expandedRowIdxContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor *x1Contiguous = nullptr;
+    const aclTensor* x1Contiguous = nullptr;
     if (x1Optional != nullptr) {
         x1Contiguous = l0op::Contiguous(x1Optional, uniqueExecutor.get());
         CHECK_RET(x1Contiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor *x2Contiguous = nullptr;
+    const aclTensor* x2Contiguous = nullptr;
     if (x2Optional != nullptr) {
         x2Contiguous = l0op::Contiguous(x2Optional, uniqueExecutor.get());
         CHECK_RET(x2Contiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor *biasContiguous = nullptr;
+    const aclTensor* biasContiguous = nullptr;
     if (biasOptional != nullptr) {
         biasContiguous = l0op::Contiguous(biasOptional, uniqueExecutor.get());
         CHECK_RET(biasContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor *scalesContiguous = nullptr;
+    const aclTensor* scalesContiguous = nullptr;
     if (scalesOptional != nullptr) {
         scalesContiguous = l0op::Contiguous(scalesOptional, uniqueExecutor.get());
         CHECK_RET(scalesContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor *expertIdxContiguous = nullptr;
+    const aclTensor* expertIdxContiguous = nullptr;
     if (expertIdxOptional != nullptr) {
         expertIdxContiguous = l0op::Contiguous(expertIdxOptional, uniqueExecutor.get());
         CHECK_RET(expertIdxContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -116,7 +114,7 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2GetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                 aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMoeFinalizeRoutingV2);

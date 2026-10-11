@@ -28,8 +28,7 @@ static const bool IS_SOFTMAX_REUSE_SOURCE = true;
 static const int32_t FP32_SIZE = 4;
 static const int32_t MAX_COL_IN_UB = 8160; // ubSize/minTypeSize
 
-class MoeGatingTopKSoftmaxV2KRenormTiling : public MoeGatingTopKSoftmaxV2BaseTiling
-{
+class MoeGatingTopKSoftmaxV2KRenormTiling : public MoeGatingTopKSoftmaxV2BaseTiling {
 public:
     explicit MoeGatingTopKSoftmaxV2KRenormTiling(gert::TilingContext* context)
         : MoeGatingTopKSoftmaxV2BaseTiling(context)
@@ -81,9 +80,8 @@ uint64_t MoeGatingTopKSoftmaxV2KRenormTiling::GetTotalTmpSizeInUb(uint32_t kAlig
 
     uint32_t maxValue = 0;
     uint32_t minValue = 0;
-    (void)GetTopKMaxMinTmpSize(
-        ascendcPlatform, kAlign + ubFormerAlign, 1, false, true, TopKMode::TOPK_NORMAL, true, dataTypeSize, maxValue,
-        minValue);
+    (void)GetTopKMaxMinTmpSize(ascendcPlatform, kAlign + ubFormerAlign, 1, false, true, TopKMode::TOPK_NORMAL, true,
+                               dataTypeSize, maxValue, minValue);
     maxValue = maxValue > softmaxUbTmpSize ? maxValue : softmaxUbTmpSize;
 
     uint64_t totalSize = gatingUbTmpSize + topkOutUbTmpSize + topkIndicesOutUbTmpSize + finishUbTmpSize + maxValue;
@@ -137,7 +135,7 @@ ge::graphStatus MoeGatingTopKSoftmaxV2KRenormTiling::DoOpTiling()
     if (!CalculateParamInUb()) {
         std::string kStr = std::to_string(k);
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "k", kStr.c_str(),
-            "AutoTiling failed, the attr k is too large for renorm tiling");
+                                              "AutoTiling failed, the attr k is too large for renorm tiling");
         return ge::GRAPH_FAILED;
     }
     tilingData.set_ubLoop(ubLoop);
@@ -161,18 +159,16 @@ ge::graphStatus MoeGatingTopKSoftmaxV2KRenormTiling::DoLibApiTiling()
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
 
-    TopKTilingFunc(
-        ascendcPlatform, kAlign + ubFormerAlignLocal, 1, kAlign, dataTypeSize, true, TopKMode::TOPK_NORMAL, true,
-        tilingData.topkFormerTilingData);
+    TopKTilingFunc(ascendcPlatform, kAlign + ubFormerAlignLocal, 1, kAlign, dataTypeSize, true, TopKMode::TOPK_NORMAL,
+                   true, tilingData.topkFormerTilingData);
 
-    TopKTilingFunc(
-        ascendcPlatform, kAlign + ubTailAlign, 1, kAlign, dataTypeSize, true, TopKMode::TOPK_NORMAL, true,
-        tilingData.topkTailTilingData);
+    TopKTilingFunc(ascendcPlatform, kAlign + ubTailAlign, 1, kAlign, dataTypeSize, true, TopKMode::TOPK_NORMAL, true,
+                   tilingData.topkTailTilingData);
 
     auto softmaxShape = ge::Shape({1, kAlign});
-    SoftMaxTilingFunc(
-        softmaxShape, dataTypeSize, GetSoftMaxMaxTmpSize(softmaxShape, dataTypeSize, IS_SOFTMAX_REUSE_SOURCE),
-        tilingData.ubFormerSoftmaxTilingData);
+    SoftMaxTilingFunc(softmaxShape, dataTypeSize,
+                      GetSoftMaxMaxTmpSize(softmaxShape, dataTypeSize, IS_SOFTMAX_REUSE_SOURCE),
+                      tilingData.ubFormerSoftmaxTilingData);
     return ge::GRAPH_SUCCESS;
 }
 

@@ -78,7 +78,7 @@
             "dtype": "int",
             "value": 1
           },
-  
+
           {
             "name": "group_select_mode",
             "dtype": "int",
@@ -188,7 +188,7 @@
             "dtype": "int",
             "value": 1
           },
-  
+
           {
             "name": "group_select_mode",
             "dtype": "int",
@@ -298,7 +298,7 @@
             "dtype": "int",
             "value": 1
           },
-  
+
           {
             "name": "group_select_mode",
             "dtype": "int",

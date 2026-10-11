@@ -16,7 +16,6 @@
 #include "log/log.h"
 #include "platform/platform_info.h"
 
-
 using namespace ge;
 namespace ops {
 static constexpr size_t DIM_ONE = 1;
@@ -67,14 +66,14 @@ static bool isSameDim(int64_t dim1, int64_t dim2)
     return dim1 == dim2;
 }
 
-static ge::graphStatus CheckInputShape(
-    const gert::InferShapeContext* context, const gert::Shape* xShape, const gert::Shape* expertIdxShape)
+static ge::graphStatus CheckInputShape(const gert::InferShapeContext* context, const gert::Shape* xShape,
+                                       const gert::Shape* expertIdxShape)
 {
     int64_t x_n = xShape->GetDimNum() == 1U ? OTHER_SHAPE : xShape->GetDim(0);
     int64_t cols = xShape->GetDimNum() == 1U ? OTHER_SHAPE : xShape->GetDim(1);
     if (x_n < OTHER_SHAPE || cols < OTHER_SHAPE) {
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", Ops::Base::ToString(*xShape).c_str(),
-            "The shape of x should not contain a dimension less than -1");
+                                              "The shape of x should not contain a dimension less than -1");
         return ge::GRAPH_FAILED;
     }
 
@@ -82,22 +81,22 @@ static ge::graphStatus CheckInputShape(
     int64_t expert_idx_k = expertIdxShape->GetDimNum() == 1U ? OTHER_SHAPE : expertIdxShape->GetDim(1);
     if (expert_idx_n < OTHER_SHAPE || expert_idx_k < OTHER_SHAPE) {
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "expertIdx",
-            Ops::Base::ToString(*expertIdxShape).c_str(),
-            "The shape of expertIdx should not contain a dimension less than -1");
+                                              Ops::Base::ToString(*expertIdxShape).c_str(),
+                                              "The shape of expertIdx should not contain a dimension less than -1");
         return ge::GRAPH_FAILED;
     }
 
     if (!isSameDim(x_n, expert_idx_n)) {
         std::string shapeMsg = std::to_string(x_n) + " and " + std::to_string(expert_idx_n);
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "x and expertIdx", shapeMsg.c_str(),
-            "The first dim of x and expertIdx should be equal");
+                                               "The first dim of x and expertIdx should be equal");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckParm(
-    const gert::InferShapeContext* context, MoeInitRoutingQuantV2InputParam moeInitRoutingQuantV2InputParam)
+static ge::graphStatus CheckParm(const gert::InferShapeContext* context,
+                                 MoeInitRoutingQuantV2InputParam moeInitRoutingQuantV2InputParam)
 {
     const gert::Shape* xShape = moeInitRoutingQuantV2InputParam.xShape;
     const gert::Shape* expertIdxShape = moeInitRoutingQuantV2InputParam.expertIdxShape;
@@ -109,8 +108,8 @@ static ge::graphStatus CheckParm(
     const int64_t quantMode = moeInitRoutingQuantV2InputParam.quantMode;
     if (xShape->GetDimNum() == 1U) {
         if (xShape->GetDim(0) != ge::UNKNOWN_DIM_NUM) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x",
-                Ops::Base::ToString(*xShape).c_str(), "The dynamic dim of x should be -2");
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", Ops::Base::ToString(*xShape).c_str(),
+                                                  "The dynamic dim of x should be -2");
             return ge::GRAPH_FAILED;
         }
     } else if (xShape->GetDimNum() != DIM_TWO) {
@@ -122,7 +121,8 @@ static ge::graphStatus CheckParm(
     if (expertIdxShape->GetDimNum() == 1U) {
         if (expertIdxShape->GetDim(0) != ge::UNKNOWN_DIM_NUM) {
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "expertIdx",
-                Ops::Base::ToString(*expertIdxShape).c_str(), "The dynamic dim of expertIdx should be -2");
+                                                  Ops::Base::ToString(*expertIdxShape).c_str(),
+                                                  "The dynamic dim of expertIdx should be -2");
             return ge::GRAPH_FAILED;
         }
     } else if (expertIdxShape->GetDimNum() != DIM_TWO) {
@@ -131,30 +131,30 @@ static ge::graphStatus CheckParm(
         return ge::GRAPH_FAILED;
     }
     if (activeNum < 0) {
-        OP_LOGE_WITH_INVALID_ATTR(
-            context->GetNodeName(), "activeNum", std::to_string(activeNum).c_str(), "greater than or equal to 0");
+        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "activeNum", std::to_string(activeNum).c_str(),
+                                  "greater than or equal to 0");
         return ge::GRAPH_FAILED;
     }
     if (expertCapacity < 0) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expertCapacity",
-            std::to_string(expertCapacity).c_str(), "greater than or equal to 0");
+        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expertCapacity", std::to_string(expertCapacity).c_str(),
+                                  "greater than or equal to 0");
         return ge::GRAPH_FAILED;
     }
     if (expertNum < 0) {
-        OP_LOGE_WITH_INVALID_ATTR(
-            context->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(), "greater than or equal to 0");
+        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),
+                                  "greater than or equal to 0");
         return ge::GRAPH_FAILED;
     }
     if (dropPadMode < 0 || dropPadMode > 1) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "dropPadMode",
-            std::to_string(dropPadMode).c_str(), "0 or 1");
+        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "dropPadMode", std::to_string(dropPadMode).c_str(), "0 or 1");
         return ge::GRAPH_FAILED;
     }
     bool dropLessCheck = (dropPadMode > 0 && (expertCapacity < 1 || expertNum < 1));
     if (dropLessCheck) {
         std::string valueMsg = std::to_string(expertCapacity) + " and " + std::to_string(expertNum);
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "expertCapacity and expertNum",
-            valueMsg.c_str(), "The expertCapacity and expertNum should be greater than 0 when dropPadMode is 1");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "expertCapacity and expertNum", valueMsg.c_str(),
+            "The expertCapacity and expertNum should be greater than 0 when dropPadMode is 1");
         return ge::GRAPH_FAILED;
     }
 
@@ -162,20 +162,21 @@ static ge::graphStatus CheckParm(
         (expertTokensCountOrCumsumFlag < 0 || expertTokensCountOrCumsumFlag > EXPERT_TOKENS_COUNT);
     if (expertTokensCountOrCumsumFlagCheck) {
         OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expertTokensCountOrCumsumFlag",
-            std::to_string(expertTokensCountOrCumsumFlag).c_str(), "0, 1 or 2");
+                                  std::to_string(expertTokensCountOrCumsumFlag).c_str(), "0, 1 or 2");
         return ge::GRAPH_FAILED;
     }
     bool expertNumCheck = (expertTokensCountOrCumsumFlag > 0 && expertNum <= 0);
     if (expertNumCheck) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "expertNum",
-            std::to_string(expertNum).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),
             "The expertNum should be greater than 0 when expertTokensCountOrCumsumFlag is greater than 0");
         return ge::GRAPH_FAILED;
     }
     bool tokenNumCheck = (dropPadMode > 0 && xShape->GetDim(0) > 0 && expertCapacity > xShape->GetDim(0));
     if (tokenNumCheck) {
         std::string shapeMsg = std::to_string(xShape->GetDim(0)) + " and " + std::to_string(expertCapacity);
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "x and expertCapacity", shapeMsg.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            context->GetNodeName(), "x and expertCapacity", shapeMsg.c_str(),
             "The first dim of x cannot be less than expertCapacity when dropPadMode is 1");
         return ge::GRAPH_FAILED;
     }
@@ -192,7 +193,7 @@ static ge::graphStatus CheckScaleOffset(gert::InferShapeContext* context, const 
     if (shape->GetDimNum() == 1U) {
         if (shape->GetDim(0) != ge::UNKNOWN_DIM_NUM && shape->GetDim(0) != OTHER_SHAPE && shape->GetDim(0) != 1) {
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), tag, Ops::Base::ToString(*shape).c_str(),
-                "The shape dim should be -2, -1 or 1");
+                                                  "The shape dim should be -2, -1 or 1");
             return ge::GRAPH_FAILED;
         }
     } else {
@@ -203,9 +204,8 @@ static ge::graphStatus CheckScaleOffset(gert::InferShapeContext* context, const 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckScaleOffsetInput(
-    gert::InferShapeContext* context, const int64_t quantMode, const int64_t expertNum,
-    const int64_t cols)
+static ge::graphStatus CheckScaleOffsetInput(gert::InferShapeContext* context, const int64_t quantMode,
+                                             const int64_t expertNum, const int64_t cols)
 {
     const gert::Shape* scaleShape = context->GetOptionalInputShape(INDEX_INPUT_SCALE);
     if (quantMode == 0) {
@@ -226,7 +226,8 @@ static ge::graphStatus CheckScaleOffsetInput(
         if (scaleShape->GetDimNum() == 1U) {
             if (scaleShape->GetDim(0) != ge::UNKNOWN_DIM_NUM) {
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "scale",
-                    Ops::Base::ToString(*scaleShape).c_str(), "The dynamic dim of scale should be -2");
+                                                      Ops::Base::ToString(*scaleShape).c_str(),
+                                                      "The dynamic dim of scale should be -2");
                 return ge::GRAPH_FAILED;
             }
         } else if (scaleShape->GetDimNum() != DIM_TWO) {
@@ -238,19 +239,20 @@ static ge::graphStatus CheckScaleOffsetInput(
         int64_t sdm = scaleShape->GetDimNum() == 1U ? OTHER_SHAPE : scaleShape->GetDim(1);
         if (fdm < OTHER_SHAPE || sdm < OTHER_SHAPE) {
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "scale",
-                Ops::Base::ToString(*scaleShape).c_str(),
-                "The shape of scale should not contain a dimension less than -1");
+                                                  Ops::Base::ToString(*scaleShape).c_str(),
+                                                  "The shape of scale should not contain a dimension less than -1");
             return ge::GRAPH_FAILED;
         }
         if (fdm != OTHER_SHAPE && fdm != 1 && fdm != expertNum) {
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "scale",
-                Ops::Base::ToString(*scaleShape).c_str(), "The first dim of scale should be -1, 1 or expertNum");
+                                                  Ops::Base::ToString(*scaleShape).c_str(),
+                                                  "The first dim of scale should be -1, 1 or expertNum");
             return ge::GRAPH_FAILED;
         }
         if (sdm != OTHER_SHAPE && cols != OTHER_SHAPE && sdm != cols) {
             std::string shapeMsg = std::to_string(sdm) + " and " + std::to_string(cols);
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "scale and x", shapeMsg.c_str(),
-                "The second dim of scale and x should be equal");
+                                                   "The second dim of scale and x should be equal");
             return ge::GRAPH_FAILED;
         }
     }
@@ -367,21 +369,20 @@ static ge::graphStatus InferShape4MoeInitRoutingQuantV2(gert::InferShapeContext*
         return ge::GRAPH_FAILED;
     }
 
-    MoeInitRoutingQuantV2InputParam moeInitRoutingQuantV2InputParam = {
-        xShape,
-        expertIdxShape,
-        expandedXShape,
-        expandedRowIdx,
-        expertTokensBeforeCapacityShape,
-        expertTokensCountOrCumsumShape,
-        dynamicQuantScaleShape,
-        activeNum,
-        expertNum,
-        expertCapacity,
-        dropPadMode,
-        expertTokensBeforeCapacityFlag,
-        expertTokensCountOrCumsumFlag,
-        quantMode};
+    MoeInitRoutingQuantV2InputParam moeInitRoutingQuantV2InputParam = {xShape,
+                                                                       expertIdxShape,
+                                                                       expandedXShape,
+                                                                       expandedRowIdx,
+                                                                       expertTokensBeforeCapacityShape,
+                                                                       expertTokensCountOrCumsumShape,
+                                                                       dynamicQuantScaleShape,
+                                                                       activeNum,
+                                                                       expertNum,
+                                                                       expertCapacity,
+                                                                       dropPadMode,
+                                                                       expertTokensBeforeCapacityFlag,
+                                                                       expertTokensCountOrCumsumFlag,
+                                                                       quantMode};
 
     if (CheckParm(context, moeInitRoutingQuantV2InputParam) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;

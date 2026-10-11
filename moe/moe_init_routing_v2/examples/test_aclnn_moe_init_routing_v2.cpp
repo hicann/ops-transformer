@@ -13,23 +13,25 @@
 #include <iostream>
 #include <vector>
 #define CHECK_RET(cond, return_expr) \
-  do {                               \
-    if (!(cond)) {                   \
-      return_expr;                   \
-    }                                \
-  } while (0)
-#define LOG_PRINT(message, ...)     \
-  do {                              \
-    printf(message, ##__VA_ARGS__); \
-  } while (0)
-int64_t GetShapeSize(const std::vector<int64_t>& shape) {
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
+    } while (0)
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
+    } while (0)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
+{
     int64_t shape_size = 1;
     for (auto i : shape) {
         shape_size *= i;
     }
     return shape_size;
 }
-int Init(int32_t deviceId, aclrtStream* stream) {
+int Init(int32_t deviceId, aclrtStream* stream)
+{
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -41,7 +43,8 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 }
 template <typename T>
 int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor) {
+                    aclDataType dataType, aclTensor** tensor)
+{
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -59,7 +62,8 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
                               shape.data(), shape.size(), *deviceAddr);
     return 0;
 }
-int main() {
+int main()
+{
     // 1. 固定写法，device/stream初始化, 参考acl对外接口列表
     // 根据自己的实际device填写deviceId
     int32_t deviceId = 0;
@@ -100,18 +104,26 @@ int main() {
     ret = CreateAclTensor(expertIdxHostData, idxShape, &expertIdxDeviceAddr, aclDataType::ACL_INT32, &expertIdx);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建out aclTensor
-    ret = CreateAclTensor(expandedXOutHostData, expandedXOutShape, &expandedXOutDeviceAddr, aclDataType::ACL_FLOAT, &expandedXOut);
+    ret = CreateAclTensor(expandedXOutHostData, expandedXOutShape, &expandedXOutDeviceAddr, aclDataType::ACL_FLOAT,
+                          &expandedXOut);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(expandedRowIdxOutHostData, idxOutShape, &expandedRowIdxOutDeviceAddr, aclDataType::ACL_INT32, &expandedRowIdxOut);
+    ret = CreateAclTensor(expandedRowIdxOutHostData, idxOutShape, &expandedRowIdxOutDeviceAddr, aclDataType::ACL_INT32,
+                          &expandedRowIdxOut);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(expertTokensBeforeCapacityOutHostData, expertTokenOutShape, &expertTokenBeforeCapacityOutDeviceAddr, aclDataType::ACL_INT32, &expertTokensBeforeCapacityOut);
+    ret = CreateAclTensor(expertTokensBeforeCapacityOutHostData, expertTokenOutShape,
+                          &expertTokenBeforeCapacityOutDeviceAddr, aclDataType::ACL_INT32,
+                          &expertTokensBeforeCapacityOut);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 3. 调用CANN算子库API，需要修改为具体的API
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor;
     // 调用aclnnMoeInitRoutingV2第一段接口
-    ret = aclnnMoeInitRoutingV2GetWorkspaceSize(x, expertIdx, activeNum, expertCapacity, expertNum, dropPadMode, expertTokensCountOrCumsumFlag, expertTokensBeforeCapacityFlag, expandedXOut, expandedRowIdxOut, nullptr, expertTokensBeforeCapacityOut, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMoeInitRoutingV2GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+    ret = aclnnMoeInitRoutingV2GetWorkspaceSize(x, expertIdx, activeNum, expertCapacity, expertNum, dropPadMode,
+                                                expertTokensCountOrCumsumFlag, expertTokensBeforeCapacityFlag,
+                                                expandedXOut, expandedRowIdxOut, nullptr, expertTokensBeforeCapacityOut,
+                                                &workspaceSize, &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMoeInitRoutingV2GetWorkspaceSize failed. ERROR: %d\n", ret);
+              return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
     void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
@@ -127,23 +139,25 @@ int main() {
     // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
     auto expandedXOutSize = GetShapeSize(expandedXOutShape);
     std::vector<float> expandedXOutData(expandedXOutSize, 0);
-    ret = aclrtMemcpy(expandedXOutData.data(), expandedXOutData.size() * sizeof(expandedXOutData[0]), expandedXOutDeviceAddr, expandedXOutSize * sizeof(float),
-                      ACL_MEMCPY_DEVICE_TO_HOST);
+    ret = aclrtMemcpy(expandedXOutData.data(), expandedXOutData.size() * sizeof(expandedXOutData[0]),
+                      expandedXOutDeviceAddr, expandedXOutSize * sizeof(float), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t i = 0; i < expandedXOutSize; i++) {
         LOG_PRINT("expandedXOutData[%ld] is: %f\n", i, expandedXOutData[i]);
     }
     auto expandedRowIdxOutSize = GetShapeSize(idxOutShape);
     std::vector<int> expandedRowIdxOutData(expandedRowIdxOutSize, 0);
-    ret = aclrtMemcpy(expandedRowIdxOutData.data(), expandedRowIdxOutData.size() * sizeof(expandedRowIdxOutData[0]), expandedRowIdxOutDeviceAddr, expandedRowIdxOutSize * sizeof(int32_t),
-                      ACL_MEMCPY_DEVICE_TO_HOST);
+    ret = aclrtMemcpy(expandedRowIdxOutData.data(), expandedRowIdxOutData.size() * sizeof(expandedRowIdxOutData[0]),
+                      expandedRowIdxOutDeviceAddr, expandedRowIdxOutSize * sizeof(int32_t), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t i = 0; i < expandedRowIdxOutSize; i++) {
         LOG_PRINT("expandedRowIdxOutData[%ld] is: %d\n", i, expandedRowIdxOutData[i]);
     }
     auto expertTokensBeforeCapacityOutSize = GetShapeSize(expertTokenOutShape);
     std::vector<int> expertTokenIdxOutData(expertTokensBeforeCapacityOutSize, 0);
-    ret = aclrtMemcpy(expertTokenIdxOutData.data(), expertTokenIdxOutData.size() * sizeof(expertTokenIdxOutData[0]), expertTokenBeforeCapacityOutDeviceAddr, expertTokensBeforeCapacityOutSize * sizeof(int32_t), ACL_MEMCPY_DEVICE_TO_HOST);
+    ret = aclrtMemcpy(expertTokenIdxOutData.data(), expertTokenIdxOutData.size() * sizeof(expertTokenIdxOutData[0]),
+                      expertTokenBeforeCapacityOutDeviceAddr, expertTokensBeforeCapacityOutSize * sizeof(int32_t),
+                      ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t i = 0; i < expertTokensBeforeCapacityOutSize; i++) {
         LOG_PRINT("expertTokenIdxOutData[%ld] is: %d\n", i, expertTokenIdxOutData[i]);
@@ -162,7 +176,7 @@ int main() {
     aclrtFree(expandedRowIdxOutDeviceAddr);
     aclrtFree(expertTokenBeforeCapacityOutDeviceAddr);
     if (workspaceSize > 0) {
-      aclrtFree(workspaceAddr);
+        aclrtFree(workspaceAddr);
     }
     aclrtDestroyStream(stream);
     aclrtResetDevice(deviceId);

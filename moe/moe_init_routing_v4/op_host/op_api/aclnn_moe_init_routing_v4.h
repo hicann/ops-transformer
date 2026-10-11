@@ -45,17 +45,13 @@ extern "C" {
  * @return ACLNN_SUCCESS表示成功，其他值表示失败
  */
 ACLNN_API aclnnStatus aclnnMoeInitRoutingV4GetWorkspaceSize(
-    const aclTensor *x, const aclTensor *expertIdx,
-    const aclTensor *scaleOptional, const aclTensor *offsetOptional,
-    const aclTensor *activeNumOptional, const aclTensor *topkWeightOptional,
-    int64_t expertCapacity, int64_t expertNum, int64_t dropPadMode,
-    int64_t expertTokensNumType, bool expertTokensNumFlag,
-    int64_t quantMode, const aclIntArray *activeExpertRangeOptional,
-    int64_t rowIdxType,
-    const aclTensor *expandedXOut, const aclTensor *expandedRowIdxOut,
-    const aclTensor *expertTokensCountOrCumsumOut,
-    const aclTensor *expandedScaleOut, const aclTensor *expandedTopkWeightOut,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* x, const aclTensor* expertIdx, const aclTensor* scaleOptional, const aclTensor* offsetOptional,
+    const aclTensor* activeNumOptional, const aclTensor* topkWeightOptional, int64_t expertCapacity, int64_t expertNum,
+    int64_t dropPadMode, int64_t expertTokensNumType, bool expertTokensNumFlag, int64_t quantMode,
+    const aclIntArray* activeExpertRangeOptional, int64_t rowIdxType, const aclTensor* expandedXOut,
+    const aclTensor* expandedRowIdxOut, const aclTensor* expertTokensCountOrCumsumOut,
+    const aclTensor* expandedScaleOut, const aclTensor* expandedTopkWeightOut, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
 /* @brief aclnnMoeInitRoutingV4的第二段接口，用于执行计算。 */
 ACLNN_API aclnnStatus aclnnMoeInitRoutingV4(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,

@@ -31,7 +31,7 @@ namespace optiling {
 
 class MoeGatingTopKBackwardTilingArch35 : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeGatingTopKBackwardTilingArch35(gert::TilingContext *context);
+    explicit MoeGatingTopKBackwardTilingArch35(gert::TilingContext* context);
     ~MoeGatingTopKBackwardTilingArch35() override = default;
 
 protected:
@@ -55,10 +55,10 @@ private:
     ge::graphStatus SplitRows();
     void DumpTiling();
 
-    const gert::Shape *xNormShape_ = nullptr;
-    const gert::Shape *gradYShape_ = nullptr;
-    const gert::Shape *expertIdxShape_ = nullptr;
-    const gert::Shape *outputGradXShape_ = nullptr;
+    const gert::Shape* xNormShape_ = nullptr;
+    const gert::Shape* gradYShape_ = nullptr;
+    const gert::Shape* expertIdxShape_ = nullptr;
+    const gert::Shape* outputGradXShape_ = nullptr;
 
     ge::DataType gradYDtype_;
 

@@ -50,8 +50,8 @@ static constexpr int64_t TOKENS_REQUIRED_DIM = 2;
 static constexpr int64_t INDICES_MIN_DIM = 1;
 static constexpr int64_t INDICES_MAX_DIM = 2;
 
-static inline bool CheckNotNull(const aclTensor *tokens, const aclTensor *indices, const aclTensor *permuteTokensOut,
-                                const aclTensor *sortedIndicesOut, const aclTensor *expandedScaleOut)
+static inline bool CheckNotNull(const aclTensor* tokens, const aclTensor* indices, const aclTensor* permuteTokensOut,
+                                const aclTensor* sortedIndicesOut, const aclTensor* expandedScaleOut)
 {
     OP_CHECK_NULL(tokens, return false);
     OP_CHECK_NULL(indices, return false);
@@ -61,8 +61,8 @@ static inline bool CheckNotNull(const aclTensor *tokens, const aclTensor *indice
     return true;
 }
 
-static inline bool CheckDtypeValidRegbase(const aclTensor *tokens, const aclTensor *indices,
-                                          const aclTensor *permuteTokensOut, const aclTensor *sortedIndicesOut)
+static inline bool CheckDtypeValidRegbase(const aclTensor* tokens, const aclTensor* indices,
+                                          const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut)
 {
     if (tokens != nullptr && tokens->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(tokens, MOE_DTYPE_SUPPORT_LIST_X, return false);
@@ -80,7 +80,7 @@ static inline bool CheckDtypeValidRegbase(const aclTensor *tokens, const aclTens
     return true;
 }
 
-static inline bool CheckShapeValid(const aclTensor *tokens, const aclTensor *indices)
+static inline bool CheckShapeValid(const aclTensor* tokens, const aclTensor* indices)
 {
     auto tokensDimNum = tokens->GetViewShape().GetDimNum();
     OP_CHECK(tokensDimNum == TOKENS_REQUIRED_DIM,
@@ -96,9 +96,9 @@ static inline bool CheckShapeValid(const aclTensor *tokens, const aclTensor *ind
     return true;
 }
 
-static inline bool CheckDtypeValidV2Regbase(const aclTensor *tokens, const aclTensor *indices, int64_t quantMode,
-                                            const aclTensor *permuteTokensOut, const aclTensor *sortedIndicesOut,
-                                            const aclTensor *expandedScaleOut)
+static inline bool CheckDtypeValidV2Regbase(const aclTensor* tokens, const aclTensor* indices, int64_t quantMode,
+                                            const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut,
+                                            const aclTensor* expandedScaleOut)
 {
     if (indices != nullptr && indices->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(indices, MOE_DTYPE_SUPPORT_LIST_EXPERT_IDX_REGBASE, return false);
@@ -130,9 +130,9 @@ static inline bool CheckDtypeValidV2Regbase(const aclTensor *tokens, const aclTe
     return true;
 }
 
-static aclnnStatus CheckParamsV2Regbase(const aclTensor *tokens, const aclTensor *indices, int64_t quantMode,
-                                        const aclTensor *permuteTokensOut, const aclTensor *sortedIndicesOut,
-                                        const aclTensor *expandedScaleOut)
+static aclnnStatus CheckParamsV2Regbase(const aclTensor* tokens, const aclTensor* indices, int64_t quantMode,
+                                        const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut,
+                                        const aclTensor* expandedScaleOut)
 {
     CHECK_RET(CheckNotNull(tokens, indices, permuteTokensOut, sortedIndicesOut, expandedScaleOut),
               ACLNN_ERR_PARAM_NULLPTR);
@@ -142,9 +142,9 @@ static aclnnStatus CheckParamsV2Regbase(const aclTensor *tokens, const aclTensor
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckParamsV2Fallback(const aclTensor *tokens, const aclTensor *indices,
-                                         const aclTensor *permuteTokensOut, const aclTensor *sortedIndicesOut,
-                                         const aclTensor *expandedScaleOut)
+static aclnnStatus CheckParamsV2Fallback(const aclTensor* tokens, const aclTensor* indices,
+                                         const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut,
+                                         const aclTensor* expandedScaleOut)
 {
     CHECK_RET(CheckNotNull(tokens, indices, permuteTokensOut, sortedIndicesOut, expandedScaleOut),
               ACLNN_ERR_PARAM_NULLPTR);
@@ -155,10 +155,10 @@ static aclnnStatus CheckParamsV2Fallback(const aclTensor *tokens, const aclTenso
 
 } // namespace MoeTokenPermuteV2Check
 
-static aclnnStatus BuildMoeInitRoutingV2Executor(const aclTensor *tokens, const aclTensor *indices,
-                                                 int64_t numOutTokens, const aclTensor *permuteTokensOut,
-                                                 const aclTensor *sortedIndicesOut, uint64_t *workspaceSize,
-                                                 aclOpExecutor **executor)
+static aclnnStatus BuildMoeInitRoutingV2Executor(const aclTensor* tokens, const aclTensor* indices,
+                                                 int64_t numOutTokens, const aclTensor* permuteTokensOut,
+                                                 const aclTensor* sortedIndicesOut, uint64_t* workspaceSize,
+                                                 aclOpExecutor** executor)
 {
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -182,7 +182,7 @@ static aclnnStatus BuildMoeInitRoutingV2Executor(const aclTensor *tokens, const 
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus SliceAndViewCopy(const aclTensor *src, const aclTensor *dst, aclOpExecutor *executor)
+static aclnnStatus SliceAndViewCopy(const aclTensor* src, const aclTensor* dst, aclOpExecutor* executor)
 {
     FVector<int64_t> offsets(dst->GetViewShape().GetDimNum(), 0);
     auto size = ToShapeVector(dst->GetViewShape());
@@ -193,9 +193,9 @@ static aclnnStatus SliceAndViewCopy(const aclTensor *src, const aclTensor *dst, 
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus PrepareIndicesForV3(const aclTensor *tokens, const aclTensor *indices,
-                                       const aclTensor **outTokensContiguous, const aclTensor **outIndicesContiguous,
-                                       int64_t *outFullTokenNum, aclOpExecutor *executor)
+static aclnnStatus PrepareIndicesForV3(const aclTensor* tokens, const aclTensor* indices,
+                                       const aclTensor** outTokensContiguous, const aclTensor** outIndicesContiguous,
+                                       int64_t* outFullTokenNum, aclOpExecutor* executor)
 {
     auto tokensContiguous = l0op::Contiguous(tokens, executor);
     CHECK_RET(tokensContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -219,10 +219,10 @@ static aclnnStatus PrepareIndicesForV3(const aclTensor *tokens, const aclTensor 
 }
 
 static aclnnStatus AllocIntermediateTensorsForV3(int64_t fullTokenNum, int64_t quantMode,
-                                                 const aclTensor *permuteTokensOut, const aclTensor *expandedScaleOut,
-                                                 aclTensor **outFullExpandedX, aclTensor **outFullExpandedRowIdx,
-                                                 aclTensor **outExpertTokensCount, aclTensor **outFullExpandedScale,
-                                                 aclIntArray **outActiveExpertRange, aclOpExecutor *executor)
+                                                 const aclTensor* permuteTokensOut, const aclTensor* expandedScaleOut,
+                                                 aclTensor** outFullExpandedX, aclTensor** outFullExpandedRowIdx,
+                                                 aclTensor** outExpertTokensCount, aclTensor** outFullExpandedScale,
+                                                 aclIntArray** outActiveExpertRange, aclOpExecutor* executor)
 {
     op::Shape fullExpandedXShape = permuteTokensOut->GetViewShape();
     fullExpandedXShape.SetDim(0, fullTokenNum);
@@ -264,10 +264,10 @@ static aclnnStatus AllocIntermediateTensorsForV3(int64_t fullTokenNum, int64_t q
 }
 
 static aclnnStatus CallMoeInitRoutingV3AndUnpack(
-    const aclTensor *tokensContiguous, const aclTensor *indicesContiguous, int64_t fullTokenNum, int64_t quantMode,
-    const aclTensor *fullExpandedX, const aclTensor *fullExpandedRowIdx, const aclTensor *expertTokensCount,
-    const aclTensor *fullExpandedScale, const aclIntArray *activeExpertRange, const aclTensor **outExpandedXOut,
-    const aclTensor **outExpandedRowIdxOut, const aclTensor **outExpandedScale, aclOpExecutor *executor)
+    const aclTensor* tokensContiguous, const aclTensor* indicesContiguous, int64_t fullTokenNum, int64_t quantMode,
+    const aclTensor* fullExpandedX, const aclTensor* fullExpandedRowIdx, const aclTensor* expertTokensCount,
+    const aclTensor* fullExpandedScale, const aclIntArray* activeExpertRange, const aclTensor** outExpandedXOut,
+    const aclTensor** outExpandedRowIdxOut, const aclTensor** outExpandedScale, aclOpExecutor* executor)
 {
     auto result = l0op::MoeInitRoutingV3(tokensContiguous, indicesContiguous, nullptr, nullptr, fullTokenNum, 0,
                                          MoeTokenPermuteV2Check::EXPERT_NUM, 0,
@@ -289,11 +289,11 @@ static aclnnStatus CallMoeInitRoutingV3AndUnpack(
 extern "C" {
 #endif
 
-aclnnStatus aclnnMoeTokenPermuteV2GetWorkspaceSize(const aclTensor *tokens, const aclTensor *indices,
+aclnnStatus aclnnMoeTokenPermuteV2GetWorkspaceSize(const aclTensor* tokens, const aclTensor* indices,
                                                    int64_t numOutTokens, bool paddedMode, int64_t quantMode,
-                                                   const aclTensor *permuteTokensOut, const aclTensor *sortedIndicesOut,
-                                                   const aclTensor *expandedScaleOut, uint64_t *workspaceSize,
-                                                   aclOpExecutor **executor)
+                                                   const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut,
+                                                   const aclTensor* expandedScaleOut, uint64_t* workspaceSize,
+                                                   aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     L2_DFX_PHASE_1(aclnnMoeTokenPermuteV2, DFX_IN(tokens, indices, numOutTokens, paddedMode, quantMode),
@@ -327,26 +327,26 @@ aclnnStatus aclnnMoeTokenPermuteV2GetWorkspaceSize(const aclTensor *tokens, cons
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    const aclTensor *tokensContiguous = nullptr;
-    const aclTensor *indicesContiguous = nullptr;
+    const aclTensor* tokensContiguous = nullptr;
+    const aclTensor* indicesContiguous = nullptr;
     int64_t fullTokenNum = 0;
     CHECK_RET(PrepareIndicesForV3(tokens, indices, &tokensContiguous, &indicesContiguous, &fullTokenNum,
                                   uniqueExecutor.get()) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
 
-    aclTensor *fullExpandedX = nullptr;
-    aclTensor *fullExpandedRowIdx = nullptr;
-    aclTensor *expertTokensCount = nullptr;
-    aclTensor *fullExpandedScale = nullptr;
-    aclIntArray *activeExpertRange = nullptr;
+    aclTensor* fullExpandedX = nullptr;
+    aclTensor* fullExpandedRowIdx = nullptr;
+    aclTensor* expertTokensCount = nullptr;
+    aclTensor* fullExpandedScale = nullptr;
+    aclIntArray* activeExpertRange = nullptr;
     CHECK_RET(AllocIntermediateTensorsForV3(fullTokenNum, quantMode, permuteTokensOut, expandedScaleOut, &fullExpandedX,
                                             &fullExpandedRowIdx, &expertTokensCount, &fullExpandedScale,
                                             &activeExpertRange, uniqueExecutor.get()) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor *expandedXOut = nullptr;
-    const aclTensor *expandedRowIdxOut = nullptr;
-    const aclTensor *expandedScale = nullptr;
+    const aclTensor* expandedXOut = nullptr;
+    const aclTensor* expandedRowIdxOut = nullptr;
+    const aclTensor* expandedScale = nullptr;
     CHECK_RET(CallMoeInitRoutingV3AndUnpack(tokensContiguous, indicesContiguous, fullTokenNum, quantMode, fullExpandedX,
                                             fullExpandedRowIdx, expertTokensCount, fullExpandedScale, activeExpertRange,
                                             &expandedXOut, &expandedRowIdxOut, &expandedScale,
@@ -367,7 +367,7 @@ aclnnStatus aclnnMoeTokenPermuteV2GetWorkspaceSize(const aclTensor *tokens, cons
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMoeTokenPermuteV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMoeTokenPermuteV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     static bool isRegbase = Ops::Transformer::AclnnUtil::IsRegbase();
     if (!isRegbase) {

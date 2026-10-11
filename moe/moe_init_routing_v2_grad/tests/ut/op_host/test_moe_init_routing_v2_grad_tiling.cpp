@@ -24,8 +24,8 @@
 using namespace std;
 
 namespace {
-void GetPlatFormInfos(const char *compileInfoStr, map<string, string> &socInfos, map<string, string> &aicoreSpec,
-                      map<string, string> &intrinsics)
+void GetPlatFormInfos(const char* compileInfoStr, map<string, string>& socInfos, map<string, string>& aicoreSpec,
+                      map<string, string>& intrinsics)
 {
     string defaultHardwardInfo = R"({
         "hardware_info": {"BT_SIZE": 0, "load3d_constraints": "1", "Intrinsic_fix_pipe_l0c2out": false,
@@ -39,9 +39,9 @@ void GetPlatFormInfos(const char *compileInfoStr, map<string, string> &socInfos,
     }
 
     map<string, string> socInfoKeys = {{"ai_core_cnt", "CORE_NUM"}, {"l2_size", "L2_SIZE"}};
-    for (auto &t : socInfoKeys) {
+    for (auto& t : socInfoKeys) {
         if (compileInfoJson.contains("hardware_info") && compileInfoJson["hardware_info"].contains(t.second)) {
-            auto &objJson = compileInfoJson["hardware_info"][t.second];
+            auto& objJson = compileInfoJson["hardware_info"][t.second];
             if (objJson.is_number_integer()) {
                 socInfos[t.first] = to_string(compileInfoJson["hardware_info"][t.second].get<uint32_t>());
             }
@@ -52,14 +52,14 @@ void GetPlatFormInfos(const char *compileInfoStr, map<string, string> &socInfos,
     map<string, string> aicoreSpecKeys = {{"ub_size", "UB_SIZE"},    {"l0_a_size", "L0A_SIZE"},
                                           {"l0_b_size", "L0B_SIZE"}, {"l0_c_size", "L0C_SIZE"},
                                           {"l1_size", "L1_SIZE"},    {"bt_size", "BT_SIZE"}};
-    for (auto &t : aicoreSpecKeys) {
+    for (auto& t : aicoreSpecKeys) {
         if (compileInfoJson.contains("hardware_info") && compileInfoJson["hardware_info"].contains(t.second)) {
             aicoreSpec[t.first] = to_string(compileInfoJson["hardware_info"][t.second].get<uint32_t>());
         }
     }
 
     std::string intrinsicsKeys[] = {"Intrinsic_data_move_l12ub", "Intrinsic_data_move_l0c2ub"};
-    for (const string &key : intrinsicsKeys) {
+    for (const string& key : intrinsicsKeys) {
         if (compileInfoJson.contains("hardware_info") && compileInfoJson["hardware_info"].contains(key) &&
             compileInfoJson["hardware_info"][key].get<bool>()) {
             intrinsics[key] = "float16";
@@ -67,7 +67,7 @@ void GetPlatFormInfos(const char *compileInfoStr, map<string, string> &socInfos,
     }
 }
 
-void InitTilingParsePlatform(fe::PlatFormInfos &platformInfo, const char *compileJson)
+void InitTilingParsePlatform(fe::PlatFormInfos& platformInfo, const char* compileJson)
 {
     map<string, string> socInfos;
     map<string, string> aicoreSpec;
@@ -543,7 +543,7 @@ TEST_F(MoeInitRoutingV2GradTiling, moe_init_routing_v2_grad_tiling_invalid_row_i
 
 TEST_F(MoeInitRoutingV2GradTiling, moe_init_routing_v2_grad_tiling_parse_succ_24)
 {
-    const char *compileJson =
+    const char* compileJson =
         R"({"hardware_info": {"UB_SIZE": 65536, "L2_SIZE": 33554432, "L1_SIZE": 524288,
             "L0A_SIZE": 65536, "L0B_SIZE": 65536, "L0C_SIZE": 131072, "CORE_NUM": 40,
             "socVersion": "Ascend910B"}})";
@@ -558,7 +558,7 @@ TEST_F(MoeInitRoutingV2GradTiling, moe_init_routing_v2_grad_tiling_parse_succ_24
                       .IONum(2, 1)
                       .CompiledJson(compileJson)
                       .CompiledInfo(&compileInfo)
-                      .PlatformInfo(reinterpret_cast<const void *>(&platformInfo))
+                      .PlatformInfo(reinterpret_cast<const void*>(&platformInfo))
                       .Build();
     auto parseContext = holder.GetContext();
     ASSERT_NE(parseContext, nullptr);
@@ -569,7 +569,7 @@ TEST_F(MoeInitRoutingV2GradTiling, moe_init_routing_v2_grad_tiling_parse_succ_24
     ASSERT_NE(opImpl, nullptr);
     ASSERT_NE(opImpl->tiling_parse, nullptr);
 
-    EXPECT_EQ(opImpl->tiling_parse(reinterpret_cast<gert::KernelContext *>(parseContext)), ge::GRAPH_SUCCESS);
+    EXPECT_EQ(opImpl->tiling_parse(reinterpret_cast<gert::KernelContext*>(parseContext)), ge::GRAPH_SUCCESS);
     EXPECT_GT(compileInfo.aivNum, 0);
     EXPECT_GT(compileInfo.ubSize, 0);
 }
@@ -944,7 +944,7 @@ TEST_F(MoeInitRoutingV2GradTiling, moe_init_routing_v2_grad_tiling_data_struct_f
 
 TEST_F(MoeInitRoutingV2GradTiling, moe_init_routing_v2_grad_tiling_parse_fail_aivnum_zero_25)
 {
-    const char *compileJson =
+    const char* compileJson =
         R"({"hardware_info": {"UB_SIZE": 65536, "L2_SIZE": 33554432, "L1_SIZE": 524288,
             "L0A_SIZE": 65536, "L0B_SIZE": 65536, "L0C_SIZE": 131072, "CORE_NUM": 0,
             "socVersion": "Ascend910B"}})";
@@ -959,7 +959,7 @@ TEST_F(MoeInitRoutingV2GradTiling, moe_init_routing_v2_grad_tiling_parse_fail_ai
                       .IONum(2, 1)
                       .CompiledJson(compileJson)
                       .CompiledInfo(&compileInfo)
-                      .PlatformInfo(reinterpret_cast<const void *>(&platformInfo))
+                      .PlatformInfo(reinterpret_cast<const void*>(&platformInfo))
                       .Build();
     auto parseContext = holder.GetContext();
     ASSERT_NE(parseContext, nullptr);
@@ -970,13 +970,13 @@ TEST_F(MoeInitRoutingV2GradTiling, moe_init_routing_v2_grad_tiling_parse_fail_ai
     ASSERT_NE(opImpl, nullptr);
     ASSERT_NE(opImpl->tiling_parse, nullptr);
 
-    EXPECT_EQ(opImpl->tiling_parse(reinterpret_cast<gert::KernelContext *>(parseContext)), ge::GRAPH_FAILED);
+    EXPECT_EQ(opImpl->tiling_parse(reinterpret_cast<gert::KernelContext*>(parseContext)), ge::GRAPH_FAILED);
     EXPECT_LE(compileInfo.aivNum, 0);
 }
 
 TEST_F(MoeInitRoutingV2GradTiling, moe_init_routing_v2_grad_tiling_parse_fail_ubsize_zero_26)
 {
-    const char *compileJson =
+    const char* compileJson =
         R"({"hardware_info": {"UB_SIZE": 256, "L2_SIZE": 33554432, "L1_SIZE": 524288,
             "L0A_SIZE": 65536, "L0B_SIZE": 65536, "L0C_SIZE": 131072, "CORE_NUM": 40,
             "socVersion": "Ascend910B"}})";
@@ -991,7 +991,7 @@ TEST_F(MoeInitRoutingV2GradTiling, moe_init_routing_v2_grad_tiling_parse_fail_ub
                       .IONum(2, 1)
                       .CompiledJson(compileJson)
                       .CompiledInfo(&compileInfo)
-                      .PlatformInfo(reinterpret_cast<const void *>(&platformInfo))
+                      .PlatformInfo(reinterpret_cast<const void*>(&platformInfo))
                       .Build();
     auto parseContext = holder.GetContext();
     ASSERT_NE(parseContext, nullptr);
@@ -1002,7 +1002,7 @@ TEST_F(MoeInitRoutingV2GradTiling, moe_init_routing_v2_grad_tiling_parse_fail_ub
     ASSERT_NE(opImpl, nullptr);
     ASSERT_NE(opImpl->tiling_parse, nullptr);
 
-    EXPECT_EQ(opImpl->tiling_parse(reinterpret_cast<gert::KernelContext *>(parseContext)), ge::GRAPH_FAILED);
+    EXPECT_EQ(opImpl->tiling_parse(reinterpret_cast<gert::KernelContext*>(parseContext)), ge::GRAPH_FAILED);
     EXPECT_GT(compileInfo.aivNum, 0);
     EXPECT_EQ(compileInfo.ubSize, 0U);
 }
@@ -1013,7 +1013,7 @@ TEST_F(MoeInitRoutingV2GradTiling, moe_init_routing_v2_grad_tiling_compile_info_
     EXPECT_EQ(defaultInfo.aivNum, 0);
     EXPECT_EQ(defaultInfo.ubSize, 0U);
 
-    auto *heapInfo = new optiling::MoeInitRoutingV2GradCompileInfo();
+    auto* heapInfo = new optiling::MoeInitRoutingV2GradCompileInfo();
     EXPECT_EQ(heapInfo->aivNum, 0);
     EXPECT_EQ(heapInfo->ubSize, 0U);
     delete heapInfo;

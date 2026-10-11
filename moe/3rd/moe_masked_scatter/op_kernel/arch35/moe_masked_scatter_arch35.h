@@ -30,8 +30,8 @@ constexpr int64_t CUSTOM_OFFSET = 32;
 
 template <typename T, typename U>
 __simt_vf__ __aicore__ LAUNCH_BOUND(USED_THREAD_NUMS) inline void MoeMaskedScatterSimt(
-    int64_t curCoreHandleData, U preCoreMaskSum, __gm__ T *xGm, __gm__ bool *maskGm, __gm__ T *updatesGm, __gm__ T *yGm,
-    __gm__ U *prefixSumGm)
+    int64_t curCoreHandleData, U preCoreMaskSum, __gm__ T* xGm, __gm__ bool* maskGm, __gm__ T* updatesGm, __gm__ T* yGm,
+    __gm__ U* prefixSumGm)
 {
     for (int64_t i = threadIdx.x; i < curCoreHandleData; i += blockDim.x) {
         if (maskGm[i] == 0) {
@@ -44,8 +44,8 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(USED_THREAD_NUMS) inline void MoeMaskedScatt
 
 template <typename T, typename U>
 __simt_vf__ __aicore__ LAUNCH_BOUND(USED_THREAD_NUMS) void MoeMaskedScatterToUBSimt(
-    int64_t curLoopHandleData, U preCoreMaskSum, __local_mem__ T *x, __local_mem__ bool *mask, __gm__ T *updatesGm,
-    __local_mem__ T *y, __gm__ U *prefixSumGm)
+    int64_t curLoopHandleData, U preCoreMaskSum, __local_mem__ T* x, __local_mem__ bool* mask, __gm__ T* updatesGm,
+    __local_mem__ T* y, __gm__ U* prefixSumGm)
 {
     for (int64_t i = threadIdx.x; i < curLoopHandleData; i += blockDim.x) {
         if (mask[i] == 0) {
@@ -59,20 +59,20 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(USED_THREAD_NUMS) void MoeMaskedScatterToUBS
 template <typename T, typename U>
 class MoeMaskedScatterImpl {
 public:
-    __aicore__ inline MoeMaskedScatterImpl(const MoeMaskedScatterTilingData &tilingData, TPipe &pipe)
+    __aicore__ inline MoeMaskedScatterImpl(const MoeMaskedScatterTilingData& tilingData, TPipe& pipe)
         : tilingData_(tilingData),
           pipe_(pipe){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR mask, GM_ADDR updates, GM_ADDR y, GM_ADDR workspace);
     __aicore__ inline void CopyInMask(int64_t offset, int64_t dataLen);
     __aicore__ inline void CopyInX(int64_t offset, int64_t dataLen);
     __aicore__ inline void ComputePrefixSum(int64_t dataLen);
-    __aicore__ inline void ComputeSingleLoopPrefixSum(uint32_t dataLen, __ubuf__ int32_t *prefixSumAddr,
-                                                      __ubuf__ int32_t *tmpAddr);
+    __aicore__ inline void ComputeSingleLoopPrefixSum(uint32_t dataLen, __ubuf__ int32_t* prefixSumAddr,
+                                                      __ubuf__ int32_t* tmpAddr);
     template <bool isCopyOutMaskSum = false, bool notNeedCopyPrefixSum = false>
     __aicore__ inline void CopyOutMask(int64_t offset, int64_t dataLen);
     __aicore__ inline void CopyOutY(int64_t offset, int64_t dataLen);
     __aicore__ inline void ComputePreCoreMaskSum();
-    __aicore__ inline void CustomReduceSum(const LocalTensor<U> &dst, const LocalTensor<U> &src, uint16_t dataLen);
+    __aicore__ inline void CustomReduceSum(const LocalTensor<U>& dst, const LocalTensor<U>& src, uint16_t dataLen);
     __aicore__ inline void MoeMaskedScatterToUB(int64_t offset, int64_t dataLen);
     __aicore__ inline void ProcessLowBit(int64_t curCoreHandleData);
     __aicore__ inline void Process();
@@ -90,8 +90,8 @@ private:
     TBuf<QuePosition::VECCALC> tmpBuf_;
     TQue<QuePosition::VECOUT, 1> prefixSumQueue_;
     TQue<QuePosition::VECOUT, 1> yQueue_;
-    TPipe &pipe_;
-    const MoeMaskedScatterTilingData &tilingData_;
+    TPipe& pipe_;
+    const MoeMaskedScatterTilingData& tilingData_;
     U curMaskSum_{0};
     U preCoreMaskSum_{0};
 };
@@ -100,12 +100,12 @@ template <typename T, typename U>
 __aicore__ inline void MoeMaskedScatterImpl<T, U>::Init(GM_ADDR x, GM_ADDR mask, GM_ADDR updates, GM_ADDR y,
                                                         GM_ADDR workspace)
 {
-    xGm_.SetGlobalBuffer((__gm__ T *)(x) + GetBlockIdx() * tilingData_.normalCoreData);
-    updatesGm_.SetGlobalBuffer((__gm__ T *)(updates));
-    yGm_.SetGlobalBuffer((__gm__ T *)(y) + GetBlockIdx() * tilingData_.normalCoreData);
-    maskGm_.SetGlobalBuffer((__gm__ bool *)(mask) + GetBlockIdx() * tilingData_.normalCoreData);
-    maskSumGm_.SetGlobalBuffer((__gm__ U *)(workspace), GetBlockNum());
-    prefixSumGm_.SetGlobalBuffer((__gm__ U *)(workspace) + GetBlockNum() + GetBlockIdx() * tilingData_.normalCoreData);
+    xGm_.SetGlobalBuffer((__gm__ T*)(x) + GetBlockIdx() * tilingData_.normalCoreData);
+    updatesGm_.SetGlobalBuffer((__gm__ T*)(updates));
+    yGm_.SetGlobalBuffer((__gm__ T*)(y) + GetBlockIdx() * tilingData_.normalCoreData);
+    maskGm_.SetGlobalBuffer((__gm__ bool*)(mask) + GetBlockIdx() * tilingData_.normalCoreData);
+    maskSumGm_.SetGlobalBuffer((__gm__ U*)(workspace), GetBlockNum());
+    prefixSumGm_.SetGlobalBuffer((__gm__ U*)(workspace) + GetBlockNum() + GetBlockIdx() * tilingData_.normalCoreData);
     prefixSumGmTmp_ = prefixSumGm_[1];
     pipe_.InitBuffer(maskQueue_, DOUBLE_BUFFER, tilingData_.ubFactor);
     pipe_.InitBuffer(tmpBuf_, tilingData_.ubFactor * sizeof(U));
@@ -150,8 +150,8 @@ __aicore__ inline void MoeMaskedScatterImpl<T, U>::ComputePrefixSum(int64_t data
 {
     LocalTensor<U> prefixSumLocal = prefixSumQueue_.AllocTensor<U>();
     LocalTensor<int32_t> tmpLocal = tmpBuf_.Get<int32_t>();
-    auto prefixSumAddr = (__ubuf__ int32_t *)prefixSumLocal.GetPhyAddr();
-    auto tmpAddr = (__ubuf__ int32_t *)tmpLocal.GetPhyAddr();
+    auto prefixSumAddr = (__ubuf__ int32_t*)prefixSumLocal.GetPhyAddr();
+    auto tmpAddr = (__ubuf__ int32_t*)tmpLocal.GetPhyAddr();
     ComputeSingleLoopPrefixSum(dataLen, tmpAddr, prefixSumAddr);
     if constexpr (sizeof(U) == sizeof(int32_t)) {
         Adds(prefixSumLocal, tmpLocal, curMaskSum_, dataLen);
@@ -168,11 +168,11 @@ __aicore__ inline void MoeMaskedScatterImpl<T, U>::ComputePrefixSum(int64_t data
 
 template <typename T, typename U>
 __aicore__ inline void MoeMaskedScatterImpl<T, U>::ComputeSingleLoopPrefixSum(uint32_t dataLen,
-                                                                              __ubuf__ int32_t *prefixSumAddr,
-                                                                              __ubuf__ int32_t *tmpAddr)
+                                                                              __ubuf__ int32_t* prefixSumAddr,
+                                                                              __ubuf__ int32_t* tmpAddr)
 {
     LocalTensor<bool> maskLocal = maskQueue_.DeQue<bool>();
-    auto maskAddr = (__ubuf__ uint8_t *)maskLocal.GetPhyAddr();
+    auto maskAddr = (__ubuf__ uint8_t*)maskLocal.GetPhyAddr();
     uint32_t vfLen = Ops::Base::GetVRegSize() / sizeof(int32_t);
     uint32_t rows = vfLen;
     uint32_t cols = (dataLen + vfLen - 1) / vfLen;
@@ -194,7 +194,7 @@ __aicore__ inline void MoeMaskedScatterImpl<T, U>::ComputeSingleLoopPrefixSum(ui
             AscendC::Reg::DataCopy<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
                 mask, maskAddr, vfLen);
             AscendC::Reg::DataCopy<int32_t, Reg::PostLiteral::POST_MODE_UPDATE>(
-                prefixSumTmpAddr, (AscendC::Reg::RegTensor<int32_t> &)mask, vfLen, p0);
+                prefixSumTmpAddr, (AscendC::Reg::RegTensor<int32_t>&)mask, vfLen, p0);
         }
         AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
         uint32_t stride = rows;
@@ -202,7 +202,7 @@ __aicore__ inline void MoeMaskedScatterImpl<T, U>::ComputeSingleLoopPrefixSum(ui
         AscendC::Reg::RegTensor<uint32_t> sequence;
         AscendC::Reg::RegTensor<uint32_t> index;
         AscendC::Reg::Arange(tmp, 0);
-        sequence = (AscendC::Reg::RegTensor<uint32_t> &)tmp; // 以0开始的序列
+        sequence = (AscendC::Reg::RegTensor<uint32_t>&)tmp; // 以0开始的序列
         AscendC::Reg::RegTensor<int32_t> v0;
         AscendC::Reg::RegTensor<int32_t> v1;
         AscendC::Reg::RegTensor<int32_t> v2;
@@ -223,7 +223,7 @@ __aicore__ inline void MoeMaskedScatterImpl<T, U>::ComputeSingleLoopPrefixSum(ui
         AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
 
         AscendC::Reg::Arange(tmp, 0);
-        sequence = (AscendC::Reg::RegTensor<uint32_t> &)tmp;
+        sequence = (AscendC::Reg::RegTensor<uint32_t>&)tmp;
         AscendC::Reg::MaskReg pregFull = AscendC::Reg::CreateMask<int32_t, AscendC::Reg::MaskPattern::ALL>();
         AscendC::Reg::Muls(sequence, sequence, rows, pregFull);
         uint32_t spReg1 = tailSize1 - 1;
@@ -285,13 +285,13 @@ __aicore__ inline void MoeMaskedScatterImpl<T, U>::ComputePreCoreMaskSum()
 }
 
 template <typename T, typename U>
-__aicore__ inline void MoeMaskedScatterImpl<T, U>::CustomReduceSum(const LocalTensor<U> &dst, const LocalTensor<U> &src,
+__aicore__ inline void MoeMaskedScatterImpl<T, U>::CustomReduceSum(const LocalTensor<U>& dst, const LocalTensor<U>& src,
                                                                    uint16_t dataLen)
 {
     uint16_t vfLen = Ops::Base::GetVRegSize() / sizeof(U);
     uint16_t loopSize = (dataLen + vfLen - 1) / vfLen;
-    auto srcAddr = (__ubuf__ U *)src.GetPhyAddr();
-    auto dstAddr = (__ubuf__ U *)dst.GetPhyAddr();
+    auto srcAddr = (__ubuf__ U*)src.GetPhyAddr();
+    auto dstAddr = (__ubuf__ U*)dst.GetPhyAddr();
     __VEC_SCOPE__
     {
         AscendC::Reg::RegTensor<U> src;
@@ -338,9 +338,9 @@ __aicore__ inline void MoeMaskedScatterImpl<T, U>::MoeMaskedScatterToUB(int64_t 
     LocalTensor<T> yLocal = yQueue_.AllocTensor<T>();
     auto curLoopPrefixSumGm = prefixSumGm_[offset];
     asc_vf_call<MoeMaskedScatterToUBSimt<T, U>>(
-        dim3(USED_THREAD_NUMS), dataLen, preCoreMaskSum_, (__local_mem__ T *)(xLocal.GetPhyAddr()),
-        (__local_mem__ bool *)(maskLocal.GetPhyAddr()), (__gm__ T *)(updatesGm_.GetPhyAddr()),
-        (__local_mem__ T *)(yLocal.GetPhyAddr()), (__gm__ U *)(curLoopPrefixSumGm.GetPhyAddr()));
+        dim3(USED_THREAD_NUMS), dataLen, preCoreMaskSum_, (__local_mem__ T*)(xLocal.GetPhyAddr()),
+        (__local_mem__ bool*)(maskLocal.GetPhyAddr()), (__gm__ T*)(updatesGm_.GetPhyAddr()),
+        (__local_mem__ T*)(yLocal.GetPhyAddr()), (__gm__ U*)(curLoopPrefixSumGm.GetPhyAddr()));
     yQueue_.EnQue(yLocal);
     xQueue_.FreeTensor(xLocal);
     maskQueue_.FreeTensor(maskLocal);
@@ -413,9 +413,9 @@ __aicore__ inline void MoeMaskedScatterImpl<T, U>::Process()
     } else {
         ComputePreCoreMaskSum();
         asc_vf_call<MoeMaskedScatterSimt<T, U>>(dim3(USED_THREAD_NUMS), curCoreHandleData, preCoreMaskSum_,
-                                                (__gm__ T *)(xGm_.GetPhyAddr()), (__gm__ bool *)(maskGm_.GetPhyAddr()),
-                                                (__gm__ T *)(updatesGm_.GetPhyAddr()), (__gm__ T *)(yGm_.GetPhyAddr()),
-                                                (__gm__ U *)(prefixSumGm_.GetPhyAddr()));
+                                                (__gm__ T*)(xGm_.GetPhyAddr()), (__gm__ bool*)(maskGm_.GetPhyAddr()),
+                                                (__gm__ T*)(updatesGm_.GetPhyAddr()), (__gm__ T*)(yGm_.GetPhyAddr()),
+                                                (__gm__ U*)(prefixSumGm_.GetPhyAddr()));
     }
 }
 } // namespace MoeMaskedScatter

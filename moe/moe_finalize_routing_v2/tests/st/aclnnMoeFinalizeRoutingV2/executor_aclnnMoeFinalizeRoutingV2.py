@@ -16,10 +16,17 @@ from atk.tasks.api_execute import register
 from atk.tasks.api_execute.base_api import BaseApi
 from atk.tasks.backends.lib_interface.acl_wrapper import AclFormat
 
-def MoeFinalizeRoutingV2Golden(expandedX: torch.Tensor, expandedRowIdx: torch.Tensor, 
-                               x1Optional: torch.Tensor, x2Optional: torch.Tensor, 
-                               biasOptional: torch.Tensor, scalesOptional: torch.Tensor, 
-                               expertIdxOptional: torch.Tensor, dropPadMode: int):
+
+def MoeFinalizeRoutingV2Golden(
+    expandedX: torch.Tensor,
+    expandedRowIdx: torch.Tensor,
+    x1Optional: torch.Tensor,
+    x2Optional: torch.Tensor,
+    biasOptional: torch.Tensor,
+    scalesOptional: torch.Tensor,
+    expertIdxOptional: torch.Tensor,
+    dropPadMode: int,
+):
     """
     按组处理输入数据，并调用 GMM_Swiglu_quant 函数进行量化计算。
 
@@ -44,7 +51,10 @@ def MoeFinalizeRoutingV2Golden(expandedX: torch.Tensor, expandedRowIdx: torch.Te
         for i in range(Num_Rows):
             temp_sum = torch.zeros(H)
             for k in range(K):
-                temp_sum += scalesOptional[i, k] * (expandedX[expandedRowIdx[i + k * Num_Rows]] + biasOptional[expertIdxOptional[i, k]])
+                temp_sum += scalesOptional[i, k] * (
+                    expandedX[expandedRowIdx[i + k * Num_Rows]]
+                    + biasOptional[expertIdxOptional[i, k]]
+                )
             output[i] = x1Optional[i] + x2Optional[i] + temp_sum
         # print(output.dtype)
         # print(output.shape)
@@ -65,6 +75,7 @@ def MoeFinalizeRoutingV2Golden(expandedX: torch.Tensor, expandedRowIdx: torch.Te
         # print(output.shape)
         return output.to(expandedX.dtype)
 
+
 @register("executor_function_aclnn_moe_finalize_routing_v2")
 class AclnnMoeFinalizeRoutingV2(BaseApi):
     def init_by_input_data(self, input_data: InputDataset):
@@ -74,26 +85,31 @@ class AclnnMoeFinalizeRoutingV2(BaseApi):
         :param input_data:
         :return:
         """
-        seed = input_data.kwargs['seed']
+        seed = input_data.kwargs["seed"]
         # input_data.kwargs['groupList'] = generate_non_decreasing_sequence(weight.shape[0], x.shape[0], seed)
-        input_data.kwargs.pop('seed')
-        input_data.kwargs.pop('case')
-        input_data.kwargs.pop('out')
+        input_data.kwargs.pop("seed")
+        input_data.kwargs.pop("case")
+        input_data.kwargs.pop("out")
 
     def __call__(self, input_data: InputDataset, with_output: bool = False):
-        expandedX = input_data.kwargs['expandedX']
-        expandedRowIdx = input_data.kwargs['expandedRowIdx']
-        x1Optional = input_data.kwargs['x1Optional']
-        x2Optional = input_data.kwargs['x2Optional']
-        biasOptional = input_data.kwargs['biasOptional']
-        scalesOptional = input_data.kwargs['scalesOptional']
-        expertIdxOptional = input_data.kwargs['expertIdxOptional']
-        dropPadMode = input_data.kwargs['dropPadMode']
+        expandedX = input_data.kwargs["expandedX"]
+        expandedRowIdx = input_data.kwargs["expandedRowIdx"]
+        x1Optional = input_data.kwargs["x1Optional"]
+        x2Optional = input_data.kwargs["x2Optional"]
+        biasOptional = input_data.kwargs["biasOptional"]
+        scalesOptional = input_data.kwargs["scalesOptional"]
+        expertIdxOptional = input_data.kwargs["expertIdxOptional"]
+        dropPadMode = input_data.kwargs["dropPadMode"]
 
-        output = MoeFinalizeRoutingV2Golden(expandedX, expandedRowIdx, 
-                                            x1Optional, x2Optional, 
-                                            biasOptional, scalesOptional, 
-                                            expertIdxOptional, dropPadMode)
+        output = MoeFinalizeRoutingV2Golden(
+            expandedX,
+            expandedRowIdx,
+            x1Optional,
+            x2Optional,
+            biasOptional,
+            scalesOptional,
+            expertIdxOptional,
+            dropPadMode,
+        )
 
         return output
-    

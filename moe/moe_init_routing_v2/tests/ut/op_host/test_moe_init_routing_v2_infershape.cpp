@@ -164,7 +164,6 @@ TEST_F(MoeInitRoutingV2, moe_init_routing_v2_infer_shape_05)
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
-
 TEST_F(MoeInitRoutingV2, moe_init_routing_v2_infer_shape_06)
 {
     gert::InfershapeContextPara infershapeContextPara(
@@ -216,7 +215,6 @@ TEST_F(MoeInitRoutingV2, moe_init_routing_v2_infer_shape_07)
         });
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, {});
 }
-
 
 TEST_F(MoeInitRoutingV2, moe_init_routing_v2_infer_shape_08)
 {
@@ -322,7 +320,6 @@ TEST_F(MoeInitRoutingV2, moe_init_routing_v2_infer_shape_11)
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, {});
 }
 
-
 TEST_F(MoeInitRoutingV2, moe_init_routing_v2_infer_shape_12)
 {
     gert::InfershapeContextPara infershapeContextPara(
@@ -348,7 +345,6 @@ TEST_F(MoeInitRoutingV2, moe_init_routing_v2_infer_shape_12)
         });
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, {});
 }
-
 
 TEST_F(MoeInitRoutingV2, moe_init_routing_v2_infer_shape_13)
 {

@@ -22,12 +22,13 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void moe_finalize_routing_v2_grad(
-    GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR scales, GM_ADDR expertIdx, GM_ADDR bias,
-    GM_ADDR gradExpandedX, GM_ADDR gradScales, GM_ADDR workspace, GM_ADDR tiling);
+extern "C" __global__ __aicore__ void moe_finalize_routing_v2_grad(GM_ADDR gradY, GM_ADDR expandedRowIdx,
+                                                                   GM_ADDR expandedX, GM_ADDR scales, GM_ADDR expertIdx,
+                                                                   GM_ADDR bias, GM_ADDR gradExpandedX,
+                                                                   GM_ADDR gradScales, GM_ADDR workspace,
+                                                                   GM_ADDR tiling);
 
-class moe_finalize_routing_v2_grad_test : public testing::Test
-{
+class moe_finalize_routing_v2_grad_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -77,9 +78,8 @@ TEST_F(moe_finalize_routing_v2_grad_test, test_case_10001_001)
 
     ICPU_SET_TILING_KEY(10001);
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
-    ICPU_RUN_KF(
-        moe_finalize_routing_v2_grad, blockDim, gradY, expandedRowIdx, nullptr, nullptr, nullptr, nullptr,
-        gradExpandedX, gradScales, workspace, tiling);
+    ICPU_RUN_KF(moe_finalize_routing_v2_grad, blockDim, gradY, expandedRowIdx, nullptr, nullptr, nullptr, nullptr,
+                gradExpandedX, gradScales, workspace, tiling);
 
     AscendC::GmFree(gradY);
     AscendC::GmFree(expandedRowIdx);
@@ -128,9 +128,8 @@ TEST_F(moe_finalize_routing_v2_grad_test, test_case_10002_001)
 
     ICPU_SET_TILING_KEY(10002);
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
-    ICPU_RUN_KF(
-        moe_finalize_routing_v2_grad, blockDim, gradY, expandedRowIdx, nullptr, nullptr, nullptr, nullptr,
-        gradExpandedX, gradScales, workspace, tiling);
+    ICPU_RUN_KF(moe_finalize_routing_v2_grad, blockDim, gradY, expandedRowIdx, nullptr, nullptr, nullptr, nullptr,
+                gradExpandedX, gradScales, workspace, tiling);
 
     AscendC::GmFree(gradY);
     AscendC::GmFree(expandedRowIdx);
@@ -187,9 +186,8 @@ TEST_F(moe_finalize_routing_v2_grad_test, test_case_20001_001)
 
     ICPU_SET_TILING_KEY(20001);
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
-    ICPU_RUN_KF(
-        moe_finalize_routing_v2_grad, blockDim, gradY, expandedRowIdx, expandedX, scales, expertIdx, bias,
-        gradExpandedX, gradScales, workspace, tiling);
+    ICPU_RUN_KF(moe_finalize_routing_v2_grad, blockDim, gradY, expandedRowIdx, expandedX, scales, expertIdx, bias,
+                gradExpandedX, gradScales, workspace, tiling);
 
     AscendC::GmFree(gradY);
     AscendC::GmFree(expandedRowIdx);
@@ -251,9 +249,8 @@ TEST_F(moe_finalize_routing_v2_grad_test, test_case_20002_001)
 
     ICPU_SET_TILING_KEY(20001);
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
-    ICPU_RUN_KF(
-        moe_finalize_routing_v2_grad, blockDim, gradY, expandedRowIdx, expandedX, scales, expertIdx, bias,
-        gradExpandedX, gradScales, workspace, tiling);
+    ICPU_RUN_KF(moe_finalize_routing_v2_grad, blockDim, gradY, expandedRowIdx, expandedX, scales, expertIdx, bias,
+                gradExpandedX, gradScales, workspace, tiling);
 
     AscendC::GmFree(gradY);
     AscendC::GmFree(expandedRowIdx);

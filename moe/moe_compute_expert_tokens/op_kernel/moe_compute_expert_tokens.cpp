@@ -18,10 +18,10 @@
 
 using namespace MoeCompute;
 
-extern "C" __global__ __aicore__ void moe_compute_expert_tokens(
-    GM_ADDR sortExperts, GM_ADDR out, GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void moe_compute_expert_tokens(GM_ADDR sortExperts, GM_ADDR out, GM_ADDR workspace,
+                                                                GM_ADDR tiling)
 {
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIV_1_0);  
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIV_1_0);
     GM_ADDR userWS = GetUserWorkspace(workspace);
     if (userWS == nullptr) {
         return;

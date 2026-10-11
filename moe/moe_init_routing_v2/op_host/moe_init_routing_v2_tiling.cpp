@@ -62,12 +62,12 @@ const static int64_t TILING_KEY_DROP_PAD_MODE_HIST_REGBASE_SORT_MULTI_CORE = 110
 const static int64_t TILING_KEY_HIGH_PERFORMANCE = 20000;
 const static int64_t SCATTER_MODE_MAX_K = 6;
 
-#define CHECK_FAIL(context, cond, ...)                                                                                 \
-    do {                                                                                                               \
-        if (cond) {                                                                                                    \
-            __VA_ARGS__;                                                                                               \
-            return ge::GRAPH_FAILED;                                                                                   \
-        }                                                                                                              \
+#define CHECK_FAIL(context, cond, ...) \
+    do { \
+        if (cond) { \
+            __VA_ARGS__; \
+            return ge::GRAPH_FAILED; \
+        } \
     } while (0)
 
 inline static int64_t GetPerOrLastValue(int64_t x, int64_t y)
@@ -98,7 +98,7 @@ ge::graphStatus MoeInitRoutingV2TilingBase::GetPlatformInfo()
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
 
-    auto compileInfoPtr = reinterpret_cast<const MoeInitRoutingV2CompileInfo *>(context_->GetCompileInfo());
+    auto compileInfoPtr = reinterpret_cast<const MoeInitRoutingV2CompileInfo*>(context_->GetCompileInfo());
     OP_CHECK_IF(compileInfoPtr == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "compileInfo", "nullptr",
                                                       "Compile info should not be nullptr"),
@@ -121,7 +121,7 @@ ge::graphStatus MoeInitRoutingV2TilingBase::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeInitRoutingV2TilingBase::CheckTokenCount(int64_t num, const char *tag)
+ge::graphStatus MoeInitRoutingV2TilingBase::CheckTokenCount(int64_t num, const char* tag)
 {
     auto expertTokensShapePtr = context_->GetOutputShape(num);
     OP_CHECK_IF(expertTokensShapePtr == nullptr,
@@ -150,7 +150,7 @@ ge::graphStatus MoeInitRoutingV2TilingBase::CheckTokenCount(int64_t num, const c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeInitRoutingV2TilingBase::ValidateExpandedXShape(const gert::Shape &expandedXShape, bool isRegbase)
+ge::graphStatus MoeInitRoutingV2TilingBase::ValidateExpandedXShape(const gert::Shape& expandedXShape, bool isRegbase)
 {
     size_t expandedXDimNum = expandedXShape.GetDimNum();
 
@@ -239,7 +239,7 @@ ge::graphStatus MoeInitRoutingV2TilingBase::CheckOutShape(bool isRegbase)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeInitRoutingV2TilingBase::GetInputShapes(gert::Shape &xShape, gert::Shape &expertIdxShape)
+ge::graphStatus MoeInitRoutingV2TilingBase::GetInputShapes(gert::Shape& xShape, gert::Shape& expertIdxShape)
 {
     opName = context_->GetNodeName();
 
@@ -265,33 +265,33 @@ ge::graphStatus MoeInitRoutingV2TilingBase::GetAttrsParams()
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
-    const int64_t *activateNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_ACTIVE_ROWS);
+    const int64_t* activateNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_ACTIVE_ROWS);
     if (activateNumPtr != nullptr) {
         activateNum = *activateNumPtr;
     }
 
-    const int64_t *expertCapacityPtr = attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_CAPACITY);
+    const int64_t* expertCapacityPtr = attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_CAPACITY);
     if (expertCapacityPtr != nullptr) {
         expertCapacity = *expertCapacityPtr;
     }
 
-    const int64_t *expertNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_NUM);
+    const int64_t* expertNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_NUM);
     if (expertNumPtr != nullptr) {
         expertNum = *expertNumPtr;
     }
 
-    const int64_t *dropPadModePtr = attrs->GetAttrPointer<int64_t>(ATTR_DROP_PAD_MODE);
+    const int64_t* dropPadModePtr = attrs->GetAttrPointer<int64_t>(ATTR_DROP_PAD_MODE);
     if (dropPadModePtr != nullptr) {
         dropPadMode = *dropPadModePtr;
     }
 
-    const int64_t *expertTokensCountOrCumsumFlagPtr =
+    const int64_t* expertTokensCountOrCumsumFlagPtr =
         attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_TOKENS_COUNT_OR_CUMSUM_FLAG);
     if (expertTokensCountOrCumsumFlagPtr != nullptr) {
         expertTokensCountOrCumsumFlag = *expertTokensCountOrCumsumFlagPtr;
     }
 
-    const bool *expertTokensBeforeCapacityFlagPtr =
+    const bool* expertTokensBeforeCapacityFlagPtr =
         attrs->GetAttrPointer<bool>(ATTR_EXPERT_TOKENS_BEFORE_CAPACITY_FLAG);
     if (expertTokensBeforeCapacityFlagPtr != nullptr) {
         expertTokensBeforeCapacityFlag = *expertTokensBeforeCapacityFlagPtr;
@@ -300,8 +300,8 @@ ge::graphStatus MoeInitRoutingV2TilingBase::GetAttrsParams()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeInitRoutingV2TilingBase::ValidateInputShapes(const gert::Shape &xShape,
-                                                                const gert::Shape &expertIdxShape) const
+ge::graphStatus MoeInitRoutingV2TilingBase::ValidateInputShapes(const gert::Shape& xShape,
+                                                                const gert::Shape& expertIdxShape) const
 {
     size_t xDimNnum = xShape.GetDimNum();
     CHECK_FAIL(context_, xDimNnum != DIM_TWO,
@@ -329,7 +329,7 @@ ge::graphStatus MoeInitRoutingV2TilingBase::ValidateInputShapes(const gert::Shap
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeInitRoutingV2TilingBase::ValidateAttrsParams(const gert::Shape &xShape) const
+ge::graphStatus MoeInitRoutingV2TilingBase::ValidateAttrsParams(const gert::Shape& xShape) const
 {
     CHECK_FAIL(context_, expertCapacity < 0,
                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertCapacity",
@@ -354,11 +354,11 @@ ge::graphStatus MoeInitRoutingV2TilingBase::ValidateAttrsParams(const gert::Shap
                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertTokensCountOrCumsumFlag",
                                          std::to_string(expertTokensCountOrCumsumFlag).c_str(), "0, 1 or 2"));
 
-    CHECK_FAIL(context_, expertTokensCountOrCumsumFlag > 0 && expertNum <= 0,
-               OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expertNum",
-                                                     std::to_string(expertNum).c_str(),
-                                                     "expertNum should be greater than 0 when "
-                                                     "expertTokensCountOrCumsumFlag is greater than 0"));
+    CHECK_FAIL(
+        context_, expertTokensCountOrCumsumFlag > 0 && expertNum <= 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),
+                                              "expertNum should be greater than 0 when "
+                                              "expertTokensCountOrCumsumFlag is greater than 0"));
 
     CHECK_FAIL(context_, dropPadMode > 0 && expertCapacity > xShape.GetDim(0),
                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
@@ -370,8 +370,8 @@ ge::graphStatus MoeInitRoutingV2TilingBase::ValidateAttrsParams(const gert::Shap
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeInitRoutingV2TilingBase::ProcessParamsAndSetTilingData(const gert::Shape &xShape,
-                                                                          const gert::Shape &expertIdxShape)
+ge::graphStatus MoeInitRoutingV2TilingBase::ProcessParamsAndSetTilingData(const gert::Shape& xShape,
+                                                                          const gert::Shape& expertIdxShape)
 {
     if (dropPadMode == 1) {
         // droppad场景下不输出expertTokensCountOrCumsum
@@ -638,7 +638,7 @@ ge::graphStatus MoeInitRoutingV2TilingBase::GetWorkspaceSize()
 ge::graphStatus MoeInitRoutingV2TilingBase::PostTiling()
 {
     context_->SetBlockDim(aivNum);
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     currentWorkspace[0] = workspaceSize_;
     if (regBase) {
         context_->SetLocalMemorySize(aicoreParams_.ubSize);
@@ -649,7 +649,7 @@ ge::graphStatus MoeInitRoutingV2TilingBase::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-void MoeInitRoutingV2TilingBase::Tiling4VBSOneCoreCompute(MoeV2VBSComputeTilingData *tilingData)
+void MoeInitRoutingV2TilingBase::Tiling4VBSOneCoreCompute(MoeV2VBSComputeTilingData* tilingData)
 {
     uint64_t needCoreNum = totalLength <= 0 ? 0 : 1;
     tilingData->set_needCoreNum(needCoreNum);
@@ -663,7 +663,7 @@ void MoeInitRoutingV2TilingBase::Tiling4VBSOneCoreCompute(MoeV2VBSComputeTilingD
     tilingData->set_lastCoreLastLoopElements(tilingData->get_perCoreElements());
 }
 
-void MoeInitRoutingV2TilingBase::Tiling4VBSMultiCoreCompute(MoeV2VBSComputeTilingData *tilingData)
+void MoeInitRoutingV2TilingBase::Tiling4VBSMultiCoreCompute(MoeV2VBSComputeTilingData* tilingData)
 {
     int64_t needCoreNum = CeilDiv(totalLength, sortLoopMaxElement);         // 向上取整
     needCoreNum = static_cast<int64_t>(std::pow(4, CeilLog4(needCoreNum))); // 用到多核时，核数最多是4^x
@@ -801,8 +801,8 @@ void MoeInitRoutingV2TilingBase::Tiling4SrcToDstCapacityCompute()
     int64_t lastCoreRows = totalLength - perCoreRows * (needCoreNum - 1);
     tilingData->set_lastCoreRows(lastCoreRows);
 
-    int64_t rowSize = (perCoreRows * sizeof(int32_t) * NUM_TWO + ONE_BLOCK_BYTE + ONE_BLOCK_BYTE - 1) /
-                      ONE_BLOCK_BYTE * ONE_BLOCK_BYTE;
+    int64_t rowSize = (perCoreRows * sizeof(int32_t) * NUM_TWO + ONE_BLOCK_BYTE + ONE_BLOCK_BYTE - 1) / ONE_BLOCK_BYTE *
+                      ONE_BLOCK_BYTE;
     int64_t colSize = (cols * inuptXDtypeSize_ + ONE_BLOCK_BYTE - 1) / ONE_BLOCK_BYTE * ONE_BLOCK_BYTE;
 
     if (rowSize + colSize < static_cast<int64_t>(aicoreParams_.ubSize)) {
@@ -843,7 +843,7 @@ void MoeInitRoutingV2TilingBase::Tiling4SrcToDstCapacityCompute()
 }
 
 bool MoeInitRoutingV2TilingBase::CalculateScatterOutCoreAllocation(int64_t actualActivateRows,
-                                                                   MoeV2GatherOutComputeTilingData *tilingData)
+                                                                   MoeV2GatherOutComputeTilingData* tilingData)
 {
     if (actualActivateRows <= 0) {
         tilingData->set_needCoreNum(0);
@@ -864,7 +864,7 @@ bool MoeInitRoutingV2TilingBase::CalculateScatterOutCoreAllocation(int64_t actua
 }
 
 void MoeInitRoutingV2TilingBase::CalculateScatterOutBufferParams(int64_t ubRowsVal, int64_t cols,
-                                                                 MoeV2GatherOutComputeTilingData *tilingData)
+                                                                 MoeV2GatherOutComputeTilingData* tilingData)
 {
     int64_t perCoreRows = tilingData->get_perCoreRows();
     int64_t lastCoreRows = tilingData->get_lastCoreRows();
@@ -921,8 +921,8 @@ void MoeInitRoutingV2TilingBase::SetGatherOutLoopParams(int64_t perCoreRows, int
 
     bool colsAligned = (cols * inuptXDtypeSize_ % ONE_BLOCK_BYTE == 0);
     // 使用moe_v2_scatter_out_batch_row模板
-    bool useScatterMode = regBase && colsAligned && (ubRowsVal >= NUM_TWO) &&
-                         (dropPadMode != 1) && (moeInitRoutingTilingData.get_k() <= SCATTER_MODE_MAX_K);
+    bool useScatterMode = regBase && colsAligned && (ubRowsVal >= NUM_TWO) && (dropPadMode != 1) &&
+                          (moeInitRoutingTilingData.get_k() <= SCATTER_MODE_MAX_K);
     if (useScatterMode) {
         tilingData->set_scatterMode(1);
         int64_t actualActivateRows = tilingData->get_activateRows();
@@ -1014,13 +1014,13 @@ bool MoeInitRoutingV2TilingBase::IsFullLoad()
     return remainUbAfterSort > 0;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingForMoeInitRoutingV2(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingForMoeInitRoutingV2(gert::TilingContext* context)
 {
     MoeInitRoutingV2TilingBase tiling(context);
     return tiling.DoTiling();
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForMoeInitRoutingV2(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForMoeInitRoutingV2(gert::TilingParseContext* context)
 {
     OP_LOGD(context, "TilingPrepareForMoeInitRountingV2 enter.");
 
@@ -1030,20 +1030,20 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForMoeInitRoutingV2(gert::TilingPa
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     compileInfo->aivNum = ascendcPlatform.GetCoreNumAiv();
-    OP_CHECK_IF((compileInfo->aivNum <= 0),
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MoeInitRoutingV2", "aivNum",
-                                                      std::to_string(compileInfo->aivNum).c_str(),
-                                                      "TilingPrepareForMoeInitRoutingV2 failed to get core num"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (compileInfo->aivNum <= 0),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MoeInitRoutingV2", "aivNum", std::to_string(compileInfo->aivNum).c_str(),
+                                              "TilingPrepareForMoeInitRoutingV2 failed to get core num"),
+        return ge::GRAPH_FAILED);
 
     uint64_t ubSize;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
     compileInfo->ubSize = static_cast<int64_t>(ubSize);
-    OP_CHECK_IF((compileInfo->ubSize <= 0),
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MoeInitRoutingV2", "ubSize",
-                                                      std::to_string(compileInfo->ubSize).c_str(),
-                                                      "TilingPrepareForMoeInitRoutingV2 failed to get ub size"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (compileInfo->ubSize <= 0),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MoeInitRoutingV2", "ubSize", std::to_string(compileInfo->ubSize).c_str(),
+                                              "TilingPrepareForMoeInitRoutingV2 failed to get ub size"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

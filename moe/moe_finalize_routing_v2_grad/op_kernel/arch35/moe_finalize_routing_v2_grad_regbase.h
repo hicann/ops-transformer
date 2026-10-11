@@ -41,7 +41,7 @@ struct BinAddParams {
     int64_t binaryAddLastNum;
 };
 
-__aicore__ inline void BinaryAddVF(__ubuf__ float *ubbinaryAddCache, __ubuf__ float *binaryAddTmpAddr,
+__aicore__ inline void BinaryAddVF(__ubuf__ float* ubbinaryAddCache, __ubuf__ float* binaryAddTmpAddr,
                                    const uint16_t binaryAddKLoop, const uint16_t binaryAddLoop,
                                    const int64_t binaryAddLastNum, const int64_t pos)
 {
@@ -54,8 +54,8 @@ __aicore__ inline void BinaryAddVF(__ubuf__ float *ubbinaryAddCache, __ubuf__ fl
     for (uint16_t i = 0; i < binaryAddKLoop; i++) {
         curBinaryAddLoop = curBinaryAddLoop / BINARY_ADD_COF;
         for (uint16_t j = 0; j < curBinaryAddLoop; j++) {
-            LoadAlign(vregXQ, ((__ubuf__ float *)binaryAddTmpAddr + j * VL_FLOAT32_SIZE));
-            LoadAlign(vregXR, ((__ubuf__ float *)binaryAddTmpAddr + (j + curBinaryAddLoop) * VL_FLOAT32_SIZE));
+            LoadAlign(vregXQ, ((__ubuf__ float*)binaryAddTmpAddr + j * VL_FLOAT32_SIZE));
+            LoadAlign(vregXR, ((__ubuf__ float*)binaryAddTmpAddr + (j + curBinaryAddLoop) * VL_FLOAT32_SIZE));
             Add(vregXQ, vregXQ, vregXR, pregMain);
             StoreAlign(binaryAddTmpAddr + j * VL_FLOAT32_SIZE, vregXQ, pregMain);
         }
@@ -64,7 +64,7 @@ __aicore__ inline void BinaryAddVF(__ubuf__ float *ubbinaryAddCache, __ubuf__ fl
     {
         uint32_t sreg2 = binaryAddLastNum;
         Reg::MaskReg pregLoop = Reg::UpdateMask<float>(sreg2);
-        LoadAlign(vregXSum, ((__ubuf__ float *)binaryAddTmpAddr));
+        LoadAlign(vregXSum, ((__ubuf__ float*)binaryAddTmpAddr));
         Reg::Reduce<Reg::ReduceType::SUM>(vregXSum, vregXSum, pregLoop);
         StoreAlign<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(ubbinaryAddCache + pos, vregXSum, pregMerge);
     }
@@ -77,11 +77,11 @@ public:
     __aicore__ inline ~MoeFinalizeRoutingV2GradRegbase(){};
 
 protected:
-    __aicore__ inline void InitCommon(TPipe *pipe);
+    __aicore__ inline void InitCommon(TPipe* pipe);
     __aicore__ inline void CopyOutGradScales(int64_t batchIdx);
-    __aicore__ inline void VfCalGradScale(const LocalTensor<T1> &biasUb, const LocalTensor<T1> &gradYUb,
-                                          const BinAddParams &binAddParams, const int64_t reduceNum,
-                                          const LocalTensor<float> &binaryAddCache, const int64_t pos);
+    __aicore__ inline void VfCalGradScale(const LocalTensor<T1>& biasUb, const LocalTensor<T1>& gradYUb,
+                                          const BinAddParams& binAddParams, const int64_t reduceNum,
+                                          const LocalTensor<float>& binaryAddCache, const int64_t pos);
 
 protected:
     GlobalTensor<T1> gradYGm_;
@@ -104,14 +104,14 @@ protected:
     TQue<QuePosition::VECOUT, DOUBLE_BUFFER> gradScalesOutQueue_;
     TBuf<TPosition::VECCALC> binaryAddSumBuf_;
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     int64_t blockIdx_ = 0;
     int64_t startBatchIdx_ = 0;
     int64_t endBatchIdx_ = 0;
 };
 
 template <typename T1, typename T2, typename T3, bool IsBiasExist>
-__aicore__ inline void MoeFinalizeRoutingV2GradRegbase<T1, T2, T3, IsBiasExist>::InitCommon(TPipe *pipe)
+__aicore__ inline void MoeFinalizeRoutingV2GradRegbase<T1, T2, T3, IsBiasExist>::InitCommon(TPipe* pipe)
 {
     this->pipe_ = pipe;
     this->blockIdx_ = GetBlockIdx();
@@ -129,14 +129,14 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegbase<T1, T2, T3, IsBiasExist>:
 
 template <typename T1, typename T2, typename T3, bool IsBiasExist>
 __aicore__ inline void MoeFinalizeRoutingV2GradRegbase<T1, T2, T3, IsBiasExist>::VfCalGradScale(
-    const LocalTensor<T1> &biasUb, const LocalTensor<T1> &gradYUb, const BinAddParams &binAddParams,
-    const int64_t reduceNum, const LocalTensor<float> &binaryAddCache, const int64_t pos)
+    const LocalTensor<T1>& biasUb, const LocalTensor<T1>& gradYUb, const BinAddParams& binAddParams,
+    const int64_t reduceNum, const LocalTensor<float>& binaryAddCache, const int64_t pos)
 {
-    __ubuf__ T1 *ubBias = (__ubuf__ T1 *)biasUb.GetPhyAddr();
-    __ubuf__ T1 *ubGradY = (__ubuf__ T1 *)gradYUb.GetPhyAddr();
-    __ubuf__ float *ubbinaryAddCache = (__ubuf__ float *)binaryAddCache.GetPhyAddr();
+    __ubuf__ T1* ubBias = (__ubuf__ T1*)biasUb.GetPhyAddr();
+    __ubuf__ T1* ubGradY = (__ubuf__ T1*)gradYUb.GetPhyAddr();
+    __ubuf__ float* ubbinaryAddCache = (__ubuf__ float*)binaryAddCache.GetPhyAddr();
     LocalTensor<float> binaryAddSumUb = binaryAddSumBuf_.Get<float>();
-    __ubuf__ float *ubAddSum = (__ubuf__ float *)binaryAddSumUb.GetPhyAddr();
+    __ubuf__ float* ubAddSum = (__ubuf__ float*)binaryAddSumUb.GetPhyAddr();
 
     int64_t binaryAddQuotient = binAddParams.binaryAddQuotient;
     int64_t binaryAddKLoop = binAddParams.binaryAddk;

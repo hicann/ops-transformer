@@ -14,18 +14,18 @@
 #include "aclnnop/aclnn_moe_compute_expert_tokens.h"
 
 #define CHECK_RET(cond, return_expr) \
-    do {                             \
-        if (!(cond)) {               \
-            return_expr;             \
-        }                            \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)         \
-    do {                                \
+#define LOG_PRINT(message, ...) \
+    do { \
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -47,8 +47,8 @@ int Init(int32_t deviceId, aclrtStream* stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void** deviceAddr,
-    aclDataType dataType, aclTensor** tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -66,15 +66,8 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     }
 
     // 调用aclCreateTensor接口创建aclTensor
-    *tensor = aclCreateTensor(shape.data(),
-        shape.size(),
-        dataType,
-        strides.data(),
-        0,
-        aclFormat::ACL_FORMAT_ND,
-        shape.data(),
-        shape.size(),
-        *deviceAddr);
+    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
+                              shape.data(), shape.size(), *deviceAddr);
     return 0;
 }
 
@@ -102,11 +95,8 @@ int main()
     std::int64_t numExperts = 3;
 
     // 创建input aclTensor
-    ret = CreateAclTensor(sortedExpertForSourceRowData,
-        sortedExpertForSourceRowShape,
-        &sortedExpertForSourceRowAddr,
-        aclDataType::ACL_INT32,
-        &sortedExperts);
+    ret = CreateAclTensor(sortedExpertForSourceRowData, sortedExpertForSourceRowShape, &sortedExpertForSourceRowAddr,
+                          aclDataType::ACL_INT32, &sortedExperts);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建Out aclTensor
     ret = CreateAclTensor(outData, outShape, &outAddr, aclDataType::ACL_INT32, &out);
@@ -116,8 +106,7 @@ int main()
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor;
     // 调用aclnnMoeComputeExpertTokens第一段接口
-    ret = aclnnMoeComputeExpertTokensGetWorkspaceSize(
-        sortedExperts, numExperts, out, &workspaceSize, &executor);
+    ret = aclnnMoeComputeExpertTokensGetWorkspaceSize(sortedExperts, numExperts, out, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMoeComputeExpertTokensGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
@@ -135,11 +124,8 @@ int main()
     // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
     auto size = GetShapeSize(outShape);
     std::vector<int32_t> resultData(size, 0);
-    ret = aclrtMemcpy(resultData.data(),
-        resultData.size() * sizeof(resultData[0]),
-        outAddr,
-        size * sizeof(resultData[0]),
-        ACL_MEMCPY_DEVICE_TO_HOST);
+    ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), outAddr,
+                      size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t i = 0; i < size; i++) {
         LOG_PRINT("result[%ld] is: %d\n", i, resultData[i]);

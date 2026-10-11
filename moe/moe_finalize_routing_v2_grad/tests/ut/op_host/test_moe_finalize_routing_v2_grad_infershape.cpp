@@ -14,8 +14,7 @@
 #include "infer_shape_case_executor.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 #include "infer_datatype_context_faker.h"
-class MoeFinalizeRoutingV2GradProto : public testing::Test
-{
+class MoeFinalizeRoutingV2GradProto : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -31,28 +30,32 @@ protected:
 TEST_F(MoeFinalizeRoutingV2GradProto, shape_infer)
 {
     gert::InfershapeContextPara infershapeContextPara("MoeFinalizeRoutingV2Grad",
-    {
-        {{{5, 8}, {5, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{15}, {15}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{15, 8}, {15, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{5, 3}, {5, 3}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{5, 3}, {5, 3}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{8, 8}, {8, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-    },
-    {
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-    },
-    {}
-    );
+                                                      {
+                                                          {{{5, 8}, {5, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{15}, {15}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{15, 8}, {15, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{5, 3}, {5, 3}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{5, 3}, {5, 3}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{8, 8}, {8, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                      },
+                                                      {
+                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                      },
+                                                      {});
     std::vector<std::vector<int64_t>> expectOutputShape = {{15, 8}, {5, 3}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeFinalizeRoutingV2GradProto, dtype_infer)
 {
-    ASSERT_NE(gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry()->GetOpImpl("MoeFinalizeRoutingV2Grad"), nullptr);
-    auto data_type_func = gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry()->GetOpImpl("MoeFinalizeRoutingV2Grad")->infer_datatype;
+    ASSERT_NE(
+        gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry()->GetOpImpl("MoeFinalizeRoutingV2Grad"),
+        nullptr);
+    auto data_type_func = gert::DefaultOpImplSpaceRegistryV2::GetInstance()
+                              .GetSpaceRegistry()
+                              ->GetOpImpl("MoeFinalizeRoutingV2Grad")
+                              ->infer_datatype;
 
     if (data_type_func != nullptr) {
         ge::DataType input_ref1 = ge::DT_FLOAT;
@@ -85,62 +88,59 @@ TEST_F(MoeFinalizeRoutingV2GradProto, dtype_infer)
 TEST_F(MoeFinalizeRoutingV2GradProto, invalid_shape_infer_0)
 {
     gert::InfershapeContextPara infershapeContextPara("MoeFinalizeRoutingV2Grad",
-    {
-        {{{5, 8}, {5, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{15}, {15}}, ge::DT_INT32, ge::FORMAT_ND},
-    },
-    {
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-    },
-    {}
-    );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{ 15, 8 }, { 5, 1 }};
+                                                      {
+                                                          {{{5, 8}, {5, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{15}, {15}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                      },
+                                                      {
+                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                      },
+                                                      {});
+    std::vector<std::vector<int64_t>> expectOutputShape = {{15, 8}, {5, 1}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeFinalizeRoutingV2GradProto, shape_infer_option_param_shape_invalid)
 {
     gert::InfershapeContextPara infershapeContextPara("MoeFinalizeRoutingV2Grad",
-    {
-        {{{5, 8}, {5, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{15}, {15}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{15, 8}, {15, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{5, 3}, {5, 3}}, ge::DT_FLOAT, ge::FORMAT_ND},
-    },
-    {
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-    },
-    {}
-    );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{ 15, 8 }, { 5, 3 }};
+                                                      {
+                                                          {{{5, 8}, {5, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{15}, {15}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{15, 8}, {15, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{5, 3}, {5, 3}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                      },
+                                                      {
+                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                      },
+                                                      {});
+    std::vector<std::vector<int64_t>> expectOutputShape = {{15, 8}, {5, 3}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeFinalizeRoutingV2GradProto, shape_infer_set_drop_mode_on)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeFinalizeRoutingV2Grad",
-    {
-        {{{5, 8}, {5, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{15}, {15}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{15, 8}, {15, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{5, 3}, {5, 3}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{5, 3}, {5, 3}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{8, 8}, {8, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-    },
-    {
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-    },
-    {
-        {"drop_pad_mode",Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-        {"expert_num",Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-        {"expert_capacity",Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-        {"active_num",Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-    }
-    );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{ 1, 1, 8 }, {5, 3}};
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeFinalizeRoutingV2Grad",
+        {
+            {{{5, 8}, {5, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{15}, {15}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{15, 8}, {15, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{5, 3}, {5, 3}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{5, 3}, {5, 3}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{8, 8}, {8, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+        });
+    std::vector<std::vector<int64_t>> expectOutputShape = {{1, 1, 8}, {5, 3}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
-

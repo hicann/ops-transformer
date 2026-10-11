@@ -88,74 +88,74 @@ constexpr AscendC::Reg::CastTrait castTraitB322B16 = {
     AscendC::RoundMode::CAST_RINT,
 };
 
-__aicore__ inline void BinaryAddVF(__ubuf__ float *binaryAddTmpAddr, uint32_t rLoopStride, uint32_t offset,
+__aicore__ inline void BinaryAddVF(__ubuf__ float* binaryAddTmpAddr, uint32_t rLoopStride, uint32_t offset,
                                    uint16_t binaryAddKLoop, uint16_t binaryAddInnerLoop, uint16_t binaryAddLastLoop,
-                                   MaskReg &pregLoop, RegTensor<float> &x1, RegTensor<float> &x2, RegTensor<float> &x3,
-                                   RegTensor<float> &x4)
+                                   MaskReg& pregLoop, RegTensor<float>& x1, RegTensor<float>& x2, RegTensor<float>& x3,
+                                   RegTensor<float>& x4)
 {
     uint16_t curBinaryAddInnerLoop = binaryAddInnerLoop;
     for (uint16_t i = 0; i < binaryAddKLoop; i++) {
         curBinaryAddInnerLoop = curBinaryAddInnerLoop / ROW_FOUR_OFFSET;
         for (uint16_t j = 0; j < curBinaryAddInnerLoop; j++) {
-            LoadAlign(x1, ((__ubuf__ float *)binaryAddTmpAddr + (j * ROW_FOUR_OFFSET) * rLoopStride + offset));
-            LoadAlign(x2, ((__ubuf__ float *)binaryAddTmpAddr + (j * ROW_FOUR_OFFSET + 1) * rLoopStride + offset));
+            LoadAlign(x1, ((__ubuf__ float*)binaryAddTmpAddr + (j * ROW_FOUR_OFFSET) * rLoopStride + offset));
+            LoadAlign(x2, ((__ubuf__ float*)binaryAddTmpAddr + (j * ROW_FOUR_OFFSET + 1) * rLoopStride + offset));
             Add(x1, x1, x2, pregLoop);
-            LoadAlign(x3, ((__ubuf__ float *)binaryAddTmpAddr + (j * ROW_FOUR_OFFSET + ROW_TWO_OFFSET) * rLoopStride +
+            LoadAlign(x3, ((__ubuf__ float*)binaryAddTmpAddr + (j * ROW_FOUR_OFFSET + ROW_TWO_OFFSET) * rLoopStride +
                            offset));
-            LoadAlign(x4, ((__ubuf__ float *)binaryAddTmpAddr + (j * ROW_FOUR_OFFSET + ROW_THREE_OFFSET) * rLoopStride +
+            LoadAlign(x4, ((__ubuf__ float*)binaryAddTmpAddr + (j * ROW_FOUR_OFFSET + ROW_THREE_OFFSET) * rLoopStride +
                            offset));
             Add(x3, x3, x4, pregLoop);
             Add(x1, x1, x3, pregLoop);
-            StoreAlign(((__ubuf__ float *)binaryAddTmpAddr + j * rLoopStride + offset), x1, pregLoop);
+            StoreAlign(((__ubuf__ float*)binaryAddTmpAddr + j * rLoopStride + offset), x1, pregLoop);
         }
         LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     }
     for (uint16_t i = 0; i < binaryAddLastLoop; i++) {
-        LoadAlign(x1, ((__ubuf__ float *)binaryAddTmpAddr + offset));
-        LoadAlign(x2, ((__ubuf__ float *)binaryAddTmpAddr + rLoopStride + offset));
+        LoadAlign(x1, ((__ubuf__ float*)binaryAddTmpAddr + offset));
+        LoadAlign(x2, ((__ubuf__ float*)binaryAddTmpAddr + rLoopStride + offset));
         Add(x1, x1, x2, pregLoop);
-        StoreAlign(((__ubuf__ float *)binaryAddTmpAddr + offset), x1, pregLoop);
+        StoreAlign(((__ubuf__ float*)binaryAddTmpAddr + offset), x1, pregLoop);
         LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     }
 }
 
 template <typename T>
-__aicore__ inline void LoadOneTensorForDtypeT(__ubuf__ T *input, RegTensor<float> &dst, MaskReg &preg, uint32_t offset)
+__aicore__ inline void LoadOneTensorForDtypeT(__ubuf__ T* input, RegTensor<float>& dst, MaskReg& preg, uint32_t offset)
 {
     if constexpr (IsSameType<T, half>::value) {
         RegTensor<half> xFp16;
-        LoadAlign<half, LoadDist::DIST_UNPACK_B16>(xFp16, ((__ubuf__ half *)(input) + (offset)));
+        LoadAlign<half, LoadDist::DIST_UNPACK_B16>(xFp16, ((__ubuf__ half*)(input) + (offset)));
         Cast<float, half, castTraitB162B32>(dst, xFp16, preg);
     } else if constexpr (IsSameType<T, bfloat16_t>::value) {
         RegTensor<bfloat16_t> xBf16;
-        LoadAlign<bfloat16_t, LoadDist::DIST_UNPACK_B16>(xBf16, ((__ubuf__ bfloat16_t *)(input) + (offset)));
+        LoadAlign<bfloat16_t, LoadDist::DIST_UNPACK_B16>(xBf16, ((__ubuf__ bfloat16_t*)(input) + (offset)));
         Cast<float, bfloat16_t, castTraitB162B32>(dst, xBf16, preg);
     } else {
-        LoadAlign(dst, ((__ubuf__ float *)(input) + (offset)));
+        LoadAlign(dst, ((__ubuf__ float*)(input) + (offset)));
     }
 }
 
 template <typename T>
-__aicore__ inline void StoreOneTensorForDtypeT(__ubuf__ T *output, RegTensor<float> &src, MaskReg &preg,
+__aicore__ inline void StoreOneTensorForDtypeT(__ubuf__ T* output, RegTensor<float>& src, MaskReg& preg,
                                                uint32_t offset)
 {
     if constexpr (IsSameType<T, half>::value) {
         RegTensor<half> yFp16;
         Cast<half, float, castTraitB322B16>(yFp16, src, preg);
-        StoreAlign<half, StoreDist::DIST_PACK_B32>(((__ubuf__ half *)output + offset), yFp16, preg);
+        StoreAlign<half, StoreDist::DIST_PACK_B32>(((__ubuf__ half*)output + offset), yFp16, preg);
     } else if constexpr (IsSameType<T, bfloat16_t>::value) {
         RegTensor<bfloat16_t> xBf16;
         Cast<bfloat16_t, float, castTraitB322B16>(xBf16, src, preg);
-        StoreAlign<bfloat16_t, StoreDist::DIST_PACK_B32>(((__ubuf__ bfloat16_t *)output + offset), xBf16, preg);
+        StoreAlign<bfloat16_t, StoreDist::DIST_PACK_B32>(((__ubuf__ bfloat16_t*)output + offset), xBf16, preg);
     } else {
-        StoreAlign(((__ubuf__ float *)output + offset), src, preg);
+        StoreAlign(((__ubuf__ float*)output + offset), src, preg);
     }
 }
 
 template <typename T>
-__aicore__ inline void TwoRowAddWithTail(RegTensor<float> &dst, __ubuf__ T *input, MaskReg &preg, uint32_t offset1,
-                                         uint32_t offset2, uint32_t offset3, uint32_t offset4, RegTensor<float> &rem,
-                                         RegTensor<float> &nextRow, RegTensor<float> &remNextRow)
+__aicore__ inline void TwoRowAddWithTail(RegTensor<float>& dst, __ubuf__ T* input, MaskReg& preg, uint32_t offset1,
+                                         uint32_t offset2, uint32_t offset3, uint32_t offset4, RegTensor<float>& rem,
+                                         RegTensor<float>& nextRow, RegTensor<float>& remNextRow)
 {
     LoadOneTensorForDtypeT(input, dst, preg, offset1);
     LoadOneTensorForDtypeT(input, rem, preg, offset2);
@@ -167,8 +167,8 @@ __aicore__ inline void TwoRowAddWithTail(RegTensor<float> &dst, __ubuf__ T *inpu
 }
 
 template <typename T>
-__aicore__ inline void TwoRowAdd(RegTensor<float> &dst, __ubuf__ T *input, MaskReg &preg, uint32_t offset1,
-                                 uint32_t offset2, RegTensor<float> &nextRow)
+__aicore__ inline void TwoRowAdd(RegTensor<float>& dst, __ubuf__ T* input, MaskReg& preg, uint32_t offset1,
+                                 uint32_t offset2, RegTensor<float>& nextRow)
 {
     LoadOneTensorForDtypeT(input, dst, preg, offset1);
     LoadOneTensorForDtypeT(input, nextRow, preg, offset2);
@@ -176,11 +176,11 @@ __aicore__ inline void TwoRowAdd(RegTensor<float> &dst, __ubuf__ T *input, MaskR
 }
 
 template <typename T>
-__aicore__ inline void SixteenRowAddWithTail(RegTensor<float> &dst, __ubuf__ T *input, MaskReg &pregLoop,
+__aicore__ inline void SixteenRowAddWithTail(RegTensor<float>& dst, __ubuf__ T* input, MaskReg& pregLoop,
                                              uint32_t quotOffset, uint32_t remOffset, uint32_t stride,
-                                             RegTensor<float> &rem, RegTensor<float> &nextRow,
-                                             RegTensor<float> &remNextRow, RegTensor<float> &x2, RegTensor<float> &x3,
-                                             RegTensor<float> &x4)
+                                             RegTensor<float>& rem, RegTensor<float>& nextRow,
+                                             RegTensor<float>& remNextRow, RegTensor<float>& x2, RegTensor<float>& x3,
+                                             RegTensor<float>& x4)
 {
     TwoRowAddWithTail(dst, input, pregLoop, quotOffset, remOffset, quotOffset + stride, remOffset + stride, rem,
                       nextRow, remNextRow);
@@ -199,7 +199,7 @@ __aicore__ inline void SixteenRowAddWithTail(RegTensor<float> &dst, __ubuf__ T *
 }
 
 template <typename T, typename U, bool withInit>
-__aicore__ inline void SequenceReduceSum(__ubuf__ T *inputAddr, __ubuf__ U *outputAddr, int64_t currentN,
+__aicore__ inline void SequenceReduceSum(__ubuf__ T* inputAddr, __ubuf__ U* outputAddr, int64_t currentN,
                                          int64_t currentK, int64_t currentH, int64_t currentHAlign,
                                          int64_t currentKStride)
 {

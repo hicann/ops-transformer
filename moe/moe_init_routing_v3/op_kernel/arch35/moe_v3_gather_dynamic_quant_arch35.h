@@ -30,36 +30,36 @@ template <typename T, typename QuantT = int8_t>
 class MoeGatherOutDynamicQuant {
 public:
     __aicore__ inline MoeGatherOutDynamicQuant(){};
-    __aicore__ inline void InitBaseData(GM_ADDR sortedExpertIdx, const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                        TPipe *tPipe);
+    __aicore__ inline void InitBaseData(GM_ADDR sortedExpertIdx, const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                        TPipe* tPipe);
     __aicore__ inline void Init(GM_ADDR inputX, GM_ADDR quantSmooth, GM_ADDR expandedRowIdx, GM_ADDR expandedX,
                                 GM_ADDR expandedScale, GM_ADDR sortedExpertIdx,
-                                const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void StoreInt4QuantOut(__ubuf__ uint8_t *outUbAddr, Reg::RegTensor<float> &inReg,
-                                             Reg::MaskReg &maskRegInLoop, Reg::MaskReg &maskRegHalf);
+    __aicore__ inline void StoreInt4QuantOut(__ubuf__ uint8_t* outUbAddr, Reg::RegTensor<float>& inReg,
+                                             Reg::MaskReg& maskRegInLoop, Reg::MaskReg& maskRegHalf);
     __aicore__ inline void CopyInExpandedExpertIdx(int64_t progress);
     __aicore__ inline void CopyOutXQuantEH(int64_t progress);
     template <bool IS_INPUT_SCALE>
-    __aicore__ inline void Compute(LocalTensor<float> &smoothLocal);
+    __aicore__ inline void Compute(LocalTensor<float>& smoothLocal);
     template <bool IS_INPUT_SCALE>
-    __aicore__ inline void ComputeInt4SinglePass(LocalTensor<float> &smoothLocal);
+    __aicore__ inline void ComputeInt4SinglePass(LocalTensor<float>& smoothLocal);
     template <bool IS_INPUT_SCALE>
-    __aicore__ inline void ComputeMultiPass(LocalTensor<float> &smoothLocal);
+    __aicore__ inline void ComputeMultiPass(LocalTensor<float>& smoothLocal);
     __aicore__ inline void CopyOutPartialXQuantEH(int64_t progress);
     template <bool IS_INPUT_SCALE>
-    __aicore__ inline float ComputeMax(LocalTensor<float> &inLocal, LocalTensor<float> &scaleLocal, int32_t srcIdx,
+    __aicore__ inline float ComputeMax(LocalTensor<float>& inLocal, LocalTensor<float>& scaleLocal, int32_t srcIdx,
                                        int32_t expertIdx, int64_t j);
-    __aicore__ inline void QuantizeToInt4(LocalTensor<float> &inLocal, LocalTensor<int8_t> &outLocal,
+    __aicore__ inline void QuantizeToInt4(LocalTensor<float>& inLocal, LocalTensor<int8_t>& outLocal,
                                           float quantFactor);
-    __aicore__ inline void QuantizeToInt8(LocalTensor<float> &inLocal, LocalTensor<int8_t> &outLocal, float scaleTemp);
-    __aicore__ inline void ComputeScale(LocalTensor<float> &inLocal, float scaleTemp, int64_t dstIndex, int64_t j);
+    __aicore__ inline void QuantizeToInt8(LocalTensor<float>& inLocal, LocalTensor<int8_t>& outLocal, float scaleTemp);
+    __aicore__ inline void ComputeScale(LocalTensor<float>& inLocal, float scaleTemp, int64_t dstIndex, int64_t j);
     __aicore__ inline void SetColTileParams(int64_t j);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, GATHER_OUT_DYNAMIC_QUANT_INPUT_X_QUEUE_NUM> inputXInQueue_;
     TQue<QuePosition::VECIN, GATHER_OUT_DYNAMIC_QUANT_INPUT_QUEUE_NUM> smoothInQueue_;
     TQue<QuePosition::VECIN, GATHER_OUT_DYNAMIC_QUANT_INPUT_QUEUE_NUM> expandRowIdxInQueue_;
@@ -75,7 +75,7 @@ private:
     GlobalTensor<int32_t> expandedExpertIdxGm_;
     GlobalTensor<int32_t> expertTotalCountGm_;
 
-    const MoeV3Arch35GatherOutComputeTilingData *gatherOutTilingData_;
+    const MoeV3Arch35GatherOutComputeTilingData* gatherOutTilingData_;
 
     int64_t needCoreNum_;
     int64_t blockIdx_;
@@ -115,19 +115,19 @@ private:
 };
 
 template <typename T, typename QuantT>
-__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::StoreInt4QuantOut(__ubuf__ uint8_t *outUbAddr,
-                                                                              Reg::RegTensor<float> &inReg,
-                                                                              Reg::MaskReg &maskRegInLoop,
-                                                                              Reg::MaskReg &maskRegHalf)
+__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::StoreInt4QuantOut(__ubuf__ uint8_t* outUbAddr,
+                                                                              Reg::RegTensor<float>& inReg,
+                                                                              Reg::MaskReg& maskRegInLoop,
+                                                                              Reg::MaskReg& maskRegHalf)
 {
     Reg::RegTensor<half> outRegF16;
     Reg::RegTensor<uint8_t> outRegI4;
     Reg::RegTensor<uint16_t> outRegPackedHalf;
 
     Reg::Cast<half, float, castTraitF32ToF16>(outRegF16, inReg, maskRegInLoop);
-    Reg::Pack(outRegPackedHalf, (Reg::RegTensor<uint32_t> &)outRegF16);
-    Reg::Cast<int4x2_t, half, castTraitF16ToI4>((Reg::RegTensor<int4x2_t> &)outRegI4,
-                                                (Reg::RegTensor<half> &)outRegPackedHalf, maskRegInLoop);
+    Reg::Pack(outRegPackedHalf, (Reg::RegTensor<uint32_t>&)outRegF16);
+    Reg::Cast<int4x2_t, half, castTraitF16ToI4>((Reg::RegTensor<int4x2_t>&)outRegI4,
+                                                (Reg::RegTensor<half>&)outRegPackedHalf, maskRegInLoop);
     Reg::StoreAlign<uint8_t, Reg::StoreDist::DIST_PACK4_B32>(outUbAddr, outRegI4, maskRegHalf);
 }
 
@@ -148,7 +148,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::CopyInExpandedExpert
 
 template <typename T, typename QuantT>
 template <bool IS_INPUT_SCALE>
-__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::Compute(LocalTensor<float> &smoothLocal)
+__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::Compute(LocalTensor<float>& smoothLocal)
 {
     if constexpr (IsSameType<QuantT, int4b_t>::value) {
         if (cols_ <= FLOAT_REG_TENSOR_LENGTH) {
@@ -161,22 +161,22 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::Compute(LocalTensor<
 
 template <typename T, typename QuantT>
 template <bool IS_INPUT_SCALE>
-__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::ComputeInt4SinglePass(LocalTensor<float> &smoothLocal)
+__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::ComputeInt4SinglePass(LocalTensor<float>& smoothLocal)
 {
     LocalTensor<float> inLocal = inputXInQueue_.DeQue<float>();
     LocalTensor<int8_t> outLocal = inputXOutQueue_.AllocTensor<int8_t>();
     LocalTensor<float> scaleLocal = scaleOutQueue_.AllocTensor<float>();
 
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)inLocal.GetPhyAddr();
-    __ubuf__ float *scaleUbAddr = (__ubuf__ float *)scaleLocal.GetPhyAddr();
-    __ubuf__ int8_t *outUbAddr = (__ubuf__ int8_t *)outLocal.GetPhyAddr();
-    __ubuf__ T *inUbAddrCastT;
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)inLocal.GetPhyAddr();
+    __ubuf__ float* scaleUbAddr = (__ubuf__ float*)scaleLocal.GetPhyAddr();
+    __ubuf__ int8_t* outUbAddr = (__ubuf__ int8_t*)outLocal.GetPhyAddr();
+    __ubuf__ T* inUbAddrCastT;
     if constexpr (!IsSameType<T, float>::value) {
-        inUbAddrCastT = (__ubuf__ T *)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
+        inUbAddrCastT = (__ubuf__ T*)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
     }
-    __ubuf__ float *smoothUbAddr;
+    __ubuf__ float* smoothUbAddr;
     if constexpr (IS_INPUT_SCALE) {
-        smoothUbAddr = (__ubuf__ float *)smoothLocal.GetPhyAddr();
+        smoothUbAddr = (__ubuf__ float*)smoothLocal.GetPhyAddr();
     }
 
     uint32_t sreg = static_cast<uint32_t>(cols_);
@@ -216,7 +216,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::ComputeInt4SinglePas
         Reg::StoreAlign(scaleUbAddr, scaleValueReg, maskRegVL1);
 
         Reg::Mul(inReg, inReg, quantFactorReg, maskRegInLoop);
-        StoreInt4QuantOut((__ubuf__ uint8_t *)outUbAddr, inReg, maskRegInLoop, maskRegHalf);
+        StoreInt4QuantOut((__ubuf__ uint8_t*)outUbAddr, inReg, maskRegInLoop, maskRegHalf);
     }
 
     inputXOutQueue_.EnQue(outLocal);
@@ -225,22 +225,22 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::ComputeInt4SinglePas
 
 template <typename T, typename QuantT>
 template <bool IS_INPUT_SCALE>
-__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::ComputeMultiPass(LocalTensor<float> &smoothLocal)
+__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::ComputeMultiPass(LocalTensor<float>& smoothLocal)
 {
     LocalTensor<float> inLocal = inputXInQueue_.DeQue<float>();
     LocalTensor<int8_t> outLocal = inputXOutQueue_.AllocTensor<int8_t>();
     LocalTensor<float> scaleLocal = scaleOutQueue_.AllocTensor<float>();
 
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)inLocal.GetPhyAddr();
-    __ubuf__ float *scaleUbAddr = (__ubuf__ float *)scaleLocal.GetPhyAddr();
-    __ubuf__ int8_t *outUbAddr = (__ubuf__ int8_t *)outLocal.GetPhyAddr();
-    __ubuf__ T *inUbAddrCastT;
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)inLocal.GetPhyAddr();
+    __ubuf__ float* scaleUbAddr = (__ubuf__ float*)scaleLocal.GetPhyAddr();
+    __ubuf__ int8_t* outUbAddr = (__ubuf__ int8_t*)outLocal.GetPhyAddr();
+    __ubuf__ T* inUbAddrCastT;
     if constexpr (!IsSameType<T, float>::value) {
-        inUbAddrCastT = (__ubuf__ T *)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
+        inUbAddrCastT = (__ubuf__ T*)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
     }
-    __ubuf__ float *smoothUbAddr;
+    __ubuf__ float* smoothUbAddr;
     if constexpr (IS_INPUT_SCALE) {
-        smoothUbAddr = (__ubuf__ float *)smoothLocal.GetPhyAddr();
+        smoothUbAddr = (__ubuf__ float*)smoothLocal.GetPhyAddr();
     }
 
     uint16_t repeatTimes = Ceil(cols_, FLOAT_REG_TENSOR_LENGTH);
@@ -301,7 +301,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::ComputeMultiPass(Loc
             Reg::LoadAlign(inReg, inUbAddr + i * FLOAT_REG_TENSOR_LENGTH);
             if constexpr (IsSameType<QuantT, int4b_t>::value) {
                 Reg::Mul(inReg, inReg, quantFactorReg, maskRegInLoop);
-                StoreInt4QuantOut((__ubuf__ uint8_t *)outUbAddr + i * FLOAT_REG_TENSOR_LENGTH / 2, inReg, maskRegInLoop,
+                StoreInt4QuantOut((__ubuf__ uint8_t*)outUbAddr + i * FLOAT_REG_TENSOR_LENGTH / 2, inReg, maskRegInLoop,
                                   maskRegHalf);
             } else {
                 Reg::Div(inReg, inReg, scaleValueReg, maskRegInLoop);
@@ -385,8 +385,8 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::CopyOutXQuantEH(int6
 
 template <typename T, typename QuantT>
 template <bool IS_INPUT_SCALE>
-__aicore__ inline float MoeGatherOutDynamicQuant<T, QuantT>::ComputeMax(LocalTensor<float> &inLocal,
-                                                                        LocalTensor<float> &scaleLocal, int32_t srcIdx,
+__aicore__ inline float MoeGatherOutDynamicQuant<T, QuantT>::ComputeMax(LocalTensor<float>& inLocal,
+                                                                        LocalTensor<float>& scaleLocal, int32_t srcIdx,
                                                                         int32_t expertIdx, int64_t j)
 {
     LocalTensor<float> smoothLocal = smoothInQueue_.AllocTensor<float>();
@@ -410,15 +410,15 @@ __aicore__ inline float MoeGatherOutDynamicQuant<T, QuantT>::ComputeMax(LocalTen
         smoothLocal = smoothInQueue_.DeQue<float>();
     }
 
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)inLocal.GetPhyAddr();
-    __ubuf__ float *scaleUbAddr = (__ubuf__ float *)scaleLocal.GetPhyAddr();
-    __ubuf__ T *inUbAddrCastT;
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)inLocal.GetPhyAddr();
+    __ubuf__ float* scaleUbAddr = (__ubuf__ float*)scaleLocal.GetPhyAddr();
+    __ubuf__ T* inUbAddrCastT;
     if constexpr (!IsSameType<T, float>::value) {
-        inUbAddrCastT = (__ubuf__ T *)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
+        inUbAddrCastT = (__ubuf__ T*)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
     }
-    __ubuf__ float *smoothUbAddr;
+    __ubuf__ float* smoothUbAddr;
     if constexpr (IS_INPUT_SCALE) {
-        smoothUbAddr = (__ubuf__ float *)smoothLocal.GetPhyAddr();
+        smoothUbAddr = (__ubuf__ float*)smoothLocal.GetPhyAddr();
     }
 
     uint16_t repeatTimes = Ceil(colsTileLength_, FLOAT_REG_TENSOR_LENGTH);
@@ -463,12 +463,12 @@ __aicore__ inline float MoeGatherOutDynamicQuant<T, QuantT>::ComputeMax(LocalTen
 }
 
 template <typename T, typename QuantT>
-__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::QuantizeToInt4(LocalTensor<float> &inLocal,
-                                                                           LocalTensor<int8_t> &outLocal,
+__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::QuantizeToInt4(LocalTensor<float>& inLocal,
+                                                                           LocalTensor<int8_t>& outLocal,
                                                                            float quantFactor)
 {
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)inLocal.GetPhyAddr();
-    __ubuf__ uint8_t *outUbAddr = (__ubuf__ uint8_t *)outLocal.GetPhyAddr();
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)inLocal.GetPhyAddr();
+    __ubuf__ uint8_t* outUbAddr = (__ubuf__ uint8_t*)outLocal.GetPhyAddr();
 
     uint16_t repeatTimes = Ceil(colsTileLength_, FLOAT_REG_TENSOR_LENGTH);
     uint32_t sreg = static_cast<uint32_t>(colsTileLength_);
@@ -503,12 +503,12 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::SetColTileParams(int
 }
 
 template <typename T, typename QuantT>
-__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::QuantizeToInt8(LocalTensor<float> &inLocal,
-                                                                           LocalTensor<int8_t> &outLocal,
+__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::QuantizeToInt8(LocalTensor<float>& inLocal,
+                                                                           LocalTensor<int8_t>& outLocal,
                                                                            float scaleTemp)
 {
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)inLocal.GetPhyAddr();
-    __ubuf__ int8_t *outUbAddr = (__ubuf__ int8_t *)outLocal.GetPhyAddr();
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)inLocal.GetPhyAddr();
+    __ubuf__ int8_t* outUbAddr = (__ubuf__ int8_t*)outLocal.GetPhyAddr();
 
     uint16_t repeatTimes = Ceil(colsTileLength_, FLOAT_REG_TENSOR_LENGTH);
     uint32_t sreg = static_cast<uint32_t>(colsTileLength_);
@@ -533,7 +533,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::QuantizeToInt8(Local
 }
 
 template <typename T, typename QuantT>
-__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::ComputeScale(LocalTensor<float> &inLocal, float scaleTemp,
+__aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::ComputeScale(LocalTensor<float>& inLocal, float scaleTemp,
                                                                          int64_t dstIndex, int64_t j)
 {
     DataCopyExtParams copyInParams{1, static_cast<uint32_t>(colsTileLength_ * sizeof(float)), 0, 0, 0};
@@ -582,7 +582,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::CopyOutPartialXQuant
         LocalTensor<float> scaleLocal = scaleOutQueue_.AllocTensor<float>();
 
         uint32_t tmp = 0xFF7FFFFF;
-        float reduceMax = *((float *)&tmp);
+        float reduceMax = *((float*)&tmp);
         for (int64_t j = 0; j < colLoops_; j++) {
             SetColTileParams(j);
             float tileMax;
@@ -624,7 +624,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::CopyOutPartialXQuant
 
 template <typename T, typename QuantT>
 __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::InitBaseData(
-    GM_ADDR sortedExpertIdx, const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+    GM_ADDR sortedExpertIdx, const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe)
 {
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
@@ -645,7 +645,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::InitBaseData(
 
     // core split
     int64_t actualExpertNum = tilingData->actualExpertNum;
-    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) * 2 +
+    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t*)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) * 2 +
                                             Align(actualExpertNum, sizeof(int32_t)),
                                         1);
     AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
@@ -686,34 +686,34 @@ template <typename T, typename QuantT>
 __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::Init(GM_ADDR inputX, GM_ADDR quantSmooth,
                                                                  GM_ADDR sortedExpertIdx, GM_ADDR expandedRowIdx,
                                                                  GM_ADDR expandedX, GM_ADDR expandedScale,
-                                                                 const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                                                 TPipe *tPipe)
+                                                                 const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                                                 TPipe* tPipe)
 {
     InitBaseData(sortedExpertIdx, tilingData, tPipe);
-    inputXGm_.SetGlobalBuffer((__gm__ T *)inputX);
-    expandedXGm_.SetGlobalBuffer((__gm__ int8_t *)expandedX);
+    inputXGm_.SetGlobalBuffer((__gm__ T*)inputX);
+    expandedXGm_.SetGlobalBuffer((__gm__ int8_t*)expandedX);
 
-    expandedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdx + blockIdx_ * perCoreRow_,
+    expandedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)sortedExpertIdx + blockIdx_ * perCoreRow_,
                                          Align(coreRows_, sizeof(int32_t)));
 
     if (rowIdxType_ == SCATTER) {
-        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreRow_,
+        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreRow_,
                                           Align(perCoreRow_, sizeof(int32_t)));
     } else {
         expandedRowIdxGm_.SetGlobalBuffer(
-            (__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+            (__gm__ int32_t*)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
             Align(perCoreRow_, sizeof(int32_t)));
     }
 
     if (isInputScale_) {
-        quantSmoothGm_.SetGlobalBuffer((__gm__ float *)quantSmooth);
+        quantSmoothGm_.SetGlobalBuffer((__gm__ float*)quantSmooth);
     }
-    expandedScaleGm_.SetGlobalBuffer((__gm__ float *)expandedScale);
+    expandedScaleGm_.SetGlobalBuffer((__gm__ float*)expandedScale);
 
     int64_t actualExpertNum = tilingData->actualExpertNum;
     if (colLoops_ > 1) {
         // cols非全载 smooth*x结果临时存储
-        quantTempGm_.SetGlobalBuffer((__gm__ float *)sortedExpertIdx + Align(totalLength_, sizeof(int32_t)) * 2 +
+        quantTempGm_.SetGlobalBuffer((__gm__ float*)sortedExpertIdx + Align(totalLength_, sizeof(int32_t)) * 2 +
                                          Align(actualExpertNum, sizeof(int32_t)) + Align(1, sizeof(int32_t)) +
                                          blockIdx_ * cols_,
                                      cols_ * sizeof(float));

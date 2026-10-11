@@ -23,7 +23,7 @@ template <typename T1, typename T2, typename TScale>
 class KernelMoeReRouting {
 public:
     __aicore__ inline KernelMoeReRouting() {}
-    __aicore__ inline KernelMoeReRouting(TPipe *pipe, const MoeReRoutingTilingData *tiling)
+    __aicore__ inline KernelMoeReRouting(TPipe* pipe, const MoeReRoutingTilingData* tiling)
         : pipe_(pipe),
           tl_(tiling)
     {}
@@ -38,8 +38,8 @@ protected:
     __aicore__ inline void CopyOut(int64_t rows, int64_t offset);
     __aicore__ inline void ComputeAndCopyOutIndex(int64_t rows, int64_t offset, int64_t head);
 
-    TPipe *pipe_ = nullptr;
-    const MoeReRoutingTilingData *tl_;
+    TPipe* pipe_ = nullptr;
+    const MoeReRoutingTilingData* tl_;
     constexpr static int64_t blockSize = 32;
     GlobalTensor<T1> srcGm;
     GlobalTensor<T1> dstGm;
@@ -66,14 +66,14 @@ __aicore__ inline void KernelMoeReRouting<T1, T2, TScale>::Init(GM_ADDR tokens, 
                                                                 GM_ADDR permutePerTokenScales, GM_ADDR permuteTokenIdx,
                                                                 GM_ADDR expertTokenNum)
 {
-    srcGm.SetGlobalBuffer((__gm__ T1 *)tokens);
-    dstGm.SetGlobalBuffer((__gm__ T1 *)permuteTokens);
-    srcExpertTokenGm.SetGlobalBuffer((__gm__ T2 *)expertTokensNumPerRank);
-    dstExpertTokenGm.SetGlobalBuffer((__gm__ T2 *)expertTokenNum);
-    indexGm.SetGlobalBuffer((__gm__ int32_t *)permuteTokenIdx);
+    srcGm.SetGlobalBuffer((__gm__ T1*)tokens);
+    dstGm.SetGlobalBuffer((__gm__ T1*)permuteTokens);
+    srcExpertTokenGm.SetGlobalBuffer((__gm__ T2*)expertTokensNumPerRank);
+    dstExpertTokenGm.SetGlobalBuffer((__gm__ T2*)expertTokenNum);
+    indexGm.SetGlobalBuffer((__gm__ int32_t*)permuteTokenIdx);
     if (tl_->hasScale == 1) {
-        srcScaleGm.SetGlobalBuffer((__gm__ TScale *)perTokenScales);
-        dstScaleGm.SetGlobalBuffer((__gm__ TScale *)permutePerTokenScales);
+        srcScaleGm.SetGlobalBuffer((__gm__ TScale*)perTokenScales);
+        dstScaleGm.SetGlobalBuffer((__gm__ TScale*)permutePerTokenScales);
         this->pipe_->InitBuffer(queBind, 2,
                                 AlignUp(tl_->ubFactor * tl_->tokensSize * sizeof(T1), blockSize) +
                                     AlignUp(tl_->ubFactor * sizeof(TScale), blockSize));

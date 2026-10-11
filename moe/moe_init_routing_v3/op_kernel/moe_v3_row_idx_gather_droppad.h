@@ -25,7 +25,7 @@ class MoeV3SrcToDstWithCapacity {
 public:
     __aicore__ inline MoeV3SrcToDstWithCapacity(){};
     __aicore__ inline void Init(GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR expandedScale, GM_ADDR workspace,
-                                const TilingData *tilingData, TPipe *tPipe);
+                                const TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -36,7 +36,7 @@ private:
     __aicore__ inline void AssistInit();
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> copyInQueue;
     TQue<QuePosition::VECOUT, 1> copyOutQueue;
     TQue<QuePosition::VECOUT, 1> copyOutZeroQueue;
@@ -50,7 +50,7 @@ private:
 
     LocalTensor<T> outTmpLocal;
 
-    const MoeV3SrcToDstCapacityComputeTilingData *srcToDstTilingData;
+    const MoeV3SrcToDstCapacityComputeTilingData* srcToDstTilingData;
     int64_t coreNum;
     int64_t blockIdx;
     int64_t totalLength;
@@ -201,8 +201,8 @@ __aicore__ inline void MoeV3SrcToDstWithCapacity<T, TilingData>::SyncAll()
 template <typename T, typename TilingData>
 __aicore__ inline void MoeV3SrcToDstWithCapacity<T, TilingData>::Init(GM_ADDR expandedRowIdx, GM_ADDR expandedX,
                                                                       GM_ADDR expandedScale, GM_ADDR workspace,
-                                                                      const TilingData *tilingData,
-                                                                      TPipe *tPipe) // 增加scale
+                                                                      const TilingData* tilingData,
+                                                                      TPipe* tPipe) // 增加scale
 {
     int64_t blockNum = GetBlockNum();
     this->pipe = tPipe;
@@ -232,17 +232,17 @@ __aicore__ inline void MoeV3SrcToDstWithCapacity<T, TilingData>::Init(GM_ADDR ex
     this->colLoops = this->srcToDstTilingData->colLoops;
 
     int64_t length = Align(this->totalLength, sizeof(int32_t));
-    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, length);
-    expandedXGm.SetGlobalBuffer((__gm__ T *)expandedX, this->expertNum * this->expertCapacity * this->cols);
+    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, length);
+    expandedXGm.SetGlobalBuffer((__gm__ T*)expandedX, this->expertNum * this->expertCapacity * this->cols);
 
     expandedExpertIdxGm.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
+        (__gm__ int32_t*)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
         Align(this->coreRows, sizeof(int32_t)));
     expandDstToSrcRowGm.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + length + this->blockIdx * this->srcToDstTilingData->perCoreRows,
+        (__gm__ int32_t*)workspace + length + this->blockIdx * this->srcToDstTilingData->perCoreRows,
         Align(this->coreRows, sizeof(int32_t)));
     expertIdxValueGm.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + length * 2 + Align(this->expertNum, sizeof(int32_t)) * 2, this->coreNum * 2);
+        (__gm__ int32_t*)workspace + length * 2 + Align(this->expertNum, sizeof(int32_t)) * 2, this->coreNum * 2);
 
     pipe->InitBuffer(copyInQueue, 1, AlignBytes(this->perLoopRows, sizeof(int32_t)) * 2);
     pipe->InitBuffer(copyOutQueue, 1, AlignBytes(INT32_ONE_BLOCK_NUM, sizeof(int32_t)));

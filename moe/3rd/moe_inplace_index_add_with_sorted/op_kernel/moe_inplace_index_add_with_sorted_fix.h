@@ -23,7 +23,7 @@ template <typename T>
 class MoeInplaceIndexAddWithSortedFix {
 public:
     __aicore__ inline MoeInplaceIndexAddWithSortedFix(
-        TPipe *pipeIn, const MoeInplaceIndexAddWithSortedTilingData *__restrict tilingData)
+        TPipe* pipeIn, const MoeInplaceIndexAddWithSortedTilingData* __restrict tilingData)
     {
         pipe = pipeIn;
         coreId = GetBlockIdx();
@@ -53,18 +53,18 @@ public:
 
     __aicore__ inline void Init(GM_ADDR var, GM_ADDR value, GM_ADDR sorted_indices, GM_ADDR pos, GM_ADDR alpha)
     {
-        inputGmFix.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(var), inputCountFix);
-        valueGmFix.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(value), updatesCountFix);
+        inputGmFix.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(var), inputCountFix);
+        valueGmFix.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(value), updatesCountFix);
         if (enableAlpha == 1) {
-            alphaGmFix.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(alpha), 1);
+            alphaGmFix.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(alpha), 1);
             alphaDataFix = alphaGmFix.GetValue(0);
             if (alphaDataFix == static_cast<float>(1.0)) {
                 // 经测试，即使在torch侧不传alpha位置参数，aclnn侧传给算子的alpha的值为1，因此判断为1时，不做vmuls，省一点计算时间
                 enableAlpha = 0;
             }
         }
-        indicesGmFix.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(sorted_indices), indicesCountFix);
-        posGmFix.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(pos), indicesCountFix);
+        indicesGmFix.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(sorted_indices), indicesCountFix);
+        posGmFix.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(pos), indicesCountFix);
         finalIndex = indicesGmFix.GetValue(indicesCountFix - 1);
         pipe->InitBuffer(inQueueSelfFix, BUFFER_NUM, maxSize * sizeof(T));
         pipe->InitBuffer(inQueueValueFix, BUFFER_NUM, maxSize * sizeof(T));
@@ -258,7 +258,7 @@ private:
     }
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     GlobalTensor<T> inputGmFix;
     GlobalTensor<T> valueGmFix;
     GlobalTensor<float> alphaGmFix;

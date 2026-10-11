@@ -56,9 +56,9 @@ static const std::initializer_list<DataType> DTYPE_SUPPORT_LIST_EXPANDED_SCALE_O
 static const std::initializer_list<DataType> DTYPE_SUPPORT_LIST_EXPANDED_SCALE_OUT_REGBASE = {DataType::DT_FLOAT,
                                                                                               DataType::DT_FLOAT8_E8M0};
 
-static inline bool CheckNotNull(const aclTensor *x, const aclTensor *expertIdx, const aclTensor *expandedXOut,
-                                const aclTensor *expandedRowIdxOut, const aclTensor *expertTokensCountOrCumsumOut,
-                                const aclTensor *expandedScaleOut)
+static inline bool CheckNotNull(const aclTensor* x, const aclTensor* expertIdx, const aclTensor* expandedXOut,
+                                const aclTensor* expandedRowIdxOut, const aclTensor* expertTokensCountOrCumsumOut,
+                                const aclTensor* expandedScaleOut)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(expertIdx, return false);
@@ -70,11 +70,11 @@ static inline bool CheckNotNull(const aclTensor *x, const aclTensor *expertIdx, 
     return true;
 }
 
-static inline bool CheckDtypeValidRegbase(const aclTensor *x, const aclTensor *expertIdx,
-                                          const aclTensor *scaleOptional, const aclTensor *offsetOptional,
-                                          const aclTensor *expandedXOut, const aclTensor *expandedRowIdxOut,
-                                          const aclTensor *expertTokensCountOrCumsumOut,
-                                          const aclTensor *expandedScaleOut)
+static inline bool CheckDtypeValidRegbase(const aclTensor* x, const aclTensor* expertIdx,
+                                          const aclTensor* scaleOptional, const aclTensor* offsetOptional,
+                                          const aclTensor* expandedXOut, const aclTensor* expandedRowIdxOut,
+                                          const aclTensor* expertTokensCountOrCumsumOut,
+                                          const aclTensor* expandedScaleOut)
 {
     if (x != nullptr && x->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(x, DTYPE_SUPPORT_LIST_X_REGBASE, return false);
@@ -105,17 +105,17 @@ static inline bool CheckDtypeValidRegbase(const aclTensor *x, const aclTensor *e
 }
 
 ACLNN_API aclnnStatus aclnnMoeInitRoutingV3GetWorkspaceSize(
-    const aclTensor *x, const aclTensor *expertIdx, const aclTensor *scaleOptional, const aclTensor *offsetOptional,
+    const aclTensor* x, const aclTensor* expertIdx, const aclTensor* scaleOptional, const aclTensor* offsetOptional,
     int64_t activeNum, int64_t expertCapacity, int64_t expertNum, int64_t dropPadMode, int64_t expertTokensNumType,
-    bool expertTokensNumFlag, int64_t quantMode, const aclIntArray *activeExpertRangeOptional, int64_t rowIdxType,
-    const aclTensor *expandedXOut, const aclTensor *expandedRowIdxOut, const aclTensor *expertTokensCountOrCumsumOut,
-    const aclTensor *expandedScaleOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    bool expertTokensNumFlag, int64_t quantMode, const aclIntArray* activeExpertRangeOptional, int64_t rowIdxType,
+    const aclTensor* expandedXOut, const aclTensor* expandedRowIdxOut, const aclTensor* expertTokensCountOrCumsumOut,
+    const aclTensor* expandedScaleOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    L2_DFX_PHASE_1(aclnnMoeInitRoutingV3,
-                   DFX_IN(x, expertIdx, scaleOptional, offsetOptional, activeNum, expertCapacity, expertNum,
-                          dropPadMode, expertTokensNumType, expertTokensNumFlag, quantMode, activeExpertRangeOptional,
-                          rowIdxType),
-                   DFX_OUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut, expandedScaleOut));
+    L2_DFX_PHASE_1(
+        aclnnMoeInitRoutingV3,
+        DFX_IN(x, expertIdx, scaleOptional, offsetOptional, activeNum, expertCapacity, expertNum, dropPadMode,
+               expertTokensNumType, expertTokensNumFlag, quantMode, activeExpertRangeOptional, rowIdxType),
+        DFX_OUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut, expandedScaleOut));
     // 参数检查
     auto ret =
         CheckNotNull(x, expertIdx, expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut, expandedScaleOut);
@@ -139,8 +139,8 @@ ACLNN_API aclnnStatus aclnnMoeInitRoutingV3GetWorkspaceSize(
     auto expertIdxContiguous = l0op::Contiguous(expertIdx, uniqueExecutor.get());
     CHECK_RET(expertIdxContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    const aclTensor *scaleContiguous = nullptr;
-    const aclTensor *offsetContiguous = nullptr;
+    const aclTensor* scaleContiguous = nullptr;
+    const aclTensor* offsetContiguous = nullptr;
     if (scaleOptional != nullptr) {
         scaleContiguous = l0op::Contiguous(scaleOptional, uniqueExecutor.get());
         CHECK_RET(scaleContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -151,8 +151,7 @@ ACLNN_API aclnnStatus aclnnMoeInitRoutingV3GetWorkspaceSize(
         CHECK_RET(offsetContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     }
 
-    auto routingResult =
-        std::tuple<aclTensor *, aclTensor *, aclTensor *, aclTensor *>(nullptr, nullptr, nullptr, nullptr);
+    auto routingResult = std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*>(nullptr, nullptr, nullptr, nullptr);
     // 调用v3版本的l0接口进行计算
     routingResult = l0op::MoeInitRoutingV3(
         xContiguous, expertIdxContiguous, scaleContiguous, offsetContiguous, activeNum, expertCapacity, expertNum,
@@ -181,7 +180,7 @@ ACLNN_API aclnnStatus aclnnMoeInitRoutingV3GetWorkspaceSize(
     uniqueExecutor.ReleaseTo(executor);
     return ACLNN_SUCCESS;
 }
-ACLNN_API aclnnStatus aclnnMoeInitRoutingV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMoeInitRoutingV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                             aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMoeInitRoutingV3);

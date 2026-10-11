@@ -34,12 +34,12 @@ protected:
     }
 };
 
-static string TilingData2Str(const gert::TilingData *tiling_data)
+static string TilingData2Str(const gert::TilingData* tiling_data)
 {
     auto data = tiling_data->GetData();
     string result;
     for (size_t i = 0; i < tiling_data->GetDataSize(); i += sizeof(int64_t)) {
-        result += std::to_string((reinterpret_cast<const int64_t *>(tiling_data->GetData())[i / sizeof(int64_t)]));
+        result += std::to_string((reinterpret_cast<const int64_t*>(tiling_data->GetData())[i / sizeof(int64_t)]));
         result += " ";
     }
 

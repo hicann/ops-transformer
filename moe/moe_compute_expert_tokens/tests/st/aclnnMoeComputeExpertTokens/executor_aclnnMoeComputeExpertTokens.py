@@ -18,7 +18,9 @@ from atk.tasks.api_execute import register
 from atk.tasks.api_execute.base_api import BaseApi
 
 import os
+
 os.environ["PYTORCH_NO_NPU_MEMORY_CACHING"] = "1"
+
 
 @register("function_aclnn_moe_compute_expert_tokens")
 class FunctionApi(BaseApi):
@@ -42,12 +44,11 @@ class FunctionApi(BaseApi):
             res[i] = target_location + 1
         res = res.astype(np.int32)
         return torch.from_numpy(res)
-    
+
     def init_by_input_data(self, input_data: InputDataset):
         sorted_experts = input_data.kwargs["sortedExperts"]
 
-        input_data.kwargs['sortedExperts'] = torch.sort(sorted_experts, stable=True)[0]
-
+        input_data.kwargs["sortedExperts"] = torch.sort(sorted_experts, stable=True)[0]
 
     def get_cpp_func_signature_type(self):
         return "aclnnStatus aclnnMoeComputeExpertTokensGetWorkspaceSize(const aclTensor* sortedExperts, int64_t numExperts, const aclTensor* out, uint64_t *workspaceSize, aclOpExecutor **executor)"

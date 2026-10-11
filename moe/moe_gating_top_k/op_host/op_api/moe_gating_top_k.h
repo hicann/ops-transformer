@@ -20,15 +20,15 @@
 
 namespace l0op {
 struct MoeGatingTopKResult {
-    const aclTensor *y;
-    const aclTensor *expertIdx;
-    const aclTensor *outOut;
+    const aclTensor* y;
+    const aclTensor* expertIdx;
+    const aclTensor* outOut;
 };
 
-MoeGatingTopKResult MoeGatingTopK(const aclTensor *x, const aclTensor *bias, const aclTensor *input_ids,
-                                  const aclTensor *tid2eid, int64_t k, int64_t k_group, int64_t group_count,
+MoeGatingTopKResult MoeGatingTopK(const aclTensor* x, const aclTensor* bias, const aclTensor* input_ids,
+                                  const aclTensor* tid2eid, int64_t k, int64_t k_group, int64_t group_count,
                                   int64_t group_select_mode, int64_t renorm, int64_t norm_type, bool out_flag,
-                                  double routed_scaling_factor, double eps, const aclTensor *y_out,
-                                  const aclTensor *expert_idx_out, const aclTensor *out_out, aclOpExecutor *executor);
+                                  double routed_scaling_factor, double eps, const aclTensor* y_out,
+                                  const aclTensor* expert_idx_out, const aclTensor* out_out, aclOpExecutor* executor);
 } // namespace l0op
 #endif // OP_API_INC_LEVEL0_MOE_GATING_TOP_K_H_

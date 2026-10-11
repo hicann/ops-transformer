@@ -27,7 +27,7 @@ public:
     __aicore__ inline MoeV2ExpertTokenOut(){};
     template <typename TilingData>
     __aicore__ inline void Init(GM_ADDR expertTokensCountOrCumsum, GM_ADDR expertTokensBeforeCapacity,
-                                GM_ADDR expandedRowIdx, GM_ADDR workspace, const TilingData *tilingData, TPipe *tPipe);
+                                GM_ADDR expandedRowIdx, GM_ADDR workspace, const TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -41,7 +41,7 @@ private:
     __aicore__ inline void CopyOutExpertTokensCount(bool isTail);
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> copyInQueue;
     TQue<QuePosition::VECIN, 1> expertTokenIdxCopyInQueue;
     TQue<QuePosition::VECOUT, 1> expertTokenIdxCopyOutQueue;
@@ -57,7 +57,7 @@ private:
 #endif
     LocalTensor<int32_t> expertTokenIdxOutLocal;
 
-    const MoeV2GatherOutComputeTilingData *srcToDstTilingData;
+    const MoeV2GatherOutComputeTilingData* srcToDstTilingData;
 
     int64_t coreNum;
     int64_t blockIdx;
@@ -296,7 +296,7 @@ __aicore__ inline void MoeV2ExpertTokenOut::SyncAll()
 template <typename TilingData>
 __aicore__ inline void MoeV2ExpertTokenOut::Init(GM_ADDR expertTokensCountOrCumsum, GM_ADDR expertTokensBeforeCapacity,
                                                  GM_ADDR expandedRowIdx, GM_ADDR workspace,
-                                                 const TilingData *tilingData, TPipe *tPipe)
+                                                 const TilingData* tilingData, TPipe* tPipe)
 {
     int64_t blockNum = GetBlockNum();
     this->pipe = tPipe;
@@ -320,19 +320,19 @@ __aicore__ inline void MoeV2ExpertTokenOut::Init(GM_ADDR expertTokensCountOrCums
         this->lastLoopRows = this->srcToDstTilingData->perCoreLastLoopRows;
     }
 
-    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, Align(this->totalLength, sizeof(int32_t)));
+    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, Align(this->totalLength, sizeof(int32_t)));
     if (this->dropPadMode == DROPLESS_MODE && this->expertTokensCountOrCumsumFlag > EXERPT_TOKENS_NONE) {
-        expertTokensCountOrCumsumGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensCountOrCumsum, this->expertNum);
+        expertTokensCountOrCumsumGm.SetGlobalBuffer((__gm__ int32_t*)expertTokensCountOrCumsum, this->expertNum);
     }
     if (this->dropPadMode == DROP_PAD_MODE && this->expertTokensBeforeCapacityFlag == EXERPT_TOKENS_BEFORE_CAPACITY) {
-        expertTokensBeforeCapacityGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensBeforeCapacity, this->expertNum);
+        expertTokensBeforeCapacityGm.SetGlobalBuffer((__gm__ int32_t*)expertTokensBeforeCapacity, this->expertNum);
     }
 
     expandedExpertIdxGm.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
+        (__gm__ int32_t*)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
         Align(this->coreRows, sizeof(int32_t)));
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 200
-    syncTmpSpaceGm_.SetGlobalBuffer((__gm__ int32_t *)workspace +
+    syncTmpSpaceGm_.SetGlobalBuffer((__gm__ int32_t*)workspace +
                                         Align(this->totalLength, sizeof(int32_t)) * EXERPT_TOKENS_COUNT +
                                         this->coreNum * BLOCK_BYTES / sizeof(int32_t),
                                     INT32_ONE_BLOCK_NUM * GetBlockNum() * BLOCK_BYTES);
@@ -341,10 +341,10 @@ __aicore__ inline void MoeV2ExpertTokenOut::Init(GM_ADDR expertTokensCountOrCums
     Duplicate<int32_t>(syncLocal, 0, SYNC_LEN);
     SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
     DataCopy(syncTmpSpaceGm_, syncLocal, SYNC_LEN);
-    expertIdxValueGm.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2,
+    expertIdxValueGm.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(this->totalLength, sizeof(int32_t)) * 2,
                                      this->coreNum * BLOCK_BYTES / sizeof(int32_t));
 #else
-    expertIdxValueGm.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2,
+    expertIdxValueGm.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(this->totalLength, sizeof(int32_t)) * 2,
                                      this->coreNum * 2);
 #endif
     this->expertNumUbAlign = Min(Align(this->expertNum, sizeof(int32_t)), MAX_EXPERT_NUM);

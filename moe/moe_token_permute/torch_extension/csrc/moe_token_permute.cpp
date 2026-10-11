@@ -39,7 +39,7 @@ bool IsMxQuantMode(int64_t quantMode)
 
 bool IsAscend950()
 {
-    const char *socName = aclrtGetSocName();
+    const char* socName = aclrtGetSocName();
     return socName != nullptr && std::strstr(socName, "Ascend950") != nullptr;
 }
 
@@ -53,14 +53,14 @@ int64_t AlignUp(int64_t value, int64_t align)
     return CeilDiv(value, align) * align;
 }
 
-void CheckMoeTokenPermuteInputs(const at::Tensor &tokens, const at::Tensor &indices)
+void CheckMoeTokenPermuteInputs(const at::Tensor& tokens, const at::Tensor& indices)
 {
     TORCH_CHECK(tokens.dim() == DIM_TWO, "tokens must be a 2D tensor, but got ", tokens.dim(), " dimensions.");
     TORCH_CHECK(indices.dim() == DIM_ONE || indices.dim() == DIM_TWO, "indices must be a 1D or 2D tensor, but got ",
                 indices.dim(), " dimensions.");
 }
 
-int64_t GetActualNumOutTokens(const at::Tensor &indices, c10::optional<int64_t> numOutTokens)
+int64_t GetActualNumOutTokens(const at::Tensor& indices, c10::optional<int64_t> numOutTokens)
 {
     int64_t flattenSize = indices.numel();
     int64_t numOutTokensValue = numOutTokens.value_or(0);
@@ -70,7 +70,7 @@ int64_t GetActualNumOutTokens(const at::Tensor &indices, c10::optional<int64_t> 
     return std::max<int64_t>(numOutTokensValue + flattenSize, 0);
 }
 
-int64_t ResolveQuantMode(const at::Tensor &tokens, int64_t quantMode)
+int64_t ResolveQuantMode(const at::Tensor& tokens, int64_t quantMode)
 {
     int64_t effectiveQuantMode = IsAscend950() ? quantMode : QUANT_MODE_NONE;
     TORCH_CHECK(effectiveQuantMode == QUANT_MODE_NONE || IsMxQuantMode(effectiveQuantMode),
@@ -80,7 +80,7 @@ int64_t ResolveQuantMode(const at::Tensor &tokens, int64_t quantMode)
     return effectiveQuantMode;
 }
 
-MoeTokenPermuteOutput CreateMoeTokenPermuteOutput(const at::Tensor &tokens, const at::Tensor &indices,
+MoeTokenPermuteOutput CreateMoeTokenPermuteOutput(const at::Tensor& tokens, const at::Tensor& indices,
                                                   int64_t actualNumOutTokens, int64_t quantMode)
 {
     auto tokenOptions = tokens.options();
@@ -110,12 +110,12 @@ MoeTokenPermuteOutput CreateMoeTokenPermuteOutput(const at::Tensor &tokens, cons
     return output;
 }
 
-TensorWrapper MakeTensorWrapper(const at::Tensor &tensor)
+TensorWrapper MakeTensorWrapper(const at::Tensor& tensor)
 {
     return {tensor, ConvertToAclDataType(tensor.scalar_type())};
 }
 
-void FixMxfp4AclDtypes(int64_t quantMode, TensorWrapper &permutedTokensWrapper, TensorWrapper &expandedScaleWrapper)
+void FixMxfp4AclDtypes(int64_t quantMode, TensorWrapper& permutedTokensWrapper, TensorWrapper& expandedScaleWrapper)
 {
     if (quantMode != QUANT_MODE_MXFP4_E2M1) {
         return;
@@ -126,7 +126,7 @@ void FixMxfp4AclDtypes(int64_t quantMode, TensorWrapper &permutedTokensWrapper, 
 } // namespace
 
 namespace op_api {
-std::tuple<at::Tensor, at::Tensor, at::Tensor> MoeTokenPermute(const at::Tensor &tokens, const at::Tensor &indices,
+std::tuple<at::Tensor, at::Tensor, at::Tensor> MoeTokenPermute(const at::Tensor& tokens, const at::Tensor& indices,
                                                                c10::optional<int64_t> numOutTokens, bool paddedMode,
                                                                int64_t quantMode)
 {

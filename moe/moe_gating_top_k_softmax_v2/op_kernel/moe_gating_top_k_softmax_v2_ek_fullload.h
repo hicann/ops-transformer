@@ -34,26 +34,25 @@ public:
     __aicore__ inline MoeGatingTopKSoftmaxV2EKFullLoad(){};
     __aicore__ inline void Init(GM_ADDR gating, GM_ADDR finished, GM_ADDR out, GM_ADDR indicesOut, GM_ADDR softmaxOut,
                                 GM_ADDR workspace,
-                                const MoeGatingTopKSoftmaxV2EKFullLoadTilingData *__restrict tilingData)
+                                const MoeGatingTopKSoftmaxV2EKFullLoadTilingData* __restrict tilingData)
     {
         ParesTiling(tilingData);
         //   计算核块大小，获取当前核的起始索引
         int64_t formerblockLength = blockFormer * col;
         int64_t blockLength = (GetBlockIdx() != blockNum - 1) ? formerblockLength : blockTail * col;
-        gatingTensorGM.SetGlobalBuffer((__gm__ T *)gating + formerblockLength * GetBlockIdx(), blockLength);
+        gatingTensorGM.SetGlobalBuffer((__gm__ T*)gating + formerblockLength * GetBlockIdx(), blockLength);
         if (finished != nullptr) {
             exitFinished = true;
             int64_t blockLengthFinished = (GetBlockIdx() != blockNum - 1) ? blockFormer : blockTail;
-            finishedTensorGM.SetGlobalBuffer((__gm__ bool *)finished + blockFormer * GetBlockIdx(),
-                                             blockLengthFinished);
+            finishedTensorGM.SetGlobalBuffer((__gm__ bool*)finished + blockFormer * GetBlockIdx(), blockLengthFinished);
         }
 
         int64_t outFormerBlockLength = blockFormer * k;
         int64_t outBlockLength = (GetBlockIdx() != blockNum - 1) ? outFormerBlockLength : blockTail * k;
-        outTensorGM.SetGlobalBuffer((__gm__ T *)out + outFormerBlockLength * GetBlockIdx(), outBlockLength);
-        indicesOutTensorGM.SetGlobalBuffer((__gm__ int32_t *)indicesOut + outFormerBlockLength * GetBlockIdx(),
+        outTensorGM.SetGlobalBuffer((__gm__ T*)out + outFormerBlockLength * GetBlockIdx(), outBlockLength);
+        indicesOutTensorGM.SetGlobalBuffer((__gm__ int32_t*)indicesOut + outFormerBlockLength * GetBlockIdx(),
                                            outBlockLength);
-        softmaxOutTensorGM.SetGlobalBuffer((__gm__ float *)softmaxOut + formerblockLength * GetBlockIdx(), blockLength);
+        softmaxOutTensorGM.SetGlobalBuffer((__gm__ float*)softmaxOut + formerblockLength * GetBlockIdx(), blockLength);
 
         if constexpr (renorm == 0 || IsSameType<T, bfloat16_t>::value) {
             pipe.InitBuffer(gatingQueue, bufferNum, ubFormer * colAlign * sizeof(float));
@@ -72,8 +71,8 @@ public:
     __aicore__ inline void Process()
     {
         int32_t curRowNum = ubFormer;
-        SoftMaxTiling *softmaxTilingData = &formerSoftmaxTilingData;
-        TopkTiling *topKTilingData = &formerTopkTilingData;
+        SoftMaxTiling* softmaxTilingData = &formerSoftmaxTilingData;
+        TopkTiling* topKTilingData = &formerTopkTilingData;
         int64_t ubLoopCount = (GetBlockIdx() == blockNum - 1) ? ubLoopOfTailBlock : ubLoopOfFormerBlock;
 
         for (int64_t i = 0; i < ubLoopCount - 1; i++) {
@@ -122,7 +121,7 @@ public:
 
 private:
     template <typename U>
-    __aicore__ inline void CastComputeAlignmentBefore(LocalTensor<float> &dst, LocalTensor<U> &src,
+    __aicore__ inline void CastComputeAlignmentBefore(LocalTensor<float>& dst, LocalTensor<U>& src,
                                                       const int32_t rowCount, const int32_t colCount)
     {
         int32_t repeatTimesOneRow = (colCount * sizeof(float) + COUNTINUOUS_DATA - 1) / COUNTINUOUS_DATA;
@@ -174,7 +173,7 @@ private:
     }
 
     template <typename U>
-    __aicore__ inline void CastComputeAlignmentAfter(LocalTensor<U> &dst, LocalTensor<float> &src,
+    __aicore__ inline void CastComputeAlignmentAfter(LocalTensor<U>& dst, LocalTensor<float>& src,
                                                      const int32_t rowCount, const int32_t colCount)
     {
         int32_t repeatTimesOneRow = (colCount * sizeof(float) + COUNTINUOUS_DATA - 1) / COUNTINUOUS_DATA;
@@ -221,19 +220,19 @@ private:
     }
 
     template <typename U>
-    __aicore__ inline void VectorDup(LocalTensor<U> &dst, const int32_t rowCount, const int32_t colCount)
+    __aicore__ inline void VectorDup(LocalTensor<U>& dst, const int32_t rowCount, const int32_t colCount)
     {
         if (colAlign - colCount != 0) {
             U scalar;
             if constexpr (IsSameType<U, half>::value) {
                 uint16_t tmp = 0xFC00; // -inf
-                scalar = *((half *)&tmp);
+                scalar = *((half*)&tmp);
             } else if constexpr (IsSameType<U, bfloat16_t>::value) {
                 uint16_t tmp = 0xFF80; // -inf
-                scalar = *((bfloat16_t *)&tmp);
+                scalar = *((bfloat16_t*)&tmp);
             } else {
                 uint32_t tmp = 0xFF800000; // -inf
-                scalar = *((float *)&tmp);
+                scalar = *((float*)&tmp);
             }
             // 当对齐后大小与实际大小不一致，需要将 colCount到colAlign之间的数据掩成-1
             uint64_t mask[2] = {(((uint64_t)1 << (colAlign - colCount)) - 1) << (ALIGN_FACTOR - (colAlign - colCount)),
@@ -273,8 +272,8 @@ private:
         }
     }
 
-    __aicore__ inline void Compute(int32_t progress, int32_t curRowsNum, const SoftMaxTiling *softmaxTilingData,
-                                   const TopkTiling *topKTilingData)
+    __aicore__ inline void Compute(int32_t progress, int32_t curRowsNum, const SoftMaxTiling* softmaxTilingData,
+                                   const TopkTiling* topKTilingData)
     {
         SoftMaxShapeInfo softmaxShapeInfoData{(uint32_t)curRowsNum, colAlign, (uint32_t)curRowsNum, col};
         TopKInfo topKInfoData{curRowsNum, (int32_t)colAlign, (int32_t)col};
@@ -331,8 +330,8 @@ private:
         }
     }
 
-    __aicore__ inline void ComputeCast(int32_t progress, int32_t curRowsNum, const SoftMaxTiling *softmaxTilingData,
-                                       const TopkTiling *topKTilingData)
+    __aicore__ inline void ComputeCast(int32_t progress, int32_t curRowsNum, const SoftMaxTiling* softmaxTilingData,
+                                       const TopkTiling* topKTilingData)
     {
         SoftMaxShapeInfo softmaxShapeInfoData{(uint32_t)curRowsNum, colAlign, (uint32_t)curRowsNum, col};
         TopKInfo topKInfoData{curRowsNum, (int32_t)colAlign, (int32_t)col};
@@ -400,8 +399,8 @@ private:
         }
     }
 
-    __aicore__ inline void ComputeRenorm(int32_t progress, int32_t curRowsNum, const SoftMaxTiling *softmaxTilingData,
-                                         const TopkTiling *topKTilingData)
+    __aicore__ inline void ComputeRenorm(int32_t progress, int32_t curRowsNum, const SoftMaxTiling* softmaxTilingData,
+                                         const TopkTiling* topKTilingData)
     {
         SoftMaxShapeInfo softmaxShapeInfoData;
         if constexpr (IsSameType<T, half>::value) {
@@ -457,7 +456,7 @@ private:
     }
 
     __aicore__ inline void ComputeRenormCast(int32_t progress, int32_t curRowsNum,
-                                             const SoftMaxTiling *softmaxTilingData, const TopkTiling *topKTilingData)
+                                             const SoftMaxTiling* softmaxTilingData, const TopkTiling* topKTilingData)
     {
         SoftMaxShapeInfo softmaxShapeInfoData;
         if constexpr (IsSameType<T, half>::value) {
@@ -534,7 +533,7 @@ private:
         indicesOutQueue.FreeTensor(newIndicesOutLocal);
     }
 
-    __aicore__ inline void ParesTiling(const MoeGatingTopKSoftmaxV2EKFullLoadTilingData *__restrict tilingData)
+    __aicore__ inline void ParesTiling(const MoeGatingTopKSoftmaxV2EKFullLoadTilingData* __restrict tilingData)
     {
         row = tilingData->row;
         col = tilingData->col;

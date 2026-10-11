@@ -32,8 +32,8 @@ class MoeGatherOutHif8PertokenQuant {
 public:
     __aicore__ inline MoeGatherOutHif8PertokenQuant(){};
     __aicore__ inline void Init(GM_ADDR inputX, GM_ADDR sortedExpertIdx, GM_ADDR expandedRowIdx, GM_ADDR expandedX,
-                                GM_ADDR expandedScale, const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                TPipe *tPipe);
+                                GM_ADDR expandedScale, const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -41,14 +41,14 @@ private:
     __aicore__ inline void CopyOutXQuant(int64_t progress);
     __aicore__ inline void Compute();
     __aicore__ inline void CopyOutPartialXQuant(int64_t progress);
-    __aicore__ inline float ComputeMax(LocalTensor<float> &inLocal, LocalTensor<float> &scaleLocal, int32_t srcIdx,
+    __aicore__ inline float ComputeMax(LocalTensor<float>& inLocal, LocalTensor<float>& scaleLocal, int32_t srcIdx,
                                        int32_t expertIdx, int64_t j);
-    __aicore__ inline void ComputeQuant(LocalTensor<float> &inLocal, float scaleTemp, int64_t dstIndex, int64_t j);
-    __aicore__ inline void InitBasicParams(GM_ADDR sortedExpertIdx, const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                           TPipe *tPipe);
+    __aicore__ inline void ComputeQuant(LocalTensor<float>& inLocal, float scaleTemp, int64_t dstIndex, int64_t j);
+    __aicore__ inline void InitBasicParams(GM_ADDR sortedExpertIdx, const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                           TPipe* tPipe);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> inputXInQueue_;
     TQue<QuePosition::VECIN, 1> expandRowIdxInQueue_;
     TQue<QuePosition::VECOUT, 1> xOutQueue_;
@@ -72,7 +72,7 @@ private:
     int64_t currentLoopRows_;
     int64_t currentLoopRowsAlign_;
 
-    const MoeV3Arch35GatherOutComputeTilingData *gatherOutTilingData_;
+    const MoeV3Arch35GatherOutComputeTilingData* gatherOutTilingData_;
 
     int64_t coreRows_;
     int64_t perLoopRows_;
@@ -115,10 +115,10 @@ __aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::Compute()
     LocalTensor<hifloat8_t> outLocal = xOutQueue_.AllocTensor<hifloat8_t>();
     LocalTensor<float> scaleLocal = scaleOutQueue_.AllocTensor<float>();
 
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)inLocal.GetPhyAddr();
-    __ubuf__ float *scaleUbAddr = (__ubuf__ float *)scaleLocal.GetPhyAddr();
-    __ubuf__ hifloat8_t *outUbAddr = (__ubuf__ hifloat8_t *)outLocal.GetPhyAddr();
-    __ubuf__ T *inUbAddrCastT = (__ubuf__ T *)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)inLocal.GetPhyAddr();
+    __ubuf__ float* scaleUbAddr = (__ubuf__ float*)scaleLocal.GetPhyAddr();
+    __ubuf__ hifloat8_t* outUbAddr = (__ubuf__ hifloat8_t*)outLocal.GetPhyAddr();
+    __ubuf__ T* inUbAddrCastT = (__ubuf__ T*)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
 
     uint16_t repeatTimes = Ceil(cols_, FLOAT_REG_TENSOR_LENGTH);
     uint32_t sreg;
@@ -199,8 +199,8 @@ __aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::CopyOutXQuant(int64_t p
 }
 
 template <typename T>
-__aicore__ inline float MoeGatherOutHif8PertokenQuant<T>::ComputeMax(LocalTensor<float> &inLocal,
-                                                                     LocalTensor<float> &scaleLocal, int32_t srcIdx,
+__aicore__ inline float MoeGatherOutHif8PertokenQuant<T>::ComputeMax(LocalTensor<float>& inLocal,
+                                                                     LocalTensor<float>& scaleLocal, int32_t srcIdx,
                                                                      int32_t expertIdx, int64_t j)
 {
     DataCopyExtParams intriParamsT{1, static_cast<uint32_t>(colsTileLength_ * sizeof(T)), 0, 0, 0};
@@ -211,10 +211,10 @@ __aicore__ inline float MoeGatherOutHif8PertokenQuant<T>::ComputeMax(LocalTensor
     inputXInQueue_.EnQue<float>(inLocal);
     inLocal = inputXInQueue_.DeQue<float>();
 
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)inLocal.GetPhyAddr();
-    __ubuf__ float *scaleUbAddr = (__ubuf__ float *)scaleLocal.GetPhyAddr();
-    __ubuf__ T *inUbAddrCastT;
-    inUbAddrCastT = (__ubuf__ T *)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)inLocal.GetPhyAddr();
+    __ubuf__ float* scaleUbAddr = (__ubuf__ float*)scaleLocal.GetPhyAddr();
+    __ubuf__ T* inUbAddrCastT;
+    inUbAddrCastT = (__ubuf__ T*)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
     uint32_t sreg;
     uint16_t repeatTimes = Ceil(colsTileLength_, FLOAT_REG_TENSOR_LENGTH);
 
@@ -248,7 +248,7 @@ __aicore__ inline float MoeGatherOutHif8PertokenQuant<T>::ComputeMax(LocalTensor
 }
 
 template <typename T>
-__aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::ComputeQuant(LocalTensor<float> &inLocal, float scaleTemp,
+__aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::ComputeQuant(LocalTensor<float>& inLocal, float scaleTemp,
                                                                       int64_t dstIndex, int64_t j)
 {
     DataCopyExtParams copyInParams{1, static_cast<uint32_t>(colsTileLength_ * sizeof(float)), 0, 0, 0};
@@ -260,8 +260,8 @@ __aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::ComputeQuant(LocalTenso
     inputXInQueue_.EnQue<float>(inLocal);
     inLocal = inputXInQueue_.DeQue<float>();
 
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)inLocal.GetPhyAddr();
-    __ubuf__ hifloat8_t *outUbAddr = (__ubuf__ hifloat8_t *)outLocal.GetPhyAddr();
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)inLocal.GetPhyAddr();
+    __ubuf__ hifloat8_t* outUbAddr = (__ubuf__ hifloat8_t*)outLocal.GetPhyAddr();
 
     uint16_t repeatTimes = Ceil(colsTileLength_, FLOAT_REG_TENSOR_LENGTH);
     uint32_t sreg;
@@ -305,7 +305,7 @@ __aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::CopyOutPartialXQuant(in
                             expertStart_; // hif8 pertoken专家id与tokenid的间隔相差currentLoopRowsAlign_这么长
 
         uint32_t tmp = 0xFF7FFFFF;
-        float reduceMax = *((float *)&tmp); // 初始化reduceMax为float最大值
+        float reduceMax = *((float*)&tmp); // 初始化reduceMax为float最大值
         for (int64_t j = 0; j < colLoops_; j++) {
             colsTileLength_ = perLoopCols_;
             if (j == colLoops_ - 1) {
@@ -337,7 +337,7 @@ __aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::CopyOutPartialXQuant(in
 
 template <typename T>
 __aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::InitBasicParams(
-    GM_ADDR sortedExpertIdx, const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+    GM_ADDR sortedExpertIdx, const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe)
 {
 #if (__NPU_ARCH__ == 3510)
     SetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>(0);
@@ -355,7 +355,7 @@ __aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::InitBasicParams(
 
     // hif8 pertoken core split
     int64_t actualExpertNum = tilingData->actualExpertNum;
-    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) * 2 +
+    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t*)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) * 2 +
                                             Align(actualExpertNum, sizeof(int32_t)),
                                         1);
     AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
@@ -388,29 +388,29 @@ template <typename T>
 __aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::Init(GM_ADDR inputX, GM_ADDR sortedExpertIdx,
                                                               GM_ADDR expandedRowIdx, GM_ADDR expandedX,
                                                               GM_ADDR expandedScale,
-                                                              const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                                              TPipe *tPipe)
+                                                              const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                                              TPipe* tPipe)
 {
     InitBasicParams(sortedExpertIdx, tilingData, tPipe);
-    inputXGm_.SetGlobalBuffer((__gm__ T *)inputX);
-    expandedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdx + blockIdx_ * perCoreRow_,
+    inputXGm_.SetGlobalBuffer((__gm__ T*)inputX);
+    expandedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)sortedExpertIdx + blockIdx_ * perCoreRow_,
                                          Align(coreRows_, sizeof(int32_t)));
-    expandedXGm_.SetGlobalBuffer((__gm__ hifloat8_t *)expandedX);
+    expandedXGm_.SetGlobalBuffer((__gm__ hifloat8_t*)expandedX);
 
     if (rowIdxType_ == SCATTER) {
-        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreRow_,
+        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreRow_,
                                           Align(perCoreRow_, sizeof(int32_t)));
     } else {
         expandedRowIdxGm_.SetGlobalBuffer(
-            (__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+            (__gm__ int32_t*)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
             Align(perCoreRow_, sizeof(int32_t)));
     }
-    expandedScaleGm_.SetGlobalBuffer((__gm__ float *)expandedScale);
+    expandedScaleGm_.SetGlobalBuffer((__gm__ float*)expandedScale);
 
     int64_t actualExpertNum = tilingData->actualExpertNum;
     if (colLoops_ > 1) {
         // cols非全载 存储转成float32的额外gm空间
-        quantTempGm_.SetGlobalBuffer((__gm__ float *)sortedExpertIdx + Align(totalLength_, sizeof(int32_t)) * 2 +
+        quantTempGm_.SetGlobalBuffer((__gm__ float*)sortedExpertIdx + Align(totalLength_, sizeof(int32_t)) * 2 +
                                          Align(actualExpertNum, sizeof(int32_t)) + Align(1, sizeof(int32_t)) +
                                          blockIdx_ * cols_,
                                      cols_ * sizeof(float));

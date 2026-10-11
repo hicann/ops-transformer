@@ -28,11 +28,12 @@
 #endif
 using namespace std;
 
-extern "C" __global__ __aicore__ void moe_token_unpermute_with_ep_grad(
-    GM_ADDR unpermuted_tokens_grad, GM_ADDR sorted_indices, GM_ADDR permuted_tokens, GM_ADDR probs,
-    GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad, GM_ADDR workspace, GM_ADDR tiling);
-class moe_token_unpermute_with_ep_grad_test : public testing::Test
-{
+extern "C" __global__ __aicore__ void moe_token_unpermute_with_ep_grad(GM_ADDR unpermuted_tokens_grad,
+                                                                       GM_ADDR sorted_indices, GM_ADDR permuted_tokens,
+                                                                       GM_ADDR probs, GM_ADDR permuted_tokens_grad,
+                                                                       GM_ADDR probs_grad, GM_ADDR workspace,
+                                                                       GM_ADDR tiling);
+class moe_token_unpermute_with_ep_grad_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -92,9 +93,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_not_none_bf16)
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(1);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -155,9 +155,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_not_none_bf16_fp32)
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(1);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -218,9 +217,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_not_none_fp16)
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(1);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -281,9 +279,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_not_none_fp16_bf16)
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(1);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -344,9 +341,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_not_none_fp32)
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(1);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -407,9 +403,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_not_none_fp32_bf16)
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(1);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -470,9 +465,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_none_bf16)
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(0);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -533,9 +527,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_none_fp16)
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(0);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -596,9 +589,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_none_fp32)
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(0);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -659,9 +651,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_not_none_split_h_bf
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(1);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -722,9 +713,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_not_none_split_h_bf
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(1);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -785,9 +775,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_not_none_split_h_fp
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(1);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -848,9 +837,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_not_none_split_h_fp
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(1);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -911,9 +899,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_not_none_split_h_fp
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(1);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);
@@ -974,9 +961,8 @@ TEST_F(moe_token_unpermute_with_ep_grad_test, test_case_prob_not_none_split_h_fp
     tilingDatafromBin->end = 10;
 
     ICPU_SET_TILING_KEY(1);
-    ICPU_RUN_KF(
-        moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
-        permuted_tokens_grad, probs_grad, workspace, tiling);
+    ICPU_RUN_KF(moe_token_unpermute_with_ep_grad, blockDim, unpermuted_output_d, sorted_indices, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, workspace, tiling);
 
     AscendC::GmFree(permuted_tokens);
     AscendC::GmFree(unpermuted_output_d);

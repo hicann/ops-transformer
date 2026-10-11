@@ -66,10 +66,9 @@ const static int64_t DIM_ONE = 1;
 
 class MoeGatingTopKBackwardTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeGatingTopKBackwardTiling(gert::TilingContext *context)
+    explicit MoeGatingTopKBackwardTiling(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context)
-    {
-    }
+    {}
     ~MoeGatingTopKBackwardTiling() override = default;
 
 protected:
@@ -104,10 +103,10 @@ private:
     void DumpTiling();
 
     // Shapes
-    const gert::Shape *xNormShape_ = nullptr;
-    const gert::Shape *gradYShape_ = nullptr;
-    const gert::Shape *expertIdxShape_ = nullptr;
-    const gert::Shape *outputGradXShape_ = nullptr;
+    const gert::Shape* xNormShape_ = nullptr;
+    const gert::Shape* gradYShape_ = nullptr;
+    const gert::Shape* expertIdxShape_ = nullptr;
+    const gert::Shape* outputGradXShape_ = nullptr;
 
     // Miscellaneous
     int64_t inputDtypeSize_;
@@ -151,7 +150,7 @@ ge::graphStatus MoeGatingTopKBackwardTiling::CheckInputShape()
 
 ge::graphStatus MoeGatingTopKBackwardTiling::CheckXNorm()
 {
-    const gert::StorageShape *xNormShapePtr = context_->GetInputShape(X_NORM_INPUT_INDEX);
+    const gert::StorageShape* xNormShapePtr = context_->GetInputShape(X_NORM_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, xNormShapePtr);
     auto xNormDimSize = xNormShapePtr->GetOriginShape().GetDimNum();
     OP_CHECK_IF(xNormDimSize != X_NORM_INPUT_DIMS,
@@ -177,7 +176,7 @@ ge::graphStatus MoeGatingTopKBackwardTiling::CheckXNorm()
 
 ge::graphStatus MoeGatingTopKBackwardTiling::CheckGradY()
 {
-    const gert::StorageShape *gradYShapePtr = context_->GetInputShape(GRAD_Y_INPUT_INDEX);
+    const gert::StorageShape* gradYShapePtr = context_->GetInputShape(GRAD_Y_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, gradYShapePtr);
     auto gradYDimSize = gradYShapePtr->GetOriginShape().GetDimNum();
     OP_CHECK_IF(gradYDimSize != GRAD_Y_INPUT_DIMS,
@@ -210,7 +209,7 @@ ge::graphStatus MoeGatingTopKBackwardTiling::CheckGradY()
 
 ge::graphStatus MoeGatingTopKBackwardTiling::CheckExpertIdx()
 {
-    const gert::StorageShape *expertIdxShapePtr = context_->GetInputShape(EXPERT_IDX_INPUT_INDEX);
+    const gert::StorageShape* expertIdxShapePtr = context_->GetInputShape(EXPERT_IDX_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expertIdxShapePtr);
     auto expertIdxDimSize = expertIdxShapePtr->GetOriginShape().GetDimNum();
     OP_CHECK_IF(expertIdxDimSize != EXPERT_IDX_INPUT_DIMS,
@@ -242,13 +241,13 @@ ge::graphStatus MoeGatingTopKBackwardTiling::CheckAttr()
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
-    const int64_t *renormPtr = attrs->GetAttrPointer<int64_t>(RENORM_ATTR_INDEX);
+    const int64_t* renormPtr = attrs->GetAttrPointer<int64_t>(RENORM_ATTR_INDEX);
     if (renormPtr != nullptr) {
         renorm_ = *renormPtr;
     }
     OP_LOGI(context_, "Attr renorm: %ld.", renorm_);
 
-    const int64_t *normTypePtr = attrs->GetAttrPointer<int64_t>(NORM_TYPE_ATTR_INDEX);
+    const int64_t* normTypePtr = attrs->GetAttrPointer<int64_t>(NORM_TYPE_ATTR_INDEX);
     if (normTypePtr != nullptr) {
         normType_ = *normTypePtr;
     }
@@ -258,13 +257,13 @@ ge::graphStatus MoeGatingTopKBackwardTiling::CheckAttr()
                 OP_LOGE(context_, "Attr normType: expected %ld, but got %ld.", NORM_TYPE_SIGMOID, normType_),
                 return ge::GRAPH_FAILED);
 
-    const float *routedScalingFactorPtr = attrs->GetAttrPointer<float>(ROUTED_SCALING_FACTOR_ATTR_INDEX);
+    const float* routedScalingFactorPtr = attrs->GetAttrPointer<float>(ROUTED_SCALING_FACTOR_ATTR_INDEX);
     if (routedScalingFactorPtr != nullptr) {
         routedScalingFactor_ = *routedScalingFactorPtr;
     }
     OP_LOGI(context_, "Attr routedScalingFactor: %f.", routedScalingFactor_);
 
-    const float *epsPtr = attrs->GetAttrPointer<float>(EPS_ATTR_INDEX);
+    const float* epsPtr = attrs->GetAttrPointer<float>(EPS_ATTR_INDEX);
     if (epsPtr != nullptr) {
         eps_ = *epsPtr;
     }
@@ -475,7 +474,7 @@ ge::graphStatus MoeGatingTopKBackwardTiling::GetWorkspaceSize()
 ge::graphStatus MoeGatingTopKBackwardTiling::PostTiling()
 {
     context_->SetBlockDim(MoeGatingTopKBackwardTilingData_.get_needCoreNum());
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     currentWorkspace[0] = workspaceSize_;
     MoeGatingTopKBackwardTilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(),
                                                   context_->GetRawTilingData()->GetCapacity());

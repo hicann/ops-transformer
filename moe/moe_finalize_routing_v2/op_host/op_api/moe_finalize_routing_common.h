@@ -36,7 +36,7 @@ static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST_X_310P = {op
                                                                               op::DataType::DT_FLOAT};
 static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST_ROW_IDX = {op::DataType::DT_INT32};
 
-static inline bool CheckNotNull(const aclTensor *expandedX, const aclTensor *expandedRowIdx, const aclTensor *out)
+static inline bool CheckNotNull(const aclTensor* expandedX, const aclTensor* expandedRowIdx, const aclTensor* out)
 {
     OP_CHECK_NULL(expandedX, return false);
     OP_CHECK_NULL(expandedRowIdx, return false);
@@ -44,10 +44,10 @@ static inline bool CheckNotNull(const aclTensor *expandedX, const aclTensor *exp
     return true;
 }
 
-static inline bool CheckDtypeValid(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
-                                   const aclTensor *x1Optional, const aclTensor *x2Optional,
-                                   const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                                   const aclTensor *expertIdxOptional, const aclTensor *out)
+static inline bool CheckDtypeValid(const aclTensor* expandedX, const aclTensor* expandedRowIdx,
+                                   const aclTensor* x1Optional, const aclTensor* x2Optional,
+                                   const aclTensor* biasOptional, const aclTensor* scalesOptional,
+                                   const aclTensor* expertIdxOptional, const aclTensor* out)
 {
     if (expandedX != nullptr && expandedX->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(expandedX, DTYPE_SUPPORT_LIST_X, return false);
@@ -80,10 +80,10 @@ static inline bool CheckDtypeValid(const aclTensor *expandedX, const aclTensor *
     return true;
 }
 
-static inline bool CheckDtypeValid310P(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
-                                       const aclTensor *x1Optional, const aclTensor *x2Optional,
-                                       const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                                       const aclTensor *expertIdxOptional, const aclTensor *out)
+static inline bool CheckDtypeValid310P(const aclTensor* expandedX, const aclTensor* expandedRowIdx,
+                                       const aclTensor* x1Optional, const aclTensor* x2Optional,
+                                       const aclTensor* biasOptional, const aclTensor* scalesOptional,
+                                       const aclTensor* expertIdxOptional, const aclTensor* out)
 {
     if (expandedX != nullptr && expandedX->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(expandedX, DTYPE_SUPPORT_LIST_X_310P, return false);
@@ -116,12 +116,12 @@ static inline bool CheckDtypeValid310P(const aclTensor *expandedX, const aclTens
     return true;
 }
 
-static inline bool CheckConstExpertDtype(const aclTensor *expandedX, const aclTensor *xOptional,
-                                         const aclTensor *alpha1Optional, const aclTensor *alpha2Optional,
-                                         const aclTensor *vOptional)
+static inline bool CheckConstExpertDtype(const aclTensor* expandedX, const aclTensor* xOptional,
+                                         const aclTensor* alpha1Optional, const aclTensor* alpha2Optional,
+                                         const aclTensor* vOptional)
 {
-    const aclTensor *extras[] = {xOptional, alpha1Optional, alpha2Optional, vOptional};
-    for (const auto *tensor : extras) {
+    const aclTensor* extras[] = {xOptional, alpha1Optional, alpha2Optional, vOptional};
+    for (const auto* tensor : extras) {
         if (tensor != nullptr && tensor->GetViewShape().GetShapeSize() != 0) {
             OP_CHECK_DTYPE_NOT_SUPPORT(tensor, DTYPE_SUPPORT_LIST_X, return false);
             OP_CHECK_DTYPE_NOT_SAME(expandedX, tensor, return false);
@@ -135,12 +135,12 @@ static inline bool IsExpandedX3D(int64_t dropPadMode)
     return dropPadMode != 0 && dropPadMode != 2;
 }
 
-static inline bool CheckFormatValid(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
-                                    const aclTensor *x1Optional, const aclTensor *x2Optional,
-                                    const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                                    const aclTensor *expertIdxOptional, const aclTensor *xOptional,
-                                    const aclTensor *alpha1Optional, const aclTensor *alpha2Optional,
-                                    const aclTensor *vOptional, const aclTensor *out, int64_t dropPadMode)
+static inline bool CheckFormatValid(const aclTensor* expandedX, const aclTensor* expandedRowIdx,
+                                    const aclTensor* x1Optional, const aclTensor* x2Optional,
+                                    const aclTensor* biasOptional, const aclTensor* scalesOptional,
+                                    const aclTensor* expertIdxOptional, const aclTensor* xOptional,
+                                    const aclTensor* alpha1Optional, const aclTensor* alpha2Optional,
+                                    const aclTensor* vOptional, const aclTensor* out, int64_t dropPadMode)
 {
     bool expandedXIs3D = IsExpandedX3D(dropPadMode);
     if (expandedX != nullptr && expandedX->GetViewShape().GetShapeSize() != 0) {
@@ -153,9 +153,9 @@ static inline bool CheckFormatValid(const aclTensor *expandedX, const aclTensor 
             return false;
         }
     }
-    std::vector<const aclTensor *> tensors = {expandedRowIdx, x1Optional,        x2Optional, biasOptional,
-                                              scalesOptional, expertIdxOptional, xOptional,  alpha1Optional,
-                                              alpha2Optional, vOptional,         out};
+    std::vector<const aclTensor*> tensors = {expandedRowIdx, x1Optional,        x2Optional, biasOptional,
+                                             scalesOptional, expertIdxOptional, xOptional,  alpha1Optional,
+                                             alpha2Optional, vOptional,         out};
     std::vector<std::string> names = {"expandedRowIdx", "x1",     "x2", "bias", "scales", "expertIdx", "x",
                                       "alpha1",         "alpha2", "v",  "out"};
     for (size_t i = 0; i < tensors.size(); ++i) {
@@ -170,12 +170,12 @@ static inline bool CheckFormatValid(const aclTensor *expandedX, const aclTensor 
     return true;
 }
 
-static inline bool CheckShapeValid(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
-                                   const aclTensor *x1Optional, const aclTensor *x2Optional,
-                                   const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                                   const aclTensor *expertIdxOptional, const aclTensor *xOptional,
-                                   const aclTensor *alpha1Optional, const aclTensor *alpha2Optional,
-                                   const aclTensor *vOptional, const aclTensor *out, int64_t dropPadMode)
+static inline bool CheckShapeValid(const aclTensor* expandedX, const aclTensor* expandedRowIdx,
+                                   const aclTensor* x1Optional, const aclTensor* x2Optional,
+                                   const aclTensor* biasOptional, const aclTensor* scalesOptional,
+                                   const aclTensor* expertIdxOptional, const aclTensor* xOptional,
+                                   const aclTensor* alpha1Optional, const aclTensor* alpha2Optional,
+                                   const aclTensor* vOptional, const aclTensor* out, int64_t dropPadMode)
 {
     size_t expandedXDimNum = expandedX->GetViewShape().GetDimNum();
     if (IsExpandedX3D(dropPadMode)) {
@@ -196,16 +196,16 @@ static inline bool CheckShapeValid(const aclTensor *expandedX, const aclTensor *
                 expandedRowIdx->GetViewShape().GetDimNum());
         return false;
     }
-    std::vector<std::pair<const aclTensor *, std::string>> optional2D = {{x1Optional, "x1"},
-                                                                         {x2Optional, "x2"},
-                                                                         {biasOptional, "bias"},
-                                                                         {scalesOptional, "scales"},
-                                                                         {expertIdxOptional, "expertIdx"},
-                                                                         {xOptional, "x"},
-                                                                         {alpha1Optional, "alpha1"},
-                                                                         {alpha2Optional, "alpha2"},
-                                                                         {vOptional, "v"}};
-    for (const auto &item : optional2D) {
+    std::vector<std::pair<const aclTensor*, std::string>> optional2D = {{x1Optional, "x1"},
+                                                                        {x2Optional, "x2"},
+                                                                        {biasOptional, "bias"},
+                                                                        {scalesOptional, "scales"},
+                                                                        {expertIdxOptional, "expertIdx"},
+                                                                        {xOptional, "x"},
+                                                                        {alpha1Optional, "alpha1"},
+                                                                        {alpha2Optional, "alpha2"},
+                                                                        {vOptional, "v"}};
+    for (const auto& item : optional2D) {
         if (item.first != nullptr && item.first->GetViewShape().GetShapeSize() != 0) {
             if (item.first->GetViewShape().GetDimNum() != 2) {
                 OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Tensor %s should be 2D, but got %zuD.", item.second.c_str(),
@@ -221,12 +221,12 @@ static inline bool CheckShapeValid(const aclTensor *expandedX, const aclTensor *
     return true;
 }
 
-static inline aclnnStatus CheckParams(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
-                                      const aclTensor *x1Optional, const aclTensor *x2Optional,
-                                      const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                                      const aclTensor *expertIdxOptional, const aclTensor *xOptional,
-                                      const aclTensor *alpha1Optional, const aclTensor *alpha2Optional,
-                                      const aclTensor *vOptional, const aclTensor *out, int64_t dropPadMode)
+static inline aclnnStatus CheckParams(const aclTensor* expandedX, const aclTensor* expandedRowIdx,
+                                      const aclTensor* x1Optional, const aclTensor* x2Optional,
+                                      const aclTensor* biasOptional, const aclTensor* scalesOptional,
+                                      const aclTensor* expertIdxOptional, const aclTensor* xOptional,
+                                      const aclTensor* alpha1Optional, const aclTensor* alpha2Optional,
+                                      const aclTensor* vOptional, const aclTensor* out, int64_t dropPadMode)
 {
     CHECK_RET(CheckNotNull(expandedX, expandedRowIdx, out), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
@@ -243,10 +243,10 @@ static inline aclnnStatus CheckParams(const aclTensor *expandedX, const aclTenso
     return ACLNN_SUCCESS;
 }
 
-static inline aclnnStatus CheckParams310P(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
-                                          const aclTensor *x1Optional, const aclTensor *x2Optional,
-                                          const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                                          const aclTensor *expertIdxOptional, const aclTensor *out, int64_t dropPadMode)
+static inline aclnnStatus CheckParams310P(const aclTensor* expandedX, const aclTensor* expandedRowIdx,
+                                          const aclTensor* x1Optional, const aclTensor* x2Optional,
+                                          const aclTensor* biasOptional, const aclTensor* scalesOptional,
+                                          const aclTensor* expertIdxOptional, const aclTensor* out, int64_t dropPadMode)
 {
     CHECK_RET(CheckNotNull(expandedX, expandedRowIdx, out), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid310P(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,

@@ -27,15 +27,15 @@ public:
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
                                 GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale, GM_ADDR topkWeight,
                                 GM_ADDR expandedTopkWeight, GM_ADDR workspace,
-                                const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 protected:
     __aicore__ inline void ScatterOutX();
     __aicore__ inline void GatherOutX();
     __aicore__ inline void ProcessDropPadMode();
-    __aicore__ inline void GatherOutXScatterLoop(const LocalTensor<int32_t> &expandedRowIdx,
-                                                 const LocalTensor<T> &xLocal, int64_t startRowIdx, int64_t outputRows,
+    __aicore__ inline void GatherOutXScatterLoop(const LocalTensor<int32_t>& expandedRowIdx,
+                                                 const LocalTensor<T>& xLocal, int64_t startRowIdx, int64_t outputRows,
                                                  int64_t inFactor);
     __aicore__ inline void ScatterOutScale();
     __aicore__ inline void GatherOutScale();
@@ -58,8 +58,8 @@ __aicore__ inline void MoeV3FullLoadUnquantized<T>::Init(GM_ADDR x, GM_ADDR expe
                                                          GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
                                                          GM_ADDR expandedScale, GM_ADDR topkWeight,
                                                          GM_ADDR expandedTopkWeight, GM_ADDR workspace,
-                                                         const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                                         TPipe *tPipe)
+                                                         const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                                         TPipe* tPipe)
 {
     MoeV3FullLoadBase<T>::Init(expertIdx, expandedRowIdx, expertTokensCountOrCumsum, topkWeight, expandedTopkWeight,
                                workspace, tilingData, tPipe);
@@ -69,16 +69,16 @@ __aicore__ inline void MoeV3FullLoadUnquantized<T>::Init(GM_ADDR x, GM_ADDR expe
     }
 
     if constexpr (IsSameType<T, hifloat8_t>::value) {
-        xUint8tGm_.SetGlobalBuffer((__gm__ uint8_t *)x);
+        xUint8tGm_.SetGlobalBuffer((__gm__ uint8_t*)x);
     } else {
-        xGm_.SetGlobalBuffer((__gm__ T *)x);
+        xGm_.SetGlobalBuffer((__gm__ T*)x);
     }
     if (this->isInputScale_) {
-        scaleGm_.SetGlobalBuffer((__gm__ float *)scale);
-        expandedScaleGm_.SetGlobalBuffer((__gm__ float *)expandedScale);
+        scaleGm_.SetGlobalBuffer((__gm__ float*)scale);
+        expandedScaleGm_.SetGlobalBuffer((__gm__ float*)expandedScale);
     }
 
-    expandedXGm_.SetGlobalBuffer((__gm__ T *)expandedX);
+    expandedXGm_.SetGlobalBuffer((__gm__ T*)expandedX);
 
     int64_t rowLength = this->endXRow_ - this->startXRow_ + 1;
 
@@ -282,8 +282,8 @@ __aicore__ inline void MoeV3FullLoadUnquantized<T>::GatherOutX()
 }
 
 template <typename T>
-__aicore__ inline void MoeV3FullLoadUnquantized<T>::GatherOutXScatterLoop(const LocalTensor<int32_t> &expandedRowIdx,
-                                                                          const LocalTensor<T> &xLocal,
+__aicore__ inline void MoeV3FullLoadUnquantized<T>::GatherOutXScatterLoop(const LocalTensor<int32_t>& expandedRowIdx,
+                                                                          const LocalTensor<T>& xLocal,
                                                                           int64_t startRowIdx, int64_t outputRows,
                                                                           int64_t inFactor)
 {
@@ -374,12 +374,12 @@ __aicore__ inline void MoeV3FullLoadUnquantized<T>::ZeroOutX()
 
     if constexpr (IsSameType<T, hifloat8_t>::value) {
         GlobalTensor<uint8_t> zeroGm;
-        zeroGm.SetGlobalBuffer((__gm__ uint8_t *)expandedXGm_.GetPhyAddr() + startRow * this->cols_,
+        zeroGm.SetGlobalBuffer((__gm__ uint8_t*)expandedXGm_.GetPhyAddr() + startRow * this->cols_,
                                rowCount * this->cols_);
         InitGlobalMemory(zeroGm, rowCount * this->cols_, static_cast<uint8_t>(0));
     } else {
         GlobalTensor<T> zeroGm;
-        zeroGm.SetGlobalBuffer((__gm__ T *)expandedXGm_.GetPhyAddr() + startRow * this->cols_, rowCount * this->cols_);
+        zeroGm.SetGlobalBuffer((__gm__ T*)expandedXGm_.GetPhyAddr() + startRow * this->cols_, rowCount * this->cols_);
         InitGlobalMemory(zeroGm, rowCount * this->cols_, static_cast<T>(0));
     }
 }
@@ -395,7 +395,7 @@ __aicore__ inline void MoeV3FullLoadUnquantized<T>::ZeroOutScale()
     }
     int64_t rowCount = endRow - startRow;
     GlobalTensor<float> scaleZeroGm;
-    scaleZeroGm.SetGlobalBuffer((__gm__ float *)expandedScaleGm_.GetPhyAddr() + startRow, rowCount);
+    scaleZeroGm.SetGlobalBuffer((__gm__ float*)expandedScaleGm_.GetPhyAddr() + startRow, rowCount);
     InitGlobalMemory(scaleZeroGm, rowCount, 0.0f);
 }
 

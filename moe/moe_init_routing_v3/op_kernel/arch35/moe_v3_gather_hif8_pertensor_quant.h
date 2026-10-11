@@ -32,7 +32,7 @@ class MoeGatherOutHif8PertensorQuant {
 public:
     __aicore__ inline MoeGatherOutHif8PertensorQuant(){};
     __aicore__ inline void Init(GM_ADDR inputX, GM_ADDR scale, GM_ADDR sortedExpertIdx, GM_ADDR expandedRowIdx,
-                                GM_ADDR expandedX, const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+                                GM_ADDR expandedX, const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -40,12 +40,12 @@ private:
     __aicore__ inline void CopyOutXQuant(int64_t progress);
     __aicore__ inline void Compute();
     __aicore__ inline void CopyOutPartialXQuant(int64_t progress);
-    __aicore__ inline void ComputePartial(LocalTensor<float> &inLocal, int32_t srcIdx, int64_t dstIndex, int64_t j);
-    __aicore__ inline void InitBasicParams(GM_ADDR sortedExpertIdx, const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                           TPipe *tPipe);
+    __aicore__ inline void ComputePartial(LocalTensor<float>& inLocal, int32_t srcIdx, int64_t dstIndex, int64_t j);
+    __aicore__ inline void InitBasicParams(GM_ADDR sortedExpertIdx, const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                           TPipe* tPipe);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> inputXInQueue_;
     TQue<QuePosition::VECIN, 1> expandRowIdxInQueue_;
     TQue<QuePosition::VECOUT, 1> inputXOutQueue_;
@@ -57,7 +57,7 @@ private:
     GlobalTensor<int32_t> expertTotalCountGm_;
     GlobalTensor<hifloat8_t> expandedXGm_;
 
-    const MoeV3Arch35GatherOutComputeTilingData *gatherOutTilingData_;
+    const MoeV3Arch35GatherOutComputeTilingData* gatherOutTilingData_;
 
     int64_t indicesOffset_;
     int64_t rowIdxType_ = 0;
@@ -109,11 +109,11 @@ __aicore__ inline void MoeGatherOutHif8PertensorQuant<T>::Compute()
     LocalTensor<float> inLocal = inputXInQueue_.DeQue<float>();
     LocalTensor<hifloat8_t> outLocal = inputXOutQueue_.AllocTensor<hifloat8_t>();
 
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)inLocal.GetPhyAddr();
-    __ubuf__ hifloat8_t *outUbAddr = (__ubuf__ hifloat8_t *)outLocal.GetPhyAddr();
-    __ubuf__ T *inUbAddrCastT;
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)inLocal.GetPhyAddr();
+    __ubuf__ hifloat8_t* outUbAddr = (__ubuf__ hifloat8_t*)outLocal.GetPhyAddr();
+    __ubuf__ T* inUbAddrCastT;
 
-    inUbAddrCastT = (__ubuf__ T *)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
+    inUbAddrCastT = (__ubuf__ T*)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
 
     uint16_t repeatTimes = Ceil(cols_, FLOAT_REG_TENSOR_LENGTH);
     float scaleNum = scale_;
@@ -170,7 +170,7 @@ __aicore__ inline void MoeGatherOutHif8PertensorQuant<T>::CopyOutXQuant(int64_t 
 }
 
 template <typename T>
-__aicore__ inline void MoeGatherOutHif8PertensorQuant<T>::ComputePartial(LocalTensor<float> &inLocal, int32_t srcIdx,
+__aicore__ inline void MoeGatherOutHif8PertensorQuant<T>::ComputePartial(LocalTensor<float>& inLocal, int32_t srcIdx,
                                                                          int64_t dstIndex, int64_t j)
 {
     DataCopyExtParams copyOutParams{1, static_cast<uint32_t>(colsTileLength_ * sizeof(hifloat8_t)), 0, 0, 0};
@@ -183,9 +183,9 @@ __aicore__ inline void MoeGatherOutHif8PertensorQuant<T>::ComputePartial(LocalTe
 
     LocalTensor<hifloat8_t> outLocal = inputXOutQueue_.AllocTensor<hifloat8_t>();
 
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)inLocal.GetPhyAddr();
-    __ubuf__ T *inUbAddrCastT = (__ubuf__ T *)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
-    __ubuf__ hifloat8_t *outUbAddr = (__ubuf__ hifloat8_t *)outLocal.GetPhyAddr();
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)inLocal.GetPhyAddr();
+    __ubuf__ T* inUbAddrCastT = (__ubuf__ T*)inLocal.ReinterpretCast<T>().GetPhyAddr() + perLoopColsAlign_;
+    __ubuf__ hifloat8_t* outUbAddr = (__ubuf__ hifloat8_t*)outLocal.GetPhyAddr();
 
     uint16_t repeatTimes = Ceil(colsTileLength_, FLOAT_REG_TENSOR_LENGTH);
     float scaleNum = scale_;
@@ -241,7 +241,7 @@ __aicore__ inline void MoeGatherOutHif8PertensorQuant<T>::CopyOutPartialXQuant(i
 
 template <typename T>
 __aicore__ inline void MoeGatherOutHif8PertensorQuant<T>::InitBasicParams(
-    GM_ADDR sortedExpertIdx, const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+    GM_ADDR sortedExpertIdx, const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe)
 {
 #if (__NPU_ARCH__ == 3510)
     SetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>(0);
@@ -260,7 +260,7 @@ __aicore__ inline void MoeGatherOutHif8PertensorQuant<T>::InitBasicParams(
     gatherOutTilingData_ = &(tilingData->gatherOutComputeParamsOp);
 
     int64_t actualExpertNum_ = tilingData->actualExpertNum;
-    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) * 2 +
+    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t*)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) * 2 +
                                             Align(actualExpertNum_, sizeof(int32_t)),
                                         1);
     AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
@@ -292,26 +292,26 @@ __aicore__ inline void MoeGatherOutHif8PertensorQuant<T>::InitBasicParams(
 template <typename T>
 __aicore__ inline void MoeGatherOutHif8PertensorQuant<T>::Init(GM_ADDR inputX, GM_ADDR scale, GM_ADDR sortedExpertIdx,
                                                                GM_ADDR expandedRowIdx, GM_ADDR expandedX,
-                                                               const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                                               TPipe *tPipe)
+                                                               const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                                               TPipe* tPipe)
 {
     InitBasicParams(sortedExpertIdx, tilingData, tPipe);
-    inputXGm_.SetGlobalBuffer((__gm__ T *)inputX);
-    expandedXGm_.SetGlobalBuffer((__gm__ hifloat8_t *)expandedX);
-    scaleGm_.SetGlobalBuffer((__gm__ float *)scale, 1);
+    inputXGm_.SetGlobalBuffer((__gm__ T*)inputX);
+    expandedXGm_.SetGlobalBuffer((__gm__ hifloat8_t*)expandedX);
+    scaleGm_.SetGlobalBuffer((__gm__ float*)scale, 1);
     scale_ = scaleGm_.GetValue(0);
 
     currentLoopRowsAlign_ = Align(perLoopRows_, sizeof(int32_t));
 
     if (rowIdxType_ == SCATTER) {
-        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreRow_,
+        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreRow_,
                                           Align(perCoreRow_, sizeof(int32_t)));
     } else {
         expandedRowIdxGm_.SetGlobalBuffer(
-            (__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+            (__gm__ int32_t*)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
             Align(perCoreRow_, sizeof(int32_t)));
     }
-    expandedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdx + blockIdx_ * perCoreRow_,
+    expandedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)sortedExpertIdx + blockIdx_ * perCoreRow_,
                                          Align(coreRows_, sizeof(int32_t)));
 
     int64_t perLoopColsAlignBytes = AlignBytes(perLoopCols_, sizeof(T));

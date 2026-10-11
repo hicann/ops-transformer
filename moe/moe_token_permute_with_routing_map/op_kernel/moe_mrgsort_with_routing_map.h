@@ -29,10 +29,10 @@ struct MoeMrgsortParam {
 class MoeMrgsort {
 public:
     __aicore__ inline MoeMrgsort(){};
-    __aicore__ inline void Init(MoeMrgsortParam *param);
+    __aicore__ inline void Init(MoeMrgsortParam* param);
     __aicore__ inline void Process();
-    __aicore__ inline void SetInput(GlobalTensor<float> &gmInput, LocalTensor<float> &ubInput);
-    __aicore__ inline void SetOutput(GlobalTensor<float> &gmOutput, LocalTensor<float> &ubOutput);
+    __aicore__ inline void SetInput(GlobalTensor<float>& gmInput, LocalTensor<float>& ubInput);
+    __aicore__ inline void SetOutput(GlobalTensor<float>& gmOutput, LocalTensor<float>& ubOutput);
 
 private:
     __aicore__ inline void CopyIn();
@@ -43,7 +43,7 @@ private:
     __aicore__ inline void ClearCache();
 
 private:
-    MoeMrgsortParam *param = nullptr;
+    MoeMrgsortParam* param = nullptr;
 
     GlobalTensor<float> gmInputs[4];
     GlobalTensor<float> gmOutput;
@@ -74,14 +74,14 @@ __aicore__ inline void MoeMrgsort::ClearCache()
     this->outOffset = 0;
 }
 
-__aicore__ inline void MoeMrgsort::SetInput(GlobalTensor<float> &gmInput, LocalTensor<float> &ubInput)
+__aicore__ inline void MoeMrgsort::SetInput(GlobalTensor<float>& gmInput, LocalTensor<float>& ubInput)
 {
     this->gmInputs[listNum] = gmInput;
     this->ubInputs[listNum] = ubInput;
     this->listNum += 1;
 }
 
-__aicore__ inline void MoeMrgsort::SetOutput(GlobalTensor<float> &gmOutput, LocalTensor<float> &ubOutput)
+__aicore__ inline void MoeMrgsort::SetOutput(GlobalTensor<float>& gmOutput, LocalTensor<float>& ubOutput)
 {
     this->gmOutput = gmOutput;
     this->ubOutput = ubOutput;
@@ -174,7 +174,7 @@ __aicore__ inline void MoeMrgsort::CopyOut()
     outOffset += GetSortLen<float>(curLoopSortedNum);
 }
 
-__aicore__ inline void MoeMrgsort::Init(MoeMrgsortParam *param)
+__aicore__ inline void MoeMrgsort::Init(MoeMrgsortParam* param)
 {
     this->param = param;
     this->remainListNum = listNum;

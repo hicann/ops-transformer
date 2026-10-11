@@ -26,7 +26,7 @@ public:
     __aicore__ inline MoeV3FullLoadStaticQuant(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedX,
                                 GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum, GM_ADDR workspace,
-                                const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -53,14 +53,14 @@ template <typename T>
 __aicore__ inline void MoeV3FullLoadStaticQuant<T>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset,
                                                          GM_ADDR expandedX, GM_ADDR expandedRowIdx,
                                                          GM_ADDR expertTokensCountOrCumsum, GM_ADDR workspace,
-                                                         const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe)
+                                                         const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe)
 {
     MoeV3FullLoadBase<T>::Init(expertIdx, expandedRowIdx, expertTokensCountOrCumsum, workspace, tilingData, tPipe);
 
-    xGm_.SetGlobalBuffer((__gm__ T *)x);
-    expandedXGm_.SetGlobalBuffer((__gm__ int8_t *)expandedX);
-    scaleGm_.SetGlobalBuffer((__gm__ float *)scale, 1);
-    offsetGm_.SetGlobalBuffer((__gm__ float *)offset, 1);
+    xGm_.SetGlobalBuffer((__gm__ T*)x);
+    expandedXGm_.SetGlobalBuffer((__gm__ int8_t*)expandedX);
+    scaleGm_.SetGlobalBuffer((__gm__ float*)scale, 1);
+    offsetGm_.SetGlobalBuffer((__gm__ float*)offset, 1);
     this->scale_ = scaleGm_.GetValue(0);
     this->offset_ = offsetGm_.GetValue(0);
     SetWaitFlag<HardEvent::S_V>(HardEvent::S_V);

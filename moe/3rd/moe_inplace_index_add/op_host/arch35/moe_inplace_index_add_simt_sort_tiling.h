@@ -45,7 +45,7 @@ REGISTER_TILING_DATA_CLASS(MoeInplaceIndexAdd_500011, MoeInplaceIndexAddSimtSort
 
 class MoeInplaceIndexAddSimtSortTiling : public MoeInplaceIndexAddTiling {
 public:
-    explicit MoeInplaceIndexAddSimtSortTiling(gert::TilingContext *context)
+    explicit MoeInplaceIndexAddSimtSortTiling(gert::TilingContext* context)
         : MoeInplaceIndexAddTiling(context)
     {}
     ~MoeInplaceIndexAddSimtSortTiling() override = default;

@@ -19,14 +19,10 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "kernel_operator.h"
 
-#define MOE_GATING_SOFTMAX_310P_FLOAT16_OPTIONAL_FINISHED  18
+#define MOE_GATING_SOFTMAX_310P_FLOAT16_OPTIONAL_FINISHED 18
 
-extern "C" __global__ __aicore__ void moe_gating_top_k_softmax(GM_ADDR x,
-                                                               GM_ADDR finished,
-                                                               GM_ADDR y,
-                                                               GM_ADDR expertIdx,
-                                                               GM_ADDR rowIdx,
-                                                               GM_ADDR workspace,
+extern "C" __global__ __aicore__ void moe_gating_top_k_softmax(GM_ADDR x, GM_ADDR finished, GM_ADDR y,
+                                                               GM_ADDR expertIdx, GM_ADDR rowIdx, GM_ADDR workspace,
                                                                GM_ADDR tiling)
 {
     if (TILING_KEY_IS(MOE_GATING_SOFTMAX_310P_FLOAT16_OPTIONAL_FINISHED)) {
@@ -51,36 +47,36 @@ extern "C" __global__ __aicore__ void moe_gating_top_k_softmax(GM_ADDR x,
 
 using namespace MoeGatingTopKSoftmax;
 
-#define MOE_GATING_TOP_K_SOFTMAX_E_K_FULL_LOAD_IMPL(INPUT_TYPE, BUFFER_NUM)                            \
-    do {                                                                                               \
+#define MOE_GATING_TOP_K_SOFTMAX_E_K_FULL_LOAD_IMPL(INPUT_TYPE, BUFFER_NUM) \
+    do { \
         GET_TILING_DATA_WITH_STRUCT(MoeGatingTopKSoftmaxEKFullLoadTilingData, tiling_data_in, tiling); \
-        const MoeGatingTopKSoftmaxEKFullLoadTilingData* __restrict tilingData = &tiling_data_in;       \
-        MoeGatingTopKSoftmaxEKFullLoad<INPUT_TYPE, BUFFER_NUM> op;                                     \
-        op.Init(gating, finished, out, indicesOut, sourceRowsOut, workspace, tilingData);              \
-        op.Process();                                                                                  \
+        const MoeGatingTopKSoftmaxEKFullLoadTilingData* __restrict tilingData = &tiling_data_in; \
+        MoeGatingTopKSoftmaxEKFullLoad<INPUT_TYPE, BUFFER_NUM> op; \
+        op.Init(gating, finished, out, indicesOut, sourceRowsOut, workspace, tilingData); \
+        op.Process(); \
     } while (0)
 
-#define MOE_GATING_TOP_K_SOFTMAX_K_FULL_LOAD_IMPL(INPUT_TYPE, BUFFER_NUM)                             \
-    do {                                                                                              \
+#define MOE_GATING_TOP_K_SOFTMAX_K_FULL_LOAD_IMPL(INPUT_TYPE, BUFFER_NUM) \
+    do { \
         GET_TILING_DATA_WITH_STRUCT(MoeGatingTopKSoftmaxKFullLoadTilingData, tiling_data_in, tiling); \
-        const MoeGatingTopKSoftmaxKFullLoadTilingData* __restrict tilingData = &tiling_data_in;       \
-        MoeGatingTopKSoftmaxKFullLoad<INPUT_TYPE, BUFFER_NUM> op;                                     \
-        op.Init(gating, finished, out, indicesOut, sourceRowsOut, workspace, tilingData);             \
-        op.Process();                                                                                 \
+        const MoeGatingTopKSoftmaxKFullLoadTilingData* __restrict tilingData = &tiling_data_in; \
+        MoeGatingTopKSoftmaxKFullLoad<INPUT_TYPE, BUFFER_NUM> op; \
+        op.Init(gating, finished, out, indicesOut, sourceRowsOut, workspace, tilingData); \
+        op.Process(); \
     } while (0)
 
-#define MOE_GATING_TOP_K_SOFTMAX_PERF_IMPL(INPUT_TYPE, COL_RANGE)                                \
-    do {                                                                                         \
+#define MOE_GATING_TOP_K_SOFTMAX_PERF_IMPL(INPUT_TYPE, COL_RANGE) \
+    do { \
         GET_TILING_DATA_WITH_STRUCT(MoeGatingTopKSoftmaxPerfTilingData, tiling_data_in, tiling); \
-        const MoeGatingTopKSoftmaxPerfTilingData* __restrict tilingData = &tiling_data_in;       \
-        MoeGatingTopKSoftmaxPerf<INPUT_TYPE, COL_RANGE> op;                                      \
-        op.Init(gating, finished, out, indicesOut, sourceRowsOut, workspace, tilingData);        \
-        op.Process(tilingData);                                                                  \
+        const MoeGatingTopKSoftmaxPerfTilingData* __restrict tilingData = &tiling_data_in; \
+        MoeGatingTopKSoftmaxPerf<INPUT_TYPE, COL_RANGE> op; \
+        op.Init(gating, finished, out, indicesOut, sourceRowsOut, workspace, tilingData); \
+        op.Process(tilingData); \
     } while (0)
 
-extern "C" __global__ __aicore__ void moe_gating_top_k_softmax(
-    GM_ADDR gating, GM_ADDR finished, GM_ADDR out, GM_ADDR indicesOut, GM_ADDR sourceRowsOut, GM_ADDR workspace,
-    GM_ADDR tiling)
+extern "C" __global__ __aicore__ void moe_gating_top_k_softmax(GM_ADDR gating, GM_ADDR finished, GM_ADDR out,
+                                                               GM_ADDR indicesOut, GM_ADDR sourceRowsOut,
+                                                               GM_ADDR workspace, GM_ADDR tiling)
 {
     if (g_coreType == AIC) {
         return;

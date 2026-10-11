@@ -77,16 +77,16 @@ TEST_P(MoeFusedTopkTest, test_case_moe_fused_topk)
     int64_t workspaceSize = 16 * 1024 * 1024 + tilingParam.blockNum * tilingParam.workspacePerCore;
     int64_t tilingSize = sizeof(MoeFusedTopkTilingData);
 
-    uint8_t *x = (uint8_t *)AscendC::GmAlloc(xByteSize);
-    uint8_t *addNum = (uint8_t *)AscendC::GmAlloc(addNumByteSize);
-    uint8_t *mappingNum = (uint8_t *)AscendC::GmAlloc(mappingNumByteSize);
-    uint8_t *mappingTable = (uint8_t *)AscendC::GmAlloc(mappingTableByteSize);
-    uint8_t *y = (uint8_t *)AscendC::GmAlloc(yByteSize);
-    uint8_t *indices = (uint8_t *)AscendC::GmAlloc(indicesByteSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(workspaceSize);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingSize);
+    uint8_t* x = (uint8_t*)AscendC::GmAlloc(xByteSize);
+    uint8_t* addNum = (uint8_t*)AscendC::GmAlloc(addNumByteSize);
+    uint8_t* mappingNum = (uint8_t*)AscendC::GmAlloc(mappingNumByteSize);
+    uint8_t* mappingTable = (uint8_t*)AscendC::GmAlloc(mappingTableByteSize);
+    uint8_t* y = (uint8_t*)AscendC::GmAlloc(yByteSize);
+    uint8_t* indices = (uint8_t*)AscendC::GmAlloc(indicesByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(workspaceSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingSize);
 
-    MoeFusedTopkTilingData *tilingData = reinterpret_cast<MoeFusedTopkTilingData *>(tiling);
+    MoeFusedTopkTilingData* tilingData = reinterpret_cast<MoeFusedTopkTilingData*>(tiling);
     tilingData->firstDimSize = tilingParam.firstDimSize;
     tilingData->secondDimSize = tilingParam.secondDimSize;
     tilingData->addNumDimSize = tilingParam.addNumDimSize;
@@ -117,14 +117,14 @@ TEST_P(MoeFusedTopkTest, test_case_moe_fused_topk)
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_RUN_KF(moe_fused_topk, blockDim, x, addNum, mappingNum, mappingTable, y, indices, workspace, tiling);
 
-    AscendC::GmFree((void *)x);
-    AscendC::GmFree((void *)addNum);
-    AscendC::GmFree((void *)mappingNum);
-    AscendC::GmFree((void *)mappingTable);
-    AscendC::GmFree((void *)y);
-    AscendC::GmFree((void *)indices);
-    AscendC::GmFree((void *)workspace);
-    AscendC::GmFree((void *)tiling);
+    AscendC::GmFree((void*)x);
+    AscendC::GmFree((void*)addNum);
+    AscendC::GmFree((void*)mappingNum);
+    AscendC::GmFree((void*)mappingTable);
+    AscendC::GmFree((void*)y);
+    AscendC::GmFree((void*)indices);
+    AscendC::GmFree((void*)workspace);
+    AscendC::GmFree((void*)tiling);
 }
 
 static MoeFusedTopkTestParam cases[] = {

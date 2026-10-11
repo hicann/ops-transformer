@@ -37,121 +37,121 @@
 using namespace AscendC;
 using namespace MoeTokenPermute;
 
-#define MASKSELECT_ONLY_IMPL()                                                                                         \
-    do {                                                                                                               \
-        TPipe sortPipe;                                                                                                \
-        KernelMaskedSelectV3<DTYPE_PERMUTE_PROBS> opMS;                                                                \
-        auto maskedSelectTilingData = &(t->maskedSelectParamsOp);                                                      \
-        opMS.Init(probs, routingMap, permuteProbs, sortedIndices, userWS, maskedSelectTilingData, t->topK, hasProb,    \
-                  &sortPipe);                                                                                          \
-        opMS.Process(permuteProbs, sortedIndices, actualOutTokens);                                                    \
-        sortPipe.Destroy();                                                                                            \
-        AscendC::SyncAll();                                                                                            \
+#define MASKSELECT_ONLY_IMPL() \
+    do { \
+        TPipe sortPipe; \
+        KernelMaskedSelectV3<DTYPE_PERMUTE_PROBS> opMS; \
+        auto maskedSelectTilingData = &(t->maskedSelectParamsOp); \
+        opMS.Init(probs, routingMap, permuteProbs, sortedIndices, userWS, maskedSelectTilingData, t->topK, hasProb, \
+                  &sortPipe); \
+        opMS.Process(permuteProbs, sortedIndices, actualOutTokens); \
+        sortPipe.Destroy(); \
+        AscendC::SyncAll(); \
     } while (0)
 
-#define MASKSELECT_GATHER_RANK_IMPL(sortPositionGm, valueStreamOffset)                                                 \
-    do {                                                                                                               \
-        TPipe sortPipe;                                                                                                \
-        KernelMaskedSelectV3<DTYPE_PERMUTE_PROBS> opMS;                                                                \
-        auto maskedSelectTilingData = &(t->maskedSelectParamsOp);                                                      \
-        opMS.Init(probs, routingMap, permuteProbs, sortedIndices, userWS, maskedSelectTilingData, t->topK, hasProb,    \
-                  &sortPipe, AscendC::MaskedSelectMode::kGatherExternalIndex, sortPositionGm, valueStreamOffset);      \
-        opMS.Process(permuteProbs, sortedIndices, actualOutTokens);                                                    \
-        sortPipe.Destroy();                                                                                            \
-        AscendC::SyncAll();                                                                                            \
+#define MASKSELECT_GATHER_RANK_IMPL(sortPositionGm, valueStreamOffset) \
+    do { \
+        TPipe sortPipe; \
+        KernelMaskedSelectV3<DTYPE_PERMUTE_PROBS> opMS; \
+        auto maskedSelectTilingData = &(t->maskedSelectParamsOp); \
+        opMS.Init(probs, routingMap, permuteProbs, sortedIndices, userWS, maskedSelectTilingData, t->topK, hasProb, \
+                  &sortPipe, AscendC::MaskedSelectMode::kGatherExternalIndex, sortPositionGm, valueStreamOffset); \
+        opMS.Process(permuteProbs, sortedIndices, actualOutTokens); \
+        sortPipe.Destroy(); \
+        AscendC::SyncAll(); \
     } while (0)
 
-#define SORT_COPY_IMPL(sortClass2, indexCopyClass, tokenDtype, ifNumOutTokens)          \
-    do {                                                                               \
-        TPipe sortPipe2;                                                               \
-        sortClass2<int32_t> op2;                                                       \
-        op2.Init(sortedIndices, sortedIndices, userWS, t, &sortPipe2);                 \
-        op2.Process();                                                                 \
-        sortPipe2.Destroy();                                                           \
-        TPipe MoeindexCopyPipe;                                                        \
-        indexCopyClass<tokenDtype, false> indexCopyOp;                        \
-        indexCopyOp.Init(tokens, sortedIndices, permuteTokens, t, &MoeindexCopyPipe);  \
-        indexCopyOp.Process();                                                         \
+#define SORT_COPY_IMPL(sortClass2, indexCopyClass, tokenDtype, ifNumOutTokens) \
+    do { \
+        TPipe sortPipe2; \
+        sortClass2<int32_t> op2; \
+        op2.Init(sortedIndices, sortedIndices, userWS, t, &sortPipe2); \
+        op2.Process(); \
+        sortPipe2.Destroy(); \
+        TPipe MoeindexCopyPipe; \
+        indexCopyClass<tokenDtype, false> indexCopyOp; \
+        indexCopyOp.Init(tokens, sortedIndices, permuteTokens, t, &MoeindexCopyPipe); \
+        indexCopyOp.Process(); \
     } while (0)
 
-#define NONALIGNED_SORT_COPY_IMPL(indexCopyClass, tokenDtype)                                                          \
-    do {                                                                                                               \
-        TPipe sortPipe2;                                                                                               \
-        int64_t msNeedCoreNum = t->maskedSelectParamsOp.needCoreNum;                                                   \
-        int64_t msNumTokens = t->n;                                                                                    \
-        int64_t msNumExperts = t->expertNum;                                                                           \
-        int64_t partialOffset = MoeTokenPermute::Align(msNeedCoreNum, sizeof(int32_t));                                \
-        int64_t sortPositionOffset = partialOffset + msNeedCoreNum * msNumTokens;                                      \
-        int64_t valueStreamOffset = sortPositionOffset + msNumExperts * msNumTokens;                                   \
-        GM_ADDR sortPositionGm = userWS + sortPositionOffset * sizeof(int32_t);                                        \
-        GM_ADDR valueStreamGm = userWS + valueStreamOffset * sizeof(int32_t);                                          \
-        MoeRoutingRankMultiCore rankOp;                                                                                \
-        rankOp.Init(routingMap, userWS, &(t->maskedSelectParamsOp), msNumExperts, t->topK, &sortPipe2);                \
-        rankOp.Process();                                                                                              \
-        sortPipe2.Destroy();                                                                                           \
-        MASKSELECT_GATHER_RANK_IMPL(sortPositionGm, valueStreamOffset);                                                \
-        TPipe scatterPipe;                                                                                             \
-        MoeSortIndicesScatterMultiCore scatterOp;                                                                      \
-        scatterOp.Init(sortedIndices, valueStreamGm, actualOutTokens, t, userWS, &scatterPipe);                        \
-        scatterOp.Process();                                                                                           \
-        scatterPipe.Destroy();                                                                                         \
-        TPipe MoeindexCopyPipe;                                                                                        \
-        indexCopyClass<tokenDtype, true> indexCopyOp;                                                                  \
-        indexCopyOp.Init(tokens, sortedIndices, permuteTokens, t, &MoeindexCopyPipe);                                  \
-        indexCopyOp.Process();                                                                                         \
+#define NONALIGNED_SORT_COPY_IMPL(indexCopyClass, tokenDtype) \
+    do { \
+        TPipe sortPipe2; \
+        int64_t msNeedCoreNum = t->maskedSelectParamsOp.needCoreNum; \
+        int64_t msNumTokens = t->n; \
+        int64_t msNumExperts = t->expertNum; \
+        int64_t partialOffset = MoeTokenPermute::Align(msNeedCoreNum, sizeof(int32_t)); \
+        int64_t sortPositionOffset = partialOffset + msNeedCoreNum * msNumTokens; \
+        int64_t valueStreamOffset = sortPositionOffset + msNumExperts * msNumTokens; \
+        GM_ADDR sortPositionGm = userWS + sortPositionOffset * sizeof(int32_t); \
+        GM_ADDR valueStreamGm = userWS + valueStreamOffset * sizeof(int32_t); \
+        MoeRoutingRankMultiCore rankOp; \
+        rankOp.Init(routingMap, userWS, &(t->maskedSelectParamsOp), msNumExperts, t->topK, &sortPipe2); \
+        rankOp.Process(); \
+        sortPipe2.Destroy(); \
+        MASKSELECT_GATHER_RANK_IMPL(sortPositionGm, valueStreamOffset); \
+        TPipe scatterPipe; \
+        MoeSortIndicesScatterMultiCore scatterOp; \
+        scatterOp.Init(sortedIndices, valueStreamGm, actualOutTokens, t, userWS, &scatterPipe); \
+        scatterOp.Process(); \
+        scatterPipe.Destroy(); \
+        TPipe MoeindexCopyPipe; \
+        indexCopyClass<tokenDtype, true> indexCopyOp; \
+        indexCopyOp.Init(tokens, sortedIndices, permuteTokens, t, &MoeindexCopyPipe); \
+        indexCopyOp.Process(); \
     } while (0)
 
 #define GENERAL_OP_IMPL(sortClass1, sortClass2, indexCopyClass, tokenDtype, ifNumOutTokens) \
-    do {                                                                               \
-        int32_t actualOutTokens = 0;                                                   \
-        MASKSELECT_ONLY_IMPL();                                                        \
-        if (actualOutTokens != t->n * t->topK) {                                       \
-            NONALIGNED_SORT_COPY_IMPL(indexCopyClass, tokenDtype);                     \
-        } else {                                                                       \
-            SORT_COPY_IMPL(sortClass2, indexCopyClass, tokenDtype, ifNumOutTokens);    \
-        }                                                                              \
+    do { \
+        int32_t actualOutTokens = 0; \
+        MASKSELECT_ONLY_IMPL(); \
+        if (actualOutTokens != t->n * t->topK) { \
+            NONALIGNED_SORT_COPY_IMPL(indexCopyClass, tokenDtype); \
+        } else { \
+            SORT_COPY_IMPL(sortClass2, indexCopyClass, tokenDtype, ifNumOutTokens); \
+        } \
     } while (0)
 
-#define GENERAL_PAD_OP_IMPL(sortClass1, sortClass2, indexCopyClass, ...)         \
-    do {                                                                         \
-        TPipe sortPipe2;                                                         \
-        MoeSortMultiLastDimCore<uint8_t> op;                                     \
-        op.Init(routingMap, sortedIndices, userWS, t, &sortPipe2);               \
-        op.Process();                                                            \
-        sortPipe2.Destroy();                                                     \
-        if (hasProb) {                                                           \
-            TPipe sortPipe;                                                      \
-            AscendC::SyncAll();                                                  \
-            MoePermuteProb<DTYPE_PERMUTE_PROBS> op2;                             \
-            op2.Init(permuteProbs, probs, sortedIndices, t, &sortPipe);          \
-            op2.Process();                                                       \
-            sortPipe.Destroy();                                                  \
-        }                                                                        \
-    } while (0)                                                                  \
+#define GENERAL_PAD_OP_IMPL(sortClass1, sortClass2, indexCopyClass, ...) \
+    do { \
+        TPipe sortPipe2; \
+        MoeSortMultiLastDimCore<uint8_t> op; \
+        op.Init(routingMap, sortedIndices, userWS, t, &sortPipe2); \
+        op.Process(); \
+        sortPipe2.Destroy(); \
+        if (hasProb) { \
+            TPipe sortPipe; \
+            AscendC::SyncAll(); \
+            MoePermuteProb<DTYPE_PERMUTE_PROBS> op2; \
+            op2.Init(permuteProbs, probs, sortedIndices, t, &sortPipe); \
+            op2.Process(); \
+            sortPipe.Destroy(); \
+        } \
+    } while (0)
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
-#define GENERAL_PAD_OP_IMPL_3510(sortClass1, sortClass2, indexCopyClass, ...)                                          \
-    do {                                                                                                               \
-        TPipe sortPipe2;                                                                                               \
-        MoeSortMultiLastDimCore<uint8_t> op;                                                                           \
-        op.Init(routingMap, sortedIndices, userWS, t, &sortPipe2);                                                     \
-        op.Process();                                                                                                  \
-        sortPipe2.Destroy();                                                                                           \
-        if (hasProb) {                                                                                                 \
-            AscendC::SyncAll();                                                                                        \
-            gatherv2::Gatherv2SimtTwoDim<DTYPE_PERMUTE_PROBS, int32_t, uint32_t> gatherv2Op;                           \
-            gatherv2Op.Init(probs, sortedIndices, permuteProbs, t, true);                                              \
-            gatherv2Op.ProbProcess();                                                                                  \
-        }                                                                                                              \
+#define GENERAL_PAD_OP_IMPL_3510(sortClass1, sortClass2, indexCopyClass, ...) \
+    do { \
+        TPipe sortPipe2; \
+        MoeSortMultiLastDimCore<uint8_t> op; \
+        op.Init(routingMap, sortedIndices, userWS, t, &sortPipe2); \
+        op.Process(); \
+        sortPipe2.Destroy(); \
+        if (hasProb) { \
+            AscendC::SyncAll(); \
+            gatherv2::Gatherv2SimtTwoDim<DTYPE_PERMUTE_PROBS, int32_t, uint32_t> gatherv2Op; \
+            gatherv2Op.Init(probs, sortedIndices, permuteProbs, t, true); \
+            gatherv2Op.ProbProcess(); \
+        } \
     } while (0)
 
-#define GATHER_IMPL()                                                                                                  \
-    do {                                                                                                               \
-        AscendC::SyncAll();                                                                                            \
-        TPipe MoeindexCopyPipe;                                                                                        \
-        gatherv2::Gatherv2SimdTwoDim<int32_t> gatherv2Op(&MoeindexCopyPipe);                                           \
-        gatherv2Op.Init(tokens, sortedIndices, permuteTokens, t);                                                      \
-        gatherv2Op.Process();                                                                                          \
+#define GATHER_IMPL() \
+    do { \
+        AscendC::SyncAll(); \
+        TPipe MoeindexCopyPipe; \
+        gatherv2::Gatherv2SimdTwoDim<int32_t> gatherv2Op(&MoeindexCopyPipe); \
+        gatherv2Op.Init(tokens, sortedIndices, permuteTokens, t); \
+        gatherv2Op.Process(); \
     } while (0)
 #endif
 

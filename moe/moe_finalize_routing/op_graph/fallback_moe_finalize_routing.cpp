@@ -27,7 +27,7 @@ static const size_t EXPANDED_SRC_TO_DST_ROW_INDEX = 5;
 static const size_t EXPERT_FOR_SOURCE_ROW_INDEX = 6;
 static const size_t INPUT_NUM = 7;
 
-static graphStatus MoeFinalizeRoutingHostExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus MoeFinalizeRoutingHostExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_LOGD("aclnnFallback", "MoeFinalizeRouting fallback begin");
 

@@ -28,8 +28,8 @@ static const std::initializer_list<op::DataType> MOE_GRAD_DTYPE_SUPPORT_LIST_X =
     DataType::DT_FLOAT16, DataType::DT_BF16, DataType::DT_FLOAT};
 static const std::initializer_list<op::DataType> MOE_GRAD_DTYPE_SUPPORT_LIST_ROW_IDX = {DataType::DT_INT32};
 
-static inline bool CheckNotNull(const aclTensor *permutedOutputGrad, const aclTensor *sortedIndices,
-                                const aclTensor *out)
+static inline bool CheckNotNull(const aclTensor* permutedOutputGrad, const aclTensor* sortedIndices,
+                                const aclTensor* out)
 {
     OP_CHECK_NULL(permutedOutputGrad, return false);
     OP_CHECK_NULL(sortedIndices, return false);
@@ -37,8 +37,8 @@ static inline bool CheckNotNull(const aclTensor *permutedOutputGrad, const aclTe
     return true;
 }
 
-static inline bool CheckDtypeValid(const aclTensor *permutedOutputGrad, const aclTensor *sortedIndices,
-                                   const aclTensor *out)
+static inline bool CheckDtypeValid(const aclTensor* permutedOutputGrad, const aclTensor* sortedIndices,
+                                   const aclTensor* out)
 {
     if (permutedOutputGrad != nullptr && permutedOutputGrad->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(permutedOutputGrad, MOE_GRAD_DTYPE_SUPPORT_LIST_X, return false);
@@ -53,8 +53,8 @@ static inline bool CheckDtypeValid(const aclTensor *permutedOutputGrad, const ac
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *permutedOutputGrad, const aclTensor *sortedIndices,
-                               const aclTensor *out)
+static aclnnStatus CheckParams(const aclTensor* permutedOutputGrad, const aclTensor* sortedIndices,
+                               const aclTensor* out)
 {
     CHECK_RET(CheckNotNull(permutedOutputGrad, sortedIndices, out), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid(permutedOutputGrad, sortedIndices, out), ACLNN_ERR_PARAM_INVALID);
@@ -67,9 +67,9 @@ static aclnnStatus CheckParams(const aclTensor *permutedOutputGrad, const aclTen
 extern "C" {
 #endif
 
-aclnnStatus aclnnMoeTokenPermuteGradGetWorkspaceSize(const aclTensor *permutedOutputGrad,
-                                                     const aclTensor *sortedIndices, int64_t numTopk, bool paddedMode,
-                                                     aclTensor *out, uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnMoeTokenPermuteGradGetWorkspaceSize(const aclTensor* permutedOutputGrad,
+                                                     const aclTensor* sortedIndices, int64_t numTopk, bool paddedMode,
+                                                     aclTensor* out, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     L2_DFX_PHASE_1(aclnnMoeTokenPermuteGrad, DFX_IN(permutedOutputGrad, sortedIndices, numTopk, paddedMode),
@@ -118,7 +118,7 @@ aclnnStatus aclnnMoeTokenPermuteGradGetWorkspaceSize(const aclTensor *permutedOu
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMoeTokenPermuteGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMoeTokenPermuteGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                      aclrtStream stream)
 {
     static bool useMoeInitRoutingV2Grad = Ops::Transformer::AclnnUtil::IsRegbase();

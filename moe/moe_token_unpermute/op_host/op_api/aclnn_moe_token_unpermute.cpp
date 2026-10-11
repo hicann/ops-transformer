@@ -32,7 +32,7 @@ static const std::initializer_list<op::DataType> MOE_DTYPE_SUPPORT_LIST_X = {Dat
                                                                              DataType::DT_FLOAT};
 static const std::initializer_list<op::DataType> MOE_DTYPE_SUPPORT_LIST_ROW_IDX = {DataType::DT_INT32};
 
-static inline bool CheckNotNull(const aclTensor *permutedTokens, const aclTensor *sortedIndices, const aclTensor *out)
+static inline bool CheckNotNull(const aclTensor* permutedTokens, const aclTensor* sortedIndices, const aclTensor* out)
 {
     OP_CHECK_NULL(permutedTokens, return false);
     OP_CHECK_NULL(sortedIndices, return false);
@@ -40,8 +40,8 @@ static inline bool CheckNotNull(const aclTensor *permutedTokens, const aclTensor
     return true;
 }
 
-static inline bool CheckDtypeValid(const aclTensor *permutedTokens, const aclTensor *sortedIndices,
-                                   const aclTensor *probsOptional, const aclTensor *out)
+static inline bool CheckDtypeValid(const aclTensor* permutedTokens, const aclTensor* sortedIndices,
+                                   const aclTensor* probsOptional, const aclTensor* out)
 {
     if (permutedTokens != nullptr && permutedTokens->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(permutedTokens, MOE_DTYPE_SUPPORT_LIST_X, return false);
@@ -59,8 +59,8 @@ static inline bool CheckDtypeValid(const aclTensor *permutedTokens, const aclTen
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *permutedTokens, const aclTensor *sortedIndices,
-                               const aclTensor *probsOptional, const aclTensor *out)
+static aclnnStatus CheckParams(const aclTensor* permutedTokens, const aclTensor* sortedIndices,
+                               const aclTensor* probsOptional, const aclTensor* out)
 {
     CHECK_RET(CheckNotNull(permutedTokens, sortedIndices, out), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid(permutedTokens, sortedIndices, probsOptional, out), ACLNN_ERR_PARAM_INVALID);
@@ -75,10 +75,10 @@ extern "C" {
 
 constexpr int64_t READ_INDEX_BY_ROW = 2;
 
-aclnnStatus aclnnMoeTokenUnpermuteGetWorkspaceSize(const aclTensor *permutedTokens, const aclTensor *sortedIndices,
-                                                   const aclTensor *probsOptional, bool paddedMode,
-                                                   const aclIntArray *restoreShapeOptional, aclTensor *out,
-                                                   uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnMoeTokenUnpermuteGetWorkspaceSize(const aclTensor* permutedTokens, const aclTensor* sortedIndices,
+                                                   const aclTensor* probsOptional, bool paddedMode,
+                                                   const aclIntArray* restoreShapeOptional, aclTensor* out,
+                                                   uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     L2_DFX_PHASE_1(aclnnMoeTokenUnpermute,
@@ -107,7 +107,7 @@ aclnnStatus aclnnMoeTokenUnpermuteGetWorkspaceSize(const aclTensor *permutedToke
     CHECK_RET(permutedTokensContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     auto sortedIndicesContiguous = l0op::Contiguous(sortedIndices, uniqueExecutor.get());
     CHECK_RET(sortedIndicesContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *probsContiguous = nullptr;
+    const aclTensor* probsContiguous = nullptr;
     if (probsOptional != nullptr) {
         probsContiguous = l0op::Contiguous(probsOptional, uniqueExecutor.get());
         CHECK_RET(probsContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -125,7 +125,7 @@ aclnnStatus aclnnMoeTokenUnpermuteGetWorkspaceSize(const aclTensor *permutedToke
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMoeTokenUnpermute(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMoeTokenUnpermute(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     static bool useMoeFinalizeRoutingV2 = Ops::Transformer::AclnnUtil::IsRegbase();
     if (!useMoeFinalizeRoutingV2) {

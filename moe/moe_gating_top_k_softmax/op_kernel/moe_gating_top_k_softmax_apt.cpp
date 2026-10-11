@@ -20,16 +20,12 @@ using namespace AscendC;
 using namespace MoeGatingTopKSoftmax;
 
 #define TILINGKEY_WITHOUT_FINISHED_NOT_NEED_PAD_ENGINF 100000
-#define TILINGKEY_WITH_FINISHED_NOT_NEED_PAD_ENGINF    100001
-#define TILINGKEY_WITHOUT_FINISHED_NEED_PAD_ENGINF     100010
-#define TILINGKEY_WITH_FINISHED_NEED_PAD_ENGINF        100011
+#define TILINGKEY_WITH_FINISHED_NOT_NEED_PAD_ENGINF 100001
+#define TILINGKEY_WITHOUT_FINISHED_NEED_PAD_ENGINF 100010
+#define TILINGKEY_WITH_FINISHED_NEED_PAD_ENGINF 100011
 
-extern "C" __global__ __aicore__ void moe_gating_top_k_softmax(GM_ADDR x,
-                                                               GM_ADDR finished,
-                                                               GM_ADDR y,
-                                                               GM_ADDR expertIdx,
-                                                               GM_ADDR rowIdx,
-                                                               GM_ADDR workspace,
+extern "C" __global__ __aicore__ void moe_gating_top_k_softmax(GM_ADDR x, GM_ADDR finished, GM_ADDR y,
+                                                               GM_ADDR expertIdx, GM_ADDR rowIdx, GM_ADDR workspace,
                                                                GM_ADDR tiling)
 {
     if (g_coreType == AIC) {

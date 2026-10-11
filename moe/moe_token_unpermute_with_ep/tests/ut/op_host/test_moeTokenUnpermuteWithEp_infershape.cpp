@@ -33,7 +33,7 @@ protected:
     }
 };
 
-static std::vector<int64_t> ToVector(const gert::Shape &shape)
+static std::vector<int64_t> ToVector(const gert::Shape& shape)
 {
     size_t shapeSize = shape.GetDimNum();
     std::vector<int64_t> shapeVec(shapeSize, 0);

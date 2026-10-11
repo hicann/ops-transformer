@@ -29,7 +29,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -38,7 +38,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -50,8 +50,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -91,14 +91,14 @@ int main()
     std::vector<int64_t> gradXShape = {4, 8};
     std::vector<float> gradXHostData(32, 0);
 
-    void *xNormDeviceAddr = nullptr;
-    void *gradYDeviceAddr = nullptr;
-    void *expertIdxDeviceAddr = nullptr;
-    void *gradXDeviceAddr = nullptr;
-    aclTensor *xNorm = nullptr;
-    aclTensor *gradY = nullptr;
-    aclTensor *expertIdx = nullptr;
-    aclTensor *gradX = nullptr;
+    void* xNormDeviceAddr = nullptr;
+    void* gradYDeviceAddr = nullptr;
+    void* expertIdxDeviceAddr = nullptr;
+    void* gradXDeviceAddr = nullptr;
+    aclTensor* xNorm = nullptr;
+    aclTensor* gradY = nullptr;
+    aclTensor* expertIdx = nullptr;
+    aclTensor* gradX = nullptr;
 
     ret = CreateAclTensor(xNormHostData, xNormShape, &xNormDeviceAddr, aclDataType::ACL_FLOAT, &xNorm);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -115,14 +115,14 @@ int main()
     double routedScalingFactor = 2.5;
     double eps = 1e-20;
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     ret = aclnnMoeGatingTopKBackwardGetWorkspaceSize(xNorm, gradY, expertIdx, renorm, normType, routedScalingFactor,
                                                      eps, gradX, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMoeGatingTopKBackwardGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret;);

@@ -33,8 +33,8 @@ static constexpr Reg::CastTrait castTraitFp32ToVarT = {Reg::RegLayout::ZERO, Reg
 template <typename VAR_T, typename IDX_T>
 class MoeInplaceIndexAddDeterminstic {
 public:
-    __aicore__ inline MoeInplaceIndexAddDeterminstic(const MoeInplaceIndexAddDeterminsticTilingData &tilingData,
-                                                     TPipe &pipe)
+    __aicore__ inline MoeInplaceIndexAddDeterminstic(const MoeInplaceIndexAddDeterminsticTilingData& tilingData,
+                                                     TPipe& pipe)
         : tilingData_(tilingData),
           pipe_(pipe){};
     __aicore__ inline void Init(GM_ADDR var, GM_ADDR indices, GM_ADDR updates, GM_ADDR alpha, GM_ADDR workspace);
@@ -94,8 +94,8 @@ private:
     TQue<QuePosition::VECIN, DOUBLE_BUFFER> sumQuanToIntQue_;
     TQue<QuePosition::VECOUT, DOUBLE_BUFFER> invQuanDataQue_;
 
-    TPipe &pipe_;
-    const MoeInplaceIndexAddDeterminsticTilingData &tilingData_;
+    TPipe& pipe_;
+    const MoeInplaceIndexAddDeterminsticTilingData& tilingData_;
 
     VAR_T alphaValue_{0};
     int64_t varNumel_{0};
@@ -116,10 +116,10 @@ template <typename VAR_T, typename IDX_T>
 __aicore__ inline void MoeInplaceIndexAddDeterminstic<VAR_T, IDX_T>::Init(GM_ADDR var, GM_ADDR indices, GM_ADDR updates,
                                                                           GM_ADDR alpha, GM_ADDR workspace)
 {
-    var_.SetGlobalBuffer((__gm__ VAR_T *)(var));
-    indices_.SetGlobalBuffer((__gm__ IDX_T *)(indices));
-    updates_.SetGlobalBuffer((__gm__ VAR_T *)(updates));
-    alpha_.SetGlobalBuffer((__gm__ VAR_T *)(alpha));
+    var_.SetGlobalBuffer((__gm__ VAR_T*)(var));
+    indices_.SetGlobalBuffer((__gm__ IDX_T*)(indices));
+    updates_.SetGlobalBuffer((__gm__ VAR_T*)(updates));
+    alpha_.SetGlobalBuffer((__gm__ VAR_T*)(alpha));
     if (tilingData_.isWithAlpha) {
         alphaValue_ = alpha_(0);
     }
@@ -143,20 +143,20 @@ __aicore__ inline void MoeInplaceIndexAddDeterminstic<VAR_T, IDX_T>::Init(GM_ADD
     int64_t tailCoreLen = wsInitLen - (GetBlockNum() - 1) * mainCoreLen;
     int64_t curCoreLen = (GetBlockIdx() == (GetBlockNum() - 1)) ? tailCoreLen : mainCoreLen;
     int64_t wsInitOfset = GetBlockIdx() * mainCoreLen;
-    workspaceInitGm_.SetGlobalBuffer((__gm__ float *)workspace + wsInitOfset, curCoreLen);
+    workspaceInitGm_.SetGlobalBuffer((__gm__ float*)workspace + wsInitOfset, curCoreLen);
     InitGlobalMemory(workspaceInitGm_, curCoreLen, (float)0);
     event_t eventIdMte3ToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_S));
     SetFlag<HardEvent::MTE3_S>(eventIdMte3ToS);
     WaitFlag<HardEvent::MTE3_S>(eventIdMte3ToS);
 
-    sameIdxCountWsGm_.SetGlobalBuffer((__gm__ uint32_t *)workspace, varRowCount);
-    updateRValueWsGm_.SetGlobalBuffer((__gm__ float *)workspace + varRowCount, varNumel_);
-    sumQuanToIntWsGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + rValueWsSize_, varNumel_);
-    updateSumWsGm_.SetGlobalBuffer((__gm__ float *)workspace + rValueWsSize_ + varNumel_ + GetBlockIdx() * sumWsSize_,
+    sameIdxCountWsGm_.SetGlobalBuffer((__gm__ uint32_t*)workspace, varRowCount);
+    updateRValueWsGm_.SetGlobalBuffer((__gm__ float*)workspace + varRowCount, varNumel_);
+    sumQuanToIntWsGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + rValueWsSize_, varNumel_);
+    updateSumWsGm_.SetGlobalBuffer((__gm__ float*)workspace + rValueWsSize_ + varNumel_ + GetBlockIdx() * sumWsSize_,
                                    sumWsSize_);
-    auto updateSumStartAddr = (__gm__ float *)workspace + rValueWsSize_ + varNumel_ + GetBlockNum() * sumWsSize_;
+    auto updateSumStartAddr = (__gm__ float*)workspace + rValueWsSize_ + varNumel_ + GetBlockNum() * sumWsSize_;
     updateSumIdxWsGm_.SetGlobalBuffer(
-        (__gm__ IDX_T *)updateSumStartAddr + GetBlockIdx() * tilingData_.eachCoreIndexCount,
+        (__gm__ IDX_T*)updateSumStartAddr + GetBlockIdx() * tilingData_.eachCoreIndexCount,
         tilingData_.eachCoreIndexCount);
 
     InitGlobalMemory(updateSumWsGm_, sumWsSize_, (float)(0));
@@ -206,8 +206,8 @@ __aicore__ void MoeInplaceIndexAddDeterminstic<VAR_T, IDX_T>::ComputeUniqueIdNum
     LocalTensor<IDX_T> indicesLocal = sortIndicesQue_.Get<IDX_T>();
     LocalTensor<int32_t> uniqueIdCountLocal = uniqueIdCountQue_.AllocTensor<int32_t>();
 
-    __local_mem__ IDX_T *indicesAddr = (__local_mem__ IDX_T *)indicesLocal[shiftOffset_].GetPhyAddr();
-    __local_mem__ int32_t *uniqueIdCountsAddr = (__local_mem__ int32_t *)uniqueIdCountLocal.GetPhyAddr();
+    __local_mem__ IDX_T* indicesAddr = (__local_mem__ IDX_T*)indicesLocal[shiftOffset_].GetPhyAddr();
+    __local_mem__ int32_t* uniqueIdCountsAddr = (__local_mem__ int32_t*)uniqueIdCountLocal.GetPhyAddr();
 
     int64_t vfLen = Ops::Base::GetVRegSize() / sizeof(IDX_T);
     uint16_t loopCnt = Ops::Base::CeilDiv(dataLen + 1, vfLen);
@@ -267,7 +267,7 @@ template <typename VAR_T, typename IDX_T>
 __aicore__ void MoeInplaceIndexAddDeterminstic<VAR_T, IDX_T>::ComputeUinqueIdTimes(uint32_t uniqueIdNum)
 {
     LocalTensor<int32_t> uniqueIdCountLocal = uniqueIdCountQue_.DeQue<int32_t>();
-    __local_mem__ int32_t *uniqueIdCountsAddr = (__local_mem__ int32_t *)uniqueIdCountLocal.GetPhyAddr();
+    __local_mem__ int32_t* uniqueIdCountsAddr = (__local_mem__ int32_t*)uniqueIdCountLocal.GetPhyAddr();
 
     // compute repeated num of each id
     uint32_t vfLen = Ops::Base::GetVRegSize() / sizeof(int32_t);
@@ -301,8 +301,8 @@ __aicore__ void MoeInplaceIndexAddDeterminstic<VAR_T, IDX_T>::ComputeSum(uint32_
     LocalTensor<float> updatesCastLocal = updatesCastQue_.DeQue<float>();
     LocalTensor<float> updateSumLocal = updateSumQue_.AllocTensor<float>();
 
-    __local_mem__ float *updatesAddr = (__local_mem__ float *)updatesCastLocal.GetPhyAddr();
-    __local_mem__ float *updateSumAddr = (__local_mem__ float *)updateSumLocal.GetPhyAddr();
+    __local_mem__ float* updatesAddr = (__local_mem__ float*)updatesCastLocal.GetPhyAddr();
+    __local_mem__ float* updateSumAddr = (__local_mem__ float*)updateSumLocal.GetPhyAddr();
 
     uint32_t vfLen = Ops::Base::GetVRegSize() / sizeof(float);
     int32_t loopSize = (colLen + vfLen - 1) / vfLen;
@@ -394,7 +394,7 @@ __aicore__ void MoeInplaceIndexAddDeterminstic<VAR_T, IDX_T>::CopySumOutToWs(int
         SetAtomicMax<float>();
         CopyOut<float>(updateRValueWsGm_[outOfset], updateSumLocal[i * afterAxisAlignFp32_], colLen);
         SetAtomicNone();
-        AscendC::AtomicAdd(const_cast<__gm__ uint32_t *>(sameIdxCountWsGm_[sumIdx].GetPhyAddr()), uint32_t(1));
+        AscendC::AtomicAdd(const_cast<__gm__ uint32_t*>(sameIdxCountWsGm_[sumIdx].GetPhyAddr()), uint32_t(1));
     }
 
     updateSumQue_.FreeTensor(updateSumLocal);
@@ -453,9 +453,9 @@ __aicore__ inline void MoeInplaceIndexAddDeterminstic<VAR_T, IDX_T>::QuantizeFor
     LocalTensor<float> rValueLocal = rValueQue_.DeQue<float>();
     LocalTensor<int32_t> quantaSumLocal = quantaSumQue_.AllocTensor<int32_t>();
 
-    __local_mem__ float *sumAddr = (__local_mem__ float *)sumLocal.GetPhyAddr();
-    __local_mem__ float *rValueAddr = (__local_mem__ float *)rValueLocal.GetPhyAddr();
-    __local_mem__ int32_t *quantaSumAddr = (__local_mem__ int32_t *)quantaSumLocal.GetPhyAddr();
+    __local_mem__ float* sumAddr = (__local_mem__ float*)sumLocal.GetPhyAddr();
+    __local_mem__ float* rValueAddr = (__local_mem__ float*)rValueLocal.GetPhyAddr();
+    __local_mem__ int32_t* quantaSumAddr = (__local_mem__ int32_t*)quantaSumLocal.GetPhyAddr();
 
     uint32_t vfLen = Ops::Base::GetVRegSize() / sizeof(float);
     uint16_t loopCnt = (colLen + vfLen - 1) / vfLen;
@@ -580,7 +580,7 @@ __aicore__ inline void MoeInplaceIndexAddDeterminstic<VAR_T, IDX_T>::CopyRValueA
             continue;
         }
         uint32_t count =
-            AscendC::AtomicExch(const_cast<__gm__ uint32_t *>(sameIdxCountWsGm_[sumIdx].GetPhyAddr()), uint32_t(0));
+            AscendC::AtomicExch(const_cast<__gm__ uint32_t*>(sameIdxCountWsGm_[sumIdx].GetPhyAddr()), uint32_t(0));
         if (count == 0) {
             continue;
         }
@@ -607,9 +607,9 @@ __aicore__ inline void MoeInplaceIndexAddDeterminstic<VAR_T, IDX_T>::InverseQuan
     LocalTensor<float> rValueLocal = rValueQue_.DeQue<float>();
     LocalTensor<VAR_T> inverseQuantData = invQuanDataQue_.AllocTensor<VAR_T>();
 
-    __local_mem__ int32_t *sumQuanToIntAddr = (__ubuf__ int32_t *)sumQuanToIntLocal.GetPhyAddr();
-    __local_mem__ float *rValueAddr = (__ubuf__ float *)rValueLocal.GetPhyAddr();
-    __local_mem__ VAR_T *invQuantDataAddr = (__ubuf__ VAR_T *)inverseQuantData.GetPhyAddr();
+    __local_mem__ int32_t* sumQuanToIntAddr = (__ubuf__ int32_t*)sumQuanToIntLocal.GetPhyAddr();
+    __local_mem__ float* rValueAddr = (__ubuf__ float*)rValueLocal.GetPhyAddr();
+    __local_mem__ VAR_T* invQuantDataAddr = (__ubuf__ VAR_T*)inverseQuantData.GetPhyAddr();
 
     uint32_t vfLen = Ops::Base::GetVRegSize() / sizeof(int32_t);
     uint16_t loopCnt = (colLen + vfLen - 1) / vfLen;

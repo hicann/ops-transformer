@@ -30,7 +30,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -39,7 +39,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<float> resultData(size, 0);
@@ -51,7 +51,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -64,8 +64,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -105,8 +105,8 @@ int main()
     int64_t num_capacity = 16;
     std::vector<float> permuted_output_grad_Data(num_expert * num_capacity * hidden_size, 0);
     std::vector<int64_t> permuted_output_grad_Shape = {num_expert * num_capacity, hidden_size};
-    void *permuted_output_grad_Addr = nullptr;
-    aclTensor *permuted_output_grad = nullptr;
+    void* permuted_output_grad_Addr = nullptr;
+    aclTensor* permuted_output_grad = nullptr;
 
     ret = CreateAclTensor(permuted_output_grad_Data, permuted_output_grad_Shape, &permuted_output_grad_Addr,
                           aclDataType::ACL_FLOAT, &permuted_output_grad);
@@ -114,8 +114,8 @@ int main()
 
     std::vector<float> permutedProbsOutputGradOptional(num_expert * num_capacity, 0.1);
     std::vector<int64_t> permutedProbsOutputGradOptionalShape = {num_expert * num_capacity};
-    void *permutedProbsOutputGrad_Addr = nullptr;
-    aclTensor *ppermutedProbsOutputGrad = nullptr;
+    void* permutedProbsOutputGrad_Addr = nullptr;
+    aclTensor* ppermutedProbsOutputGrad = nullptr;
     ret = CreateAclTensor(permutedProbsOutputGradOptional, permutedProbsOutputGradOptionalShape,
                           &permutedProbsOutputGrad_Addr, aclDataType::ACL_FLOAT, &ppermutedProbsOutputGrad);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -124,16 +124,16 @@ int main()
     std::vector<int> sortedIndicesData(num_expert * num_capacity);
     std::iota(sortedIndicesData.begin(), sortedIndicesData.end(), 0);
     std::vector<int64_t> sortedIndicesShape = {num_expert * num_capacity};
-    void *sortedIndicesAddr = nullptr;
-    aclTensor *sortedIndices = nullptr;
+    void* sortedIndicesAddr = nullptr;
+    aclTensor* sortedIndices = nullptr;
     ret = CreateAclTensor(sortedIndicesData, sortedIndicesShape, &sortedIndicesAddr, aclDataType::ACL_INT32,
                           &sortedIndices);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<char> routingMapOptionalData(num_token * num_expert, 1);
     std::vector<int64_t> routingMapOptionalShape = {num_token, num_expert};
-    void *routingMapOptionalAddr = nullptr;
-    aclTensor *proutingMapOptional = nullptr;
+    void* routingMapOptionalAddr = nullptr;
+    aclTensor* proutingMapOptional = nullptr;
 
     ret = CreateAclTensor(routingMapOptionalData, routingMapOptionalShape, &routingMapOptionalAddr,
                           aclDataType::ACL_INT8, &proutingMapOptional);
@@ -142,23 +142,23 @@ int main()
     std::vector<float> outData(num_token * hidden_size, 0.0f);
     std::vector<int64_t> outShape = {num_token, hidden_size};
     // std::vector<int64_t> outShape = {num_token};
-    void *outAddr = nullptr;
-    aclTensor *out = nullptr;
+    void* outAddr = nullptr;
+    aclTensor* out = nullptr;
 
     ret = CreateAclTensor(outData, outShape, &outAddr, aclDataType::ACL_FLOAT, &out);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<float> outData2(num_token * num_expert, 0.0f);
     std::vector<int64_t> outShape2 = {num_token, num_expert};
-    void *outAddr2 = nullptr;
-    aclTensor *out2 = nullptr;
+    void* outAddr2 = nullptr;
+    aclTensor* out2 = nullptr;
 
     ret = CreateAclTensor(outData2, outShape2, &outAddr2, aclDataType::ACL_FLOAT, &out2);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 调用aclnnMoeTokenPermuteGrad第一段接口
     ret = aclnnMoeTokenPermuteWithRoutingMapGradGetWorkspaceSize(permuted_output_grad, ppermutedProbsOutputGrad,
@@ -169,7 +169,7 @@ int main()
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

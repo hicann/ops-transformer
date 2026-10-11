@@ -20,20 +20,115 @@ import sys
 # case3:    20          20      44321
 
 # coreNum, n, cols, k
-case0_params = [40, 8, 0, 0, 5120, 2, 0, 8, 1, 1, 1, 5120, 5120, 1, 1, 0, 20480, 1, 1, 1, 1, 1]
-case1_params = [40, 4096, 0, 0, 8, 40, 0, 40, 103, 79, 1, 16, 8, 16, 1, 4, 64, 103, 1, 103, 1, 79]
-case2_params = [40, 10, 0, 0, 512, 64, 40, 10, 1, 1, 1, 512, 512, 32, 1, 5, 2048, 1, 1, 1, 1, 1]
-case3_params = [40, 80, 10, 8, 512, 8, 40, 40, 2, 2, 1, 512, 512, 4, 1, 2, 2048, 2, 1, 2, 1, 2]
+case0_params = [
+    40,
+    8,
+    0,
+    0,
+    5120,
+    2,
+    0,
+    8,
+    1,
+    1,
+    1,
+    5120,
+    5120,
+    1,
+    1,
+    0,
+    20480,
+    1,
+    1,
+    1,
+    1,
+    1,
+]
+case1_params = [
+    40,
+    4096,
+    0,
+    0,
+    8,
+    40,
+    0,
+    40,
+    103,
+    79,
+    1,
+    16,
+    8,
+    16,
+    1,
+    4,
+    64,
+    103,
+    1,
+    103,
+    1,
+    79,
+]
+case2_params = [
+    40,
+    10,
+    0,
+    0,
+    512,
+    64,
+    40,
+    10,
+    1,
+    1,
+    1,
+    512,
+    512,
+    32,
+    1,
+    5,
+    2048,
+    1,
+    1,
+    1,
+    1,
+    1,
+]
+case3_params = [
+    40,
+    80,
+    10,
+    8,
+    512,
+    8,
+    40,
+    40,
+    2,
+    2,
+    1,
+    512,
+    512,
+    4,
+    1,
+    2,
+    2048,
+    2,
+    1,
+    2,
+    1,
+    2,
+]
 
 params_info = {
     "case0": case0_params,
     "case1": case1_params,
     "case2": case2_params,
-    "case3": case3_params
+    "case3": case3_params,
 }
 
+
 def main():
-    params_list = params_info[sys.argv[1]]   # python gen_tiling.py case0  sys.argv[1]="case0"
+    params_list = params_info[
+        sys.argv[1]
+    ]  # python gen_tiling.py case0  sys.argv[1]="case0"
 
     base_params = np.array(params_list, dtype=np.int64)
 
@@ -41,5 +136,5 @@ def main():
     base_params.tofile(tiling_file)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -15,7 +15,7 @@
 #include "moe_init_routing_v2_grad_with_dropless.h"
 #include "moe_init_routing_v2_grad_with_activate.h"
 #include "moe_init_routing_v2_grad_with_pos_drop_and_pad_zero.h"
-///test
+/// test
 using namespace AscendC;
 using namespace MoeInitRoutingV2Grad;
 
@@ -29,12 +29,8 @@ using namespace MoeInitRoutingV2Grad;
 #define MOE_INIT_ROUTING_V2_GRAD_POSITION_PAD0_FLOAT16 1101UL
 #define MOE_INIT_ROUTING_V2_GRAD_POSITION_PAD0_BF16 1102UL
 
-extern "C" __global__ __aicore__ void moe_init_routing_v2_grad(
-    GM_ADDR gradExpandedX,
-    GM_ADDR expandedRowIdx,
-    GM_ADDR gradX,
-    GM_ADDR workspace,
-    GM_ADDR tiling)
+extern "C" __global__ __aicore__ void moe_init_routing_v2_grad(GM_ADDR gradExpandedX, GM_ADDR expandedRowIdx,
+                                                               GM_ADDR gradX, GM_ADDR workspace, GM_ADDR tiling)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
     if (g_coreType == AIC) {

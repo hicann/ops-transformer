@@ -63,7 +63,7 @@ REGISTER_TILING_DATA_CLASS(MoeInplaceIndexAdd_300002, MoeInplaceIndexAddDetermin
 
 class MoeInplaceIndexAddDeterminsticTiling : public MoeInplaceIndexAddTiling {
 public:
-    explicit MoeInplaceIndexAddDeterminsticTiling(gert::TilingContext *context)
+    explicit MoeInplaceIndexAddDeterminsticTiling(gert::TilingContext* context)
         : MoeInplaceIndexAddTiling(context)
     {}
     ~MoeInplaceIndexAddDeterminsticTiling() override = default;

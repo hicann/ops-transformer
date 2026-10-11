@@ -37,10 +37,10 @@ static inline uint32_t CeilDiv(uint32_t value, uint32_t factor)
     return (value + factor - 1U) / factor;
 }
 
-class MoeGatingTopKSoftmaxKFullLoadTiling : public MoeGatingTopKSoftmaxBaseTiling
-{
+class MoeGatingTopKSoftmaxKFullLoadTiling : public MoeGatingTopKSoftmaxBaseTiling {
 public:
-    explicit MoeGatingTopKSoftmaxKFullLoadTiling(gert::TilingContext* context) : MoeGatingTopKSoftmaxBaseTiling(context)
+    explicit MoeGatingTopKSoftmaxKFullLoadTiling(gert::TilingContext* context)
+        : MoeGatingTopKSoftmaxBaseTiling(context)
     {}
 
 protected:
@@ -97,9 +97,8 @@ uint64_t MoeGatingTopKSoftmaxKFullLoadTiling::GetTotalTmpSizeInUb(uint32_t kAlig
 
     uint32_t maxValue = 0;
     uint32_t minValue = 0;
-    (void)GetTopKMaxMinTmpSize(
-        ascendcPlatform, kAlign + ubFormerAlign, 1, false, true, TopKMode::TOPK_NORMAL, true, dataTypeSize, maxValue,
-        minValue);
+    (void)GetTopKMaxMinTmpSize(ascendcPlatform, kAlign + ubFormerAlign, 1, false, true, TopKMode::TOPK_NORMAL, true,
+                               dataTypeSize, maxValue, minValue);
     maxValue = maxValue > softmaxUbTmpSize ? maxValue : softmaxUbTmpSize;
 
     uint64_t additionalUbtmpSize = static_cast<uint64_t>(ALIGN_NUM + ALIGN_NUM + ALIGN_NUM);
@@ -174,30 +173,27 @@ ge::graphStatus MoeGatingTopKSoftmaxKFullLoadTiling::DoLibApiTiling()
     } else {
         dataTypeSize = ge::GetSizeByDataType(dtype);
     }
-    uint32_t ubFormerAlignLocal = CeilDiv(ubFormer, static_cast<uint32_t>(ALIGN_NUM)) * static_cast<uint32_t>(ALIGN_NUM);
+    uint32_t ubFormerAlignLocal =
+        CeilDiv(ubFormer, static_cast<uint32_t>(ALIGN_NUM)) * static_cast<uint32_t>(ALIGN_NUM);
     uint32_t kAlign =
         CeilDiv(static_cast<uint32_t>(k), static_cast<uint32_t>(ALIGN_NUM)) * static_cast<uint32_t>(ALIGN_NUM);
     auto softmaxShape = ge::Shape({tilingData.get_ubFormer()});
-    SoftMaxFlashV2TilingFunc(
-        softmaxShape, dataTypeSize, dataTypeSize,
-        GetSoftMaxFlashV2MaxTmpSize(softmaxShape, dataTypeSize, dataTypeSize, true),
-        tilingData.ubFormerSoftmaxTilingData, true);
+    SoftMaxFlashV2TilingFunc(softmaxShape, dataTypeSize, dataTypeSize,
+                             GetSoftMaxFlashV2MaxTmpSize(softmaxShape, dataTypeSize, dataTypeSize, true),
+                             tilingData.ubFormerSoftmaxTilingData, true);
 
     softmaxShape = ge::Shape({tilingData.get_ubTail()});
-    SoftMaxFlashV2TilingFunc(
-        softmaxShape, dataTypeSize, dataTypeSize,
-        GetSoftMaxFlashV2MaxTmpSize(softmaxShape, dataTypeSize, dataTypeSize, true), tilingData.ubTailSoftmaxTilingData,
-        true);
+    SoftMaxFlashV2TilingFunc(softmaxShape, dataTypeSize, dataTypeSize,
+                             GetSoftMaxFlashV2MaxTmpSize(softmaxShape, dataTypeSize, dataTypeSize, true),
+                             tilingData.ubTailSoftmaxTilingData, true);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
 
-    TopKTilingFunc(
-        ascendcPlatform, kAlign + ubFormerAlignLocal, 1, kAlign, dataTypeSize, true, TopKMode::TOPK_NORMAL, true,
-        tilingData.topkFormerTilingData);
+    TopKTilingFunc(ascendcPlatform, kAlign + ubFormerAlignLocal, 1, kAlign, dataTypeSize, true, TopKMode::TOPK_NORMAL,
+                   true, tilingData.topkFormerTilingData);
 
-    TopKTilingFunc(
-        ascendcPlatform, kAlign + ubTailAlign, 1, kAlign, dataTypeSize, true, TopKMode::TOPK_NORMAL, true,
-        tilingData.topkTailTilingData);
+    TopKTilingFunc(ascendcPlatform, kAlign + ubTailAlign, 1, kAlign, dataTypeSize, true, TopKMode::TOPK_NORMAL, true,
+                   tilingData.topkTailTilingData);
     return ge::GRAPH_SUCCESS;
 }
 

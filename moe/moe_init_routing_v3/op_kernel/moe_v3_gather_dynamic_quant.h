@@ -28,7 +28,7 @@ public:
     __aicore__ inline MoeGatherOutDynamicQuant(){};
     __aicore__ inline void Init(GM_ADDR inputX, GM_ADDR quantSmooth, GM_ADDR expandedRowIdx, GM_ADDR expandedX,
                                 GM_ADDR expandedScale, GM_ADDR sortedExpertIdx,
-                                const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -37,14 +37,14 @@ private:
     __aicore__ inline void CopyOutXPartialDynamicQuantFromGather(int64_t progress);
     __aicore__ inline void CopyOutXPartialDynamicQuantFromScatter(int64_t progress);
     __aicore__ inline void CopyInExpandedExpertIdx(int64_t progress);
-    __aicore__ inline void Compute(LocalTensor<float> &smoothLocal);
-    __aicore__ inline float ComputeMax(LocalTensor<float> &inLocal, LocalTensor<float> &tempLocal,
-                                       LocalTensor<float> &scaleLocal, int32_t srcIdx, int32_t expertIdx, int64_t j);
-    __aicore__ inline void ComputeScale(LocalTensor<float> &inLocal, LocalTensor<float> &tempLocal, float scaleTemp,
+    __aicore__ inline void Compute(LocalTensor<float>& smoothLocal);
+    __aicore__ inline float ComputeMax(LocalTensor<float>& inLocal, LocalTensor<float>& tempLocal,
+                                       LocalTensor<float>& scaleLocal, int32_t srcIdx, int32_t expertIdx, int64_t j);
+    __aicore__ inline void ComputeScale(LocalTensor<float>& inLocal, LocalTensor<float>& tempLocal, float scaleTemp,
                                         int64_t dstIndex, int64_t j);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> inputXInQueue_;
     TQue<QuePosition::VECIN, 1> smoothInQueue_;
     TQue<QuePosition::VECIN, 1> expandRowIdxInQueue_;
@@ -61,7 +61,7 @@ private:
     GlobalTensor<int32_t> expandedExpertIdxGm_;
     GlobalTensor<int32_t> expertTotalCountGm_;
 
-    const MoeV3GatherOutComputeTilingData *gatherOutTilingData_;
+    const MoeV3GatherOutComputeTilingData* gatherOutTilingData_;
 
     int64_t needCoreNum_;
     int64_t blockIdx_;
@@ -110,7 +110,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::CopyInExpandedE
 }
 
 template <typename T, const int COPYOUTTYPE>
-__aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::Compute(LocalTensor<float> &smoothLocal)
+__aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::Compute(LocalTensor<float>& smoothLocal)
 {
     LocalTensor<float> inLocal = inputXInQueue_.DeQue<float>();
 
@@ -268,9 +268,9 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::CopyOutXDynamic
 }
 
 template <typename T, const int COPYOUTTYPE>
-__aicore__ inline float MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::ComputeMax(LocalTensor<float> &inLocal,
-                                                                             LocalTensor<float> &tempLocal,
-                                                                             LocalTensor<float> &scaleLocal,
+__aicore__ inline float MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::ComputeMax(LocalTensor<float>& inLocal,
+                                                                             LocalTensor<float>& tempLocal,
+                                                                             LocalTensor<float>& scaleLocal,
                                                                              int32_t srcIdx, int32_t expertIdx,
                                                                              int64_t j)
 {
@@ -318,8 +318,8 @@ __aicore__ inline float MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::ComputeMax(Loc
 }
 
 template <typename T, const int COPYOUTTYPE>
-__aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::ComputeScale(LocalTensor<float> &inLocal,
-                                                                              LocalTensor<float> &tempLocal,
+__aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::ComputeScale(LocalTensor<float>& inLocal,
+                                                                              LocalTensor<float>& tempLocal,
                                                                               float scaleTemp, int64_t dstIndex,
                                                                               int64_t j)
 {
@@ -368,7 +368,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::CopyOutXPartial
         LocalTensor<float> scaleLocal = scaleOutQueue_.AllocTensor<float>();
 
         float tileMax;
-        float reduceMax = *((float *)&INF);
+        float reduceMax = *((float*)&INF);
         for (int64_t j = 0; j < colLoops_; j++) {
             colsTileLength_ = perLoopCols_;
             if (j == colLoops_ - 1) {
@@ -422,7 +422,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::CopyOutXPartial
         LocalTensor<float> tempLocal = calcQueue_.AllocTensor<float>();
         LocalTensor<float> quantScaleLocal = scaleOutQueue_.AllocTensor<float>();
 
-        float reduceMax = *((float *)&INF);
+        float reduceMax = *((float*)&INF);
         for (int64_t j = 0; j < colLoops_; j++) {
             colsTileLength_ = perLoopCols_;
             if (j == colLoops_ - 1) {
@@ -464,8 +464,8 @@ template <typename T, const int COPYOUTTYPE>
 __aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::Init(GM_ADDR inputX, GM_ADDR quantSmooth,
                                                                       GM_ADDR sortedExpertIdx, GM_ADDR expandedRowIdx,
                                                                       GM_ADDR expandedX, GM_ADDR expandedScale,
-                                                                      const MoeInitRoutingV3TilingData *tilingData,
-                                                                      TPipe *tPipe)
+                                                                      const MoeInitRoutingV3TilingData* tilingData,
+                                                                      TPipe* tPipe)
 {
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
@@ -486,7 +486,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::Init(GM_ADDR in
     // core split
     int64_t actualExpertNum_ = tilingData->actualExpertNum;
     if (ep_) {
-        expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) * 2 +
+        expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t*)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) * 2 +
                                                 Align(actualExpertNum_, sizeof(int32_t)),
                                             1);
         AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE,
@@ -520,42 +520,42 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::Init(GM_ADDR in
 
     perLoopColsAlign_ = Align(perLoopCols_, sizeof(T));
 
-    inputXGm_.SetGlobalBuffer((__gm__ T *)inputX);
-    expandedXGm_.SetGlobalBuffer((__gm__ int8_t *)expandedX);
+    inputXGm_.SetGlobalBuffer((__gm__ T*)inputX);
+    expandedXGm_.SetGlobalBuffer((__gm__ int8_t*)expandedX);
 
-    expandedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdx + blockIdx_ * perCoreRow_,
+    expandedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)sortedExpertIdx + blockIdx_ * perCoreRow_,
                                          Align(coreRows_, sizeof(int32_t)));
 
     if constexpr (COPYOUTTYPE == SCATTER) {
         // 获取scatter索引
         if (rowIdxType_ == SCATTER) {
-            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreRow_,
+            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreRow_,
                                               Align(perCoreRow_, sizeof(int32_t)));
         } else {
             expandedRowIdxGm_.SetGlobalBuffer(
-                (__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+                (__gm__ int32_t*)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
                 Align(perCoreRow_, sizeof(int32_t)));
         }
     } else {
         // 获取gather索引
         if (rowIdxType_ == GATHER) {
-            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreRow_,
+            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreRow_,
                                               Align(perCoreRow_, sizeof(int32_t)));
         } else {
             expandedRowIdxGm_.SetGlobalBuffer(
-                (__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+                (__gm__ int32_t*)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
                 Align(perCoreRow_, sizeof(int32_t)));
         }
     }
 
     if (isInputScale_) {
-        quantSmoothGm_.SetGlobalBuffer((__gm__ float *)quantSmooth);
+        quantSmoothGm_.SetGlobalBuffer((__gm__ float*)quantSmooth);
     }
-    expandedScaleGm_.SetGlobalBuffer((__gm__ float *)expandedScale);
+    expandedScaleGm_.SetGlobalBuffer((__gm__ float*)expandedScale);
 
     if (colLoops_ > 1) {
         // cols非全载 smooth*x结果临时存储
-        quantTempGm_.SetGlobalBuffer((__gm__ float *)sortedExpertIdx + Align(totalLength_, sizeof(int32_t)) * 2 +
+        quantTempGm_.SetGlobalBuffer((__gm__ float*)sortedExpertIdx + Align(totalLength_, sizeof(int32_t)) * 2 +
                                          Align(actualExpertNum_, sizeof(int32_t)) * 2 +
                                          Align(totalLength_, sizeof(int32_t)) + blockIdx_ * cols_,
                                      cols_ * sizeof(float));

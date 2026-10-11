@@ -31,12 +31,8 @@ void SetupParsePlatformInfo(fe::PlatFormInfos* platformInfo)
         {"core_type_list", "AICore"},
     };
     map<string, string> aicoreSpec = {
-        {"ub_size", "65536"},
-        {"l0_a_size", "65536"},
-        {"l0_b_size", "65536"},
-        {"l0_c_size", "131072"},
-        {"l1_size", "524288"},
-        {"bt_size", "0"},
+        {"ub_size", "65536"},    {"l0_a_size", "65536"}, {"l0_b_size", "65536"},
+        {"l0_c_size", "131072"}, {"l1_size", "524288"},  {"bt_size", "0"},
     };
     map<string, string> intrinsics = {
         {"Intrinsic_data_move_l12ub", "float16"},
@@ -54,8 +50,7 @@ void SetupParsePlatformInfo(fe::PlatFormInfos* platformInfo)
 }
 } // namespace
 
-class MoeFinalizeRoutingV2GradTiling : public testing::Test
-{
+class MoeFinalizeRoutingV2GradTiling : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -73,27 +68,28 @@ protected:
 TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_10001_001)
 {
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{5, 8}, {5, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{5}, {5}}, ge::DT_INT32, ge::FORMAT_ND},
-                                            },
-                                            // output info
-                                            {
-                                                {{{5, 8}, {5, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{5, 1}, {5, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                            },
-                                            &compileInfo);
-    int64_t expectTilingKey = 10001; // tilngkey
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {
+            // input info
+            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+            {{{5, 8}, {5, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{5}, {5}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        // output info
+        {
+            {{{5, 8}, {5, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{5, 1}, {5, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo);
+    int64_t expectTilingKey = 10001;                                  // tilngkey
     string expectTilingData = "5 0 5 5 0 5 0 1 8 5 16376 0 0 10001 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
@@ -110,28 +106,30 @@ TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_10002_001)
     gert::StorageShape grad_scales_shape = {{5, 1}, {5, 1}};
 
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                            },
-                                            // output info
-                                            {
-                                                {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {
+            // input info
+            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+            {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        // output info
+        {
+            {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo);
     int64_t expectTilingKey = 10002; // tilngkey
-    string expectTilingData = "5 0 5 5 0 5 0 1 262144 5 16376 16 128 10002 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "5 0 5 5 0 5 0 1 262144 5 16376 16 128 10002 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -151,31 +149,31 @@ TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_20001_001)
     gert::StorageShape grad_scales_shape = {{5, 3}, {5, 3}};
 
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {                           // input info
+         // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+         {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND}},
+        // output info
+        {
+            {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo);
     int64_t expectTilingKey = 20001; // tilngkey
-    string expectTilingData = "15 0 15 15 0 15 0 3 8 15 5448 0 0 20001 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "15 0 15 15 0 15 0 3 8 15 5448 0 0 20001 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -195,31 +193,31 @@ TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_20002_001)
     gert::StorageShape grad_scales_shape = {{5, 3}, {5, 3}};
 
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {                           // input info
+         // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+         {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND}},
+        // output info
+        {
+            {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo);
     int64_t expectTilingKey = 20002; // tilngkey
-    string expectTilingData = "15 0 15 15 0 15 0 3 262144 15 5448 48 640 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "15 0 15 15 0 15 0 3 262144 15 5448 48 640 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -239,31 +237,31 @@ TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_20002_002)
     gert::StorageShape grad_scales_shape = {{5, 3}, {5, 3}};
 
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expert_idx_shape, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {                           // input info
+         // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+         {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expert_idx_shape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // output info
+        {
+            {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo);
     int64_t expectTilingKey = 20002; // tilngkey
-    string expectTilingData = "15 0 15 15 0 15 0 3 262144 15 5448 48 640 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "15 0 15 15 0 15 0 3 262144 15 5448 48 640 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -283,31 +281,33 @@ TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_20002_003)
     gert::StorageShape grad_scales_shape = {{5, 3}, {5, 3}};
 
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {grad_y_shape, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {expanded_x_shape, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {scales_shape, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                //{expert_idx_shape, ge::DT_FLOAT16, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {grad_expanded_x_shape, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {grad_scales_shape, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {
+            // input info
+            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+            {grad_y_shape, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+            {expanded_x_shape, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {scales_shape, ge::DT_FLOAT16, ge::FORMAT_ND},
+            //{expert_idx_shape, ge::DT_FLOAT16, ge::FORMAT_ND}
+        },
+        // output info
+        {
+            {grad_expanded_x_shape, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {grad_scales_shape, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo);
     int64_t expectTilingKey = 20002; // tilngkey
-    string expectTilingData = "15 0 15 15 0 15 0 3 262144 15 6528 40 1024 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "15 0 15 15 0 15 0 3 262144 15 6528 40 1024 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -323,27 +323,28 @@ TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_regbase_10
     gert::StorageShape grad_scales_shape = {{5, 1}, {5, 1}};
 
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                            },
-                                            // output info
-                                            {
-                                                {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                            },
-                                            &compileInfo);
-    int64_t expectTilingKey = 10001; // tilngkey
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {
+            // input info
+            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+            {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        // output info
+        {
+            {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo);
+    int64_t expectTilingKey = 10001;                                  // tilngkey
     string expectTilingData = "5 0 5 5 0 5 0 1 8 5 16376 0 0 10001 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
@@ -360,28 +361,30 @@ TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_regbase_10
     gert::StorageShape grad_scales_shape = {{5, 1}, {5, 1}};
 
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                            },
-                                            // output info
-                                            {
-                                                {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {
+            // input info
+            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+            {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        // output info
+        {
+            {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo);
     int64_t expectTilingKey = 10002; // tilngkey
-    string expectTilingData = "5 0 5 5 0 5 0 1 262144 5 16376 16 128 10002 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "5 0 5 5 0 5 0 1 262144 5 16376 16 128 10002 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -401,32 +404,32 @@ TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_regbase_20
     gert::StorageShape grad_scales_shape = {{5, 3}, {5, 3}};
 
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {bias_shape, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {                           // input info
+         // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+         {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+         {bias_shape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // output info
+        {
+            {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo);
     int64_t expectTilingKey = 20001; // tilngkey
-    string expectTilingData = "15 0 15 15 0 15 0 3 8 15 4088 0 0 20001 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "15 0 15 15 0 15 0 3 8 15 4088 0 0 20001 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -446,32 +449,32 @@ TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_regbase_20
     gert::StorageShape grad_scales_shape = {{5, 3}, {5, 3}};
 
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {bias_shape, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {                           // input info
+         // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+         {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+         {bias_shape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // output info
+        {
+            {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo);
     int64_t expectTilingKey = 20002; // tilngkey
-    string expectTilingData = "15 0 15 15 0 15 0 3 262000 15 4088 64 368 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "15 0 15 15 0 15 0 3 262000 15 4088 64 368 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -491,32 +494,32 @@ TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_regbase_20
     gert::StorageShape grad_scales_shape = {{5, 3}, {5, 3}};
 
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {bias_shape, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(26)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262)},
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {                           // input info
+         // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+         {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+         {bias_shape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // output info
+        {
+            {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(26)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262)},
+        },
+        &compileInfo);
     int64_t expectTilingKey = 20022; // tilngkey
-    string expectTilingData = "15 0 15 15 0 15 0 3 262000 15 16360 16 240 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "15 0 15 15 0 15 0 3 262000 15 16360 16 240 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -536,32 +539,32 @@ TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_regbase_20
     gert::StorageShape grad_scales_shape = {{18, 5}, {18, 5}};
 
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {bias_shape, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(22)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(20)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(58)},
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {                           // input info
+         // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expanded_row_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+         {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+         {bias_shape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // output info
+        {
+            {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(22)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(20)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(58)},
+        },
+        &compileInfo);
     int64_t expectTilingKey = 20002; // tilngkey
-    string expectTilingData = "15 0 15 15 0 15 0 3 262000 15 16360 16 240 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "15 0 15 15 0 15 0 3 262000 15 16360 16 240 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -581,32 +584,32 @@ TEST_F(MoeFinalizeRoutingV2GradTiling, MoeFinalizeRoutingV2GradTiling_regbase_20
     gert::StorageShape grad_scales_shape = {{18, 5}, {18, 5}};
 
     optiling::MoeFinalizeRoutingV2GradCompileInfo compileInfo = {40, 65536};
-    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2Grad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expanded_row_idx_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
-                                                {bias_shape, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
-                                            },
-                                            // attr
-                                            {
-                                                {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(22)},
-                                                {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(20)},
-                                                {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(58)},
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeFinalizeRoutingV2Grad", // op_name
+        {                           // input info
+         // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {grad_y_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expanded_row_idx_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {expert_idx_shape, ge::DT_INT32, ge::FORMAT_ND},
+         {bias_shape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // output info
+        {
+            {grad_expanded_x_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+            {grad_scales_shape, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        // attr
+        {
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(22)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(20)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(58)},
+        },
+        &compileInfo);
     int64_t expectTilingKey = 20002; // tilngkey
-    string expectTilingData = "15 0 15 15 0 15 0 3 262000 15 16360 16 240 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "15 0 15 15 0 15 0 3 262000 15 16360 16 240 20002 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces);
 }

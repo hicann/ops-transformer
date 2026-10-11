@@ -52,7 +52,7 @@ inline static int64_t AlignParam(const int64_t param, const int32_t typeSize)
     return ((param * typeSize + ONE_BLK_SIZE - 1) / ONE_BLK_SIZE * ONE_BLK_SIZE) / typeSize;
 }
 
-ge::graphStatus MoeFinalizeRoutingTiling::Init(gert::TilingContext *context)
+ge::graphStatus MoeFinalizeRoutingTiling::Init(gert::TilingContext* context)
 {
     context_ = context;
     OP_CHECK_IF(CheckParamsShape() != ge::GRAPH_SUCCESS,
@@ -215,7 +215,7 @@ ge::graphStatus MoeFinalizeRoutingTiling::CheckParamsShape()
     return ge::GRAPH_SUCCESS;
 }
 
-void MoeFinalizeRoutingTiling::GetTilingData(MoeFinalizeRoutingTilingData &tilingData) const
+void MoeFinalizeRoutingTiling::GetTilingData(MoeFinalizeRoutingTilingData& tilingData) const
 {
     tilingData.set_totalCoreNum(totalCoreNum_);
     tilingData.set_usedCoreNum(usedCoreNum_);
@@ -556,8 +556,8 @@ int64_t MoeFinalizeRoutingTiling::GetTilingKey() const
     return DTYPE_BF16_CUTH;
 }
 
-inline static ge::graphStatus MoeFinalizeRoutingSetTilingData(gert::TilingContext *context,
-                                                              MoeFinalizeRoutingTilingData &tilingData)
+inline static ge::graphStatus MoeFinalizeRoutingSetTilingData(gert::TilingContext* context,
+                                                              MoeFinalizeRoutingTilingData& tilingData)
 {
     if (tilingData.GetDataSize() > context->GetRawTilingData()->GetCapacity()) {
         return ge::GRAPH_FAILED;
@@ -567,7 +567,7 @@ inline static ge::graphStatus MoeFinalizeRoutingSetTilingData(gert::TilingContex
     return ge::GRAPH_SUCCESS;
 }
 
-static void PrintTilingData(MoeFinalizeRoutingTilingData &tilingData)
+static void PrintTilingData(MoeFinalizeRoutingTilingData& tilingData)
 {
     OP_LOGI("MoeFinalizeRouting", "totalCoreNum: %ld", tilingData.get_totalCoreNum());
     OP_LOGI("MoeFinalizeRouting", "usedCoreNum: %ld", tilingData.get_usedCoreNum());
@@ -592,7 +592,7 @@ static void PrintTilingData(MoeFinalizeRoutingTilingData &tilingData)
     OP_LOGI("MoeFinalizeRouting", "tailCoreHandleNumTailLoop: %ld", tilingData.get_tailCoreHandleNumTailLoop());
 }
 
-ge::graphStatus Tiling4MoeFinalizeRouting(gert::TilingContext *context)
+ge::graphStatus Tiling4MoeFinalizeRouting(gert::TilingContext* context)
 {
     OP_LOGD(context->GetNodeName(), "[MoeFinalizeRouting] Tiling4MoeFinalizeRouting running begin");
     MoeFinalizeRoutingTiling tilingOp;
@@ -610,7 +610,7 @@ ge::graphStatus Tiling4MoeFinalizeRouting(gert::TilingContext *context)
         return ge::GRAPH_FAILED);
     context->SetBlockDim(tilingData.get_usedCoreNum());
     context->SetTilingKey(tilingOp.GetTilingKey());
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, workspaces);
     workspaces[0] = WORKSPACE_SIZE;
 
@@ -618,7 +618,7 @@ ge::graphStatus Tiling4MoeFinalizeRouting(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingPrepareForMoeFinalizeRouting(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForMoeFinalizeRouting(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

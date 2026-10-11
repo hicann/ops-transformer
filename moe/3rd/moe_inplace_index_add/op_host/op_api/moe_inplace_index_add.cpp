@@ -27,23 +27,24 @@ namespace l0op {
 OP_TYPE_REGISTER(MoeInplaceIndexAdd);
 OP_TYPE_REGISTER(InplaceIndexAdd);
 // AICORE算子kernel
-const aclTensor *MoeInplaceIndexAddAiCore(const aclTensor *self, const int64_t dim, const aclTensor *index,
-                                       const aclTensor *source, const aclTensor *alphaTensor,
-                                       aclOpExecutor *executor) {
-  L0_DFX(MoeInplaceIndexAddAiCore, self, dim, index, source, alphaTensor);
-  auto indexAddOut = const_cast<aclTensor*>(self);
-  auto ret=ACLNN_SUCCESS;
-  if (op::GetCurrentPlatformInfo().GetCurNpuArch()  == NpuArch::DAV_3510) {
-      ret = ADD_TO_LAUNCHER_LIST_AICORE(MoeInplaceIndexAdd, OP_INPUT(self, index, source, alphaTensor),
-                                        OP_OUTPUT(indexAddOut), OP_ATTR(dim));
-  } else {
-      ret = ADD_TO_LAUNCHER_LIST_AICORE(InplaceIndexAdd, OP_INPUT(self, index, source, alphaTensor),
-                                        OP_OUTPUT(indexAddOut), OP_ATTR(dim));
-  }
-  OP_CHECK(ret == ACLNN_SUCCESS,
-           OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "MoeInplaceIndexAddAiCore ADD_TO_LAUNCHER_LIST_AICORE failed."),
-           return nullptr);
-  return indexAddOut;
+const aclTensor* MoeInplaceIndexAddAiCore(const aclTensor* self, const int64_t dim, const aclTensor* index,
+                                          const aclTensor* source, const aclTensor* alphaTensor,
+                                          aclOpExecutor* executor)
+{
+    L0_DFX(MoeInplaceIndexAddAiCore, self, dim, index, source, alphaTensor);
+    auto indexAddOut = const_cast<aclTensor*>(self);
+    auto ret = ACLNN_SUCCESS;
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+        ret = ADD_TO_LAUNCHER_LIST_AICORE(MoeInplaceIndexAdd, OP_INPUT(self, index, source, alphaTensor),
+                                          OP_OUTPUT(indexAddOut), OP_ATTR(dim));
+    } else {
+        ret = ADD_TO_LAUNCHER_LIST_AICORE(InplaceIndexAdd, OP_INPUT(self, index, source, alphaTensor),
+                                          OP_OUTPUT(indexAddOut), OP_ATTR(dim));
+    }
+    OP_CHECK(ret == ACLNN_SUCCESS,
+             OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "MoeInplaceIndexAddAiCore ADD_TO_LAUNCHER_LIST_AICORE failed."),
+             return nullptr);
+    return indexAddOut;
 }
 
-}  // namespace l0op
+} // namespace l0op

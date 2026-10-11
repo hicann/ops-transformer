@@ -24,14 +24,14 @@ using namespace AscendC;
 class RowIdxGather {
 public:
     __aicore__ inline RowIdxGather(){};
-    __aicore__ inline void Init(GM_ADDR expandedRowIdx, GM_ADDR workspace, const MoeInitRoutingV3TilingData *tilingData,
-                                TPipe *tPipe);
+    __aicore__ inline void Init(GM_ADDR expandedRowIdx, GM_ADDR workspace, const MoeInitRoutingV3TilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void CopyIn(int64_t loop, int64_t elements);
     __aicore__ inline void Compute(int64_t loop, int64_t elements);
-    __aicore__ inline void CopyOut(int64_t loop, int64_t elements, GlobalTensor<int32_t> &RowIdxDstGm_);
+    __aicore__ inline void CopyOut(int64_t loop, int64_t elements, GlobalTensor<int32_t>& RowIdxDstGm_);
     __aicore__ inline void AssistInit();
 
 private:
@@ -42,13 +42,13 @@ private:
     GlobalTensor<int32_t> assistGm_;
     GlobalTensor<int32_t> gatherIndicesGm_;
 
-    TPipe *pipe_;
+    TPipe* pipe_;
 
     TQue<QuePosition::VECIN, 1> sortedExpertIndicesInQueue_;
     TQue<QuePosition::VECOUT, 1> copyOutQueue_;
     TBuf<TPosition::VECCALC> assistBuffer_;
 
-    const MoeV3SrcToDstComputeTilingData *srcToDstComputeTilingData_;
+    const MoeV3SrcToDstComputeTilingData* srcToDstComputeTilingData_;
     int64_t blockIdx_;
     int64_t needCoreNum_;
     int64_t perCoreElements_;
@@ -71,7 +71,7 @@ __aicore__ inline void RowIdxGather::AssistInit()
 }
 
 __aicore__ inline void RowIdxGather::Init(GM_ADDR expandedRowIdx, GM_ADDR workspace,
-                                          const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe)
+                                          const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe)
 {
     pipe_ = tPipe;
     srcToDstComputeTilingData_ = &(tilingData->srcToDstComputeParamsOp);
@@ -80,10 +80,10 @@ __aicore__ inline void RowIdxGather::Init(GM_ADDR expandedRowIdx, GM_ADDR worksp
     ep_ = tilingData->ep;
     rowIdxType_ = tilingData->rowIdxType;
 
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, actualExpertNum_);
+    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, actualExpertNum_);
 
     if (ep_) {
-        expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)workspace +
+        expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t*)workspace +
                                                 Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2 +
                                                 Align(actualExpertNum_, sizeof(int32_t)),
                                             actualExpertNum_);
@@ -93,7 +93,7 @@ __aicore__ inline void RowIdxGather::Init(GM_ADDR expandedRowIdx, GM_ADDR worksp
     } else {
         expertTotalCount_ = tilingData->n * tilingData->k;
     }
-    assistGm_.SetGlobalBuffer((__gm__ int32_t *)assist, ASSIST_NUM);
+    assistGm_.SetGlobalBuffer((__gm__ int32_t*)assist, ASSIST_NUM);
     perCoreElements_ = Ceil(expertTotalCount_, srcToDstComputeTilingData_->needCoreNum);
     needCoreNum_ = Ceil(expertTotalCount_, perCoreElements_);
 
@@ -118,17 +118,17 @@ __aicore__ inline void RowIdxGather::Init(GM_ADDR expandedRowIdx, GM_ADDR worksp
     }
 
     if (rowIdxType_ == SCATTER) {
-        sortedExpertIndicesGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreElements_,
+        sortedExpertIndicesGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreElements_,
                                                actualExpertNum_);
     } else {
-        sortedExpertIndicesGm_.SetGlobalBuffer((__gm__ int32_t *)workspace +
+        sortedExpertIndicesGm_.SetGlobalBuffer((__gm__ int32_t*)workspace +
                                                    Align(tilingData->n * tilingData->k, sizeof(int32_t)) +
                                                    blockIdx_ * perCoreElements_,
                                                actualExpertNum_);
     }
 
     if ((ep_ == 0 && rowIdxType_ == SCATTER) && (blockIdx_ < needCoreNum_)) {
-        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace +
+        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)workspace +
                                           Align(tilingData->n * tilingData->k, sizeof(int32_t)));
     }
     pipe_->InitBuffer(sortedExpertIndicesInQueue_, 1, AlignBytes(perLoopElements_, sizeof(int32_t)));
@@ -182,7 +182,7 @@ __aicore__ inline void RowIdxGather::Compute(int64_t loop, int64_t elements)
     copyOutQueue_.EnQue<int32_t>(outLocal);
 }
 
-__aicore__ inline void RowIdxGather::CopyOut(int64_t loop, int64_t elements, GlobalTensor<int32_t> &RowIdxDstGm_)
+__aicore__ inline void RowIdxGather::CopyOut(int64_t loop, int64_t elements, GlobalTensor<int32_t>& RowIdxDstGm_)
 {
     LocalTensor<int32_t> inLocal = sortedExpertIndicesInQueue_.DeQue<int32_t>();
     LocalTensor<int32_t> outLocal = copyOutQueue_.DeQue<int32_t>();

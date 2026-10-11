@@ -17,11 +17,10 @@
 #include "moe_compute_expert_tokens_tiling.h"
 #include "data_utils.h"
 
-extern "C" __global__ __aicore__ void moe_compute_expert_tokens(
-    GM_ADDR sorted_experts, GM_ADDR out, GM_ADDR workspace, GM_ADDR tiling);
+extern "C" __global__ __aicore__ void moe_compute_expert_tokens(GM_ADDR sorted_experts, GM_ADDR out, GM_ADDR workspace,
+                                                                GM_ADDR tiling);
 
-class moe_compute_expert_tokens_test : public testing::Test
-{
+class moe_compute_expert_tokens_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {

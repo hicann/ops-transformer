@@ -39,8 +39,8 @@ inline at::ScalarType MapDTypeToAtenScalarType(int64_t dtype_val)
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> moe_re_routing(
-    const at::Tensor &tokens, const at::Tensor &expert_token_num_per_rank,
-    const c10::optional<at::Tensor> &per_token_scales_opt, const c10::optional<at::Tensor> &expert_topk_weight_opt,
+    const at::Tensor& tokens, const at::Tensor& expert_token_num_per_rank,
+    const c10::optional<at::Tensor>& per_token_scales_opt, const c10::optional<at::Tensor>& expert_topk_weight_opt,
     int64_t expert_token_num_type, int64_t idx_type, c10::optional<int64_t> tokens_dtype)
 {
     TORCH_CHECK(tokens.dim() > 1, "tokens dim should larger than 1");
@@ -53,7 +53,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> moe_re_ro
                     "tokens_dtype only supports hifloat8, float4_e2m1fn_x2, float4_e1m2fn_x2 or None, but got ", td);
     }
 
-    const at::Tensor &per_token_scales = c10::value_or_else(per_token_scales_opt, [] { return at::Tensor(); });
+    const at::Tensor& per_token_scales = c10::value_or_else(per_token_scales_opt, [] { return at::Tensor(); });
     auto per_token_scales_dtype = per_token_scales.defined() ? per_token_scales.scalar_type() : at::kFloat;
 
     at::SmallVector<int64_t, op_infer::SIZE> permute_tokens_size;
@@ -139,6 +139,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> moe_re_ro
     return std::tie(permute_tokens, permute_per_token_scales, permute_token_idx, expert_token_num, permute_topk_weight);
 }
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) { m.def("moe_re_routing", &moe_re_routing, "moe_re_routing"); }
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
+{
+    m.def("moe_re_routing", &moe_re_routing, "moe_re_routing");
+}
 
 } // namespace op_api

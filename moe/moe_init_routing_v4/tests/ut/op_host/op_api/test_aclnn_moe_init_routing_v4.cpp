@@ -20,8 +20,7 @@
 
 using namespace std;
 
-class l2_moe_init_routing_v4_test : public testing::Test
-{
+class l2_moe_init_routing_v4_test : public testing::Test {
 protected:
 };
 
@@ -37,7 +36,7 @@ TEST_F(l2_moe_init_routing_v4_test, Ascend950_moe_init_routing_v4_basic)
     auto expandedScaleOut = TensorDesc({20}, ACL_FLOAT, ACL_FORMAT_ND);
     auto expandedTopkWeightOut = TensorDesc({}, ACL_FLOAT, ACL_FORMAT_ND);
     std::vector<int64_t> activeExpertRangeArray = {0, 8};
-    aclIntArray *activeExpertRange = aclCreateIntArray(activeExpertRangeArray.data(), activeExpertRangeArray.size());
+    aclIntArray* activeExpertRange = aclCreateIntArray(activeExpertRangeArray.data(), activeExpertRangeArray.size());
 
     int64_t expertCapacity = -1;
     int64_t expertNum = 32;
@@ -47,12 +46,11 @@ TEST_F(l2_moe_init_routing_v4_test, Ascend950_moe_init_routing_v4_basic)
     int64_t quantMode = -1;
     int64_t rowIdxType = 1;
 
-    auto ut = OP_API_UT(aclnnMoeInitRoutingV4, INPUT(x, expertIdx, nullptr, nullptr, nullptr, nullptr,
-                                                      expertCapacity, expertNum, dropPadMode,
-                                                      expertTokensNumType, expertTokensNumFlag, quantMode,
-                                                      activeExpertRange, rowIdxType),
-                        OUTPUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut,
-                               expandedScaleOut, nullptr));
+    auto ut =
+        OP_API_UT(aclnnMoeInitRoutingV4,
+                  INPUT(x, expertIdx, nullptr, nullptr, nullptr, nullptr, expertCapacity, expertNum, dropPadMode,
+                        expertTokensNumType, expertTokensNumFlag, quantMode, activeExpertRange, rowIdxType),
+                  OUTPUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut, expandedScaleOut, nullptr));
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
@@ -73,7 +71,7 @@ TEST_F(l2_moe_init_routing_v4_test, Ascend950_moe_init_routing_v4_with_scale_off
     auto expandedScaleOut = TensorDesc({20}, ACL_FLOAT, ACL_FORMAT_ND);
     auto expandedTopkWeightOut = TensorDesc({}, ACL_FLOAT, ACL_FORMAT_ND);
     std::vector<int64_t> activeExpertRangeArray = {0, 8};
-    aclIntArray *activeExpertRange = aclCreateIntArray(activeExpertRangeArray.data(), activeExpertRangeArray.size());
+    aclIntArray* activeExpertRange = aclCreateIntArray(activeExpertRangeArray.data(), activeExpertRangeArray.size());
 
     int64_t expertCapacity = -1;
     int64_t expertNum = 32;
@@ -83,14 +81,13 @@ TEST_F(l2_moe_init_routing_v4_test, Ascend950_moe_init_routing_v4_with_scale_off
     int64_t quantMode = -1;
     int64_t rowIdxType = 1;
 
-    auto ut = OP_API_UT(aclnnMoeInitRoutingV4, INPUT(x, expertIdx, scale, offset, nullptr, nullptr,
-                                                      expertCapacity, expertNum, dropPadMode,
-                                                      expertTokensNumType, expertTokensNumFlag, quantMode,
-                                                      activeExpertRange, rowIdxType),
-                        OUTPUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut,
-                               expandedScaleOut, nullptr));
+    auto ut =
+        OP_API_UT(aclnnMoeInitRoutingV4,
+                  INPUT(x, expertIdx, scale, offset, nullptr, nullptr, expertCapacity, expertNum, dropPadMode,
+                        expertTokensNumType, expertTokensNumFlag, quantMode, activeExpertRange, rowIdxType),
+                  OUTPUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut, expandedScaleOut, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -108,7 +105,7 @@ TEST_F(l2_moe_init_routing_v4_test, Ascend950_moe_init_routing_v4_with_topkweigh
     auto expandedScaleOut = TensorDesc({20}, ACL_FLOAT, ACL_FORMAT_ND);
     auto expandedTopkWeightOut = TensorDesc({20}, ACL_FLOAT, ACL_FORMAT_ND);
     std::vector<int64_t> activeExpertRangeArray = {0, 8};
-    aclIntArray *activeExpertRange = aclCreateIntArray(activeExpertRangeArray.data(), activeExpertRangeArray.size());
+    aclIntArray* activeExpertRange = aclCreateIntArray(activeExpertRangeArray.data(), activeExpertRangeArray.size());
 
     int64_t expertCapacity = -1;
     int64_t expertNum = 32;
@@ -118,14 +115,13 @@ TEST_F(l2_moe_init_routing_v4_test, Ascend950_moe_init_routing_v4_with_topkweigh
     int64_t quantMode = -1;
     int64_t rowIdxType = 1;
 
-    auto ut = OP_API_UT(aclnnMoeInitRoutingV4, INPUT(x, expertIdx, nullptr, nullptr, nullptr, topkWeight,
-                                                      expertCapacity, expertNum, dropPadMode,
-                                                      expertTokensNumType, expertTokensNumFlag, quantMode,
-                                                      activeExpertRange, rowIdxType),
-                        OUTPUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut,
-                               expandedScaleOut, expandedTopkWeightOut));
+    auto ut = OP_API_UT(
+        aclnnMoeInitRoutingV4,
+        INPUT(x, expertIdx, nullptr, nullptr, nullptr, topkWeight, expertCapacity, expertNum, dropPadMode,
+              expertTokensNumType, expertTokensNumFlag, quantMode, activeExpertRange, rowIdxType),
+        OUTPUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut, expandedScaleOut, expandedTopkWeightOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -143,7 +139,7 @@ TEST_F(l2_moe_init_routing_v4_test, Ascend950_moe_init_routing_v4_with_active_nu
     auto expandedScaleOut = TensorDesc({20}, ACL_FLOAT, ACL_FORMAT_ND);
     auto expandedTopkWeightOut = TensorDesc({}, ACL_FLOAT, ACL_FORMAT_ND);
     std::vector<int64_t> activeExpertRangeArray = {0, 8};
-    aclIntArray *activeExpertRange = aclCreateIntArray(activeExpertRangeArray.data(), activeExpertRangeArray.size());
+    aclIntArray* activeExpertRange = aclCreateIntArray(activeExpertRangeArray.data(), activeExpertRangeArray.size());
 
     int64_t expertCapacity = -1;
     int64_t expertNum = 32;
@@ -153,14 +149,13 @@ TEST_F(l2_moe_init_routing_v4_test, Ascend950_moe_init_routing_v4_with_active_nu
     int64_t quantMode = -1;
     int64_t rowIdxType = 1;
 
-    auto ut = OP_API_UT(aclnnMoeInitRoutingV4, INPUT(x, expertIdx, nullptr, nullptr, activeNumTensor, nullptr,
-                                                      expertCapacity, expertNum, dropPadMode,
-                                                      expertTokensNumType, expertTokensNumFlag, quantMode,
-                                                      activeExpertRange, rowIdxType),
-                        OUTPUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut,
-                               expandedScaleOut, nullptr));
+    auto ut = OP_API_UT(
+        aclnnMoeInitRoutingV4,
+        INPUT(x, expertIdx, nullptr, nullptr, activeNumTensor, nullptr, expertCapacity, expertNum, dropPadMode,
+              expertTokensNumType, expertTokensNumFlag, quantMode, activeExpertRange, rowIdxType),
+        OUTPUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut, expandedScaleOut, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -180,7 +175,7 @@ TEST_F(l2_moe_init_routing_v4_test, Ascend950_moe_init_routing_v4_with_active_nu
     auto expandedScaleOut = TensorDesc({20}, ACL_FLOAT, ACL_FORMAT_ND);
     auto expandedTopkWeightOut = TensorDesc({20}, ACL_FLOAT, ACL_FORMAT_ND);
     std::vector<int64_t> activeExpertRangeArray = {0, 8};
-    aclIntArray *activeExpertRange = aclCreateIntArray(activeExpertRangeArray.data(), activeExpertRangeArray.size());
+    aclIntArray* activeExpertRange = aclCreateIntArray(activeExpertRangeArray.data(), activeExpertRangeArray.size());
 
     int64_t expertCapacity = -1;
     int64_t expertNum = 32;
@@ -190,14 +185,13 @@ TEST_F(l2_moe_init_routing_v4_test, Ascend950_moe_init_routing_v4_with_active_nu
     int64_t quantMode = -1;
     int64_t rowIdxType = 1;
 
-    auto ut = OP_API_UT(aclnnMoeInitRoutingV4, INPUT(x, expertIdx, scale, nullptr, activeNumTensor, topkWeight,
-                                                      expertCapacity, expertNum, dropPadMode,
-                                                      expertTokensNumType, expertTokensNumFlag, quantMode,
-                                                      activeExpertRange, rowIdxType),
-                        OUTPUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut,
-                               expandedScaleOut, expandedTopkWeightOut));
+    auto ut = OP_API_UT(
+        aclnnMoeInitRoutingV4,
+        INPUT(x, expertIdx, scale, nullptr, activeNumTensor, topkWeight, expertCapacity, expertNum, dropPadMode,
+              expertTokensNumType, expertTokensNumFlag, quantMode, activeExpertRange, rowIdxType),
+        OUTPUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut, expandedScaleOut, expandedTopkWeightOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }

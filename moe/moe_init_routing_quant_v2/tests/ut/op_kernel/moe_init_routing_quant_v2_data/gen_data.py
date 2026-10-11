@@ -13,11 +13,12 @@
 import sys
 import numpy as np
 
+
 def adapterCapacity(sorted_row_idx, sorted_expert_idx, capacity):
     count = 0
     last = sorted_expert_idx[0]
     for i, val in enumerate(sorted_expert_idx):
-        if last !=val:
+        if last != val:
             count = 1
             last = val
         else:
@@ -25,14 +26,17 @@ def adapterCapacity(sorted_row_idx, sorted_expert_idx, capacity):
             if count > capacity:
                 sorted_row_idx[i] = -1
 
-def moe_init_routing_v2(input_x: np.ndarray,
-                    expert_idx: np.ndarray,
-                    active_num: int,
-                    capacity: int,
-                    E: int,
-                    drop_pad_mode: int, 
-                    capacity_flag: bool,
-                    cumsum_flag: int):
+
+def moe_init_routing_v2(
+    input_x: np.ndarray,
+    expert_idx: np.ndarray,
+    active_num: int,
+    capacity: int,
+    E: int,
+    drop_pad_mode: int,
+    capacity_flag: bool,
+    cumsum_flag: int,
+):
     N = input_x.shape[0]
     H = input_x.shape[-1]
     k = expert_idx.shape[-1]
@@ -50,10 +54,12 @@ def moe_init_routing_v2(input_x: np.ndarray,
         expert_tokens_count_or_cumsum = expert_token_idx
     if cumsum_flag == 2:
         expert_tokens_count_or_cumsum = expert_idx_hist
-    
+
     if drop_pad_mode == 0:
         expanded_row_idx = np.zeros(sorted_row_idx.shape, dtype=np.int32)
-        expanded_row_idx[sorted_row_idx] = np.arange(sorted_row_idx.shape[-1], dtype=np.int32)
+        expanded_row_idx[sorted_row_idx] = np.arange(
+            sorted_row_idx.shape[-1], dtype=np.int32
+        )
 
         active_num = min(active_num, N) * k
         expanded_x = input_x[sorted_row_idx[:active_num] // k, :]
@@ -67,7 +73,9 @@ def moe_init_routing_v2(input_x: np.ndarray,
                 if lastExpertId != sorted_expert_idx[i]:
                     offset = 0
                     lastExpertId = sorted_expert_idx[i]
-                sort_row_tmp[sorted_expert_idx[i] * capacity + offset] = sorted_row_idx[i]
+                sort_row_tmp[sorted_expert_idx[i] * capacity + offset] = sorted_row_idx[
+                    i
+                ]
                 offset = offset + 1
 
         expanded_row_idx = np.full(sorted_row_idx.shape, -1)
@@ -81,9 +89,17 @@ def moe_init_routing_v2(input_x: np.ndarray,
                 expanded_x[i] = input_x[val // k]
         expanded_x = expanded_x.reshape(E, capacity, H)
 
-    return expanded_x, expanded_row_idx.astype("int32"), expert_tokens_count_or_cumsum, expert_tokens_before_capacity
+    return (
+        expanded_x,
+        expanded_row_idx.astype("int32"),
+        expert_tokens_count_or_cumsum,
+        expert_tokens_before_capacity,
+    )
 
-def gen_golden_data_simple(N, k, H, active_num, C, E, drop_mode, cumsum_flag, capacity_flag, quant_mode, dtype):
+
+def gen_golden_data_simple(
+    N, k, H, active_num, C, E, drop_mode, cumsum_flag, capacity_flag, quant_mode, dtype
+):
     N = int(N)
     k = int(k)
     H = int(H)
@@ -115,7 +131,19 @@ def gen_golden_data_simple(N, k, H, active_num, C, E, drop_mode, cumsum_flag, ca
     # expandedRowIdx.tofile("./golden_1.bin")
     # expandedExpertIdx.tofile("./golden_2.bin")
 
+
 # python3 gen_data.py 8 2 5120 8 float32
 if __name__ == "__main__":
-    gen_golden_data_simple(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], 
-                           sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11])
+    gen_golden_data_simple(
+        sys.argv[1],
+        sys.argv[2],
+        sys.argv[3],
+        sys.argv[4],
+        sys.argv[5],
+        sys.argv[6],
+        sys.argv[7],
+        sys.argv[8],
+        sys.argv[9],
+        sys.argv[10],
+        sys.argv[11],
+    )

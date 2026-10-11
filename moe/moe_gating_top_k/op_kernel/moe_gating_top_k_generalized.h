@@ -25,7 +25,7 @@ class MoeGatingTopKGenerlized {
 public:
     __aicore__ inline MoeGatingTopKGenerlized(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR bias, GM_ADDR y, GM_ADDR expertIdx, GM_ADDR out, GM_ADDR workspace,
-                                const MoeGatingTopKTilingData *tilingData, TPipe *tPipe);
+                                const MoeGatingTopKTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -41,7 +41,7 @@ private:
     __aicore__ inline void CopyOut(int64_t row);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> xInQueue_;
     TQue<QuePosition::VECOUT, 1> yOutQueue_;
     TQue<QuePosition::VECOUT, 1> expertIdxOutQueue_;
@@ -82,7 +82,7 @@ private:
     int64_t kAlign_ = 0;
     bool isAlign_ = false;
 
-    const MoeGatingTopKTilingData *tilingData_;
+    const MoeGatingTopKTilingData* tilingData_;
 };
 
 template <typename T>
@@ -590,7 +590,7 @@ __aicore__ inline void MoeGatingTopKGenerlized<T>::CopyOut(int64_t row)
 template <typename T>
 __aicore__ inline void MoeGatingTopKGenerlized<T>::Init(GM_ADDR x, GM_ADDR bias, GM_ADDR y, GM_ADDR expertIdx,
                                                         GM_ADDR out, GM_ADDR workspace,
-                                                        const MoeGatingTopKTilingData *tilingData, TPipe *tPipe)
+                                                        const MoeGatingTopKTilingData* tilingData, TPipe* tPipe)
 {
     tilingData_ = tilingData;
     pipe_ = tPipe;
@@ -619,13 +619,13 @@ __aicore__ inline void MoeGatingTopKGenerlized<T>::Init(GM_ADDR x, GM_ADDR bias,
     isAlign_ = perGroupExpertCount_ == perGroupExpertCountAlign_;
 
     // init input gm buf
-    xGm_.SetGlobalBuffer((__gm__ T *)x + perCoreRowCount_ * expertCount_ * blockIdx_, expertCount_);
-    biasGm_.SetGlobalBuffer((__gm__ T *)bias, expertCount_);
+    xGm_.SetGlobalBuffer((__gm__ T*)x + perCoreRowCount_ * expertCount_ * blockIdx_, expertCount_);
+    biasGm_.SetGlobalBuffer((__gm__ T*)bias, expertCount_);
 
     // init output gm buf
-    yGm_.SetGlobalBuffer((__gm__ T *)y + perCoreRowCount_ * k_ * blockIdx_, k_);
-    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertIdx + perCoreRowCount_ * k_ * blockIdx_, k_);
-    outGm_.SetGlobalBuffer((__gm__ float *)out + perCoreRowCount_ * expertCount_ * blockIdx_, expertCount_);
+    yGm_.SetGlobalBuffer((__gm__ T*)y + perCoreRowCount_ * k_ * blockIdx_, k_);
+    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertIdx + perCoreRowCount_ * k_ * blockIdx_, k_);
+    outGm_.SetGlobalBuffer((__gm__ float*)out + perCoreRowCount_ * expertCount_ * blockIdx_, expertCount_);
 
     // init que
     pipe_->InitBuffer(xInQueue_, 1, expertCountAlign_ * sizeof(float) * (sizeof(float) / sizeof(T)));

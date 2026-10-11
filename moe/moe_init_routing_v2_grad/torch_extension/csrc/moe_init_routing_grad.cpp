@@ -21,7 +21,7 @@ namespace op_api {
 constexpr int64_t DROP_PAD_MODE_DROPLESS = 0;
 constexpr int64_t DROP_PAD_MODE_DROP_PAD = 1;
 
-at::Tensor moe_init_routing_grad(const at::Tensor &gradExpandedX, const at::Tensor &expandedRowIdx, int64_t topK,
+at::Tensor moe_init_routing_grad(const at::Tensor& gradExpandedX, const at::Tensor& expandedRowIdx, int64_t topK,
                                  int64_t dropPadMode, int64_t activeNum)
 {
     TORCH_CHECK(gradExpandedX.dim() == 2 || gradExpandedX.dim() == 3, "grad_expanded_x should be 2D or 3D, but got ",

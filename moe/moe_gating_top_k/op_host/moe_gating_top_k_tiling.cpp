@@ -79,14 +79,14 @@ inline static int64_t CeilLog4(int64_t x)
 
 class MoeGatingTopKTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeGatingTopKTilingBase(gert::TilingContext *context)
+    explicit MoeGatingTopKTilingBase(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {
         Reset();
     }
     ~MoeGatingTopKTilingBase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
@@ -120,13 +120,13 @@ private:
     void SplitRows();
     void CalTmpBufUbSize();
 
-    const gert::Shape *xShape_ = nullptr;
-    const gert::Shape *biasShape_ = nullptr;
-    const gert::Shape *inputIdsShape_ = nullptr;
-    const gert::Shape *tid2eidShape_ = nullptr;
-    const gert::Shape *yShape_ = nullptr;
-    const gert::Shape *expertIdxShape_ = nullptr;
-    const gert::Shape *outShape_ = nullptr;
+    const gert::Shape* xShape_ = nullptr;
+    const gert::Shape* biasShape_ = nullptr;
+    const gert::Shape* inputIdsShape_ = nullptr;
+    const gert::Shape* tid2eidShape_ = nullptr;
+    const gert::Shape* yShape_ = nullptr;
+    const gert::Shape* expertIdxShape_ = nullptr;
+    const gert::Shape* outShape_ = nullptr;
     ge::DataType inputIdsDtype_;
     ge::DataType tid2eidDtype_;
 
@@ -147,7 +147,7 @@ private:
     float eps_ = 1e-20f;
 
     int64_t inputDtypeSize_;
-    const char *opName_ = "";
+    const char* opName_ = "";
     MoeGatingTopKTilingData moeGatingTopKTilingData_;
 };
 
@@ -385,62 +385,62 @@ ge::graphStatus MoeGatingTopKTilingBase::GetShapeAttrsInfo()
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
-    const int64_t *kPtr = attrs->GetAttrPointer<int64_t>(K_ATTR_INDEX);
+    const int64_t* kPtr = attrs->GetAttrPointer<int64_t>(K_ATTR_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, kPtr);
     k_ = *kPtr;
     moeGatingTopKTilingData_.set_k(k_);
     OP_LOGI(context_, "Attr k is: %ld ", k_);
 
-    const int64_t *kGroupPtr = attrs->GetAttrPointer<int64_t>(K_GROUP_ATTR_INDEX);
+    const int64_t* kGroupPtr = attrs->GetAttrPointer<int64_t>(K_GROUP_ATTR_INDEX);
     if (kGroupPtr != nullptr) {
         kGroup_ = *kGroupPtr;
         moeGatingTopKTilingData_.set_kGroup(kGroup_);
     }
     OP_LOGI(context_, "Attr k_group is: %ld ", kGroup_);
 
-    const int64_t *groupCountPtr = attrs->GetAttrPointer<int64_t>(GROUP_COUNT_ATTR_INDEX);
+    const int64_t* groupCountPtr = attrs->GetAttrPointer<int64_t>(GROUP_COUNT_ATTR_INDEX);
     if (groupCountPtr != nullptr) {
         groupCount_ = *groupCountPtr;
         moeGatingTopKTilingData_.set_groupCount(groupCount_);
     }
     OP_LOGI(context_, "Attr group_count is: %ld ", groupCount_);
 
-    const int64_t *groupSelectModePtr = attrs->GetAttrPointer<int64_t>(GROUP_SELECT_MODE_ATTR_INDEX);
+    const int64_t* groupSelectModePtr = attrs->GetAttrPointer<int64_t>(GROUP_SELECT_MODE_ATTR_INDEX);
     if (groupSelectModePtr != nullptr) {
         groupSelectMode_ = *groupSelectModePtr;
         moeGatingTopKTilingData_.set_groupSelectMode(groupSelectMode_);
     }
     OP_LOGI(context_, "Attr group_select_mode is: %ld ", groupSelectMode_);
 
-    const int64_t *renormPtr = attrs->GetAttrPointer<int64_t>(RENORM_ATTR_INDEX);
+    const int64_t* renormPtr = attrs->GetAttrPointer<int64_t>(RENORM_ATTR_INDEX);
     if (renormPtr != nullptr) {
         renorm_ = *renormPtr;
         moeGatingTopKTilingData_.set_renorm(renorm_);
     }
     OP_LOGI(context_, "Attr renorm is: %ld ", renorm_);
 
-    const int64_t *normTypePtr = attrs->GetAttrPointer<int64_t>(NORM_TYPE_ATTR_INDEX);
+    const int64_t* normTypePtr = attrs->GetAttrPointer<int64_t>(NORM_TYPE_ATTR_INDEX);
     if (normTypePtr != nullptr) {
         normType_ = *normTypePtr;
         moeGatingTopKTilingData_.set_normType(normType_);
     }
     OP_LOGI(context_, "Attr norm_type is: %ld ", normType_);
 
-    const bool *outFlagPtr = attrs->GetAttrPointer<bool>(OUT_FLAG_ATTR_INDEX);
+    const bool* outFlagPtr = attrs->GetAttrPointer<bool>(OUT_FLAG_ATTR_INDEX);
     if (outFlagPtr != nullptr) {
         outFlag_ = (*outFlagPtr) ? 1 : 0;
         moeGatingTopKTilingData_.set_outFlag(outFlag_);
     }
     OP_LOGI(context_, "Attr out_flag is: %ld ", outFlag_);
 
-    const float *routedScalingFactorPtr = attrs->GetAttrPointer<float>(ROUTED_SCALING_FACTOR_ATTR_INDEX);
+    const float* routedScalingFactorPtr = attrs->GetAttrPointer<float>(ROUTED_SCALING_FACTOR_ATTR_INDEX);
     if (routedScalingFactorPtr != nullptr) {
         routedScalingFactor_ = *routedScalingFactorPtr;
         moeGatingTopKTilingData_.set_routedScalingFactor(routedScalingFactor_);
     }
     OP_LOGI(context_, "Attr routed_scaling_factor is: %f ", routedScalingFactor_);
 
-    const float *epsPtr = attrs->GetAttrPointer<float>(EPS_ATTR_INDEX);
+    const float* epsPtr = attrs->GetAttrPointer<float>(EPS_ATTR_INDEX);
     if (epsPtr != nullptr) {
         eps_ = *epsPtr;
         moeGatingTopKTilingData_.set_eps(eps_);
@@ -578,7 +578,7 @@ ge::graphStatus MoeGatingTopKTilingBase::GetWorkspaceSize()
 ge::graphStatus MoeGatingTopKTilingBase::PostTiling()
 {
     context_->SetBlockDim(moeGatingTopKTilingData_.get_needCoreNum());
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     currentWorkspace[0] = workspaceSize_;
     moeGatingTopKTilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(),
                                           context_->GetRawTilingData()->GetCapacity());

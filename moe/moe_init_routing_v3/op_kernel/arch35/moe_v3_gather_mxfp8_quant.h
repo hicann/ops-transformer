@@ -31,7 +31,7 @@ constexpr uint16_t MXFP8_E5M2_EMAX = 15;
 constexpr uint16_t MXFP8_E4M3_EMAX = 8;
 
 template <typename T, typename U, bool CLAMP_AMAX>
-__simd_vf__ inline void vfComputeAmax(__ubuf__ T *xAddr, __ubuf__ uint16_t *amaxOutAddr, uint32_t xElemNum,
+__simd_vf__ inline void vfComputeAmax(__ubuf__ T* xAddr, __ubuf__ uint16_t* amaxOutAddr, uint32_t xElemNum,
                                       uint16_t vfLoopNum, uint32_t vlForT, uint32_t numVRegBlocks)
 {
     using namespace AscendC::Reg;
@@ -65,8 +65,8 @@ __simd_vf__ inline void vfComputeAmax(__ubuf__ T *xAddr, __ubuf__ uint16_t *amax
 
         if constexpr (IsSameType<T, half>::value) {
             // 单独提取fp16中inf/nan的元素
-            And(exp0FP16, (RegTensor<uint16_t> &)x0, emaskFP16, mask0);
-            And(exp1FP16, (RegTensor<uint16_t> &)x1, emaskFP16, mask1);
+            And(exp0FP16, (RegTensor<uint16_t>&)x0, emaskFP16, mask0);
+            And(exp1FP16, (RegTensor<uint16_t>&)x1, emaskFP16, mask1);
             Compare<uint16_t, CMPMODE::EQ>(mask0FP16NanInf, exp0FP16, emaskFP16, mask0);
             Compare<uint16_t, CMPMODE::EQ>(mask1FP16NanInf, exp1FP16, emaskFP16, mask1);
 
@@ -74,16 +74,16 @@ __simd_vf__ inline void vfComputeAmax(__ubuf__ T *xAddr, __ubuf__ uint16_t *amax
             Cast<bfloat16_t, T, traitFP16ToBF16>(x0BF16, x0, mask0);
             Cast<bfloat16_t, T, traitFP16ToBF16>(x1BF16, x1, mask1);
             // 截断为BF16后取绝对值，保留完整指数和尾数，供RoundScale判断尾数进位。
-            And(abs0, (RegTensor<uint16_t> &)x0BF16, absMask, mask0);
-            And(abs1, (RegTensor<uint16_t> &)x1BF16, absMask, mask1);
+            And(abs0, (RegTensor<uint16_t>&)x0BF16, absMask, mask0);
+            And(abs1, (RegTensor<uint16_t>&)x1BF16, absMask, mask1);
 
             // FP16的Inf/NaN在截断前检测，统一按BF16 Inf参与后续特殊值处理。
             Select(abs0, emaskBF16, abs0, mask0FP16NanInf);
             Select(abs1, emaskBF16, abs1, mask1FP16NanInf);
         } else {
             // BF16直接取绝对值，NaN/Inf会在scale计算阶段统一识别。
-            And(abs0, (RegTensor<uint16_t> &)x0, absMask, mask0);
-            And(abs1, (RegTensor<uint16_t> &)x1, absMask, mask1);
+            And(abs0, (RegTensor<uint16_t>&)x0, absMask, mask0);
+            And(abs1, (RegTensor<uint16_t>&)x1, absMask, mask1);
         }
         // 先计算奇数位、偶数位之间的最大值，即每2个元素的最大值，放在maxExp
         // 由于mask0和mask1相同或是比mask1多一个元素，使用mask0保证不漏元素
@@ -98,8 +98,8 @@ __simd_vf__ inline void vfComputeAmax(__ubuf__ T *xAddr, __ubuf__ uint16_t *amax
 }
 
 template <typename T, typename U, bool CLAMP_AMAX>
-__simd_vf__ inline void vfComputeRoundScale(__ubuf__ uint16_t *amaxInAddr, __ubuf__ uint16_t *mxScaleOutAddr,
-                                            __ubuf__ uint16_t *invScaleOutAddr, uint32_t scaleElemNum,
+__simd_vf__ inline void vfComputeRoundScale(__ubuf__ uint16_t* amaxInAddr, __ubuf__ uint16_t* mxScaleOutAddr,
+                                            __ubuf__ uint16_t* invScaleOutAddr, uint32_t scaleElemNum,
                                             uint32_t validScaleElemNum, uint16_t vfLoopNum, uint32_t vlForT,
                                             uint16_t fp8EmaxValue)
 {
@@ -198,8 +198,8 @@ __simd_vf__ inline void vfComputeRoundScale(__ubuf__ uint16_t *amaxInAddr, __ubu
 }
 
 template <typename T, typename U>
-__simd_vf__ inline void vfComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t *invScaleInAddr,
-                                      __ubuf__ int8_t *xQuantOutAddr, uint32_t xElemNum, uint16_t vfLoopNum,
+__simd_vf__ inline void vfComputeData(__ubuf__ T* xAddr, __ubuf__ uint16_t* invScaleInAddr,
+                                      __ubuf__ int8_t* xQuantOutAddr, uint32_t xElemNum, uint16_t vfLoopNum,
                                       uint32_t vlForT, uint32_t numVRegBlocks)
 {
     using namespace AscendC::Reg;
@@ -243,7 +243,7 @@ __simd_vf__ inline void vfComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t *invS
             // 对于T为float16，先把x和invScale转成float32，再计算x*invScale后转为float8对应类型
 
             // 0.invScaleFP32存放invScale转为FP32后的值，invScale每个元素重复16次->invScaleFP32每个元素重复8次
-            Cast<float, bfloat16_t, traitB16ToB32Layout0>(invScaleFP32, (RegTensor<bfloat16_t> &)invScale, maskAllB16);
+            Cast<float, bfloat16_t, traitB16ToB32Layout0>(invScaleFP32, (RegTensor<bfloat16_t>&)invScale, maskAllB16);
 
             // 1.对奇数位元素x0进行量化：
             // x0FP32Layout0放x0的奇数位转为fp32的值，x0FP32Layout1放x0的偶数位转fp32的值
@@ -277,8 +277,8 @@ __simd_vf__ inline void vfComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t *invS
 
             // 1.乘以invScale
             // x[i]*= invScale，这里invScale每元素重复16次，刚好对于x0、x1就是每32元素一个invScale
-            Mul(x0, x0, (RegTensor<T> &)invScale, maskAllB16);
-            Mul(x1, x1, (RegTensor<T> &)invScale, maskAllB16);
+            Mul(x0, x0, (RegTensor<T>&)invScale, maskAllB16);
+            Mul(x1, x1, (RegTensor<T>&)invScale, maskAllB16);
             // 恢复x0、x1为原始顺序
             Interleave(x0, x1, x0, x1);
 
@@ -302,13 +302,13 @@ __simd_vf__ inline void vfComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t *invS
 
         // 拷出xQuant到xOutAddr。OUT_ELE_NUM_ONE_BLK=64，即一个VL下有64个float32->fp8的元素，一次拷出64个元素
         StoreAlign<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
-            xQuantOutAddr, (RegTensor<int8_t> &)xQuant0, OUT_ELE_NUM_ONE_BLK, maskXQuant0B32);
+            xQuantOutAddr, (RegTensor<int8_t>&)xQuant0, OUT_ELE_NUM_ONE_BLK, maskXQuant0B32);
         StoreAlign<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
-            xQuantOutAddr, (RegTensor<int8_t> &)xQuant1, OUT_ELE_NUM_ONE_BLK, maskXQuant1B32);
+            xQuantOutAddr, (RegTensor<int8_t>&)xQuant1, OUT_ELE_NUM_ONE_BLK, maskXQuant1B32);
         StoreAlign<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
-            xQuantOutAddr, (RegTensor<int8_t> &)xQuant2, OUT_ELE_NUM_ONE_BLK, maskXQuant2B32);
+            xQuantOutAddr, (RegTensor<int8_t>&)xQuant2, OUT_ELE_NUM_ONE_BLK, maskXQuant2B32);
         StoreAlign<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
-            xQuantOutAddr, (RegTensor<int8_t> &)xQuant3, OUT_ELE_NUM_ONE_BLK, maskXQuant3B32);
+            xQuantOutAddr, (RegTensor<int8_t>&)xQuant3, OUT_ELE_NUM_ONE_BLK, maskXQuant3B32);
     }
 }
 
@@ -318,11 +318,11 @@ public:
     __aicore__ inline MoeGatherOutMxfp8Quant(){};
     __aicore__ inline void Init(GM_ADDR xAddr, GM_ADDR unused_ScaleAddr, GM_ADDR workspace, GM_ADDR expandedRowIdxAddr,
                                 GM_ADDR expandedXAddr, GM_ADDR expandedScaleAddr,
-                                const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void InitKernelTiling(GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData *tilingData);
+    __aicore__ inline void InitKernelTiling(GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData* tilingData);
     __aicore__ inline void CopyInExpandedExpertIdx(int64_t progress);
     __aicore__ inline void ScatterCopyExpandedXandMXQuant(int64_t progress);
     __aicore__ inline void GatherCopyExpandedXandMXQuant(int64_t progress);
@@ -331,7 +331,7 @@ private:
     __aicore__ inline void CopyOut(int64_t dstIdx, int64_t colIdx, int64_t loopCols, int64_t loopScaleCols);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, GATHER_OUT_BUFFER_NUM> xInQueue_;
     TQue<QuePosition::VECIN, GATHER_OUT_BUFFER_NUM> sortedRowIdxInQueue_;
     TQue<QuePosition::VECOUT, GATHER_OUT_BUFFER_NUM> xQuantOutQueue_;
@@ -345,7 +345,7 @@ private:
     GlobalTensor<int32_t> sortedRowIdxGm_;
     GlobalTensor<int32_t> expertTotalCountGm_;
 
-    const MoeV3Arch35GatherOutComputeTilingData *gatherOutTilingData_;
+    const MoeV3Arch35GatherOutComputeTilingData* gatherOutTilingData_;
 
     int64_t needCoreNum_;
     int64_t blockIdx_;
@@ -389,7 +389,7 @@ private:
 template <typename T, typename U, bool CLAMP_AMAX>
 __aicore__ inline void MoeGatherOutMxfp8Quant<T, U, CLAMP_AMAX>::Init(
     GM_ADDR xAddr, GM_ADDR unused_ScaleAddr, GM_ADDR workspace, GM_ADDR expandedRowIdxAddr, GM_ADDR expandedXAddr,
-    GM_ADDR expandedScaleAddr, const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+    GM_ADDR expandedScaleAddr, const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe)
 {
 #if (__NPU_ARCH__ == 3510)
     SetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>(0);
@@ -399,28 +399,28 @@ __aicore__ inline void MoeGatherOutMxfp8Quant<T, U, CLAMP_AMAX>::Init(
     blockIdx_ = GetBlockIdx();
     InitKernelTiling(workspace, tilingData);
 
-    xInGm_.SetGlobalBuffer((__gm__ T *)xAddr);
-    expandedXOutGm_.SetGlobalBuffer((__gm__ uint8_t *)expandedXAddr);
+    xInGm_.SetGlobalBuffer((__gm__ T*)xAddr);
+    expandedXOutGm_.SetGlobalBuffer((__gm__ uint8_t*)expandedXAddr);
     if (useGatherCopy_) {
         if (rowIdxType_ == SCATTER) {
             sortedRowIdxGm_.SetGlobalBuffer(
-                (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+                (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
                 Align(perCoreRow_, sizeof(int32_t)));
         } else {
-            sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
+            sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
                                             Align(perCoreRow_, sizeof(int32_t)));
         }
     } else {
         if (rowIdxType_ == SCATTER) {
-            sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
+            sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
                                             Align(perCoreRow_, sizeof(int32_t)));
         } else {
             sortedRowIdxGm_.SetGlobalBuffer(
-                (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+                (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
                 Align(perCoreRow_, sizeof(int32_t)));
         }
     }
-    expandedScaleOutGm_.SetGlobalBuffer((__gm__ uint8_t *)expandedScaleAddr);
+    expandedScaleOutGm_.SetGlobalBuffer((__gm__ uint8_t*)expandedScaleAddr);
 
     // perrows * 2 * 2 * 4 expandRowIdx + sortedExpertId
     pipe_->InitBuffer(sortedRowIdxInQueue_, GATHER_OUT_BUFFER_NUM, AlignBytes(perLoopRows_, sizeof(int32_t)));
@@ -438,7 +438,7 @@ __aicore__ inline void MoeGatherOutMxfp8Quant<T, U, CLAMP_AMAX>::Init(
 
 template <typename T, typename U, bool CLAMP_AMAX>
 __aicore__ inline void MoeGatherOutMxfp8Quant<T, U, CLAMP_AMAX>::InitKernelTiling(
-    GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData *tilingData)
+    GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData* tilingData)
 {
     gatherOutTilingData_ = &(tilingData->gatherOutComputeParamsOp);
     cols_ = tilingData->cols;
@@ -453,9 +453,9 @@ __aicore__ inline void MoeGatherOutMxfp8Quant<T, U, CLAMP_AMAX>::InitKernelTilin
     int64_t actualExpertNum_ = tilingData->actualExpertNum;
     int64_t scanRowCount = n_ * k_;
     if (!useGatherCopy_) {
-        expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 +
-                                                Align(actualExpertNum_, sizeof(int32_t)),
-                                            1);
+        expertTotalCountGm_.SetGlobalBuffer(
+            (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum_, sizeof(int32_t)),
+            1);
         DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(expertTotalCountGm_);
         scanRowCount = expertTotalCountGm_.GetValue(0);
     }
@@ -626,17 +626,17 @@ __aicore__ inline void MoeGatherOutMxfp8Quant<T, U, CLAMP_AMAX>::Compute(uint32_
 {
     // deque input
     LocalTensor<T> xLocal = xInQueue_.DeQue<T>();
-    auto xLocalAddr = reinterpret_cast<__ubuf__ T *>(xLocal.GetPhyAddr());
+    auto xLocalAddr = reinterpret_cast<__ubuf__ T*>(xLocal.GetPhyAddr());
     // alloc outputs
     LocalTensor<int8_t> xQuantLocal = xQuantOutQueue_.AllocTensor<int8_t>();
-    auto xQuantLocalAddr = reinterpret_cast<__ubuf__ int8_t *>(xQuantLocal.GetPhyAddr());
+    auto xQuantLocalAddr = reinterpret_cast<__ubuf__ int8_t*>(xQuantLocal.GetPhyAddr());
     LocalTensor<uint16_t> mxScaleLocal = mxScaleOutQueue_.AllocTensor<uint16_t>();
-    auto mxScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t *>(mxScaleLocal.GetPhyAddr());
+    auto mxScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t*>(mxScaleLocal.GetPhyAddr());
     // get tmp buffers
     LocalTensor<uint16_t> maxExpLocal = maxExpBuffer_.Get<uint16_t>();
-    auto maxExpLocalAddr = reinterpret_cast<__ubuf__ uint16_t *>(maxExpLocal.GetPhyAddr());
+    auto maxExpLocalAddr = reinterpret_cast<__ubuf__ uint16_t*>(maxExpLocal.GetPhyAddr());
     LocalTensor<uint16_t> invScaleLocal = invScaleBuffer_.Get<uint16_t>();
-    auto invScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t *>(invScaleLocal.GetPhyAddr());
+    auto invScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t*>(invScaleLocal.GetPhyAddr());
 
     // 按每次双搬vlForHalfNumber_*2来计算loopNum
     uint16_t vfLoopNumForX = (xElemNum + vlForB16_ * 2 - 1) / (vlForB16_ * 2);

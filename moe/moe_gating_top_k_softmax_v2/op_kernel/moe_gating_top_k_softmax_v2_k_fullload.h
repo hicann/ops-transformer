@@ -28,26 +28,25 @@ public:
     __aicore__ inline MoeGatingTopKSoftmaxV2KFullLoad(){};
     __aicore__ inline void Init(GM_ADDR gating, GM_ADDR finished, GM_ADDR out, GM_ADDR indicesOut, GM_ADDR softmaxOut,
                                 GM_ADDR workspace,
-                                const MoeGatingTopKSoftmaxV2KFullLoadTilingData *__restrict tilingData)
+                                const MoeGatingTopKSoftmaxV2KFullLoadTilingData* __restrict tilingData)
     {
         ParesTiling(tilingData);
         //  计算核块大小，获取当前核的起始索引
         int64_t formerblockLength = blockFormer * col;
         int64_t blockLength = (GetBlockIdx() != blockNum - 1) ? formerblockLength : blockTail * col;
-        gatingTensorGM.SetGlobalBuffer((__gm__ T *)gating + formerblockLength * GetBlockIdx(), blockLength);
+        gatingTensorGM.SetGlobalBuffer((__gm__ T*)gating + formerblockLength * GetBlockIdx(), blockLength);
         if (finished != nullptr) {
             exitFinished = true;
             int64_t blockLengthFinished = (GetBlockIdx() != blockNum - 1) ? blockFormer : blockTail;
-            finishedTensorGM.SetGlobalBuffer((__gm__ bool *)finished + blockFormer * GetBlockIdx(),
-                                             blockLengthFinished);
+            finishedTensorGM.SetGlobalBuffer((__gm__ bool*)finished + blockFormer * GetBlockIdx(), blockLengthFinished);
         }
 
         int64_t outFormerBlockLength = blockFormer * k;
         int64_t outBlockLength = (GetBlockIdx() != blockNum - 1) ? outFormerBlockLength : blockTail * k;
-        outTensorGM.SetGlobalBuffer((__gm__ T *)out + outFormerBlockLength * GetBlockIdx(), outBlockLength);
-        indicesOutTensorGM.SetGlobalBuffer((__gm__ int32_t *)indicesOut + outFormerBlockLength * GetBlockIdx(),
+        outTensorGM.SetGlobalBuffer((__gm__ T*)out + outFormerBlockLength * GetBlockIdx(), outBlockLength);
+        indicesOutTensorGM.SetGlobalBuffer((__gm__ int32_t*)indicesOut + outFormerBlockLength * GetBlockIdx(),
                                            outBlockLength);
-        softmaxOutTensorGM.SetGlobalBuffer((__gm__ float *)softmaxOut + formerblockLength * GetBlockIdx(), blockLength);
+        softmaxOutTensorGM.SetGlobalBuffer((__gm__ float*)softmaxOut + formerblockLength * GetBlockIdx(), blockLength);
 
         pipe.InitBuffer(gatingQueue, DB_KFULL_LOAD, ubFormerAlign * sizeof(float));
         pipe.InitBuffer(outQueue, DB_KFULL_LOAD, (ubFormerAlign + kAlign) * sizeof(float));
@@ -101,19 +100,19 @@ private:
     }
 
     template <typename U>
-    __aicore__ inline void VectorDup(LocalTensor<U> &dst, const int32_t colCount, const int32_t colCountAlign)
+    __aicore__ inline void VectorDup(LocalTensor<U>& dst, const int32_t colCount, const int32_t colCountAlign)
     {
         if (colCountAlign - colCount != 0) {
             U scalar;
             if constexpr (IsSameType<U, half>::value) {
                 uint16_t tmp = 0xFC00; // -inf
-                scalar = *((half *)&tmp);
+                scalar = *((half*)&tmp);
             } else if constexpr (IsSameType<U, bfloat16_t>::value) {
                 uint16_t tmp = 0xFF80; // -inf
-                scalar = *((bfloat16_t *)&tmp);
+                scalar = *((bfloat16_t*)&tmp);
             } else {
                 uint32_t tmp = 0xFF800000; // -inf
-                scalar = *((float *)&tmp);
+                scalar = *((float*)&tmp);
             }
             // 当对齐后大小与实际大小不一致，需要将 colCount到colAlign之间的数据掩成-1
             uint64_t mask[2] = {
@@ -149,9 +148,9 @@ private:
     }
 
     __aicore__ inline void Compute(int32_t progress, int32_t ubIdx, int32_t curCol, int32_t curRowsNum,
-                                   LocalTensor<float> &outLocal, LocalTensor<int32_t> &indicesOutLocal,
-                                   LocalTensor<float> &softmaxSumTensor, LocalTensor<float> &softmaxMaxTensor,
-                                   LocalTensor<bool> &finishedLocal)
+                                   LocalTensor<float>& outLocal, LocalTensor<int32_t>& indicesOutLocal,
+                                   LocalTensor<float>& softmaxSumTensor, LocalTensor<float>& softmaxMaxTensor,
+                                   LocalTensor<bool>& finishedLocal)
     {
         SoftMaxShapeInfo softmaxShapeInfoData;
         softmaxShapeInfoData.srcK = Align(curCol);
@@ -165,8 +164,8 @@ private:
 
         LocalTensor<float> gatingLocal = gatingQueue.template DeQue<float>();
 
-        SoftMaxTiling *softmaxTilingData = (ubIdx < ubLoop - 1) ? &ubFormerSoftmaxTilingData : &ubTailSoftmaxTilingData;
-        TopkTiling *topKTilingData = (ubIdx < ubLoop - 1) ? &topkFormerTilingData : &topkTailTilingData;
+        SoftMaxTiling* softmaxTilingData = (ubIdx < ubLoop - 1) ? &ubFormerSoftmaxTilingData : &ubTailSoftmaxTilingData;
+        TopkTiling* topKTilingData = (ubIdx < ubLoop - 1) ? &topkFormerTilingData : &topkTailTilingData;
 
         // curcol haven't dirty data
         if constexpr (!IsSameType<T, float>::value) {
@@ -210,8 +209,8 @@ private:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline float ComputeOut(LocalTensor<float> &outLocal, LocalTensor<int32_t> &indicesOutLocal,
-                                       LocalTensor<float> &softmaxSumTensor, LocalTensor<bool> &finishedLocal,
+    __aicore__ inline float ComputeOut(LocalTensor<float>& outLocal, LocalTensor<int32_t>& indicesOutLocal,
+                                       LocalTensor<float>& softmaxSumTensor, LocalTensor<bool>& finishedLocal,
                                        int32_t rowIdx)
     {
         auto eventID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));
@@ -293,7 +292,7 @@ private:
         }
     }
 
-    __aicore__ inline void ParesTiling(const MoeGatingTopKSoftmaxV2KFullLoadTilingData *__restrict tilingData)
+    __aicore__ inline void ParesTiling(const MoeGatingTopKSoftmaxV2KFullLoadTilingData* __restrict tilingData)
     {
         row = tilingData->row;
         col = tilingData->col;

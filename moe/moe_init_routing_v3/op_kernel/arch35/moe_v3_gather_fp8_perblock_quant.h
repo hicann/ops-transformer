@@ -31,7 +31,7 @@ constexpr uint32_t FP32_NAN_VALUE = 0x7fc00000;
 constexpr uint16_t FP16_MAX_VALUE_MASK = 0x7fff;
 
 template <typename T, typename U>
-__simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, __ubuf__ U *yAddr,
+__simd_vf__ inline void ComputeVF(__ubuf__ T* xAddr, __ubuf__ float* scaleAddr, __ubuf__ U* yAddr,
                                   uint32_t totalElemNum, uint16_t blockNum, float fp8MaxValue)
 {
     using namespace AscendC::Reg;
@@ -54,7 +54,7 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
         MaskReg preg0, yMaskReg, nanMask;
         MaskReg maskAll = CreateMask<uint16_t, MaskPattern::ALL>();
 
-        Duplicate((RegTensor<uint16_t> &)vreg2, FP16_MAX_VALUE_MASK);
+        Duplicate((RegTensor<uint16_t>&)vreg2, FP16_MAX_VALUE_MASK);
         Duplicate(fp8MaxReg, fp8MaxValue);
         Duplicate(infThresholdReg, FP32_INF_VALUE);
         Duplicate(nanIntReg, FP32_NAN_VALUE);
@@ -77,29 +77,29 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
             // --- block 0 ---
             LoadAlign(vreg0, xAddr + blockOffset);
             Duplicate(maxReg0, static_cast<T>(0));
-            And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg0, (RegTensor<uint16_t> &)vreg2, maskAll);
+            And((RegTensor<uint16_t>&)vreg3, (RegTensor<uint16_t>&)vreg0, (RegTensor<uint16_t>&)vreg2, maskAll);
             Max<T>(maxReg0, maxReg0, vreg3, maskAll);
-            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0,
+            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t>&)maxReg0, (RegTensor<uint16_t>&)maxReg0,
                                                         maskAll);
             Duplicate(maxReg0, maxReg0, maskAll);
             Cast<float, T, castTrait0>(scaleReg0, maxReg0, maskAll);
-            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t> &)scaleReg0, infThresholdReg, maskAll);
+            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t>&)scaleReg0, infThresholdReg, maskAll);
             Div<float, &mode>(scaleReg0, scaleReg0, fp8MaxReg, maskAll);
-            Select<uint32_t>((RegTensor<uint32_t> &)scaleReg0, nanIntReg, (RegTensor<uint32_t> &)scaleReg0, nanMask);
+            Select<uint32_t>((RegTensor<uint32_t>&)scaleReg0, nanIntReg, (RegTensor<uint32_t>&)scaleReg0, nanMask);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2, scaleReg0, maskAll);
 
             // --- block 1 ---
             LoadAlign(vreg1, xAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE);
             Duplicate(maxReg1, static_cast<T>(0));
-            And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg1, (RegTensor<uint16_t> &)vreg2, maskAll);
+            And((RegTensor<uint16_t>&)vreg3, (RegTensor<uint16_t>&)vreg1, (RegTensor<uint16_t>&)vreg2, maskAll);
             Max<T>(maxReg1, maxReg1, vreg3, maskAll);
-            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg1, (RegTensor<uint16_t> &)maxReg1,
+            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t>&)maxReg1, (RegTensor<uint16_t>&)maxReg1,
                                                         maskAll);
             Duplicate(maxReg1, maxReg1, maskAll);
             Cast<float, T, castTrait0>(scaleReg1, maxReg1, maskAll);
-            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t> &)scaleReg1, infThresholdReg, maskAll);
+            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t>&)scaleReg1, infThresholdReg, maskAll);
             Div<float, &mode>(scaleReg1, scaleReg1, fp8MaxReg, maskAll);
-            Select<uint32_t>((RegTensor<uint32_t> &)scaleReg1, nanIntReg, (RegTensor<uint32_t> &)scaleReg1, nanMask);
+            Select<uint32_t>((RegTensor<uint32_t>&)scaleReg1, nanIntReg, (RegTensor<uint32_t>&)scaleReg1, nanMask);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2 + 1, scaleReg1, maskAll);
 
             // --- 量化 block 0 ---
@@ -138,15 +138,15 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
             // --- block 0（完整）---
             LoadAlign(vreg0, xAddr + blockOffset);
             Duplicate(maxReg0, static_cast<T>(0));
-            And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg0, (RegTensor<uint16_t> &)vreg2, maskAll);
+            And((RegTensor<uint16_t>&)vreg3, (RegTensor<uint16_t>&)vreg0, (RegTensor<uint16_t>&)vreg2, maskAll);
             Max<T>(maxReg0, maxReg0, vreg3, maskAll);
-            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0,
+            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t>&)maxReg0, (RegTensor<uint16_t>&)maxReg0,
                                                         maskAll);
             Duplicate(maxReg0, maxReg0, maskAll);
             Cast<float, T, castTrait0>(scaleReg0, maxReg0, maskAll);
-            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t> &)scaleReg0, infThresholdReg, maskAll);
+            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t>&)scaleReg0, infThresholdReg, maskAll);
             Div<float, &mode>(scaleReg0, scaleReg0, fp8MaxReg, maskAll);
-            Select<uint32_t>((RegTensor<uint32_t> &)scaleReg0, nanIntReg, (RegTensor<uint32_t> &)scaleReg0, nanMask);
+            Select<uint32_t>((RegTensor<uint32_t>&)scaleReg0, nanIntReg, (RegTensor<uint32_t>&)scaleReg0, nanMask);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2, scaleReg0, maskAll);
 
             // --- block 1（partial，精确掩码）---
@@ -154,15 +154,15 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
             uint32_t partialInputNum = lastBlockElemNum;
             preg0 = UpdateMask<T>(partialInputNum);
             Duplicate(maxReg1, static_cast<T>(0));
-            And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg1, (RegTensor<uint16_t> &)vreg2, preg0);
+            And((RegTensor<uint16_t>&)vreg3, (RegTensor<uint16_t>&)vreg1, (RegTensor<uint16_t>&)vreg2, preg0);
             Max<T, MaskMergeMode::MERGING>(maxReg1, maxReg1, vreg3, preg0);
-            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg1, (RegTensor<uint16_t> &)maxReg1,
+            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t>&)maxReg1, (RegTensor<uint16_t>&)maxReg1,
                                                         maskAll);
             Duplicate(maxReg1, maxReg1, maskAll);
             Cast<float, T, castTrait0>(scaleReg1, maxReg1, maskAll);
-            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t> &)scaleReg1, infThresholdReg, maskAll);
+            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t>&)scaleReg1, infThresholdReg, maskAll);
             Div<float, &mode>(scaleReg1, scaleReg1, fp8MaxReg, maskAll);
-            Select<uint32_t>((RegTensor<uint32_t> &)scaleReg1, nanIntReg, (RegTensor<uint32_t> &)scaleReg1, nanMask);
+            Select<uint32_t>((RegTensor<uint32_t>&)scaleReg1, nanIntReg, (RegTensor<uint32_t>&)scaleReg1, nanMask);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2 + 1, scaleReg1, maskAll);
 
             // --- 量化 block 0（完整）---
@@ -205,15 +205,15 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
             Duplicate(maxReg0, static_cast<T>(0));
             preg0 = UpdateMask<T>(inputNum);
             LoadAlign(vreg0, xAddr + lastBlockOffset);
-            And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg0, (RegTensor<uint16_t> &)vreg2, preg0);
+            And((RegTensor<uint16_t>&)vreg3, (RegTensor<uint16_t>&)vreg0, (RegTensor<uint16_t>&)vreg2, preg0);
             Max<T, MaskMergeMode::MERGING>(maxReg0, maxReg0, vreg3, preg0);
-            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0,
+            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t>&)maxReg0, (RegTensor<uint16_t>&)maxReg0,
                                                         maskAll);
             Duplicate(maxReg0, maxReg0, maskAll);
             Cast<float, T, castTrait0>(scaleReg0, maxReg0, maskAll);
-            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t> &)scaleReg0, infThresholdReg, maskAll);
+            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t>&)scaleReg0, infThresholdReg, maskAll);
             Div<float, &mode>(scaleReg0, scaleReg0, fp8MaxReg, maskAll);
-            Select<uint32_t>((RegTensor<uint32_t> &)scaleReg0, nanIntReg, (RegTensor<uint32_t> &)scaleReg0, nanMask);
+            Select<uint32_t>((RegTensor<uint32_t>&)scaleReg0, nanIntReg, (RegTensor<uint32_t>&)scaleReg0, nanMask);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + lastBlockIdx, scaleReg0, maskAll);
 
             // 量化（按 blockElemNum 限制有效输出范围）
@@ -237,13 +237,13 @@ public:
 
     __aicore__ inline void Init(GM_ADDR xAddr, GM_ADDR unused_ScaleAddr, GM_ADDR sortedExpertIdxAddr,
                                 GM_ADDR expandedRowIdxAddr, GM_ADDR expandedXAddr, GM_ADDR expandedScaleAddr,
-                                const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
 
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void InitKernelTiling(GM_ADDR sortedExpertIdxAddr,
-                                            const MoeInitRoutingV3Arch35TilingData *tilingData);
+                                            const MoeInitRoutingV3Arch35TilingData* tilingData);
     __aicore__ inline void InitBuffer();
 
     __aicore__ inline void CopyInExpandedExpertIdx(int64_t progress);
@@ -253,7 +253,7 @@ private:
     __aicore__ inline void CopyOut(int64_t dstIdx, int64_t colIdx, int64_t loopCols, int64_t loopScaleCols);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
 
     TQue<QuePosition::VECIN, GATHER_OUT_BUFFER_NUM> inQueue_;
     TQue<QuePosition::VECOUT, GATHER_OUT_BUFFER_NUM> outQueue_;
@@ -266,7 +266,7 @@ private:
     GlobalTensor<int32_t> sortedRowIdxGm_;
     GlobalTensor<int32_t> expertTotalCountGm_;
 
-    const MoeV3Arch35GatherOutComputeTilingData *gatherOutTilingData_;
+    const MoeV3Arch35GatherOutComputeTilingData* gatherOutTilingData_;
 
     int64_t needCoreNum_;
     int64_t blockIdx_;
@@ -299,8 +299,8 @@ template <typename T, typename U>
 __aicore__ inline void MoeGatherOutFP8PerBlockQuant<T, U>::Init(GM_ADDR xAddr, GM_ADDR unused_ScaleAddr,
                                                                 GM_ADDR sortedExpertIdxAddr, GM_ADDR expandedRowIdxAddr,
                                                                 GM_ADDR expandedXAddr, GM_ADDR expandedScaleAddr,
-                                                                const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                                                TPipe *tPipe)
+                                                                const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                                                TPipe* tPipe)
 {
 #if (__NPU_ARCH__ == 3510)
     SetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>(0);
@@ -311,16 +311,16 @@ __aicore__ inline void MoeGatherOutFP8PerBlockQuant<T, U>::Init(GM_ADDR xAddr, G
 
     InitKernelTiling(sortedExpertIdxAddr, tilingData);
 
-    xInGm_.SetGlobalBuffer((__gm__ T *)xAddr);
-    expandedXOutGm_.SetGlobalBuffer((__gm__ uint8_t *)expandedXAddr);
-    expandedScaleOutGm_.SetGlobalBuffer((__gm__ float *)expandedScaleAddr);
+    xInGm_.SetGlobalBuffer((__gm__ T*)xAddr);
+    expandedXOutGm_.SetGlobalBuffer((__gm__ uint8_t*)expandedXAddr);
+    expandedScaleOutGm_.SetGlobalBuffer((__gm__ float*)expandedScaleAddr);
 
     if (rowIdxType_ == SCATTER) {
-        sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
+        sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
                                         Align(perCoreRow_, sizeof(int32_t)));
     } else {
         sortedRowIdxGm_.SetGlobalBuffer(
-            (__gm__ int32_t *)sortedExpertIdxAddr + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+            (__gm__ int32_t*)sortedExpertIdxAddr + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
             Align(perCoreRow_, sizeof(int32_t)));
     }
 
@@ -335,7 +335,7 @@ __aicore__ inline void MoeGatherOutFP8PerBlockQuant<T, U>::Init(GM_ADDR xAddr, G
 
 template <typename T, typename U>
 __aicore__ inline void MoeGatherOutFP8PerBlockQuant<T, U>::InitKernelTiling(
-    GM_ADDR sortedExpertIdxAddr, const MoeInitRoutingV3Arch35TilingData *tilingData)
+    GM_ADDR sortedExpertIdxAddr, const MoeInitRoutingV3Arch35TilingData* tilingData)
 {
     gatherOutTilingData_ = &(tilingData->gatherOutComputeParamsOp);
     cols_ = tilingData->cols;
@@ -347,7 +347,7 @@ __aicore__ inline void MoeGatherOutFP8PerBlockQuant<T, U>::InitKernelTiling(
     scaleCols_ = Ops::Base::CeilAlign<int64_t>(validScaleCols_, 2);
 
     int64_t actualExpertNum_ = tilingData->actualExpertNum;
-    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdxAddr + Align(n_ * k_, sizeof(int32_t)) * 2 +
+    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t*)sortedExpertIdxAddr + Align(n_ * k_, sizeof(int32_t)) * 2 +
                                             Align(actualExpertNum_, sizeof(int32_t)),
                                         1);
 
@@ -462,13 +462,13 @@ __aicore__ inline void MoeGatherOutFP8PerBlockQuant<T, U>::Compute(int64_t loopC
                                                                    int64_t loopScaleCols)
 {
     LocalTensor<T> xLocal = inQueue_.DeQue<T>();
-    __ubuf__ T *xAddr = reinterpret_cast<__ubuf__ T *>(xLocal.GetPhyAddr());
+    __ubuf__ T* xAddr = reinterpret_cast<__ubuf__ T*>(xLocal.GetPhyAddr());
 
     LocalTensor<U> outLocal = outQueue_.AllocTensor<U>();
-    __ubuf__ U *outAddr = reinterpret_cast<__ubuf__ U *>(outLocal.GetPhyAddr());
+    __ubuf__ U* outAddr = reinterpret_cast<__ubuf__ U*>(outLocal.GetPhyAddr());
 
     LocalTensor<float> scaleLocal = scaleQueue_.AllocTensor<float>();
-    __ubuf__ float *scaleAddr = reinterpret_cast<__ubuf__ float *>(scaleLocal.GetPhyAddr());
+    __ubuf__ float* scaleAddr = reinterpret_cast<__ubuf__ float*>(scaleLocal.GetPhyAddr());
 
     Duplicate(scaleLocal, 0.0f, Align(loopScaleCols, sizeof(float)));
 

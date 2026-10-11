@@ -31,27 +31,27 @@ static constexpr int64_t PERMUTE_WITH_EP_OUTPUT_PROBS = 2;
 static constexpr int64_t PERMUTE_WITH_EP_ARRT_RANGE = 0;
 static constexpr int64_t PERMUTE_WITH_EP_ARRT_NUM_OUT_TOKENS = 1;
 
-static ge::graphStatus InferShape4MoeTokenPermuteWithEp(gert::InferShapeContext *context)
+static ge::graphStatus InferShape4MoeTokenPermuteWithEp(gert::InferShapeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do MoeTokenPermuteWithEpInfershape.");
     // 获取输入shape
-    const gert::Shape *xShape = context->GetInputShape(PERMUTE_WITH_EP_INPUT_TOKENS);
+    const gert::Shape* xShape = context->GetInputShape(PERMUTE_WITH_EP_INPUT_TOKENS);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
-    const gert::Shape *indicesShape = context->GetInputShape(PERMUTE_WITH_EP_INPUT_IDX);
+    const gert::Shape* indicesShape = context->GetInputShape(PERMUTE_WITH_EP_INPUT_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, indicesShape);
 
-    gert::Shape *permuteXShape = context->GetOutputShape(PERMUTE_WITH_EP_OUTPUT_TOKENS);
+    gert::Shape* permuteXShape = context->GetOutputShape(PERMUTE_WITH_EP_OUTPUT_TOKENS);
     OP_CHECK_NULL_WITH_CONTEXT(context, permuteXShape);
-    gert::Shape *sortedIndices = context->GetOutputShape(PERMUTE_WITH_EP_OUTPUT_IDX);
+    gert::Shape* sortedIndices = context->GetOutputShape(PERMUTE_WITH_EP_OUTPUT_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, sortedIndices);
-    gert::Shape *permuteProbsShape = context->GetOutputShape(PERMUTE_WITH_EP_OUTPUT_PROBS);
+    gert::Shape* permuteProbsShape = context->GetOutputShape(PERMUTE_WITH_EP_OUTPUT_PROBS);
     OP_CHECK_NULL_WITH_CONTEXT(context, permuteProbsShape);
 
     // 获取attr
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
     auto rangePtr = attrs->GetAttrPointer<gert::ContinuousVector>(PERMUTE_WITH_EP_ARRT_RANGE);
-    const int64_t *numOutTokensPtr = attrs->GetAttrPointer<int64_t>(PERMUTE_WITH_EP_ARRT_NUM_OUT_TOKENS);
+    const int64_t* numOutTokensPtr = attrs->GetAttrPointer<int64_t>(PERMUTE_WITH_EP_ARRT_NUM_OUT_TOKENS);
 
     int64_t sortedIndicesLen = NEG_ONE;
     sortedIndices->SetDimNum(DIM_ONE);
@@ -76,7 +76,7 @@ static ge::graphStatus InferShape4MoeTokenPermuteWithEp(gert::InferShapeContext 
             OP_LOGE(context->GetNodeName(), "the size of range only support 2");
             return ge::GRAPH_FAILED;
         }
-        const int64_t *RangeList = reinterpret_cast<const int64_t *>(rangePtr->GetData());
+        const int64_t* RangeList = reinterpret_cast<const int64_t*>(rangePtr->GetData());
         start = RangeList[0];
         end = RangeList[1];
     } else {
@@ -98,7 +98,7 @@ static ge::graphStatus InferShape4MoeTokenPermuteWithEp(gert::InferShapeContext 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataType4MoeTokenPermuteWithEp(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataType4MoeTokenPermuteWithEp(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do MoeTokenPermuteWithEpInferDataType.");
     auto xDtype = context->GetInputDataType(PERMUTE_WITH_EP_INPUT_TOKENS);

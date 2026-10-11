@@ -23,8 +23,7 @@
 
 using namespace std;
 
-class MoeTokenUnpermuteGradTiling : public testing::Test
-{
+class MoeTokenUnpermuteGradTiling : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -37,330 +36,391 @@ protected:
     }
 };
 
-struct MoeTokenUnpermuteGradCompileInfo {
-};
+struct MoeTokenUnpermuteGradCompileInfo {};
 
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_bf16_001) {
-    MoeTokenUnpermuteGradCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
-    gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_bf16_001)
+{
+    MoeTokenUnpermuteGradCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenUnpermuteGrad", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // output info
+        {{{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND}, {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // attr
+        {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}}, &compileInfo);
     int64_t expectTilingKey = 1; // tilngkey
-    string expectTilingData = "10 3 64 30 10 54 1 0 3 0 256 1 64 3 3 16 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "10 3 64 30 10 54 1 0 3 0 256 1 64 3 3 16 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_bf16_002) {
-    MoeTokenUnpermuteGradCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
-    gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_bf16_002)
+{
+    MoeTokenUnpermuteGradCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenUnpermuteGrad", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // output info
+        {{{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND}, {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // attr
+        {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}}, &compileInfo);
     int64_t expectTilingKey = 1; // tilngkey
-    string expectTilingData = "10 3 64 30 10 54 1 0 3 0 256 1 64 3 3 8 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "10 3 64 30 10 54 1 0 3 0 256 1 64 3 3 8 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_none_bf16_001) {
-    MoeTokenUnpermuteGradCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
-    gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_none_bf16_001)
+{
+    MoeTokenUnpermuteGradCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenUnpermuteGrad", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND}},
+        // output info
+        {{{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND}, {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // attr
+        {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}}, &compileInfo);
     int64_t expectTilingKey = 0; // tilngkey
-    string expectTilingData = "10 1 64 30 10 54 1 0 1 0 64 1 64 992 992 992 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "10 1 64 30 10 54 1 0 1 0 64 1 64 992 992 992 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_split_h_bf16_001) {
-    MoeTokenUnpermuteGradCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
-    gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{30, 8192}, {30, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{10, 8192}, {10, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{30, 8192}, {30, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_split_h_bf16_001)
+{
+    MoeTokenUnpermuteGradCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenUnpermuteGrad", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{30, 8192}, {30, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{10, 8192}, {10, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // output info
+        {{{{30, 8192}, {30, 8192}}, ge::DT_BF16, ge::FORMAT_ND}, {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // attr
+        {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}}, &compileInfo);
     int64_t expectTilingKey = 1; // tilngkey
-    string expectTilingData = "10 3 8192 30 10 54 1 0 3 0 8192 1 8192 1 3 16 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "10 3 8192 30 10 54 1 0 3 0 8192 1 8192 1 3 16 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_fp16_001) {
-    MoeTokenUnpermuteGradCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
-    gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{30, 64}, {30, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{10, 64}, {10, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{30, 64}, {30, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_fp16_001)
+{
+    MoeTokenUnpermuteGradCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenUnpermuteGrad", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{30, 64}, {30, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{10, 64}, {10, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        // output info
+        {{{{30, 64}, {30, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{10, 3}, {10, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        // attr
+        {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}}, &compileInfo);
     int64_t expectTilingKey = 1; // tilngkey
-    string expectTilingData = "10 3 64 30 10 54 1 0 3 0 256 1 64 3 3 16 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "10 3 64 30 10 54 1 0 3 0 256 1 64 3 3 16 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_none_fp16_001) {
-    MoeTokenUnpermuteGradCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
-    gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{30, 64}, {30, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{10, 64}, {10, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{30, 64}, {30, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_none_fp16_001)
+{
+    MoeTokenUnpermuteGradCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenUnpermuteGrad", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{30, 64}, {30, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{10, 64}, {10, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND}},
+        // output info
+        {{{{30, 64}, {30, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{10, 3}, {10, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        // attr
+        {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}}, &compileInfo);
     int64_t expectTilingKey = 0; // tilngkey
-    string expectTilingData = "10 1 64 30 10 54 1 0 1 0 64 1 64 992 992 992 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "10 1 64 30 10 54 1 0 1 0 64 1 64 992 992 992 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_split_h_fp16_001) {
-    MoeTokenUnpermuteGradCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_split_h_fp16_001)
+{
+    MoeTokenUnpermuteGradCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
     gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{10, 8192}, {10, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+                                              {                        // input info
+                                               // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+                                               {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                               {{{10, 8192}, {10, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                               {{{
+                                                     30,
+                                                 },
+                                                 {
+                                                     30,
+                                                 }},
+                                                ge::DT_INT32,
+                                                ge::FORMAT_ND},
+                                               {{{10, 3}, {10, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+                                              // output info
+                                              {{{{30, 8192}, {30, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                               {{{10, 3}, {10, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+                                              // attr
+                                              {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
+                                              &compileInfo);
     int64_t expectTilingKey = 1; // tilngkey
-    string expectTilingData = "10 3 8192 30 10 54 1 0 3 0 8192 1 8192 1 3 16 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "10 3 8192 30 10 54 1 0 3 0 8192 1 8192 1 3 16 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_split_h_fp16_002) {
-    MoeTokenUnpermuteGradCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
-    gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{10, 8192}, {10, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_split_h_fp16_002)
+{
+    MoeTokenUnpermuteGradCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenUnpermuteGrad", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{10, 8192}, {10, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // output info
+        {{{{30, 8192}, {30, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // attr
+        {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}}, &compileInfo);
     int64_t expectTilingKey = 1; // tilngkey
-    string expectTilingData = "10 3 8192 30 10 54 1 0 3 0 8192 1 8192 1 3 8 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "10 3 8192 30 10 54 1 0 3 0 8192 1 8192 1 3 8 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_fp32_001) {
-    MoeTokenUnpermuteGradCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
-    gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{30, 64}, {30, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{10, 64}, {10, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{30, 64}, {30, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_fp32_001)
+{
+    MoeTokenUnpermuteGradCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenUnpermuteGrad", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{30, 64}, {30, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{10, 64}, {10, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // output info
+        {{{{30, 64}, {30, 64}}, ge::DT_FLOAT, ge::FORMAT_ND}, {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // attr
+        {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}}, &compileInfo);
     int64_t expectTilingKey = 1; // tilngkey
-    string expectTilingData = "10 3 64 30 10 54 1 0 3 0 128 1 64 3 3 8 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "10 3 64 30 10 54 1 0 3 0 128 1 64 3 3 8 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_none_fp32_001) {
-    MoeTokenUnpermuteGradCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
-    gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{30, 64}, {30, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{10, 64}, {10, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{30, 64}, {30, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_none_fp32_001)
+{
+    MoeTokenUnpermuteGradCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenUnpermuteGrad", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{30, 64}, {30, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{10, 64}, {10, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND}},
+        // output info
+        {{{{30, 64}, {30, 64}}, ge::DT_FLOAT, ge::FORMAT_ND}, {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // attr
+        {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}}, &compileInfo);
     int64_t expectTilingKey = 0; // tilngkey
-    string expectTilingData = "10 1 64 30 10 54 1 0 1 0 64 1 64 496 496 496 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "10 1 64 30 10 54 1 0 1 0 64 1 64 496 496 496 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_split_h_fp32_001) {
-    MoeTokenUnpermuteGradCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
-    gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{10, 8192}, {10, 8192}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_split_h_fp32_001)
+{
+    MoeTokenUnpermuteGradCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenUnpermuteGrad", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{10, 8192}, {10, 8192}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // output info
+        {{{{30, 8192}, {30, 8192}}, ge::DT_FLOAT, ge::FORMAT_ND}, {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        // attr
+        {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}}, &compileInfo);
     int64_t expectTilingKey = 1; // tilngkey
-    string expectTilingData = "10 3 8192 30 10 54 1 0 3 0 7168 2 1024 1 3 8 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "10 3 8192 30 10 54 1 0 3 0 7168 2 1024 1 3 8 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_split_h_fp32_002) {
-    MoeTokenUnpermuteGradCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
-    gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{10, 8192}, {10, 8192}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_not_none_split_h_fp32_002)
+{
+    MoeTokenUnpermuteGradCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenUnpermuteGrad", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{10, 8192}, {10, 8192}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // output info
+        {{{{30, 8192}, {30, 8192}}, ge::DT_FLOAT, ge::FORMAT_ND}, {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // attr
+        {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}}, &compileInfo);
     int64_t expectTilingKey = 1; // tilngkey
-    string expectTilingData = "10 3 8192 30 10 54 1 0 3 0 7168 2 1024 1 3 16 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
+    string expectTilingData =
+        "10 3 8192 30 10 54 1 0 3 0 7168 2 1024 1 3 16 261888 "; // tilingData（不确定的话跑下对应用例打印看看）
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_none_split_h_bf16_001) {
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_prob_none_split_h_bf16_001)
+{
     MoeTokenUnpermuteGradCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingContextPara("MoeTokenUnpermuteGrad",
-                                            {
-                                                {{{30, 8192}, {30, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{10, 8192}, {10, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{30, 8192}, {30, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}},
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenUnpermuteGrad",
+        {{{{30, 8192}, {30, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{10, 8192}, {10, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND}},
+        {{{{30, 8192}, {30, 8192}}, ge::DT_BF16, ge::FORMAT_ND}, {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(0)}}, &compileInfo);
     int64_t expectTilingKey = 0;
     string expectTilingData = "10 1 8192 30 10 54 1 0 1 0 8176 2 16 8 8 8 261888 ";
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_parse) {
+TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_parse)
+{
     gert::OpTilingParseContextBuilder builder;
     auto holder = builder.Build();
     auto parseContext = holder.GetContext();
@@ -375,7 +435,8 @@ TEST_F(MoeTokenUnpermuteGradTiling, test_tiling_parse) {
     EXPECT_EQ(ret, ge::GRAPH_SUCCESS);
 }
 
-TEST_F(MoeTokenUnpermuteGradTiling, MoeTokenUnpermuteGrad_tiling_data_field_access) {
+TEST_F(MoeTokenUnpermuteGradTiling, MoeTokenUnpermuteGrad_tiling_data_field_access)
+{
     optiling::MoeTokenUnpermuteGradTilingData tilingData;
     tilingData.set_tokensNum(10);
     tilingData.set_topK(3);

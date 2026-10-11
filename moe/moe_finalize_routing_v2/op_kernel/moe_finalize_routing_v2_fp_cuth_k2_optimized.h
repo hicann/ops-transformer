@@ -25,8 +25,8 @@ using namespace AscendC;
 template <typename T>
 class MoeFinalizeRoutingV2FpCuthK2Optimized {
 public:
-    __aicore__ inline MoeFinalizeRoutingV2FpCuthK2Optimized(const MoeFinalizeRoutingV2TilingData &tilingData,
-                                                            TPipe &pipe)
+    __aicore__ inline MoeFinalizeRoutingV2FpCuthK2Optimized(const MoeFinalizeRoutingV2TilingData& tilingData,
+                                                            TPipe& pipe)
         : tilingData_(tilingData),
           pipe_(pipe){};
     __aicore__ inline void Init(GM_ADDR expandedPermutedRows, GM_ADDR expandedSrcToDstRow, GM_ADDR skip1, GM_ADDR skip2,
@@ -46,8 +46,8 @@ private:
     __aicore__ inline void PrepareData();
 
 private:
-    TPipe &pipe_;
-    const MoeFinalizeRoutingV2TilingData &tilingData_;
+    TPipe& pipe_;
+    const MoeFinalizeRoutingV2TilingData& tilingData_;
     TQue<QuePosition::VECIN, BUFFER_NUM_OPTIMIZED_V2> skip1Skip2ScalesQueue_;
     TQue<QuePosition::VECIN, BUFFER_NUM_OPTIMIZED_V2> expertForSourceRowQueue_;
     TQue<QuePosition::VECOUT, BUFFER_NUM_OPTIMIZED_V2> outQueue_;
@@ -171,10 +171,10 @@ __aicore__ inline void MoeFinalizeRoutingV2FpCuthK2Optimized<T>::Init(GM_ADDR ex
 
     // gmInput分核 && 输入偏移量初始化
     inputSkipIdx_ = GetBlockIdx() * tilingData_.normalCoreHandleNum * tilingData_.H;
-    gmSkip1_.SetGlobalBuffer((__gm__ T *)skip1 + inputSkipIdx_, tilingData_.normalCoreHandleNum * tilingData_.H);
+    gmSkip1_.SetGlobalBuffer((__gm__ T*)skip1 + inputSkipIdx_, tilingData_.normalCoreHandleNum * tilingData_.H);
 
     if (tilingData_.skip2IsNull == 0) {
-        gmSkip2_.SetGlobalBuffer((__gm__ T *)skip2 + inputSkipIdx_, tilingData_.normalCoreHandleNum * tilingData_.H);
+        gmSkip2_.SetGlobalBuffer((__gm__ T*)skip2 + inputSkipIdx_, tilingData_.normalCoreHandleNum * tilingData_.H);
         pipe_.InitBuffer(
             skip1Skip2ScalesQueue_, BUFFER_NUM_OPTIMIZED_V2,
             tilingData_.normalCoreHandleNumPerLoop * AlignmentProcess(tilingData_.normalH) * sizeof(T) * 2 +
@@ -186,20 +186,20 @@ __aicore__ inline void MoeFinalizeRoutingV2FpCuthK2Optimized<T>::Init(GM_ADDR ex
     }
 
     inputScalesAndExpertIdx_ = GetBlockIdx() * tilingData_.normalCoreHandleNum * tilingData_.K;
-    gmScales_.SetGlobalBuffer((__gm__ T *)scales + inputScalesAndExpertIdx_,
+    gmScales_.SetGlobalBuffer((__gm__ T*)scales + inputScalesAndExpertIdx_,
                               tilingData_.normalCoreHandleNum * tilingData_.K);
-    gmExpertForSourceRow_.SetGlobalBuffer((__gm__ int32_t *)expertForSourceRow + inputScalesAndExpertIdx_,
+    gmExpertForSourceRow_.SetGlobalBuffer((__gm__ int32_t*)expertForSourceRow + inputScalesAndExpertIdx_,
                                           tilingData_.normalCoreHandleNum * tilingData_.K);
 
-    gmExpandedSrcToDstRow_.SetGlobalBuffer((__gm__ int32_t *)expandedSrcToDstRow,
+    gmExpandedSrcToDstRow_.SetGlobalBuffer((__gm__ int32_t*)expandedSrcToDstRow,
                                            tilingData_.totalRowNum * tilingData_.K);
 
     outputIdx_ = GetBlockIdx() * tilingData_.normalCoreHandleNum * tilingData_.H;
-    gmOut_.SetGlobalBuffer((__gm__ T *)out + outputIdx_, tilingData_.normalCoreHandleNum * tilingData_.H);
+    gmOut_.SetGlobalBuffer((__gm__ T*)out + outputIdx_, tilingData_.normalCoreHandleNum * tilingData_.H);
 
-    gmExpandedPermutedRows_.SetGlobalBuffer((__gm__ T *)expandedPermutedRows,
+    gmExpandedPermutedRows_.SetGlobalBuffer((__gm__ T*)expandedPermutedRows,
                                             tilingData_.totalRowNum * tilingData_.K * tilingData_.H);
-    gmBias_.SetGlobalBuffer((__gm__ T *)bias, tilingData_.biasRowNum * tilingData_.H);
+    gmBias_.SetGlobalBuffer((__gm__ T*)bias, tilingData_.biasRowNum * tilingData_.H);
 
     // 申请 buffer 空间
     pipe_.InitBuffer(expertForSourceRowQueue_, BUFFER_NUM_OPTIMIZED_V2,

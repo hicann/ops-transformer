@@ -23,7 +23,7 @@
     do { \
         printf(message, ##__VA_ARGS__); \
     } while (0)
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -31,7 +31,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     }
     return shape_size;
 }
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -43,8 +43,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
     return 0;
 }
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -85,20 +85,20 @@ int main()
 
     std::vector<int64_t> activeExpertRangeArray = {0, 4};
 
-    void *xDeviceAddr = nullptr;
-    void *expertIdxDeviceAddr = nullptr;
-    void *scaleDeviceAddr = nullptr;
-    void *offsetDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* expertIdxDeviceAddr = nullptr;
+    void* scaleDeviceAddr = nullptr;
+    void* offsetDeviceAddr = nullptr;
 
-    void *expandedXOutDeviceAddr = nullptr;
-    void *expandedRowIdxOutDeviceAddr = nullptr;
-    void *expertTokensCountOrCumsumOutOptionalDeviceAddr = nullptr;
-    void *expandedScaleOutOptionalDeviceAddr = nullptr;
+    void* expandedXOutDeviceAddr = nullptr;
+    void* expandedRowIdxOutDeviceAddr = nullptr;
+    void* expertTokensCountOrCumsumOutOptionalDeviceAddr = nullptr;
+    void* expandedScaleOutOptionalDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *expertIdx = nullptr;
-    aclTensor *scale = nullptr;
-    aclTensor *offset = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* expertIdx = nullptr;
+    aclTensor* scale = nullptr;
+    aclTensor* offset = nullptr;
 
     int64_t activeNum = 12;
     int64_t expertCapacity = 0;
@@ -107,13 +107,13 @@ int main()
     int64_t expertTokensNumType = 1;
     bool expertTokensNumFlag = true;
     int64_t quantMode = -1;
-    aclIntArray *activeExpertRange = aclCreateIntArray(activeExpertRangeArray.data(), activeExpertRangeArray.size());
+    aclIntArray* activeExpertRange = aclCreateIntArray(activeExpertRangeArray.data(), activeExpertRangeArray.size());
     int64_t rowIdxType = 1;
 
-    aclTensor *expandedXOut = nullptr;
-    aclTensor *expandedRowIdxOut = nullptr;
-    aclTensor *expertTokensCountOrCumsumOutOptional = nullptr;
-    aclTensor *expandedScaleOutOptional = nullptr;
+    aclTensor* expandedXOut = nullptr;
+    aclTensor* expandedRowIdxOut = nullptr;
+    aclTensor* expertTokensCountOrCumsumOutOptional = nullptr;
+    aclTensor* expandedScaleOutOptional = nullptr;
 
     std::vector<float> xHostData = {0.1, 0.1, 0.2, 0.2, 0.3, 0.3};
     std::vector<int> expertIdxHostData = {1, 2, 0, 3, 0, 2, 1, 3, 0, 1, 3, 2};
@@ -150,7 +150,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 3. 调用CANN算子库API，需要修改为具体的API
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     // 调用aclnnMoeInitRoutingV3第一段接口
     ret = aclnnMoeInitRoutingV3GetWorkspaceSize(
         x, expertIdx, scale, offset, activeNum, expertCapacity, expertNum, dropPadMode, expertTokensNumType,
@@ -159,7 +159,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMoeInitRoutingV3GetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

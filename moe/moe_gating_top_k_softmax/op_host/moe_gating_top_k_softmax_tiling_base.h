@@ -125,14 +125,14 @@ REGISTER_TILING_DATA_CLASS(MoeGatingTopKSoftmax_18, MoeGatingTopKSoftmax310PTili
 
 class MoeGatingTopKSoftmaxBaseTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeGatingTopKSoftmaxBaseTiling(gert::TilingContext *context)
+    explicit MoeGatingTopKSoftmaxBaseTiling(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
 protected:
     ge::graphStatus GetPlatformInfo() override;
     ge::graphStatus GetShapeAttrsInfo() override;
-    ge::graphStatus CheckOutShape(const gert::Shape &, gert::Shape &);
+    ge::graphStatus CheckOutShape(const gert::Shape&, gert::Shape&);
 
 protected:
     int coreNum;

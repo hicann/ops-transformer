@@ -28,18 +28,18 @@ class MoeGatherOut {
 public:
     __aicore__ inline MoeGatherOut(){};
     __aicore__ inline void Init(GM_ADDR inputActivations, GM_ADDR expandSrcToDstRow, GM_ADDR expandedActivations,
-                                const MoeInitRoutingTilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void SyncAll();
     __aicore__ inline void CopyInIndices(int64_t progress, int64_t kProcess);
     __aicore__ inline void CopyIn(int64_t progress, int64_t colsProgress);
-    __aicore__ inline void CopyOut(int64_t progress, int64_t colsProgress, LocalTensor<int32_t> &indicesLocal);
+    __aicore__ inline void CopyOut(int64_t progress, int64_t colsProgress, LocalTensor<int32_t>& indicesLocal);
     __aicore__ inline void UpdataOffset(int64_t progress, int64_t colsProgress);
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, BUFFER_NUM> inputActivationsCopyInQueue;
     TQue<QuePosition::VECIN, BUFFER_NUM> expandSrcToDstRowCopyInQueue;
 
@@ -47,7 +47,7 @@ private:
     GlobalTensor<int32_t> expandSrcToDstRowGm;
     GlobalTensor<T> expandedActivationsGm;
 
-    const GatherOutComputeTilingData *gatherOutTilingData;
+    const GatherOutComputeTilingData* gatherOutTilingData;
 
     int64_t coreNum_;
     int64_t needCoreNum;
@@ -118,7 +118,7 @@ __aicore__ inline void MoeGatherOut<T>::CopyIn(int64_t progress, int64_t colsPro
 
 template <typename T>
 __aicore__ inline void MoeGatherOut<T>::CopyOut(int64_t progress, int64_t colsProgress,
-                                                LocalTensor<int32_t> &indicesLocal)
+                                                LocalTensor<int32_t>& indicesLocal)
 {
     LocalTensor<T> inLocal = inputActivationsCopyInQueue.DeQue<T>();
 
@@ -153,8 +153,8 @@ __aicore__ inline void MoeGatherOut<T>::CopyOut(int64_t progress, int64_t colsPr
 
 template <typename T>
 __aicore__ inline void MoeGatherOut<T>::Init(GM_ADDR inputActivations, GM_ADDR expandSrcToDstRow,
-                                             GM_ADDR expandedActivations, const MoeInitRoutingTilingData *tilingData,
-                                             TPipe *tPipe)
+                                             GM_ADDR expandedActivations, const MoeInitRoutingTilingData* tilingData,
+                                             TPipe* tPipe)
 {
     this->pipe = tPipe;
     this->blockIdx = GetBlockIdx();
@@ -185,19 +185,19 @@ __aicore__ inline void MoeGatherOut<T>::Init(GM_ADDR inputActivations, GM_ADDR e
     }
     if (this->gatherOutTilingData->splitFlag == SPLIT_N) {
         inputActivationsGm.SetGlobalBuffer(
-            (__gm__ T *)inputActivations + this->blockIdx * this->gatherOutTilingData->perCoreRows * this->cols,
+            (__gm__ T*)inputActivations + this->blockIdx * this->gatherOutTilingData->perCoreRows * this->cols,
             this->coreRows * this->cols);
         expandSrcToDstRowGm.SetGlobalBuffer(
-            (__gm__ int32_t *)expandSrcToDstRow + this->blockIdx * this->gatherOutTilingData->perCoreRows,
+            (__gm__ int32_t*)expandSrcToDstRow + this->blockIdx * this->gatherOutTilingData->perCoreRows,
             tilingData->n * tilingData->k);
     } else if (this->gatherOutTilingData->splitFlag == SPLIT_K) {
-        inputActivationsGm.SetGlobalBuffer((__gm__ T *)inputActivations, this->coreRows * this->cols);
+        inputActivationsGm.SetGlobalBuffer((__gm__ T*)inputActivations, this->coreRows * this->cols);
         expandSrcToDstRowGm.SetGlobalBuffer(
-            (__gm__ int32_t *)expandSrcToDstRow + this->blockIdx * this->gatherOutTilingData->perCoreK * this->n,
+            (__gm__ int32_t*)expandSrcToDstRow + this->blockIdx * this->gatherOutTilingData->perCoreK * this->n,
             tilingData->n * tilingData->k);
     }
 
-    expandedActivationsGm.SetGlobalBuffer((__gm__ T *)expandedActivations, tilingData->n * tilingData->k * this->cols);
+    expandedActivationsGm.SetGlobalBuffer((__gm__ T*)expandedActivations, tilingData->n * tilingData->k * this->cols);
 
     pipe->InitBuffer(inputActivationsCopyInQueue, BUFFER_NUM,
                      this->perLoopRows * AlignBytes(this->maxColsOneLoop, sizeof(T)));

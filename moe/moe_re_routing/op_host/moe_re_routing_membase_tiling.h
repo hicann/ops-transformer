@@ -21,7 +21,7 @@ namespace optiling {
 
 class MoeReRoutingTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeReRoutingTiling(gert::TilingContext *contextReRouting)
+    explicit MoeReRoutingTiling(gert::TilingContext* contextReRouting)
         : TilingBaseClass(contextReRouting)
     {}
     ~MoeReRoutingTiling() override = default;

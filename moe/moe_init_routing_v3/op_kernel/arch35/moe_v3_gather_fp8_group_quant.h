@@ -39,7 +39,7 @@ constexpr CastTrait CAST_TRAIT_F32_TO_FP8 = {RegLayout::ZERO, SatMode::SAT, Mask
                                              RoundMode::CAST_RINT};
 
 template <typename T>
-__simd_callee__ inline void LoadFp8GroupInput(RegTensor<float> &dst, __ubuf__ T *src, MaskReg mask, uint32_t offset)
+__simd_callee__ inline void LoadFp8GroupInput(RegTensor<float>& dst, __ubuf__ T* src, MaskReg mask, uint32_t offset)
 {
     if constexpr (IsSameType<T, float>::value) {
         LoadAlign(dst, src + offset);
@@ -51,7 +51,7 @@ __simd_callee__ inline void LoadFp8GroupInput(RegTensor<float> &dst, __ubuf__ T 
 }
 
 template <typename T, bool CLAMP_AMAX>
-__simd_vf__ inline void VfComputeAmax(__ubuf__ T *xAddr, __ubuf__ float *amaxOutAddr, uint32_t totalElemNum,
+__simd_vf__ inline void VfComputeAmax(__ubuf__ T* xAddr, __ubuf__ float* amaxOutAddr, uint32_t totalElemNum,
                                       uint16_t groupNum)
 {
     const uint16_t vfLen = AscendC::VECTOR_REG_WIDTH / sizeof(float);
@@ -117,8 +117,8 @@ __simd_vf__ inline void VfComputeAmax(__ubuf__ T *xAddr, __ubuf__ float *amaxOut
 }
 
 template <bool CLAMP_AMAX>
-__simd_vf__ inline void VfComputeRoundScale(__ubuf__ float *amaxInAddr, __ubuf__ float *scaleOutAddr,
-                                            __ubuf__ float *invScaleOutAddr, uint16_t groupNum, uint32_t fp8EmaxValue)
+__simd_vf__ inline void VfComputeRoundScale(__ubuf__ float* amaxInAddr, __ubuf__ float* scaleOutAddr,
+                                            __ubuf__ float* invScaleOutAddr, uint16_t groupNum, uint32_t fp8EmaxValue)
 {
     const uint16_t vfLen = AscendC::VECTOR_REG_WIDTH / sizeof(float);
     uint16_t vfLoopNum = (groupNum + vfLen - 1) / vfLen;
@@ -168,10 +168,10 @@ __simd_vf__ inline void VfComputeRoundScale(__ubuf__ float *amaxInAddr, __ubuf__
 
             LoadAlign<float, PostLiteral::POST_MODE_UPDATE>(maxReg, amaxInAddr, vfLen);
 
-            ShiftRights(expBitsReg, (RegTensor<uint32_t> &)maxReg, FP32_EXPONENT_SHIFT, maskAllUint);
+            ShiftRights(expBitsReg, (RegTensor<uint32_t>&)maxReg, FP32_EXPONENT_SHIFT, maskAllUint);
             And(expBitsReg, expBitsReg, expMaskReg, maskAllUint);
-            And(mantBitsReg, (RegTensor<uint32_t> &)maxReg, mantMaskReg, maskAllUint);
-            Compare<uint32_t, CMPMODE::GE>(maskInfNaN, (RegTensor<uint32_t> &)maxReg, infThresholdReg, maskAllUint);
+            And(mantBitsReg, (RegTensor<uint32_t>&)maxReg, mantMaskReg, maskAllUint);
+            Compare<uint32_t, CMPMODE::GE>(maskInfNaN, (RegTensor<uint32_t>&)maxReg, infThresholdReg, maskAllUint);
             Compare<uint32_t, CMPMODE::GT>(maskMantHigh, mantBitsReg, fp8MantReg, maskAllUint);
             Select(mantAddReg, oneIntReg, zeroIntReg, maskMantHigh);
             Sub<uint32_t>(roundedExpBitsReg, expBitsReg, fp8EmaxReg, maskAllUint);
@@ -180,14 +180,14 @@ __simd_vf__ inline void VfComputeRoundScale(__ubuf__ float *amaxInAddr, __ubuf__
             Select(roundedExpBitsReg, oneIntReg, roundedExpBitsReg, maskClamp);
             Compare<uint32_t, CMPMODE::GT>(maskClamp, roundedExpBitsReg, threshold254Reg, maskAllUint);
             Select(roundedExpBitsReg, oneIntReg, roundedExpBitsReg, maskClamp);
-            ShiftLefts((RegTensor<uint32_t> &)roundScaleReg, roundedExpBitsReg, FP32_EXPONENT_SHIFT, maskAllUint);
-            Select<uint32_t>((RegTensor<uint32_t> &)roundScaleReg, nanIntReg, (RegTensor<uint32_t> &)roundScaleReg,
+            ShiftLefts((RegTensor<uint32_t>&)roundScaleReg, roundedExpBitsReg, FP32_EXPONENT_SHIFT, maskAllUint);
+            Select<uint32_t>((RegTensor<uint32_t>&)roundScaleReg, nanIntReg, (RegTensor<uint32_t>&)roundScaleReg,
                              maskInfNaN);
 
             StoreAlign<float, PostLiteral::POST_MODE_UPDATE>(scaleOutAddr, roundScaleReg, vfLen, maskGroupNum);
             Sub<uint32_t>(invExpBitsReg, invExpSubReg, roundedExpBitsReg, maskAllUint);
-            ShiftLefts((RegTensor<uint32_t> &)invScaleReg, invExpBitsReg, FP32_EXPONENT_SHIFT, maskAllUint);
-            Select<uint32_t>((RegTensor<uint32_t> &)invScaleReg, nanIntReg, (RegTensor<uint32_t> &)invScaleReg,
+            ShiftLefts((RegTensor<uint32_t>&)invScaleReg, invExpBitsReg, FP32_EXPONENT_SHIFT, maskAllUint);
+            Select<uint32_t>((RegTensor<uint32_t>&)invScaleReg, nanIntReg, (RegTensor<uint32_t>&)invScaleReg,
                              maskInfNaN);
             StoreAlign<float, PostLiteral::POST_MODE_UPDATE>(invScaleOutAddr, invScaleReg, vfLen, maskGroupNum);
         }
@@ -195,7 +195,7 @@ __simd_vf__ inline void VfComputeRoundScale(__ubuf__ float *amaxInAddr, __ubuf__
 }
 
 template <typename T, typename U>
-__simd_vf__ inline void VfComputeData(__ubuf__ T *xAddr, __ubuf__ float *invScaleInAddr, __ubuf__ U *yAddr,
+__simd_vf__ inline void VfComputeData(__ubuf__ T* xAddr, __ubuf__ float* invScaleInAddr, __ubuf__ U* yAddr,
                                       uint32_t totalElemNum, uint16_t groupNum)
 {
     const uint16_t vfLen = AscendC::VECTOR_REG_WIDTH / sizeof(float);
@@ -264,11 +264,11 @@ public:
 
     __aicore__ inline void Init(GM_ADDR xAddr, GM_ADDR unusedScaleAddr, GM_ADDR workspace, GM_ADDR expandedRowIdxAddr,
                                 GM_ADDR expandedXAddr, GM_ADDR expandedScaleAddr,
-                                const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void InitKernelTiling(GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData *tilingData);
+    __aicore__ inline void InitKernelTiling(GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData* tilingData);
     __aicore__ inline void InitBuffer();
     __aicore__ inline void CopyInExpandedExpertIdx(int64_t progress);
     __aicore__ inline void ScatterCopyExpandedXAndQuant(int64_t progress);
@@ -278,7 +278,7 @@ private:
     __aicore__ inline void CopyOut(int64_t dstIdx, int64_t colIdx, int64_t loopCols, int64_t loopScaleCols);
 
 private:
-    TPipe *pipe_{nullptr};
+    TPipe* pipe_{nullptr};
     TQue<QuePosition::VECIN, GATHER_OUT_BUFFER_NUM> inQueue_;
     TQue<QuePosition::VECOUT, GATHER_OUT_BUFFER_NUM> outQueue_;
     TQue<QuePosition::VECOUT, GATHER_OUT_BUFFER_NUM> scaleQueue_;
@@ -292,7 +292,7 @@ private:
     GlobalTensor<int32_t> sortedRowIdxGm_;
     GlobalTensor<int32_t> expertTotalCountGm_;
 
-    const MoeV3Arch35GatherOutComputeTilingData *gatherOutTilingData_{nullptr};
+    const MoeV3Arch35GatherOutComputeTilingData* gatherOutTilingData_{nullptr};
 
     int64_t needCoreNum_{0};
     int64_t blockIdx_{0};
@@ -321,7 +321,7 @@ private:
 template <typename T, typename U, bool CLAMP_AMAX>
 __aicore__ inline void MoeV3GatherFP8GroupQuant<T, U, CLAMP_AMAX>::Init(
     GM_ADDR xAddr, GM_ADDR unusedScaleAddr, GM_ADDR workspace, GM_ADDR expandedRowIdxAddr, GM_ADDR expandedXAddr,
-    GM_ADDR expandedScaleAddr, const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+    GM_ADDR expandedScaleAddr, const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe)
 {
     (void)unusedScaleAddr;
 #if (__NPU_ARCH__ == 3510)
@@ -331,26 +331,26 @@ __aicore__ inline void MoeV3GatherFP8GroupQuant<T, U, CLAMP_AMAX>::Init(
     blockIdx_ = GetBlockIdx();
     InitKernelTiling(workspace, tilingData);
 
-    xInGm_.SetGlobalBuffer((__gm__ T *)xAddr);
-    expandedXOutGm_.SetGlobalBuffer((__gm__ U *)expandedXAddr);
-    expandedScaleOutGm_.SetGlobalBuffer((__gm__ float *)expandedScaleAddr);
+    xInGm_.SetGlobalBuffer((__gm__ T*)xAddr);
+    expandedXOutGm_.SetGlobalBuffer((__gm__ U*)expandedXAddr);
+    expandedScaleOutGm_.SetGlobalBuffer((__gm__ float*)expandedScaleAddr);
 
     if (useGatherCopy_) {
         if (rowIdxType_ == SCATTER) {
             sortedRowIdxGm_.SetGlobalBuffer(
-                (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+                (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
                 Align(perCoreRow_, sizeof(int32_t)));
         } else {
-            sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
+            sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
                                             Align(perCoreRow_, sizeof(int32_t)));
         }
     } else {
         if (rowIdxType_ == SCATTER) {
-            sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
+            sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
                                             Align(perCoreRow_, sizeof(int32_t)));
         } else {
             sortedRowIdxGm_.SetGlobalBuffer(
-                (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+                (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
                 Align(perCoreRow_, sizeof(int32_t)));
         }
     }
@@ -365,7 +365,7 @@ __aicore__ inline void MoeV3GatherFP8GroupQuant<T, U, CLAMP_AMAX>::Init(
 
 template <typename T, typename U, bool CLAMP_AMAX>
 __aicore__ inline void MoeV3GatherFP8GroupQuant<T, U, CLAMP_AMAX>::InitKernelTiling(
-    GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData *tilingData)
+    GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData* tilingData)
 {
     gatherOutTilingData_ = &(tilingData->gatherOutComputeParamsOp);
     cols_ = tilingData->cols;
@@ -381,7 +381,7 @@ __aicore__ inline void MoeV3GatherFP8GroupQuant<T, U, CLAMP_AMAX>::InitKernelTil
     int64_t scanRowCount = n_ * k_;
     if (!useGatherCopy_) {
         expertTotalCountGm_.SetGlobalBuffer(
-            (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum, sizeof(int32_t)),
+            (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum, sizeof(int32_t)),
             1);
         DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(expertTotalCountGm_);
         scanRowCount = expertTotalCountGm_.GetValue(0);
@@ -551,19 +551,19 @@ template <typename T, typename U, bool CLAMP_AMAX>
 __aicore__ inline void MoeV3GatherFP8GroupQuant<T, U, CLAMP_AMAX>::Compute(int64_t loopCols, int64_t loopScaleCols)
 {
     LocalTensor<T> xLocal = inQueue_.DeQue<T>();
-    __ubuf__ T *xAddr = reinterpret_cast<__ubuf__ T *>(xLocal.GetPhyAddr());
+    __ubuf__ T* xAddr = reinterpret_cast<__ubuf__ T*>(xLocal.GetPhyAddr());
 
     LocalTensor<U> outLocal = outQueue_.AllocTensor<U>();
-    __ubuf__ U *outAddr = reinterpret_cast<__ubuf__ U *>(outLocal.GetPhyAddr());
+    __ubuf__ U* outAddr = reinterpret_cast<__ubuf__ U*>(outLocal.GetPhyAddr());
 
     LocalTensor<float> scaleLocal = scaleQueue_.AllocTensor<float>();
-    __ubuf__ float *scaleAddr = reinterpret_cast<__ubuf__ float *>(scaleLocal.GetPhyAddr());
+    __ubuf__ float* scaleAddr = reinterpret_cast<__ubuf__ float*>(scaleLocal.GetPhyAddr());
 
     LocalTensor<float> amaxLocal = amaxBuffer_.Get<float>();
-    __ubuf__ float *amaxAddr = reinterpret_cast<__ubuf__ float *>(amaxLocal.GetPhyAddr());
+    __ubuf__ float* amaxAddr = reinterpret_cast<__ubuf__ float*>(amaxLocal.GetPhyAddr());
 
     LocalTensor<float> invScaleLocal = invScaleBuffer_.Get<float>();
-    __ubuf__ float *invScaleAddr = reinterpret_cast<__ubuf__ float *>(invScaleLocal.GetPhyAddr());
+    __ubuf__ float* invScaleAddr = reinterpret_cast<__ubuf__ float*>(invScaleLocal.GetPhyAddr());
 
     __VEC_SCOPE__
     {

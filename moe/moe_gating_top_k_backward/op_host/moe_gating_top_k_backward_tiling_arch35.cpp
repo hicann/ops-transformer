@@ -54,7 +54,7 @@ inline int64_t AlignBytes_(int64_t x)
     return (x + UB_ALIGN_BYTES_MINUS_ONE) & ~UB_ALIGN_BYTES_MINUS_ONE;
 }
 
-MoeGatingTopKBackwardTilingArch35::MoeGatingTopKBackwardTilingArch35(gert::TilingContext *context)
+MoeGatingTopKBackwardTilingArch35::MoeGatingTopKBackwardTilingArch35(gert::TilingContext* context)
     : Ops::Transformer::OpTiling::TilingBaseClass(context)
 {}
 
@@ -128,7 +128,7 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::GetWorkspaceSize()
 ge::graphStatus MoeGatingTopKBackwardTilingArch35::PostTiling()
 {
     context_->SetBlockDim(static_cast<uint32_t>(needCoreNum_));
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     currentWorkspace[0] = workspaceSize_;
 
     MoeGatingTopKBackwardA5TilingData td;
@@ -149,7 +149,7 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::PostTiling()
 
     auto tilingDataSize = sizeof(MoeGatingTopKBackwardA5TilingData);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&td), tilingDataSize);
+                           reinterpret_cast<void*>(&td), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
@@ -174,7 +174,7 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckInputShape()
 
 ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckXNorm()
 {
-    const gert::StorageShape *xNormShapePtr = context_->GetInputShape(X_NORM_INPUT_INDEX);
+    const gert::StorageShape* xNormShapePtr = context_->GetInputShape(X_NORM_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, xNormShapePtr);
     auto xNormDimSize = xNormShapePtr->GetOriginShape().GetDimNum();
     if (xNormDimSize != X_NORM_INPUT_DIMS) {
@@ -212,7 +212,7 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckXNorm()
 
 ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckGradY()
 {
-    const gert::StorageShape *gradYShapePtr = context_->GetInputShape(GRAD_Y_INPUT_INDEX);
+    const gert::StorageShape* gradYShapePtr = context_->GetInputShape(GRAD_Y_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, gradYShapePtr);
     auto gradYDimSize = gradYShapePtr->GetOriginShape().GetDimNum();
     if (gradYDimSize != GRAD_Y_INPUT_DIMS) {
@@ -256,7 +256,7 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckGradY()
 
 ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckExpertIdx()
 {
-    const gert::StorageShape *expertIdxShapePtr = context_->GetInputShape(EXPERT_IDX_INPUT_INDEX);
+    const gert::StorageShape* expertIdxShapePtr = context_->GetInputShape(EXPERT_IDX_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expertIdxShapePtr);
     auto expertIdxDimSize = expertIdxShapePtr->GetOriginShape().GetDimNum();
     if (expertIdxDimSize != EXPERT_IDX_INPUT_DIMS) {
@@ -303,13 +303,13 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckAttr()
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
-    const int64_t *renormPtr = attrs->GetAttrPointer<int64_t>(RENORM_ATTR_INDEX);
+    const int64_t* renormPtr = attrs->GetAttrPointer<int64_t>(RENORM_ATTR_INDEX);
     if (renormPtr != nullptr) {
         renorm_ = *renormPtr;
     }
     OP_LOGI(context_, "Attr renorm: %ld.", renorm_);
 
-    const int64_t *normTypePtr = attrs->GetAttrPointer<int64_t>(NORM_TYPE_ATTR_INDEX);
+    const int64_t* normTypePtr = attrs->GetAttrPointer<int64_t>(NORM_TYPE_ATTR_INDEX);
     if (normTypePtr != nullptr) {
         normType_ = *normTypePtr;
     }
@@ -320,13 +320,13 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckAttr()
         return ge::GRAPH_FAILED;
     }
 
-    const float *routedScalingFactorPtr = attrs->GetAttrPointer<float>(ROUTED_SCALING_FACTOR_ATTR_INDEX);
+    const float* routedScalingFactorPtr = attrs->GetAttrPointer<float>(ROUTED_SCALING_FACTOR_ATTR_INDEX);
     if (routedScalingFactorPtr != nullptr) {
         routedScalingFactor_ = *routedScalingFactorPtr;
     }
     OP_LOGI(context_, "Attr routedScalingFactor: %f.", routedScalingFactor_);
 
-    const float *epsPtr = attrs->GetAttrPointer<float>(EPS_ATTR_INDEX);
+    const float* epsPtr = attrs->GetAttrPointer<float>(EPS_ATTR_INDEX);
     if (epsPtr != nullptr) {
         eps_ = *epsPtr;
     }

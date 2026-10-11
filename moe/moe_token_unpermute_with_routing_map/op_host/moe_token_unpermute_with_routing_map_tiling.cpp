@@ -154,7 +154,7 @@ int64_t GetCeilAlign(const int64_t value1, const int64_t value2)
     return (value1 + value2 - 1) / value2 * value2;
 }
 
-static void InitSplitInfoPad(gert::TilingContext *context, TilingPadParams &param, uint64_t dType)
+static void InitSplitInfoPad(gert::TilingContext* context, TilingPadParams& param, uint64_t dType)
 {
     auto platformInfo = context->GetPlatformInfo();
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
@@ -194,7 +194,7 @@ static inline int64_t ComputeUnitHSpace(const int64_t inputDtypeSize, const int6
     return inputDtypeSize * (QUE_NUM + bufferNum - 1) + FLOAT_DATA_SIZE * castNum;
 }
 
-static inline int64_t ComputeMaxHiddenSize(MoeTokenUnpermuteWithRoutingMapParam &param, int64_t bufferNum)
+static inline int64_t ComputeMaxHiddenSize(MoeTokenUnpermuteWithRoutingMapParam& param, int64_t bufferNum)
 {
     // sorted_indices和probs的预留空间；topK_num为最大值512时，至少需要5120 Btye。
     const int64_t reserveSpace = 5120;
@@ -204,14 +204,14 @@ static inline int64_t ComputeMaxHiddenSize(MoeTokenUnpermuteWithRoutingMapParam 
     return AlignN(maxHiddenSize - ALIGN_512, ALIGN_512);
 }
 
-static inline ge::graphStatus InputParamCheck(const gert::TilingContext *context)
+static inline ge::graphStatus InputParamCheck(const gert::TilingContext* context)
 {
-    const gert::StorageShape *tokensShape = context->GetInputShape(0);
-    const gert::StorageShape *indicesShape = context->GetInputShape(1);
-    const gert::StorageShape *probsShape = context->GetOptionalInputShape(3);
+    const gert::StorageShape* tokensShape = context->GetInputShape(0);
+    const gert::StorageShape* indicesShape = context->GetInputShape(1);
+    const gert::StorageShape* probsShape = context->GetOptionalInputShape(3);
     auto attrs = context->GetAttrs();
     auto restoreAttr = attrs->GetAttrPointer<gert::ContinuousVector>(1);
-    auto attrData = reinterpret_cast<const int64_t *>(restoreAttr->GetData());
+    auto attrData = reinterpret_cast<const int64_t*>(restoreAttr->GetData());
     int64_t restore_shape = attrData[0];
     auto dataTensor0 = context->GetInputTensor(0);
     auto dataTensor1 = context->GetInputTensor(1);
@@ -246,10 +246,10 @@ static inline ge::graphStatus InputParamCheck(const gert::TilingContext *context
     return ge::GRAPH_SUCCESS;
 }
 
-static inline void Init(gert::TilingContext *context, MoeTokenUnpermuteWithRoutingMapParam &param)
+static inline void Init(gert::TilingContext* context, MoeTokenUnpermuteWithRoutingMapParam& param)
 {
     size_t sysWorkspaceSize = 16 * 1024 * 1024 * 2;
-    size_t *currentWorkspace = context->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context->GetWorkspaceSizes(1);
     currentWorkspace[0] = sysWorkspaceSize;
 
     auto ascendPlaform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
@@ -258,9 +258,9 @@ static inline void Init(gert::TilingContext *context, MoeTokenUnpermuteWithRouti
     ascendPlaform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, maxCoreMemery);
     param.core.maxCoreMemery = static_cast<int64_t>(maxCoreMemery);
 
-    const gert::StorageShape *tokensShape = context->GetInputShape(0);
-    const gert::StorageShape *sortedIndicesShape = context->GetInputShape(1);
-    const gert::StorageShape *probsShape = context->GetOptionalInputShape(3);
+    const gert::StorageShape* tokensShape = context->GetInputShape(0);
+    const gert::StorageShape* sortedIndicesShape = context->GetInputShape(1);
+    const gert::StorageShape* probsShape = context->GetOptionalInputShape(3);
     auto attrs = context->GetAttrs();
     auto dataTensor0 = context->GetInputTensor(0);
     auto dataTensor1 = context->GetInputTensor(1);
@@ -280,14 +280,14 @@ static inline void Init(gert::TilingContext *context, MoeTokenUnpermuteWithRouti
         param.input.topK = tokensShape->GetStorageShape().GetDim(0) / param.input.tokensNum;
     } else {
         auto restoreAttr = attrs->GetAttrPointer<gert::ContinuousVector>(1);
-        auto attrData = reinterpret_cast<const int64_t *>(restoreAttr->GetData());
+        auto attrData = reinterpret_cast<const int64_t*>(restoreAttr->GetData());
         int64_t restore_shape = attrData[0];
         param.input.topK = tokensShape->GetStorageShape().GetDim(0) / restore_shape;
         param.input.tokensNum = safeDiv(param.input.totalLength, param.input.topK);
     }
 }
 
-static void SetCoreNum(MoeTokenUnpermuteWithRoutingMapParam &param)
+static void SetCoreNum(MoeTokenUnpermuteWithRoutingMapParam& param)
 {
     if (param.input.tokensNum < param.core.maxCoreNum) {
         param.core.usedCoreNum = param.input.tokensNum;
@@ -296,7 +296,7 @@ static void SetCoreNum(MoeTokenUnpermuteWithRoutingMapParam &param)
     }
 }
 
-static inline void TilingHiddenSize(MoeTokenUnpermuteWithRoutingMapParam &param)
+static inline void TilingHiddenSize(MoeTokenUnpermuteWithRoutingMapParam& param)
 {
     int64_t maxHiddenSize = ComputeMaxHiddenSize(param, MIN_BUFFER_NUM);
     if (AlignN(param.input.hiddenSize, ALIGN_512) <= maxHiddenSize) {
@@ -310,7 +310,7 @@ static inline void TilingHiddenSize(MoeTokenUnpermuteWithRoutingMapParam &param)
     }
 }
 
-static inline void SetBufferNum(MoeTokenUnpermuteWithRoutingMapParam &param)
+static inline void SetBufferNum(MoeTokenUnpermuteWithRoutingMapParam& param)
 {
     const int64_t maxBufferNum = 4;
     int64_t bufferNum = maxBufferNum;
@@ -320,7 +320,7 @@ static inline void SetBufferNum(MoeTokenUnpermuteWithRoutingMapParam &param)
     param.core.bufferNum = bufferNum;
 }
 
-static inline void ComputeRemainMemerySpace(MoeTokenUnpermuteWithRoutingMapParam &param)
+static inline void ComputeRemainMemerySpace(MoeTokenUnpermuteWithRoutingMapParam& param)
 {
     param.core.remainMemerySpace =
         param.core.maxCoreMemery - AlignN(param.hiddenTiling.length, ALIGN_512) *
@@ -328,7 +328,7 @@ static inline void ComputeRemainMemerySpace(MoeTokenUnpermuteWithRoutingMapParam
     param.core.remainMemerySpace -= ALIGN_256;
 }
 
-static inline void TilingToken(MoeTokenUnpermuteWithRoutingMapParam &param)
+static inline void TilingToken(MoeTokenUnpermuteWithRoutingMapParam& param)
 {
     param.tokenPerCore.length = safeDiv(param.input.tokensNum, param.core.usedCoreNum);
     param.tokenPerCore.num = param.core.usedCoreNum;
@@ -356,8 +356,8 @@ static inline void TilingToken(MoeTokenUnpermuteWithRoutingMapParam &param)
     }
 }
 
-static inline void Tiling4MaskedSelect(MoeTokenUnpermuteWithRoutingMapTilingData &tilingData,
-                                       MoeTokenUnpermuteWithRoutingMapParam &param)
+static inline void Tiling4MaskedSelect(MoeTokenUnpermuteWithRoutingMapTilingData& tilingData,
+                                       MoeTokenUnpermuteWithRoutingMapParam& param)
 {
     auto mstilingData = &tilingData.maskedSelectParamsOp;
 
@@ -437,7 +437,7 @@ static inline void Tiling4MaskedSelect(MoeTokenUnpermuteWithRoutingMapTilingData
     0表示probs为None，1表示prob非None。
  */
 
-static inline void SetTilingKey(gert::TilingContext *context, MoeTokenUnpermuteWithRoutingMapParam &param)
+static inline void SetTilingKey(gert::TilingContext* context, MoeTokenUnpermuteWithRoutingMapParam& param)
 {
     if (param.input.haveProbs) {
         // 存在probs
@@ -446,7 +446,7 @@ static inline void SetTilingKey(gert::TilingContext *context, MoeTokenUnpermuteW
     }
 }
 
-static inline void SetTilingData(gert::TilingContext *context, MoeTokenUnpermuteWithRoutingMapParam &param)
+static inline void SetTilingData(gert::TilingContext* context, MoeTokenUnpermuteWithRoutingMapParam& param)
 {
     MoeTokenUnpermuteWithRoutingMapTilingData tilingData;
     Tiling4MaskedSelect(tilingData, param);
@@ -468,17 +468,17 @@ static inline void SetTilingData(gert::TilingContext *context, MoeTokenUnpermute
     context->SetBlockDim(param.core.maxUsedCoreNum);
 }
 
-static void InitPad(const gert::TilingContext *context, TilingPadParams &param)
+static void InitPad(const gert::TilingContext* context, TilingPadParams& param)
 {
-    const gert::StorageShape *sortedIndicesShape = context->GetInputShape(INPUT_SORTED_INDICES_INDEX);
-    const gert::StorageShape *probsOptionalShape = context->GetInputShape(INPUT_PROBS_OPTIONAL_INDEX);
+    const gert::StorageShape* sortedIndicesShape = context->GetInputShape(INPUT_SORTED_INDICES_INDEX);
+    const gert::StorageShape* probsOptionalShape = context->GetInputShape(INPUT_PROBS_OPTIONAL_INDEX);
     uint64_t num_experts_capacity = sortedIndicesShape->GetStorageShape().GetDim(0);
     param.num_tokens = probsOptionalShape->GetStorageShape().GetDim(0);
     param.num_experts = probsOptionalShape->GetStorageShape().GetDim(1);
     param.capacity = num_experts_capacity / param.num_experts;
 }
 
-static ge::graphStatus SetTilingKeyPad(gert::TilingContext *context, TilingPadParams &params, uint64_t dType)
+static ge::graphStatus SetTilingKeyPad(gert::TilingContext* context, TilingPadParams& params, uint64_t dType)
 {
     (void)params;
     (void)dType;
@@ -487,7 +487,7 @@ static ge::graphStatus SetTilingKeyPad(gert::TilingContext *context, TilingPadPa
     return context->SetTilingKey(tilingKey);
 }
 
-static inline void SetTilingDataPad(gert::TilingContext *context, TilingPadParams &param)
+static inline void SetTilingDataPad(gert::TilingContext* context, TilingPadParams& param)
 {
     MoeTokenUnpermuteWithRoutingMapTilingData tilingData;
 
@@ -518,11 +518,11 @@ static inline void SetTilingDataPad(gert::TilingContext *context, TilingPadParam
     context->SetBlockDim(param.core_num_use);
 
     uint64_t sysWorkspaceSize = 16 * 1024 * 1024;
-    size_t *currentWorkspace = context->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context->GetWorkspaceSizes(1);
     currentWorkspace[0] = sysWorkspaceSize;
 }
 
-static inline void PrintTilingDataPad(const gert::TilingContext *context, const TilingPadParams &param)
+static inline void PrintTilingDataPad(const gert::TilingContext* context, const TilingPadParams& param)
 {
     auto nodeName = context->GetNodeName();
     OP_LOGD(nodeName, ">>>>>>>>>>>>>>> Start to print MoeTokenUnpermuteWithRoutingMap tiling data <<<<<<<<<<<<<<<<");
@@ -544,7 +544,7 @@ static inline void PrintTilingDataPad(const gert::TilingContext *context, const 
     OP_LOGD(nodeName, ">>>>>>>>>>>>>>> Print MoeTokenUnpermuteWithRoutingMap tiling data end <<<<<<<<<<<<<<<<");
 }
 
-static ge::graphStatus TilingMoeTokenUnpermuteWithRoutingMapPad(gert::TilingContext *context)
+static ge::graphStatus TilingMoeTokenUnpermuteWithRoutingMapPad(gert::TilingContext* context)
 {
     TilingPadParams param;
     InitPad(context, param);
@@ -561,7 +561,7 @@ static ge::graphStatus TilingMoeTokenUnpermuteWithRoutingMapPad(gert::TilingCont
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingCompute(gert::TilingContext *context, MoeTokenUnpermuteWithRoutingMapParam &param)
+ge::graphStatus TilingCompute(gert::TilingContext* context, MoeTokenUnpermuteWithRoutingMapParam& param)
 {
     if (InputParamCheck(context) == ge::GRAPH_FAILED) {
         return ge::GRAPH_FAILED;
@@ -578,12 +578,12 @@ ge::graphStatus TilingCompute(gert::TilingContext *context, MoeTokenUnpermuteWit
     return context->SetTilingKey(param.core.tilingKey);
 }
 
-static ge::graphStatus TilingMoeTokenUnpermuteWithRoutingMap(gert::TilingContext *context)
+static ge::graphStatus TilingMoeTokenUnpermuteWithRoutingMap(gert::TilingContext* context)
 {
     MoeTokenUnpermuteWithRoutingMapParam param;
     auto attrPtr = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrPtr);
-    const bool *pPadded_mode = attrPtr->GetAttrPointer<bool>(0);
+    const bool* pPadded_mode = attrPtr->GetAttrPointer<bool>(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, pPadded_mode);
     auto padded_mode = *pPadded_mode;
     if (padded_mode == false) {
@@ -594,7 +594,7 @@ static ge::graphStatus TilingMoeTokenUnpermuteWithRoutingMap(gert::TilingContext
     }
 }
 
-static ge::graphStatus TilingPrepareForMoeTokenUnpermuteWithRoutingMap(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForMoeTokenUnpermuteWithRoutingMap(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

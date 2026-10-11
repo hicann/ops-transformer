@@ -30,8 +30,8 @@ static const std::initializer_list<op::DataType> MOE_GATING_TOP_K_V2_DTYPE_SUPPO
 static const std::initializer_list<op::DataType> MOE_GATING_TOP_K_V2_DTYPE_SUPPORT_LIST_INT32 = {DataType::DT_INT32};
 static const std::initializer_list<op::DataType> MOE_GATING_TOP_K_V2_DTYPE_SUPPORT_LIST_FLOAT = {DataType::DT_FLOAT};
 
-static inline bool CheckNotNull(const aclTensor *x, const aclTensor *yOut, const aclTensor *expertIdxOut,
-                                const aclTensor *outOut)
+static inline bool CheckNotNull(const aclTensor* x, const aclTensor* yOut, const aclTensor* expertIdxOut,
+                                const aclTensor* outOut)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(yOut, return false);
@@ -40,9 +40,9 @@ static inline bool CheckNotNull(const aclTensor *x, const aclTensor *yOut, const
     return true;
 }
 
-static inline bool CheckDtypeValid(const aclTensor *x, const aclTensor *biasOptional, const aclTensor *inputIdsOptional,
-                                   const aclTensor *tid2eidOptional, const aclTensor *yOut,
-                                   const aclTensor *expertIdxOut, const aclTensor *outOut)
+static inline bool CheckDtypeValid(const aclTensor* x, const aclTensor* biasOptional, const aclTensor* inputIdsOptional,
+                                   const aclTensor* tid2eidOptional, const aclTensor* yOut,
+                                   const aclTensor* expertIdxOut, const aclTensor* outOut)
 {
     if (x != nullptr && x->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(x, MOE_GATING_TOP_K_V2_DTYPE_SUPPORT_LIST_X, return false);
@@ -70,9 +70,9 @@ static inline bool CheckDtypeValid(const aclTensor *x, const aclTensor *biasOpti
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *biasOptional, const aclTensor *inputIdsOptional,
-                               const aclTensor *tid2eidOptional, const aclTensor *yOut, const aclTensor *expertIdxOut,
-                               const aclTensor *outOut)
+static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* biasOptional, const aclTensor* inputIdsOptional,
+                               const aclTensor* tid2eidOptional, const aclTensor* yOut, const aclTensor* expertIdxOut,
+                               const aclTensor* outOut)
 {
     CHECK_RET(CheckNotNull(x, yOut, expertIdxOut, outOut), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid(x, biasOptional, inputIdsOptional, tid2eidOptional, yOut, expertIdxOut, outOut),
@@ -87,10 +87,10 @@ extern "C" {
 #endif
 
 ACLNN_API aclnnStatus aclnnMoeGatingTopKV2GetWorkspaceSize(
-    const aclTensor *x, const aclTensor *biasOptional, const aclTensor *inputIdsOptional,
-    const aclTensor *tid2eidOptional, int64_t k, int64_t kGroup, int64_t groupCount, int64_t groupSelectMode,
-    int64_t renorm, int64_t normType, bool outFlag, double routedScalingFactor, double eps, const aclTensor *yOut,
-    const aclTensor *expertIdxOut, const aclTensor *outOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* x, const aclTensor* biasOptional, const aclTensor* inputIdsOptional,
+    const aclTensor* tid2eidOptional, int64_t k, int64_t kGroup, int64_t groupCount, int64_t groupSelectMode,
+    int64_t renorm, int64_t normType, bool outFlag, double routedScalingFactor, double eps, const aclTensor* yOut,
+    const aclTensor* expertIdxOut, const aclTensor* outOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnMoeGatingTopKV2,
                    DFX_IN(x, biasOptional, inputIdsOptional, tid2eidOptional, k, kGroup, groupCount, groupSelectMode,
@@ -107,19 +107,19 @@ ACLNN_API aclnnStatus aclnnMoeGatingTopKV2GetWorkspaceSize(
     auto xContiguous = l0op::Contiguous(x, uniqueExecutor.get());
     CHECK_RET(xContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor *biasContiguous = nullptr;
+    const aclTensor* biasContiguous = nullptr;
     if (biasOptional != nullptr) {
         biasContiguous = l0op::Contiguous(biasOptional, uniqueExecutor.get());
         CHECK_RET(biasContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor *inputIdsContiguous = nullptr;
+    const aclTensor* inputIdsContiguous = nullptr;
     if (inputIdsOptional != nullptr) {
         inputIdsContiguous = l0op::Contiguous(inputIdsOptional, uniqueExecutor.get());
         CHECK_RET(inputIdsContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor *tid2eidContiguous = nullptr;
+    const aclTensor* tid2eidContiguous = nullptr;
     if (tid2eidOptional != nullptr) {
         tid2eidContiguous = l0op::Contiguous(tid2eidOptional, uniqueExecutor.get());
         CHECK_RET(tid2eidContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -146,7 +146,7 @@ ACLNN_API aclnnStatus aclnnMoeGatingTopKV2GetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-ACLNN_API aclnnStatus aclnnMoeGatingTopKV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMoeGatingTopKV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMoeGatingTopKV2);

@@ -105,8 +105,8 @@ __aicore__ inline void SetWaitFlag(HardEvent evt)
 namespace MoeGatingTopK {
 
 template <typename T>
-__aicore__ inline void SmallKAlignEVFNoNorm(__ubuf__ float *inputAddr, __ubuf__ uint32_t *mrgSortAddr,
-                                            __ubuf__ T *outputAddr, __ubuf__ uint32_t *expertIdxAddr, uint32_t k,
+__aicore__ inline void SmallKAlignEVFNoNorm(__ubuf__ float* inputAddr, __ubuf__ uint32_t* mrgSortAddr,
+                                            __ubuf__ T* outputAddr, __ubuf__ uint32_t* expertIdxAddr, uint32_t k,
                                             float routedScalingFactor)
 {
     __VEC_SCOPE__
@@ -125,8 +125,8 @@ __aicore__ inline void SmallKAlignEVFNoNorm(__ubuf__ float *inputAddr, __ubuf__ 
 }
 
 template <typename T>
-__aicore__ inline void SmallKAlignEVFWithNorm(__ubuf__ float *inputAddr, __ubuf__ uint32_t *mrgSortAddr,
-                                              __ubuf__ T *outputAddr, __ubuf__ uint32_t *expertIdxAddr, uint32_t k,
+__aicore__ inline void SmallKAlignEVFWithNorm(__ubuf__ float* inputAddr, __ubuf__ uint32_t* mrgSortAddr,
+                                              __ubuf__ T* outputAddr, __ubuf__ uint32_t* expertIdxAddr, uint32_t k,
                                               float eps, float routedScalingFactor)
 {
     __VEC_SCOPE__
@@ -151,8 +151,8 @@ __aicore__ inline void SmallKAlignEVFWithNorm(__ubuf__ float *inputAddr, __ubuf_
 }
 
 template <typename T>
-__aicore__ inline void LargeKAlignEVFNoNorm(__ubuf__ float *inputAddr, __ubuf__ uint32_t *mrgSortAddr,
-                                            __ubuf__ T *outputAddr, __ubuf__ uint32_t *expertIdxAddr, uint32_t k,
+__aicore__ inline void LargeKAlignEVFNoNorm(__ubuf__ float* inputAddr, __ubuf__ uint32_t* mrgSortAddr,
+                                            __ubuf__ T* outputAddr, __ubuf__ uint32_t* expertIdxAddr, uint32_t k,
                                             float routedScalingFactor)
 {
     __VEC_SCOPE__
@@ -176,8 +176,8 @@ __aicore__ inline void LargeKAlignEVFNoNorm(__ubuf__ float *inputAddr, __ubuf__ 
 }
 
 template <typename T>
-__aicore__ inline void LargeKAlignEVFWithNorm(__ubuf__ float *inputAddr, __ubuf__ uint32_t *mrgSortAddr,
-                                              __ubuf__ T *outputAddr, __ubuf__ uint32_t *expertIdxAddr, uint32_t k,
+__aicore__ inline void LargeKAlignEVFWithNorm(__ubuf__ float* inputAddr, __ubuf__ uint32_t* mrgSortAddr,
+                                              __ubuf__ T* outputAddr, __ubuf__ uint32_t* expertIdxAddr, uint32_t k,
                                               float eps, float routedScalingFactor)
 {
     uint32_t k1 = k;

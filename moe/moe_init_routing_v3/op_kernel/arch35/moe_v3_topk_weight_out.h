@@ -24,8 +24,8 @@ using namespace AscendC;
 constexpr int64_t TOPK_WEIGHT_SIMT_THREAD_NUM = 1024;
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(TOPK_WEIGHT_SIMT_THREAD_NUM) inline void TopkWeightGatherSimt(
-    int64_t elements, int64_t indexBase, int64_t totalLength, __gm__ int32_t *dstToSrcRow, __gm__ float *topkWeight,
-    __gm__ volatile float *expandedTopkWeight)
+    int64_t elements, int64_t indexBase, int64_t totalLength, __gm__ int32_t* dstToSrcRow, __gm__ float* topkWeight,
+    __gm__ volatile float* expandedTopkWeight)
 {
     for (int64_t index = static_cast<int64_t>(threadIdx.x); index < elements;
          index += static_cast<int64_t>(blockDim.x)) {
@@ -38,8 +38,8 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(TOPK_WEIGHT_SIMT_THREAD_NUM) inline void Top
 }
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(TOPK_WEIGHT_SIMT_THREAD_NUM) inline void TopkWeightScatterSimt(
-    int64_t elements, int64_t indexBase, int64_t outputRows, __gm__ int32_t *srcToDstRow, __gm__ float *topkWeight,
-    __gm__ volatile float *expandedTopkWeight)
+    int64_t elements, int64_t indexBase, int64_t outputRows, __gm__ int32_t* srcToDstRow, __gm__ float* topkWeight,
+    __gm__ volatile float* expandedTopkWeight)
 {
     for (int64_t index = static_cast<int64_t>(threadIdx.x); index < elements;
          index += static_cast<int64_t>(blockDim.x)) {
@@ -55,7 +55,7 @@ class MoeV3TopkWeightOut {
 public:
     __aicore__ inline MoeV3TopkWeightOut() {}
     __aicore__ inline void Init(GM_ADDR topkWeight, GM_ADDR expandedRowIdx, GM_ADDR expandedTopkWeight,
-                                GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData *tilingData);
+                                GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData* tilingData);
     __aicore__ inline void Process();
 
 private:
@@ -75,7 +75,7 @@ private:
 };
 
 __aicore__ inline void MoeV3TopkWeightOut::Init(GM_ADDR topkWeight, GM_ADDR expandedRowIdx, GM_ADDR expandedTopkWeight,
-                                                GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData *tilingData)
+                                                GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData* tilingData)
 {
     blockIdx_ = GetBlockIdx();
     coreNum_ = tilingData->coreNum;
@@ -85,15 +85,15 @@ __aicore__ inline void MoeV3TopkWeightOut::Init(GM_ADDR topkWeight, GM_ADDR expa
                       static_cast<int64_t>(tilingData->expertNum) * tilingData->expertCapacity :
                       tilingData->activeNum;
 
-    topkWeightGm_.SetGlobalBuffer((__gm__ float *)topkWeight, totalLength_);
-    expandedTopkWeightGm_.SetGlobalBuffer((__gm__ float *)expandedTopkWeight, outputRows_);
+    topkWeightGm_.SetGlobalBuffer((__gm__ float*)topkWeight, totalLength_);
+    expandedTopkWeightGm_.SetGlobalBuffer((__gm__ float*)expandedTopkWeight, outputRows_);
 
     int64_t splitBase = totalLength_;
     if (dropPadMode_ == DROP_PAD_MODE) {
-        srcToDstRowGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, totalLength_);
+        srcToDstRowGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, totalLength_);
     } else {
         GlobalTensor<int32_t> expertTotalCountGm;
-        expertTotalCountGm.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(totalLength_, sizeof(int32_t)) * 2 +
+        expertTotalCountGm.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(totalLength_, sizeof(int32_t)) * 2 +
                                                Align(tilingData->actualExpertNum, sizeof(int32_t)),
                                            1);
         AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE,
@@ -101,9 +101,9 @@ __aicore__ inline void MoeV3TopkWeightOut::Init(GM_ADDR topkWeight, GM_ADDR expa
         splitBase = expertTotalCountGm.GetValue(0);
 
         if (tilingData->rowIdxType == SCATTER) {
-            dstToSrcRowGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, totalLength_);
+            dstToSrcRowGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, totalLength_);
         } else {
-            dstToSrcRowGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(totalLength_, sizeof(int32_t)),
+            dstToSrcRowGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(totalLength_, sizeof(int32_t)),
                                            Align(totalLength_, sizeof(int32_t)));
         }
     }
@@ -124,7 +124,7 @@ __aicore__ inline void MoeV3TopkWeightOut::Process()
         int64_t endRow = Min(startRow + perCoreZeroRows, outputRows_);
         if (startRow < endRow) {
             GlobalTensor<float> zeroGm;
-            zeroGm.SetGlobalBuffer((__gm__ float *)expandedTopkWeightGm_.GetPhyAddr() + startRow, endRow - startRow);
+            zeroGm.SetGlobalBuffer((__gm__ float*)expandedTopkWeightGm_.GetPhyAddr() + startRow, endRow - startRow);
             SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
             InitGlobalMemory(zeroGm, endRow - startRow, 0.0f);
             SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
@@ -136,9 +136,9 @@ __aicore__ inline void MoeV3TopkWeightOut::Process()
         if (blockIdx_ < needCoreNum_) {
             uint32_t threadNum = static_cast<uint32_t>(Min(coreElements_, TOPK_WEIGHT_SIMT_THREAD_NUM));
             asc_vf_call<TopkWeightScatterSimt>(dim3{threadNum, 1, 1}, coreElements_, startIdx, outputRows_,
-                                               (__gm__ int32_t *)srcToDstRowGm_.GetPhyAddr(),
-                                               (__gm__ float *)topkWeightGm_.GetPhyAddr(),
-                                               (__gm__ volatile float *)expandedTopkWeightGm_.GetPhyAddr());
+                                               (__gm__ int32_t*)srcToDstRowGm_.GetPhyAddr(),
+                                               (__gm__ float*)topkWeightGm_.GetPhyAddr(),
+                                               (__gm__ volatile float*)expandedTopkWeightGm_.GetPhyAddr());
         }
         return;
     }
@@ -146,8 +146,8 @@ __aicore__ inline void MoeV3TopkWeightOut::Process()
     if (blockIdx_ < needCoreNum_) {
         uint32_t threadNum = static_cast<uint32_t>(Min(coreElements_, TOPK_WEIGHT_SIMT_THREAD_NUM));
         asc_vf_call<TopkWeightGatherSimt>(
-            dim3{threadNum, 1, 1}, coreElements_, startIdx, totalLength_, (__gm__ int32_t *)dstToSrcRowGm_.GetPhyAddr(),
-            (__gm__ float *)topkWeightGm_.GetPhyAddr(), (__gm__ volatile float *)expandedTopkWeightGm_.GetPhyAddr());
+            dim3{threadNum, 1, 1}, coreElements_, startIdx, totalLength_, (__gm__ int32_t*)dstToSrcRowGm_.GetPhyAddr(),
+            (__gm__ float*)topkWeightGm_.GetPhyAddr(), (__gm__ volatile float*)expandedTopkWeightGm_.GetPhyAddr());
     }
 }
 

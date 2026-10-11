@@ -90,14 +90,14 @@ struct MoeInitRoutingV2CompileInfo {
 
 class MoeInitRoutingV2TilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeInitRoutingV2TilingBase(gert::TilingContext *context)
+    explicit MoeInitRoutingV2TilingBase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {
         Reset();
     }
     ~MoeInitRoutingV2TilingBase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
@@ -125,19 +125,19 @@ protected:
     void Reset();
 
 protected:
-    ge::graphStatus CheckTokenCount(int64_t num, const char *tag);
+    ge::graphStatus CheckTokenCount(int64_t num, const char* tag);
     virtual ge::graphStatus CheckOutShape(bool isRegbase);
     virtual void Tiling4GatherOutCompute();
-    bool CalculateScatterOutCoreAllocation(int64_t actualActivateRows, MoeV2GatherOutComputeTilingData *tilingData);
-    void CalculateScatterOutBufferParams(int64_t ubRowsVal, int64_t cols, MoeV2GatherOutComputeTilingData *tilingData);
+    bool CalculateScatterOutCoreAllocation(int64_t actualActivateRows, MoeV2GatherOutComputeTilingData* tilingData);
+    void CalculateScatterOutBufferParams(int64_t ubRowsVal, int64_t cols, MoeV2GatherOutComputeTilingData* tilingData);
     void Tiling4SrcToDstCompute();
     virtual void Tiling4SrcToDstCapacityCompute();
     void Tiling4SortOutCompute();
     void Tiling4VMSMiddleCompute();
     void Tiling4VBSCompute();
     void ShowTilingData();
-    void Tiling4VBSMultiCoreCompute(MoeV2VBSComputeTilingData *tilingData);
-    void Tiling4VBSOneCoreCompute(MoeV2VBSComputeTilingData *tilingData);
+    void Tiling4VBSMultiCoreCompute(MoeV2VBSComputeTilingData* tilingData);
+    void Tiling4VBSOneCoreCompute(MoeV2VBSComputeTilingData* tilingData);
     virtual bool IsFullLoad();
 
     void ShowBasicTilingData();
@@ -146,12 +146,12 @@ protected:
     void ShowGatherOutTilingData();
     void SetGatherOutLoopParams(int64_t perCoreRows, int64_t lastCoreRows, int64_t rowSize, int64_t colSize);
 
-    ge::graphStatus GetInputShapes(gert::Shape &xShape, gert::Shape &expertIdxShape);
+    ge::graphStatus GetInputShapes(gert::Shape& xShape, gert::Shape& expertIdxShape);
     ge::graphStatus GetAttrsParams();
-    ge::graphStatus ValidateInputShapes(const gert::Shape &xShape, const gert::Shape &expertIdxShape) const;
-    ge::graphStatus ValidateAttrsParams(const gert::Shape &xShape) const;
-    ge::graphStatus ProcessParamsAndSetTilingData(const gert::Shape &xShape, const gert::Shape &expertIdxShape);
-    ge::graphStatus ValidateExpandedXShape(const gert::Shape &expandedXShape, bool isRegbase);
+    ge::graphStatus ValidateInputShapes(const gert::Shape& xShape, const gert::Shape& expertIdxShape) const;
+    ge::graphStatus ValidateAttrsParams(const gert::Shape& xShape) const;
+    ge::graphStatus ProcessParamsAndSetTilingData(const gert::Shape& xShape, const gert::Shape& expertIdxShape);
+    ge::graphStatus ValidateExpandedXShape(const gert::Shape& expandedXShape, bool isRegbase);
 
     int64_t aivNum;
     int64_t sortLoopMaxElement = 0;
@@ -167,7 +167,7 @@ protected:
     bool isFullLoad = false;
     bool regBase = false;
     bool is310P = false;
-    const char *opName = "";
+    const char* opName = "";
     MoeInitRoutingV2TilingData moeInitRoutingTilingData;
 };
 } // namespace optiling

@@ -23,10 +23,9 @@ using Ops::Transformer::OpTiling::TilingBaseClass;
 
 class MoeInitRoutingV4TilingArch35 : public MoeInitRoutingV3TilingArch35 {
 public:
-    explicit MoeInitRoutingV4TilingArch35(gert::TilingContext *context)
+    explicit MoeInitRoutingV4TilingArch35(gert::TilingContext* context)
         : MoeInitRoutingV3TilingArch35(context)
-    {
-    }
+    {}
     ~MoeInitRoutingV4TilingArch35() override = default;
 
 protected:
@@ -54,21 +53,20 @@ protected:
         OP_LOGD(context_, "Get input attr expertNum = %ld.", expertNum_);
         MIRV3_CHECK_GE_RET(GetInputAttr<int64_t>(dropPadMode_, attrsPtr, V4_ATTR_DROP_PAD_MODE_INDEX));
         OP_LOGD(context_, "Get input attr dropPadMode = %ld.", dropPadMode_);
-        MIRV3_CHECK_GE_RET(
-            GetInputAttr<int64_t>(expertTokensNumType_, attrsPtr, V4_ATTR_EXPERT_TOKEN_NUM_TYPE_INDEX));
+        MIRV3_CHECK_GE_RET(GetInputAttr<int64_t>(expertTokensNumType_, attrsPtr, V4_ATTR_EXPERT_TOKEN_NUM_TYPE_INDEX));
         OP_LOGD(context_, "Get input attr expertTokensNumType = %ld.", expertTokensNumType_);
         MIRV3_CHECK_GE_RET(GetInputAttr<bool>(expertTokensNumFlag_, attrsPtr, V4_ATTR_EXPERT_TOKEN_NUM_FLAG_INDEX));
         OP_LOGD(context_, "Get input attr expertTokensNumFlag = %d.", expertTokensNumFlag_);
         MIRV3_CHECK_GE_RET(GetInputAttr<int64_t>(quantMode_, attrsPtr, V4_ATTR_QUANT_MODE_INDEX));
         OP_LOGD(context_, "Get input attr quantMode = %ld.", quantMode_);
-        const auto *aerPtr = attrsPtr->GetAttrPointer<gert::ContinuousVector>(V4_ATTR_EXPERT_RANGE_INDEX);
+        const auto* aerPtr = attrsPtr->GetAttrPointer<gert::ContinuousVector>(V4_ATTR_EXPERT_RANGE_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, aerPtr);
         int64_t aerLen = aerPtr->GetSize();
-        OP_CHECK_IF(aerLen != 2,
-                    OP_LOGE_WITH_INVALID_ATTR_SIZE(context_->GetNodeName(), "active_expert_range",
-                                                   std::to_string(aerLen), "2"),
-                    return ge::GRAPH_FAILED);
-        const int64_t *aerList = reinterpret_cast<const int64_t *>(aerPtr->GetData());
+        OP_CHECK_IF(
+            aerLen != 2,
+            OP_LOGE_WITH_INVALID_ATTR_SIZE(context_->GetNodeName(), "active_expert_range", std::to_string(aerLen), "2"),
+            return ge::GRAPH_FAILED);
+        const int64_t* aerList = reinterpret_cast<const int64_t*>(aerPtr->GetData());
         expertStart_ = aerList[0];
         expertEnd_ = aerList[1];
         OP_LOGD(context_, "Extracted input attrs expertStart = %ld, expertEnd = %ld.", expertStart_, expertEnd_);
@@ -86,8 +84,7 @@ protected:
         inputXDtypeSize_ = static_cast<int64_t>(ge::GetSizeByDataType(xDtype_));
         inputXDtypeSize_ = (inputXDtypeSize_ > NUM_THOUSAND) ? 1 : inputXDtypeSize_;
         MIRV3_CHECK_GE_RET(GetTensorShapeDtype<true>(expertIdxShape_, expertIdxDtype_, V4_INPUT_EXPERT_IDX_INDEX));
-        MIRV3_CHECK_GE_RET(
-            GetOptionalInputShapeDtype(scaleShape_, scaleDtype_, isInputScale_, V4_INPUT_SCALE_INDEX));
+        MIRV3_CHECK_GE_RET(GetOptionalInputShapeDtype(scaleShape_, scaleDtype_, isInputScale_, V4_INPUT_SCALE_INDEX));
         tilingDataPtr_->isInputScale = isInputScale_;
         if (isInputScale_) {
             inputScaleDTypeSize_ = static_cast<int64_t>(ge::GetSizeByDataType(scaleDtype_));
@@ -122,12 +119,10 @@ protected:
     {
         OP_LOGD(context_, "Entered MoeInitRoutingV4TilingArch35::GetOutputTensorsInfo()");
 
+        MIRV3_CHECK_GE_RET(GetTensorShapeDtype<false>(expandedXShape_, expandedXDtype_, V4_OUTPUT_EXPANDED_X_INDEX));
         MIRV3_CHECK_GE_RET(
-            GetTensorShapeDtype<false>(expandedXShape_, expandedXDtype_, V4_OUTPUT_EXPANDED_X_INDEX));
-        MIRV3_CHECK_GE_RET(GetTensorShapeDtype<false>(expandedRowIdxShape_, expandedRowIdxDtype_,
-                                                      V4_OUTPUT_EXPANDED_ROW_IDX_INDEX));
-        MIRV3_CHECK_GE_RET(GetTensorShapeDtype<false>(expertTokensCountOrCumsumShape_,
-                                                      expertTokensCountOrCumsumDtype_,
+            GetTensorShapeDtype<false>(expandedRowIdxShape_, expandedRowIdxDtype_, V4_OUTPUT_EXPANDED_ROW_IDX_INDEX));
+        MIRV3_CHECK_GE_RET(GetTensorShapeDtype<false>(expertTokensCountOrCumsumShape_, expertTokensCountOrCumsumDtype_,
                                                       V4_OUTPUT_EXPERT_TOKENS_COUNT_INDEX));
         MIRV3_CHECK_GE_RET(
             GetTensorShapeDtype<false>(expandedScaleShape_, expandedScaleDtype_, V4_OUTPUT_EXPANDED_SCALE_INDEX));

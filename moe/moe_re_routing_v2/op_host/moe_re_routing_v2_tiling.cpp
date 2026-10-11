@@ -27,8 +27,9 @@ const static int64_t TOPK_WEIGHT_DIM1_VALUE = 1;
 
 class MoeReRoutingV2ReTiling : public MoeReRoutingReTiling {
 public:
-    explicit MoeReRoutingV2ReTiling(gert::TilingContext *context)
-        : MoeReRoutingReTiling(context) {}
+    explicit MoeReRoutingV2ReTiling(gert::TilingContext* context)
+        : MoeReRoutingReTiling(context)
+    {}
     ~MoeReRoutingV2ReTiling() override = default;
 
 protected:
@@ -49,11 +50,10 @@ protected:
             hasTopkWeight_ = true;
             auto topkWeightShapePtr = context_->GetOptionalInputShape(V2_IN_EXPERT_TOPK_WEIGHT_INDEX);
             OP_CHECK_NULL_WITH_CONTEXT(context_, topkWeightShapePtr);
-            auto &topkWeightShape = topkWeightShapePtr->GetStorageShape();
+            auto& topkWeightShape = topkWeightShapePtr->GetStorageShape();
             OP_CHECK_IF(topkWeightShape.GetDimNum() != TOPK_WEIGHT_DIM,
-                        OP_LOGE_FOR_INVALID_SHAPEDIM(
-                            context_->GetNodeName(), "expert_topk_weight",
-                            std::to_string(topkWeightShape.GetDimNum()).c_str(), "2"),
+                        OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "expert_topk_weight",
+                                                     std::to_string(topkWeightShape.GetDimNum()).c_str(), "2"),
                         return ge::GRAPH_FAILED);
             OP_CHECK_IF(topkWeightShape.GetDim(0) != tokenSum_,
                         OP_LOGE(context_->GetNodeName(), "expert_topk_weight dim0: %ld should equal tokenSum: %ld.",
@@ -66,11 +66,10 @@ protected:
         } else {
             auto permuteTopkWeightOutShape = context_->GetOutputShape(V2_OUTPUT_PERMUTE_TOPK_WEIGHT_INDEX);
             if (permuteTopkWeightOutShape != nullptr) {
-                auto &shape = permuteTopkWeightOutShape->GetStorageShape();
+                auto& shape = permuteTopkWeightOutShape->GetStorageShape();
                 OP_CHECK_IF(shape.GetDimNum() > 0 && shape.GetDim(0) > 0,
-                            OP_LOGE(context_->GetNodeName(),
-                                    "permute_topk_weight output must not be provided"
-                                    " when expert_topk_weight is not input."),
+                            OP_LOGE(context_->GetNodeName(), "permute_topk_weight output must not be provided"
+                                                             " when expert_topk_weight is not input."),
                             return ge::GRAPH_FAILED);
             }
         }
@@ -81,8 +80,9 @@ protected:
 
 class MoeReRoutingV2RTiling : public MoeReRoutingRTiling {
 public:
-    explicit MoeReRoutingV2RTiling(gert::TilingContext *context)
-        : MoeReRoutingRTiling(context) {}
+    explicit MoeReRoutingV2RTiling(gert::TilingContext* context)
+        : MoeReRoutingRTiling(context)
+    {}
     ~MoeReRoutingV2RTiling() override = default;
 
 protected:
@@ -103,11 +103,10 @@ protected:
             hasTopkWeight_ = true;
             auto topkWeightShapePtr = context_->GetOptionalInputShape(V2_IN_EXPERT_TOPK_WEIGHT_INDEX);
             OP_CHECK_NULL_WITH_CONTEXT(context_, topkWeightShapePtr);
-            auto &topkWeightShape = topkWeightShapePtr->GetStorageShape();
+            auto& topkWeightShape = topkWeightShapePtr->GetStorageShape();
             OP_CHECK_IF(topkWeightShape.GetDimNum() != TOPK_WEIGHT_DIM,
-                        OP_LOGE_FOR_INVALID_SHAPEDIM(
-                            context_->GetNodeName(), "expert_topk_weight",
-                            std::to_string(topkWeightShape.GetDimNum()).c_str(), "2"),
+                        OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "expert_topk_weight",
+                                                     std::to_string(topkWeightShape.GetDimNum()).c_str(), "2"),
                         return ge::GRAPH_FAILED);
             OP_CHECK_IF(topkWeightShape.GetDim(0) != tokenSum_,
                         OP_LOGE(context_->GetNodeName(), "expert_topk_weight dim0: %ld should equal tokenSum: %ld.",
@@ -120,11 +119,10 @@ protected:
         } else {
             auto permuteTopkWeightOutShape = context_->GetOutputShape(V2_OUTPUT_PERMUTE_TOPK_WEIGHT_INDEX);
             if (permuteTopkWeightOutShape != nullptr) {
-                auto &shape = permuteTopkWeightOutShape->GetStorageShape();
+                auto& shape = permuteTopkWeightOutShape->GetStorageShape();
                 OP_CHECK_IF(shape.GetDimNum() > 0 && shape.GetDim(0) > 0,
-                            OP_LOGE(context_->GetNodeName(),
-                                    "permute_topk_weight output must not be provided"
-                                    " when expert_topk_weight is not input."),
+                            OP_LOGE(context_->GetNodeName(), "permute_topk_weight output must not be provided"
+                                                             " when expert_topk_weight is not input."),
                             return ge::GRAPH_FAILED);
             }
         }
@@ -136,4 +134,4 @@ protected:
 REGISTER_OPS_TILING_TEMPLATE(MoeReRoutingV2, MoeReRoutingV2ReTiling, 10000);
 REGISTER_OPS_TILING_TEMPLATE(MoeReRoutingV2, MoeReRoutingV2RTiling, 11000);
 
-}  // namespace optiling
+} // namespace optiling

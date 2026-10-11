@@ -221,7 +221,7 @@ extern "C" __global__ __aicore__ void moe_init_routing_v4(GM_ADDR x, GM_ADDR exp
         if (t->n > 0 && t->k > 0) {
             int64_t rowIdxElements = t->n * t->k;
             GlobalTensor<int32_t> expandedRowIdxGm;
-            expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, rowIdxElements);
+            expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, rowIdxElements);
             InitGlobalMemory(expandedRowIdxGm, rowIdxElements, static_cast<int32_t>(0));
 
             constexpr bool isMXFPXNoQuant = IsSameType<DTYPE_X, fp8_e4m3fn_t>::value ||
@@ -244,7 +244,7 @@ extern "C" __global__ __aicore__ void moe_init_routing_v4(GM_ADDR x, GM_ADDR exp
                 }
                 if (scaleElements > 0) {
                     GlobalTensor<float> expandedScaleGm;
-                    expandedScaleGm.SetGlobalBuffer((__gm__ float *)expandedScale, scaleElements);
+                    expandedScaleGm.SetGlobalBuffer((__gm__ float*)expandedScale, scaleElements);
                     InitGlobalMemory(expandedScaleGm, scaleElements, 0.0f);
                 }
             }
@@ -255,7 +255,7 @@ extern "C" __global__ __aicore__ void moe_init_routing_v4(GM_ADDR x, GM_ADDR exp
                 }
                 if (topkWeightElements > 0) {
                     GlobalTensor<float> expandedTopkWeightGm;
-                    expandedTopkWeightGm.SetGlobalBuffer((__gm__ float *)expandedTopkWeight, topkWeightElements);
+                    expandedTopkWeightGm.SetGlobalBuffer((__gm__ float*)expandedTopkWeight, topkWeightElements);
                     InitGlobalMemory(expandedTopkWeightGm, topkWeightElements, 0.0f);
                 }
             }
@@ -267,7 +267,7 @@ extern "C" __global__ __aicore__ void moe_init_routing_v4(GM_ADDR x, GM_ADDR exp
             int32_t expertCountElements = (t->expertTokensNumType == EXERPT_TOKENS_KEY_VALUE) ?
                                               static_cast<int32_t>(t->expertNum * EXERPT_TOKENS_KEY_VALUE) :
                                               static_cast<int32_t>(t->actualExpertNum);
-            expertTokensCountGm.SetGlobalBuffer((__gm__ int64_t *)expertTokensCountOrCumsum, expertCountElements);
+            expertTokensCountGm.SetGlobalBuffer((__gm__ int64_t*)expertTokensCountOrCumsum, expertCountElements);
             pipe.InitBuffer(zeroBuf, AlignBytes(expertCountElements, sizeof(int64_t)));
 
             LocalTensor<int64_t> zeroLocal = zeroBuf.Get<int64_t>();

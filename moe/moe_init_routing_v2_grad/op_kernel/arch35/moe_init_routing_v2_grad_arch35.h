@@ -21,12 +21,12 @@ namespace MoeInitRoutingV2Grad {
 template <typename T, int64_t Mode = 0>
 class MoeInitRoutingV2GradCompute {
 public:
-    __aicore__ inline MoeInitRoutingV2GradCompute(const MoeInitRoutingV2GradRegbaseTilingData *tilingData)
+    __aicore__ inline MoeInitRoutingV2GradCompute(const MoeInitRoutingV2GradRegbaseTilingData* tilingData)
     {
         td_ = tilingData;
     }
 
-    __aicore__ inline void Init(GM_ADDR gradExpandedX, GM_ADDR expandedRowIdx, GM_ADDR gradX, TPipe *tPipe)
+    __aicore__ inline void Init(GM_ADDR gradExpandedX, GM_ADDR expandedRowIdx, GM_ADDR gradX, TPipe* tPipe)
     {
         auto blockIdx = GetBlockIdx();
 
@@ -34,9 +34,9 @@ public:
             (blockIdx == td_->numBlocks - 1) ? (td_->n - td_->nBlockFactor * (td_->numBlocks - 1)) : td_->nBlockFactor;
         int64_t indexGmOffset = td_->nBlockFactor * blockIdx * td_->k;
         int64_t outputGmOffset = td_->nBlockFactor * blockIdx * td_->h;
-        inputGm.SetGlobalBuffer((__gm__ T *)gradExpandedX);
-        indexGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + indexGmOffset);
-        outputGm.SetGlobalBuffer((__gm__ T *)gradX + outputGmOffset);
+        inputGm.SetGlobalBuffer((__gm__ T*)gradExpandedX);
+        indexGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + indexGmOffset);
+        outputGm.SetGlobalBuffer((__gm__ T*)gradX + outputGmOffset);
 
         tPipe->InitBuffer(inputQueue, DOUBLE_BUFFER, td_->nUbFactor * td_->kUbFactor * td_->hUbFactor * sizeof(T));
         tPipe->InitBuffer(outputQueue, 1, td_->nUbFactor * td_->hUbFactor * sizeof(T));
@@ -69,13 +69,13 @@ private:
                                      int64_t currentH, int64_t currentHAlign)
     {
         LocalTensor<float> tmpBuf = binaryAddBuf.Get<float>();
-        __ubuf__ float *tmpBufAddr = (__ubuf__ float *)tmpBuf.GetPhyAddr();
+        __ubuf__ float* tmpBufAddr = (__ubuf__ float*)tmpBuf.GetPhyAddr();
         CopyInAndUpdateAllK(tmpBufAddr, indexOffset, inputOffset, currentN, currentH, currentHAlign);
         Compute(tmpBufAddr, currentN, currentH, currentHAlign);
         CopyOut(outputOffset, currentN, currentH, currentHAlign);
     }
 
-    __aicore__ inline void CopyInAndUpdateAllK(__ubuf__ float *tmpBuf, int64_t indexOffset, int64_t inputOffset,
+    __aicore__ inline void CopyInAndUpdateAllK(__ubuf__ float* tmpBuf, int64_t indexOffset, int64_t inputOffset,
                                                int64_t currentN, int64_t currentH, int64_t currentHAlign)
     {
         int64_t kQuotient = (td_->k + td_->kUbFactor - 1) / td_->kUbFactor;
@@ -124,30 +124,30 @@ private:
         inputQueue.EnQue(inputUb);
     }
 
-    __aicore__ inline void UpdateKWithInit(__ubuf__ float *tmpBuf, int64_t currentN, int64_t currentK, int64_t currentH,
+    __aicore__ inline void UpdateKWithInit(__ubuf__ float* tmpBuf, int64_t currentN, int64_t currentK, int64_t currentH,
                                            int64_t currentHAlign)
     {
         LocalTensor<T> inputUb = inputQueue.template DeQue<T>();
-        __ubuf__ T *inputUbAddr = (__ubuf__ T *)inputUb.GetPhyAddr();
+        __ubuf__ T* inputUbAddr = (__ubuf__ T*)inputUb.GetPhyAddr();
         SequenceReduceSum<T, float, true>(inputUbAddr, tmpBuf, currentN, currentK, currentH, currentHAlign,
                                           td_->kUbFactor);
         inputQueue.FreeTensor(inputUb);
     }
 
-    __aicore__ inline void UpdateK(__ubuf__ float *tmpBuf, int64_t currentN, int64_t currentK, int64_t currentH,
+    __aicore__ inline void UpdateK(__ubuf__ float* tmpBuf, int64_t currentN, int64_t currentK, int64_t currentH,
                                    int64_t currentHAlign)
     {
         LocalTensor<T> inputUb = inputQueue.template DeQue<T>();
-        __ubuf__ T *inputUbAddr = (__ubuf__ T *)inputUb.GetPhyAddr();
+        __ubuf__ T* inputUbAddr = (__ubuf__ T*)inputUb.GetPhyAddr();
         SequenceReduceSum<T, float, false>(inputUbAddr, tmpBuf, currentN, currentK, currentH, currentHAlign,
                                            td_->kUbFactor);
         inputQueue.FreeTensor(inputUb);
     }
 
-    __aicore__ inline void Compute(__ubuf__ float *tmpBuf, int64_t currentN, int64_t currentH, int64_t currentHAlign)
+    __aicore__ inline void Compute(__ubuf__ float* tmpBuf, int64_t currentN, int64_t currentH, int64_t currentHAlign)
     {
         LocalTensor<T> outputUb = outputQueue.AllocTensor<T>();
-        __ubuf__ T *outputUbAddr = (__ubuf__ T *)outputUb.GetPhyAddr();
+        __ubuf__ T* outputUbAddr = (__ubuf__ T*)outputUb.GetPhyAddr();
 
         uint32_t updateNum = currentN * currentHAlign;
         uint16_t dataLoopCount = Ops::Base::CeilDiv(updateNum, VL_F32);
@@ -180,7 +180,7 @@ private:
         outputQueue.FreeTensor(outputUb);
     }
 
-    const MoeInitRoutingV2GradRegbaseTilingData *__restrict td_;
+    const MoeInitRoutingV2GradRegbaseTilingData* __restrict td_;
     GlobalTensor<T> inputGm;
     GlobalTensor<int32_t> indexGm;
     GlobalTensor<T> outputGm;

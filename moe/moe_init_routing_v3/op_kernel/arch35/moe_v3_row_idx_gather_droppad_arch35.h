@@ -26,7 +26,7 @@ class MoeV3RowIdxGatherDropPad {
 public:
     __aicore__ inline MoeV3RowIdxGatherDropPad(){};
     __aicore__ inline void Init(GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR expandedScale, GM_ADDR workspace,
-                                const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -35,10 +35,10 @@ private:
     __aicore__ inline void SyncAll();
     __aicore__ inline void AssistInit();
     __aicore__ inline void ZeroOutAllOutput();
-    __aicore__ inline void InitBasicParams(const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+    __aicore__ inline void InitBasicParams(const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> copyInQueue_;
     TQue<QuePosition::VECOUT, 1> copyOutQueue_;
 
@@ -51,7 +51,7 @@ private:
     GlobalTensor<uint8_t> expandedXUint8Gm_;
     GlobalTensor<float> expandedScaleGm_;
 
-    const MoeV3Arch35SrcToDstCapacityComputeTilingData *srcToDstTilingData_;
+    const MoeV3Arch35SrcToDstCapacityComputeTilingData* srcToDstTilingData_;
     int64_t coreNum_;
     int64_t blockIdx_;
     int64_t totalLength_;
@@ -110,14 +110,13 @@ __aicore__ inline void MoeV3RowIdxGatherDropPad<T>::ZeroOutAllOutput()
     // synchronize before valid rows are written, avoiding many small expert-gap clears.
     if constexpr (IsSameType<T, hifloat8_t>::value) {
         GlobalTensor<uint8_t> zeroGm;
-        zeroGm.SetGlobalBuffer((__gm__ uint8_t *)expandedXUint8Gm_.GetPhyAddr() + startIndex * this->cols_,
+        zeroGm.SetGlobalBuffer((__gm__ uint8_t*)expandedXUint8Gm_.GetPhyAddr() + startIndex * this->cols_,
                                rowCount * this->cols_);
         SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
         InitGlobalMemory(zeroGm, rowCount * this->cols_, static_cast<uint8_t>(0));
     } else {
         GlobalTensor<T> zeroGm;
-        zeroGm.SetGlobalBuffer((__gm__ T *)expandedXGm_.GetPhyAddr() + startIndex * this->cols_,
-                               rowCount * this->cols_);
+        zeroGm.SetGlobalBuffer((__gm__ T*)expandedXGm_.GetPhyAddr() + startIndex * this->cols_, rowCount * this->cols_);
         SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
         InitGlobalMemory(zeroGm, rowCount * this->cols_, static_cast<T>(0));
     }
@@ -125,7 +124,7 @@ __aicore__ inline void MoeV3RowIdxGatherDropPad<T>::ZeroOutAllOutput()
 
     if (this->isInputScale_ == 1) {
         GlobalTensor<float> scaleZeroGm;
-        scaleZeroGm.SetGlobalBuffer((__gm__ float *)expandedScaleGm_.GetPhyAddr() + startIndex, rowCount);
+        scaleZeroGm.SetGlobalBuffer((__gm__ float*)expandedScaleGm_.GetPhyAddr() + startIndex, rowCount);
         SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
         InitGlobalMemory(scaleZeroGm, rowCount, static_cast<float>(0));
         SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
@@ -133,7 +132,7 @@ __aicore__ inline void MoeV3RowIdxGatherDropPad<T>::ZeroOutAllOutput()
 
     if (this->useCompactOutputRows_ == 1) {
         GlobalTensor<int32_t> sourceRowGm;
-        sourceRowGm.SetGlobalBuffer((__gm__ int32_t *)outputToSrcRowGm_.GetPhyAddr() + startIndex, rowCount);
+        sourceRowGm.SetGlobalBuffer((__gm__ int32_t*)outputToSrcRowGm_.GetPhyAddr() + startIndex, rowCount);
         SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
         InitGlobalMemory(sourceRowGm, rowCount, static_cast<int32_t>(-1));
         SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
@@ -214,8 +213,8 @@ __aicore__ inline void MoeV3RowIdxGatherDropPad<T>::SyncAll()
 }
 
 template <typename T>
-__aicore__ inline void MoeV3RowIdxGatherDropPad<T>::InitBasicParams(const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                                                    TPipe *tPipe)
+__aicore__ inline void MoeV3RowIdxGatherDropPad<T>::InitBasicParams(const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                                                    TPipe* tPipe)
 {
     pipe_ = tPipe;
     this->blockIdx_ = GetBlockIdx();
@@ -251,39 +250,39 @@ __aicore__ inline void MoeV3RowIdxGatherDropPad<T>::InitBasicParams(const MoeIni
 template <typename T>
 __aicore__ inline void MoeV3RowIdxGatherDropPad<T>::Init(GM_ADDR expandedRowIdx, GM_ADDR expandedX,
                                                          GM_ADDR expandedScale, GM_ADDR workspace,
-                                                         const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                                         TPipe *tPipe)
+                                                         const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                                         TPipe* tPipe)
 {
     InitBasicParams(tilingData, tPipe);
 
     int64_t length = Align(this->totalLength_, sizeof(int32_t));
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, length);
+    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, length);
 
     if constexpr (IsSameType<T, hifloat8_t>::value) {
-        expandedXUint8Gm_.SetGlobalBuffer((__gm__ uint8_t *)expandedX,
+        expandedXUint8Gm_.SetGlobalBuffer((__gm__ uint8_t*)expandedX,
                                           this->expertNum_ * this->expertCapacity_ * this->cols_);
     } else {
-        expandedXGm_.SetGlobalBuffer((__gm__ T *)expandedX, this->expertNum_ * this->expertCapacity_ * this->cols_);
+        expandedXGm_.SetGlobalBuffer((__gm__ T*)expandedX, this->expertNum_ * this->expertCapacity_ * this->cols_);
     }
 
     if (this->isInputScale_ == 1) {
-        expandedScaleGm_.SetGlobalBuffer((__gm__ float *)expandedScale, this->expertNum_ * this->expertCapacity_);
+        expandedScaleGm_.SetGlobalBuffer((__gm__ float*)expandedScale, this->expertNum_ * this->expertCapacity_);
     }
 
     expandedExpertIdxGm_.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + this->blockIdx_ * this->srcToDstTilingData_->perCoreRows,
+        (__gm__ int32_t*)workspace + this->blockIdx_ * this->srcToDstTilingData_->perCoreRows,
         Align(this->coreRows_, sizeof(int32_t)));
     expandDstToSrcRowGm_.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + length + this->blockIdx_ * this->srcToDstTilingData_->perCoreRows,
+        (__gm__ int32_t*)workspace + length + this->blockIdx_ * this->srcToDstTilingData_->perCoreRows,
         Align(this->coreRows_, sizeof(int32_t)));
     // expertIdxValueGm偏移地址必须与expert_tokens_count.h保持一致
     // expert_tokens_count.h偏移: Align(n*k)*2 + Align(actualExpertNum) (DropPad模式不保留expertTotalCountGm空间)
     int64_t actualExpertNumOffset = Align(tilingData->actualExpertNum, sizeof(int32_t));
-    expertIdxValueGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + length * 2 + actualExpertNumOffset,
+    expertIdxValueGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + length * 2 + actualExpertNumOffset,
                                       this->coreNum_ * 2);
     if (this->useCompactOutputRows_ == 1) {
         outputToSrcRowGm_.SetGlobalBuffer(
-            (__gm__ int32_t *)workspace + length * 2 + actualExpertNumOffset + this->coreNum_ * 2, this->outputRows_);
+            (__gm__ int32_t*)workspace + length * 2 + actualExpertNumOffset + this->coreNum_ * 2, this->outputRows_);
     }
 
     pipe_->InitBuffer(copyInQueue_, 1, AlignBytes(this->perLoopRows_, sizeof(int32_t)) * 2);

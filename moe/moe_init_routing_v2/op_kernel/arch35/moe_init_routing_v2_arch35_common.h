@@ -114,7 +114,7 @@ __aicore__ inline constexpr uint32_t GetVRegSize()
     return 256U;
 }
 
-__aicore__ inline void ArithProgressionPerf(const LocalTensor<int32_t> &dst, const int32_t firstValue,
+__aicore__ inline void ArithProgressionPerf(const LocalTensor<int32_t>& dst, const int32_t firstValue,
                                             const int32_t diffValue, int32_t countAlign)
 {
     // countAlign must be eight aligned

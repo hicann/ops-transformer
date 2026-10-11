@@ -17,7 +17,7 @@ if (BUILD_OPEN_PROJECT)
         add_ops_compile_options(
             OP_NAME MoeFinalizeRoutingV2
             OPTIONS --cce-auto-sync=on
-                    -mllvm 
+                    -mllvm
                     -cce-aicore-dcci-before-kernel-end=false
         )
     else()

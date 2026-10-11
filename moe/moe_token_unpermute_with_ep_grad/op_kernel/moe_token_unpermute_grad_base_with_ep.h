@@ -33,7 +33,7 @@ public:
     __aicore__ inline MoeTokenUnpermuteGradBase(){};
     __aicore__ inline void Init(GM_ADDR permuted_tokens, GM_ADDR unpermuted_tokens_grad, GM_ADDR sorted_indices,
                                 GM_ADDR probs, GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
-                                const MoeTokenUnpermuteWithEpGradTilingData &tilingData);
+                                const MoeTokenUnpermuteWithEpGradTilingData& tilingData);
     __aicore__ inline int32_t AlignUp(int32_t a, int32_t b);
     __aicore__ inline int32_t CeilDiv(int32_t a, int32_t b);
     __aicore__ inline void BinaryAddFunc(LocalTensor<float> tmpBuffer, int32_t hiddensizeLen, int32_t threshold,
@@ -151,7 +151,7 @@ __aicore__ inline void MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::ReduceSumFu
 template <typename OriT, typename IdxT, typename ProbT>
 __aicore__ inline void MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::Init(
     GM_ADDR permuted_tokens, GM_ADDR unpermuted_tokens_grad, GM_ADDR sorted_indices, GM_ADDR probs,
-    GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad, const MoeTokenUnpermuteWithEpGradTilingData &tilingData)
+    GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad, const MoeTokenUnpermuteWithEpGradTilingData& tilingData)
 {
     tokensNum = tilingData.tokensNum;
     topK = tilingData.topK;
@@ -183,12 +183,12 @@ __aicore__ inline void MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::Init(
     hiddensizeAlignFp32TailMask = this->hiddenSizeAlign % FP32_ONE_REPEAT;
     hiddensizeAlignFp32TailOffset = hiddensizeAlignFp32RepeatTimes * FP32_ONE_REPEAT;
 
-    permutedTokensGm.SetGlobalBuffer((__gm__ OriT *)permuted_tokens);
-    unpermutedOutputDGm.SetGlobalBuffer((__gm__ OriT *)unpermuted_tokens_grad);
-    sortedIndicesGm.SetGlobalBuffer((__gm__ IdxT *)sorted_indices);
-    permutedTokensGradGm.SetGlobalBuffer((__gm__ OriT *)permuted_tokens_grad);
-    probGm.SetGlobalBuffer((__gm__ ProbT *)probs);
-    probGradGm.SetGlobalBuffer((__gm__ ProbT *)probs_grad);
+    permutedTokensGm.SetGlobalBuffer((__gm__ OriT*)permuted_tokens);
+    unpermutedOutputDGm.SetGlobalBuffer((__gm__ OriT*)unpermuted_tokens_grad);
+    sortedIndicesGm.SetGlobalBuffer((__gm__ IdxT*)sorted_indices);
+    permutedTokensGradGm.SetGlobalBuffer((__gm__ OriT*)permuted_tokens_grad);
+    probGm.SetGlobalBuffer((__gm__ ProbT*)probs);
+    probGradGm.SetGlobalBuffer((__gm__ ProbT*)probs_grad);
 
     if (coreIndex < formerCoreNum) {
         rowIdMapStartOffset = coreIndex * rowIdMapEachCore;

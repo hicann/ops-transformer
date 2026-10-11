@@ -8,25 +8,24 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
- #include <array>
- #include <vector>
- #include <iostream>
- #include <string>
- #include <cstdint>
- #include "gtest/gtest.h"
- #include "tikicpulib.h"
- #include "data_utils.h"
- #include "tiling_case_executor.h"
+#include <array>
+#include <vector>
+#include <iostream>
+#include <string>
+#include <cstdint>
+#include "gtest/gtest.h"
+#include "tikicpulib.h"
+#include "data_utils.h"
+#include "tiling_case_executor.h"
 #include "moe_gating_top_k_softmax_v2_tiling.h"
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void moe_gating_top_k_softmax_v2(
-    GM_ADDR gating, GM_ADDR finished, GM_ADDR out, GM_ADDR indicesOut, GM_ADDR softmaxOut, GM_ADDR workspace,
-    GM_ADDR tiling);
+extern "C" __global__ __aicore__ void moe_gating_top_k_softmax_v2(GM_ADDR gating, GM_ADDR finished, GM_ADDR out,
+                                                                  GM_ADDR indicesOut, GM_ADDR softmaxOut,
+                                                                  GM_ADDR workspace, GM_ADDR tiling);
 
-class moe_gating_top_k_softmax_v2_test : public testing::Test
-{
+class moe_gating_top_k_softmax_v2_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -139,9 +138,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_float32)
     tilingDatafromBin->tailBlockTailTopkTilingData = TopkTilingData;
 
     ICPU_SET_TILING_KEY(101010);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, finished, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, finished, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -253,9 +251,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_float16)
     tilingDatafromBin->tailBlockTailTopkTilingData = TopkTilingData;
 
     ICPU_SET_TILING_KEY(101020);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, finished, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, finished, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -367,9 +364,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_bfloat16)
     tilingDatafromBin->tailBlockTailTopkTilingData = TopkTilingData;
 
     ICPU_SET_TILING_KEY(101030);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, finished, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, finished, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -423,9 +419,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_perf_bfloat16_big_col_num_ren
     tilingDatafromBin->bufferElemSize = 288;
 
     ICPU_SET_TILING_KEY(103023);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -479,9 +474,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_perf_float16_big_col_num_reno
     tilingDatafromBin->bufferElemSize = 288;
 
     ICPU_SET_TILING_KEY(103033);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -535,9 +529,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_perf_float_big_col_num_renorm
     tilingDatafromBin->bufferElemSize = 288;
 
     ICPU_SET_TILING_KEY(103013);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -591,9 +584,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_perf_bfloat16_big_col_num_non
     tilingDatafromBin->bufferElemSize = 288;
 
     ICPU_SET_TILING_KEY(103133);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -647,9 +639,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_perf_float16_big_col_num_non_
     tilingDatafromBin->bufferElemSize = 288;
 
     ICPU_SET_TILING_KEY(103133);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -703,9 +694,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_perf_float_big_col_num_non_re
     tilingDatafromBin->bufferElemSize = 288;
 
     ICPU_SET_TILING_KEY(103113);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -759,9 +749,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_perf_bfloat16_middle_col_num_
     tilingDatafromBin->bufferElemSize = 192;
 
     ICPU_SET_TILING_KEY(103132);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -814,9 +803,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_perf_float16_middle_col_num_r
     tilingDatafromBin->topKIndicesMask = 170;
     tilingDatafromBin->bufferElemSize = 192;
     ICPU_SET_TILING_KEY(103122);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -870,9 +858,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_perf_float_middle_col_num_ren
     tilingDatafromBin->bufferElemSize = 192;
 
     ICPU_SET_TILING_KEY(103112);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -926,9 +913,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_perf_bfloat16_middle_col_num_
     tilingDatafromBin->bufferElemSize = 192;
 
     ICPU_SET_TILING_KEY(103032);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -982,9 +968,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_perf_float16_middle_col_num_n
     tilingDatafromBin->bufferElemSize = 192;
 
     ICPU_SET_TILING_KEY(103022);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);
@@ -1038,9 +1023,8 @@ TEST_F(moe_gating_top_k_softmax_v2_test, test_case_perf_float_middle_col_num_non
     tilingDatafromBin->bufferElemSize = 192;
 
     ICPU_SET_TILING_KEY(103012);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_gating_top_k_softmax_v2, blockDim, x, nullptr, y, expert_idx, softmax_out, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(finished);

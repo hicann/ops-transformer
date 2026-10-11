@@ -27,7 +27,7 @@ using namespace AscendC;
 template <typename T, typename TIndex, typename TScale, bool hasScales>
 class MoeReRoutingRRegbase {
 public:
-    __aicore__ inline MoeReRoutingRRegbase(TPipe *pipe, const MoeReRoutingRTilingData *tiling)
+    __aicore__ inline MoeReRoutingRRegbase(TPipe* pipe, const MoeReRoutingRTilingData* tiling)
         : pipe_(pipe),
           tilingData_(tiling)
     {}
@@ -51,8 +51,8 @@ protected:
     __aicore__ inline void CopyOutIndex(const int64_t rows, const int64_t srcOffset, const int64_t dstOffset);
     __aicore__ inline void CopyTopkWeight(const int64_t rows, const int64_t srcOffset, const int64_t dstOffset);
 
-    TPipe *pipe_ = nullptr;
-    const MoeReRoutingRTilingData *tilingData_;
+    TPipe* pipe_ = nullptr;
+    const MoeReRoutingRTilingData* tilingData_;
     constexpr static int64_t BLOCK_SIZE = static_cast<int64_t>(platform::GetUbBlockSize());
     GlobalTensor<T> srcTokenGm_;
     GlobalTensor<T> dstTokenGm_;
@@ -86,18 +86,18 @@ __aicore__ inline void MoeReRoutingRRegbase<T, TIndex, TScale, hasScales>::Init(
     tokenSize_ = tilingData_->tokenSize;
     tokenSizeOrigin_ = tilingData_->tokenSizeOrigin;
     scaleSize_ = tilingData_->scaleSize;
-    srcTokenGm_.SetGlobalBuffer((__gm__ T *)tokens);
-    dstTokenGm_.SetGlobalBuffer((__gm__ T *)permuteTokens);
-    srcRankTokenGm_.SetGlobalBuffer((__gm__ TIndex *)expertTokenNumPerRank);
-    tokenIdxGm_.SetGlobalBuffer((__gm__ int32_t *)permuteTokenIdx);
-    dstExpertTokenGm_.SetGlobalBuffer((__gm__ TIndex *)expertTokenNum);
+    srcTokenGm_.SetGlobalBuffer((__gm__ T*)tokens);
+    dstTokenGm_.SetGlobalBuffer((__gm__ T*)permuteTokens);
+    srcRankTokenGm_.SetGlobalBuffer((__gm__ TIndex*)expertTokenNumPerRank);
+    tokenIdxGm_.SetGlobalBuffer((__gm__ int32_t*)permuteTokenIdx);
+    dstExpertTokenGm_.SetGlobalBuffer((__gm__ TIndex*)expertTokenNum);
     if constexpr (hasScales) {
-        srcScaleGm_.SetGlobalBuffer((__gm__ TScale *)perTokenScales);
-        dstScaleGm_.SetGlobalBuffer((__gm__ TScale *)permutePerTokenScales);
+        srcScaleGm_.SetGlobalBuffer((__gm__ TScale*)perTokenScales);
+        dstScaleGm_.SetGlobalBuffer((__gm__ TScale*)permutePerTokenScales);
     }
     if (tilingData_->hasTopkWeight == HAS_TOPK_WEIGHT) {
-        srcTopkWeightGm_.SetGlobalBuffer((__gm__ float *)expertTopkWeight);
-        dstTopkWeightGm_.SetGlobalBuffer((__gm__ float *)permuteTopkWeight);
+        srcTopkWeightGm_.SetGlobalBuffer((__gm__ float*)expertTopkWeight);
+        dstTopkWeightGm_.SetGlobalBuffer((__gm__ float*)permuteTopkWeight);
     }
     this->pipe_->InitBuffer(queBind_, DOUBLE_BUFFER,
                             Ops::Base::CeilAlign(tilingData_->ubFactor, static_cast<int64_t>(BLOCK_SIZE / sizeof(T))));

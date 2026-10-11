@@ -102,24 +102,24 @@ inline uint32_t GetLengthByType(int32_t dtype)
 
 inline int64_t GetGreatestDivisor(int64_t num, int64_t div)
 {
-    if (div == 0){
+    if (div == 0) {
         return -1;
     }
     while (num % div != 0) {
         div--;
-        if (div == 0){
+        if (div == 0) {
             return -1;
         }
     }
     return div;
 }
 
-static void MoeTokenUnpermuteWithRoutingMapGradPrintParam(
-    gert::TilingContext* context, MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling)
+static void MoeTokenUnpermuteWithRoutingMapGradPrintParam(gert::TilingContext* context,
+                                                          MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling)
 {
     auto nodeName = context->GetNodeName();
-    OP_LOGD(
-        nodeName, ">>>>>>>>>>>>>>> Start to print MoeTokenUnpermuteWithRoutingMapGrad tiling data <<<<<<<<<<<<<<<<");
+    OP_LOGD(nodeName,
+            ">>>>>>>>>>>>>>> Start to print MoeTokenUnpermuteWithRoutingMapGrad tiling data <<<<<<<<<<<<<<<<");
     OP_LOGD(nodeName, "=== tokensNum:                %ld", tiling.get_tokensNum());
     OP_LOGD(nodeName, "=== topK:                     %ld", tiling.get_topK());
     OP_LOGD(nodeName, "=== capacity:                 %ld", tiling.get_capacity());
@@ -144,8 +144,8 @@ static void MoeTokenUnpermuteWithRoutingMapGradPrintParam(
     OP_LOGD(nodeName, ">>>>>>>>>>>>>>> Print MoeTokenUnpermuteWithRoutingMapGrad tiling data end <<<<<<<<<<<<<<<<");
 }
 
-static ge::graphStatus TilingForProbIsNone(
-    const gert::TilingContext* context, MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling, bool paddedMode)
+static ge::graphStatus TilingForProbIsNone(const gert::TilingContext* context,
+                                           MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling, bool paddedMode)
 {
     // 核间切分策略
     int64_t numOutTokens = tiling.get_numOutTokens();
@@ -165,7 +165,7 @@ static ge::graphStatus TilingForProbIsNone(
     int64_t hiddenSize = tiling.get_hiddenSize();
     auto tokensDtype = context->GetInputDesc(INPUT_UNPERMUTEDOUTPUTD_IDX)->GetDataType();
     int64_t inputTypeLength = GetLengthByType(tokensDtype);
-    if (inputTypeLength == 0){
+    if (inputTypeLength == 0) {
         OP_LOGE(context->GetNodeName(), "The Dtype size of unpermuted_tokens_grad is 0.");
         return ge::GRAPH_FAILED;
     }
@@ -187,8 +187,8 @@ static ge::graphStatus TilingForProbIsNone(
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingForProbNotNonePadTrue(
-    const gert::TilingContext* context, MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling)
+static ge::graphStatus TilingForProbNotNonePadTrue(const gert::TilingContext* context,
+                                                   MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling)
 {
     // 核间切分策略
     int64_t numOutTokens = tiling.get_numOutTokens();
@@ -199,13 +199,11 @@ static ge::graphStatus TilingForProbNotNonePadTrue(
     int64_t tailCoreNum = totalCoreNum - formerCoreNum;
     int64_t capacity = GetDiv(numOutTokens, tiling.get_numExpert());
     int64_t tokensNum = tiling.get_tokensNum();
-    OP_CHECK_IF(
-        capacity > tokensNum,
-        OP_LOGE(
-            context->GetNodeName(),
-            "Capacity should be smaller than tokens_num, but now capacity is %ld, tokens_num is %ld.", capacity,
-            tokensNum),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(capacity > tokensNum,
+                OP_LOGE(context->GetNodeName(),
+                        "Capacity should be smaller than tokens_num, but now capacity is %ld, tokens_num is %ld.",
+                        capacity, tokensNum),
+                return ge::GRAPH_FAILED);
     tiling.set_formerCoreNum(formerCoreNum);
     tiling.set_tailCoreNum(tailCoreNum);
     tiling.set_rowIdMapEachCore(rowIdMapEachCore);
@@ -216,7 +214,7 @@ static ge::graphStatus TilingForProbNotNonePadTrue(
     int64_t hiddenSize = tiling.get_hiddenSize();
     auto tokensDtype = context->GetInputDesc(INPUT_UNPERMUTEDOUTPUTD_IDX)->GetDataType();
     int64_t inputTypeLength = GetLengthByType(tokensDtype);
-    if (inputTypeLength == 0){
+    if (inputTypeLength == 0) {
         OP_LOGE(context->GetNodeName(), "The Dtype size of unpermuted_tokens_grad is 0.");
         return ge::GRAPH_FAILED;
     }
@@ -224,11 +222,12 @@ static ge::graphStatus TilingForProbNotNonePadTrue(
     int64_t totalUbSize = tiling.get_totalUbSize();
     int64_t hiddenSizeAlign = AlignUp<int64_t>(hiddenSize, inputBlockAlignEleNum);
     int64_t hiddenSizeOneLoopMax = (totalUbSize - BLOCK_SIZE_32 - H_LOOP_ALIGN_BUFFER_LENGTH * SIZE_OF_FLOAT) /
-                               (BUFFER_NUM * (H_BUFFER_NUM + inputTypeLength));
+                                   (BUFFER_NUM * (H_BUFFER_NUM + inputTypeLength));
     int64_t hiddenSizeMax = hiddenSizeOneLoopMax * H_LOOP_ALIGN_BUFFER_LENGTH;
     OP_CHECK_IF(
         hiddenSize > hiddenSizeMax,
-        OP_LOGE(context->GetNodeName(), "The maximum hidden_size supported is %d, but got %d, which is too large.", hiddenSizeMax, hiddenSize),
+        OP_LOGE(context->GetNodeName(), "The maximum hidden_size supported is %d, but got %d, which is too large.",
+                hiddenSizeMax, hiddenSize),
         return ge::GRAPH_FAILED);
     if (hiddenSizeOneLoopMax < hiddenSizeAlign) { // hiddensize需要切分
         hiddenSizeAlign = AlignDown<int64_t>(hiddenSizeOneLoopMax, inputBlockAlignEleNum);
@@ -245,27 +244,24 @@ static ge::graphStatus TilingForProbNotNonePadTrue(
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingForProbNotNonePadFalse(
-    const gert::TilingContext* context, MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling)
+static ge::graphStatus TilingForProbNotNonePadFalse(const gert::TilingContext* context,
+                                                    MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling)
 {
     int64_t numOutTokens = tiling.get_numOutTokens();
     int64_t tokensNum = tiling.get_tokensNum();
-    if (tokensNum == 0){
+    if (tokensNum == 0) {
         return ge::GRAPH_FAILED;
     }
     int64_t topK = GetDiv(numOutTokens, tokensNum);
-    OP_CHECK_IF(
-        topK > MAX_TOP_K,
-        OP_LOGE(
-            context->GetNodeName(), "The topK_num needs to be smaller than 512, but now is %ld.", topK),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(topK > MAX_TOP_K,
+                OP_LOGE(context->GetNodeName(), "The topK_num needs to be smaller than 512, but now is %ld.", topK),
+                return ge::GRAPH_FAILED);
     int64_t numExpert = tiling.get_numExpert();
     OP_CHECK_IF(
         topK > numExpert,
-        OP_LOGE(
-            context->GetNodeName(),
-            "The topK_num needs to be smaller than experts_num, but now topK_num is %ld, experts_num is %ld.", topK,
-            numExpert),
+        OP_LOGE(context->GetNodeName(),
+                "The topK_num needs to be smaller than experts_num, but now topK_num is %ld, experts_num is %ld.", topK,
+                numExpert),
         return ge::GRAPH_FAILED);
     int64_t totalCoreNum = static_cast<int64_t>(context->GetBlockDim());
     int64_t tokenNumTailCore = GetDiv(tokensNum, totalCoreNum);
@@ -283,7 +279,7 @@ static ge::graphStatus TilingForProbNotNonePadFalse(
     tiling.set_rowIdMapTailCore(rowIdMapTailCore);
     int64_t hiddenSize = tiling.get_hiddenSize();
     int64_t inputTypeLength = GetLengthByType(context->GetInputDesc(INPUT_UNPERMUTEDOUTPUTD_IDX)->GetDataType());
-    if (inputTypeLength == 0){
+    if (inputTypeLength == 0) {
         return ge::GRAPH_FAILED;
     }
     int64_t inputBlockAlignEleNum = BLOCK_SIZE_32 / inputTypeLength;
@@ -295,14 +291,17 @@ static ge::graphStatus TilingForProbNotNonePadFalse(
     int64_t indicesReserveNumAlign = AlignUp<int64_t>(indicesReserveNum, inputBlockAlignEleNum);
     int64_t numExpertAlign = AlignUp<int64_t>(numExpert, BLOCK_SIZE_32);
     int64_t probTypeLength = GetLengthByType(context->GetInputDesc(INPUT_PROB_IDX)->GetDataType());
-    int64_t remainSize = tiling.get_totalUbSize() - inputTypeLength * INDICES_RESERVE_MAX_NUM - INDICES_RESERVE_MAX_NUM * SIZE_OF_FLOAT * INDICES_FP32_BUFFER_NUM;
+    int64_t remainSize = tiling.get_totalUbSize() - inputTypeLength * INDICES_RESERVE_MAX_NUM -
+                         INDICES_RESERVE_MAX_NUM * SIZE_OF_FLOAT * INDICES_FP32_BUFFER_NUM;
     int64_t numExpertSize = (1 + probTypeLength) * numExpertAlign;
-    int64_t hiddenNum = H_BUFFER_NUM_PAD_FALSE * BUFFER_NUM * inputTypeLength + H_FP32_BUFFER_NUM_PAD_FALSE * SIZE_OF_FLOAT;
-    
+    int64_t hiddenNum =
+        H_BUFFER_NUM_PAD_FALSE * BUFFER_NUM * inputTypeLength + H_FP32_BUFFER_NUM_PAD_FALSE * SIZE_OF_FLOAT;
+
     int64_t numExpertMax = (remainSize - hiddenNum) / (1 + probTypeLength);
     OP_CHECK_IF(
         numExpert > numExpertMax,
-        OP_LOGE(context->GetNodeName(), "The maximum experts_num supported is %d, but got %d, which is too large.",numExpertMax, numExpert),
+        OP_LOGE(context->GetNodeName(), "The maximum experts_num supported is %d, but got %d, which is too large.",
+                numExpertMax, numExpert),
         return ge::GRAPH_FAILED);
     int64_t hiddenSizeTmpMax = (remainSize - numExpertSize) / hiddenNum;
     hiddenSizeAlign = hiddenSizeTmpMax < hiddenSizeAlign ? AlignDown<int64_t>(hiddenSizeTmpMax, inputBlockAlignEleNum) :
@@ -318,18 +317,17 @@ static ge::graphStatus TilingForProbNotNonePadFalse(
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus PreInitForTiling(
-    gert::TilingContext* context, MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling)
+static ge::graphStatus PreInitForTiling(gert::TilingContext* context,
+                                        MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling)
 {
     const gert::StorageShape* unpermutedOutputDShape = context->GetInputShape(INPUT_UNPERMUTEDOUTPUTD_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, unpermutedOutputDShape);
     auto unpermutedOutputDDimNum = unpermutedOutputDShape->GetStorageShape().GetDimNum();
     OP_CHECK_IF(
         unpermutedOutputDDimNum != UNPERMUTE_GRAD_DIM_NUM,
-        OP_LOGE(
-            context->GetNodeName(),
-            "Check unpermutedTokensGrad shape failed, the dims of unpermutedTokensGrad should be %u, but get %zu.",
-            UNPERMUTE_GRAD_DIM_NUM, unpermutedOutputDDimNum),
+        OP_LOGE(context->GetNodeName(),
+                "Check unpermutedTokensGrad shape failed, the dims of unpermutedTokensGrad should be %u, but get %zu.",
+                UNPERMUTE_GRAD_DIM_NUM, unpermutedOutputDDimNum),
         return ge::GRAPH_FAILED);
 
     const gert::StorageShape* outIndexShape = context->GetInputShape(INPUT_SORTED_TWICE_IDX);
@@ -337,21 +335,18 @@ static ge::graphStatus PreInitForTiling(
     auto outIndexDimNum = outIndexShape->GetStorageShape().GetDimNum();
     OP_CHECK_IF(
         outIndexDimNum != INDEX_DIM_NUM,
-        OP_LOGE(
-            context->GetNodeName(), "Check outIndex shape failed, the dims of outIndex should be %u, but get %zu.",
-            INDEX_DIM_NUM, outIndexDimNum),
+        OP_LOGE(context->GetNodeName(), "Check outIndex shape failed, the dims of outIndex should be %u, but get %zu.",
+                INDEX_DIM_NUM, outIndexDimNum),
         return ge::GRAPH_FAILED);
 
     const gert::StorageShape* permuteTokenIdShape = context->GetInputShape(INPUT_SORTED_TWICE_INDICES_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, permuteTokenIdShape);
     auto permuteTokenIdDimNum = permuteTokenIdShape->GetStorageShape().GetDimNum();
-    OP_CHECK_IF(
-        permuteTokenIdDimNum != INDEX_DIM_NUM,
-        OP_LOGE(
-            context->GetNodeName(),
-            "Check permuteTokenId shape failed, the dims of permuteTokenId should be %u, but get %zu.", INDEX_DIM_NUM,
-            permuteTokenIdDimNum),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(permuteTokenIdDimNum != INDEX_DIM_NUM,
+                OP_LOGE(context->GetNodeName(),
+                        "Check permuteTokenId shape failed, the dims of permuteTokenId should be %u, but get %zu.",
+                        INDEX_DIM_NUM, permuteTokenIdDimNum),
+                return ge::GRAPH_FAILED);
     int64_t tokensNum = unpermutedOutputDShape->GetStorageShape().GetDim(DIM_0);
     int64_t hiddenSize = unpermutedOutputDShape->GetStorageShape().GetDim(DIM_1);
     int64_t numOutTokens = outIndexShape->GetStorageShape().GetDim(DIM_0);
@@ -370,18 +365,17 @@ static ge::graphStatus PreInitForTiling(
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckInputForProbIsNotNone(
-    gert::TilingContext* context, MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling)
+static ge::graphStatus CheckInputForProbIsNotNone(gert::TilingContext* context,
+                                                  MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling)
 {
     const gert::StorageShape* routingMapShape = context->GetInputShape(INPUT_ROUTING_MAP_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, routingMapShape);
     auto routingMapDimNum = routingMapShape->GetStorageShape().GetDimNum();
     OP_CHECK_IF(
         routingMapDimNum != UNPERMUTE_GRAD_DIM_NUM,
-        OP_LOGE(
-            context->GetNodeName(),
-            "Check routingMapOptional shape failed, the dims of routingMapOptional should be %u, but get %zu.",
-            UNPERMUTE_GRAD_DIM_NUM, routingMapDimNum),
+        OP_LOGE(context->GetNodeName(),
+                "Check routingMapOptional shape failed, the dims of routingMapOptional should be %u, but get %zu.",
+                UNPERMUTE_GRAD_DIM_NUM, routingMapDimNum),
         return ge::GRAPH_FAILED);
 
     const gert::StorageShape* permutedTokensMapShape = context->GetInputShape(INPUT_PERMUTED_TOKENS_IDX);
@@ -398,13 +392,11 @@ static ge::graphStatus CheckInputForProbIsNotNone(
     const gert::StorageShape* probsShape = context->GetInputShape(INPUT_PROB_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, probsShape);
     auto probsDimNum = probsShape->GetStorageShape().GetDimNum();
-    OP_CHECK_IF(
-        probsDimNum != UNPERMUTE_GRAD_DIM_NUM,
-        OP_LOGE(
-            context->GetNodeName(),
-            "Check probsOptional shape failed, the dims of probsOptional should be %u, but get %zu.",
-            UNPERMUTE_GRAD_DIM_NUM, probsDimNum),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(probsDimNum != UNPERMUTE_GRAD_DIM_NUM,
+                OP_LOGE(context->GetNodeName(),
+                        "Check probsOptional shape failed, the dims of probsOptional should be %u, but get %zu.",
+                        UNPERMUTE_GRAD_DIM_NUM, probsDimNum),
+                return ge::GRAPH_FAILED);
     int64_t numExpert = probsShape->GetStorageShape().GetDim(DIM_1);
     tiling.set_numExpert(numExpert);
     return ge::GRAPH_SUCCESS;
@@ -416,13 +408,14 @@ static ge::graphStatus Tiling4MoeTokenUnpermuteWithRoutingMapGrad(gert::TilingCo
     auto tokenDtype = context->GetInputDesc(INPUT_UNPERMUTEDOUTPUTD_IDX)->GetDataType();
     auto probTensor = context->GetOptionalInputTensor(INPUT_PROB_IDX);
     auto probDtype = (probTensor == nullptr) ? tokenDtype : context->GetInputDesc(INPUT_PROB_IDX)->GetDataType();
-    OP_CHECK_IF(
-        tokenDtype != probDtype && (tokenDtype != ge::DataType::DT_BF16 || probDtype != ge::DataType::DT_FLOAT),
-        OP_LOGE(context->GetNodeName(), "The input probs data type only supports being consistent with the input unpermuted_tokens_grad, or when unpermuted_tokens_grad is BFLOAT16, probs can be FLOAT."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(tokenDtype != probDtype && (tokenDtype != ge::DataType::DT_BF16 || probDtype != ge::DataType::DT_FLOAT),
+                OP_LOGE(context->GetNodeName(),
+                        "The input probs data type only supports being consistent with the input "
+                        "unpermuted_tokens_grad, or when unpermuted_tokens_grad is BFLOAT16, probs can be FLOAT."),
+                return ge::GRAPH_FAILED);
     MoeTokenUnpermuteWithRoutingMapGradTilingData tiling;
-    OP_CHECK_IF(
-        ge::GRAPH_SUCCESS != PreInitForTiling(context, tiling),
-        OP_LOGE(context->GetNodeName(), "The input shape is invalid."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ge::GRAPH_SUCCESS != PreInitForTiling(context, tiling),
+                OP_LOGE(context->GetNodeName(), "The input shape is invalid."), return ge::GRAPH_FAILED);
 
     const auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint32_t totalCoreNum = ascendcPlatform.GetCoreNumAiv();
@@ -437,35 +430,29 @@ static ge::graphStatus Tiling4MoeTokenUnpermuteWithRoutingMapGrad(gert::TilingCo
     bool paddedMode = *paddedModePtr;
     OP_LOGD(context->GetNodeName(), ">>> [MoeTokenUnpermuteWithRoutingMapGradTiling] paddedMode: %d", paddedMode);
     if (probTensor == nullptr) {
-        OP_CHECK_IF(
-            ge::GRAPH_SUCCESS != TilingForProbIsNone(context, tiling, paddedMode),
-            OP_LOGE(context->GetNodeName(), "Tiling( Prob is None ) failed."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(ge::GRAPH_SUCCESS != TilingForProbIsNone(context, tiling, paddedMode),
+                    OP_LOGE(context->GetNodeName(), "Tiling( Prob is None ) failed."), return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(
-            ge::GRAPH_SUCCESS != CheckInputForProbIsNotNone(context, tiling),
-            OP_LOGE(context->GetNodeName(), "The input shape is invalid."), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckInputForProbIsNotNone(context, tiling),
+                    OP_LOGE(context->GetNodeName(), "The input shape is invalid."), return ge::GRAPH_FAILED);
         if (paddedMode) {
-            OP_CHECK_IF(
-                ge::GRAPH_SUCCESS != TilingForProbNotNonePadTrue(context, tiling),
-                OP_LOGE(context->GetNodeName(), "Tiling( Prob Not None and Pad Mode True ) failed."),
-                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(ge::GRAPH_SUCCESS != TilingForProbNotNonePadTrue(context, tiling),
+                        OP_LOGE(context->GetNodeName(), "Tiling( Prob Not None and Pad Mode True ) failed."),
+                        return ge::GRAPH_FAILED);
         } else {
-            OP_CHECK_IF(
-                ge::GRAPH_SUCCESS != TilingForProbNotNonePadFalse(context, tiling),
-                OP_LOGE(context->GetNodeName(), "Tiling( Prob Not None and Pad Mode False ) failed."),
-                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(ge::GRAPH_SUCCESS != TilingForProbNotNonePadFalse(context, tiling),
+                        OP_LOGE(context->GetNodeName(), "Tiling( Prob Not None and Pad Mode False ) failed."),
+                        return ge::GRAPH_FAILED);
         }
     }
-    OP_LOGD(
-        context->GetNodeName(),
-        "MoeTokenUnpermuteWithRoutingMapGradTiling MoeTokenUnpermuteWithRoutingMapGradCoreSplitInfo finished");
+    OP_LOGD(context->GetNodeName(),
+            "MoeTokenUnpermuteWithRoutingMapGradTiling MoeTokenUnpermuteWithRoutingMapGradCoreSplitInfo finished");
     MoeTokenUnpermuteWithRoutingMapGradPrintParam(context, tiling);
 
     uint32_t paddedModeKey = paddedMode ? 1 : 0;
     uint32_t probKey = (probTensor == nullptr) ? 0 : 1;
     uint32_t mixKey = 0;
-    if (probDtype != tokenDtype){
+    if (probDtype != tokenDtype) {
         mixKey = 1;
     }
     uint32_t tilingKey = mixKey * 100 + paddedModeKey * 10 + probKey;

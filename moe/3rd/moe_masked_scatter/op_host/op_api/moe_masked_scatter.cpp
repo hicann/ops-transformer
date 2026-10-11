@@ -45,7 +45,7 @@ static bool CheckShapeLimit(const aclTensor* self, const aclTensor* mask)
 static bool IsAiCoreSupport(const aclTensor* self, const aclTensor* mask)
 {
     // 只需要判断dtype
-    auto supportList = op::GetCurrentPlatformInfo().GetCurNpuArch()  == NpuArch::DAV_3510 ?
+    auto supportList = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ?
                            AICORE_DTYPE_SUPPORT_LIST_950 :
                            AICORE_DTYPE_SUPPORT_LIST;
     bool result = CheckType(self->GetDataType(), supportList);
@@ -55,25 +55,24 @@ static bool IsAiCoreSupport(const aclTensor* self, const aclTensor* mask)
 }
 
 // AICORE算子kernel
-static const aclTensor* MoeMaskedScatterAiCore(
-    const aclTensor* self, const aclTensor* mask, const aclTensor* source, aclTensor* output, aclOpExecutor* executor)
+static const aclTensor* MoeMaskedScatterAiCore(const aclTensor* self, const aclTensor* mask, const aclTensor* source,
+                                               aclTensor* output, aclOpExecutor* executor)
 {
     L0_DFX(MoeMaskedScatterAiCore, self, mask, source, output);
     auto ret = ACLNN_SUCCESS;
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch()  == NpuArch::DAV_3510)
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510)
         ret = ADD_TO_LAUNCHER_LIST_AICORE(MoeMaskedScatter, OP_INPUT(self, mask, source), OP_OUTPUT(output));
-    else{
+    else {
         ret = ADD_TO_LAUNCHER_LIST_AICORE(MaskedScatter, OP_INPUT(self, mask, source), OP_OUTPUT(output));
     }
-    OP_CHECK(
-        ret == ACLNN_SUCCESS,
-        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "MoeMaskedScatterAiCore ADD_TO_LAUNCHER_LIST_AICORE failed."), return nullptr);
+    OP_CHECK(ret == ACLNN_SUCCESS,
+             OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "MoeMaskedScatterAiCore ADD_TO_LAUNCHER_LIST_AICORE failed."),
+             return nullptr);
     return output;
 }
 
-
-const aclTensor* MoeMaskedScatter(
-    const aclTensor* self, const aclTensor* mask, const aclTensor* source, aclOpExecutor* executor)
+const aclTensor* MoeMaskedScatter(const aclTensor* self, const aclTensor* mask, const aclTensor* source,
+                                  aclOpExecutor* executor)
 {
     L0_DFX(MoeMaskedScatter, self, mask, source);
     auto maskedScatterOut = executor->AllocTensor(self->GetViewShape(), self->GetDataType());

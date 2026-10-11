@@ -26,7 +26,7 @@ template <typename VAR_T, typename IDX_T, bool IS_CONTIGUOUS, uint32_t CAST_MODE
 class MoeInplaceIndexAddSimdSort : MoeInplaceIndexAddBase<VAR_T, IDX_T, CAST_MODE> {
 public:
     using CAST_T = typename MoeInplaceIndexAddBase<VAR_T, IDX_T, CAST_MODE>::CAST_T;
-    __aicore__ inline MoeInplaceIndexAddSimdSort(const MoeInplaceIndexAddSimdSortTilingData &tilingData, TPipe &pipe)
+    __aicore__ inline MoeInplaceIndexAddSimdSort(const MoeInplaceIndexAddSimdSortTilingData& tilingData, TPipe& pipe)
         : tilingData_(tilingData),
           pipe_(pipe){};
     __aicore__ inline void Init(GM_ADDR var, GM_ADDR indices, GM_ADDR updates, GM_ADDR alpha, GM_ADDR workspace);
@@ -60,8 +60,8 @@ private:
     TQue<QuePosition::VECOUT, DOUBLE_BUFFER> updatesCastQue_;
     TBuf<QuePosition::VECCALC> maxScoreBuf_;
 
-    TPipe &pipe_;
-    const MoeInplaceIndexAddSimdSortTilingData &tilingData_;
+    TPipe& pipe_;
+    const MoeInplaceIndexAddSimdSortTilingData& tilingData_;
 
     int64_t curPreAxisCount_{0};
     VAR_T alphaValue_{0};
@@ -72,10 +72,10 @@ template <typename VAR_T, typename IDX_T, bool IS_CONTIGUOUS, uint32_t CAST_MODE
 __aicore__ inline void MoeInplaceIndexAddSimdSort<VAR_T, IDX_T, IS_CONTIGUOUS, CAST_MODE>::Init(
     GM_ADDR var, GM_ADDR indices, GM_ADDR updates, GM_ADDR alpha, GM_ADDR workspace)
 {
-    var_.SetGlobalBuffer((__gm__ VAR_T *)(var));
-    indices_.SetGlobalBuffer((__gm__ IDX_T *)(indices));
-    updates_.SetGlobalBuffer((__gm__ VAR_T *)(updates));
-    alpha_.SetGlobalBuffer((__gm__ VAR_T *)(alpha));
+    var_.SetGlobalBuffer((__gm__ VAR_T*)(var));
+    indices_.SetGlobalBuffer((__gm__ IDX_T*)(indices));
+    updates_.SetGlobalBuffer((__gm__ VAR_T*)(updates));
+    alpha_.SetGlobalBuffer((__gm__ VAR_T*)(alpha));
 
     pipe_.InitBuffer(maxScoreBuf_, 128 * sizeof(float));
     this->indicesFactor_ = tilingData_.ubIndexFactor;

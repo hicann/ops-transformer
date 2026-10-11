@@ -14,8 +14,7 @@
 #include "infer_datatype_context_faker.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 
-class MoeGatingTopKSoftmax : public testing::Test
-{
+class MoeGatingTopKSoftmax : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -32,17 +31,19 @@ TEST_F(MoeGatingTopKSoftmax, MoeGatingTopKSoftmax_infershape_diff_test_legal_inp
 {
     gert::InfershapeContextPara infershapeContextPara("MoeGatingTopKSoftmax",
                                                       {
-                                                        {{{4, 4}, {4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{4, 4}, {4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                          {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                                       });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 2},};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {4, 2},
+    };
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -50,17 +51,19 @@ TEST_F(MoeGatingTopKSoftmax, MoeGatingTopKSoftmax_infershape_diff_test_legal_inp
 {
     gert::InfershapeContextPara infershapeContextPara("MoeGatingTopKSoftmax",
                                                       {
-                                                        {{{4, 4, 4}, {4, 4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{4, 4, 4}, {4, 4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                          {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                                       });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 4, 2},};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {4, 4, 2},
+    };
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -68,17 +71,19 @@ TEST_F(MoeGatingTopKSoftmax, MoeGatingTopKSoftmax_infershape_diff_test_illegal_i
 {
     gert::InfershapeContextPara infershapeContextPara("MoeGatingTopKSoftmax",
                                                       {
-                                                        {{{4, 4, 4, 4}, {4, 4, 4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{4, 4, 4, 4}, {4, 4, 4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                          {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                                       });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 4, 2},};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {4, 4, 2},
+    };
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
 
@@ -86,17 +91,19 @@ TEST_F(MoeGatingTopKSoftmax, MoeGatingTopKSoftmax_infershape_diff_test_illegal_i
 {
     gert::InfershapeContextPara infershapeContextPara("MoeGatingTopKSoftmax",
                                                       {
-                                                        {{{4}, {4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{4}, {4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                          {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                                       });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 4, 2},};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {4, 4, 2},
+    };
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
 
@@ -104,17 +111,19 @@ TEST_F(MoeGatingTopKSoftmax, MoeGatingTopKSoftmax_infershape_diff_test_illegal_k
 {
     gert::InfershapeContextPara infershapeContextPara("MoeGatingTopKSoftmax",
                                                       {
-                                                        {{{4, 4}, {4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{4, 4}, {4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-2)},
+                                                          {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-2)},
                                                       });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 2},};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {4, 2},
+    };
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
 
@@ -122,17 +131,19 @@ TEST_F(MoeGatingTopKSoftmax, MoeGatingTopKSoftmax_infershape_diff_test_illegal_k
 {
     gert::InfershapeContextPara infershapeContextPara("MoeGatingTopKSoftmax",
                                                       {
-                                                        {{{4, 4}, {4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{4, 4}, {4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                                          {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                                       });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 2},};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {4, 2},
+    };
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
 
@@ -140,17 +151,19 @@ TEST_F(MoeGatingTopKSoftmax, MoeGatingTopKSoftmax_infershape_diff_test_illegal_k
 {
     gert::InfershapeContextPara infershapeContextPara("MoeGatingTopKSoftmax",
                                                       {
-                                                        {{{4, 4}, {4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{4, 4}, {4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1025)},
+                                                          {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1025)},
                                                       });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 2},};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {4, 2},
+    };
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
 
@@ -158,17 +171,19 @@ TEST_F(MoeGatingTopKSoftmax, MoeGatingTopKSoftmax_infershape_diff_test_illegal_k
 {
     gert::InfershapeContextPara infershapeContextPara("MoeGatingTopKSoftmax",
                                                       {
-                                                        {{{4, 4}, {4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{4, 4}, {4, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(5)},
+                                                          {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(5)},
                                                       });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 2},};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {4, 2},
+    };
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
 
@@ -176,15 +191,15 @@ TEST_F(MoeGatingTopKSoftmax, MoeGatingTopKSoftmax_infershape_diff_test_legal_dyn
 {
     gert::InfershapeContextPara infershapeContextPara("MoeGatingTopKSoftmax",
                                                       {
-                                                        {{{-1, -1}, {-1, -1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{-1, -1}, {-1, -1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                          {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                                       });
     std::vector<std::vector<int64_t>> expectOutputShape = {{-1, 2}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
@@ -194,15 +209,15 @@ TEST_F(MoeGatingTopKSoftmax, MoeGatingTopKSoftmax_infershape_diff_test_legal_dyn
 {
     gert::InfershapeContextPara infershapeContextPara("MoeGatingTopKSoftmax",
                                                       {
-                                                        {{{-1, -1, -1}, {-1, -1, -1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{-1, -1, -1}, {-1, -1, -1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                          {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                                       });
     std::vector<std::vector<int64_t>> expectOutputShape = {{-1, -1, 2}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
@@ -212,15 +227,15 @@ TEST_F(MoeGatingTopKSoftmax, MoeGatingTopKSoftmax_infershape_diff_test_legal_dyn
 {
     gert::InfershapeContextPara infershapeContextPara("MoeGatingTopKSoftmax",
                                                       {
-                                                        {{{-2}, {-2}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{-2}, {-2}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                          {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                                       });
     std::vector<std::vector<int64_t>> expectOutputShape = {{-2}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);

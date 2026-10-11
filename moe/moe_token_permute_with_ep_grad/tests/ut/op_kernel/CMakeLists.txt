@@ -20,4 +20,3 @@ if (UT_TEST_ALL OR OP_KERNEL_UT)
     # param4：该算子依赖的所有tiling源码文件
     AddOpTestCase(moe_token_permute_with_ep_grad "ascend910B1" "-DDTYPE_X=float" "${moe_token_permute_with_ep_grad_tiling_files}")
 endif()
-

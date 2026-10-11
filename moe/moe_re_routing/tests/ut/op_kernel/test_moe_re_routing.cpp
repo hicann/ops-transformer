@@ -27,8 +27,9 @@
 using namespace std;
 
 extern "C" __global__ __aicore__ void moe_re_routing(GM_ADDR tokens, GM_ADDR expertTokensNumPerRank,
-    GM_ADDR perTokenScales, GM_ADDR permuteTokens, GM_ADDR permutePerTokenScales, GM_ADDR permuteTokenIdx,
-    GM_ADDR expertTokenNum, GM_ADDR workspace, GM_ADDR tiling);
+                                                     GM_ADDR perTokenScales, GM_ADDR permuteTokens,
+                                                     GM_ADDR permutePerTokenScales, GM_ADDR permuteTokenIdx,
+                                                     GM_ADDR expertTokenNum, GM_ADDR workspace, GM_ADDR tiling);
 
 class moe_re_routing_test : public testing::Test {
 protected:
@@ -55,20 +56,20 @@ TEST_F(moe_re_routing_test, test_case_0001)
     size_t tiling_data_size = sizeof(MoeReRoutingTilingData);
     uint32_t blockDim = 48;
 
-    uint8_t *tokens = (uint8_t *)AscendC::GmAlloc(tokensSize);
-    uint8_t *expertTokenNumPerRank = (uint8_t *)AscendC::GmAlloc(expertTokensNumPerRankSize);
-    uint8_t *perTokenScales = (uint8_t *)AscendC::GmAlloc(perTokenScalesSize);
-    uint8_t *permuteTokens = (uint8_t *)AscendC::GmAlloc(permuteTokensSize);
-    uint8_t *permutePerTokenScales = (uint8_t *)AscendC::GmAlloc(permutePerTokenScalesSize);
-    uint8_t *permuteTokenIdx = (uint8_t *)AscendC::GmAlloc(permuteTokenIdxSize);
-    uint8_t *expertTokenNum = (uint8_t *)AscendC::GmAlloc(expertTokenNumSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16 * 2);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tiling_data_size);
+    uint8_t* tokens = (uint8_t*)AscendC::GmAlloc(tokensSize);
+    uint8_t* expertTokenNumPerRank = (uint8_t*)AscendC::GmAlloc(expertTokensNumPerRankSize);
+    uint8_t* perTokenScales = (uint8_t*)AscendC::GmAlloc(perTokenScalesSize);
+    uint8_t* permuteTokens = (uint8_t*)AscendC::GmAlloc(permuteTokensSize);
+    uint8_t* permutePerTokenScales = (uint8_t*)AscendC::GmAlloc(permutePerTokenScalesSize);
+    uint8_t* permuteTokenIdx = (uint8_t*)AscendC::GmAlloc(permuteTokenIdxSize);
+    uint8_t* expertTokenNum = (uint8_t*)AscendC::GmAlloc(expertTokenNumSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 2);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
 
-    MoeReRoutingTilingData *tilingDatafromBin = reinterpret_cast<MoeReRoutingTilingData *>(tiling);
+    MoeReRoutingTilingData* tilingDatafromBin = reinterpret_cast<MoeReRoutingTilingData*>(tiling);
 
     tilingDatafromBin->coreNum = 48;
     tilingDatafromBin->ubFactor = 12;
@@ -79,17 +80,8 @@ TEST_F(moe_re_routing_test, test_case_0001)
     tilingDatafromBin->hasScale = 1;
 
     ICPU_SET_TILING_KEY(100000);
-    ICPU_RUN_KF(moe_re_routing,
-        blockDim,
-        tokens,
-        expertTokenNumPerRank,
-        perTokenScales,
-        permuteTokens,
-        permutePerTokenScales,
-        permuteTokenIdx,
-        expertTokenNum,
-        workspace,
-        (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_re_routing, blockDim, tokens, expertTokenNumPerRank, perTokenScales, permuteTokens,
+                permutePerTokenScales, permuteTokenIdx, expertTokenNum, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(tokens);
     AscendC::GmFree(expertTokenNumPerRank);
@@ -116,20 +108,20 @@ TEST_F(moe_re_routing_test, test_case_0002)
     size_t tiling_data_size = sizeof(MoeReRoutingTilingData);
     uint32_t blockDim = 48;
 
-    uint8_t *tokens = (uint8_t *)AscendC::GmAlloc(tokensSize);
-    uint8_t *expertTokenNumPerRank = (uint8_t *)AscendC::GmAlloc(expertTokensNumPerRankSize);
-    uint8_t *perTokenScales = (uint8_t *)AscendC::GmAlloc(perTokenScalesSize);
-    uint8_t *permuteTokens = (uint8_t *)AscendC::GmAlloc(permuteTokensSize);
-    uint8_t *permutePerTokenScales = (uint8_t *)AscendC::GmAlloc(permutePerTokenScalesSize);
-    uint8_t *permuteTokenIdx = (uint8_t *)AscendC::GmAlloc(permuteTokenIdxSize);
-    uint8_t *expertTokenNum = (uint8_t *)AscendC::GmAlloc(expertTokenNumSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16 * 2);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tiling_data_size);
+    uint8_t* tokens = (uint8_t*)AscendC::GmAlloc(tokensSize);
+    uint8_t* expertTokenNumPerRank = (uint8_t*)AscendC::GmAlloc(expertTokensNumPerRankSize);
+    uint8_t* perTokenScales = (uint8_t*)AscendC::GmAlloc(perTokenScalesSize);
+    uint8_t* permuteTokens = (uint8_t*)AscendC::GmAlloc(permuteTokensSize);
+    uint8_t* permutePerTokenScales = (uint8_t*)AscendC::GmAlloc(permutePerTokenScalesSize);
+    uint8_t* permuteTokenIdx = (uint8_t*)AscendC::GmAlloc(permuteTokenIdxSize);
+    uint8_t* expertTokenNum = (uint8_t*)AscendC::GmAlloc(expertTokenNumSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 2);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
 
-    MoeReRoutingTilingData *tilingDatafromBin = reinterpret_cast<MoeReRoutingTilingData *>(tiling);
+    MoeReRoutingTilingData* tilingDatafromBin = reinterpret_cast<MoeReRoutingTilingData*>(tiling);
 
     tilingDatafromBin->coreNum = 48;
     tilingDatafromBin->ubFactor = 5;
@@ -140,29 +132,11 @@ TEST_F(moe_re_routing_test, test_case_0002)
     tilingDatafromBin->hasScale = 1;
 
     ICPU_SET_TILING_KEY(100100);
-    ICPU_RUN_KF(moe_re_routing,
-        blockDim,
-        tokens,
-        expertTokenNumPerRank,
-        perTokenScales,
-        permuteTokens,
-        permutePerTokenScales,
-        permuteTokenIdx,
-        expertTokenNum,
-        workspace,
-        (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_re_routing, blockDim, tokens, expertTokenNumPerRank, perTokenScales, permuteTokens,
+                permutePerTokenScales, permuteTokenIdx, expertTokenNum, workspace, (uint8_t*)(tilingDatafromBin));
     ICPU_SET_TILING_KEY(100200);
-    ICPU_RUN_KF(moe_re_routing,
-        blockDim,
-        tokens,
-        expertTokenNumPerRank,
-        perTokenScales,
-        permuteTokens,
-        permutePerTokenScales,
-        permuteTokenIdx,
-        expertTokenNum,
-        workspace,
-        (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_re_routing, blockDim, tokens, expertTokenNumPerRank, perTokenScales, permuteTokens,
+                permutePerTokenScales, permuteTokenIdx, expertTokenNum, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(tokens);
     AscendC::GmFree(expertTokenNumPerRank);
@@ -189,20 +163,20 @@ TEST_F(moe_re_routing_test, test_case_0003)
     size_t tiling_data_size = sizeof(MoeReRoutingTilingData);
     uint32_t blockDim = 48;
 
-    uint8_t *tokens = (uint8_t *)AscendC::GmAlloc(tokensSize);
-    uint8_t *expertTokenNumPerRank = (uint8_t *)AscendC::GmAlloc(expertTokensNumPerRankSize);
-    uint8_t *perTokenScales = (uint8_t *)AscendC::GmAlloc(perTokenScalesSize);
-    uint8_t *permuteTokens = (uint8_t *)AscendC::GmAlloc(permuteTokensSize);
-    uint8_t *permutePerTokenScales = (uint8_t *)AscendC::GmAlloc(permutePerTokenScalesSize);
-    uint8_t *permuteTokenIdx = (uint8_t *)AscendC::GmAlloc(permuteTokenIdxSize);
-    uint8_t *expertTokenNum = (uint8_t *)AscendC::GmAlloc(expertTokenNumSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16 * 2);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tiling_data_size);
+    uint8_t* tokens = (uint8_t*)AscendC::GmAlloc(tokensSize);
+    uint8_t* expertTokenNumPerRank = (uint8_t*)AscendC::GmAlloc(expertTokensNumPerRankSize);
+    uint8_t* perTokenScales = (uint8_t*)AscendC::GmAlloc(perTokenScalesSize);
+    uint8_t* permuteTokens = (uint8_t*)AscendC::GmAlloc(permuteTokensSize);
+    uint8_t* permutePerTokenScales = (uint8_t*)AscendC::GmAlloc(permutePerTokenScalesSize);
+    uint8_t* permuteTokenIdx = (uint8_t*)AscendC::GmAlloc(permuteTokenIdxSize);
+    uint8_t* expertTokenNum = (uint8_t*)AscendC::GmAlloc(expertTokenNumSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 2);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
 
-    MoeReRoutingTilingData *tilingDatafromBin = reinterpret_cast<MoeReRoutingTilingData *>(tiling);
+    MoeReRoutingTilingData* tilingDatafromBin = reinterpret_cast<MoeReRoutingTilingData*>(tiling);
 
     tilingDatafromBin->coreNum = 48;
     tilingDatafromBin->ubFactor = 12;
@@ -213,17 +187,8 @@ TEST_F(moe_re_routing_test, test_case_0003)
     tilingDatafromBin->hasScale = 1;
 
     ICPU_SET_TILING_KEY(100010);
-    ICPU_RUN_KF(moe_re_routing,
-        blockDim,
-        tokens,
-        expertTokenNumPerRank,
-        perTokenScales,
-        permuteTokens,
-        permutePerTokenScales,
-        permuteTokenIdx,
-        expertTokenNum,
-        workspace,
-        (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_re_routing, blockDim, tokens, expertTokenNumPerRank, perTokenScales, permuteTokens,
+                permutePerTokenScales, permuteTokenIdx, expertTokenNum, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(tokens);
     AscendC::GmFree(expertTokenNumPerRank);
@@ -250,20 +215,20 @@ TEST_F(moe_re_routing_test, test_case_0004)
     size_t tiling_data_size = sizeof(MoeReRoutingTilingData);
     uint32_t blockDim = 48;
 
-    uint8_t *tokens = (uint8_t *)AscendC::GmAlloc(tokensSize);
-    uint8_t *expertTokenNumPerRank = (uint8_t *)AscendC::GmAlloc(expertTokensNumPerRankSize);
-    uint8_t *perTokenScales = (uint8_t *)AscendC::GmAlloc(perTokenScalesSize);
-    uint8_t *permuteTokens = (uint8_t *)AscendC::GmAlloc(permuteTokensSize);
-    uint8_t *permutePerTokenScales = (uint8_t *)AscendC::GmAlloc(permutePerTokenScalesSize);
-    uint8_t *permuteTokenIdx = (uint8_t *)AscendC::GmAlloc(permuteTokenIdxSize);
-    uint8_t *expertTokenNum = (uint8_t *)AscendC::GmAlloc(expertTokenNumSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16 * 2);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tiling_data_size);
+    uint8_t* tokens = (uint8_t*)AscendC::GmAlloc(tokensSize);
+    uint8_t* expertTokenNumPerRank = (uint8_t*)AscendC::GmAlloc(expertTokensNumPerRankSize);
+    uint8_t* perTokenScales = (uint8_t*)AscendC::GmAlloc(perTokenScalesSize);
+    uint8_t* permuteTokens = (uint8_t*)AscendC::GmAlloc(permuteTokensSize);
+    uint8_t* permutePerTokenScales = (uint8_t*)AscendC::GmAlloc(permutePerTokenScalesSize);
+    uint8_t* permuteTokenIdx = (uint8_t*)AscendC::GmAlloc(permuteTokenIdxSize);
+    uint8_t* expertTokenNum = (uint8_t*)AscendC::GmAlloc(expertTokenNumSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 2);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
 
-    MoeReRoutingTilingData *tilingDatafromBin = reinterpret_cast<MoeReRoutingTilingData *>(tiling);
+    MoeReRoutingTilingData* tilingDatafromBin = reinterpret_cast<MoeReRoutingTilingData*>(tiling);
 
     tilingDatafromBin->coreNum = 48;
     tilingDatafromBin->ubFactor = 5;
@@ -274,29 +239,11 @@ TEST_F(moe_re_routing_test, test_case_0004)
     tilingDatafromBin->hasScale = 1;
 
     ICPU_SET_TILING_KEY(100110);
-    ICPU_RUN_KF(moe_re_routing,
-        blockDim,
-        tokens,
-        expertTokenNumPerRank,
-        perTokenScales,
-        permuteTokens,
-        permutePerTokenScales,
-        permuteTokenIdx,
-        expertTokenNum,
-        workspace,
-        (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_re_routing, blockDim, tokens, expertTokenNumPerRank, perTokenScales, permuteTokens,
+                permutePerTokenScales, permuteTokenIdx, expertTokenNum, workspace, (uint8_t*)(tilingDatafromBin));
     ICPU_SET_TILING_KEY(100210);
-    ICPU_RUN_KF(moe_re_routing,
-        blockDim,
-        tokens,
-        expertTokenNumPerRank,
-        perTokenScales,
-        permuteTokens,
-        permutePerTokenScales,
-        permuteTokenIdx,
-        expertTokenNum,
-        workspace,
-        (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(moe_re_routing, blockDim, tokens, expertTokenNumPerRank, perTokenScales, permuteTokens,
+                permutePerTokenScales, permuteTokenIdx, expertTokenNum, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(tokens);
     AscendC::GmFree(expertTokenNumPerRank);

@@ -22,12 +22,11 @@ extern "C" __global__ __aicore__ void moe_token_permute_with_routing_map_grad(
     GM_ADDR permutedTokenOutPutGrad, GM_ADDR permutedProbsOutPutGradOptional, GM_ADDR sortedIndices,
     GM_ADDR routingMapOptional, GM_ADDR tokensGradOut, GM_ADDR probsGradOutOptional, GM_ADDR workspace, GM_ADDR tiling)
 {
-    GET_TILING_DATA_MEMBER(
-        MoeTokenPermuteWithRoutingMapGradTilingData, moeTokenPermuteWithRoutingMapGradUnpermuteTilingData, moe_token_unpermute_tiling_data_in,
-        tiling);
-    GET_TILING_DATA_MEMBER(
-        MoeTokenPermuteWithRoutingMapGradTilingData, moeTokenpermuteWithRoutingMapDropPadTilingData,
-        drop_tiling_data_in, tiling);
+    GET_TILING_DATA_MEMBER(MoeTokenPermuteWithRoutingMapGradTilingData,
+                           moeTokenPermuteWithRoutingMapGradUnpermuteTilingData, moe_token_unpermute_tiling_data_in,
+                           tiling);
+    GET_TILING_DATA_MEMBER(MoeTokenPermuteWithRoutingMapGradTilingData, moeTokenpermuteWithRoutingMapDropPadTilingData,
+                           drop_tiling_data_in, tiling);
     // 调用unpermute计算， probs始终false
     if (TILING_KEY_IS(0)) {
         KernelMoeTokenUnpermute<DTYPE_PERMUTED_TOKEN_OUTPUT_GRAD, int32_t, DTYPE_PERMUTED_TOKEN_OUTPUT_GRAD, false> op;

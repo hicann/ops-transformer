@@ -29,12 +29,12 @@ constexpr int64_t MAXSCORE_SORT_THRESHOLD = 128;
 template <typename VAR_T, typename IDX_T>
 class MoeInplaceIndexAddDeterminsticNotQuant : public MoeInplaceIndexAddBase<VAR_T, IDX_T, CAST_0> {
 public:
-    __aicore__ inline MoeInplaceIndexAddDeterminsticNotQuant(const MoeInplaceIndexAddDeterminsticTilingData &tilingData,
-                                                             TPipe &pipe)
+    __aicore__ inline MoeInplaceIndexAddDeterminsticNotQuant(const MoeInplaceIndexAddDeterminsticTilingData& tilingData,
+                                                             TPipe& pipe)
         : tilingData_(tilingData),
           pipe_(pipe){};
     __aicore__ inline void Init(GM_ADDR var, GM_ADDR indices, GM_ADDR updates, GM_ADDR alpha, GM_ADDR workspace);
-    __aicore__ inline void CopyXToOut(__local_mem__ int8_t *inAddr, __local_mem__ int8_t *outAddr, int64_t dataCount);
+    __aicore__ inline void CopyXToOut(__local_mem__ int8_t* inAddr, __local_mem__ int8_t* outAddr, int64_t dataCount);
     __aicore__ inline void ProcessPreSingleLoop(int64_t rowIdx, int64_t colIdx, int64_t rowLen, int64_t colLen);
     __aicore__ inline void ProcessPreSmallIndices(int64_t preOfset, int64_t colIdx, int64_t preLen, int64_t colLen);
     __aicore__ inline void ProcessAfterSingleLoop(int64_t rowIdx, int64_t colIdx, int64_t rowLen, int64_t colLen);
@@ -53,8 +53,8 @@ private:
     TQue<QuePosition::VECOUT, 1> updatesCastQue_;
     TBuf<QuePosition::VECCALC> maxScoreBuf_;
 
-    TPipe &pipe_;
-    const MoeInplaceIndexAddDeterminsticTilingData &tilingData_;
+    TPipe& pipe_;
+    const MoeInplaceIndexAddDeterminsticTilingData& tilingData_;
 
     VAR_T alphaValue_{0};
     int64_t curPreAxisCount_{0};
@@ -66,10 +66,10 @@ __aicore__ inline void MoeInplaceIndexAddDeterminsticNotQuant<VAR_T, IDX_T>::Ini
                                                                                   GM_ADDR updates, GM_ADDR alpha,
                                                                                   GM_ADDR workspace)
 {
-    var_.SetGlobalBuffer((__gm__ VAR_T *)(var));
-    indices_.SetGlobalBuffer((__gm__ IDX_T *)(indices));
-    updates_.SetGlobalBuffer((__gm__ VAR_T *)(updates));
-    alpha_.SetGlobalBuffer((__gm__ VAR_T *)(alpha));
+    var_.SetGlobalBuffer((__gm__ VAR_T*)(var));
+    indices_.SetGlobalBuffer((__gm__ IDX_T*)(indices));
+    updates_.SetGlobalBuffer((__gm__ VAR_T*)(updates));
+    alpha_.SetGlobalBuffer((__gm__ VAR_T*)(alpha));
 
     pipe_.InitBuffer(maxScoreBuf_, MAXSCORE_SORT_THRESHOLD * sizeof(float));
     this->indicesFactor_ = tilingData_.ubIndexFactor;
@@ -91,8 +91,8 @@ __aicore__ inline void MoeInplaceIndexAddDeterminsticNotQuant<VAR_T, IDX_T>::Ini
 }
 
 template <typename VAR_T, typename IDX_T>
-__aicore__ inline void MoeInplaceIndexAddDeterminsticNotQuant<VAR_T, IDX_T>::CopyXToOut(__local_mem__ int8_t *inAddr,
-                                                                                        __local_mem__ int8_t *outAddr,
+__aicore__ inline void MoeInplaceIndexAddDeterminsticNotQuant<VAR_T, IDX_T>::CopyXToOut(__local_mem__ int8_t* inAddr,
+                                                                                        __local_mem__ int8_t* outAddr,
                                                                                         int64_t dataCount)
 {
     uint32_t totalBytes = dataCount * sizeof(VAR_T);
@@ -144,8 +144,8 @@ __aicore__ inline void MoeInplaceIndexAddDeterminsticNotQuant<VAR_T, IDX_T>::Pro
     if (tilingData_.isWithAlpha) {
         AscendC::Muls(updateOutLocal, updatesLocal, alphaValue_, rowLen * colLenAlignSize);
     } else {
-        auto inAddr = reinterpret_cast<__local_mem__ int8_t *>(updatesLocal.GetPhyAddr());
-        auto outAddr = reinterpret_cast<__local_mem__ int8_t *>(updateOutLocal.GetPhyAddr());
+        auto inAddr = reinterpret_cast<__local_mem__ int8_t*>(updatesLocal.GetPhyAddr());
+        auto outAddr = reinterpret_cast<__local_mem__ int8_t*>(updateOutLocal.GetPhyAddr());
         CopyXToOut(inAddr, outAddr, rowLen * colLenAlignSize);
     }
     updatesCastQue_.EnQue(updateOutLocal);
@@ -206,8 +206,8 @@ __aicore__ inline void MoeInplaceIndexAddDeterminsticNotQuant<VAR_T, IDX_T>::Pro
         if (tilingData_.isWithAlpha) {
             AscendC::Muls(updateOutLocal, updatesLocal, alphaValue_, rowLen * colLenAlignSize);
         } else {
-            auto inAddr = reinterpret_cast<__local_mem__ int8_t *>(updatesLocal.GetPhyAddr());
-            auto outAddr = reinterpret_cast<__local_mem__ int8_t *>(updateOutLocal.GetPhyAddr());
+            auto inAddr = reinterpret_cast<__local_mem__ int8_t*>(updatesLocal.GetPhyAddr());
+            auto outAddr = reinterpret_cast<__local_mem__ int8_t*>(updateOutLocal.GetPhyAddr());
             CopyXToOut(inAddr, outAddr, rowLen * colLenAlignSize);
         }
         updatesCastQue_.EnQue(updateOutLocal);
@@ -313,8 +313,8 @@ __aicore__ inline void MoeInplaceIndexAddDeterminsticNotQuant<VAR_T, IDX_T>::Pro
         if (tilingData_.isWithAlpha) {
             AscendC::Muls(updateOutLocal, updatesLocal, alphaValue_, rowLen * colLenAlignSize);
         } else {
-            auto inAddr = reinterpret_cast<__local_mem__ int8_t *>(updatesLocal.GetPhyAddr());
-            auto outAddr = reinterpret_cast<__local_mem__ int8_t *>(updateOutLocal.GetPhyAddr());
+            auto inAddr = reinterpret_cast<__local_mem__ int8_t*>(updatesLocal.GetPhyAddr());
+            auto outAddr = reinterpret_cast<__local_mem__ int8_t*>(updateOutLocal.GetPhyAddr());
             CopyXToOut(inAddr, outAddr, rowLen * colLenAlignSize);
         }
         updatesCastQue_.EnQue(updateOutLocal);

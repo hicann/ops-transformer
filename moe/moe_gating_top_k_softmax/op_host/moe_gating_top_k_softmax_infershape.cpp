@@ -27,19 +27,19 @@ static const int MAX_K = 1024;
 static constexpr int64_t UNKNOWN_DIM_VALUE_ = -1LL;
 static constexpr int64_t UNKNOWN_RANK_DIM_VALUE_ = -2LL;
 
-
 /*
  * @brief: check whether the output shape is unknown rank shape
  * @param [out] output_shape: the output shape ptr
  * @return bool
  */
-static inline bool IsUnknownShape(const gert::Shape* check_shape) {
-  for (size_t i = 0; i < check_shape->GetDimNum(); i++) {
-    if (check_shape->GetDim(i) == UNKNOWN_DIM_VALUE_) {
-      return true;
+static inline bool IsUnknownShape(const gert::Shape* check_shape)
+{
+    for (size_t i = 0; i < check_shape->GetDimNum(); i++) {
+        if (check_shape->GetDim(i) == UNKNOWN_DIM_VALUE_) {
+            return true;
+        }
     }
-  }
-  return false;
+    return false;
 }
 
 static ge::graphStatus InferShapeMoeGatingTopKSoftmax(gert::InferShapeContext* context)
@@ -72,9 +72,7 @@ static ge::graphStatus InferShapeMoeGatingTopKSoftmax(gert::InferShapeContext* c
     const int64_t k = *kPtr;
 
     if (k <= 0 || k > MAX_K || (!IsUnknownShape(gatingShape) && k > gatingShape->GetDim(gatingDimNum - 1))) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            context->GetNodeName(), "k", std::to_string(k),
-            "k value error!");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "k", std::to_string(k), "k value error!");
         return ge::GRAPH_FAILED;
     }
 

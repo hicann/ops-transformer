@@ -37,15 +37,15 @@ struct MoeV2GradComputeTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeV2GradComputeTilingData *const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeV2GradComputeTilingData* const_data)
 {
-    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
-    uint32_t *dst = (uint32_t *)const_data;
+    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
+    uint32_t* dst = (uint32_t*)const_data;
     for (auto i = 0; i < sizeof(MoeV2GradComputeTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t *tiling, MoeV2GradComputeTilingData *const_data)
+inline void InitTilingData(uint8_t* tiling, MoeV2GradComputeTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeV2GradComputeTilingData));
 }
@@ -65,15 +65,15 @@ struct MoeInitRoutingV2GradTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeInitRoutingV2GradTilingData *const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeInitRoutingV2GradTilingData* const_data)
 {
-    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
-    uint32_t *dst = (uint32_t *)const_data;
+    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
+    uint32_t* dst = (uint32_t*)const_data;
     for (auto i = 0; i < sizeof(MoeInitRoutingV2GradTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t *tiling, MoeInitRoutingV2GradTilingData *const_data)
+inline void InitTilingData(uint8_t* tiling, MoeInitRoutingV2GradTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeInitRoutingV2GradTilingData));
 }

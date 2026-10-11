@@ -24,12 +24,12 @@ using namespace AscendC;
 class MoeV2MrgsortOut {
 public:
     __aicore__ inline MoeV2MrgsortOut(){};
-    __aicore__ inline void Init(MoeV2MrgsortParam *param, TPipe *tPipe);
+    __aicore__ inline void Init(MoeV2MrgsortParam* param, TPipe* tPipe);
     __aicore__ inline void Process();
-    __aicore__ inline void SetInput(GlobalTensor<float> &gmInput, LocalTensor<float> &ubInput);
-    __aicore__ inline void SetOutput(GlobalTensor<int32_t> &gmOutput1, GlobalTensor<int32_t> &gmOutput2,
-                                     LocalTensor<float> &ubOutput1, LocalTensor<float> &ubOutput2);
-    __aicore__ inline void SetBuffer(LocalTensor<float> &tempBuffer);
+    __aicore__ inline void SetInput(GlobalTensor<float>& gmInput, LocalTensor<float>& ubInput);
+    __aicore__ inline void SetOutput(GlobalTensor<int32_t>& gmOutput1, GlobalTensor<int32_t>& gmOutput2,
+                                     LocalTensor<float>& ubOutput1, LocalTensor<float>& ubOutput2);
+    __aicore__ inline void SetBuffer(LocalTensor<float>& tempBuffer);
 
 private:
     __aicore__ inline void CopyIn();
@@ -41,7 +41,7 @@ private:
     __aicore__ inline void ClearCache();
 
 private:
-    MoeV2MrgsortParam *param = nullptr;
+    MoeV2MrgsortParam* param = nullptr;
 
     GlobalTensor<int32_t> gmOutput1;
     GlobalTensor<int32_t> gmOutput2;
@@ -81,15 +81,15 @@ __aicore__ inline void MoeV2MrgsortOut::ClearCache()
     this->outOffset = 0;
 }
 
-__aicore__ inline void MoeV2MrgsortOut::SetInput(GlobalTensor<float> &gmInput, LocalTensor<float> &ubInput)
+__aicore__ inline void MoeV2MrgsortOut::SetInput(GlobalTensor<float>& gmInput, LocalTensor<float>& ubInput)
 {
     this->gmInputs[listNum] = gmInput;
     this->ubInputs[listNum] = ubInput;
     this->listNum += 1;
 }
 
-__aicore__ inline void MoeV2MrgsortOut::SetOutput(GlobalTensor<int32_t> &gmOutput1, GlobalTensor<int32_t> &gmOutput2,
-                                                  LocalTensor<float> &ubOutput1, LocalTensor<float> &ubOutput2)
+__aicore__ inline void MoeV2MrgsortOut::SetOutput(GlobalTensor<int32_t>& gmOutput1, GlobalTensor<int32_t>& gmOutput2,
+                                                  LocalTensor<float>& ubOutput1, LocalTensor<float>& ubOutput2)
 {
     this->gmOutput1 = gmOutput1;
     this->ubOutput1 = ubOutput1;
@@ -100,7 +100,7 @@ __aicore__ inline void MoeV2MrgsortOut::SetOutput(GlobalTensor<int32_t> &gmOutpu
     this->ubOutputInt2 = ubOutput2.ReinterpretCast<int32_t>();
 }
 
-__aicore__ inline void MoeV2MrgsortOut::SetBuffer(LocalTensor<float> &tempBuffer)
+__aicore__ inline void MoeV2MrgsortOut::SetBuffer(LocalTensor<float>& tempBuffer)
 {
     this->tempBuffer = tempBuffer;
 }
@@ -194,7 +194,7 @@ __aicore__ inline void MoeV2MrgsortOut::CopyOut()
     outOffset += curLoopSortedNum;
 }
 
-__aicore__ inline void MoeV2MrgsortOut::Init(MoeV2MrgsortParam *param, TPipe *tPipe)
+__aicore__ inline void MoeV2MrgsortOut::Init(MoeV2MrgsortParam* param, TPipe* tPipe)
 {
     this->param = param;
     this->allRemainElements = 0;

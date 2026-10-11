@@ -28,7 +28,7 @@ class MoeGatherOut {
 public:
     __aicore__ inline MoeGatherOut(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR scale, GM_ADDR workspace, GM_ADDR expandedRowIdx, GM_ADDR expandedX,
-                                GM_ADDR expandedScale, const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe);
+                                GM_ADDR expandedScale, const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void CopyExpertIn(int64_t progress);
     __aicore__ inline void CopyXIn(int64_t xSrcOffset, int64_t curLoopCols);
@@ -39,7 +39,7 @@ public:
     __aicore__ inline void ScatterCopyOut(int64_t progress);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQueBind<TPosition::VECIN, TPosition::VECOUT, GATHER_OUT_BUFFER_NUM> xCopyInQueue_;
     TQueBind<TPosition::VECIN, TPosition::VECOUT, GATHER_OUT_BUFFER_NUM> scaleCopyInQueue_;
     TQue<QuePosition::VECIN, GATHER_OUT_BUFFER_NUM> expandedRowIdxCopyInQueue_;
@@ -86,7 +86,7 @@ private:
 template <typename T, const int EP>
 __aicore__ inline void MoeGatherOut<T, EP>::Init(GM_ADDR x, GM_ADDR scale, GM_ADDR workspace, GM_ADDR expandedRowIdx,
                                                  GM_ADDR expandedX, GM_ADDR expandedScale,
-                                                 const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe)
+                                                 const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe)
 {
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
@@ -108,9 +108,9 @@ __aicore__ inline void MoeGatherOut<T, EP>::Init(GM_ADDR x, GM_ADDR scale, GM_AD
     actualExpertNum_ = tilingData->actualExpertNum;
 
     if constexpr (EP) {
-        expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 +
-                                                Align(actualExpertNum_, sizeof(int32_t)),
-                                            1);
+        expertTotalCountGm_.SetGlobalBuffer(
+            (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum_, sizeof(int32_t)),
+            1);
         AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE,
                                           AscendC::DcciDst::CACHELINE_OUT>(expertTotalCountGm_);
         expertTotalCount_ = expertTotalCountGm_.GetValue(0);
@@ -134,37 +134,37 @@ __aicore__ inline void MoeGatherOut<T, EP>::Init(GM_ADDR x, GM_ADDR scale, GM_AD
     indicesLoops_ = Ceil(curCoreIndicesElements_, curCorePerLoopIndicesElements_);
     curCoreLastLoopIndicesElements_ = curCoreIndicesElements_ - (indicesLoops_ - 1) * curCorePerLoopIndicesElements_;
 
-    xGm_.SetGlobalBuffer((__gm__ T *)x, n_ * cols_);
-    xGscaleGm_.SetGlobalBuffer((__gm__ float *)scale, n_);
+    xGm_.SetGlobalBuffer((__gm__ T*)x, n_ * cols_);
+    xGscaleGm_.SetGlobalBuffer((__gm__ float*)scale, n_);
 
-    expandedXGm_.SetGlobalBuffer((__gm__ T *)expandedX);
-    expandedScaleGm_.SetGlobalBuffer((__gm__ float *)expandedScale);
+    expandedXGm_.SetGlobalBuffer((__gm__ T*)expandedX);
+    expandedScaleGm_.SetGlobalBuffer((__gm__ float*)expandedScale);
 
     pipe_->InitBuffer(expandedRowIdxCopyInQueue_, GATHER_OUT_BUFFER_NUM,
                       AlignBytes(curCorePerLoopIndicesElements_, sizeof(int32_t)));
     pipe_->InitBuffer(xCopyInQueue_, GATHER_OUT_BUFFER_NUM, AlignBytes(perLoopCols_, sizeof(T)));
     pipe_->InitBuffer(scaleCopyInQueue_, GATHER_OUT_BUFFER_NUM, AlignBytes(1, sizeof(float)));
 
-    sortedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + blockIdx_ * perCoreIndicesElements_,
+    sortedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + blockIdx_ * perCoreIndicesElements_,
                                        Align(curCoreIndicesElements_, sizeof(int32_t)));
 
     // 获取scatter索引
     if constexpr (EP) {
         if (rowIdxType_ == SCATTER) {
-            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
+            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
                                               Align(curCoreIndicesElements_, sizeof(int32_t)));
         } else {
             expandedRowIdxGm_.SetGlobalBuffer(
-                (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
+                (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
                 Align(curCoreIndicesElements_, sizeof(int32_t)));
         }
     } else { // 获取gather索引
         if (rowIdxType_ == GATHER) {
-            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
+            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
                                               Align(curCoreIndicesElements_, sizeof(int32_t)));
         } else {
             expandedRowIdxGm_.SetGlobalBuffer(
-                (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
+                (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
                 Align(curCoreIndicesElements_, sizeof(int32_t)));
         }
     }

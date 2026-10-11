@@ -116,8 +116,8 @@ static void MoeTokenUnpermuteGradPrintParam(const gert::TilingContext* context, 
 }
 
 // 核间切分策略
-static void MoeTokenUnpermuteGradInitSplitInfo(
-    const gert::TilingContext* context, MoeTokenUnpermuteGradTilingData& tiling)
+static void MoeTokenUnpermuteGradInitSplitInfo(const gert::TilingContext* context,
+                                               MoeTokenUnpermuteGradTilingData& tiling)
 {
     int64_t tokensNum = tiling.get_tokensNum();
     int64_t topK = tiling.get_topK();
@@ -144,9 +144,8 @@ static void MoeTokenUnpermuteGradInitSplitInfo(
     tiling.set_totalUbSize(ubSize);
 }
 
-static bool CoreSplitInfoProbIsNone(
-    MoeTokenUnpermuteGradTilingData& tiling, uint32_t inputTypeLength, uint32_t rowIdMapTypeLength,
-    uint64_t totalUbSize)
+static bool CoreSplitInfoProbIsNone(MoeTokenUnpermuteGradTilingData& tiling, uint32_t inputTypeLength,
+                                    uint32_t rowIdMapTypeLength, uint64_t totalUbSize)
 {
     int64_t hiddenSize = tiling.get_hiddenSize();
     uint32_t inputBlockAlignEleNum = BLOCK_SIZE_32 / inputTypeLength;
@@ -159,19 +158,19 @@ static bool CoreSplitInfoProbIsNone(
         (BUFFER_NUM *
          (hiddenSizeAlign * inputTypeLength +
           rowIdMapTypeLength)); // 剩余空间全部尽可能分满,inque(indicesNumPerLoop,h),indices(indicesNumPerLoop,)
-    indicesReserveNum = AlignDown<int64_t>(
-        indicesReserveNum, static_cast<int64_t>(rowIdMapBlockAlignEleNum)); // indicesNumPerLoop 32B对齐
-    indicesReserveNum = std::max(
-        indicesReserveNum,
-        static_cast<int64_t>(rowIdMapBlockAlignEleNum)); // indicesNumPerLoop<32B的边界值处理,最小保证32B对齐
+    indicesReserveNum = AlignDown<int64_t>(indicesReserveNum,
+                                           static_cast<int64_t>(rowIdMapBlockAlignEleNum)); // indicesNumPerLoop 32B对齐
+    indicesReserveNum =
+        std::max(indicesReserveNum,
+                 static_cast<int64_t>(rowIdMapBlockAlignEleNum)); // indicesNumPerLoop<32B的边界值处理,最小保证32B对齐
     if (indicesReserveNum <= 0) {
         return false;
     }
     int64_t hiddenSizeTmpMax = (totalUbSize - indicesReserveNum * BUFFER_NUM * rowIdMapTypeLength) /
                                (BUFFER_NUM * inputTypeLength * indicesReserveNum);
     if (hiddenSizeTmpMax < hiddenSizeAlign) { // hiddensize需要切分
-        hiddenSizeAlign = AlignDown<int64_t>(
-            hiddenSizeTmpMax, static_cast<int64_t>(inputBlockAlignEleNum)); // hiddenSize很大，一定不为0
+        hiddenSizeAlign = AlignDown<int64_t>(hiddenSizeTmpMax,
+                                             static_cast<int64_t>(inputBlockAlignEleNum)); // hiddenSize很大，一定不为0
     }
     int64_t hiddenSizeLoopTimes = (hiddenSize + hiddenSizeAlign - 1) / hiddenSizeAlign;
     int64_t hiddenSizeTail = hiddenSize - (hiddenSizeLoopTimes - 1) * hiddenSizeAlign;
@@ -184,8 +183,8 @@ static bool CoreSplitInfoProbIsNone(
     return true;
 }
 
-static bool CoreSplitInfoProbIsNotNone(
-    MoeTokenUnpermuteGradTilingData& tiling, uint32_t inputTypeLength, uint32_t probTypeLength, uint64_t totalUbSize)
+static bool CoreSplitInfoProbIsNotNone(MoeTokenUnpermuteGradTilingData& tiling, uint32_t inputTypeLength,
+                                       uint32_t probTypeLength, uint64_t totalUbSize)
 {
     int64_t hiddenSize = tiling.get_hiddenSize();
     int64_t topK = tiling.get_topK();
@@ -193,26 +192,36 @@ static bool CoreSplitInfoProbIsNotNone(
     uint32_t inputBlock32AlignEleNum = BLOCK_SIZE_32 / probTypeLength;
     uint32_t fp32TypeLength = sizeof(float);
 
-    int64_t hiddenSizeAlign = AlignUp<int64_t>(hiddenSize, static_cast<int64_t>(inputBlock512AlignEleNum)); // h=hiddensize,全载
+    int64_t hiddenSizeAlign =
+        AlignUp<int64_t>(hiddenSize, static_cast<int64_t>(inputBlock512AlignEleNum)); // h=hiddensize,全载
     int64_t indicesReserveNumMax = tiling.get_tokenNumEachCore() * topK;
 
-    int64_t indicesReserveNum = topK <= INDICES_RESERVE_MAX_NUM  // indicesReserveNum最大预留256个元素，占据内存BUFFER_NUM*(4*n+2*n)+4*n=(BUFFER_NUM* 6 + 4)*n
-        ? std::min(indicesReserveNumMax, AlignDown<int64_t>(INDICES_RESERVE_MAX_NUM, topK))  // indicesReserveNum最大预留topK个元素
-        : topK; // indicesNumPerLoop
-    int64_t indicesReserveNumAlign = AlignUp<int64_t>(indicesReserveNum, static_cast<int64_t>(inputBlock32AlignEleNum)); // indicesNumPerLoopAlign
-    int64_t inputReserveNumMax = static_cast<int64_t>(
-                                     totalUbSize - BUFFER_NUM * probTypeLength * indicesReserveNumAlign * 2 -
-                                     indicesReserveNumAlign * fp32TypeLength * 3 - 256 -
-                                     (BUFFER_NUM * inputTypeLength * 2 + 3 * fp32TypeLength) * hiddenSizeAlign) /
-                                 static_cast<int64_t>(BUFFER_NUM * inputTypeLength * hiddenSizeAlign);
+    int64_t indicesReserveNum =
+        topK <= INDICES_RESERVE_MAX_NUM // indicesReserveNum最大预留256个元素，占据内存BUFFER_NUM*(4*n+2*n)+4*n=(BUFFER_NUM*
+                                        // 6 + 4)*n
+            ?
+            std::min(indicesReserveNumMax,
+                     AlignDown<int64_t>(INDICES_RESERVE_MAX_NUM, topK)) // indicesReserveNum最大预留topK个元素
+            :
+            topK; // indicesNumPerLoop
+    int64_t indicesReserveNumAlign =
+        AlignUp<int64_t>(indicesReserveNum, static_cast<int64_t>(inputBlock32AlignEleNum)); // indicesNumPerLoopAlign
+    int64_t inputReserveNumMax =
+        static_cast<int64_t>(totalUbSize - BUFFER_NUM * probTypeLength * indicesReserveNumAlign * 2 -
+                             indicesReserveNumAlign * fp32TypeLength * 3 - 256 -
+                             (BUFFER_NUM * inputTypeLength * 2 + 3 * fp32TypeLength) * hiddenSizeAlign) /
+        static_cast<int64_t>(BUFFER_NUM * inputTypeLength * hiddenSizeAlign);
     int64_t inputReserveNum = 1;
     int64_t hiddenSizeLoopTimes = 1;
     if (inputReserveNumMax < 1) {
         // 切hiddensize
         OP_LOGD("MoeTokenUnpermuteGradTiling", "hiddensize need to be split.");
-        int64_t hiddenSizeLoopMax =(totalUbSize - BUFFER_NUM * probTypeLength * indicesReserveNumAlign * 2 -
-             indicesReserveNumAlign * fp32TypeLength * 3 - 256) / (3 * BUFFER_NUM * inputTypeLength + 3 * fp32TypeLength); // 一个切片最大能载入的hidden_size大小
-        hiddenSizeLoopMax = AlignDown<int64_t>(hiddenSizeLoopMax, static_cast<int64_t>(inputBlock512AlignEleNum)); // 512B能存放元素数量对齐
+        int64_t hiddenSizeLoopMax =
+            (totalUbSize - BUFFER_NUM * probTypeLength * indicesReserveNumAlign * 2 -
+             indicesReserveNumAlign * fp32TypeLength * 3 - 256) /
+            (3 * BUFFER_NUM * inputTypeLength + 3 * fp32TypeLength); // 一个切片最大能载入的hidden_size大小
+        hiddenSizeLoopMax = AlignDown<int64_t>(
+            hiddenSizeLoopMax, static_cast<int64_t>(inputBlock512AlignEleNum)); // 512B能存放元素数量对齐
         if (hiddenSizeLoopMax == 0) {
             OP_LOGD("MoeTokenUnpermuteGradTiling tiling error, hiddenSizeLoopMax == 0");
             return false;
@@ -239,8 +248,8 @@ static bool CoreSplitInfoProbIsNotNone(
 }
 
 // 核内切分策略
-static ge::graphStatus MoeTokenUnpermuteGradCoreSplitInfo(
-    const gert::TilingContext* context, MoeTokenUnpermuteGradTilingData& tiling)
+static ge::graphStatus MoeTokenUnpermuteGradCoreSplitInfo(const gert::TilingContext* context,
+                                                          MoeTokenUnpermuteGradTilingData& tiling)
 {
     auto tokensDtype = context->GetOptionalInputDesc(INPUT_UNPERMUTEDOUTPUTD_IDX)->GetDataType();
     uint32_t tokensTypeLength = GetLengthByType(tokensDtype); // sizeof(bfloat16)
@@ -255,30 +264,24 @@ static ge::graphStatus MoeTokenUnpermuteGradCoreSplitInfo(
 
     auto rowIdMapDtype = context->GetOptionalInputDesc(INPUT_ROWIDMAP_IDX)->GetDataType();
     uint32_t rowIdMapTypeLength = GetLengthByType(rowIdMapDtype); // sizeof(int32)
-    OP_CHECK_IF(
-        tokensTypeLength == 0 || rowIdMapTypeLength == 0 || probTypeLength == 0,
-        OP_LOGE(
-            context->GetNodeName(), "[MoeTokenUnpermuteGrad] input or rowIdMap GetLengthByType is: 0."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(tokensTypeLength == 0 || rowIdMapTypeLength == 0 || probTypeLength == 0,
+                OP_LOGE(context->GetNodeName(), "[MoeTokenUnpermuteGrad] input or rowIdMap GetLengthByType is: 0."),
+                return ge::GRAPH_FAILED);
 
     const auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint64_t totalUbSize;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, totalUbSize);
 
     if (probTensor == nullptr) { // prob为None
-        OP_CHECK_IF(
-            !CoreSplitInfoProbIsNone(tiling, tokensTypeLength, rowIdMapTypeLength, totalUbSize),
-            OP_LOGE(
-                context->GetNodeName(),
-                "[MoeTokenUnpermuteGrad] In this case prob is None, split in core operation illegal."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(!CoreSplitInfoProbIsNone(tiling, tokensTypeLength, rowIdMapTypeLength, totalUbSize),
+                    OP_LOGE(context->GetNodeName(),
+                            "[MoeTokenUnpermuteGrad] In this case prob is None, split in core operation illegal."),
+                    return ge::GRAPH_FAILED);
     } else { // prob非None
-        OP_CHECK_IF(
-            !CoreSplitInfoProbIsNotNone(tiling, tokensTypeLength, probTypeLength, totalUbSize),
-            OP_LOGE(
-                context->GetNodeName(),
-                "[MoeTokenUnpermuteGrad] In this case prob is not None, split in core operation illegal."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(!CoreSplitInfoProbIsNotNone(tiling, tokensTypeLength, probTypeLength, totalUbSize),
+                    OP_LOGE(context->GetNodeName(),
+                            "[MoeTokenUnpermuteGrad] In this case prob is not None, split in core operation illegal."),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -291,8 +294,9 @@ static ge::graphStatus Tiling4MoeTokenUnpermuteGrad(gert::TilingContext* context
     OP_CHECK_NULL_WITH_CONTEXT(context, unpermutedOutputDShape);
 
     auto probTensor = context->GetOptionalInputTensor(INPUT_PROB_IDX);
-    const gert::StorageShape* probShape = (probTensor == nullptr) ? nullptr : context->GetOptionalInputShape(INPUT_PROB_IDX);
-    
+    const gert::StorageShape* probShape =
+        (probTensor == nullptr) ? nullptr : context->GetOptionalInputShape(INPUT_PROB_IDX);
+
     int64_t tokensNum = unpermutedOutputDShape->GetStorageShape().GetDim(DIM_0);
     int64_t hiddenSize = unpermutedOutputDShape->GetStorageShape().GetDim(DIM_1);
     int64_t topK = (probShape == nullptr) ? 1 : probShape->GetStorageShape().GetDim(DIM_1);
@@ -304,9 +308,10 @@ static ge::graphStatus Tiling4MoeTokenUnpermuteGrad(gert::TilingContext* context
     tiling.set_hiddenSize(hiddenSize);
     tiling.set_numOutTokens(numOutTokens);
     OP_CHECK_IF(tokensNum == 0 || topK == 0 || hiddenSize == 0 || numOutTokens == 0,
-        OP_LOGE(context->GetNodeName(), "[MoeTokenUnpermuteGrad] input shape has 0."),return ge::GRAPH_FAILED);
-    OP_CHECK_IF(topK > 512,OP_LOGE(context->GetNodeName(), "[MoeTokenUnpermuteGrad] topK only support no greater than 512."),
-        return ge::GRAPH_FAILED);
+                OP_LOGE(context->GetNodeName(), "[MoeTokenUnpermuteGrad] input shape has 0."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(topK > 512,
+                OP_LOGE(context->GetNodeName(), "[MoeTokenUnpermuteGrad] topK only support no greater than 512."),
+                return ge::GRAPH_FAILED);
 
     MoeTokenUnpermuteGradInitSplitInfo(context, tiling); // 核间切分
     OP_LOGD("MoeTokenUnpermuteGradTiling MoeTokenUnpermuteGradInitSplitInfo finished");
@@ -348,8 +353,7 @@ static ge::graphStatus TilingPrepare4MoeTokenUnpermuteGrad(gert::TilingParseCont
     return ge::GRAPH_SUCCESS;
 }
 
-struct MoeTokenUnpermuteGradCompileInfo {
-};
+struct MoeTokenUnpermuteGradCompileInfo {};
 
 IMPL_OP_OPTILING(MoeTokenUnpermuteGrad)
     .Tiling(Tiling4MoeTokenUnpermuteGrad)

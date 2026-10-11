@@ -26,16 +26,39 @@ class FunctionApi(BaseApi):
         active_num = input_data.kwargs.get("active_num")
         num_rows = x.shape[0]
         k = expert_idx.shape[-1]
-        sort_expert_idx = numpy.argsort(expert_idx.reshape((-1,)), axis=-1, kind="stable")
-        expanded_expert_idx = numpy.sort(expert_idx.reshape((-1,)), axis=-1, kind="stable")
+        sort_expert_idx = numpy.argsort(
+            expert_idx.reshape((-1,)), axis=-1, kind="stable"
+        )
+        expanded_expert_idx = numpy.sort(
+            expert_idx.reshape((-1,)), axis=-1, kind="stable"
+        )
 
-        expanded_dst_to_src_row = numpy.take_along_axis(row_idx.reshape((-1,)), sort_expert_idx, axis=-1)
+        expanded_dst_to_src_row = numpy.take_along_axis(
+            row_idx.reshape((-1,)), sort_expert_idx, axis=-1
+        )
         expanded_row_idx = numpy.zeros(expanded_dst_to_src_row.shape, dtype=numpy.int32)
-        expanded_row_idx[expanded_dst_to_src_row] = numpy.arange(expanded_dst_to_src_row.shape[-1], dtype=numpy.int32)
+        expanded_row_idx[expanded_dst_to_src_row] = numpy.arange(
+            expanded_dst_to_src_row.shape[-1], dtype=numpy.int32
+        )
 
         active_num = min(active_num, num_rows) * k
         expanded_x = x[expanded_dst_to_src_row[:active_num] % num_rows, :]
-        return torch.from_numpy(expanded_x), torch.from_numpy(expanded_row_idx.astype("int32")), torch.from_numpy(expanded_expert_idx)
-    
+        return (
+            torch.from_numpy(expanded_x),
+            torch.from_numpy(expanded_row_idx.astype("int32")),
+            torch.from_numpy(expanded_expert_idx),
+        )
+
     def init_by_input_data(self, input_data: InputDataset):
-        input_data.kwargs['row_idx'] = torch.arange(input_data.kwargs['expert_idx'].size(0)* input_data.kwargs['expert_idx'].size(1)).reshape(input_data.kwargs['expert_idx'].size(0),input_data.kwargs['expert_idx'].size(1)).to(torch.int32).to(input_data.kwargs['expert_idx'].device)
+        input_data.kwargs["row_idx"] = (
+            torch.arange(
+                input_data.kwargs["expert_idx"].size(0)
+                * input_data.kwargs["expert_idx"].size(1)
+            )
+            .reshape(
+                input_data.kwargs["expert_idx"].size(0),
+                input_data.kwargs["expert_idx"].size(1),
+            )
+            .to(torch.int32)
+            .to(input_data.kwargs["expert_idx"].device)
+        )

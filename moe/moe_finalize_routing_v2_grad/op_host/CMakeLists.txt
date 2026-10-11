@@ -19,7 +19,7 @@ if (BUILD_OPEN_PROJECT)
             OPTIONS --cce-auto-sync=on
                     -Wno-deprecated-declarations
                     -Werror
-                    -mllvm 
+                    -mllvm
                     -cce-aicore-dcci-before-kernel-end=false
         )
     else()
@@ -33,5 +33,5 @@ if (BUILD_OPEN_PROJECT)
 endif()
 
 if(NOT BUILD_OPS_RTY_KERNEL)
-    add_modules_sources(OPTYPE moe_finalize_routing_v2_grad ACLNNTYPE aclnn_exclude)  
+    add_modules_sources(OPTYPE moe_finalize_routing_v2_grad ACLNNTYPE aclnn_exclude)
 endif()

@@ -63,8 +63,8 @@ static const std::initializer_list<op::DataType> INT_DTYPE_SUPPORT_LIST = {DataT
 
 static const std::initializer_list<op::DataType> Y_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
 
-static inline bool CheckNotNull(const aclTensor *x, const aclTensor *addNum, const aclTensor *mappingNum,
-                                const aclTensor *mappingTable, const aclTensor *y, const aclTensor *indices,
+static inline bool CheckNotNull(const aclTensor* x, const aclTensor* addNum, const aclTensor* mappingNum,
+                                const aclTensor* mappingTable, const aclTensor* y, const aclTensor* indices,
                                 bool enableExpertMapping)
 {
     OP_CHECK_NULL(x, return false);
@@ -80,8 +80,8 @@ static inline bool CheckNotNull(const aclTensor *x, const aclTensor *addNum, con
     return true;
 }
 
-static inline bool CheckDtypeValid(const aclTensor *x, const aclTensor *addNum, const aclTensor *mappingNum,
-                                   const aclTensor *mappingTable, const aclTensor *y, const aclTensor *indices,
+static inline bool CheckDtypeValid(const aclTensor* x, const aclTensor* addNum, const aclTensor* mappingNum,
+                                   const aclTensor* mappingTable, const aclTensor* y, const aclTensor* indices,
                                    bool enableExpertMapping)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(x, X_SUPPORT_LIST, return false);
@@ -100,10 +100,10 @@ static inline bool CheckDtypeValid(const aclTensor *x, const aclTensor *addNum, 
     return true;
 }
 
-static inline bool CheckShape(const aclTensor *x, const aclTensor *addNum, const aclTensor *mappingNum,
-                              const aclTensor *mappingTable, uint32_t groupNum, uint32_t groupTopk, uint32_t topN,
+static inline bool CheckShape(const aclTensor* x, const aclTensor* addNum, const aclTensor* mappingNum,
+                              const aclTensor* mappingTable, uint32_t groupNum, uint32_t groupTopk, uint32_t topN,
                               uint32_t topK, uint32_t activateType, bool isNorm, float scale, bool enableExpertMapping,
-                              const aclTensor *y, const aclTensor *indices)
+                              const aclTensor* y, const aclTensor* indices)
 {
     if (x->IsEmpty()) {
         return true;
@@ -204,10 +204,10 @@ static inline bool CheckShape(const aclTensor *x, const aclTensor *addNum, const
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *addNum, const aclTensor *mappingNum,
-                               const aclTensor *mappingTable, uint32_t groupNum, uint32_t groupTopk, uint32_t topN,
+static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* addNum, const aclTensor* mappingNum,
+                               const aclTensor* mappingTable, uint32_t groupNum, uint32_t groupTopk, uint32_t topN,
                                uint32_t topK, uint32_t activateType, bool isNorm, float scale, bool enableExpertMapping,
-                               const aclTensor *y, const aclTensor *indices)
+                               const aclTensor* y, const aclTensor* indices)
 {
     // 1. 检查参数是否为空指针
     CHECK_RET(CheckNotNull(x, addNum, mappingNum, mappingTable, y, indices, enableExpertMapping),
@@ -225,11 +225,11 @@ static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *addNum, cons
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMoeFusedTopkGetWorkspaceSize(const aclTensor *x, const aclTensor *addNum, const aclTensor *mappingNum,
-                                              const aclTensor *mappingTable, uint32_t groupNum, uint32_t groupTopk,
+aclnnStatus aclnnMoeFusedTopkGetWorkspaceSize(const aclTensor* x, const aclTensor* addNum, const aclTensor* mappingNum,
+                                              const aclTensor* mappingTable, uint32_t groupNum, uint32_t groupTopk,
                                               uint32_t topN, uint32_t topK, uint32_t activateType, bool isNorm,
-                                              float scale, bool enableExpertMapping, aclTensor *y, aclTensor *indices,
-                                              uint64_t *workspaceSize, aclOpExecutor **executor)
+                                              float scale, bool enableExpertMapping, aclTensor* y, aclTensor* indices,
+                                              uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     L2_DFX_PHASE_1(aclnnMoeFusedTopk,
@@ -258,8 +258,8 @@ aclnnStatus aclnnMoeFusedTopkGetWorkspaceSize(const aclTensor *x, const aclTenso
     auto addNumContiguous = l0op::Contiguous(addNum, uniqueExecutor.get());
     CHECK_RET(addNumContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor *mappingNumContiguous = mappingNum;
-    const aclTensor *mappingTableContiguous = mappingTable;
+    const aclTensor* mappingNumContiguous = mappingNum;
+    const aclTensor* mappingTableContiguous = mappingTable;
     if (enableExpertMapping) {
         mappingNumContiguous = l0op::Contiguous(mappingNum, uniqueExecutor.get());
         CHECK_RET(mappingNumContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -285,7 +285,7 @@ aclnnStatus aclnnMoeFusedTopkGetWorkspaceSize(const aclTensor *x, const aclTenso
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMoeFusedTopk(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMoeFusedTopk(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMoeFusedTopk);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);

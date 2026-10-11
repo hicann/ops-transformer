@@ -22,7 +22,7 @@ using namespace AscendC;
 template <typename VAR_T, typename IDX_T, typename CAST_T, bool IS_CONTIGUOUS>
 class MoeInplaceIndexAddSimd {
 public:
-    __aicore__ inline MoeInplaceIndexAddSimd(const MoeInplaceIndexAddSimdTilingData &tilingData, TPipe &pipe)
+    __aicore__ inline MoeInplaceIndexAddSimd(const MoeInplaceIndexAddSimdTilingData& tilingData, TPipe& pipe)
         : tilingData_(tilingData),
           pipe_(pipe){};
     __aicore__ inline void Init(GM_ADDR var, GM_ADDR indices, GM_ADDR updates, GM_ADDR alpha, GM_ADDR workspace);
@@ -48,8 +48,8 @@ private:
     TQue<QuePosition::VECIN, DOUBLE_BUFFER> indicesQue_;
     TQue<QuePosition::VECIN, DOUBLE_BUFFER> updatesQue_;
 
-    TPipe &pipe_;
-    const MoeInplaceIndexAddSimdTilingData &tilingData_;
+    TPipe& pipe_;
+    const MoeInplaceIndexAddSimdTilingData& tilingData_;
     int64_t blockIdx_;
     int64_t blockNum_;
     int64_t normBlockData_{0};
@@ -65,10 +65,10 @@ __aicore__ inline void MoeInplaceIndexAddSimd<VAR_T, IDX_T, CAST_T, IS_CONTIGUOU
                                                                                          GM_ADDR updates, GM_ADDR alpha,
                                                                                          GM_ADDR workspace)
 {
-    updates_.SetGlobalBuffer((__gm__ VAR_T *)(updates));
-    indices_.SetGlobalBuffer((__gm__ IDX_T *)(indices));
-    alpha_.SetGlobalBuffer((__gm__ VAR_T *)(alpha));
-    var_.SetGlobalBuffer((__gm__ VAR_T *)(var));
+    updates_.SetGlobalBuffer((__gm__ VAR_T*)(updates));
+    indices_.SetGlobalBuffer((__gm__ IDX_T*)(indices));
+    alpha_.SetGlobalBuffer((__gm__ VAR_T*)(alpha));
+    var_.SetGlobalBuffer((__gm__ VAR_T*)(var));
     if (tilingData_.isWithAlpha) {
         alphaValue_ = alpha_(0);
     }
@@ -83,8 +83,8 @@ template <typename VAR_T, typename IDX_T, typename CAST_T, bool IS_CONTIGUOUS>
 __aicore__ inline void MoeInplaceIndexAddSimd<VAR_T, IDX_T, CAST_T, IS_CONTIGUOUS>::ComputeMulWithCast(
     LocalTensor<VAR_T> updatesLocal, LocalTensor<VAR_T> updateMulLocal, int16_t alphaValue, int64_t colLen)
 {
-    __local_mem__ VAR_T *updatesAddr = (__local_mem__ VAR_T *)updatesLocal.GetPhyAddr();
-    __local_mem__ VAR_T *updateMulAddr = (__local_mem__ VAR_T *)updateMulLocal.GetPhyAddr();
+    __local_mem__ VAR_T* updatesAddr = (__local_mem__ VAR_T*)updatesLocal.GetPhyAddr();
+    __local_mem__ VAR_T* updateMulAddr = (__local_mem__ VAR_T*)updateMulLocal.GetPhyAddr();
 
     constexpr uint32_t vfLen = Ops::Base::GetVRegSize() / sizeof(int16_t);
     int32_t loopSize = Ops::Base::CeilDiv(static_cast<uint32_t>(colLen), vfLen);

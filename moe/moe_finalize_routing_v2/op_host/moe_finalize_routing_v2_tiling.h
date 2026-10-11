@@ -111,18 +111,18 @@ struct MoeFinalizeRoutingCompileInfoV2 {
 };
 
 struct ShapeParamsV2 {
-    const gert::StorageShape *expandedXShape = nullptr;
-    const gert::StorageShape *expandedRowIdxShape = nullptr;
-    const gert::StorageShape *x1Shape = nullptr;
-    const gert::StorageShape *x2Shape = nullptr;
-    const gert::StorageShape *biasShape = nullptr;
-    const gert::StorageShape *scalesShape = nullptr;
-    const gert::StorageShape *expertForSourceRowShape = nullptr;
+    const gert::StorageShape* expandedXShape = nullptr;
+    const gert::StorageShape* expandedRowIdxShape = nullptr;
+    const gert::StorageShape* x1Shape = nullptr;
+    const gert::StorageShape* x2Shape = nullptr;
+    const gert::StorageShape* biasShape = nullptr;
+    const gert::StorageShape* scalesShape = nullptr;
+    const gert::StorageShape* expertForSourceRowShape = nullptr;
 };
 
 class MoeFinalizeRoutingTilingV2 : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeFinalizeRoutingTilingV2(gert::TilingContext *context)
+    explicit MoeFinalizeRoutingTilingV2(gert::TilingContext* context)
         : TilingBaseClass(context) {};
 
 protected:

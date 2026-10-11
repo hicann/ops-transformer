@@ -17,8 +17,7 @@
 #include "moe_inplace_index_add_tiling.h"
 #include <cstdint>
 
-namespace optiling
-{
+namespace optiling {
 constexpr int64_t VAR_IDX = 0L;
 constexpr int64_t INDICES_IDX = 1L;
 constexpr int64_t UPDATES_IDX = 2L;
@@ -28,20 +27,20 @@ constexpr int64_t DCACHE_SIZE_SIMT = 32L * 1024L;
 constexpr int64_t MIN_SIZE_SIMD_HANDLE = 128L;
 constexpr int64_t THRESHOLD_USE_SORT = 5L;
 constexpr int64_t SIMT_SORT_LASTDIM_LIMIT = 1024L;
-static constexpr uint64_t CAST_INT32_TO_INT16 = 1;   // int32 Cast int16
-static constexpr uint64_t CAST_INT64_TO_INT32 = 2;   // int64 Cast int32
-static constexpr uint64_t CAST_INT64_TO_INT16 = 3;   // int64 Cast int16
-static constexpr uint64_t CAST_INT32_TO_UINT8 = 4;   // int32 Cast uint8
-static constexpr uint64_t CAST_INT64_TO_UINT8 = 5;   // int64 Cast uint8
+static constexpr uint64_t CAST_INT32_TO_INT16 = 1; // int32 Cast int16
+static constexpr uint64_t CAST_INT64_TO_INT32 = 2; // int64 Cast int32
+static constexpr uint64_t CAST_INT64_TO_INT16 = 3; // int64 Cast int16
+static constexpr uint64_t CAST_INT32_TO_UINT8 = 4; // int32 Cast uint8
+static constexpr uint64_t CAST_INT64_TO_UINT8 = 5; // int64 Cast uint8
 
 constexpr int64_t ASCENDC_TOOLS_WORKSPACE = 16L * 1024L * 1024L;
-static const std::set<ge::DataType> VAR_DTYPE = {ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT64, ge::DT_INT32,
-                                                 ge::DT_INT16, ge::DT_INT8, ge::DT_UINT8, ge::DT_BOOL};
+static const std::set<ge::DataType> VAR_DTYPE = {ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16,  ge::DT_INT64, ge::DT_INT32,
+                                                 ge::DT_INT16, ge::DT_INT8,    ge::DT_UINT8, ge::DT_BOOL};
 static const std::set<ge::DataType> SIMD_DTYPE = {ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT32,
-                                                 ge::DT_INT16, ge::DT_INT8, ge::DT_BOOL};
-static const std::set<ge::DataType> SIMT_SORT_DTYPE = {ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16,
-                                                     ge::DT_INT64, ge::DT_INT32};
-static const std::set<ge::DataType> DETERMIN_DTYPE = { ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16 };
+                                                  ge::DT_INT16, ge::DT_INT8,    ge::DT_BOOL};
+static const std::set<ge::DataType> SIMT_SORT_DTYPE = {ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT64,
+                                                       ge::DT_INT32};
+static const std::set<ge::DataType> DETERMIN_DTYPE = {ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16};
 
 bool MoeInplaceIndexAddTiling::IsCapable()
 {
@@ -54,21 +53,21 @@ void MoeInplaceIndexAddTiling::GetCastTypeForSort()
 
     if (indicesDtype_ == ge::DT_INT32) {
         if (varInAxis_ < UINT8_MAX) {
-            indicesCastMode_ = CAST_INT32_TO_UINT8;          // int32 Cast uint8
+            indicesCastMode_ = CAST_INT32_TO_UINT8; // int32 Cast uint8
             indicesCastDtype_ = ge::DT_UINT8;
         } else if (varInAxis_ < INT16_MAX) {
-            indicesCastMode_ = CAST_INT32_TO_INT16;          // int32 Cast int16
+            indicesCastMode_ = CAST_INT32_TO_INT16; // int32 Cast int16
             indicesCastDtype_ = ge::DT_INT16;
         }
     } else {
         if (varInAxis_ < UINT8_MAX) {
-            indicesCastMode_ = CAST_INT64_TO_UINT8;          // int64 Cast uint8
+            indicesCastMode_ = CAST_INT64_TO_UINT8; // int64 Cast uint8
             indicesCastDtype_ = ge::DT_UINT8;
         } else if (varInAxis_ < INT16_MAX) {
-            indicesCastMode_ = CAST_INT64_TO_INT16;          // int64 Cast int16
+            indicesCastMode_ = CAST_INT64_TO_INT16; // int64 Cast int16
             indicesCastDtype_ = ge::DT_INT16;
         } else if (varInAxis_ < INT32_MAX) {
-            indicesCastMode_ = CAST_INT64_TO_INT32;          // int64 Cast int32
+            indicesCastMode_ = CAST_INT64_TO_INT32; // int64 Cast int32
             indicesCastDtype_ = ge::DT_INT32;
         }
     }
@@ -144,12 +143,12 @@ ge::graphStatus MoeInplaceIndexAddTiling::GetShapeAttrsInfo()
     dim_ = dim < 0 ? dim + rank_ : dim;
 
     MOE_OP_TILING_CHECK(CheckInputDtype() != ge::GRAPH_SUCCESS,
-                    MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "input dtype check failed."),
-                    return ge::GRAPH_FAILED);
+                        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "input dtype check failed."),
+                        return ge::GRAPH_FAILED);
 
     MOE_OP_TILING_CHECK(CheckInputShape() != ge::GRAPH_SUCCESS,
-                    MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "input shape check failed."),
-                    return ge::GRAPH_FAILED);
+                        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "input shape check failed."),
+                        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -160,34 +159,36 @@ ge::graphStatus MoeInplaceIndexAddTiling::CheckInputDtype()
     OP_CHECK_NULL_WITH_CONTEXT(context_, varPtr);
     dtype_ = varPtr->GetDataType();
     MOE_OP_TILING_CHECK((VAR_DTYPE.find(dtype_) == VAR_DTYPE.end()),
-                    MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(),
-                                                    "var dtype only support float32, float16, uint8, int8, int32, \
+                        MOE_VECTOR_INNER_ERR_REPORT_TILIING(
+                            context_->GetNodeName(), "var dtype only support float32, float16, uint8, int8, int32, \
 int16, bool, int64, bfloat16 currently, but got [%s].",
-                                                    Ops::Base::ToString(dtype_).c_str()),
-                    return ge::GRAPH_FAILED);
+                            Ops::Base::ToString(dtype_).c_str()),
+                        return ge::GRAPH_FAILED);
     varTypeSize_ = ge::GetSizeByDataType(dtype_);
-    MOE_OP_TILING_CHECK(varTypeSize_ <= 0, MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "get dataType size fail."),
-                    return ge::GRAPH_FAILED);
+    MOE_OP_TILING_CHECK(varTypeSize_ <= 0,
+                        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "get dataType size fail."),
+                        return ge::GRAPH_FAILED);
 
     auto indicesPtr = context_->GetInputDesc(INDICES_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, indicesPtr);
     indicesDtype_ = indicesPtr->GetDataType();
     indicesTypeSize_ = ge::GetSizeByDataType(indicesDtype_);
     bool dtypeInValid = indicesDtype_ != ge::DT_INT32 && indicesDtype_ != ge::DT_INT64;
-    MOE_OP_TILING_CHECK(dtypeInValid,
-                    MOE_VECTOR_INNER_ERR_REPORT_TILIING(
-                        context_->GetNodeName(), "indices dtype only support int32 and int64 currently, but got [%s].",
-                        Ops::Base::ToString(indicesDtype_).c_str()),
-                    return ge::GRAPH_FAILED);
+    MOE_OP_TILING_CHECK(
+        dtypeInValid,
+        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(),
+                                            "indices dtype only support int32 and int64 currently, but got [%s].",
+                                            Ops::Base::ToString(indicesDtype_).c_str()),
+        return ge::GRAPH_FAILED);
 
     auto updatesPtr = context_->GetInputDesc(UPDATES_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, updatesPtr);
     auto updatesDtype = updatesPtr->GetDataType();
-    MOE_OP_TILING_CHECK(
-        (updatesDtype != dtype_),
-        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "updates [%s] and var [%s] must have the same dtype.",
-                                        Ops::Base::ToString(updatesDtype).c_str(), Ops::Base::ToString(dtype_).c_str()),
-        return ge::GRAPH_FAILED);
+    MOE_OP_TILING_CHECK((updatesDtype != dtype_),
+                        MOE_VECTOR_INNER_ERR_REPORT_TILIING(
+                            context_->GetNodeName(), "updates [%s] and var [%s] must have the same dtype.",
+                            Ops::Base::ToString(updatesDtype).c_str(), Ops::Base::ToString(dtype_).c_str()),
+                        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -236,7 +237,7 @@ ge::graphStatus MoeInplaceIndexAddTiling::CheckInputShape()
     }
     auto indicesShapePtr = context_->GetInputShape(INDICES_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, indicesShapePtr);
-    auto indicesShape = isView ? indicesShapePtr->GetShape() :indicesShapePtr->GetStorageShape();
+    auto indicesShape = isView ? indicesShapePtr->GetShape() : indicesShapePtr->GetStorageShape();
     int64_t indicesDimNum = static_cast<int64_t>(indicesShape.GetDimNum());
     indicesAxis_ = indicesShape.GetShapeSize();
 
@@ -251,36 +252,39 @@ ge::graphStatus MoeInplaceIndexAddTiling::CheckInputShape()
         withAlpha_ = 1UL;
         auto alphaShape = alphaShapePtr->GetStorageShape();
         MOE_OP_TILING_CHECK(alphaShape.GetShapeSize() != 1,
-                        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "the alpha size must be 1."),
-                        return ge::GRAPH_FAILED);
+                            MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "the alpha size must be 1."),
+                            return ge::GRAPH_FAILED);
     }
 
-    MOE_OP_TILING_CHECK((indicesDimNum > 1),
-                    MOE_VECTOR_INNER_ERR_REPORT_TILIING(
-                        context_->GetNodeName(), "index is supposed to be a vector, but got dim: %ld.", indicesDimNum),
-                    return ge::GRAPH_FAILED);
+    MOE_OP_TILING_CHECK(
+        (indicesDimNum > 1),
+        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(),
+                                            "index is supposed to be a vector, but got dim: %ld.", indicesDimNum),
+        return ge::GRAPH_FAILED);
 
     if (varShape.IsScalar() && updatesAxis_ == 1 && indicesAxis_ == 1) {
         return ge::GRAPH_SUCCESS;
     } else {
         MOE_OP_TILING_CHECK((updatesDimNum != rank_),
-                        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(),
-                                                        "updates must have the same number of dimensions as var."),
-                        return ge::GRAPH_FAILED);
+                            MOE_VECTOR_INNER_ERR_REPORT_TILIING(
+                                context_->GetNodeName(), "updates must have the same number of dimensions as var."),
+                            return ge::GRAPH_FAILED);
 
         int64_t expectedNum = updatesShape.GetDim(dim_);
-        MOE_OP_TILING_CHECK(indicesAxis_ != expectedNum,
+        MOE_OP_TILING_CHECK(
+            indicesAxis_ != expectedNum,
             MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(),
-                                            "number of indices [%ld] should be equal to update.size(%ld): [%ld].",
-                                            indicesAxis_, dim_, expectedNum),
+                                                "number of indices [%ld] should be equal to update.size(%ld): [%ld].",
+                                                indicesAxis_, dim_, expectedNum),
             return ge::GRAPH_FAILED);
 
-        MOE_OP_TILING_CHECK(!CompareShape(updatesShape, varShape, dim_),
-                        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(),
-                            "updates shape must match var shape, excluding the specified dimension %ld. \
+        MOE_OP_TILING_CHECK(
+            !CompareShape(updatesShape, varShape, dim_),
+            MOE_VECTOR_INNER_ERR_REPORT_TILIING(
+                context_->GetNodeName(), "updates shape must match var shape, excluding the specified dimension %ld. \
 Got var.shape = %s updates.shape = %s",
-                            dim_, Ops::Base::ToString(varShape).c_str(), Ops::Base::ToString(updatesShape).c_str()),
-                        return ge::GRAPH_FAILED);
+                dim_, Ops::Base::ToString(varShape).c_str(), Ops::Base::ToString(updatesShape).c_str()),
+            return ge::GRAPH_FAILED);
         CombineAxis(varShape, updatesShape);
     }
     return ge::GRAPH_SUCCESS;
@@ -297,7 +301,7 @@ void MoeInplaceIndexAddTiling::GetCastTypeSize()
 
 uint32_t MoeInplaceIndexAddTiling::GetSortTmpSize(ge::DataType dataType, uint32_t lastAxisNum, bool isDescend)
 {
-    std::vector<int64_t> shapeVec = { lastAxisNum };
+    std::vector<int64_t> shapeVec = {lastAxisNum};
     ge::Shape srcShape(shapeVec);
     AscendC::SortConfig config;
     config.type = AscendC::SortType::RADIX_SORT;
@@ -339,4 +343,4 @@ ge::graphStatus MoeInplaceIndexAddTiling::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-}  // namespace optiling
+} // namespace optiling

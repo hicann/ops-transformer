@@ -24,51 +24,51 @@
 #define DTYPE_PROBS DTYPE_PERMUTED_TOKENS
 #endif
 
-#define GENERAL_OP_IMPL()                              \
-  do {                                                                               \
-    auto t = &tilingData;                                 \
-    TPipe sortPipe;                                         \
-    KernelMaskedSelectV3<DTYPE_PERMUTE_PROBS> opMS;                                           \
-    auto maskedSelectTilingData = &(t->maskedSelectParamsOp);     \
-    opMS.Init(probs, routing_map, permute_probs, userWS, maskedSelectTilingData, &sortPipe); \
-    opMS.Process(permute_probs);                                                      \
-    sortPipe.Destroy();                                                                    \
-    AscendC::SyncAll();                                                                    \
-  } while (0)
+#define GENERAL_OP_IMPL() \
+    do { \
+        auto t = &tilingData; \
+        TPipe sortPipe; \
+        KernelMaskedSelectV3<DTYPE_PERMUTE_PROBS> opMS; \
+        auto maskedSelectTilingData = &(t->maskedSelectParamsOp); \
+        opMS.Init(probs, routing_map, permute_probs, userWS, maskedSelectTilingData, &sortPipe); \
+        opMS.Process(permute_probs); \
+        sortPipe.Destroy(); \
+        AscendC::SyncAll(); \
+    } while (0)
 
+#define MOE_TOKEN_UNPERMUTE_WITH_ROUTING_MAP_IMPL(T1, T2, T3, haveProbs) \
+    do { \
+        auto t = &tilingData; \
+        TPipe sortPipe; \
+        GET_TILING_DATA(tiling_data_in, tiling); \
+        const MoeTokenUnpermuteWithRoutingMapTilingData* __restrict tiling_data = &tiling_data_in; \
+        MoeTokenUnpermuteWithRoutingMap::KernelMoeTokenUnpermuteWithRoutingMap<T1, T2, T3, haveProbs> op; \
+        op.Init(permuted_tokens, sorted_indices, permute_probs, unpermuted_tokens, tiling_data); \
+        op.Process(); \
+    } while (0)
 
-#define MOE_TOKEN_UNPERMUTE_WITH_ROUTING_MAP_IMPL(T1, T2, T3, haveProbs)                              \
-  do {                                            \
-    auto t = &tilingData;                         \
-    TPipe sortPipe;                                                                                       \
-    GET_TILING_DATA(tiling_data_in, tiling);                                         \
-    const MoeTokenUnpermuteWithRoutingMapTilingData* __restrict tiling_data = &tiling_data_in;     \
-    MoeTokenUnpermuteWithRoutingMap::KernelMoeTokenUnpermuteWithRoutingMap<T1, T2, T3, haveProbs> op;                               \
-    op.Init(permuted_tokens, sorted_indices, permute_probs, unpermuted_tokens, tiling_data); \
-    op.Process();                                                                    \
-  } while (0)
+extern "C" __global__ __aicore__ void moe_token_unpermute_with_routing_map(
+    GM_ADDR permuted_tokens, GM_ADDR sorted_indices, GM_ADDR routing_map, GM_ADDR probs, GM_ADDR unpermuted_tokens,
+    GM_ADDR out_index, GM_ADDR permute_token_id, GM_ADDR permute_probs, GM_ADDR workspace, GM_ADDR tiling)
+{
+    if (g_coreType == AIC) {
+        return;
+    }
 
-extern "C" __global__ __aicore__ void moe_token_unpermute_with_routing_map(GM_ADDR permuted_tokens, GM_ADDR sorted_indices, GM_ADDR routing_map,
-                                                          GM_ADDR probs, GM_ADDR unpermuted_tokens, GM_ADDR out_index, GM_ADDR permute_token_id,  
-                                                          GM_ADDR permute_probs, GM_ADDR workspace, GM_ADDR tiling) {
-  if (g_coreType == AIC) {
-    return;
-  }
-
-  GM_ADDR userWS = GetUserWorkspace(workspace);
-  if (userWS == nullptr) {
-    return;
-  }
-  GET_TILING_DATA(tilingData, tiling);
-  //==================================BF16==================================
-  if (TILING_KEY_IS(1000)) {
-    MoeTokenUnpermuteWithRoutingMap::KernelMoeTokenUnpermuteWithRoutingMapPad<DTYPE_PERMUTE_PROBS> op;                             
-    op.Init(sorted_indices, probs, permute_probs, tilingData);          
-    op.Process(); 
-  } else if (TILING_KEY_IS(1)) {
-    GENERAL_OP_IMPL();
-    MOE_TOKEN_UNPERMUTE_WITH_ROUTING_MAP_IMPL(DTYPE_PERMUTED_TOKENS, int32_t, DTYPE_PERMUTE_PROBS, true);
-  } else if (TILING_KEY_IS(0)) {
-    MOE_TOKEN_UNPERMUTE_WITH_ROUTING_MAP_IMPL(DTYPE_PERMUTED_TOKENS, int32_t, DTYPE_PERMUTE_PROBS, false);
-  } 
+    GM_ADDR userWS = GetUserWorkspace(workspace);
+    if (userWS == nullptr) {
+        return;
+    }
+    GET_TILING_DATA(tilingData, tiling);
+    //==================================BF16==================================
+    if (TILING_KEY_IS(1000)) {
+        MoeTokenUnpermuteWithRoutingMap::KernelMoeTokenUnpermuteWithRoutingMapPad<DTYPE_PERMUTE_PROBS> op;
+        op.Init(sorted_indices, probs, permute_probs, tilingData);
+        op.Process();
+    } else if (TILING_KEY_IS(1)) {
+        GENERAL_OP_IMPL();
+        MOE_TOKEN_UNPERMUTE_WITH_ROUTING_MAP_IMPL(DTYPE_PERMUTED_TOKENS, int32_t, DTYPE_PERMUTE_PROBS, true);
+    } else if (TILING_KEY_IS(0)) {
+        MOE_TOKEN_UNPERMUTE_WITH_ROUTING_MAP_IMPL(DTYPE_PERMUTED_TOKENS, int32_t, DTYPE_PERMUTE_PROBS, false);
+    }
 }

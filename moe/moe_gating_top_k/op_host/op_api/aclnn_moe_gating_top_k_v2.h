@@ -28,13 +28,13 @@ extern "C" {
  * @domain aclnn_ops_infer
  */
 ACLNN_API aclnnStatus aclnnMoeGatingTopKV2GetWorkspaceSize(
-    const aclTensor *x, const aclTensor *biasOptional, const aclTensor *inputIdsOptional,
-    const aclTensor *tid2eidOptional, int64_t k, int64_t kGroup, int64_t groupCount, int64_t groupSelectMode,
-    int64_t renorm, int64_t normType, bool outFlag, double routedScalingFactor, double eps, const aclTensor *yOut,
-    const aclTensor *expertIdxOut, const aclTensor *outOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* x, const aclTensor* biasOptional, const aclTensor* inputIdsOptional,
+    const aclTensor* tid2eidOptional, int64_t k, int64_t kGroup, int64_t groupCount, int64_t groupSelectMode,
+    int64_t renorm, int64_t normType, bool outFlag, double routedScalingFactor, double eps, const aclTensor* yOut,
+    const aclTensor* expertIdxOut, const aclTensor* outOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /* @brief aclnnMoeGatingTopKV2的第二段接口，用于执行计算。 */
-ACLNN_API aclnnStatus aclnnMoeGatingTopKV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMoeGatingTopKV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            aclrtStream stream);
 
 #ifdef __cplusplus

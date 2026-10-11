@@ -26,12 +26,11 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void moe_gating_top_k(
-    uint8_t* x, uint8_t* bias, uint8_t* inputIds, uint8_t* tid2eid, uint8_t* y, uint8_t* expertIdx, uint8_t* out,
-    uint8_t* workspace, uint8_t* tiling);
+extern "C" __global__ __aicore__ void moe_gating_top_k(uint8_t* x, uint8_t* bias, uint8_t* inputIds, uint8_t* tid2eid,
+                                                       uint8_t* y, uint8_t* expertIdx, uint8_t* out, uint8_t* workspace,
+                                                       uint8_t* tiling);
 
-class moe_gating_top_k_test : public testing::Test
-{
+class moe_gating_top_k_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {

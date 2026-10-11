@@ -27,7 +27,7 @@ public:
     __aicore__ inline void Init(GM_ADDR unpermuted_tokens_grad, GM_ADDR outIndex, GM_ADDR permuteTokenId,
                                 GM_ADDR routing_map, GM_ADDR permuted_tokens, GM_ADDR probs,
                                 GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
-                                const MoeTokenUnpermuteWithRoutingMapGradTilingData &tiling_data);
+                                const MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling_data);
     __aicore__ inline void Process();
 
 protected:
@@ -48,7 +48,7 @@ template <typename PermutedTokenT, typename IdxT, typename ProbsT>
 __aicore__ inline void MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadTrue<PermutedTokenT, IdxT, ProbsT>::Init(
     GM_ADDR unpermuted_tokens_grad, GM_ADDR outIndex, GM_ADDR permuteTokenId, GM_ADDR routing_map,
     GM_ADDR permuted_tokens, GM_ADDR probs, GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
-    const MoeTokenUnpermuteWithRoutingMapGradTilingData &tiling_data)
+    const MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling_data)
 {
     MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT>::Init(
         unpermuted_tokens_grad, outIndex, permuteTokenId, routing_map, permuted_tokens, probs, permuted_tokens_grad,
@@ -65,7 +65,7 @@ __aicore__ inline void MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadTrue
                                    (initProbNumPerCore + 1) * initFormerCoreNum +
                                        (this->coreIndex - initFormerCoreNum) * initProbNumPerCore;
             GlobalTensor<ProbsT> probGradInitGm;
-            probGradInitGm.SetGlobalBuffer((__gm__ ProbsT *)probs_grad + initAddr);
+            probGradInitGm.SetGlobalBuffer((__gm__ ProbsT*)probs_grad + initAddr);
             Fill(probGradInitGm, initNum, static_cast<ProbsT>(0));
         }
         SyncAll();

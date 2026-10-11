@@ -21,7 +21,7 @@ namespace MoeTokenPermuteWithEp {
 using namespace AscendC;
 
 template <typename T>
-__aicore__ inline void GetBaseArithProgressionSupportInt32(const LocalTensor<T> &dstLocal, const T firstValue,
+__aicore__ inline void GetBaseArithProgressionSupportInt32(const LocalTensor<T>& dstLocal, const T firstValue,
                                                            const T diffValue, const int32_t count)
 {
     for (int i = 0; i < count; i++) {
@@ -31,7 +31,7 @@ __aicore__ inline void GetBaseArithProgressionSupportInt32(const LocalTensor<T> 
 }
 
 template <typename T>
-__aicore__ inline void ArithProgressionSupportInt32(const LocalTensor<T> &dstLocal, const T firstValue,
+__aicore__ inline void ArithProgressionSupportInt32(const LocalTensor<T>& dstLocal, const T firstValue,
                                                     const T diffValue, const int32_t count)
 {
     struct UnaryRepeatParams addsParamsStride1(1, 1, 1, 1);
@@ -95,21 +95,21 @@ __aicore__ inline void ArithProgressionSupportInt32(const LocalTensor<T> &dstLoc
 }
 
 template <typename T>
-__aicore__ inline __inout_pipe__(MTE2) void DataCopyB64(const LocalTensor<T> &dstLocal,
-                                                        const GlobalTensor<T> &srcGlobal,
-                                                        const DataCopyExtParams &dataCopyParams,
-                                                        const DataCopyPadExtParams<int32_t> &padParams)
+__aicore__ inline __inout_pipe__(MTE2) void DataCopyB64(const LocalTensor<T>& dstLocal,
+                                                        const GlobalTensor<T>& srcGlobal,
+                                                        const DataCopyExtParams& dataCopyParams,
+                                                        const DataCopyPadExtParams<int32_t>& padParams)
 {
-    DataCopyPadGm2UBImpl((__ubuf__ int32_t *)dstLocal.GetPhyAddr(), (__gm__ int32_t *)srcGlobal.GetPhyAddr(),
+    DataCopyPadGm2UBImpl((__ubuf__ int32_t*)dstLocal.GetPhyAddr(), (__gm__ int32_t*)srcGlobal.GetPhyAddr(),
                          dataCopyParams, padParams);
 }
 
 template <typename T>
-__aicore__ inline __inout_pipe__(MTE3) void DataCopyB64(const GlobalTensor<T> &dstGlobal,
-                                                        const LocalTensor<T> &srcLocal,
-                                                        const DataCopyExtParams &dataCopyParams)
+__aicore__ inline __inout_pipe__(MTE3) void DataCopyB64(const GlobalTensor<T>& dstGlobal,
+                                                        const LocalTensor<T>& srcLocal,
+                                                        const DataCopyExtParams& dataCopyParams)
 {
-    DataCopyPadUB2GMImpl((__gm__ int32_t *)dstGlobal.GetPhyAddr(), (__ubuf__ int32_t *)srcLocal.GetPhyAddr(),
+    DataCopyPadUB2GMImpl((__gm__ int32_t*)dstGlobal.GetPhyAddr(), (__ubuf__ int32_t*)srcLocal.GetPhyAddr(),
                          dataCopyParams);
 }
 
@@ -122,7 +122,7 @@ protected:
     __aicore__ inline void SyncAll();
 
 protected:
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> sortDataCopyInQueue;
     TQue<QuePosition::VECOUT, 1> sortDataCopyOutQueue;
     TBuf<TPosition::VECCALC> tempBuffer;

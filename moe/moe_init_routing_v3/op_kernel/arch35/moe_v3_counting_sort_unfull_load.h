@@ -24,7 +24,7 @@ using namespace AscendC;
 constexpr int64_t EXERPT_TOKENS_CUMSUM = 0;
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void ScatterPairsStableSimt(
-    int32_t batchSize, __ubuf__ int32_t *flatIdxLocalAddr, __ubuf__ int32_t *rankLocalAddr, __gm__ int32_t *dstGmAddr)
+    int32_t batchSize, __ubuf__ int32_t* flatIdxLocalAddr, __ubuf__ int32_t* rankLocalAddr, __gm__ int32_t* dstGmAddr)
 {
     for (int32_t i = static_cast<int32_t>(threadIdx.x); i < batchSize; i += static_cast<int32_t>(blockDim.x)) {
         dstGmAddr[rankLocalAddr[i]] = flatIdxLocalAddr[i];
@@ -36,30 +36,30 @@ class MoeV3CutOriginPhaseAB {
 public:
     __aicore__ inline MoeV3CutOriginPhaseAB(){};
     __aicore__ inline void Init(GM_ADDR expertIdx, GM_ADDR expandedRowIdx, GM_ADDR expertTokens, GM_ADDR workspace,
-                                const MoeInitRoutingV3Arch35TilingData *tiling, TPipe *pipe);
+                                const MoeInitRoutingV3Arch35TilingData* tiling, TPipe* pipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void FilterAndCountChunked();
-    __aicore__ inline void CountChunkWithFilter(int64_t chunkLength, int64_t gmFlatOffset, int64_t &pairCursor);
+    __aicore__ inline void CountChunkWithFilter(int64_t chunkLength, int64_t gmFlatOffset, int64_t& pairCursor);
     // 过滤核心：接收 CountChunkWithFilter 载入的 expertIdxLocal，调用方不再重复 DataCopyPad
     __aicore__ inline void CountChunkFilteredWithLoaded(int64_t chunkLength, int64_t gmFlatOffset,
-                                                        LocalTensor<int32_t> &expertIdxLocal, int64_t &pairCursor);
+                                                        LocalTensor<int32_t>& expertIdxLocal, int64_t& pairCursor);
     // 过滤两段式：构造 [expertStart_, expertEnd_) 命中掩码 / 按掩码收拢命中并计数写回（细分以缩小
     // CountChunkWithFilter）
     __aicore__ inline void BuildChunkFilterMask(int64_t chunkLength, int64_t alignedLen,
-                                                LocalTensor<int32_t> &expertIdxLocal,
-                                                LocalTensor<float> &expertIdxFp32Local,
-                                                LocalTensor<uint8_t> &compareMask0, LocalTensor<uint8_t> &compareMask1,
-                                                LocalTensor<uint8_t> &gatherMaskLocal);
+                                                LocalTensor<int32_t>& expertIdxLocal,
+                                                LocalTensor<float>& expertIdxFp32Local,
+                                                LocalTensor<uint8_t>& compareMask0, LocalTensor<uint8_t>& compareMask1,
+                                                LocalTensor<uint8_t>& gatherMaskLocal);
     __aicore__ inline void GatherAndCountFilteredHits(int64_t chunkLength, int64_t gmFlatOffset,
-                                                      LocalTensor<int32_t> &expertIdxLocal,
-                                                      LocalTensor<uint8_t> &gatherMaskLocal,
-                                                      LocalTensor<int32_t> &gatheredExpertLocal,
-                                                      LocalTensor<int32_t> &flatIdxBufferLocal,
-                                                      LocalTensor<int32_t> &gatheredIdxLocal, int64_t &pairCursor);
-    __aicore__ inline void WritePairBatchToWs(int64_t pairCursor, int64_t count, LocalTensor<int32_t> &idxSrc,
-                                              LocalTensor<int32_t> &expertSrc);
+                                                      LocalTensor<int32_t>& expertIdxLocal,
+                                                      LocalTensor<uint8_t>& gatherMaskLocal,
+                                                      LocalTensor<int32_t>& gatheredExpertLocal,
+                                                      LocalTensor<int32_t>& flatIdxBufferLocal,
+                                                      LocalTensor<int32_t>& gatheredIdxLocal, int64_t& pairCursor);
+    __aicore__ inline void WritePairBatchToWs(int64_t pairCursor, int64_t count, LocalTensor<int32_t>& idxSrc,
+                                              LocalTensor<int32_t>& expertSrc);
     __aicore__ inline void WriteExpertCountToWorkspace();
     // Phase B
     __aicore__ inline void ComputeGlobalOffset();
@@ -73,7 +73,7 @@ private:
     static constexpr int64_t DST_REP_STRIDE = 8;
     static constexpr int64_t MASK_STRIDE = 64;
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     TBuf<TPosition::VECCALC> buf_;
 
     // GM tensors
@@ -139,8 +139,8 @@ private:
 
 template <typename T>
 __aicore__ inline void MoeV3CutOriginPhaseAB<T>::Init(GM_ADDR expertIdx, GM_ADDR expandedRowIdx, GM_ADDR expertTokens,
-                                                      GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData *tiling,
-                                                      TPipe *pipe)
+                                                      GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData* tiling,
+                                                      TPipe* pipe)
 {
     pipe_ = pipe;
     blockIdx_ = GetBlockIdx();
@@ -178,8 +178,8 @@ __aicore__ inline void MoeV3CutOriginPhaseAB<T>::Init(GM_ADDR expertIdx, GM_ADDR
     int64_t maxCoreEntries = maxCoreTokens * k_;
     pairsPerCore_ = AlignElem(maxCoreEntries, static_cast<int64_t>(8)) * 2;
 
-    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertIdx);
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx);
+    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertIdx);
+    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx);
 
     if (rowIdxType_ == GATHER) {
         if (blockIdx_ < filterNeedCoreNum_) {
@@ -194,17 +194,16 @@ __aicore__ inline void MoeV3CutOriginPhaseAB<T>::Init(GM_ADDR expertIdx, GM_ADDR
         SyncAll();
     }
     int64_t wsOffset = tiling->countingSortParamsOp.pairsWsOffset;
-    pairsWorkspaceGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + wsOffset);
+    pairsWorkspaceGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + wsOffset);
     wsOffset += filterNeedCoreNum_ * pairsPerCore_;
-    expertCountWorkspaceGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + wsOffset);
+    expertCountWorkspaceGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + wsOffset);
 
-    sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace +
-                                    Align(n_ * k_, static_cast<int64_t>(sizeof(int32_t))));
-    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)workspace +
+    sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(n_ * k_, static_cast<int64_t>(sizeof(int32_t))));
+    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t*)workspace +
                                         Align(n_ * k_, static_cast<int64_t>(sizeof(int32_t))) * 2 +
                                         Align(actualExpertNum_, static_cast<int64_t>(sizeof(int32_t))));
-    expandedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace);
-    expertIdxValueGm_.SetGlobalBuffer((__gm__ int32_t *)workspace +
+    expandedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)workspace);
+    expertIdxValueGm_.SetGlobalBuffer((__gm__ int32_t*)workspace +
                                       Align(n_ * k_, static_cast<int64_t>(sizeof(int32_t))) * 2 +
                                       Align(actualExpertNum_, static_cast<int64_t>(sizeof(int32_t))));
 
@@ -230,7 +229,7 @@ __aicore__ inline void MoeV3CutOriginPhaseAB<T>::Init(GM_ADDR expertIdx, GM_ADDR
     dropPadPerCoreRows_ = tiling->srcToDstDropPadParamsOp.perCoreRows;
     dropPadLastCoreRows_ = tiling->srcToDstDropPadParamsOp.lastCoreRows;
     if (expertTokensNumFlag_ != EXERPT_TOKENS_NONE) {
-        expertTokensGm_.SetGlobalBuffer((__gm__ int64_t *)expertTokens);
+        expertTokensGm_.SetGlobalBuffer((__gm__ int64_t*)expertTokens);
     }
 
     // UB 布局及各段大小由 tiling 下发（host 统一计算），kernel 仅按偏移使用
@@ -311,7 +310,7 @@ __aicore__ inline void MoeV3CutOriginPhaseAB<T>::FilterAndCountChunked()
 
 template <typename T>
 __aicore__ inline void MoeV3CutOriginPhaseAB<T>::CountChunkWithFilter(int64_t chunkLength, int64_t gmFlatOffset,
-                                                                      int64_t &pairCursor)
+                                                                      int64_t& pairCursor)
 {
     int64_t expertIdxOff = persistentSize_;
     LocalTensor<int32_t> expertIdxLocal = buf_.Get<int32_t>()[expertIdxOff / sizeof(int32_t)];
@@ -331,8 +330,8 @@ __aicore__ inline void MoeV3CutOriginPhaseAB<T>::CountChunkWithFilter(int64_t ch
 // 过滤核心：expertIdxLocal 由 CountChunkWithFilter 载入后传入。
 template <typename T>
 __aicore__ inline void MoeV3CutOriginPhaseAB<T>::CountChunkFilteredWithLoaded(int64_t chunkLength, int64_t gmFlatOffset,
-                                                                              LocalTensor<int32_t> &expertIdxLocal,
-                                                                              int64_t &pairCursor)
+                                                                              LocalTensor<int32_t>& expertIdxLocal,
+                                                                              int64_t& pairCursor)
 {
     int64_t off = persistentSize_ + AlignElem(chunkAligned_ * static_cast<int64_t>(sizeof(int32_t)), BLOCK_BYTES);
 
@@ -370,11 +369,11 @@ __aicore__ inline void MoeV3CutOriginPhaseAB<T>::CountChunkFilteredWithLoaded(in
 // 段1：构造 [expertStart_, expertEnd_) 命中掩码
 template <typename T>
 __aicore__ inline void MoeV3CutOriginPhaseAB<T>::BuildChunkFilterMask(int64_t chunkLength, int64_t alignedLen,
-                                                                      LocalTensor<int32_t> &expertIdxLocal,
-                                                                      LocalTensor<float> &expertIdxFp32Local,
-                                                                      LocalTensor<uint8_t> &compareMask0,
-                                                                      LocalTensor<uint8_t> &compareMask1,
-                                                                      LocalTensor<uint8_t> &gatherMaskLocal)
+                                                                      LocalTensor<int32_t>& expertIdxLocal,
+                                                                      LocalTensor<float>& expertIdxFp32Local,
+                                                                      LocalTensor<uint8_t>& compareMask0,
+                                                                      LocalTensor<uint8_t>& compareMask1,
+                                                                      LocalTensor<uint8_t>& gatherMaskLocal)
 {
     Cast(expertIdxFp32Local, expertIdxLocal, RoundMode::CAST_ROUND, alignedLen);
     PipeBarrier<PIPE_V>();
@@ -398,9 +397,9 @@ __aicore__ inline void MoeV3CutOriginPhaseAB<T>::BuildChunkFilterMask(int64_t ch
 // 段2：按掩码收拢命中并计数写回 pairs
 template <typename T>
 __aicore__ inline void MoeV3CutOriginPhaseAB<T>::GatherAndCountFilteredHits(
-    int64_t chunkLength, int64_t gmFlatOffset, LocalTensor<int32_t> &expertIdxLocal,
-    LocalTensor<uint8_t> &gatherMaskLocal, LocalTensor<int32_t> &gatheredExpertLocal,
-    LocalTensor<int32_t> &flatIdxBufferLocal, LocalTensor<int32_t> &gatheredIdxLocal, int64_t &pairCursor)
+    int64_t chunkLength, int64_t gmFlatOffset, LocalTensor<int32_t>& expertIdxLocal,
+    LocalTensor<uint8_t>& gatherMaskLocal, LocalTensor<int32_t>& gatheredExpertLocal,
+    LocalTensor<int32_t>& flatIdxBufferLocal, LocalTensor<int32_t>& gatheredIdxLocal, int64_t& pairCursor)
 {
     LocalTensor<int32_t> expertCountLocal = buf_.Get<int32_t>()[expertCountLocalOffset_ / sizeof(int32_t)];
     uint64_t rsvdCnt = 0;
@@ -442,8 +441,8 @@ __aicore__ inline void MoeV3CutOriginPhaseAB<T>::GatherAndCountFilteredHits(
 
 template <typename T>
 __aicore__ inline void MoeV3CutOriginPhaseAB<T>::WritePairBatchToWs(int64_t pairCursor, int64_t count,
-                                                                    LocalTensor<int32_t> &idxSrc,
-                                                                    LocalTensor<int32_t> &expertSrc)
+                                                                    LocalTensor<int32_t>& idxSrc,
+                                                                    LocalTensor<int32_t>& expertSrc)
 {
     if (count <= 0) {
         return;
@@ -548,10 +547,10 @@ __aicore__ inline void MoeV3CutOriginPhaseAB<T>::ScatterToSortedRowIdx()
     LocalTensor<int32_t> expertIdxLocal = buf_.Get<int32_t>()[scatterExpertIdxOffset_ / sizeof(int32_t)];
 
     // 目标 GM 基址：GATHER -> sortedRowIdx（workspace+Align(n*k)）；SCATTER -> expandedRowIdx（输出）
-    __gm__ int32_t *dstGmAddr = (rowIdxType_ == GATHER) ? (__gm__ int32_t *)sortedRowIdxGm_.GetPhyAddr() :
-                                                          (__gm__ int32_t *)expandedRowIdxGm_.GetPhyAddr();
-    __ubuf__ int32_t *flatIdxAddr = (__ubuf__ int32_t *)flatIdxLocal.GetPhyAddr();
-    __ubuf__ int32_t *rankAddr = (__ubuf__ int32_t *)expertIdxLocal.GetPhyAddr();
+    __gm__ int32_t* dstGmAddr = (rowIdxType_ == GATHER) ? (__gm__ int32_t*)sortedRowIdxGm_.GetPhyAddr() :
+                                                          (__gm__ int32_t*)expandedRowIdxGm_.GetPhyAddr();
+    __ubuf__ int32_t* flatIdxAddr = (__ubuf__ int32_t*)flatIdxLocal.GetPhyAddr();
+    __ubuf__ int32_t* rankAddr = (__ubuf__ int32_t*)expertIdxLocal.GetPhyAddr();
 
     DataCopyPadExtParams<int32_t> intPadParams{false, 0, 0, 0};
 

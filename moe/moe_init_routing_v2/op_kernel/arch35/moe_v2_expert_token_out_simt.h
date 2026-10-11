@@ -26,7 +26,7 @@ public:
     __aicore__ inline MoeV2ExpertTokenOutSimt(){};
     template <typename TilingData>
     __aicore__ inline void Init(GM_ADDR expertTokensCountOrCumsum, GM_ADDR expertTokensBeforeCapacity,
-                                GM_ADDR expandedRowIdx, GM_ADDR workspace, const TilingData *tilingData, TPipe *tPipe);
+                                GM_ADDR expandedRowIdx, GM_ADDR workspace, const TilingData* tilingData, TPipe* tPipe);
     template <bool CALCHIST = true>
     __aicore__ inline void Process();
 
@@ -35,21 +35,21 @@ private:
     __aicore__ inline void InitLocal();
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     AscendC::TBuf<AscendC::TPosition::VECCALC> expertIdCunsumTBuf_;
 
     GlobalTensor<int32_t> expandedRowIdxGmGT_;
-    __gm__ int32_t *expandedRowIdxGm_;
-    __gm__ int32_t *expandedExpertIdxGm_;
-    __gm__ int32_t *expertTokensBeforeCapacityGm_;
-    __gm__ int32_t *expertTokensCountOrCumsumGm_;
+    __gm__ int32_t* expandedRowIdxGm_;
+    __gm__ int32_t* expandedExpertIdxGm_;
+    __gm__ int32_t* expertTokensBeforeCapacityGm_;
+    __gm__ int32_t* expertTokensCountOrCumsumGm_;
     GlobalTensor<int32_t> expertTokensCountOrCumsumGmOut;
-    __gm__ int32_t *expertFirstIndexGm_;
+    __gm__ int32_t* expertFirstIndexGm_;
 
     LocalTensor<int32_t> lastExpertIdCunsum_;
-    __ubuf__ int32_t *lastExpertIdCunsumAddr_;
+    __ubuf__ int32_t* lastExpertIdCunsumAddr_;
 
-    const MoeV2GatherOutComputeTilingData *srcToDstTilingData;
+    const MoeV2GatherOutComputeTilingData* srcToDstTilingData;
 
     int64_t coreNum_;
     int64_t blockIdx_;
@@ -91,7 +91,7 @@ __aicore__ inline void MoeV2ExpertTokenOutSimt::SyncAll()
 template <typename TilingData>
 __aicore__ inline void MoeV2ExpertTokenOutSimt::Init(GM_ADDR expertTokensCountOrCumsum,
                                                      GM_ADDR expertTokensBeforeCapacity, GM_ADDR expandedRowIdx,
-                                                     GM_ADDR workspace, const TilingData *tilingData, TPipe *tPipe)
+                                                     GM_ADDR workspace, const TilingData* tilingData, TPipe* tPipe)
 {
     this->pipe = tPipe;
     this->blockIdx_ = GetBlockIdx();
@@ -118,36 +118,36 @@ __aicore__ inline void MoeV2ExpertTokenOutSimt::Init(GM_ADDR expertTokensCountOr
     }
     this->threadNum_ = this->coreRows_ > THREAD_NUM ? THREAD_NUM : this->coreRows_;
 
-    expandedRowIdxGmGT_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, Align(this->totalLength_, sizeof(int32_t)));
-    expandedRowIdxGm_ = (__gm__ int32_t *)expandedRowIdx;
+    expandedRowIdxGmGT_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, Align(this->totalLength_, sizeof(int32_t)));
+    expandedRowIdxGm_ = (__gm__ int32_t*)expandedRowIdx;
 
     if (this->dropPadMode_ == DROPLESS_MODE && this->expertTokensCountOrCumsumFlag_ > EXERPT_TOKENS_NONE) {
         if (this->expertTokensCountOrCumsumFlag_ == EXERPT_TOKENS_COUNT) {
-            expertTokensBeforeCapacityGm_ = (__gm__ int32_t *)expertTokensCountOrCumsum;
+            expertTokensBeforeCapacityGm_ = (__gm__ int32_t*)expertTokensCountOrCumsum;
             this->expertCount_ = true;
         } else {
-            expertTokensCountOrCumsumGm_ = (__gm__ int32_t *)expertTokensCountOrCumsum;
-            expertTokensCountOrCumsumGmOut.SetGlobalBuffer((__gm__ int32_t *)expertTokensCountOrCumsum,
+            expertTokensCountOrCumsumGm_ = (__gm__ int32_t*)expertTokensCountOrCumsum;
+            expertTokensCountOrCumsumGmOut.SetGlobalBuffer((__gm__ int32_t*)expertTokensCountOrCumsum,
                                                            this->expertNum_);
             this->expertCumsum_ = true;
         }
     }
 
     if (this->dropPadMode_ == DROP_PAD_MODE && this->expertTokensBeforeCapacityFlag_ == EXERPT_TOKENS_BEFORE_CAPACITY) {
-        expertTokensBeforeCapacityGm_ = (__gm__ int32_t *)expertTokensBeforeCapacity;
+        expertTokensBeforeCapacityGm_ = (__gm__ int32_t*)expertTokensBeforeCapacity;
         this->expertCount_ = true;
     }
 
-    expertFirstIndexGm_ = (__gm__ int32_t *)workspace + Align(this->totalLength_, sizeof(int32_t)) * 2;
-    expandedExpertIdxGm_ = (__gm__ int32_t *)workspace;
+    expertFirstIndexGm_ = (__gm__ int32_t*)workspace + Align(this->totalLength_, sizeof(int32_t)) * 2;
+    expandedExpertIdxGm_ = (__gm__ int32_t*)workspace;
     pipe->InitBuffer(expertIdCunsumTBuf_, BLOCK_BYTES);
     lastExpertIdCunsum_ = expertIdCunsumTBuf_.Get<int32_t>();
-    lastExpertIdCunsumAddr_ = (__ubuf__ int32_t *)lastExpertIdCunsum_.GetPhyAddr();
+    lastExpertIdCunsumAddr_ = (__ubuf__ int32_t*)lastExpertIdCunsum_.GetPhyAddr();
 }
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void ExpertFirstIndexComputeSimt(
-    int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t *expertFirstIndexGm,
-    __gm__ int32_t *expandedExpertIdxGm)
+    int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t* expertFirstIndexGm,
+    __gm__ int32_t* expandedExpertIdxGm)
 {
     for (int32_t index = static_cast<int32_t>(threadIdx.x); index < static_cast<int32_t>(coreRows);
          index += static_cast<int32_t>(blockDim.x)) {
@@ -168,8 +168,8 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void ExpertFirstIndexComp
 }
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void TokensComputeSimt(
-    int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t *expertFirstIndexGm,
-    __gm__ int32_t *expandedExpertIdxGm, __gm__ int32_t *expertTokensBeforeCapacityGm)
+    int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t* expertFirstIndexGm,
+    __gm__ int32_t* expandedExpertIdxGm, __gm__ int32_t* expertTokensBeforeCapacityGm)
 {
     for (int32_t index = static_cast<int32_t>(threadIdx.x); index < static_cast<int32_t>(coreRows);
          index += static_cast<int32_t>(blockDim.x)) {
@@ -188,8 +188,8 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void TokensComputeSimt(
 }
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void CumsumComputeSimt(
-    int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t *expandedExpertIdxGm,
-    __gm__ int32_t *expertTokensCountOrCumsumGm, __ubuf__ int32_t *lastExpertIdCunsumAddr)
+    int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t* expandedExpertIdxGm,
+    __gm__ int32_t* expertTokensCountOrCumsumGm, __ubuf__ int32_t* lastExpertIdCunsumAddr)
 {
     for (int32_t index = static_cast<int32_t>(threadIdx.x); index < static_cast<int32_t>(coreRows);
          index += static_cast<int32_t>(blockDim.x)) {

@@ -30,18 +30,17 @@
 #include "moe_token_unpermute_with_routing_map.h"
 #include "aclnn_moe_token_unpermute_with_routing_map.h"
 #ifdef BUILD_OPEN_PROJECT_API
-    #include "../../../moe/3rd/moe_inplace_index_add_with_sorted/op_host/op_api/moe_inplace_index_add_with_sorted.h"
-    #include "../../../moe/3rd/moe_inplace_index_add/op_host/op_api/moe_inplace_index_add.h"
+#include "../../../moe/3rd/moe_inplace_index_add_with_sorted/op_host/op_api/moe_inplace_index_add_with_sorted.h"
+#include "../../../moe/3rd/moe_inplace_index_add/op_host/op_api/moe_inplace_index_add.h"
 #else
-    #include "level0/inplace_index_add.h"
+#include "level0/inplace_index_add.h"
 #endif
 
 using namespace op;
 #ifdef __cplusplus
 extern "C" {
 #endif
-namespace
-{
+namespace {
 static constexpr int64_t INDEX_SHAPE = 1;
 static constexpr int64_t TRANSPOSE_SHAPE_SIZE = 2;
 
@@ -95,36 +94,32 @@ static bool IsAICoreSupport(const aclTensor* self)
 static const std::initializer_list<DataType> dtype_list = {op::DataType::DT_FLOAT16, op::DataType::DT_FLOAT,
                                                            op::DataType::DT_BF16};
 
-static const std::initializer_list<DataType> routing_map_dtype_list = {op::DataType::DT_INT8, op::DataType::DT_UINT8, op::DataType::DT_BOOL};
+static const std::initializer_list<DataType> routing_map_dtype_list = {op::DataType::DT_INT8, op::DataType::DT_UINT8,
+                                                                       op::DataType::DT_BOOL};
 
 static const std::initializer_list<DataType> indice_dtype_list = {op::DataType::DT_INT32};
 
-static inline bool CheckNotNull(const aclTensor* permuteTokens,
-                                const aclTensor* sortedIndices,
-                                const aclTensor* probsOptional,
-                                const aclIntArray* restoreShapeOptional)
+static inline bool CheckNotNull(const aclTensor* permuteTokens, const aclTensor* sortedIndices,
+                                const aclTensor* probsOptional, const aclIntArray* restoreShapeOptional)
 {
     OP_CHECK_NULL(permuteTokens, return false);
     OP_CHECK_NULL(sortedIndices, return false);
-    if(probsOptional == nullptr && restoreShapeOptional == nullptr){
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The probsOptional and restoreShapeOptional should not be nullptr at the same time.");
+    if (probsOptional == nullptr && restoreShapeOptional == nullptr) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "The probsOptional and restoreShapeOptional should not be nullptr at the same time.");
         return false;
     }
     return true;
 }
 
-static inline bool CheckDtypeValid(const aclTensor* permuteTokens,
-                                   const aclTensor* sortedIndices,
-                                   const aclTensor* routingMapOptional,
-                                   const aclTensor* probsOptional,
-                                   const aclTensor* unpermutedTokens, 
-                                   const aclTensor* outIndex, 
-                                   const aclTensor* permuteTokenId, 
-                                   const aclTensor* permuteProbs)
+static inline bool CheckDtypeValid(const aclTensor* permuteTokens, const aclTensor* sortedIndices,
+                                   const aclTensor* routingMapOptional, const aclTensor* probsOptional,
+                                   const aclTensor* unpermutedTokens, const aclTensor* outIndex,
+                                   const aclTensor* permuteTokenId, const aclTensor* permuteProbs)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(permuteTokens, dtype_list, return false);
     OP_CHECK_DTYPE_NOT_SUPPORT(sortedIndices, indice_dtype_list, return false);
-    
+
     if (routingMapOptional != nullptr) {
         bool dtypeSupported = false;
         for (auto dtype : routing_map_dtype_list) {
@@ -137,10 +132,11 @@ static inline bool CheckDtypeValid(const aclTensor* permuteTokens,
             OP_LOGW("routingMapOptional's dtype is not supported. Supported dtypes are INT8, UINT8, BOOL.");
         }
     }
-    
+
     if (probsOptional != nullptr) {
         OP_CHECK_DTYPE_NOT_SUPPORT(probsOptional, dtype_list, return false);
-        if (probsOptional->GetDataType() != op::DataType::DT_FLOAT || permuteTokens->GetDataType() != op::DataType::DT_BF16) {
+        if (probsOptional->GetDataType() != op::DataType::DT_FLOAT ||
+            permuteTokens->GetDataType() != op::DataType::DT_BF16) {
             OP_CHECK_DTYPE_NOT_MATCH(permuteTokens, probsOptional->GetDataType(), return false);
         }
         if (permuteProbs != nullptr) {
@@ -151,7 +147,7 @@ static inline bool CheckDtypeValid(const aclTensor* permuteTokens,
     if (unpermutedTokens != nullptr) {
         OP_CHECK_DTYPE_NOT_MATCH(unpermutedTokens, permuteTokens->GetDataType(), return false);
     }
-    
+
     if (outIndex != nullptr) {
         OP_CHECK_DTYPE_NOT_MATCH(outIndex, sortedIndices->GetDataType(), return false);
     }
@@ -163,36 +159,34 @@ static inline bool CheckDtypeValid(const aclTensor* permuteTokens,
     return true;
 }
 
-static bool CheckShapeValid(const aclTensor* permuteTokens, 
-                            const aclTensor* sortedIndices, 
-                            const aclTensor* routingMapOptional,
-                            const aclTensor* probsOptional,
+static bool CheckShapeValid(const aclTensor* permuteTokens, const aclTensor* sortedIndices,
+                            const aclTensor* routingMapOptional, const aclTensor* probsOptional,
                             const aclTensor* unpermutedTokens)
 {
     auto permuteTokenspDimNum = permuteTokens->GetViewShape().GetDimNum();
-    OP_CHECK(
-        permuteTokenspDimNum == TRANSPOSE_SHAPE_SIZE,
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The dimension of permuteTokens should be two, but got %lu.", permuteTokenspDimNum),
-        return false);
+    OP_CHECK(permuteTokenspDimNum == TRANSPOSE_SHAPE_SIZE,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The dimension of permuteTokens should be two, but got %lu.",
+                     permuteTokenspDimNum),
+             return false);
 
     auto sortedIndicesDimNum = sortedIndices->GetViewShape().GetDimNum();
-    OP_CHECK(
-        sortedIndicesDimNum == INDEX_SHAPE,
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The dimension of sortedIndices should be one, but got %lu.", sortedIndicesDimNum),
-        return false);
+    OP_CHECK(sortedIndicesDimNum == INDEX_SHAPE,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The dimension of sortedIndices should be one, but got %lu.",
+                     sortedIndicesDimNum),
+             return false);
 
     auto unpermutedTokensDimNum = unpermutedTokens->GetViewShape().GetDimNum();
-    OP_CHECK(
-        unpermutedTokensDimNum == TRANSPOSE_SHAPE_SIZE,
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The dimension of unpermutedTokensDimNum should be two, but got %lu.", unpermutedTokensDimNum),
-        return false);
+    OP_CHECK(unpermutedTokensDimNum == TRANSPOSE_SHAPE_SIZE,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The dimension of unpermutedTokensDimNum should be two, but got %lu.",
+                     unpermutedTokensDimNum),
+             return false);
 
     if (routingMapOptional != nullptr) {
         auto routingMapDimNum = routingMapOptional->GetViewShape().GetDimNum();
         if (routingMapDimNum != TRANSPOSE_SHAPE_SIZE) {
             OP_LOGW("The dimension of routingMapOptional should be two, but got %lu.", routingMapDimNum);
         }
-        
+
         if (probsOptional != nullptr) {
             if (routingMapOptional->GetViewShape() != probsOptional->GetViewShape()) {
                 OP_LOGW("The shape of routingMapOptional should match probsOptional.");
@@ -207,14 +201,12 @@ static void IsFormatSupport(const aclTensor* input, const std::string& inputName
 {
     if (input != nullptr && op::IsPrivateFormat(input->GetStorageFormat())) {
         OP_LOGW("%s's format should be ND. actual is [%s].", inputName.c_str(),
-            op::ToString(input->GetStorageFormat()).GetString());
+                op::ToString(input->GetStorageFormat()).GetString());
     }
 }
 
-static void CheckFormatValid(const aclTensor* permutedTokens,
-                             const aclTensor* sortedIndices,
-                             const aclTensor* routingMapOptional,
-                             const aclTensor* probsOptional)
+static void CheckFormatValid(const aclTensor* permutedTokens, const aclTensor* sortedIndices,
+                             const aclTensor* routingMapOptional, const aclTensor* probsOptional)
 {
     IsFormatSupport(permutedTokens, "permutedTokens");
     IsFormatSupport(sortedIndices, "sortedIndices");
@@ -222,18 +214,17 @@ static void CheckFormatValid(const aclTensor* permutedTokens,
     IsFormatSupport(probsOptional, "probsOptional");
 }
 
-static aclnnStatus CheckParams(const aclTensor* permuteTokens,
-                               const aclTensor* sortedIndices,
-                               const aclTensor* routingMapOptional,
-                               const aclTensor* probsOptional, 
-                               const aclIntArray* restoreShapeOptional,
-                               aclTensor* unpermutedTokens, aclTensor* outIndex, aclTensor* permuteTokenId, aclTensor* permuteProbs)
+static aclnnStatus CheckParams(const aclTensor* permuteTokens, const aclTensor* sortedIndices,
+                               const aclTensor* routingMapOptional, const aclTensor* probsOptional,
+                               const aclIntArray* restoreShapeOptional, aclTensor* unpermutedTokens,
+                               aclTensor* outIndex, aclTensor* permuteTokenId, aclTensor* permuteProbs)
 {
-    CHECK_RET(CheckNotNull(permuteTokens, sortedIndices, probsOptional, restoreShapeOptional), 
-                           ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(CheckDtypeValid(permuteTokens, sortedIndices, routingMapOptional, probsOptional, unpermutedTokens, outIndex, permuteTokenId, permuteProbs), 
-                              ACLNN_ERR_PARAM_INVALID);
-    CHECK_RET(CheckShapeValid(permuteTokens, sortedIndices, routingMapOptional, probsOptional, unpermutedTokens), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckNotNull(permuteTokens, sortedIndices, probsOptional, restoreShapeOptional), ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(CheckDtypeValid(permuteTokens, sortedIndices, routingMapOptional, probsOptional, unpermutedTokens,
+                              outIndex, permuteTokenId, permuteProbs),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckShapeValid(permuteTokens, sortedIndices, routingMapOptional, probsOptional, unpermutedTokens),
+              ACLNN_ERR_PARAM_INVALID);
     CheckFormatValid(permuteTokens, sortedIndices, routingMapOptional, probsOptional);
     return ACLNN_SUCCESS;
 }
@@ -248,37 +239,35 @@ static void ViewDataType(const aclTensor* input, const op::DataType dtype)
     tmpTensor->SetDataType(dtype);
     input = tmpTensor;
 }
-}  // namespace
+} // namespace
 
-aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(const aclTensor* permutedTokens,
-                                                                 const aclTensor* sortedIndices,
-                                                                 const aclTensor* routingMapOptional,
-                                                                 const aclTensor* probsOptional, 
-                                                                 bool paddedMode,
-                                                                 const aclIntArray* restoreShapeOptional, 
-                                                                 aclTensor* unpermutedTokens, aclTensor* outIndex, aclTensor* permuteTokenId, aclTensor* permuteProbs,
-                                                                 uint64_t* workspaceSize, aclOpExecutor** executor)
+aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(
+    const aclTensor* permutedTokens, const aclTensor* sortedIndices, const aclTensor* routingMapOptional,
+    const aclTensor* probsOptional, bool paddedMode, const aclIntArray* restoreShapeOptional,
+    aclTensor* unpermutedTokens, aclTensor* outIndex, aclTensor* permuteTokenId, aclTensor* permuteProbs,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    L2_DFX_PHASE_1(aclnnMoeTokenUnpermuteWithRoutingMap,
-                   DFX_IN(permutedTokens, sortedIndices, routingMapOptional, probsOptional, paddedMode, restoreShapeOptional),
-                   DFX_OUT(unpermutedTokens, outIndex, permuteTokenId, permuteProbs));
+    L2_DFX_PHASE_1(
+        aclnnMoeTokenUnpermuteWithRoutingMap,
+        DFX_IN(permutedTokens, sortedIndices, routingMapOptional, probsOptional, paddedMode, restoreShapeOptional),
+        DFX_OUT(unpermutedTokens, outIndex, permuteTokenId, permuteProbs));
 
-    auto ret = CheckParams(permutedTokens, sortedIndices, routingMapOptional, probsOptional, 
-                           restoreShapeOptional, unpermutedTokens, outIndex, permuteTokenId, permuteProbs);
+    auto ret = CheckParams(permutedTokens, sortedIndices, routingMapOptional, probsOptional, restoreShapeOptional,
+                           unpermutedTokens, outIndex, permuteTokenId, permuteProbs);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    //判断是否为混合精度，作为计算中是否进行精度转换的依据
+    // 判断是否为混合精度，作为计算中是否进行精度转换的依据
     bool isMixed = false;
-    if(probsOptional != nullptr) {
-        if(permutedTokens->GetDataType() == op::DataType::DT_BF16 &&
+    if (probsOptional != nullptr) {
+        if (permutedTokens->GetDataType() == op::DataType::DT_BF16 &&
             probsOptional->GetDataType() == op::DataType::DT_FLOAT) {
-                isMixed = true;
-            }
+            isMixed = true;
+        }
     }
-     // 空Tensor处理
+    // 空Tensor处理
     if (sortedIndices->IsEmpty() || (paddedMode == false && permutedTokens->IsEmpty())) {
         *workspaceSize = uniqueExecutor->GetWorkspaceSize();
         const aclTensor* unpermutedTokensZero = l0op::ZerosLike(unpermutedTokens, uniqueExecutor.get());
@@ -303,21 +292,22 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(const aclTensor
     auto sortedIndicesContiguous = l0op::Contiguous(sortedIndices, uniqueExecutor.get());
     CHECK_RET(sortedIndicesContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor *routingMapOptionalContiguous = nullptr;
-    if (routingMapOptional != nullptr){
+    const aclTensor* routingMapOptionalContiguous = nullptr;
+    if (routingMapOptional != nullptr) {
         routingMapOptionalContiguous = l0op::Contiguous(routingMapOptional, uniqueExecutor.get());
         CHECK_RET(routingMapOptionalContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
     const aclTensor* source = nullptr;
     std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*> permuteprob;
-    if (probsOptional != nullptr){
+    if (probsOptional != nullptr) {
         auto probsOptionalContiguous = l0op::Contiguous(probsOptional, uniqueExecutor.get());
         CHECK_RET(probsOptionalContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-        permuteprob = l0op::MoeTokenUnpermuteWithRoutingMap(permuteTokensContiguous, sortedIndicesContiguous, routingMapOptionalContiguous, probsOptionalContiguous, 
-                                                            paddedMode, restoreShapeOptional, uniqueExecutor.get()); //传参
-        if(paddedMode == true){
-            if(!permutedTokens->IsEmpty()){
+        permuteprob = l0op::MoeTokenUnpermuteWithRoutingMap(
+            permuteTokensContiguous, sortedIndicesContiguous, routingMapOptionalContiguous, probsOptionalContiguous,
+            paddedMode, restoreShapeOptional, uniqueExecutor.get()); // 传参
+        if (paddedMode == true) {
+            if (!permutedTokens->IsEmpty()) {
                 int64_t tensorSize = static_cast<int64_t>(permuteTokensContiguous->GetViewShape().GetDimNum());
                 std::vector<int64_t> tensorShape(2);
                 tensorShape[0] = (permuteTokensContiguous->GetViewShape())[0];
@@ -327,11 +317,12 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(const aclTensor
                 CHECK_RET(permuteprobReshape != nullptr, ACLNN_ERR_INNER_NULLPTR);
                 source = l0op::Mul(permuteTokensContiguous, permuteprobReshape, uniqueExecutor.get());
             }
-        }     
+        }
     } else {
-        if (paddedMode == false){
-            permuteprob = l0op::MoeTokenUnpermuteWithRoutingMap(permuteTokensContiguous, sortedIndicesContiguous, routingMapOptionalContiguous, nullptr, 
-                                                                paddedMode, restoreShapeOptional, uniqueExecutor.get());
+        if (paddedMode == false) {
+            permuteprob = l0op::MoeTokenUnpermuteWithRoutingMap(permuteTokensContiguous, sortedIndicesContiguous,
+                                                                routingMapOptionalContiguous, nullptr, paddedMode,
+                                                                restoreShapeOptional, uniqueExecutor.get());
         }
         source = permuteTokensContiguous;
     }
@@ -347,7 +338,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(const aclTensor
         unpermutedTokensOut = l0op::ZerosLike(unpermutedTokensContiguous, uniqueExecutor.get());
         CHECK_RET(unpermutedTokensOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-        //混精场景下将unpermutedTokensOut提升精度再计算
+        // 混精场景下将unpermutedTokensOut提升精度再计算
         if (isMixed) {
             unpermutedTokensOut = l0op::Cast(unpermutedTokensOut, op::DataType::DT_FLOAT, uniqueExecutor.get());
             CHECK_RET(unpermutedTokensOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -356,15 +347,16 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(const aclTensor
         const aclTensor* indicesViewFloat =
             uniqueExecutor.get()->CreateView(sortedIndicesContiguous, sortedIndicesContiguous->GetViewShape(), 0);
         ViewDataType(indicesViewFloat, op::DataType::DT_FLOAT);
-        auto sortResult = l0op::Sort(indicesViewFloat, -1, descending, stable, op::DataType::DT_INT32, uniqueExecutor.get());
-        auto sortIndex = std::get<1>(sortResult);//输出1
-        auto sortValues = std::get<0>(sortResult);//输出2
+        auto sortResult =
+            l0op::Sort(indicesViewFloat, -1, descending, stable, op::DataType::DT_INT32, uniqueExecutor.get());
+        auto sortIndex = std::get<1>(sortResult);  // 输出1
+        auto sortValues = std::get<0>(sortResult); // 输出2
 
         CHECK_RET(sortValues != nullptr && sortIndex != nullptr, ACLNN_ERR_INNER_NULLPTR);
         auto sortValuesI32 = uniqueExecutor.get()->CreateView(sortValues, sortedIndicesContiguous->GetViewShape(),
-                                                                sortValues->GetViewOffset());
+                                                              sortValues->GetViewOffset());
         ViewDataType(sortValuesI32, op::DataType::DT_INT32);
-        if(!permutedTokens->IsEmpty()){
+        if (!permutedTokens->IsEmpty()) {
             int64_t deterministicValue = 0;
             aclError aclRet = aclrtGetSysParamOpt(ACL_OPT_DETERMINISTIC, &deterministicValue);
             const bool is910 = (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B ||
@@ -372,33 +364,28 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(const aclTensor
             bool is910Deterministic = is910 && (aclRet == ACL_SUCCESS && deterministicValue == 1);
             // 当设备类型为A2或A3且index为int32类型时，切为InplaceIndexAddWithSorted算子
             bool useNewOp = (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B ||
-                            GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910_93 ||
-                            GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) &&
+                             GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910_93 ||
+                             GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) &&
                             unpermutedTokens->GetViewShape().GetDim(0) < MAX_SORT_SHAPE_DIM &&
                             (unpermutedTokensOut->GetDataType() == op::DataType::DT_BF16 ||
-                             unpermutedTokensOut->GetDataType() == op::DataType::DT_FLOAT16 ||
-                             is910Deterministic);
-            #ifdef BUILD_OPEN_PROJECT_API
-                if (useNewOp) {
-                    indexAddRes =
-                        l0op::MoeInplaceIndexAddWithSorted(unpermutedTokensOut, 0, sortValuesI32, sortIndex,
-                                                        source, nullptr, uniqueExecutor.get());
-                } else {
-                    indexAddRes =
-                        l0op::MoeInplaceIndexAddAiCore(unpermutedTokensOut, 0, sortedIndicesContiguous,
-                                                    source, nullptr, uniqueExecutor.get());
-                }
-            #else
-                if (useNewOp) {
-                    indexAddRes =
-                        l0op::InplaceIndexAddWithSorted(unpermutedTokensOut, 0, sortValuesI32, sortIndex,
-                                                        source, nullptr, uniqueExecutor.get());
-                } else {
-                    indexAddRes =
-                        l0op::InplaceIndexAddAiCore(unpermutedTokensOut, 0, sortedIndicesContiguous,
-                                                    source, nullptr, uniqueExecutor.get());
-                }
-            #endif
+                             unpermutedTokensOut->GetDataType() == op::DataType::DT_FLOAT16 || is910Deterministic);
+#ifdef BUILD_OPEN_PROJECT_API
+            if (useNewOp) {
+                indexAddRes = l0op::MoeInplaceIndexAddWithSorted(unpermutedTokensOut, 0, sortValuesI32, sortIndex,
+                                                                 source, nullptr, uniqueExecutor.get());
+            } else {
+                indexAddRes = l0op::MoeInplaceIndexAddAiCore(unpermutedTokensOut, 0, sortedIndicesContiguous, source,
+                                                             nullptr, uniqueExecutor.get());
+            }
+#else
+            if (useNewOp) {
+                indexAddRes = l0op::InplaceIndexAddWithSorted(unpermutedTokensOut, 0, sortValuesI32, sortIndex, source,
+                                                              nullptr, uniqueExecutor.get());
+            } else {
+                indexAddRes = l0op::InplaceIndexAddAiCore(unpermutedTokensOut, 0, sortedIndicesContiguous, source,
+                                                          nullptr, uniqueExecutor.get());
+            }
+#endif
         } else {
             indexAddRes = unpermutedTokensOut; // unpermutedTokensOut 已经是 zerosLike 得到的正确形状的空张量
             OP_LOGD("Skipping InplaceIndexAdd due to empty tensor (hidden_size==0).\n");
@@ -406,27 +393,27 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(const aclTensor
 
         CHECK_RET(indexAddRes != nullptr, ACLNN_ERR_INNER_NULLPTR);
         // 固定写法，将计算结果拷贝到输出out上，out可能是非连续的tensor
-        //输出3
+        // 输出3
         if (std::get<3>(permuteprob) != nullptr) {
             auto permuteProbsResult = l0op::ViewCopy(std::get<3>(permuteprob), permuteProbs, uniqueExecutor.get());
             CHECK_RET(permuteProbsResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
         }
-        //输出2
+        // 输出2
         auto sortIndexViewCopyResult = l0op::ViewCopy(sortIndex, outIndex, uniqueExecutor.get());
-        CHECK_RET(sortIndexViewCopyResult != nullptr, ACLNN_ERR_INNER_NULLPTR);        
-        //输出1
+        CHECK_RET(sortIndexViewCopyResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        // 输出1
         auto sortValuesViewCopyResult = l0op::ViewCopy(sortValuesI32, permuteTokenId, uniqueExecutor.get());
         CHECK_RET(sortValuesViewCopyResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
-        
-        //混精场景下在ViewCopy之前，将高精度（FP32）的累加结果转换回目标输出精度
+
+        // 混精场景下在ViewCopy之前，将高精度（FP32）的累加结果转换回目标输出精度
         if (isMixed) {
             indexAddRes = l0op::Cast(indexAddRes, op::DataType::DT_BF16, uniqueExecutor.get());
             CHECK_RET(indexAddRes != nullptr, ACLNN_ERR_INNER_NULLPTR);
         }
-        //输出0
+        // 输出0
         auto unpermutedTokensResult = l0op::ViewCopy(indexAddRes, unpermutedTokens, uniqueExecutor.get());
         CHECK_RET(unpermutedTokensResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    }else{
+    } else {
         auto unpermutedTokensOpOut = std::get<0>(permuteprob);
         CHECK_RET(unpermutedTokensOpOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
@@ -435,7 +422,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(const aclTensor
 
         auto permuteProbsOpOut = std::get<3>(permuteprob);
         CHECK_RET(permuteProbsOpOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
-        if(permuteProbs != nullptr){
+        if (permuteProbs != nullptr) {
             auto permuteProbsResult = l0op::ViewCopy(permuteProbsOpOut, permuteProbs, uniqueExecutor.get());
             CHECK_RET(permuteProbsResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
         }
@@ -448,7 +435,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(const aclTensor
 }
 
 aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMap(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
-                                                   const aclrtStream stream)
+                                                 const aclrtStream stream)
 {
     // 固定写法，调用框架能力，完成计算
     L2_DFX_PHASE_2(aclnnMoeTokenUnpermuteWithRoutingMap);

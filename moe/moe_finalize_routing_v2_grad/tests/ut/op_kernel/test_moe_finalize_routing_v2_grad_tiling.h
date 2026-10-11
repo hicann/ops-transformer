@@ -25,7 +25,7 @@
 #define __CCE_UT_TEST__
 #define __CCE_AICORE__ 220
 
-inline void InitMoeFinalizeRoutingV2GradTilingData(uint8_t *tiling, MoeFinalizeRoutingV2GradTilingData *const_data)
+inline void InitMoeFinalizeRoutingV2GradTilingData(uint8_t* tiling, MoeFinalizeRoutingV2GradTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeFinalizeRoutingV2GradTilingData));
 }

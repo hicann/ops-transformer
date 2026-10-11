@@ -102,11 +102,11 @@ constexpr int64_t ULONG_BIT_LEN = 64;
 
 class MoeFinalizeRoutingV2GradTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeFinalizeRoutingV2GradTiling(gert::TilingContext *context)
+    explicit MoeFinalizeRoutingV2GradTiling(gert::TilingContext* context)
         : TilingBaseClass(context),
           nodeName_(context->GetNodeName()) {};
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         nodeName_ = context->GetNodeName();
@@ -123,7 +123,7 @@ protected:
     ge::graphStatus PostTiling() override;
     // 内部计算方法
     virtual void CalcBaseInfo();
-    void SetBinaryAddParams(MoeFinalizeRoutingV2GradBinaryAddTilingData &params, int64_t factor);
+    void SetBinaryAddParams(MoeFinalizeRoutingV2GradBinaryAddTilingData& params, int64_t factor);
     virtual ge::graphStatus CalcTilingKey() = 0;
     ge::graphStatus GetRequiredTensorInfo();
     ge::graphStatus GetOptionalTensorInfo();
@@ -151,7 +151,7 @@ protected:
     {
         return Ops::Base::ToString(dtype);
     }
-    std::string ShapeToString(const gert::Shape &shape) const
+    std::string ShapeToString(const gert::Shape& shape) const
     {
         return Ops::Base::ToString(shape);
     }

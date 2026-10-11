@@ -26,7 +26,7 @@ public:
     __aicore__ inline MoeV2FullLoadQuant(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedX,
                                 GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum, GM_ADDR workspace,
-                                const MoeInitRoutingQuantV2TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingQuantV2TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -137,12 +137,12 @@ template <typename T>
 __aicore__ inline void MoeV2FullLoadQuant<T>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset,
                                                    GM_ADDR expandedX, GM_ADDR expandedRowIdx,
                                                    GM_ADDR expertTokensCountOrCumsum, GM_ADDR workspace,
-                                                   const MoeInitRoutingQuantV2TilingData *tilingData, TPipe *tPipe)
+                                                   const MoeInitRoutingQuantV2TilingData* tilingData, TPipe* tPipe)
 {
     this->InitBase(x, expertIdx, expandedX, expandedRowIdx, expertTokensCountOrCumsum, workspace, tilingData, tPipe);
-    xGm.SetGlobalBuffer((__gm__ T *)x);
-    scaleGm.SetGlobalBuffer((__gm__ float *)scale, 1);
-    offsetGm.SetGlobalBuffer((__gm__ float *)offset, 1);
+    xGm.SetGlobalBuffer((__gm__ T*)x);
+    scaleGm.SetGlobalBuffer((__gm__ float*)scale, 1);
+    offsetGm.SetGlobalBuffer((__gm__ float*)offset, 1);
     this->scale = scaleGm.GetValue(0);
     this->offset = offsetGm.GetValue(0);
 

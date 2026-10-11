@@ -30,7 +30,7 @@ constexpr size_t expandedXOutputIndex = 0;
 constexpr size_t expandedRowIdxOutputIndex = 1;
 constexpr size_t expandedExpertIdxOutputIndex = 2;
 
-static graphStatus MoeInitRoutingExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus MoeInitRoutingExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
 
@@ -52,7 +52,7 @@ static graphStatus MoeInitRoutingExecuteFunc(OpExecuteContext *host_api_ctx)
 
     auto attrs = host_api_ctx->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE("aclnnfallback", "attrs is null"), return GRAPH_FAILED);
-    const int64_t *active_num = attrs->GetAttrPointer<int64_t>(0);
+    const int64_t* active_num = attrs->GetAttrPointer<int64_t>(0);
     // execute opapi
     auto api_ret = EXEC_OPAPI_CMD(aclnnMoeInitRouting, x_ge, row_idx_ge, expert_idx_ge, active_num, expanded_x_ge,
                                   expanded_row_idx_ge, expanded_expert_idx_ge);

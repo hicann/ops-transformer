@@ -83,7 +83,7 @@ public:
             .ExtendCfgInfo("opFile.value", "moe_token_unpermute_with_routing_map_grad");
         this->AICore().AddConfig("ascend910b", membaseCfg);
         this->AICore().AddConfig("ascend910_93", membaseCfg);
-        
+
         OpAICoreConfig regbaseCfg;
         regbaseCfg.DynamicCompileStaticFlag(true)
             .DynamicRankSupportFlag(true)

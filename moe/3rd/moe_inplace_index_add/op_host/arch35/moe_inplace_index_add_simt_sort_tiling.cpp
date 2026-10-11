@@ -17,8 +17,7 @@
 #include "moe_inplace_index_add_tiling.h"
 #include "moe_inplace_index_add_simt_sort_tiling.h"
 
-namespace optiling
-{
+namespace optiling {
 constexpr int64_t ALIGN_SIZE = 32;
 constexpr int64_t INT32_BYTES = 4;
 constexpr int64_t FP32_BYTES = 4;
@@ -53,24 +52,27 @@ uint64_t MoeInplaceIndexAddSimtSortTiling::computeIndicesUbFactor()
     int64_t sortTmpSize = 0;
     int64_t ubBlock = static_cast<int64_t>(Ops::Base::GetUbBlockSize(context_));
 
-    while(end - start > 1) {
+    while (end - start > 1) {
         mid = (end + start) / static_cast<int64_t>(DOUBLE);
         int64_t totalIndexSize = 0;
         if (indicesCastMode_ == 0) {
-        // 所需空间：indicesLocal + indicesSortedLocal + updatesOriginIdxLocal + uniqueIdCountLocal
-        totalIndexSize = Ops::Base::CeilAlign(mid * static_cast<int64_t>(indicesTypeSize_), ubBlock) * DOUBLE +
-                        Ops::Base::CeilAlign(mid * static_cast<int64_t>(sizeof(uint32_t)), ubBlock) + ubBlock * DOUBLE +
-                        Ops::Base::CeilAlign(mid * static_cast<int64_t>(sizeof(int32_t)), ubBlock) + ubBlock * DOUBLE;
-        sortTmpSize = static_cast<int64_t>(GetSortTmpSize(indicesDtype_, static_cast<uint32_t>(mid), false));
+            // 所需空间：indicesLocal + indicesSortedLocal + updatesOriginIdxLocal + uniqueIdCountLocal
+            totalIndexSize =
+                Ops::Base::CeilAlign(mid * static_cast<int64_t>(indicesTypeSize_), ubBlock) * DOUBLE +
+                Ops::Base::CeilAlign(mid * static_cast<int64_t>(sizeof(uint32_t)), ubBlock) + ubBlock * DOUBLE +
+                Ops::Base::CeilAlign(mid * static_cast<int64_t>(sizeof(int32_t)), ubBlock) + ubBlock * DOUBLE;
+            sortTmpSize = static_cast<int64_t>(GetSortTmpSize(indicesDtype_, static_cast<uint32_t>(mid), false));
         } else {
-        // 所需空间：indicesLocal + CastindicesLocal + CastindicesSortedLocal + updatesOriginIdxLocal + uniqueIdCountLocal
-        totalIndexSize = Ops::Base::CeilAlign(mid * static_cast<int64_t>(indicesTypeSize_), ubBlock) * DOUBLE +
-                        Ops::Base::CeilAlign(mid * static_cast<int64_t>(indicesCastDtypeSize_), ubBlock) * DOUBLE +
-                        Ops::Base::CeilAlign(mid * static_cast<int64_t>(sizeof(uint32_t)), ubBlock) + ubBlock * DOUBLE +
-                        Ops::Base::CeilAlign(mid * static_cast<int64_t>(sizeof(int32_t)), ubBlock) + ubBlock * DOUBLE;
-        sortTmpSize = static_cast<int64_t>(GetSortTmpSize(indicesCastDtype_, static_cast<uint32_t>(mid), false));
+            // 所需空间：indicesLocal + CastindicesLocal + CastindicesSortedLocal + updatesOriginIdxLocal +
+            // uniqueIdCountLocal
+            totalIndexSize =
+                Ops::Base::CeilAlign(mid * static_cast<int64_t>(indicesTypeSize_), ubBlock) * DOUBLE +
+                Ops::Base::CeilAlign(mid * static_cast<int64_t>(indicesCastDtypeSize_), ubBlock) * DOUBLE +
+                Ops::Base::CeilAlign(mid * static_cast<int64_t>(sizeof(uint32_t)), ubBlock) + ubBlock * DOUBLE +
+                Ops::Base::CeilAlign(mid * static_cast<int64_t>(sizeof(int32_t)), ubBlock) + ubBlock * DOUBLE;
+            sortTmpSize = static_cast<int64_t>(GetSortTmpSize(indicesCastDtype_, static_cast<uint32_t>(mid), false));
         }
-        
+
         sortTmpSize = Ops::Base::CeilAlign(sortTmpSize, ubBlock);
         int64_t updateSize1Pre = Ops::Base::CeilAlign(static_cast<int64_t>(mid * afterAxis_ * varTypeSize_), ubBlock);
         int64_t tmpTotalSize = totalIndexSize + sortTmpSize + updateSize1Pre + HASH_BUCKET_SIZE;
@@ -92,35 +94,44 @@ void MoeInplaceIndexAddSimtSortTiling::TilingForSimtSort()
     indicesLoopSize_ = Ops::Base::CeilDiv(totalLoop, totalCoreNum_);
     usedCoreNum_ = Ops::Base::CeilDiv(totalLoop, indicesLoopSize_);
     tailBlockIndicesLoopSize_ = totalLoop - indicesLoopSize_ * (usedCoreNum_ - 1);
-    indiceAxisTailNum_ = indicesAxis_ - indicesUbFactor_ * indicesLoopSize_ * (usedCoreNum_ - 1) - indicesUbFactor_ * (tailBlockIndicesLoopSize_ - 1);
-    while(usedCoreNum_ < totalCoreNum_ / DOUBLE && indicesUbFactor_ > 1) {
+    indiceAxisTailNum_ = indicesAxis_ - indicesUbFactor_ * indicesLoopSize_ * (usedCoreNum_ - 1) -
+                         indicesUbFactor_ * (tailBlockIndicesLoopSize_ - 1);
+    while (usedCoreNum_ < totalCoreNum_ / DOUBLE && indicesUbFactor_ > 1) {
         indicesUbFactor_ = indicesUbFactor_ / DOUBLE;
         totalLoop = Ops::Base::CeilDiv(indicesAxis_, indicesUbFactor_);
         indicesLoopSize_ = Ops::Base::CeilDiv(totalLoop, totalCoreNum_);
         usedCoreNum_ = Ops::Base::CeilDiv(totalLoop, indicesLoopSize_);
         tailBlockIndicesLoopSize_ = totalLoop - indicesLoopSize_ * (usedCoreNum_ - 1);
-        indiceAxisTailNum_ = indicesAxis_ - indicesUbFactor_ * indicesLoopSize_ * (usedCoreNum_ - 1) - indicesUbFactor_ * (tailBlockIndicesLoopSize_ - 1);
+        indiceAxisTailNum_ = indicesAxis_ - indicesUbFactor_ * indicesLoopSize_ * (usedCoreNum_ - 1) -
+                             indicesUbFactor_ * (tailBlockIndicesLoopSize_ - 1);
     }
-    eachCoreIndexCount_ = indicesUbFactor_ * indicesLoopSize_; 
+    eachCoreIndexCount_ = indicesUbFactor_ * indicesLoopSize_;
 
     // indices数量固定情况下，增加搬运pre中updates份数，计算每次最多能搬多少份updates
     int64_t totalIndexSize = 0;
     int64_t ubBlock = static_cast<int64_t>(Ops::Base::GetUbBlockSize(context_));
     if (indicesCastMode_ == 0) {
         totalIndexSize = Ops::Base::CeilAlign(indicesUbFactor_ * indicesTypeSize_, ubBlock) * DOUBLE +
-                    Ops::Base::CeilAlign(indicesUbFactor_ * static_cast<int64_t>(sizeof(uint32_t)), ubBlock) + ubBlock * DOUBLE +
-                    Ops::Base::CeilAlign(indicesUbFactor_ * static_cast<int64_t>(sizeof(int32_t)), ubBlock) + ubBlock * DOUBLE;
-        sortShareBufSize_ = static_cast<int64_t>(GetSortTmpSize(indicesDtype_, static_cast<uint32_t>(indicesUbFactor_), false));
+                         Ops::Base::CeilAlign(indicesUbFactor_ * static_cast<int64_t>(sizeof(uint32_t)), ubBlock) +
+                         ubBlock * DOUBLE +
+                         Ops::Base::CeilAlign(indicesUbFactor_ * static_cast<int64_t>(sizeof(int32_t)), ubBlock) +
+                         ubBlock * DOUBLE;
+        sortShareBufSize_ =
+            static_cast<int64_t>(GetSortTmpSize(indicesDtype_, static_cast<uint32_t>(indicesUbFactor_), false));
     } else {
         totalIndexSize = Ops::Base::CeilAlign(indicesUbFactor_ * indicesTypeSize_, ubBlock) * DOUBLE +
-                    Ops::Base::CeilAlign(indicesUbFactor_ * indicesCastDtypeSize_, ubBlock) * DOUBLE +
-                    Ops::Base::CeilAlign(indicesUbFactor_ * static_cast<int64_t>(sizeof(uint32_t)), ubBlock) + ubBlock * DOUBLE +
-                    Ops::Base::CeilAlign(indicesUbFactor_ * static_cast<int64_t>(sizeof(int32_t)), ubBlock) + ubBlock * DOUBLE;
-        sortShareBufSize_ = static_cast<int64_t>(GetSortTmpSize(indicesCastDtype_, static_cast<uint32_t>(indicesUbFactor_), false));
+                         Ops::Base::CeilAlign(indicesUbFactor_ * indicesCastDtypeSize_, ubBlock) * DOUBLE +
+                         Ops::Base::CeilAlign(indicesUbFactor_ * static_cast<int64_t>(sizeof(uint32_t)), ubBlock) +
+                         ubBlock * DOUBLE +
+                         Ops::Base::CeilAlign(indicesUbFactor_ * static_cast<int64_t>(sizeof(int32_t)), ubBlock) +
+                         ubBlock * DOUBLE;
+        sortShareBufSize_ =
+            static_cast<int64_t>(GetSortTmpSize(indicesCastDtype_, static_cast<uint32_t>(indicesUbFactor_), false));
     }
     normalUpdatesPreNum_ = preAxis_;
-    for (int64_t preNum = 2; preNum <= preAxis_; preNum++) {  // 前面已计算preNum = 1确保UB空间能容纳，因此preNum从2开始
-        int64_t updateSizeNPre = Ops::Base::CeilAlign(static_cast<int64_t>(indicesUbFactor_ * afterAxis_ * varTypeSize_), ubBlock) * preNum;
+    for (int64_t preNum = 2; preNum <= preAxis_; preNum++) { // 前面已计算preNum = 1确保UB空间能容纳，因此preNum从2开始
+        int64_t updateSizeNPre =
+            Ops::Base::CeilAlign(static_cast<int64_t>(indicesUbFactor_ * afterAxis_ * varTypeSize_), ubBlock) * preNum;
         int64_t tmpTotalSize = totalIndexSize + sortShareBufSize_ + updateSizeNPre + HASH_BUCKET_SIZE;
         if (tmpTotalSize > ubSize_) {
             normalUpdatesPreNum_ = preNum - 1;
@@ -171,10 +182,10 @@ ge::graphStatus MoeInplaceIndexAddSimtSortTiling::PostTiling()
     context_->SetScheduleMode(1);
     auto res = context_->SetLocalMemorySize(ubSize_);
     context_->SetBlockDim(usedCoreNum_);
-    MOE_OP_TILING_CHECK(
-        (res != ge::GRAPH_SUCCESS),
-        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "SetLocalMemorySize ubSize = %ld failed.", ubSize_),
-        return ge::GRAPH_FAILED);
+    MOE_OP_TILING_CHECK((res != ge::GRAPH_SUCCESS),
+                        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(),
+                                                            "SetLocalMemorySize ubSize = %ld failed.", ubSize_),
+                        return ge::GRAPH_FAILED);
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
     return ge::GRAPH_SUCCESS;
@@ -192,7 +203,6 @@ void MoeInplaceIndexAddSimtSortTiling::DumpTilingInfo()
     info << ", usedCoreNum: " << usedCoreNum_;
     OP_LOGD(context_->GetNodeName(), "%s", info.str().c_str());
 }
-
 
 void MoeInplaceIndexAddSimtSortTiling::SetTilingData()
 {
@@ -216,4 +226,4 @@ void MoeInplaceIndexAddSimtSortTiling::SetTilingData()
 }
 
 REGISTER_OPS_TILING_TEMPLATE(MoeInplaceIndexAdd, MoeInplaceIndexAddSimtSortTiling, 3);
-}  // namespace optiling
+} // namespace optiling

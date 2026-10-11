@@ -36,8 +36,8 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV4GetWorkspaceSize(
     uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /* @brief aclnnMoeFinalizeRoutingV4的第二段接口，用于执行计算。 */
-ACLNN_API aclnnStatus
-aclnnMoeFinalizeRoutingV4(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
+ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV4(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                                aclrtStream stream);
 
 #ifdef __cplusplus
 }

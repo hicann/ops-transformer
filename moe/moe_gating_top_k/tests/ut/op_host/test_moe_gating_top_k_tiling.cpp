@@ -36,12 +36,12 @@ protected:
     }
 };
 
-static string TilingData2Str(const gert::TilingData *tiling_data)
+static string TilingData2Str(const gert::TilingData* tiling_data)
 {
     auto data = tiling_data->GetData();
     string result;
     for (size_t i = 0; i < tiling_data->GetDataSize(); i += sizeof(int64_t)) {
-        result += std::to_string((reinterpret_cast<const int64_t *>(tiling_data->GetData())[i / sizeof(int64_t)]));
+        result += std::to_string((reinterpret_cast<const int64_t*>(tiling_data->GetData())[i / sizeof(int64_t)]));
         result += " ";
     }
 
@@ -674,7 +674,7 @@ TEST_F(MoeGatingTopKTiling, moe_gating_top_k_tiling_parse_succ_01)
     ASSERT_NE(opImpl, nullptr);
     ASSERT_NE(opImpl->tiling_parse, nullptr);
 
-    auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext *>(parseContext));
+    auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext*>(parseContext));
     EXPECT_EQ(ret, ge::GRAPH_SUCCESS);
 }
 

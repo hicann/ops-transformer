@@ -189,7 +189,7 @@ ExpandedScaleDesc GetExpandedScaleDesc(int64_t quantMode, int64_t totalLength, i
     }
 }
 
-gert::StorageShape MakeStorageShape(const std::vector<int64_t> &dims)
+gert::StorageShape MakeStorageShape(const std::vector<int64_t>& dims)
 {
     switch (dims.size()) {
         case 0:
@@ -205,14 +205,14 @@ gert::StorageShape MakeStorageShape(const std::vector<int64_t> &dims)
     }
 }
 
-void AppendOptionalInput(std::vector<gert::TilingContextPara::TensorDescription> &inputs,
-                         const std::vector<int64_t> &shape, ge::DataType dtype)
+void AppendOptionalInput(std::vector<gert::TilingContextPara::TensorDescription>& inputs,
+                         const std::vector<int64_t>& shape, ge::DataType dtype)
 {
     inputs.emplace_back(MakeStorageShape(shape), dtype, ge::FORMAT_ND);
 }
 
-void AppendOptionalOutput(std::vector<gert::TilingContextPara::TensorDescription> &outputs,
-                          const std::vector<int64_t> &shape, ge::DataType dtype)
+void AppendOptionalOutput(std::vector<gert::TilingContextPara::TensorDescription>& outputs,
+                          const std::vector<int64_t>& shape, ge::DataType dtype)
 {
     outputs.emplace_back(MakeStorageShape(shape), dtype, ge::FORMAT_ND);
 }
@@ -245,8 +245,8 @@ std::vector<int64_t> GetExpertTokensShape(int64_t expertTokensNumType, int64_t e
 }
 
 std::vector<gert::TilingContextPara::TensorDescription> BuildV4Inputs(
-    int64_t n, int64_t h, int64_t k, ge::DataType xDataType, const std::vector<int64_t> &scaleShape,
-    ge::DataType scaleDtype, const std::vector<int64_t> &offsetShape, ge::DataType offsetDtype, bool hasActiveNum,
+    int64_t n, int64_t h, int64_t k, ge::DataType xDataType, const std::vector<int64_t>& scaleShape,
+    ge::DataType scaleDtype, const std::vector<int64_t>& offsetShape, ge::DataType offsetDtype, bool hasActiveNum,
     int64_t activeNumVal, bool hasTopkWeight, int64_t totalLength)
 {
     std::vector<gert::TilingContextPara::TensorDescription> inputDesc;
@@ -268,8 +268,8 @@ std::vector<gert::TilingContextPara::TensorDescription> BuildV4Inputs(
 }
 
 std::vector<gert::TilingContextPara::TensorDescription> BuildV4Outputs(
-    int64_t totalLength, int64_t h, ge::DataType expandedXDtype, const std::vector<int64_t> &expertTokensShape,
-    const ExpandedScaleDesc &expandedScale, bool hasExpandedTopkWeight, int64_t n, int64_t k, int64_t dropPadMode,
+    int64_t totalLength, int64_t h, ge::DataType expandedXDtype, const std::vector<int64_t>& expertTokensShape,
+    const ExpandedScaleDesc& expandedScale, bool hasExpandedTopkWeight, int64_t n, int64_t k, int64_t dropPadMode,
     int64_t expertNum, int64_t expertCapacity)
 {
     std::vector<gert::TilingContextPara::TensorDescription> outputDesc;
@@ -294,7 +294,7 @@ std::vector<gert::TilingContextPara::TensorDescription> BuildV4Outputs(
 std::vector<gert::TilingContextPara::OpAttr> BuildV4Attrs(int64_t expertCapacity, int64_t expertNum,
                                                           int64_t dropPadMode, int64_t expertTokensNumType,
                                                           bool expertTokensNumFlag, int64_t quantMode,
-                                                          const std::vector<int64_t> &aciveExpertRange,
+                                                          const std::vector<int64_t>& aciveExpertRange,
                                                           int64_t rowIdxType)
 {
     return {
@@ -311,10 +311,10 @@ std::vector<gert::TilingContextPara::OpAttr> BuildV4Attrs(int64_t expertCapacity
 
 gert::TilingContextPara MakeV4TilingContextPara(
     int64_t n, int64_t h, int64_t k, int64_t expertCapacity, int64_t dropPadMode, int64_t expertTokensNumType,
-    bool expertTokensNumFlag, int64_t quantMode, ge::DataType xDataType, const std::vector<int64_t> &aciveExpertRange,
-    int64_t rowIdxType, const std::vector<int64_t> &scaleShape, ge::DataType scaleDtype,
-    const std::vector<int64_t> &offsetShape, ge::DataType offsetDtype, ge::DataType expandedXDtypeOverride,
-    bool hasActiveNum, int64_t activeNumVal, bool hasTopkWeight, optiling::MoeInitRoutingV3CompileInfo *compileInfo)
+    bool expertTokensNumFlag, int64_t quantMode, ge::DataType xDataType, const std::vector<int64_t>& aciveExpertRange,
+    int64_t rowIdxType, const std::vector<int64_t>& scaleShape, ge::DataType scaleDtype,
+    const std::vector<int64_t>& offsetShape, ge::DataType offsetDtype, ge::DataType expandedXDtypeOverride,
+    bool hasActiveNum, int64_t activeNumVal, bool hasTopkWeight, optiling::MoeInitRoutingV3CompileInfo* compileInfo)
 {
     int64_t expertNum = EXPERT_NUM;
     int64_t expertRange = aciveExpertRange[1] - aciveExpertRange[0];
@@ -335,8 +335,8 @@ gert::TilingContextPara MakeV4TilingContextPara(
 
 void RunV4Testcase(int64_t N, int64_t H, int64_t K, int64_t expertCapacity, int64_t dropPadMode,
                    int64_t expertTokensNumType, bool expertTokensNumFlag, int64_t quantMode, ge::DataType xDataType,
-                   std::vector<int64_t> aciveExpertRange, int64_t rowIdxType, const std::vector<int64_t> &scaleShape,
-                   ge::DataType scaleDtype, const std::vector<int64_t> &offsetShape, ge::DataType offsetDtype,
+                   std::vector<int64_t> aciveExpertRange, int64_t rowIdxType, const std::vector<int64_t>& scaleShape,
+                   ge::DataType scaleDtype, const std::vector<int64_t>& offsetShape, ge::DataType offsetDtype,
                    ge::DataType expandedXDtypeOverride, bool hasActiveNum, int64_t activeNumVal, bool hasTopkWeight,
                    ge::graphStatus expectResult, uint64_t expectTilingKey = SKIP_TILING_KEY_VALIDATION)
 {
@@ -368,7 +368,7 @@ struct V4TilingDataCase {
     int64_t expectedUseGatherCopy = -1;
 };
 
-void ExpectV4TilingData(const V4TilingDataCase &testCase)
+void ExpectV4TilingData(const V4TilingDataCase& testCase)
 {
     optiling::MoeInitRoutingV3CompileInfo compileInfo = {40, 262144, platform_ascendc::SocVersion::ASCEND950};
     gert::TilingContextPara tilingContextPara = MakeV4TilingContextPara(
@@ -380,7 +380,7 @@ void ExpectV4TilingData(const V4TilingDataCase &testCase)
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     ASSERT_GE(tilingInfo.tilingDataSize, sizeof(MoeInitRoutingV3Arch35TilingData));
-    const auto *tilingData = reinterpret_cast<const MoeInitRoutingV3Arch35TilingData *>(tilingInfo.tilingData.get());
+    const auto* tilingData = reinterpret_cast<const MoeInitRoutingV3Arch35TilingData*>(tilingInfo.tilingData.get());
 
     EXPECT_EQ(tilingInfo.tilingKey, testCase.expectedTilingKey);
     EXPECT_EQ(tilingData->coreNum, 40);

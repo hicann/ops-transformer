@@ -25,12 +25,11 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void moe_init_routing(
-    uint8_t* x, uint8_t* rowIdx, uint8_t* expertIdx, uint8_t* expandedX, uint8_t* expandedRowIdx,
-    uint8_t* expandedExpertIdx, uint8_t* workspace, uint8_t* tiling);
+extern "C" __global__ __aicore__ void moe_init_routing(uint8_t* x, uint8_t* rowIdx, uint8_t* expertIdx,
+                                                       uint8_t* expandedX, uint8_t* expandedRowIdx,
+                                                       uint8_t* expandedExpertIdx, uint8_t* workspace, uint8_t* tiling);
 
-class moe_init_routing_test : public testing::Test
-{
+class moe_init_routing_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -92,9 +91,8 @@ TEST_F(moe_init_routing_test, test_case_0)
     ReadFile(path + "/moe_init_routing_data/tiling.bin", tiling_FileSize, tiling, tiling_FileSize);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        moe_init_routing, blockDim, x, rowIdx, expertIdx, expandedX, expandedRowIdx, expandedExpertIdx, workspace,
-        tiling);
+    ICPU_RUN_KF(moe_init_routing, blockDim, x, rowIdx, expertIdx, expandedX, expandedRowIdx, expandedExpertIdx,
+                workspace, tiling);
     // WriteFile(path + "/moe_init_routing_data/out_0.bin", expandedX, expandedX_FileSize);
     // WriteFile(path + "/moe_init_routing_data/out_1.bin", expandedRowIdx, expandedRowIdx_FileSize);
     // WriteFile(path + "/moe_init_routing_data/out_2.bin", expandedExpertIdx, expandedExpertIdx_FileSize);
@@ -154,9 +152,8 @@ TEST_F(moe_init_routing_test, test_case_1)
     ReadFile(path + "/moe_init_routing_data/tiling.bin", tiling_FileSize, tiling, tiling_FileSize);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        moe_init_routing, blockDim, x, rowIdx, expertIdx, expandedX, expandedRowIdx, expandedExpertIdx, workspace,
-        tiling);
+    ICPU_RUN_KF(moe_init_routing, blockDim, x, rowIdx, expertIdx, expandedX, expandedRowIdx, expandedExpertIdx,
+                workspace, tiling);
     // WriteFile(path + "/moe_init_routing_data/out_0.bin", expandedX, expandedX_FileSize);
     // WriteFile(path + "/moe_init_routing_data/out_1.bin", expandedRowIdx, expandedRowIdx_FileSize);
     // WriteFile(path + "/moe_init_routing_data/out_2.bin", expandedExpertIdx, expandedExpertIdx_FileSize);
@@ -216,9 +213,8 @@ TEST_F(moe_init_routing_test, test_case_2)
     ReadFile(path + "/moe_init_routing_data/tiling.bin", tiling_FileSize, tiling, tiling_FileSize);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        moe_init_routing, blockDim, x, rowIdx, expertIdx, expandedX, expandedRowIdx, expandedExpertIdx, workspace,
-        tiling);
+    ICPU_RUN_KF(moe_init_routing, blockDim, x, rowIdx, expertIdx, expandedX, expandedRowIdx, expandedExpertIdx,
+                workspace, tiling);
     // WriteFile(path + "/moe_init_routing_data/out_0.bin", expandedX, expandedX_FileSize);
     // WriteFile(path + "/moe_init_routing_data/out_1.bin", expandedRowIdx, expandedRowIdx_FileSize);
     // WriteFile(path + "/moe_init_routing_data/out_2.bin", expandedExpertIdx, expandedExpertIdx_FileSize);
@@ -278,9 +274,8 @@ TEST_F(moe_init_routing_test, test_case_3)
     ReadFile(path + "/moe_init_routing_data/tiling.bin", tiling_FileSize, tiling, tiling_FileSize);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        moe_init_routing, blockDim, x, rowIdx, expertIdx, expandedX, expandedRowIdx, expandedExpertIdx, workspace,
-        tiling);
+    ICPU_RUN_KF(moe_init_routing, blockDim, x, rowIdx, expertIdx, expandedX, expandedRowIdx, expandedExpertIdx,
+                workspace, tiling);
     // WriteFile(path + "/moe_init_routing_data/out_0.bin", expandedX, expandedX_FileSize);
     // WriteFile(path + "/moe_init_routing_data/out_1.bin", expandedRowIdx, expandedRowIdx_FileSize);
     // WriteFile(path + "/moe_init_routing_data/out_2.bin", expandedExpertIdx, expandedExpertIdx_FileSize);

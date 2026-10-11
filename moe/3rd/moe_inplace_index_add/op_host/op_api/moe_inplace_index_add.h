@@ -18,9 +18,9 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *MoeInplaceIndexAddAiCore(const aclTensor *self, const int64_t dim, const aclTensor *index,
-                                          const aclTensor *source, const aclTensor *alphaTensor,
-                                          aclOpExecutor *executor);
+const aclTensor* MoeInplaceIndexAddAiCore(const aclTensor* self, const int64_t dim, const aclTensor* index,
+                                          const aclTensor* source, const aclTensor* alphaTensor,
+                                          aclOpExecutor* executor);
 }
 
 #endif

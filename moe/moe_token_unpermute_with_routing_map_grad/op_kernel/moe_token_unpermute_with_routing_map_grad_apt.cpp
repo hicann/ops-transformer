@@ -28,44 +28,41 @@ extern "C" __global__ __aicore__ void moe_token_unpermute_with_routing_map_grad(
     GET_TILING_DATA(tiling_data, tiling);
     if (TILING_KEY_IS(0)) {
         MoeTokenUnpermuteWithRoutingMapGradProbNoneDropPadFalse<DTYPE_PERMUTED_TOKENS, int32_t> op;
-        op.Init(
-            unpermuted_tokens_grad, out_index, permute_token_id, routing_map, permuted_tokens, probs,
-            permuted_tokens_grad, probs_grad, tiling_data);
+        op.Init(unpermuted_tokens_grad, out_index, permute_token_id, routing_map, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, tiling_data);
         op.Process();
     }
     if (TILING_KEY_IS(10)) {
         MoeTokenUnpermuteWithRoutingMapGradProbNoneDropPadTrue<DTYPE_PERMUTED_TOKENS, int32_t> op;
-        op.Init(
-            unpermuted_tokens_grad, out_index, permute_token_id, routing_map, permuted_tokens, probs,
-            permuted_tokens_grad, probs_grad, tiling_data);
+        op.Init(unpermuted_tokens_grad, out_index, permute_token_id, routing_map, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, tiling_data);
         op.Process();
     }
     if (TILING_KEY_IS(1)) {
-        MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadFalse<DTYPE_PERMUTED_TOKENS, int32_t, DTYPE_PERMUTED_TOKENS> op;
-        op.Init(
-            unpermuted_tokens_grad, out_index, permute_token_id, routing_map, permuted_tokens, probs,
-            permuted_tokens_grad, probs_grad, tiling_data);
+        MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadFalse<DTYPE_PERMUTED_TOKENS, int32_t,
+                                                                   DTYPE_PERMUTED_TOKENS>
+            op;
+        op.Init(unpermuted_tokens_grad, out_index, permute_token_id, routing_map, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, tiling_data);
         op.Process();
     }
     if (TILING_KEY_IS(11)) {
-        MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadTrue<DTYPE_PERMUTED_TOKENS, int32_t, DTYPE_PERMUTED_TOKENS> op;
-        op.Init(
-            unpermuted_tokens_grad, out_index, permute_token_id, routing_map, permuted_tokens, probs,
-            permuted_tokens_grad, probs_grad, tiling_data);
+        MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadTrue<DTYPE_PERMUTED_TOKENS, int32_t, DTYPE_PERMUTED_TOKENS>
+            op;
+        op.Init(unpermuted_tokens_grad, out_index, permute_token_id, routing_map, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, tiling_data);
         op.Process();
     }
     if (TILING_KEY_IS(101)) {
         MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadFalse<DTYPE_PERMUTED_TOKENS, int32_t, float> op;
-        op.Init(
-            unpermuted_tokens_grad, out_index, permute_token_id, routing_map, permuted_tokens, probs,
-            permuted_tokens_grad, probs_grad, tiling_data);
+        op.Init(unpermuted_tokens_grad, out_index, permute_token_id, routing_map, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, tiling_data);
         op.Process();
     }
     if (TILING_KEY_IS(111)) {
         MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadTrue<DTYPE_PERMUTED_TOKENS, int32_t, float> op;
-        op.Init(
-            unpermuted_tokens_grad, out_index, permute_token_id, routing_map, permuted_tokens, probs,
-            permuted_tokens_grad, probs_grad, tiling_data);
+        op.Init(unpermuted_tokens_grad, out_index, permute_token_id, routing_map, permuted_tokens, probs,
+                permuted_tokens_grad, probs_grad, tiling_data);
         op.Process();
     }
 }

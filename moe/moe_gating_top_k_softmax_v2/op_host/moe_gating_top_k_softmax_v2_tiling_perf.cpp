@@ -57,10 +57,10 @@ static uint32_t GenValuesMask(int64_t k)
     return mask;
 }
 
-class MoeGatingTopKSoftmaxV2PerfTiling : public MoeGatingTopKSoftmaxV2BaseTiling
-{
+class MoeGatingTopKSoftmaxV2PerfTiling : public MoeGatingTopKSoftmaxV2BaseTiling {
 public:
-    explicit MoeGatingTopKSoftmaxV2PerfTiling(gert::TilingContext* context) : MoeGatingTopKSoftmaxV2BaseTiling(context)
+    explicit MoeGatingTopKSoftmaxV2PerfTiling(gert::TilingContext* context)
+        : MoeGatingTopKSoftmaxV2BaseTiling(context)
     {}
 
 protected:
@@ -77,15 +77,14 @@ private:
     bool doubleBufferFlag;
     MoeGatingTopKSoftmaxV2PerfTilingData tilingData;
 
-    uint32_t calcMaxRowInUb(
-        const int64_t ubSize, const ge::DataType dtype, const uint32_t k, const uint32_t blockRow, const uint32_t col);
+    uint32_t calcMaxRowInUb(const int64_t ubSize, const ge::DataType dtype, const uint32_t k, const uint32_t blockRow,
+                            const uint32_t col);
 
-    bool isBufferSizeEnough(
-        const uint32_t curRowInUb, const uint32_t gatingAlignCol, const int64_t tmpUbSize, const ge::DataType dtype,
-        const uint32_t k);
+    bool isBufferSizeEnough(const uint32_t curRowInUb, const uint32_t gatingAlignCol, const int64_t tmpUbSize,
+                            const ge::DataType dtype, const uint32_t k);
 
-    bool getDoubleBufferFlag(
-        const uint32_t gatingAlignCol, const int64_t ubSize, const ge::DataType dtype, const uint32_t k);
+    bool getDoubleBufferFlag(const uint32_t gatingAlignCol, const int64_t ubSize, const ge::DataType dtype,
+                             const uint32_t k);
 };
 
 bool MoeGatingTopKSoftmaxV2PerfTiling::IsCapable()
@@ -103,8 +102,7 @@ ge::graphStatus MoeGatingTopKSoftmaxV2PerfTiling::DoOpTiling()
 {
     gatingAlignCol = calcGatingAlignCol(col, dtype);
     doubleBufferFlag = getDoubleBufferFlag(gatingAlignCol, ubSize, dtype, k);
-    maxRow = calcMaxRowInUb(ubSize, dtype, k, CeilDiv(row, coreNum)
-, gatingAlignCol);
+    maxRow = calcMaxRowInUb(ubSize, dtype, k, CeilDiv(row, coreNum), gatingAlignCol);
 
     tilingData.set_row(row);
     tilingData.set_col(col);
@@ -120,11 +118,11 @@ ge::graphStatus MoeGatingTopKSoftmaxV2PerfTiling::DoOpTiling()
     tilingData.set_colAlign(gatingAlignCol);
     tilingData.set_ubLoopOfFormerBlock(CeilDiv(tilingData.get_blockFormer(), maxRow));
     tilingData.set_ubFormer(maxRow);
-    tilingData.set_ubTailOfFormerBlock(
-        tilingData.get_blockFormer() - (tilingData.get_ubLoopOfFormerBlock() - 1) * tilingData.get_ubFormer());
+    tilingData.set_ubTailOfFormerBlock(tilingData.get_blockFormer() -
+                                       (tilingData.get_ubLoopOfFormerBlock() - 1) * tilingData.get_ubFormer());
     tilingData.set_ubLoopOfTailBlock(CeilDiv(tilingData.get_blockTail(), maxRow));
-    tilingData.set_ubTailOfTailBlock(
-        tilingData.get_blockTail() - (tilingData.get_ubLoopOfTailBlock() - 1) * tilingData.get_ubFormer());
+    tilingData.set_ubTailOfTailBlock(tilingData.get_blockTail() -
+                                     (tilingData.get_ubLoopOfTailBlock() - 1) * tilingData.get_ubFormer());
     if (renorm == 1) {
         tilingData.set_topKValuesMask(GenValuesMask(kAlign));
     } else {
@@ -168,16 +166,17 @@ ge::graphStatus MoeGatingTopKSoftmaxV2PerfTiling::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-bool MoeGatingTopKSoftmaxV2PerfTiling::getDoubleBufferFlag(
-    const uint32_t gatingAlignColLocal, const int64_t ubSizeLocal, const ge::DataType dtypeLocal, const uint32_t kLocal)
+bool MoeGatingTopKSoftmaxV2PerfTiling::getDoubleBufferFlag(const uint32_t gatingAlignColLocal,
+                                                           const int64_t ubSizeLocal, const ge::DataType dtypeLocal,
+                                                           const uint32_t kLocal)
 {
     // 判断一行的数据是否能搬进一半大小的ub空间
     return isBufferSizeEnough(1, gatingAlignColLocal, ubSizeLocal / SIZE_2, dtypeLocal, kLocal);
 }
 
-bool MoeGatingTopKSoftmaxV2PerfTiling::isBufferSizeEnough(
-    const uint32_t curRowInUb, const uint32_t gatingAlignColLocal, const int64_t tmpUbSize, const ge::DataType dtypeLocal,
-    const uint32_t kLocal)
+bool MoeGatingTopKSoftmaxV2PerfTiling::isBufferSizeEnough(const uint32_t curRowInUb, const uint32_t gatingAlignColLocal,
+                                                          const int64_t tmpUbSize, const ge::DataType dtypeLocal,
+                                                          const uint32_t kLocal)
 {
     (void)kLocal;
     // 1.搬入gating
@@ -204,8 +203,9 @@ bool MoeGatingTopKSoftmaxV2PerfTiling::isBufferSizeEnough(
     return true;
 }
 
-uint32_t MoeGatingTopKSoftmaxV2PerfTiling::calcMaxRowInUb(
-    const int64_t ubSizeLocal, const ge::DataType dtypeLocal, const uint32_t kLocal, const uint32_t blockRow, const uint32_t colLocal)
+uint32_t MoeGatingTopKSoftmaxV2PerfTiling::calcMaxRowInUb(const int64_t ubSizeLocal, const ge::DataType dtypeLocal,
+                                                          const uint32_t kLocal, const uint32_t blockRow,
+                                                          const uint32_t colLocal)
 {
     (void)colLocal;
     uint32_t ubOuter = 1;

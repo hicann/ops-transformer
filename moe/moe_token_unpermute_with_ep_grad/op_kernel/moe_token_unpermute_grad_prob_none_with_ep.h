@@ -26,7 +26,7 @@ public:
     __aicore__ inline MoeTokenUnpermuteGradProbNone(){};
     __aicore__ inline void Init(GM_ADDR permuted_tokens, GM_ADDR unpermuted_tokens_grad, GM_ADDR sorted_indices,
                                 GM_ADDR probs, GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
-                                const MoeTokenUnpermuteWithEpGradTilingData &tilingData);
+                                const MoeTokenUnpermuteWithEpGradTilingData& tilingData);
     __aicore__ inline void Process();
 
 protected:
@@ -40,7 +40,7 @@ protected:
 template <typename OriT, typename IdxT>
 __aicore__ inline void MoeTokenUnpermuteGradProbNone<OriT, IdxT>::Init(
     GM_ADDR permuted_tokens, GM_ADDR unpermuted_tokens_grad, GM_ADDR sorted_indices, GM_ADDR probs,
-    GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad, const MoeTokenUnpermuteWithEpGradTilingData &tilingData)
+    GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad, const MoeTokenUnpermuteWithEpGradTilingData& tilingData)
 {
     MoeTokenUnpermuteGradBase<OriT, IdxT>::Init(permuted_tokens, unpermuted_tokens_grad, sorted_indices, probs,
                                                 permuted_tokens_grad, probs_grad, tilingData);

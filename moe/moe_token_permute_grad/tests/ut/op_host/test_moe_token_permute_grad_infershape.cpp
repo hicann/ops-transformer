@@ -16,70 +16,75 @@
 #include "base/registry/op_impl_space_registry_v2.h"
 
 class MoeTokenPermuteGrad : public testing::Test {
- protected:
-  static void SetUpTestCase() {
-    std::cout << "MoeTokenPermuteGrad Proto Test SetUp" << std::endl;
-  }
+protected:
+    static void SetUpTestCase()
+    {
+        std::cout << "MoeTokenPermuteGrad Proto Test SetUp" << std::endl;
+    }
 
-  static void TearDownTestCase() {
-    std::cout << "MoeTokenPermuteGrad Proto Test TearDown" << std::endl;
-  }
+    static void TearDownTestCase()
+    {
+        std::cout << "MoeTokenPermuteGrad Proto Test TearDown" << std::endl;
+    }
 };
 
 TEST_F(MoeTokenPermuteGrad, infershape_bf16)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenPermuteGrad",
-    { // input info
-        {{{49152, 5120}, {49152, 5120}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{49152}, {49152}}, ge::DT_INT32, ge::FORMAT_ND}
-    }, 
-    { // output info
-        {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
-    }, 
-    { // attr
-        {"num_topk",Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-        {"padded_mode",Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-    }
-    );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{6144, 5120},};
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenPermuteGrad",
+        {// input info
+         {{{49152, 5120}, {49152, 5120}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{49152}, {49152}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {
+            // output info
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+        },
+        {
+            // attr
+            {"num_topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+            {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        });
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {6144, 5120},
+    };
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeTokenPermuteGrad, infershape_fp16)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenPermuteGrad",
-    {
-        {{{49152, 5120}, {49152, 5120}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{49152}, {49152}}, ge::DT_INT32, ge::FORMAT_ND}
-    },
-    {
-        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-    },
-    {
-        {"num_topk",Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-        {"padded_mode",Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-    }
-    );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{6144, 5120},};
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenPermuteGrad",
+        {{{{49152, 5120}, {49152, 5120}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{49152}, {49152}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            {"num_topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+            {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        });
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {6144, 5120},
+    };
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeTokenPermuteGrad, infershape_fp32)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenPermuteGrad",
-    {
-        {{{49152, 5120}, {49152, 5120}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{49152}, {49152}}, ge::DT_INT32, ge::FORMAT_ND}
-    },
-    {
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-    },
-    {
-        {"num_topk",Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-        {"padded_mode",Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-    }
-    );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{6144, 5120},};
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenPermuteGrad",
+        {{{{49152, 5120}, {49152, 5120}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{49152}, {49152}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"num_topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+            {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        });
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {6144, 5120},
+    };
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 

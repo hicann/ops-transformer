@@ -17,6 +17,8 @@ from atk.configs.results_config import TaskResult
 
 from atk.tasks.api_execute import register
 from atk.tasks.api_execute.base_api import BaseApi
+
+
 def permute(tokens, indices, num_out_tokens: int = None, padded_mode: bool = False):
     if padded_mode:
         return permute_with_padded_tokens(tokens, indices)
@@ -46,7 +48,6 @@ class FunctionApi(BaseApi):
         self.token = None
 
     def __call__(self, input_data: InputDataset, with_output: bool = False):
-
         def permute_with_padded_tokens(tokens, indices):
             permuted_tokens = tokens.index_select(dim=0, index=indices.view(-1))
             return permuted_tokens, indices
@@ -54,35 +55,51 @@ class FunctionApi(BaseApi):
         if self.device == "npu":
             device = f"{self.device}:{self.device_id}"
             from mindspeed.ops.npu_moe_token_permute import npu_moe_token_permute
+
             input_data.kwargs["tokens"].requires_grad_(True)
-            permuted_tokens, sorted_indices = npu_moe_token_permute(input_data.kwargs["tokens"],
-                                                                    input_data.kwargs["indices"],
-                                                                    self.numOutTokensOptional,
-                                                                    input_data.kwargs["paddedModeOptional"])
-            permuted_tokens.backward(torch.ones(permuted_tokens.shape).to(torch.bfloat16).npu())
+            permuted_tokens, sorted_indices = npu_moe_token_permute(
+                input_data.kwargs["tokens"],
+                input_data.kwargs["indices"],
+                self.numOutTokensOptional,
+                input_data.kwargs["paddedModeOptional"],
+            )
+            permuted_tokens.backward(
+                torch.ones(permuted_tokens.shape).to(torch.bfloat16).npu()
+            )
             out = input_data.kwargs["tokens"].grad
             return out
 
         else:
             device = "cpu"
             self.token.requires_grad_(True)
-            permuted_tokens, sorted_indices = permute(self.token, self.index,
-                                                      self.numOutTokensOptional,
-                                                      input_data.kwargs["paddedModeOptional"])
+            permuted_tokens, sorted_indices = permute(
+                self.token,
+                self.index,
+                self.numOutTokensOptional,
+                input_data.kwargs["paddedModeOptional"],
+            )
             permute_bwd_input = torch.ones(permuted_tokens.shape)
             print(permute_bwd_input.dtype)
             permuted_tokens.backward(permute_bwd_input)
             out = self.token.grad
             return out
+
     def init_by_input_data(self, input_data: InputDataset):
-        self.token = input_data.kwargs["tokens"] 
-        tmp,indice = permute(input_data.kwargs["tokens"], input_data.kwargs["indices"],
-                                               input_data.kwargs["numOutTokensOptional"],
-                                               input_data.kwargs["paddedModeOptional"])
+        self.token = input_data.kwargs["tokens"]
+        tmp, indice = permute(
+            input_data.kwargs["tokens"],
+            input_data.kwargs["indices"],
+            input_data.kwargs["numOutTokensOptional"],
+            input_data.kwargs["paddedModeOptional"],
+        )
         self.index = input_data.kwargs["indices"]
 
         input_data.kwargs["indices"] = indice.to(torch.int32)
-        input_data.kwargs["tokens"] = torch.ones(tmp.shape).to(torch.bfloat16).to(input_data.kwargs["tokens"].device)                         
+        input_data.kwargs["tokens"] = (
+            torch.ones(tmp.shape)
+            .to(torch.bfloat16)
+            .to(input_data.kwargs["tokens"].device)
+        )
         self.numOutTokensOptional = input_data.kwargs["numOutTokensOptional"]
         input_data.kwargs["numOutTokensOptional"] = 1
         if len(self.index.shape) == 2:

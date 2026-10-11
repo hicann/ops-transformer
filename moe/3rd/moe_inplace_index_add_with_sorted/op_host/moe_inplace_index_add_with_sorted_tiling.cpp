@@ -54,25 +54,24 @@ const int32_t BLOCK_SIZE = 32;
 const int64_t UB_INDEX_NUM = 1536;
 const int64_t INDEX_BUFFER_SIZE = UB_INDEX_NUM * 2 * SIZE_OF_INT32;
 const int64_t RESERVED_BUFFER_SIZE = 1024;
-static const std::map<int32_t, int32_t> DTYPE_BUF_CNT_MAP = {
-    {FLOAT32_TILING_KEY, BUF_CNT_2},
-    {FLOAT16_TILING_KEY, BUF_CNT_7},
-    {BF16_TILING_KEY, BUF_CNT_7},
-    {INT16_TILING_KEY, BUF_CNT_2},
-    {INT32_TILING_KEY, BUF_CNT_2},
-    {FLOAT32_FIX_TILING_KEY, BUF_CNT_3},
-    {FLOAT32_OTHER_DIM_TILING_KEY, BUF_CNT_2},
-    {FLOAT16_OTHER_DIM_TILING_KEY, BUF_CNT_6},
-    {BF16_OTHER_DIM_TILING_KEY, BUF_CNT_6},
-    {INT16_OTHER_DIM_TILING_KEY, BUF_CNT_2},
-    {INT32_OTHER_DIM_TILING_KEY, BUF_CNT_2}};
+static const std::map<int32_t, int32_t> DTYPE_BUF_CNT_MAP = {{FLOAT32_TILING_KEY, BUF_CNT_2},
+                                                             {FLOAT16_TILING_KEY, BUF_CNT_7},
+                                                             {BF16_TILING_KEY, BUF_CNT_7},
+                                                             {INT16_TILING_KEY, BUF_CNT_2},
+                                                             {INT32_TILING_KEY, BUF_CNT_2},
+                                                             {FLOAT32_FIX_TILING_KEY, BUF_CNT_3},
+                                                             {FLOAT32_OTHER_DIM_TILING_KEY, BUF_CNT_2},
+                                                             {FLOAT16_OTHER_DIM_TILING_KEY, BUF_CNT_6},
+                                                             {BF16_OTHER_DIM_TILING_KEY, BUF_CNT_6},
+                                                             {INT16_OTHER_DIM_TILING_KEY, BUF_CNT_2},
+                                                             {INT32_OTHER_DIM_TILING_KEY, BUF_CNT_2}};
 } // namespace
 
 namespace optiling {
-class MoeInplaceIndexAddWithSortedTiling
-{
+class MoeInplaceIndexAddWithSortedTiling {
 public:
-    explicit MoeInplaceIndexAddWithSortedTiling(gert::TilingContext* context) : tilingContext(context){};
+    explicit MoeInplaceIndexAddWithSortedTiling(gert::TilingContext* context)
+        : tilingContext(context) {};
     ge::graphStatus Init();
     ge::graphStatus RunKernelTiling();
 
@@ -302,8 +301,8 @@ void MoeInplaceIndexAddWithSortedTiling::TilingDataSet()
 
     tilingContext->SetBlockDim(usedCoreNum);
     tilingContext->SetTilingKey(static_cast<uint64_t>(tilingKey));
-    tilingData.SaveToBuffer(
-        tilingContext->GetRawTilingData()->GetData(), tilingContext->GetRawTilingData()->GetCapacity());
+    tilingData.SaveToBuffer(tilingContext->GetRawTilingData()->GetData(),
+                            tilingContext->GetRawTilingData()->GetCapacity());
     tilingContext->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
     size_t* currentWorkspace = tilingContext->GetWorkspaceSizes(1);
     currentWorkspace[0] = workspaceSize;
@@ -358,8 +357,8 @@ ge::graphStatus TilingPrepareForMoeInplaceIndexAddWithSorted(gert::TilingParseCo
     uint64_t ubSizePlatForm;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
     compileInfo->ubSizePlatForm = static_cast<int64_t>(ubSizePlatForm);
-    OP_CHECK_IF(
-        (compileInfo->ubSizePlatForm <= 0), OP_LOGE(context, "Failed to get ub size."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF((compileInfo->ubSizePlatForm <= 0), OP_LOGE(context, "Failed to get ub size."),
+                return ge::GRAPH_FAILED);
     OP_LOGD(context, "ub_size_platform is %lu.", compileInfo->ubSizePlatForm);
     uint64_t totalUbSize = 0;
     platformInfo->GetLocalMemSize(fe::LocalMemType::UB, totalUbSize);

@@ -16,7 +16,7 @@
 #include "register/register.h"
 
 namespace domi {
-static Status ParseParamsMoeFinalizeRoutingV2(const ge::Operator &op_src, ge::Operator &op_dest)
+static Status ParseParamsMoeFinalizeRoutingV2(const ge::Operator& op_src, ge::Operator& op_dest)
 {
     int64_t parsed_value = 0;
     ge::AscendString attributes;
@@ -31,11 +31,11 @@ static Status ParseParamsMoeFinalizeRoutingV2(const ge::Operator &op_src, ge::Op
                 return FAILED;
             }
             if (root.contains("attribute")) {
-                const auto &attrs = root.at("attribute");
+                const auto& attrs = root.at("attribute");
                 if (!attrs.is_array()) {
                     return FAILED;
                 }
-                for (const auto &attr : attrs) {
+                for (const auto& attr : attrs) {
                     if (!attr.is_object()) {
                         return FAILED;
                     }
@@ -48,7 +48,7 @@ static Status ParseParamsMoeFinalizeRoutingV2(const ge::Operator &op_src, ge::Op
                         parsed_value = 0;
                         continue;
                     }
-                    const auto &value = attr.at("i");
+                    const auto& value = attr.at("i");
                     if (!value.is_number_integer() ||
                         (value.is_number_unsigned() &&
                          value.get<uint64_t>() > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))) {
@@ -57,7 +57,7 @@ static Status ParseParamsMoeFinalizeRoutingV2(const ge::Operator &op_src, ge::Op
                     parsed_value = value.get<int64_t>();
                 }
             }
-        } catch (const nlohmann::json::exception &) {
+        } catch (const nlohmann::json::exception&) {
             return FAILED;
         }
     }

@@ -16,7 +16,6 @@
 #include "log/log.h"
 #include "platform/platform_info.h"
 
-
 using namespace ge;
 namespace ops {
 static constexpr size_t DIM_ONE = 1;
@@ -37,9 +36,8 @@ static bool isSameDim(int64_t dim1, int64_t dim2)
     return dim1 == dim2;
 }
 
-static ge::graphStatus CheckInputShape(
-    const gert::InferShapeContext* context, const gert::Shape* xShape, const gert::Shape* rowIdxShape,
-    const gert::Shape* expertIdxShape)
+static ge::graphStatus CheckInputShape(const gert::InferShapeContext* context, const gert::Shape* xShape,
+                                       const gert::Shape* rowIdxShape, const gert::Shape* expertIdxShape)
 {
     int64_t x_n = xShape->GetDimNum() == 1U ? NEG_ONE : xShape->GetDim(0);
     int64_t cols = xShape->GetDimNum() == 1U ? NEG_ONE : xShape->GetDim(DIM_ONE);
@@ -51,74 +49,70 @@ static ge::graphStatus CheckInputShape(
     int64_t row_idx_n = rowIdxShape->GetDimNum() == 1U ? NEG_ONE : rowIdxShape->GetDim(0);
     int64_t row_idx_k = rowIdxShape->GetDimNum() == 1U ? NEG_ONE : rowIdxShape->GetDim(DIM_ONE);
     if (row_idx_n < NEG_ONE || row_idx_k < NEG_ONE) {
-        OP_LOGE(context->GetNodeName(), "Invalid row_idx shape, shape is %s.", Ops::Base::ToString(*rowIdxShape).c_str());
+        OP_LOGE(context->GetNodeName(), "Invalid row_idx shape, shape is %s.",
+                Ops::Base::ToString(*rowIdxShape).c_str());
         return ge::GRAPH_FAILED;
     }
 
     int64_t expert_idx_n = expertIdxShape->GetDimNum() == 1U ? NEG_ONE : expertIdxShape->GetDim(0);
     int64_t expert_idx_k = expertIdxShape->GetDimNum() == 1U ? NEG_ONE : expertIdxShape->GetDim(DIM_ONE);
     if (expert_idx_n < NEG_ONE || expert_idx_k < NEG_ONE) {
-        OP_LOGE(
-            context->GetNodeName(), "Invalid expert_idx shape, shape is %s.",
-            Ops::Base::ToString(*expertIdxShape).c_str());
+        OP_LOGE(context->GetNodeName(), "Invalid expert_idx shape, shape is %s.",
+                Ops::Base::ToString(*expertIdxShape).c_str());
         return ge::GRAPH_FAILED;
     }
 
     if (!isSameDim(x_n, row_idx_n) || !isSameDim(x_n, expert_idx_n) || !isSameDim(row_idx_n, expert_idx_n)) {
-        OP_LOGE(context->GetNodeName(), "Invalid input shape, the first dim of x, row_idx and expert_idx should be same.");
+        OP_LOGE(context->GetNodeName(),
+                "Invalid input shape, the first dim of x, row_idx and expert_idx should be same.");
         return ge::GRAPH_FAILED;
     }
 
     if (!isSameDim(row_idx_k, expert_idx_k)) {
-        OP_LOGE(context->GetNodeName(), "Invalid input shape, the second dim of row_idx and expert_idx should be same.");
+        OP_LOGE(context->GetNodeName(),
+                "Invalid input shape, the second dim of row_idx and expert_idx should be same.");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckInputDimsAndAttr(
-    const gert::InferShapeContext* context, const gert::Shape* xShape, const gert::Shape* rowIdxShape,
-    const gert::Shape* expertIdxShape, const int64_t activeNum)
+static ge::graphStatus CheckInputDimsAndAttr(const gert::InferShapeContext* context, const gert::Shape* xShape,
+                                             const gert::Shape* rowIdxShape, const gert::Shape* expertIdxShape,
+                                             const int64_t activeNum)
 {
     if (xShape->GetDimNum() == 1U) {
         if (xShape->GetDim(0) != ge::UNKNOWN_DIM_NUM) {
-            OP_LOGE(
-                context->GetNodeName(), "The dynamic dim of x should be -2, current is %s.",
-                Ops::Base::ToString(*xShape).c_str());
+            OP_LOGE(context->GetNodeName(), "The dynamic dim of x should be -2, current is %s.",
+                    Ops::Base::ToString(*xShape).c_str());
             return ge::GRAPH_FAILED;
         }
     } else if (xShape->GetDimNum() != DIM_TWO) {
-        OP_LOGE(
-            context->GetNodeName(), "The dim of x should be 2 or dynamic, current is %s.",
-            Ops::Base::ToString(*xShape).c_str());
+        OP_LOGE(context->GetNodeName(), "The dim of x should be 2 or dynamic, current is %s.",
+                Ops::Base::ToString(*xShape).c_str());
         return ge::GRAPH_FAILED;
     }
 
     if (rowIdxShape->GetDimNum() == 1U) {
         if (rowIdxShape->GetDim(0) != ge::UNKNOWN_DIM_NUM) {
-            OP_LOGE(
-                context->GetNodeName(), "The dynamic dim of row_idx should be -2, current is %s.",
-                Ops::Base::ToString(*rowIdxShape).c_str());
+            OP_LOGE(context->GetNodeName(), "The dynamic dim of row_idx should be -2, current is %s.",
+                    Ops::Base::ToString(*rowIdxShape).c_str());
             return ge::GRAPH_FAILED;
         }
     } else if (rowIdxShape->GetDimNum() != DIM_TWO) {
-        OP_LOGE(
-            context->GetNodeName(), "The dim of row_idx should be 2 or dynamic, current is %s.",
-            Ops::Base::ToString(*rowIdxShape).c_str());
+        OP_LOGE(context->GetNodeName(), "The dim of row_idx should be 2 or dynamic, current is %s.",
+                Ops::Base::ToString(*rowIdxShape).c_str());
         return ge::GRAPH_FAILED;
     }
 
     if (expertIdxShape->GetDimNum() == 1U) {
         if (expertIdxShape->GetDim(0) != ge::UNKNOWN_DIM_NUM) {
-            OP_LOGE(
-                context->GetNodeName(), "The dynamic dim of expert_idx should be -2, current is %s.",
-                Ops::Base::ToString(*expertIdxShape).c_str());
+            OP_LOGE(context->GetNodeName(), "The dynamic dim of expert_idx should be -2, current is %s.",
+                    Ops::Base::ToString(*expertIdxShape).c_str());
             return ge::GRAPH_FAILED;
         }
     } else if (expertIdxShape->GetDimNum() != DIM_TWO) {
-        OP_LOGE(
-            context->GetNodeName(), "The dim of expert_idx should be 2 or dynamic, current is %s.",
-            Ops::Base::ToString(*expertIdxShape).c_str());
+        OP_LOGE(context->GetNodeName(), "The dim of expert_idx should be 2 or dynamic, current is %s.",
+                Ops::Base::ToString(*expertIdxShape).c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -130,9 +124,9 @@ static ge::graphStatus CheckInputDimsAndAttr(
     return ge::GRAPH_SUCCESS;
 }
 
-static void ShowInputShapeInfo(
-    const gert::InferShapeContext* context, const gert::Shape* xShape, const gert::Shape* rowIdxShape,
-    const gert::Shape* expertIdxShape, const int64_t activeNum)
+static void ShowInputShapeInfo(const gert::InferShapeContext* context, const gert::Shape* xShape,
+                               const gert::Shape* rowIdxShape, const gert::Shape* expertIdxShape,
+                               const int64_t activeNum)
 {
     OP_LOGD(context->GetNodeName(), "x's shape is: %s.", Ops::Base::ToString(*xShape).c_str());
     OP_LOGD(context->GetNodeName(), "row_idx's shape is: %s.", Ops::Base::ToString(*rowIdxShape).c_str());
@@ -140,18 +134,15 @@ static void ShowInputShapeInfo(
     OP_LOGD(context->GetNodeName(), "activeNum is: %ld.", activeNum);
 }
 
-static void ShowOutputShapeInfo(
-    const gert::InferShapeContext* context, const gert::Shape* expandedXShape, const gert::Shape* expandedRowIdx,
-    const gert::Shape* expandedExpertIdxShape)
+static void ShowOutputShapeInfo(const gert::InferShapeContext* context, const gert::Shape* expandedXShape,
+                                const gert::Shape* expandedRowIdx, const gert::Shape* expandedExpertIdxShape)
 {
-    OP_LOGD(
-        context->GetNodeName(), "expanded_x's shape is: %s after infershape.", Ops::Base::ToString(*expandedXShape).c_str());
-    OP_LOGD(
-        context->GetNodeName(), "expanded_row_idx's shape is: %s after infershape.",
-        Ops::Base::ToString(*expandedRowIdx).c_str());
-    OP_LOGD(
-        context->GetNodeName(), "expanded_expert_idx's shape is: %s after infershape.",
-        Ops::Base::ToString(*expandedExpertIdxShape).c_str());
+    OP_LOGD(context->GetNodeName(), "expanded_x's shape is: %s after infershape.",
+            Ops::Base::ToString(*expandedXShape).c_str());
+    OP_LOGD(context->GetNodeName(), "expanded_row_idx's shape is: %s after infershape.",
+            Ops::Base::ToString(*expandedRowIdx).c_str());
+    OP_LOGD(context->GetNodeName(), "expanded_expert_idx's shape is: %s after infershape.",
+            Ops::Base::ToString(*expandedExpertIdxShape).c_str());
 }
 
 static ge::graphStatus InferShape4MoeInitRoutingQuant(gert::InferShapeContext* context)

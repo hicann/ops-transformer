@@ -73,7 +73,7 @@ using namespace MoeInplaceIndexAdd;
 
 template <typename VAR_T, typename IDX_T, bool IS_CONTIGUOUS>
 __aicore__ inline void MoeInplaceIndexAddSimdSortCast(GM_ADDR var, GM_ADDR indices, GM_ADDR updates, GM_ADDR alpha,
-                                                      GM_ADDR var_out, GM_ADDR userWS, GM_ADDR tiling, TPipe &pipe)
+                                                      GM_ADDR var_out, GM_ADDR userWS, GM_ADDR tiling, TPipe& pipe)
 {
     GET_TILING_DATA_WITH_STRUCT(MoeInplaceIndexAddSimdSortTilingData, tilingData, tiling);
     uint32_t cast_mode = tilingData.indicesCastMode;
@@ -106,7 +106,7 @@ __aicore__ inline void MoeInplaceIndexAddSimdSortCast(GM_ADDR var, GM_ADDR indic
 
 template <typename VAR_T, typename IDX_T, typename COMP_T, bool WITH_ALPHA, bool IS_CONTIGUOUS>
 __aicore__ inline void MoeInplaceIndexAddSimtSortCast(GM_ADDR var, GM_ADDR indices, GM_ADDR updates, GM_ADDR alpha,
-                                                      GM_ADDR var_out, GM_ADDR userWS, GM_ADDR tiling, TPipe &pipe)
+                                                      GM_ADDR var_out, GM_ADDR userWS, GM_ADDR tiling, TPipe& pipe)
 {
     GET_TILING_DATA_WITH_STRUCT(MoeInplaceIndexAddSimtSortTilingData, tilingData, tiling);
     uint32_t cast_mode = tilingData.indicesCastMode;

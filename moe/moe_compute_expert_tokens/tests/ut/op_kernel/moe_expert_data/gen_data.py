@@ -20,8 +20,8 @@ warnings.filterwarnings("ignore")
 
 
 def compute_total_rows_before_expert(
-        sorted_experts:np.ndarray, 
-        num_experts: int) -> np.ndarray:
+    sorted_experts: np.ndarray, num_experts: int
+) -> np.ndarray:
     arr_length = sorted_experts.shape[-1]
     res = np.arange(num_experts)
     for i in range(num_experts):
@@ -51,9 +51,7 @@ def general_input_data(sorted_expert_len, experts_num):
 
 def gen_golden_data_simple(BSK_len, num_expert):
     sorted_experts, num_experts = general_input_data(BSK_len, num_expert)
-    result = compute_total_rows_before_expert(
-        sorted_experts, num_experts
-    )
+    result = compute_total_rows_before_expert(sorted_experts, num_experts)
     sorted_experts.astype(np.int32).tofile("./sorted_experts.bin")
     np.array(num_experts).astype(np.int32).tofile("./num_experts.bin")
     result.astype(np.int32).tofile("./output_golden.bin")
@@ -61,5 +59,3 @@ def gen_golden_data_simple(BSK_len, num_expert):
 
 if __name__ == "__main__":
     gen_golden_data_simple(sys.argv[1], sys.argv[2])
-
-

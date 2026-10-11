@@ -36,7 +36,7 @@ public:
     }
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR y, GM_ADDR expertIdx, GM_ADDR rowIdx, GM_ADDR workspace,
-                                const MoeGatingTopKSoftmax310PTilingData &tilingData, AscendC::TPipe *pipeIn,
+                                const MoeGatingTopKSoftmax310PTilingData& tilingData, AscendC::TPipe* pipeIn,
                                 int32_t count)
     {
         counter = count;
@@ -50,20 +50,19 @@ public:
         gmXOffset_ = oneCoreRow_ * numCol_; // input data offset
         gmYOffset_ = oneCoreRow_ * k_;      //* numCol_;
         gmExpertIdxOffset_ = oneCoreRow_ * k_;
-        gmX_.SetGlobalBuffer((__gm__ T1 *)x + GetBlock() * gmXOffset_, gmXOffset_);
-        gmY_.SetGlobalBuffer((__gm__ T1 *)y + GetBlock() * gmYOffset_, gmYOffset_);
-        gmExpertIdx_.SetGlobalBuffer((__gm__ T2 *)expertIdx + GetBlock() * gmExpertIdxOffset_, gmExpertIdxOffset_);
-        gmRowIdx_.SetGlobalBuffer((__gm__ T2 *)rowIdx + GetBlock() * gmExpertIdxOffset_, gmExpertIdxOffset_);
+        gmX_.SetGlobalBuffer((__gm__ T1*)x + GetBlock() * gmXOffset_, gmXOffset_);
+        gmY_.SetGlobalBuffer((__gm__ T1*)y + GetBlock() * gmYOffset_, gmYOffset_);
+        gmExpertIdx_.SetGlobalBuffer((__gm__ T2*)expertIdx + GetBlock() * gmExpertIdxOffset_, gmExpertIdxOffset_);
+        gmRowIdx_.SetGlobalBuffer((__gm__ T2*)rowIdx + GetBlock() * gmExpertIdxOffset_, gmExpertIdxOffset_);
 
-        gmSync_.SetGlobalBuffer((__gm__ int32_t *)workspace, WorkspaceSize);
-        gmYTmp_.SetGlobalBuffer(
-            (__gm__ T1 *)workspace + WorkspaceSize / sizeof(T1) + GetBlock() * oneCoreRow_ * kAlign_,
-            rowWork_ * kAlign_);
-        gmExpertTmp_.SetGlobalBuffer((__gm__ T2 *)workspace + WorkspaceSize / sizeof(T2) +
+        gmSync_.SetGlobalBuffer((__gm__ int32_t*)workspace, WorkspaceSize);
+        gmYTmp_.SetGlobalBuffer((__gm__ T1*)workspace + WorkspaceSize / sizeof(T1) + GetBlock() * oneCoreRow_ * kAlign_,
+                                rowWork_ * kAlign_);
+        gmExpertTmp_.SetGlobalBuffer((__gm__ T2*)workspace + WorkspaceSize / sizeof(T2) +
                                          numRow_ * kAlign_ * sizeof(T1) / sizeof(T2) +
                                          GetBlock() * oneCoreRow_ * kAlign_,
                                      rowWork_ * kAlign_);
-        gmRowTmp_.SetGlobalBuffer((__gm__ T2 *)workspace + WorkspaceSize / sizeof(T2) +
+        gmRowTmp_.SetGlobalBuffer((__gm__ T2*)workspace + WorkspaceSize / sizeof(T2) +
                                       numRow_ * kAlign_ * sizeof(T1) / sizeof(T2) + GetBlock() * oneCoreRow_ * kAlign_ +
                                       rowWork_ * kAlign_,
                                   rowWork_ * kAlign_);
@@ -86,7 +85,7 @@ public:
         syncLT = syncIn.Get<int32_t>();
     }
 
-    __aicore__ inline void ParesTiling(const MoeGatingTopKSoftmax310PTilingData *__restrict tilingData)
+    __aicore__ inline void ParesTiling(const MoeGatingTopKSoftmax310PTilingData* __restrict tilingData)
     {
         tilingKey = tilingData->tilingKey;
         numRow_ = tilingData->row;
@@ -143,13 +142,13 @@ public:
         softmaxShapeInfoData.srcM = rowWork_;
         softmaxShapeInfoData.oriSrcK = numCol_;
         softmaxShapeInfoData.oriSrcM = rowWork_;
-        SoftMaxTiling *softmaxTilingData =
+        SoftMaxTiling* softmaxTilingData =
             (GetBlock() < activateCore_ - 1) ? &FormerSoftmaxTilingData : &TailSoftmaxTilingData;
         TopKInfo topkInfo;
         topkInfo.outter = rowWork_;
         topkInfo.inner = numCol_;
         topkInfo.n = numCol_;
-        TopkTiling *TopkTilingData = (GetBlock() < activateCore_ - 1) ? &FormerTopkTilingData : &TailTopkTilingData;
+        TopkTiling* TopkTilingData = (GetBlock() < activateCore_ - 1) ? &FormerTopkTilingData : &TailTopkTilingData;
         AscendC::LocalTensor<T1> sumTmpLT = tmpLT;
         AscendC::LocalTensor<T1> maxTmpLT = sumTmpLT[oneCoreRow_ * FP16_PER_REPEAT];
         AscendC::LocalTensor<T1> softmaxTmpLT = maxTmpLT[oneCoreRow_ * FP16_PER_REPEAT];
@@ -194,7 +193,7 @@ public:
     }
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     AscendC::TBuf<AscendC::TPosition::VECCALC> bufUb_;
     AscendC::TBuf<AscendC::TPosition::VECCALC> syncIn;
     AscendC::GlobalTensor<T1> gmX_;

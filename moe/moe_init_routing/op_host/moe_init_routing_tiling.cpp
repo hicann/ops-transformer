@@ -41,10 +41,10 @@ inline static int64_t CeilLog4(int64_t x)
     return static_cast<int64_t>(std::ceil(std::log(x) / std::log(NUM_FOUR)));
 }
 
-class MoeInitRountingTilingBase : public TilingBaseClass
-{
+class MoeInitRountingTilingBase : public TilingBaseClass {
 public:
-    explicit MoeInitRountingTilingBase(gert::TilingContext* context) : TilingBaseClass(context)
+    explicit MoeInitRountingTilingBase(gert::TilingContext* context)
+        : TilingBaseClass(context)
     {
         Reset();
     }
@@ -115,9 +115,8 @@ void MoeInitRountingTilingBase::Reset()
 ge::graphStatus MoeInitRountingTilingBase::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
-    OP_CHECK_IF(
-        platformInfo == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "platform_info"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "platform_info"),
+                return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     aivNum = ascendcPlatform.GetCoreNumAiv();
     aicoreParams_.numBlocks = aivNum;
@@ -142,54 +141,54 @@ ge::graphStatus MoeInitRountingTilingBase::CheckOutShape()
     size_t expandedXDimNnum = expandedXShape.GetDimNum();
     if (expandedXDimNnum != DIM_TWO) {
         std::string expandedXDimNumStr = std::to_string(expandedXDimNnum);
-        OP_LOGE_FOR_INVALID_SHAPEDIM(
-            context_->GetNodeName(), "expanded_x", expandedXDimNumStr.c_str(), "2D");
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "expanded_x", expandedXDimNumStr.c_str(), "2D");
         return ge::GRAPH_FAILED;
     }
 
     size_t expandedRowIdxDimNnum = expandedRowIdxShape.GetDimNum();
     if (expandedRowIdxDimNnum != DIM_ONE) {
         std::string expandedRowIdxDimNumStr = std::to_string(expandedRowIdxDimNnum);
-        OP_LOGE_FOR_INVALID_SHAPEDIM(
-            context_->GetNodeName(), "expanded_row_idx", expandedRowIdxDimNumStr.c_str(), "1D");
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "expanded_row_idx", expandedRowIdxDimNumStr.c_str(),
+                                     "1D");
         return ge::GRAPH_FAILED;
     }
 
     if (expandedRowIdxShape != expandedExpertIdxShape) {
-        std::string shapeMsg = Ops::Base::ToString(expandedRowIdxShape) + " and " +
-            Ops::Base::ToString(expandedExpertIdxShape);
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-            context_->GetNodeName(), "expanded_row_idx and expanded_expert_idx", shapeMsg.c_str(),
-            "The shape of expanded_row_idx and expanded_expert_idx should be same");
+        std::string shapeMsg =
+            Ops::Base::ToString(expandedRowIdxShape) + " and " + Ops::Base::ToString(expandedExpertIdxShape);
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "expanded_row_idx and expanded_expert_idx",
+                                               shapeMsg.c_str(),
+                                               "The shape of expanded_row_idx and expanded_expert_idx should be same");
         return ge::GRAPH_FAILED;
     }
 
     if (expandedXShape.GetDim(0) !=
         std::min(moeInitRoutingTilingData.get_n(), activateNum) * moeInitRoutingTilingData.get_k()) {
         std::string expandedXShapeStr = Ops::Base::ToString(expandedXShape);
-        std::string reasonMsg = "The first dim of expanded_x should be " +
+        std::string reasonMsg =
+            "The first dim of expanded_x should be " +
             std::to_string(std::min(moeInitRoutingTilingData.get_n(), activateNum) * moeInitRoutingTilingData.get_k());
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            context_->GetNodeName(), "expanded_x", expandedXShapeStr.c_str(), reasonMsg.c_str());
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expanded_x", expandedXShapeStr.c_str(),
+                                              reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
 
     if (expandedXShape.GetDim(1) != moeInitRoutingTilingData.get_cols()) {
         std::string expandedXShapeStr = Ops::Base::ToString(expandedXShape);
-        std::string reasonMsg = "The second dim of expanded_x should be " +
-            std::to_string(moeInitRoutingTilingData.get_cols());
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            context_->GetNodeName(), "expanded_x", expandedXShapeStr.c_str(), reasonMsg.c_str());
+        std::string reasonMsg =
+            "The second dim of expanded_x should be " + std::to_string(moeInitRoutingTilingData.get_cols());
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expanded_x", expandedXShapeStr.c_str(),
+                                              reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
 
     if (expandedRowIdxShape.GetDim(0) != totalLength) {
-        std::string shapeMsg = Ops::Base::ToString(expandedRowIdxShape) + " and " +
-            Ops::Base::ToString(expandedExpertIdxShape);
-        std::string reasonMsg = "The first dim of expanded_row_idx and expanded_expert_idx should be " +
-            std::to_string(totalLength);
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-            context_->GetNodeName(), "expanded_row_idx and expanded_expert_idx", shapeMsg.c_str(), reasonMsg.c_str());
+        std::string shapeMsg =
+            Ops::Base::ToString(expandedRowIdxShape) + " and " + Ops::Base::ToString(expandedExpertIdxShape);
+        std::string reasonMsg =
+            "The first dim of expanded_row_idx and expanded_expert_idx should be " + std::to_string(totalLength);
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "expanded_row_idx and expanded_expert_idx",
+                                               shapeMsg.c_str(), reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -227,23 +226,22 @@ ge::graphStatus MoeInitRountingTilingBase::GetShapeAttrsInfo()
 
     if (rowIdxShape != expertIdxShape) {
         std::string shapeMsg = Ops::Base::ToString(rowIdxShape) + " and " + Ops::Base::ToString(expertIdxShape);
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-            context_->GetNodeName(), "row_idx and expert_idx", shapeMsg.c_str(),
-            "The shape of row_idx and expert_idx should be same");
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "row_idx and expert_idx", shapeMsg.c_str(),
+                                               "The shape of row_idx and expert_idx should be same");
         return ge::GRAPH_FAILED;
     }
 
     if (xShape.GetDim(0) != expertIdxShape.GetDim(0)) {
         std::string shapeMsg = Ops::Base::ToString(xShape) + " and " + Ops::Base::ToString(expertIdxShape);
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-            context_->GetNodeName(), "x and expert_idx", shapeMsg.c_str(), "Input rows should be same");
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "x and expert_idx", shapeMsg.c_str(),
+                                               "Input rows should be same");
         return ge::GRAPH_FAILED;
     }
 
     if (activateNum < 0) {
         std::string activateNumStr = std::to_string(activateNum);
-        OP_LOGE_WITH_INVALID_ATTR(
-            context_->GetNodeName(), "active_num", activateNumStr.c_str(), "a non-negative number");
+        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "active_num", activateNumStr.c_str(),
+                                  "a non-negative number");
         return ge::GRAPH_FAILED;
     }
 
@@ -263,10 +261,9 @@ ge::graphStatus MoeInitRountingTilingBase::GetShapeAttrsInfo()
 
 void MoeInitRountingTilingBase::ShowTilingData()
 {
-    OP_LOGI(
-        opName, "moeInitRoutingTilingData is coreNum:%ld, n:%ld, cols:%ld,k:%ld",
-        moeInitRoutingTilingData.get_coreNum(), moeInitRoutingTilingData.get_n(), moeInitRoutingTilingData.get_cols(),
-        moeInitRoutingTilingData.get_k());
+    OP_LOGI(opName, "moeInitRoutingTilingData is coreNum:%ld, n:%ld, cols:%ld,k:%ld",
+            moeInitRoutingTilingData.get_coreNum(), moeInitRoutingTilingData.get_n(),
+            moeInitRoutingTilingData.get_cols(), moeInitRoutingTilingData.get_k());
     OP_LOGI(
         opName,
         "VBSComputeTilingData is needCoreNum:%ld, perCoreElements:%ld, perCoreLoops:%ld, perCorePerLoopElements:%ld, "
@@ -282,49 +279,45 @@ void MoeInitRountingTilingBase::ShowTilingData()
         moeInitRoutingTilingData.vbsComputeParamsOp.get_lastCorePerLoopElements(),
         moeInitRoutingTilingData.vbsComputeParamsOp.get_lastCoreLastLoopElements(),
         moeInitRoutingTilingData.vbsComputeParamsOp.get_oneLoopMaxElements());
-    OP_LOGI(
-        opName, "VMSMiddleComputeTilingData is needCoreNum:%ld",
-        moeInitRoutingTilingData.vmsMiddleComputeParamsOp.get_needCoreNum());
-    OP_LOGI(
-        opName, "SortOutComputeTilingData is oneLoopMaxElements:%ld",
-        moeInitRoutingTilingData.sortOutComputeParamsOp.get_oneLoopMaxElements());
-    OP_LOGI(
-        opName,
-        "SrcToDstComputeTilingData is needCoreNum:%ld, activateRows:%ld, perCoreRows:%ld, perCorePerLoopRows:%ld, "
-        "perCoreLastLoopRows:%ld, lastCoreRows:%ld, lastCorePerLoopRows:%ld, lastCoreLastLoopRows:%ld, "
-        "maxColsOneLoop:%ld",
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_needCoreNum(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_activateRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_perCoreRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_perCorePerLoopRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_perCoreLastLoopRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_lastCoreRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_lastCorePerLoopRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_lastCoreLastLoopRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_maxColsOneLoop());
-    OP_LOGI(
-        opName,
-        "GatherOutComputeTilingData is needCoreNum:%ld, activateRows:%ld, perCoreRows:%ld, perCoreK:%ld, "
-        "perCorePerLoopK:%ld, perCoreLastLoopK:%ld, perCorePerLoopRows:%ld, "
-        "perCoreLastLoopRows:%ld, lastCoreRows:%ld, lastCoreK:%ld, lastCorePerLoopK:%ld, lastCoreLastLoopK:%ld, "
-        "lastCorePerLoopRows:%ld, lastCoreLastLoopRows:%ld, "
-        "maxColsOneLoop:%ld, splitFlag:%ld",
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_needCoreNum(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_activateRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCoreRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCoreK(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCorePerLoopK(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCoreLastLoopK(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCorePerLoopRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCoreLastLoopRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreK(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCorePerLoopK(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreLastLoopK(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCorePerLoopRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreLastLoopRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_maxColsOneLoop(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_splitFlag());
+    OP_LOGI(opName, "VMSMiddleComputeTilingData is needCoreNum:%ld",
+            moeInitRoutingTilingData.vmsMiddleComputeParamsOp.get_needCoreNum());
+    OP_LOGI(opName, "SortOutComputeTilingData is oneLoopMaxElements:%ld",
+            moeInitRoutingTilingData.sortOutComputeParamsOp.get_oneLoopMaxElements());
+    OP_LOGI(opName,
+            "SrcToDstComputeTilingData is needCoreNum:%ld, activateRows:%ld, perCoreRows:%ld, perCorePerLoopRows:%ld, "
+            "perCoreLastLoopRows:%ld, lastCoreRows:%ld, lastCorePerLoopRows:%ld, lastCoreLastLoopRows:%ld, "
+            "maxColsOneLoop:%ld",
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_needCoreNum(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_activateRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_perCoreRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_perCorePerLoopRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_perCoreLastLoopRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_lastCoreRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_lastCorePerLoopRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_lastCoreLastLoopRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_maxColsOneLoop());
+    OP_LOGI(opName,
+            "GatherOutComputeTilingData is needCoreNum:%ld, activateRows:%ld, perCoreRows:%ld, perCoreK:%ld, "
+            "perCorePerLoopK:%ld, perCoreLastLoopK:%ld, perCorePerLoopRows:%ld, "
+            "perCoreLastLoopRows:%ld, lastCoreRows:%ld, lastCoreK:%ld, lastCorePerLoopK:%ld, lastCoreLastLoopK:%ld, "
+            "lastCorePerLoopRows:%ld, lastCoreLastLoopRows:%ld, "
+            "maxColsOneLoop:%ld, splitFlag:%ld",
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_needCoreNum(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_activateRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCoreRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCoreK(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCorePerLoopK(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCoreLastLoopK(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCorePerLoopRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCoreLastLoopRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreK(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCorePerLoopK(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreLastLoopK(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCorePerLoopRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreLastLoopRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_maxColsOneLoop(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_splitFlag());
 }
 ge::graphStatus MoeInitRountingTilingBase::DoOpTiling()
 {
@@ -369,8 +362,8 @@ ge::graphStatus MoeInitRountingTilingBase::PostTiling()
     context_->SetLocalMemorySize(aicoreParams_.ubSize);
     // 涉及核间同步的算子必须设置schedule_mode为1，独占全核
     context_->SetScheduleMode(1);
-    moeInitRoutingTilingData.SaveToBuffer(
-        context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
+    moeInitRoutingTilingData.SaveToBuffer(context_->GetRawTilingData()->GetData(),
+                                          context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(moeInitRoutingTilingData.GetDataSize());
     return ge::GRAPH_SUCCESS;
 }
@@ -389,9 +382,9 @@ void MoeInitRountingTilingBase::Tinlig4VBSOneCoreCompute(VBSComputeTilingData* t
 
 void MoeInitRountingTilingBase::Tinlig4VBSMultiCoreCompute(VBSComputeTilingData* tilingData)
 {
-    int64_t needCoreNum = Ops::Base::CeilDiv(totalLength, sortLoopMaxElement);    // 向上取整
-    needCoreNum = static_cast<int64_t>(std::pow(4, CeilLog4(needCoreNum))); // 用到多核时，核数最多是4^x
-    needCoreNum = std::min(needCoreNum, aivNum);                            // 不能超过物理核数
+    int64_t needCoreNum = Ops::Base::CeilDiv(totalLength, sortLoopMaxElement); // 向上取整
+    needCoreNum = static_cast<int64_t>(std::pow(4, CeilLog4(needCoreNum)));    // 用到多核时，核数最多是4^x
+    needCoreNum = std::min(needCoreNum, aivNum);                               // 不能超过物理核数
 
     int64_t perCoreElements = totalLength / needCoreNum; // 每个核处理的元素数
     int64_t alineFloorPerCoreElements = perCoreElements - perCoreElements % SORT32_ALIGN_ELEMENT;
@@ -411,29 +404,28 @@ void MoeInitRountingTilingBase::Tinlig4VBSMultiCoreCompute(VBSComputeTilingData*
             Ops::Base::CeilDiv(tilingData->get_perCoreElements(), sortLoopMaxElement)); // 每个核处理的loop数
         tilingData->set_perCorePerLoopElements(std::min(tilingData->get_perCoreElements(), sortLoopMaxElement));
 
-        tilingData->set_perCoreLastLoopElements(
-            tilingData->get_perCoreElements() -
-            (tilingData->get_perCoreLoops() - 1) * tilingData->get_perCorePerLoopElements());
+        tilingData->set_perCoreLastLoopElements(tilingData->get_perCoreElements() -
+                                                (tilingData->get_perCoreLoops() - 1) *
+                                                    tilingData->get_perCorePerLoopElements());
 
-        tilingData->set_lastCoreElements(
-            totalLength - (tilingData->get_needCoreNum() - 1) * tilingData->get_perCoreElements());
+        tilingData->set_lastCoreElements(totalLength -
+                                         (tilingData->get_needCoreNum() - 1) * tilingData->get_perCoreElements());
         tilingData->set_lastCoreLoops(tilingData->get_perCoreLoops());
         int64_t lastCorePerLoopElements =
-            Ops::Base::CeilDiv(
-                Ops::Base::CeilDiv(tilingData->get_lastCoreElements(), tilingData->get_lastCoreLoops()),
-                SORT32_ALIGN_ELEMENT) *
+            Ops::Base::CeilDiv(Ops::Base::CeilDiv(tilingData->get_lastCoreElements(), tilingData->get_lastCoreLoops()),
+                               SORT32_ALIGN_ELEMENT) *
             SORT32_ALIGN_ELEMENT;
         tilingData->set_lastCorePerLoopElements(lastCorePerLoopElements);
-        tilingData->set_lastCoreLastLoopElements(
-            tilingData->get_lastCoreElements() -
-            (tilingData->get_lastCoreLoops() - 1) * tilingData->get_lastCorePerLoopElements());
+        tilingData->set_lastCoreLastLoopElements(tilingData->get_lastCoreElements() -
+                                                 (tilingData->get_lastCoreLoops() - 1) *
+                                                     tilingData->get_lastCorePerLoopElements());
         perCoreElements -= SORT32_ALIGN_ELEMENT;
     } while (tilingData->get_lastCoreLastLoopElements() <= 0 && perCoreElements > 0);
     OP_CHECK_IF(tilingData->get_lastCoreLastLoopElements() <= 0,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                        opName, "lastCoreLastLoopElements",
-                        std::to_string(tilingData->get_lastCoreLastLoopElements()).c_str(), "vbs tiling failed"),
-                    ;);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    opName, "lastCoreLastLoopElements",
+                    std::to_string(tilingData->get_lastCoreLastLoopElements()).c_str(), "vbs tiling failed"),
+                ;);
 }
 
 void MoeInitRountingTilingBase::Tiling4VBSCompute()
@@ -489,9 +481,9 @@ void MoeInitRountingTilingBase::Tiling4SrcToDstCompute()
         tilingData->set_perCoreLastLoopRows(tilingData->get_perCoreRows());
     } else {
         tilingData->set_perCorePerLoopRows(perLoopMaxRows);
-        tilingData->set_perCoreLastLoopRows(
-            tilingData->get_perCoreRows() -
-            (Ops::Base::CeilDiv(tilingData->get_perCoreRows(), perLoopMaxRows) - 1) * perLoopMaxRows);
+        tilingData->set_perCoreLastLoopRows(tilingData->get_perCoreRows() -
+                                            (Ops::Base::CeilDiv(tilingData->get_perCoreRows(), perLoopMaxRows) - 1) *
+                                                perLoopMaxRows);
     }
 
     tilingData->set_lastCoreRows(lastCoreNum);
@@ -500,9 +492,9 @@ void MoeInitRountingTilingBase::Tiling4SrcToDstCompute()
         tilingData->set_lastCoreLastLoopRows(tilingData->get_lastCoreRows());
     } else {
         tilingData->set_lastCorePerLoopRows(perLoopMaxRows);
-        tilingData->set_lastCoreLastLoopRows(
-            tilingData->get_lastCoreRows() -
-            (Ops::Base::CeilDiv(tilingData->get_lastCoreRows(), perLoopMaxRows) - 1) * perLoopMaxRows);
+        tilingData->set_lastCoreLastLoopRows(tilingData->get_lastCoreRows() -
+                                             (Ops::Base::CeilDiv(tilingData->get_lastCoreRows(), perLoopMaxRows) - 1) *
+                                                 perLoopMaxRows);
     }
 }
 
@@ -524,8 +516,8 @@ void MoeInitRountingTilingBase::Tiling4GatherOutComputeSplitK()
     tilingData->set_perCoreK(perCoreK);
     int needCoreNum = Ops::Base::CeilDiv(moeInitRoutingTilingData.get_k(), perCoreK);
     tilingData->set_needCoreNum(needCoreNum);
-    tilingData->set_lastCoreK(
-        moeInitRoutingTilingData.get_k() - (tilingData->get_needCoreNum() - 1) * tilingData->get_perCoreK());
+    tilingData->set_lastCoreK(moeInitRoutingTilingData.get_k() -
+                              (tilingData->get_needCoreNum() - 1) * tilingData->get_perCoreK());
 
     int64_t maxColsOneLoop = std::min(MAX_COLS_ONE_LOOP, moeInitRoutingTilingData.get_cols());
     tilingData->set_maxColsOneLoop(maxColsOneLoop);
@@ -544,11 +536,11 @@ void MoeInitRountingTilingBase::Tiling4GatherOutComputeSplitK()
     }
 
     tilingData->set_perCorePerLoopK(kFactor);
-    tilingData->set_perCoreLastLoopK(
-        tilingData->get_perCoreK() - (Ops::Base::CeilDiv(tilingData->get_perCoreK(), kFactor) - 1) * kFactor);
+    tilingData->set_perCoreLastLoopK(tilingData->get_perCoreK() -
+                                     (Ops::Base::CeilDiv(tilingData->get_perCoreK(), kFactor) - 1) * kFactor);
     tilingData->set_lastCorePerLoopK(kFactor);
-    tilingData->set_lastCoreLastLoopK(
-        tilingData->get_perCoreK() - (Ops::Base::CeilDiv(tilingData->get_perCoreK(), kFactor) - 1) * kFactor);
+    tilingData->set_lastCoreLastLoopK(tilingData->get_perCoreK() -
+                                      (Ops::Base::CeilDiv(tilingData->get_perCoreK(), kFactor) - 1) * kFactor);
     tilingData->set_perCorePerLoopRows(std::min(tilingData->get_perCoreRows(), perLoopMaxRows));
     tilingData->set_perCoreLastLoopRows(
         tilingData->get_perCoreRows() -
@@ -590,12 +582,12 @@ void MoeInitRountingTilingBase::Tiling4GatherOutComputeSplitN()
 
     tilingData->set_perCoreK(moeInitRoutingTilingData.get_k());
     tilingData->set_perCorePerLoopK(kFactor);
-    tilingData->set_perCoreLastLoopK(
-        moeInitRoutingTilingData.get_k() - (Ops::Base::CeilDiv(moeInitRoutingTilingData.get_k(), kFactor) - 1) * kFactor);
+    tilingData->set_perCoreLastLoopK(moeInitRoutingTilingData.get_k() -
+                                     (Ops::Base::CeilDiv(moeInitRoutingTilingData.get_k(), kFactor) - 1) * kFactor);
     tilingData->set_lastCoreK(moeInitRoutingTilingData.get_k());
     tilingData->set_lastCorePerLoopK(kFactor);
-    tilingData->set_lastCoreLastLoopK(
-        moeInitRoutingTilingData.get_k() - (Ops::Base::CeilDiv(moeInitRoutingTilingData.get_k(), kFactor) - 1) * kFactor);
+    tilingData->set_lastCoreLastLoopK(moeInitRoutingTilingData.get_k() -
+                                      (Ops::Base::CeilDiv(moeInitRoutingTilingData.get_k(), kFactor) - 1) * kFactor);
 
     tilingData->set_activateRows(activateNum * moeInitRoutingTilingData.get_k());
     tilingData->set_perCoreRows(perCoreRows);
@@ -666,8 +658,8 @@ bool MoeInitRountingTilingBase::IsFullLoad()
     int64_t realRows = moeInitRoutingTilingData.get_n();
     activateNum = std::min(activateNum, realRows);
     int64_t perCoreRows = Ops::Base::CeilDiv(realRows, aivNum);
-    int64_t sortSpace = Ops::Base::CeilDiv(this->totalLength, SORT32_ALIGN_ELEMENT) * SORT32_ALIGN_ELEMENT * sizeof(int32_t) *
-                        KV_FACTOR * ONE_CORE_SORT_BUFFER;
+    int64_t sortSpace = Ops::Base::CeilDiv(this->totalLength, SORT32_ALIGN_ELEMENT) * SORT32_ALIGN_ELEMENT *
+                        sizeof(int32_t) * KV_FACTOR * ONE_CORE_SORT_BUFFER;
     int64_t gatherSpace = 0;
     int64_t remainUbAfterSort = 0;
     if (this->n_ < aivNum && this->n_ < this->k_) {

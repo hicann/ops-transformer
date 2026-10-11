@@ -26,11 +26,11 @@ class MoeSortMultiLastDimCore : public MoeSortBase {
 public:
     __aicore__ inline MoeSortMultiLastDimCore(){};
     __aicore__ inline void Init(GM_ADDR expertForSourceRow, GM_ADDR sortedExpertForSourceRow, GM_ADDR workspace,
-                                const MoeTokenPermuteWithRoutingMapTilingData *tilingData, TPipe *tPipe);
+                                const MoeTokenPermuteWithRoutingMapTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void InitTilingConfig(const MoeTokenPermuteWithRoutingMapTilingData *tilingData);
+    __aicore__ inline void InitTilingConfig(const MoeTokenPermuteWithRoutingMapTilingData* tilingData);
     __aicore__ inline void VBSProcess();
     __aicore__ inline void UBSortProcess(int64_t progress, int64_t size, int64_t sortNum);
     __aicore__ inline void OneCoreVMSProcess(int64_t listNum, int64_t perListElements, int64_t lastListElements);
@@ -39,16 +39,16 @@ private:
     __aicore__ inline void VBSCopyIn(int64_t progress, int64_t size, int64_t sortNum);
     __aicore__ inline void UBSortCompute(int64_t progress, int64_t size, int64_t sortNum);
     __aicore__ inline void VBSCopyOut(int64_t progress, int64_t size, int64_t sortNum);
-    __aicore__ inline void InitMoeMrgSort(MoeMrgsort *sorter, int64_t listNum, int64_t coreOffset, int64_t loopOffset);
-    __aicore__ inline void InitMoeMrgSortOut(MoeMrgsortOut<int32_t, int32_t> *sorter, int64_t listNum,
+    __aicore__ inline void InitMoeMrgSort(MoeMrgsort* sorter, int64_t listNum, int64_t coreOffset, int64_t loopOffset);
+    __aicore__ inline void InitMoeMrgSortOut(MoeMrgsortOut<int32_t, int32_t>* sorter, int64_t listNum,
                                              int64_t coreOffset);
 
 private:
     GlobalTensor<float> workspaceGms[2];
 
-    const PermuteVBSComputeRMTilingData *vbsTilingData;
-    const PermuteVMSMiddleComputeRMTilingData *vmsTilingData;
-    const PermuteSortOutComputeRMTilingData *sortOutTilingData;
+    const PermuteVBSComputeRMTilingData* vbsTilingData;
+    const PermuteVMSMiddleComputeRMTilingData* vmsTilingData;
+    const PermuteSortOutComputeRMTilingData* sortOutTilingData;
 
     // for MoeMrgsort
     MoeMrgsort mrgsorter;
@@ -171,7 +171,7 @@ __aicore__ inline void MoeSortMultiLastDimCore<T>::VBSCopyOut(int64_t progress, 
 }
 
 template <typename T>
-__aicore__ inline void MoeSortMultiLastDimCore<T>::InitMoeMrgSort(MoeMrgsort *sorter, int64_t listNum,
+__aicore__ inline void MoeSortMultiLastDimCore<T>::InitMoeMrgSort(MoeMrgsort* sorter, int64_t listNum,
                                                                   int64_t coreOffset, int64_t loopOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex][blockIdx * coreOffset + loopOffset];
@@ -188,7 +188,7 @@ __aicore__ inline void MoeSortMultiLastDimCore<T>::InitMoeMrgSort(MoeMrgsort *so
 }
 
 template <typename T>
-__aicore__ inline void MoeSortMultiLastDimCore<T>::InitMoeMrgSortOut(MoeMrgsortOut<int32_t, int32_t> *sorter,
+__aicore__ inline void MoeSortMultiLastDimCore<T>::InitMoeMrgSortOut(MoeMrgsortOut<int32_t, int32_t>* sorter,
                                                                      int64_t listNum, int64_t coreOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex][blockIdx * coreOffset];
@@ -340,7 +340,7 @@ __aicore__ inline void MoeSortMultiLastDimCore<T>::SortOutProcess()
 
 template <typename T>
 __aicore__ inline void MoeSortMultiLastDimCore<T>::InitTilingConfig(
-    const MoeTokenPermuteWithRoutingMapTilingData *tilingData)
+    const MoeTokenPermuteWithRoutingMapTilingData* tilingData)
 {
     this->totalLength = tilingData->n;
     this->coreNum = tilingData->coreNum;
@@ -366,8 +366,8 @@ __aicore__ inline void MoeSortMultiLastDimCore<T>::InitTilingConfig(
 template <typename T>
 __aicore__ inline void MoeSortMultiLastDimCore<T>::Init(GM_ADDR expertForSourceRow, GM_ADDR sortedExpertForSourceRow,
                                                         GM_ADDR workspace,
-                                                        const MoeTokenPermuteWithRoutingMapTilingData *tilingData,
-                                                        TPipe *tPipe)
+                                                        const MoeTokenPermuteWithRoutingMapTilingData* tilingData,
+                                                        TPipe* tPipe)
 {
     expertForSourceRow_ = expertForSourceRow;
     sortedExpertForSourceRow_ = sortedExpertForSourceRow;
@@ -382,19 +382,19 @@ __aicore__ inline void MoeSortMultiLastDimCore<T>::Init(GM_ADDR expertForSourceR
     int64_t coreNum = GetBlockNum();
     blockFactor = tilingData->vbsComputeParamsOp.perCoreElements;
     expertForSourceRowGm.SetGlobalBuffer(
-        (__gm__ T *)expertForSourceRow + this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
+        (__gm__ T*)expertForSourceRow + this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
         this->sortTotalLength);
-    sortedExpertForSourceRowGm.SetGlobalBuffer((__gm__ int32_t *)sortedExpertForSourceRow, this->totalLength);
+    sortedExpertForSourceRowGm.SetGlobalBuffer((__gm__ int32_t*)sortedExpertForSourceRow, this->totalLength);
     // for sort: expandDstToSrcRowGm.SetGlobalBuffer((__gm__ int32_t*)workspace, Align(this->totalLength,
     // sizeof(int32_t)));
 
     int64_t kvFactor = 2;
 
     workspaceGms[0].SetGlobalBuffer(
-        (__gm__ float *)workspace,
+        (__gm__ float*)workspace,
         Align(this->totalLength * tilingData->vbsComputeParamsOp.needCoreNum, sizeof(int32_t)) * kvFactor);
     workspaceGms[1].SetGlobalBuffer(
-        (__gm__ float *)workspace +
+        (__gm__ float*)workspace +
             Align(this->totalLength * tilingData->vbsComputeParamsOp.needCoreNum, sizeof(int32_t)) * kvFactor,
         Align(this->totalLength * tilingData->vbsComputeParamsOp.needCoreNum, sizeof(int32_t)) * kvFactor);
 
@@ -420,8 +420,8 @@ __aicore__ inline void MoeSortMultiLastDimCore<T>::Process()
     uint64_t processOutOffset = (this->blockIdx * tailcoreTask + coreTaskNumFront) * capacity;
 
     while (taskId < coreTaskNum) {
-        expertForSourceRowGm.SetGlobalBuffer((__gm__ T *)expertForSourceRow_ + processoffset + taskId * blockFactor);
-        sortedExpertForSourceRowGm.SetGlobalBuffer((__gm__ int32_t *)sortedExpertForSourceRow_ + processOutOffset +
+        expertForSourceRowGm.SetGlobalBuffer((__gm__ T*)expertForSourceRow_ + processoffset + taskId * blockFactor);
+        sortedExpertForSourceRowGm.SetGlobalBuffer((__gm__ int32_t*)sortedExpertForSourceRow_ + processOutOffset +
                                                    taskId * capacity);
 
         VBSProcess();

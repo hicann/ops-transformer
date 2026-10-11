@@ -27,7 +27,7 @@ public:
     __aicore__ inline void Init(GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias,
                                 GM_ADDR scales, GM_ADDR expertIdx, GM_ADDR x, GM_ADDR constExpertAlpha1,
                                 GM_ADDR constExpertAlpha2, GM_ADDR v, GM_ADDR y, GM_ADDR workspace,
-                                const MoeFinalizeRoutingV2RegbaseTilingData *tilingDataPtr, TPipe *pipePtr)
+                                const MoeFinalizeRoutingV2RegbaseTilingData* tilingDataPtr, TPipe* pipePtr)
     {
         hasBiasAndExpertIdx = (bias != nullptr) && (expertIdx != nullptr);
         hasScales = scales != nullptr;
@@ -40,18 +40,18 @@ public:
         hasX = x != nullptr;
         hasConstExpert = (constExpertAlpha1 != nullptr) && (constExpertAlpha2 != nullptr) && (v != nullptr);
 
-        expandedXGm.SetGlobalBuffer((__gm__ T *)expandedX);
-        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx);
-        biasGm.SetGlobalBuffer((__gm__ T *)bias);
-        scalesGm.SetGlobalBuffer((__gm__ S *)scales);
-        x1Gm.SetGlobalBuffer((__gm__ T *)x1);
-        x2Gm.SetGlobalBuffer((__gm__ T *)x2);
-        expertIdxGm.SetGlobalBuffer((__gm__ int32_t *)expertIdx);
-        xGm.SetGlobalBuffer((__gm__ T *)x);
-        constExpertAlpha1Gm.SetGlobalBuffer((__gm__ T *)constExpertAlpha1);
-        constExpertAlpha2Gm.SetGlobalBuffer((__gm__ T *)constExpertAlpha2);
-        vGm.SetGlobalBuffer((__gm__ T *)v);
-        yGm.SetGlobalBuffer((__gm__ T *)y);
+        expandedXGm.SetGlobalBuffer((__gm__ T*)expandedX);
+        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx);
+        biasGm.SetGlobalBuffer((__gm__ T*)bias);
+        scalesGm.SetGlobalBuffer((__gm__ S*)scales);
+        x1Gm.SetGlobalBuffer((__gm__ T*)x1);
+        x2Gm.SetGlobalBuffer((__gm__ T*)x2);
+        expertIdxGm.SetGlobalBuffer((__gm__ int32_t*)expertIdx);
+        xGm.SetGlobalBuffer((__gm__ T*)x);
+        constExpertAlpha1Gm.SetGlobalBuffer((__gm__ T*)constExpertAlpha1);
+        constExpertAlpha2Gm.SetGlobalBuffer((__gm__ T*)constExpertAlpha2);
+        vGm.SetGlobalBuffer((__gm__ T*)v);
+        yGm.SetGlobalBuffer((__gm__ T*)y);
 
         int32_t hFactorAlignedT = RoundUp<T>(tilingData->hFactor);
         int32_t hFactorAlignedFloat = RoundUp<float>(tilingData->hFactor);
@@ -273,8 +273,8 @@ private:
     }
 
 private:
-    TPipe *pipe;
-    const MoeFinalizeRoutingV2RegbaseTilingData *tilingData;
+    TPipe* pipe;
+    const MoeFinalizeRoutingV2RegbaseTilingData* tilingData;
     GlobalTensor<T> expandedXGm;
     GlobalTensor<int32_t> expandedRowIdxGm;
     GlobalTensor<int32_t> expertIdxGm;

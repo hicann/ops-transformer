@@ -31,13 +31,13 @@ static constexpr size_t DIM_NUM_2 = 2;
 static constexpr size_t DIM_NUM_3 = 3;
 constexpr int64_t UNKNOWN_RANK_DIM_VALUE = -2;
 
-inline bool IsUnknownRank(const gert::Shape *checkShape)
+inline bool IsUnknownRank(const gert::Shape* checkShape)
 {
     return checkShape->GetDimNum() == 1 && checkShape->GetDim(0) == UNKNOWN_RANK_DIM_VALUE;
 }
 
-static ge::graphStatus GetAttrs(const gert::InferShapeContext *context, int64_t &dropPadMode, int64_t &activeNum,
-                                int64_t &expertNum, int64_t &expertCapacity)
+static ge::graphStatus GetAttrs(const gert::InferShapeContext* context, int64_t& dropPadMode, int64_t& activeNum,
+                                int64_t& expertNum, int64_t& expertCapacity)
 {
     dropPadMode = 0;
     activeNum = 0;
@@ -62,9 +62,9 @@ static ge::graphStatus GetAttrs(const gert::InferShapeContext *context, int64_t 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetGradExpandedXOutputShape(gert::Shape *gradExpandedXShape,
-                                                   const gert::Shape *expandedRowIdxShape,
-                                                   const gert::Shape *gradYShape, int64_t dropPadMode,
+static ge::graphStatus SetGradExpandedXOutputShape(gert::Shape* gradExpandedXShape,
+                                                   const gert::Shape* expandedRowIdxShape,
+                                                   const gert::Shape* gradYShape, int64_t dropPadMode,
                                                    int64_t activeNum, int64_t expertNum, int64_t expertCapacity)
 {
     gradExpandedXShape->SetDimNum(DIM_NUM_2);
@@ -80,13 +80,13 @@ static ge::graphStatus SetGradExpandedXOutputShape(gert::Shape *gradExpandedXSha
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetGradScalesOutputShape(const gert::InferShapeContext *context, gert::Shape *gradScalesShape,
-                                                const gert::Shape *gradYShape)
+static ge::graphStatus SetGradScalesOutputShape(const gert::InferShapeContext* context, gert::Shape* gradScalesShape,
+                                                const gert::Shape* gradYShape)
 {
     gradScalesShape->SetDimNum(DIM_NUM_2);
     gradScalesShape->SetDim(0, gradYShape->GetDim(0));
     gradScalesShape->SetDim(1, 1);
-    const gert::Shape *scalesShape = context->GetOptionalInputShape(INPUT_3_IDX);
+    const gert::Shape* scalesShape = context->GetOptionalInputShape(INPUT_3_IDX);
     if (scalesShape != nullptr && !IsUnknownRank(scalesShape)) {
         OP_CHECK_IF((scalesShape->GetDimNum() != DIM_NUM_2),
                     OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "scales",
@@ -97,15 +97,15 @@ static ge::graphStatus SetGradScalesOutputShape(const gert::InferShapeContext *c
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeFinalizeRoutingV2GradInferShape(gert::InferShapeContext *context)
+static ge::graphStatus MoeFinalizeRoutingV2GradInferShape(gert::InferShapeContext* context)
 {
-    const gert::Shape *gradYShape = context->GetInputShape(INPUT_0_IDX);
+    const gert::Shape* gradYShape = context->GetInputShape(INPUT_0_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradYShape);
-    const gert::Shape *expandedRowIdxShape = context->GetInputShape(INPUT_1_IDX);
+    const gert::Shape* expandedRowIdxShape = context->GetInputShape(INPUT_1_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, expandedRowIdxShape);
-    gert::Shape *gradExpandedXShape = context->GetOutputShape(OUTPUT_0_IDX);
+    gert::Shape* gradExpandedXShape = context->GetOutputShape(OUTPUT_0_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradExpandedXShape);
-    gert::Shape *gradScalesShape = context->GetOutputShape(OUTPUT_1_IDX);
+    gert::Shape* gradScalesShape = context->GetOutputShape(OUTPUT_1_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradScalesShape);
     if (IsUnknownRank(gradYShape)) {
         *gradExpandedXShape = *gradYShape;
@@ -148,7 +148,7 @@ static ge::graphStatus MoeFinalizeRoutingV2GradInferShape(gert::InferShapeContex
     return ge::GRAPH_SUCCESS;
 }
 
-static graphStatus MoeFinalizeRoutingV2GradInferDtype(gert::InferDataTypeContext *context)
+static graphStatus MoeFinalizeRoutingV2GradInferDtype(gert::InferDataTypeContext* context)
 {
     auto gradYtype = context->GetInputDataType(INPUT_0_IDX);
     auto scaleType = context->GetOptionalInputDataType(INPUT_3_IDX);

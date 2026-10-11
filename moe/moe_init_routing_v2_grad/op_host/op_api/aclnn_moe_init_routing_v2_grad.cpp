@@ -29,7 +29,7 @@ static const std::initializer_list<op::DataType> MOE_INIT_ROUTING_V2_GRAD_DTYPE_
 static const std::initializer_list<op::DataType> MOE_INIT_ROUTING_V2_GRAD_DTYPE_SUPPORT_LIST_ROW_IDX = {
     DataType::DT_INT32};
 
-static inline bool CheckNotNull(const aclTensor *gradExpandedX, const aclTensor *expandedRowIdx, const aclTensor *out)
+static inline bool CheckNotNull(const aclTensor* gradExpandedX, const aclTensor* expandedRowIdx, const aclTensor* out)
 {
     OP_CHECK_NULL(gradExpandedX, return false);
     OP_CHECK_NULL(expandedRowIdx, return false);
@@ -37,8 +37,8 @@ static inline bool CheckNotNull(const aclTensor *gradExpandedX, const aclTensor 
     return true;
 }
 
-static inline bool CheckDtypeValid(const aclTensor *gradExpandedX, const aclTensor *expandedRowIdx,
-                                   const aclTensor *out)
+static inline bool CheckDtypeValid(const aclTensor* gradExpandedX, const aclTensor* expandedRowIdx,
+                                   const aclTensor* out)
 {
     if (gradExpandedX != nullptr && gradExpandedX->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(gradExpandedX, MOE_INIT_ROUTING_V2_GRAD_DTYPE_SUPPORT_LIST_GRAD_X, return false);
@@ -53,7 +53,7 @@ static inline bool CheckDtypeValid(const aclTensor *gradExpandedX, const aclTens
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *gradExpandedX, const aclTensor *expandedRowIdx, const aclTensor *out)
+static aclnnStatus CheckParams(const aclTensor* gradExpandedX, const aclTensor* expandedRowIdx, const aclTensor* out)
 {
     CHECK_RET(CheckNotNull(gradExpandedX, expandedRowIdx, out), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid(gradExpandedX, expandedRowIdx, out), ACLNN_ERR_PARAM_INVALID);
@@ -66,13 +66,14 @@ static aclnnStatus CheckParams(const aclTensor *gradExpandedX, const aclTensor *
 extern "C" {
 #endif
 
-ACLNN_API aclnnStatus aclnnMoeInitRoutingV2GradGetWorkspaceSize(
-    const aclTensor* gradExpandedX, const aclTensor* expandedRowIdx, int64_t topK, int64_t dropPadMode,
-    int64_t activeNum, const aclTensor* out, uint64_t* workspaceSize, aclOpExecutor** executor)
+ACLNN_API aclnnStatus aclnnMoeInitRoutingV2GradGetWorkspaceSize(const aclTensor* gradExpandedX,
+                                                                const aclTensor* expandedRowIdx, int64_t topK,
+                                                                int64_t dropPadMode, int64_t activeNum,
+                                                                const aclTensor* out, uint64_t* workspaceSize,
+                                                                aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
-    L2_DFX_PHASE_1(aclnnMoeInitRoutingV2Grad,
-        DFX_IN(gradExpandedX, expandedRowIdx, topK, dropPadMode, activeNum),
+    L2_DFX_PHASE_1(aclnnMoeInitRoutingV2Grad, DFX_IN(gradExpandedX, expandedRowIdx, topK, dropPadMode, activeNum),
                    DFX_OUT(out));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -88,9 +89,8 @@ ACLNN_API aclnnStatus aclnnMoeInitRoutingV2GradGetWorkspaceSize(
     CHECK_RET(expandedRowIdxContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     // 调用l0接口进行计算，传入out参数
-    auto out_ = l0op::MoeInitRoutingV2Grad(gradExpandedXContiguous, expandedRowIdxContiguous,
-        topK, dropPadMode, activeNum,
-        out, uniqueExecutor.get());
+    auto out_ = l0op::MoeInitRoutingV2Grad(gradExpandedXContiguous, expandedRowIdxContiguous, topK, dropPadMode,
+                                           activeNum, out, uniqueExecutor.get());
     CHECK_RET(out_ != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     // copyout结果，如果出参out是非连续Tensor，需要把计算完的连续Tensor转非连续
@@ -103,8 +103,8 @@ ACLNN_API aclnnStatus aclnnMoeInitRoutingV2GradGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-ACLNN_API aclnnStatus aclnnMoeInitRoutingV2Grad(
-    void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
+ACLNN_API aclnnStatus aclnnMoeInitRoutingV2Grad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                                aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMoeInitRoutingV2Grad);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);

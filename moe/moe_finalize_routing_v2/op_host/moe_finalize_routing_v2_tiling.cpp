@@ -30,9 +30,15 @@ ge::graphStatus MoeFinalizeRoutingTilingV2::GetPlatformInfo()
     return DoGetPlatformInfo();
 }
 
-ge::graphStatus MoeFinalizeRoutingTilingV2::GetShapeAttrsInfo() { return DoGetShapeAttrsInfo(); }
+ge::graphStatus MoeFinalizeRoutingTilingV2::GetShapeAttrsInfo()
+{
+    return DoGetShapeAttrsInfo();
+}
 
-uint64_t MoeFinalizeRoutingTilingV2::GetTilingKey() const { return tilingKey_; }
+uint64_t MoeFinalizeRoutingTilingV2::GetTilingKey() const
+{
+    return tilingKey_;
+}
 
 ge::graphStatus MoeFinalizeRoutingTilingV2::GetWorkspaceSize()
 {
@@ -46,7 +52,7 @@ ge::graphStatus MoeFinalizeRoutingTilingV2::PostTiling()
     uint64_t tilingKey = GetTilingKey();
     context_->SetTilingKey(tilingKey);
     context_->SetBlockDim(usedCoreNum_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = workspaceSize_;
     return ge::GRAPH_SUCCESS;
@@ -68,14 +74,17 @@ ge::graphStatus MoeFinalizeRoutingTilingV2::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeFinalizeRoutingTilingV2::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus MoeFinalizeRoutingTilingV2::DoLibApiTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
-ge::graphStatus TilingForMoeFinalizeRoutingV2(gert::TilingContext *context)
+ge::graphStatus TilingForMoeFinalizeRoutingV2(gert::TilingContext* context)
 {
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingPrepareForMoeFinalizeRoutingV2(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForMoeFinalizeRoutingV2(gert::TilingParseContext* context)
 {
     OP_LOGD(context, "TilingPrepareForMoeFinalizeRoutingV2 enter.");
 

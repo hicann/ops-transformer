@@ -34,7 +34,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -43,7 +43,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，初始化
     auto ret = aclInit(nullptr);
@@ -56,8 +56,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -86,7 +86,7 @@ void Finalize(int32_t deviceId, aclrtStream stream)
     aclFinalize();
 }
 
-int aclnnMoeFusedTopkTest(int32_t deviceId, aclrtStream &stream)
+int aclnnMoeFusedTopkTest(int32_t deviceId, aclrtStream& stream)
 {
     auto ret = Init(deviceId, &stream);
     CHECK_FREE_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
@@ -114,21 +114,21 @@ int aclnnMoeFusedTopkTest(int32_t deviceId, aclrtStream &stream)
     std::vector<int64_t> yShape = {num_token, topK};
     std::vector<int64_t> indicesShape = {num_token, topK};
 
-    void *xDeviceAddr = nullptr;
-    void *addNumDeviceAddr = nullptr;
-    void *mappingNumDeviceAddr = nullptr;
-    void *mappingTableDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* addNumDeviceAddr = nullptr;
+    void* mappingNumDeviceAddr = nullptr;
+    void* mappingTableDeviceAddr = nullptr;
 
-    void *yDeviceAddr = nullptr;
-    void *indicesDeviceAddr = nullptr;
+    void* yDeviceAddr = nullptr;
+    void* indicesDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *addNum = nullptr;
-    aclTensor *mappingNum = nullptr;
-    aclTensor *mappingTable = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* addNum = nullptr;
+    aclTensor* mappingNum = nullptr;
+    aclTensor* mappingTable = nullptr;
 
-    aclTensor *y = nullptr;
-    aclTensor *indices = nullptr;
+    aclTensor* y = nullptr;
+    aclTensor* indices = nullptr;
 
     std::vector<float> xHostData(GetShapeSize(xShape), 1);
     std::vector<float> addNumHostData(GetShapeSize(addNumShape), 1);
@@ -141,39 +141,38 @@ int aclnnMoeFusedTopkTest(int32_t deviceId, aclrtStream &stream)
     // 创建x aclTensor
     ret = CreateAclTensor(xHostData, xShape, &xDeviceAddr, aclDataType::ACL_FLOAT, &x);
     CHECK_FREE_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> xTensorPtr(x, aclDestroyTensor);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> xTensorPtr(x, aclDestroyTensor);
 
     // 创建addNum aclTensor
     ret = CreateAclTensor(addNumHostData, addNumShape, &addNumDeviceAddr, aclDataType::ACL_FLOAT, &addNum);
     CHECK_FREE_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> addNumTensorPtr(addNum, aclDestroyTensor);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> addNumTensorPtr(addNum, aclDestroyTensor);
 
     // 创建mappingNum aclTensor
     ret = CreateAclTensor(mappingNumHostData, mappingNumShape, &mappingNumDeviceAddr, aclDataType::ACL_INT32,
                           &mappingNum);
     CHECK_FREE_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> mappingNumTensorPtr(mappingNum, aclDestroyTensor);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> mappingNumTensorPtr(mappingNum, aclDestroyTensor);
 
     // 创建mappingTable aclTensor
     ret = CreateAclTensor(mappingTableHostData, mappingTableShape, &mappingTableDeviceAddr, aclDataType::ACL_INT32,
                           &mappingTable);
     CHECK_FREE_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> mappingTableTensorPtr(mappingTable,
-                                                                                         aclDestroyTensor);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> mappingTableTensorPtr(mappingTable, aclDestroyTensor);
 
     // 创建y aclTensor
     ret = CreateAclTensor(yHostData, yShape, &yDeviceAddr, aclDataType::ACL_FLOAT, &y);
     CHECK_FREE_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> yTensorPtr(y, aclDestroyTensor);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> yTensorPtr(y, aclDestroyTensor);
 
     // 创建indices aclTensor
     ret = CreateAclTensor(indicesHostData, indicesShape, &indicesDeviceAddr, aclDataType::ACL_INT32, &indices);
     CHECK_FREE_RET(ret == ACL_SUCCESS, return ret);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> indicesTensorPtr(indices, aclDestroyTensor);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> indicesTensorPtr(indices, aclDestroyTensor);
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     // 调用aclnnMoeFusedTopk第一段接口
     ret = aclnnMoeFusedTopkGetWorkspaceSize(x, addNum, mappingNum, mappingTable, groupNum, groupTopk, topN, topK,
                                             activateType, isNorm, scale, enableExpertMapping, y, indices,
@@ -181,8 +180,8 @@ int aclnnMoeFusedTopkTest(int32_t deviceId, aclrtStream &stream)
     CHECK_FREE_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMoeFusedTopkGetWorkspaceSize failed. ERROR: %d\n", ret);
                    return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
-    std::unique_ptr<void, aclError (*)(void *)> workspaceAddrPtr(nullptr, aclrtFree);
+    void* workspaceAddr = nullptr;
+    std::unique_ptr<void, aclError (*)(void*)> workspaceAddrPtr(nullptr, aclrtFree);
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_FREE_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

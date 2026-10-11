@@ -2040,7 +2040,7 @@ std::vector<gert::InfershapeContextPara::TensorDescription> BuildExtendedInferSh
 
 std::vector<gert::InfershapeContextPara::OpAttr> BuildExtendedInferShapeAttrs(
     int64_t activeNum, int64_t expertCapacity, int64_t expertNum, int64_t dropPadMode, int64_t expertTokensNumType,
-    bool expertTokensNumFlag, int64_t quantMode, const std::vector<int64_t> &activeExpertRange, int64_t rowIdxType)
+    bool expertTokensNumFlag, int64_t quantMode, const std::vector<int64_t>& activeExpertRange, int64_t rowIdxType)
 {
     return {
         {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(activeNum)},
@@ -2058,7 +2058,7 @@ std::vector<gert::InfershapeContextPara::OpAttr> BuildExtendedInferShapeAttrs(
 gert::InfershapeContextPara MakeExtendedInferShapeContextPara(
     ShapeList xShape, ge::DataType xDtype, ShapeList expertIdxShape, ShapeList scaleShape, ShapeList offsetShape,
     int64_t activeNum, int64_t expertCapacity, int64_t expertNum, int64_t dropPadMode, int64_t expertTokensNumType,
-    bool expertTokensNumFlag, int64_t quantMode, const std::vector<int64_t> &activeExpertRange, int64_t rowIdxType)
+    bool expertTokensNumFlag, int64_t quantMode, const std::vector<int64_t>& activeExpertRange, int64_t rowIdxType)
 {
     auto inputs = BuildExtendedInferShapeInputs(xShape, xDtype, expertIdxShape, scaleShape, offsetShape);
     ge::DataType expandedXDtype = GetExpandedXDtype(xDtype, quantMode);
@@ -2084,8 +2084,8 @@ void RunExtendedSuccessInferShape(ShapeList xShape, ge::DataType xDtype, ShapeLi
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
-void RunFailureInferShape(const std::vector<gert::InfershapeContextPara::TensorDescription> &inputs,
-                          const std::vector<gert::InfershapeContextPara::OpAttr> &attrs)
+void RunFailureInferShape(const std::vector<gert::InfershapeContextPara::TensorDescription>& inputs,
+                          const std::vector<gert::InfershapeContextPara::OpAttr>& attrs)
 {
     gert::InfershapeContextPara infershapeContextPara("MoeInitRoutingV3", inputs,
                                                       {

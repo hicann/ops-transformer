@@ -22,107 +22,117 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void moe_token_permute_with_ep_grad(GM_ADDR permuted_output_grad, GM_ADDR sorted_indices,
-                                                                     GM_ADDR permuted_probs_output_grad, GM_ADDR token_grad,
-                                                                     GM_ADDR probs_grad, GM_ADDR workspace, GM_ADDR tiling);
+extern "C" __global__ __aicore__ void moe_token_permute_with_ep_grad(GM_ADDR permuted_output_grad,
+                                                                     GM_ADDR sorted_indices,
+                                                                     GM_ADDR permuted_probs_output_grad,
+                                                                     GM_ADDR token_grad, GM_ADDR probs_grad,
+                                                                     GM_ADDR workspace, GM_ADDR tiling);
 class moe_token_permute_with_ep_grad_test : public testing::Test {
- protected:
-  static void SetUpTestCase() {
-    cout << "moe_token_permute_with_ep_grad_test SetUp\n" << endl;
-  }
-  static void TearDownTestCase() {
-    cout << "moe_token_permute_with_ep_grad_test TearDown\n" << endl;
-  }
+protected:
+    static void SetUpTestCase()
+    {
+        cout << "moe_token_permute_with_ep_grad_test SetUp\n" << endl;
+    }
+    static void TearDownTestCase()
+    {
+        cout << "moe_token_permute_with_ep_grad_test TearDown\n" << endl;
+    }
 };
 
-TEST_F(moe_token_permute_with_ep_grad_test, test_bf16_none_prob) {
-  // system("chmod -R 755 ./gen_data/");
-  // // token_num, topk, hiddensize, dtype, flag
-  // system("cd ./gen_data/ && python3 gen_data.py 6144 8 5120 bfloat16_t True");
-  // system("cd ./moe_token_permute_grad_data/ && python3 gen_tiling.py case0");
+TEST_F(moe_token_permute_with_ep_grad_test, test_bf16_none_prob)
+{
+    // system("chmod -R 755 ./gen_data/");
+    // // token_num, topk, hiddensize, dtype, flag
+    // system("cd ./gen_data/ && python3 gen_data.py 6144 8 5120 bfloat16_t True");
+    // system("cd ./moe_token_permute_grad_data/ && python3 gen_tiling.py case0");
 
-  size_t permutedOutDByteSize = 6144 * 8 * 5120 * sizeof(bfloat16_t);
-  size_t sortedIndicesByteSize = 6144 * 8 * sizeof(int32_t);
-  size_t probsByteSize = 6144 * 8 * sizeof(bfloat16_t);
-  // output
-  size_t inputDByteSize = 6144 * 5120 * sizeof(bfloat16_t);
-  size_t inputProbsDByteSize = 6144 * 8 * sizeof(bfloat16_t);
-  size_t tilingDataSize = sizeof(MoeTokenPermuteWithEpGradTilingData);
+    size_t permutedOutDByteSize = 6144 * 8 * 5120 * sizeof(bfloat16_t);
+    size_t sortedIndicesByteSize = 6144 * 8 * sizeof(int32_t);
+    size_t probsByteSize = 6144 * 8 * sizeof(bfloat16_t);
+    // output
+    size_t inputDByteSize = 6144 * 5120 * sizeof(bfloat16_t);
+    size_t inputProbsDByteSize = 6144 * 8 * sizeof(bfloat16_t);
+    size_t tilingDataSize = sizeof(MoeTokenPermuteWithEpGradTilingData);
 
-  uint8_t* permuted_output_d = (uint8_t*)AscendC::GmAlloc(permutedOutDByteSize + 32);
-  uint8_t* sorted_indices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize + 32);
-  uint8_t* probs = (uint8_t*)AscendC::GmAlloc(probsByteSize + 32);
+    uint8_t* permuted_output_d = (uint8_t*)AscendC::GmAlloc(permutedOutDByteSize + 32);
+    uint8_t* sorted_indices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize + 32);
+    uint8_t* probs = (uint8_t*)AscendC::GmAlloc(probsByteSize + 32);
 
-  uint8_t* input_grad = (uint8_t*)AscendC::GmAlloc(inputDByteSize + 32);
-  uint8_t* input_probs_grad = (uint8_t*)AscendC::GmAlloc(inputProbsDByteSize + 32);
+    uint8_t* input_grad = (uint8_t*)AscendC::GmAlloc(inputDByteSize + 32);
+    uint8_t* input_probs_grad = (uint8_t*)AscendC::GmAlloc(inputProbsDByteSize + 32);
 
-  uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024 + 32);
-  uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize + 32);
-  uint32_t blockDim = 48;
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024 + 32);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize + 32);
+    uint32_t blockDim = 48;
 
-  char* path_ = get_current_dir_name();
-  string path(path_);
+    char* path_ = get_current_dir_name();
+    string path(path_);
 
-  MoeTokenPermuteWithEpGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenPermuteWithEpGradTilingData*>(tiling);
-  tilingDatafromBin->top_k=1;
-  tilingDatafromBin->hidden_splited_length=1;
-  tilingDatafromBin->tokens_splited_length=1;
-  tilingDatafromBin->buffer_num=1;
-  ICPU_SET_TILING_KEY(0);
-  ICPU_RUN_KF(moe_token_permute_with_ep_grad, blockDim, permuted_output_d, sorted_indices, probs, input_grad, input_probs_grad, workspace, tiling);
+    MoeTokenPermuteWithEpGradTilingData* tilingDatafromBin =
+        reinterpret_cast<MoeTokenPermuteWithEpGradTilingData*>(tiling);
+    tilingDatafromBin->top_k = 1;
+    tilingDatafromBin->hidden_splited_length = 1;
+    tilingDatafromBin->tokens_splited_length = 1;
+    tilingDatafromBin->buffer_num = 1;
+    ICPU_SET_TILING_KEY(0);
+    ICPU_RUN_KF(moe_token_permute_with_ep_grad, blockDim, permuted_output_d, sorted_indices, probs, input_grad,
+                input_probs_grad, workspace, tiling);
 
-  AscendC::GmFree(permuted_output_d);
-  AscendC::GmFree(sorted_indices);
-  AscendC::GmFree(probs);
-  AscendC::GmFree(input_grad);
-  AscendC::GmFree(input_probs_grad);
-  AscendC::GmFree(workspace);
-  AscendC::GmFree(tiling);
-  free(path_);
+    AscendC::GmFree(permuted_output_d);
+    AscendC::GmFree(sorted_indices);
+    AscendC::GmFree(probs);
+    AscendC::GmFree(input_grad);
+    AscendC::GmFree(input_probs_grad);
+    AscendC::GmFree(workspace);
+    AscendC::GmFree(tiling);
+    free(path_);
 }
 
-TEST_F(moe_token_permute_with_ep_grad_test, test_bf16_with_prob) {
-  system("chmod -R 755 ./gen_data/");
-  // token_num, topk, hiddensize, dtype, flag
-  system("cd ./gen_data/ && python3 gen_data.py 6144 8 5120 bfloat16_t True");
-  system("cd ./moe_token_permute_grad_data/ && python3 gen_tiling.py case0");
+TEST_F(moe_token_permute_with_ep_grad_test, test_bf16_with_prob)
+{
+    system("chmod -R 755 ./gen_data/");
+    // token_num, topk, hiddensize, dtype, flag
+    system("cd ./gen_data/ && python3 gen_data.py 6144 8 5120 bfloat16_t True");
+    system("cd ./moe_token_permute_grad_data/ && python3 gen_tiling.py case0");
 
-  size_t permutedOutDByteSize = 6144 * 8 * 5120 * sizeof(bfloat16_t);
-  size_t sortedIndicesByteSize = 6144 * 8 * sizeof(int32_t);
-  size_t probsByteSize = 6144 * 8 * sizeof(bfloat16_t);
-  // output
-  size_t inputDByteSize = 6144 * 5120 * sizeof(bfloat16_t);
-  size_t inputProbsDByteSize = 6144 * 8 * sizeof(bfloat16_t);
-  size_t tilingDataSize = sizeof(MoeTokenPermuteWithEpGradTilingData);
+    size_t permutedOutDByteSize = 6144 * 8 * 5120 * sizeof(bfloat16_t);
+    size_t sortedIndicesByteSize = 6144 * 8 * sizeof(int32_t);
+    size_t probsByteSize = 6144 * 8 * sizeof(bfloat16_t);
+    // output
+    size_t inputDByteSize = 6144 * 5120 * sizeof(bfloat16_t);
+    size_t inputProbsDByteSize = 6144 * 8 * sizeof(bfloat16_t);
+    size_t tilingDataSize = sizeof(MoeTokenPermuteWithEpGradTilingData);
 
-  uint8_t* permuted_output_d = (uint8_t*)AscendC::GmAlloc(permutedOutDByteSize + 32);
-  uint8_t* sorted_indices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize + 32);
-  uint8_t* probs = (uint8_t*)AscendC::GmAlloc(probsByteSize + 32);
+    uint8_t* permuted_output_d = (uint8_t*)AscendC::GmAlloc(permutedOutDByteSize + 32);
+    uint8_t* sorted_indices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize + 32);
+    uint8_t* probs = (uint8_t*)AscendC::GmAlloc(probsByteSize + 32);
 
-  uint8_t* input_grad = (uint8_t*)AscendC::GmAlloc(inputDByteSize + 32);
-  uint8_t* input_probs_grad = (uint8_t*)AscendC::GmAlloc(inputProbsDByteSize + 32);
+    uint8_t* input_grad = (uint8_t*)AscendC::GmAlloc(inputDByteSize + 32);
+    uint8_t* input_probs_grad = (uint8_t*)AscendC::GmAlloc(inputProbsDByteSize + 32);
 
-  uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024 + 32);
-  uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize + 32);
-  uint32_t blockDim = 48;
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024 + 32);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize + 32);
+    uint32_t blockDim = 48;
 
-  char* path_ = get_current_dir_name();
-  string path(path_);
+    char* path_ = get_current_dir_name();
+    string path(path_);
 
-  MoeTokenPermuteWithEpGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenPermuteWithEpGradTilingData*>(tiling);
-  tilingDatafromBin->top_k=1;
-  tilingDatafromBin->hidden_splited_length=1;
-  tilingDatafromBin->tokens_splited_length=1;
-  tilingDatafromBin->buffer_num=1;
-  ICPU_SET_TILING_KEY(1);
-  ICPU_RUN_KF(moe_token_permute_with_ep_grad, blockDim, permuted_output_d, sorted_indices, probs, input_grad, input_probs_grad, workspace, tiling);
+    MoeTokenPermuteWithEpGradTilingData* tilingDatafromBin =
+        reinterpret_cast<MoeTokenPermuteWithEpGradTilingData*>(tiling);
+    tilingDatafromBin->top_k = 1;
+    tilingDatafromBin->hidden_splited_length = 1;
+    tilingDatafromBin->tokens_splited_length = 1;
+    tilingDatafromBin->buffer_num = 1;
+    ICPU_SET_TILING_KEY(1);
+    ICPU_RUN_KF(moe_token_permute_with_ep_grad, blockDim, permuted_output_d, sorted_indices, probs, input_grad,
+                input_probs_grad, workspace, tiling);
 
-  AscendC::GmFree(permuted_output_d);
-  AscendC::GmFree(sorted_indices);
-  AscendC::GmFree(probs);
-  AscendC::GmFree(input_grad);
-  AscendC::GmFree(input_probs_grad);
-  AscendC::GmFree(workspace);
-  AscendC::GmFree(tiling);
-  free(path_);
+    AscendC::GmFree(permuted_output_d);
+    AscendC::GmFree(sorted_indices);
+    AscendC::GmFree(probs);
+    AscendC::GmFree(input_grad);
+    AscendC::GmFree(input_probs_grad);
+    AscendC::GmFree(workspace);
+    AscendC::GmFree(tiling);
+    free(path_);
 }

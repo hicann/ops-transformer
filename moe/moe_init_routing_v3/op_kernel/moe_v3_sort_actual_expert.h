@@ -28,7 +28,7 @@ public:
     __aicore__ inline MoeSortActualExpert(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX, GM_ADDR expendedRowIdx,
                                 GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale, GM_ADDR workspace,
-                                const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline bool Process();
     __aicore__ inline void multiCoreGatheredSort();
     __aicore__ inline void CopyOutExpandRowIdx();
@@ -42,7 +42,7 @@ private:
     __aicore__ inline void CopyOutExpertCount();
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     TBuf<TPosition::VECCALC> buffer_;
     TQueBind<TPosition::VECIN, TPosition::VECOUT, SINGLE_GATHERED_BUFFER_NUM> scaleCopyInQueue_;
     TQue<TPosition::VECOUT, 1> sortedNumCopyOutQueue_;
@@ -354,7 +354,7 @@ template <typename T>
 __aicore__ inline void MoeSortActualExpert<T>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX,
                                                     GM_ADDR expendedRowIdx, GM_ADDR expertTokensCountOrCumsum,
                                                     GM_ADDR expandedScale, GM_ADDR workspace,
-                                                    const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe)
+                                                    const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe)
 {
     this->pipe = tPipe;
     this->totalLength_ = tilingData->n * tilingData->k;
@@ -365,28 +365,28 @@ __aicore__ inline void MoeSortActualExpert<T>::Init(GM_ADDR x, GM_ADDR expertIdx
     isInputScale_ = tilingData->isInputScale;
     k_ = tilingData->k;
 
-    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertIdx);
+    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertIdx);
 
-    expendedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expendedRowIdx);
+    expendedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expendedRowIdx);
 
-    xGm_.SetGlobalBuffer((__gm__ T *)x);
-    scaleGm_.SetGlobalBuffer((__gm__ float *)scale);
-    expandedXGm_.SetGlobalBuffer((__gm__ T *)expandedX);
-    expertTokensCountOrCumsumGm_.SetGlobalBuffer((__gm__ int64_t *)expertTokensCountOrCumsum);
-    expandedScaleGm_.SetGlobalBuffer((__gm__ float *)expandedScale);
-    workspaceGm_.SetGlobalBuffer((__gm__ int32_t *)workspace, ASSIST_NUM);
+    xGm_.SetGlobalBuffer((__gm__ T*)x);
+    scaleGm_.SetGlobalBuffer((__gm__ float*)scale);
+    expandedXGm_.SetGlobalBuffer((__gm__ T*)expandedX);
+    expertTokensCountOrCumsumGm_.SetGlobalBuffer((__gm__ int64_t*)expertTokensCountOrCumsum);
+    expandedScaleGm_.SetGlobalBuffer((__gm__ float*)expandedScale);
+    workspaceGm_.SetGlobalBuffer((__gm__ int32_t*)workspace, ASSIST_NUM);
     if (GetBlockIdx() == 0) {
         InitGlobalMemory(workspaceGm_, ASSIST_NUM, 0);
         SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
     }
     // 多核sort场景workspace分为5段，分别为ExpertIdx、ExpertIndex、gatheredSortNum、GatheredExpertIdx、GatheredExpertIndex
-    workspaceExpertIdxGm_.SetGlobalBuffer((__gm__ float *)workspace);
+    workspaceExpertIdxGm_.SetGlobalBuffer((__gm__ float*)workspace);
     int64_t offset = kvFactor * Align(this->totalLength_, sizeof(int32_t));
-    workspaceGatheredExpertIdxGm_.SetGlobalBuffer((__gm__ float *)workspace + offset);
+    workspaceGatheredExpertIdxGm_.SetGlobalBuffer((__gm__ float*)workspace + offset);
     offset += Align(this->totalLength_, sizeof(float));
-    workspaceGatheredExpertIndexGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + offset);
+    workspaceGatheredExpertIndexGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + offset);
     offset += Align(this->totalLength_, sizeof(float));
-    workspaceGatheredSortNumGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + offset);
+    workspaceGatheredSortNumGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + offset);
 
     expertIdxOffset_ = AlignBytes(this->totalLength_, sizeof(int32_t));
     expertIndexOffset_ = expertIdxOffset_;

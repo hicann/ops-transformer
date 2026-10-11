@@ -69,42 +69,42 @@
 
 using namespace MoeFinalizeRoutingV2Regbase;
 
-#define MOE_FINALIZE_ROUTING_V2_H_FULLLOAD_IMPL(INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE)                        \
-    do {                                                                                                       \
+#define MOE_FINALIZE_ROUTING_V2_H_FULLLOAD_IMPL(INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE) \
+    do { \
         MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2HFullLoad<INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE> op; \
-        op.Init(expandedX, expandedRowIdx, x1, x2, bias, scales, expertIdx, x,                                \
-            a1, a2, v, y, userWS, &tilingData, &tPipe);                          \
-        op.Process();                                                                                          \
+        op.Init(expandedX, expandedRowIdx, x1, x2, bias, scales, expertIdx, x, a1, a2, v, y, userWS, &tilingData, \
+                &tPipe); \
+        op.Process(); \
     } while (0)
 
-#define MOE_FINALIZE_ROUTING_V2_H_PARTIALLOAD_IMPL(INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE)                        \
-    do {                                                                                                          \
+#define MOE_FINALIZE_ROUTING_V2_H_PARTIALLOAD_IMPL(INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE) \
+    do { \
         MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2HPartialLoad<INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE> op; \
-        op.Init(expandedX, expandedRowIdx, x1, x2, bias, scales, expertIdx,  x,                                \
-            a1, a2, v, y, userWS, &tilingData, &tPipe);      \
-        op.Process();                                                                                             \
+        op.Init(expandedX, expandedRowIdx, x1, x2, bias, scales, expertIdx, x, a1, a2, v, y, userWS, &tilingData, \
+                &tPipe); \
+        op.Process(); \
     } while (0)
 
-#define MOE_FINALIZE_ROUTING_V2_ROWKH_FULLLOAD_IMPL(INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE)                        \
-    do {                                                                                                           \
+#define MOE_FINALIZE_ROUTING_V2_ROWKH_FULLLOAD_IMPL(INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE) \
+    do { \
         MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2RowKHFullLoad<INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE> op; \
-        op.Init(expandedX, expandedRowIdx, x1, x2, bias, scales, expertIdx,  x,                                \
-            a1, a2, v, y, userWS, &tilingData, &tPipe);       \
-        op.Process();                                                                                              \
+        op.Init(expandedX, expandedRowIdx, x1, x2, bias, scales, expertIdx, x, a1, a2, v, y, userWS, &tilingData, \
+                &tPipe); \
+        op.Process(); \
     } while (0)
 
-#define MOE_FINALIZE_ROUTING_V2_KH_FULLLOAD_IMPL(INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE)                        \
-    do {                                                                                                        \
+#define MOE_FINALIZE_ROUTING_V2_KH_FULLLOAD_IMPL(INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE) \
+    do { \
         MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2KHFullLoad<INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE> op; \
-        op.Init(expandedX, expandedRowIdx, x1, x2, bias, scales, expertIdx,  x,                                \
-            a1, a2, v, y, userWS, &tilingData, &tPipe);    \
-        op.Process();                                                                                           \
+        op.Init(expandedX, expandedRowIdx, x1, x2, bias, scales, expertIdx, x, a1, a2, v, y, userWS, &tilingData, \
+                &tPipe); \
+        op.Process(); \
     } while (0)
 
-extern "C" __global__ __aicore__ void moe_finalize_routing_v2(
-    GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR scales, GM_ADDR expertIdx,
-    GM_ADDR x, GM_ADDR a1, GM_ADDR a2, GM_ADDR v, GM_ADDR y, GM_ADDR workspace,
-    GM_ADDR tiling)
+extern "C" __global__ __aicore__ void moe_finalize_routing_v2(GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1,
+                                                              GM_ADDR x2, GM_ADDR bias, GM_ADDR scales,
+                                                              GM_ADDR expertIdx, GM_ADDR x, GM_ADDR a1, GM_ADDR a2,
+                                                              GM_ADDR v, GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling)
 {
     GM_ADDR userWS = GetUserWorkspace(workspace);
     if (userWS == nullptr) {

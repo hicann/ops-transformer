@@ -33,11 +33,10 @@ ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::GetPlatformInfo()
     socVersion = ascendcPlatform.GetSocVersion();
 
     auto compileInfoPtr = reinterpret_cast<const MoeInitRoutingV2GradCompileInfo*>(context_->GetCompileInfo());
-    OP_CHECK_IF(
-        compileInfoPtr == nullptr,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            context_->GetNodeName(), "compileInfo", "nullptr", "Compile info should not be null."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(compileInfoPtr == nullptr,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "compileInfo", "nullptr",
+                                                      "Compile info should not be null."),
+                return ge::GRAPH_FAILED);
     aivNum = compileInfoPtr->aivNum;
     aicoreParams_.numBlocks = aivNum;
     aicoreParams_.ubSize = compileInfoPtr->ubSize;
@@ -47,8 +46,8 @@ ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::GetPlatformInfo()
 
 ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckDtypeValidity()
 {
-    const std::vector<ge::DataType> DATA_TYPE_SUPPORT = {
-        ge::DataType::DT_FLOAT, ge::DataType::DT_FLOAT16, ge::DataType::DT_BF16};
+    const std::vector<ge::DataType> DATA_TYPE_SUPPORT = {ge::DataType::DT_FLOAT, ge::DataType::DT_FLOAT16,
+                                                         ge::DataType::DT_BF16};
     // 获取输入dtype
     auto gradExpandedXDesc = context_->GetInputDesc(0);
     OP_CHECK_NULL_WITH_CONTEXT(context_, gradExpandedXDesc);
@@ -61,9 +60,8 @@ ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckDtypeValidity()
     auto outDtype = gradXDesc->GetDataType();
     if (inDtype != outDtype) {
         std::string dtypeMsg = Ops::Base::ToString(inDtype) + " and " + Ops::Base::ToString(outDtype);
-        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
-            context_->GetNodeName(), "grad_expanded_x and grad_x", dtypeMsg.c_str(),
-            "The dtype of grad_expanded_x and grad_x must be the same.");
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context_->GetNodeName(), "grad_expanded_x and grad_x", dtypeMsg.c_str(),
+                                               "The dtype of grad_expanded_x and grad_x must be the same.");
         return ge::GRAPH_FAILED;
     }
     if (rowIdxDtype != ge::DataType::DT_INT32) {
@@ -74,8 +72,8 @@ ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckDtypeValidity()
     auto it = std::find(DATA_TYPE_SUPPORT.begin(), DATA_TYPE_SUPPORT.end(), inDtype);
     if (it == DATA_TYPE_SUPPORT.end()) {
         std::string dtypeStr = Ops::Base::ToString(inDtype);
-        OP_LOGE_FOR_INVALID_DTYPE(
-            context_->GetNodeName(), "grad_expanded_x", dtypeStr.c_str(), "FLOAT, FLOAT16 or BF16");
+        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "grad_expanded_x", dtypeStr.c_str(),
+                                  "FLOAT, FLOAT16 or BF16");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -84,18 +82,18 @@ ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckDtypeValidity()
 ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckShapeAllPositive(const gert::Shape& shape, std::string name)
 {
     for (size_t i = 0; i < shape.GetDimNum(); i++) {
-        OP_CHECK_IF(
-            shape.GetDim(i) <= 0,
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                context_->GetNodeName(), (name + " dim " + std::to_string(i)).c_str(),
-                std::to_string(shape.GetDim(i)).c_str(), "Shape dim should be positive."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(shape.GetDim(i) <= 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        context_->GetNodeName(), (name + " dim " + std::to_string(i)).c_str(),
+                        std::to_string(shape.GetDim(i)).c_str(), "Shape dim should be positive."),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckShapeValidity(
-    const gert::Shape& xShape, const gert::Shape& rowIdxShape, const gert::Shape& gradXShape)
+ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckShapeValidity(const gert::Shape& xShape,
+                                                                        const gert::Shape& rowIdxShape,
+                                                                        const gert::Shape& gradXShape)
 {
     if (CheckShapeAllPositive(rowIdxShape, "rowIdxShape") != ge::GRAPH_SUCCESS ||
         CheckShapeAllPositive(gradXShape, "gradXShape") != ge::GRAPH_SUCCESS) {
@@ -109,21 +107,21 @@ ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckShapeValidity(
     } else {
         // 索引含-1场景，xShape可以有0
         for (size_t i = 0; i < xShape.GetDimNum(); i++) {
-            OP_CHECK_IF(
-                xShape.GetDim(i) < 0,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                    context_->GetNodeName(), ("grad_expanded_x dim " + std::to_string(i)).c_str(),
-                    std::to_string(xShape.GetDim(i)).c_str(),
-                    "Shape dim should be greater than or equal to 0."),
-                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(xShape.GetDim(i) < 0,
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(),
+                                                              ("grad_expanded_x dim " + std::to_string(i)).c_str(),
+                                                              std::to_string(xShape.GetDim(i)).c_str(),
+                                                              "Shape dim should be greater than or equal to 0."),
+                        return ge::GRAPH_FAILED);
         }
     }
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckParamsValidity(
-    const gert::Shape& xShape, const gert::Shape& rowIdxShape, const gert::Shape& gradXShape) const
+ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckParamsValidity(const gert::Shape& xShape,
+                                                                         const gert::Shape& rowIdxShape,
+                                                                         const gert::Shape& gradXShape) const
 {
     // attr属性校验
     if (dropPadMode != 0 && dropPadMode != 1) {
@@ -140,8 +138,8 @@ ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckParamsValidity(
 
     if (activeNum < 0) {
         std::string activeNumStr = std::to_string(activeNum);
-        OP_LOGE_WITH_INVALID_ATTR(
-            context_->GetNodeName(), "active_num", activeNumStr.c_str(), "greater than or equal to 0");
+        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "active_num", activeNumStr.c_str(),
+                                  "greater than or equal to 0");
         return ge::GRAPH_FAILED;
     }
 
@@ -162,9 +160,9 @@ ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckParamsValidity(
     if (dropPadMode == 0) {
         if (activeNum == 0 && xShape.GetDim(0) != rowIdxShape.GetDim(0)) {
             std::string shapeMsg = Ops::Base::ToString(xShape) + " and " + Ops::Base::ToString(rowIdxShape);
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "grad_expanded_x and expanded_row_idx", shapeMsg.c_str(),
-                "Dim 0 size should be the same under dropless mode.");
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "grad_expanded_x and expanded_row_idx",
+                                                   shapeMsg.c_str(),
+                                                   "Dim 0 size should be the same under dropless mode.");
             return ge::GRAPH_FAILED;
         }
 
@@ -184,12 +182,12 @@ ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckParamsValidity(
         return ge::GRAPH_FAILED;
     }
 
-    int64_t hiddenSizeLocal = (dropPadMode == 0) ? xShape.GetDim(1) : xShape.GetDim(2); // 2: drop/pad 场景，尾轴在第三维
+    int64_t hiddenSizeLocal =
+        (dropPadMode == 0) ? xShape.GetDim(1) : xShape.GetDim(2); // 2: drop/pad 场景，尾轴在第三维
     if (gradXShape.GetDim(1) != hiddenSizeLocal) {
         std::string shapeMsg = Ops::Base::ToString(xShape) + " and " + Ops::Base::ToString(gradXShape);
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-            context_->GetNodeName(), "grad_expanded_x and grad_x", shapeMsg.c_str(),
-            "Tail dim size of input and output should be the same.");
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "grad_expanded_x and grad_x", shapeMsg.c_str(),
+                                               "Tail dim size of input and output should be the same.");
         return ge::GRAPH_FAILED;
     }
 
@@ -253,9 +251,9 @@ ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::GetShapeAttrsInfo()
     hiddenSize = (dropPadMode == 0) ? xShape.GetDim(1) : xShape.GetDim(2); // 2 for H, when shape is {E, C, H}
     if (BSK % topK != 0) {
         std::string actualMsg = "expanded_row_idx dim 0: " + std::to_string(BSK) + ", top_k: " + std::to_string(topK);
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            context_->GetNodeName(), "expanded_row_idx dim 0 and top_k", actualMsg.c_str(),
-            "expanded_row_idx dim 0 should be divisible by top_k.");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expanded_row_idx dim 0 and top_k",
+                                              actualMsg.c_str(),
+                                              "expanded_row_idx dim 0 should be divisible by top_k.");
         return ge::GRAPH_FAILED;
     }
     N = BSK / topK;
@@ -283,7 +281,7 @@ ge::graphStatus TilingForMoeInitRoutingV2Grad(gert::TilingContext* context)
 ge::graphStatus TilingPrepareForMoeInitRoutingV2Grad(gert::TilingParseContext* context)
 {
     OP_LOGD(context, "TilingPrepareForMoeInitRountingV2Grad enter.");
-    
+
     auto compileInfo = context->GetCompiledInfo<MoeInitRoutingV2GradCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);
     auto platformInfo = context->GetPlatformInfo();
@@ -292,8 +290,8 @@ ge::graphStatus TilingPrepareForMoeInitRoutingV2Grad(gert::TilingParseContext* c
     compileInfo->aivNum = ascendcPlatform.GetCoreNumAiv();
     if (compileInfo->aivNum <= 0) {
         std::string aivNumStr = std::to_string(compileInfo->aivNum);
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            context->GetNodeName(), "aivNum", aivNumStr.c_str(), "Failed to get valid core num.");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "aivNum", aivNumStr.c_str(),
+                                              "Failed to get valid core num.");
         return ge::GRAPH_FAILED;
     }
 
@@ -302,8 +300,8 @@ ge::graphStatus TilingPrepareForMoeInitRoutingV2Grad(gert::TilingParseContext* c
     compileInfo->ubSize = static_cast<int64_t>(ubSize);
     if (compileInfo->ubSize <= 0) {
         std::string ubSizeStr = std::to_string(compileInfo->ubSize);
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            context->GetNodeName(), "ubSize", ubSizeStr.c_str(), "Failed to get valid ub size.");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "ubSize", ubSizeStr.c_str(),
+                                              "Failed to get valid ub size.");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;

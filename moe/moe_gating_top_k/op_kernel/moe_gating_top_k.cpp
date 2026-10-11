@@ -45,7 +45,7 @@ extern "C" __global__ __aicore__ void moe_gating_top_k(GM_ADDR x, GM_ADDR bias, 
         return;
     }
 
-    const MoeGatingTopKTilingData *__restrict t = &tilingData;
+    const MoeGatingTopKTilingData* __restrict t = &tilingData;
     TPipe tPipe;
     if (TILING_KEY_IS(TILING_KEY_PER_GROUP_COUNT_32)) {
         MoeGatingTopKEKFullload<DTYPE_X> op;

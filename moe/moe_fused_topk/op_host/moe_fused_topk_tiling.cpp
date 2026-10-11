@@ -56,7 +56,7 @@ using Ops::Base::CeilAlign;
 
 class MoeFusedTopkTiling {
 public:
-    explicit MoeFusedTopkTiling(gert::TilingContext *context)
+    explicit MoeFusedTopkTiling(gert::TilingContext* context)
         : tilingContext_(context)
     {}
     ge::graphStatus Init();
@@ -96,7 +96,7 @@ protected:
     uint64_t tilingKey_ = 0;
     uint64_t workspacePerCore_ = 0;
     MoeFusedTopkTilingData tilingData_;
-    gert::TilingContext *tilingContext_ = nullptr;
+    gert::TilingContext* tilingContext_ = nullptr;
 };
 
 ge::graphStatus MoeFusedTopkTiling::Init()
@@ -123,7 +123,7 @@ ge::graphStatus MoeFusedTopkTiling::Init()
         expertNum_ = mappingTableShape.GetDim(DIM_INDEX0);
         tableDim_ = mappingTableShape.GetDim(DIM_INDEX1);
     }
-    auto compileInfo = static_cast<const MoeFusedTopkCompileInfo *>(tilingContext_->GetCompileInfo());
+    auto compileInfo = static_cast<const MoeFusedTopkCompileInfo*>(tilingContext_->GetCompileInfo());
     OP_CHECK_NULL_WITH_CONTEXT(tilingContext_, compileInfo);
     coreNum_ = compileInfo->coreNum;
     ubSize_ = (compileInfo->ubSize - RESERVED_UB) / BYTE_BLOCK * BYTE_BLOCK;
@@ -231,7 +231,7 @@ ge::graphStatus MoeFusedTopkTiling::SetKernelTiling()
     tilingData_.set_topkMinValue(topkMinValue_);
     tilingData_.set_workspacePerCore(workspacePerCore_);
 
-    size_t *workspaces = tilingContext_->GetWorkspaceSizes(1);
+    size_t* workspaces = tilingContext_->GetWorkspaceSizes(1);
     workspaces[0] = usedWorkspaceSize;
 
     tilingData_.SaveToBuffer(tilingContext_->GetRawTilingData()->GetData(),
@@ -318,7 +318,7 @@ void MoeFusedTopkTiling::GetTmpBuffSize()
     topkMaxValue_ = std::max(topkMaxValue_, topkMinValue_);
 }
 
-ge::graphStatus TilingMoeFusedTopk(gert::TilingContext *context)
+ge::graphStatus TilingMoeFusedTopk(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("MoeFusedTopk", "context is null"),
                 return ge::GRAPH_FAILED);
@@ -334,7 +334,7 @@ ge::graphStatus TilingMoeFusedTopk(gert::TilingContext *context)
 
 class MoeFusedTopkTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeFusedTopkTilingBase(gert::TilingContext *context)
+    explicit MoeFusedTopkTilingBase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 

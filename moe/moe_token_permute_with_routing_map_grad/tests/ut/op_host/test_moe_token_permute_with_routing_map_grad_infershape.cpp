@@ -15,42 +15,45 @@
 #include "infer_datatype_context_faker.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 
-
 class MoeTokenPermuteWithRoutingMapGrad : public testing::Test {
- protected:
-  static void SetUpTestCase() {
-    std::cout << "MoeTokenPermuteWithRoutingMapGrad Proto Test SetUp" << std::endl;
-  }
+protected:
+    static void SetUpTestCase()
+    {
+        std::cout << "MoeTokenPermuteWithRoutingMapGrad Proto Test SetUp" << std::endl;
+    }
 
-  static void TearDownTestCase() {
-    std::cout << "MoeTokenPermuteWithRoutingMapGrad Proto Test TearDown" << std::endl;
-  }
+    static void TearDownTestCase()
+    {
+        std::cout << "MoeTokenPermuteWithRoutingMapGrad Proto Test TearDown" << std::endl;
+    }
 };
-TEST_F(MoeTokenPermuteWithRoutingMapGrad,infershape_bf16)
+TEST_F(MoeTokenPermuteWithRoutingMapGrad, infershape_bf16)
 {
     gert::InfershapeContextPara infershapeContextPara(
         "MoeTokenPermuteWithRoutingMapGrad",
-        {// input info
+        {
+            // input info
             {{{1024, 7168}, {1024, 7168}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{1024}, {1024}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{1024, 7168}, {1024, 7168}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{512, 512}, {512, 512}}, ge::DT_INT8, ge::FORMAT_ND},
         },
-        {// output info
+        {
+            // output info
             {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
         },
-        {// attr
+        {
+            // attr
             {"num_experts", Ops::Transformer::AnyValue::CreateFrom<int64_t>(512)},
             {"num_topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(512)},
             {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-        }
-    );
+        });
 
     std::vector<std::vector<int64_t>> expectOutputShape = {
         {512, 7168},
         {512, 2},
-    };                                                                            // 预期输出shape
+    }; // 预期输出shape
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape); // 框架中已提供该接口
 }
 
@@ -69,19 +72,19 @@ TEST_F(MoeTokenPermuteWithRoutingMapGrad, infershape_inferdtype)
     ge::DataType inputRoutingMap = ge::DT_INT8;
     ge::DataType outputTokensGrad = ge::DT_UNDEFINED;
     ge::DataType outputProbsGrad = ge::DT_UNDEFINED;
-    auto contextHolder = gert::InferDataTypeContextFaker()
-                             .IrInputNum(4)
-                             .NodeIoNum(4, 2)
-                             .NodeInputTd(0, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(1, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(2, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(3, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .InputDataTypes({&inputPermutedTokenGrad, &inputPermutedProbsGrad, &inputSortedIndices,
-                                              &inputRoutingMap})
-                             .OutputDataTypes({&outputTokensGrad, &outputProbsGrad})
-                             .Build();
+    auto contextHolder =
+        gert::InferDataTypeContextFaker()
+            .IrInputNum(4)
+            .NodeIoNum(4, 2)
+            .NodeInputTd(0, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(1, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(2, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(3, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+            .InputDataTypes({&inputPermutedTokenGrad, &inputPermutedProbsGrad, &inputSortedIndices, &inputRoutingMap})
+            .OutputDataTypes({&outputTokensGrad, &outputProbsGrad})
+            .Build();
     auto context = contextHolder.GetContext<gert::InferDataTypeContext>();
     ASSERT_NE(context, nullptr);
     EXPECT_EQ(inferDtypeFunc(context), ge::GRAPH_SUCCESS);

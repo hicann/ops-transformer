@@ -22,7 +22,14 @@ from atk.tasks.api_execute.aclnn_base_api import AclnnBaseApi
 @register("function_aclnn_moe_token_permute_with_ep")
 class FunctionApi(BaseApi):
     def __call__(self, input_data: InputDataset, with_output: bool = False):
-        def permute(tokens, indices, probs, range: list = None, num_out_tokens: int = None, padded_mode: bool = False):
+        def permute(
+            tokens,
+            indices,
+            probs,
+            range: list = None,
+            num_out_tokens: int = None,
+            padded_mode: bool = False,
+        ):
             if indices.dim() == 1:
                 topk = 1
             else:
@@ -43,28 +50,34 @@ class FunctionApi(BaseApi):
                 permuted_probs = flatten_probs.index_select(0, sorted_indices)
             return permuted_tokens, sorted_indices1, permuted_probs
 
-
         if self.device == "npu":
             device = f"{self.device}:{self.device_id}"
-            permuted_tokens, sorted_indices, permuted_probs = permute(input_data.kwargs["tokens"],
-                                                                      input_data.kwargs["indices"],
-                                                                      input_data.kwargs["probsOptional"],
-                                                                      input_data.kwargs["rangeOptional"],
-                                                                      input_data.kwargs["numOutTokensOptional"],
-                                                                      input_data.kwargs["paddedModeOptional"])
+            permuted_tokens, sorted_indices, permuted_probs = permute(
+                input_data.kwargs["tokens"],
+                input_data.kwargs["indices"],
+                input_data.kwargs["probsOptional"],
+                input_data.kwargs["rangeOptional"],
+                input_data.kwargs["numOutTokensOptional"],
+                input_data.kwargs["paddedModeOptional"],
+            )
             return permuted_tokens, sorted_indices, permuted_probs
         else:
             device = "cpu"
-            permuted_tokens, sorted_indices, permuted_probs = permute(input_data.kwargs["tokens"],
-                                                                      input_data.kwargs["indices"],
-                                                                      input_data.kwargs["probsOptional"],
-                                                                      input_data.kwargs["rangeOptional"],
-                                                                      input_data.kwargs["numOutTokensOptional"],
-                                                                      input_data.kwargs["paddedModeOptional"])
+            permuted_tokens, sorted_indices, permuted_probs = permute(
+                input_data.kwargs["tokens"],
+                input_data.kwargs["indices"],
+                input_data.kwargs["probsOptional"],
+                input_data.kwargs["rangeOptional"],
+                input_data.kwargs["numOutTokensOptional"],
+                input_data.kwargs["paddedModeOptional"],
+            )
             return permuted_tokens, sorted_indices, permuted_probs
+
 
 @register("AclnnBaseApi_aclnn_moe_token_permute_with_ep")
 class MoeFunctionApi(AclnnBaseApi):
     def init_by_input_data(self, input_data: InputDataset):
-        input_args, output_packages = super(MoeFunctionApi, self).init_by_input_data(input_data)
+        input_args, output_packages = super(MoeFunctionApi, self).init_by_input_data(
+            input_data
+        )
         return input_args, output_packages

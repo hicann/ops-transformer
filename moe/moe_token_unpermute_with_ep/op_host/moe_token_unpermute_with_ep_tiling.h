@@ -74,7 +74,7 @@ struct MoeTokenUnpermuteWithEpParam {
     CoreParam core;
 };
 
-ge::graphStatus UnpermuteWithEpTilingCompute(gert::TilingContext *context, const int64_t topK, const bool isUnpermute);
+ge::graphStatus UnpermuteWithEpTilingCompute(gert::TilingContext* context, const int64_t topK, const bool isUnpermute);
 
 BEGIN_TILING_DATA_DEF(MoeTokenUnpermuteWithEpTilingData)
 TILING_DATA_FIELD_DEF(int64_t, hidden_size);

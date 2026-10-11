@@ -51,7 +51,7 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_fp16)
     auto ut =
         OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(permutedOutputGrad, sortedIndices, numTopk, paddedMode), OUTPUT(out));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -67,7 +67,7 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_fp32)
     auto ut =
         OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(permutedOutputGrad, sortedIndices, numTopk, paddedMode), OUTPUT(out));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -83,7 +83,7 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_bf16)
     auto ut =
         OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(permutedOutputGrad, sortedIndices, numTopk, paddedMode), OUTPUT(out));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -97,7 +97,7 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_permuted
 
     auto ut = OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(nullptr, sortedIndices, numTopk, paddedMode), OUTPUT(out));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -111,7 +111,7 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_sorted_i
 
     auto ut = OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(permutedOutputGrad, nullptr, numTopk, paddedMode), OUTPUT(out));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -126,7 +126,7 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_out_null
     auto ut = OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(permutedOutputGrad, sortedIndices, numTopk, paddedMode),
                         OUTPUT(nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -142,7 +142,7 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_padded_m
     auto ut =
         OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(permutedOutputGrad, sortedIndices, numTopk, paddedMode), OUTPUT(out));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
 }
@@ -158,7 +158,7 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_permuted
     auto ut =
         OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(permutedOutputGrad, sortedIndices, numTopk, paddedMode), OUTPUT(out));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
 }
@@ -174,7 +174,7 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_sorted_i
     auto ut =
         OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(permutedOutputGrad, sortedIndices, numTopk, paddedMode), OUTPUT(out));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
 }
@@ -190,7 +190,7 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_out_dtyp
     auto ut =
         OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(permutedOutputGrad, sortedIndices, numTopk, paddedMode), OUTPUT(out));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
 }
@@ -206,7 +206,7 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_dtype_di
     auto ut =
         OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(permutedOutputGrad, sortedIndices, numTopk, paddedMode), OUTPUT(out));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
 }
@@ -222,7 +222,7 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_execute)
     auto ut =
         OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(permutedOutputGrad, sortedIndices, numTopk, paddedMode), OUTPUT(out));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 

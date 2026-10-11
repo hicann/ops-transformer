@@ -22,12 +22,12 @@
 
 namespace optiling {
 namespace {
-ge::graphStatus TilingForMoeFusedTopk(gert::TilingContext *context)
+ge::graphStatus TilingForMoeFusedTopk(gert::TilingContext* context)
 {
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingPrepareForMoeFusedTopk(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForMoeFusedTopk(gert::TilingParseContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     auto compileInfo = context->GetCompiledInfo<MoeFusedTopkCompileInfo>();

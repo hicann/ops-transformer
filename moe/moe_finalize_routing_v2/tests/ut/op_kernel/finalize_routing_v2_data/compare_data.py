@@ -22,20 +22,20 @@ curr_dir = os.path.dirname(os.path.realpath(__file__))
 
 def compare_data(golden_file, output_file, d_type):
     if d_type == "float16":
-        precision = 1/1000
+        precision = 1 / 1000
     else:
-        precision = 1/10000
+        precision = 1 / 10000
     d_type_dict = {
         "float32": np.float32,
         "float16": np.float16,
         "bfloat16": bf16,
-        "bf16fp32": bf16
+        "bf16fp32": bf16,
     }
     scale_d_type_dict = {
         "float32": np.float32,
         "float16": np.float16,
         "bfloat16": bf16,
-        "bf16fp32": np.float32
+        "bf16fp32": np.float32,
     }
     dtype = d_type_dict.get(d_type)
     scale_dtype = scale_d_type_dict.get(d_type)
@@ -63,5 +63,6 @@ def process(d_type):
     output_file = os.path.join(curr_dir, "output.bin")
     result = compare_data(golden_file, output_file, d_type)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     process(sys.argv[1])

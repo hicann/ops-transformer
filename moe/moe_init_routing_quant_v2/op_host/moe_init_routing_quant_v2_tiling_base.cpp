@@ -57,11 +57,11 @@ const static int64_t EXPERT_TOKENS_COUNT = 2;
 const static int64_t SIMT_UB_SIZE_BYTE = 40960;
 
 #define CHECK_FAIL(context, cond, log_func) \
-    do {                                    \
-        if (cond) {                         \
-            log_func;                       \
-            return ge::GRAPH_FAILED;        \
-        }                                   \
+    do { \
+        if (cond) { \
+            log_func; \
+            return ge::GRAPH_FAILED; \
+        } \
     } while (0)
 
 inline static int64_t CeilLog4(int64_t x)
@@ -86,10 +86,9 @@ void InnerMoeInitRoutingV2TilingBase::Reset()
 ge::graphStatus InnerMoeInitRoutingV2TilingBase::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
-    OP_CHECK_IF(
-        platformInfo == nullptr,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "platformInfo", "nullptr", "fail to get platform info"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(platformInfo == nullptr,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "platformInfo", "nullptr", "fail to get platform info"),
+                return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     aivNum = ascendcPlatform.GetCoreNumAiv();
     aicoreParams_.numBlocks = aivNum;
@@ -115,18 +114,17 @@ ge::graphStatus InnerMoeInitRoutingV2TilingBase::CheckTokenCount(int64_t num, co
     OP_CHECK_NULL_WITH_CONTEXT(context_, expertTokensDesc);
     auto dt = expertTokensDesc->GetDataType();
     CHECK_FAIL(context_, dt != ge::DT_INT32,
-        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), tag, Ops::Base::ToString(dt).c_str(), "INT32"));
+               OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), tag, Ops::Base::ToString(dt).c_str(), "INT32"));
 
     const gert::Shape expertTokensShape = expertTokensShapePtr->GetStorageShape();
     size_t expertTokensDimNum = expertTokensShape.GetDimNum();
     std::string dimStr = std::to_string(expertTokensDimNum) + "D";
     CHECK_FAIL(context_, expertTokensDimNum != DIM_ONE,
-        OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), tag, dimStr.c_str(), "1D"));
-    CHECK_FAIL(
-        context_, expertTokensShape.GetDim(0) != expertNum,
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), tag,
-            Ops::Base::ToString(expertTokensShape).c_str(),
-            "The first dim should be expertNum"));
+               OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), tag, dimStr.c_str(), "1D"));
+    CHECK_FAIL(context_, expertTokensShape.GetDim(0) != expertNum,
+               OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), tag,
+                                                     Ops::Base::ToString(expertTokensShape).c_str(),
+                                                     "The first dim should be expertNum"));
     return ge::GRAPH_SUCCESS;
 }
 
@@ -145,44 +143,44 @@ ge::graphStatus InnerMoeInitRoutingV2TilingBase::CheckOutShape()
     if (dropPadMode > 0) {
         std::string dimStr = std::to_string(expandedXDimNum) + "D";
         CHECK_FAIL(context_, expandedXDimNum != DIM_THREE,
-            OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "expandedX", dimStr.c_str(), "3D"));
-        CHECK_FAIL(
-            context_, expandedXShape.GetDim(0) != expertNum,
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expandedX",
-                Ops::Base::ToString(expandedXShape).c_str(), "The first dim of expandedX should be expertNum"));
-        CHECK_FAIL(
-            context_, expandedXShape.GetDim(1) != expertCapacity,
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expandedX",
-                Ops::Base::ToString(expandedXShape).c_str(), "The second dim of expandedX should be expertCapacity"));
-        CHECK_FAIL(
-            context_, expandedXShape.GetDim(NUM_TWO) != moeInitRoutingTilingData.get_cols(),
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expandedX",
-                Ops::Base::ToString(expandedXShape).c_str(), "The third dim of expandedX should be cols"));
+                   OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "expandedX", dimStr.c_str(), "3D"));
+        CHECK_FAIL(context_, expandedXShape.GetDim(0) != expertNum,
+                   OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expandedX",
+                                                         Ops::Base::ToString(expandedXShape).c_str(),
+                                                         "The first dim of expandedX should be expertNum"));
+        CHECK_FAIL(context_, expandedXShape.GetDim(1) != expertCapacity,
+                   OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expandedX",
+                                                         Ops::Base::ToString(expandedXShape).c_str(),
+                                                         "The second dim of expandedX should be expertCapacity"));
+        CHECK_FAIL(context_, expandedXShape.GetDim(NUM_TWO) != moeInitRoutingTilingData.get_cols(),
+                   OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expandedX",
+                                                         Ops::Base::ToString(expandedXShape).c_str(),
+                                                         "The third dim of expandedX should be cols"));
     } else {
         std::string dimStr = std::to_string(expandedXDimNum) + "D";
         CHECK_FAIL(context_, expandedXDimNum != DIM_TWO,
-            OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "expandedX", dimStr.c_str(), "2D"));
+                   OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "expandedX", dimStr.c_str(), "2D"));
         int64_t firstDim = moeInitRoutingTilingData.get_n() * moeInitRoutingTilingData.get_k();
         firstDim = activateNum == 0 ? firstDim : std::min(firstDim, activateNum);
-        CHECK_FAIL(
-            context_, expandedXShape.GetDim(0) != firstDim,
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expandedX",
-                Ops::Base::ToString(expandedXShape).c_str(),
-                "The first dim of expandedX should be n * k or activeNum"));
-        CHECK_FAIL(
-            context_, expandedXShape.GetDim(1) != moeInitRoutingTilingData.get_cols(),
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expandedX",
-                Ops::Base::ToString(expandedXShape).c_str(), "The second dim of expandedX should be cols"));
+        CHECK_FAIL(context_, expandedXShape.GetDim(0) != firstDim,
+                   OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expandedX",
+                                                         Ops::Base::ToString(expandedXShape).c_str(),
+                                                         "The first dim of expandedX should be n * k or activeNum"));
+        CHECK_FAIL(context_, expandedXShape.GetDim(1) != moeInitRoutingTilingData.get_cols(),
+                   OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expandedX",
+                                                         Ops::Base::ToString(expandedXShape).c_str(),
+                                                         "The second dim of expandedX should be cols"));
     }
 
     size_t expandedRowIdxDimNum = expandedRowIdxShape.GetDimNum();
     std::string expandedRowIdxDimStr = std::to_string(expandedRowIdxDimNum) + "D";
-    CHECK_FAIL(context_, expandedRowIdxDimNum != DIM_ONE,
-        OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "expandedRowIdx", expandedRowIdxDimStr.c_str(), "1D"));
     CHECK_FAIL(
-        context_, expandedRowIdxShape.GetDim(0) != totalLength,
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expandedRowIdx",
-            Ops::Base::ToString(expandedRowIdxShape).c_str(), "The first dim of expandedRowIdx should be totalLength"));
+        context_, expandedRowIdxDimNum != DIM_ONE,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "expandedRowIdx", expandedRowIdxDimStr.c_str(), "1D"));
+    CHECK_FAIL(context_, expandedRowIdxShape.GetDim(0) != totalLength,
+               OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expandedRowIdx",
+                                                     Ops::Base::ToString(expandedRowIdxShape).c_str(),
+                                                     "The first dim of expandedRowIdx should be totalLength"));
 
     if (dropPadMode == 0 && expertTokensCountOrCumsumFlag != 0) {
         if (CheckTokenCount(OUTOUT_EXPERT_TOKENS_COUNT_OR_CUMSUM, "expertTokensCountOrCumsum") == ge::GRAPH_FAILED) {
@@ -242,60 +240,59 @@ ge::graphStatus InnerMoeInitRoutingV2TilingBase::GetShapeAttrsInfo()
     // 参数校验
     size_t xDimNnum = xShape.GetDimNum();
     size_t expertIdxDimNum = expertIdxShape.GetDimNum();
-    CHECK_FAIL(
-        context_, xDimNnum != DIM_TWO || expertIdxDimNum != DIM_TWO,
-        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context_->GetNodeName(), "x and expertIdx",
-            (std::to_string(xDimNnum) + " and " + std::to_string(expertIdxDimNum)).c_str(),
-            "The dim number of x and expertIdx should be 2"));
-    CHECK_FAIL(
-        context_, xShape.GetDim(0) != expertIdxShape.GetDim(0),
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "x and expertIdx",
-            (std::to_string(xShape.GetDim(0)) + " and " + std::to_string(expertIdxShape.GetDim(0))).c_str(),
-            "The first dim of x and expertIdx should be equal"));
+    CHECK_FAIL(context_, xDimNnum != DIM_TWO || expertIdxDimNum != DIM_TWO,
+               OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                   context_->GetNodeName(), "x and expertIdx",
+                   (std::to_string(xDimNnum) + " and " + std::to_string(expertIdxDimNum)).c_str(),
+                   "The dim number of x and expertIdx should be 2"));
+    CHECK_FAIL(context_, xShape.GetDim(0) != expertIdxShape.GetDim(0),
+               OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                   context_->GetNodeName(), "x and expertIdx",
+                   (std::to_string(xShape.GetDim(0)) + " and " + std::to_string(expertIdxShape.GetDim(0))).c_str(),
+                   "The first dim of x and expertIdx should be equal"));
     CHECK_FAIL(context_, xShape.GetDim(0) < 0,
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            context_->GetNodeName(), "x", Ops::Base::ToString(xShape).c_str(),
-            "The first dim of x cannot be less than 0"));
+               OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", Ops::Base::ToString(xShape).c_str(),
+                                                     "The first dim of x cannot be less than 0"));
     CHECK_FAIL(context_, xShape.GetDim(1) < 0,
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            context_->GetNodeName(), "x", Ops::Base::ToString(xShape).c_str(),
-            "The second dim of x cannot be less than 0"));
+               OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", Ops::Base::ToString(xShape).c_str(),
+                                                     "The second dim of x cannot be less than 0"));
     CHECK_FAIL(context_, expertIdxShape.GetDim(0) < 0,
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expertIdx",
-            Ops::Base::ToString(expertIdxShape).c_str(), "The first dim of expertIdx cannot be less than 0"));
+               OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expertIdx",
+                                                     Ops::Base::ToString(expertIdxShape).c_str(),
+                                                     "The first dim of expertIdx cannot be less than 0"));
     CHECK_FAIL(context_, expertIdxShape.GetDim(1) < 0,
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expertIdx",
-            Ops::Base::ToString(expertIdxShape).c_str(), "The second dim of expertIdx cannot be less than 0"));
+               OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expertIdx",
+                                                     Ops::Base::ToString(expertIdxShape).c_str(),
+                                                     "The second dim of expertIdx cannot be less than 0"));
     CHECK_FAIL(context_, activateNum < 0,
-        OP_LOGE_WITH_INVALID_ATTR(
-            context_->GetNodeName(), "activeNum", std::to_string(activateNum).c_str(), "greater than or equal to 0"));
+               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "activeNum", std::to_string(activateNum).c_str(),
+                                         "greater than or equal to 0"));
     CHECK_FAIL(context_, expertCapacity < 0,
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertCapacity",
-            std::to_string(expertCapacity).c_str(), "greater than or equal to 0"));
+               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertCapacity",
+                                         std::to_string(expertCapacity).c_str(), "greater than or equal to 0"));
     CHECK_FAIL(context_, expertNum < 0,
-        OP_LOGE_WITH_INVALID_ATTR(
-            context_->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(), "greater than or equal to 0"));
+               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),
+                                         "greater than or equal to 0"));
     CHECK_FAIL(context_, dropPadMode < 0 || dropPadMode > 1,
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "dropPadMode",
-        std::to_string(dropPadMode).c_str(), "0 or 1"));
-    CHECK_FAIL(
-        context_, dropPadMode > 0 && (expertCapacity < 1 || expertNum < 1),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expertCapacity and expertNum",
-            (std::to_string(expertCapacity) + " and " + std::to_string(expertNum)).c_str(),
-            "The expertCapacity and expertNum should be greater than 0 when dropPadMode is 1"));
-    CHECK_FAIL(
-        context_, expertTokensCountOrCumsumFlag < 0 || expertTokensCountOrCumsumFlag > EXPERT_TOKENS_COUNT,
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertTokensCountOrCumsumFlag",
-            std::to_string(expertTokensCountOrCumsumFlag).c_str(), "0, 1 or 2"));
-    CHECK_FAIL(
-        context_, expertTokensCountOrCumsumFlag > 0 && expertNum <= 0,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),
-            "The expertNum should be greater than 0 when expertTokensCountOrCumsumFlag is greater than 0"));
-    CHECK_FAIL(
-        context_, dropPadMode > 0 && expertCapacity > xShape.GetDim(0),
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "x and expertCapacity",
-            (std::to_string(xShape.GetDim(0)) + " and " + std::to_string(expertCapacity)).c_str(),
-            "The first dim of x cannot be less than expertCapacity"));
+               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "dropPadMode", std::to_string(dropPadMode).c_str(),
+                                         "0 or 1"));
+    CHECK_FAIL(context_, dropPadMode > 0 && (expertCapacity < 1 || expertNum < 1),
+               OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                   context_->GetNodeName(), "expertCapacity and expertNum",
+                   (std::to_string(expertCapacity) + " and " + std::to_string(expertNum)).c_str(),
+                   "The expertCapacity and expertNum should be greater than 0 when dropPadMode is 1"));
+    CHECK_FAIL(context_, expertTokensCountOrCumsumFlag < 0 || expertTokensCountOrCumsumFlag > EXPERT_TOKENS_COUNT,
+               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertTokensCountOrCumsumFlag",
+                                         std::to_string(expertTokensCountOrCumsumFlag).c_str(), "0, 1 or 2"));
+    CHECK_FAIL(context_, expertTokensCountOrCumsumFlag > 0 && expertNum <= 0,
+               OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                   context_->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),
+                   "The expertNum should be greater than 0 when expertTokensCountOrCumsumFlag is greater than 0"));
+    CHECK_FAIL(context_, dropPadMode > 0 && expertCapacity > xShape.GetDim(0),
+               OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                   context_->GetNodeName(), "x and expertCapacity",
+                   (std::to_string(xShape.GetDim(0)) + " and " + std::to_string(expertCapacity)).c_str(),
+                   "The first dim of x cannot be less than expertCapacity"));
     if (dropPadMode == 1) {
         // droppad场景下不输出expertTokensCountOrCumsum
         expertTokensCountOrCumsumFlag = 0;
@@ -320,72 +317,65 @@ ge::graphStatus InnerMoeInitRoutingV2TilingBase::GetShapeAttrsInfo()
 
 void InnerMoeInitRoutingV2TilingBase::ShowTilingData()
 {
-    OP_LOGI(
-        opName,
-        "moeInitRoutingTilingData is coreNum:%ld, n:%ld, cols:%ld, k:%ld, expertCapacity:%ld, expertNum:%ld, "
-        "dropPadMode:%ld, expertTokensCountOrCumsumFlag:%ld, expertTokensBeforeCapacityFlag:%ld",
-        moeInitRoutingTilingData.get_coreNum(), moeInitRoutingTilingData.get_n(), moeInitRoutingTilingData.get_cols(),
-        moeInitRoutingTilingData.get_k(), moeInitRoutingTilingData.get_expertCapacity(),
-        moeInitRoutingTilingData.get_expertNum(), moeInitRoutingTilingData.get_dropPadMode(),
-        moeInitRoutingTilingData.get_expertTokensCountOrCumsumFlag(),
-        moeInitRoutingTilingData.get_expertTokensBeforeCapacityFlag());
-    OP_LOGI(
-        opName,
-        "InnerMoeV2VBSComputeTilingData is needCoreNum:%ld, perCoreElements:%ld, perCoreLoops:%ld, "
-        "perCorePerLoopElements:%ld, "
-        "perCoreLastLoopElements:%ld, lastCoreElements:%ld, lastCoreLoops:%ld, lastCorePerLoopElements:%ld, "
-        "lastCoreLastLoopElements:%ld, oneLoopMaxElements:%ld",
-        moeInitRoutingTilingData.vbsComputeParamsOp.get_needCoreNum(),
-        moeInitRoutingTilingData.vbsComputeParamsOp.get_perCoreElements(),
-        moeInitRoutingTilingData.vbsComputeParamsOp.get_perCoreLoops(),
-        moeInitRoutingTilingData.vbsComputeParamsOp.get_perCorePerLoopElements(),
-        moeInitRoutingTilingData.vbsComputeParamsOp.get_perCoreLastLoopElements(),
-        moeInitRoutingTilingData.vbsComputeParamsOp.get_lastCoreElements(),
-        moeInitRoutingTilingData.vbsComputeParamsOp.get_lastCoreLoops(),
-        moeInitRoutingTilingData.vbsComputeParamsOp.get_lastCorePerLoopElements(),
-        moeInitRoutingTilingData.vbsComputeParamsOp.get_lastCoreLastLoopElements(),
-        moeInitRoutingTilingData.vbsComputeParamsOp.get_oneLoopMaxElements());
-    OP_LOGI(
-        opName, "VMSMiddleComputeTilingData is needCoreNum:%ld",
-        moeInitRoutingTilingData.vmsMiddleComputeParamsOp.get_needCoreNum());
-    OP_LOGI(
-        opName, "SortOutComputeTilingData is oneLoopMaxElements:%ld",
-        moeInitRoutingTilingData.sortOutComputeParamsOp.get_oneLoopMaxElements());
-    OP_LOGI(
-        opName,
-        "SrcToDstComputeTilingData is needCoreNum:%ld, activateRows:%ld, perCoreRows:%ld, perCorePerLoopRows:%ld, "
-        "perCoreLastLoopRows:%ld, lastCoreRows:%ld, lastCorePerLoopRows:%ld, lastCoreLastLoopRows:%ld,",
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_needCoreNum(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_activateRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_perCoreRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_perCorePerLoopRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_perCoreLastLoopRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_lastCoreRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_lastCorePerLoopRows(),
-        moeInitRoutingTilingData.srcToDstComputeParamsOp.get_lastCoreLastLoopRows());
-    OP_LOGI(
-        opName,
-        "SrcToDstComputeCapacityTilingData is needCoreNum:%ld, perCoreRows:%ld, perCorePerLoopRows:%ld, "
-        "perCoreLastLoopRows:%ld, lastCoreRows:%ld, lastCorePerLoopRows:%ld, lastCoreLastLoopRows:%ld,",
-        moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_needCoreNum(),
-        moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_perCoreRows(),
-        moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_perCorePerLoopRows(),
-        moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_perCoreLastLoopRows(),
-        moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_lastCoreRows(),
-        moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_lastCorePerLoopRows(),
-        moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_lastCoreLastLoopRows());
-    OP_LOGI(
-        opName,
-        "GatherOutComputeTilingData is needCoreNum:%ld, activateRows:%ld, perCoreRows:%ld, perCorePerLoopRows:%ld, "
-        "perCoreLastLoopRows:%ld, lastCoreRows:%ld, lastCorePerLoopRows:%ld, lastCoreLastLoopRows:%ld,",
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_needCoreNum(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_activateRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCoreRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCorePerLoopRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCoreLastLoopRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCorePerLoopRows(),
-        moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreLastLoopRows());
+    OP_LOGI(opName,
+            "moeInitRoutingTilingData is coreNum:%ld, n:%ld, cols:%ld, k:%ld, expertCapacity:%ld, expertNum:%ld, "
+            "dropPadMode:%ld, expertTokensCountOrCumsumFlag:%ld, expertTokensBeforeCapacityFlag:%ld",
+            moeInitRoutingTilingData.get_coreNum(), moeInitRoutingTilingData.get_n(),
+            moeInitRoutingTilingData.get_cols(), moeInitRoutingTilingData.get_k(),
+            moeInitRoutingTilingData.get_expertCapacity(), moeInitRoutingTilingData.get_expertNum(),
+            moeInitRoutingTilingData.get_dropPadMode(), moeInitRoutingTilingData.get_expertTokensCountOrCumsumFlag(),
+            moeInitRoutingTilingData.get_expertTokensBeforeCapacityFlag());
+    OP_LOGI(opName,
+            "InnerMoeV2VBSComputeTilingData is needCoreNum:%ld, perCoreElements:%ld, perCoreLoops:%ld, "
+            "perCorePerLoopElements:%ld, "
+            "perCoreLastLoopElements:%ld, lastCoreElements:%ld, lastCoreLoops:%ld, lastCorePerLoopElements:%ld, "
+            "lastCoreLastLoopElements:%ld, oneLoopMaxElements:%ld",
+            moeInitRoutingTilingData.vbsComputeParamsOp.get_needCoreNum(),
+            moeInitRoutingTilingData.vbsComputeParamsOp.get_perCoreElements(),
+            moeInitRoutingTilingData.vbsComputeParamsOp.get_perCoreLoops(),
+            moeInitRoutingTilingData.vbsComputeParamsOp.get_perCorePerLoopElements(),
+            moeInitRoutingTilingData.vbsComputeParamsOp.get_perCoreLastLoopElements(),
+            moeInitRoutingTilingData.vbsComputeParamsOp.get_lastCoreElements(),
+            moeInitRoutingTilingData.vbsComputeParamsOp.get_lastCoreLoops(),
+            moeInitRoutingTilingData.vbsComputeParamsOp.get_lastCorePerLoopElements(),
+            moeInitRoutingTilingData.vbsComputeParamsOp.get_lastCoreLastLoopElements(),
+            moeInitRoutingTilingData.vbsComputeParamsOp.get_oneLoopMaxElements());
+    OP_LOGI(opName, "VMSMiddleComputeTilingData is needCoreNum:%ld",
+            moeInitRoutingTilingData.vmsMiddleComputeParamsOp.get_needCoreNum());
+    OP_LOGI(opName, "SortOutComputeTilingData is oneLoopMaxElements:%ld",
+            moeInitRoutingTilingData.sortOutComputeParamsOp.get_oneLoopMaxElements());
+    OP_LOGI(opName,
+            "SrcToDstComputeTilingData is needCoreNum:%ld, activateRows:%ld, perCoreRows:%ld, perCorePerLoopRows:%ld, "
+            "perCoreLastLoopRows:%ld, lastCoreRows:%ld, lastCorePerLoopRows:%ld, lastCoreLastLoopRows:%ld,",
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_needCoreNum(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_activateRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_perCoreRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_perCorePerLoopRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_perCoreLastLoopRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_lastCoreRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_lastCorePerLoopRows(),
+            moeInitRoutingTilingData.srcToDstComputeParamsOp.get_lastCoreLastLoopRows());
+    OP_LOGI(opName,
+            "SrcToDstComputeCapacityTilingData is needCoreNum:%ld, perCoreRows:%ld, perCorePerLoopRows:%ld, "
+            "perCoreLastLoopRows:%ld, lastCoreRows:%ld, lastCorePerLoopRows:%ld, lastCoreLastLoopRows:%ld,",
+            moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_needCoreNum(),
+            moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_perCoreRows(),
+            moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_perCorePerLoopRows(),
+            moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_perCoreLastLoopRows(),
+            moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_lastCoreRows(),
+            moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_lastCorePerLoopRows(),
+            moeInitRoutingTilingData.srcToDstCapacityComputeParamsOp.get_lastCoreLastLoopRows());
+    OP_LOGI(opName,
+            "GatherOutComputeTilingData is needCoreNum:%ld, activateRows:%ld, perCoreRows:%ld, perCorePerLoopRows:%ld, "
+            "perCoreLastLoopRows:%ld, lastCoreRows:%ld, lastCorePerLoopRows:%ld, lastCoreLastLoopRows:%ld,",
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_needCoreNum(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_activateRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCoreRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCorePerLoopRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_perCoreLastLoopRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCorePerLoopRows(),
+            moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreLastLoopRows());
 }
 
 ge::graphStatus InnerMoeInitRoutingV2TilingBase::DoOpTiling()
@@ -468,8 +458,8 @@ void InnerMoeInitRoutingV2TilingBase::Tiling4VBSOneCoreCompute(InnerMoeV2VBSComp
 void InnerMoeInitRoutingV2TilingBase::Tiling4VBSMultiCoreCompute(InnerMoeV2VBSComputeTilingData* tilingData)
 {
     int64_t needCoreNum = Ops::Base::CeilDiv(totalLength, sortLoopMaxElement); // 向上取整
-    needCoreNum = static_cast<int64_t>(std::pow(4, CeilLog4(needCoreNum)));  // 用到多核时，核数最多是4^x
-    needCoreNum = std::min(needCoreNum, aivNum);                    // 不能超过物理核数
+    needCoreNum = static_cast<int64_t>(std::pow(4, CeilLog4(needCoreNum)));    // 用到多核时，核数最多是4^x
+    needCoreNum = std::min(needCoreNum, aivNum);                               // 不能超过物理核数
     if (needCoreNum == 0) {
         return;
     }
@@ -491,26 +481,26 @@ void InnerMoeInitRoutingV2TilingBase::Tiling4VBSMultiCoreCompute(InnerMoeV2VBSCo
             Ops::Base::CeilDiv(tilingData->get_perCoreElements(), sortLoopMaxElement)); // 每个核处理的loop数
         tilingData->set_perCorePerLoopElements(std::min(tilingData->get_perCoreElements(), sortLoopMaxElement));
 
-        tilingData->set_perCoreLastLoopElements(
-            tilingData->get_perCoreElements() -
-            (tilingData->get_perCoreLoops() - 1) * tilingData->get_perCorePerLoopElements());
+        tilingData->set_perCoreLastLoopElements(tilingData->get_perCoreElements() -
+                                                (tilingData->get_perCoreLoops() - 1) *
+                                                    tilingData->get_perCorePerLoopElements());
 
-        tilingData->set_lastCoreElements(
-            totalLength - (tilingData->get_needCoreNum() - 1) * tilingData->get_perCoreElements());
+        tilingData->set_lastCoreElements(totalLength -
+                                         (tilingData->get_needCoreNum() - 1) * tilingData->get_perCoreElements());
         tilingData->set_lastCoreLoops(tilingData->get_perCoreLoops());
         int64_t lastCorePerLoopElements =
-            Ops::Base::CeilDiv(
-                Ops::Base::CeilDiv(tilingData->get_lastCoreElements(), tilingData->get_lastCoreLoops()), SORT32_ALIGN_ELEMENT) *
+            Ops::Base::CeilDiv(Ops::Base::CeilDiv(tilingData->get_lastCoreElements(), tilingData->get_lastCoreLoops()),
+                               SORT32_ALIGN_ELEMENT) *
             SORT32_ALIGN_ELEMENT;
         tilingData->set_lastCorePerLoopElements(lastCorePerLoopElements);
-        tilingData->set_lastCoreLastLoopElements(
-            tilingData->get_lastCoreElements() -
-            (tilingData->get_lastCoreLoops() - 1) * tilingData->get_lastCorePerLoopElements());
+        tilingData->set_lastCoreLastLoopElements(tilingData->get_lastCoreElements() -
+                                                 (tilingData->get_lastCoreLoops() - 1) *
+                                                     tilingData->get_lastCorePerLoopElements());
         perCoreElements -= SORT32_ALIGN_ELEMENT;
     } while (tilingData->get_lastCoreLastLoopElements() <= 0 && perCoreElements > 0);
     OP_CHECK_IF(tilingData->get_lastCoreLastLoopElements() <= 0,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "vbs tiling", "failed", "vbs tiling failed"),
-                    ;);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "vbs tiling", "failed", "vbs tiling failed"),
+                ;);
 }
 
 void InnerMoeInitRoutingV2TilingBase::Tiling4VBSCompute()
@@ -564,9 +554,9 @@ void InnerMoeInitRoutingV2TilingBase::Tiling4SrcToDstCompute()
         tilingData->set_perCoreLastLoopRows(tilingData->get_perCoreRows());
     } else {
         tilingData->set_perCorePerLoopRows(perLoopMaxRows);
-        tilingData->set_perCoreLastLoopRows(
-            tilingData->get_perCoreRows() -
-            (Ops::Base::CeilDiv(tilingData->get_perCoreRows(), perLoopMaxRows) - 1) * perLoopMaxRows);
+        tilingData->set_perCoreLastLoopRows(tilingData->get_perCoreRows() -
+                                            (Ops::Base::CeilDiv(tilingData->get_perCoreRows(), perLoopMaxRows) - 1) *
+                                                perLoopMaxRows);
     }
 
     tilingData->set_lastCoreRows(lastCoreNum);
@@ -575,9 +565,9 @@ void InnerMoeInitRoutingV2TilingBase::Tiling4SrcToDstCompute()
         tilingData->set_lastCoreLastLoopRows(tilingData->get_lastCoreRows());
     } else {
         tilingData->set_lastCorePerLoopRows(perLoopMaxRows);
-        tilingData->set_lastCoreLastLoopRows(
-            tilingData->get_lastCoreRows() -
-            (Ops::Base::CeilDiv(tilingData->get_lastCoreRows(), perLoopMaxRows) - 1) * perLoopMaxRows);
+        tilingData->set_lastCoreLastLoopRows(tilingData->get_lastCoreRows() -
+                                             (Ops::Base::CeilDiv(tilingData->get_lastCoreRows(), perLoopMaxRows) - 1) *
+                                                 perLoopMaxRows);
     }
 }
 

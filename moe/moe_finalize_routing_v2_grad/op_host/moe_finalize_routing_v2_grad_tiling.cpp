@@ -37,7 +37,7 @@ ge::graphStatus MoeFinalizeRoutingV2GradTiling::GetPlatformInfo()
     OP_CHECK_NULL_WITH_CONTEXT(context_, platformInfo);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
 
-    auto compileInfoPtr = reinterpret_cast<const MoeFinalizeRoutingV2GradCompileInfo *>(context_->GetCompileInfo());
+    auto compileInfoPtr = reinterpret_cast<const MoeFinalizeRoutingV2GradCompileInfo*>(context_->GetCompileInfo());
     OP_CHECK_IF(compileInfoPtr == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName_, "compile_info", "null", "compile info is null"),
                 return ge::GRAPH_FAILED);
@@ -554,7 +554,7 @@ ge::graphStatus MoeFinalizeRoutingV2GradTiling::CheckParams()
     return ge::GRAPH_SUCCESS;
 }
 
-void MoeFinalizeRoutingV2GradTiling::SetBinaryAddParams(MoeFinalizeRoutingV2GradBinaryAddTilingData &params,
+void MoeFinalizeRoutingV2GradTiling::SetBinaryAddParams(MoeFinalizeRoutingV2GradBinaryAddTilingData& params,
                                                         int64_t factor)
 {
     int64_t quotient = (1L << (ULONG_BIT_LEN - 1 - __builtin_clzl(factor)));
@@ -590,7 +590,10 @@ void MoeFinalizeRoutingV2GradTiling::CalcBaseInfo()
     }
 }
 
-uint64_t MoeFinalizeRoutingV2GradTiling::GetTilingKey() const { return tilingKey_; }
+uint64_t MoeFinalizeRoutingV2GradTiling::GetTilingKey() const
+{
+    return tilingKey_;
+}
 
 ge::graphStatus MoeFinalizeRoutingV2GradTiling::PostTiling()
 {
@@ -645,22 +648,25 @@ ge::graphStatus MoeFinalizeRoutingV2GradTiling::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeFinalizeRoutingV2GradTiling::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus MoeFinalizeRoutingV2GradTiling::DoLibApiTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus MoeFinalizeRoutingV2GradTiling::GetWorkspaceSize()
 {
-    size_t *workSpaces = context_->GetWorkspaceSizes(1);
+    size_t* workSpaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workSpaces);
     workSpaces[0] = WORKSPACE_SIZE;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus Tiling4MoeFinalizeRoutingV2Grad(gert::TilingContext *context)
+ge::graphStatus Tiling4MoeFinalizeRoutingV2Grad(gert::TilingContext* context)
 {
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus TilingPrepare4MoeFinalizeRoutingV2Grad(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepare4MoeFinalizeRoutingV2Grad(gert::TilingParseContext* context)
 {
     OP_LOGD(context, "TilingPrepareForMoeFinalizeRoutingV2Grad enter.");
 

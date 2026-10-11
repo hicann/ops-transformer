@@ -27,14 +27,14 @@ public:
     __aicore__ inline MoeV3FullLoadDynamicQuant(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
                                 GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale, GM_ADDR workspace,
-                                const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void CopyOutXDynamicQuantFromGather();
     __aicore__ inline void CopyOutXDynamicQuantFromScatter();
     __aicore__ inline void FreeLocalTensor();
-    __aicore__ inline void ComputeQuant(LocalTensor<float> &smoothLocal);
+    __aicore__ inline void ComputeQuant(LocalTensor<float>& smoothLocal);
 
 private:
     TQue<QuePosition::VECIN, 1> xCopyInQueue_;
@@ -55,14 +55,14 @@ template <typename T, const int COPYOUTTYPE, const int SMOOTHTYPE>
 __aicore__ inline void MoeV3FullLoadDynamicQuant<T, COPYOUTTYPE, SMOOTHTYPE>::Init(
     GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
     GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale, GM_ADDR workspace,
-    const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe)
+    const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe)
 {
     MoeV3FullLoadBase<T>::Init(expertIdx, expandedRowIdx, expertTokensCountOrCumsum, workspace, tilingData, tPipe);
 
-    xGm_.SetGlobalBuffer((__gm__ T *)x);
-    expandedXGm_.SetGlobalBuffer((__gm__ int8_t *)expandedX);
-    quantSmoothGm_.SetGlobalBuffer((__gm__ float *)scale);
-    expandedScaleGm_.SetGlobalBuffer((__gm__ float *)expandedScale);
+    xGm_.SetGlobalBuffer((__gm__ T*)x);
+    expandedXGm_.SetGlobalBuffer((__gm__ int8_t*)expandedX);
+    quantSmoothGm_.SetGlobalBuffer((__gm__ float*)scale);
+    expandedScaleGm_.SetGlobalBuffer((__gm__ float*)expandedScale);
     this->colsAlign_ = Align(this->cols_, sizeof(T));
     if constexpr (IsSameType<T, float>::value) {
         this->pipe_->InitBuffer(xCopyInQueue_, 1, AlignBytes(this->cols_, sizeof(float)));
@@ -117,7 +117,7 @@ __aicore__ inline void MoeV3FullLoadDynamicQuant<T, COPYOUTTYPE, SMOOTHTYPE>::Pr
 
 template <typename T, const int COPYOUTTYPE, const int SMOOTHTYPE>
 __aicore__ inline void MoeV3FullLoadDynamicQuant<T, COPYOUTTYPE, SMOOTHTYPE>::ComputeQuant(
-    LocalTensor<float> &smoothLocal)
+    LocalTensor<float>& smoothLocal)
 {
     LocalTensor<float> tempLocal = tmpBuff_.Get<float>();
     LocalTensor<int8_t> outLocal = inputXOutQueue_.AllocTensor<int8_t>();

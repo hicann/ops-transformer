@@ -32,15 +32,15 @@ struct MoeV2VBSComputeTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeV2VBSComputeTilingData *const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeV2VBSComputeTilingData* const_data)
 {
-    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
-    uint32_t *dst = (uint32_t *)const_data;
+    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
+    uint32_t* dst = (uint32_t*)const_data;
     for (auto i = 0; i < sizeof(MoeV2VBSComputeTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t *tiling, MoeV2VBSComputeTilingData *const_data)
+inline void InitTilingData(uint8_t* tiling, MoeV2VBSComputeTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeV2VBSComputeTilingData));
 }
@@ -53,15 +53,15 @@ struct MoeV2VMSMiddleComputeTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeV2VMSMiddleComputeTilingData *const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeV2VMSMiddleComputeTilingData* const_data)
 {
-    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
-    uint32_t *dst = (uint32_t *)const_data;
+    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
+    uint32_t* dst = (uint32_t*)const_data;
     for (auto i = 0; i < sizeof(MoeV2VMSMiddleComputeTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t *tiling, MoeV2VMSMiddleComputeTilingData *const_data)
+inline void InitTilingData(uint8_t* tiling, MoeV2VMSMiddleComputeTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeV2VMSMiddleComputeTilingData));
 }
@@ -74,15 +74,15 @@ struct MoeV2SortOutComputeTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeV2SortOutComputeTilingData *const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeV2SortOutComputeTilingData* const_data)
 {
-    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
-    uint32_t *dst = (uint32_t *)const_data;
+    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
+    uint32_t* dst = (uint32_t*)const_data;
     for (auto i = 0; i < sizeof(MoeV2SortOutComputeTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t *tiling, MoeV2SortOutComputeTilingData *const_data)
+inline void InitTilingData(uint8_t* tiling, MoeV2SortOutComputeTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeV2SortOutComputeTilingData));
 }
@@ -108,15 +108,15 @@ struct MoeV2GatherOutComputeTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeV2GatherOutComputeTilingData *const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeV2GatherOutComputeTilingData* const_data)
 {
-    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
-    uint32_t *dst = (uint32_t *)const_data;
+    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
+    uint32_t* dst = (uint32_t*)const_data;
     for (auto i = 0; i < sizeof(MoeV2GatherOutComputeTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t *tiling, MoeV2GatherOutComputeTilingData *const_data)
+inline void InitTilingData(uint8_t* tiling, MoeV2GatherOutComputeTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeV2GatherOutComputeTilingData));
 }
@@ -143,15 +143,15 @@ struct MoeInitRoutingV2TilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeInitRoutingV2TilingData *const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeInitRoutingV2TilingData* const_data)
 {
-    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
-    uint32_t *dst = (uint32_t *)const_data;
+    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
+    uint32_t* dst = (uint32_t*)const_data;
     for (auto i = 0; i < sizeof(MoeInitRoutingV2TilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t *tiling, MoeInitRoutingV2TilingData *const_data)
+inline void InitTilingData(uint8_t* tiling, MoeInitRoutingV2TilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeInitRoutingV2TilingData));
 }

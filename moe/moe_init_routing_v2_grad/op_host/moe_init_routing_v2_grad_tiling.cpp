@@ -22,10 +22,10 @@ const static int64_t BOUND_K_FOR_BINARY = 128;
 const static int64_t ELEMENT_ALIGN_SIZE = 32;
 const static int64_t MAX_DATACOPY_SIZE = 65536;
 
-class MoeInitRoutingV2GradTilingBase : public MoeInitRoutingV2GradTilingBaseClass
-{
+class MoeInitRoutingV2GradTilingBase : public MoeInitRoutingV2GradTilingBaseClass {
 public:
-    explicit MoeInitRoutingV2GradTilingBase(gert::TilingContext* context) : MoeInitRoutingV2GradTilingBaseClass(context)
+    explicit MoeInitRoutingV2GradTilingBase(gert::TilingContext* context)
+        : MoeInitRoutingV2GradTilingBaseClass(context)
     {
         Reset();
     }
@@ -70,32 +70,31 @@ void MoeInitRoutingV2GradTilingBase::Reset()
 
 void MoeInitRoutingV2GradTilingBase::ShowTilingData()
 {
-    OP_LOGI(
-        opName, "MoeInitRoutingV2GradTilingData is coreNum:%ld, n:%ld, e:%ld, c:%ld, cols:%ld, k:%ld, activeNum:%ld",
-        moeInitRoutingV2GradTilingData.get_coreNum(), moeInitRoutingV2GradTilingData.get_n(),
-        moeInitRoutingV2GradTilingData.get_e(), moeInitRoutingV2GradTilingData.get_c(),
-        moeInitRoutingV2GradTilingData.get_cols(), moeInitRoutingV2GradTilingData.get_k(),
-        moeInitRoutingV2GradTilingData.get_activeNum());
-    OP_LOGI(
-        opName,
-        "MoeV2GradComputeTilingData is needCoreNum:%ld, perCoreElements:%ld, lastCoreElements:%ld, "
-        "elementCopyLoops:%ld, elementPerCopyCols:%ld, elementLastCopyCols:%ld, binaryAddBufferNum:%ld, "
-        "tmpBufferNum:%ld, exponentOfBinary:%ld, copyBufferSize:%ld, perCoreTokensLoop:%ld, "
-        "perCoreTailTokensFormer:%ld, lastCoreTokensLoop:%ld, lastCoreTailTokensFormer:%ld",
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_needCoreNum(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_perCoreElements(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_lastCoreElements(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_elementCopyLoops(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_elementPerCopyCols(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_elementLastCopyCols(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_binaryAddBufferNum(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_tmpBufferNum(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_exponentOfBinary(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_copyBufferSize(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_perCoreTokensLoop(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_perCoreTailTokensFormer(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_lastCoreTokensLoop(),
-        moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_lastCoreTailTokensFormer());
+    OP_LOGI(opName,
+            "MoeInitRoutingV2GradTilingData is coreNum:%ld, n:%ld, e:%ld, c:%ld, cols:%ld, k:%ld, activeNum:%ld",
+            moeInitRoutingV2GradTilingData.get_coreNum(), moeInitRoutingV2GradTilingData.get_n(),
+            moeInitRoutingV2GradTilingData.get_e(), moeInitRoutingV2GradTilingData.get_c(),
+            moeInitRoutingV2GradTilingData.get_cols(), moeInitRoutingV2GradTilingData.get_k(),
+            moeInitRoutingV2GradTilingData.get_activeNum());
+    OP_LOGI(opName,
+            "MoeV2GradComputeTilingData is needCoreNum:%ld, perCoreElements:%ld, lastCoreElements:%ld, "
+            "elementCopyLoops:%ld, elementPerCopyCols:%ld, elementLastCopyCols:%ld, binaryAddBufferNum:%ld, "
+            "tmpBufferNum:%ld, exponentOfBinary:%ld, copyBufferSize:%ld, perCoreTokensLoop:%ld, "
+            "perCoreTailTokensFormer:%ld, lastCoreTokensLoop:%ld, lastCoreTailTokensFormer:%ld",
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_needCoreNum(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_perCoreElements(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_lastCoreElements(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_elementCopyLoops(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_elementPerCopyCols(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_elementLastCopyCols(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_binaryAddBufferNum(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_tmpBufferNum(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_exponentOfBinary(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_copyBufferSize(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_perCoreTokensLoop(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_perCoreTailTokensFormer(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_lastCoreTokensLoop(),
+            moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp.get_lastCoreTailTokensFormer());
 }
 
 ge::graphStatus MoeInitRoutingV2GradTilingBase::DoOpTiling()
@@ -156,8 +155,8 @@ void MoeInitRoutingV2GradTilingBase::TilingSplitCore()
     auto tilingData = &moeInitRoutingV2GradTilingData.MoeV2GradComputeParamsOp;
 
     int64_t NLocal = moeInitRoutingV2GradTilingData.get_n();
-    int64_t perCoreElements = Ops::Base::CeilDiv(NLocal, aivNum);                 // 单核处理最大token数
-    int64_t needCoreNum = Ops::Base::CeilDiv(NLocal, perCoreElements);            // 实际使用核数
+    int64_t perCoreElements = Ops::Base::CeilDiv(NLocal, aivNum);           // 单核处理最大token数
+    int64_t needCoreNum = Ops::Base::CeilDiv(NLocal, perCoreElements);      // 实际使用核数
     int64_t lastCoreElement = NLocal - (needCoreNum - 1) * perCoreElements; // 尾核处理token数
 
     tilingData->set_needCoreNum(needCoreNum);
@@ -173,10 +172,12 @@ void MoeInitRoutingV2GradTilingBase::TilingGradCompute()
 
     // 根据K大小，选择对应的二分累加buffer数量，以一个数exp + 1做2的指数，无限逼近K的大小
     int64_t K = moeInitRoutingV2GradTilingData.get_k();
-    int64_t exponentOfBinary = (K >= BOUND_K_FOR_BINARY) ? MAX_EXPONENT_OF_BINARY : static_cast<int64_t>(std::floor(std::log2(K)) - 1);
+    int64_t exponentOfBinary =
+        (K >= BOUND_K_FOR_BINARY) ? MAX_EXPONENT_OF_BINARY : static_cast<int64_t>(std::floor(std::log2(K)) - 1);
     exponentOfBinary = (exponentOfBinary < 0) ? 0 : exponentOfBinary;
-    int64_t binaryAddBuffNum =
-        (K >= BOUND_K_FOR_BINARY) ? MAX_BINARY_ADD_BUFFER_CNT : static_cast<int64_t>(std::pow(2, exponentOfBinary)); //  2^exp
+    int64_t binaryAddBuffNum = (K >= BOUND_K_FOR_BINARY) ?
+                                   MAX_BINARY_ADD_BUFFER_CNT :
+                                   static_cast<int64_t>(std::pow(2, exponentOfBinary)); //  2^exp
 
     // 根据K大小，选择tmpBuffer数量
     int64_t tmpBuffNum = (K >= BOUND_K_FOR_BINARY) ? binaryAddBuffNum : 1;

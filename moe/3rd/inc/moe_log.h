@@ -32,7 +32,7 @@
 #include "err_mgr.h"
 #endif
 
-inline const char *MoeConvertStringToCstr(const std::string &str)
+inline const char* MoeConvertStringToCstr(const std::string& str)
 {
     return str.c_str();
 }
@@ -40,7 +40,7 @@ inline const char *MoeConvertStringToCstr(const std::string &str)
 namespace ops {
 #define MOE_OPS_CHECK_NULL_WITH_CONTEXT_RET(context, ptr, ret) \
     if ((ptr) == nullptr) { \
-        const char *name = ((context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(); \
+        const char* name = ((context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(); \
         OP_LOGE_WITHOUT_REPORT(name, "%s is nullptr!", #ptr); \
         REPORT_INNER_ERR_MSG("EZ9999", "op[%s], %s is nullptr!", name, #ptr); \
         return ret; \

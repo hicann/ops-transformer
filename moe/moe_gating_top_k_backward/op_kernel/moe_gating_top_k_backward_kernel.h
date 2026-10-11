@@ -25,7 +25,7 @@ class MoeGatingTopKBackwardKernel {
 public:
     __aicore__ inline MoeGatingTopKBackwardKernel(){};
     __aicore__ inline void Init(GM_ADDR xNorm, GM_ADDR gradY, GM_ADDR expertIdx, GM_ADDR gradX,
-                                const MoeGatingTopKBackwardTilingData *tilingData, TPipe *tPipe);
+                                const MoeGatingTopKBackwardTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -39,7 +39,7 @@ private:
     __aicore__ inline void CopyOut(int64_t loopIdx);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> gradYQue_;
     TQue<QuePosition::VECIN, 1> indicesQue_;
     TQue<QuePosition::VECIN, 1> xQue_;
@@ -75,14 +75,14 @@ private:
     int64_t curRowsByKAlign_ = 0;
     int64_t kAlign_ = 0;   // fp32的k 32字节对齐后的元素个数
     int64_t kAlign16_ = 0; // 16位的k 32字节对齐后的元素个数
-    const MoeGatingTopKBackwardTilingData *tilingData_;
+    const MoeGatingTopKBackwardTilingData* tilingData_;
 };
 
 template <typename T>
 __aicore__ inline void MoeGatingTopKBackwardKernel<T>::Init(GM_ADDR xNorm, GM_ADDR gradY, GM_ADDR expertIdx,
                                                             GM_ADDR gradX,
-                                                            const MoeGatingTopKBackwardTilingData *tilingData,
-                                                            TPipe *tPipe)
+                                                            const MoeGatingTopKBackwardTilingData* tilingData,
+                                                            TPipe* tPipe)
 {
     tilingData_ = tilingData;
     pipe_ = tPipe;
@@ -98,10 +98,10 @@ __aicore__ inline void MoeGatingTopKBackwardKernel<T>::Init(GM_ADDR xNorm, GM_AD
     }
 
     // init gm buf
-    xNormGm_.SetGlobalBuffer((__gm__ float *)xNorm + tilingData_->perCoreRows * tilingData_->expertCount * blockIdx_);
-    gradYGm_.SetGlobalBuffer((__gm__ T *)gradY + tilingData_->perCoreRows * tilingData_->k * blockIdx_);
-    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertIdx + tilingData_->perCoreRows * tilingData_->k * blockIdx_);
-    gradXGm_.SetGlobalBuffer((__gm__ T *)gradX + tilingData_->perCoreRows * tilingData_->expertCount * blockIdx_);
+    xNormGm_.SetGlobalBuffer((__gm__ float*)xNorm + tilingData_->perCoreRows * tilingData_->expertCount * blockIdx_);
+    gradYGm_.SetGlobalBuffer((__gm__ T*)gradY + tilingData_->perCoreRows * tilingData_->k * blockIdx_);
+    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertIdx + tilingData_->perCoreRows * tilingData_->k * blockIdx_);
+    gradXGm_.SetGlobalBuffer((__gm__ T*)gradX + tilingData_->perCoreRows * tilingData_->expertCount * blockIdx_);
 
     // init que
     pipe_->InitBuffer(gradYQue_, NUM_TWO,

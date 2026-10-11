@@ -32,19 +32,19 @@ TEST_F(MoeFinalizeRoutingHost, moe_finalize_routing_infershape_0)
 {
     gert::InfershapeContextPara infershapeContextPara("MoeFinalizeRouting",
                                                       {
-                                                        {{{6, 5}, {6, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{3, 5}, {3, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{3, 5}, {3, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{6, 5}, {6, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{3, 2}, {3, 2}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{3, 2}, {3, 2}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{6, 5}, {6, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{3, 5}, {3, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{3, 5}, {3, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{6, 5}, {6, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{3, 2}, {3, 2}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{3, 2}, {3, 2}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                                       },
                                                       {});
-    std::vector<std::vector<int64_t>> expectOutputShape = {{3,5}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{3, 5}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -52,16 +52,16 @@ TEST_F(MoeFinalizeRoutingHost, moe_finalize_routing_neg_one_shape)
 {
     gert::InfershapeContextPara infershapeContextPara("MoeFinalizeRouting",
                                                       {
-                                                        {{{6, 5}, {6, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{-1, -1}, {-1, -1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{3, 5}, {3, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{6, 5}, {6, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{3, 2}, {3, 2}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{3, 2}, {3, 2}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{6, 5}, {6, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{-1, -1}, {-1, -1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{3, 5}, {3, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{6, 5}, {6, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{3, 2}, {3, 2}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{3, 2}, {3, 2}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                                       },
                                                       {});
     std::vector<std::vector<int64_t>> expectOutputShape = {{-1, -1}};
@@ -72,19 +72,19 @@ TEST_F(MoeFinalizeRoutingHost, moe_finalize_routing_error_shape)
 {
     gert::InfershapeContextPara infershapeContextPara("MoeFinalizeRouting",
                                                       {
-                                                        {{{6, 5}, {6, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{3, 5, 1}, {3, 5, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{3, 5}, {3, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{6, 5}, {6, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{3, 2}, {3, 2}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{3, 2}, {3, 2}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{6, 5}, {6, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{3, 5, 1}, {3, 5, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{3, 5}, {3, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{6, 5}, {6, 5}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{3, 2}, {3, 2}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                          {{{3, 2}, {3, 2}}, ge::DT_INT32, ge::FORMAT_ND},
                                                       },
                                                       {
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                                       },
                                                       {});
-    std::vector<std::vector<int64_t>> expectOutputShape = {{3,5}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{3, 5}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
 

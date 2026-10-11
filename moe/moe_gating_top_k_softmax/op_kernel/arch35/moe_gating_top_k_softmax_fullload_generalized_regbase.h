@@ -44,7 +44,7 @@ class MoeGatingTopKSoftmaxFullloadGenerlized {
 public:
     __aicore__ inline MoeGatingTopKSoftmaxFullloadGenerlized(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR finished, GM_ADDR y, GM_ADDR expertIdx, GM_ADDR rowIdx,
-                                const MoeGatingTopKSoftmaxRegbaseTilingData *tilingData, TPipe *tPipe);
+                                const MoeGatingTopKSoftmaxRegbaseTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -52,15 +52,15 @@ private:
     __aicore__ inline void CopyInX(int64_t loop, int64_t rowCount);
     __aicore__ inline void ComputeSoftmax(int64_t rowCount);
     __aicore__ inline void ComputeTopK(int64_t row);
-    __aicore__ inline void HandleOneRepeatSortNum(int64_t rowCount, const LocalTensor<float> &softmaxTensor,
-                                                  const LocalTensor<float> &sortedTensor,
-                                                  LocalTensor<uint32_t> &expertIdxTensor);
+    __aicore__ inline void HandleOneRepeatSortNum(int64_t rowCount, const LocalTensor<float>& softmaxTensor,
+                                                  const LocalTensor<float>& sortedTensor,
+                                                  LocalTensor<uint32_t>& expertIdxTensor);
     __aicore__ inline void ComputeRowIdx(int64_t loop, int64_t rowCount);
     __aicore__ inline void CopyOutRowIdx(int64_t loop, int64_t rowCount);
     __aicore__ inline void CopyYExpertIdxOut(int64_t loop, int64_t rowCount);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> xInQueue_;
     TQue<QuePosition::VECIN, 1> finishedInQueue_;
     TQue<QuePosition::VECOUT, 1> yOutQueue_;
@@ -78,7 +78,7 @@ private:
     GlobalTensor<int32_t> expertIdxGm_;
     GlobalTensor<int32_t> rowIdxGm_;
 
-    const MoeGatingTopKSoftmaxRegbaseTilingData *tilingData_ = nullptr;
+    const MoeGatingTopKSoftmaxRegbaseTilingData* tilingData_ = nullptr;
 
     int64_t blockIdx_ = 0;
     int64_t perCoreRowCount_ = 0;
@@ -102,7 +102,7 @@ private:
 template <typename T, bool hasFinished, bool needPadNegInf>
 __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, needPadNegInf>::Init(
     GM_ADDR x, GM_ADDR finished, GM_ADDR y, GM_ADDR expertIdx, GM_ADDR rowIdx,
-    const MoeGatingTopKSoftmaxRegbaseTilingData *tilingData, TPipe *tPipe)
+    const MoeGatingTopKSoftmaxRegbaseTilingData* tilingData, TPipe* tPipe)
 {
     tilingData_ = tilingData;
     pipe_ = tPipe;
@@ -129,13 +129,13 @@ __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, ne
     sortRepeatTimes_ = tilingData_->sortRepeatTimes;
 
     // init input gm buf
-    xGm_.SetGlobalBuffer((__gm__ T *)x + perCoreRowCount_ * expertCount_ * blockIdx_, expertCount_);
-    finishedGm_.SetGlobalBuffer((__gm__ bool *)finished + perCoreRowCount_ * blockIdx_, expertCount_);
+    xGm_.SetGlobalBuffer((__gm__ T*)x + perCoreRowCount_ * expertCount_ * blockIdx_, expertCount_);
+    finishedGm_.SetGlobalBuffer((__gm__ bool*)finished + perCoreRowCount_ * blockIdx_, expertCount_);
 
     // init output gm buf
-    yGm_.SetGlobalBuffer((__gm__ T *)y + perCoreRowCount_ * k_ * blockIdx_, k_);
-    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertIdx + perCoreRowCount_ * k_ * blockIdx_, k_);
-    rowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)rowIdx + perCoreRowCount_ * k_ * blockIdx_, k_);
+    yGm_.SetGlobalBuffer((__gm__ T*)y + perCoreRowCount_ * k_ * blockIdx_, k_);
+    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertIdx + perCoreRowCount_ * k_ * blockIdx_, k_);
+    rowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)rowIdx + perCoreRowCount_ * k_ * blockIdx_, k_);
 
     // init copy in que
     pipe_->InitBuffer(xInQueue_, BUFFER_NUM, expertCountAlign_ * sizeof(T) * perLoopRowCount_);
@@ -168,7 +168,7 @@ __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, ne
         uint16_t expertCountloops = (expertCount_ + repeatCount - 1) / repeatCount;
         uint32_t precessExpert = expertCount_;
         AscendC::Reg::RegTensor<int32_t> vreg0;
-        __ubuf__ int32_t *expertIdxTensorAddr = (__ubuf__ int32_t *)expertIdxTensor.GetPhyAddr();
+        __ubuf__ int32_t* expertIdxTensorAddr = (__ubuf__ int32_t*)expertIdxTensor.GetPhyAddr();
         AscendC::Reg::MaskReg mask;
         for (uint16_t i = 0; i < expertCountloops; i++) {
             mask = AscendC::Reg::UpdateMask<int32_t>(precessExpert);
@@ -187,7 +187,7 @@ __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, ne
         uint16_t kLoops = (k_ + repeatCount - 1) / repeatCount;
         uint32_t precessK = k_;
         AscendC::Reg::RegTensor<int32_t> vreg0, vreg1;
-        __ubuf__ int32_t *rowIdxBaseTensorAddr = (__ubuf__ int32_t *)rowIdxBaseTensor.GetPhyAddr();
+        __ubuf__ int32_t* rowIdxBaseTensorAddr = (__ubuf__ int32_t*)rowIdxBaseTensor.GetPhyAddr();
         AscendC::Reg::MaskReg mask;
         for (uint16_t i = 0; i < kLoops; i++) {
             mask = AscendC::Reg::UpdateMask<int32_t>(precessK);
@@ -243,8 +243,8 @@ __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, ne
         uint32_t repeatCount = B32_VF_COUNT;
         uint16_t expertCountLoops = (expertCount_ + repeatCount - 1) / repeatCount;
 
-        __ubuf__ T *xTensorAddr = (__ubuf__ T *)xTensor.GetPhyAddr();
-        __ubuf__ float *xTensorFp32Addr = (__ubuf__ float *)xTensorFp32.GetPhyAddr();
+        __ubuf__ T* xTensorAddr = (__ubuf__ T*)xTensor.GetPhyAddr();
+        __ubuf__ float* xTensorFp32Addr = (__ubuf__ float*)xTensorFp32.GetPhyAddr();
 
         AscendC::Reg::RegTensor<float> reduceVreg, reduceMidRreg, dupVreg, vreg0;
         AscendC::Reg::MaskReg mask;
@@ -295,8 +295,8 @@ __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, ne
     {
         uint32_t repeatCount = B32_VF_COUNT;
         uint16_t expertCountLoops = (expertCount_ + repeatCount - 1) / repeatCount;
-        __ubuf__ float *softmaxTensorAddr = (__ubuf__ float *)softmaxTensor.GetPhyAddr();
-        __ubuf__ float *sumTensorAddr = (__ubuf__ float *)tmpTensor.GetPhyAddr();
+        __ubuf__ float* softmaxTensorAddr = (__ubuf__ float*)softmaxTensor.GetPhyAddr();
+        __ubuf__ float* sumTensorAddr = (__ubuf__ float*)tmpTensor.GetPhyAddr();
         AscendC::Reg::RegTensor<float> sumVreg, vreg0;
         AscendC::Reg::MaskReg mask;
         for (uint16_t i = 0; i < rowLoops; i++) {
@@ -320,15 +320,15 @@ __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, ne
 
 template <typename T, bool hasFinished, bool needPadNegInf>
 __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, needPadNegInf>::HandleOneRepeatSortNum(
-    int64_t rowCount, const LocalTensor<float> &softmaxTensor, const LocalTensor<float> &sortedTensor,
-    LocalTensor<uint32_t> &expertIdxTensor)
+    int64_t rowCount, const LocalTensor<float>& softmaxTensor, const LocalTensor<float>& sortedTensor,
+    LocalTensor<uint32_t>& expertIdxTensor)
 {
     // 如果只选top1，无需排序，用max求最大值作为top1
     if (k_ == 1 && expertCount_ <= B32_BLOCK_COUNT) {
         __VEC_SCOPE__
         {
-            __ubuf__ float *softmaxTensorAddr = (__ubuf__ float *)softmaxTensor.GetPhyAddr();
-            __ubuf__ float *sortedTensorAddr = (__ubuf__ float *)sortedTensor.GetPhyAddr();
+            __ubuf__ float* softmaxTensorAddr = (__ubuf__ float*)softmaxTensor.GetPhyAddr();
+            __ubuf__ float* sortedTensorAddr = (__ubuf__ float*)sortedTensor.GetPhyAddr();
             AscendC::Reg::RegTensor<float> valueAndIndexReg;
             AscendC::Reg::MaskReg maskForValueAndIndex =
                 AscendC::Reg::CreateMask<uint32_t, AscendC::Reg::MaskPattern::VL2>();
@@ -387,10 +387,10 @@ __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, ne
         AscendC::Reg::UnalignRegForStore u0, u1;
         AscendC::Reg::MaskReg mask, finishedMask;
         finishedMask = AscendC::Reg::CreateMask<int32_t, AscendC::Reg::MaskPattern::VL1>();
-        __ubuf__ int32_t *sortedTensorAddr = (__ubuf__ int32_t *)sortedTensor.GetPhyAddr();
-        __ubuf__ T *yOutTensorAddr = (__ubuf__ T *)yOutTensor.GetPhyAddr();
-        __ubuf__ int32_t *expertIdxOutTensorAddr = (__ubuf__ int32_t *)expertIdxOutTensor.GetPhyAddr();
-        __ubuf__ int8_t *finishedTensorAddr = (__ubuf__ int8_t *)finishedTensor.GetPhyAddr();
+        __ubuf__ int32_t* sortedTensorAddr = (__ubuf__ int32_t*)sortedTensor.GetPhyAddr();
+        __ubuf__ T* yOutTensorAddr = (__ubuf__ T*)yOutTensor.GetPhyAddr();
+        __ubuf__ int32_t* expertIdxOutTensorAddr = (__ubuf__ int32_t*)expertIdxOutTensor.GetPhyAddr();
+        __ubuf__ int8_t* finishedTensorAddr = (__ubuf__ int8_t*)finishedTensor.GetPhyAddr();
         for (uint16_t i = 0; i < rowLoops; i++) {
             uint32_t precessK = k_;
             mask = AscendC::Reg::UpdateMask<int32_t>(precessK);
@@ -403,7 +403,7 @@ __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, ne
             uint16_t rowLoopsOffset = i * expertCountAlign_ * KEY_VALUE_FACTOR;
             for (uint16_t j = 0; j < loopEnd; j++) {
                 AscendC::Reg::LoadAlign<int32_t, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(
-                    (AscendC::Reg::RegTensor<int32_t> &)valueVreg, indexVreg,
+                    (AscendC::Reg::RegTensor<int32_t>&)valueVreg, indexVreg,
                     sortedTensorAddr + rowLoopsOffset + j * repeatCount * KEY_VALUE_FACTOR);
                 if constexpr (!IsSameType<T, float>::value) {
                     ops::StoreUnAlignOneTensor<T>(yOutTensorAddr, valueVreg, u0, mask, repeatCount);
@@ -419,7 +419,7 @@ __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, ne
                 mask = AscendC::Reg::UpdateMask<int32_t>(precessK);
             }
             AscendC::Reg::LoadAlign<int32_t, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(
-                (AscendC::Reg::RegTensor<int32_t> &)valueVreg, indexVreg,
+                (AscendC::Reg::RegTensor<int32_t>&)valueVreg, indexVreg,
                 sortedTensorAddr + rowLoopsOffset + (loopEnd)*repeatCount * KEY_VALUE_FACTOR);
             if constexpr (!IsSameType<T, float>::value) {
                 ops::StoreUnAlignOneTensor<T>(yOutTensorAddr, valueVreg, u0, mask, lastLoopKCount);
@@ -457,8 +457,8 @@ __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, ne
         uint16_t loopK = (k_ + repeatCount - 1) / repeatCount;
         uint32_t precessK = k_;
         AscendC::Reg::RegTensor<int32_t> vreg0, vreg1;
-        __ubuf__ int32_t *rowIdxBaseTensorAddr = (__ubuf__ int32_t *)rowIdxBaseTensor.GetPhyAddr();
-        __ubuf__ int32_t *rowIdxOutTensorAddr = (__ubuf__ int32_t *)rowIdxOutTensor.GetPhyAddr();
+        __ubuf__ int32_t* rowIdxBaseTensorAddr = (__ubuf__ int32_t*)rowIdxBaseTensor.GetPhyAddr();
+        __ubuf__ int32_t* rowIdxOutTensorAddr = (__ubuf__ int32_t*)rowIdxOutTensor.GetPhyAddr();
         AscendC::Reg::MaskReg mask;
         for (uint16_t i = 0; i < loopK; i++) {
             mask = AscendC::Reg::UpdateMask<int32_t>(precessK);

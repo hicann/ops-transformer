@@ -19,13 +19,13 @@
 
 namespace optiling {
 
-ge::graphStatus Tiling4MoeReRouting(gert::TilingContext *context)
+ge::graphStatus Tiling4MoeReRouting(gert::TilingContext* context)
 {
     OP_LOGD(context, "TilingForMoeReRouting running.");
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingPrepare4MoeReRouting(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepare4MoeReRouting(gert::TilingParseContext* context)
 {
     OP_LOGD(context, "TilingPrepare4MoeReRouting running.");
     auto compileInfo = context->GetCompiledInfo<MoeReRoutingCompileInfo>();
@@ -35,16 +35,16 @@ ge::graphStatus TilingPrepare4MoeReRouting(gert::TilingParseContext *context)
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     compileInfo->coreNum = ascendcPlatform.GetCoreNumAiv();
     OP_CHECK_IF(compileInfo->coreNum <= 0,
-        OP_LOGE_FOR_INVALID_VALUE(
-            context->GetNodeName(), "compileInfo->coreNum", std::to_string(compileInfo->coreNum).c_str(), "> 0"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "compileInfo->coreNum",
+                                          std::to_string(compileInfo->coreNum).c_str(), "> 0"),
+                return ge::GRAPH_FAILED);
     uint64_t ubSize = 0;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
     compileInfo->ubSize = ubSize;
     OP_CHECK_IF(compileInfo->ubSize <= 0,
-        OP_LOGE_FOR_INVALID_VALUE(
-            context->GetNodeName(), "compileInfo->ubSize", std::to_string(compileInfo->ubSize).c_str(), "> 0"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "compileInfo->ubSize",
+                                          std::to_string(compileInfo->ubSize).c_str(), "> 0"),
+                return ge::GRAPH_FAILED);
     compileInfo->socVersion = ascendcPlatform.GetSocVersion();
     OP_LOGD(context, "coreNum: %ld, ubSize: %ld", compileInfo->coreNum, compileInfo->ubSize);
     OP_LOGD(context, "TilingPrepare4MoeReRouting success.");
@@ -55,4 +55,4 @@ IMPL_OP_OPTILING(MoeReRouting)
     .Tiling(Tiling4MoeReRouting)
     .TilingParse<MoeReRoutingCompileInfo>(TilingPrepare4MoeReRouting);
 
-}  // namespace optiling
+} // namespace optiling

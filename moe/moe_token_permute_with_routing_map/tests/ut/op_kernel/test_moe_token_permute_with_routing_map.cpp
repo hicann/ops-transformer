@@ -22,11 +22,11 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void moe_token_permute_with_routing_map(
-    GM_ADDR tokens, GM_ADDR indices, GM_ADDR prob, GM_ADDR permuteTokens, GM_ADDR permuteProb, GM_ADDR sortedIndices,
-    GM_ADDR workspace, GM_ADDR tiling);
-class moe_token_permute_with_routing_map_test : public testing::Test
-{
+extern "C" __global__ __aicore__ void moe_token_permute_with_routing_map(GM_ADDR tokens, GM_ADDR indices, GM_ADDR prob,
+                                                                         GM_ADDR permuteTokens, GM_ADDR permuteProb,
+                                                                         GM_ADDR sortedIndices, GM_ADDR workspace,
+                                                                         GM_ADDR tiling);
+class moe_token_permute_with_routing_map_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -71,9 +71,8 @@ TEST_F(moe_token_permute_with_routing_map_test, test_token_permute_0)
     string path(path_);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb, expandedExpertIdx,
-        workspace, tiling);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb,
+                expandedExpertIdx, workspace, tiling);
     AscendC::GmFree((void*)prob);
     AscendC::GmFree((void*)permuteProb);
     AscendC::GmFree((void*)x);
@@ -118,9 +117,8 @@ TEST_F(moe_token_permute_with_routing_map_test, test_token_permute_1)
     string path(path_);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb, expandedExpertIdx,
-        workspace, tiling);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb,
+                expandedExpertIdx, workspace, tiling);
 
     AscendC::GmFree((void*)prob);
     AscendC::GmFree((void*)permuteProb);
@@ -166,9 +164,8 @@ TEST_F(moe_token_permute_with_routing_map_test, test_token_permute_2)
     string path(path_);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb, expandedExpertIdx,
-        workspace, tiling);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb,
+                expandedExpertIdx, workspace, tiling);
 
     AscendC::GmFree((void*)prob);
     AscendC::GmFree((void*)permuteProb);
@@ -214,9 +211,8 @@ TEST_F(moe_token_permute_with_routing_map_test, test_token_permute_3)
     string path(path_);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb, expandedExpertIdx,
-        workspace, tiling);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb,
+                expandedExpertIdx, workspace, tiling);
 
     AscendC::GmFree((void*)prob);
     AscendC::GmFree((void*)permuteProb);
@@ -262,9 +258,8 @@ TEST_F(moe_token_permute_with_routing_map_test, test_token_permute_4)
     string path(path_);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb, expandedExpertIdx,
-        workspace, tiling);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb,
+                expandedExpertIdx, workspace, tiling);
 
     AscendC::GmFree((void*)prob);
     AscendC::GmFree((void*)permuteProb);
@@ -310,9 +305,8 @@ TEST_F(moe_token_permute_with_routing_map_test, test_token_permute_5)
     string path(path_);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb, expandedExpertIdx,
-        workspace, tiling);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb,
+                expandedExpertIdx, workspace, tiling);
 
     AscendC::GmFree((void*)prob);
     AscendC::GmFree((void*)permuteProb);
@@ -358,9 +352,8 @@ TEST_F(moe_token_permute_with_routing_map_test, test_token_permute_6)
     string path(path_);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb, expandedExpertIdx,
-        workspace, tiling);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb,
+                expandedExpertIdx, workspace, tiling);
 
     AscendC::GmFree((void*)prob);
     AscendC::GmFree((void*)permuteProb);
@@ -406,9 +399,8 @@ TEST_F(moe_token_permute_with_routing_map_test, test_token_permute_7)
     string path(path_);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb, expandedExpertIdx,
-        workspace, tiling);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map, blockDim, x, rowIdx, prob, expandedX, permuteProb,
+                expandedExpertIdx, workspace, tiling);
 
     AscendC::GmFree((void*)prob);
     AscendC::GmFree((void*)permuteProb);

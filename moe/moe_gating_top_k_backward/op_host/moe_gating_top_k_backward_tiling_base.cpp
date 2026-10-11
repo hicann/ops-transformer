@@ -18,12 +18,12 @@
 #include "kernel_tiling/kernel_tiling.h"
 
 namespace optiling {
-static ge::graphStatus TilingForMoeGatingTopKBackward(gert::TilingContext *context)
+static ge::graphStatus TilingForMoeGatingTopKBackward(gert::TilingContext* context)
 {
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus TilingPrepareForMoeGatingTopKBackward(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForMoeGatingTopKBackward(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

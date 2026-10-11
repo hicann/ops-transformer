@@ -18,8 +18,7 @@
 #include "moe_inplace_index_add_tiling.h"
 #include "moe_inplace_index_add_simt_tiling.h"
 
-namespace optiling
-{
+namespace optiling {
 constexpr int64_t SIMT_DB_BUFFER = 1;
 
 constexpr int64_t GM_ALIGN = 512;
@@ -34,7 +33,7 @@ constexpr int64_t ASCENDC_TOOLS_WORKSPACE = 16L * 1024L * 1024L;
 
 bool MoeInplaceIndexAddSimtTiling::IsCapable()
 {
-     if (isSimtNoSort_ == 1) {
+    if (isSimtNoSort_ == 1) {
         return true;
     }
     return false;
@@ -105,10 +104,10 @@ ge::graphStatus MoeInplaceIndexAddSimtTiling::PostTiling()
     auto res = context_->SetLocalMemorySize(ubSize_);
     context_->SetBlockDim(usedCoreNum_);
     context_->SetScheduleMode(1);
-    MOE_OP_TILING_CHECK(
-        (res != ge::GRAPH_SUCCESS),
-        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "SetLocalMemorySize ubSize = %ld failed.", ubSize_),
-        return ge::GRAPH_FAILED);
+    MOE_OP_TILING_CHECK((res != ge::GRAPH_SUCCESS),
+                        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(),
+                                                            "SetLocalMemorySize ubSize = %ld failed.", ubSize_),
+                        return ge::GRAPH_FAILED);
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
     return ge::GRAPH_SUCCESS;
@@ -131,4 +130,4 @@ void MoeInplaceIndexAddSimtTiling::DumpTilingInfo()
 }
 
 REGISTER_OPS_TILING_TEMPLATE(MoeInplaceIndexAdd, MoeInplaceIndexAddSimtTiling, 1);
-}  // namespace optiling
+} // namespace optiling

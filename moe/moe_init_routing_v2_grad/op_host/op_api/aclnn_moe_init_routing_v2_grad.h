@@ -22,12 +22,14 @@ extern "C" {
  * @brief aclnnMoeInitRoutingV2Grad的第一段接口，根据具体的计算流程，计算workspace大小。
  * @domain aclnn_ops_infer
  */
-ACLNN_API aclnnStatus aclnnMoeInitRoutingV2GradGetWorkspaceSize(
-    const aclTensor* gradExpandedX, const aclTensor* expandedRowIdx, int64_t topK, int64_t dropPadMode,
-    int64_t activeNum, const aclTensor* out, uint64_t* workspaceSize, aclOpExecutor** executor);
+ACLNN_API aclnnStatus aclnnMoeInitRoutingV2GradGetWorkspaceSize(const aclTensor* gradExpandedX,
+                                                                const aclTensor* expandedRowIdx, int64_t topK,
+                                                                int64_t dropPadMode, int64_t activeNum,
+                                                                const aclTensor* out, uint64_t* workspaceSize,
+                                                                aclOpExecutor** executor);
 /* @brief aclnnMoeInitRoutingV2Grad的第二段接口，用于执行计算。 */
-ACLNN_API aclnnStatus
-aclnnMoeInitRoutingV2Grad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
+ACLNN_API aclnnStatus aclnnMoeInitRoutingV2Grad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                                aclrtStream stream);
 
 #ifdef __cplusplus
 }

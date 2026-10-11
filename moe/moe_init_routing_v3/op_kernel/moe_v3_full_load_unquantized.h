@@ -26,7 +26,7 @@ public:
     __aicore__ inline MoeV3FullLoadUnquantized(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
                                 GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale, GM_ADDR workspace,
-                                const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 protected:
@@ -49,16 +49,16 @@ template <typename T>
 __aicore__ inline void MoeV3FullLoadUnquantized<T>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX,
                                                          GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
                                                          GM_ADDR expandedScale, GM_ADDR workspace,
-                                                         const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe)
+                                                         const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe)
 {
     MoeV3FullLoadBase<T>::Init(expertIdx, expandedRowIdx, expertTokensCountOrCumsum, workspace, tilingData, tPipe);
-    xGm_.SetGlobalBuffer((__gm__ T *)x);
+    xGm_.SetGlobalBuffer((__gm__ T*)x);
     if (this->isInputScale_) {
-        scaleGm_.SetGlobalBuffer((__gm__ float *)scale);
-        expandedScaleGm_.SetGlobalBuffer((__gm__ float *)expandedScale);
+        scaleGm_.SetGlobalBuffer((__gm__ float*)scale);
+        expandedScaleGm_.SetGlobalBuffer((__gm__ float*)expandedScale);
     }
 
-    expandedXGm_.SetGlobalBuffer((__gm__ T *)expandedX);
+    expandedXGm_.SetGlobalBuffer((__gm__ T*)expandedX);
     int64_t buffSize = this->sortNum_ * sizeof(int32_t);
     int64_t row_length =
         (this->curIndexStart_ + this->coreIndicesElements_ - 1) / this->k_ - this->curIndexStart_ / this->k_ + 1;

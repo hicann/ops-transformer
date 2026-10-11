@@ -72,7 +72,7 @@ REGISTER_TILING_DATA_CLASS(MoeInplaceIndexAdd_101112, MoeInplaceIndexAddSimtTili
 
 class MoeInplaceIndexAddSimtTiling : public MoeInplaceIndexAddTiling {
 public:
-    explicit MoeInplaceIndexAddSimtTiling(gert::TilingContext *context)
+    explicit MoeInplaceIndexAddSimtTiling(gert::TilingContext* context)
         : MoeInplaceIndexAddTiling(context)
     {}
     ~MoeInplaceIndexAddSimtTiling() override = default;

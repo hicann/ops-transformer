@@ -20,7 +20,7 @@ if (BUILD_OPEN_PROJECT)
             OPTIONS --cce-auto-sync=on
                     -Wno-deprecated-declarations
                     -Werror
-                    -mllvm 
+                    -mllvm
                     -cce-aicore-dcci-before-kernel-end=false
         )
     else()

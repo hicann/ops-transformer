@@ -33,7 +33,7 @@ using namespace std;
 using namespace ge;
 
 namespace {
-void SetupParsePlatformInfo(fe::PlatFormInfos *platformInfo)
+void SetupParsePlatformInfo(fe::PlatFormInfos* platformInfo)
 {
     platformInfo->Init();
     map<string, string> socInfos = {
@@ -87,12 +87,12 @@ protected:
     }
 };
 
-static string TilingData2Str(const gert::TilingData *tiling_data)
+static string TilingData2Str(const gert::TilingData* tiling_data)
 {
     auto data = tiling_data->GetData();
     string result;
     for (size_t i = 0; i < tiling_data->GetDataSize(); i += sizeof(int64_t)) {
-        result += std::to_string((reinterpret_cast<const int64_t *>(tiling_data->GetData())[i / sizeof(int64_t)]));
+        result += std::to_string((reinterpret_cast<const int64_t*>(tiling_data->GetData())[i / sizeof(int64_t)]));
         result += " ";
     }
 
@@ -298,7 +298,7 @@ TEST_F(MoeFusedTopkTiling, TilingParse_Success)
     fe::PlatFormInfos platformInfo;
     SetupParsePlatformInfo(&platformInfo);
 
-    const char *compileInfoString =
+    const char* compileInfoString =
         R"({"hardware_info": {"BT_SIZE": 0, "load3d_constraints": "1", "Intrinsic_fix_pipe_l0c2out": false, )"
         R"("Intrinsic_data_move_l12ub": true, "Intrinsic_data_move_l0c2ub": true, )"
         R"("Intrinsic_data_move_out2l1_nd2nz": false, "UB_SIZE": 65536, "L2_SIZE": 33554432, )"
@@ -311,7 +311,7 @@ TEST_F(MoeFusedTopkTiling, TilingParse_Success)
                       .IONum(4, 2)
                       .CompiledJson(compileInfoString)
                       .CompiledInfo(&compileInfo)
-                      .PlatformInfo(reinterpret_cast<char *>(&platformInfo))
+                      .PlatformInfo(reinterpret_cast<char*>(&platformInfo))
                       .Build();
     auto parseContext = holder.GetContext();
     ASSERT_NE(parseContext, nullptr);
@@ -324,7 +324,7 @@ TEST_F(MoeFusedTopkTiling, TilingParse_Success)
     ASSERT_NE(opImpl, nullptr);
     ASSERT_NE(opImpl->tiling_parse, nullptr);
 
-    auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext *>(parseContext));
+    auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext*>(parseContext));
     EXPECT_EQ(ret, ge::GRAPH_SUCCESS);
     EXPECT_GT(compileInfo.coreNum, 0);
     EXPECT_GT(compileInfo.ubSize, 0);

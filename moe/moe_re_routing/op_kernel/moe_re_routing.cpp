@@ -24,74 +24,45 @@
 #define MOE_RE_ROUTING_TOKENS_BF16_EXPERTS_INT64_SCALES_FLOAT32 100210UL
 
 extern "C" __global__ __aicore__ void moe_re_routing(GM_ADDR tokens, GM_ADDR expertTokensNumPerRank,
-    GM_ADDR perTokenScales, GM_ADDR permuteTokens, GM_ADDR permutePerTokenScales, GM_ADDR permuteTokenIdx,
-    GM_ADDR expertTokenNum, GM_ADDR workspace, GM_ADDR tiling)
+                                                     GM_ADDR perTokenScales, GM_ADDR permuteTokens,
+                                                     GM_ADDR permutePerTokenScales, GM_ADDR permuteTokenIdx,
+                                                     GM_ADDR expertTokenNum, GM_ADDR workspace, GM_ADDR tiling)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
     TPipe pipe;
     GET_TILING_DATA(tiling_data, tiling);
     if (TILING_KEY_IS(MOE_RE_ROUTING_TOKENS_INT8_EXPERTS_INT32_SCALES_FLOAT32)) {
         KernelMoeReRouting<int8_t, int32_t, float> op(&pipe, &tiling_data);
-        op.Init(tokens,
-            expertTokensNumPerRank,
-            perTokenScales,
-            permuteTokens,
-            permutePerTokenScales,
-            permuteTokenIdx,
-            expertTokenNum);
+        op.Init(tokens, expertTokensNumPerRank, perTokenScales, permuteTokens, permutePerTokenScales, permuteTokenIdx,
+                expertTokenNum);
         op.Process();
     } else if (TILING_KEY_IS(MOE_RE_ROUTING_TOKENS_INT8_EXPERTS_INT64_SCALES_FLOAT32)) {
         KernelMoeReRouting<int8_t, int64_t, float> op(&pipe, &tiling_data);
-        op.Init(tokens,
-            expertTokensNumPerRank,
-            perTokenScales,
-            permuteTokens,
-            permutePerTokenScales,
-            permuteTokenIdx,
-            expertTokenNum);
+        op.Init(tokens, expertTokensNumPerRank, perTokenScales, permuteTokens, permutePerTokenScales, permuteTokenIdx,
+                expertTokenNum);
         op.Process();
     } else if (TILING_KEY_IS(MOE_RE_ROUTING_TOKENS_FP16_EXPERTS_INT32_SCALES_FLOAT32)) {
         KernelMoeReRouting<half, int32_t, float> op(&pipe, &tiling_data);
-        op.Init(tokens,
-            expertTokensNumPerRank,
-            perTokenScales,
-            permuteTokens,
-            permutePerTokenScales,
-            permuteTokenIdx,
-            expertTokenNum);
+        op.Init(tokens, expertTokensNumPerRank, perTokenScales, permuteTokens, permutePerTokenScales, permuteTokenIdx,
+                expertTokenNum);
         op.Process();
     } else if (TILING_KEY_IS(MOE_RE_ROUTING_TOKENS_FP16_EXPERTS_INT64_SCALES_FLOAT32)) {
         KernelMoeReRouting<half, int64_t, float> op(&pipe, &tiling_data);
-        op.Init(tokens,
-            expertTokensNumPerRank,
-            perTokenScales,
-            permuteTokens,
-            permutePerTokenScales,
-            permuteTokenIdx,
-            expertTokenNum);
+        op.Init(tokens, expertTokensNumPerRank, perTokenScales, permuteTokens, permutePerTokenScales, permuteTokenIdx,
+                expertTokenNum);
         op.Process();
     } else if (TILING_KEY_IS(MOE_RE_ROUTING_TOKENS_BF16_EXPERTS_INT32_SCALES_FLOAT32)) {
 #if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
         KernelMoeReRouting<bfloat16_t, int32_t, float> op(&pipe, &tiling_data);
-        op.Init(tokens,
-            expertTokensNumPerRank,
-            perTokenScales,
-            permuteTokens,
-            permutePerTokenScales,
-            permuteTokenIdx,
-            expertTokenNum);
+        op.Init(tokens, expertTokensNumPerRank, perTokenScales, permuteTokens, permutePerTokenScales, permuteTokenIdx,
+                expertTokenNum);
         op.Process();
 #endif
     } else if (TILING_KEY_IS(MOE_RE_ROUTING_TOKENS_BF16_EXPERTS_INT64_SCALES_FLOAT32)) {
 #if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
         KernelMoeReRouting<bfloat16_t, int64_t, float> op(&pipe, &tiling_data);
-        op.Init(tokens,
-            expertTokensNumPerRank,
-            perTokenScales,
-            permuteTokens,
-            permutePerTokenScales,
-            permuteTokenIdx,
-            expertTokenNum);
+        op.Init(tokens, expertTokensNumPerRank, perTokenScales, permuteTokens, permutePerTokenScales, permuteTokenIdx,
+                expertTokenNum);
         op.Process();
 #endif
     }

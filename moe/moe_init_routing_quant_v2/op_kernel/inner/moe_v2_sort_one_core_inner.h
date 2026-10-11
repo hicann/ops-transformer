@@ -26,8 +26,8 @@ public:
     __aicore__ inline MoeV2SortOneCore(){};
     template <typename TilingData>
     __aicore__ inline void Init(GM_ADDR expertIdx, GM_ADDR expertTokensCountOrCumsum,
-                                GM_ADDR expertTokensBeforeCapacity, GM_ADDR workspace, const TilingData *tilingData,
-                                TPipe *tPipe);
+                                GM_ADDR expertTokensBeforeCapacity, GM_ADDR workspace, const TilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -127,7 +127,7 @@ __aicore__ inline void MoeV2SortOneCore::CopyOut()
 template <typename TilingData>
 __aicore__ inline void MoeV2SortOneCore::Init(GM_ADDR expertIdx, GM_ADDR expertTokensCountOrCumsum,
                                               GM_ADDR expertTokensBeforeCapacity, GM_ADDR workspace,
-                                              const TilingData *tilingData, TPipe *tPipe)
+                                              const TilingData* tilingData, TPipe* tPipe)
 {
     this->blockIdx = GetBlockIdx();
     this->tileLength = Align(tilingData->vbsComputeParamsOp.lastCorePerLoopElements, sizeof(int32_t));
@@ -141,20 +141,20 @@ __aicore__ inline void MoeV2SortOneCore::Init(GM_ADDR expertIdx, GM_ADDR expertT
     this->expertTokensCountOrCumsumFlag = tilingData->expertTokensCountOrCumsumFlag;
     this->expertTokensBeforeCapacityFlag = tilingData->expertTokensBeforeCapacityFlag;
 
-    expertIdxGm.SetGlobalBuffer((__gm__ int32_t *)expertIdx, this->tileLength);
-    sortedexpertIdxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace), this->tileLength);
-    expandDstToSrcRowGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + this->tileLength,
+    expertIdxGm.SetGlobalBuffer((__gm__ int32_t*)expertIdx, this->tileLength);
+    sortedexpertIdxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace), this->tileLength);
+    expandDstToSrcRowGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace) + this->tileLength,
                                         this->tileLength);
 
     if (this->blockIdx == this->coreNum - 1) {
         if (this->expertTokensCountOrCumsumFlag > 0) {
-            expertTokensCountOrCumsumGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensCountOrCumsum,
+            expertTokensCountOrCumsumGm.SetGlobalBuffer((__gm__ int32_t*)expertTokensCountOrCumsum,
                                                         Align(this->expertNum, sizeof(int32_t)));
             PipeBarrier<PIPE_V>();
             InitGlobalMemory(expertTokensCountOrCumsumGm, this->expertNum, 0);
         }
         if (this->expertTokensBeforeCapacityFlag == 1) {
-            expertTokensBeforeCapacityGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensBeforeCapacity,
+            expertTokensBeforeCapacityGm.SetGlobalBuffer((__gm__ int32_t*)expertTokensBeforeCapacity,
                                                          Align(this->expertNum, sizeof(int32_t)));
             PipeBarrier<PIPE_V>();
             InitGlobalMemory(expertTokensBeforeCapacityGm, this->expertNum, 0);

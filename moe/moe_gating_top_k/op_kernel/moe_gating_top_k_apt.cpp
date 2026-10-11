@@ -46,7 +46,7 @@ extern "C" __global__ __aicore__ void moe_gating_top_k(GM_ADDR x, GM_ADDR bias, 
     }
 
     GET_TILING_DATA_WITH_STRUCT(MoeGatingTopKRegbaseTilingData, tiling_data_in, tiling);
-    const MoeGatingTopKRegbaseTilingData *__restrict tilingData = &tiling_data_in;
+    const MoeGatingTopKRegbaseTilingData* __restrict tilingData = &tiling_data_in;
     TPipe tPipe;
 
     if (TILING_KEY_IS(TILING_KEY_E_K_FULLLOAD_REGBASE)) {

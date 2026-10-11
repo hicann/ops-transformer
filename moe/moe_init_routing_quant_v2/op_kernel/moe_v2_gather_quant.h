@@ -28,8 +28,8 @@ class MoeV2GatherQuant {
 public:
     __aicore__ inline MoeV2GatherQuant(){};
     __aicore__ inline void Init(GM_ADDR inputX, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedRowIdx,
-                                GM_ADDR expandedX, GM_ADDR workspace, const MoeInitRoutingQuantV2TilingData *tilingData,
-                                TPipe *tPipe);
+                                GM_ADDR expandedX, GM_ADDR workspace, const MoeInitRoutingQuantV2TilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -38,7 +38,7 @@ private:
     __aicore__ inline void CopyOut(int64_t progress);
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, BUFFER_NUM> inputXCopyInQueue;
     TQue<QuePosition::VECIN, BUFFER_NUM> expandRowIdxCopyInQueue;
     TQue<QuePosition::VECOUT, BUFFER_NUM> inputXCopyOutQueue;
@@ -51,7 +51,7 @@ private:
     GlobalTensor<float> scaleGm;
     GlobalTensor<float> offsetGm;
 
-    const InnerMoeV2GatherOutComputeTilingData *gatherOutTilingData;
+    const InnerMoeV2GatherOutComputeTilingData* gatherOutTilingData;
 
     int64_t needCoreNum;
     int64_t blockIdx;
@@ -186,7 +186,7 @@ __aicore__ inline void MoeV2GatherQuant<T>::CopyOut(int64_t progress)
 template <typename T>
 __aicore__ inline void MoeV2GatherQuant<T>::Init(GM_ADDR inputX, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedRowIdx,
                                                  GM_ADDR expandedX, GM_ADDR workspace,
-                                                 const MoeInitRoutingQuantV2TilingData *tilingData, TPipe *tPipe)
+                                                 const MoeInitRoutingQuantV2TilingData* tilingData, TPipe* tPipe)
 {
     this->pipe = tPipe;
     this->blockIdx = GetBlockIdx();
@@ -214,13 +214,13 @@ __aicore__ inline void MoeV2GatherQuant<T>::Init(GM_ADDR inputX, GM_ADDR scale, 
     this->lastLoopCols = this->gatherOutTilingData->lastLoopCols;
     this->colLoops = this->gatherOutTilingData->colLoops;
 
-    inputXGm.SetGlobalBuffer((__gm__ T *)inputX);
-    expandedXGm.SetGlobalBuffer((__gm__ int8_t *)expandedX);
+    inputXGm.SetGlobalBuffer((__gm__ T*)inputX);
+    expandedXGm.SetGlobalBuffer((__gm__ int8_t*)expandedX);
     expandedRowIdxGm.SetGlobalBuffer(
-        (__gm__ int32_t *)expandedRowIdx + this->blockIdx * this->gatherOutTilingData->perCoreRows,
+        (__gm__ int32_t*)expandedRowIdx + this->blockIdx * this->gatherOutTilingData->perCoreRows,
         Align(this->coreRows, sizeof(int32_t)));
-    scaleGm.SetGlobalBuffer((__gm__ float *)scale, 1);
-    offsetGm.SetGlobalBuffer((__gm__ float *)offset, 1);
+    scaleGm.SetGlobalBuffer((__gm__ float*)scale, 1);
+    offsetGm.SetGlobalBuffer((__gm__ float*)offset, 1);
     this->scale = scaleGm.GetValue(0);
     this->offset = offsetGm.GetValue(0);
 

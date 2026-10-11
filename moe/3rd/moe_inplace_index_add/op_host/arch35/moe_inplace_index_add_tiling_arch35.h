@@ -46,7 +46,7 @@ REGISTER_TILING_DATA_CLASS(MoeInplaceIndexAdd, MoeInplaceIndexAddForAscendcTilin
  * @param [in] context: gert::TilingContext
  * @return bool: std::unique_ptr<nlohmann::json>;
  */
-inline std::unique_ptr<nlohmann::json> MoeGetCompileInfoJson(gert::TilingParseContext *context)
+inline std::unique_ptr<nlohmann::json> MoeGetCompileInfoJson(gert::TilingParseContext* context)
 {
     auto json_str = context->GetCompiledJson();
     MOE_OPS_CHECK_NULL_WITH_CONTEXT_RET(context, json_str, nullptr);
@@ -63,7 +63,7 @@ inline std::unique_ptr<nlohmann::json> MoeGetCompileInfoJson(gert::TilingParseCo
  * @return bool: success or failed
  */
 template <typename T>
-bool MoeReadCompileItem(const nlohmann::json &all_vars, const std::string &name, T &value)
+bool MoeReadCompileItem(const nlohmann::json& all_vars, const std::string& name, T& value)
 {
     if (all_vars.empty()) {
         return false;
@@ -78,7 +78,7 @@ bool MoeReadCompileItem(const nlohmann::json &all_vars, const std::string &name,
 }
 
 template <typename T1, typename T2>
-void MoeReadCompileItem(const nlohmann::json &all_vars, const std::string &name, T1 &value, const T2 default_value)
+void MoeReadCompileItem(const nlohmann::json& all_vars, const std::string& name, T1& value, const T2 default_value)
 {
     if (!MoeReadCompileItem(all_vars, name, value)) {
         value = static_cast<T1>(default_value);
@@ -91,13 +91,13 @@ void MoeReadCompileItem(const nlohmann::json &all_vars, const std::string &name,
  * @param [out] int64_t: running core number
  * @return bool: result
  */
-bool MoeGetTilingCoreNum(const gert::TilingParseContext *context, uint32_t &core_num);
+bool MoeGetTilingCoreNum(const gert::TilingParseContext* context, uint32_t& core_num);
 
-ge::graphStatus MoeInplaceIndexAddTilingForAscendC(gert::TilingContext *context);
+ge::graphStatus MoeInplaceIndexAddTilingForAscendC(gert::TilingContext* context);
 
 class MoeInplaceIndexAddTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeInplaceIndexAddTiling(gert::TilingContext *context)
+    explicit MoeInplaceIndexAddTiling(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
     ~MoeInplaceIndexAddTiling() override = default;
@@ -115,8 +115,8 @@ protected:
     void SelTemplateByInput();
     ge::graphStatus CheckInputDtype();
     ge::graphStatus CheckInputShape();
-    bool CompareShape(const gert::Shape &shape1, const gert::Shape &shape2, int64_t dim = static_cast<int64_t>(-1));
-    void CombineAxis(const gert::Shape &varShape, const gert::Shape &updatesShape);
+    bool CompareShape(const gert::Shape& shape1, const gert::Shape& shape2, int64_t dim = static_cast<int64_t>(-1));
+    void CombineAxis(const gert::Shape& varShape, const gert::Shape& updatesShape);
     void GetCastTypeSize();
     uint32_t GetSortTmpSize(ge::DataType dataType, uint32_t lastAxisNum, bool isDescend);
     void GetCastTypeForSort();

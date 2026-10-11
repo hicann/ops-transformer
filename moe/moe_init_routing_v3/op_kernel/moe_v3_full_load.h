@@ -23,7 +23,7 @@ public:
     __aicore__ inline MoeV3FullLoad(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedX,
                                 GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale,
-                                const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -35,7 +35,7 @@ private:
 private:
     int64_t sortNum;
 
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> sortDataCopyInQueue;
     TQue<QuePosition::VECOUT, 1> sortDataCopyOutQueue;
     TQue<QuePosition::VECOUT, 1> expertTokensCountOrCumsumOutQueue;
@@ -229,8 +229,8 @@ __aicore__ inline void MoeV3FullLoad::CopyOutDynamicQuant()
 
 __aicore__ inline void MoeV3FullLoad::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset,
                                            GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
-                                           GM_ADDR expandedScale, const MoeInitRoutingV3TilingData *tilingData,
-                                           TPipe *tPipe)
+                                           GM_ADDR expandedScale, const MoeInitRoutingV3TilingData* tilingData,
+                                           TPipe* tPipe)
 {
     this->pipe = tPipe;
     this->blockIdx = GetBlockIdx();
@@ -242,15 +242,15 @@ __aicore__ inline void MoeV3FullLoad::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR
     cols_ = tilingData->cols;
     rowIdxType_ = tilingData->rowIdxType;
 
-    expertIdxGm.SetGlobalBuffer((__gm__ int32_t *)expertIdx, this->tileLength);
+    expertIdxGm.SetGlobalBuffer((__gm__ int32_t*)expertIdx, this->tileLength);
 
-    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, this->tileLength);
-    expertTokensCountOrCumsumGm.SetGlobalBuffer((__gm__ int64_t *)expertTokensCountOrCumsum, this->tileLength);
+    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, this->tileLength);
+    expertTokensCountOrCumsumGm.SetGlobalBuffer((__gm__ int64_t*)expertTokensCountOrCumsum, this->tileLength);
 
-    inputXGm.SetGlobalBuffer((__gm__ bfloat16_t *)x, this->n * cols_);
-    smoothGm.SetGlobalBuffer((__gm__ float *)scale, expertNum_ * cols_);
-    expandedXGm.SetGlobalBuffer((__gm__ int8_t *)expandedX, this->n * cols_ * this->k);
-    expandedScaleGm.SetGlobalBuffer((__gm__ float *)expandedScale, this->n * this->k);
+    inputXGm.SetGlobalBuffer((__gm__ bfloat16_t*)x, this->n * cols_);
+    smoothGm.SetGlobalBuffer((__gm__ float*)scale, expertNum_ * cols_);
+    expandedXGm.SetGlobalBuffer((__gm__ int8_t*)expandedX, this->n * cols_ * this->k);
+    expandedScaleGm.SetGlobalBuffer((__gm__ float*)expandedScale, this->n * this->k);
 
     // key and value
     int64_t buffSize = this->sortNum * sizeof(int32_t) * kvFactor;

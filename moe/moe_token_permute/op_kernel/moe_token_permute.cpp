@@ -26,25 +26,25 @@
 #endif
 using namespace AscendC;
 using namespace MoeTokenPermute;
-#define GENERAL_OP_IMPL(sortClass1, sortClass2, indexCopyClass, ...)                  \
-    do {                                                                              \
-        sortClass1<DTYPE_INDICES> op;                                                 \
-        op.Init(indices, sortedIndices, userWS, t, &sortPipe);                        \
-        op.Process();                                                                 \
-        sortPipe.Destroy();                                                           \
-        sortClass2<int32_t> op2;                                                      \
-        TPipe sortPipe2;                                                              \
-        op2.Init(sortedIndices, sortedIndices, userWS, t, &sortPipe2);                \
-        op2.Process();                                                                \
-        sortPipe2.Destroy();                                                          \
-        TPipe MoeindexCopyPipe;                                                       \
-        indexCopyClass<__VA_ARGS__> indexCopyOp;                                      \
+#define GENERAL_OP_IMPL(sortClass1, sortClass2, indexCopyClass, ...) \
+    do { \
+        sortClass1<DTYPE_INDICES> op; \
+        op.Init(indices, sortedIndices, userWS, t, &sortPipe); \
+        op.Process(); \
+        sortPipe.Destroy(); \
+        sortClass2<int32_t> op2; \
+        TPipe sortPipe2; \
+        op2.Init(sortedIndices, sortedIndices, userWS, t, &sortPipe2); \
+        op2.Process(); \
+        sortPipe2.Destroy(); \
+        TPipe MoeindexCopyPipe; \
+        indexCopyClass<__VA_ARGS__> indexCopyOp; \
         indexCopyOp.Init(tokens, sortedIndices, permuteTokens, t, &MoeindexCopyPipe); \
-        indexCopyOp.Process();                                                        \
+        indexCopyOp.Process(); \
     } while (0)
 
-extern "C" __global__ __aicore__ void moe_token_permute(
-    GM_ADDR tokens, GM_ADDR indices, GM_ADDR permuteTokens, GM_ADDR sortedIndices, GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void moe_token_permute(GM_ADDR tokens, GM_ADDR indices, GM_ADDR permuteTokens,
+                                                        GM_ADDR sortedIndices, GM_ADDR workspace, GM_ADDR tiling)
 {
     if (g_coreType == AIC) {
         return;

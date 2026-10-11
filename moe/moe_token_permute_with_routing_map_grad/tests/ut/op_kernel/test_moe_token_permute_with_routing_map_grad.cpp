@@ -22,392 +22,402 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void moe_token_permute_with_routing_map_grad(GM_ADDR permutedTokenOutPutGrad,
-                                                                              GM_ADDR permutedProbsOutPutGradOptional,
-                                                                              GM_ADDR sortedIndices,
-                                                                              GM_ADDR routingMapOptional,
-                                                                              GM_ADDR tokensGradOut,
-                                                                              GM_ADDR probsGradOutOptional,
-                                                                              GM_ADDR workspace, GM_ADDR tiling);
+extern "C" __global__ __aicore__ void moe_token_permute_with_routing_map_grad(
+    GM_ADDR permutedTokenOutPutGrad, GM_ADDR permutedProbsOutPutGradOptional, GM_ADDR sortedIndices,
+    GM_ADDR routingMapOptional, GM_ADDR tokensGradOut, GM_ADDR probsGradOutOptional, GM_ADDR workspace, GM_ADDR tiling);
 
 class moe_token_permute_with_routing_map_grad_test : public testing::Test {
- protected:
-  static void SetUpTestCase() {
-    cout << "moe_token_permute_with_routing_map_grad_test SetUp\n" << endl;
-  }
-  static void TearDownTestCase() {
-    cout << "moe_token_permute_with_routing_map_grad_test TearDown\n" << endl;
-  }
+protected:
+    static void SetUpTestCase()
+    {
+        cout << "moe_token_permute_with_routing_map_grad_test SetUp\n" << endl;
+    }
+    static void TearDownTestCase()
+    {
+        cout << "moe_token_permute_with_routing_map_grad_test TearDown\n" << endl;
+    }
 };
 
-TEST_F(moe_token_permute_with_routing_map_grad_test, test_bf16) {
+TEST_F(moe_token_permute_with_routing_map_grad_test, test_bf16)
+{
+    size_t permutedTokenOutPutGradByteSize = 6144 * 8 * 5120 * sizeof(bfloat16_t);
+    size_t permutedProbsOutPutGradOptionalByteSize = 6144 * 8 * sizeof(bfloat16_t);
+    size_t sortedIndicesByteSize = 6144 * 8 * sizeof(int32_t);
+    size_t routingMapOptionalByteSize = 6144 * 8;
+    // output
+    size_t tokensGradOutByteSize = 6144 * 5120 * sizeof(bfloat16_t);
+    size_t probsGradOutOptionalByteSize = 6144 * 5120 * sizeof(bfloat16_t);
 
-  size_t permutedTokenOutPutGradByteSize = 6144 * 8 * 5120 * sizeof(bfloat16_t);
-  size_t permutedProbsOutPutGradOptionalByteSize = 6144 * 8 * sizeof(bfloat16_t);
-  size_t sortedIndicesByteSize = 6144 * 8 * sizeof(int32_t);
-  size_t routingMapOptionalByteSize = 6144 * 8;
-  // output
-  size_t tokensGradOutByteSize = 6144 * 5120 * sizeof(bfloat16_t);
-  size_t probsGradOutOptionalByteSize = 6144 * 5120 * sizeof(bfloat16_t);
+    size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
 
-  size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
+    uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
+    uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
+    uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
+    uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
+    uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
+    uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
 
-  uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
-  uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
-  uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
-  uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
-  uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
-  uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
+    uint32_t blockDim = 48;
 
-  uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
-  uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
-  uint32_t blockDim = 48;
+    char* path_ = get_current_dir_name();
+    string path(path_);
 
-  char* path_ = get_current_dir_name();
-  string path(path_);
+    MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin =
+        reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
+    ICPU_SET_TILING_KEY(0);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad,
+                permutedProbsOutPutGradOptional, sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional,
+                workspace, tiling);
 
-  MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
-  ICPU_SET_TILING_KEY(0);
-  ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad, permutedProbsOutPutGradOptional,
-              sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional, workspace, tiling);
-
-  AscendC::GmFree(permutedTokenOutPutGrad);
-  AscendC::GmFree(permutedProbsOutPutGradOptional);
-  AscendC::GmFree(sortedIndices);
-  AscendC::GmFree(routingMapOptional);
-  AscendC::GmFree(tokensGradOut);
-  AscendC::GmFree(probsGradOutOptional);
-  AscendC::GmFree(workspace);
-  AscendC::GmFree(tiling);
-  free(path_);
+    AscendC::GmFree(permutedTokenOutPutGrad);
+    AscendC::GmFree(permutedProbsOutPutGradOptional);
+    AscendC::GmFree(sortedIndices);
+    AscendC::GmFree(routingMapOptional);
+    AscendC::GmFree(tokensGradOut);
+    AscendC::GmFree(probsGradOutOptional);
+    AscendC::GmFree(workspace);
+    AscendC::GmFree(tiling);
+    free(path_);
 }
 
-TEST_F(moe_token_permute_with_routing_map_grad_test, test_fp16) {
+TEST_F(moe_token_permute_with_routing_map_grad_test, test_fp16)
+{
+    size_t permutedTokenOutPutGradByteSize = 6144 * 8 * 5120 * sizeof(half);
+    size_t permutedProbsOutPutGradOptionalByteSize = 6144 * 8 * sizeof(half);
+    size_t sortedIndicesByteSize = 6144 * 8 * sizeof(int32_t);
+    size_t routingMapOptionalByteSize = 6144 * 8;
+    // output
+    size_t tokensGradOutByteSize = 6144 * 5120 * sizeof(half);
+    size_t probsGradOutOptionalByteSize = 6144 * 5120 * sizeof(half);
 
-  size_t permutedTokenOutPutGradByteSize = 6144 * 8 * 5120 * sizeof(half);
-  size_t permutedProbsOutPutGradOptionalByteSize = 6144 * 8 * sizeof(half);
-  size_t sortedIndicesByteSize = 6144 * 8 * sizeof(int32_t);
-  size_t routingMapOptionalByteSize = 6144 * 8;
-  // output
-  size_t tokensGradOutByteSize = 6144 * 5120 * sizeof(half);
-  size_t probsGradOutOptionalByteSize = 6144 * 5120 * sizeof(half);
+    size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
 
-  size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
+    uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
+    uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
+    uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
+    uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
+    uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
+    uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
 
-  uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
-  uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
-  uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
-  uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
-  uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
-  uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
+    uint32_t blockDim = 48;
 
-  uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
-  uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
-  uint32_t blockDim = 48;
+    char* path_ = get_current_dir_name();
+    string path(path_);
 
-  char* path_ = get_current_dir_name();
-  string path(path_);
+    MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin =
+        reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
+    ICPU_SET_TILING_KEY(2);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad,
+                permutedProbsOutPutGradOptional, sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional,
+                workspace, tiling);
 
-  MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
-  ICPU_SET_TILING_KEY(2);
-  ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad, permutedProbsOutPutGradOptional,
-              sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional, workspace, tiling);
-
-  AscendC::GmFree(permutedTokenOutPutGrad);
-  AscendC::GmFree(permutedProbsOutPutGradOptional);
-  AscendC::GmFree(sortedIndices);
-  AscendC::GmFree(routingMapOptional);
-  AscendC::GmFree(tokensGradOut);
-  AscendC::GmFree(probsGradOutOptional);
-  AscendC::GmFree(workspace);
-  AscendC::GmFree(tiling);
-  free(path_);
+    AscendC::GmFree(permutedTokenOutPutGrad);
+    AscendC::GmFree(permutedProbsOutPutGradOptional);
+    AscendC::GmFree(sortedIndices);
+    AscendC::GmFree(routingMapOptional);
+    AscendC::GmFree(tokensGradOut);
+    AscendC::GmFree(probsGradOutOptional);
+    AscendC::GmFree(workspace);
+    AscendC::GmFree(tiling);
+    free(path_);
 }
 
-TEST_F(moe_token_permute_with_routing_map_grad_test, test_fp32) {
+TEST_F(moe_token_permute_with_routing_map_grad_test, test_fp32)
+{
+    size_t permutedTokenOutPutGradByteSize = 6144 * 8 * 5120 * sizeof(float);
+    size_t permutedProbsOutPutGradOptionalByteSize = 6144 * 8 * sizeof(float);
+    size_t sortedIndicesByteSize = 6144 * 8 * sizeof(int32_t);
+    size_t routingMapOptionalByteSize = 6144 * 8;
+    // output
+    size_t tokensGradOutByteSize = 6144 * 5120 * sizeof(float);
+    size_t probsGradOutOptionalByteSize = 6144 * 5120 * sizeof(float);
 
-  size_t permutedTokenOutPutGradByteSize = 6144 * 8 * 5120 * sizeof(float);
-  size_t permutedProbsOutPutGradOptionalByteSize = 6144 * 8 * sizeof(float);
-  size_t sortedIndicesByteSize = 6144 * 8 * sizeof(int32_t);
-  size_t routingMapOptionalByteSize = 6144 * 8;
-  // output
-  size_t tokensGradOutByteSize = 6144 * 5120 * sizeof(float);
-  size_t probsGradOutOptionalByteSize = 6144 * 5120 * sizeof(float);
+    size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
 
-  size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
+    uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
+    uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
+    uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
+    uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
+    uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
+    uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
 
-  uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
-  uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
-  uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
-  uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
-  uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
-  uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
+    uint32_t blockDim = 48;
 
-  uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
-  uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
-  uint32_t blockDim = 48;
+    char* path_ = get_current_dir_name();
+    string path(path_);
 
-  char* path_ = get_current_dir_name();
-  string path(path_);
+    MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin =
+        reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
+    ICPU_SET_TILING_KEY(4);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad,
+                permutedProbsOutPutGradOptional, sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional,
+                workspace, tiling);
 
-  MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
-  ICPU_SET_TILING_KEY(4);
-  ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad, permutedProbsOutPutGradOptional,
-              sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional, workspace, tiling);
-
-  AscendC::GmFree(permutedTokenOutPutGrad);
-  AscendC::GmFree(permutedProbsOutPutGradOptional);
-  AscendC::GmFree(sortedIndices);
-  AscendC::GmFree(routingMapOptional);
-  AscendC::GmFree(tokensGradOut);
-  AscendC::GmFree(probsGradOutOptional);
-  AscendC::GmFree(workspace);
-  AscendC::GmFree(tiling);
-  free(path_);
+    AscendC::GmFree(permutedTokenOutPutGrad);
+    AscendC::GmFree(permutedProbsOutPutGradOptional);
+    AscendC::GmFree(sortedIndices);
+    AscendC::GmFree(routingMapOptional);
+    AscendC::GmFree(tokensGradOut);
+    AscendC::GmFree(probsGradOutOptional);
+    AscendC::GmFree(workspace);
+    AscendC::GmFree(tiling);
+    free(path_);
 }
 
+TEST_F(moe_token_permute_with_routing_map_grad_test, test_bf16_droppad)
+{
+    size_t permutedTokenOutPutGradByteSize = 1024 * 7168 * sizeof(bfloat16_t);
+    size_t permutedProbsOutPutGradOptionalByteSize = 1024 * sizeof(bfloat16_t);
+    size_t sortedIndicesByteSize = 1024 * sizeof(int32_t);
+    size_t routingMapOptionalByteSize = 512 * 512;
+    // output
+    size_t tokensGradOutByteSize = 512 * 7168 * sizeof(bfloat16_t);
+    size_t probsGradOutOptionalByteSize = 512 * 512 * sizeof(bfloat16_t);
 
+    size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
 
-TEST_F(moe_token_permute_with_routing_map_grad_test, test_bf16_droppad) {
+    uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
+    uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
+    uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
+    uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
+    uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
+    uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
 
-  size_t permutedTokenOutPutGradByteSize = 1024 * 7168 * sizeof(bfloat16_t);
-  size_t permutedProbsOutPutGradOptionalByteSize = 1024 * sizeof(bfloat16_t);
-  size_t sortedIndicesByteSize = 1024 * sizeof(int32_t);
-  size_t routingMapOptionalByteSize = 512 * 512;
-  // output
-  size_t tokensGradOutByteSize = 512 * 7168 * sizeof(bfloat16_t);
-  size_t probsGradOutOptionalByteSize = 512 * 512 * sizeof(bfloat16_t);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
+    uint32_t blockDim = 48;
 
-  size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
+    char* path_ = get_current_dir_name();
+    string path(path_);
 
-  uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
-  uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
-  uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
-  uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
-  uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
-  uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
+    MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin =
+        reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
+    ICPU_SET_TILING_KEY(1000);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad,
+                permutedProbsOutPutGradOptional, sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional,
+                workspace, tiling);
 
-  uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
-  uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
-  uint32_t blockDim = 48;
-
-  char* path_ = get_current_dir_name();
-  string path(path_);
-
-  MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
-  ICPU_SET_TILING_KEY(1000);
-  ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad, permutedProbsOutPutGradOptional,
-              sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional, workspace, tiling);
-
-  AscendC::GmFree(permutedTokenOutPutGrad);
-  AscendC::GmFree(permutedProbsOutPutGradOptional);
-  AscendC::GmFree(sortedIndices);
-  AscendC::GmFree(routingMapOptional);
-  AscendC::GmFree(tokensGradOut);
-  AscendC::GmFree(probsGradOutOptional);
-  AscendC::GmFree(workspace);
-  AscendC::GmFree(tiling);
-  free(path_);
+    AscendC::GmFree(permutedTokenOutPutGrad);
+    AscendC::GmFree(permutedProbsOutPutGradOptional);
+    AscendC::GmFree(sortedIndices);
+    AscendC::GmFree(routingMapOptional);
+    AscendC::GmFree(tokensGradOut);
+    AscendC::GmFree(probsGradOutOptional);
+    AscendC::GmFree(workspace);
+    AscendC::GmFree(tiling);
+    free(path_);
 }
 
+TEST_F(moe_token_permute_with_routing_map_grad_test, test_fp16_droppad)
+{
+    size_t permutedTokenOutPutGradByteSize = 1024 * 7168 * sizeof(half);
+    size_t permutedProbsOutPutGradOptionalByteSize = 1024 * sizeof(half);
+    size_t sortedIndicesByteSize = 1024 * sizeof(int32_t);
+    size_t routingMapOptionalByteSize = 512 * 512;
+    // output
+    size_t tokensGradOutByteSize = 512 * 7168 * sizeof(half);
+    size_t probsGradOutOptionalByteSize = 512 * 512 * sizeof(half);
 
-TEST_F(moe_token_permute_with_routing_map_grad_test, test_fp16_droppad) {
+    size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
 
-  size_t permutedTokenOutPutGradByteSize = 1024 * 7168 * sizeof(half);
-  size_t permutedProbsOutPutGradOptionalByteSize = 1024 * sizeof(half);
-  size_t sortedIndicesByteSize = 1024 * sizeof(int32_t);
-  size_t routingMapOptionalByteSize = 512 * 512;
-  // output
-  size_t tokensGradOutByteSize = 512 * 7168 * sizeof(half);
-  size_t probsGradOutOptionalByteSize = 512 * 512 * sizeof(half);
+    uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
+    uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
+    uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
+    uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
+    uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
+    uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
 
-  size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
+    uint32_t blockDim = 48;
 
-  uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
-  uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
-  uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
-  uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
-  uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
-  uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
+    char* path_ = get_current_dir_name();
+    string path(path_);
 
-  uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
-  uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
-  uint32_t blockDim = 48;
+    MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin =
+        reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
+    ICPU_SET_TILING_KEY(1002);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad,
+                permutedProbsOutPutGradOptional, sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional,
+                workspace, tiling);
 
-  char* path_ = get_current_dir_name();
-  string path(path_);
-
-  MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
-  ICPU_SET_TILING_KEY(1002);
-  ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad, permutedProbsOutPutGradOptional,
-              sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional, workspace, tiling);
-
-  AscendC::GmFree(permutedTokenOutPutGrad);
-  AscendC::GmFree(permutedProbsOutPutGradOptional);
-  AscendC::GmFree(sortedIndices);
-  AscendC::GmFree(routingMapOptional);
-  AscendC::GmFree(tokensGradOut);
-  AscendC::GmFree(probsGradOutOptional);
-  AscendC::GmFree(workspace);
-  AscendC::GmFree(tiling);
-  free(path_);
+    AscendC::GmFree(permutedTokenOutPutGrad);
+    AscendC::GmFree(permutedProbsOutPutGradOptional);
+    AscendC::GmFree(sortedIndices);
+    AscendC::GmFree(routingMapOptional);
+    AscendC::GmFree(tokensGradOut);
+    AscendC::GmFree(probsGradOutOptional);
+    AscendC::GmFree(workspace);
+    AscendC::GmFree(tiling);
+    free(path_);
 }
 
+TEST_F(moe_token_permute_with_routing_map_grad_test, test_fp32_droppad)
+{
+    size_t permutedTokenOutPutGradByteSize = 1024 * 7168 * sizeof(float);
+    size_t permutedProbsOutPutGradOptionalByteSize = 1024 * sizeof(float);
+    size_t sortedIndicesByteSize = 1024 * sizeof(int32_t);
+    size_t routingMapOptionalByteSize = 512 * 512;
+    // output
+    size_t tokensGradOutByteSize = 512 * 7168 * sizeof(float);
+    size_t probsGradOutOptionalByteSize = 512 * 512 * sizeof(float);
 
-TEST_F(moe_token_permute_with_routing_map_grad_test, test_fp32_droppad) {
+    size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
 
-  size_t permutedTokenOutPutGradByteSize = 1024 * 7168 * sizeof(float);
-  size_t permutedProbsOutPutGradOptionalByteSize = 1024 * sizeof(float);
-  size_t sortedIndicesByteSize = 1024 * sizeof(int32_t);
-  size_t routingMapOptionalByteSize = 512 * 512;
-  // output
-  size_t tokensGradOutByteSize = 512 * 7168 * sizeof(float);
-  size_t probsGradOutOptionalByteSize = 512 * 512 * sizeof(float);
+    uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
+    uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
+    uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
+    uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
+    uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
+    uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
 
-  size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
+    uint32_t blockDim = 48;
 
-  uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
-  uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
-  uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
-  uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
-  uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
-  uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
+    char* path_ = get_current_dir_name();
+    string path(path_);
 
-  uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
-  uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
-  uint32_t blockDim = 48;
+    MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin =
+        reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
+    ICPU_SET_TILING_KEY(1004);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad,
+                permutedProbsOutPutGradOptional, sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional,
+                workspace, tiling);
 
-  char* path_ = get_current_dir_name();
-  string path(path_);
-
-  MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
-  ICPU_SET_TILING_KEY(1004);
-  ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad, permutedProbsOutPutGradOptional,
-              sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional, workspace, tiling);
-
-  AscendC::GmFree(permutedTokenOutPutGrad);
-  AscendC::GmFree(permutedProbsOutPutGradOptional);
-  AscendC::GmFree(sortedIndices);
-  AscendC::GmFree(routingMapOptional);
-  AscendC::GmFree(tokensGradOut);
-  AscendC::GmFree(probsGradOutOptional);
-  AscendC::GmFree(workspace);
-  AscendC::GmFree(tiling);
-  free(path_);
+    AscendC::GmFree(permutedTokenOutPutGrad);
+    AscendC::GmFree(permutedProbsOutPutGradOptional);
+    AscendC::GmFree(sortedIndices);
+    AscendC::GmFree(routingMapOptional);
+    AscendC::GmFree(tokensGradOut);
+    AscendC::GmFree(probsGradOutOptional);
+    AscendC::GmFree(workspace);
+    AscendC::GmFree(tiling);
+    free(path_);
 }
 
-TEST_F(moe_token_permute_with_routing_map_grad_test, test_bf16_mix) {
+TEST_F(moe_token_permute_with_routing_map_grad_test, test_bf16_mix)
+{
+    size_t permutedTokenOutPutGradByteSize = 1024 * 7168 * sizeof(bfloat16_t);
+    size_t permutedProbsOutPutGradOptionalByteSize = 1024 * sizeof(float);
+    size_t sortedIndicesByteSize = 1024 * sizeof(int32_t);
+    size_t routingMapOptionalByteSize = 512 * 512;
+    // output
+    size_t tokensGradOutByteSize = 512 * 7168 * sizeof(bfloat16_t);
+    size_t probsGradOutOptionalByteSize = 512 * 512 * sizeof(float);
 
-  size_t permutedTokenOutPutGradByteSize = 1024 * 7168 * sizeof(bfloat16_t);
-  size_t permutedProbsOutPutGradOptionalByteSize = 1024 * sizeof(float);
-  size_t sortedIndicesByteSize = 1024 * sizeof(int32_t);
-  size_t routingMapOptionalByteSize = 512 * 512;
-  // output
-  size_t tokensGradOutByteSize = 512 * 7168 * sizeof(bfloat16_t);
-  size_t probsGradOutOptionalByteSize = 512 * 512 * sizeof(float);
+    size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
 
-  size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
+    uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
+    uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
+    uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
+    uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
+    uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
+    uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
 
-  uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
-  uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
-  uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
-  uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
-  uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
-  uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
+    uint32_t blockDim = 48;
 
-  uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
-  uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
-  uint32_t blockDim = 48;
+    char* path_ = get_current_dir_name();
+    string path(path_);
 
-  char* path_ = get_current_dir_name();
-  string path(path_);
+    MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin =
+        reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
+    ICPU_SET_TILING_KEY(0);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad,
+                permutedProbsOutPutGradOptional, sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional,
+                workspace, tiling);
 
-  MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
-  ICPU_SET_TILING_KEY(0);
-  ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad, permutedProbsOutPutGradOptional,
-              sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional, workspace, tiling);
-
-  AscendC::GmFree(permutedTokenOutPutGrad);
-  AscendC::GmFree(permutedProbsOutPutGradOptional);
-  AscendC::GmFree(sortedIndices);
-  AscendC::GmFree(routingMapOptional);
-  AscendC::GmFree(tokensGradOut);
-  AscendC::GmFree(probsGradOutOptional);
-  AscendC::GmFree(workspace);
-  AscendC::GmFree(tiling);
-  free(path_);
+    AscendC::GmFree(permutedTokenOutPutGrad);
+    AscendC::GmFree(permutedProbsOutPutGradOptional);
+    AscendC::GmFree(sortedIndices);
+    AscendC::GmFree(routingMapOptional);
+    AscendC::GmFree(tokensGradOut);
+    AscendC::GmFree(probsGradOutOptional);
+    AscendC::GmFree(workspace);
+    AscendC::GmFree(tiling);
+    free(path_);
 }
 
-TEST_F(moe_token_permute_with_routing_map_grad_test, test_bf16_droppad_mix) {
+TEST_F(moe_token_permute_with_routing_map_grad_test, test_bf16_droppad_mix)
+{
+    size_t permutedTokenOutPutGradByteSize = 1024 * 7168 * sizeof(bfloat16_t);
+    size_t permutedProbsOutPutGradOptionalByteSize = 1024 * sizeof(float);
+    size_t sortedIndicesByteSize = 1024 * sizeof(int32_t);
+    size_t routingMapOptionalByteSize = 512 * 512;
+    // output
+    size_t tokensGradOutByteSize = 512 * 7168 * sizeof(bfloat16_t);
+    size_t probsGradOutOptionalByteSize = 512 * 512 * sizeof(float);
 
-  size_t permutedTokenOutPutGradByteSize = 1024 * 7168 * sizeof(bfloat16_t);
-  size_t permutedProbsOutPutGradOptionalByteSize = 1024 * sizeof(float);
-  size_t sortedIndicesByteSize = 1024 * sizeof(int32_t);
-  size_t routingMapOptionalByteSize = 512 * 512;
-  // output
-  size_t tokensGradOutByteSize = 512 * 7168 * sizeof(bfloat16_t);
-  size_t probsGradOutOptionalByteSize = 512 * 512 * sizeof(float);
+    size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
 
-  size_t tilingDataSize = sizeof(MoeTokenPermuteWithRoutingMapGradTilingData);
+    uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
+    uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
+    uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
+    uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
+    uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
+    uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
 
-  uint8_t* permutedTokenOutPutGrad = (uint8_t*)AscendC::GmAlloc(permutedTokenOutPutGradByteSize);
-  uint8_t* permutedProbsOutPutGradOptional = (uint8_t*)AscendC::GmAlloc(permutedProbsOutPutGradOptionalByteSize);
-  uint8_t* sortedIndices = (uint8_t*)AscendC::GmAlloc(sortedIndicesByteSize);
-  uint8_t* routingMapOptional = (uint8_t*)AscendC::GmAlloc(routingMapOptionalByteSize);
-  uint8_t* tokensGradOut = (uint8_t*)AscendC::GmAlloc(tokensGradOutByteSize);
-  uint8_t* probsGradOutOptional = (uint8_t*)AscendC::GmAlloc(probsGradOutOptionalByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
+    uint32_t blockDim = 48;
 
-  uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
-  uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
-  uint32_t blockDim = 48;
+    char* path_ = get_current_dir_name();
+    string path(path_);
 
-  char* path_ = get_current_dir_name();
-  string path(path_);
+    MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin =
+        reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
+    tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
+    ICPU_SET_TILING_KEY(1000);
+    ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad,
+                permutedProbsOutPutGradOptional, sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional,
+                workspace, tiling);
 
-  MoeTokenPermuteWithRoutingMapGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenPermuteWithRoutingMapGradTilingData*>(tiling);
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.buffer_num=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.hidden_splited_length=1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.top_k = 1;
-  tilingDatafromBin->moeTokenPermuteWithRoutingMapGradUnpermuteTilingData.tokens_splited_length = 1;
-  ICPU_SET_TILING_KEY(1000);
-  ICPU_RUN_KF(moe_token_permute_with_routing_map_grad, blockDim, permutedTokenOutPutGrad, permutedProbsOutPutGradOptional,
-              sortedIndices, routingMapOptional, tokensGradOut, probsGradOutOptional, workspace, tiling);
-
-  AscendC::GmFree(permutedTokenOutPutGrad);
-  AscendC::GmFree(permutedProbsOutPutGradOptional);
-  AscendC::GmFree(sortedIndices);
-  AscendC::GmFree(routingMapOptional);
-  AscendC::GmFree(tokensGradOut);
-  AscendC::GmFree(probsGradOutOptional);
-  AscendC::GmFree(workspace);
-  AscendC::GmFree(tiling);
-  free(path_);
+    AscendC::GmFree(permutedTokenOutPutGrad);
+    AscendC::GmFree(permutedProbsOutPutGradOptional);
+    AscendC::GmFree(sortedIndices);
+    AscendC::GmFree(routingMapOptional);
+    AscendC::GmFree(tokensGradOut);
+    AscendC::GmFree(probsGradOutOptional);
+    AscendC::GmFree(workspace);
+    AscendC::GmFree(tiling);
+    free(path_);
 }

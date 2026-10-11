@@ -80,9 +80,10 @@
 
 using namespace MoeFinalizeRoutingV2;
 
-extern "C" __global__ __aicore__ void moe_finalize_routing_v2(
-    GM_ADDR expandedPermutedRows, GM_ADDR expandedSrcToDstRow, GM_ADDR skip1, GM_ADDR skip2, GM_ADDR bias,
-    GM_ADDR scales, GM_ADDR expertForSourceRow, GM_ADDR out, GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void moe_finalize_routing_v2(GM_ADDR expandedPermutedRows, GM_ADDR expandedSrcToDstRow,
+                                                              GM_ADDR skip1, GM_ADDR skip2, GM_ADDR bias,
+                                                              GM_ADDR scales, GM_ADDR expertForSourceRow, GM_ADDR out,
+                                                              GM_ADDR workspace, GM_ADDR tiling)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
     GM_ADDR userWS = GetUserWorkspace(workspace);

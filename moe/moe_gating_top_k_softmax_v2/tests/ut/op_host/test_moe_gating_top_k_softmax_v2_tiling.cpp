@@ -70,8 +70,7 @@ void TouchAllMoeGatingTopKSoftmaxV2TilingDataFields()
 }
 } // namespace
 
-class MoeGatingTopKSoftmaxV2Tiling : public testing::Test
-{
+class MoeGatingTopKSoftmaxV2Tiling : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -84,22 +83,23 @@ protected:
     }
 };
 
-TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_001) {
+TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_001)
+{
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {40, 196608};
     std::string socVersion = "Ascend910B";
     uint64_t coreNum = 40;
     uint64_t ubSize = 196608;
     gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
                                               {
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_BF16, ge::FORMAT_ND},
                                               },
                                               {
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
                                               },
                                               &compileInfo, socVersion, coreNum, ubSize);
     uint64_t expectTilingKey = 101031;
@@ -108,23 +108,24 @@ TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_001) {
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces, 70);
 }
 
-TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_002) {
+TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_002)
+{
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {40, 196608};
     std::string socVersion = "Ascend910B";
     uint64_t coreNum = 40;
     uint64_t ubSize = 196608;
     gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
                                               {
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-                                                {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                                  {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
                                               },
                                               &compileInfo, socVersion, coreNum, ubSize);
     uint64_t expectTilingKey = 101111;
@@ -133,92 +134,97 @@ TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_002) {
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces, 70);
 }
 
-TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_003) {
+TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_003)
+{
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {40, 196608};
     std::string socVersion = "Ascend910B";
     uint64_t coreNum = 40;
     uint64_t ubSize = 196608;
     gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
                                               {
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {{{1, 24, 16}, {1, 24, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{1, 24, 16}, {1, 24, 16}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 16}, {1, 24, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 16}, {1, 24, 16}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
                                               },
                                               &compileInfo, socVersion, coreNum, ubSize);
     uint64_t expectTilingKey = 102011;
-    string expectTilingData =
-        "0 0 0 0 ";
+    string expectTilingData = "0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {16777216};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces, 47);
 }
 
-TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_004) {
+TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_004)
+{
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {40, 196608};
     std::string socVersion = "Ascend910B";
     uint64_t coreNum = 40;
     uint64_t ubSize = 196608;
     gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
                                               {
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {{{1, 256, 8}, {1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
                                               },
                                               &compileInfo, socVersion, coreNum, ubSize);
     uint64_t expectTilingKey = 103012;
-    string expectTilingData = "68719476992 137438953488 34359738376 30064771109 4294967300 30064771073 17179869191 187647121184085 224 ";
+    string expectTilingData =
+        "68719476992 137438953488 34359738376 30064771109 4294967300 30064771073 17179869191 187647121184085 224 ";
     std::vector<size_t> expectWorkspaces = {16777216};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_005) {
+TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_005)
+{
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {40, 196608};
     std::string socVersion = "Ascend910B";
     uint64_t coreNum = 40;
     uint64_t ubSize = 196608;
     gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
                                               {
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_BF16, ge::FORMAT_ND},
                                               },
                                               {
-                                                {{{1, 256, 8}, {1, 256, 8}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
                                               },
                                               &compileInfo, socVersion, coreNum, ubSize);
     uint64_t expectTilingKey = 103032;
-    string expectTilingData = "68719476992 137438953488 34359738376 30064771109 4294967300 30064771073 17179869191 187647121184085 224 ";
+    string expectTilingData =
+        "68719476992 137438953488 34359738376 30064771109 4294967300 30064771073 17179869191 187647121184085 224 ";
     std::vector<size_t> expectWorkspaces = {16777216};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_006) {
+TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_006)
+{
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {40, 196608};
     gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
                                               {
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(5000)},
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(5000)},
                                               },
                                               &compileInfo);
     uint64_t expectTilingKey = 0000;
@@ -227,20 +233,21 @@ TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_006) {
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces, 70);
 }
 
-TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_007) {
+TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_007)
+{
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {40, 196608};
     gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
                                               {
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{1, 24}, {1, 24}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24}, {1, 24}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(5000)},
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(5000)},
                                               },
                                               &compileInfo);
     uint64_t expectTilingKey = 0000;
@@ -249,20 +256,21 @@ TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_007) {
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces, 70);
 }
 
-TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_008) {
+TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_008)
+{
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {40, 196608};
     gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
                                               {
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{1, 24}, {1, 24}}, ge::DT_BOOL, ge::FORMAT_ND},
+                                                  {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24}, {1, 24}}, ge::DT_BOOL, ge::FORMAT_ND},
                                               },
                                               {
-                                                {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(5000)},
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(5000)},
                                               },
                                               &compileInfo);
     uint64_t expectTilingKey = 0000;
@@ -271,19 +279,20 @@ TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_008) {
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces, 70);
 }
 
-TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_009) {
+TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_009)
+{
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {40, 196608};
     gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
                                               {
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{1, 1, 5000}, {1, 1, 5000}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 5000}, {1, 24, 5000}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 1, 5000}, {1, 1, 5000}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(5000)},
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(5000)},
                                               },
                                               &compileInfo);
     uint64_t expectTilingKey = 0000;
@@ -292,23 +301,24 @@ TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_009) {
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces, 70);
 }
 
-TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_010) {
+TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_010)
+{
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {40, 196608};
     std::string socVersion = "Ascend910B";
     uint64_t coreNum = 40;
     uint64_t ubSize = 196608;
     gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
                                               {
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {{{1, 24, 16}, {1, 24, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{1, 24, 16}, {1, 24, 16}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 16}, {1, 24, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 16}, {1, 24, 16}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-                                                {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                                  {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
                                               },
                                               &compileInfo, socVersion, coreNum, ubSize);
     uint64_t expectTilingKey = 102111;
@@ -317,55 +327,59 @@ TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_010) {
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces, 47);
 }
 
-TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_011) {
+TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_011)
+{
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {40, 196608};
     std::string socVersion = "Ascend910B";
     uint64_t coreNum = 40;
     uint64_t ubSize = 196608;
-    gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
-                                              {
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                              },
-                                              {
-                                                {{{1, 24, 16}, {1, 24, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{1, 24, 16}, {1, 24, 16}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                              },
-                                              {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-                                                {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"output_softmax_result_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
-                                              },
-                                              &compileInfo, socVersion, coreNum, ubSize);
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKSoftmaxV2",
+        {
+            {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{1, 24, 16}, {1, 24, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 24, 16}, {1, 24, 16}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{1, 24, 7500}, {1, 24, 7500}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"output_softmax_result_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+        },
+        &compileInfo, socVersion, coreNum, ubSize);
     uint64_t expectTilingKey = 102011;
-    string expectTilingData =
-        "0 0 0 0 ";
+    string expectTilingData = "0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {16777216};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces, 47);
 }
 
-TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_012) {
+TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_012)
+{
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {40, 196608};
     std::string socVersion = "Ascend910B";
     uint64_t coreNum = 40;
     uint64_t ubSize = 196608;
-    gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
-                                              {
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                              },
-                                              {
-                                                {{{1, 256, 8}, {1, 256,8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                              },
-                                              {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-                                                {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"output_softmax_result_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
-                                              },
-                                              &compileInfo, socVersion, coreNum, ubSize);
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKSoftmaxV2",
+        {
+            {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{1, 256, 8}, {1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"output_softmax_result_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+        },
+        &compileInfo, socVersion, coreNum, ubSize);
     uint64_t expectTilingKey = 103012;
-    string expectTilingData = "68719476992 137438953488 34359738376 30064771109 4294967300 30064771073 17179869191 187647121184085 4294967520 ";
+    string expectTilingData = "68719476992 137438953488 34359738376 30064771109 4294967300 30064771073 17179869191 "
+                              "187647121184085 4294967520 ";
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -388,21 +402,22 @@ TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_tiling_parse_st
 TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_regbase_ascend950_fp16)
 {
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {48, 196608};
-    gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
-                                              {
-                                                {{{1, 4, 16}, {1, 4, 16}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                              },
-                                              {
-                                                {{{1, 4, 8}, {1, 4, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{1, 4, 8}, {1, 4, 8}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 4, 16}, {1, 4, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                              },
-                                              {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-                                                {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"output_softmax_result_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
-                                              },
-                                              &compileInfo, "Ascend950", 48ULL, 196608ULL);
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKSoftmaxV2",
+        {
+            {{{1, 4, 16}, {1, 4, 16}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            {{{1, 4, 8}, {1, 4, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 4, 8}, {1, 4, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{1, 4, 16}, {1, 4, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"output_softmax_result_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+        },
+        &compileInfo, "Ascend950", 48ULL, 196608ULL);
     uint64_t expectTilingKey = 103020;
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
@@ -411,21 +426,22 @@ TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_regbase_ascend9
 TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_regbase_ascend950_fp16_renorm)
 {
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {48, 196608};
-    gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
-                                              {
-                                                {{{1, 4, 16}, {1, 4, 16}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                              },
-                                              {
-                                                {{{1, 4, 8}, {1, 4, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                {{{1, 4, 8}, {1, 4, 8}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{1, 4, 16}, {1, 4, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                              },
-                                              {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-                                                {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                {"output_softmax_result_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
-                                              },
-                                              &compileInfo, "Ascend950", 48ULL, 196608ULL);
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKSoftmaxV2",
+        {
+            {{{1, 4, 16}, {1, 4, 16}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            {{{1, 4, 8}, {1, 4, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 4, 8}, {1, 4, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{1, 4, 16}, {1, 4, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"output_softmax_result_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+        },
+        &compileInfo, "Ascend950", 48ULL, 196608ULL);
     uint64_t expectTilingKey = 103120;
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
@@ -434,21 +450,22 @@ TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_regbase_ascend9
 TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_regbase_ascend950_bf16)
 {
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {48, 196608};
-    gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
-                                              {
-                                                {{{4, 16}, {4, 16}}, ge::DT_BF16, ge::FORMAT_ND},
-                                              },
-                                              {
-                                                {{{4, 8}, {4, 8}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{4, 8}, {4, 8}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4, 16}, {4, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                              },
-                                              {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-                                                {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"output_softmax_result_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-                                              },
-                                              &compileInfo, "Ascend950", 48ULL, 196608ULL);
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKSoftmaxV2",
+        {
+            {{{4, 16}, {4, 16}}, ge::DT_BF16, ge::FORMAT_ND},
+        },
+        {
+            {{{4, 8}, {4, 8}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 8}, {4, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{4, 16}, {4, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"output_softmax_result_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        },
+        &compileInfo, "Ascend950", 48ULL, 196608ULL);
     uint64_t expectTilingKey = 103030;
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
@@ -457,21 +474,22 @@ TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_regbase_ascend9
 TEST_F(MoeGatingTopKSoftmaxV2Tiling, moe_gating_top_k_softmax_v2_regbase_ascend950_col_small)
 {
     optiling::MoeGatingTopKSoftmaxV2CompileInfo compileInfo = {48, 196608};
-    gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmaxV2",
-                                              {
-                                                {{{2, 4}, {2, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                              },
-                                              {
-                                                {{{2, 2}, {2, 2}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                {{{2, 2}, {2, 2}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{2, 4}, {2, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                              },
-                                              {
-                                                {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-                                                {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                {"output_softmax_result_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-                                              },
-                                              &compileInfo, "Ascend950", 48ULL, 196608ULL);
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKSoftmaxV2",
+        {
+            {{{2, 4}, {2, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2}, {2, 2}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2}, {2, 2}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{2, 4}, {2, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"output_softmax_result_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        },
+        &compileInfo, "Ascend950", 48ULL, 196608ULL);
     uint64_t expectTilingKey = 103010;
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);

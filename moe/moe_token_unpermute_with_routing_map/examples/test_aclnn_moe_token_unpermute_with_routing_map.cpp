@@ -17,18 +17,19 @@
 #include <vector>
 
 #define CHECK_RET(cond, return_expr) \
-  do {                               \
-    if (!(cond)) {                   \
-      return_expr;                   \
-    }                                \
-  } while (0)
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
+    } while (0)
 
-#define LOG_PRINT(message, ...)     \
-  do {                              \
-    printf(message, ##__VA_ARGS__); \
-  } while (0)
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
+    } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t>& shape) {
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
+{
     int64_t shape_size = 1;
     for (auto i : shape) {
         shape_size *= i;
@@ -36,7 +37,8 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape) {
     return shape_size;
 }
 
-int Init(int32_t deviceId, aclrtStream* stream) {
+int Init(int32_t deviceId, aclrtStream* stream)
+{
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
     ret = aclrtSetDevice(deviceId);
@@ -48,7 +50,8 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 
 template <typename T>
 int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor) {
+                    aclDataType dataType, aclTensor** tensor)
+{
     auto size = GetShapeSize(shape) * sizeof(T);
     auto allocSize = size == 0 ? 1 : size;
     auto ret = aclrtMalloc(deviceAddr, allocSize, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -70,7 +73,8 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
 }
 
 template <typename T>
-int CopyDeviceToHost(void* deviceAddr, std::vector<T>& hostData, const char* name) {
+int CopyDeviceToHost(void* deviceAddr, std::vector<T>& hostData, const char* name)
+{
     auto size = hostData.size() * sizeof(T);
     if (size == 0) {
         return ACL_SUCCESS;
@@ -81,14 +85,14 @@ int CopyDeviceToHost(void* deviceAddr, std::vector<T>& hostData, const char* nam
 }
 
 int RunMoeTokenUnpermute(aclTensor* permutedTokens, aclTensor* sortedIndices, aclTensor* routingMapOptional,
-                         aclTensor* probs, bool padMode, aclIntArray* restoreShapeOptional,
-                         aclTensor* unpermutedTokens, aclTensor* outIndex, aclTensor* permuteTokenId,
-                         aclTensor* permuteProbs, aclrtStream stream) {
+                         aclTensor* probs, bool padMode, aclIntArray* restoreShapeOptional, aclTensor* unpermutedTokens,
+                         aclTensor* outIndex, aclTensor* permuteTokenId, aclTensor* permuteProbs, aclrtStream stream)
+{
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
     auto ret = aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(
-        permutedTokens, sortedIndices, routingMapOptional, probs, padMode, restoreShapeOptional,
-        unpermutedTokens, outIndex, permuteTokenId, permuteProbs, &workspaceSize, &executor);
+        permutedTokens, sortedIndices, routingMapOptional, probs, padMode, restoreShapeOptional, unpermutedTokens,
+        outIndex, permuteTokenId, permuteProbs, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS,
               LOG_PRINT("aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
@@ -116,7 +120,8 @@ int RunMoeTokenUnpermute(aclTensor* permutedTokens, aclTensor* sortedIndices, ac
     return ACL_SUCCESS;
 }
 
-bool CheckFloatResult(const char* name, const std::vector<float>& actual, const std::vector<float>& expected) {
+bool CheckFloatResult(const char* name, const std::vector<float>& actual, const std::vector<float>& expected)
+{
     bool pass = actual.size() == expected.size();
     constexpr float tolerance = 1e-3f;
     for (size_t i = 0; i < actual.size() && i < expected.size(); ++i) {
@@ -129,7 +134,8 @@ bool CheckFloatResult(const char* name, const std::vector<float>& actual, const 
     return pass;
 }
 
-int RunOriginalPadModeExample(int32_t deviceId) {
+int RunOriginalPadModeExample(int32_t deviceId)
+{
     LOG_PRINT("Run original paddedMode=true example.\n");
 
     aclrtStream stream;
@@ -154,7 +160,7 @@ int RunOriginalPadModeExample(int32_t deviceId) {
     void* outIndexDeviceAddr = nullptr;
     void* permuteTokenIdDeviceAddr = nullptr;
     void* permuteProbsDeviceAddr = nullptr;
-    //in
+    // in
     aclTensor* permutedTokens = nullptr;
     aclTensor* sortedIndices = nullptr;
     aclTensor* routingMapOptional = nullptr;
@@ -165,9 +171,10 @@ int RunOriginalPadModeExample(int32_t deviceId) {
     aclTensor* permuteProbs = nullptr;
     bool padMode = true;
     std::vector<int64_t> restoreShapeOptionalData = {2, 2};
-    aclIntArray *restoreShapeOptional = aclCreateIntArray(restoreShapeOptionalData.data(), restoreShapeOptionalData.size());
+    aclIntArray* restoreShapeOptional =
+        aclCreateIntArray(restoreShapeOptionalData.data(), restoreShapeOptionalData.size());
 
-    //构造数据
+    // 构造数据
     std::vector<float> permutedTokensHostData = {1.0, 1.0, 1.0, 1.0};
     std::vector<int> sortedIndicesHostData = {1, 1};
     std::vector<char> routingMapOptionalHostData = {1, 1, 1, 1};
@@ -178,26 +185,31 @@ int RunOriginalPadModeExample(int32_t deviceId) {
     std::vector<int> permuteTokenIdHostData = {0, 0};
     std::vector<float> permuteProbsHostData = {0, 0};
     // 创建self aclTensor
-    ret = CreateAclTensor(permutedTokensHostData, permutedTokensShape, &permutedTokensDeviceAddr, aclDataType::ACL_FLOAT, &permutedTokens);
+    ret = CreateAclTensor(permutedTokensHostData, permutedTokensShape, &permutedTokensDeviceAddr,
+                          aclDataType::ACL_FLOAT, &permutedTokens);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(sortedIndicesHostData, sortedIndicesShape, &sortedIndicesDeviceAddr, aclDataType::ACL_INT32, &sortedIndices);
+    ret = CreateAclTensor(sortedIndicesHostData, sortedIndicesShape, &sortedIndicesDeviceAddr, aclDataType::ACL_INT32,
+                          &sortedIndices);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(routingMapOptionalHostData, routingMapOptionalShape, &routingMapOptionalDeviceAddr, aclDataType::ACL_INT8, &routingMapOptional);
+    ret = CreateAclTensor(routingMapOptionalHostData, routingMapOptionalShape, &routingMapOptionalDeviceAddr,
+                          aclDataType::ACL_INT8, &routingMapOptional);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(probsHostData, probsShape, &probsDeviceAddr, aclDataType::ACL_FLOAT, &probs);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(unpermutedTokensHostData, unpermutedTokensShape, &unpermutedTokensDeviceAddr, aclDataType::ACL_FLOAT, &unpermutedTokens);
+    ret = CreateAclTensor(unpermutedTokensHostData, unpermutedTokensShape, &unpermutedTokensDeviceAddr,
+                          aclDataType::ACL_FLOAT, &unpermutedTokens);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(outIndexHostData, outIndexShape, &outIndexDeviceAddr, aclDataType::ACL_INT32, &outIndex);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(permuteTokenIdHostData, permuteTokenIdShape, &permuteTokenIdDeviceAddr, aclDataType::ACL_INT32, &permuteTokenId);
+    ret = CreateAclTensor(permuteTokenIdHostData, permuteTokenIdShape, &permuteTokenIdDeviceAddr,
+                          aclDataType::ACL_INT32, &permuteTokenId);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(permuteProbsHostData, permuteProbsShape, &permuteProbsDeviceAddr, aclDataType::ACL_FLOAT, &permuteProbs);
+    ret = CreateAclTensor(permuteProbsHostData, permuteProbsShape, &permuteProbsDeviceAddr, aclDataType::ACL_FLOAT,
+                          &permuteProbs);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    ret = RunMoeTokenUnpermute(permutedTokens, sortedIndices, routingMapOptional, probs, padMode,
-                               restoreShapeOptional, unpermutedTokens, outIndex, permuteTokenId,
-                               permuteProbs, stream);
+    ret = RunMoeTokenUnpermute(permutedTokens, sortedIndices, routingMapOptional, probs, padMode, restoreShapeOptional,
+                               unpermutedTokens, outIndex, permuteTokenId, permuteProbs, stream);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     auto unpermutedTokensSize = GetShapeSize(unpermutedTokensShape);
@@ -232,7 +244,8 @@ int RunOriginalPadModeExample(int32_t deviceId) {
     return 0;
 }
 
-int RunNotPadNoMinusOneRegressionExample(int32_t deviceId) {
+int RunNotPadNoMinusOneRegressionExample(int32_t deviceId)
+{
     LOG_PRINT("Run paddedMode=false no-minus-one regression example.\n");
 
     aclrtStream stream;
@@ -264,13 +277,12 @@ int RunNotPadNoMinusOneRegressionExample(int32_t deviceId) {
 
     bool padMode = false;
     std::vector<int64_t> restoreShapeOptionalData = {2, 4};
-    aclIntArray* restoreShapeOptional = aclCreateIntArray(restoreShapeOptionalData.data(), restoreShapeOptionalData.size());
+    aclIntArray* restoreShapeOptional =
+        aclCreateIntArray(restoreShapeOptionalData.data(), restoreShapeOptionalData.size());
 
     std::vector<float> permutedTokensHostData = {
-        1.0f, 2.0f, 3.0f, 4.0f,
-        10.0f, 20.0f, 30.0f, 40.0f,
-        100.0f, 200.0f, 300.0f, 400.0f,
-        1000.0f, 2000.0f, 3000.0f, 4000.0f,
+        1.0f,   2.0f,   3.0f,   4.0f,   10.0f,   20.0f,   30.0f,   40.0f,
+        100.0f, 200.0f, 300.0f, 400.0f, 1000.0f, 2000.0f, 3000.0f, 4000.0f,
     };
     std::vector<int> sortedIndicesHostData = {0, 1, 2, 3};
     std::vector<float> unpermutedTokensHostData(GetShapeSize(unpermutedTokensShape), 0.0f);
@@ -281,25 +293,23 @@ int RunNotPadNoMinusOneRegressionExample(int32_t deviceId) {
     ret = CreateAclTensor(permutedTokensHostData, permutedTokensShape, &permutedTokensDeviceAddr,
                           aclDataType::ACL_FLOAT, &permutedTokens);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(sortedIndicesHostData, sortedIndicesShape, &sortedIndicesDeviceAddr,
-                          aclDataType::ACL_INT32, &sortedIndices);
+    ret = CreateAclTensor(sortedIndicesHostData, sortedIndicesShape, &sortedIndicesDeviceAddr, aclDataType::ACL_INT32,
+                          &sortedIndices);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(unpermutedTokensHostData, unpermutedTokensShape, &unpermutedTokensDeviceAddr,
                           aclDataType::ACL_FLOAT, &unpermutedTokens);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(outIndexHostData, outIndexShape, &outIndexDeviceAddr,
-                          aclDataType::ACL_INT32, &outIndex);
+    ret = CreateAclTensor(outIndexHostData, outIndexShape, &outIndexDeviceAddr, aclDataType::ACL_INT32, &outIndex);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(permuteTokenIdHostData, permuteTokenIdShape, &permuteTokenIdDeviceAddr,
                           aclDataType::ACL_INT32, &permuteTokenId);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(permuteProbsHostData, permuteProbsShape, &permuteProbsDeviceAddr,
-                          aclDataType::ACL_FLOAT, &permuteProbs);
+    ret = CreateAclTensor(permuteProbsHostData, permuteProbsShape, &permuteProbsDeviceAddr, aclDataType::ACL_FLOAT,
+                          &permuteProbs);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    ret = RunMoeTokenUnpermute(permutedTokens, sortedIndices, routingMapOptional, probs, padMode,
-                               restoreShapeOptional, unpermutedTokens, outIndex, permuteTokenId,
-                               permuteProbs, stream);
+    ret = RunMoeTokenUnpermute(permutedTokens, sortedIndices, routingMapOptional, probs, padMode, restoreShapeOptional,
+                               unpermutedTokens, outIndex, permuteTokenId, permuteProbs, stream);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     auto unpermutedTokensSize = GetShapeSize(unpermutedTokensShape);
@@ -308,8 +318,7 @@ int RunNotPadNoMinusOneRegressionExample(int32_t deviceId) {
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<float> expected = {
-        11.0f, 22.0f, 33.0f, 44.0f,
-        1100.0f, 2200.0f, 3300.0f, 4400.0f,
+        11.0f, 22.0f, 33.0f, 44.0f, 1100.0f, 2200.0f, 3300.0f, 4400.0f,
     };
 
     bool pass = CheckFloatResult("no-minus-one unpermutedTokensData", unpermutedTokensData, expected);
@@ -335,7 +344,8 @@ int RunNotPadNoMinusOneRegressionExample(int32_t deviceId) {
     return pass ? 0 : 1;
 }
 
-int RunMinusOneWithAlignedProbsExample(int32_t deviceId) {
+int RunMinusOneWithAlignedProbsExample(int32_t deviceId)
+{
     LOG_PRINT("Run paddedMode=false minus-one with aligned probs example.\n");
 
     aclrtStream stream;
@@ -371,13 +381,11 @@ int RunMinusOneWithAlignedProbsExample(int32_t deviceId) {
 
     bool padMode = false;
     std::vector<int64_t> restoreShapeOptionalData = {2, 4};
-    aclIntArray* restoreShapeOptional = aclCreateIntArray(restoreShapeOptionalData.data(), restoreShapeOptionalData.size());
+    aclIntArray* restoreShapeOptional =
+        aclCreateIntArray(restoreShapeOptionalData.data(), restoreShapeOptionalData.size());
 
     std::vector<float> permutedTokensHostData = {
-        2.0f, 4.0f, 6.0f, 8.0f,
-        4.0f, 8.0f, 12.0f, 16.0f,
-        8.0f, 16.0f, 24.0f, 32.0f,
-        100.0f, 200.0f, 300.0f, 400.0f,
+        2.0f, 4.0f, 6.0f, 8.0f, 4.0f, 8.0f, 12.0f, 16.0f, 8.0f, 16.0f, 24.0f, 32.0f, 100.0f, 200.0f, 300.0f, 400.0f,
     };
     std::vector<int> sortedIndicesHostData = {0, -1, 1, 2};
 
@@ -394,31 +402,28 @@ int RunMinusOneWithAlignedProbsExample(int32_t deviceId) {
     ret = CreateAclTensor(permutedTokensHostData, permutedTokensShape, &permutedTokensDeviceAddr,
                           aclDataType::ACL_FLOAT, &permutedTokens);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(sortedIndicesHostData, sortedIndicesShape, &sortedIndicesDeviceAddr,
-                          aclDataType::ACL_INT32, &sortedIndices);
+    ret = CreateAclTensor(sortedIndicesHostData, sortedIndicesShape, &sortedIndicesDeviceAddr, aclDataType::ACL_INT32,
+                          &sortedIndices);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(routingMapOptionalHostData, routingMapOptionalShape, &routingMapOptionalDeviceAddr,
                           aclDataType::ACL_INT8, &routingMapOptional);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(probsHostData, probsShape, &probsDeviceAddr,
-                          aclDataType::ACL_FLOAT, &probs);
+    ret = CreateAclTensor(probsHostData, probsShape, &probsDeviceAddr, aclDataType::ACL_FLOAT, &probs);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(unpermutedTokensHostData, unpermutedTokensShape, &unpermutedTokensDeviceAddr,
                           aclDataType::ACL_FLOAT, &unpermutedTokens);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(outIndexHostData, outIndexShape, &outIndexDeviceAddr,
-                          aclDataType::ACL_INT32, &outIndex);
+    ret = CreateAclTensor(outIndexHostData, outIndexShape, &outIndexDeviceAddr, aclDataType::ACL_INT32, &outIndex);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(permuteTokenIdHostData, permuteTokenIdShape, &permuteTokenIdDeviceAddr,
                           aclDataType::ACL_INT32, &permuteTokenId);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(permuteProbsHostData, permuteProbsShape, &permuteProbsDeviceAddr,
-                          aclDataType::ACL_FLOAT, &permuteProbs);
+    ret = CreateAclTensor(permuteProbsHostData, permuteProbsShape, &permuteProbsDeviceAddr, aclDataType::ACL_FLOAT,
+                          &permuteProbs);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    ret = RunMoeTokenUnpermute(permutedTokens, sortedIndices, routingMapOptional, probs, padMode,
-                               restoreShapeOptional, unpermutedTokens, outIndex, permuteTokenId,
-                               permuteProbs, stream);
+    ret = RunMoeTokenUnpermute(permutedTokens, sortedIndices, routingMapOptional, probs, padMode, restoreShapeOptional,
+                               unpermutedTokens, outIndex, permuteTokenId, permuteProbs, stream);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     auto unpermutedTokensSize = GetShapeSize(unpermutedTokensShape);
@@ -432,8 +437,7 @@ int RunMinusOneWithAlignedProbsExample(int32_t deviceId) {
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<float> expectedTokens = {
-        1.0f, 2.0f, 3.0f, 4.0f,
-        7.0f, 14.0f, 21.0f, 28.0f,
+        1.0f, 2.0f, 3.0f, 4.0f, 7.0f, 14.0f, 21.0f, 28.0f,
     };
     std::vector<float> expectedPermuteProbs = {0.5f, 0.0f, 0.25f, 0.75f};
 
@@ -465,7 +469,8 @@ int RunMinusOneWithAlignedProbsExample(int32_t deviceId) {
     return pass ? 0 : 1;
 }
 
-int main() {
+int main()
+{
     // 根据自己的实际device填写deviceId
     int32_t deviceId = 0;
 

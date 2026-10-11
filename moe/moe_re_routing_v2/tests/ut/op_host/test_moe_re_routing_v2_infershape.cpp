@@ -15,8 +15,7 @@
 #include "infer_shape_case_executor.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 
-class MoeReRoutingV2 : public testing::Test
-{
+class MoeReRoutingV2 : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -31,127 +30,136 @@ protected:
 
 TEST_F(MoeReRoutingV2, moe_re_routing_v2_infer_shape_00)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeReRoutingV2",
-                                                      {
-                                                        {{{256, 7168}, {256, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{16, 16}, {16, 16}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{256, 1}, {256, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {"expert_token_num_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                        {"idx_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                      });
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeReRoutingV2",
+        {
+            {{{256, 7168}, {256, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{16, 16}, {16, 16}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256, 1}, {256, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"expert_token_num_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{256, 7168}, {256}, {256}, {16}, {256, 1}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeReRoutingV2, MoeReRoutingV2_infershape_scale)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeReRoutingV2",
-                                                      {
-                                                        {{{36, 385}, {36, 385}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{3, 12}, {3, 12}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{36, 1}, {36, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{36, 1}, {36, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {"expert_token_num_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                        {"idx_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                      });
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeReRoutingV2",
+        {
+            {{{36, 385}, {36, 385}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{3, 12}, {3, 12}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{36, 1}, {36, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{36, 1}, {36, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"expert_token_num_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{36, 385}, {36, 1}, {36}, {12}, {36, 1}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeReRoutingV2, MoeReRoutingV2_infershape_dynamic)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeReRoutingV2",
-                                                      {
-                                                        {{{-1, -1}, {-1, -1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{-1, -1}, {-1, -1}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{-1, 1}, {-1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{-1, 1}, {-1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {"expert_token_num_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                        {"idx_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                      });
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeReRoutingV2",
+        {
+            {{{-1, -1}, {-1, -1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{-1, -1}, {-1, -1}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{-1, 1}, {-1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{-1, 1}, {-1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"expert_token_num_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{-1, -1}, {-1, 1}, {-1}, {-1}, {-1, 1}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeReRoutingV2, MoeReRoutingV2_infershape_unknownshape)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeReRoutingV2",
-                                                      {
-                                                        {{{-2}, {-2}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{-2}, {-2}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{-2, 1}, {-2, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{-2, 1}, {-2, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {"expert_token_num_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                        {"idx_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                      });
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeReRoutingV2",
+        {
+            {{{-2}, {-2}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{-2}, {-2}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{-2, 1}, {-2, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{-2, 1}, {-2, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"expert_token_num_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{-2}, {-2, 1}, {-2}, {-2}, {-2, 1}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeReRoutingV2, MoeReRoutingV2_infershape_no_topk_weight)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeReRoutingV2",
-                                                      {
-                                                        {{{256, 7168}, {256, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{16, 16}, {16, 16}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {"expert_token_num_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                        {"idx_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                      });
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeReRoutingV2",
+        {
+            {{{256, 7168}, {256, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{16, 16}, {16, 16}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"expert_token_num_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{256, 7168}, {256}, {256}, {16}, {0, 1}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeReRoutingV2, MoeReRoutingV2_inferdtype)
 {
-    ASSERT_NE(gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry()->GetOpImpl("MoeReRoutingV2"), nullptr);
-    auto data_type_func = gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry()->GetOpImpl("MoeReRoutingV2")->infer_datatype;
+    ASSERT_NE(gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry()->GetOpImpl("MoeReRoutingV2"),
+              nullptr);
+    auto data_type_func = gert::DefaultOpImplSpaceRegistryV2::GetInstance()
+                              .GetSpaceRegistry()
+                              ->GetOpImpl("MoeReRoutingV2")
+                              ->infer_datatype;
     ASSERT_NE(data_type_func, nullptr);
     ge::DataType input_0 = ge::DT_FLOAT16;
     ge::DataType input_1 = ge::DT_INT32;
@@ -191,52 +199,58 @@ TEST_F(MoeReRoutingV2, MoeReRoutingV2_inferdtype)
 
 TEST_F(MoeReRoutingV2, MoeReRoutingV2_infershape_tokens_not_2d)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeReRoutingV2",
-                                                      {
-                                                        {{{256}, {256}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{16, 16}, {16, 16}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{256, 1}, {256, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {"expert_token_num_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                        {"idx_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                      });
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeReRoutingV2",
+        {
+            {{{256}, {256}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{16, 16}, {16, 16}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{256, 1}, {256, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"expert_token_num_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        });
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED);
 }
 
 TEST_F(MoeReRoutingV2, MoeReRoutingV2_infershape_expert_token_num_not_2d)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeReRoutingV2",
-                                                      {
-                                                        {{{256, 7168}, {256, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{16}, {16}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{256, 1}, {256, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                        {"expert_token_num_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                        {"idx_type",Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                                                      });
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeReRoutingV2",
+        {
+            {{{256, 7168}, {256, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{16}, {16}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{256, 1}, {256, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"expert_token_num_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        });
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED);
 }
 
 TEST_F(MoeReRoutingV2, MoeReRoutingV2_inferdtype_no_topk_weight)
 {
-    ASSERT_NE(gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry()->GetOpImpl("MoeReRoutingV2"), nullptr);
-    auto data_type_func = gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry()->GetOpImpl("MoeReRoutingV2")->infer_datatype;
+    ASSERT_NE(gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry()->GetOpImpl("MoeReRoutingV2"),
+              nullptr);
+    auto data_type_func = gert::DefaultOpImplSpaceRegistryV2::GetInstance()
+                              .GetSpaceRegistry()
+                              ->GetOpImpl("MoeReRoutingV2")
+                              ->infer_datatype;
     ASSERT_NE(data_type_func, nullptr);
     ge::DataType input_0 = ge::DT_FLOAT16;
     ge::DataType input_1 = ge::DT_INT32;

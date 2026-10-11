@@ -26,7 +26,7 @@ public:
     __aicore__ inline MoeFullLoad(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR rowIdx, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
                                 GM_ADDR expandedExpertIdx, GM_ADDR workspace,
-                                const MoeInitRoutingTilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -38,7 +38,7 @@ private:
 
 private:
     int64_t sortNum_;
-    const GatherOutComputeTilingData *gatherOutTilingData_;
+    const GatherOutComputeTilingData* gatherOutTilingData_;
     int64_t blockIdx_;
     int64_t needCoreNum_;
     int64_t coreRows_;
@@ -199,7 +199,7 @@ __aicore__ inline void MoeFullLoad<T>::CopyOutEmpty()
 template <typename T>
 __aicore__ inline void MoeFullLoad<T>::Init(GM_ADDR x, GM_ADDR rowIdx, GM_ADDR expertIdx, GM_ADDR expandedX,
                                             GM_ADDR expandedRowIdx, GM_ADDR expandedExpertIdx, GM_ADDR workspace,
-                                            const MoeInitRoutingTilingData *tilingData, TPipe *tPipe)
+                                            const MoeInitRoutingTilingData* tilingData, TPipe* tPipe)
 {
     this->gatherOutTilingData_ = &(tilingData->gatherOutComputeParamsOp);
     this->blockIdx_ = GetBlockIdx();
@@ -224,13 +224,13 @@ __aicore__ inline void MoeFullLoad<T>::Init(GM_ADDR x, GM_ADDR rowIdx, GM_ADDR e
     this->totalLength = tilingData->n * tilingData->k;
     this->pipe = tPipe;
 
-    xGm_.SetGlobalBuffer((__gm__ T *)x);
-    rowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)rowIdx, this->tileLength);
-    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertIdx, this->tileLength);
+    xGm_.SetGlobalBuffer((__gm__ T*)x);
+    rowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)rowIdx, this->tileLength);
+    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertIdx, this->tileLength);
 
-    expandedXGm_.SetGlobalBuffer((__gm__ T *)expandedX);
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, this->tileLength);
-    expandedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedExpertIdx, this->tileLength);
+    expandedXGm_.SetGlobalBuffer((__gm__ T*)expandedX);
+    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, this->tileLength);
+    expandedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedExpertIdx, this->tileLength);
 
     int64_t kvFactor = 2;
     int64_t buffSize = this->sortNum_ * sizeof(int32_t);

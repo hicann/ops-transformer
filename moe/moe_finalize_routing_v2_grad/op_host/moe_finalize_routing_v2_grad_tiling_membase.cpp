@@ -22,10 +22,10 @@ constexpr int64_t TILING_KEY_WITH_SCALE_CUT_H = 20002;
 constexpr int64_t BYTE_BLOCK = 32;
 constexpr int64_t FP32_SIZE = 4;
 
-class MoeFinalizeRoutingV2GradMembase : public MoeFinalizeRoutingV2GradTiling
-{
+class MoeFinalizeRoutingV2GradMembase : public MoeFinalizeRoutingV2GradTiling {
 public:
-    explicit MoeFinalizeRoutingV2GradMembase(gert::TilingContext* context) : MoeFinalizeRoutingV2GradTiling(context)
+    explicit MoeFinalizeRoutingV2GradMembase(gert::TilingContext* context)
+        : MoeFinalizeRoutingV2GradTiling(context)
     {}
     ~MoeFinalizeRoutingV2GradMembase() override = default;
 
@@ -65,8 +65,8 @@ ge::graphStatus MoeFinalizeRoutingV2GradMembase::CalcTilingKey()
 
     OP_CHECK_IF(
         (hiddenPrePart_ <= 0),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            nodeName_, "hiddenPrePart", std::to_string(hiddenPrePart_).c_str(), "hiddenPrePart must be greater than 0"),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName_, "hiddenPrePart", std::to_string(hiddenPrePart_).c_str(),
+                                              "hiddenPrePart must be greater than 0"),
         return ge::GRAPH_FAILED);
 
     if (hidden_ <= hiddenPrePart_) {

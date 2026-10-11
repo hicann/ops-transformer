@@ -387,7 +387,7 @@ TEST_F(l2_moe_fused_topk_test, ascend910B2_test_moe_fused_topk_empty_x)
                               is_norm, scale, enable_expert_mapping),
                         OUTPUT(y_desc, indices_desc));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_SUCCESS);
     EXPECT_EQ(workspace_size, 0U);

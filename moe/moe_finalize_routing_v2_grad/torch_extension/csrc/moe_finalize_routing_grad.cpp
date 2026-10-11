@@ -23,16 +23,16 @@ constexpr int64_t DIM_TWO = 2;
 constexpr int64_t DROP_PAD_MODE_DROPLESS = 0;
 constexpr int64_t DROP_PAD_MODE_DROP_PAD = 1;
 
-static bool HasValue(const c10::optional<at::Tensor> &opt)
+static bool HasValue(const c10::optional<at::Tensor>& opt)
 {
     return opt.has_value() && opt.value().defined() && opt.value().numel() > 0;
 }
 
-std::tuple<at::Tensor, at::Tensor> moe_finalize_routing_grad(const at::Tensor &gradY, const at::Tensor &expandedRowIdx,
-                                                             const c10::optional<at::Tensor> &expandedXOptional,
-                                                             const c10::optional<at::Tensor> &scalesOptional,
-                                                             const c10::optional<at::Tensor> &expertIdxOptional,
-                                                             const c10::optional<at::Tensor> &biasOptional,
+std::tuple<at::Tensor, at::Tensor> moe_finalize_routing_grad(const at::Tensor& gradY, const at::Tensor& expandedRowIdx,
+                                                             const c10::optional<at::Tensor>& expandedXOptional,
+                                                             const c10::optional<at::Tensor>& scalesOptional,
+                                                             const c10::optional<at::Tensor>& expertIdxOptional,
+                                                             const c10::optional<at::Tensor>& biasOptional,
                                                              int64_t dropPadMode, int64_t activeNum, int64_t expertNum,
                                                              int64_t expertCapacity)
 {

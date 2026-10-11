@@ -41,11 +41,11 @@ END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MoeMaskedScatter, MoeMaskedScatterTilingData)
 
-ge::graphStatus MoeMaskedScatterTilingForAscendC(gert::TilingContext *context);
+ge::graphStatus MoeMaskedScatterTilingForAscendC(gert::TilingContext* context);
 
 class MoeMaskedScatterTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeMaskedScatterTiling(gert::TilingContext *context)
+    explicit MoeMaskedScatterTiling(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 

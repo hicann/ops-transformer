@@ -27,13 +27,13 @@ constexpr int64_t MAX_MRGSORT_LIST_TOTAL = 16;
 class MoeMrgsortOutPerformance {
 public:
     __aicore__ inline MoeMrgsortOutPerformance(){};
-    __aicore__ inline void Init(MoeMrgsortPerformanceParam *param, TPipe *tPipe);
+    __aicore__ inline void Init(MoeMrgsortPerformanceParam* param, TPipe* tPipe);
     __aicore__ inline void Process();
-    __aicore__ inline void SetInput(GlobalTensor<float> &gmInput, LocalTensor<float> &ubInput,
-                                    GlobalTensor<int32_t> &gmActualSortNum);
-    __aicore__ inline void SetOutput(GlobalTensor<int32_t> &gmOutput1, GlobalTensor<int32_t> &gmOutput2,
-                                     LocalTensor<float> &ubOutput1, LocalTensor<float> &ubOutput2);
-    __aicore__ inline void SetBuffer(LocalTensor<float> &tempBuffer);
+    __aicore__ inline void SetInput(GlobalTensor<float>& gmInput, LocalTensor<float>& ubInput,
+                                    GlobalTensor<int32_t>& gmActualSortNum);
+    __aicore__ inline void SetOutput(GlobalTensor<int32_t>& gmOutput1, GlobalTensor<int32_t>& gmOutput2,
+                                     LocalTensor<float>& ubOutput1, LocalTensor<float>& ubOutput2);
+    __aicore__ inline void SetBuffer(LocalTensor<float>& tempBuffer);
 
 private:
     __aicore__ inline void CopyIn();
@@ -45,7 +45,7 @@ private:
     __aicore__ inline void ClearCache();
 
 private:
-    MoeMrgsortPerformanceParam *param = nullptr;
+    MoeMrgsortPerformanceParam* param = nullptr;
 
     GlobalTensor<float> gmInputs[4];
     GlobalTensor<int32_t> gmOutput1;
@@ -86,8 +86,8 @@ __aicore__ inline void MoeMrgsortOutPerformance::ClearCache()
     this->outOffset = 0;
 }
 
-__aicore__ inline void MoeMrgsortOutPerformance::SetInput(GlobalTensor<float> &gmInput, LocalTensor<float> &ubInput,
-                                                          GlobalTensor<int32_t> &gmActualSortNum)
+__aicore__ inline void MoeMrgsortOutPerformance::SetInput(GlobalTensor<float>& gmInput, LocalTensor<float>& ubInput,
+                                                          GlobalTensor<int32_t>& gmActualSortNum)
 {
     if (this->listNum == 0) {
         this->gmActualSortNum = gmActualSortNum;
@@ -97,9 +97,9 @@ __aicore__ inline void MoeMrgsortOutPerformance::SetInput(GlobalTensor<float> &g
     this->listNum += 1;
 }
 
-__aicore__ inline void MoeMrgsortOutPerformance::SetOutput(GlobalTensor<int32_t> &gmOutput1,
-                                                           GlobalTensor<int32_t> &gmOutput2,
-                                                           LocalTensor<float> &ubOutput1, LocalTensor<float> &ubOutput2)
+__aicore__ inline void MoeMrgsortOutPerformance::SetOutput(GlobalTensor<int32_t>& gmOutput1,
+                                                           GlobalTensor<int32_t>& gmOutput2,
+                                                           LocalTensor<float>& ubOutput1, LocalTensor<float>& ubOutput2)
 {
     this->gmOutput1 = gmOutput1;
     this->ubOutput1 = ubOutput1;
@@ -110,7 +110,7 @@ __aicore__ inline void MoeMrgsortOutPerformance::SetOutput(GlobalTensor<int32_t>
     this->ubOutputInt2 = ubOutput2.ReinterpretCast<int32_t>();
 }
 
-__aicore__ inline void MoeMrgsortOutPerformance::SetBuffer(LocalTensor<float> &tempBuffer)
+__aicore__ inline void MoeMrgsortOutPerformance::SetBuffer(LocalTensor<float>& tempBuffer)
 {
     this->tempBuffer = tempBuffer;
 }
@@ -211,7 +211,7 @@ __aicore__ inline void MoeMrgsortOutPerformance::CopyOut()
     outOffset += curLoopSortedNum;
 }
 
-__aicore__ inline void MoeMrgsortOutPerformance::Init(MoeMrgsortPerformanceParam *param, TPipe *tPipe)
+__aicore__ inline void MoeMrgsortOutPerformance::Init(MoeMrgsortPerformanceParam* param, TPipe* tPipe)
 {
     this->param = param;
     for (int64_t i = 0; i < MAX_MRGSORT_LIST_TOTAL; i++) {

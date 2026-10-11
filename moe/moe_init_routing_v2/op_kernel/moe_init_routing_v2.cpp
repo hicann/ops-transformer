@@ -13,7 +13,6 @@
  * \brief
  */
 
-
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
 #include "arch35/moe_v2_mrgsort_out_arch35.h"
 #include "arch35/moe_v2_mrgsort_arch35.h"

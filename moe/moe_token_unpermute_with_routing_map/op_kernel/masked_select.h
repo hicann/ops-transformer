@@ -173,12 +173,12 @@ class KernelMaskedSelectV3 {
 public:
     __aicore__ inline KernelMaskedSelectV3() {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR mask, GM_ADDR y, GM_ADDR workspace,
-                                const MaskedSelectMTUTilingData *maskedSelectTilingData, TPipe *tPipe)
+                                const MaskedSelectMTUTilingData* maskedSelectTilingData, TPipe* tPipe)
     {
         this->pipe = tPipe;
         ASSERT(GetBlockNum() != 0 && "block dim can not be zero!");
 
-        __gm__ T *globalWorkTensor = (__gm__ T *)((__gm__ uint64_t *)workspace);
+        __gm__ T* globalWorkTensor = (__gm__ T*)((__gm__ uint64_t*)workspace);
         blockIdx = GetBlockIdx();
         this->formerNum = maskedSelectTilingData->formerNum;
         this->formerLength = maskedSelectTilingData->formerLength;
@@ -199,8 +199,8 @@ public:
             this->tileLength = this->formertileLength / BUFFER_NUM;
             this->lasttileLength = this->formerlasttileLength / BUFFER_NUM;
             this->tileNum = this->formertileNum * BUFFER_NUM;
-            xGlobal.SetGlobalBuffer((__gm__ T *)x + this->formerLength * blockIdx, this->formerLength);
-            maskGlobal.SetGlobalBuffer((__gm__ uint8_t *)mask + this->formerLength * blockIdx, this->formerLength);
+            xGlobal.SetGlobalBuffer((__gm__ T*)x + this->formerLength * blockIdx, this->formerLength);
+            maskGlobal.SetGlobalBuffer((__gm__ uint8_t*)mask + this->formerLength * blockIdx, this->formerLength);
             workGlobal.SetGlobalBuffer(globalWorkTensor + this->formerLength * blockIdx, this->formerLength);
         } else { // 分到小块核的处理，需要处理的数据量比大核少alignNum个
             this->tileLength = this->tailtileLength / BUFFER_NUM;
@@ -208,9 +208,9 @@ public:
             this->tileNum = this->tailtileNum * BUFFER_NUM;
 
             xGlobal.SetGlobalBuffer(
-                (__gm__ T *)x + this->formerLength * this->formerNum + this->tailLength * (blockIdx - this->formerNum),
+                (__gm__ T*)x + this->formerLength * this->formerNum + this->tailLength * (blockIdx - this->formerNum),
                 this->tailLength);
-            maskGlobal.SetGlobalBuffer((__gm__ uint8_t *)mask + this->formerLength * this->formerNum +
+            maskGlobal.SetGlobalBuffer((__gm__ uint8_t*)mask + this->formerLength * this->formerNum +
                                            this->tailLength * (blockIdx - this->formerNum),
                                        this->tailLength);
             workGlobal.SetGlobalBuffer(globalWorkTensor + this->formerLength * this->formerNum +
@@ -219,7 +219,7 @@ public:
         }
         uint64_t alignNum = DATA_ALIGN / sizeof(half); // 256/<8>=32
         tileLengthAlign = (tileLength + alignNum - 1) / alignNum * alignNum;
-        offsetGlobal.SetGlobalBuffer((__gm__ int32_t *)workspace, numBlocks);
+        offsetGlobal.SetGlobalBuffer((__gm__ int32_t*)workspace, numBlocks);
         pipe->InitBuffer(inQueueX, BUFFER_NUM, this->tileLengthAlign * sizeof(T));
         pipe->InitBuffer(inQueueMask, BUFFER_NUM, this->tileLengthAlign * sizeof(uint8_t));
         pipe->InitBuffer(outQueueY, BUFFER_NUM, this->tileLengthAlign * sizeof(T));
@@ -278,7 +278,7 @@ public:
             }
             this->outOffset = 0;
 
-            yGlobal.SetGlobalBuffer((__gm__ T *)y + ind);
+            yGlobal.SetGlobalBuffer((__gm__ T*)y + ind);
             PipeBarrier<PIPE_ALL>();
 
             for (int32_t i = 0; i < loopCount; ++i) {
@@ -365,7 +365,7 @@ private:
         inQueueMask.EnQue(maskLocal);
     }
 
-    __aicore__ inline void GenerateMask(const LocalTensor<uint8_t> &mask, LocalTensor<uint8_t> &bitMask, uint32_t count)
+    __aicore__ inline void GenerateMask(const LocalTensor<uint8_t>& mask, LocalTensor<uint8_t>& bitMask, uint32_t count)
     {
         LocalTensor<half> maskCastLocal = maskCastBuf.Get<half>();
         Cast(maskCastLocal, mask, RoundMode::CAST_NONE, count);
@@ -390,8 +390,8 @@ private:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void GatherResult(LocalTensor<T> &dstLocal, const LocalTensor<T> &srcLocal,
-                                        const LocalTensor<uint8_t> &bitMaskLocal, int32_t count)
+    __aicore__ inline void GatherResult(LocalTensor<T>& dstLocal, const LocalTensor<T>& srcLocal,
+                                        const LocalTensor<uint8_t>& bitMaskLocal, int32_t count)
     {
         GatherMaskParams params;
         params.src0BlockStride = 1;
@@ -472,11 +472,11 @@ private:
         PipeBarrier<PIPE_V>();
         Add(offsetLocal, offsetLocal, sumInt32, 1);
     }
-    __aicore__ inline void DataCopyPadDoubleWord(const LocalTensor<T> &dstLocal, const GlobalTensor<T> &srcGlobal,
+    __aicore__ inline void DataCopyPadDoubleWord(const LocalTensor<T>& dstLocal, const GlobalTensor<T>& srcGlobal,
                                                  int64_t count)
     {
         GlobalTensor<int32_t> srcCastGlobal;
-        srcCastGlobal.SetGlobalBuffer((__gm__ int32_t *)srcGlobal.GetPhyAddr(),
+        srcCastGlobal.SetGlobalBuffer((__gm__ int32_t*)srcGlobal.GetPhyAddr(),
                                       count * INT64_LENGTH_IN_INT32); // 将GM 中 64 转成 32 * 2
 
         LocalTensor<int32_t> dstCastLocal = dstLocal.template ReinterpretCast<int32_t>(); // 将 ue转 int32
@@ -487,11 +487,11 @@ private:
         DataCopyPad(dstCastLocal, srcCastGlobal, copyParams, padParams);
     }
 
-    __aicore__ inline void DataCopyPadDoubleWord(const GlobalTensor<T> &dstGlobal, const LocalTensor<T> &srcLocal,
+    __aicore__ inline void DataCopyPadDoubleWord(const GlobalTensor<T>& dstGlobal, const LocalTensor<T>& srcLocal,
                                                  int64_t count)
     {
         GlobalTensor<int32_t> dstCastGlobal;
-        dstCastGlobal.SetGlobalBuffer((__gm__ int32_t *)dstGlobal.GetPhyAddr(), count * INT64_LENGTH_IN_INT32);
+        dstCastGlobal.SetGlobalBuffer((__gm__ int32_t*)dstGlobal.GetPhyAddr(), count * INT64_LENGTH_IN_INT32);
 
         LocalTensor<int32_t> srcCastLocal = srcLocal.template ReinterpretCast<int32_t>();
 
@@ -509,7 +509,7 @@ private:
     }
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, BUFFER_NUM> inQueueX, inQueueMask;
     TQue<QuePosition::VECOUT, BUFFER_NUM> outQueueY;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, BUFFER_NUM> moveQue;

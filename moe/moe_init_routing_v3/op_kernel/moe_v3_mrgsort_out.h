@@ -24,12 +24,12 @@ using namespace AscendC;
 class MoeMrgsortOut {
 public:
     __aicore__ inline MoeMrgsortOut(){};
-    __aicore__ inline void Init(MoeMrgsortParam *param, TPipe *tPipe);
+    __aicore__ inline void Init(MoeMrgsortParam* param, TPipe* tPipe);
     __aicore__ inline void Process();
-    __aicore__ inline void SetInput(GlobalTensor<float> &gmInput, LocalTensor<float> &ubInput);
-    __aicore__ inline void SetOutput(GlobalTensor<int32_t> &gmOutput1, GlobalTensor<int32_t> &gmOutput2,
-                                     LocalTensor<float> &ubOutput1, LocalTensor<float> &ubOutput2);
-    __aicore__ inline void SetBuffer(LocalTensor<float> &tempBuffer);
+    __aicore__ inline void SetInput(GlobalTensor<float>& gmInput, LocalTensor<float>& ubInput);
+    __aicore__ inline void SetOutput(GlobalTensor<int32_t>& gmOutput1, GlobalTensor<int32_t>& gmOutput2,
+                                     LocalTensor<float>& ubOutput1, LocalTensor<float>& ubOutput2);
+    __aicore__ inline void SetBuffer(LocalTensor<float>& tempBuffer);
 
 private:
     __aicore__ inline void CopyIn();
@@ -41,7 +41,7 @@ private:
     __aicore__ inline void ClearCache();
 
 private:
-    MoeMrgsortParam *param = nullptr;
+    MoeMrgsortParam* param = nullptr;
 
     GlobalTensor<float> gmInputs[4];
     GlobalTensor<int32_t> gmOutput1;
@@ -81,15 +81,15 @@ __aicore__ inline void MoeMrgsortOut::ClearCache()
     this->outOffset = 0;
 }
 
-__aicore__ inline void MoeMrgsortOut::SetInput(GlobalTensor<float> &gmInput, LocalTensor<float> &ubInput)
+__aicore__ inline void MoeMrgsortOut::SetInput(GlobalTensor<float>& gmInput, LocalTensor<float>& ubInput)
 {
     this->gmInputs[listNum] = gmInput;
     this->ubInputs[listNum] = ubInput;
     this->listNum += 1;
 }
 
-__aicore__ inline void MoeMrgsortOut::SetOutput(GlobalTensor<int32_t> &gmOutput1, GlobalTensor<int32_t> &gmOutput2,
-                                                LocalTensor<float> &ubOutput1, LocalTensor<float> &ubOutput2)
+__aicore__ inline void MoeMrgsortOut::SetOutput(GlobalTensor<int32_t>& gmOutput1, GlobalTensor<int32_t>& gmOutput2,
+                                                LocalTensor<float>& ubOutput1, LocalTensor<float>& ubOutput2)
 {
     this->gmOutput1 = gmOutput1;
     this->ubOutput1 = ubOutput1;
@@ -100,7 +100,7 @@ __aicore__ inline void MoeMrgsortOut::SetOutput(GlobalTensor<int32_t> &gmOutput1
     this->ubOutputInt2 = ubOutput2.ReinterpretCast<int32_t>();
 }
 
-__aicore__ inline void MoeMrgsortOut::SetBuffer(LocalTensor<float> &tempBuffer)
+__aicore__ inline void MoeMrgsortOut::SetBuffer(LocalTensor<float>& tempBuffer)
 {
     this->tempBuffer = tempBuffer;
 }
@@ -201,7 +201,7 @@ __aicore__ inline void MoeMrgsortOut::CopyOut()
     outOffset += curLoopSortedNum;
 }
 
-__aicore__ inline void MoeMrgsortOut::Init(MoeMrgsortParam *param, TPipe *tPipe)
+__aicore__ inline void MoeMrgsortOut::Init(MoeMrgsortParam* param, TPipe* tPipe)
 {
     this->param = param;
     this->allRemainElements = 0;

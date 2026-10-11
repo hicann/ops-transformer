@@ -33,56 +33,56 @@ constexpr size_t IDX_ZERO = 0;
 constexpr size_t IDX_ONE = 1;
 constexpr int64_t DIM_NUM = 2;
 
-graphStatus InferShape4MoeReRouting(gert::InferShapeContext *context)
+graphStatus InferShape4MoeReRouting(gert::InferShapeContext* context)
 {
     OP_LOGD(context, "Begin to do InferShape4MoeReRouting.");
 
-    const gert::Shape *tokensInputShape = context->GetInputShape(INPUT_IDX_TOKENS);  // [A, H]
+    const gert::Shape* tokensInputShape = context->GetInputShape(INPUT_IDX_TOKENS); // [A, H]
     OP_CHECK_NULL_WITH_CONTEXT(context, tokensInputShape);
-    const gert::Shape *expertTokenNumPerRankInputShape = context->GetInputShape(INPUT_IDX_EXPERT_TOKEN_NUM_PER_RANK);
+    const gert::Shape* expertTokenNumPerRankInputShape = context->GetInputShape(INPUT_IDX_EXPERT_TOKEN_NUM_PER_RANK);
     OP_CHECK_NULL_WITH_CONTEXT(context, expertTokenNumPerRankInputShape);
-    const gert::Shape *perTokenScaleShape = context->GetOptionalInputShape(INPUT_IDX_PER_TOKEN_SCALES);
+    const gert::Shape* perTokenScaleShape = context->GetOptionalInputShape(INPUT_IDX_PER_TOKEN_SCALES);
 
-    gert::Shape *permuteTokensShape = context->GetOutputShape(OUTPUT_IDX_PERMUTE_TOKENS);
-    gert::Shape *permutePerTokenScalesShape = context->GetOutputShape(OUTPUT_IDX_PERMUTE_PER_TOKEN_SCALES);
-    gert::Shape *permuteTokenIdxShape = context->GetOutputShape(OUTPUT_IDX_PERMUTE_TOKEN_IDX);
-    gert::Shape *expertTokenNumShape = context->GetOutputShape(OUTPUT_IDX_EXPERT_TOKEN_NUM);
+    gert::Shape* permuteTokensShape = context->GetOutputShape(OUTPUT_IDX_PERMUTE_TOKENS);
+    gert::Shape* permutePerTokenScalesShape = context->GetOutputShape(OUTPUT_IDX_PERMUTE_PER_TOKEN_SCALES);
+    gert::Shape* permuteTokenIdxShape = context->GetOutputShape(OUTPUT_IDX_PERMUTE_TOKEN_IDX);
+    gert::Shape* expertTokenNumShape = context->GetOutputShape(OUTPUT_IDX_EXPERT_TOKEN_NUM);
     OP_CHECK_NULL_WITH_CONTEXT(context, permuteTokensShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, permutePerTokenScalesShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, permuteTokenIdxShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, expertTokenNumShape);
 
-    *permuteTokensShape = *tokensInputShape;  // [A, H]
+    *permuteTokensShape = *tokensInputShape; // [A, H]
     size_t tokensDim = tokensInputShape->GetDimNum();
     OP_CHECK_IF(!Ops::Base::IsUnknownRank(*tokensInputShape) && tokensDim != DIM_NUM,
-        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "tokens", std::to_string(tokensDim).c_str(), "2D"),
-        return ge::GRAPH_FAILED);
-    const auto &tokensInputShapeDims = tokensInputShape->GetDim(IDX_ZERO);  // 取A
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "tokens", std::to_string(tokensDim).c_str(), "2D"),
+                return ge::GRAPH_FAILED);
+    const auto& tokensInputShapeDims = tokensInputShape->GetDim(IDX_ZERO); // 取A
     size_t expertDim = expertTokenNumPerRankInputShape->GetDimNum();
     OP_CHECK_IF(!Ops::Base::IsUnknownRank(*expertTokenNumPerRankInputShape) && expertDim != DIM_NUM,
-        OP_LOGE_FOR_INVALID_SHAPEDIM(
-            context->GetNodeName(), "expert_token_num_per_rank_dim", std::to_string(expertDim).c_str(), "2D"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "expert_token_num_per_rank_dim",
+                                             std::to_string(expertDim).c_str(), "2D"),
+                return ge::GRAPH_FAILED);
     if (perTokenScaleShape) {
         *permutePerTokenScalesShape = *perTokenScaleShape;
     } else {
         permutePerTokenScalesShape->SetDimNum(IDX_ONE);
-        permutePerTokenScalesShape->SetDim(IDX_ZERO, tokensInputShapeDims);  // [A]
+        permutePerTokenScalesShape->SetDim(IDX_ZERO, tokensInputShapeDims); // [A]
     }
     permuteTokenIdxShape->SetDimNum(IDX_ONE);
-    permuteTokenIdxShape->SetDim(IDX_ZERO, tokensInputShapeDims);  // [A]
+    permuteTokenIdxShape->SetDim(IDX_ZERO, tokensInputShapeDims); // [A]
     if (Ops::Base::IsUnknownRank(*expertTokenNumPerRankInputShape)) {
         *expertTokenNumShape = *expertTokenNumPerRankInputShape;
     } else {
         expertTokenNumShape->SetDimNum(IDX_ONE);
-        const auto &expertTokenNumPerRankInputShapeDims = expertTokenNumPerRankInputShape->GetDim(IDX_ONE);  // 取E
-        expertTokenNumShape->SetDim(IDX_ZERO, expertTokenNumPerRankInputShapeDims);                          // [E,]
+        const auto& expertTokenNumPerRankInputShapeDims = expertTokenNumPerRankInputShape->GetDim(IDX_ONE); // 取E
+        expertTokenNumShape->SetDim(IDX_ZERO, expertTokenNumPerRankInputShapeDims);                         // [E,]
     }
     OP_LOGD(context, "End to do InferShape4MoeReRouting.");
     return GRAPH_SUCCESS;
 }
 
-graphStatus InferDtype4MoeReRouting(gert::InferDataTypeContext *context)
+graphStatus InferDtype4MoeReRouting(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context, "InferDtype4MoeReRouting enter");
 
@@ -104,4 +104,4 @@ graphStatus InferDtype4MoeReRouting(gert::InferDataTypeContext *context)
 }
 
 IMPL_OP_INFERSHAPE(MoeReRouting).InferShape(InferShape4MoeReRouting).InferDataType(InferDtype4MoeReRouting);
-}  // namespace ops
+} // namespace ops

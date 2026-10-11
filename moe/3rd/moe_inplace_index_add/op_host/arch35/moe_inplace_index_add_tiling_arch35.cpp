@@ -16,20 +16,20 @@
 #include "op_host/tiling_templates_registry.h"
 #include "moe_inplace_index_add_tiling_arch35.h"
 
-namespace optiling
-{
+namespace optiling {
 ge::graphStatus MoeInplaceIndexAddTilingForAscendC(gert::TilingContext* context)
 {
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-bool MoeGetTilingCoreNum(const gert::TilingParseContext* context, uint32_t& core_num) {
-  auto platform_info = context->GetPlatformInfo();
-  MOE_OPS_CHECK_NULL_WITH_CONTEXT_RET(context, platform_info, false);
+bool MoeGetTilingCoreNum(const gert::TilingParseContext* context, uint32_t& core_num)
+{
+    auto platform_info = context->GetPlatformInfo();
+    MOE_OPS_CHECK_NULL_WITH_CONTEXT_RET(context, platform_info, false);
 
-  core_num = platform_info->GetCoreNum();
-  OP_LOGD(context->GetNodeName(), "get tiling core num is %u", core_num);
-  return true;
+    core_num = platform_info->GetCoreNum();
+    OP_LOGD(context->GetNodeName(), "get tiling core num is %u", core_num);
+    return true;
 }
 
-}  // namespace optiling
+} // namespace optiling

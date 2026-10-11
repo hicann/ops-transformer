@@ -63,7 +63,7 @@ using Ops::Base::CeilAlign;
 
 class MoeFusedTopkTilingArch35 {
 public:
-    explicit MoeFusedTopkTilingArch35(gert::TilingContext *context)
+    explicit MoeFusedTopkTilingArch35(gert::TilingContext* context)
         : context_(context)
     {}
 
@@ -80,7 +80,7 @@ private:
     ge::graphStatus SetKernelTiling();
     void TilingDataPrint();
 
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     uint32_t firstDimSize_ = 0;
     uint32_t secondDimSize_ = 0;
     uint32_t addNumDimSize_ = 0;
@@ -110,7 +110,7 @@ private:
 
 ge::graphStatus MoeFusedTopkTilingArch35::GetPlatformInfo()
 {
-    auto compileInfo = static_cast<const MoeFusedTopkCompileInfo *>(context_->GetCompileInfo());
+    auto compileInfo = static_cast<const MoeFusedTopkCompileInfo*>(context_->GetCompileInfo());
     OP_CHECK_NULL_WITH_CONTEXT(context_, compileInfo);
     OP_CHECK_IF(compileInfo->ubSize <= RESERVED_UB,
                 OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "MoeFusedTopk GetHardwareInfo Failed, ubSize: %lu",
@@ -302,7 +302,7 @@ ge::graphStatus MoeFusedTopkTilingArch35::SetKernelTiling()
                 return ge::GRAPH_FAILED);
     tilingData_.SaveToBuffer(rawTilingData->GetData(), rawTilingData->GetCapacity());
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     context_->SetTilingKey(tilingKey_);
     context_->SetBlockDim(usedCoreNum_);
@@ -343,7 +343,7 @@ ge::graphStatus MoeFusedTopkTilingArch35::Run()
     return SetKernelTiling();
 }
 
-ge::graphStatus TilingMoeFusedTopkArch35(gert::TilingContext *context)
+ge::graphStatus TilingMoeFusedTopkArch35(gert::TilingContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     MoeFusedTopkTilingArch35 tiling(context);
@@ -352,7 +352,7 @@ ge::graphStatus TilingMoeFusedTopkArch35(gert::TilingContext *context)
 
 class MoeFusedTopkTilingArch35Base : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeFusedTopkTilingArch35Base(gert::TilingContext *context)
+    explicit MoeFusedTopkTilingArch35Base(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 

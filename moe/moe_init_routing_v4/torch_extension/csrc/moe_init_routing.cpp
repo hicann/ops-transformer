@@ -55,7 +55,10 @@ enum MoeQuantMode {
 };
 
 // ---- Helper functions (from MoeInitRoutingV2KernelNpuOpApi.cpp) ----
-inline bool IsQuantModeMXFP4(int64_t quantMode) { return quantMode == QUANT_MODE_MXFP4_E2M1; }
+inline bool IsQuantModeMXFP4(int64_t quantMode)
+{
+    return quantMode == QUANT_MODE_MXFP4_E2M1;
+}
 
 inline bool IsQuantModeMXFP8(int64_t quantMode)
 {
@@ -80,27 +83,33 @@ inline bool IsQuantModeHIF8(int64_t quantMode)
            quantMode == QUANT_MODE_HIF8_PER_TOKEN_DIM;
 }
 
-inline bool IsInt4OutputDtype(const c10::optional<int64_t> &xDtype)
+inline bool IsInt4OutputDtype(const c10::optional<int64_t>& xDtype)
 {
     return xDtype.has_value() && xDtype.value() == static_cast<int64_t>(DType::INT4);
 }
 
-inline bool IsDynamicQuantInt4Output(int64_t quantMode, const c10::optional<int64_t> &xDtype)
+inline bool IsDynamicQuantInt4Output(int64_t quantMode, const c10::optional<int64_t>& xDtype)
 {
     return quantMode == QUANT_MODE_INT4_DYNAMIC && (!xDtype.has_value() || IsInt4OutputDtype(xDtype));
 }
 
-inline int64_t CeilDiv(int64_t a, int64_t b) { return (a + b - 1) / b; }
+inline int64_t CeilDiv(int64_t a, int64_t b)
+{
+    return (a + b - 1) / b;
+}
 
-inline int64_t CeilAlign(int64_t a, int64_t b) { return CeilDiv(a, b) * b; }
+inline int64_t CeilAlign(int64_t a, int64_t b)
+{
+    return CeilDiv(a, b) * b;
+}
 
 // ---- Main function ----
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> moe_init_routing(
-    const at::Tensor &x, const at::Tensor &expert_idx, const c10::optional<at::Tensor> &scale,
-    const c10::optional<at::Tensor> &offset, const c10::optional<at::Tensor> &topk_weight, int64_t active_num,
+    const at::Tensor& x, const at::Tensor& expert_idx, const c10::optional<at::Tensor>& scale,
+    const c10::optional<at::Tensor>& offset, const c10::optional<at::Tensor>& topk_weight, int64_t active_num,
     int64_t expert_capacity, int64_t expert_num, int64_t drop_pad_mode, int64_t expert_tokens_num_type,
-    bool expert_tokens_num_flag, int64_t quant_mode, const c10::optional<std::vector<int64_t>> &active_expert_range,
-    int64_t row_idx_type, const c10::optional<int64_t> &x_dtype)
+    bool expert_tokens_num_flag, int64_t quant_mode, const c10::optional<std::vector<int64_t>>& active_expert_range,
+    int64_t row_idx_type, const c10::optional<int64_t>& x_dtype)
 {
     // ---- Input validation ----
     TORCH_CHECK(x.dim() == DIM_X, "x must be 2D, but got ", x.dim(), "D.");
@@ -131,8 +140,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> moe_init_
     // ---- Dimension computation (mirrors MoeInitRoutingV2KernelNpuOpApi.cpp) ----
     auto x_size = x.sizes();
     auto expert_idx_size = expert_idx.sizes();
-    const at::Tensor &p_scale = c10::value_or_else(scale, [] { return at::Tensor(); });
-    const at::Tensor &p_offset = c10::value_or_else(offset, [] { return at::Tensor(); });
+    const at::Tensor& p_scale = c10::value_or_else(scale, [] { return at::Tensor(); });
+    const at::Tensor& p_offset = c10::value_or_else(offset, [] { return at::Tensor(); });
 
     int64_t bs = x_size[0];
     int64_t h = x_size[1];
@@ -327,6 +336,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> moe_init_
     return std::tie(expanded_x, expanded_row_idx, expert_tokens_count_or_cumsum, expanded_scale, expanded_topk_weight);
 }
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) { m.def("moe_init_routing", &moe_init_routing, "moe_init_routing"); }
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
+{
+    m.def("moe_init_routing", &moe_init_routing, "moe_init_routing");
+}
 
 } // namespace op_api

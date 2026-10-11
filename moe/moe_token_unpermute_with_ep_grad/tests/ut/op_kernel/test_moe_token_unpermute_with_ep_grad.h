@@ -25,8 +25,8 @@
 
 #define __CCE_UT_TEST__
 
-inline void InitMoeTokenUnpermuteWithEpGradTilingData(uint8_t *tiling,
-                                                      MoeTokenUnpermuteWithEpGradTilingData *const_data)
+inline void InitMoeTokenUnpermuteWithEpGradTilingData(uint8_t* tiling,
+                                                      MoeTokenUnpermuteWithEpGradTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeTokenUnpermuteWithEpGradTilingData));
 }

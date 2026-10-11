@@ -25,8 +25,8 @@ class MoeV3SrcToDstAndGather {
 public:
     __aicore__ inline MoeV3SrcToDstAndGather(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR scale, GM_ADDR expandedRowIdx, GM_ADDR expandedX,
-                                GM_ADDR dynamicQuantScale, GM_ADDR workspace, const TilingData *tilingData,
-                                TPipe *tPipe);
+                                GM_ADDR dynamicQuantScale, GM_ADDR workspace, const TilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -34,10 +34,10 @@ private:
     __aicore__ inline void CopyOut(int64_t progress);
     __aicore__ inline void CopyOutLoops(int64_t progress);
     __aicore__ inline void Compute(int32_t srcIdx, int32_t dstIdx, int32_t expertIdx);
-    __aicore__ inline float ComputeMax(LocalTensor<float> &inLocal, LocalTensor<float> &tempLocal,
-                                       LocalTensor<float> &dynamicQuantLocal, int32_t srcIdx, int32_t expertIdx,
+    __aicore__ inline float ComputeMax(LocalTensor<float>& inLocal, LocalTensor<float>& tempLocal,
+                                       LocalTensor<float>& dynamicQuantLocal, int32_t srcIdx, int32_t expertIdx,
                                        int64_t j);
-    __aicore__ inline void ComputeScale(LocalTensor<float> &inLocal, LocalTensor<float> &tempLocal, float scaleTemp,
+    __aicore__ inline void ComputeScale(LocalTensor<float>& inLocal, LocalTensor<float>& tempLocal, float scaleTemp,
                                         int64_t dstIndex, int64_t j);
     __aicore__ inline void ComputeLoops(int32_t srcIdx, int32_t dstIdx, int32_t expertIdx);
 
@@ -46,7 +46,7 @@ private:
     __aicore__ inline void AssistInit();
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> copyInQueue;
     TQue<QuePosition::VECOUT, 1> copyOutQueue;
     TQue<QuePosition::VECOUT, 1> copyOutZeroQueue;
@@ -73,7 +73,7 @@ private:
     LocalTensor<float> scaleOutTmpLocal;
     LocalTensor<float> smoothLocal;
 
-    const MoeV3SrcToDstCapacityComputeTilingData *srcToDstTilingData;
+    const MoeV3SrcToDstCapacityComputeTilingData* srcToDstTilingData;
 
     int64_t coreNum;
     int64_t blockIdx;
@@ -258,9 +258,9 @@ __aicore__ inline void MoeV3SrcToDstAndGather<T, TilingData>::CopyOut(int64_t pr
 }
 
 template <typename T, typename TilingData>
-__aicore__ inline float MoeV3SrcToDstAndGather<T, TilingData>::ComputeMax(LocalTensor<float> &inLocal,
-                                                                          LocalTensor<float> &tempLocal,
-                                                                          LocalTensor<float> &dynamicQuantLocal,
+__aicore__ inline float MoeV3SrcToDstAndGather<T, TilingData>::ComputeMax(LocalTensor<float>& inLocal,
+                                                                          LocalTensor<float>& tempLocal,
+                                                                          LocalTensor<float>& dynamicQuantLocal,
                                                                           int32_t srcIdx, int32_t expertIdx, int64_t j)
 {
     LocalTensor<float> smoothLocal = smoothInQueue.AllocTensor<float>();
@@ -306,8 +306,8 @@ __aicore__ inline float MoeV3SrcToDstAndGather<T, TilingData>::ComputeMax(LocalT
 }
 
 template <typename T, typename TilingData>
-__aicore__ inline void MoeV3SrcToDstAndGather<T, TilingData>::ComputeScale(LocalTensor<float> &inLocal,
-                                                                           LocalTensor<float> &tempLocal,
+__aicore__ inline void MoeV3SrcToDstAndGather<T, TilingData>::ComputeScale(LocalTensor<float>& inLocal,
+                                                                           LocalTensor<float>& tempLocal,
                                                                            float scaleTemp, int64_t dstIndex, int64_t j)
 {
     DataCopyExtParams copyInParams{1, static_cast<uint32_t>(colsTileLength * sizeof(float)), 0, 0, 0};
@@ -351,7 +351,7 @@ __aicore__ inline void MoeV3SrcToDstAndGather<T, TilingData>::ComputeLoops(int32
     DataCopyExtParams quantScaleParams{1, static_cast<uint32_t>(sizeof(int32_t)), 0, 0, 0};
 
     uint32_t tmp = 0xFF7FFFFF;
-    float reduceMax = *((float *)&tmp);
+    float reduceMax = *((float*)&tmp);
     for (int64_t j = 0; j < this->colLoops; j++) {
         colsTileLength = this->perLoopCols;
         if (j == this->colLoops - 1) {
@@ -473,8 +473,8 @@ __aicore__ inline void MoeV3SrcToDstAndGather<T, TilingData>::CopyOutRemain()
 template <typename T, typename TilingData>
 __aicore__ inline void MoeV3SrcToDstAndGather<T, TilingData>::Init(GM_ADDR x, GM_ADDR scale, GM_ADDR expandedRowIdx,
                                                                    GM_ADDR expandedX, GM_ADDR dynamicQuantScale,
-                                                                   GM_ADDR workspace, const TilingData *tilingData,
-                                                                   TPipe *tPipe)
+                                                                   GM_ADDR workspace, const TilingData* tilingData,
+                                                                   TPipe* tPipe)
 {
     int64_t blockNum = GetBlockNum();
     this->pipe = tPipe;
@@ -505,26 +505,25 @@ __aicore__ inline void MoeV3SrcToDstAndGather<T, TilingData>::Init(GM_ADDR x, GM
     this->colLoops = this->srcToDstTilingData->colLoops;
     this->perLoopColsAlign = Align(this->perLoopCols, sizeof(T));
 
-    inputXGm.SetGlobalBuffer((__gm__ T *)x);
-    quantSmoothGm.SetGlobalBuffer((__gm__ float *)scale);
-    dynamicQuantScaleGm.SetGlobalBuffer((__gm__ float *)dynamicQuantScale);
+    inputXGm.SetGlobalBuffer((__gm__ T*)x);
+    quantSmoothGm.SetGlobalBuffer((__gm__ float*)scale);
+    dynamicQuantScaleGm.SetGlobalBuffer((__gm__ float*)dynamicQuantScale);
 
     int64_t length = Align(this->totalLength, sizeof(int32_t));
-    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, length);
-    expandedXGm.SetGlobalBuffer((__gm__ int8_t *)expandedX, this->expertNum * this->expertCapacity * this->cols);
+    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, length);
+    expandedXGm.SetGlobalBuffer((__gm__ int8_t*)expandedX, this->expertNum * this->expertCapacity * this->cols);
 
     expandedExpertIdxGm.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
+        (__gm__ int32_t*)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
         Align(this->coreRows, sizeof(int32_t)));
     expandDstToSrcRowGm.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + length + this->blockIdx * this->srcToDstTilingData->perCoreRows,
+        (__gm__ int32_t*)workspace + length + this->blockIdx * this->srcToDstTilingData->perCoreRows,
         Align(this->coreRows, sizeof(int32_t)));
     expertIdxValueGm.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + length * 2 + Align(this->expertNum, sizeof(int32_t)) * 2, this->coreNum * 2);
+        (__gm__ int32_t*)workspace + length * 2 + Align(this->expertNum, sizeof(int32_t)) * 2, this->coreNum * 2);
     if (this->colLoops > 1) {
-        quantSrcGm.SetGlobalBuffer((__gm__ float *)workspace + length * 2 +
-                                       Align(this->expertNum, sizeof(int32_t)) * 2 + this->coreNum * 2 +
-                                       this->blockIdx * this->cols,
+        quantSrcGm.SetGlobalBuffer((__gm__ float*)workspace + length * 2 + Align(this->expertNum, sizeof(int32_t)) * 2 +
+                                       this->coreNum * 2 + this->blockIdx * this->cols,
                                    this->cols * sizeof(float));
     }
 

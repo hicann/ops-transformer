@@ -28,7 +28,7 @@ class MoeGatherSortMultiCore {
 public:
     __aicore__ inline MoeGatherSortMultiCore(){};
     __aicore__ inline void Init(GM_ADDR expertIdx, GM_ADDR expendedRowIdx, GM_ADDR workspace,
-                                const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -37,7 +37,7 @@ private:
     __aicore__ inline void CopyOut();
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TBuf<TPosition::VECCALC> buffer_;
     GlobalTensor<int32_t> workspaceGm_;
     GlobalTensor<int32_t> expendedRowIdxGm_;
@@ -183,7 +183,7 @@ __aicore__ inline void MoeGatherSortMultiCore::CopyOut()
 }
 
 __aicore__ inline void MoeGatherSortMultiCore::Init(GM_ADDR expertIdx, GM_ADDR expendedRowIdx, GM_ADDR workspace,
-                                                    const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe)
+                                                    const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe)
 {
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
@@ -192,17 +192,17 @@ __aicore__ inline void MoeGatherSortMultiCore::Init(GM_ADDR expertIdx, GM_ADDR e
     expertStart_ = tilingData->expertStart;
     expertEnd_ = tilingData->expertEnd;
 
-    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertIdx);
+    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertIdx);
 
-    expendedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expendedRowIdx);
+    expendedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expendedRowIdx);
 
-    workspaceGm_.SetGlobalBuffer((__gm__ int32_t *)workspace);
+    workspaceGm_.SetGlobalBuffer((__gm__ int32_t*)workspace);
 
-    sortedExpertIdxGm_.SetGlobalBuffer((__gm__ float *)workspace);
-    sortedExpertIndexGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(totalLength_, sizeof(int32_t)));
+    sortedExpertIdxGm_.SetGlobalBuffer((__gm__ float*)workspace);
+    sortedExpertIndexGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(totalLength_, sizeof(int32_t)));
 
     // key and value
-    sortedNumGm_.SetGlobalBuffer((__gm__ int32_t *)workspace +
+    sortedNumGm_.SetGlobalBuffer((__gm__ int32_t*)workspace +
                                  Align(totalLength_, sizeof(int32_t)) * kvFactor * kvFactor);
 
     needCoreNum_ = PARALLEL_GATHERED_SORT_NEED_CORE_NUM;

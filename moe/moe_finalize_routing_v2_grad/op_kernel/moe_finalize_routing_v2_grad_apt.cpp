@@ -30,9 +30,11 @@
 
 using namespace MoeFinalizeRoutingV2Grad;
 
-extern "C" __global__ __aicore__ void moe_finalize_routing_v2_grad(
-    GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR scales, GM_ADDR expertIdx, GM_ADDR bias,
-    GM_ADDR gradExpandedX, GM_ADDR gradScales, GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void moe_finalize_routing_v2_grad(GM_ADDR gradY, GM_ADDR expandedRowIdx,
+                                                                   GM_ADDR expandedX, GM_ADDR scales, GM_ADDR expertIdx,
+                                                                   GM_ADDR bias, GM_ADDR gradExpandedX,
+                                                                   GM_ADDR gradScales, GM_ADDR workspace,
+                                                                   GM_ADDR tiling)
 {
     TPipe pipe;
 
@@ -51,42 +53,38 @@ extern "C" __global__ __aicore__ void moe_finalize_routing_v2_grad(
     } else if (TILING_KEY_IS(TILING_KEY_WITH_SCALE_NOT_CUT_H_WITH_BIAS)) {
         GET_TILING_DATA_WITH_STRUCT(MoeFinalizeRoutingV2GradNotSplitHTilingData, tiling_data_in, tiling);
         const MoeFinalizeRoutingV2GradNotSplitHTilingData* __restrict tilingData = &tiling_data_in;
-        MoeFinalizeRoutingV2Grad::MoeFinalizeRoutingV2GradRegbaseNotCutH<
-            DTYPE_GRAD_Y, DTYPE_EXPANDED_ROW_IDX, DTYPE_SCALES, true>
+        MoeFinalizeRoutingV2Grad::MoeFinalizeRoutingV2GradRegbaseNotCutH<DTYPE_GRAD_Y, DTYPE_EXPANDED_ROW_IDX,
+                                                                         DTYPE_SCALES, true>
             op;
-        op.Init(
-            gradY, expandedRowIdx, expandedX, scales, expertIdx, bias, gradExpandedX, gradScales, workspace, tilingData,
-            &pipe);
+        op.Init(gradY, expandedRowIdx, expandedX, scales, expertIdx, bias, gradExpandedX, gradScales, workspace,
+                tilingData, &pipe);
         op.Process();
     } else if (TILING_KEY_IS(TILING_KEY_WITH_SCALE_NOT_CUT_H_WITHOUT_BIAS)) {
         GET_TILING_DATA_WITH_STRUCT(MoeFinalizeRoutingV2GradNotSplitHTilingData, tiling_data_in, tiling);
         const MoeFinalizeRoutingV2GradNotSplitHTilingData* __restrict tilingData = &tiling_data_in;
-        MoeFinalizeRoutingV2Grad::MoeFinalizeRoutingV2GradRegbaseNotCutH<
-            DTYPE_GRAD_Y, DTYPE_EXPANDED_ROW_IDX, DTYPE_SCALES, false>
+        MoeFinalizeRoutingV2Grad::MoeFinalizeRoutingV2GradRegbaseNotCutH<DTYPE_GRAD_Y, DTYPE_EXPANDED_ROW_IDX,
+                                                                         DTYPE_SCALES, false>
             op;
-        op.Init(
-            gradY, expandedRowIdx, expandedX, scales, expertIdx, bias, gradExpandedX, gradScales, workspace, tilingData,
-            &pipe);
+        op.Init(gradY, expandedRowIdx, expandedX, scales, expertIdx, bias, gradExpandedX, gradScales, workspace,
+                tilingData, &pipe);
         op.Process();
     } else if (TILING_KEY_IS(TILING_KEY_WITH_SCALE_CUT_H_WITH_BIAS)) {
         GET_TILING_DATA_WITH_STRUCT(MoeFinalizeRoutingV2GradSplitHTilingData, tiling_data_in, tiling);
         const MoeFinalizeRoutingV2GradSplitHTilingData* __restrict tilingData = &tiling_data_in;
-        MoeFinalizeRoutingV2Grad::MoeFinalizeRoutingV2GradRegBaseCutH<
-            DTYPE_GRAD_Y, DTYPE_EXPANDED_ROW_IDX, DTYPE_SCALES, true>
+        MoeFinalizeRoutingV2Grad::MoeFinalizeRoutingV2GradRegBaseCutH<DTYPE_GRAD_Y, DTYPE_EXPANDED_ROW_IDX,
+                                                                      DTYPE_SCALES, true>
             op;
-        op.Init(
-            gradY, expandedRowIdx, expandedX, scales, expertIdx, bias, gradExpandedX, gradScales, workspace, tilingData,
-            &pipe);
+        op.Init(gradY, expandedRowIdx, expandedX, scales, expertIdx, bias, gradExpandedX, gradScales, workspace,
+                tilingData, &pipe);
         op.Process();
     } else if (TILING_KEY_IS(TILING_KEY_WITH_SCALE_CUT_H_WITHOUT_BIAS)) {
         GET_TILING_DATA_WITH_STRUCT(MoeFinalizeRoutingV2GradSplitHTilingData, tiling_data_in, tiling);
         const MoeFinalizeRoutingV2GradSplitHTilingData* __restrict tilingData = &tiling_data_in;
-        MoeFinalizeRoutingV2Grad::MoeFinalizeRoutingV2GradRegBaseCutH<
-            DTYPE_GRAD_Y, DTYPE_EXPANDED_ROW_IDX, DTYPE_SCALES, false>
+        MoeFinalizeRoutingV2Grad::MoeFinalizeRoutingV2GradRegBaseCutH<DTYPE_GRAD_Y, DTYPE_EXPANDED_ROW_IDX,
+                                                                      DTYPE_SCALES, false>
             op;
-        op.Init(
-            gradY, expandedRowIdx, expandedX, scales, expertIdx, bias, gradExpandedX, gradScales, workspace, tilingData,
-            &pipe);
+        op.Init(gradY, expandedRowIdx, expandedX, scales, expertIdx, bias, gradExpandedX, gradScales, workspace,
+                tilingData, &pipe);
         op.Process();
     } else {
         return;

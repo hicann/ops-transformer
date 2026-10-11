@@ -26,8 +26,8 @@ public:
     __aicore__ inline MoeSortIndicesScatterMultiCore() {}
 
     __aicore__ inline void Init(GM_ADDR sortedIndicesOut, GM_ADDR valueStreamGm, int32_t actualOutTokensIn,
-                                const MoeTokenPermuteWithRoutingMapTilingData *tilingData, GM_ADDR workspace,
-                                TPipe *tPipeIn);
+                                const MoeTokenPermuteWithRoutingMapTilingData* tilingData, GM_ADDR workspace,
+                                TPipe* tPipeIn);
 
     __aicore__ inline void Process();
 
@@ -41,7 +41,7 @@ private:
 private:
     static constexpr int32_t SCATTER_MINUS_ONE = -1;
 
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> copyInQueue;
     TQue<QuePosition::VECOUT, 1> copyOutQueue;
     TBuf<TPosition::VECCALC> assistBuffer;
@@ -68,8 +68,8 @@ private:
 
 __aicore__ inline void MoeSortIndicesScatterMultiCore::Init(GM_ADDR sortedIndicesOut, GM_ADDR valueStreamGm,
                                                             int32_t actualOutTokensIn,
-                                                            const MoeTokenPermuteWithRoutingMapTilingData *tilingData,
-                                                            GM_ADDR workspace, TPipe *tPipeIn)
+                                                            const MoeTokenPermuteWithRoutingMapTilingData* tilingData,
+                                                            GM_ADDR workspace, TPipe* tPipeIn)
 {
     (void)workspace;
     pipe = tPipeIn;
@@ -77,8 +77,8 @@ __aicore__ inline void MoeSortIndicesScatterMultiCore::Init(GM_ADDR sortedIndice
     actualOutTokens = actualOutTokensIn;
     totalLength = tilingData->n * tilingData->topK;
 
-    outGm.SetGlobalBuffer((__gm__ int32_t *)sortedIndicesOut, Align(totalLength, sizeof(int32_t)));
-    valueGm.SetGlobalBuffer((__gm__ int32_t *)valueStreamGm, actualOutTokens);
+    outGm.SetGlobalBuffer((__gm__ int32_t*)sortedIndicesOut, Align(totalLength, sizeof(int32_t)));
+    valueGm.SetGlobalBuffer((__gm__ int32_t*)valueStreamGm, actualOutTokens);
 
     int64_t blockNum = static_cast<int64_t>(GetBlockNum());
     initPerCore = Ceil(Ceil(totalLength, blockNum), ASSIST_NUM) * ASSIST_NUM;
@@ -122,7 +122,7 @@ __aicore__ inline void MoeSortIndicesScatterMultiCore::Init(GM_ADDR sortedIndice
     pipe->InitBuffer(copyInQueue, 1, perLoopRows * BLOCK_BYTES);
     pipe->InitBuffer(copyOutQueue, 1, Ceil(perLoopRows, ASSIST_INDEX_NUM) * ASSIST_INDEX_NUM * BLOCK_BYTES);
     pipe->InitBuffer(assistBuffer, ASSIST_NUM * sizeof(int32_t));
-    assistGm.SetGlobalBuffer((__gm__ int32_t *)scatterAssist, ASSIST_NUM);
+    assistGm.SetGlobalBuffer((__gm__ int32_t*)scatterAssist, ASSIST_NUM);
 }
 
 __aicore__ inline void MoeSortIndicesScatterMultiCore::AssistInit()

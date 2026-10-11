@@ -28,7 +28,7 @@ public:
     __aicore__ inline MoeV3FullLoadCutOriginT(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
                                 GM_ADDR expertTokens, GM_ADDR expandedScale, GM_ADDR workspace,
-                                const MoeInitRoutingV3TilingData *tiling, TPipe *pipe);
+                                const MoeInitRoutingV3TilingData* tiling, TPipe* pipe);
     __aicore__ inline void Process();
 
 private:
@@ -47,7 +47,7 @@ private:
     static constexpr int64_t MASK_STRIDE = 64;
     static constexpr int64_t VECTOR_FILTER_THRESHOLD = 64;
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     TBuf<TPosition::VECCALC> buf_;
 
     GlobalTensor<int32_t> expertIdxGm_;
@@ -115,7 +115,7 @@ template <typename T>
 __aicore__ inline void MoeV3FullLoadCutOriginT<T>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX,
                                                         GM_ADDR expandedRowIdx, GM_ADDR expertTokens,
                                                         GM_ADDR expandedScale, GM_ADDR workspace,
-                                                        const MoeInitRoutingV3TilingData *tiling, TPipe *pipe)
+                                                        const MoeInitRoutingV3TilingData* tiling, TPipe* pipe)
 {
     pipe_ = pipe;
     blockIdx_ = GetBlockIdx();
@@ -157,17 +157,17 @@ __aicore__ inline void MoeV3FullLoadCutOriginT<T>::Init(GM_ADDR x, GM_ADDR exper
     maskBytes_ = OpsBaseCeilAlign(Ceil(entriesAligned_, static_cast<int64_t>(8)), BLOCK_BYTES);
 
     // Setup GlobalTensors
-    xGm_.SetGlobalBuffer((__gm__ T *)x);
-    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertIdx);
-    expandedXGm_.SetGlobalBuffer((__gm__ T *)expandedX);
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx);
-    workspaceGm_.SetGlobalBuffer((__gm__ int32_t *)workspace);
+    xGm_.SetGlobalBuffer((__gm__ T*)x);
+    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertIdx);
+    expandedXGm_.SetGlobalBuffer((__gm__ T*)expandedX);
+    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx);
+    workspaceGm_.SetGlobalBuffer((__gm__ int32_t*)workspace);
     if (expertTokensNumFlag_ != EXERPT_TOKENS_NONE) {
-        expertTokensGm_.SetGlobalBuffer((__gm__ int64_t *)expertTokens);
+        expertTokensGm_.SetGlobalBuffer((__gm__ int64_t*)expertTokens);
     }
     if (isInputScale_) {
-        scaleGm_.SetGlobalBuffer((__gm__ float *)scale);
-        expandedScaleGm_.SetGlobalBuffer((__gm__ float *)expandedScale);
+        scaleGm_.SetGlobalBuffer((__gm__ float*)scale);
+        expandedScaleGm_.SetGlobalBuffer((__gm__ float*)expandedScale);
     }
 
     // Modification 1: Use InitGlobalMemory for GATHER mode pre-fill -1

@@ -7,7 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
- 
+
 #ifndef OP_API_INC_MOE_INIT_ROUTING_V3_H_
 #define OP_API_INC_MOE_INIT_ROUTING_V3_H_
 
@@ -22,29 +22,16 @@ extern "C" {
  * @brief aclnnMoeInitRoutingV3的第一段接口，根据具体的计算流程，计算workspace大小。
  * @domain aclnn_ops_infer
  */
-ACLNN_API aclnnStatus aclnnMoeInitRoutingV3GetWorkspaceSize(const aclTensor *x, 
-                                                            const aclTensor *expertIdx,
-                                                            const aclTensor *scaleOptional,
-                                                            const aclTensor *offsetOptional, 
-                                                            int64_t activeNum, 
-                                                            int64_t expertCapacity, 
-                                                            int64_t expertNum, 
-                                                            int64_t dropPadMode, 
-                                                            int64_t expertTokensNumType, 
-                                                            bool expertTokensNumFlag, 
-                                                            int64_t quantMode, 
-                                                            const aclIntArray *activeExpertRangeOptional, 
-                                                            int64_t rowIdxType, 
-                                                            const aclTensor *expandedXOut, 
-                                                            const aclTensor *expandedRowIdxOut, 
-                                                            const aclTensor *expertTokensCountOrCumsumOut, 
-                                                            const aclTensor *expandedScaleOut, 
-                                                            uint64_t *workspaceSize, 
-                                                            aclOpExecutor **executor);
-                                                            
+ACLNN_API aclnnStatus aclnnMoeInitRoutingV3GetWorkspaceSize(
+    const aclTensor* x, const aclTensor* expertIdx, const aclTensor* scaleOptional, const aclTensor* offsetOptional,
+    int64_t activeNum, int64_t expertCapacity, int64_t expertNum, int64_t dropPadMode, int64_t expertTokensNumType,
+    bool expertTokensNumFlag, int64_t quantMode, const aclIntArray* activeExpertRangeOptional, int64_t rowIdxType,
+    const aclTensor* expandedXOut, const aclTensor* expandedRowIdxOut, const aclTensor* expertTokensCountOrCumsumOut,
+    const aclTensor* expandedScaleOut, uint64_t* workspaceSize, aclOpExecutor** executor);
+
 /* @brief aclnnMoeInitRoutingV3的第二段接口，用于执行计算。 */
 ACLNN_API aclnnStatus aclnnMoeInitRoutingV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
-                                                aclrtStream stream);
+                                            aclrtStream stream);
 
 #ifdef __cplusplus
 }

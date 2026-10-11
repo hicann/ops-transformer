@@ -86,14 +86,14 @@ struct MoeInitRoutingV2CompileInfo {};
 
 class InnerMoeInitRoutingV2TilingBase : public TilingBaseClass {
 public:
-    explicit InnerMoeInitRoutingV2TilingBase(gert::TilingContext *context)
+    explicit InnerMoeInitRoutingV2TilingBase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {
         Reset();
     }
     ~InnerMoeInitRoutingV2TilingBase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
@@ -119,7 +119,7 @@ protected:
     void Reset();
 
 protected:
-    ge::graphStatus CheckTokenCount(int64_t num, const char *tag);
+    ge::graphStatus CheckTokenCount(int64_t num, const char* tag);
     virtual ge::graphStatus CheckOutShape();
     virtual void Tiling4GatherOutCompute() = 0;
     void Tiling4SrcToDstCompute();
@@ -128,8 +128,8 @@ protected:
     void Tiling4VMSMiddleCompute();
     void Tiling4VBSCompute();
     void ShowTilingData();
-    void Tiling4VBSMultiCoreCompute(InnerMoeV2VBSComputeTilingData *tilingData);
-    void Tiling4VBSOneCoreCompute(InnerMoeV2VBSComputeTilingData *tilingData);
+    void Tiling4VBSMultiCoreCompute(InnerMoeV2VBSComputeTilingData* tilingData);
+    void Tiling4VBSOneCoreCompute(InnerMoeV2VBSComputeTilingData* tilingData);
     virtual bool IsFullLoad() = 0;
 
     int64_t aivNum;
@@ -146,7 +146,7 @@ protected:
     bool isFullLoad = false;
     bool regBase = false;
 
-    const char *opName = "";
+    const char* opName = "";
     InnerMoeInitRoutingV2TilingData moeInitRoutingTilingData;
 };
 } // namespace optiling

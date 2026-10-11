@@ -26,7 +26,7 @@ class MoeSortMultiCore : public MoeSortBase {
 public:
     __aicore__ inline MoeSortMultiCore(){};
     __aicore__ inline void Init(GM_ADDR expertIdx, GM_ADDR expandedRowIdx, GM_ADDR workspace,
-                                const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -38,16 +38,16 @@ private:
     __aicore__ inline void VBSCopyIn(int64_t progress, int64_t size, int64_t sortNum);
     __aicore__ inline void UBSortCompute(int64_t progress, int64_t size, int64_t sortNum);
     __aicore__ inline void VBSCopyOut(int64_t progress, int64_t size, int64_t sortNum);
-    __aicore__ inline void InitMoeMrgSort(MoeMrgsort *sorter, int64_t listNum, int64_t coreOffset, int64_t loopOffset);
-    __aicore__ inline void InitMoeMrgSortOut(MoeMrgsortOut *sorter, int64_t listNum, int64_t coreOffset);
-    __aicore__ inline void InitBasicParams(const MoeInitRoutingV3Arch35TilingData *tilingData);
+    __aicore__ inline void InitMoeMrgSort(MoeMrgsort* sorter, int64_t listNum, int64_t coreOffset, int64_t loopOffset);
+    __aicore__ inline void InitMoeMrgSortOut(MoeMrgsortOut* sorter, int64_t listNum, int64_t coreOffset);
+    __aicore__ inline void InitBasicParams(const MoeInitRoutingV3Arch35TilingData* tilingData);
 
 private:
     GlobalTensor<float> workspaceGms[2];
 
-    const MoeV3Arch35VBSComputeTilingData *vbsTilingData;
-    const MoeV3Arch35VMSMiddleComputeTilingData *vmsTilingData;
-    const MoeV3Arch35SortOutComputeTilingData *sortOutTilingData;
+    const MoeV3Arch35VBSComputeTilingData* vbsTilingData;
+    const MoeV3Arch35VMSMiddleComputeTilingData* vmsTilingData;
+    const MoeV3Arch35SortOutComputeTilingData* sortOutTilingData;
 
     // for MoeMrgsort
     MoeMrgsort mrgsorter;
@@ -98,7 +98,7 @@ __aicore__ inline void MoeSortMultiCore::UBSortCompute(int64_t progress, int64_t
 
     uint16_t repeatTimes = Ceil(sortNum, FLOAT_REG_TENSOR_LENGTH);
     uint32_t sreg = static_cast<uint32_t>(sortNum);
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)expertForSourceRowLocalFp32.GetPhyAddr();
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)expertForSourceRowLocalFp32.GetPhyAddr();
     float cmpScalar = static_cast<float>(expertStart_);
     float negone = static_cast<float>(-1);
 
@@ -150,7 +150,7 @@ __aicore__ inline void MoeSortMultiCore::VBSCopyOut(int64_t progress, int64_t si
     sortDataCopyOutQueue.FreeTensor(outLocal);
 }
 
-__aicore__ inline void MoeSortMultiCore::InitMoeMrgSort(MoeMrgsort *sorter, int64_t listNum, int64_t coreOffset,
+__aicore__ inline void MoeSortMultiCore::InitMoeMrgSort(MoeMrgsort* sorter, int64_t listNum, int64_t coreOffset,
                                                         int64_t loopOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex][blockIdx * coreOffset + loopOffset];
@@ -166,7 +166,7 @@ __aicore__ inline void MoeSortMultiCore::InitMoeMrgSort(MoeMrgsort *sorter, int6
     sortDataCopyOutQueue.FreeTensor(outLocal);
 }
 
-__aicore__ inline void MoeSortMultiCore::InitMoeMrgSortOut(MoeMrgsortOut *sorter, int64_t listNum, int64_t coreOffset)
+__aicore__ inline void MoeSortMultiCore::InitMoeMrgSortOut(MoeMrgsortOut* sorter, int64_t listNum, int64_t coreOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex];
     LocalTensor<float> inLocal = sortDataCopyInQueue.AllocTensor<float>();
@@ -301,7 +301,7 @@ __aicore__ inline void MoeSortMultiCore::SortOutProcess()
     SyncAll();
 }
 
-__aicore__ inline void MoeSortMultiCore::InitBasicParams(const MoeInitRoutingV3Arch35TilingData *tilingData)
+__aicore__ inline void MoeSortMultiCore::InitBasicParams(const MoeInitRoutingV3Arch35TilingData* tilingData)
 {
     this->totalLength = tilingData->n * tilingData->k;
     this->coreNum = tilingData->coreNum;
@@ -335,25 +335,25 @@ __aicore__ inline void MoeSortMultiCore::InitBasicParams(const MoeInitRoutingV3A
 }
 
 __aicore__ inline void MoeSortMultiCore::Init(GM_ADDR expertIdx, GM_ADDR expandedRowIdx, GM_ADDR workspace,
-                                              const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+                                              const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe)
 {
     InitBasicParams(tilingData);
     this->pipe = tPipe;
     expertIdxGm.SetGlobalBuffer(
-        (__gm__ int32_t *)expertIdx + this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
+        (__gm__ int32_t*)expertIdx + this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
         this->sortTotalLength);
-    sortedexpertIdxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace),
+    sortedexpertIdxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace),
                                       Align(this->totalLength, sizeof(int32_t)));
     if (rowIdxType_ == SCATTER) {
-        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, Align(this->totalLength, sizeof(int32_t)));
+        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, Align(this->totalLength, sizeof(int32_t)));
     } else {
-        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)),
+        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(this->totalLength, sizeof(int32_t)),
                                          Align(this->totalLength, sizeof(int32_t)));
     }
 
     if (GetBlockIdx() == 0) {
         expertCountTempGm.SetGlobalBuffer(
-            (__gm__ int32_t *)workspace + Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2,
+            (__gm__ int32_t*)workspace + Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2,
             tilingData->actualExpertNum);
         InitGlobalMemory(expertCountTempGm, tilingData->actualExpertNum, 0);
         SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
@@ -361,9 +361,9 @@ __aicore__ inline void MoeSortMultiCore::Init(GM_ADDR expertIdx, GM_ADDR expande
 
     int64_t kvFactor = 2;
     workspaceGms[0].SetGlobalBuffer(
-        (__gm__ float *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2 + tilingData->actualExpertNum,
+        (__gm__ float*)workspace + Align(this->totalLength, sizeof(int32_t)) * 2 + tilingData->actualExpertNum,
         Align(this->totalLength, sizeof(int32_t)) * kvFactor);
-    workspaceGms[1].SetGlobalBuffer((__gm__ float *)workspace +
+    workspaceGms[1].SetGlobalBuffer((__gm__ float*)workspace +
                                         Align(this->totalLength, sizeof(int32_t)) * (kvFactor + 2) +
                                         tilingData->actualExpertNum,
                                     Align(this->totalLength, sizeof(int32_t)) * kvFactor);

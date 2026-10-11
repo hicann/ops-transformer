@@ -28,11 +28,11 @@ public:
     __aicore__ inline MoeFinalizeRoutingFpDb(){};
     __aicore__ inline void Init(GM_ADDR expandedPermutedRows, GM_ADDR skip1, GM_ADDR skip2, GM_ADDR bias,
                                 GM_ADDR scales, GM_ADDR expandedSrcToDstRow, GM_ADDR expertForSourceRow, GM_ADDR out,
-                                GM_ADDR workspace, const MoeFinalizeRoutingTilingData *tilingData);
+                                GM_ADDR workspace, const MoeFinalizeRoutingTilingData* tilingData);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void ParseTilingData(const MoeFinalizeRoutingTilingData *tilingData);
+    __aicore__ inline void ParseTilingData(const MoeFinalizeRoutingTilingData* tilingData);
     __aicore__ inline void SetPadMode();
     __aicore__ inline void CopyIn(int64_t nLoopIdx, int64_t curRepeatTimes);
     __aicore__ inline void Compute(int64_t nLoopIdx, int64_t curRepeatTimes);
@@ -118,7 +118,7 @@ __aicore__ inline int64_t MoeFinalizeRoutingFpDb<T>::PadProcessT(int64_t param)
 }
 
 template <typename T>
-__aicore__ inline void MoeFinalizeRoutingFpDb<T>::ParseTilingData(const MoeFinalizeRoutingTilingData *tilingData)
+__aicore__ inline void MoeFinalizeRoutingFpDb<T>::ParseTilingData(const MoeFinalizeRoutingTilingData* tilingData)
 {
     skip2IsNull_ = tilingData->skip2IsNull;
     BS_ = tilingData->totalRowNum;
@@ -166,7 +166,7 @@ template <typename T>
 __aicore__ inline void MoeFinalizeRoutingFpDb<T>::Init(GM_ADDR expandedPermutedRows, GM_ADDR skip1, GM_ADDR skip2,
                                                        GM_ADDR bias, GM_ADDR scales, GM_ADDR expandedSrcToDstRow,
                                                        GM_ADDR expertForSourceRow, GM_ADDR out, GM_ADDR workspace,
-                                                       const MoeFinalizeRoutingTilingData *tilingData)
+                                                       const MoeFinalizeRoutingTilingData* tilingData)
 {
     // init tiling data
     ParseTilingData(tilingData);
@@ -179,29 +179,29 @@ __aicore__ inline void MoeFinalizeRoutingFpDb<T>::Init(GM_ADDR expandedPermutedR
     SetPadMode();
     // gmInput分核 && 输入偏移量初始化
     inputSkipIdx_ = GetBlockIdx() * normalCoreHandleNum_ * H_;
-    gmSkip1_.SetGlobalBuffer((__gm__ T *)skip1 + inputSkipIdx_, normalCoreHandleNum_ * H_);
+    gmSkip1_.SetGlobalBuffer((__gm__ T*)skip1 + inputSkipIdx_, normalCoreHandleNum_ * H_);
 #ifndef __CCE_KT_TEST__
     pipe.InitBuffer(skip1Queue_, 1, normalCoreHandleNumPerLoop_ * AlignmentProcess(H_) * sizeof(T));
 #else
     pipe.InitBuffer(skip1Queue_, 1, ONE_BLK_SIZE);
 #endif
     if (skip2IsNull_ == 0) {
-        gmSkip2_.SetGlobalBuffer((__gm__ T *)skip2 + inputSkipIdx_, normalCoreHandleNum_ * H_);
+        gmSkip2_.SetGlobalBuffer((__gm__ T*)skip2 + inputSkipIdx_, normalCoreHandleNum_ * H_);
         pipe.InitBuffer(skip2Queue_, 1, normalCoreHandleNumPerLoop_ * AlignmentProcess(H_) * sizeof(T));
     }
 
     inputScalesAndExpertIdx_ = GetBlockIdx() * normalCoreHandleNum_ * K_;
-    gmScales_.SetGlobalBuffer((__gm__ T *)scales + inputScalesAndExpertIdx_, normalCoreHandleNum_ * K_);
-    gmExpertForSourceRow_.SetGlobalBuffer((__gm__ int32_t *)expertForSourceRow + inputScalesAndExpertIdx_,
+    gmScales_.SetGlobalBuffer((__gm__ T*)scales + inputScalesAndExpertIdx_, normalCoreHandleNum_ * K_);
+    gmExpertForSourceRow_.SetGlobalBuffer((__gm__ int32_t*)expertForSourceRow + inputScalesAndExpertIdx_,
                                           normalCoreHandleNum_ * K_);
 
-    gmExpandedSrcToDstRow_.SetGlobalBuffer((__gm__ int32_t *)expandedSrcToDstRow, BS_ * K_);
+    gmExpandedSrcToDstRow_.SetGlobalBuffer((__gm__ int32_t*)expandedSrcToDstRow, BS_ * K_);
 
     outputIdx_ = GetBlockIdx() * normalCoreHandleNum_ * H_;
-    gmOut_.SetGlobalBuffer((__gm__ T *)out + outputIdx_, normalCoreHandleNum_ * H_);
+    gmOut_.SetGlobalBuffer((__gm__ T*)out + outputIdx_, normalCoreHandleNum_ * H_);
 
-    gmExpandedPermutedRows_.SetGlobalBuffer((__gm__ T *)expandedPermutedRows, BS_ * K_ * H_);
-    gmBias_.SetGlobalBuffer((__gm__ T *)bias, E_ * H_);
+    gmExpandedPermutedRows_.SetGlobalBuffer((__gm__ T*)expandedPermutedRows, BS_ * K_ * H_);
+    gmBias_.SetGlobalBuffer((__gm__ T*)bias, E_ * H_);
 
     // 申请 buffer 空间
 #ifndef __CCE_KT_TEST__

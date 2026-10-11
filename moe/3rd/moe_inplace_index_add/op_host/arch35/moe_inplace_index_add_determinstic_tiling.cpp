@@ -17,8 +17,7 @@
 #include "moe_inplace_index_add_determinstic_tiling.h"
 #include <cstdint>
 
-namespace optiling
-{
+namespace optiling {
 constexpr int64_t SIMD_DB_BUFFER = 2L;
 constexpr int64_t SIZE_TWO = 2L;
 
@@ -94,9 +93,10 @@ void MoeInplaceIndexAddDeterminsticTiling::DoOpTilingForDeterminsticSplitAfter()
     usedCoreNumBefore_ = Ops::Base::CeilDiv(afterAxis_, eachCoreAfterAxisCount_);
     tailCoreAfterAxisCount_ = afterAxis_ - eachCoreAfterAxisCount_ * (usedCoreNumBefore_ - 1);
     if (eachCoreAfterAxisCount_ * varTypeSize_ > (halfUbSize - MIN_BLOCK_SIZE)) {
-        int64_t indicesUbSize = std::min(MIN_BLOCK_SIZE, indicesAxis_ * indicesTypeSize_);  
+        int64_t indicesUbSize = std::min(MIN_BLOCK_SIZE, indicesAxis_ * indicesTypeSize_);
         ubIndexFactor_ = Ops::Base::CeilAlign(indicesUbSize, ALIGN_SIZE) / indicesTypeSize_;
-        afterAxisFactor_ = (halfUbSize - ubIndexFactor_ * indicesTypeSize_) / (ubIndexFactor_ * varTypeSize_ * SIZE_TWO);
+        afterAxisFactor_ =
+            (halfUbSize - ubIndexFactor_ * indicesTypeSize_) / (ubIndexFactor_ * varTypeSize_ * SIZE_TWO);
         afterAxisFactor_ = Ops::Base::FloorAlign(afterAxisFactor_, alignNum);
     } else {
         afterAxisFactor_ = Ops::Base::CeilAlign(eachCoreAfterAxisCount_, alignNum);
@@ -113,25 +113,26 @@ void MoeInplaceIndexAddDeterminsticTiling::DoOpTilingForDeterminsticSplitAfter()
     updateTailNum_ = eachCoreAfterAxisCount_ - (updateLoopSize_ - 1) * afterAxisFactor_;
 
     /* 尾核循环次数 */
-    tailUpdateLoopSize_ =  Ops::Base::CeilDiv(tailCoreAfterAxisCount_, afterAxisFactor_);
+    tailUpdateLoopSize_ = Ops::Base::CeilDiv(tailCoreAfterAxisCount_, afterAxisFactor_);
     /* 尾核尾loop处理afterAxis大小 */
     tailUpdateAxisNum_ = tailCoreAfterAxisCount_ - (tailUpdateLoopSize_ - 1) * afterAxisFactor_;
     isSplitAfterAxis_ = 1;
 }
 
 int64_t MoeInplaceIndexAddDeterminsticTiling::GetRestAvailableSize(int64_t sampleNum, int64_t valueTypeBytes,
-                 int64_t originalSize, int64_t postAxisSize, ge::DataType idType)
+                                                                   int64_t originalSize, int64_t postAxisSize,
+                                                                   ge::DataType idType)
 {
     auto ubBlock = static_cast<int64_t>(Ops::Base::GetUbBlockSize(context_));
     int64_t occupy = Ops::Base::CeilAlign(sampleNum * indicesTypeSize_, ubBlock) +
-                      Ops::Base::CeilAlign(sampleNum * (indicesTypeSize_ + SIZE_TWO * ALIGN_SIZE), ubBlock) + 
-                      Ops::Base::CeilAlign(sampleNum * INT32_BYTES, ubBlock) + 
-                      Ops::Base::CeilAlign(sampleNum * (INT32_BYTES * SIZE_TWO), ubBlock) +
-                      Ops::Base::CeilAlign(sampleNum * indicesTypeSize_, ubBlock) + 
-                      sampleNum * Ops::Base::CeilAlign((varTypeSize_) * postAxisSize, ubBlock) + 
-                      sampleNum * Ops::Base::CeilAlign((FP32_BYTES) * postAxisSize, ubBlock) + 
-                      sampleNum * Ops::Base::CeilAlign((FP32_BYTES) * postAxisSize, ubBlock) + 
-                      GetSortTmpSize(idType, sampleNum, false);
+                     Ops::Base::CeilAlign(sampleNum * (indicesTypeSize_ + SIZE_TWO * ALIGN_SIZE), ubBlock) +
+                     Ops::Base::CeilAlign(sampleNum * INT32_BYTES, ubBlock) +
+                     Ops::Base::CeilAlign(sampleNum * (INT32_BYTES * SIZE_TWO), ubBlock) +
+                     Ops::Base::CeilAlign(sampleNum * indicesTypeSize_, ubBlock) +
+                     sampleNum * Ops::Base::CeilAlign((varTypeSize_)*postAxisSize, ubBlock) +
+                     sampleNum * Ops::Base::CeilAlign((FP32_BYTES)*postAxisSize, ubBlock) +
+                     sampleNum * Ops::Base::CeilAlign((FP32_BYTES)*postAxisSize, ubBlock) +
+                     GetSortTmpSize(idType, sampleNum, false);
     return originalSize - occupy;
 }
 
@@ -148,8 +149,8 @@ void MoeInplaceIndexAddDeterminsticTiling::DoOpTilingForDeterminstic()
         } else {
             DoOpTilingForDeterminsticSplitPre();
         }
-         return;
-    } 
+        return;
+    }
     if (indicesAxis_ > splitCoreNumThresh) {
         /* split indices分核 */
         eachCoreIndexCount_ = Ops::Base::CeilDiv(indicesAxis_, totalCoreNum_);
@@ -162,11 +163,11 @@ void MoeInplaceIndexAddDeterminsticTiling::DoOpTilingForDeterminstic()
         tailCoreVarCount_ = preAxis_ * varInAxis_ - eachCoreVarCount_ * (usedCoreNumAfter_ - 1);
 
         /* first step:搬入多少行indices,就搬入相同行数的updates:
-         * ubIndexFactor_: indicesindicesQue + (sortIndicesQue + 2 * shiftOfset) + originIdxQue + (uniqueIdCntQue_ + 1) + updateSumIdxQue_,
-         * ubIndexFactor_ * afterAxisAlign: updatesQue_ + updatesCastQue_ + updateSumQue_
-        */
+         * ubIndexFactor_: indicesindicesQue + (sortIndicesQue + 2 * shiftOfset) + originIdxQue + (uniqueIdCntQue_ + 1)
+         * + updateSumIdxQue_, ubIndexFactor_ * afterAxisAlign: updatesQue_ + updatesCastQue_ + updateSumQue_
+         */
         int64_t indicesSize = indicesTypeSize_ + (indicesTypeSize_ + SIZE_TWO * ALIGN_SIZE) + INT32_BYTES +
-                             (INT32_BYTES * SIZE_TWO) + indicesTypeSize_;
+                              (INT32_BYTES * SIZE_TWO) + indicesTypeSize_;
         int64_t oneBlockSize = indicesSize + (varTypeSize_ + FP32_BYTES + FP32_BYTES) * afterAxis_;
         ubIndexFactor_ = halfUbSize / oneBlockSize;
 
@@ -183,15 +184,15 @@ void MoeInplaceIndexAddDeterminsticTiling::DoOpTilingForDeterminstic()
         /* sumIdx, sumQue + rValueQue + sumQuantaQue */
         oneBlockSize = indicesTypeSize_ + (FP32_BYTES + FP32_BYTES + INT32_BYTES) * afterAxis_;
         ubQuantaIndxFactor_ = halfUbSize / oneBlockSize;
-        
+
         restSize = static_cast<int64_t>(-1);
         auto ubBlock = static_cast<int64_t>(Ops::Base::GetUbBlockSize(context_));
         while (restSize <= 0) {
             --ubQuantaIndxFactor_;
             int64_t occupy = Ops::Base::CeilAlign(ubQuantaIndxFactor_ * indicesTypeSize_, ubBlock) +
-                          ubQuantaIndxFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock) + 
-                          ubQuantaIndxFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock) + 
-                          ubQuantaIndxFactor_ * Ops::Base::CeilAlign(INT32_BYTES * afterAxis_, ubBlock);
+                             ubQuantaIndxFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock) +
+                             ubQuantaIndxFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock) +
+                             ubQuantaIndxFactor_ * Ops::Base::CeilAlign(INT32_BYTES * afterAxis_, ubBlock);
             restSize = halfUbSize - occupy;
         }
         if (ubQuantaIndxFactor_ > indicesAxis_) {
@@ -205,9 +206,9 @@ void MoeInplaceIndexAddDeterminsticTiling::DoOpTilingForDeterminstic()
         restSize = static_cast<int64_t>(-1);
         while (restSize <= 0) {
             --ubVarFactor_;
-            int64_t occupy = ubQuantaIndxFactor_ * Ops::Base::CeilAlign(INT32_BYTES * afterAxis_, ubBlock) + 
-                        ubQuantaIndxFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock) + 
-                        ubQuantaIndxFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock);
+            int64_t occupy = ubQuantaIndxFactor_ * Ops::Base::CeilAlign(INT32_BYTES * afterAxis_, ubBlock) +
+                             ubQuantaIndxFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock) +
+                             ubQuantaIndxFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock);
             restSize = halfUbSize - occupy;
         }
         if (ubVarFactor_ > eachCoreVarCount_) {
@@ -226,14 +227,14 @@ void MoeInplaceIndexAddDeterminsticTiling::DoOpTilingForDeterminstic()
         while (restSize <= 0) {
             --ubVarOptiFactor_;
             int64_t occupy = Ops::Base::CeilAlign(ubQuantaIndxFactor_ * indicesTypeSize_, ubBlock) +
-                            ubQuantaIndxFactor_ * Ops::Base::CeilAlign(INT32_BYTES * afterAxis_, ubBlock) + 
-                            ubQuantaIndxFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock) + 
-                            ubQuantaIndxFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock);
+                             ubQuantaIndxFactor_ * Ops::Base::CeilAlign(INT32_BYTES * afterAxis_, ubBlock) +
+                             ubQuantaIndxFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock) +
+                             ubQuantaIndxFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock);
             restSize = halfUbSize - occupy;
         }
         if (ubVarOptiFactor_ > eachCoreVarCount_) {
             ubVarOptiFactor_ = eachCoreVarCount_;
-        }        
+        }
     }
 }
 
@@ -307,7 +308,8 @@ ge::graphStatus MoeInplaceIndexAddDeterminsticTiling::GetWorkspaceSize()
     if (isDeterminstic_ == 1 && isSplitPreAxis_ == 0 && isSplitAfterAxis_ == 0) {
         int64_t rCoutWsSize = preAxis_ * varInAxis_ * INT32_BYTES;
         int64_t rValueWsSize = varAxis_ * FP32_BYTES;
-        int64_t sumQuantaIntWsSize = varAxis_ * INT32_BYTES;;
+        int64_t sumQuantaIntWsSize = varAxis_ * INT32_BYTES;
+        ;
         int64_t sumWsSize = totalCoreNum_ * eachCoreIndexCount_ * afterAxis_ * FP32_BYTES;
         int64_t sumIdxWsSize = totalCoreNum_ * eachCoreIndexCount_ * indicesTypeSize_;
 
@@ -327,10 +329,10 @@ ge::graphStatus MoeInplaceIndexAddDeterminsticTiling::PostTiling()
     context_->SetBlockDim(usedCoreNum_);
     context_->SetScheduleMode(1);
     auto res = context_->SetLocalMemorySize(ubSize_);
-    MOE_OP_TILING_CHECK(
-        (res != ge::GRAPH_SUCCESS),
-        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "SetLocalMemorySize ubSize = %ld failed.", ubSize_),
-        return ge::GRAPH_FAILED);
+    MOE_OP_TILING_CHECK((res != ge::GRAPH_SUCCESS),
+                        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(),
+                                                            "SetLocalMemorySize ubSize = %ld failed.", ubSize_),
+                        return ge::GRAPH_FAILED);
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
     return ge::GRAPH_SUCCESS;
@@ -349,4 +351,4 @@ void MoeInplaceIndexAddDeterminsticTiling::DumpTilingInfo()
 }
 
 REGISTER_OPS_TILING_TEMPLATE(MoeInplaceIndexAdd, MoeInplaceIndexAddDeterminsticTiling, 100);
-}  // namespace optiling
+} // namespace optiling

@@ -27,7 +27,7 @@ constexpr uint32_t ASCEND910B_L2_SIZE = 33554432;
 constexpr uint32_t ASCEND910B_UB_SIZE = 262144;
 constexpr uint32_t ASCEND910B_L1_SIZE = 524288;
 
-void InitParsePlatformInfo(fe::PlatFormInfos &platformInfo)
+void InitParsePlatformInfo(fe::PlatFormInfos& platformInfo)
 {
     platformInfo.Init();
     map<string, string> socInfos;
@@ -57,7 +57,7 @@ constexpr size_t EMPTY_TENSOR_WORKSPACE = 16ULL * 1024ULL * 1024ULL;
 constexpr int64_t EXPERT_TOKENS_TYPE_COUNT = 1;
 constexpr int64_t EXPERT_TOKENS_TYPE_KEY_VALUE = 2;
 
-gert::StorageShape MakeShape(const std::vector<int64_t> &dims)
+gert::StorageShape MakeShape(const std::vector<int64_t>& dims)
 {
     switch (dims.size()) {
         case 0:
@@ -74,17 +74,17 @@ gert::StorageShape MakeShape(const std::vector<int64_t> &dims)
 }
 
 gert::TilingContextPara MakeExtendedTilingContextPara(
-    const std::vector<gert::TilingContextPara::TensorDescription> &inputs,
-    const std::vector<gert::TilingContextPara::TensorDescription> &outputs,
-    const std::vector<gert::TilingContextPara::OpAttr> &attrs, optiling::MoeInitRoutingV3CompileInfo *compileInfo)
+    const std::vector<gert::TilingContextPara::TensorDescription>& inputs,
+    const std::vector<gert::TilingContextPara::TensorDescription>& outputs,
+    const std::vector<gert::TilingContextPara::OpAttr>& attrs, optiling::MoeInitRoutingV3CompileInfo* compileInfo)
 {
     return gert::TilingContextPara("MoeInitRoutingV3", inputs, outputs, attrs, compileInfo);
 }
 
-void RunExtendedTilingCase(const gert::TilingContextPara &tilingContextPara,
+void RunExtendedTilingCase(const gert::TilingContextPara& tilingContextPara,
                            ge::graphStatus expectResult = ge::GRAPH_SUCCESS,
                            uint64_t expectTilingKey = SKIP_TILING_KEY_VALIDATION,
-                           const std::vector<size_t> &expectWorkspaces = {})
+                           const std::vector<size_t>& expectWorkspaces = {})
 {
     ExecuteTestCase(tilingContextPara, expectResult, expectTilingKey, "", expectWorkspaces);
 }
@@ -107,7 +107,7 @@ std::vector<int64_t> GetLargeColsExpertTokensShape(int64_t expertTokensNumType, 
 
 std::vector<gert::TilingContextPara::TensorDescription> BuildLargeColsInputs(
     int64_t n, int64_t h, int64_t k, ge::DataType xDataType,
-    const std::vector<gert::TilingContextPara::TensorDescription> &extraInputs)
+    const std::vector<gert::TilingContextPara::TensorDescription>& extraInputs)
 {
     std::vector<gert::TilingContextPara::TensorDescription> inputs;
     inputs.emplace_back(gert::StorageShape({n, h}, {n, h}), xDataType, ge::FORMAT_ND);
@@ -117,8 +117,8 @@ std::vector<gert::TilingContextPara::TensorDescription> BuildLargeColsInputs(
 }
 
 std::vector<gert::TilingContextPara::TensorDescription> BuildLargeColsOutputs(
-    int64_t totalLength, int64_t h, ge::DataType expandedXDtype, const std::vector<int64_t> &expertTokensShape,
-    const std::vector<gert::TilingContextPara::TensorDescription> &extraOutputs)
+    int64_t totalLength, int64_t h, ge::DataType expandedXDtype, const std::vector<int64_t>& expertTokensShape,
+    const std::vector<gert::TilingContextPara::TensorDescription>& extraOutputs)
 {
     std::vector<gert::TilingContextPara::TensorDescription> outputs;
     outputs.emplace_back(gert::StorageShape({totalLength, h}, {totalLength, h}), expandedXDtype, ge::FORMAT_ND);
@@ -132,7 +132,7 @@ std::vector<gert::TilingContextPara::TensorDescription> BuildLargeColsOutputs(
 std::vector<gert::TilingContextPara::OpAttr> BuildLargeColsAttrs(int64_t totalLength, int64_t dropPadMode,
                                                                  int64_t expertTokensNumType, bool expertTokensNumFlag,
                                                                  int64_t quantMode,
-                                                                 const std::vector<int64_t> &aciveExpertRange,
+                                                                 const std::vector<int64_t>& aciveExpertRange,
                                                                  int64_t rowIdxType)
 {
     return {
@@ -151,8 +151,8 @@ std::vector<gert::TilingContextPara::OpAttr> BuildLargeColsAttrs(int64_t totalLe
 void RunLargeColsCase(int64_t N, int64_t H, int64_t K, int64_t quantMode, int64_t dropPadMode,
                       int64_t expertTokensNumType, bool expertTokensNumFlag, ge::DataType xDataType,
                       std::vector<int64_t> aciveExpertRange, int64_t rowIdxType, uint64_t ubSize,
-                      const std::vector<gert::TilingContextPara::TensorDescription> &extraInputs,
-                      const std::vector<gert::TilingContextPara::TensorDescription> &extraOutputs)
+                      const std::vector<gert::TilingContextPara::TensorDescription>& extraInputs,
+                      const std::vector<gert::TilingContextPara::TensorDescription>& extraOutputs)
 {
     optiling::MoeInitRoutingV3CompileInfo compileInfo = {40, ubSize};
     int64_t expertNum = EXPERT_NUM;

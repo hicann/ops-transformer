@@ -39,7 +39,9 @@ class FunctionUnpermuteApi(BaseApi):
 
         unpermuted_tokens = self.unpermuted_tokens
         unpermuted_tokens.index_copy_(0, sorted_indices, permuted_tokens)
-        unpermuted_tokens = unpermuted_tokens.reshape(-1, topk, permuted_tokens.size(-1))
+        unpermuted_tokens = unpermuted_tokens.reshape(
+            -1, topk, permuted_tokens.size(-1)
+        )
         unpermuted_tokens = unpermuted_tokens.sum(dim=1)
         return unpermuted_tokens.to(self.case_dtype)
 
@@ -48,17 +50,21 @@ class FunctionUnpermuteApi(BaseApi):
             device = f"{self.device}:{self.device_id}"
         else:
             device = "cpu"
-        sorted_indices = input_data.kwargs['sorted_indices']
+        sorted_indices = input_data.kwargs["sorted_indices"]
         permutedtokens = input_data.kwargs["permutedTokens"]
         probs = input_data.kwargs["probs"]
         self.case_dtype = permutedtokens.dtype
         OpsDataset.seed_everything()
-        sorted_indices_after = torch.randint(low=0, high=sorted_indices.shape[0],size=(probs.shape[0], probs.shape[1])).to(torch.int32)
+        sorted_indices_after = torch.randint(
+            low=0, high=sorted_indices.shape[0], size=(probs.shape[0], probs.shape[1])
+        ).to(torch.int32)
         if self.device == "npu":
             sorted_indices_after = sorted_indices_after.npu()
         sorted_indices_after = sorted_indices_after.to(device)
-        permuted_tokens, sorted_indices_tmp, origin_sorted_indices = self.mpermute(permutedtokens, sorted_indices_after)
-        input_data.kwargs['sorted_indices'] = sorted_indices_tmp.to(torch.int32)
+        permuted_tokens, sorted_indices_tmp, origin_sorted_indices = self.mpermute(
+            permutedtokens, sorted_indices_after
+        )
+        input_data.kwargs["sorted_indices"] = sorted_indices_tmp.to(torch.int32)
         input_data.kwargs["permutedTokens"] = permuted_tokens
         self.origin_sorted_indices = origin_sorted_indices.to(torch.int64)
         self.unpermuted_tokens = torch.zeros(
@@ -70,8 +76,9 @@ class FunctionUnpermuteApi(BaseApi):
         self.permuted_tokens = permuted_tokens.float()
         self.probs = probs.float()
 
-
-    def mpermute(self, tokens, indices, num_out_tokens: int = None, padded_mode: bool = False):
+    def mpermute(
+        self, tokens, indices, num_out_tokens: int = None, padded_mode: bool = False
+    ):
         device = tokens.device
         if indices.dim() == 1:
             topk = 1
@@ -91,11 +98,13 @@ class FunctionUnpermuteApi(BaseApi):
         permuted_tokens = tokens_tmp.index_select(0, s_k_tmp).to(device)
         return permuted_tokens, sorted_indices, orgin_sorted_indices
 
+
 @register("pyaclnn_aclnn_moe_token_unpermute_probs_none")
 class AclnnFunctionalMultiLabelMarginLossApi(AclnnBaseApi):
     def init_by_input_data(self, input_data: InputDataset):
         input_args, output_packages = super().init_by_input_data(input_data)
         # probs设置为空指针
         from atk.tasks.backends.lib_interface.acl_wrapper import TensorPtr
+
         input_args[2] = TensorPtr()
         return input_args, output_packages

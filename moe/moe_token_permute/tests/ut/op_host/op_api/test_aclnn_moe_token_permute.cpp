@@ -53,7 +53,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_fp16_int32
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -70,7 +70,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_fp32_int32
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -87,7 +87,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_bf16_int32
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -104,7 +104,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_fp16_int64
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -120,7 +120,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_tokens_nul
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(nullptr, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -136,7 +136,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_indices_nu
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, nullptr, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -152,7 +152,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_permute_to
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(nullptr, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -168,7 +168,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_sorted_ind
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -185,7 +185,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_padded_mod
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
 }
@@ -202,7 +202,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_indices_1d
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -219,7 +219,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_num_out_to
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -236,7 +236,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_int8_int32
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -253,7 +253,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_int8_int64
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
@@ -270,7 +270,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_int8_outpu
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
 }
@@ -287,7 +287,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_tokens_dty
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
 }
@@ -304,7 +304,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_indices_dt
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
 }
@@ -321,7 +321,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_sorted_ind
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
 }
@@ -338,7 +338,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_permute_to
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_PARAM_INVALID);
 }
@@ -354,7 +354,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_v2_mxfp8_e
     auto ut = OP_API_UT(aclnnMoeTokenPermuteV2, INPUT(tokens, indices, 6, false, 2),
                         OUTPUT(permuteTokensOut, sortedIndicesOut, expandedScaleOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     EXPECT_EQ(ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor), ACLNN_SUCCESS);
 }
 
@@ -369,7 +369,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_v2_int8_un
     auto ut = OP_API_UT(aclnnMoeTokenPermuteV2, INPUT(tokens, indices, 6, false, -1),
                         OUTPUT(permuteTokensOut, sortedIndicesOut, expandedScaleOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     EXPECT_EQ(ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor), ACLNN_SUCCESS);
 }
 
@@ -384,7 +384,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_v2_tokens_
     auto ut = OP_API_UT(aclnnMoeTokenPermuteV2, INPUT(tokens, indices, 6, false, -1),
                         OUTPUT(permuteTokensOut, sortedIndicesOut, expandedScaleOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     EXPECT_EQ(ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor), ACLNN_ERR_PARAM_INVALID);
 }
 
@@ -399,7 +399,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_v2_unquant
     auto ut = OP_API_UT(aclnnMoeTokenPermuteV2, INPUT(tokens, indices, 10, false, -1),
                         OUTPUT(permuteTokensOut, sortedIndicesOut, expandedScaleOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     EXPECT_EQ(ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor), ACLNN_SUCCESS);
 }
 
@@ -414,7 +414,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_v2_mxfp8_e
     auto ut = OP_API_UT(aclnnMoeTokenPermuteV2, INPUT(tokens, indices, 6, false, 3),
                         OUTPUT(permuteTokensOut, sortedIndicesOut, expandedScaleOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     EXPECT_EQ(ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor), ACLNN_SUCCESS);
 }
 
@@ -429,7 +429,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_v2_mxfp4_e
     auto ut = OP_API_UT(aclnnMoeTokenPermuteV2, INPUT(tokens, indices, 6, false, 9),
                         OUTPUT(permuteTokensOut, sortedIndicesOut, expandedScaleOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     EXPECT_EQ(ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor), ACLNN_SUCCESS);
 }
 
@@ -445,7 +445,7 @@ TEST_F(l2_moe_token_permute_regbase_test, Ascend950_moe_token_permute_execute)
     auto ut = OP_API_UT(aclnnMoeTokenPermute, INPUT(tokens, indices, numOutTokens, paddedMode),
                         OUTPUT(permuteTokensOut, sortedIndicesOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 

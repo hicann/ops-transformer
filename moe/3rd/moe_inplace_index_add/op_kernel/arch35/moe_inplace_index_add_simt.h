@@ -37,7 +37,7 @@ constexpr int64_t LEAST_DEAL_SIZE = 512;
 template <typename VAR_T, typename IDX_T, typename COMP_T, typename CAST_T, bool WITH_ALPHA, bool IS_CONTIGUOUS>
 class MoeInplaceIndexAddSimt {
 public:
-    __aicore__ inline MoeInplaceIndexAddSimt(const MoeInplaceIndexAddSimtTilingData &tilingData, TPipe &pipe)
+    __aicore__ inline MoeInplaceIndexAddSimt(const MoeInplaceIndexAddSimtTilingData& tilingData, TPipe& pipe)
         : td_(tilingData),
           pipe_(pipe){};
     __aicore__ inline void Init(GM_ADDR var, GM_ADDR indices, GM_ADDR updates, GM_ADDR alpha, GM_ADDR workspace);
@@ -50,9 +50,9 @@ public:
 private:
     static __simt_vf__ __aicore__ inline void SimtCompute(COMP_T varInAxis, COMP_T afterAxis, COMP_T updatesStride0,
                                                           COMP_T updatesAxis, COMP_T m0, COMP_T shift0, COMP_T m1,
-                                                          COMP_T shift1, __gm__ VAR_T *var, __gm__ IDX_T *indices,
-                                                          __gm__ VAR_T *updates, __gm__ VAR_T *alpha,
-                                                          __gm__ CAST_T *varWorkspaceGm, COMP_T blockIdx,
+                                                          COMP_T shift1, __gm__ VAR_T* var, __gm__ IDX_T* indices,
+                                                          __gm__ VAR_T* updates, __gm__ VAR_T* alpha,
+                                                          __gm__ CAST_T* varWorkspaceGm, COMP_T blockIdx,
                                                           COMP_T blockNum, COMP_T indicesStride);
 
 private:
@@ -63,9 +63,9 @@ private:
     GlobalTensor<CAST_T> varWorkspaceGm_;
     TQue<QuePosition::VECIN, DB_BUFFER> varQue_;
     TQue<QuePosition::VECIN, DB_BUFFER> varCastQue_;
-    TPipe &pipe_;
+    TPipe& pipe_;
 
-    const MoeInplaceIndexAddSimtTilingData &td_;
+    const MoeInplaceIndexAddSimtTilingData& td_;
     COMP_T blockIdx_;
     COMP_T blockNum_;
     int64_t normBlockData_{0};
@@ -80,13 +80,13 @@ __aicore__ inline void MoeInplaceIndexAddSimt<VAR_T, IDX_T, COMP_T, CAST_T, WITH
 {
     blockIdx_ = GetBlockIdx();
     blockNum_ = GetBlockNum();
-    var_.SetGlobalBuffer((__gm__ VAR_T *)(var));
-    indices_.SetGlobalBuffer((__gm__ IDX_T *)(indices));
-    updates_.SetGlobalBuffer((__gm__ VAR_T *)(updates));
-    alpha_.SetGlobalBuffer((__gm__ VAR_T *)(alpha));
+    var_.SetGlobalBuffer((__gm__ VAR_T*)(var));
+    indices_.SetGlobalBuffer((__gm__ IDX_T*)(indices));
+    updates_.SetGlobalBuffer((__gm__ VAR_T*)(updates));
+    alpha_.SetGlobalBuffer((__gm__ VAR_T*)(alpha));
     if constexpr (IsSameType<VAR_T, int8_t>::value || IsSameType<VAR_T, uint8_t>::value ||
                   IsSameType<VAR_T, int16_t>::value) {
-        varWorkspaceGm_.SetGlobalBuffer((__gm__ CAST_T *)workspace);
+        varWorkspaceGm_.SetGlobalBuffer((__gm__ CAST_T*)workspace);
 
         int64_t varAxis = td_.preAxis * td_.varInAxis * td_.afterAxis;
         normBlockData_ = Ops::Base::CeilDiv(varAxis, static_cast<int64_t>(blockNum_));
@@ -204,10 +204,10 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(USED_THREAD) inline void MoeInplaceIndexAddS
     VAR_T, IDX_T, COMP_T, CAST_T, WITH_ALPHA, IS_CONTIGUOUS>::SimtCompute(COMP_T varInAxis, COMP_T afterAxis,
                                                                           COMP_T updatesStride0, COMP_T updatesAxis,
                                                                           COMP_T m0, COMP_T shift0, COMP_T m1,
-                                                                          COMP_T shift1, __gm__ VAR_T *var,
-                                                                          __gm__ IDX_T *indices, __gm__ VAR_T *updates,
-                                                                          __gm__ VAR_T *alpha,
-                                                                          __gm__ CAST_T *varWorkspaceGm,
+                                                                          COMP_T shift1, __gm__ VAR_T* var,
+                                                                          __gm__ IDX_T* indices, __gm__ VAR_T* updates,
+                                                                          __gm__ VAR_T* alpha,
+                                                                          __gm__ CAST_T* varWorkspaceGm,
                                                                           COMP_T blockIdx, COMP_T blockNum,
                                                                           COMP_T indicesStride)
 {
@@ -279,9 +279,9 @@ __aicore__ inline void MoeInplaceIndexAddSimt<VAR_T, IDX_T, COMP_T, CAST_T, WITH
 
     asc_vf_call<MoeInplaceIndexAddSimt<VAR_T, IDX_T, COMP_T, CAST_T, WITH_ALPHA, IS_CONTIGUOUS>::SimtCompute>(
         dim3(USED_THREAD), varInAxis, afterAxis, updatesStride0, updatesAxis, m0, shift0, m1, shift1,
-        (__gm__ VAR_T *)(var_.GetPhyAddr()), (__gm__ IDX_T *)(indices_.GetPhyAddr()),
-        (__gm__ VAR_T *)(updates_.GetPhyAddr()), (__gm__ VAR_T *)(alpha_.GetPhyAddr()),
-        (__gm__ CAST_T *)(varWorkspaceGm_.GetPhyAddr()), blockIdx_, blockNum_, indicesStride);
+        (__gm__ VAR_T*)(var_.GetPhyAddr()), (__gm__ IDX_T*)(indices_.GetPhyAddr()),
+        (__gm__ VAR_T*)(updates_.GetPhyAddr()), (__gm__ VAR_T*)(alpha_.GetPhyAddr()),
+        (__gm__ CAST_T*)(varWorkspaceGm_.GetPhyAddr()), blockIdx_, blockNum_, indicesStride);
     if constexpr (IsSameType<VAR_T, int8_t>::value || IsSameType<VAR_T, uint8_t>::value ||
                   IsSameType<VAR_T, int16_t>::value) {
         SyncAll();

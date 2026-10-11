@@ -18,8 +18,7 @@
 #include "moe_inplace_index_add_tiling.h"
 #include "moe_inplace_index_add_simd_tiling.h"
 
-namespace optiling
-{
+namespace optiling {
 constexpr int64_t SIMD_DB_BUFFER = 2;
 constexpr int64_t SIZE_TWO = 2;
 constexpr int64_t ALIGN_SIZE = 32;
@@ -54,7 +53,7 @@ int64_t MoeInplaceIndexAddSimdTiling::GetIndicesAlignBlockSize(int64_t indicesFa
 int64_t MoeInplaceIndexAddSimdTiling::GetAfterAlignBlockSize(int64_t indicesFactor, int64_t afterFactor)
 {
     auto ubBlock = static_cast<int64_t>(Ops::Base::GetUbBlockSize(context_));
-    int64_t occupy = indicesFactor * Ops::Base::CeilAlign((varTypeSize_) * afterFactor, ubBlock);
+    int64_t occupy = indicesFactor * Ops::Base::CeilAlign((varTypeSize_)*afterFactor, ubBlock);
     return occupy;
 }
 
@@ -82,7 +81,7 @@ void MoeInplaceIndexAddSimdTiling::DoOpTilingSplitPre()
         ubIndexFactor_ += 1;
         while (restSize <= 0) {
             --ubIndexFactor_;
-            restSize = halfUbSize - (GetIndicesAlignBlockSize(ubIndexFactor_) + 
+            restSize = halfUbSize - (GetIndicesAlignBlockSize(ubIndexFactor_) +
                                      GetAfterAlignBlockSize(ubIndexFactor_, afterAxisFactor_));
         }
         ubIndexFactor_ = ubIndexFactor_ == 0 ? 1 : ubIndexFactor_;
@@ -133,7 +132,7 @@ void MoeInplaceIndexAddSimdTiling::DoOpTilingSplitIndices()
         ubIndexFactor_ += 1;
         while (restSize <= 0) {
             --ubIndexFactor_;
-            restSize = halfUbSize - (GetIndicesAlignBlockSize(ubIndexFactor_) + 
+            restSize = halfUbSize - (GetIndicesAlignBlockSize(ubIndexFactor_) +
                                      GetAfterAlignBlockSize(ubIndexFactor_, afterAxisFactor_));
         }
         ubIndexFactor_ = ubIndexFactor_ > eachCoreIndexCount_ ? eachCoreIndexCount_ : ubIndexFactor_;
@@ -164,10 +163,11 @@ void MoeInplaceIndexAddSimdTiling::DoOpTilingSplitAfter()
     usedCoreNumBefore_ = Ops::Base::CeilDiv(afterAxis_, eachCoreAfterAxisCount_);
     tailCoreAfterAxisCount_ = afterAxis_ - eachCoreAfterAxisCount_ * (usedCoreNumBefore_ - 1);
     auto transTypeSize = ge::GetSizeByDataType(ge::DT_INT32);
-    if (eachCoreAfterAxisCount_ * (varTypeSize_ + transTypeSize)> (halfUbSize - INDICES_MIN_BLOCK_SIZE)) {
+    if (eachCoreAfterAxisCount_ * (varTypeSize_ + transTypeSize) > (halfUbSize - INDICES_MIN_BLOCK_SIZE)) {
         int64_t indicesUbSize = std::min(INDICES_MIN_BLOCK_SIZE, indicesAxis_ * indicesTypeSize_);
         ubIndexFactor_ = Ops::Base::CeilAlign(indicesUbSize, ALIGN_SIZE) / indicesTypeSize_;
-        afterAxisFactor_ = (halfUbSize - ubIndexFactor_ * indicesTypeSize_) / (ubIndexFactor_ * (varTypeSize_ + transTypeSize));
+        afterAxisFactor_ =
+            (halfUbSize - ubIndexFactor_ * indicesTypeSize_) / (ubIndexFactor_ * (varTypeSize_ + transTypeSize));
         afterAxisFactor_ = Ops::Base::FloorAlign(afterAxisFactor_, alignNum);
     } else {
         afterAxisFactor_ = Ops::Base::CeilAlign(eachCoreAfterAxisCount_, alignNum);
@@ -185,7 +185,7 @@ void MoeInplaceIndexAddSimdTiling::DoOpTilingSplitAfter()
     updateTailNum_ = eachCoreAfterAxisCount_ - (updateLoopSize_ - 1) * afterAxisFactor_;
 
     /* 尾核循环次数 */
-    tailUpdateLoopSize_ =  Ops::Base::CeilDiv(tailCoreAfterAxisCount_, afterAxisFactor_);
+    tailUpdateLoopSize_ = Ops::Base::CeilDiv(tailCoreAfterAxisCount_, afterAxisFactor_);
     /* 尾核尾loop处理afterAxis大小 */
     tailUpdateAxisNum_ = tailCoreAfterAxisCount_ - (tailUpdateLoopSize_ - 1) * afterAxisFactor_;
     isSplitAfterAxis_ = 1;
@@ -237,10 +237,10 @@ ge::graphStatus MoeInplaceIndexAddSimdTiling::PostTiling()
     auto res = context_->SetLocalMemorySize(ubSize_);
     tilingKey_ = GetTilingKey();
     workspaces[0] = workspaceSize_;
-    MOE_OP_TILING_CHECK(
-        (res != ge::GRAPH_SUCCESS),
-        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(), "SetLocalMemorySize ubSize = %ld failed.", ubSize_),
-        return ge::GRAPH_FAILED);
+    MOE_OP_TILING_CHECK((res != ge::GRAPH_SUCCESS),
+                        MOE_VECTOR_INNER_ERR_REPORT_TILIING(context_->GetNodeName(),
+                                                            "SetLocalMemorySize ubSize = %ld failed.", ubSize_),
+                        return ge::GRAPH_FAILED);
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
     return ge::GRAPH_SUCCESS;
@@ -294,4 +294,4 @@ void MoeInplaceIndexAddSimdTiling::SetTilingData()
 }
 
 REGISTER_OPS_TILING_TEMPLATE(MoeInplaceIndexAdd, MoeInplaceIndexAddSimdTiling, 2);
-}  // namespace optiling
+} // namespace optiling

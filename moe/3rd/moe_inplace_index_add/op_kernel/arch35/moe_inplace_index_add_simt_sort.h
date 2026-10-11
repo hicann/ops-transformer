@@ -90,7 +90,7 @@ template <typename VAR_T, typename IDX_T, typename COMP_T, bool WITH_ALPHA, bool
 class MoeInplaceIndexAddSimtSort : MoeInplaceIndexAddBase<VAR_T, IDX_T, CAST_MODE> {
 public:
     using CAST_T = typename MoeInplaceIndexAddBase<VAR_T, IDX_T, CAST_MODE>::CAST_T;
-    __aicore__ inline MoeInplaceIndexAddSimtSort(const MoeInplaceIndexAddSimtSortTilingData &tilingData, TPipe &pipe)
+    __aicore__ inline MoeInplaceIndexAddSimtSort(const MoeInplaceIndexAddSimtSortTilingData& tilingData, TPipe& pipe)
         : td_(tilingData),
           pipe_(pipe){};
     __aicore__ inline void Init(GM_ADDR var, GM_ADDR indices, GM_ADDR updates, GM_ADDR alpha, GM_ADDR workspace);
@@ -105,9 +105,9 @@ private:
     static __simt_vf__ __aicore__ inline void SimtComputeNoSort(COMP_T varInAxis, uint32_t afterAxis, COMP_T preAxis,
                                                                 COMP_T updatesInAxis, COMP_T indicesOffset,
                                                                 uint32_t indicesCount,
-                                                                __local_mem__ IDX_T *indicesLocalAddr,
-                                                                __gm__ VAR_T *varAddr, __gm__ VAR_T *updatesAddr,
-                                                                __gm__ VAR_T *alpha, uint32_t m1, uint32_t shift1);
+                                                                __local_mem__ IDX_T* indicesLocalAddr,
+                                                                __gm__ VAR_T* varAddr, __gm__ VAR_T* updatesAddr,
+                                                                __gm__ VAR_T* alpha, uint32_t m1, uint32_t shift1);
 
 private:
     GlobalTensor<VAR_T> var_;
@@ -123,8 +123,8 @@ private:
     TBuf<QuePosition::VECCALC> uniqueIdCountQue_;
     TBuf<QuePosition::VECCALC> sharedTmpBuf_;
     TBuf<QuePosition::VECCALC> hashBuffer_;
-    TPipe &pipe_;
-    const MoeInplaceIndexAddSimtSortTilingData &td_;
+    TPipe& pipe_;
+    const MoeInplaceIndexAddSimtSortTilingData& td_;
 
     COMP_T blockIdx_;
     COMP_T blockNum_;
@@ -141,10 +141,10 @@ __aicore__ inline void MoeInplaceIndexAddSimtSort<VAR_T, IDX_T, COMP_T, WITH_ALP
     GM_ADDR var, GM_ADDR indices, GM_ADDR updates, GM_ADDR alpha, GM_ADDR workspace)
 {
     blockIdx_ = GetBlockIdx();
-    var_.SetGlobalBuffer((__gm__ VAR_T *)(var));
-    indices_.SetGlobalBuffer((__gm__ IDX_T *)(indices));
-    updates_.SetGlobalBuffer((__gm__ VAR_T *)(updates));
-    alpha_.SetGlobalBuffer((__gm__ VAR_T *)(alpha));
+    var_.SetGlobalBuffer((__gm__ VAR_T*)(var));
+    indices_.SetGlobalBuffer((__gm__ IDX_T*)(indices));
+    updates_.SetGlobalBuffer((__gm__ VAR_T*)(updates));
+    alpha_.SetGlobalBuffer((__gm__ VAR_T*)(alpha));
 
     pipe_.InitBuffer(indicesInQueue_, 1, Ops::Base::CeilAlign(td_.indicesUbFactor * sizeof(IDX_T), UB_AGLIN_VALUE));
     pipe_.InitBuffer(updatesInQueue_, 1,
@@ -207,9 +207,9 @@ __aicore__ inline void MoeInplaceIndexAddSimtSort<VAR_T, IDX_T, COMP_T, WITH_ALP
 template <typename VAR_T, typename IDX_T, typename COMP_T, bool WITH_ALPHA, bool IS_CONTIGUOUS, uint32_t CAST_MODE>
 __simt_vf__ __aicore__ LAUNCH_BOUND(USED_THREAD_SORT) inline void SimtCompute(
     COMP_T varInAxis, uint32_t afterAxis, uint32_t uniqueIdNum, uint32_t updatesPreNum, uint32_t updatesStride,
-    int64_t preIdx, __local_mem__ IDX_T *sortedAddr, __local_mem__ uint32_t *updatesOriginIdxAddr,
-    __local_mem__ int32_t *uniqueIdCountAddr, __local_mem__ VAR_T *updatesLocalAddr, __gm__ VAR_T *varAddr,
-    __gm__ VAR_T *alpha, uint32_t m0, uint32_t shift0)
+    int64_t preIdx, __local_mem__ IDX_T* sortedAddr, __local_mem__ uint32_t* updatesOriginIdxAddr,
+    __local_mem__ int32_t* uniqueIdCountAddr, __local_mem__ VAR_T* updatesLocalAddr, __gm__ VAR_T* varAddr,
+    __gm__ VAR_T* alpha, uint32_t m0, uint32_t shift0)
 {
     COMP_T varStride = varInAxis * afterAxis;
     VAR_T alphaValue = 1;
@@ -267,8 +267,8 @@ template <typename VAR_T, typename IDX_T, typename COMP_T, bool WITH_ALPHA, bool
 __simt_vf__ __aicore__ LAUNCH_BOUND(USED_THREAD_SORT) inline void MoeInplaceIndexAddSimtSort<
     VAR_T, IDX_T, COMP_T, WITH_ALPHA, IS_CONTIGUOUS,
     CAST_MODE>::SimtComputeNoSort(COMP_T varInAxis, uint32_t afterAxis, COMP_T preAxis, COMP_T updatesInAxis,
-                                  COMP_T indicesOffset, uint32_t indicesCount, __local_mem__ IDX_T *indicesLocalAddr,
-                                  __gm__ VAR_T *varAddr, __gm__ VAR_T *updatesAddr, __gm__ VAR_T *alpha, uint32_t m1,
+                                  COMP_T indicesOffset, uint32_t indicesCount, __local_mem__ IDX_T* indicesLocalAddr,
+                                  __gm__ VAR_T* varAddr, __gm__ VAR_T* updatesAddr, __gm__ VAR_T* alpha, uint32_t m1,
                                   uint32_t shift1)
 {
     COMP_T varStride = varInAxis * afterAxis;
@@ -335,10 +335,10 @@ __aicore__ inline void MoeInplaceIndexAddSimtSort<VAR_T, IDX_T, COMP_T, WITH_ALP
     LocalTensor<int32_t> uniqueIdCountLocal = uniqueIdCountQue_.Get<int32_t>();
     LocalTensor<uint8_t> sharedTmpBuffer = sharedTmpBuf_.Get<uint8_t>();
 
-    __local_mem__ CAST_T *indicesSortedPtr = (__local_mem__ CAST_T *)(indicesSortedLocal.GetPhyAddr()) + shiftOffset_;
-    __local_mem__ VAR_T *updatesLocalPtr = (__local_mem__ VAR_T *)(updatesLocal.GetPhyAddr());
-    __local_mem__ uint32_t *updatesOriginIdxPtr = (__local_mem__ uint32_t *)(updatesOriginIdxLocal.GetPhyAddr());
-    __local_mem__ int32_t *uniqueIdCountPtr = (__local_mem__ int32_t *)(uniqueIdCountLocal.GetPhyAddr());
+    __local_mem__ CAST_T* indicesSortedPtr = (__local_mem__ CAST_T*)(indicesSortedLocal.GetPhyAddr()) + shiftOffset_;
+    __local_mem__ VAR_T* updatesLocalPtr = (__local_mem__ VAR_T*)(updatesLocal.GetPhyAddr());
+    __local_mem__ uint32_t* updatesOriginIdxPtr = (__local_mem__ uint32_t*)(updatesOriginIdxLocal.GetPhyAddr());
+    __local_mem__ int32_t* uniqueIdCountPtr = (__local_mem__ int32_t*)(uniqueIdCountLocal.GetPhyAddr());
 
     uint32_t m0 = 1;
     uint32_t shift0 = 1;
@@ -350,8 +350,8 @@ __aicore__ inline void MoeInplaceIndexAddSimtSort<VAR_T, IDX_T, COMP_T, WITH_ALP
 
     asc_vf_call<SimtCompute<VAR_T, CAST_T, COMP_T, WITH_ALPHA, IS_CONTIGUOUS, CAST_MODE>>(
         dim3({afterAxis, threadBlock}), varInAxis, afterAxis, uniqueIdNum, updatesPreNum, updatesLocalStride, preIdx,
-        indicesSortedPtr, updatesOriginIdxPtr, uniqueIdCountPtr, updatesLocalPtr, (__gm__ VAR_T *)(var_.GetPhyAddr()),
-        (__gm__ VAR_T *)(alpha_.GetPhyAddr()), m0, shift0);
+        indicesSortedPtr, updatesOriginIdxPtr, uniqueIdCountPtr, updatesLocalPtr, (__gm__ VAR_T*)(var_.GetPhyAddr()),
+        (__gm__ VAR_T*)(alpha_.GetPhyAddr()), m0, shift0);
 
     updatesInQueue_.FreeTensor(updatesLocal);
 }
@@ -367,7 +367,7 @@ __aicore__ inline void MoeInplaceIndexAddSimtSort<VAR_T, IDX_T, COMP_T, WITH_ALP
     COMP_T updatesInAxis = td_.updatesInAxis;
     COMP_T indicesOffset = loopIdx * td_.indicesUbFactor + blockIdx_ * td_.eachCoreIndexCount;
 
-    __local_mem__ IDX_T *indicesLocalPtr = (__local_mem__ IDX_T *)(indicesLocal.GetPhyAddr());
+    __local_mem__ IDX_T* indicesLocalPtr = (__local_mem__ IDX_T*)(indicesLocal.GetPhyAddr());
 
     uint32_t m1 = 1;
     uint32_t shift1 = 1;
@@ -381,8 +381,8 @@ __aicore__ inline void MoeInplaceIndexAddSimtSort<VAR_T, IDX_T, COMP_T, WITH_ALP
     asc_vf_call<
         MoeInplaceIndexAddSimtSort<VAR_T, IDX_T, COMP_T, WITH_ALPHA, IS_CONTIGUOUS, CAST_MODE>::SimtComputeNoSort>(
         dim3({afterAxis, threadBlock}), varInAxis, afterAxis, preAxis, updatesInAxis, indicesOffset, indicesCount,
-        indicesLocalPtr, (__gm__ VAR_T *)(var_.GetPhyAddr()), (__gm__ VAR_T *)(updates_.GetPhyAddr()),
-        (__gm__ VAR_T *)(alpha_.GetPhyAddr()), m1, shift1);
+        indicesLocalPtr, (__gm__ VAR_T*)(var_.GetPhyAddr()), (__gm__ VAR_T*)(updates_.GetPhyAddr()),
+        (__gm__ VAR_T*)(alpha_.GetPhyAddr()), m1, shift1);
 }
 
 template <typename VAR_T, typename IDX_T, typename COMP_T, bool WITH_ALPHA, bool IS_CONTIGUOUS, uint32_t CAST_MODE>

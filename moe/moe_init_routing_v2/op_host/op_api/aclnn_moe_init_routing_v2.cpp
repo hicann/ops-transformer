@@ -41,10 +41,10 @@ static const std::initializer_list<op::DataType> MOE_INIT_ROUTING_V2_DTYPE_SUPPO
     DataType::DT_INT32, DataType::DT_INT64};
 static const std::initializer_list<op::DataType> MOE_INIT_ROUTING_V2_DTYPE_SUPPORT_LIST_ROW_IDX = {DataType::DT_INT32};
 
-static inline bool CheckNotNull(const aclTensor *x, const aclTensor *expertIdx, const aclTensor *expandedXOut,
-                                const aclTensor *expandedRowIdxOut,
-                                const aclTensor *expertTokensCountOrCumsumOutOptional,
-                                const aclTensor *expertTokensBeforeCapacityOutOptional)
+static inline bool CheckNotNull(const aclTensor* x, const aclTensor* expertIdx, const aclTensor* expandedXOut,
+                                const aclTensor* expandedRowIdxOut,
+                                const aclTensor* expertTokensCountOrCumsumOutOptional,
+                                const aclTensor* expertTokensBeforeCapacityOutOptional)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(expertIdx, return false);
@@ -53,10 +53,10 @@ static inline bool CheckNotNull(const aclTensor *x, const aclTensor *expertIdx, 
     return true;
 }
 
-static inline bool CheckDtypeValid(const aclTensor *x, const aclTensor *expertIdx, const aclTensor *expandedXOut,
-                                   const aclTensor *expandedRowIdxOut,
-                                   const aclTensor *expertTokensCountOrCumsumOutOptional,
-                                   const aclTensor *expertTokensBeforeCapacityOutOptional)
+static inline bool CheckDtypeValid(const aclTensor* x, const aclTensor* expertIdx, const aclTensor* expandedXOut,
+                                   const aclTensor* expandedRowIdxOut,
+                                   const aclTensor* expertTokensCountOrCumsumOutOptional,
+                                   const aclTensor* expertTokensBeforeCapacityOutOptional)
 {
     if (x != nullptr && x->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(x, MOE_INIT_ROUTING_V2_DTYPE_SUPPORT_LIST_X, return false);
@@ -84,10 +84,10 @@ static inline bool CheckDtypeValid(const aclTensor *x, const aclTensor *expertId
     return true;
 }
 
-static inline bool CheckDtypeValid310P(const aclTensor *x, const aclTensor *expertIdx, const aclTensor *expandedXOut,
-                                       const aclTensor *expandedRowIdxOut,
-                                       const aclTensor *expertTokensCountOrCumsumOutOptional,
-                                       const aclTensor *expertTokensBeforeCapacityOutOptional)
+static inline bool CheckDtypeValid310P(const aclTensor* x, const aclTensor* expertIdx, const aclTensor* expandedXOut,
+                                       const aclTensor* expandedRowIdxOut,
+                                       const aclTensor* expertTokensCountOrCumsumOutOptional,
+                                       const aclTensor* expertTokensBeforeCapacityOutOptional)
 {
     if (x != nullptr && x->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(x, MOE_INIT_ROUTING_V2_DTYPE_SUPPORT_LIST_X_310P, return false);
@@ -115,10 +115,10 @@ static inline bool CheckDtypeValid310P(const aclTensor *x, const aclTensor *expe
     return true;
 }
 
-static inline bool CheckDtypeValidRegbase(const aclTensor *x, const aclTensor *expertIdx, const aclTensor *expandedXOut,
-                                          const aclTensor *expandedRowIdxOut,
-                                          const aclTensor *expertTokensCountOrCumsumOutOptional,
-                                          const aclTensor *expertTokensBeforeCapacityOutOptional)
+static inline bool CheckDtypeValidRegbase(const aclTensor* x, const aclTensor* expertIdx, const aclTensor* expandedXOut,
+                                          const aclTensor* expandedRowIdxOut,
+                                          const aclTensor* expertTokensCountOrCumsumOutOptional,
+                                          const aclTensor* expertTokensBeforeCapacityOutOptional)
 {
     if (x != nullptr && x->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(x, MOE_INIT_ROUTING_V2_DTYPE_SUPPORT_LIST_X, return false);
@@ -146,10 +146,10 @@ static inline bool CheckDtypeValidRegbase(const aclTensor *x, const aclTensor *e
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *expertIdx, const aclTensor *expandedXOut,
-                               const aclTensor *expandedRowIdxOut,
-                               const aclTensor *expertTokensCountOrCumsumOutOptional,
-                               const aclTensor *expertTokensBeforeCapacityOutOptional)
+static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* expertIdx, const aclTensor* expandedXOut,
+                               const aclTensor* expandedRowIdxOut,
+                               const aclTensor* expertTokensCountOrCumsumOutOptional,
+                               const aclTensor* expertTokensBeforeCapacityOutOptional)
 {
     CHECK_RET(CheckNotNull(x, expertIdx, expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOutOptional,
                            expertTokensBeforeCapacityOutOptional),
@@ -160,10 +160,10 @@ static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *expertIdx, c
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckParams310P(const aclTensor *x, const aclTensor *expertIdx, const aclTensor *expandedXOut,
-                                   const aclTensor *expandedRowIdxOut,
-                                   const aclTensor *expertTokensCountOrCumsumOutOptional,
-                                   const aclTensor *expertTokensBeforeCapacityOutOptional)
+static aclnnStatus CheckParams310P(const aclTensor* x, const aclTensor* expertIdx, const aclTensor* expandedXOut,
+                                   const aclTensor* expandedRowIdxOut,
+                                   const aclTensor* expertTokensCountOrCumsumOutOptional,
+                                   const aclTensor* expertTokensBeforeCapacityOutOptional)
 {
     CHECK_RET(CheckNotNull(x, expertIdx, expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOutOptional,
                            expertTokensBeforeCapacityOutOptional),
@@ -174,10 +174,10 @@ static aclnnStatus CheckParams310P(const aclTensor *x, const aclTensor *expertId
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckParamsRegbase(const aclTensor *x, const aclTensor *expertIdx, const aclTensor *expandedXOut,
-                                      const aclTensor *expandedRowIdxOut,
-                                      const aclTensor *expertTokensCountOrCumsumOutOptional,
-                                      const aclTensor *expertTokensBeforeCapacityOutOptional)
+static aclnnStatus CheckParamsRegbase(const aclTensor* x, const aclTensor* expertIdx, const aclTensor* expandedXOut,
+                                      const aclTensor* expandedRowIdxOut,
+                                      const aclTensor* expertTokensCountOrCumsumOutOptional,
+                                      const aclTensor* expertTokensBeforeCapacityOutOptional)
 {
     CHECK_RET(CheckNotNull(x, expertIdx, expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOutOptional,
                            expertTokensBeforeCapacityOutOptional),
@@ -195,19 +195,19 @@ extern "C" {
 #endif
 
 ACLNN_API aclnnStatus aclnnMoeInitRoutingV2GetWorkspaceSize(
-    const aclTensor *x, const aclTensor *expertIdx, int64_t activeNumOptional, int64_t expertCapacityOptional,
+    const aclTensor* x, const aclTensor* expertIdx, int64_t activeNumOptional, int64_t expertCapacityOptional,
     int64_t expertNumOptional, int64_t dropPadModeOptional, int64_t expertTokensCountOrCumsumFlagOptional,
-    bool expertTokensBeforeCapacityFlagOptional, const aclTensor *expandedXOut, const aclTensor *expandedRowIdxOut,
-    const aclTensor *expertTokensCountOrCumsumOutOptional, const aclTensor *expertTokensBeforeCapacityOutOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    bool expertTokensBeforeCapacityFlagOptional, const aclTensor* expandedXOut, const aclTensor* expandedRowIdxOut,
+    const aclTensor* expertTokensCountOrCumsumOutOptional, const aclTensor* expertTokensBeforeCapacityOutOptional,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
-    L2_DFX_PHASE_1(aclnnMoeInitRoutingV2,
-        DFX_IN(x, expertIdx, activeNumOptional, expertCapacityOptional,
-                            expertNumOptional, dropPadModeOptional, expertTokensCountOrCumsumFlagOptional,
-                          expertTokensBeforeCapacityFlagOptional),
-                   DFX_OUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOutOptional,
-                           expertTokensBeforeCapacityOutOptional));
+    L2_DFX_PHASE_1(
+        aclnnMoeInitRoutingV2,
+        DFX_IN(x, expertIdx, activeNumOptional, expertCapacityOptional, expertNumOptional, dropPadModeOptional,
+               expertTokensCountOrCumsumFlagOptional, expertTokensBeforeCapacityFlagOptional),
+        DFX_OUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOutOptional,
+                expertTokensBeforeCapacityOutOptional));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -236,11 +236,11 @@ ACLNN_API aclnnStatus aclnnMoeInitRoutingV2GetWorkspaceSize(
     CHECK_RET(expertIdxContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     // 调用l0接口进行计算，传入输出参数
-    auto result = l0op::MoeInitRoutingV2(xContiguous, expertIdxContiguous, activeNumOptional,
-                                         expertCapacityOptional, expertNumOptional, dropPadModeOptional,
-                                         expertTokensCountOrCumsumFlagOptional, expertTokensBeforeCapacityFlagOptional,
-                                         expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOutOptional,
-                                         expertTokensBeforeCapacityOutOptional, uniqueExecutor.get());
+    auto result = l0op::MoeInitRoutingV2(xContiguous, expertIdxContiguous, activeNumOptional, expertCapacityOptional,
+                                         expertNumOptional, dropPadModeOptional, expertTokensCountOrCumsumFlagOptional,
+                                         expertTokensBeforeCapacityFlagOptional, expandedXOut, expandedRowIdxOut,
+                                         expertTokensCountOrCumsumOutOptional, expertTokensBeforeCapacityOutOptional,
+                                         uniqueExecutor.get());
     auto [expandedXOut_, expandedRowIdxOut_, expertTokensCountOrCumsumOut_, expertTokensBeforeCapacityOut_] = result;
     bool hasNullptr = (expandedXOut_ == nullptr) || (expandedRowIdxOut_ == nullptr);
     CHECK_RET(hasNullptr != true, ACLNN_ERR_INNER_NULLPTR);
@@ -253,14 +253,14 @@ ACLNN_API aclnnStatus aclnnMoeInitRoutingV2GetWorkspaceSize(
 
     // 处理可选输出
     if (expertTokensCountOrCumsumOutOptional != nullptr && expertTokensCountOrCumsumOut_ != nullptr) {
-        auto viewCopyExpertTokensCountOrCumsumOutResult = l0op::ViewCopy(expertTokensCountOrCumsumOut_,
-            expertTokensCountOrCumsumOutOptional, uniqueExecutor.get());
+        auto viewCopyExpertTokensCountOrCumsumOutResult =
+            l0op::ViewCopy(expertTokensCountOrCumsumOut_, expertTokensCountOrCumsumOutOptional, uniqueExecutor.get());
         CHECK_RET(viewCopyExpertTokensCountOrCumsumOutResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
     if (expertTokensBeforeCapacityOutOptional != nullptr && expertTokensBeforeCapacityOut_ != nullptr) {
-        auto viewCopyExpertTokensBeforeCapacityOutResult = l0op::ViewCopy(expertTokensBeforeCapacityOut_,
-            expertTokensBeforeCapacityOutOptional, uniqueExecutor.get());
+        auto viewCopyExpertTokensBeforeCapacityOutResult =
+            l0op::ViewCopy(expertTokensBeforeCapacityOut_, expertTokensBeforeCapacityOutOptional, uniqueExecutor.get());
         CHECK_RET(viewCopyExpertTokensBeforeCapacityOutResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
@@ -270,7 +270,7 @@ ACLNN_API aclnnStatus aclnnMoeInitRoutingV2GetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-ACLNN_API aclnnStatus aclnnMoeInitRoutingV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMoeInitRoutingV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                             aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMoeInitRoutingV2);

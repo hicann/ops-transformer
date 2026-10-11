@@ -30,12 +30,11 @@ constexpr int64_t DIGIT_TWO = 2;
 constexpr int64_t DIGIT_TEN = 10;
 constexpr int64_t MIN_DATA_SIZE = 1024;
 constexpr int64_t DCACHE_SIZE = 32768;
-static const std::set<ge::DataType> SUPPORT_DTYPE = {
-    ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_DOUBLE, ge::DT_UINT8, ge::DT_INT8,
-    ge::DT_INT16, ge::DT_INT32, ge::DT_INT64, ge::DT_BOOL, ge::DT_BF16
-};
+static const std::set<ge::DataType> SUPPORT_DTYPE = {ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_DOUBLE, ge::DT_UINT8,
+                                                     ge::DT_INT8,  ge::DT_INT16,   ge::DT_INT32,  ge::DT_INT64,
+                                                     ge::DT_BOOL,  ge::DT_BF16};
 
-inline static bool IsSupportDtype(const std::set<ge::DataType> &supportDtype, const ge::DataType dtype)
+inline static bool IsSupportDtype(const std::set<ge::DataType>& supportDtype, const ge::DataType dtype)
 {
     return (supportDtype.count(dtype) != 0);
 }
@@ -66,8 +65,9 @@ ge::graphStatus MoeMaskedScatterTiling::CheckDataType()
     auto inputMaskPtr = context_->GetRequiredInputDesc(INPUT_MASK_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, inputMaskPtr);
     auto maskDtype = inputMaskPtr->GetDataType();
-    OP_CHECK_IF(maskDtype != ge::DT_BOOL, OP_LOGE(context_->GetNodeName(),
-        "The dtype of mask only support bool currently, please check."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(maskDtype != ge::DT_BOOL,
+                OP_LOGE(context_->GetNodeName(), "The dtype of mask only support bool currently, please check."),
+                return ge::GRAPH_FAILED);
     auto inputUpdatesPtr = context_->GetRequiredInputDesc(INPUT_UPDATES_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, inputUpdatesPtr);
     auto updatesDtype = inputUpdatesPtr->GetDataType();
@@ -75,14 +75,17 @@ ge::graphStatus MoeMaskedScatterTiling::CheckDataType()
     OP_CHECK_NULL_WITH_CONTEXT(context_, outputYPtr);
     auto yDtype = outputYPtr->GetDataType();
     OP_CHECK_IF(dType_ != updatesDtype || dType_ != yDtype,
+                OP_LOGE(context_->GetNodeName(), "The x, updates and y must have the same dtype, please check."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        !IsSupportDtype(SUPPORT_DTYPE, dType_),
         OP_LOGE(context_->GetNodeName(),
-        "The x, updates and y must have the same dtype, please check."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!IsSupportDtype(SUPPORT_DTYPE, dType_), OP_LOGE(context_->GetNodeName(),
-        "The dtype only support float32, float16, double, uint8, int8, int16, int32, int64, bool, bfloat16 \
-currently, please check."), return ge::GRAPH_FAILED);
+                "The dtype only support float32, float16, double, uint8, int8, int16, int32, int64, bool, bfloat16 \
+currently, please check."),
+        return ge::GRAPH_FAILED);
     dataTypeSize_ = ge::GetSizeByDataType(dType_);
-    OP_CHECK_IF(dataTypeSize_ == -1, OP_LOGE(context_->GetNodeName(),
-        "Get the size of dtype failed, please check."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(dataTypeSize_ == -1, OP_LOGE(context_->GetNodeName(), "Get the size of dtype failed, please check."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -101,8 +104,9 @@ ge::graphStatus MoeMaskedScatterTiling::CheckOutputShape()
     auto yShapePtr = context_->GetOutputShape(OUTPUT_Y_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, yShapePtr);
     auto yShape = yShapePtr->GetStorageShape();
-    OP_CHECK_IF(xShape != maskShape || xShape != yShape, OP_LOGE(context_->GetNodeName(),
-        "The x, mask and y must have the same shape, please check."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(xShape != maskShape || xShape != yShape,
+                OP_LOGE(context_->GetNodeName(), "The x, mask and y must have the same shape, please check."),
+                return ge::GRAPH_FAILED);
     inputShape_ = xShape;
     return ge::GRAPH_SUCCESS;
 }
@@ -120,8 +124,8 @@ ge::graphStatus MoeMaskedScatterTiling::DoOpTiling()
 {
     xEleNums_ = inputShape_.GetShapeSize();
     isInt64Mask_ = xEleNums_ > INT32_MAX;
-    int64_t prefixSumDtypeSize = isInt64Mask_ ? static_cast<int64_t>(sizeof(int64_t)) :
-        static_cast<int64_t>(sizeof(int32_t));
+    int64_t prefixSumDtypeSize =
+        isInt64Mask_ ? static_cast<int64_t>(sizeof(int64_t)) : static_cast<int64_t>(sizeof(int32_t));
     int64_t maxUbAvailable = ubSize_ / (DOUBLE_BUFFER + DIGIT_TWO * prefixSumDtypeSize);
     normalCoreData_ = std::max(Ops::Base::CeilDiv(xEleNums_, totalCoreNum_), MIN_DATA_SIZE);
     usedCoreNum_ = Ops::Base::CeilDiv(xEleNums_, normalCoreData_);
@@ -158,8 +162,8 @@ uint64_t MoeMaskedScatterTiling::GetTilingKey() const
 
 ge::graphStatus MoeMaskedScatterTiling::GetWorkspaceSize()
 {
-    int64_t maskDataTypeSize = isInt64Mask_ ? static_cast<int64_t>(sizeof(int64_t)) :
-        static_cast<int64_t>(sizeof(int32_t));
+    int64_t maskDataTypeSize =
+        isInt64Mask_ ? static_cast<int64_t>(sizeof(int64_t)) : static_cast<int64_t>(sizeof(int32_t));
     workspaceSize_ = ASCENDC_TOOLS_WORKSPACE + usedCoreNum_ * maskDataTypeSize + xEleNums_ * maskDataTypeSize;
     return ge::GRAPH_SUCCESS;
 }
@@ -205,17 +209,19 @@ void MoeMaskedScatterTiling::DumpTilingInfo()
     OP_LOGI(context_->GetNodeName(), "%s", info.str().c_str());
 }
 
-static ge::graphStatus Tiling4MoeMaskedScatter(gert::TilingContext* context) {
+static ge::graphStatus Tiling4MoeMaskedScatter(gert::TilingContext* context)
+{
     MoeMaskedScatterTiling tiling(context);
     return tiling.DoTiling();
 }
 
-static ge::graphStatus TilingPrepare4MoeMaskedScatter(gert::TilingParseContext* context) {
-    (void) context;
+static ge::graphStatus TilingPrepare4MoeMaskedScatter(gert::TilingParseContext* context)
+{
+    (void)context;
     return ge::GRAPH_SUCCESS;
 }
 
 IMPL_OP_OPTILING(MoeMaskedScatter)
-  .Tiling(Tiling4MoeMaskedScatter)
-  .TilingParse<MoeMaskedScatterCompileInfo>(TilingPrepare4MoeMaskedScatter);
+    .Tiling(Tiling4MoeMaskedScatter)
+    .TilingParse<MoeMaskedScatterCompileInfo>(TilingPrepare4MoeMaskedScatter);
 } // namespace optiling

@@ -23,8 +23,7 @@ constexpr int64_t DOUBLE_BUFFER = 2;
 constexpr int64_t BINARY_ADD_CACHE_BUFFER_SIZE = 3 * 1024;
 constexpr int64_t BINARY_ADD_BUFFER_SIZE = 1024;
 
-class MoeFinalizeRoutingV2GradRegbaseSplitH : public MoeFinalizeRoutingV2GradTiling
-{
+class MoeFinalizeRoutingV2GradRegbaseSplitH : public MoeFinalizeRoutingV2GradTiling {
 public:
     explicit MoeFinalizeRoutingV2GradRegbaseSplitH(gert::TilingContext* context)
         : MoeFinalizeRoutingV2GradTiling(context)
@@ -96,8 +95,8 @@ ge::graphStatus MoeFinalizeRoutingV2GradRegbaseSplitH::PostTiling()
     splitHTilingData_.set_foldTailBlockNum(foldTailBlockNum_);
     SetBinaryAddParams(splitHTilingData_.mainBinAddParams, mainFactor_);
     SetBinaryAddParams(splitHTilingData_.foldBinAddParams, foldFactor_);
-    splitHTilingData_.SaveToBuffer(
-        context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
+    splitHTilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(),
+                                   context_->GetRawTilingData()->GetCapacity());
 
     context_->GetRawTilingData()->SetDataSize(splitHTilingData_.GetDataSize());
     context_->SetBlockDim(initOutNeedCoreNum_);
@@ -136,9 +135,8 @@ ge::graphStatus MoeFinalizeRoutingV2GradRegbaseSplitH::CalcTilingKey()
     // 预留1个block输出gradScale, UB间二分折叠预留3K, UB内的二分折叠预留1K空间
     int64_t reserverUbSize = BINARY_ADD_CACHE_BUFFER_SIZE + BINARY_ADD_BUFFER_SIZE + blockSize_;
     // foldFactor_ = mainFactor_  / 2, foldFactor_ 需要block对齐
-    mainFactor_ = Ops::Base::FloorDiv(
-                      (aicoreParams_.ubSize - reserverUbSize) / DOUBLE_BUFFER / bufferNum,
-                      static_cast<uint64_t>(blockSize_ * TWO)) *
+    mainFactor_ = Ops::Base::FloorDiv((aicoreParams_.ubSize - reserverUbSize) / DOUBLE_BUFFER / bufferNum,
+                                      static_cast<uint64_t>(blockSize_ * TWO)) *
                   (blockSize_ * TWO) / dtypeSize;
     int64_t blockNum = hidden_ / mainFactor_;
     mainBlockNum_ = blockNum <= 0 ? 1L : std::max(1L, (1L << (ULONG_BIT_LEN - 1 - __builtin_clzl(blockNum))));

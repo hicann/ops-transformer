@@ -31,10 +31,9 @@ static const int32_t MAX_COL_IN_UB = 8160; // ubSize/minTypeSize
 
 class MoeGatingTopKSoftmaxV2KFullLoadTiling : public MoeGatingTopKSoftmaxV2BaseTiling {
 public:
-    explicit MoeGatingTopKSoftmaxV2KFullLoadTiling(gert::TilingContext *context)
+    explicit MoeGatingTopKSoftmaxV2KFullLoadTiling(gert::TilingContext* context)
         : MoeGatingTopKSoftmaxV2BaseTiling(context)
-    {
-    }
+    {}
 
 protected:
     uint64_t GetTilingKey() const override;
@@ -134,7 +133,7 @@ ge::graphStatus MoeGatingTopKSoftmaxV2KFullLoadTiling::DoOpTiling()
     if (!CalculateParamInUb()) {
         std::string kStr = std::to_string(k);
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "k", kStr.c_str(),
-            "AutoTiling failed, the attr k is too large for non-renorm tiling");
+                                              "AutoTiling failed, the attr k is too large for non-renorm tiling");
         return ge::GRAPH_FAILED;
     }
     tilingData.set_ubLoop(ubLoop);
@@ -202,7 +201,7 @@ ge::graphStatus MoeGatingTopKSoftmaxV2KFullLoadTiling::PostTiling()
     tilingData.set_softmaxFlag(softmaxFlag);
     context_->SetTilingKey(GetTilingKey());
     context_->SetBlockDim(tilingData.get_blockNum());
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = workspaceSize_;
     tilingData.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());

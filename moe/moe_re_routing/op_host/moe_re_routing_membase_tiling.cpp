@@ -49,7 +49,10 @@ constexpr int64_t TILING_KEY_TOKENS_FP16_EXPERTS_INT64_SCALES_FLOAT32 = 100110;
 constexpr int64_t TILING_KEY_TOKENS_BF16_EXPERTS_INT32_SCALES_FLOAT32 = 100200;
 constexpr int64_t TILING_KEY_TOKENS_BF16_EXPERTS_INT64_SCALES_FLOAT32 = 100210;
 
-inline int64_t CeilDiv(int64_t N, int64_t n) { return ((((N) + (n)-1) / (n))); }
+inline int64_t CeilDiv(int64_t N, int64_t n)
+{
+    return ((((N) + (n)-1) / (n)));
+}
 
 static const std::map<std::pair<ge::DataType, ge::DataType>, int64_t> TILING_KEY_MAP = {
     {{ge::DT_INT8, ge::DT_INT32}, TILING_KEY_TOKENS_INT8_EXPERTS_INT32_SCALES_FLOAT32},
@@ -60,9 +63,9 @@ static const std::map<std::pair<ge::DataType, ge::DataType>, int64_t> TILING_KEY
     {{ge::DT_BF16, ge::DT_INT64}, TILING_KEY_TOKENS_BF16_EXPERTS_INT64_SCALES_FLOAT32},
 };
 
-static std::tuple<int64_t, int64_t> GetShapeTuple(const gert::TilingContext *context, const int64_t index = 0)
+static std::tuple<int64_t, int64_t> GetShapeTuple(const gert::TilingContext* context, const int64_t index = 0)
 {
-    const gert::StorageShape *shapePtr = context->GetInputShape(index);
+    const gert::StorageShape* shapePtr = context->GetInputShape(index);
     OP_CHECK_IF(shapePtr == nullptr, OP_LOGE(context->GetNodeName(), "Shape is nullptr."),
                 return std::make_tuple(0, 0));
     // check shape length is DIM_SIZE
@@ -76,7 +79,7 @@ ge::graphStatus MoeReRoutingTiling::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const MoeReRoutingCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const MoeReRoutingCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_->GetNodeName(), "CompileInfo is nullptr."),
                     return ge::GRAPH_FAILED);
         coreNum_ = compileInfoPtr->coreNum;
@@ -86,7 +89,7 @@ ge::graphStatus MoeReRoutingTiling::GetPlatformInfo()
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
         coreNum_ = ascendcPlatform.GetCoreNumAiv();
         int64_t ubSize = 0;
-        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ((uint64_t &)ubSize));
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ((uint64_t&)ubSize));
         ubSize_ = ubSize;
         socVersion_ = ascendcPlatform.GetSocVersion();
     }
@@ -140,7 +143,10 @@ ge::graphStatus MoeReRoutingTiling::GetShapeAttrsInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-bool MoeReRoutingTiling::IsCapable() { return true; }
+bool MoeReRoutingTiling::IsCapable()
+{
+    return true;
+}
 
 ge::graphStatus MoeReRoutingTiling::DoOpTiling()
 {
@@ -183,16 +189,25 @@ ge::graphStatus MoeReRoutingTiling::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeReRoutingTiling::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus MoeReRoutingTiling::DoLibApiTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
-ge::graphStatus MoeReRoutingTiling::GetWorkspaceSize() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus MoeReRoutingTiling::GetWorkspaceSize()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
-uint64_t MoeReRoutingTiling::GetTilingKey() const { return tilingKey_; }
+uint64_t MoeReRoutingTiling::GetTilingKey() const
+{
+    return tilingKey_;
+}
 
 ge::graphStatus MoeReRoutingTiling::PostTiling()
 {
     context_->SetTilingKey(GetTilingKey());
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = static_cast<size_t>(32); // 设置工作区大小为32字节
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());

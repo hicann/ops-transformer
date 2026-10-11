@@ -28,8 +28,8 @@ class MoeGatherDroppadQuant {
 public:
     __aicore__ inline MoeGatherDroppadQuant(){};
     __aicore__ inline void Init(GM_ADDR inputX, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedRowIdx,
-                                GM_ADDR expandedX, GM_ADDR workspace, const MoeInitRoutingV3TilingData *tilingData,
-                                TPipe *tPipe);
+                                GM_ADDR expandedX, GM_ADDR workspace, const MoeInitRoutingV3TilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -39,7 +39,7 @@ private:
     __aicore__ inline void CopyOut(int64_t progress);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, GATHER_OUT_DROPPAD_QUANT_BUFFER_NUM> inputXCopyInQueue_;
     TQue<QuePosition::VECIN, GATHER_OUT_DROPPAD_QUANT_BUFFER_NUM> expandRowIdxCopyInQueue_;
     TQue<QuePosition::VECOUT, GATHER_OUT_DROPPAD_QUANT_BUFFER_NUM> inputXCopyOutQueue_;
@@ -52,7 +52,7 @@ private:
     GlobalTensor<float> scaleGm_;
     GlobalTensor<float> offsetGm_;
 
-    const MoeV3GatherOutComputeTilingData *gatherOutTilingData_;
+    const MoeV3GatherOutComputeTilingData* gatherOutTilingData_;
 
     int64_t needCoreNum_;
     int64_t blockIdx_;
@@ -175,7 +175,7 @@ __aicore__ inline void MoeGatherDroppadQuant<T>::CopyOut(int64_t progress)
 template <typename T>
 __aicore__ inline void MoeGatherDroppadQuant<T>::Init(GM_ADDR inputX, GM_ADDR scale, GM_ADDR offset,
                                                       GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR workspace,
-                                                      const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe)
+                                                      const MoeInitRoutingV3TilingData* tilingData, TPipe* tPipe)
 {
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
@@ -201,13 +201,13 @@ __aicore__ inline void MoeGatherDroppadQuant<T>::Init(GM_ADDR inputX, GM_ADDR sc
     lastLoopCols_ = gatherOutTilingData_->lastLoopCols;
     colLoops_ = gatherOutTilingData_->colsLoops;
 
-    inputXGm_.SetGlobalBuffer((__gm__ T *)inputX);
-    expandedXGm_.SetGlobalBuffer((__gm__ int8_t *)expandedX);
+    inputXGm_.SetGlobalBuffer((__gm__ T*)inputX);
+    expandedXGm_.SetGlobalBuffer((__gm__ int8_t*)expandedX);
     expandedRowIdxGm_.SetGlobalBuffer(
-        (__gm__ int32_t *)expandedRowIdx + blockIdx_ * gatherOutTilingData_->perCoreIndicesElements,
+        (__gm__ int32_t*)expandedRowIdx + blockIdx_ * gatherOutTilingData_->perCoreIndicesElements,
         Align(coreRows_, sizeof(int32_t)));
-    scaleGm_.SetGlobalBuffer((__gm__ float *)scale, 1);
-    offsetGm_.SetGlobalBuffer((__gm__ float *)offset, 1);
+    scaleGm_.SetGlobalBuffer((__gm__ float*)scale, 1);
+    offsetGm_.SetGlobalBuffer((__gm__ float*)offset, 1);
     scale_ = scaleGm_.GetValue(0);
     offset_ = offsetGm_.GetValue(0);
 

@@ -32,7 +32,7 @@ public:
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
                                 GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale, GM_ADDR topkWeight,
                                 GM_ADDR expandedTopkWeight, GM_ADDR workspace, GM_ADDR offset,
-                                const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -66,8 +66,8 @@ __aicore__ inline void MoeV3FullLoadStaticQuant<T>::Init(GM_ADDR x, GM_ADDR expe
                                                          GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
                                                          GM_ADDR expandedScale, GM_ADDR topkWeight,
                                                          GM_ADDR expandedTopkWeight, GM_ADDR workspace, GM_ADDR offset,
-                                                         const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                                         TPipe *tPipe)
+                                                         const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                                         TPipe* tPipe)
 {
     MoeV3FullLoadBase<T>::Init(expertIdx, expandedRowIdx, expertTokensCountOrCumsum, topkWeight, expandedTopkWeight,
                                workspace, tilingData, tPipe);
@@ -79,11 +79,11 @@ __aicore__ inline void MoeV3FullLoadStaticQuant<T>::Init(GM_ADDR x, GM_ADDR expe
     colsAlign_ = Align(this->cols_, sizeof(T));
     inFactor_ = Align(this->cols_, sizeof(int8_t));
 
-    xGm_.SetGlobalBuffer((__gm__ T *)x);
-    expandedXGm_.SetGlobalBuffer((__gm__ int8_t *)expandedX);
+    xGm_.SetGlobalBuffer((__gm__ T*)x);
+    expandedXGm_.SetGlobalBuffer((__gm__ int8_t*)expandedX);
 
-    scaleGm_.SetGlobalBuffer((__gm__ float *)scale, 1);
-    offsetGm_.SetGlobalBuffer((__gm__ float *)offset, 1);
+    scaleGm_.SetGlobalBuffer((__gm__ float*)scale, 1);
+    offsetGm_.SetGlobalBuffer((__gm__ float*)offset, 1);
     scale_ = scaleGm_.GetValue(0);
     offset_ = offsetGm_.GetValue(0);
 
@@ -106,11 +106,11 @@ __aicore__ inline void MoeV3FullLoadStaticQuant<T>::Compute(int64_t rowLength)
     LocalTensor<float> inLocal = inputXInQueue_.DeQue<float>();
     LocalTensor<int8_t> outLocal = inputXOutQueue_.AllocTensor<int8_t>();
 
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)inLocal.GetPhyAddr();
-    __ubuf__ int8_t *outUbAddr = (__ubuf__ int8_t *)outLocal.GetPhyAddr();
-    __ubuf__ T *inUbAddrCastT;
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)inLocal.GetPhyAddr();
+    __ubuf__ int8_t* outUbAddr = (__ubuf__ int8_t*)outLocal.GetPhyAddr();
+    __ubuf__ T* inUbAddrCastT;
     if constexpr (!IsSameType<T, float>::value) {
-        inUbAddrCastT = (__ubuf__ T *)inLocal.ReinterpretCast<T>().GetPhyAddr() + colsAlign_;
+        inUbAddrCastT = (__ubuf__ T*)inLocal.ReinterpretCast<T>().GetPhyAddr() + colsAlign_;
     }
 
     uint16_t repeatTimes = Ceil(inFactor_ * rowLength, FLOAT_REG_TENSOR_LENGTH);

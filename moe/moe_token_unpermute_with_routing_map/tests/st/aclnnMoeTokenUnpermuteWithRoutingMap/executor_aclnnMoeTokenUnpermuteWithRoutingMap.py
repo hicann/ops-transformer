@@ -64,7 +64,9 @@ def make_padded_routing_map(capacity, num_tokens, num_experts):
         return routing_map
 
     token_indices = torch.arange(num_experts * capacity, dtype=torch.long) % num_tokens
-    expert_indices = torch.arange(num_experts, dtype=torch.long).repeat_interleave(capacity)
+    expert_indices = torch.arange(num_experts, dtype=torch.long).repeat_interleave(
+        capacity
+    )
     routing_map[token_indices, expert_indices] = True
     return routing_map
 
@@ -101,7 +103,9 @@ def make_non_padded_inputs(num_tokens, num_experts, topk, prob_dtype, with_minus
                 continue
 
             sorted_indices[slot] = permuted_row
-            probs[token_idx, expert_idx] = (torch.rand((), dtype=torch.float32) * 2 - 1).to(prob_dtype)
+            probs[token_idx, expert_idx] = (
+                torch.rand((), dtype=torch.float32) * 2 - 1
+            ).to(prob_dtype)
             permuted_row += 1
 
     return routing_map, probs, sorted_indices
@@ -111,19 +115,33 @@ def permute_padded(tokens, routing_map, probs, num_out_tokens):
     num_experts = routing_map.shape[1]
     capacity = safe_div(num_out_tokens, num_experts)
     routing_map_t = routing_map.to(dtype=torch.int8).T.contiguous()
-    sorted_indices = routing_map_t.argsort(dim=-1, descending=True, stable=True)[:, :capacity].contiguous().view(-1)
+    sorted_indices = (
+        routing_map_t.argsort(dim=-1, descending=True, stable=True)[:, :capacity]
+        .contiguous()
+        .view(-1)
+    )
     permuted_tokens = tokens.index_select(0, sorted_indices)
     return permuted_tokens, sorted_indices, routing_map
 
 
 def normalize_flat_probs(probs, expected_size):
     if probs.numel() < expected_size:
-        padding = torch.zeros((expected_size - probs.numel(),), dtype=probs.dtype, device=probs.device)
+        padding = torch.zeros(
+            (expected_size - probs.numel(),), dtype=probs.dtype, device=probs.device
+        )
         return torch.cat((probs, padding), dim=0)
     return probs[:expected_size]
 
 
-def unpermute_padded(permuted_tokens, sorted_indices, probs, restore_shape, is_mixed, compute_dtype, output_dtype):
+def unpermute_padded(
+    permuted_tokens,
+    sorted_indices,
+    probs,
+    restore_shape,
+    is_mixed,
+    compute_dtype,
+    output_dtype,
+):
     original_dtype = permuted_tokens.dtype
     if is_mixed:
         permuted_tokens = permuted_tokens.to(compute_dtype)
@@ -133,14 +151,24 @@ def unpermute_padded(permuted_tokens, sorted_indices, probs, restore_shape, is_m
     num_experts = probs.size(1)
     capacity = safe_div(sorted_indices.size(0), num_experts)
 
-    expert_indices = torch.arange(num_experts, device=permuted_tokens.device).unsqueeze(-1)
+    expert_indices = torch.arange(num_experts, device=permuted_tokens.device).unsqueeze(
+        -1
+    )
     token_indices = sorted_indices.view(num_experts, capacity)
-    prob_indices = (expert_indices * num_tokens + token_indices).view(-1).clamp(0, num_experts * num_tokens - 1)
+    prob_indices = (
+        (expert_indices * num_tokens + token_indices)
+        .view(-1)
+        .clamp(0, num_experts * num_tokens - 1)
+    )
     permuted_probs = probs.T.contiguous().view(-1).index_select(0, prob_indices)
     weighted_tokens = permuted_tokens * permuted_probs.unsqueeze(-1)
 
-    sorted_values, sorted_order = sorted_indices.sort(dim=-1, stable=True, descending=False)
-    output_tokens = torch.zeros(restore_shape, dtype=compute_dtype, device=permuted_tokens.device)
+    sorted_values, sorted_order = sorted_indices.sort(
+        dim=-1, stable=True, descending=False
+    )
+    output_tokens = torch.zeros(
+        restore_shape, dtype=compute_dtype, device=permuted_tokens.device
+    )
     output_tokens.index_add_(0, sorted_values, weighted_tokens[sorted_order])
 
     if is_mixed:
@@ -155,28 +183,58 @@ def unpermute_padded(permuted_tokens, sorted_indices, probs, restore_shape, is_m
     )
 
 
-def unpermute_non_padded(permuted_tokens, sorted_indices, routing_map, probs, restore_shape):
+def unpermute_non_padded(
+    permuted_tokens, sorted_indices, routing_map, probs, restore_shape
+):
     num_tokens = restore_shape[0]
     topk = safe_div(sorted_indices.numel(), num_tokens)
-    compute_dtype = torch.float32 if permuted_tokens.dtype in (torch.float16, torch.bfloat16) else permuted_tokens.dtype
+    compute_dtype = (
+        torch.float32
+        if permuted_tokens.dtype in (torch.float16, torch.bfloat16)
+        else permuted_tokens.dtype
+    )
     permuted_probs = probs.masked_select(routing_map.to(torch.bool)).to(compute_dtype)
 
     if num_tokens == 0 or topk == 0 or permuted_tokens.numel() == 0:
-        output_tokens = torch.zeros(restore_shape, dtype=compute_dtype, device=permuted_tokens.device)
-        dummy_index = torch.tensor([1], dtype=sorted_indices.dtype, device=sorted_indices.device)
-        return output_tokens.to(permuted_tokens.dtype), dummy_index, dummy_index, permuted_probs.to(probs.dtype)
+        output_tokens = torch.zeros(
+            restore_shape, dtype=compute_dtype, device=permuted_tokens.device
+        )
+        dummy_index = torch.tensor(
+            [1], dtype=sorted_indices.dtype, device=sorted_indices.device
+        )
+        return (
+            output_tokens.to(permuted_tokens.dtype),
+            dummy_index,
+            dummy_index,
+            permuted_probs.to(probs.dtype),
+        )
 
     permuted_probs = normalize_flat_probs(permuted_probs, num_tokens * topk)
     valid_mask = (sorted_indices >= 0) & (sorted_indices < permuted_tokens.shape[0])
-    gather_indices = sorted_indices.clamp(0, permuted_tokens.shape[0] - 1).to(torch.long)
-    gathered_tokens = permuted_tokens.index_select(0, gather_indices).reshape(num_tokens, topk, permuted_tokens.shape[1])
+    gather_indices = sorted_indices.clamp(0, permuted_tokens.shape[0] - 1).to(
+        torch.long
+    )
+    gathered_tokens = permuted_tokens.index_select(0, gather_indices).reshape(
+        num_tokens, topk, permuted_tokens.shape[1]
+    )
 
     weights = permuted_probs.reshape(num_tokens, topk).to(compute_dtype)
     valid_weights = valid_mask.reshape(num_tokens, topk).to(compute_dtype)
-    output_tokens = (gathered_tokens.to(compute_dtype) * weights.unsqueeze(-1) * valid_weights.unsqueeze(-1)).sum(dim=1)
+    output_tokens = (
+        gathered_tokens.to(compute_dtype)
+        * weights.unsqueeze(-1)
+        * valid_weights.unsqueeze(-1)
+    ).sum(dim=1)
 
-    dummy_index = torch.tensor([1], dtype=sorted_indices.dtype, device=permuted_tokens.device)
-    return output_tokens.to(permuted_tokens.dtype), dummy_index, dummy_index, permuted_probs.to(probs.dtype)
+    dummy_index = torch.tensor(
+        [1], dtype=sorted_indices.dtype, device=permuted_tokens.device
+    )
+    return (
+        output_tokens.to(permuted_tokens.dtype),
+        dummy_index,
+        dummy_index,
+        permuted_probs.to(probs.dtype),
+    )
 
 
 @register("ascend_function_moe_token_unpermute_with_routing_map")
@@ -211,7 +269,10 @@ class FunctionMoeTokenUnpermuteWithRoutingMapApi(BaseApi):
         num_out_tokens = sorted_indices_input.shape[0]
         capacity = safe_div(num_out_tokens, num_experts)
 
-        self.is_mixed = token_dtype in (torch.bfloat16, torch.float16) and prob_dtype == torch.float32
+        self.is_mixed = (
+            token_dtype in (torch.bfloat16, torch.float16)
+            and prob_dtype == torch.float32
+        )
         self.compute_dtype = torch.float32 if self.is_mixed else token_dtype
         self.output_dtype = token_dtype
 
@@ -224,7 +285,11 @@ class FunctionMoeTokenUnpermuteWithRoutingMapApi(BaseApi):
         else:
             original_tokens = generate_tensor((num_tokens, hidden_size), token_dtype)
             routing_map = make_padded_routing_map(capacity, num_tokens, num_experts)
-            probs = generate_tensor((num_tokens, num_experts), torch.float32 if self.is_mixed else prob_dtype, 1.0)
+            probs = generate_tensor(
+                (num_tokens, num_experts),
+                torch.float32 if self.is_mixed else prob_dtype,
+                1.0,
+            )
             probs = probs * first_route_mask(routing_map, probs.dtype)
             permuted_tokens, sorted_indices, routing_map = permute_padded(
                 original_tokens, routing_map, probs, num_out_tokens
@@ -233,8 +298,12 @@ class FunctionMoeTokenUnpermuteWithRoutingMapApi(BaseApi):
 
         device = target_device(self)
         probs_dtype = torch.float32 if self.is_mixed else token_dtype
-        input_data.kwargs["permutedTokens"] = to_target(permuted_tokens, device, token_dtype)
-        input_data.kwargs["sortedIndices"] = to_target(sorted_indices, device, torch.int32)
+        input_data.kwargs["permutedTokens"] = to_target(
+            permuted_tokens, device, token_dtype
+        )
+        input_data.kwargs["sortedIndices"] = to_target(
+            sorted_indices, device, torch.int32
+        )
         input_data.kwargs["routingMapOptional"] = to_target(routing_map, device)
         input_data.kwargs["probsOptional"] = to_target(probs, device, probs_dtype)
         input_data.kwargs["paddedMode"] = True
@@ -251,7 +320,11 @@ class FunctionMoeTokenUnpermuteWithRoutingMapApi(BaseApi):
         hidden_size = max(1, min(int(token_input.shape[1]), 512))
         topk = min(16, num_experts)
 
-        self.compute_dtype = torch.float32 if token_dtype in (torch.float16, torch.bfloat16) else token_dtype
+        self.compute_dtype = (
+            torch.float32
+            if token_dtype in (torch.float16, torch.bfloat16)
+            else token_dtype
+        )
         routing_map, probs, sorted_indices = make_non_padded_inputs(
             num_tokens, num_experts, topk, probs_input.dtype, with_minus_one
         )
@@ -260,7 +333,9 @@ class FunctionMoeTokenUnpermuteWithRoutingMapApi(BaseApi):
         device = target_device(self)
         input_data.kwargs["permutedTokens"] = to_target(permuted_tokens, device)
         input_data.kwargs["sortedIndices"] = to_target(sorted_indices, device)
-        input_data.kwargs["routingMapOptional"] = to_target(routing_map, device, routing_input.dtype)
+        input_data.kwargs["routingMapOptional"] = to_target(
+            routing_map, device, routing_input.dtype
+        )
         input_data.kwargs["probsOptional"] = to_target(probs, device)
         input_data.kwargs["paddedMode"] = False
         input_data.kwargs["restoreShapeOptional"] = [num_tokens, hidden_size]
@@ -275,10 +350,17 @@ class FunctionMoeTokenUnpermuteWithRoutingMapApi(BaseApi):
 
         if self.mode == PADDED:
             return unpermute_padded(
-                permuted_tokens, sorted_indices, probs, restore_shape,
-                self.is_mixed, self.compute_dtype, self.output_dtype
+                permuted_tokens,
+                sorted_indices,
+                probs,
+                restore_shape,
+                self.is_mixed,
+                self.compute_dtype,
+                self.output_dtype,
             )
-        return unpermute_non_padded(permuted_tokens, sorted_indices, routing_map, probs, restore_shape)
+        return unpermute_non_padded(
+            permuted_tokens, sorted_indices, routing_map, probs, restore_shape
+        )
 
 
 @register("aclnn_function")
@@ -289,7 +371,10 @@ class AclnnMoeTokenUnpermuteWithRoutingMapApi(AclnnBaseApi):
 
     def after_call(self, output_packages):
         if self.mode == PADDED:
-            return [self.acl_tensor_to_torch(output_package) for output_package in output_packages]
+            return [
+                self.acl_tensor_to_torch(output_package)
+                for output_package in output_packages
+            ]
 
         output_tokens = self.acl_tensor_to_torch(output_packages[0])
         return [

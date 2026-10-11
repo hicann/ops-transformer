@@ -21,15 +21,15 @@ extern "C" {
  * @brief aclnnMoeGatingTopK的第一段接口，根据具体的计算流程，计算workspace大小。
  * @domain aclnn_ops_infer
  */
-ACLNN_API aclnnStatus aclnnMoeGatingTopKGetWorkspaceSize(const aclTensor *x, const aclTensor *biasOptional, int64_t k,
+ACLNN_API aclnnStatus aclnnMoeGatingTopKGetWorkspaceSize(const aclTensor* x, const aclTensor* biasOptional, int64_t k,
                                                          int64_t kGroup, int64_t groupCount, int64_t groupSelectMode,
                                                          int64_t renorm, int64_t normType, bool outFlag,
-                                                         double routedScalingFactor, double eps, const aclTensor *yOut,
-                                                         const aclTensor *expertIdxOut, const aclTensor *outOut,
-                                                         uint64_t *workspaceSize, aclOpExecutor **executor);
+                                                         double routedScalingFactor, double eps, const aclTensor* yOut,
+                                                         const aclTensor* expertIdxOut, const aclTensor* outOut,
+                                                         uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /* @brief aclnnMoeGatingTopK的第二段接口，用于执行计算。 */
-ACLNN_API aclnnStatus aclnnMoeGatingTopK(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMoeGatingTopK(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                          aclrtStream stream);
 
 #ifdef __cplusplus

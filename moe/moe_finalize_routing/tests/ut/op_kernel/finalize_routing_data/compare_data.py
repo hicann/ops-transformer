@@ -22,13 +22,10 @@ curr_dir = os.path.dirname(os.path.realpath(__file__))
 
 def compare_data(golden_file, output_file, d_type):
     if d_type == "float16":
-        precision = 1/1000
+        precision = 1 / 1000
     else:
-        precision = 1/10000
-    d_type_dict = {
-        "float32": np.float32,
-        "float16": np.float16
-    }
+        precision = 1 / 10000
+    d_type_dict = {"float32": np.float32, "float16": np.float16}
     dtype = d_type_dict.get(d_type)
 
     golden = np.fromfile(golden_file, dtype)
@@ -54,5 +51,6 @@ def process(d_type):
     output_file = os.path.join(curr_dir, "output.bin")
     result = compare_data(golden_file, output_file, d_type)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     process(sys.argv[1])

@@ -72,7 +72,7 @@ struct MoeTokenUnpermuteWithRoutingMapTilingData {
     MoeTokenUnpermuteWithRoutingMapPadTilingData moeTokenUnpermuteWithRoutingMapPadTilingData;
 };
 
-inline void InitMoeTokenUnpermuteTilingData(uint8_t *tiling, MoeTokenUnpermuteWithRoutingMapTilingData *const_data)
+inline void InitMoeTokenUnpermuteTilingData(uint8_t* tiling, MoeTokenUnpermuteWithRoutingMapTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeTokenUnpermuteWithRoutingMapTilingData));
 }

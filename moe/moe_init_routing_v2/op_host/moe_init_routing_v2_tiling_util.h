@@ -33,7 +33,7 @@ typename std::enable_if<std::is_signed<T>::value, T>::type CeilDiv(T x, T y)
     return x;
 }
 
-std::string PrintShape(const gert::Shape &shape)
+std::string PrintShape(const gert::Shape& shape)
 {
     std::ostringstream oss;
     oss << "[";
@@ -47,7 +47,7 @@ std::string PrintShape(const gert::Shape &shape)
     return oss.str();
 }
 
-std::string PrintTensorDesc(const gert::StorageShape *shape, const gert::CompileTimeTensorDesc *tensor)
+std::string PrintTensorDesc(const gert::StorageShape* shape, const gert::CompileTimeTensorDesc* tensor)
 {
     if (shape == nullptr || tensor == nullptr) {
         return "nil ";
@@ -67,7 +67,7 @@ std::string PrintTensorDesc(const gert::StorageShape *shape, const gert::Compile
     return oss.str();
 }
 
-std::string PrintTilingContext(gert::TilingContext *context)
+std::string PrintTilingContext(gert::TilingContext* context)
 {
     std::ostringstream oss;
     for (size_t i = 0; i < context->GetComputeNodeInfo()->GetInputsNum(); ++i) {

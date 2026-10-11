@@ -25,17 +25,17 @@ class MoeindexCopySplitDOp {
 public:
     __aicore__ inline MoeindexCopySplitDOp(){};
     __aicore__ inline void Init(GM_ADDR src, GM_ADDR indices, GM_ADDR dst,
-                                const MoeTokenPermuteWithRoutingMapTilingData *tilingData, TPipe *tPipe);
+                                const MoeTokenPermuteWithRoutingMapTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void CopyInAndOut(int64_t Offset, int64_t progress);
-    __aicore__ inline void CopyInIndices(int64_t progress, DataCopyExtParams &dataCopyExtParams);
+    __aicore__ inline void CopyInIndices(int64_t progress, DataCopyExtParams& dataCopyExtParams);
     __aicore__ inline void CopyOut(int64_t innerLoop);
     __aicore__ inline void SyncAll();
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     TQueBind<TPosition::VECIN, TPosition::VECOUT, 1> copyInQueue;
     TQue<QuePosition::VECIN, 1> indicesQueue;
     TQue<QuePosition::VECOUT, 1> copyOutQueue;
@@ -47,7 +47,7 @@ private:
 
     LocalTensor<int32_t> indicesLocal;
 
-    const IndexCopyComputeRMTilingData *indexCopyTilingData;
+    const IndexCopyComputeRMTilingData* indexCopyTilingData;
     event_t indicesSToMte2;
     event_t indicesMte2ToV;
     int64_t cols;
@@ -153,7 +153,7 @@ __aicore__ inline void MoeindexCopySplitDOp<T, ifNumOutTokens>::CopyInAndOut(int
 
 template <typename T, bool ifNumOutTokens>
 __aicore__ inline void MoeindexCopySplitDOp<T, ifNumOutTokens>::CopyInIndices(int64_t progress,
-                                                                              DataCopyExtParams &dataCopyExtParams)
+                                                                              DataCopyExtParams& dataCopyExtParams)
 {
     indicesLocal = indicesQueue.AllocTensor<int32_t>();
     DataCopyPadCustom(indicesLocal, indicesGm[progress * onceIndicesNums], dataCopyExtParams, indicesPadParams);
@@ -172,7 +172,7 @@ __aicore__ inline void MoeindexCopySplitDOp<T, ifNumOutTokens>::SyncAll()
 
 template <typename T, bool ifNumOutTokens>
 __aicore__ inline void MoeindexCopySplitDOp<T, ifNumOutTokens>::Init(
-    GM_ADDR src, GM_ADDR indices, GM_ADDR dst, const MoeTokenPermuteWithRoutingMapTilingData *tilingData, TPipe *tPipe)
+    GM_ADDR src, GM_ADDR indices, GM_ADDR dst, const MoeTokenPermuteWithRoutingMapTilingData* tilingData, TPipe* tPipe)
 {
     int64_t blockNum = GetBlockNum();
     this->pipe = tPipe;
@@ -222,9 +222,9 @@ __aicore__ inline void MoeindexCopySplitDOp<T, ifNumOutTokens>::Init(
     onceUbTokenCols = this->onceUbTokenNums * cols;
     onceUbIndicesCols = this->onceUbTokenNums * topK;
 
-    srcGm.SetGlobalBuffer((__gm__ T *)src + srcoffset, this->coreCalcNum * cols);
-    indicesGm.SetGlobalBuffer((__gm__ int32_t *)indices + indicesoffset, this->coreCalcNum * topK);
-    dstGm.SetGlobalBuffer((__gm__ T *)dst, this->numOutTokens * cols);
+    srcGm.SetGlobalBuffer((__gm__ T*)src + srcoffset, this->coreCalcNum * cols);
+    indicesGm.SetGlobalBuffer((__gm__ int32_t*)indices + indicesoffset, this->coreCalcNum * topK);
+    dstGm.SetGlobalBuffer((__gm__ T*)dst, this->numOutTokens * cols);
     pipe->InitBuffer(copyInQueue, 2, this->indexCopyTilingData->tokenUB);
     pipe->InitBuffer(indicesQueue, 1, this->indexCopyTilingData->indicesUB);
     onceIndicesNums = onceIndicesTokenNums * topK;

@@ -19,12 +19,12 @@
 using Ops::Transformer::OpTiling::TilingRegistry;
 
 namespace optiling {
-static ge::graphStatus TilingForMoeInitRoutingV4(gert::TilingContext *context)
+static ge::graphStatus TilingForMoeInitRoutingV4(gert::TilingContext* context)
 {
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus TilingPrepareForMoeInitRoutingV4(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForMoeInitRoutingV4(gert::TilingParseContext* context)
 {
     OP_LOGD(context, "TilingPrepareForMoeInitRoutingV4 enter.");
 
@@ -36,8 +36,7 @@ static ge::graphStatus TilingPrepareForMoeInitRoutingV4(gert::TilingParseContext
     compileInfo->aivNum = ascendcPlatform.GetCoreNumAiv();
     OP_CHECK_IF((compileInfo->aivNum <= 0),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "compileInfo->aivNum",
-                                                      std::to_string(compileInfo->aivNum),
-                                                      "failed to get core num"),
+                                                      std::to_string(compileInfo->aivNum), "failed to get core num"),
                 return ge::GRAPH_FAILED);
 
     uint64_t ubSize;
@@ -46,8 +45,7 @@ static ge::graphStatus TilingPrepareForMoeInitRoutingV4(gert::TilingParseContext
     compileInfo->socVersion = ascendcPlatform.GetSocVersion();
     OP_CHECK_IF((compileInfo->ubSize <= 0),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "ubSize",
-                                                      std::to_string(compileInfo->ubSize),
-                                                      "failed to get ub size"),
+                                                      std::to_string(compileInfo->ubSize), "failed to get ub size"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;

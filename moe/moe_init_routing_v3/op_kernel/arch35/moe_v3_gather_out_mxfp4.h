@@ -29,8 +29,8 @@ class MoeV3GatherOutMxFp4 {
 public:
     __aicore__ inline MoeV3GatherOutMxFp4(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR scale, GM_ADDR workspace, GM_ADDR expandedRowIdx, GM_ADDR expandedX,
-                                GM_ADDR expandedScale, const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                TPipe *tPipe);
+                                GM_ADDR expandedScale, const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void CopyExpertIn(int64_t curExpertLoopOffset, int64_t curLoopElements);
     __aicore__ inline void CopyXIn(int64_t xSrcOffset, int64_t curLoopCols);
@@ -39,10 +39,10 @@ public:
     __aicore__ inline void CopyScaleOut(int64_t scaleDstOffset, int64_t curLoopCols);
 
 private:
-    __aicore__ inline void InitBasicParams(GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                           TPipe *tPipe);
+    __aicore__ inline void InitBasicParams(GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                           TPipe* tPipe);
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQueBind<TPosition::VECIN, TPosition::VECOUT, GATHER_OUT_BUFFER_NUM> xCopyInQueue_;
     TQueBind<TPosition::VECIN, TPosition::VECOUT, GATHER_OUT_BUFFER_NUM> scaleCopyInQueue_;
     TQue<QuePosition::VECIN, GATHER_OUT_BUFFER_NUM> expandedRowIdxCopyInQueue_;
@@ -85,8 +85,8 @@ private:
 
 template <typename T>
 __aicore__ inline void MoeV3GatherOutMxFp4<T>::InitBasicParams(GM_ADDR workspace,
-                                                               const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                                               TPipe *tPipe)
+                                                               const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                                               TPipe* tPipe)
 {
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
@@ -105,8 +105,7 @@ __aicore__ inline void MoeV3GatherOutMxFp4<T>::InitBasicParams(GM_ADDR workspace
 
     actualExpertNum_ = tilingData->actualExpertNum;
     expertTotalCountGm_.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum_, sizeof(int32_t)),
-        1);
+        (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum_, sizeof(int32_t)), 1);
     AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
         expertTotalCountGm_);
     expertTotalCount_ = expertTotalCountGm_.GetValue(0);
@@ -132,14 +131,14 @@ __aicore__ inline void MoeV3GatherOutMxFp4<T>::InitBasicParams(GM_ADDR workspace
 template <typename T>
 __aicore__ inline void MoeV3GatherOutMxFp4<T>::Init(GM_ADDR x, GM_ADDR scale, GM_ADDR workspace, GM_ADDR expandedRowIdx,
                                                     GM_ADDR expandedX, GM_ADDR expandedScale,
-                                                    const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+                                                    const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe)
 {
     InitBasicParams(workspace, tilingData, tPipe);
-    xUint8tGm_.SetGlobalBuffer((__gm__ uint8_t *)x, n_ * cols_ / NUM_TWO);
-    xGscaleGm_.SetGlobalBuffer((__gm__ uint8_t *)scale, n_ * scaleCols_);
-    expandedXGm_.SetGlobalBuffer((__gm__ uint8_t *)expandedX + blockIdx_ * perCoreIndicesElements_ * cols_ / NUM_TWO,
+    xUint8tGm_.SetGlobalBuffer((__gm__ uint8_t*)x, n_ * cols_ / NUM_TWO);
+    xGscaleGm_.SetGlobalBuffer((__gm__ uint8_t*)scale, n_ * scaleCols_);
+    expandedXGm_.SetGlobalBuffer((__gm__ uint8_t*)expandedX + blockIdx_ * perCoreIndicesElements_ * cols_ / NUM_TWO,
                                  curCoreIndicesElements_ * cols_ / NUM_TWO);
-    expandedScaleGm_.SetGlobalBuffer((__gm__ uint8_t *)expandedScale + blockIdx_ * perCoreIndicesElements_ * scaleCols_,
+    expandedScaleGm_.SetGlobalBuffer((__gm__ uint8_t*)expandedScale + blockIdx_ * perCoreIndicesElements_ * scaleCols_,
                                      curCoreIndicesElements_ * scaleCols_);
 
     pipe_->InitBuffer(expandedRowIdxCopyInQueue_, GATHER_OUT_BUFFER_NUM,
@@ -148,15 +147,15 @@ __aicore__ inline void MoeV3GatherOutMxFp4<T>::Init(GM_ADDR x, GM_ADDR scale, GM
     pipe_->InitBuffer(scaleCopyInQueue_, GATHER_OUT_BUFFER_NUM,
                       AlignBytes(perLoopCols_ / SCALE_FACTOR_WITH_X, sizeof(uint8_t)));
 
-    sortedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + blockIdx_ * perCoreIndicesElements_,
+    sortedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + blockIdx_ * perCoreIndicesElements_,
                                        Align(curCoreIndicesElements_, sizeof(int32_t)));
 
     if (rowIdxType_ == SCATTER) {
-        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
+        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
                                           Align(curCoreIndicesElements_, sizeof(int32_t)));
     } else {
         expandedRowIdxGm_.SetGlobalBuffer(
-            (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
+            (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
             Align(curCoreIndicesElements_, sizeof(int32_t)));
     }
 }

@@ -28,8 +28,8 @@ class MoeV3GatherStaticQuant {
 public:
     __aicore__ inline MoeV3GatherStaticQuant(){};
     __aicore__ inline void Init(GM_ADDR inputX, GM_ADDR scale, GM_ADDR workspace, GM_ADDR expandedRowIdx,
-                                GM_ADDR expandedX, GM_ADDR offset, const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                TPipe *tPipe);
+                                GM_ADDR expandedX, GM_ADDR offset, const MoeInitRoutingV3Arch35TilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -41,7 +41,7 @@ private:
     __aicore__ inline void CopyXOut(int64_t xDstOffset, int64_t curLoopCols);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, BUFFER_NUM> inputXCopyInQueue_;
     TQue<QuePosition::VECIN, BUFFER_NUM> expandRowIdxCopyInQueue_;
     TQue<QuePosition::VECOUT, BUFFER_NUM> inputXCopyOutQueue_;
@@ -55,7 +55,7 @@ private:
     GlobalTensor<float> offsetGm_;
     GlobalTensor<int32_t> expertTotalCountGm_;
 
-    const MoeV3Arch35GatherOutComputeTilingData *gatherOutTilingData_;
+    const MoeV3Arch35GatherOutComputeTilingData* gatherOutTilingData_;
 
     int64_t needCoreNum_;
     int64_t blockIdx_;
@@ -238,7 +238,7 @@ __aicore__ inline void MoeV3GatherStaticQuant<T>::GatherCopyOut(int64_t progress
 template <typename T>
 __aicore__ inline void MoeV3GatherStaticQuant<T>::Init(GM_ADDR inputX, GM_ADDR scale, GM_ADDR workspace,
                                                        GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR offset,
-                                                       const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+                                                       const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe)
 {
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
@@ -253,12 +253,12 @@ __aicore__ inline void MoeV3GatherStaticQuant<T>::Init(GM_ADDR inputX, GM_ADDR s
     totalLength_ = tilingData->n * tilingData->k;
     activateRows_ = gatherOutTilingData_->activeNum;
     rowIdxType_ = tilingData->rowIdxType;
-    scaleGm_.SetGlobalBuffer((__gm__ float *)scale, 1);
-    offsetGm_.SetGlobalBuffer((__gm__ float *)offset, 1);
+    scaleGm_.SetGlobalBuffer((__gm__ float*)scale, 1);
+    offsetGm_.SetGlobalBuffer((__gm__ float*)offset, 1);
     scale_ = scaleGm_.GetValue(0);
     offset_ = offsetGm_.GetValue(0);
 
-    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(totalLength_, sizeof(int32_t)) * 2 +
+    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(totalLength_, sizeof(int32_t)) * 2 +
                                             Align(actualExpertNum_, sizeof(int32_t)),
                                         1);
     AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
@@ -299,17 +299,17 @@ __aicore__ inline void MoeV3GatherStaticQuant<T>::Init(GM_ADDR inputX, GM_ADDR s
     lastLoopCols_ = gatherOutTilingData_->lastLoopCols;
     colLoops_ = gatherOutTilingData_->colsLoops;
 
-    inputXGm_.SetGlobalBuffer((__gm__ T *)inputX, n_ * cols_);
-    expandedXGm_.SetGlobalBuffer((__gm__ int8_t *)expandedX, totalLength_ * cols_);
+    inputXGm_.SetGlobalBuffer((__gm__ T*)inputX, n_ * cols_);
+    expandedXGm_.SetGlobalBuffer((__gm__ int8_t*)expandedX, totalLength_ * cols_);
 
     if (rowIdxType_ == SCATTER) {
         // SCATTER模式：从expandedRowIdx参数中读取输出位置索引
-        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreRow_,
+        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreRow_,
                                           Align(coreRows_, sizeof(int32_t)));
     } else {
         // GATHER模式：从workspace中读取排好序的原始行索引
         expandedRowIdxGm_.SetGlobalBuffer(
-            (__gm__ int32_t *)workspace + Align(totalLength_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+            (__gm__ int32_t*)workspace + Align(totalLength_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
             Align(coreRows_, sizeof(int32_t)));
     }
 

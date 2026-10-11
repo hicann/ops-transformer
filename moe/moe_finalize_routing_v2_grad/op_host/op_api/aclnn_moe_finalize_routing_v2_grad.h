@@ -30,8 +30,8 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2GradGetWorkspaceSize(
     aclOpExecutor** executor);
 
 /* @brief aclnnMoeFinalizeRoutingV2Grad的第二段接口，用于执行计算。 */
-ACLNN_API aclnnStatus
-aclnnMoeFinalizeRoutingV2Grad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
+ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2Grad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                                    aclrtStream stream);
 
 #ifdef __cplusplus
 }

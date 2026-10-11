@@ -24,7 +24,7 @@ class MoeSortOneCore : public MoeSortBase {
 public:
     __aicore__ inline MoeSortOneCore(){};
     __aicore__ inline void Init(GM_ADDR expertIdx, GM_ADDR expandedRowIdx, GM_ADDR workspace,
-                                const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -58,7 +58,7 @@ __aicore__ inline void MoeSortOneCore::SortCompute()
 
     uint16_t repeatTimes = Ceil(this->tileLength, FLOAT_REG_TENSOR_LENGTH);
     uint32_t sreg = static_cast<uint32_t>(this->tileLength);
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)expertIdxFp32.GetPhyAddr();
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)expertIdxFp32.GetPhyAddr();
     float cmpScalar = static_cast<float>(expertStart_);
     float negone = static_cast<float>(-1);
 
@@ -121,7 +121,7 @@ __aicore__ inline void MoeSortOneCore::CopyOut()
 }
 
 __aicore__ inline void MoeSortOneCore::Init(GM_ADDR expertIdx, GM_ADDR expandedRowIdx, GM_ADDR workspace,
-                                            const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+                                            const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe)
 {
     this->pipe = tPipe;
     this->tileLength = Align(tilingData->vbsComputeParamsOp.lastCorePerLoopElements, sizeof(int32_t));
@@ -132,19 +132,19 @@ __aicore__ inline void MoeSortOneCore::Init(GM_ADDR expertIdx, GM_ADDR expandedR
     expertEnd_ = tilingData->expertEnd;
     rowIdxType_ = tilingData->rowIdxType;
 
-    expertIdxGm.SetGlobalBuffer((__gm__ int32_t *)expertIdx, this->tileLength);
-    sortedexpertIdxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace),
+    expertIdxGm.SetGlobalBuffer((__gm__ int32_t*)expertIdx, this->tileLength);
+    sortedexpertIdxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace),
                                       Align(this->totalLength, sizeof(int32_t)));
     if (rowIdxType_ == SCATTER) {
-        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, this->tileLength);
+        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, this->tileLength);
     } else {
-        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(this->tileLength, sizeof(int32_t)),
+        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(this->tileLength, sizeof(int32_t)),
                                          Align(this->tileLength, sizeof(int32_t)));
     }
 
     if (GetBlockIdx() == 0) {
         expertCountTempGm.SetGlobalBuffer(
-            (__gm__ int32_t *)workspace + Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2,
+            (__gm__ int32_t*)workspace + Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2,
             tilingData->actualExpertNum);
         InitGlobalMemory(expertCountTempGm, tilingData->actualExpertNum, 0);
         SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);

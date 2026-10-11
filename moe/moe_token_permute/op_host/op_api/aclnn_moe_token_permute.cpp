@@ -37,8 +37,8 @@ static constexpr int64_t EXPERT_NUM = 10240;
 static constexpr int64_t EXPERT_TOKENS_NUM_TYPE_COUNT = 1;
 static constexpr int64_t ROW_IDX_TYPE_GATHER = 0;
 
-static inline bool CheckNotNull(const aclTensor *tokens, const aclTensor *indices, const aclTensor *permuteTokensOut,
-                                const aclTensor *sortedIndicesOut)
+static inline bool CheckNotNull(const aclTensor* tokens, const aclTensor* indices, const aclTensor* permuteTokensOut,
+                                const aclTensor* sortedIndicesOut)
 {
     OP_CHECK_NULL(tokens, return false);
     OP_CHECK_NULL(indices, return false);
@@ -47,8 +47,8 @@ static inline bool CheckNotNull(const aclTensor *tokens, const aclTensor *indice
     return true;
 }
 
-static inline bool CheckDtypeValidRegbase(const aclTensor *tokens, const aclTensor *indices,
-                                          const aclTensor *permuteTokensOut, const aclTensor *sortedIndicesOut)
+static inline bool CheckDtypeValidRegbase(const aclTensor* tokens, const aclTensor* indices,
+                                          const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut)
 {
     if (tokens != nullptr && tokens->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(tokens, MOE_DTYPE_SUPPORT_LIST_X, return false);
@@ -66,8 +66,8 @@ static inline bool CheckDtypeValidRegbase(const aclTensor *tokens, const aclTens
     return true;
 }
 
-static inline bool CheckDtypeValidInt8Regbase(const aclTensor *tokens, const aclTensor *indices,
-                                              const aclTensor *permuteTokensOut, const aclTensor *sortedIndicesOut)
+static inline bool CheckDtypeValidInt8Regbase(const aclTensor* tokens, const aclTensor* indices,
+                                              const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut)
 {
     if (tokens->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_MATCH(tokens, DataType::DT_INT8, return false);
@@ -85,8 +85,8 @@ static inline bool CheckDtypeValidInt8Regbase(const aclTensor *tokens, const acl
     return true;
 }
 
-static aclnnStatus CheckParamsRegbase(const aclTensor *tokens, const aclTensor *indices,
-                                      const aclTensor *permuteTokensOut, const aclTensor *sortedIndicesOut)
+static aclnnStatus CheckParamsRegbase(const aclTensor* tokens, const aclTensor* indices,
+                                      const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut)
 {
     CHECK_RET(CheckNotNull(tokens, indices, permuteTokensOut, sortedIndicesOut), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValidRegbase(tokens, indices, permuteTokensOut, sortedIndicesOut), ACLNN_ERR_PARAM_INVALID);
@@ -95,9 +95,9 @@ static aclnnStatus CheckParamsRegbase(const aclTensor *tokens, const aclTensor *
 
 } // namespace MoeTokenPermuteCheck
 
-static aclnnStatus BuildMoeInitRoutingV3Executor(const aclTensor *tokens, const aclTensor *indices,
-                                                 const aclTensor *permuteTokensOut, const aclTensor *sortedIndicesOut,
-                                                 uint64_t *workspaceSize, aclOpExecutor **executor)
+static aclnnStatus BuildMoeInitRoutingV3Executor(const aclTensor* tokens, const aclTensor* indices,
+                                                 const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut,
+                                                 uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -180,10 +180,10 @@ static aclnnStatus BuildMoeInitRoutingV3Executor(const aclTensor *tokens, const 
 extern "C" {
 #endif
 
-aclnnStatus aclnnMoeTokenPermuteGetWorkspaceSize(const aclTensor *tokens, const aclTensor *indices,
+aclnnStatus aclnnMoeTokenPermuteGetWorkspaceSize(const aclTensor* tokens, const aclTensor* indices,
                                                  int64_t numOutTokens, bool paddedMode,
-                                                 const aclTensor *permuteTokensOut, const aclTensor *sortedIndicesOut,
-                                                 uint64_t *workspaceSize, aclOpExecutor **executor)
+                                                 const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut,
+                                                 uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     L2_DFX_PHASE_1(aclnnMoeTokenPermute, DFX_IN(tokens, indices, numOutTokens, paddedMode),
@@ -245,7 +245,7 @@ aclnnStatus aclnnMoeTokenPermuteGetWorkspaceSize(const aclTensor *tokens, const 
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMoeTokenPermute(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMoeTokenPermute(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     static bool useMoeInitRoutingV2 = Ops::Transformer::AclnnUtil::IsRegbase();
     if (!useMoeInitRoutingV2) {

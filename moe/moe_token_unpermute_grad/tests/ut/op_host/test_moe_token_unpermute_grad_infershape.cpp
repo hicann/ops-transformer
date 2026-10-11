@@ -17,125 +17,135 @@
 #include <iostream>
 #include "infer_shape_context_faker.h"
 #include "infer_shape_case_executor.h"
-#include "infer_datatype_context_faker.h" 
+#include "infer_datatype_context_faker.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 
 class MoeTokenUnpermuteGradInferShape : public testing::Test {
- protected:
-  static void SetUpTestCase() {
-    std::cout << "MoeTokenUnpermuteGradInferShape SetUp" << std::endl;
-  }
+protected:
+    static void SetUpTestCase()
+    {
+        std::cout << "MoeTokenUnpermuteGradInferShape SetUp" << std::endl;
+    }
 
-  static void TearDownTestCase() {
-    std::cout << "MoeTokenUnpermuteGradInferShape TearDown" << std::endl;
-  }
+    static void TearDownTestCase()
+    {
+        std::cout << "MoeTokenUnpermuteGradInferShape TearDown" << std::endl;
+    }
 };
-
 
 TEST_F(MoeTokenUnpermuteGradInferShape, MoeTokenUnpermuteGrad_infershape_case_0)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenUnpermuteGrad",
-    {
-        {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-    },
-    {
-        {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}
-    },
-    {
-        {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-    }
-    );
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenUnpermuteGrad",
+        {{{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {
+            {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{30, 64}, {10, 3}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 TEST_F(MoeTokenUnpermuteGradInferShape, MoeTokenUnpermuteGrad_infershape_case_1)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenUnpermuteGrad",
-    {
-        {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}
-    },
-    {
-        {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-    },
-    {
-        {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-    }
-    );
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenUnpermuteGrad",
+        {{{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {
+            {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{30, 64}, {10, 3}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeTokenUnpermuteGradInferShape, MoeTokenUnpermuteGrad_infershape_prob_not_none_split_h_case_0)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenUnpermuteGrad",
-    {
-        {{{30, 8192}, {30, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{10, 8192}, {10, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}
-    },
-    {
-        {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-    },
-    {
-        {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-    }
-    );
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenUnpermuteGrad",
+        {{{{30, 8192}, {30, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{10, 8192}, {10, 8192}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {
+            {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{30, 8192}, {10, 3}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeTokenUnpermuteGradInferShape, MoeTokenUnpermuteGrad_infershape_prob_not_none_split_h_fp16_case_0)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenUnpermuteGrad",
-    {
-        {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{10, 8192}, {10, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{10, 3}, {10, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND}
-    },
-    {
-        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}
-    },
-    {
-        {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-    }
-    );
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenUnpermuteGrad",
+        {{{{30, 8192}, {30, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{10, 8192}, {10, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        {
+            {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{30, 8192}, {10, 3}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeTokenUnpermuteGradInferShape, MoeTokenUnpermuteGrad_infershape_prob_not_none_split_h_fp16_case_1)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenUnpermuteGrad",
-    {
-        {{{30, 8192}, {30, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{10, 8192}, {10, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}
-    },
-    {
-        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-    },
-    {
-        {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-    }
-    );
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenUnpermuteGrad",
+        {{{{30, 8192}, {30, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{10, 8192}, {10, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {
+            {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{30, 8192}, {10, 3}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
-
 
 TEST_F(MoeTokenUnpermuteGradInferShape, MoeTokenUnpermuteGrad_inferdtype_bf16_case_0)
 {
@@ -207,12 +217,11 @@ TEST_F(MoeTokenUnpermuteGradInferShape, MoeTokenUnpermuteGrad_inferdtype_bf16_ca
     }
 }
 
-
 TEST_F(MoeTokenUnpermuteGradInferShape, MoeTokenUnpermuteGrad_inferdtype_fp16_case_0)
 {
     auto spaceRegistry = gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry();
     auto data_type_func = spaceRegistry->GetOpImpl("MoeTokenUnpermuteGrad")->infer_datatype;
-    
+
     if (data_type_func != nullptr) {
         ge::DataType input_ref = ge::DT_FLOAT16;
         ge::DataType input_indices_ref = ge::DT_INT32;
@@ -244,62 +253,61 @@ TEST_F(MoeTokenUnpermuteGradInferShape, MoeTokenUnpermuteGrad_inferdtype_fp16_ca
 
 TEST_F(MoeTokenUnpermuteGradInferShape, MoeTokenUnpermuteGrad_infershape_prob_none_bf16)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenUnpermuteGrad",
-    {
-        {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND}
-    },
-    {
-        {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}
-    },
-    {
-        {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-    }
-    );
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenUnpermuteGrad",
+        {{{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {
+            {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{30, 64}, {}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeTokenUnpermuteGradInferShape, MoeTokenUnpermuteGrad_infershape_unknown_rank)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenUnpermuteGrad",
-    {
-        {{{-2}, {-2}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{30,}, {30,}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-    },
-    {
-        {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}
-    },
-    {
-        {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-    }
-    );
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenUnpermuteGrad",
+        {{{{-2}, {-2}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{
+               30,
+           },
+           {
+               30,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {
+            {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{}, {10, 3}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(MoeTokenUnpermuteGradInferShape, MoeTokenUnpermuteGrad_infershape_invalid_dim)
 {
-    gert::InfershapeContextPara infershapeContextPara("MoeTokenUnpermuteGrad",
-    {
-        {{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{30, 1}, {30, 1}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-    },
-    {
-        {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}
-    },
-    {
-        {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-    }
-    );
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeTokenUnpermuteGrad",
+        {{{{30, 64}, {30, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{10, 64}, {10, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{30, 1}, {30, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{10, 3}, {10, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {
+            {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        });
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, {});
 }
 

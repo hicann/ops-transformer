@@ -34,7 +34,7 @@ static inline bool IsValidType(const DataType dtype)
     return dtype == ge::DT_FLOAT || dtype == ge::DT_FLOAT16 || dtype == ge::DT_BF16;
 }
 
-static ge::graphStatus InferDataTypeMoeFinalizeRouting(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeMoeFinalizeRouting(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do MoeFinalizeRoutingInferDataType.");
     OP_CHECK_IF(
@@ -91,7 +91,7 @@ static bool IsValidShape(const int64_t shape1, const int64_t shape2, const int64
     return true;
 }
 
-static ge::graphStatus MoeCopyShapeInput2OutputWithIdx(gert::InferShapeContext *context, int64_t input_idx,
+static ge::graphStatus MoeCopyShapeInput2OutputWithIdx(gert::InferShapeContext* context, int64_t input_idx,
                                                        int64_t output_idx)
 {
     auto in_shape = context->GetInputShape(input_idx);
@@ -102,44 +102,44 @@ static ge::graphStatus MoeCopyShapeInput2OutputWithIdx(gert::InferShapeContext *
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckInputShapes(const gert::InferShapeContext *context, const size_t offset)
+static ge::graphStatus CheckInputShapes(const gert::InferShapeContext* context, const size_t offset)
 {
-    const gert::Shape *expandedPermutedRowsInputShape = context->GetInputShape(INDEX_IN_EXPAND_PERMUTED_ROWS);
+    const gert::Shape* expandedPermutedRowsInputShape = context->GetInputShape(INDEX_IN_EXPAND_PERMUTED_ROWS);
     OP_CHECK_NULL_WITH_CONTEXT(context, expandedPermutedRowsInputShape);
     OP_CHECK_IF(expandedPermutedRowsInputShape->GetDimNum() != SHAPE_SIZE,
                 OP_LOGE(context->GetNodeName(), "The expanded_permuted_rows of input should be 2D tensor."),
                 return ge::GRAPH_FAILED);
 
-    const gert::Shape *skip1InputShape = context->GetInputShape(INDEX_IN_SKIP1);
+    const gert::Shape* skip1InputShape = context->GetInputShape(INDEX_IN_SKIP1);
     OP_CHECK_NULL_WITH_CONTEXT(context, skip1InputShape);
     OP_CHECK_IF(skip1InputShape->GetDimNum() != SHAPE_SIZE,
                 OP_LOGE(context->GetNodeName(), "The skip1 of input should be 2D tensor."), return ge::GRAPH_FAILED);
 
-    const gert::Tensor *x2Tensor = context->GetOptionalInputTensor(INDEX_IN_SKIP2);
-    const gert::Shape *skip2InputShape = (x2Tensor == nullptr || x2Tensor->GetShapeSize() == 0) ?
+    const gert::Tensor* x2Tensor = context->GetOptionalInputTensor(INDEX_IN_SKIP2);
+    const gert::Shape* skip2InputShape = (x2Tensor == nullptr || x2Tensor->GetShapeSize() == 0) ?
                                              nullptr :
                                              context->GetOptionalInputShape(INDEX_IN_SKIP2);
     OP_CHECK_IF(skip2InputShape != nullptr && skip2InputShape->GetDimNum() != SHAPE_SIZE,
                 OP_LOGE(context->GetNodeName(), "The skip2 of input should be 2D tensor."), return ge::GRAPH_FAILED);
 
-    const gert::Shape *biasInputShape = context->GetInputShape(INDEX_IN_BIAS - offset);
+    const gert::Shape* biasInputShape = context->GetInputShape(INDEX_IN_BIAS - offset);
     OP_CHECK_NULL_WITH_CONTEXT(context, biasInputShape);
     OP_CHECK_IF(biasInputShape->GetDimNum() != SHAPE_SIZE,
                 OP_LOGE(context->GetNodeName(), "The bias of input should be 2D tensor."), return ge::GRAPH_FAILED);
 
-    const gert::Shape *scalesInputShape = context->GetInputShape(INDEX_IN_SCALES - offset);
+    const gert::Shape* scalesInputShape = context->GetInputShape(INDEX_IN_SCALES - offset);
     OP_CHECK_NULL_WITH_CONTEXT(context, scalesInputShape);
     OP_CHECK_IF(scalesInputShape->GetDimNum() != SHAPE_SIZE,
                 OP_LOGE(context->GetNodeName(), "The scales of input should be 2D tensor."), return ge::GRAPH_FAILED);
 
-    const gert::Shape *expandedSrcToDstRowInputShape =
+    const gert::Shape* expandedSrcToDstRowInputShape =
         context->GetInputShape(INDEX_IN_EXPANDED_SRC_TO_DST_ROW - offset);
     OP_CHECK_NULL_WITH_CONTEXT(context, expandedSrcToDstRowInputShape);
     OP_CHECK_IF(expandedSrcToDstRowInputShape->GetDimNum() != 1,
                 OP_LOGE(context->GetNodeName(), "The expanded_src_to_dst_row of input should be 1D tensor."),
                 return ge::GRAPH_FAILED);
 
-    const gert::Shape *expertForSourceRowInputShape = context->GetInputShape(INDEX_IN_EXPERT_FOR_SOURCE_ROW - offset);
+    const gert::Shape* expertForSourceRowInputShape = context->GetInputShape(INDEX_IN_EXPERT_FOR_SOURCE_ROW - offset);
     OP_CHECK_NULL_WITH_CONTEXT(context, expertForSourceRowInputShape);
     OP_CHECK_IF(expertForSourceRowInputShape->GetDimNum() != SHAPE_SIZE,
                 OP_LOGE(context->GetNodeName(), "The expert_for_source_row of input should be 2D tensor."),
@@ -148,18 +148,18 @@ static ge::graphStatus CheckInputShapes(const gert::InferShapeContext *context, 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckInputDims(const gert::InferShapeContext *context, const size_t offset)
+static ge::graphStatus CheckInputDims(const gert::InferShapeContext* context, const size_t offset)
 {
-    const gert::Shape *scalesInputShape = context->GetInputShape(INDEX_IN_SCALES - offset);
-    const gert::Shape *expertForSourceRowInputShape = context->GetInputShape(INDEX_IN_EXPERT_FOR_SOURCE_ROW - offset);
+    const gert::Shape* scalesInputShape = context->GetInputShape(INDEX_IN_SCALES - offset);
+    const gert::Shape* expertForSourceRowInputShape = context->GetInputShape(INDEX_IN_EXPERT_FOR_SOURCE_ROW - offset);
     bool validColK = scalesInputShape->GetDim(1) == -1 || expertForSourceRowInputShape->GetDim(1) == -1 ||
                      scalesInputShape->GetDim(1) == expertForSourceRowInputShape->GetDim(1);
     OP_CHECK_IF(!validColK,
                 OP_LOGE(context->GetNodeName(), "The dim 1 of scales and expert_for_source_row should be same."),
                 return ge::GRAPH_FAILED);
 
-    const gert::Shape *skip1InputShape = context->GetInputShape(INDEX_IN_SKIP1);
-    const gert::Shape *skip2InputShape = (context->GetOptionalInputTensor(INDEX_IN_SKIP2) == nullptr ||
+    const gert::Shape* skip1InputShape = context->GetInputShape(INDEX_IN_SKIP1);
+    const gert::Shape* skip2InputShape = (context->GetOptionalInputTensor(INDEX_IN_SKIP2) == nullptr ||
                                           context->GetOptionalInputTensor(INDEX_IN_SKIP2)->GetShapeSize() == 0) ?
                                              nullptr :
                                              context->GetOptionalInputShape(INDEX_IN_SKIP2);
@@ -178,9 +178,9 @@ static ge::graphStatus CheckInputDims(const gert::InferShapeContext *context, co
         OP_LOGE(context->GetNodeName(), "The dim 1 of skip1, skip2, expanded_permuted_rows and bias should be same."),
         return ge::GRAPH_FAILED);
 
-    const gert::Shape *expandedSrcToDstRowInputShape =
+    const gert::Shape* expandedSrcToDstRowInputShape =
         context->GetInputShape(INDEX_IN_EXPANDED_SRC_TO_DST_ROW - offset);
-    const gert::Shape *expandedPermutedRowsInputShape = context->GetInputShape(INDEX_IN_EXPAND_PERMUTED_ROWS);
+    const gert::Shape* expandedPermutedRowsInputShape = context->GetInputShape(INDEX_IN_EXPAND_PERMUTED_ROWS);
     bool validDim = expandedSrcToDstRowInputShape->GetDim(0) == -1 || expandedPermutedRowsInputShape->GetDim(0) == -1 ||
                     expandedSrcToDstRowInputShape->GetDim(0) == expandedPermutedRowsInputShape->GetDim(0);
 
@@ -188,11 +188,11 @@ static ge::graphStatus CheckInputDims(const gert::InferShapeContext *context, co
                 OP_LOGE(context->GetNodeName(),
                         "The dim 0 of expanded_permuted_rows and expanded_src_to_dst_row should be same."),
                 return ge::GRAPH_FAILED);
-    
+
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus Infershape4MoeFinalizeRouting(gert::InferShapeContext *context)
+static ge::graphStatus Infershape4MoeFinalizeRouting(gert::InferShapeContext* context)
 {
     // get and check input param
     size_t offset = (context->GetComputeNodeInputNum() == INPUT_NUM) ? 0 : 1;

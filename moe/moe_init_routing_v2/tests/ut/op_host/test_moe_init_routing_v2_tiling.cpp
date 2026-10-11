@@ -25,10 +25,10 @@
 using namespace std;
 
 namespace {
-void InitParsePlatformInfo(fe::PlatFormInfos &platformInfo)
+void InitParsePlatformInfo(fe::PlatFormInfos& platformInfo)
 {
     platformInfo.Init();
-    const char *compileJson =
+    const char* compileJson =
         R"({"hardware_info": {"UB_SIZE": 262144, "CORE_NUM": 64, "L2_SIZE": 33554432, "L1_SIZE": 524288, "L0A_SIZE": 65536, "L0B_SIZE": 65536, "L0C_SIZE": 131072, "BT_SIZE": 0, "load3d_constraints": "1", "socVersion":"Ascend910B"}})";
     nlohmann::json compileInfoJson = nlohmann::json::parse(compileJson);
     map<string, string> socInfos;
@@ -301,14 +301,14 @@ TEST_F(MoeInitRoutingV2Tiling, moe_init_routing_v2_util_print_tiling_context)
     optiling::MoeInitRoutingV2CompileInfo compileInfo = {64, 262144};
     auto tilingData = gert::TilingData::CreateCap(4096);
     auto wsHolder = gert::ContinuousVector::Create<size_t>(4096);
-    auto ws = reinterpret_cast<gert::ContinuousVector *>(wsHolder.get());
+    auto ws = reinterpret_cast<gert::ContinuousVector*>(wsHolder.get());
     fe::PlatFormInfos platformInfo;
     platformInfo.Init();
     auto faker = gert::TilingContextFaker();
 
     std::vector<std::unique_ptr<gert::Tensor>> keepAlive;
-    std::vector<gert::Tensor *> inputs;
-    std::vector<gert::Tensor *> outputs;
+    std::vector<gert::Tensor*> inputs;
+    std::vector<gert::Tensor*> outputs;
 
     gert::StorageShape inShape0({8, 30}, {8, 30});
     auto inT0 = std::make_unique<gert::Tensor>(
@@ -343,18 +343,18 @@ TEST_F(MoeInitRoutingV2Tiling, moe_init_routing_v2_util_print_tiling_context)
                       .InputTensors(inputs)
                       .OutputTensors(outputs)
                       .CompileInfo(&compileInfo)
-                      .PlatformInfo(reinterpret_cast<char *>(&platformInfo))
+                      .PlatformInfo(reinterpret_cast<char*>(&platformInfo))
                       .TilingData(tilingData.get())
                       .Workspace(ws)
                       .Build();
-    auto *ctx = holder.GetContext();
+    auto* ctx = holder.GetContext();
     ASSERT_NE(ctx, nullptr);
 
     std::string result = optiling::PrintTilingContext(ctx);
     EXPECT_FALSE(result.empty());
 
-    auto *shape0 = ctx->GetInputShape(0);
-    auto *desc0 = ctx->GetInputDesc(0);
+    auto* shape0 = ctx->GetInputShape(0);
+    auto* desc0 = ctx->GetInputDesc(0);
     ASSERT_NE(shape0, nullptr);
     ASSERT_NE(desc0, nullptr);
     std::string tdResult = optiling::PrintTensorDesc(shape0, desc0);
@@ -706,7 +706,7 @@ TEST_F(MoeInitRoutingV2Tiling, moe_init_routing_v2_tiling_parse_success)
     optiling::MoeInitRoutingV2CompileInfo compileInfo = {0, 0};
     fe::PlatFormInfos platformInfo;
     InitParsePlatformInfo(platformInfo);
-    const char *compileJson =
+    const char* compileJson =
         R"({"hardware_info": {"BT_SIZE": 0, "load3d_constraints": "1", "Intrinsic_fix_pipe_l0c2out": false, "Intrinsic_data_move_l12ub": true, "Intrinsic_data_move_l0c2ub": true, "Intrinsic_data_move_out2l1_nd2nz": false, "UB_SIZE": 262144, "L2_SIZE": 33554432, "L1_SIZE": 524288, "L0A_SIZE": 65536, "L0B_SIZE": 65536, "L0C_SIZE": 131072, "CORE_NUM": 64, "socVersion":"Ascend910B"}})";
 
     gert::OpTilingParseContextBuilder builder;
@@ -722,9 +722,9 @@ TEST_F(MoeInitRoutingV2Tiling, moe_init_routing_v2_tiling_parse_success)
                       .OutputTensorDesc(3, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
                       .CompiledJson(compileJson)
                       .CompiledInfo(&compileInfo)
-                      .PlatformInfo(reinterpret_cast<char *>(&platformInfo))
+                      .PlatformInfo(reinterpret_cast<char*>(&platformInfo))
                       .Build();
-    auto *parseContext = holder.GetContext();
+    auto* parseContext = holder.GetContext();
     ASSERT_NE(parseContext, nullptr);
 
     auto spaceRegistry = gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry();
@@ -733,7 +733,7 @@ TEST_F(MoeInitRoutingV2Tiling, moe_init_routing_v2_tiling_parse_success)
     ASSERT_NE(opImpl, nullptr);
     ASSERT_NE(opImpl->tiling_parse, nullptr);
 
-    auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext *>(parseContext));
+    auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext*>(parseContext));
     EXPECT_EQ(ret, ge::GRAPH_SUCCESS);
     EXPECT_GT(compileInfo.aivNum, 0);
     EXPECT_GT(compileInfo.ubSize, 0);

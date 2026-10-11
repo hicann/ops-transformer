@@ -29,8 +29,8 @@ static const std::initializer_list<op::DataType> MOE_FINALIZE_ROUTING_V2_GRAD_DT
 static const std::initializer_list<op::DataType> MOE_FINALIZE_ROUTING_V2_GRAD_DTYPE_SUPPORT_LIST_ROW_IDX = {
     DataType::DT_INT32};
 
-static inline bool CheckNotNull(const aclTensor *gradY, const aclTensor *expandedRowIdx,
-                                const aclTensor *gradExpandedXOut, const aclTensor *gradScalesOut)
+static inline bool CheckNotNull(const aclTensor* gradY, const aclTensor* expandedRowIdx,
+                                const aclTensor* gradExpandedXOut, const aclTensor* gradScalesOut)
 {
     OP_CHECK_NULL(gradY, return false);
     OP_CHECK_NULL(expandedRowIdx, return false);
@@ -39,10 +39,10 @@ static inline bool CheckNotNull(const aclTensor *gradY, const aclTensor *expande
     return true;
 }
 
-static inline bool CheckDtypeValid(const aclTensor *gradY, const aclTensor *expandedRowIdx,
-                                   const aclTensor *expandedXOptional, const aclTensor *scalesOptional,
-                                   const aclTensor *expertIdxOptional, const aclTensor *biasOptional,
-                                   const aclTensor *gradExpandedXOut, const aclTensor *gradScalesOut)
+static inline bool CheckDtypeValid(const aclTensor* gradY, const aclTensor* expandedRowIdx,
+                                   const aclTensor* expandedXOptional, const aclTensor* scalesOptional,
+                                   const aclTensor* expertIdxOptional, const aclTensor* biasOptional,
+                                   const aclTensor* gradExpandedXOut, const aclTensor* gradScalesOut)
 {
     if (gradY != nullptr && gradY->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(gradY, MOE_FINALIZE_ROUTING_V2_GRAD_DTYPE_SUPPORT_LIST_X, return false);
@@ -76,10 +76,10 @@ static inline bool CheckDtypeValid(const aclTensor *gradY, const aclTensor *expa
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *gradY, const aclTensor *expandedRowIdx,
-                               const aclTensor *expandedXOptional, const aclTensor *scalesOptional,
-                               const aclTensor *expertIdxOptional, const aclTensor *biasOptional,
-                               const aclTensor *gradExpandedXOut, const aclTensor *gradScalesOut)
+static aclnnStatus CheckParams(const aclTensor* gradY, const aclTensor* expandedRowIdx,
+                               const aclTensor* expandedXOptional, const aclTensor* scalesOptional,
+                               const aclTensor* expertIdxOptional, const aclTensor* biasOptional,
+                               const aclTensor* gradExpandedXOut, const aclTensor* gradScalesOut)
 {
     CHECK_RET(CheckNotNull(gradY, expandedRowIdx, gradExpandedXOut, gradScalesOut), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid(gradY, expandedRowIdx, expandedXOptional, scalesOptional, expertIdxOptional, biasOptional,
@@ -146,10 +146,10 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2GradGetWorkspaceSize(
     }
 
     // 调用l0接口进行计算，传入输出参数
-    auto result = l0op::MoeFinalizeRoutingV2Grad(gradYContiguous, expandedRowIdxContiguous, expandedXContiguous,
-                                                 scalesContiguous, expertIdxContiguous, biasContiguous,
-                                                 dropPadMode, activeNum, expertNum, expertCapacity,
-                                                 gradExpandedXOut, gradScalesOut, uniqueExecutor.get());
+    auto result =
+        l0op::MoeFinalizeRoutingV2Grad(gradYContiguous, expandedRowIdxContiguous, expandedXContiguous, scalesContiguous,
+                                       expertIdxContiguous, biasContiguous, dropPadMode, activeNum, expertNum,
+                                       expertCapacity, gradExpandedXOut, gradScalesOut, uniqueExecutor.get());
     auto [gradExpandedXOut_, gradScalesOut_] = result;
     bool hasNullptr = (gradExpandedXOut_ == nullptr) || (gradScalesOut_ == nullptr);
     CHECK_RET(hasNullptr != true, ACLNN_ERR_INNER_NULLPTR);
@@ -166,8 +166,8 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2GradGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2Grad(
-    void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
+ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2Grad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                                    aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMoeFinalizeRoutingV2Grad);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);

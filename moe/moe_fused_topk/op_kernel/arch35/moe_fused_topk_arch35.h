@@ -46,10 +46,10 @@ template <typename inputT, typename calT, uint32_t enableExpertMapping>
 class MoeFusedTopkArch35 {
 public:
     __aicore__ inline MoeFusedTopkArch35() = default;
-    __aicore__ inline void InitTilingData(MoeFusedTopkArch35TilingData *tilingData, GM_ADDR x, GM_ADDR addNum,
+    __aicore__ inline void InitTilingData(MoeFusedTopkArch35TilingData* tilingData, GM_ADDR x, GM_ADDR addNum,
                                           GM_ADDR mappingNum, GM_ADDR mappingTable, GM_ADDR y, GM_ADDR indices,
                                           GM_ADDR workspace);
-    __aicore__ inline void InitBuffer(TPipe *inputPipe);
+    __aicore__ inline void InitBuffer(TPipe* inputPipe);
     __aicore__ inline void Process();
     __aicore__ inline void CopyInAddNum();
     __aicore__ inline void CopyInX(const int32_t loop);
@@ -75,7 +75,7 @@ public:
     }
 
 private:
-    TPipe *pipe_ = nullptr;
+    TPipe* pipe_ = nullptr;
     TBuf<TPosition::VECIN> xInBuf_;
     TBuf<TPosition::VECCALC> addNumInBuf_;
     TBuf<TPosition::VECOUT> yOutBuf_;
@@ -131,7 +131,7 @@ private:
 
 template <typename inputT, typename calT, uint32_t enableExpertMapping>
 __aicore__ inline void MoeFusedTopkArch35<inputT, calT, enableExpertMapping>::InitTilingData(
-    MoeFusedTopkArch35TilingData *tilingData, GM_ADDR x, GM_ADDR addNum, GM_ADDR mappingNum, GM_ADDR mappingTable,
+    MoeFusedTopkArch35TilingData* tilingData, GM_ADDR x, GM_ADDR addNum, GM_ADDR mappingNum, GM_ADDR mappingTable,
     GM_ADDR y, GM_ADDR indices, GM_ADDR workspace)
 {
     secondDimSize_ = tilingData->secondDimSize;
@@ -166,16 +166,16 @@ __aicore__ inline void MoeFusedTopkArch35<inputT, calT, enableExpertMapping>::In
     topnPad_ = CeilAlign(n_, BLOCK_BYTES / sizeof(calT));
 
     uint32_t tmpNegativeInf = NEGATIVE_MIN_VAULE_FP32;
-    floatNegativeInf_ = *((float *)&tmpNegativeInf);
+    floatNegativeInf_ = *((float*)&tmpNegativeInf);
 
     outBatchStride_ = k_ * batchOffset_;
-    mGmX_.SetGlobalBuffer(reinterpret_cast<__gm__ inputT *>(x));
-    mGmAddNum_.SetGlobalBuffer(reinterpret_cast<__gm__ inputT *>(addNum));
-    mGmY_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(y) + outBatchStride_);
-    mGmIndices_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(indices) + outBatchStride_);
-    mGmWorkspace_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(workspace));
-    mappingNumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(mappingNum));
-    mappingTableGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(mappingTable));
+    mGmX_.SetGlobalBuffer(reinterpret_cast<__gm__ inputT*>(x));
+    mGmAddNum_.SetGlobalBuffer(reinterpret_cast<__gm__ inputT*>(addNum));
+    mGmY_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(y) + outBatchStride_);
+    mGmIndices_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(indices) + outBatchStride_);
+    mGmWorkspace_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace));
+    mappingNumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(mappingNum));
+    mappingTableGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(mappingTable));
 
     groupElesAlignBlockCountFp32_ = CeilAlign(groupEles_, perBlockCountFp32);
     groupElesAlignSortCount_ = CeilAlign(groupEles_, SORT_UNIT);
@@ -310,7 +310,7 @@ __aicore__ inline void MoeFusedTopkArch35<inputT, calT, enableExpertMapping>::Co
 }
 
 template <typename inputT, typename calT, uint32_t enableExpertMapping>
-__aicore__ inline void MoeFusedTopkArch35<inputT, calT, enableExpertMapping>::InitBuffer(TPipe *inputPipe)
+__aicore__ inline void MoeFusedTopkArch35<inputT, calT, enableExpertMapping>::InitBuffer(TPipe* inputPipe)
 {
     pipe_ = inputPipe;
     pipe_->InitBuffer(xInBuf_, sizeof(float) * groupElesAlignSortCount_ * groupNum_);
@@ -417,7 +417,7 @@ __aicore__ inline void MoeFusedTopkArch35<inputT, calT, enableExpertMapping>::Gr
     // Use IEEE -inf for the aligned tail. Valid -inf scores are clamped to
     // the finite sentinel below, so padded slots can never enter expert TopK.
     uint32_t negativeInfinityBits = 0xFF800000;
-    float floatNegativeInfinity = *((float *)&negativeInfinityBits);
+    float floatNegativeInfinity = *((float*)&negativeInfinityBits);
     Duplicate(topkGroupValue, floatNegativeInfinity, wholeSortNum_);
     // The reference semantics use +0 for a valid but deselected expert;
     // only the aligned tail must remain -inf.

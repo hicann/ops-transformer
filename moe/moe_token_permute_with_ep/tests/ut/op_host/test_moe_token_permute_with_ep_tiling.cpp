@@ -19,8 +19,7 @@
 
 using namespace std;
 
-class MoeTokenPermuteWithEpTiling : public testing::Test
-{
+class MoeTokenPermuteWithEpTiling : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -35,196 +34,193 @@ protected:
 
 TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_01)
 {
-    optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    optiling::MoeTokenPermuteWithEpCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
     std::vector<int64_t> range({1, 5});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6,}, {6,}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4,}, {4,}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // output info
+        {{{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{
+               6,
+           },
+           {
+               6,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND},
+         {{{
+               4,
+           },
+           {
+               4,
+           }},
+          ge::DT_INT32,
+          ge::FORMAT_ND}},
+        // attr
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     int64_t expectTilingKey = 5; // tilngkey
-    string expectTilingData = "1 2 5 16 3 1 6 1 6 6 6 1 6 6 8160 0 0 1024 2 2 0 1 0 10 2 2 2337 4674 14022 1 1 1 1 1 0 4674 2 2337 1 1 4 1 5 74784 56096 56096 ";
+    string expectTilingData = "1 2 5 16 3 1 6 1 6 6 6 1 6 6 8160 0 0 1024 2 2 0 1 0 10 2 2 2337 4674 14022 1 1 1 1 1 0 "
+                              "4674 2 2337 1 1 4 1 5 74784 56096 56096 ";
     std::vector<size_t> expectWorkspaces = {16777376}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
 TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_02)
 {
-    optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    optiling::MoeTokenPermuteWithEpCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
     std::vector<int64_t> range({0, 4096});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{4096, 5}, {4096, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{4096, 3}, {4096, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{4096, 3}, {4096, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{4096, 5}, {4096, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{4096 * 3}, {4096 * 3}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{4096, 5}, {4096, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{4096, 3}, {4096, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{4096, 3}, {4096, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // output info
+        {{{{4096, 5}, {4096, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{4096 * 3}, {4096 * 3}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}},
+        // attr
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     int64_t expectTilingKey = 6; // tilngkey
-    string expectTilingData = "64 4096 5 16 3 4 3072 1 3072 3072 3072 1 3072 3072 8096 0 0 1024 64 64 0 64 64 10 2 2 2337 4674 14022 1 1 1 1 64 1 64 1 64 1 64 4096 0 4096 74784 56096 56096 ";
+    string expectTilingData = "64 4096 5 16 3 4 3072 1 3072 3072 3072 1 3072 3072 8096 0 0 1024 64 64 0 64 64 10 2 2 "
+                              "2337 4674 14022 1 1 1 1 64 1 64 1 64 1 64 4096 0 4096 74784 56096 56096 ";
     std::vector<size_t> expectWorkspaces = {16977920}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
 TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_03)
 {
-    optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    optiling::MoeTokenPermuteWithEpCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
     std::vector<int64_t> range({0, 4096});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{4096, 5}, {4096, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{4096, 3}, {4096, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{4096, 3}, {4096, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{4096, 5}, {4096, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{4096 * 3}, {4096 * 3}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{4096, 5}, {4096, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{4096, 3}, {4096, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{4096, 3}, {4096, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // output info
+        {{{{4096, 5}, {4096, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{4096 * 3}, {4096 * 3}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}},
+        // attr
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     int64_t expectTilingKey = 6; // tilngkey
-    string expectTilingData = "64 4096 5 16 3 4 3072 1 3072 3072 3072 1 3072 3072 8096 0 0 1024 64 64 0 64 64 10 2 2 2337 4674 14022 1 1 1 1 64 1 64 1 64 1 64 4096 0 4096 74784 56096 56096 ";
+    string expectTilingData = "64 4096 5 16 3 4 3072 1 3072 3072 3072 1 3072 3072 8096 0 0 1024 64 64 0 64 64 10 2 2 "
+                              "2337 4674 14022 1 1 1 1 64 1 64 1 64 1 64 4096 0 4096 74784 56096 56096 ";
     std::vector<size_t> expectWorkspaces = {16977920}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
 TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_multi_core)
 {
-    optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    optiling::MoeTokenPermuteWithEpCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
     int64_t tokenNum = 16384;
     int64_t topk = 3;
     std::vector<int64_t> range({0, 4096});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{tokenNum, 5}, {tokenNum, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{4096, 5}, {4096, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{tokenNum, 5}, {tokenNum, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // output info
+        {{{{4096, 5}, {4096, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}},
+        // attr
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     int64_t expectTilingKey = 6; // tilngkey
-    string expectTilingData = "64 16384 5 16 3 16 3072 1 3072 3072 3072 1 3072 3072 8096 0 4 1024 64 64 0 256 256 10 2 2 2337 4674 14022 1 1 1 1 256 1 256 1 256 1 256 4096 0 4096 74784 56096 56096 ";
+    string expectTilingData = "64 16384 5 16 3 16 3072 1 3072 3072 3072 1 3072 3072 8096 0 4 1024 64 64 0 256 256 10 2 "
+                              "2 2337 4674 14022 1 1 1 1 256 1 256 1 256 1 256 4096 0 4096 74784 56096 56096 ";
     std::vector<size_t> expectWorkspaces = {17567744}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
 TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_long_h)
 {
-    optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    optiling::MoeTokenPermuteWithEpCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
     int64_t tokenNum = 16384;
     int64_t topk = 3;
     int64_t h = 32768;
 
     std::vector<int64_t> range({0, 4096});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{tokenNum, h}, {tokenNum, h}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{4096, h}, {4096, h}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{tokenNum, h}, {tokenNum, h}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // output info
+        {{{{4096, h}, {4096, h}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}},
+        // attr
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     int64_t expectTilingKey = 6; // tilngkey
-    string expectTilingData = "64 16384 32768 32768 3 16 3072 1 3072 3072 3072 1 3072 3072 8096 0 4 1024 64 64 0 256 256 65536 2 5446 1 5446 16338 1 1 1 1 256 1 256 256 1 256 1 4096 0 4096 65536 65376 65376 ";
+    string expectTilingData =
+        "64 16384 32768 32768 3 16 3072 1 3072 3072 3072 1 3072 3072 8096 0 4 1024 64 64 0 256 256 65536 2 5446 1 5446 "
+        "16338 1 1 1 1 256 1 256 256 1 256 1 4096 0 4096 65536 65376 65376 ";
     std::vector<size_t> expectWorkspaces = {17567744}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
 TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_error)
 {
-    optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
+    optiling::MoeTokenPermuteWithEpCompileInfo compileInfo =
+        {}; // 根据tiling头文件中的compileInfo填入对应值，一般原先的用例里能找到
     int64_t tokenNum = 16384;
     int64_t topk = 3;
     int64_t h = 32768;
 
     std::vector<int64_t> range({0, 4096});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp", // op_name
-                                            {
-                                            // input info
-                                            // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
-                                                {{{tokenNum, h}, {tokenNum, h}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            // output info
-                                            {
-                                                {{{4096, h}, {4096, h}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            // attr
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp", // op_name
+        {                        // input info
+                                 // shape都需要重复一次，比如shape为{16,16}，要填入{{16, 16}, {16, 16}}
+         {{{tokenNum, h}, {tokenNum, h}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        // output info
+        {{{{4096, h}, {4096, h}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}},
+        // attr
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     int64_t expectTilingKey = 6; // tilngkey
-    string expectTilingData = "64 16384 5 16 3 16 3072 1 3072 3072 3072 1 3072 3072 8096 0 4 1024 64 64 0 256 256 10 2 2 2338 4676 14028 1 1 1 1 256 1 256 1 256 1 256 4096 0 4096 74816 14048 14048 ";
+    string expectTilingData = "64 16384 5 16 3 16 3072 1 3072 3072 3072 1 3072 3072 8096 0 4 1024 64 64 0 256 256 10 2 "
+                              "2 2338 4676 14028 1 1 1 1 256 1 256 1 256 1 256 4096 0 4096 74816 14048 14048 ";
     std::vector<size_t> expectWorkspaces = {17567744}; // workspace
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -233,23 +229,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_padded_mode
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -257,23 +248,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_range_size_
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6, 1});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -281,25 +267,21 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_indices_1d)
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 4});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     int64_t expectTilingKey = 1;
-    string expectTilingData = "1 4 5 16 1 1 4 1 4 4 4 1 4 4 8160 0 0 1024 4 4 0 1 0 10 2 2 3272 6544 6544 1 1 1 1 1 0 6544 2 3272 1 1 4 0 4 104704 26176 26176 ";
+    string expectTilingData = "1 4 5 16 1 1 4 1 4 4 4 1 4 4 8160 0 0 1024 4 4 0 1 0 10 2 2 3272 6544 6544 1 1 1 1 1 0 "
+                              "6544 2 3272 1 1 4 0 4 104704 26176 26176 ";
     std::vector<size_t> expectWorkspaces = {16777344};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -308,23 +290,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_indices_dim
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3, 1}, {2, 3, 1}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3, 1}, {2, 3, 1}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -332,23 +309,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_topk_out_of
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 513}, {2, 513}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 513}, {2, 513}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 513}, {2, 513}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 513}, {2, 513}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -356,23 +328,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_range_out_o
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 100});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -380,23 +347,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_output_indi
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -404,23 +366,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_output_toke
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6}, {6}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6}, {6}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -428,23 +385,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_probs_dim_m
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -455,26 +407,22 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_split_d_sma
     int64_t topk = 3;
     int64_t h = 32768;
     std::vector<int64_t> range({0, 4096});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{tokenNum, h}, {tokenNum, h}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{4096, h}, {4096, h}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{tokenNum, h}, {tokenNum, h}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{tokenNum, 3}, {tokenNum, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{4096, h}, {4096, h}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     tilingContextPara.ubSize_ = 98304;
     int64_t expectTilingKey = 8;
-    string expectTilingData = "64 16384 32768 32768 3 64 768 1 768 768 768 1 768 768 2976 0 16 1024 64 64 0 256 256 65536 2 1 1 170 510 9472 23296 2 2 86 2 86 86 1 86 1 4096 0 4096 46592 2048 2048 ";
+    string expectTilingData = "64 16384 32768 32768 3 64 768 1 768 768 768 1 768 768 2976 0 16 1024 64 64 0 256 256 "
+                              "65536 2 1 1 170 510 9472 23296 2 2 86 2 86 86 1 86 1 4096 0 4096 46592 2048 2048 ";
     std::vector<size_t> expectWorkspaces = {17567744};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -483,23 +431,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_output_indi
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -507,23 +450,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_output_hidd
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 8}, {6, 8}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 8}, {6, 8}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -531,23 +469,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_output_toke
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{4, 5}, {4, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -555,23 +488,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_probs_dim_n
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -579,23 +507,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_probs_token
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{4, 3}, {4, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{4, 3}, {4, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -603,23 +526,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_output_prob
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{6, 1}, {6, 1}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{6, 1}, {6, 1}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -783,23 +701,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_output_prob
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -807,23 +720,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_probs_3d)
 {
     optiling::MoeTokenPermuteWithEpCompileInfo compileInfo = {};
     std::vector<int64_t> range({0, 6});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{2, 3, 1}, {2, 3, 1}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{2, 5}, {2, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 3}, {2, 3}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{2, 3, 1}, {2, 3, 1}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{6, 5}, {6, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(6)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -833,23 +741,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_sort_limit_
     int64_t tokenNum = 32768;
     int64_t topk = 512;
     std::vector<int64_t> range({0, tokenNum * topk});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{tokenNum, 5}, {tokenNum, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{tokenNum, topk}, {tokenNum, topk}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{tokenNum, topk}, {tokenNum, topk}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{tokenNum * topk, 5}, {tokenNum * topk, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(tokenNum * topk)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{tokenNum, 5}, {tokenNum, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{tokenNum, topk}, {tokenNum, topk}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{tokenNum, topk}, {tokenNum, topk}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{tokenNum * topk, 5}, {tokenNum * topk, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(tokenNum * topk)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -859,23 +762,18 @@ TEST_F(MoeTokenPermuteWithEpTiling, moe_token_permute_with_ep_tiling_vbs_ceil_al
     int64_t tokenNum = 20000;
     int64_t topk = 5;
     std::vector<int64_t> range({0, 4096});
-    gert::TilingContextPara tilingContextPara("MoeTokenPermuteWithEp",
-                                            {
-                                                {{{tokenNum, 5}, {tokenNum, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{tokenNum, topk}, {tokenNum, topk}}, ge::DT_INT64, ge::FORMAT_ND},
-                                                {{{tokenNum, topk}, {tokenNum, topk}}, ge::DT_BF16, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {{{4096, 5}, {4096, 5}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}
-                                            },
-                                            {
-                                                {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
-                                                {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-                                            },
-                                            &compileInfo);
+    gert::TilingContextPara tilingContextPara(
+        "MoeTokenPermuteWithEp",
+        {{{{tokenNum, 5}, {tokenNum, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{tokenNum, topk}, {tokenNum, topk}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{tokenNum, topk}, {tokenNum, topk}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{4096, 5}, {4096, 5}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{tokenNum * topk}, {tokenNum * topk}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{4096}, {4096}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
+         {"num_out_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, 6);

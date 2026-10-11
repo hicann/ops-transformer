@@ -25,7 +25,7 @@ const static int64_t NUM_FOUR = 4;
 const static int64_t MRG_LIST_NUM = 4;
 const static int64_t SORT32_ALIGN_ELEMENT = 32;
 const static int64_t ONE_BLOCK_BYTE = 32;
-const static int64_t USED_SIZE = 96;// prob outsize + prob align + index align
+const static int64_t USED_SIZE = 96; // prob outsize + prob align + index align
 const static size_t DIM_ONE = 1;
 const static size_t DIM_TWO = 2;
 const static int32_t SIZE_16 = 16;
@@ -146,46 +146,46 @@ inline static int64_t VmsLoops(int64_t x)
 } // namespace
 
 namespace optiling {
-class MoeTokenPermuteWithEpTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass
-{
+class MoeTokenPermuteWithEpTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-	struct CoreParams {
-		int64_t frontCoreNum = 1;
-		int64_t tailCoreNum = 1;
-		int64_t numBlocks = 1;
-		int64_t coreCalcNum = 1;
-		int64_t coreCalcTail = 1;
-	};
-	struct UBParams {
-		int64_t ubLeft = 1;
-		int64_t oneTokenBtypeSize = 1;
-		int64_t oneTokenBtypeSizeAlign32 = 1;
-		int64_t oneTokenlastMove = 1;
-    	int64_t oneTokenOnceMove = 1;
-    	int64_t oneTokenMoveTimes = 1;
-    	int64_t onceIndicesTokenMoveTimes = 1;
-    	int64_t onceUbTokenNums = 1;
-    	int64_t onceIndicesTokenNums = 1;
-    	int64_t onceIndices = 1;
-    	int64_t tokenUB = 1;
-    	int64_t indicesUB = 1;
-    	int64_t probsUB = 1;
-		int64_t oneProbBtypeSize = 1;
-	};
+    struct CoreParams {
+        int64_t frontCoreNum = 1;
+        int64_t tailCoreNum = 1;
+        int64_t numBlocks = 1;
+        int64_t coreCalcNum = 1;
+        int64_t coreCalcTail = 1;
+    };
+    struct UBParams {
+        int64_t ubLeft = 1;
+        int64_t oneTokenBtypeSize = 1;
+        int64_t oneTokenBtypeSizeAlign32 = 1;
+        int64_t oneTokenlastMove = 1;
+        int64_t oneTokenOnceMove = 1;
+        int64_t oneTokenMoveTimes = 1;
+        int64_t onceIndicesTokenMoveTimes = 1;
+        int64_t onceUbTokenNums = 1;
+        int64_t onceIndicesTokenNums = 1;
+        int64_t onceIndices = 1;
+        int64_t tokenUB = 1;
+        int64_t indicesUB = 1;
+        int64_t probsUB = 1;
+        int64_t oneProbBtypeSize = 1;
+    };
 
-	struct LoopParams {
-	    int64_t frontCoreLoop = 1;
-    	int64_t frontCoreLastTokenNums = 1;
-    	int64_t tailCoreLoop = 1;
-    	int64_t tailCoreLastTokenNums = 1;
-    	int64_t tailLastonceIndicesTokenMoveTimes = 1;
-    	int64_t tailLastIndicesLastTokenNums = 1;
-    	int64_t frontLastonceIndicesTokenMoveTimes = 1;
-    	int64_t frontLastIndicesLastTokenNums = 1;
-	};
+    struct LoopParams {
+        int64_t frontCoreLoop = 1;
+        int64_t frontCoreLastTokenNums = 1;
+        int64_t tailCoreLoop = 1;
+        int64_t tailCoreLastTokenNums = 1;
+        int64_t tailLastonceIndicesTokenMoveTimes = 1;
+        int64_t tailLastIndicesLastTokenNums = 1;
+        int64_t frontLastonceIndicesTokenMoveTimes = 1;
+        int64_t frontLastIndicesLastTokenNums = 1;
+    };
 
 public:
-    explicit MoeTokenPermuteWithEpTilingBase(gert::TilingContext* context) : TilingBaseClass(context)
+    explicit MoeTokenPermuteWithEpTilingBase(gert::TilingContext* context)
+        : TilingBaseClass(context)
     {
         Reset();
     }
@@ -223,7 +223,7 @@ private:
     ge::graphStatus CheckInputShape();
     ge::graphStatus CheckAttrsInfosAndInputShape();
     ge::graphStatus CheckOutputIndicesAndToken(const gert::Shape indicesShape, int64_t cols,
-        const gert::Shape tokensShape);
+                                               const gert::Shape tokensShape);
     ge::graphStatus CheckOutputShape();
     void Tiling4IndexCopyCompute();
     void Tiling4SortOutCompute();
@@ -234,12 +234,12 @@ private:
     void ShowTilingData();
     void Tinlig4VBSMultiCoreCompute(PermuteVBSComputeTilingEPData* tilingData);
     void Tinlig4VBSOneCoreCompute(PermuteVBSComputeTilingEPData* tilingData);
-	void CalculateCoreParams(CoreParams& coreParams, int64_t tokenNums);
-	void CalculateUBParams(UBParams& ubParams, int64_t topK, int64_t cols);
-	void CalculateLoopParams(LoopParams& loopParams, const CoreParams& coreParams, int64_t onceIndicesTokenNums,
-		int64_t onceUbTokenNums) const;
-	void SetTilingDataFinalParams(IndexMixCopyComputeTilingData* tilingData, const CoreParams& coreParams,
-		const UBParams& ubParams, const LoopParams& loopParams) const;
+    void CalculateCoreParams(CoreParams& coreParams, int64_t tokenNums);
+    void CalculateUBParams(UBParams& ubParams, int64_t topK, int64_t cols);
+    void CalculateLoopParams(LoopParams& loopParams, const CoreParams& coreParams, int64_t onceIndicesTokenNums,
+                             int64_t onceUbTokenNums) const;
+    void SetTilingDataFinalParams(IndexMixCopyComputeTilingData* tilingData, const CoreParams& coreParams,
+                                  const UBParams& ubParams, const LoopParams& loopParams) const;
     int64_t aivNum = 0;
     int64_t realCoreNumAiv = 0;
     int64_t inputDimNum = 0;
@@ -267,10 +267,10 @@ void MoeTokenPermuteWithEpTilingBase::Reset()
 ge::graphStatus MoeTokenPermuteWithEpTilingBase::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
-        if (platformInfo == nullptr) {
-            OP_LOGE(opName, "fail to get platform info");
-            return ge::GRAPH_FAILED;
-        }
+    if (platformInfo == nullptr) {
+        OP_LOGE(opName, "fail to get platform info");
+        return ge::GRAPH_FAILED;
+    }
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     auto indicesPtr = context_->GetInputTensor(1);
     if (indicesPtr == nullptr) {
@@ -291,8 +291,8 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeTokenPermuteWithEpTilingBase::CheckOutputIndicesAndToken(
-    const gert::Shape indicesShape, int64_t cols, const gert::Shape tokensShape)
+ge::graphStatus MoeTokenPermuteWithEpTilingBase::CheckOutputIndicesAndToken(const gert::Shape indicesShape,
+                                                                            int64_t cols, const gert::Shape tokensShape)
 {
     size_t IndicesDimNnum = indicesShape.GetDimNum();
     if (IndicesDimNnum != DIM_ONE) {
@@ -307,13 +307,13 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::CheckOutputIndicesAndToken(
 
     if (cols != moeTokenPermuteWithEpTilingData.get_cols()) {
         OP_LOGE(context_->GetNodeName(), "The hidden_size of output permuteTokens should be %ld but got %ld.",
-            moeTokenPermuteWithEpTilingData.get_cols(), cols);
+                moeTokenPermuteWithEpTilingData.get_cols(), cols);
         return ge::GRAPH_FAILED;
     }
 
     if (tokensShape.GetDim(0) != numOutTokens) {
         OP_LOGE(context_->GetNodeName(), "The dim 0 of output permuteTokens should be %ld but got %ld.", numOutTokens,
-            tokensShape.GetDim(0));
+                tokensShape.GetDim(0));
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -332,7 +332,7 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::CheckOutputShape()
     size_t tokensDimNnum = tokensShape.GetDimNum();
     if (tokensDimNnum < DIM_TWO) {
         OP_LOGE(context_->GetNodeName(),
-            "The dim number of Output permute_tokens should be greater than 1 but got [%lu].", tokensDimNnum);
+                "The dim number of Output permute_tokens should be greater than 1 but got [%lu].", tokensDimNnum);
         return ge::GRAPH_FAILED;
     }
 
@@ -358,8 +358,8 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::CheckOutputShape()
         }
 
         if (probsShape.GetDim(0) != numOutTokens) {
-            OP_LOGE(context_->GetNodeName(),
-                "The size of output permuteProbs should be [%ld] but got [%ld].", numOutTokens, probsShape.GetDim(0));
+            OP_LOGE(context_->GetNodeName(), "The size of output permuteProbs should be [%ld] but got [%ld].",
+                    numOutTokens, probsShape.GetDim(0));
             return ge::GRAPH_FAILED;
         }
     }
@@ -409,9 +409,8 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::CheckInputShape()
     }
 
     if (tokensShape.GetDim(0) != IndicesShape.GetDim(0)) {
-        OP_LOGE(
-            context_->GetNodeName(), "Input token's dim 0 [%ld] should be same with indices' dim 0 [%ld].",
-            tokensShape.GetDim(0), IndicesShape.GetDim(0));
+        OP_LOGE(context_->GetNodeName(), "Input token's dim 0 [%ld] should be same with indices' dim 0 [%ld].",
+                tokensShape.GetDim(0), IndicesShape.GetDim(0));
         return ge::GRAPH_FAILED;
     }
 
@@ -424,23 +423,20 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::CheckInputShape()
         }
 
         if (indicesDimNum != probsDimNum) {
-            OP_LOGE(
-                context_->GetNodeName(), "The dim number of probs [%zu] should be equal to indices [%lu].", probsDimNum,
-                indicesDimNum);
+            OP_LOGE(context_->GetNodeName(), "The dim number of probs [%zu] should be equal to indices [%lu].",
+                    probsDimNum, indicesDimNum);
             return ge::GRAPH_FAILED;
         }
 
         if (tokensShape.GetDim(0) != probsShape.GetDim(0)) {
-            OP_LOGE(
-                context_->GetNodeName(), "Input token's dim 0 [%ld] should be same with probs' dim 0 [%ld].",
-                tokensShape.GetDim(0), probsShape.GetDim(0));
+            OP_LOGE(context_->GetNodeName(), "Input token's dim 0 [%ld] should be same with probs' dim 0 [%ld].",
+                    tokensShape.GetDim(0), probsShape.GetDim(0));
             return ge::GRAPH_FAILED;
         }
 
         if ((probsDimNum == DIM_TWO) && (IndicesShape.GetDim(1) != probsShape.GetDim(1))) {
-            OP_LOGE(
-                context_->GetNodeName(), "Input indices' dim 1 [%ld] should be same with probs' dim 1 [%ld].",
-                IndicesShape.GetDim(1), probsShape.GetDim(1));
+            OP_LOGE(context_->GetNodeName(), "Input indices' dim 1 [%ld] should be same with probs' dim 1 [%ld].",
+                    IndicesShape.GetDim(1), probsShape.GetDim(1));
             return ge::GRAPH_FAILED;
         }
     }
@@ -476,7 +472,8 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::GetShapeAttrsInfo()
 
     tokenBtypeSize = ge::GetSizeByDataType(context_->GetInputDesc(PERMUTE_WITH_EP_INPUT_TOKENS)->GetDataType());
     indicesBtypeSize = ge::GetSizeByDataType(context_->GetInputDesc(PERMUTE_WITH_EP_INPUT_IDX)->GetDataType());
-    probsBtypeSize = (probsTensor == nullptr) ? 0 :
+    probsBtypeSize = (probsTensor == nullptr) ?
+                         0 :
                          ge::GetSizeByDataType(context_->GetInputDesc(PERMUTE_WITH_EP_INPUT_PROBS)->GetDataType());
 
     size_t TokensDimNnum = tokensShape.GetDimNum();
@@ -500,14 +497,14 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::GetShapeAttrsInfo()
     moeTokenPermuteWithEpTilingData.set_topK(topK);
     totalLength = moeTokenPermuteWithEpTilingData.get_n() * moeTokenPermuteWithEpTilingData.get_topK();
     if (totalLength >= SORT_LIMIT_LENGTH) {
-        OP_LOGE( context_->GetNodeName(), "The elements num of indices [%ld] should be less than [%ld].", totalLength,
-            SORT_LIMIT_LENGTH);
+        OP_LOGE(context_->GetNodeName(), "The elements num of indices [%ld] should be less than [%ld].", totalLength,
+                SORT_LIMIT_LENGTH);
         return ge::GRAPH_FAILED;
     }
 
     if (start < 0 || start > totalLength || end < 0 || end > totalLength) {
-        OP_LOGE(
-            context_->GetNodeName(), "The start [%ld] and end [%ld] should be in [0, %ld].", start, end, totalLength);
+        OP_LOGE(context_->GetNodeName(), "The start [%ld] and end [%ld] should be in [0, %ld].", start, end,
+                totalLength);
         return ge::GRAPH_FAILED;
     }
 
@@ -521,80 +518,75 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::GetShapeAttrsInfo()
 
 void MoeTokenPermuteWithEpTilingBase::ShowIndexCopyCTilingData()
 {
-    OP_LOGD(
-        opName,
-        "indexCopyCTilingData is needCoreNum:%ld, frontCoreNum:%ld, "
-        "tailCoreNum:%ld, coreCalcNum:%ld, coreCalcTail:%ld, oneTokenBtypeSize:%ld, "
-        "onceIndicesTokenMoveTimes:%ld, onceUbTokenNums:%ld, onceIndicesTokenNums:%ld, "
-        "onceIndices:%ld, oneTokenlastMove:%ld, oneTokenOnceMove:%ld, oneTokenMoveTimes:%ld, "
-        "frontCoreLoop:%ld, frontCoreLastTokenNums:%ld, tailCoreLoop:%ld, tailCoreLastTokenNums:%ld, "
-        "tailLastonceIndicesTokenMoveTimes:%ld, tailLastIndicesLastTokenNums:%ld, "
-        "frontLastonceIndicesTokenMoveTimes:%ld, frontLastIndicesLastTokenNums:%ld, "
-        "numOutTokens:%ld, start:%ld, end:%ld, tokenUB:%ld, indicesUB:%ld, probsUB:%ld",
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_needCoreNum(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_frontCoreNum(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_tailCoreNum(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_coreCalcNum(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_coreCalcTail(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_oneTokenBtypeSize(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_onceIndicesTokenMoveTimes(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_onceUbTokenNums(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_onceIndicesTokenNums(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_onceIndices(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_oneTokenlastMove(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_oneTokenOnceMove(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_oneTokenMoveTimes(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_frontCoreLoop(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_frontCoreLastTokenNums(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_tailCoreLoop(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_tailCoreLastTokenNums(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_tailLastonceIndicesTokenMoveTimes(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_tailLastIndicesLastTokenNums(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_frontLastonceIndicesTokenMoveTimes(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_frontLastIndicesLastTokenNums(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_numOutTokens(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_start(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_end(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_tokenUB(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_indicesUB(),
-        moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_probsUB());
+    OP_LOGD(opName,
+            "indexCopyCTilingData is needCoreNum:%ld, frontCoreNum:%ld, "
+            "tailCoreNum:%ld, coreCalcNum:%ld, coreCalcTail:%ld, oneTokenBtypeSize:%ld, "
+            "onceIndicesTokenMoveTimes:%ld, onceUbTokenNums:%ld, onceIndicesTokenNums:%ld, "
+            "onceIndices:%ld, oneTokenlastMove:%ld, oneTokenOnceMove:%ld, oneTokenMoveTimes:%ld, "
+            "frontCoreLoop:%ld, frontCoreLastTokenNums:%ld, tailCoreLoop:%ld, tailCoreLastTokenNums:%ld, "
+            "tailLastonceIndicesTokenMoveTimes:%ld, tailLastIndicesLastTokenNums:%ld, "
+            "frontLastonceIndicesTokenMoveTimes:%ld, frontLastIndicesLastTokenNums:%ld, "
+            "numOutTokens:%ld, start:%ld, end:%ld, tokenUB:%ld, indicesUB:%ld, probsUB:%ld",
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_needCoreNum(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_frontCoreNum(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_tailCoreNum(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_coreCalcNum(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_coreCalcTail(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_oneTokenBtypeSize(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_onceIndicesTokenMoveTimes(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_onceUbTokenNums(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_onceIndicesTokenNums(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_onceIndices(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_oneTokenlastMove(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_oneTokenOnceMove(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_oneTokenMoveTimes(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_frontCoreLoop(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_frontCoreLastTokenNums(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_tailCoreLoop(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_tailCoreLastTokenNums(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_tailLastonceIndicesTokenMoveTimes(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_tailLastIndicesLastTokenNums(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_frontLastonceIndicesTokenMoveTimes(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_frontLastIndicesLastTokenNums(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_numOutTokens(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_start(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_end(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_tokenUB(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_indicesUB(),
+            moeTokenPermuteWithEpTilingData.indexCopyComputeParamsOp.get_probsUB());
 }
 
 void MoeTokenPermuteWithEpTilingBase::ShowVBSComputeTilingEPData()
 {
-    OP_LOGD(
-        opName,
-        "PermuteVBSComputeTilingEPData is needCoreNum:%ld, perCoreElements:%ld, perCoreLoops:%ld, "
-        "perCorePerLoopElements:%ld, "
-        "perCoreLastLoopElements:%ld, lastCoreElements:%ld, lastCoreLoops:%ld, lastCorePerLoopElements:%ld, "
-        "lastCoreLastLoopElements:%ld, oneLoopMaxElements:%ld, lastCoreWSindex:%ld",
-        moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_needCoreNum(),
-        moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_perCoreElements(),
-        moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_perCoreLoops(),
-        moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_perCorePerLoopElements(),
-        moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_perCoreLastLoopElements(),
-        moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_lastCoreElements(),
-        moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_lastCoreLoops(),
-        moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_lastCorePerLoopElements(),
-        moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_lastCoreLastLoopElements(),
-        moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_oneLoopMaxElements(),
-        moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_lastCoreWSindex());
+    OP_LOGD(opName,
+            "PermuteVBSComputeTilingEPData is needCoreNum:%ld, perCoreElements:%ld, perCoreLoops:%ld, "
+            "perCorePerLoopElements:%ld, "
+            "perCoreLastLoopElements:%ld, lastCoreElements:%ld, lastCoreLoops:%ld, lastCorePerLoopElements:%ld, "
+            "lastCoreLastLoopElements:%ld, oneLoopMaxElements:%ld, lastCoreWSindex:%ld",
+            moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_needCoreNum(),
+            moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_perCoreElements(),
+            moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_perCoreLoops(),
+            moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_perCorePerLoopElements(),
+            moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_perCoreLastLoopElements(),
+            moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_lastCoreElements(),
+            moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_lastCoreLoops(),
+            moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_lastCorePerLoopElements(),
+            moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_lastCoreLastLoopElements(),
+            moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_oneLoopMaxElements(),
+            moeTokenPermuteWithEpTilingData.vbsComputeParamsOp.get_lastCoreWSindex());
 }
 void MoeTokenPermuteWithEpTilingBase::ShowTilingData()
 {
     ShowIndexCopyCTilingData();
     ShowVBSComputeTilingEPData();
-    OP_LOGD(
-        opName, "PermuteVMSMiddleComputeTilingEPData is needCoreNum:%ld",
-        moeTokenPermuteWithEpTilingData.vmsMiddleComputeParamsOp.get_needCoreNum());
-    OP_LOGD(
-        opName, "moeTokenPermuteWithEpTilingData is coreNum:%ld, n:%ld, cols:%ld, colsAlign:%ld, k:%ld",
-        moeTokenPermuteWithEpTilingData.get_coreNum(), moeTokenPermuteWithEpTilingData.get_n(),
-        moeTokenPermuteWithEpTilingData.get_cols(), moeTokenPermuteWithEpTilingData.get_colsAlign(),
-        moeTokenPermuteWithEpTilingData.get_topK());
-    OP_LOGD(
-        opName, "PermuteSortOutComputeTilingEPData is oneLoopMaxElements:%ld",
-        moeTokenPermuteWithEpTilingData.sortOutComputeParamsOp.get_oneLoopMaxElements());
+    OP_LOGD(opName, "PermuteVMSMiddleComputeTilingEPData is needCoreNum:%ld",
+            moeTokenPermuteWithEpTilingData.vmsMiddleComputeParamsOp.get_needCoreNum());
+    OP_LOGD(opName, "moeTokenPermuteWithEpTilingData is coreNum:%ld, n:%ld, cols:%ld, colsAlign:%ld, k:%ld",
+            moeTokenPermuteWithEpTilingData.get_coreNum(), moeTokenPermuteWithEpTilingData.get_n(),
+            moeTokenPermuteWithEpTilingData.get_cols(), moeTokenPermuteWithEpTilingData.get_colsAlign(),
+            moeTokenPermuteWithEpTilingData.get_topK());
+    OP_LOGD(opName, "PermuteSortOutComputeTilingEPData is oneLoopMaxElements:%ld",
+            moeTokenPermuteWithEpTilingData.sortOutComputeParamsOp.get_oneLoopMaxElements());
 }
 ge::graphStatus MoeTokenPermuteWithEpTilingBase::DoOpTiling()
 {
@@ -636,8 +628,8 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::PostTiling()
     size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, currentWorkspace);
     currentWorkspace[0] = workspaceSize_;
-    moeTokenPermuteWithEpTilingData.SaveToBuffer(
-        context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
+    moeTokenPermuteWithEpTilingData.SaveToBuffer(context_->GetRawTilingData()->GetData(),
+                                                 context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(moeTokenPermuteWithEpTilingData.GetDataSize());
     return ge::GRAPH_SUCCESS;
 }
@@ -678,17 +670,17 @@ void MoeTokenPermuteWithEpTilingBase::Tinlig4VBSMultiCoreCompute(PermuteVBSCompu
         GetCeilInt(tilingData->get_perCoreElements(), sortLoopMaxElement)); // 每个核处理的loop数
     tilingData->set_perCorePerLoopElements(std::min(tilingData->get_perCoreElements(), sortLoopMaxElement));
 
-    tilingData->set_perCoreLastLoopElements(
-        tilingData->get_perCoreElements() -
-        (tilingData->get_perCoreLoops() - 1) * tilingData->get_perCorePerLoopElements());
+    tilingData->set_perCoreLastLoopElements(tilingData->get_perCoreElements() -
+                                            (tilingData->get_perCoreLoops() - 1) *
+                                                tilingData->get_perCorePerLoopElements());
 
-    tilingData->set_lastCoreElements(
-        totalLength - (tilingData->get_needCoreNum() - 1) * tilingData->get_perCoreElements());
+    tilingData->set_lastCoreElements(totalLength -
+                                     (tilingData->get_needCoreNum() - 1) * tilingData->get_perCoreElements());
     tilingData->set_lastCoreLoops(GetCeilInt(tilingData->get_lastCoreElements(), sortLoopMaxElement));
     tilingData->set_lastCorePerLoopElements(std::min(tilingData->get_lastCoreElements(), sortLoopMaxElement));
-    tilingData->set_lastCoreLastLoopElements(
-        tilingData->get_lastCoreElements() -
-        (tilingData->get_lastCoreLoops() - 1) * tilingData->get_lastCorePerLoopElements());
+    tilingData->set_lastCoreLastLoopElements(tilingData->get_lastCoreElements() -
+                                             (tilingData->get_lastCoreLoops() - 1) *
+                                                 tilingData->get_lastCorePerLoopElements());
     tilingData->set_lastCoreWSindex(
         std::abs(VmsLoops(tilingData->get_lastCoreLoops()) - VmsLoops(tilingData->get_perCoreLoops())));
 }
@@ -729,42 +721,46 @@ void MoeTokenPermuteWithEpTilingBase::Tiling4SortOutCompute()
 }
 
 void MoeTokenPermuteWithEpTilingBase::CalculateCoreParams(MoeTokenPermuteWithEpTilingBase::CoreParams& coreParams,
-	int64_t tokenNums)
+                                                          int64_t tokenNums)
 {
-	coreParams.frontCoreNum = GetRem(tokenNums, realCoreNumAiv) != 0 ? GetRem(tokenNums, realCoreNumAiv) : realCoreNumAiv;
+    coreParams.frontCoreNum =
+        GetRem(tokenNums, realCoreNumAiv) != 0 ? GetRem(tokenNums, realCoreNumAiv) : realCoreNumAiv;
     coreParams.tailCoreNum = tokenNums <= realCoreNumAiv ? 0 : realCoreNumAiv - coreParams.frontCoreNum;
     coreParams.numBlocks = coreParams.frontCoreNum + coreParams.tailCoreNum;
     coreParams.coreCalcNum = GetCeilInt(tokenNums, realCoreNumAiv);
     coreParams.coreCalcTail = GetDiv(tokenNums, realCoreNumAiv);
 }
 
-void MoeTokenPermuteWithEpTilingBase::CalculateUBParams(
-	MoeTokenPermuteWithEpTilingBase::UBParams& ubParams, int64_t topK, int64_t cols)
+void MoeTokenPermuteWithEpTilingBase::CalculateUBParams(MoeTokenPermuteWithEpTilingBase::UBParams& ubParams,
+                                                        int64_t topK, int64_t cols)
 {
     ubParams.ubLeft = aicoreParams_.ubSize - PROBS_SPACE_SCALE * MAX_INDICES_NUM * INT32_DTYPE_SIZE - ONE_BLOCK_BYTE;
     ubParams.oneTokenBtypeSize = cols * tokenBtypeSize;
-	ubParams.oneProbBtypeSize = probsBtypeSize;
-	ubParams.oneTokenBtypeSizeAlign32 = UpAlign(ubParams.oneTokenBtypeSize, ONE_BLOCK_BYTE);
+    ubParams.oneProbBtypeSize = probsBtypeSize;
+    ubParams.oneTokenBtypeSizeAlign32 = UpAlign(ubParams.oneTokenBtypeSize, ONE_BLOCK_BYTE);
 
-	if (ubParams.ubLeft >= BUFFER_NUM * ubParams.oneTokenBtypeSizeAlign32) {
-		ubParams.onceUbTokenNums = GetDiv(
+    if (ubParams.ubLeft >= BUFFER_NUM * ubParams.oneTokenBtypeSizeAlign32) {
+        ubParams.onceUbTokenNums = GetDiv(
             static_cast<int64_t>(aicoreParams_.ubSize - USED_SIZE),
             ubParams.oneTokenBtypeSizeAlign32 * BUFFER_NUM + PROBS_SPACE_SCALE * topK * BUFFER_NUM * INT32_DTYPE_SIZE);
         ubParams.onceUbTokenNums = std::min(ubParams.onceUbTokenNums, MAX_BLOCK_COUNT);
 
-        int64_t TopKUbLeft = aicoreParams_.ubSize - USED_SIZE - ubParams.onceUbTokenNums * ubParams.oneTokenBtypeSizeAlign32 * BUFFER_NUM;
+        int64_t TopKUbLeft = aicoreParams_.ubSize - USED_SIZE -
+                             ubParams.onceUbTokenNums * ubParams.oneTokenBtypeSizeAlign32 * BUFFER_NUM;
         /* Probs的UB按照indices的UB计算, 这里乘以2*/
-        ubParams.onceIndicesTokenMoveTimes = GetDiv(TopKUbLeft, PROBS_SPACE_SCALE * ubParams.onceUbTokenNums * topK * INT32_DTYPE_SIZE);
+        ubParams.onceIndicesTokenMoveTimes =
+            GetDiv(TopKUbLeft, PROBS_SPACE_SCALE * ubParams.onceUbTokenNums * topK * INT32_DTYPE_SIZE);
 
         ubParams.onceIndicesTokenNums = ubParams.onceIndicesTokenMoveTimes * ubParams.onceUbTokenNums;
         ubParams.onceIndices = ubParams.onceIndicesTokenNums * topK;
         ubParams.tokenUB = ubParams.onceUbTokenNums * ubParams.oneTokenBtypeSizeAlign32;
         ubParams.indicesUB = UpAlign(ubParams.onceIndices * INT32_DTYPE_SIZE, ONE_BLOCK_BYTE);
         ubParams.probsUB = ubParams.indicesUB;
-	} else {
-		ubParams.onceIndicesTokenNums = GetDiv(MAX_INDICES_NUM, topK);
+    } else {
+        ubParams.onceIndicesTokenNums = GetDiv(MAX_INDICES_NUM, topK);
         ubParams.onceIndices = ubParams.onceIndicesTokenNums * topK;
-        ubParams.oneTokenOnceMove = GetDiv(FloorAlign(GetDiv(ubParams.ubLeft, BUFFER_NUM), DATA_MOVE_ALIGN), tokenBtypeSize);
+        ubParams.oneTokenOnceMove =
+            GetDiv(FloorAlign(GetDiv(ubParams.ubLeft, BUFFER_NUM), DATA_MOVE_ALIGN), tokenBtypeSize);
         ubParams.oneTokenMoveTimes = GetCeilInt(cols, ubParams.oneTokenOnceMove);
         ubParams.oneTokenlastMove = cols - (ubParams.oneTokenMoveTimes - 1) * ubParams.oneTokenOnceMove;
 
@@ -772,13 +768,12 @@ void MoeTokenPermuteWithEpTilingBase::CalculateUBParams(
         ubParams.tokenUB = ubParams.oneTokenOnceMove * tokenBtypeSize;
         ubParams.indicesUB = MAX_INDICES_NUM * INT32_DTYPE_SIZE;
         ubParams.probsUB = ubParams.indicesUB;
-	}
+    }
 }
 
-void MoeTokenPermuteWithEpTilingBase::CalculateLoopParams(
-	MoeTokenPermuteWithEpTilingBase::LoopParams& loopParams,
-	const MoeTokenPermuteWithEpTilingBase::CoreParams& coreParams,
-	int64_t onceIndicesTokenNums, int64_t onceUbTokenNums) const 
+void MoeTokenPermuteWithEpTilingBase::CalculateLoopParams(MoeTokenPermuteWithEpTilingBase::LoopParams& loopParams,
+                                                          const MoeTokenPermuteWithEpTilingBase::CoreParams& coreParams,
+                                                          int64_t onceIndicesTokenNums, int64_t onceUbTokenNums) const
 {
     loopParams.frontCoreLoop = GetCeilInt(coreParams.coreCalcNum, onceIndicesTokenNums);
     loopParams.frontCoreLastTokenNums = coreParams.coreCalcNum - (loopParams.frontCoreLoop - 1) * onceIndicesTokenNums;
@@ -793,10 +788,10 @@ void MoeTokenPermuteWithEpTilingBase::CalculateLoopParams(
         loopParams.frontCoreLastTokenNums - (loopParams.frontLastonceIndicesTokenMoveTimes - 1) * onceUbTokenNums;
 }
 
-void MoeTokenPermuteWithEpTilingBase::SetTilingDataFinalParams(IndexMixCopyComputeTilingData* tilingData,
-	const MoeTokenPermuteWithEpTilingBase::CoreParams& coreParams,
-	const MoeTokenPermuteWithEpTilingBase::UBParams& ubParams,
-	const MoeTokenPermuteWithEpTilingBase::LoopParams& loopParams) const
+void MoeTokenPermuteWithEpTilingBase::SetTilingDataFinalParams(
+    IndexMixCopyComputeTilingData* tilingData, const MoeTokenPermuteWithEpTilingBase::CoreParams& coreParams,
+    const MoeTokenPermuteWithEpTilingBase::UBParams& ubParams,
+    const MoeTokenPermuteWithEpTilingBase::LoopParams& loopParams) const
 {
     tilingData->set_tokenUB(ubParams.tokenUB);
     tilingData->set_indicesUB(ubParams.indicesUB);
@@ -842,16 +837,16 @@ void MoeTokenPermuteWithEpTilingBase::Tiling4IndexCopyCompute()
     tilingData->set_start(start);
     tilingData->set_end(end);
 
-	CoreParams coreParams;
-	CalculateCoreParams(coreParams, tokenNums);
-	UBParams ubParams;
-	CalculateUBParams(ubParams, topK, cols);
+    CoreParams coreParams;
+    CalculateCoreParams(coreParams, tokenNums);
+    UBParams ubParams;
+    CalculateUBParams(ubParams, topK, cols);
 
-	LoopParams loopParams;
-	CalculateLoopParams(loopParams, coreParams, ubParams.onceIndicesTokenNums, ubParams.onceUbTokenNums);
-	SetTilingDataFinalParams(tilingData, coreParams, ubParams, loopParams);
+    LoopParams loopParams;
+    CalculateLoopParams(loopParams, coreParams, ubParams.onceIndicesTokenNums, ubParams.onceUbTokenNums);
+    SetTilingDataFinalParams(tilingData, coreParams, ubParams, loopParams);
 
-	aivNum = std::max(aivNum, coreParams.numBlocks);
+    aivNum = std::max(aivNum, coreParams.numBlocks);
 }
 
 static ge::graphStatus TilingForMoeTokenPermuteWithEp(gert::TilingContext* context)

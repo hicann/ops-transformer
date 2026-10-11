@@ -26,9 +26,9 @@ const static int64_t RANGE_SIZE = 2;
 const static uint64_t WORKSPACE_SIZE_WITH_M = 16;
 const static uint64_t BYTE_SIZE_WITH_K = 1024;
 
-ge::graphStatus TilingMoeTokenUnpermuteWithEp(gert::TilingContext *context);
+ge::graphStatus TilingMoeTokenUnpermuteWithEp(gert::TilingContext* context);
 
-ge::graphStatus TilingMoeTokenUnpermuteWithEp(gert::TilingContext *context)
+ge::graphStatus TilingMoeTokenUnpermuteWithEp(gert::TilingContext* context)
 {
     return UnpermuteWithEpTilingCompute(context, -1, true);
 }
@@ -83,7 +83,7 @@ static inline int64_t ComputeUnitHSpace(const int64_t inputDtypeSize, const int6
     return inputDtypeSize * (QUE_NUM + bufferNum - 1) + FLOAT_DATA_SIZE * castNum;
 }
 
-static inline int64_t ComputeMaxHiddenSize(MoeTokenUnpermuteWithEpParam &param, int64_t bufferNum)
+static inline int64_t ComputeMaxHiddenSize(MoeTokenUnpermuteWithEpParam& param, int64_t bufferNum)
 {
     // sorted_indices和probs的预留空间；topK_num为最大值512时，至少需要5120 Btye。
     const int64_t reserveSpace = 5120;
@@ -93,16 +93,16 @@ static inline int64_t ComputeMaxHiddenSize(MoeTokenUnpermuteWithEpParam &param, 
     return AlignN(maxHiddenSize - ALIGN_512, ALIGN_512);
 }
 
-static inline ge::graphStatus MoeTokenUnpermuteWithEpInputParamCheck(const gert::TilingContext *context,
+static inline ge::graphStatus MoeTokenUnpermuteWithEpInputParamCheck(const gert::TilingContext* context,
                                                                      const bool isUnpermute)
 {
-    const gert::StorageShape *tokensShape = context->GetInputShape(0);
-    const gert::StorageShape *indicesShape = context->GetInputShape(1);
-    const gert::StorageShape *probsShape = context->GetInputShape(2);
+    const gert::StorageShape* tokensShape = context->GetInputShape(0);
+    const gert::StorageShape* indicesShape = context->GetInputShape(1);
+    const gert::StorageShape* probsShape = context->GetInputShape(2);
     auto dataTensor0 = context->GetInputTensor(0);
     auto dataTensor1 = context->GetInputTensor(1);
     auto nodeName = context->GetNodeName();
-    const int64_t *tmpTopK = context->GetAttrs()->GetAttrPointer<int64_t>(0);
+    const int64_t* tmpTopK = context->GetAttrs()->GetAttrPointer<int64_t>(0);
     int inputTopK = *tmpTopK;
 
     OP_CHECK_IF(inputTopK < 1, OP_LOGE(nodeName, "input num TopK cannot less than 1."), return ge::GRAPH_FAILED);
@@ -140,7 +140,7 @@ static inline ge::graphStatus MoeTokenUnpermuteWithEpInputParamCheck(const gert:
     return ge::GRAPH_SUCCESS;
 }
 
-static inline void Init(const gert::TilingContext *context, const int64_t topK, MoeTokenUnpermuteWithEpParam &param,
+static inline void Init(const gert::TilingContext* context, const int64_t topK, MoeTokenUnpermuteWithEpParam& param,
                         const bool isUnpermute)
 {
     auto ascendPlaform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
@@ -149,9 +149,9 @@ static inline void Init(const gert::TilingContext *context, const int64_t topK, 
     ascendPlaform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, maxCoreMemory);
     param.core.maxCoreMemory = static_cast<int64_t>(maxCoreMemory);
 
-    const gert::StorageShape *tokensShape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_TOKENS);
-    const gert::StorageShape *sortedIndicesShape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_IDX);
-    const gert::StorageShape *probsShape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_PROBS);
+    const gert::StorageShape* tokensShape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_TOKENS);
+    const gert::StorageShape* sortedIndicesShape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_IDX);
+    const gert::StorageShape* probsShape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_PROBS);
 
     param.input.tokensDtypeSize =
         GetLengthByType(context->GetInputTensor(UNPERMUTE_WITH_EP_INPUT_TOKENS)->GetDataType());
@@ -159,13 +159,13 @@ static inline void Init(const gert::TilingContext *context, const int64_t topK, 
     param.input.isUnpermute = isUnpermute;
 
     auto attrPtr = context->GetAttrs();
-    const int64_t *tmpTopK = attrPtr->GetAttrPointer<int64_t>(UNPERMUTE_WITH_EP_ARRT_TOPK);
+    const int64_t* tmpTopK = attrPtr->GetAttrPointer<int64_t>(UNPERMUTE_WITH_EP_ARRT_TOPK);
     int inputTopK = *tmpTopK;
     auto rangePtr = attrPtr->GetAttrPointer<gert::ContinuousVector>(UNPERMUTE_WITH_EP_ARRT_RANGE);
     if (rangePtr != nullptr) {
         OP_CHECK_IF(rangePtr->GetSize() != RANGE_SIZE,
                     OP_LOGE(context->GetNodeName(), "the size of range only support 2"), return);
-        const int64_t *rangeList = reinterpret_cast<const int64_t *>(rangePtr->GetData());
+        const int64_t* rangeList = reinterpret_cast<const int64_t*>(rangePtr->GetData());
         param.input.start = rangeList[0];
         param.input.end = rangeList[1];
     } else {
@@ -199,7 +199,7 @@ static inline void Init(const gert::TilingContext *context, const int64_t topK, 
     }
 }
 
-static void SetCoreNum(MoeTokenUnpermuteWithEpParam &param)
+static void SetCoreNum(MoeTokenUnpermuteWithEpParam& param)
 {
     if (param.input.tokensNum < param.core.maxCoreNum) {
         param.core.usedCoreNum = param.input.tokensNum;
@@ -208,7 +208,7 @@ static void SetCoreNum(MoeTokenUnpermuteWithEpParam &param)
     }
 }
 
-static inline void TilingHiddenSize(MoeTokenUnpermuteWithEpParam &param)
+static inline void TilingHiddenSize(MoeTokenUnpermuteWithEpParam& param)
 {
     int64_t maxHiddenSize = ComputeMaxHiddenSize(param, MIN_BUFFER_NUM);
     if (AlignN(param.input.hiddenSize, ALIGN_512) <= maxHiddenSize) {
@@ -222,7 +222,7 @@ static inline void TilingHiddenSize(MoeTokenUnpermuteWithEpParam &param)
     }
 }
 
-static inline void SetBufferNum(MoeTokenUnpermuteWithEpParam &param)
+static inline void SetBufferNum(MoeTokenUnpermuteWithEpParam& param)
 {
     const int64_t maxBufferNum = 4;
     int64_t bufferNum = maxBufferNum;
@@ -232,7 +232,7 @@ static inline void SetBufferNum(MoeTokenUnpermuteWithEpParam &param)
     param.core.bufferNum = bufferNum;
 }
 
-static inline void ComputeRemainMemerySpace(MoeTokenUnpermuteWithEpParam &param)
+static inline void ComputeRemainMemerySpace(MoeTokenUnpermuteWithEpParam& param)
 {
     param.core.remainMemorySpace =
         param.core.maxCoreMemory - AlignN(param.hiddenTiling.length, ALIGN_512) *
@@ -240,7 +240,7 @@ static inline void ComputeRemainMemerySpace(MoeTokenUnpermuteWithEpParam &param)
     param.core.remainMemorySpace -= ALIGN_256;
 }
 
-static inline void TilingToken(MoeTokenUnpermuteWithEpParam &param)
+static inline void TilingToken(MoeTokenUnpermuteWithEpParam& param)
 {
     param.tokenPerCore.length = safeDiv(param.input.tokensNum, param.core.usedCoreNum);
     param.tokenPerCore.num = param.core.usedCoreNum;
@@ -272,8 +272,8 @@ static inline void TilingToken(MoeTokenUnpermuteWithEpParam &param)
     0表示probs为None，
     1 2 3 表示 DT_FLOAT DT_FLOAT16 DT_BF16
  */
-static inline void SetTilingKey(const gert::TilingContext *context, const bool isUnpermute,
-                                MoeTokenUnpermuteWithEpParam &param)
+static inline void SetTilingKey(const gert::TilingContext* context, const bool isUnpermute,
+                                MoeTokenUnpermuteWithEpParam& param)
 {
     if (param.input.haveProbs) {
         // 存在probs
@@ -299,7 +299,7 @@ static inline void SetTilingKey(const gert::TilingContext *context, const bool i
     }
 }
 
-static inline void SetTilingData(gert::TilingContext *context, const MoeTokenUnpermuteWithEpParam &param)
+static inline void SetTilingData(gert::TilingContext* context, const MoeTokenUnpermuteWithEpParam& param)
 {
     MoeTokenUnpermuteWithEpTilingData tilingData;
     tilingData.set_hidden_size(param.input.hiddenSize);
@@ -322,7 +322,7 @@ static inline void SetTilingData(gert::TilingContext *context, const MoeTokenUnp
     context->SetBlockDim(param.core.usedCoreNum);
 }
 
-static inline void DebugPrint(const gert::TilingContext *context, const MoeTokenUnpermuteWithEpParam &param)
+static inline void DebugPrint(const gert::TilingContext* context, const MoeTokenUnpermuteWithEpParam& param)
 {
     auto nodeName = context->GetNodeName();
     OP_LOGD(nodeName, ">>>>>>>>>>>>>>> Start to print MoeTokenUnpermuteWithEp tiling data <<<<<<<<<<<<<<<<");
@@ -360,7 +360,7 @@ static inline void DebugPrint(const gert::TilingContext *context, const MoeToken
     OP_LOGD(nodeName, ">>>>>>>>>>>>>>> Print MoeTokenUnpermuteWithEp tiling data end <<<<<<<<<<<<<<<<");
 }
 
-ge::graphStatus UnpermuteWithEpTilingCompute(gert::TilingContext *context, const int64_t topK, const bool isUnpermute)
+ge::graphStatus UnpermuteWithEpTilingCompute(gert::TilingContext* context, const int64_t topK, const bool isUnpermute)
 {
     MoeTokenUnpermuteWithEpParam param;
 
@@ -376,12 +376,12 @@ ge::graphStatus UnpermuteWithEpTilingCompute(gert::TilingContext *context, const
     SetTilingKey(context, isUnpermute, param);
     SetTilingData(context, param);
     DebugPrint(context, param);
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     workSpaces[0] = WORKSPACE_SIZE_WITH_M * BYTE_SIZE_WITH_K * BYTE_SIZE_WITH_K;
     return context->SetTilingKey(param.core.tilingKey);
 }
 
-static ge::graphStatus TilingPrepareForMoeTokenUnpermuteWithEp(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForMoeTokenUnpermuteWithEp(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

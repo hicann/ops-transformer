@@ -25,19 +25,19 @@ class MoeindexCopySpiltDOp {
 public:
     __aicore__ inline MoeindexCopySpiltDOp(){};
     __aicore__ inline void Init(GM_ADDR src, GM_ADDR srcProbs, GM_ADDR indices, GM_ADDR dst, GM_ADDR dstProbs,
-                                const MoeTokenPermuteWithEpTilingData *tilingData, TPipe *tPipe);
+                                const MoeTokenPermuteWithEpTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void CopyInAndOut(int64_t Offset, int64_t progress);
-    __aicore__ inline void CopyInProbs(int64_t progress, DataCopyExtParams &dataCopyExtParams);
-    __aicore__ inline void CopyInIndices(int64_t progress, DataCopyExtParams &dataCopyExtParams);
+    __aicore__ inline void CopyInProbs(int64_t progress, DataCopyExtParams& dataCopyExtParams);
+    __aicore__ inline void CopyInIndices(int64_t progress, DataCopyExtParams& dataCopyExtParams);
     __aicore__ inline void CopyOut(int64_t innerLoop);
-    __aicore__ inline void CopyOutProbs(int64_t progress, DataCopyExtParams &dataCopyExtParams);
+    __aicore__ inline void CopyOutProbs(int64_t progress, DataCopyExtParams& dataCopyExtParams);
     __aicore__ inline void SyncAll();
 
 private:
-    TPipe *pipe;
+    TPipe* pipe;
     TQueBind<TPosition::VECIN, TPosition::VECOUT, 1> copyInQueue;
     TQueBind<TPosition::VECIN, TPosition::VECOUT, 1> copyProbsInQueue;
     TQue<QuePosition::VECIN, 1> indicesQueue;
@@ -55,7 +55,7 @@ private:
 
     LocalTensor<int32_t> indicesLocal;
 
-    const IndexMixCopyComputeTilingData *indexCopyTilingData;
+    const IndexMixCopyComputeTilingData* indexCopyTilingData;
     event_t indicesSToMte2;
     event_t indicesMte2ToV;
     event_t probsMte3ToS;
@@ -152,7 +152,7 @@ __aicore__ inline void MoeindexCopySpiltDOp<T, probsT, ifNumOutTokens>::CopyInAn
 
 template <typename T, typename probsT, bool ifNumOutTokens>
 __aicore__ inline void MoeindexCopySpiltDOp<T, probsT, ifNumOutTokens>::CopyInIndices(
-    int64_t progress, DataCopyExtParams &dataCopyExtParams)
+    int64_t progress, DataCopyExtParams& dataCopyExtParams)
 {
     indicesLocal = indicesQueue.AllocTensor<int32_t>();
     DataCopyPad(indicesLocal, indicesGm[progress * onceIndicesNums], dataCopyExtParams, indicesPadParams);
@@ -160,7 +160,7 @@ __aicore__ inline void MoeindexCopySpiltDOp<T, probsT, ifNumOutTokens>::CopyInIn
 
 template <typename T, typename probsT, bool ifNumOutTokens>
 __aicore__ inline void MoeindexCopySpiltDOp<T, probsT, ifNumOutTokens>::CopyInProbs(
-    int64_t progress, DataCopyExtParams &dataCopyExtParams)
+    int64_t progress, DataCopyExtParams& dataCopyExtParams)
 {
     probsLocal = copyProbsInQueue.AllocTensor<probsT>();
     if (srcProbsGm.GetPhyAddr() == nullptr) {
@@ -173,7 +173,7 @@ __aicore__ inline void MoeindexCopySpiltDOp<T, probsT, ifNumOutTokens>::CopyInPr
 
 template <typename T, typename probsT, bool ifNumOutTokens>
 __aicore__ inline void MoeindexCopySpiltDOp<T, probsT, ifNumOutTokens>::CopyOutProbs(
-    int64_t progress, DataCopyExtParams &dataCopyExtParams)
+    int64_t progress, DataCopyExtParams& dataCopyExtParams)
 {
     if (srcProbsGm.GetPhyAddr() == nullptr) {
         return;
@@ -216,7 +216,7 @@ __aicore__ inline void MoeindexCopySpiltDOp<T, probsT, ifNumOutTokens>::SyncAll(
 template <typename T, typename probsT, bool ifNumOutTokens>
 __aicore__ inline void MoeindexCopySpiltDOp<T, probsT, ifNumOutTokens>::Init(
     GM_ADDR src, GM_ADDR srcProbs, GM_ADDR indices, GM_ADDR dst, GM_ADDR dstProbs,
-    const MoeTokenPermuteWithEpTilingData *tilingData, TPipe *tPipe)
+    const MoeTokenPermuteWithEpTilingData* tilingData, TPipe* tPipe)
 {
     int64_t blockNum = GetBlockNum();
     this->pipe = tPipe;
@@ -271,15 +271,15 @@ __aicore__ inline void MoeindexCopySpiltDOp<T, probsT, ifNumOutTokens>::Init(
     onceUbIndicesCols = this->onceUbTokenNums * topK;
     onceUbProbsCols = onceUbIndicesCols;
 
-    srcGm.SetGlobalBuffer((__gm__ T *)src + srcoffset, this->coreCalcNum * cols);
-    indicesGm.SetGlobalBuffer((__gm__ int32_t *)indices + indicesoffset, this->coreCalcNum * topK);
-    dstGm.SetGlobalBuffer((__gm__ T *)dst, this->numOutTokens * cols);
+    srcGm.SetGlobalBuffer((__gm__ T*)src + srcoffset, this->coreCalcNum * cols);
+    indicesGm.SetGlobalBuffer((__gm__ int32_t*)indices + indicesoffset, this->coreCalcNum * topK);
+    dstGm.SetGlobalBuffer((__gm__ T*)dst, this->numOutTokens * cols);
     if (srcProbs != nullptr) {
-        srcProbsGm.SetGlobalBuffer((__gm__ probsT *)srcProbs + probsoffset, this->coreCalcNum * topK);
+        srcProbsGm.SetGlobalBuffer((__gm__ probsT*)srcProbs + probsoffset, this->coreCalcNum * topK);
     } else {
         srcProbsGm.SetGlobalBuffer(nullptr);
     }
-    dstProbsGm.SetGlobalBuffer((__gm__ probsT *)dstProbs, this->numOutTokens * topK);
+    dstProbsGm.SetGlobalBuffer((__gm__ probsT*)dstProbs, this->numOutTokens * topK);
     pipe->InitBuffer(copyInQueue, 2, this->indexCopyTilingData->tokenUB);
     pipe->InitBuffer(indicesQueue, 1, this->indexCopyTilingData->indicesUB);
     pipe->InitBuffer(copyProbsInQueue, 1, this->indexCopyTilingData->probsUB);

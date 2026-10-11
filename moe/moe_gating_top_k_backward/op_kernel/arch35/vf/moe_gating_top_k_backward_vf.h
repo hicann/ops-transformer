@@ -43,7 +43,7 @@ constexpr Reg::DivSpecificMode div0UlpMode = {
     true,
 };
 
-__simd_vf__ void SigmoidGradFP32VF(__ubuf__ float *xNormAddr, __ubuf__ float *gradNormXAddr, __ubuf__ float *gradXAddr,
+__simd_vf__ void SigmoidGradFP32VF(__ubuf__ float* xNormAddr, __ubuf__ float* gradNormXAddr, __ubuf__ float* gradXAddr,
                                    uint32_t totalElements, uint32_t oneRepeatSize, uint16_t repeatTimes)
 {
     Reg::RegTensor<float> xReg, gNormReg, tmpReg, dstReg;
@@ -64,7 +64,7 @@ __simd_vf__ void SigmoidGradFP32VF(__ubuf__ float *xNormAddr, __ubuf__ float *gr
 }
 
 template <typename T>
-__simd_vf__ void SigmoidGradHalfVF(__ubuf__ float *xNormAddr, __ubuf__ float *gradNormXAddr, __ubuf__ T *gradXAddr,
+__simd_vf__ void SigmoidGradHalfVF(__ubuf__ float* xNormAddr, __ubuf__ float* gradNormXAddr, __ubuf__ T* gradXAddr,
                                    uint32_t totalElements, uint32_t oneRepeatSize, uint16_t repeatTimes)
 {
     Reg::RegTensor<float> xReg, gNormReg, tmpReg, dstReg;
@@ -88,7 +88,7 @@ __simd_vf__ void SigmoidGradHalfVF(__ubuf__ float *xNormAddr, __ubuf__ float *gr
 }
 
 template <typename T>
-__simd_vf__ void CastGradYFlatVF(__ubuf__ T *srcAddr, __ubuf__ float *dstAddr, uint32_t totalElements,
+__simd_vf__ void CastGradYFlatVF(__ubuf__ T* srcAddr, __ubuf__ float* dstAddr, uint32_t totalElements,
                                  uint32_t oneRepeatSize, uint16_t repeatTimes)
 {
     Reg::MaskReg preg = Reg::CreateMask<float>();
@@ -105,15 +105,15 @@ __simd_vf__ void CastGradYFlatVF(__ubuf__ T *srcAddr, __ubuf__ float *dstAddr, u
 }
 
 template <typename T>
-__simd_vf__ void CastGradYRowsVF(__ubuf__ T *srcAddr, __ubuf__ float *dstAddr, uint16_t curRows, uint16_t k,
+__simd_vf__ void CastGradYRowsVF(__ubuf__ T* srcAddr, __ubuf__ float* dstAddr, uint16_t curRows, uint16_t k,
                                  uint16_t srcRowStride, uint16_t dstRowStride)
 {
     constexpr uint16_t chunkSize = VECTOR_REG_WIDTH / (2 * sizeof(T)); // 64 for half/bfloat16_t
     uint16_t repeatTimes = static_cast<uint16_t>((k + chunkSize - 1) / chunkSize);
 
     for (uint16_t row = 0; row < curRows; row++) {
-        __ubuf__ T *srcRow = srcAddr + row * srcRowStride;
-        __ubuf__ float *dstRow = dstAddr + row * dstRowStride;
+        __ubuf__ T* srcRow = srcAddr + row * srcRowStride;
+        __ubuf__ float* dstRow = dstAddr + row * dstRowStride;
 
         uint32_t remainingK = k;
         for (uint16_t c = 0; c < repeatTimes; c++) {
@@ -129,20 +129,20 @@ __simd_vf__ void CastGradYRowsVF(__ubuf__ T *srcAddr, __ubuf__ float *dstAddr, u
     }
 }
 
-__simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int32_t *expertIdxBase,
-                                         __ubuf__ float *gradYBase, __ubuf__ float *gradNormXBase, float eps,
+__simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float* xNormBase, __ubuf__ int32_t* expertIdxBase,
+                                         __ubuf__ float* gradYBase, __ubuf__ float* gradNormXBase, float eps,
                                          uint16_t curRows, uint16_t k, uint16_t kAlign, uint16_t n,
-                                         __ubuf__ float *partialSumBuf)
+                                         __ubuf__ float* partialSumBuf)
 {
     constexpr uint16_t chunkSize = kReduceChunkLane; // 单次向量归约 chunk 的 lane 数(64)
     uint16_t repeatTimes = static_cast<uint16_t>((k + chunkSize - 1) / chunkSize);
     Reg::MaskReg maskLane0 = Reg::CreateMask<float, Reg::MaskPattern::VL1>();
 
     for (uint16_t row = 0; row < curRows; row++) {
-        __ubuf__ int32_t *idxRow = expertIdxBase + row * kAlign;
-        __ubuf__ float *xNormRow = xNormBase + row * n;
-        __ubuf__ float *gradYRow = gradYBase + row * kAlign;
-        __ubuf__ float *gradNormXRow = gradNormXBase + row * n;
+        __ubuf__ int32_t* idxRow = expertIdxBase + row * kAlign;
+        __ubuf__ float* xNormRow = xNormBase + row * n;
+        __ubuf__ float* gradYRow = gradYBase + row * kAlign;
+        __ubuf__ float* gradNormXRow = gradNormXBase + row * n;
 
         // ---- Phase 1a: per-chunk partial sums into partialSumBuf, then tree-reduce. ----
         Reg::RegTensor<float> globalD;
@@ -159,7 +159,7 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
             Reg::RegTensor<float> wPrimeReg;
 
             Reg::LoadAlign(idxReg, idxRow + chunkOffset);
-            idxU32Reg = (Reg::RegTensor<uint32_t> &)idxReg;
+            idxU32Reg = (Reg::RegTensor<uint32_t>&)idxReg;
             Reg::DataCopyGather(wPrimeReg, xNormRow, idxU32Reg, chunkMask);
 
             Reg::ReduceSum(chunkSum, wPrimeReg, chunkMask);
@@ -189,7 +189,7 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
             Reg::RegTensor<float> wPrimeReg, gradYReg, wNormReg, tmpReg;
 
             Reg::LoadAlign(idxReg, idxRow + chunkOffset);
-            idxU32Reg = (Reg::RegTensor<uint32_t> &)idxReg;
+            idxU32Reg = (Reg::RegTensor<uint32_t>&)idxReg;
             Reg::DataCopyGather(wPrimeReg, xNormRow, idxU32Reg, chunkMask);
 
             // Broadcast D (lane0) to every lane for this chunk's w'/D.
@@ -222,7 +222,7 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
             Reg::RegTensor<float> gradYReg;
 
             Reg::LoadAlign(idxReg, idxRow + chunkOffset);
-            idxU32Reg = (Reg::RegTensor<uint32_t> &)idxReg;
+            idxU32Reg = (Reg::RegTensor<uint32_t>&)idxReg;
             Reg::LoadAlign(gradYReg, gradYRow + chunkOffset);
 
             // Broadcast the row-global D/betaNum (lane0) to every lane of this chunk.
@@ -244,9 +244,9 @@ template <typename T>
 __aicore__ inline void CallSigmoidGradVF(LocalTensor<T> gradXOut, LocalTensor<float> xNorm,
                                          LocalTensor<float> gradNormX, uint32_t totalElements)
 {
-    __ubuf__ T *gradXAddr = (__ubuf__ T *)gradXOut.GetPhyAddr();
-    __ubuf__ float *xNormAddr = (__ubuf__ float *)xNorm.GetPhyAddr();
-    __ubuf__ float *gradNormXAddr = (__ubuf__ float *)gradNormX.GetPhyAddr();
+    __ubuf__ T* gradXAddr = (__ubuf__ T*)gradXOut.GetPhyAddr();
+    __ubuf__ float* xNormAddr = (__ubuf__ float*)xNorm.GetPhyAddr();
+    __ubuf__ float* gradNormXAddr = (__ubuf__ float*)gradNormX.GetPhyAddr();
     constexpr uint32_t oneRepeatSize = VECTOR_REG_WIDTH / sizeof(float);
     uint16_t repeatTimes = static_cast<uint16_t>((totalElements + oneRepeatSize - 1) / oneRepeatSize);
     if constexpr (IsSameType<T, float>::value) {
@@ -259,8 +259,8 @@ __aicore__ inline void CallSigmoidGradVF(LocalTensor<T> gradXOut, LocalTensor<fl
 template <typename T>
 __aicore__ inline void CallCastGradYFlatVF(LocalTensor<T> gradYSrc, LocalTensor<float> dst, uint32_t totalElements)
 {
-    __ubuf__ T *srcAddr = (__ubuf__ T *)gradYSrc.GetPhyAddr();
-    __ubuf__ float *dstAddr = (__ubuf__ float *)dst.GetPhyAddr();
+    __ubuf__ T* srcAddr = (__ubuf__ T*)gradYSrc.GetPhyAddr();
+    __ubuf__ float* dstAddr = (__ubuf__ float*)dst.GetPhyAddr();
     constexpr uint32_t oneRepeatSize = VECTOR_REG_WIDTH / sizeof(float);
     uint16_t repeatTimes = static_cast<uint16_t>((totalElements + oneRepeatSize - 1) / oneRepeatSize);
     CastGradYFlatVF<T>(srcAddr, dstAddr, totalElements, oneRepeatSize, repeatTimes);
@@ -270,8 +270,8 @@ template <typename T>
 __aicore__ inline void CallCastGradYRowsVF(LocalTensor<T> gradYSrc, LocalTensor<float> dst, uint16_t curRows,
                                            uint16_t k, uint16_t srcRowStride, uint16_t dstRowStride)
 {
-    __ubuf__ T *srcAddr = (__ubuf__ T *)gradYSrc.GetPhyAddr();
-    __ubuf__ float *dstAddr = (__ubuf__ float *)dst.GetPhyAddr();
+    __ubuf__ T* srcAddr = (__ubuf__ T*)gradYSrc.GetPhyAddr();
+    __ubuf__ float* dstAddr = (__ubuf__ float*)dst.GetPhyAddr();
     CastGradYRowsVF<T>(srcAddr, dstAddr, curRows, k, srcRowStride, dstRowStride);
 }
 
@@ -280,11 +280,11 @@ __aicore__ inline void CallSigmoidRenormBackwardVF(LocalTensor<float> xNorm, Loc
                                                    uint16_t curRows, uint16_t k, uint16_t kAlign, uint16_t n,
                                                    LocalTensor<float> partialSumBuf)
 {
-    __ubuf__ float *xNormAddr = (__ubuf__ float *)xNorm.GetPhyAddr();
-    __ubuf__ int32_t *expertIdxAddr = (__ubuf__ int32_t *)expertIdx.GetPhyAddr();
-    __ubuf__ float *gradYAddr = (__ubuf__ float *)gradY.GetPhyAddr();
-    __ubuf__ float *gradNormXAddr = (__ubuf__ float *)gradNormX.GetPhyAddr();
-    __ubuf__ float *partialSumAddr = (__ubuf__ float *)partialSumBuf.GetPhyAddr();
+    __ubuf__ float* xNormAddr = (__ubuf__ float*)xNorm.GetPhyAddr();
+    __ubuf__ int32_t* expertIdxAddr = (__ubuf__ int32_t*)expertIdx.GetPhyAddr();
+    __ubuf__ float* gradYAddr = (__ubuf__ float*)gradY.GetPhyAddr();
+    __ubuf__ float* gradNormXAddr = (__ubuf__ float*)gradNormX.GetPhyAddr();
+    __ubuf__ float* partialSumAddr = (__ubuf__ float*)partialSumBuf.GetPhyAddr();
     SigmoidRenormBackwardVF(xNormAddr, expertIdxAddr, gradYAddr, gradNormXAddr, eps, curRows, k, kAlign, n,
                             partialSumAddr);
 }

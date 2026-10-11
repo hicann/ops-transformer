@@ -48,52 +48,47 @@ static inline bool IsValidType(const DataType dtype)
 static ge::graphStatus InferDataTypeMoeFinalizeRoutingV2(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do MoeFinalizeRoutingV2InferDataType.");
-    OP_CHECK_IF(
-        !IsValidType(context->GetInputDataType(INDEX_IN_EXPANDED_X)),
-        OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "expanded_x",
-            Ops::Base::ToString(context->GetInputDataType(INDEX_IN_EXPANDED_X)).c_str(),
-            "FLOAT, FLOAT16 or BF16"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!IsValidType(context->GetInputDataType(INDEX_IN_EXPANDED_X)),
+                OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "expanded_x",
+                                          Ops::Base::ToString(context->GetInputDataType(INDEX_IN_EXPANDED_X)).c_str(),
+                                          "FLOAT, FLOAT16 or BF16"),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(
-        context->GetInputDataType(INDEX_IN_EXPANDED_ROW_IDX) != ge::DT_INT32,
-        OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "expanded_row_idx",
-            Ops::Base::ToString(context->GetInputDataType(INDEX_IN_EXPANDED_ROW_IDX)).c_str(),
-            "INT32"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context->GetInputDataType(INDEX_IN_EXPANDED_ROW_IDX) != ge::DT_INT32,
+                OP_LOGE_FOR_INVALID_DTYPE(
+                    context->GetNodeName(), "expanded_row_idx",
+                    Ops::Base::ToString(context->GetInputDataType(INDEX_IN_EXPANDED_ROW_IDX)).c_str(), "INT32"),
+                return ge::GRAPH_FAILED);
 
     DataType parameterDtype = context->GetOptionalInputDataType(INDEX_IN_SKIP1);
-    OP_CHECK_IF(
-        parameterDtype != ge::DT_UNDEFINED && !IsValidType(parameterDtype),
-        OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "skip1",
-            Ops::Base::ToString(parameterDtype).c_str(), "FLOAT, FLOAT16 or BF16"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(parameterDtype != ge::DT_UNDEFINED && !IsValidType(parameterDtype),
+                OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "skip1", Ops::Base::ToString(parameterDtype).c_str(),
+                                          "FLOAT, FLOAT16 or BF16"),
+                return ge::GRAPH_FAILED);
 
     parameterDtype = context->GetOptionalInputDataType(INDEX_IN_SKIP2);
-    OP_CHECK_IF(
-        parameterDtype != ge::DT_UNDEFINED && !IsValidType(parameterDtype),
-        OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "skip2",
-            Ops::Base::ToString(parameterDtype).c_str(), "FLOAT, FLOAT16 or BF16"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(parameterDtype != ge::DT_UNDEFINED && !IsValidType(parameterDtype),
+                OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "skip2", Ops::Base::ToString(parameterDtype).c_str(),
+                                          "FLOAT, FLOAT16 or BF16"),
+                return ge::GRAPH_FAILED);
 
     parameterDtype = context->GetOptionalInputDataType(INDEX_IN_BIAS);
-    OP_CHECK_IF(
-        parameterDtype != ge::DT_UNDEFINED && !IsValidType(parameterDtype),
-        OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "bias",
-            Ops::Base::ToString(parameterDtype).c_str(), "FLOAT, FLOAT16 or BF16"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(parameterDtype != ge::DT_UNDEFINED && !IsValidType(parameterDtype),
+                OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "bias", Ops::Base::ToString(parameterDtype).c_str(),
+                                          "FLOAT, FLOAT16 or BF16"),
+                return ge::GRAPH_FAILED);
 
     parameterDtype = context->GetOptionalInputDataType(INDEX_IN_SCALES);
-    OP_CHECK_IF(
-        parameterDtype != ge::DT_UNDEFINED && !IsValidType(parameterDtype),
-        OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "scales",
-            Ops::Base::ToString(parameterDtype).c_str(), "FLOAT, FLOAT16 or BF16"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(parameterDtype != ge::DT_UNDEFINED && !IsValidType(parameterDtype),
+                OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "scales", Ops::Base::ToString(parameterDtype).c_str(),
+                                          "FLOAT, FLOAT16 or BF16"),
+                return ge::GRAPH_FAILED);
 
     parameterDtype = context->GetOptionalInputDataType(INDEX_IN_EXPERT_IDX);
-    OP_CHECK_IF(
-        parameterDtype != ge::DT_UNDEFINED && parameterDtype != ge::DT_INT32,
-        OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "expert_idx",
-            Ops::Base::ToString(parameterDtype).c_str(), "INT32"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(parameterDtype != ge::DT_UNDEFINED && parameterDtype != ge::DT_INT32,
+                OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "expert_idx",
+                                          Ops::Base::ToString(parameterDtype).c_str(), "INT32"),
+                return ge::GRAPH_FAILED);
 
     context->SetOutputDataType(0, context->GetInputDataType(INDEX_IN_EXPANDED_X));
     return ge::GRAPH_SUCCESS;
@@ -146,12 +141,9 @@ inline ge::graphStatus SetUnknownRank(gert::Shape* outShape)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckExpandedXShape(const gert::InferShapeContext* context,
-                                           int64_t dropPadMode,
-                                           gert::Shape* outShape,
-                                           const gert::Shape** outExpandedXShape,
-                                           int64_t* outLastDim,
-                                           bool& earlyReturn)
+static ge::graphStatus CheckExpandedXShape(const gert::InferShapeContext* context, int64_t dropPadMode,
+                                           gert::Shape* outShape, const gert::Shape** outExpandedXShape,
+                                           int64_t* outLastDim, bool& earlyReturn)
 {
     earlyReturn = false;
     const gert::Shape* expandedXShape = context->GetInputShape(INDEX_IN_EXPANDED_X);
@@ -170,27 +162,23 @@ static ge::graphStatus CheckExpandedXShape(const gert::InferShapeContext* contex
     *outLastDim = expandedXShape->GetDim(expandedXShapeSize - 1);
     *outExpandedXShape = expandedXShape;
 
-    OP_CHECK_IF(
-        (dropPadMode == VALUE_MODE_0 || dropPadMode == VALUE_MODE_2) && expandedXShapeSize != SHAPE_SIZE,
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "expanded_x",
-            std::to_string(expandedXShapeSize).c_str(),
-            "The expanded_x of input should be 2D tensor when drop_pad_mode is 0 or 2."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((dropPadMode == VALUE_MODE_0 || dropPadMode == VALUE_MODE_2) && expandedXShapeSize != SHAPE_SIZE,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    context->GetNodeName(), "expanded_x", std::to_string(expandedXShapeSize).c_str(),
+                    "The expanded_x of input should be 2D tensor when drop_pad_mode is 0 or 2."),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(
-        (dropPadMode == VALUE_MODE_1 || dropPadMode == VALUE_MODE_3) && expandedXShapeSize != SHAPE_SIZE + 1,
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "expanded_x",
-            std::to_string(expandedXShapeSize).c_str(),
-            "The expanded_x of input should be 3D tensor when drop_pad_mode is 1 or 3."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((dropPadMode == VALUE_MODE_1 || dropPadMode == VALUE_MODE_3) && expandedXShapeSize != SHAPE_SIZE + 1,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    context->GetNodeName(), "expanded_x", std::to_string(expandedXShapeSize).c_str(),
+                    "The expanded_x of input should be 3D tensor when drop_pad_mode is 1 or 3."),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckExpandedRowIdxShape(const gert::InferShapeContext* context,
-                                                gert::Shape* outShape,
-                                                const gert::Shape** outRowIdxShape,
-                                                bool& earlyReturn)
+static ge::graphStatus CheckExpandedRowIdxShape(const gert::InferShapeContext* context, gert::Shape* outShape,
+                                                const gert::Shape** outRowIdxShape, bool& earlyReturn)
 {
     earlyReturn = false;
     const gert::Shape* expandedRowIdxShape = context->GetInputShape(INDEX_IN_EXPANDED_ROW_IDX);
@@ -205,21 +193,17 @@ static ge::graphStatus CheckExpandedRowIdxShape(const gert::InferShapeContext* c
         earlyReturn = true;
         return ge::GRAPH_SUCCESS;
     }
-    OP_CHECK_IF(
-        expandedRowIdxShape->GetDimNum() != 1,
-        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "expanded_row_idx",
-            std::to_string(expandedRowIdxShape->GetDimNum()).c_str(), "1D"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(expandedRowIdxShape->GetDimNum() != 1,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "expanded_row_idx",
+                                             std::to_string(expandedRowIdxShape->GetDimNum()).c_str(), "1D"),
+                return ge::GRAPH_FAILED);
     *outRowIdxShape = expandedRowIdxShape;
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckOptionalInputShape(const gert::InferShapeContext* context,
-                                               size_t inputIndex,
-                                               const char* inputName,
-                                               gert::Shape* outShape,
-                                               const gert::Shape** outInputShape,
-                                               bool& earlyReturn)
+static ge::graphStatus CheckOptionalInputShape(const gert::InferShapeContext* context, size_t inputIndex,
+                                               const char* inputName, gert::Shape* outShape,
+                                               const gert::Shape** outInputShape, bool& earlyReturn)
 {
     earlyReturn = false;
     const gert::Tensor* tensor = context->GetOptionalInputTensor(inputIndex);
@@ -238,22 +222,18 @@ static ge::graphStatus CheckOptionalInputShape(const gert::InferShapeContext* co
         earlyReturn = true;
         return ge::GRAPH_SUCCESS;
     }
-    OP_CHECK_IF(
-        (*outInputShape)->GetDimNum() != SHAPE_SIZE,
-        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), inputName,
-            std::to_string((*outInputShape)->GetDimNum()).c_str(), "2D"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((*outInputShape)->GetDimNum() != SHAPE_SIZE,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), inputName,
+                                             std::to_string((*outInputShape)->GetDimNum()).c_str(), "2D"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckCrossInputConsistency(const gert::InferShapeContext* context,
-                                                  int64_t dropPadMode,
-                                                  int64_t lastDimExpandedX,
-                                                  const gert::Shape* expandedXShape,
+static ge::graphStatus CheckCrossInputConsistency(const gert::InferShapeContext* context, int64_t dropPadMode,
+                                                  int64_t lastDimExpandedX, const gert::Shape* expandedXShape,
                                                   const gert::Shape* expandedRowIdxShape,
                                                   const gert::Shape* skip1InputShape,
-                                                  const gert::Shape* skip2InputShape,
-                                                  const gert::Shape* biasInputShape,
+                                                  const gert::Shape* skip2InputShape, const gert::Shape* biasInputShape,
                                                   const gert::Shape* scalesInputShape,
                                                   const gert::Shape* expertIdxShape)
 {
@@ -261,10 +241,10 @@ static ge::graphStatus CheckCrossInputConsistency(const gert::InferShapeContext*
                      ((scalesInputShape != nullptr && expertIdxShape != nullptr) &&
                       (scalesInputShape->GetDim(1) == -1 || expertIdxShape->GetDim(1) == -1 ||
                        scalesInputShape->GetDim(1) == expertIdxShape->GetDim(1)));
-    OP_CHECK_IF(
-        !validColK, OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "scales and expert_idx",
-            "invalid", "The dim 1 of scales and expert_idx should be same."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!validColK,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "scales and expert_idx", "invalid",
+                                                       "The dim 1 of scales and expert_idx should be same."),
+                return ge::GRAPH_FAILED);
 
     int64_t skip2Row = skip2InputShape != nullptr ? skip2InputShape->GetDim(0) : -1;
     int64_t skip1Row = skip1InputShape != nullptr ? skip1InputShape->GetDim(0) : -1;
@@ -272,27 +252,27 @@ static ge::graphStatus CheckCrossInputConsistency(const gert::InferShapeContext*
     int64_t expertIdxRow = expertIdxShape != nullptr ? expertIdxShape->GetDim(0) : -1;
     OP_CHECK_IF(
         !IsValidShape(skip1Row, skip2Row, scaleRow, expertIdxRow),
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "skip1, skip2, scales and expert_idx",
-            "invalid", "The dim 0 of skip1, skip2, scales and expert_idx should be same."),
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "skip1, skip2, scales and expert_idx", "invalid",
+                                               "The dim 0 of skip1, skip2, scales and expert_idx should be same."),
         return ge::GRAPH_FAILED);
 
     int64_t skip2Col = skip2InputShape != nullptr ? skip2InputShape->GetDim(1) : -1;
     int64_t skip1Col = skip1InputShape != nullptr ? skip1InputShape->GetDim(1) : -1;
     int64_t biasCol = biasInputShape != nullptr ? biasInputShape->GetDim(1) : -1;
-    OP_CHECK_IF(
-        !IsValidShape(skip1Col, skip2Col, lastDimExpandedX, biasCol),
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "skip1, skip2, bias and expanded_x",
-            "invalid", "The dim 1 of skip1, skip2, bias and last dim of expanded_x should be same."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!IsValidShape(skip1Col, skip2Col, lastDimExpandedX, biasCol),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context->GetNodeName(), "skip1, skip2, bias and expanded_x", "invalid",
+                    "The dim 1 of skip1, skip2, bias and last dim of expanded_x should be same."),
+                return ge::GRAPH_FAILED);
 
     if (dropPadMode == VALUE_MODE_0 || dropPadMode == VALUE_MODE_2) {
         bool validDim = expandedRowIdxShape->GetDim(0) == -1 || expandedXShape->GetDim(0) == -1 ||
                         (expandedRowIdxShape->GetDim(0) == expandedXShape->GetDim(0));
-        OP_CHECK_IF(
-            !validDim,
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "expanded_x and expanded_row_idx",
-                "invalid", "The dim 0 of expanded_x and expanded_row_idx should be same when drop_pad_mode is 0."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(!validDim,
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        context->GetNodeName(), "expanded_x and expanded_row_idx", "invalid",
+                        "The dim 0 of expanded_x and expanded_row_idx should be same when drop_pad_mode is 0."),
+                    return ge::GRAPH_FAILED);
     }
 
     return ge::GRAPH_SUCCESS;
@@ -325,16 +305,16 @@ static ge::graphStatus Infershape4MoeFinalizeRoutingV2(gert::InferShapeContext* 
     const int64_t dropPadMode = *dropPadModePtr;
 
     auto outShape = context->GetOutputShape(INDEX_OUT);
-    OP_CHECK_IF(
-        dropPadMode < VALUE_MODE_0 || dropPadMode > VALUE_MODE_3,
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "drop_pad_mode",
-            std::to_string(dropPadMode).c_str(), "[0,3]"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(dropPadMode < VALUE_MODE_0 || dropPadMode > VALUE_MODE_3,
+                OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "drop_pad_mode", std::to_string(dropPadMode).c_str(),
+                                          "[0,3]"),
+                return ge::GRAPH_FAILED);
 
     bool earlyReturn = false;
     const gert::Shape* expandedXShape = nullptr;
     int64_t lastDimExpandedX = -1;
-    ge::graphStatus ret = CheckExpandedXShape(context, dropPadMode, outShape, &expandedXShape,
-                                              &lastDimExpandedX, earlyReturn);
+    ge::graphStatus ret =
+        CheckExpandedXShape(context, dropPadMode, outShape, &expandedXShape, &lastDimExpandedX, earlyReturn);
     if (ret != ge::GRAPH_SUCCESS || earlyReturn) {
         return ret;
     }
@@ -367,7 +347,7 @@ static ge::graphStatus Infershape4MoeFinalizeRoutingV2(gert::InferShapeContext* 
     if (ret != ge::GRAPH_SUCCESS || earlyReturn) {
         return ret;
     }
-    
+
     const int64_t* kPtr = attrs->GetAttrPointer<int64_t>(ATTR_K);
     OP_CHECK_NULL_WITH_CONTEXT(context, kPtr);
     int64_t k = *kPtr;
@@ -375,11 +355,10 @@ static ge::graphStatus Infershape4MoeFinalizeRoutingV2(gert::InferShapeContext* 
         int64_t scalesDim1 = scalesInputShape->GetDim(1);
         // k > 1 means user explicitly specified k, need to verify consistency with scales dim1
         if (*kPtr > 1) {
-            OP_CHECK_IF(
-                scalesDim1 != UNKNOWN_DIM_VALUE_ && *kPtr != scalesDim1,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "k",
-                    std::to_string(*kPtr).c_str(), "k must equal scales dim1"),
-                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(scalesDim1 != UNKNOWN_DIM_VALUE_ && *kPtr != scalesDim1,
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            context->GetNodeName(), "k", std::to_string(*kPtr).c_str(), "k must equal scales dim1"),
+                        return ge::GRAPH_FAILED);
         }
         k = scalesDim1;
     }
@@ -389,17 +368,17 @@ static ge::graphStatus Infershape4MoeFinalizeRoutingV2(gert::InferShapeContext* 
         return ret;
     }
 
-    OP_CHECK_IF(
-        CheckCrossInputConsistency(context, dropPadMode, lastDimExpandedX, expandedXShape,
-            expandedRowIdxShape, skip1InputShape, skip2InputShape, biasInputShape,
-            scalesInputShape, expertIdxShape) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "infershape", "GRAPH_FAILED",
-            "Infershape4MoeFinalizeRoutingV2 failed!"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckCrossInputConsistency(context, dropPadMode, lastDimExpandedX, expandedXShape, expandedRowIdxShape,
+                                           skip1InputShape, skip2InputShape, biasInputShape, scalesInputShape,
+                                           expertIdxShape) != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "infershape", "GRAPH_FAILED",
+                                                      "Infershape4MoeFinalizeRoutingV2 failed!"),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(
-        MoeCopyShapeInput2OutputWithIdx(context, k) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "infershape", "GRAPH_FAILED",
-            "Infershape4MoeFinalizeRoutingV2 failed!"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(MoeCopyShapeInput2OutputWithIdx(context, k) != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "infershape", "GRAPH_FAILED",
+                                                      "Infershape4MoeFinalizeRoutingV2 failed!"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }

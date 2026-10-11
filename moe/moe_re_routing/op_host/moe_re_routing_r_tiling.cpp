@@ -66,13 +66,12 @@ ge::graphStatus MoeReRoutingRTiling::SplitUb()
 ge::graphStatus MoeReRoutingRTiling::DoOpTiling()
 {
     OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                    context_->GetNodeName(), "CheckParam()", "GRAPH_FAILED", "check param fail."),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "CheckParam()", "GRAPH_FAILED",
+                                                      "check param fail."),
                 return ge::GRAPH_FAILED);
     SplitCore();
     if (SplitUb() != ge::GRAPH_SUCCESS) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            context_->GetNodeName(), "SplitUb()", "GRAPH_FAILED", "SplitUb failed.");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "SplitUb()", "GRAPH_FAILED", "SplitUb failed.");
         return ge::GRAPH_FAILED;
     }
     if (hasScale_) {
@@ -135,7 +134,7 @@ ge::graphStatus MoeReRoutingRTiling::PostTiling()
 
     context_->SetBlockDim(blockNum_);
     context_->SetTilingKey(GetTilingKey());
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
 
     workspaces[0] = static_cast<size_t>(RESERVE_WORKSPACE_BYTE);

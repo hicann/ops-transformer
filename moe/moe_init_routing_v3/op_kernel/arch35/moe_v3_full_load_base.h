@@ -22,8 +22,8 @@ namespace MoeInitRoutingV3 {
 using namespace AscendC;
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadComputeExpertFirstIndexSimt(
-    int32_t elementNum, int32_t expertStart, int32_t expertEnd, __ubuf__ int32_t *sortedExpertIdLocalAddr,
-    __ubuf__ int32_t *expertFirstIndexLocalAddr)
+    int32_t elementNum, int32_t expertStart, int32_t expertEnd, __ubuf__ int32_t* sortedExpertIdLocalAddr,
+    __ubuf__ int32_t* expertFirstIndexLocalAddr)
 {
     for (auto i = static_cast<int32_t>(threadIdx.x); i < elementNum; i += static_cast<int32_t>(blockDim.x)) {
         auto currExpertId = sortedExpertIdLocalAddr[i];
@@ -41,8 +41,8 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadCompute
 }
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadComputeExpertCountOutSimt(
-    int32_t elementNum, int32_t expertStart, int32_t expertEnd, __ubuf__ int32_t *sortedExpertIdLocalAddr,
-    __ubuf__ int32_t *expertFirstIndexLocalAddr, __ubuf__ int32_t *expertCountOutLocalAddr)
+    int32_t elementNum, int32_t expertStart, int32_t expertEnd, __ubuf__ int32_t* sortedExpertIdLocalAddr,
+    __ubuf__ int32_t* expertFirstIndexLocalAddr, __ubuf__ int32_t* expertCountOutLocalAddr)
 {
     for (auto i = static_cast<int32_t>(threadIdx.x); i < elementNum; i += static_cast<int32_t>(blockDim.x)) {
         auto currExpertId = sortedExpertIdLocalAddr[i];
@@ -60,8 +60,8 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadCompute
 }
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadComputeActualIdxNumSimt(
-    int32_t elementNum, int32_t expertStart, int32_t expertEnd, __ubuf__ int32_t *sortedExpertIdLocalAddr,
-    __ubuf__ int32_t *actualIdxNumAddr)
+    int32_t elementNum, int32_t expertStart, int32_t expertEnd, __ubuf__ int32_t* sortedExpertIdLocalAddr,
+    __ubuf__ int32_t* actualIdxNumAddr)
 {
     int32_t localCount = 0;
     for (auto i = static_cast<int32_t>(threadIdx.x); i < elementNum; i += static_cast<int32_t>(blockDim.x)) {
@@ -74,8 +74,8 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadCompute
 }
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadFillInvalidRowIdxSimt(
-    int32_t invalidNum, int32_t validNum, __ubuf__ int32_t *sortedRowIdxLocalAddr,
-    __ubuf__ int32_t *expandedRowIdxLocalAddr)
+    int32_t invalidNum, int32_t validNum, __ubuf__ int32_t* sortedRowIdxLocalAddr,
+    __ubuf__ int32_t* expandedRowIdxLocalAddr)
 {
     for (auto offset = static_cast<int32_t>(threadIdx.x); offset < invalidNum;
          offset += static_cast<int32_t>(blockDim.x)) {
@@ -86,8 +86,8 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadFillInv
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadTopkWeightGatherSimt(
     int64_t elements, int64_t indexBase, int64_t totalLength, int64_t expertStart, int64_t expertEnd,
-    __ubuf__ int32_t *sortedRowIdx, __ubuf__ int32_t *sortedExpertIdx, __gm__ float *topkWeight,
-    __gm__ volatile float *expandedTopkWeight)
+    __ubuf__ int32_t* sortedRowIdx, __ubuf__ int32_t* sortedExpertIdx, __gm__ float* topkWeight,
+    __gm__ volatile float* expandedTopkWeight)
 {
     for (int64_t index = static_cast<int64_t>(threadIdx.x); index < elements;
          index += static_cast<int64_t>(blockDim.x)) {
@@ -101,8 +101,8 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadTopkWei
 }
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadTopkWeightScatterSimt(
-    int64_t elements, int64_t indexBase, int64_t outputRows, __ubuf__ int32_t *srcToDstRow, __gm__ float *topkWeight,
-    __gm__ volatile float *expandedTopkWeight)
+    int64_t elements, int64_t indexBase, int64_t outputRows, __ubuf__ int32_t* srcToDstRow, __gm__ float* topkWeight,
+    __gm__ volatile float* expandedTopkWeight)
 {
     for (int64_t index = static_cast<int64_t>(threadIdx.x); index < elements;
          index += static_cast<int64_t>(blockDim.x)) {
@@ -120,7 +120,7 @@ public:
     __aicore__ inline MoeV3FullLoadBase(){};
     __aicore__ inline void Init(GM_ADDR expertIdx, GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
                                 GM_ADDR topkWeight, GM_ADDR expandedTopkWeight, GM_ADDR workspace,
-                                const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+                                const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe);
 
 protected:
     __aicore__ inline void CopyIn();
@@ -129,9 +129,9 @@ protected:
                                              GM_ADDR expandedTopkWeight, GM_ADDR workspace);
     __aicore__ inline void InitQueBuffers();
     __aicore__ inline void SortCompute();
-    __aicore__ inline void FilterExpertIdx(LocalTensor<int32_t> &expertIdxLocal,
-                                           LocalTensor<float> &expertIdxLocalFp32);
-    __aicore__ inline void ComputeGatherIdx(LocalTensor<int32_t> &inLocal);
+    __aicore__ inline void FilterExpertIdx(LocalTensor<int32_t>& expertIdxLocal,
+                                           LocalTensor<float>& expertIdxLocalFp32);
+    __aicore__ inline void ComputeGatherIdx(LocalTensor<int32_t>& inLocal);
     __aicore__ inline void ComputeGatherIdxWithCapacity();
     __aicore__ inline void CopyOutRowIdx();
     __aicore__ inline void ComputeExpertTokenCount();
@@ -143,7 +143,7 @@ protected:
 
 protected:
     int64_t sortNum_;
-    const MoeV3Arch35GatherOutComputeTilingData *gatherOutTilingData_;
+    const MoeV3Arch35GatherOutComputeTilingData* gatherOutTilingData_;
     int64_t blockIdx_;
     int64_t needCoreNum_;
     int64_t coreIndicesElements_;
@@ -198,14 +198,14 @@ protected:
     GlobalTensor<float> topkWeightGm_;
     GlobalTensor<float> expandedTopkWeightGm_;
 
-    TPipe *pipe_;
+    TPipe* pipe_;
 };
 
 template <typename T>
 __aicore__ inline void MoeV3FullLoadBase<T>::Init(GM_ADDR expertIdx, GM_ADDR expandedRowIdx,
                                                   GM_ADDR expertTokensCountOrCumsum, GM_ADDR topkWeight,
                                                   GM_ADDR expandedTopkWeight, GM_ADDR workspace,
-                                                  const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+                                                  const MoeInitRoutingV3Arch35TilingData* tilingData, TPipe* tPipe)
 {
     this->gatherOutTilingData_ = &(tilingData->gatherOutComputeParamsOp);
     this->blockIdx_ = GetBlockIdx();
@@ -263,20 +263,20 @@ __aicore__ inline void MoeV3FullLoadBase<T>::InitGlobalBuffers(GM_ADDR expertIdx
                                                                GM_ADDR expertTokensCountOrCumsum, GM_ADDR topkWeight,
                                                                GM_ADDR expandedTopkWeight, GM_ADDR workspace)
 {
-    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertIdx, this->tileLength_);
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, this->tileLength_);
+    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertIdx, this->tileLength_);
+    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, this->tileLength_);
 
     if (this->expertTokensNumFlag_ > 0) {
-        expertTokensCountOrCumsumGm_.SetGlobalBuffer((__gm__ int64_t *)expertTokensCountOrCumsum);
+        expertTokensCountOrCumsumGm_.SetGlobalBuffer((__gm__ int64_t*)expertTokensCountOrCumsum);
     }
 
-    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(this->totalLength_, sizeof(int32_t)) * 2 +
+    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(this->totalLength_, sizeof(int32_t)) * 2 +
                                             Align(this->actualExpertNum_, sizeof(int32_t)),
                                         1);
 
     if (isInputTopkWeight_ == 1) {
-        topkWeightGm_.SetGlobalBuffer((__gm__ float *)topkWeight, totalLength_);
-        expandedTopkWeightGm_.SetGlobalBuffer((__gm__ float *)expandedTopkWeight,
+        topkWeightGm_.SetGlobalBuffer((__gm__ float*)topkWeight, totalLength_);
+        expandedTopkWeightGm_.SetGlobalBuffer((__gm__ float*)expandedTopkWeight,
                                               (dropPadMode_ == DROP_PAD_MODE) ? outputRows_ : totalLength_);
     }
 }
@@ -342,8 +342,8 @@ __aicore__ inline void MoeV3FullLoadBase<T>::SortCompute()
 
     LocalTensor<int32_t> expertCountLocal = expertCountBuf_.Get<int32_t>(actualExpertNum_);
     Duplicate(expertCountLocal, static_cast<int32_t>(0), static_cast<int32_t>(1));
-    __ubuf__ int32_t *sortedExpertIdxLocalAddr = (__ubuf__ int32_t *)sortedExpertIdxLocal.GetPhyAddr();
-    __ubuf__ int32_t *actualIdxNumAddr = (__ubuf__ int32_t *)expertCountLocal.GetPhyAddr();
+    __ubuf__ int32_t* sortedExpertIdxLocalAddr = (__ubuf__ int32_t*)sortedExpertIdxLocal.GetPhyAddr();
+    __ubuf__ int32_t* actualIdxNumAddr = (__ubuf__ int32_t*)expertCountLocal.GetPhyAddr();
     asc_vf_call<FullLoadComputeActualIdxNumSimt>(dim3{SIMT_THREAD_NUM, 1, 1}, static_cast<int32_t>(totalLength_),
                                                  static_cast<int32_t>(expertStart_), static_cast<int32_t>(expertEnd_),
                                                  sortedExpertIdxLocalAddr, actualIdxNumAddr);
@@ -372,14 +372,14 @@ __aicore__ inline void MoeV3FullLoadBase<T>::SortCompute()
 }
 
 template <typename T>
-__aicore__ inline void MoeV3FullLoadBase<T>::FilterExpertIdx(LocalTensor<int32_t> &expertIdxLocal,
-                                                             LocalTensor<float> &expertIdxLocalFp32)
+__aicore__ inline void MoeV3FullLoadBase<T>::FilterExpertIdx(LocalTensor<int32_t>& expertIdxLocal,
+                                                             LocalTensor<float>& expertIdxLocalFp32)
 {
     Cast(expertIdxLocalFp32, expertIdxLocal, RoundMode::CAST_ROUND, this->tileLength_);
 
     uint16_t repeatTimes = Ceil(this->tileLength_, FLOAT_REG_TENSOR_LENGTH);
     uint32_t sreg = static_cast<uint32_t>(this->tileLength_);
-    __ubuf__ float *inUbAddr = (__ubuf__ float *)expertIdxLocalFp32.GetPhyAddr();
+    __ubuf__ float* inUbAddr = (__ubuf__ float*)expertIdxLocalFp32.GetPhyAddr();
     float cmpScalar = static_cast<float>(expertStart_);
     float negOne = static_cast<float>(-1);
 
@@ -403,7 +403,7 @@ __aicore__ inline void MoeV3FullLoadBase<T>::FilterExpertIdx(LocalTensor<int32_t
 }
 
 template <typename T>
-__aicore__ inline void MoeV3FullLoadBase<T>::ComputeGatherIdx(LocalTensor<int32_t> &inLocal)
+__aicore__ inline void MoeV3FullLoadBase<T>::ComputeGatherIdx(LocalTensor<int32_t>& inLocal)
 {
     LocalTensor<uint32_t> expandDstToSrcRowLocal = sortedRowIdxQueue_.DeQue<uint32_t>();
     LocalTensor<float> expandDstToSrcRowLocalFp32 = expandDstToSrcRowLocal.ReinterpretCast<float>();
@@ -520,7 +520,7 @@ __aicore__ inline void MoeV3FullLoadBase<T>::CopyOutRowIdx()
                 uint32_t threadNum = static_cast<uint32_t>(Min(invalidNum, SIMT_THREAD_NUM));
                 asc_vf_call<FullLoadFillInvalidRowIdxSimt>(
                     dim3{threadNum, 1, 1}, static_cast<int32_t>(invalidNum), static_cast<int32_t>(actualExpertIdxNum_),
-                    (__ubuf__ int32_t *)sortedRowIdx.GetPhyAddr(), (__ubuf__ int32_t *)expandedRowIdx.GetPhyAddr());
+                    (__ubuf__ int32_t*)sortedRowIdx.GetPhyAddr(), (__ubuf__ int32_t*)expandedRowIdx.GetPhyAddr());
             }
             SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
             DataCopyExtParams copyParams{static_cast<uint16_t>(1),
@@ -540,8 +540,8 @@ __aicore__ inline void MoeV3FullLoadBase<T>::ComputeExpertTokenCount()
     LocalTensor<int32_t> expertCountLocal = expertCountBuf_.Get<int32_t>(actualExpertNum_);
     Duplicate(expertCountLocal, static_cast<int32_t>(0), actualExpertNum_);
 
-    __ubuf__ int32_t *sortedExpertIdxLocalAddr = (__ubuf__ int32_t *)sortedExpertIdx.GetPhyAddr();
-    __ubuf__ int32_t *expertCountOutLocalAddr = (__ubuf__ int32_t *)expertCountLocal.GetPhyAddr();
+    __ubuf__ int32_t* sortedExpertIdxLocalAddr = (__ubuf__ int32_t*)sortedExpertIdx.GetPhyAddr();
+    __ubuf__ int32_t* expertCountOutLocalAddr = (__ubuf__ int32_t*)expertCountLocal.GetPhyAddr();
 
     asc_vf_call<FullLoadComputeExpertFirstIndexSimt>(
         dim3{SIMT_THREAD_NUM, 1, 1}, static_cast<int32_t>(totalLength_), static_cast<int32_t>(expertStart_),
@@ -630,8 +630,8 @@ __aicore__ inline void MoeV3FullLoadBase<T>::TopkWeightScatterOut()
         uint32_t threadNum = static_cast<uint32_t>(Min(elements, SIMT_THREAD_NUM));
         asc_vf_call<FullLoadTopkWeightGatherSimt>(
             dim3{threadNum, 1, 1}, elements, startRowIdx, totalLength_, expertStart_, expertEnd_,
-            (__ubuf__ int32_t *)sortedRowIdx.GetPhyAddr(), (__ubuf__ int32_t *)sortedExpertIdx.GetPhyAddr(),
-            (__gm__ float *)topkWeightGm_.GetPhyAddr(), (__gm__ volatile float *)expandedTopkWeightGm_.GetPhyAddr());
+            (__ubuf__ int32_t*)sortedRowIdx.GetPhyAddr(), (__ubuf__ int32_t*)sortedExpertIdx.GetPhyAddr(),
+            (__gm__ float*)topkWeightGm_.GetPhyAddr(), (__gm__ volatile float*)expandedTopkWeightGm_.GetPhyAddr());
     }
 
     sortedRowIdxQueue_.EnQue<int32_t>(sortedRowIdx);
@@ -650,8 +650,8 @@ __aicore__ inline void MoeV3FullLoadBase<T>::TopkWeightGatherOut()
     if (elements > 0) {
         uint32_t threadNum = static_cast<uint32_t>(Min(elements, SIMT_THREAD_NUM));
         asc_vf_call<FullLoadTopkWeightScatterSimt>(
-            dim3{threadNum, 1, 1}, elements, startRowIdx, outputRows, (__ubuf__ int32_t *)expandedRowIdx.GetPhyAddr(),
-            (__gm__ float *)topkWeightGm_.GetPhyAddr(), (__gm__ volatile float *)expandedTopkWeightGm_.GetPhyAddr());
+            dim3{threadNum, 1, 1}, elements, startRowIdx, outputRows, (__ubuf__ int32_t*)expandedRowIdx.GetPhyAddr(),
+            (__gm__ float*)topkWeightGm_.GetPhyAddr(), (__gm__ volatile float*)expandedTopkWeightGm_.GetPhyAddr());
     }
 
     expandedRowIdxQueue_.EnQue<int32_t>(expandedRowIdx);
@@ -668,7 +668,7 @@ __aicore__ inline void MoeV3FullLoadBase<T>::TopkWeightZeroOut()
     }
     int64_t rowCount = endRow - startRow;
     GlobalTensor<float> topkWeightZeroGm;
-    topkWeightZeroGm.SetGlobalBuffer((__gm__ float *)expandedTopkWeightGm_.GetPhyAddr() + startRow, rowCount);
+    topkWeightZeroGm.SetGlobalBuffer((__gm__ float*)expandedTopkWeightGm_.GetPhyAddr() + startRow, rowCount);
     SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
     InitGlobalMemory(topkWeightZeroGm, rowCount, 0.0f);
     SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);

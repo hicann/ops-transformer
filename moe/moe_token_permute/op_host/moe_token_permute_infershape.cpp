@@ -17,7 +17,6 @@
 #include "platform/platform_info.h"
 #include "util/shape_util.h"
 
-
 using namespace ge;
 namespace ops {
 static constexpr size_t DIM_ONE = 1;

@@ -25,44 +25,43 @@ static constexpr int64_t DROPLESS = 0;
 static constexpr int64_t POSITION_DROP_AND_PAD_0 = 1;
 
 template <typename T>
-std::string Shape2String4Moe(const T& shape) {
-  std::ostringstream oss;
-  oss << "[";
-  if (shape.GetDimNum() > 0) {
-    for (size_t i = 0; i < shape.GetDimNum() - 1; ++i) {
-      oss << shape.GetDim(i) << ", ";
+std::string Shape2String4Moe(const T& shape)
+{
+    std::ostringstream oss;
+    oss << "[";
+    if (shape.GetDimNum() > 0) {
+        for (size_t i = 0; i < shape.GetDimNum() - 1; ++i) {
+            oss << shape.GetDim(i) << ", ";
+        }
+        oss << shape.GetDim(shape.GetDimNum() - 1);
     }
-    oss << shape.GetDim(shape.GetDimNum() - 1);
-  }
-  oss << "]";
-  return oss.str();
+    oss << "]";
+    return oss.str();
 }
 
-static ge::graphStatus CheckParamShape(
-    gert::InferShapeContext* context, const gert::Shape* checkShape, const size_t expectDimNum,
-    const char* paramName)
+static ge::graphStatus CheckParamShape(gert::InferShapeContext* context, const gert::Shape* checkShape,
+                                       const size_t expectDimNum, const char* paramName)
 {
     if (checkShape->GetDimNum() == 1U) {
         if (expectDimNum != 1 && checkShape->GetDim(0) != ge::UNKNOWN_DIM_NUM) {
             std::string shapeStr = Ops::Base::ToString(*checkShape);
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                context->GetNodeName(), paramName, shapeStr.c_str(), "The dynamic dim of input should be -2.");
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), paramName, shapeStr.c_str(),
+                                                  "The dynamic dim of input should be -2.");
             return ge::GRAPH_FAILED;
         }
     } else if (checkShape->GetDimNum() != expectDimNum) {
         std::string dimNumStr = std::to_string(checkShape->GetDimNum());
         std::string expectDimNumStr = std::to_string(expectDimNum) + "D or dynamic";
-        OP_LOGE_FOR_INVALID_SHAPEDIM(
-            context->GetNodeName(), paramName, dimNumStr.c_str(), expectDimNumStr.c_str());
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), paramName, dimNumStr.c_str(), expectDimNumStr.c_str());
         return ge::GRAPH_FAILED;
     }
 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckParm(
-    gert::InferShapeContext* context, const gert::Shape* gradExpandedXShape, const gert::Shape* expandedRowIdxShape,
-    const int64_t dropPadMode, const int64_t topK, const int64_t activeNum)
+static ge::graphStatus CheckParm(gert::InferShapeContext* context, const gert::Shape* gradExpandedXShape,
+                                 const gert::Shape* expandedRowIdxShape, const int64_t dropPadMode, const int64_t topK,
+                                 const int64_t activeNum)
 {
     // attr drop_pad_mode
     if (dropPadMode != DROPLESS && dropPadMode != POSITION_DROP_AND_PAD_0) {
@@ -81,8 +80,8 @@ static ge::graphStatus CheckParm(
     // attr active_num
     if (activeNum < 0) {
         std::string activeNumStr = std::to_string(activeNum);
-        OP_LOGE_WITH_INVALID_ATTR(
-            context->GetNodeName(), "active_num", activeNumStr.c_str(), "greater than or equal to 0");
+        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "active_num", activeNumStr.c_str(),
+                                  "greater than or equal to 0");
         return ge::GRAPH_FAILED;
     }
 
@@ -90,16 +89,16 @@ static ge::graphStatus CheckParm(
     size_t expectDimNum = (dropPadMode == DROPLESS) ? DIM_TWO : DIM_THREE;
     if (CheckParamShape(context, gradExpandedXShape, expectDimNum, "grad_expanded_x") != ge::GRAPH_SUCCESS) {
         std::string shapeStr = Ops::Base::ToString(*gradExpandedXShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            context->GetNodeName(), "grad_expanded_x", shapeStr.c_str(), "grad_expanded_x shape dims invalid.");
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "grad_expanded_x", shapeStr.c_str(),
+                                              "grad_expanded_x shape dims invalid.");
         return ge::GRAPH_FAILED;
     }
 
     // expanded_row_idx
     if (CheckParamShape(context, expandedRowIdxShape, DIM_ONE, "expanded_row_idx") != ge::GRAPH_SUCCESS) {
         std::string shapeStr = Ops::Base::ToString(*expandedRowIdxShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            context->GetNodeName(), "expanded_row_idx", shapeStr.c_str(), "expanded_row_idx shape dims invalid.");
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "expanded_row_idx", shapeStr.c_str(),
+                                              "expanded_row_idx shape dims invalid.");
         return ge::GRAPH_FAILED;
     }
 

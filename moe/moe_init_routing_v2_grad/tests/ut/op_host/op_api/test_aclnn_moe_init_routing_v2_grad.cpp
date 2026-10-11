@@ -20,8 +20,7 @@
 
 using namespace std;
 
-class l2_moe_init_routing_v2_grad_test : public testing::Test
-{
+class l2_moe_init_routing_v2_grad_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -47,8 +46,8 @@ TEST_F(l2_moe_init_routing_v2_grad_test, Ascend910B2_moe_init_routing_v2_grad_fp
 
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
-    aclnnStatus getWorkspaceResult = aclnnMoeInitRoutingV2GradGetWorkspaceSize(
-        gradExpandedX, expandedRowIdx, 1, 0, 0, out, &workspaceSize, &executor);
+    aclnnStatus getWorkspaceResult = aclnnMoeInitRoutingV2GradGetWorkspaceSize(gradExpandedX, expandedRowIdx, 1, 0, 0,
+                                                                               out, &workspaceSize, &executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
     ASSERT_NE(executor, nullptr);
 
