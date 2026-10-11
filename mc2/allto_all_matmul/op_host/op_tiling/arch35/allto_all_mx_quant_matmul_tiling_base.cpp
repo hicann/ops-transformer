@@ -15,7 +15,6 @@
 #include "allto_all_mx_quant_matmul_tiling_base.h"
 
 #include "../allto_all_matmul_tiling_base.h"
-#include "mc2/matmul_allto_all/op_host/op_tiling/common/allto_all_comm_algo_table.h"
 #include "common/utils/mc2_comm_utils.h"
 #include "common/utils/op_mc2.h"
 #include "mc2/matmul_allto_all/op_host/op_tiling/common/matmul_allto_all_util_tiling.h"
@@ -545,12 +544,9 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::SetHcclTiling()
         return ge::GRAPH_FAILED;
     }
     hcclServerType_ = hcclServerEngine;
-    std::string algoName = Mc2Tiling::SelectAllToAllAlgoName(
-        opName_, contextInfo_.group, hcclServerEngine, inferredInfo_.tileM, contextInfo_.args_.kValue,
-        contextInfo_.args_.inputDtypeSize, contextInfo_.args_.rankDim);
-
     Mc2CcTilingConfigBuilder allToAllMatmulBuilder =
-        Mc2CcTilingConfigBuilder::create(contextInfo_.group, mc2tiling::AicpuComType::HCCL_CMD_ALLTOALL, algoName);
+        Mc2CcTilingConfigBuilder::create(contextInfo_.group, mc2tiling::AicpuComType::HCCL_CMD_ALLTOALL,
+                                         Mc2CcTilingConfigBuilder::AlgConfigType::ALL_TO_ALL);
 
     // reducetype接口附带的数据类型优先于调用通信接口传入的数据类型，因此这里需要设置
     AscendC::Mc2CcTilingConfig allToAllTilingConfig =
