@@ -57,6 +57,8 @@ constexpr uint64_t HCCL_MAX_COMM_TILES = 62; // 总通信次数上限63, tile+ta
 
 class AllGatherMatmulTilingBase : public TilingBaseClass {
 public:
+    static constexpr const char *ALLGATHER_DEFAULT_ALGO_NAME = "AllGather=level0:fullmesh";
+
     explicit AllGatherMatmulTilingBase(gert::TilingContext *context)
         : TilingBaseClass(context)
     {}
