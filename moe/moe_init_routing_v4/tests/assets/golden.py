@@ -7,12 +7,24 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 
+__golden__ = {
+    "kernel": {"moe_init_routing_v4": "MoeInitRoutingV4"},
+}
+
+__input__ = {
+    "kernel": {"moe_init_routing_v4": "MoeInitRoutingV4_input"},
+}
+
 __spec__ = {
     "moe_init_routing_v4": "MoeInitRoutingV4KernelSpec",
     "aclnnMoeInitRoutingV4": "AclnnMoeInitRoutingV4Spec",
 }
 
 import numpy
+
+
+def MoeInitRoutingV4_input(*input_arrays, **kwargs):
+    return tuple(input_arrays)
 
 
 def To_BF16(x):
