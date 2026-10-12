@@ -523,6 +523,23 @@ TEST_F(FfnWorkerBatchingTilingTest, arch35_review_context_length_contract)
     }
 }
 
+// monolithic（A2/A3）同步 arch35 的 1024B context 下界校验：dim[0] < 1024（含空张量）
+// 必须在下发 kernel 前拒绝，避免 kernel 无条件读 1024B 造成 GM 越界读（issue #5778）。
+TEST_F(FfnWorkerBatchingTilingTest, monolithic_review_context_length_contract)
+{
+    for (const auto* soc : {"Ascend910B", "Ascend910_93"}) {
+        for (int64_t bytes : {0, 1, 1023, 1024, 1056}) {
+            SCOPED_TRACE(::testing::Message() << soc << " bytes=" << bytes);
+            gert::StorageShape scShape = {{bytes}, {bytes}};
+            FfnWorkerBatchingCompileInfo compileInfo = {};
+            gert::TilingContextPara para("FfnWorkerBatching", {{scShape, ge::DT_INT8, ge::FORMAT_ND}},
+                                         MakeA5OutputDesc(), MakeArch35Attrs(0, 0, 1, 1, 1, 2), &compileInfo, soc);
+            TilingInfo info;
+            EXPECT_EQ(ExecuteTiling(para, info), bytes >= 1024);
+        }
+    }
+}
+
 // Attribute arithmetic must fail before allocating outputs/workspace. Keep
 // representable large indices legal: there is no artificial 2^22 limit.
 TEST_F(FfnWorkerBatchingTilingTest, arch35_adopt_attribute_boundaries)

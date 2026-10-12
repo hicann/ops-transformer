@@ -15,6 +15,8 @@
 #include "ffn_worker_batching_tiling.h"
 #include "op_host/tiling_util.h"
 #include "context_util.h"
+#include "../../../common/include/op_kernel/attention_ffn_schedule.h"
+#include <string>
 
 namespace optiling {
 constexpr uint32_t EXPERT_NUM_ATTR = 0;
@@ -23,6 +25,7 @@ constexpr uint32_t TOKEN_DTYPE_ATTR = 2;
 constexpr uint32_t NEED_SCHEDULE_ATTR = 3;
 constexpr uint32_t LAY_NUM_ATTR = 4;
 constexpr int64_t X_SHAPE_VALUE = 1024;
+constexpr int64_t CONTEXT_BYTES = sizeof(aicpu::ScheduleContext);
 
 constexpr uint32_t INDEX_ZERO = 0;
 constexpr uint32_t INDEX_ONE = 1;
@@ -97,6 +100,13 @@ ge::graphStatus FfnWorkerBatchingTiling::CheckInputParam()
     OP_CHECK_IF(xShape.GetDimNum() != 1,
                 OP_LOGE(context_->GetNodeName(), "x shape %s dim num not 1", Ops::Base::ToString(xShape).c_str()),
                 return ge::GRAPH_FAILED);
+    // 所有公共入口均需保护固定 1024B context 读取；Torch wrapper 的检查不能
+    // 覆盖直接 ACLNN/GE 调用。空输入也必须在下发 kernel 前拒绝。
+    OP_CHECK_IF(
+        xShape.GetDim(0) < CONTEXT_BYTES,
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "schedule_context dim[0]", std::to_string(xShape.GetDim(0)),
+                                  "at least " + std::to_string(CONTEXT_BYTES)),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
