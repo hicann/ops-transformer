@@ -111,6 +111,7 @@ void MatmulAlltoAllFitBalanceTiling::SetLongTileLen()
     // balancing the pipeline
     if (tilingM_.cutRes.shortTileAtBack) {
         double targetTime = matmulPerf_.MatmulTime(tilingM_.cutRes.shortTileLen, 1);
+        targetTime = std::max(targetTime, commPerf_.CommTime(1));
         tilingM_.cutRes.longTileLen = commPerf_.InverseCommTime(targetTime);
     } else {
         double targetTime = commPerf_.CommTime(tilingM_.cutRes.shortTileLen);
