@@ -22,14 +22,14 @@ template <typename TYPE, class TILING_TYPE>
 class VectorSoftmaxGrad {
 public:
     __aicore__ inline VectorSoftmaxGrad(){};
-    __aicore__ inline void Init(TPipe *pipe_in, __gm__ uint8_t *dy, __gm__ uint8_t *attenIn,
-                                __gm__ uint8_t *actual_seq_qlen, __gm__ uint8_t *workspace, int32_t batch,
-                                const TILING_TYPE *orgTilingData);
+    __aicore__ inline void Init(TPipe* pipe_in, __gm__ uint8_t* dy, __gm__ uint8_t* attenIn,
+                                __gm__ uint8_t* actual_seq_qlen, __gm__ uint8_t* workspace, int32_t batch,
+                                const TILING_TYPE* orgTilingData);
     __aicore__ inline void Process();
 
 protected:
-    __aicore__ inline void InitIndex(int64_t startIdx, int64_t &curS, GM_ADDR seqS);
-    __aicore__ inline void CopyInSfmg(int64_t leftNburst, int64_t &curS, GM_ADDR seqS);
+    __aicore__ inline void InitIndex(int64_t startIdx, int64_t& curS, GM_ADDR seqS);
+    __aicore__ inline void CopyInSfmg(int64_t leftNburst, int64_t& curS, GM_ADDR seqS);
     __aicore__ inline void DoCopyIn(int64_t curS, int64_t curNBurst, int64_t dstOffset, GM_ADDR seqS);
 
 protected:
@@ -38,10 +38,10 @@ protected:
     constexpr static int64_t SFMG_HIGH_PERF_N_FACTOR = 8;
     constexpr static int64_t SFMG_HIGH_PERF_D_FACTOR = 64;
 
-    TPipe *pipe;
+    TPipe* pipe;
     uint32_t cBlockIdx;
 
-    const TILING_TYPE *tilingData;
+    const TILING_TYPE* tilingData;
 
     GlobalTensor<float> sfmgWorkspaceGm;
     GlobalTensor<TYPE> dyGm;
@@ -78,11 +78,11 @@ protected:
 };
 
 template <typename TYPE, class TILING_TYPE>
-__aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::Init(TPipe *pipe_in, __gm__ uint8_t *dy,
-                                                                  __gm__ uint8_t *attenIn,
-                                                                  __gm__ uint8_t *actual_seq_qlen,
-                                                                  __gm__ uint8_t *workspace, int32_t batchIn,
-                                                                  const TILING_TYPE *orgTilingData)
+__aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::Init(TPipe* pipe_in, __gm__ uint8_t* dy,
+                                                                  __gm__ uint8_t* attenIn,
+                                                                  __gm__ uint8_t* actual_seq_qlen,
+                                                                  __gm__ uint8_t* workspace, int32_t batchIn,
+                                                                  const TILING_TYPE* orgTilingData)
 {
     cBlockIdx = GetBlockIdx();
     tilingData = orgTilingData;
@@ -128,22 +128,22 @@ __aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::Init(TPipe *pipe_in
     pipe->InitBuffer(tmpBuf, tempBufferLen); // 40K - outputBufferLen
 
     // 初始化 GM
-    dyGm.SetGlobalBuffer((__gm__ TYPE *)dy);
-    attenInGm.SetGlobalBuffer((__gm__ TYPE *)attenIn);
-    sfmgWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dyGm.SetGlobalBuffer((__gm__ TYPE*)dy);
+    attenInGm.SetGlobalBuffer((__gm__ TYPE*)attenIn);
+    sfmgWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                     tilingData->mlaTensorTilingData.sfmgWorkspaceOffset / sizeof(float));
 }
 
 template <typename TYPE, class TILING_TYPE>
-__aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::InitIndex(int64_t startIdx, int64_t &curS, GM_ADDR seqS)
+__aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::InitIndex(int64_t startIdx, int64_t& curS, GM_ADDR seqS)
 {
     int64_t totalLen = 0;
     for (int64_t bDimIdx = bIdx; bDimIdx < b; bDimIdx++) {
-        totalLen = n1 * ((__gm__ int64_t *)seqS)[bDimIdx] * d;
+        totalLen = n1 * ((__gm__ int64_t*)seqS)[bDimIdx] * d;
         if (totalLen > startIdx) {
             bIdx = bDimIdx;
-            curS = (bIdx == 0) ? ((__gm__ int64_t *)seqS)[bIdx] :
-                                 (((__gm__ int64_t *)seqS)[bIdx] - ((__gm__ int64_t *)seqS)[bIdx - 1]);
+            curS = (bIdx == 0) ? ((__gm__ int64_t*)seqS)[bIdx] :
+                                 (((__gm__ int64_t*)seqS)[bIdx] - ((__gm__ int64_t*)seqS)[bIdx - 1]);
             int64_t bTail = startIdx - (totalLen - n1 * curS * d);
             nIdx = bTail / (curS * d);
             int64_t nTail = bTail % (curS * d);
@@ -158,7 +158,7 @@ __aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::DoCopyIn(int64_t cu
                                                                       int64_t dstOffset, GM_ADDR seqS)
 {
     int64_t srcOffset = 0;
-    int64_t bOffset = bIdx == 0 ? 0 : n1 * ((__gm__ int64_t *)seqS)[bIdx - 1] * d;
+    int64_t bOffset = bIdx == 0 ? 0 : n1 * ((__gm__ int64_t*)seqS)[bIdx - 1] * d;
     srcOffset = bOffset + (sIdx * n1 + nIdx) * d;
 
     DataCopyPad(input1Buf[dstOffset], dyGm[srcOffset],
@@ -172,7 +172,7 @@ __aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::DoCopyIn(int64_t cu
 }
 
 template <typename TYPE, class TILING_TYPE>
-__aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::CopyInSfmg(int64_t leftNburst, int64_t &curS, GM_ADDR seqS)
+__aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::CopyInSfmg(int64_t leftNburst, int64_t& curS, GM_ADDR seqS)
 {
     int64_t dstOffset = 0;
     while (leftNburst > 0) {
@@ -188,7 +188,7 @@ __aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::CopyInSfmg(int64_t 
                 nIdx = 0;
                 if (bIdx < b - 1) { // 需要借B
                     bIdx += 1;
-                    curS = ((__gm__ int64_t *)seqS)[bIdx] - ((__gm__ int64_t *)seqS)[bIdx - 1];
+                    curS = ((__gm__ int64_t*)seqS)[bIdx] - ((__gm__ int64_t*)seqS)[bIdx - 1];
                 } else { // 没有轴可以借了，end
                     leftNburst = 0;
                 }

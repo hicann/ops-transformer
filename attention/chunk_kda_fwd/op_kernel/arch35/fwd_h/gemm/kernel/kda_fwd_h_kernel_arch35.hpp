@@ -221,8 +221,8 @@ public:
                                 GM_ADDR cu_seqlens, GM_ADDR chunk_indices, GM_ADDR h, GM_ADDR v_new,
                                 GM_ADDR final_state, GM_ADDR tiling, GM_ADDR user)
     {
-        __gm__ ChunkKdaFwdHRuntimeTiling *__restrict kdaFwdHTilingData =
-            reinterpret_cast<__gm__ ChunkKdaFwdHRuntimeTiling *__restrict>(tiling);
+        __gm__ ChunkKdaFwdHRuntimeTiling* __restrict kdaFwdHTilingData =
+            reinterpret_cast<__gm__ ChunkKdaFwdHRuntimeTiling* __restrict>(tiling);
 
         batch = kdaFwdHTilingData->batch;
         seqlen = kdaFwdHTilingData->seqlen;
@@ -246,23 +246,23 @@ public:
         useDirectFp32Ub = std::is_same<ElementVWork, float>::value && chunkSize <= 64 && kHeadDim == 128 &&
                           vHeadDim == 128 && effectiveTaskCount >= AscendC::GetBlockNum();
 
-        gmK.SetGlobalBuffer((__gm__ ElementK *)k);
-        gmW.SetGlobalBuffer((__gm__ ElementW *)w);
-        gmU.SetGlobalBuffer((__gm__ ElementU *)u);
-        gmG.SetGlobalBuffer((__gm__ ElementG *)(scalarGated ? g : gk));
-        gmGk.SetGlobalBuffer((__gm__ ElementG *)(kGated ? gk : g));
-        gmInitialState.SetGlobalBuffer((__gm__ ElementInitialState *)inital_state);
-        gmH.SetGlobalBuffer((__gm__ ElementH *)h);
-        gmV.SetGlobalBuffer((__gm__ ElementV *)v_new);
-        gmFinalState.SetGlobalBuffer((__gm__ ElementFinalState *)final_state);
-        gmVWorkspace.SetGlobalBuffer((__gm__ ElementVWork *)(user + vWorkspaceOffset));
-        gmVUpdateWorkspace.SetGlobalBuffer((__gm__ ElementV *)(user + vUpdateWorkspaceOffset));
-        gmHWorkspace.SetGlobalBuffer((__gm__ ElementHWork *)(user + hWorkspaceOffset));
-        gmKDecayWorkspace.SetGlobalBuffer((__gm__ ElementK *)(user + kDecayWorkspaceOffset));
+        gmK.SetGlobalBuffer((__gm__ ElementK*)k);
+        gmW.SetGlobalBuffer((__gm__ ElementW*)w);
+        gmU.SetGlobalBuffer((__gm__ ElementU*)u);
+        gmG.SetGlobalBuffer((__gm__ ElementG*)(scalarGated ? g : gk));
+        gmGk.SetGlobalBuffer((__gm__ ElementG*)(kGated ? gk : g));
+        gmInitialState.SetGlobalBuffer((__gm__ ElementInitialState*)inital_state);
+        gmH.SetGlobalBuffer((__gm__ ElementH*)h);
+        gmV.SetGlobalBuffer((__gm__ ElementV*)v_new);
+        gmFinalState.SetGlobalBuffer((__gm__ ElementFinalState*)final_state);
+        gmVWorkspace.SetGlobalBuffer((__gm__ ElementVWork*)(user + vWorkspaceOffset));
+        gmVUpdateWorkspace.SetGlobalBuffer((__gm__ ElementV*)(user + vUpdateWorkspaceOffset));
+        gmHWorkspace.SetGlobalBuffer((__gm__ ElementHWork*)(user + hWorkspaceOffset));
+        gmKDecayWorkspace.SetGlobalBuffer((__gm__ ElementK*)(user + kDecayWorkspaceOffset));
 
-        gmSeqlen.SetGlobalBuffer((__gm__ int64_t *)cu_seqlens);
-        gmNumSeq.SetGlobalBuffer((__gm__ int64_t *)(user + numSeqWorkspaceOffset));
-        gmNumChunks.SetGlobalBuffer((__gm__ int64_t *)(user + numChunksWorkspaceOffset));
+        gmSeqlen.SetGlobalBuffer((__gm__ int64_t*)cu_seqlens);
+        gmNumSeq.SetGlobalBuffer((__gm__ int64_t*)(user + numSeqWorkspaceOffset));
+        gmNumChunks.SetGlobalBuffer((__gm__ int64_t*)(user + numChunksWorkspaceOffset));
 
         ubHUpdatePing = resource.ubBuf.template GetBufferByByte<ElementHWork>(32 * 1024);
         ubHUpdatePong = resource.ubBuf.template GetBufferByByte<ElementHWork>(96 * 1024);
@@ -284,7 +284,7 @@ public:
     template <typename TilingData>
     __aicore__ inline void InitFromData(GM_ADDR k, GM_ADDR w, GM_ADDR u, GM_ADDR g, GM_ADDR gk, GM_ADDR inital_state,
                                         GM_ADDR cu_seqlens, GM_ADDR chunk_indices, GM_ADDR h, GM_ADDR v_new,
-                                        GM_ADDR final_state, const TilingData &tilingData, GM_ADDR user)
+                                        GM_ADDR final_state, const TilingData& tilingData, GM_ADDR user)
     {
         batch = tilingData.batch;
         seqlen = tilingData.seqlen;
@@ -308,22 +308,22 @@ public:
         useDirectFp32Ub = std::is_same<ElementVWork, float>::value && chunkSize <= 64 && kHeadDim == 128 &&
                           vHeadDim == 128 && effectiveTaskCount >= AscendC::GetBlockNum();
 
-        gmK.SetGlobalBuffer((__gm__ ElementK *)k);
-        gmW.SetGlobalBuffer((__gm__ ElementW *)w);
-        gmU.SetGlobalBuffer((__gm__ ElementU *)u);
-        gmG.SetGlobalBuffer((__gm__ ElementG *)(scalarGated ? g : gk));
-        gmInitialState.SetGlobalBuffer((__gm__ ElementInitialState *)inital_state);
-        gmH.SetGlobalBuffer((__gm__ ElementH *)h);
-        gmV.SetGlobalBuffer((__gm__ ElementV *)v_new);
-        gmFinalState.SetGlobalBuffer((__gm__ ElementFinalState *)final_state);
-        gmVWorkspace.SetGlobalBuffer((__gm__ ElementVWork *)(user + vWorkspaceOffset));
-        gmVUpdateWorkspace.SetGlobalBuffer((__gm__ ElementV *)(user + vUpdateWorkspaceOffset));
-        gmHWorkspace.SetGlobalBuffer((__gm__ ElementHWork *)(user + hWorkspaceOffset));
-        gmGk.SetGlobalBuffer((__gm__ ElementG *)(kGated ? gk : g));
-        gmKDecayWorkspace.SetGlobalBuffer((__gm__ ElementK *)(user + kDecayWorkspaceOffset));
-        gmSeqlen.SetGlobalBuffer((__gm__ int64_t *)cu_seqlens);
-        gmNumSeq.SetGlobalBuffer((__gm__ int64_t *)(user + numSeqWorkspaceOffset));
-        gmNumChunks.SetGlobalBuffer((__gm__ int64_t *)(user + numChunksWorkspaceOffset));
+        gmK.SetGlobalBuffer((__gm__ ElementK*)k);
+        gmW.SetGlobalBuffer((__gm__ ElementW*)w);
+        gmU.SetGlobalBuffer((__gm__ ElementU*)u);
+        gmG.SetGlobalBuffer((__gm__ ElementG*)(scalarGated ? g : gk));
+        gmInitialState.SetGlobalBuffer((__gm__ ElementInitialState*)inital_state);
+        gmH.SetGlobalBuffer((__gm__ ElementH*)h);
+        gmV.SetGlobalBuffer((__gm__ ElementV*)v_new);
+        gmFinalState.SetGlobalBuffer((__gm__ ElementFinalState*)final_state);
+        gmVWorkspace.SetGlobalBuffer((__gm__ ElementVWork*)(user + vWorkspaceOffset));
+        gmVUpdateWorkspace.SetGlobalBuffer((__gm__ ElementV*)(user + vUpdateWorkspaceOffset));
+        gmHWorkspace.SetGlobalBuffer((__gm__ ElementHWork*)(user + hWorkspaceOffset));
+        gmGk.SetGlobalBuffer((__gm__ ElementG*)(kGated ? gk : g));
+        gmKDecayWorkspace.SetGlobalBuffer((__gm__ ElementK*)(user + kDecayWorkspaceOffset));
+        gmSeqlen.SetGlobalBuffer((__gm__ int64_t*)cu_seqlens);
+        gmNumSeq.SetGlobalBuffer((__gm__ int64_t*)(user + numSeqWorkspaceOffset));
+        gmNumChunks.SetGlobalBuffer((__gm__ int64_t*)(user + numChunksWorkspaceOffset));
 
         ubHUpdatePing = resource.ubBuf.template GetBufferByByte<ElementHWork>(32 * 1024);
         ubHUpdatePong = resource.ubBuf.template GetBufferByByte<ElementHWork>(96 * 1024);
@@ -342,7 +342,7 @@ public:
     }
 
     // Tail helpers borrow the stream's V_MTE2 free token and restore it before returning.
-    __aicore__ inline void ComputeTailVWorkspace(const KdaFwdHOffsets &offsets, uint32_t tailEventId)
+    __aicore__ inline void ComputeTailVWorkspace(const KdaFwdHOffsets& offsets, uint32_t tailEventId)
     {
         uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
         uint32_t subBlockNum = AscendC::GetSubBlockNum();
@@ -369,9 +369,9 @@ public:
             AscendC::DataCopy(wInputUb, gmW[offsets.wOffset + rowBegin * kHeadDim], rowCount * kHeadDim);
             AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(tailEventId);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(tailEventId);
-            __ubuf__ float *outputAddr = reinterpret_cast<__ubuf__ float *>(outputUb.GetPhyAddr());
-            __ubuf__ ElementW *wInputAddr = reinterpret_cast<__ubuf__ ElementW *>(wInputUb.GetPhyAddr());
-            __ubuf__ ElementH *hInputAddr = reinterpret_cast<__ubuf__ ElementH *>(hInputUb.GetPhyAddr());
+            __ubuf__ float* outputAddr = reinterpret_cast<__ubuf__ float*>(outputUb.GetPhyAddr());
+            __ubuf__ ElementW* wInputAddr = reinterpret_cast<__ubuf__ ElementW*>(wInputUb.GetPhyAddr());
+            __ubuf__ ElementH* hInputAddr = reinterpret_cast<__ubuf__ ElementH*>(hInputUb.GetPhyAddr());
             AscendC::VF_CALL<
                 Catlass::Epilogue::Block::detail::ComputeKdaTailVWorkspaceRegbaseDualIssue<ElementW, ElementH>>(
                 outputAddr, wInputAddr, hInputAddr, static_cast<uint16_t>(rowCount),
@@ -439,7 +439,7 @@ public:
         AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(tailEventId);
     }
 
-    __aicore__ inline void ComputeTailHWorkspace(const KdaFwdHOffsets &offsets, uint32_t tailEventId)
+    __aicore__ inline void ComputeTailHWorkspace(const KdaFwdHOffsets& offsets, uint32_t tailEventId)
     {
         uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
         uint32_t subBlockNum = AscendC::GetSubBlockNum();
@@ -501,7 +501,7 @@ public:
         AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(tailEventId);
     }
 
-    __aicore__ inline void ComputeKdaTailFinalState(const KdaFwdHOffsets &offsets, uint32_t tailEventId)
+    __aicore__ inline void ComputeKdaTailFinalState(const KdaFwdHOffsets& offsets, uint32_t tailEventId)
     {
         static_assert(kGated && !scalarGated && useExp2 && std::is_same<ElementFinalState, float>::value,
                       "The fused tail state path is specific to FP32 KDA state");
@@ -555,11 +555,11 @@ public:
         AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(tailEventId);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(tailEventId);
 
-        __ubuf__ float *stateAddr = reinterpret_cast<__ubuf__ float *>(stateUb.GetPhyAddr());
-        __ubuf__ ElementK *kInputAddr = reinterpret_cast<__ubuf__ ElementK *>(kInputUb.GetPhyAddr());
-        __ubuf__ ElementV *vInputAddr = reinterpret_cast<__ubuf__ ElementV *>(vInputUb.GetPhyAddr());
-        __ubuf__ ElementG *gateInputAddr = reinterpret_cast<__ubuf__ ElementG *>(gateInputUb.GetPhyAddr());
-        __ubuf__ float *gateScaleAddr = reinterpret_cast<__ubuf__ float *>(gateScaleUb.GetPhyAddr());
+        __ubuf__ float* stateAddr = reinterpret_cast<__ubuf__ float*>(stateUb.GetPhyAddr());
+        __ubuf__ ElementK* kInputAddr = reinterpret_cast<__ubuf__ ElementK*>(kInputUb.GetPhyAddr());
+        __ubuf__ ElementV* vInputAddr = reinterpret_cast<__ubuf__ ElementV*>(vInputUb.GetPhyAddr());
+        __ubuf__ ElementG* gateInputAddr = reinterpret_cast<__ubuf__ ElementG*>(gateInputUb.GetPhyAddr());
+        __ubuf__ float* gateScaleAddr = reinterpret_cast<__ubuf__ float*>(gateScaleUb.GetPhyAddr());
         AscendC::VF_CALL<Catlass::Epilogue::Block::detail::PrepareKGateRegbase<ElementG, true>>(
             gateScaleAddr, gateInputAddr, static_cast<uint16_t>(rowCount));
         AscendC::VF_CALL<
@@ -617,12 +617,12 @@ public:
                             resource, chunkSize * cubeBlockScheduler.vBlockSize * sizeof(ElementV) * PING_PONG_STAGES);
                         for (uint32_t i = 0; i < PING_PONG_STAGES; ++i) {
                             uint32_t streamId = cubeBlockScheduler.GetStreamId(i);
-                            const auto &stream = cubeBlockScheduler.GetStream(i);
+                            const auto& stream = cubeBlockScheduler.GetStream(i);
                             if (cubeBlockScheduler.StreamIsDone(stream)) {
                                 continue;
                             }
 
-                            const KdaFwdHOffsets &cube1Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
+                            const KdaFwdHOffsets& cube1Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
                             Arch::CrossCoreWaitFlag(cubeBlockScheduler.vec2Done[streamId]);
                             if (cube1Offsets.blockTokens < 16) {
                                 Arch::CrossCoreSetFlag<0x2, PIPE_MTE2>(cubeBlockScheduler.cube1Done[streamId]);
@@ -655,12 +655,12 @@ public:
                     } else if (useBoundedMmad) {
                         for (uint32_t i = 0; i < PING_PONG_STAGES; ++i) {
                             uint32_t streamId = cubeBlockScheduler.GetStreamId(i);
-                            const auto &stream = cubeBlockScheduler.GetStream(i);
+                            const auto& stream = cubeBlockScheduler.GetStream(i);
                             if (cubeBlockScheduler.StreamIsDone(stream)) {
                                 continue;
                             }
 
-                            const KdaFwdHOffsets &cube1Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
+                            const KdaFwdHOffsets& cube1Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
                             Arch::CrossCoreWaitFlag(cubeBlockScheduler.vec2Done[streamId]);
                             if (cube1Offsets.blockTokens < 16) {
                                 Arch::CrossCoreSetFlag<0x2, PIPE_MTE2>(cubeBlockScheduler.cube1Done[streamId]);
@@ -692,12 +692,12 @@ public:
                         blockMmadWH.preSetFlags();
                         for (uint32_t i = 0; i < PING_PONG_STAGES; ++i) {
                             uint32_t streamId = cubeBlockScheduler.GetStreamId(i);
-                            const auto &stream = cubeBlockScheduler.GetStream(i);
+                            const auto& stream = cubeBlockScheduler.GetStream(i);
                             if (cubeBlockScheduler.StreamIsDone(stream)) {
                                 continue;
                             }
 
-                            const KdaFwdHOffsets &cube1Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
+                            const KdaFwdHOffsets& cube1Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
                             Arch::CrossCoreWaitFlag(cubeBlockScheduler.vec2Done[streamId]);
                             if (cube1Offsets.blockTokens < 16) {
                                 Arch::CrossCoreSetFlag<0x2, PIPE_MTE2>(cubeBlockScheduler.cube1Done[streamId]);
@@ -732,11 +732,11 @@ public:
                             resource, chunkSize * cubeBlockScheduler.vBlockSize * sizeof(ElementV) * PING_PONG_STAGES);
                         for (uint32_t i = 0; i < PING_PONG_STAGES; ++i) {
                             uint32_t streamId = cubeBlockScheduler.GetStreamId(i);
-                            const auto &stream = cubeBlockScheduler.GetStream(i);
+                            const auto& stream = cubeBlockScheduler.GetStream(i);
                             if (cubeBlockScheduler.StreamIsDone(stream)) {
                                 continue;
                             }
-                            const KdaFwdHOffsets &cube2Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
+                            const KdaFwdHOffsets& cube2Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
                             Arch::CrossCoreWaitFlag(cubeBlockScheduler.vec1Done[streamId]);
 
                             if (cubeBlockScheduler.NeedProcessStage2(stream)) {
@@ -781,11 +781,11 @@ public:
                     } else if (useBoundedMmad) {
                         for (uint32_t i = 0; i < PING_PONG_STAGES; ++i) {
                             uint32_t streamId = cubeBlockScheduler.GetStreamId(i);
-                            const auto &stream = cubeBlockScheduler.GetStream(i);
+                            const auto& stream = cubeBlockScheduler.GetStream(i);
                             if (cubeBlockScheduler.StreamIsDone(stream)) {
                                 continue;
                             }
-                            const KdaFwdHOffsets &cube2Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
+                            const KdaFwdHOffsets& cube2Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
                             Arch::CrossCoreWaitFlag(cubeBlockScheduler.vec1Done[streamId]);
 
                             if (cubeBlockScheduler.NeedProcessStage2(stream)) {
@@ -824,11 +824,11 @@ public:
                         blockMmadKV.preSetFlags();
                         for (uint32_t i = 0; i < PING_PONG_STAGES; ++i) {
                             uint32_t streamId = cubeBlockScheduler.GetStreamId(i);
-                            const auto &stream = cubeBlockScheduler.GetStream(i);
+                            const auto& stream = cubeBlockScheduler.GetStream(i);
                             if (cubeBlockScheduler.StreamIsDone(stream)) {
                                 continue;
                             }
-                            const KdaFwdHOffsets &cube2Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
+                            const KdaFwdHOffsets& cube2Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
                             Arch::CrossCoreWaitFlag(cubeBlockScheduler.vec1Done[streamId]);
 
                             if (cubeBlockScheduler.NeedProcessStage2(stream)) {
@@ -1001,11 +1001,11 @@ public:
                     vecBlockScheduler.InitTasks();
                     for (uint32_t i = 0; i < PING_PONG_STAGES; ++i) {
                         uint32_t streamId = vecBlockScheduler.GetStreamId(i);
-                        const auto &stream = vecBlockScheduler.GetStream(i);
+                        const auto& stream = vecBlockScheduler.GetStream(i);
                         if (vecBlockScheduler.StreamIsDone(stream)) {
                             continue;
                         }
-                        const KdaFwdHOffsets &vec1Offsets = vecBlockScheduler.GetCurTaskOffsets(stream);
+                        const KdaFwdHOffsets& vec1Offsets = vecBlockScheduler.GetCurTaskOffsets(stream);
                         AscendC::LocalTensor<ElementV> l1VUpdate = (i == 0) ? l1VUpdatePing : l1VUpdatePong;
                         bool tailVectorPath = vec1Offsets.blockTokens < 16;
                         if (tailVectorPath) {
@@ -1032,11 +1032,11 @@ public:
                     /* V2: h[i+1] += h_work if i < num_chunks - 1 else None */
                     for (uint32_t i = 0; i < PING_PONG_STAGES; ++i) {
                         uint32_t streamId = vecBlockScheduler.GetStreamId(i);
-                        const auto &stream = vecBlockScheduler.GetStream(i);
+                        const auto& stream = vecBlockScheduler.GetStream(i);
                         if (vecBlockScheduler.StreamIsDone(stream)) {
                             continue;
                         }
-                        const KdaFwdHOffsets &vec2Offsets = vecBlockScheduler.GetCurTaskOffsets(stream);
+                        const KdaFwdHOffsets& vec2Offsets = vecBlockScheduler.GetCurTaskOffsets(stream);
                         if (vecBlockScheduler.NeedProcessStage2(stream)) {
                             bool tailVectorPath = vec2Offsets.blockTokens < 16;
                             bool fuseTailFinalState = false;

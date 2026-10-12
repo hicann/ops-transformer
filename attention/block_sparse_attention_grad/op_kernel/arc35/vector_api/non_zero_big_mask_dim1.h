@@ -29,13 +29,13 @@ public:
     __aicore__ inline NonZeroBigMaskDim1(){};
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR y, GM_ADDR outShape, GM_ADDR workspace,
-                                const mNonZeroTiling *tilingData, TPipe *tPipe);
-    template <typename CLS_NAME, void (CLS_NAME::*ComputeOutputPtr)(LocalTensor<int32_t> &yUb)>
-    __aicore__ inline void Process(CLS_NAME *objPtr);
-    __aicore__ inline void ComputeOutput(LocalTensor<int32_t> &yUb);
+                                const mNonZeroTiling* tilingData, TPipe* tPipe);
+    template <typename CLS_NAME, void (CLS_NAME::*ComputeOutputPtr)(LocalTensor<int32_t>& yUb)>
+    __aicore__ inline void Process(CLS_NAME* objPtr);
+    __aicore__ inline void ComputeOutput(LocalTensor<int32_t>& yUb);
 };
 template <typename T1, typename T2>
-__aicore__ inline void NonZeroBigMaskDim1<T1, T2>::ComputeOutput(LocalTensor<int32_t> &yUb)
+__aicore__ inline void NonZeroBigMaskDim1<T1, T2>::ComputeOutput(LocalTensor<int32_t>& yUb)
 {
     this->CastOutput(yUb, this->processSize_ * (this->shapeDim_ + 1), this->arNum_, this->shapeDim_);
     this->outQueY_.EnQue(yUb);
@@ -43,14 +43,14 @@ __aicore__ inline void NonZeroBigMaskDim1<T1, T2>::ComputeOutput(LocalTensor<int
 
 template <typename T1, typename T2>
 __aicore__ inline void NonZeroBigMaskDim1<T1, T2>::Init(GM_ADDR x, GM_ADDR y, GM_ADDR outShape, GM_ADDR workspace,
-                                                        const mNonZeroTiling *tilingData, TPipe *tPipe)
+                                                        const mNonZeroTiling* tilingData, TPipe* tPipe)
 {
     this->InitBase(x, y, outShape, workspace, tilingData, tPipe);
 }
 
 template <typename T1, typename T2>
-template <typename CLS_NAME, void (CLS_NAME::*ComputeOutputPtr)(LocalTensor<int32_t> &yUb)>
-__aicore__ inline void NonZeroBigMaskDim1<T1, T2>::Process(CLS_NAME *objPtr)
+template <typename CLS_NAME, void (CLS_NAME::*ComputeOutputPtr)(LocalTensor<int32_t>& yUb)>
+__aicore__ inline void NonZeroBigMaskDim1<T1, T2>::Process(CLS_NAME* objPtr)
 {
     this->template ProcessBase<CLS_NAME, ComputeOutputPtr>(objPtr);
 }

@@ -18,7 +18,7 @@ namespace optiling {
 // 计算时结果并不确定。这不是参数非法，而是特性未支持 —— 明确拒绝，不静默放行，
 // 避免用户以为拿到了确定性结果。待确定性模板落地后（独立 tilingkey 分支、
 // 前缀表放 AICPU），把这里改成正例即可。
-ge::graphStatus FagDeterministicChecker::Check(FagCheckCtx &ctx)
+ge::graphStatus FagDeterministicChecker::Check(FagCheckCtx& ctx)
 {
     OP_CHECK_IF(ctx.context->GetDeterministic() == 1,
                 OP_LOGE(ctx.opName, "FlashAttnGrad does not support deterministic computation yet "

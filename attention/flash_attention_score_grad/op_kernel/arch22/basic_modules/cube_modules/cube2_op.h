@@ -16,19 +16,19 @@
 #define _CUBE2_OP_H_
 
 template <typename TYPE>
-__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Compute(const AddrInfo &shapeInfo,
-                                                                                 __gm__ TYPE *left, __gm__ TYPE *right,
-                                                                                 __gm__ float *out, const bool isFisrt)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Compute(const AddrInfo& shapeInfo,
+                                                                                 __gm__ TYPE* left, __gm__ TYPE* right,
+                                                                                 __gm__ float* out, const bool isFisrt)
 {
     // pingpongl1a/pingpongl0a 在1 * n情况下，恒为0，在2 * n情况下，0-1跳动
     // pingpongl1b/pingpongl0b 在1 * n情况和2 * n下，随n进行n % 2
-    __gm__ TYPE *left_start_addr = left + (shapeInfo.out + globalBlockOffset) * 2;
-    __gm__ TYPE *right_start_addr = right + shapeInfo.right;
-    __gm__ float *result_gm = out + shapeInfo.left;
+    __gm__ TYPE* left_start_addr = left + (shapeInfo.out + globalBlockOffset) * 2;
+    __gm__ TYPE* right_start_addr = right + shapeInfo.right;
+    __gm__ float* result_gm = out + shapeInfo.left;
 
-    uint64_t left_offset = left_start_addr - (__gm__ TYPE *)0;
-    uint64_t right_offset = right_start_addr - (__gm__ TYPE *)0;
-    uint64_t out_offset = result_gm - (__gm__ float *)0;
+    uint64_t left_offset = left_start_addr - (__gm__ TYPE*)0;
+    uint64_t right_offset = right_start_addr - (__gm__ TYPE*)0;
+    uint64_t out_offset = result_gm - (__gm__ float*)0;
 
     // left matrix is (ky, kx)
     // right matrix is (kx, headDim)
@@ -59,7 +59,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Compute
         bool l0_c_init_flag = (n_loop_index == 0);
 
         // load right matrix gm (kx, headDim)-> L1B
-        AscendC::LocalTensor<TYPE> *l1_b_buf_tensor = ping_pong_flag_l1_b_ ? &l1_b_pong_tensor : &l1_b_ping_tensor;
+        AscendC::LocalTensor<TYPE>* l1_b_buf_tensor = ping_pong_flag_l1_b_ ? &l1_b_pong_tensor : &l1_b_ping_tensor;
         AscendC::WaitFlag<HardEvent::MTE1_MTE2>(static_cast<int32_t>(ping_pong_flag_l1_b_));
         commonNd2NzParams.nValue = n_remain;
         commonNd2NzParams.dValue = headDim;
@@ -77,7 +77,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Compute
         // Load Left_GM matrix A -> L1A
         ping_pong_flag_l1_a_ = 0;
         for (uint32_t m_loop_index = 0; m_loop_index < m_loop; m_loop_index++) {
-            AscendC::LocalTensor<TYPE> *l1_a_buf_tensor = ping_pong_flag_l1_a_ ? &l1_a_pong_tensor : &l1_a_ping_tensor;
+            AscendC::LocalTensor<TYPE>* l1_a_buf_tensor = ping_pong_flag_l1_a_ ? &l1_a_pong_tensor : &l1_a_ping_tensor;
             int32_t m_remain = (m_loop_index == m_loop - 1) ? l1_m_block_size_tail : 128;
             int32_t m_remain_align = (m_loop_index == m_loop - 1) ? l1_m_block_size_align_tail : 128;
             bool is_skip = false;
@@ -115,7 +115,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Compute
         }
 
         // load L1B (n, headDim) -> L0B
-        AscendC::LocalTensor<TYPE> *l0_b_buf_tensor = ping_pong_flag_l0_b_ ? &l0_b_pong_tensor : &l0_b_ping_tensor;
+        AscendC::LocalTensor<TYPE>* l0_b_buf_tensor = ping_pong_flag_l0_b_ ? &l0_b_pong_tensor : &l0_b_ping_tensor;
         commonLoadData2dParamsTranspose.repeatTimes = headDim / 16;
         commonLoadData2dParamsTranspose.srcStride = n_remain_align / 16;
         AscendC::WaitFlag<HardEvent::MTE2_MTE1>(static_cast<int32_t>(ping_pong_flag_l1_b_));
@@ -132,9 +132,9 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Compute
         AscendC::WaitFlag<HardEvent::MTE1_M>(static_cast<int32_t>(ping_pong_flag_l0_b_ + 2));
         // do m_loop times mad with l0B常驻
         for (uint32_t m_loop_index = 0; m_loop_index < m_loop; m_loop_index++) {
-            AscendC::LocalTensor<TYPE> *l1_a_buf_tensor = ping_pong_flag_l1_a_ ? &l1_a_pong_tensor : &l1_a_ping_tensor;
-            AscendC::LocalTensor<TYPE> *l0_a_buf_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
-            AscendC::LocalTensor<float> *l0_c_buf_tensor = m_loop_index ? &l0_c_pong_tensor : &l0_c_ping_tensor;
+            AscendC::LocalTensor<TYPE>* l1_a_buf_tensor = ping_pong_flag_l1_a_ ? &l1_a_pong_tensor : &l1_a_ping_tensor;
+            AscendC::LocalTensor<TYPE>* l0_a_buf_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
+            AscendC::LocalTensor<float>* l0_c_buf_tensor = m_loop_index ? &l0_c_pong_tensor : &l0_c_ping_tensor;
 
             int32_t m_remain = (m_loop_index == m_loop - 1) ? l1_m_block_size_tail : 128;
             int32_t m_remain_align = (m_loop_index == m_loop - 1) ? l1_m_block_size_align_tail : 128;

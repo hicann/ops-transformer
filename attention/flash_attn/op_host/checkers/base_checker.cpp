@@ -28,15 +28,15 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35FA;
 
-ge::graphStatus FABaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const
+ge::graphStatus FABaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const
 {
     if (desc != nullptr) {
-        const auto &it = DTYPE_SUPPORT_MAP.find(name);
+        const auto& it = DTYPE_SUPPORT_MAP.find(name);
         OP_CHECK_IF(
             it == DTYPE_SUPPORT_MAP.end(),
             OP_LOGE("FlashAttn", "%s datatype support list should be specified in DTYPE_SUPPORT_MAP", name.c_str()),
             return ge::GRAPH_FAILED);
-        auto &expectDtypeList = it->second;
+        auto& expectDtypeList = it->second;
         if (std::find(expectDtypeList.begin(), expectDtypeList.end(), desc->GetDataType()) == expectDtypeList.end()) {
             std::string dtypeStr = DataTypeToSerialString(desc->GetDataType());
             std::string expectedDtypes;
@@ -52,8 +52,8 @@ ge::graphStatus FABaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorDe
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FABaseChecker::CheckFormatSupport(const gert::CompileTimeTensorDesc *desc,
-                                                  const std::string &name) const
+ge::graphStatus FABaseChecker::CheckFormatSupport(const gert::CompileTimeTensorDesc* desc,
+                                                  const std::string& name) const
 {
     if (desc != nullptr) {
         auto format = desc->GetOriginFormat();

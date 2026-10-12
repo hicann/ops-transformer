@@ -61,13 +61,13 @@ struct TempParamsS1s2Bn2 {
 
 class FlashAttentionScoreGradTilingS1s2Bn2 : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit FlashAttentionScoreGradTilingS1s2Bn2(gert::TilingContext *context)
+    explicit FlashAttentionScoreGradTilingS1s2Bn2(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {
         td_->reset();
     }
 
-    FlashAttentionScoreGradTilingDataS1s2Bn2 *td_ = context_->GetTilingData<FlashAttentionScoreGradTilingDataS1s2Bn2>();
+    FlashAttentionScoreGradTilingDataS1s2Bn2* td_ = context_->GetTilingData<FlashAttentionScoreGradTilingDataS1s2Bn2>();
 
 protected:
     bool IsCapable() override;
@@ -95,9 +95,9 @@ private:
     ge::graphStatus SetBmm1TilingData(uint32_t sOut, uint32_t sFla, uint32_t l1SizeRemain);
     ge::graphStatus SetBmm31TilingData(uint32_t l1SizeRemain);
     ge::graphStatus SetBmm4TilingData(uint32_t l1SizeRemain);
-    ge::graphStatus SetBaseInfo(const gert::Shape &queryShape, const gert::Shape &keyShape, int64_t dimN1);
+    ge::graphStatus SetBaseInfo(const gert::Shape& queryShape, const gert::Shape& keyShape, int64_t dimN1);
     ge::graphStatus ProcessDropInfo();
-    ge::graphStatus SetMaskShapeType(const gert::Shape &storageShape, const uint32_t maskShapeDims);
+    ge::graphStatus SetMaskShapeType(const gert::Shape& storageShape, const uint32_t maskShapeDims);
     virtual void SetQKVStartIdx();
     void PrintShapeInfo();
     void DecideBranch();
@@ -111,8 +111,8 @@ private:
     void VectorBaseMNSplit();
     void MatmulBaseMNSplit();
     void SFTBaseMDSplit();
-    bool CheckForDichotomy(std::vector<int64_t> &nums, uint32_t x, uint32_t m);
-    int64_t GetSplitArrayMinMaxSum(std::vector<int64_t> &s1s2WeightNums, uint32_t coreNum);
+    bool CheckForDichotomy(std::vector<int64_t>& nums, uint32_t x, uint32_t m);
+    int64_t GetSplitArrayMinMaxSum(std::vector<int64_t>& s1s2WeightNums, uint32_t coreNum);
 
     TempParamsS1s2Bn2 tmpData_;
     uint32_t tensorSize{0};
@@ -146,7 +146,7 @@ private:
 
 class FlashAttentionScoreGradTilingDeterministic : public FlashAttentionScoreGradTilingS1s2Bn2 {
 public:
-    explicit FlashAttentionScoreGradTilingDeterministic(gert::TilingContext *context)
+    explicit FlashAttentionScoreGradTilingDeterministic(gert::TilingContext* context)
         : FlashAttentionScoreGradTilingS1s2Bn2(context)
     {}
 

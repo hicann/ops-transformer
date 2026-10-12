@@ -35,19 +35,19 @@ namespace test_utils = block_attn_res_update::test;
 
 constexpr size_t kCsvColumnCount = 27UL;
 constexpr size_t kCaseNameColumnIndex = 1UL;
-constexpr const char *kRunModeGetWorkspace = "GET_WORKSPACE";
-constexpr const char *kRunModeNullWorkspaceSize = "NULL_WORKSPACE_SIZE";
-constexpr const char *kRunModeNullExecutorOut = "NULL_EXECUTOR_OUT";
-constexpr const char *kRunModeNullPartialBlockRef = "NULL_PARTIAL_BLOCK_REF";
-constexpr const char *kRunModeNullDelta = "NULL_DELTA";
-constexpr const char *kRunModeNullPseudoQuery = "NULL_PSEUDO_QUERY";
-constexpr const char *kRunModeNullNumerator = "NULL_NUMERATOR";
-constexpr const char *kRunModeNullLogitMax = "NULL_LOGIT_MAX";
-constexpr const char *kRunModeNullExpSum = "NULL_EXP_SUM";
-constexpr const char *kRunModeNullH = "NULL_H";
-constexpr const char *kRunModeBlockAttnResUpdateNullExecutor = "BLOCK_ATTN_RES_UPDATE_NULL_EXECUTOR";
+constexpr const char* kRunModeGetWorkspace = "GET_WORKSPACE";
+constexpr const char* kRunModeNullWorkspaceSize = "NULL_WORKSPACE_SIZE";
+constexpr const char* kRunModeNullExecutorOut = "NULL_EXECUTOR_OUT";
+constexpr const char* kRunModeNullPartialBlockRef = "NULL_PARTIAL_BLOCK_REF";
+constexpr const char* kRunModeNullDelta = "NULL_DELTA";
+constexpr const char* kRunModeNullPseudoQuery = "NULL_PSEUDO_QUERY";
+constexpr const char* kRunModeNullNumerator = "NULL_NUMERATOR";
+constexpr const char* kRunModeNullLogitMax = "NULL_LOGIT_MAX";
+constexpr const char* kRunModeNullExpSum = "NULL_EXP_SUM";
+constexpr const char* kRunModeNullH = "NULL_H";
+constexpr const char* kRunModeBlockAttnResUpdateNullExecutor = "BLOCK_ATTN_RES_UPDATE_NULL_EXECUTOR";
 
-TensorDesc MakeTensorDesc(const string &spec, const string &dtype, const string &format)
+TensorDesc MakeTensorDesc(const string& spec, const string& dtype, const string& format)
 {
     const auto parsed = test_utils::ParseAclTensorSpec(spec);
     return TensorDesc(parsed.viewDims, test_utils::ParseAclDtype(dtype), test_utils::ParseAclFormat(format),
@@ -56,10 +56,10 @@ TensorDesc MakeTensorDesc(const string &spec, const string &dtype, const string 
 }
 
 struct BlockAttnResUpdateOpApiCase {
-    aclnnStatus RunSpecialCase(const TensorDesc &partialBlockRefDesc, const TensorDesc &deltaDesc,
-                               const TensorDesc &pseudoQueryDesc, const TensorDesc &numeratorDesc,
-                               const TensorDesc &logitMaxDesc, const TensorDesc &expSumDesc,
-                               const TensorDesc &hDesc) const
+    aclnnStatus RunSpecialCase(const TensorDesc& partialBlockRefDesc, const TensorDesc& deltaDesc,
+                               const TensorDesc& pseudoQueryDesc, const TensorDesc& numeratorDesc,
+                               const TensorDesc& logitMaxDesc, const TensorDesc& expSumDesc,
+                               const TensorDesc& hDesc) const
     {
         if (runMode == kRunModeBlockAttnResUpdateNullExecutor) {
             return aclnnBlockAttnResUpdate(nullptr, 0U, nullptr, nullptr);
@@ -73,17 +73,17 @@ struct BlockAttnResUpdateOpApiCase {
         auto expSum = expSumDesc.ToAclType();
         auto h = hDesc.ToAclType();
 
-        aclTensor *partialBlockRefArg = partialBlockRef.get();
-        const aclTensor *deltaArg = delta.get();
-        const aclTensor *pseudoQueryArg = pseudoQuery.get();
-        const aclTensor *numeratorArg = numerator.get();
-        const aclTensor *logitMaxArg = logitMax.get();
-        const aclTensor *expSumArg = expSum.get();
-        aclTensor *hArg = h.get();
+        aclTensor* partialBlockRefArg = partialBlockRef.get();
+        const aclTensor* deltaArg = delta.get();
+        const aclTensor* pseudoQueryArg = pseudoQuery.get();
+        const aclTensor* numeratorArg = numerator.get();
+        const aclTensor* logitMaxArg = logitMax.get();
+        const aclTensor* expSumArg = expSum.get();
+        aclTensor* hArg = h.get();
         uint64_t workspaceSize = 0U;
-        uint64_t *workspaceSizeArg = &workspaceSize;
-        aclOpExecutor *executor = nullptr;
-        aclOpExecutor **executorArg = &executor;
+        uint64_t* workspaceSizeArg = &workspaceSize;
+        aclOpExecutor* executor = nullptr;
+        aclOpExecutor** executorArg = &executor;
 
         if (runMode == kRunModeNullWorkspaceSize) {
             workspaceSizeArg = nullptr;
@@ -177,7 +177,7 @@ struct BlockAttnResUpdateOpApiCase {
     string runMode = kRunModeGetWorkspace;
 };
 
-vector<BlockAttnResUpdateOpApiCase> LoadCases(const string &csvFilePath)
+vector<BlockAttnResUpdateOpApiCase> LoadCases(const string& csvFilePath)
 {
     ifstream in(csvFilePath);
     EXPECT_TRUE(in.is_open()) << "Failed to open CSV file: " << csvFilePath;
@@ -235,7 +235,7 @@ vector<BlockAttnResUpdateOpApiCase> LoadCases(const string &csvFilePath)
             c.hFormat = test_utils::Trim(cols[i++]);
             c.runMode = test_utils::Trim(cols[i++]);
             cases.emplace_back(c);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << test_utils::BuildCsvParseErrorMessage(csvFilePath, lineNo, caseName, error);
         }
     }
@@ -243,7 +243,7 @@ vector<BlockAttnResUpdateOpApiCase> LoadCases(const string &csvFilePath)
     return cases;
 }
 
-string BuildCaseName(const testing::TestParamInfo<BlockAttnResUpdateOpApiCase> &info)
+string BuildCaseName(const testing::TestParamInfo<BlockAttnResUpdateOpApiCase>& info)
 {
     return test_utils::MakeSafeParamName(info.param.socVersion + "_" + info.param.caseName);
 }

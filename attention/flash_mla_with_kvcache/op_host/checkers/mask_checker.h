@@ -28,12 +28,12 @@ public:
     MaskChecker() = default;
     ~MaskChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const FlashMlaWithKvcacheTilingInfo &faInfo) override;
-    ge::graphStatus CheckParaExistence(const FlashMlaWithKvcacheTilingInfo &faInfo) override;
+    ge::graphStatus CheckSinglePara(const FlashMlaWithKvcacheTilingInfo& faInfo) override;
+    ge::graphStatus CheckParaExistence(const FlashMlaWithKvcacheTilingInfo& faInfo) override;
 
 private:
-    ge::graphStatus CheckSingleParaMaskMode(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckSingleParaAttnMask(const FlashMlaWithKvcacheTilingInfo &faInfo);
+    ge::graphStatus CheckSingleParaMaskMode(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckSingleParaAttnMask(const FlashMlaWithKvcacheTilingInfo& faInfo);
 };
 
 } // namespace flash_mla_with_kvcache

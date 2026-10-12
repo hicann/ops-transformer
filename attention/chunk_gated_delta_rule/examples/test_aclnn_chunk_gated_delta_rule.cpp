@@ -31,7 +31,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -40,7 +40,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr, const char *name)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr, const char* name)
 {
     auto size = GetShapeSize(shape);
     std::vector<uint16_t> resultData(size, 0);
@@ -58,7 +58,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr, const char *
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // AscendCL初始化
     auto ret = aclInit(nullptr);
@@ -75,8 +75,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -104,25 +104,25 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
     // 2. 构造输入与输出，需要根据API的接口自定义构造
-    void *queryDeviceAddr = nullptr;
-    void *keyDeviceAddr = nullptr;
-    void *valueDeviceAddr = nullptr;
-    void *gamaDeviceAddr = nullptr;
-    void *betaDeviceAddr = nullptr;
-    void *initStateDeviceAddr = nullptr;
-    void *actSeqLenDeviceAddr = nullptr;
-    void *attnOutDeviceAddr = nullptr;
-    void *finalStateDeviceAddr = nullptr;
+    void* queryDeviceAddr = nullptr;
+    void* keyDeviceAddr = nullptr;
+    void* valueDeviceAddr = nullptr;
+    void* gamaDeviceAddr = nullptr;
+    void* betaDeviceAddr = nullptr;
+    void* initStateDeviceAddr = nullptr;
+    void* actSeqLenDeviceAddr = nullptr;
+    void* attnOutDeviceAddr = nullptr;
+    void* finalStateDeviceAddr = nullptr;
 
-    aclTensor *query = nullptr;
-    aclTensor *key = nullptr;
-    aclTensor *value = nullptr;
-    aclTensor *gama = nullptr;
-    aclTensor *beta = nullptr;
-    aclTensor *initState = nullptr;
-    aclTensor *actSeqLen = nullptr;
-    aclTensor *attnOut = nullptr;
-    aclTensor *finalState = nullptr;
+    aclTensor* query = nullptr;
+    aclTensor* key = nullptr;
+    aclTensor* value = nullptr;
+    aclTensor* gama = nullptr;
+    aclTensor* beta = nullptr;
+    aclTensor* initState = nullptr;
+    aclTensor* actSeqLen = nullptr;
+    aclTensor* attnOut = nullptr;
+    aclTensor* finalState = nullptr;
 
     // 自定义输入与属性
     int32_t batchSize = 2;
@@ -190,7 +190,7 @@ int main()
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
     float scale = 1.0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     // 调用aclnnChunkGatedDeltaRuleGetWorkspaceSize第一段接口
     ret = aclnnChunkGatedDeltaRuleGetWorkspaceSize(query, key, value, beta, initState, actSeqLen, gama, scale, attnOut,
                                                    finalState, &workspaceSize, &executor);
@@ -198,7 +198,7 @@ int main()
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

@@ -27,10 +27,10 @@ struct DecodeUpdateTilingData {
 };
 #pragma pack()
 
-inline void InitAttentionUpdateTilingData(uint8_t *tiling, DecodeUpdateTilingData *constData)
+inline void InitAttentionUpdateTilingData(uint8_t* tiling, DecodeUpdateTilingData* constData)
 {
-    auto *src = reinterpret_cast<uint32_t *>(tiling);
-    auto *dst = reinterpret_cast<uint32_t *>(constData);
+    auto* src = reinterpret_cast<uint32_t*>(tiling);
+    auto* dst = reinterpret_cast<uint32_t*>(constData);
     for (size_t i = 0; i < sizeof(DecodeUpdateTilingData) / sizeof(uint32_t); ++i) {
         dst[i] = src[i];
     }

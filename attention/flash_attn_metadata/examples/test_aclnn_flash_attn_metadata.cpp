@@ -29,7 +29,7 @@ using namespace optiling;
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -38,7 +38,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // Fixed writing method, AscendCL initialization.
     auto ret = aclInit(nullptr);
@@ -59,9 +59,9 @@ int Init(int32_t deviceId, aclrtStream *stream)
     return 0;
 }
 
-static void DumpMeta(void *data)
+static void DumpMeta(void* data)
 {
-    auto *raw = static_cast<int32_t *>(data);
+    auto* raw = static_cast<int32_t*>(data);
     int32_t sectionNum = raw[0];
     uint32_t aicNum = static_cast<uint32_t>(raw[optiling::HEAD_AIC_NUM_INDEX]);
     uint32_t aivNum = static_cast<uint32_t>(raw[optiling::HEAD_AIV_NUM_INDEX]);
@@ -100,8 +100,8 @@ static void DumpMeta(void *data)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // Call aclrtMalloc to request device side memory.
@@ -170,12 +170,12 @@ int main()
     std::vector<int64_t> actualSeqLengthsQueryShape = {batchSize};
     std::vector<int64_t> actualSeqLengthsKvShape = {batchSize};
     std::vector<int64_t> metadataShape = {alignedSize};
-    void *actualSeqLengthsQueryDeviceAddr = nullptr;
-    void *actualSeqLengthsKvDeviceAddr = nullptr;
-    void *metadataDeviceAddr = nullptr;
-    aclTensor *actualSeqLengthsQueryTensor = nullptr;
-    aclTensor *actualSeqLengthsKvTensor = nullptr;
-    aclTensor *metadataTensor = nullptr;
+    void* actualSeqLengthsQueryDeviceAddr = nullptr;
+    void* actualSeqLengthsKvDeviceAddr = nullptr;
+    void* metadataDeviceAddr = nullptr;
+    aclTensor* actualSeqLengthsQueryTensor = nullptr;
+    aclTensor* actualSeqLengthsKvTensor = nullptr;
+    aclTensor* metadataTensor = nullptr;
     int64_t actualSeqLengthsQueryShapeSize = GetShapeSize(actualSeqLengthsQueryShape);
     int64_t actualSeqLengthsKvShapeSize = GetShapeSize(actualSeqLengthsKvShape);
     int64_t metadataShapeSize = GetShapeSize(metadataShape);
@@ -202,9 +202,9 @@ int main()
         return ret;
     }
 
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     uint64_t workspaceSize = 0;
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
 
     char socVersion[] = "ascend950";
     printf("start aclnnFlashAttnMetadata\n");

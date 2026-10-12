@@ -40,7 +40,7 @@ namespace {
 
 using op::bfloat16;
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -49,7 +49,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -65,8 +65,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     if (size > 0) {
@@ -88,7 +88,7 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-void PrintBf16Result(const std::vector<int64_t> &shape, void **deviceAddr)
+void PrintBf16Result(const std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<bfloat16> resultData(size, bfloat16(0.0f));
@@ -165,27 +165,27 @@ int main()
     std::vector<float_t> kvHostData(kvSize, 0.0f);
 
     // 4. 创建 aclTensor
-    void *xDeviceAddr = nullptr;
-    void *wkvDeviceAddr = nullptr;
-    void *wgateDeviceAddr = nullptr;
-    void *stateCacheDeviceAddr = nullptr;
-    void *apeDeviceAddr = nullptr;
-    void *stateBlockTableDeviceAddr = nullptr;
-    void *startPosDeviceAddr = nullptr;
-    void *cmpKvDeviceAddr = nullptr;
-    void *softmaxScoreDeviceAddr = nullptr;
-    void *kvDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* wkvDeviceAddr = nullptr;
+    void* wgateDeviceAddr = nullptr;
+    void* stateCacheDeviceAddr = nullptr;
+    void* apeDeviceAddr = nullptr;
+    void* stateBlockTableDeviceAddr = nullptr;
+    void* startPosDeviceAddr = nullptr;
+    void* cmpKvDeviceAddr = nullptr;
+    void* softmaxScoreDeviceAddr = nullptr;
+    void* kvDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *wkv = nullptr;
-    aclTensor *wgate = nullptr;
-    aclTensor *stateCacheRef = nullptr;
-    aclTensor *ape = nullptr;
-    aclTensor *stateBlockTable = nullptr;
-    aclTensor *startPos = nullptr;
-    aclTensor *cmpKvOut = nullptr;
-    aclTensor *softmaxScoreOut = nullptr;
-    aclTensor *kvOut = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* wkv = nullptr;
+    aclTensor* wgate = nullptr;
+    aclTensor* stateCacheRef = nullptr;
+    aclTensor* ape = nullptr;
+    aclTensor* stateBlockTable = nullptr;
+    aclTensor* startPos = nullptr;
+    aclTensor* cmpKvOut = nullptr;
+    aclTensor* softmaxScoreOut = nullptr;
+    aclTensor* kvOut = nullptr;
 
     ret = CreateAclTensor(xHostData, xShape, &xDeviceAddr, aclDataType::ACL_BF16, &x);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -213,18 +213,17 @@ int main()
 
     // 5. 调用 aclnnCompressorGetWorkspaceSize
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     bool gradEnabled = false;
 
     ret = aclnnCompressorGetWorkspaceSize(x, wkv, wgate, stateCacheRef, ape, stateBlockTable, nullptr, nullptr,
                                           startPos, cmpRatio, coff, cacheMode, stateCacheStrideDim0, gradEnabled,
                                           cmpKvOut, softmaxScoreOut, kvOut, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCompressorGetWorkspaceSize failed. ERROR: %d\n", ret);
-              return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCompressorGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 
     // 6. 申请 workspace
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

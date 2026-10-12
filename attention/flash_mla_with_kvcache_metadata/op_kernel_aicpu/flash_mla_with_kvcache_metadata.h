@@ -70,14 +70,14 @@ struct FaMetadata {
     uint32_t sectionNum;
     uint32_t aicCoreNum;         // 每 section 的 FA 区核数（硬件平台值，host 透传）
     uint32_t aivCoreNum;         // 每 section 的 FD 区核数（硬件平台值，host 透传）
-    FA_METADATA_T *headMetadata; // [HEAD_METADATA_STRIDE];
-    FA_METADATA_T *faMetadata;   // [sectionNum][aicCoreNum][FA_METADATA_STRIDE];
-    FA_METADATA_T *fdMetadata;   // [sectionNum][aivCoreNum][FD_METADATA_STRIDE];
-    FaMetadata(void *metadataPtr, uint32_t sectionNum, uint32_t aicNum, uint32_t aivNum)
+    FA_METADATA_T* headMetadata; // [HEAD_METADATA_STRIDE];
+    FA_METADATA_T* faMetadata;   // [sectionNum][aicCoreNum][FA_METADATA_STRIDE];
+    FA_METADATA_T* fdMetadata;   // [sectionNum][aivCoreNum][FD_METADATA_STRIDE];
+    FaMetadata(void* metadataPtr, uint32_t sectionNum, uint32_t aicNum, uint32_t aivNum)
         : sectionNum(sectionNum),
           aicCoreNum(aicNum),
           aivCoreNum(aivNum),
-          headMetadata(static_cast<FA_METADATA_T *>(metadataPtr)),
+          headMetadata(static_cast<FA_METADATA_T*>(metadataPtr)),
           faMetadata(headMetadata + HEAD_METADATA_STRIDE),
           fdMetadata(faMetadata + sectionNum * aicCoreNum * FA_METADATA_STRIDE)
     {

@@ -29,10 +29,10 @@ public:
     PagedAttentionChecker() = default;
     ~PagedAttentionChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const FaTilingInfo &faInfo) override;
-    ge::graphStatus CheckParaExistence(const FaTilingInfo &faInfo) override;
-    ge::graphStatus CheckFeature(const FaTilingInfo &faInfo) override;
-    ge::graphStatus CheckMultiPara(const FaTilingInfo &faInfo) override;
+    ge::graphStatus CheckSinglePara(const FaTilingInfo& faInfo) override;
+    ge::graphStatus CheckParaExistence(const FaTilingInfo& faInfo) override;
+    ge::graphStatus CheckFeature(const FaTilingInfo& faInfo) override;
+    ge::graphStatus CheckMultiPara(const FaTilingInfo& faInfo) override;
 };
 
 } // namespace flash_attn

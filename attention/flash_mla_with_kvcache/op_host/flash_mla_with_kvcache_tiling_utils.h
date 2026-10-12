@@ -22,8 +22,8 @@ namespace optiling {
 namespace flash_mla_with_kvcache {
 
 // 逐维比对strides与连续场景的期望stride, index返回首个非连续维, 全连续返回GRAPH_SUCCESS
-inline ge::graphStatus CheckTensorContiguous(const uint32_t &tensorDimNum, const gert::Shape &inputShape,
-                                             const gert::Stride *strides, int32_t &index)
+inline ge::graphStatus CheckTensorContiguous(const uint32_t& tensorDimNum, const gert::Shape& inputShape,
+                                             const gert::Stride* strides, int32_t& index)
 {
     if (strides == nullptr || strides->GetDimNum() == 0) {
         return ge::GRAPH_SUCCESS;

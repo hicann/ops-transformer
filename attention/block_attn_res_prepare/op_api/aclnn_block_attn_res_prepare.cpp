@@ -53,9 +53,9 @@ constexpr size_t VALID_BLOCKS_VALUE_DIM_INDEX = 0;
 constexpr size_t NUMERATOR_OUTPUT_INDEX = 0;
 constexpr size_t LOGIT_MAX_OUTPUT_INDEX = 1;
 constexpr size_t EXP_SUM_OUTPUT_INDEX = 2;
-constexpr const char *API_NAME = "aclnnBlockAttnResPrepareGetWorkspaceSize";
+constexpr const char* API_NAME = "aclnnBlockAttnResPrepareGetWorkspaceSize";
 
-aclnnStatus CheckRequiredParameter(const void *parameter, const char *parameterName)
+aclnnStatus CheckRequiredParameter(const void* parameter, const char* parameterName)
 {
     if (parameter == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, parameterName, "nullptr",
@@ -65,9 +65,9 @@ aclnnStatus CheckRequiredParameter(const void *parameter, const char *parameterN
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckNotNull(const aclTensor *blockRes, const aclTensor *validBlocks, const aclTensor *pseudoQuery,
-                         const aclTensor *numerator, const aclTensor *logitMax, const aclTensor *expSum,
-                         uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus CheckNotNull(const aclTensor* blockRes, const aclTensor* validBlocks, const aclTensor* pseudoQuery,
+                         const aclTensor* numerator, const aclTensor* logitMax, const aclTensor* expSum,
+                         uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (CheckRequiredParameter(blockRes, "blockRes") != ACLNN_SUCCESS ||
         CheckRequiredParameter(validBlocks, "validBlocks") != ACLNN_SUCCESS ||
@@ -82,7 +82,7 @@ aclnnStatus CheckNotNull(const aclTensor *blockRes, const aclTensor *validBlocks
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckTensorDtype(const aclTensor *tensor, const char *tensorName, DataType expectedDtype)
+aclnnStatus CheckTensorDtype(const aclTensor* tensor, const char* tensorName, DataType expectedDtype)
 {
     const DataType actualDtype = tensor->GetDataType();
     if (actualDtype != expectedDtype) {
@@ -93,8 +93,8 @@ aclnnStatus CheckTensorDtype(const aclTensor *tensor, const char *tensorName, Da
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckDtype(const aclTensor *blockRes, const aclTensor *validBlocks, const aclTensor *pseudoQuery,
-                       const aclTensor *numerator, const aclTensor *logitMax, const aclTensor *expSum)
+aclnnStatus CheckDtype(const aclTensor* blockRes, const aclTensor* validBlocks, const aclTensor* pseudoQuery,
+                       const aclTensor* numerator, const aclTensor* logitMax, const aclTensor* expSum)
 {
     if (CheckTensorDtype(blockRes, "blockRes", DataType::DT_FLOAT) != ACLNN_SUCCESS ||
         CheckTensorDtype(validBlocks, "validBlocks", DataType::DT_UINT64) != ACLNN_SUCCESS ||
@@ -107,7 +107,7 @@ aclnnStatus CheckDtype(const aclTensor *blockRes, const aclTensor *validBlocks, 
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckTensorContiguous(const aclTensor *tensor, const char *tensorName)
+aclnnStatus CheckTensorContiguous(const aclTensor* tensor, const char* tensorName)
 {
     if (!IsContiguous(tensor)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s must be contiguous, but got shape %s and strides %s.", tensorName,
@@ -117,8 +117,8 @@ aclnnStatus CheckTensorContiguous(const aclTensor *tensor, const char *tensorNam
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckContiguous(const aclTensor *blockRes, const aclTensor *validBlocks, const aclTensor *pseudoQuery,
-                            const aclTensor *numerator, const aclTensor *logitMax, const aclTensor *expSum)
+aclnnStatus CheckContiguous(const aclTensor* blockRes, const aclTensor* validBlocks, const aclTensor* pseudoQuery,
+                            const aclTensor* numerator, const aclTensor* logitMax, const aclTensor* expSum)
 {
     if (CheckTensorContiguous(blockRes, "blockRes") != ACLNN_SUCCESS ||
         CheckTensorContiguous(validBlocks, "validBlocks") != ACLNN_SUCCESS ||
@@ -131,9 +131,9 @@ aclnnStatus CheckContiguous(const aclTensor *blockRes, const aclTensor *validBlo
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckTensorDimension(const aclTensor *tensor, const char *tensorName, size_t expectedDimension)
+aclnnStatus CheckTensorDimension(const aclTensor* tensor, const char* tensorName, size_t expectedDimension)
 {
-    const auto &shape = tensor->GetViewShape();
+    const auto& shape = tensor->GetViewShape();
     const size_t actualDimension = shape.GetDimNum();
     if (actualDimension != expectedDimension) {
         OP_LOGE_FOR_INVALID_SHAPEDIM("aclnnBlockAttnResPrepareGetWorkspaceSize", tensorName,
@@ -144,7 +144,7 @@ aclnnStatus CheckTensorDimension(const aclTensor *tensor, const char *tensorName
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckInputDimensions(const aclTensor *blockRes, const aclTensor *validBlocks, const aclTensor *pseudoQuery)
+aclnnStatus CheckInputDimensions(const aclTensor* blockRes, const aclTensor* validBlocks, const aclTensor* pseudoQuery)
 {
     if (CheckTensorDimension(blockRes, "blockRes", BLOCK_RES_DIM_NUM) != ACLNN_SUCCESS ||
         CheckTensorDimension(validBlocks, "validBlocks", VALID_BLOCKS_DIM_NUM) != ACLNN_SUCCESS ||
@@ -154,7 +154,7 @@ aclnnStatus CheckInputDimensions(const aclTensor *blockRes, const aclTensor *val
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckOutputDimensions(const aclTensor *numerator, const aclTensor *logitMax, const aclTensor *expSum)
+aclnnStatus CheckOutputDimensions(const aclTensor* numerator, const aclTensor* logitMax, const aclTensor* expSum)
 {
     if (CheckTensorDimension(numerator, "numerator", NUMERATOR_DIM_NUM) != ACLNN_SUCCESS ||
         CheckTensorDimension(logitMax, "logitMax", STATS_DIM_NUM) != ACLNN_SUCCESS ||
@@ -164,11 +164,11 @@ aclnnStatus CheckOutputDimensions(const aclTensor *numerator, const aclTensor *l
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckInputShapes(const aclTensor *blockRes, const aclTensor *validBlocks, const aclTensor *pseudoQuery)
+aclnnStatus CheckInputShapes(const aclTensor* blockRes, const aclTensor* validBlocks, const aclTensor* pseudoQuery)
 {
-    const auto &blockResShape = blockRes->GetViewShape();
-    const auto &validBlocksShape = validBlocks->GetViewShape();
-    const auto &pseudoQueryShape = pseudoQuery->GetViewShape();
+    const auto& blockResShape = blockRes->GetViewShape();
+    const auto& validBlocksShape = validBlocks->GetViewShape();
+    const auto& pseudoQueryShape = pseudoQuery->GetViewShape();
     const int64_t totalT = blockResShape.GetDim(T_DIM_INDEX);
     const int64_t totalN = blockResShape.GetDim(N_DIM_INDEX);
     const int64_t totalD = blockResShape.GetDim(D_DIM_INDEX);
@@ -209,14 +209,14 @@ aclnnStatus CheckInputShapes(const aclTensor *blockRes, const aclTensor *validBl
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckOutputShapes(const aclTensor *blockRes, const aclTensor *pseudoQuery, const aclTensor *numerator,
-                              const aclTensor *logitMax, const aclTensor *expSum)
+aclnnStatus CheckOutputShapes(const aclTensor* blockRes, const aclTensor* pseudoQuery, const aclTensor* numerator,
+                              const aclTensor* logitMax, const aclTensor* expSum)
 {
-    const auto &blockResShape = blockRes->GetViewShape();
-    const auto &pseudoQueryShape = pseudoQuery->GetViewShape();
-    const auto &numeratorShape = numerator->GetViewShape();
-    const auto &logitMaxShape = logitMax->GetViewShape();
-    const auto &expSumShape = expSum->GetViewShape();
+    const auto& blockResShape = blockRes->GetViewShape();
+    const auto& pseudoQueryShape = pseudoQuery->GetViewShape();
+    const auto& numeratorShape = numerator->GetViewShape();
+    const auto& logitMaxShape = logitMax->GetViewShape();
+    const auto& expSumShape = expSum->GetViewShape();
     const int64_t totalT = blockResShape.GetDim(T_DIM_INDEX);
     const int64_t totalD = blockResShape.GetDim(D_DIM_INDEX);
     const int64_t totalS = pseudoQueryShape.GetDim(S_DIM_INDEX);
@@ -250,8 +250,8 @@ aclnnStatus CheckOutputShapes(const aclTensor *blockRes, const aclTensor *pseudo
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckShape(const aclTensor *blockRes, const aclTensor *validBlocks, const aclTensor *pseudoQuery,
-                       const aclTensor *numerator, const aclTensor *logitMax, const aclTensor *expSum)
+aclnnStatus CheckShape(const aclTensor* blockRes, const aclTensor* validBlocks, const aclTensor* pseudoQuery,
+                       const aclTensor* numerator, const aclTensor* logitMax, const aclTensor* expSum)
 {
     if (CheckInputDimensions(blockRes, validBlocks, pseudoQuery) != ACLNN_SUCCESS) {
         return ACLNN_ERR_PARAM_INVALID;
@@ -265,9 +265,9 @@ aclnnStatus CheckShape(const aclTensor *blockRes, const aclTensor *validBlocks, 
     return CheckOutputShapes(blockRes, pseudoQuery, numerator, logitMax, expSum);
 }
 
-aclnnStatus CheckParams(const aclTensor *blockRes, const aclTensor *validBlocks, const aclTensor *pseudoQuery,
-                        const aclTensor *numerator, const aclTensor *logitMax, const aclTensor *expSum, double eps,
-                        uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus CheckParams(const aclTensor* blockRes, const aclTensor* validBlocks, const aclTensor* pseudoQuery,
+                        const aclTensor* numerator, const aclTensor* logitMax, const aclTensor* expSum, double eps,
+                        uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     CHECK_RET(CheckNotNull(blockRes, validBlocks, pseudoQuery, numerator, logitMax, expSum, workspaceSize, executor) ==
                   ACLNN_SUCCESS,
@@ -287,10 +287,10 @@ aclnnStatus CheckParams(const aclTensor *blockRes, const aclTensor *validBlocks,
 } // namespace
 
 extern "C" {
-aclnnStatus aclnnBlockAttnResPrepareGetWorkspaceSize(const aclTensor *blockRes, const aclTensor *validBlocks,
-                                                     const aclTensor *pseudoQuery, aclTensor *numerator,
-                                                     aclTensor *logitMax, aclTensor *expSum, double eps,
-                                                     uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnBlockAttnResPrepareGetWorkspaceSize(const aclTensor* blockRes, const aclTensor* validBlocks,
+                                                     const aclTensor* pseudoQuery, aclTensor* numerator,
+                                                     aclTensor* logitMax, aclTensor* expSum, double eps,
+                                                     uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnBlockAttnResPrepare, DFX_IN(blockRes, validBlocks, pseudoQuery, eps),
                    DFX_OUT(numerator, logitMax, expSum));
@@ -305,7 +305,7 @@ aclnnStatus aclnnBlockAttnResPrepareGetWorkspaceSize(const aclTensor *blockRes, 
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-    auto *executorImpl = uniqueExecutor.get();
+    auto* executorImpl = uniqueExecutor.get();
 
     const aclnnStatus checkRet =
         CheckParams(blockRes, validBlocks, pseudoQuery, numerator, logitMax, expSum, eps, workspaceSize, executor);
@@ -331,7 +331,7 @@ aclnnStatus aclnnBlockAttnResPrepareGetWorkspaceSize(const aclTensor *blockRes, 
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnBlockAttnResPrepare(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnBlockAttnResPrepare(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                      aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnBlockAttnResPrepare);

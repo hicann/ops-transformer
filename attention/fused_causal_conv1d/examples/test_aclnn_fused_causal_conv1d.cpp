@@ -31,7 +31,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -40,7 +40,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -72,8 +72,8 @@ float Fp16ToFloat(uint16_t raw)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor, aclFormat format)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor, aclFormat format)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -91,7 +91,7 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-void FreeTensorAndBuffer(aclTensor *tensor, void *deviceAddr)
+void FreeTensorAndBuffer(aclTensor* tensor, void* deviceAddr)
 {
     if (tensor != nullptr) {
         aclDestroyTensor(tensor);
@@ -209,7 +209,7 @@ int main()
     int64_t convMode = 0;           // 0: Qwen/Pangu7B
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     ret = aclnnFusedCausalConv1dGetWorkspaceSize(xTensor, weightTensor, convStatesTensor, queryStartLocTensor,
                                                  cacheIndicesTensor, initialStateModeTensor, biasTensor,
@@ -223,7 +223,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFusedCausalConv1dGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

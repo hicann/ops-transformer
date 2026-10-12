@@ -42,14 +42,14 @@ struct BlockAttnResPrepareCompileInfo {
     uint64_t systemWorkspaceSize = 0;
 };
 
-ge::graphStatus TilingBlockAttnResPrepare(gert::TilingContext *context);
-ge::graphStatus TilingPrepareBlockAttnResPrepare(gert::TilingParseContext *context);
+ge::graphStatus TilingBlockAttnResPrepare(gert::TilingContext* context);
+ge::graphStatus TilingPrepareBlockAttnResPrepare(gert::TilingParseContext* context);
 
 // Owns the template-independent tiling workflow. A new template derives directly from this class and only provides
 // its capability check, tile calculation, tiling key, data view and diagnostic dump.
 class BlockAttnResPrepareBaseTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit BlockAttnResPrepareBaseTiling(gert::TilingContext *context)
+    explicit BlockAttnResPrepareBaseTiling(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
     ~BlockAttnResPrepareBaseTiling() override = default;
@@ -77,9 +77,9 @@ protected:
     };
 
     struct TilingDataView {
-        const void *data = nullptr;
+        const void* data = nullptr;
         size_t size = 0;
-        const char *templateName = nullptr;
+        const char* templateName = nullptr;
     };
 
     ge::graphStatus GetShapeAttrsInfo() override;
@@ -92,8 +92,8 @@ protected:
 
     ge::graphStatus CheckInputShapes();
     ge::graphStatus CheckInputDtypes() const;
-    ge::graphStatus CalculateWorkDistribution(uint64_t totalWorkUnits, uint64_t maxCoreNum, const char *templateName,
-                                              WorkDistribution &distribution) const;
+    ge::graphStatus CalculateWorkDistribution(uint64_t totalWorkUnits, uint64_t maxCoreNum, const char* templateName,
+                                              WorkDistribution& distribution) const;
 
     uint64_t totalT_ = 0;
     uint64_t totalN_ = 0;

@@ -37,8 +37,8 @@ struct StageTwoParams {
     GlobalTensor<bfloat16_t> kg;
     GlobalTensor<bfloat16_t> out;
     GM_ADDR ws;
-    TPipe *pipe;
-    ChunkGroup *cg;
+    TPipe* pipe;
+    ChunkGroup* cg;
     int64_t Nv;
     int64_t Nk;
     int64_t Dv;
@@ -53,7 +53,7 @@ class Stage2 {
 public:
     static constexpr bool kIsFp32 = std::is_same_v<stateType, float>;
 
-    __aicore__ inline void Init(StageTwoParams<stateType> *initParams, int32_t coreNum)
+    __aicore__ inline void Init(StageTwoParams<stateType>* initParams, int32_t coreNum)
     {
         sTP_ = initParams;
         pipe_ = sTP_->pipe;
@@ -227,7 +227,7 @@ public:
         }
         DataCacheCleanAndInvalid<float, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(gCum[curChunkSize_ - 1]);
         float gVal = gCum.GetValue(curChunkSize_ - 1);
-        auto stateFp32Addr = reinterpret_cast<__ubuf__ float *>(stateFp32Ub_.GetPhyAddr());
+        auto stateFp32Addr = reinterpret_cast<__ubuf__ float*>(stateFp32Ub_.GetPhyAddr());
         AscendC::VF_CALL<ScaleFp32StateByExpVF>(stateFp32Addr, gVal, static_cast<uint32_t>(Dv_ * curDk_));
         PipeBarrier<PIPE_V>();
     }
@@ -244,8 +244,8 @@ public:
         auto stateOut = outQueue_.AllocTensor<bfloat16_t>();
         SetFlag<HardEvent::MTE2_V>(MTE2_V_EVENT);
         WaitFlag<HardEvent::MTE2_V>(MTE2_V_EVENT);
-        auto stateInAddr = reinterpret_cast<__ubuf__ bfloat16_t *>(stateIn.GetPhyAddr());
-        auto stateOutAddr = reinterpret_cast<__ubuf__ bfloat16_t *>(stateOut.GetPhyAddr());
+        auto stateInAddr = reinterpret_cast<__ubuf__ bfloat16_t*>(stateIn.GetPhyAddr());
+        auto stateOutAddr = reinterpret_cast<__ubuf__ bfloat16_t*>(stateOut.GetPhyAddr());
         uint32_t stateCount = static_cast<uint32_t>(Dv_ * curDk_);
         if constexpr (gOptional) {
             AscendC::VF_CALL<ScaleBf16StateByExpVF>(stateOutAddr, stateInAddr, gVal, stateCount);
@@ -374,8 +374,8 @@ public:
     }
 
 private:
-    StageTwoParams<stateType> *sTP_;
-    TPipe *pipe_;
+    StageTwoParams<stateType>* sTP_;
+    TPipe* pipe_;
     CGDRMatmulBasic mmBasic_;
     TQue<QuePosition::VECIN, BUFFER_NUM_ONE> inQueue_;
     TQue<QuePosition::VECOUT, BUFFER_NUM_ONE> outQueue_;

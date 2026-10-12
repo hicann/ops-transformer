@@ -112,14 +112,14 @@ struct FaMetadata {
     uint32_t sectionNum;
     uint32_t aicNum;
     uint32_t aivNum;
-    FA_METADATA_T *headMetadata; // [METADATA_STRIDE];
-    FA_METADATA_T *faMetadata;   // [sectionNum][aicNum][METADATA_STRIDE];
-    FA_METADATA_T *fdMetadata;   // [sectionNum][aivNum][METADATA_STRIDE];
-    FaMetadata(uint32_t aicNum, uint32_t aivNum, uint32_t sectionNum, void *metadataPtr)
+    FA_METADATA_T* headMetadata; // [METADATA_STRIDE];
+    FA_METADATA_T* faMetadata;   // [sectionNum][aicNum][METADATA_STRIDE];
+    FA_METADATA_T* fdMetadata;   // [sectionNum][aivNum][METADATA_STRIDE];
+    FaMetadata(uint32_t aicNum, uint32_t aivNum, uint32_t sectionNum, void* metadataPtr)
         : sectionNum(sectionNum),
           aicNum(aicNum),
           aivNum(aivNum),
-          headMetadata(static_cast<FA_METADATA_T *>(metadataPtr)),
+          headMetadata(static_cast<FA_METADATA_T*>(metadataPtr)),
           faMetadata(headMetadata + METADATA_STRIDE),
           fdMetadata(faMetadata + static_cast<size_t>(sectionNum) * static_cast<size_t>(aicNum * METADATA_STRIDE))
     {

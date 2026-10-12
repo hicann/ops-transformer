@@ -56,14 +56,14 @@ extern "C" __global__ __aicore__ void chunk_gated_delta_rule(GM_ADDR query, GM_A
                                                              GM_ADDR tilingGM);
 
 template <typename T>
-T *GmAllocWrapper(size_t size)
+T* GmAllocWrapper(size_t size)
 {
-    T *ptr = reinterpret_cast<T *>(AscendC::GmAlloc(size));
+    T* ptr = reinterpret_cast<T*>(AscendC::GmAlloc(size));
     assert(ptr != nullptr && "GM allocation failed");
     return ptr;
 }
 
-void InitTilingData(ChunkGatedDeltaRuleTilingData *tilingData, int64_t b, int64_t t, int64_t nk, int64_t nv, int64_t dk,
+void InitTilingData(ChunkGatedDeltaRuleTilingData* tilingData, int64_t b, int64_t t, int64_t nk, int64_t nv, int64_t dk,
                     int64_t dv, int64_t hasGamma, int64_t chunkSize, int64_t maxGroupLength, float scale = 1.0f)
 {
     tilingData->aiCoreNum = 8;
@@ -98,11 +98,11 @@ void InitTilingData(ChunkGatedDeltaRuleTilingData *tilingData, int64_t b, int64_
     tilingData->stageWorkspaceSz *= tilingData->aiCoreNum;
 }
 
-void InitInputDataWithSeqlens(uint8_t *queryGm, size_t shapeQ, uint8_t *keyGm, size_t shapeK, uint8_t *valueGm,
-                              size_t shapeV, uint8_t *betaGm, size_t shapeBeta, uint8_t *stateGm, size_t shapeState,
-                              uint8_t *gammaGm, size_t shapeGamma, uint8_t *seqlensGm,
-                              const std::vector<int32_t> &seqlensVec, uint8_t *outGm, size_t shapeOut,
-                              uint8_t *finalState, size_t shapeFs)
+void InitInputDataWithSeqlens(uint8_t* queryGm, size_t shapeQ, uint8_t* keyGm, size_t shapeK, uint8_t* valueGm,
+                              size_t shapeV, uint8_t* betaGm, size_t shapeBeta, uint8_t* stateGm, size_t shapeState,
+                              uint8_t* gammaGm, size_t shapeGamma, uint8_t* seqlensGm,
+                              const std::vector<int32_t>& seqlensVec, uint8_t* outGm, size_t shapeOut,
+                              uint8_t* finalState, size_t shapeFs)
 {
     memset_s(queryGm, shapeQ, 0, shapeQ);
     memset_s(keyGm, shapeK, 0, shapeK);
@@ -113,16 +113,16 @@ void InitInputDataWithSeqlens(uint8_t *queryGm, size_t shapeQ, uint8_t *keyGm, s
     memset_s(outGm, shapeOut, 0, shapeOut);
     memset_s(finalState, shapeFs, 0, shapeFs);
 
-    int32_t *seqlens = reinterpret_cast<int32_t *>(seqlensGm);
+    int32_t* seqlens = reinterpret_cast<int32_t*>(seqlensGm);
     for (size_t i = 0; i < seqlensVec.size(); ++i) {
         seqlens[i] = seqlensVec[i];
     }
 }
 
-void InitInputData(uint8_t *queryGm, size_t shapeQ, uint8_t *keyGm, size_t shapeK, uint8_t *valueGm, size_t shapeV,
-                   uint8_t *betaGm, size_t shapeBeta, uint8_t *stateGm, size_t shapeState, uint8_t *gammaGm,
-                   size_t shapeGamma, uint8_t *seqlensGm, size_t b, uint8_t *outGm, size_t shapeOut,
-                   uint8_t *finalState, size_t shapeFs)
+void InitInputData(uint8_t* queryGm, size_t shapeQ, uint8_t* keyGm, size_t shapeK, uint8_t* valueGm, size_t shapeV,
+                   uint8_t* betaGm, size_t shapeBeta, uint8_t* stateGm, size_t shapeState, uint8_t* gammaGm,
+                   size_t shapeGamma, uint8_t* seqlensGm, size_t b, uint8_t* outGm, size_t shapeOut,
+                   uint8_t* finalState, size_t shapeFs)
 {
     std::vector<int32_t> seqlensVec(b, 64);
     InitInputDataWithSeqlens(queryGm, shapeQ, keyGm, shapeK, valueGm, shapeV, betaGm, shapeBeta, stateGm, shapeState,
@@ -189,17 +189,17 @@ protected:
     size_t tilingSize = sizeof(ChunkGatedDeltaRuleTilingData);
 
     // GM pointers
-    uint8_t *queryGm = nullptr;
-    uint8_t *keyGm = nullptr;
-    uint8_t *valueGm = nullptr;
-    uint8_t *betaGm = nullptr;
-    uint8_t *stateGm = nullptr;
-    uint8_t *finalStateGm = nullptr;
-    uint8_t *gammaGm = nullptr;
-    uint8_t *seqlensGm = nullptr;
-    uint8_t *outGm = nullptr;
-    uint8_t *workspace = nullptr;
-    uint8_t *tiling = nullptr;
+    uint8_t* queryGm = nullptr;
+    uint8_t* keyGm = nullptr;
+    uint8_t* valueGm = nullptr;
+    uint8_t* betaGm = nullptr;
+    uint8_t* stateGm = nullptr;
+    uint8_t* finalStateGm = nullptr;
+    uint8_t* gammaGm = nullptr;
+    uint8_t* seqlensGm = nullptr;
+    uint8_t* outGm = nullptr;
+    uint8_t* workspace = nullptr;
+    uint8_t* tiling = nullptr;
 
     void SetUp() override
     {
@@ -255,7 +255,7 @@ protected:
                                  shapeFinalState);
 
         // 初始化tiling数据
-        ChunkGatedDeltaRuleTilingData *tilingData = reinterpret_cast<ChunkGatedDeltaRuleTilingData *>(tiling);
+        ChunkGatedDeltaRuleTilingData* tilingData = reinterpret_cast<ChunkGatedDeltaRuleTilingData*>(tiling);
         InitTilingData(tilingData, b, t, nk, nv, dk, dv, hasGamma, chunkSize, maxGroupLength, scale);
     }
 

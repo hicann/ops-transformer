@@ -21,14 +21,14 @@ from atk.tasks.api_execute.base_api import BaseApi
 from atk.tasks.api_execute.aclnn_base_api import AclnnBaseApi
 from atk.configs.results_config import TaskResult
 from atk.tasks.backends.lib_interface.acl_wrapper import AclTensor, nnopbase, AclFormat
-@register("ascend_attention_update")            
-class AclnnAttentionUpdateApi(BaseApi):
 
+
+@register("ascend_attention_update")
+class AclnnAttentionUpdateApi(BaseApi):
     def __call__(self, input_data: InputDataset, with_output: bool = False):
-        
-        if self.device == 'cpu':
-            all_lse = input_data.kwargs['lse']
-            all_out = input_data.kwargs['localOut']
+        if self.device == "cpu":
+            all_lse = input_data.kwargs["lse"]
+            all_out = input_data.kwargs["localOut"]
             all_lse = torch.stack(all_lse)
             all_out = torch.stack(all_out)
 
@@ -48,17 +48,17 @@ class AclnnAttentionUpdateApi(BaseApi):
             lse_sub_exp_sum = torch.sum(lse_sub_exp, dim=0)
             lse_out = lse_max + torch.log(lse_sub_exp_sum)
 
-            lse_out_expand = lse_out.unsqueeze(0)     
+            lse_out_expand = lse_out.unsqueeze(0)
             lse_out_expand = all_lse - lse_out_expand
 
             lse_out_expand = lse_out_expand.unsqueeze(2)
             lse_out_expand = lse_out_expand.expand(sp, total_length, hd)
             lse_out_expand = torch.exp(lse_out_expand)
 
-            prod_per_sp = all_out * lse_out_expand  
+            prod_per_sp = all_out * lse_out_expand
             all_out = torch.sum(prod_per_sp, dim=0)
 
-            if input_data.kwargs['updateType'] == 0:
+            if input_data.kwargs["updateType"] == 0:
                 lse_out = torch.ones(0)
             if dtype != torch.float32:
                 all_out = all_out.to(dtype)
@@ -66,7 +66,7 @@ class AclnnAttentionUpdateApi(BaseApi):
             return all_out, lse_out
 
 
-@register("ascend_attention_update_npu")            
+@register("ascend_attention_update_npu")
 class AclnnAttentionUpdateApiNPU(AclnnBaseApi):
     def __init__(self, task_result: TaskResult, backend):
         super(AclnnAttentionUpdateApiNPU, self).__init__(task_result, backend)
@@ -85,13 +85,15 @@ class AclnnAttentionUpdateApiNPU(AclnnBaseApi):
             output_packages.pop()
         else:
             total_length = input_data.kwargs["lse"][0].shape[0]
-            lse_out_tensor = torch.randn(total_length, dtype = torch.float32).npu()
-            acl_tensor = nnopbase.create_acl_tensor(lse_out_tensor, AclFormat.ACL_FORMAT_ND)
+            lse_out_tensor = torch.randn(total_length, dtype=torch.float32).npu()
+            acl_tensor = nnopbase.create_acl_tensor(
+                lse_out_tensor, AclFormat.ACL_FORMAT_ND
+            )
             output_packages[1] = acl_tensor
             input_args[4] = acl_tensor
 
         return input_args, output_packages
-    
+
     def after_call(self, output_packages):
         if self.input.kwargs["updateType"] == 0:
             all_out = super().after_call(output_packages)

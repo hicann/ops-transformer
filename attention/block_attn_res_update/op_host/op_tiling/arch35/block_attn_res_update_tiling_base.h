@@ -19,7 +19,7 @@ namespace block_attn_res_update {
 
 class BlockAttnResUpdateTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit BlockAttnResUpdateTilingBase(gert::TilingContext *context)
+    explicit BlockAttnResUpdateTilingBase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
     ~BlockAttnResUpdateTilingBase() override = default;
@@ -36,7 +36,7 @@ protected:
     float eps_ = 0.0F;
     uint64_t ubSize_ = 0;
     uint32_t aivNum_ = 0;
-    const char *opName_ = nullptr;
+    const char* opName_ = nullptr;
 };
 
 } // namespace block_attn_res_update

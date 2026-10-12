@@ -31,8 +31,8 @@ struct StageThreeParams {
     GlobalTensor<float> maskTensor;
     GM_ADDR ws;
     GlobalTensor<bfloat16_t> attnOut;
-    TPipe *pipe;
-    ChunkGroup *cg;
+    TPipe* pipe;
+    ChunkGroup* cg;
     float scale;
     int64_t Nv;
     int64_t Nk;
@@ -43,7 +43,7 @@ struct StageThreeParams {
 template <bool gOptional>
 class Stage3 {
 public:
-    __aicore__ inline void Init(StageThreeParams *initParams, int32_t coreNum)
+    __aicore__ inline void Init(StageThreeParams* initParams, int32_t coreNum)
     {
         coreId_ = GetBlockIdx();
         sTP_ = initParams;
@@ -59,7 +59,7 @@ public:
         Dk_ = sTP_->Dk;
         paddedDv_ = Ceil(Dv_, BLOCK_SIZE / sizeof(bfloat16_t)) * (BLOCK_SIZE / sizeof(bfloat16_t));
         uint64_t workSpaceOffset = 0;
-        tmpGM_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(
+        tmpGM_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(
             initParams->ws + workSpaceOffset + coreNum_ * chunkSize_ * chunkSize_ * sizeof(float)));
         if ASCEND_IS_AIC {
             mmBasic_.Init();
@@ -143,11 +143,11 @@ public:
         AlignedCopyIn(sTP_->qkt[nvId * Sp_ * chunkSize_ + chunkPos * chunkSize_], curChunkSize_, curChunkSize_);
         auto qkt = inQueue_.DeQue<bfloat16_t>();
         auto scale_qkt = outQueue_.AllocTensor<bfloat16_t>();
-        auto maskAddr = reinterpret_cast<__ubuf__ float *>(maskBuffer_.GetPhyAddr());
-        auto qktAddr = reinterpret_cast<__ubuf__ bfloat16_t *>(qkt.GetPhyAddr());
-        auto scaleQktAddr = reinterpret_cast<__ubuf__ bfloat16_t *>(scale_qkt.GetPhyAddr());
+        auto maskAddr = reinterpret_cast<__ubuf__ float*>(maskBuffer_.GetPhyAddr());
+        auto qktAddr = reinterpret_cast<__ubuf__ bfloat16_t*>(qkt.GetPhyAddr());
+        auto scaleQktAddr = reinterpret_cast<__ubuf__ bfloat16_t*>(scale_qkt.GetPhyAddr());
         if constexpr (gOptional) {
-            auto gAddr = reinterpret_cast<__ubuf__ float *>(tmpBuffer1_.GetPhyAddr());
+            auto gAddr = reinterpret_cast<__ubuf__ float*>(tmpBuffer1_.GetPhyAddr());
             AscendC::VF_CALL<ComputeMaskedQktGatedVF>(scaleQktAddr, qktAddr, gAddr, maskAddr, sTP_->scale,
                                                       static_cast<uint16_t>(curChunkSize_),
                                                       static_cast<uint16_t>(chunkSize_));
@@ -190,8 +190,8 @@ public:
     }
 
 private:
-    StageThreeParams *sTP_;
-    TPipe *pipe_;
+    StageThreeParams* sTP_;
+    TPipe* pipe_;
     CGDRMatmulBasic mmBasic_;
     TQue<QuePosition::VECIN, BUFFER_NUM_ONE> inQueue_;
     TQue<QuePosition::VECOUT, BUFFER_NUM_ONE> outQueue_;

@@ -67,7 +67,7 @@ protected:
     int32_t index_block_num_{16};
 
 public:
-    __aicore__ inline void Init(const TILING_CLASS *tilingData, GM_ADDR actualQseqlen, GM_ADDR actualKvseqlen,
+    __aicore__ inline void Init(const TILING_CLASS* tilingData, GM_ADDR actualQseqlen, GM_ADDR actualKvseqlen,
                                 GM_ADDR blockSparseMask, GM_ADDR workspace)
     {
         this->batch_num_ = tilingData->batchNum;
@@ -130,7 +130,7 @@ public:
         }
     }
 
-    __aicore__ inline void GetRunTimeInfo(RunTimeInfo &runTimeInfo)
+    __aicore__ inline void GetRunTimeInfo(RunTimeInfo& runTimeInfo)
     {
         if constexpr (DETERMINISTIC_ENABLE) {
             GetRunTimeInfoDeter(runTimeInfo);
@@ -145,11 +145,11 @@ public:
     }
 
 private:
-    __aicore__ inline void GetRunTimeInfoByIndex(RunTimeInfo &runTimeInfo)
+    __aicore__ inline void GetRunTimeInfoByIndex(RunTimeInfo& runTimeInfo)
     {
         runTimeInfo.need_compute = 0;
         if (unlikely(loop_num_ == 0)) {
-            this->vaild_block_num = ((__gm__ uint64_t *)indexShapeWorkspace_)[2];
+            this->vaild_block_num = ((__gm__ uint64_t*)indexShapeWorkspace_)[2];
             block_global_idx = cube_core_idx_;
             block_local_idx = 0;
         }
@@ -165,7 +165,7 @@ private:
             }
             block_local_idx++;
             loop_num_++;
-            int32_t block_sparse_idx = ((__gm__ int32_t *)indexWorkspace_)[index_workspace_offset];
+            int32_t block_sparse_idx = ((__gm__ int32_t*)indexWorkspace_)[index_workspace_offset];
 
             int32_t b_idx;
             int32_t n1_idx;
@@ -189,7 +189,7 @@ private:
         }
     }
 
-    __aicore__ inline void RunTimeInfoRecord(RunTimeInfo &runTimeInfo, int32_t vaild_s1_idx, int32_t vaild_s2_idx,
+    __aicore__ inline void RunTimeInfoRecord(RunTimeInfo& runTimeInfo, int32_t vaild_s1_idx, int32_t vaild_s2_idx,
                                              int32_t vaild_s1_len, int32_t vaild_s2_len)
     {
         int32_t n2Idx = n1Idx_ / q_group_;
@@ -239,8 +239,8 @@ private:
         return static_cast<uint32_t>(R * m);
     }
 
-    __aicore__ inline bool MapDenseIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t j, int64_t r, int64_t &w,
-                                         int64_t &x, int64_t &y)
+    __aicore__ inline bool MapDenseIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t j, int64_t r, int64_t& w,
+                                         int64_t& x, int64_t& y)
     {
         k = IMin(k, b * m);
         if (j > k || j < 1 || r < 1) {
@@ -262,7 +262,7 @@ private:
     }
 
     __aicore__ inline bool MapGqaIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t core_id, int64_t round_id,
-                                       int64_t g, int64_t &bn1, int64_t &x, int64_t &y)
+                                       int64_t g, int64_t& bn1, int64_t& x, int64_t& y)
     {
         k = IMin(IMin(k, b * g * m), b * n);
         int64_t R = IMax(IMax(ICeil(b * n * g, k), ICeil(n, m)), g);
@@ -359,7 +359,7 @@ private:
         return true;
     }
 
-    __aicore__ inline void GetRunTimeInfoDeter(RunTimeInfo &runTimeInfo)
+    __aicore__ inline void GetRunTimeInfoDeter(RunTimeInfo& runTimeInfo)
     {
         runTimeInfo.need_compute = 0;
         deter_latin_r_++;
@@ -449,8 +449,8 @@ private:
         }
     }
 
-    __aicore__ inline void unravel_index(int32_t flat_index, int32_t &b, int32_t &n, int32_t &s1_block,
-                                         int32_t &s2_block)
+    __aicore__ inline void unravel_index(int32_t flat_index, int32_t& b, int32_t& n, int32_t& s1_block,
+                                         int32_t& s2_block)
     {
         // 将 block index 展平下标还原为 (batch, q_head, q_block, kv_block)
         s1_block = flat_index % q_block_num_;

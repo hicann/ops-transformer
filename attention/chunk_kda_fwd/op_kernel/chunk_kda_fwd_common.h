@@ -86,7 +86,7 @@ struct FwdHTilingView {
 };
 
 template <typename TilingData>
-__aicore__ inline FwdHTilingView MakeFwdHTiling(const TilingData &tiling)
+__aicore__ inline FwdHTilingView MakeFwdHTiling(const TilingData& tiling)
 {
     constexpr bool persistFwdHStateInFp32 = true;
     return {
@@ -119,7 +119,7 @@ __aicore__ inline GM_ADDR ResolveStorage(GM_ADDR output, GM_ADDR userWorkspace, 
 template <typename TilingData>
 __aicore__ inline ChunkKdaFwdAddresses ResolveAddresses(GM_ADDR finalState, GM_ADDR gk, GM_ADDR w, GM_ADDR u,
                                                         GM_ADDR qg, GM_ADDR kg, GM_ADDR vNew, GM_ADDR h,
-                                                        GM_ADDR userWorkspace, const TilingData &tiling)
+                                                        GM_ADDR userWorkspace, const TilingData& tiling)
 {
     return {
         ResolveStorage(gk, userWorkspace, tiling.gkStorageOffset, tiling.storeGk),
@@ -136,7 +136,7 @@ __aicore__ inline ChunkKdaFwdAddresses ResolveAddresses(GM_ADDR finalState, GM_A
 }
 
 template <typename TilingData>
-__aicore__ inline GateRuntimeTiling MakeGateTiling(const TilingData &tiling)
+__aicore__ inline GateRuntimeTiling MakeGateTiling(const TilingData& tiling)
 {
     return {
         tiling.batch,
@@ -160,7 +160,7 @@ __aicore__ inline GateRuntimeTiling MakeGateTiling(const TilingData &tiling)
 
 template <typename TilingData>
 __aicore__ inline void RunGateCumsum(GM_ADDR g, GM_ADDR aLog, GM_ADDR dtBias, GM_ADDR cuSeqlens, GM_ADDR gk,
-                                     const TilingData &tiling)
+                                     const TilingData& tiling)
 {
     if (tiling.computeGateInPrepare) {
         return;
@@ -182,8 +182,8 @@ template <bool SAFE_GATE, typename T, typename GK_T, typename BETA_T, typename T
           uint32_t COMPILE_K, uint32_t COMPILE_V>
 __aicore__ inline void RunFrontEnd(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR g, GM_ADDR beta, GM_ADDR aLog,
                                    GM_ADDR dtBias, GM_ADDR initialState, GM_ADDR cuSeqlens, GM_ADDR chunkIndices,
-                                   GM_ADDR aqk, GM_ADDR akk, const ChunkKdaFwdAddresses &addresses,
-                                   GM_ADDR userWorkspace, const TilingData &tiling, TPipe &pipe)
+                                   GM_ADDR aqk, GM_ADDR akk, const ChunkKdaFwdAddresses& addresses,
+                                   GM_ADDR userWorkspace, const TilingData& tiling, TPipe& pipe)
 {
     RunGateCumsum(g, aLog, dtBias, cuSeqlens, addresses.gk, tiling);
     if (!tiling.computeGateInPrepare) {
@@ -208,7 +208,7 @@ __aicore__ inline void RunFrontEnd(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR g, G
 
 template <typename T, typename TileShapes, typename TilingData>
 __aicore__ inline void RunFwdH(GM_ADDR initialState, GM_ADDR cuSeqlens, GM_ADDR chunkIndices,
-                               const ChunkKdaFwdAddresses &addresses, GM_ADDR userWorkspace, const TilingData &tiling)
+                               const ChunkKdaFwdAddresses& addresses, GM_ADDR userWorkspace, const TilingData& tiling)
 {
     using FwdHKernel = Catlass::Gemm::Kernel::KdaFwdHKernel<T, float, float, float, TileShapes, true, false, true>;
     const auto fwdHTiling = MakeFwdHTiling(tiling);
@@ -222,8 +222,8 @@ __aicore__ inline void RunFwdH(GM_ADDR initialState, GM_ADDR cuSeqlens, GM_ADDR 
 template <typename T, typename BETA_T, typename TilingData>
 __aicore__ inline void RunGenericBackEnd(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR beta, GM_ADDR initialState,
                                          GM_ADDR cuSeqlens, GM_ADDR chunkIndices, GM_ADDR aqk, GM_ADDR attnOut,
-                                         const ChunkKdaFwdAddresses &addresses, GM_ADDR userWorkspace,
-                                         const TilingData &tiling)
+                                         const ChunkKdaFwdAddresses& addresses, GM_ADDR userWorkspace,
+                                         const TilingData& tiling)
 {
     if (tiling.vHeadDim > 128) {
         RunFwdH<T, Catlass::Gemm::Kernel::KdaFwdHTileShapes256>(initialState, cuSeqlens, chunkIndices, addresses,
@@ -242,8 +242,8 @@ __aicore__ inline void RunGenericBackEnd(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADD
 template <typename T, typename BETA_T, typename TilingData>
 __aicore__ inline void RunGenericBackEnd(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR beta, GM_ADDR initialState,
                                          GM_ADDR cuSeqlens, GM_ADDR chunkIndices, GM_ADDR aqk, GM_ADDR attnOut,
-                                         const ChunkKdaFwdAddresses &addresses, GM_ADDR userWorkspace,
-                                         const TilingData &tiling, TPipe &pipe)
+                                         const ChunkKdaFwdAddresses& addresses, GM_ADDR userWorkspace,
+                                         const TilingData& tiling, TPipe& pipe)
 {
     if (tiling.vHeadDim > 128) {
         RunFwdH<T, Catlass::Gemm::Kernel::KdaFwdHTileShapes256>(initialState, cuSeqlens, chunkIndices, addresses,
@@ -264,7 +264,7 @@ __aicore__ inline void RunGeneric(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR g, GM
                                   GM_ADDR dtBias, GM_ADDR initialState, GM_ADDR cuSeqlens, GM_ADDR chunkIndices,
                                   GM_ADDR attnOut, GM_ADDR finalState, GM_ADDR gk, GM_ADDR aqk, GM_ADDR akk, GM_ADDR w,
                                   GM_ADDR u, GM_ADDR qg, GM_ADDR kg, GM_ADDR vNew, GM_ADDR h, GM_ADDR userWorkspace,
-                                  const TilingData &tiling)
+                                  const TilingData& tiling)
 {
     const auto addresses = ResolveAddresses(finalState, gk, w, u, qg, kg, vNew, h, userWorkspace, tiling);
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310

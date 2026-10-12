@@ -38,7 +38,7 @@ using namespace Ops::Base;
 // Layout — SinglePara
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckSingleParaLayout(const FaTilingInfo &faInfo)
+ge::graphStatus CommonChecker::CheckSingleParaLayout(const FaTilingInfo& faInfo)
 {
     const std::vector<FaLayout> supportedQLayouts = {FaLayout::BNSD, FaLayout::BSND, FaLayout::TND};
     const std::vector<FaLayout> supportedKvLayouts = {FaLayout::BNSD,    FaLayout::BSND,    FaLayout::TND,
@@ -73,7 +73,7 @@ ge::graphStatus CommonChecker::CheckSingleParaLayout(const FaTilingInfo &faInfo)
 // Attr — SinglePara
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckSinglePara(const FaTilingInfo &faInfo)
+ge::graphStatus CommonChecker::CheckSinglePara(const FaTilingInfo& faInfo)
 {
     if (CheckSingleParaLayout(faInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -85,7 +85,7 @@ ge::graphStatus CommonChecker::CheckSinglePara(const FaTilingInfo &faInfo)
 // ParaExistence
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckParaExistence(const FaTilingInfo &faInfo)
+ge::graphStatus CommonChecker::CheckParaExistence(const FaTilingInfo& faInfo)
 {
     OP_CHECK_IF(faInfo.opParamInfo.query.desc == nullptr || faInfo.opParamInfo.query.shape == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(faInfo.opName, "query"), return ge::GRAPH_FAILED);
@@ -102,7 +102,7 @@ ge::graphStatus CommonChecker::CheckParaExistence(const FaTilingInfo &faInfo)
 // Dtype
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckNonQuantDataType(const FaTilingInfo &faInfo)
+ge::graphStatus CommonChecker::CheckNonQuantDataType(const FaTilingInfo& faInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckDtypeSupport(faInfo.opParamInfo.query.desc, QUERY_NAME) ||
         ge::GRAPH_SUCCESS != CheckDtypeSupport(faInfo.opParamInfo.key.desc, KEY_NAME) ||
@@ -117,12 +117,12 @@ ge::graphStatus CommonChecker::CheckNonQuantDataType(const FaTilingInfo &faInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckDtypeConsistency(const FaTilingInfo &faInfo)
+ge::graphStatus CommonChecker::CheckDtypeConsistency(const FaTilingInfo& faInfo)
 {
-    const gert::CompileTimeTensorDesc *queryDesc = faInfo.opParamInfo.query.desc;
-    const gert::CompileTimeTensorDesc *keyDesc = faInfo.opParamInfo.key.desc;
-    const gert::CompileTimeTensorDesc *valueDesc = faInfo.opParamInfo.value.desc;
-    const gert::CompileTimeTensorDesc *attnOutDesc = faInfo.opParamInfo.attnOut.desc;
+    const gert::CompileTimeTensorDesc* queryDesc = faInfo.opParamInfo.query.desc;
+    const gert::CompileTimeTensorDesc* keyDesc = faInfo.opParamInfo.key.desc;
+    const gert::CompileTimeTensorDesc* valueDesc = faInfo.opParamInfo.value.desc;
+    const gert::CompileTimeTensorDesc* attnOutDesc = faInfo.opParamInfo.attnOut.desc;
 
     ge::DataType queryDtype = queryDesc->GetDataType();
 
@@ -161,7 +161,7 @@ ge::graphStatus CommonChecker::CheckDtypeConsistency(const FaTilingInfo &faInfo)
 // HeadNum
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckNonQuantHeadNum(const FaTilingInfo &faInfo)
+ge::graphStatus CommonChecker::CheckNonQuantHeadNum(const FaTilingInfo& faInfo)
 {
     if ((faInfo.n1Size < 0) || (faInfo.n2Size < 0)) {
         std::string shapeStr = ToString(faInfo.opParamInfo.query.shape->GetStorageShape()) + " and " +
@@ -192,7 +192,7 @@ ge::graphStatus CommonChecker::CheckNonQuantHeadNum(const FaTilingInfo &faInfo)
 // Axis
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckAxis(const FaTilingInfo &faInfo)
+ge::graphStatus CommonChecker::CheckAxis(const FaTilingInfo& faInfo)
 {
     if (faInfo.bSize >= B_LIMIT || faInfo.bSize <= 0) {
         std::string reason = "The value of B must be within the range (0, " + std::to_string(B_LIMIT) + ")";
@@ -269,14 +269,14 @@ static const std::map<FaLayout, LayoutConstraintConfig> LAYOUT_CONSTRAINT_TABLE 
     {FaLayout::TND, {{FaLayout::TND, FaLayout::PA_BBND, FaLayout::PA_BNBD, FaLayout::PA_NZ}, {FaLayout::TND}}},
 };
 
-ge::graphStatus CommonChecker::CheckMultiParaLayout(const FaTilingInfo &faInfo)
+ge::graphStatus CommonChecker::CheckMultiParaLayout(const FaTilingInfo& faInfo)
 {
     auto it = LAYOUT_CONSTRAINT_TABLE.find(faInfo.qLayout);
     OP_CHECK_IF(it == LAYOUT_CONSTRAINT_TABLE.end(),
                 OP_LOGE(faInfo.opName, "layout_q %s is not supported", LayoutToSerialString(faInfo.qLayout).c_str()),
                 return ge::GRAPH_FAILED);
 
-    const auto &config = it->second;
+    const auto& config = it->second;
     const std::string qLayoutStr = LayoutToSerialString(faInfo.qLayout);
 
     OP_CHECK_IF(std::find(config.supportedKvLayouts.begin(), config.supportedKvLayouts.end(), faInfo.kvLayout) ==
@@ -297,7 +297,7 @@ ge::graphStatus CommonChecker::CheckMultiParaLayout(const FaTilingInfo &faInfo)
 // Shape Compare
 // ============================================================================
 
-void CommonChecker::SetFaShapeCompare(const FaTilingInfo &faInfo)
+void CommonChecker::SetFaShapeCompare(const FaTilingInfo& faInfo)
 {
     queryShapeCmp_ = std::make_shared<FaTilingShapeCompare>(faInfo.opParamInfo.query.shape->GetStorageShape(),
                                                             faInfo.qLayout, QUERY_NAME, faInfo.opName);
@@ -309,7 +309,7 @@ void CommonChecker::SetFaShapeCompare(const FaTilingInfo &faInfo)
                                                               faInfo.outLayout, ATTN_OUT_NAME, faInfo.opName);
 }
 
-ge::graphStatus CommonChecker::CheckQueryShape(const FaTilingInfo &faInfo) const
+ge::graphStatus CommonChecker::CheckQueryShape(const FaTilingInfo& faInfo) const
 {
     FaTilingShapeCompareParam shapeParams;
     shapeParams.B = static_cast<int64_t>(faInfo.bSize);
@@ -320,7 +320,7 @@ ge::graphStatus CommonChecker::CheckQueryShape(const FaTilingInfo &faInfo) const
     return queryShapeCmp_->CompareShape(shapeParams, __func__);
 }
 
-ge::graphStatus CommonChecker::CheckKVShapeForContinuous(const FaTilingInfo &faInfo) const
+ge::graphStatus CommonChecker::CheckKVShapeForContinuous(const FaTilingInfo& faInfo) const
 {
     FaTilingShapeCompareParam shapeParams;
     shapeParams.B = static_cast<int64_t>(faInfo.bSize);
@@ -341,7 +341,7 @@ ge::graphStatus CommonChecker::CheckKVShapeForContinuous(const FaTilingInfo &faI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckKVShapeForPageAttention(const FaTilingInfo &faInfo) const
+ge::graphStatus CommonChecker::CheckKVShapeForPageAttention(const FaTilingInfo& faInfo) const
 {
     ge::DataType kvDtype = faInfo.opParamInfo.key.desc->GetDataType();
     uint32_t kvBlockElemNum = 32 / FABaseChecker::GetTypeSize(kvDtype);
@@ -373,7 +373,7 @@ ge::graphStatus CommonChecker::CheckKVShapeForPageAttention(const FaTilingInfo &
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckKVShape(const FaTilingInfo &faInfo) const
+ge::graphStatus CommonChecker::CheckKVShape(const FaTilingInfo& faInfo) const
 {
     if (faInfo.kvLayout == FaLayout::BNSD || faInfo.kvLayout == FaLayout::BSND || faInfo.kvLayout == FaLayout::TND) {
         return CheckKVShapeForContinuous(faInfo);
@@ -395,7 +395,7 @@ ge::graphStatus CommonChecker::CheckKVShape(const FaTilingInfo &faInfo) const
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus CommonChecker::CheckAttnOutShape(const FaTilingInfo &faInfo) const
+ge::graphStatus CommonChecker::CheckAttnOutShape(const FaTilingInfo& faInfo) const
 {
     FaTilingShapeCompareParam shapeParams;
     shapeParams.B = static_cast<int64_t>(faInfo.bSize);
@@ -409,7 +409,7 @@ ge::graphStatus CommonChecker::CheckAttnOutShape(const FaTilingInfo &faInfo) con
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckShapeConsistency(const FaTilingInfo &faInfo)
+ge::graphStatus CommonChecker::CheckShapeConsistency(const FaTilingInfo& faInfo)
 {
     SetFaShapeCompare(faInfo);
     if (ge::GRAPH_SUCCESS != CheckQueryShape(faInfo) || ge::GRAPH_SUCCESS != CheckKVShape(faInfo)) {
@@ -422,7 +422,7 @@ ge::graphStatus CommonChecker::CheckShapeConsistency(const FaTilingInfo &faInfo)
 // MultiPara — combined
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckMultiPara(const FaTilingInfo &faInfo)
+ge::graphStatus CommonChecker::CheckMultiPara(const FaTilingInfo& faInfo)
 {
     if (CheckMultiParaLayout(faInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;

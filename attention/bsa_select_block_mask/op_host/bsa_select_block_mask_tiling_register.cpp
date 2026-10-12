@@ -32,9 +32,8 @@ static ge::graphStatus TilingParseForBSASelectBlockMask([[maybe_unused]] gert::T
 {
     OP_LOGD(context->GetNodeName(), "Start parsing tiling for BSASelectBlockMask.");
     auto compileInfoPtr = context->GetCompiledInfo<BSASelectBlockMaskCompileInfo>();
-    OP_CHECK_IF(compileInfoPtr == nullptr,
-        OP_LOGE(context->GetNodeName(), "compileInfoPtr is null"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "compileInfoPtr is null"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }

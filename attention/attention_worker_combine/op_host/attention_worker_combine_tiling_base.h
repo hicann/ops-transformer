@@ -81,7 +81,7 @@ struct AttentionWorkerCombineCompileInfo {
 
 class AttentionWorkerCombineTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit AttentionWorkerCombineTilingBase(gert::TilingContext *context)
+    explicit AttentionWorkerCombineTilingBase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
     ~AttentionWorkerCombineTilingBase() override = default;

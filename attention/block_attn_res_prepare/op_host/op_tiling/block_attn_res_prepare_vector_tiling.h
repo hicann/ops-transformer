@@ -23,7 +23,7 @@ namespace optiling {
 
 class BlockAttnResPrepareVectorTiling final : public BlockAttnResPrepareBaseTiling {
 public:
-    explicit BlockAttnResPrepareVectorTiling(gert::TilingContext *context)
+    explicit BlockAttnResPrepareVectorTiling(gert::TilingContext* context)
         : BlockAttnResPrepareBaseTiling(context)
     {}
     ~BlockAttnResPrepareVectorTiling() override = default;

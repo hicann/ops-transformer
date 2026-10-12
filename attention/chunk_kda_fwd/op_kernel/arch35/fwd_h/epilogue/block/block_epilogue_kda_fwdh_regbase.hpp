@@ -29,7 +29,7 @@ constexpr CastTrait KDA_B16_TO_F32_ZERO = {
 };
 
 template <typename T>
-__simd_callee__ inline void LoadKdaAsFloat(RegTensor<float> &dst, __ubuf__ T *src, MaskReg &mask)
+__simd_callee__ inline void LoadKdaAsFloat(RegTensor<float>& dst, __ubuf__ T* src, MaskReg& mask)
 {
     if constexpr (std::is_same<T, float>()) {
         DataCopy<float, LoadDist::DIST_NORM>(dst, src);
@@ -43,7 +43,7 @@ __simd_callee__ inline void LoadKdaAsFloat(RegTensor<float> &dst, __ubuf__ T *sr
 }
 
 template <typename T>
-__simd_callee__ inline void LoadKdaBroadcastAsFloat(RegTensor<float> &dst, __ubuf__ T *src, MaskReg &mask)
+__simd_callee__ inline void LoadKdaBroadcastAsFloat(RegTensor<float>& dst, __ubuf__ T* src, MaskReg& mask)
 {
     if constexpr (std::is_same<T, float>()) {
         LoadAlign<float, LoadDist::DIST_BRC_B32>(dst, src);
@@ -56,18 +56,18 @@ __simd_callee__ inline void LoadKdaBroadcastAsFloat(RegTensor<float> &dst, __ubu
     }
 }
 
-__simd_callee__ inline void LoadKdaFloat(RegTensor<float> &dst, __ubuf__ float *src)
+__simd_callee__ inline void LoadKdaFloat(RegTensor<float>& dst, __ubuf__ float* src)
 {
     DataCopy<float, LoadDist::DIST_NORM>(dst, src);
 }
 
-__simd_callee__ inline void StoreKdaFloat(__ubuf__ float *dst, RegTensor<float> &src, MaskReg &mask)
+__simd_callee__ inline void StoreKdaFloat(__ubuf__ float* dst, RegTensor<float>& src, MaskReg& mask)
 {
     DataCopy<float, StoreDist::DIST_NORM_B32>(dst, src, mask);
 }
 
 template <typename T, bool USE_EXP2>
-static __simd_vf__ inline void PrepareKGateRegbase(__ubuf__ float *gateOutput, __ubuf__ T *gateInput, uint16_t count)
+static __simd_vf__ inline void PrepareKGateRegbase(__ubuf__ float* gateOutput, __ubuf__ T* gateInput, uint16_t count)
 {
     constexpr uint16_t FP32_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(float);
     constexpr float LN2 = 0.6931471805599453f;
@@ -88,7 +88,7 @@ static __simd_vf__ inline void PrepareKGateRegbase(__ubuf__ float *gateOutput, _
 }
 
 template <typename T>
-static __simd_vf__ inline void ComputeVNewRegbaseDualIssue(__ubuf__ float *workspace, __ubuf__ T *uInput,
+static __simd_vf__ inline void ComputeVNewRegbaseDualIssue(__ubuf__ float* workspace, __ubuf__ T* uInput,
                                                            uint32_t count)
 {
     constexpr uint32_t FP32_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(float);
@@ -124,8 +124,8 @@ static __simd_vf__ inline void ComputeVNewRegbaseDualIssue(__ubuf__ float *works
 }
 
 template <typename T>
-static __simd_vf__ inline void ApplyKGateUpdateRegbaseDualIssue(__ubuf__ float *update, __ubuf__ T *state,
-                                                                __ubuf__ float *rowScale, uint16_t rows, uint16_t cols)
+static __simd_vf__ inline void ApplyKGateUpdateRegbaseDualIssue(__ubuf__ float* update, __ubuf__ T* state,
+                                                                __ubuf__ float* rowScale, uint16_t rows, uint16_t cols)
 {
     constexpr uint16_t FP32_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(float);
     RegTensor<float> stateReg0;
@@ -178,9 +178,9 @@ static __simd_vf__ inline void ApplyKGateUpdateRegbaseDualIssue(__ubuf__ float *
 }
 
 template <typename KType, typename VType>
-static __simd_vf__ inline void ComputeKdaTailFinalStateRegbaseDualIssue(__ubuf__ float *state, __ubuf__ KType *kInput,
-                                                                        __ubuf__ VType *vInput,
-                                                                        __ubuf__ float *rowScale, uint16_t rows,
+static __simd_vf__ inline void ComputeKdaTailFinalStateRegbaseDualIssue(__ubuf__ float* state, __ubuf__ KType* kInput,
+                                                                        __ubuf__ VType* vInput,
+                                                                        __ubuf__ float* rowScale, uint16_t rows,
                                                                         uint16_t cols, uint16_t tokens,
                                                                         uint16_t kStride, uint16_t kRowOffset)
 {
@@ -249,8 +249,8 @@ static __simd_vf__ inline void ComputeKdaTailFinalStateRegbaseDualIssue(__ubuf__
 }
 
 template <typename WType, typename HType>
-static __simd_vf__ inline void ComputeKdaTailVWorkspaceRegbaseDualIssue(__ubuf__ float *output, __ubuf__ WType *wInput,
-                                                                        __ubuf__ HType *hInput, uint16_t rows,
+static __simd_vf__ inline void ComputeKdaTailVWorkspaceRegbaseDualIssue(__ubuf__ float* output, __ubuf__ WType* wInput,
+                                                                        __ubuf__ HType* hInput, uint16_t rows,
                                                                         uint16_t cols, uint16_t reduction)
 {
     constexpr uint16_t FP32_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(float);
@@ -310,7 +310,7 @@ static __simd_vf__ inline void ComputeKdaTailVWorkspaceRegbaseDualIssue(__ubuf__
     }
 }
 
-static __simd_vf__ inline void ApplyRowScaleDualIssue(__ubuf__ float *matrix, __ubuf__ float *rowScale,
+static __simd_vf__ inline void ApplyRowScaleDualIssue(__ubuf__ float* matrix, __ubuf__ float* rowScale,
                                                       uint32_t rowScaleOffset, uint16_t rows, uint16_t cols)
 {
     using namespace AscendC::Reg;

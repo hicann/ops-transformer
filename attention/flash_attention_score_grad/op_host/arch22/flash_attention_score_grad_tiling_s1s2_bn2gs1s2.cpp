@@ -110,7 +110,7 @@ constexpr int64_t TND_S2_AVG_70 = 70;
 constexpr int64_t TND_S2_AVG_80 = 80;
 constexpr int64_t TND_D_128 = 128;
 constexpr int64_t TND_NZ_IN_MAX_D = 256;
-const char *templateNameS1S2 = "FlashAttentionScoreGradTilingS1s2Bn2gs1s2";
+const char* templateNameS1S2 = "FlashAttentionScoreGradTilingS1s2Bn2gs1s2";
 
 bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2::IsCapable()
 {
@@ -168,7 +168,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetPlatformInfo()
 
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(
             compileInfoPtr == nullptr,
             OP_LOGE(context_,
@@ -220,14 +220,14 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::SetQKVStartIdx()
         OP_LOGW(context_, "[%s]qStartIdxTensor is null pointer", templateNameS1S2);
         return;
     }
-    auto &qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
+    auto& qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
     if (qStartIdxShape.GetDimNum() != 1 || qStartIdxShape.GetDim(0) <= 0) {
         OP_LOGW(context_, "[%s]qStartIdxShape is invalid %lu %ld", templateNameS1S2, qStartIdxShape.GetDimNum(),
                 qStartIdxShape.GetDim(0));
         return;
     }
     /* Get Data from tensor. */
-    const int64_t *value = qStartIdxTensor->GetData<int64_t>();
+    const int64_t* value = qStartIdxTensor->GetData<int64_t>();
     if (value == nullptr) {
         OP_LOGW(context_, "[%s]qStartIdxShape data is null pointer", templateNameS1S2);
         return;
@@ -239,14 +239,14 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::SetQKVStartIdx()
         OP_LOGW(context_, "[%s]kvStartIdxTensor is null pointer", templateNameS1S2);
         return;
     }
-    auto &kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
+    auto& kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
     if (kvStartIdxShape.GetDimNum() != 1 || kvStartIdxShape.GetDim(0) <= 0) {
         OP_LOGW(context_, "[%s]kvStartIdxShape is invalid %lu %ld", templateNameS1S2, kvStartIdxShape.GetDimNum(),
                 kvStartIdxShape.GetDim(0));
         return;
     }
     /* Get Data from tensor. */
-    const int64_t *kvValue = kvStartIdxTensor->GetData<int64_t>();
+    const int64_t* kvValue = kvStartIdxTensor->GetData<int64_t>();
     if (kvValue == nullptr) {
         OP_LOGW(context_, "[%s]qStartIdxShape data is null pointer", templateNameS1S2);
         return;
@@ -268,14 +268,14 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2::SetSparseParams()
         if (isMaxWorkspace_) {
             return true;
         }
-        auto &prefixShape = prefixNTensor->GetShape().GetStorageShape();
+        auto& prefixShape = prefixNTensor->GetShape().GetStorageShape();
         if (prefixShape.GetDimNum() != 1 || prefixShape.GetDim(0) != fBaseParams.b) {
             OP_LOGW(context_, "FAG S1s2Bn2gs1s2 sparseMode is prefix, but prefixshape size[%zu] or value is invalid!",
                     prefixShape.GetDimNum());
             return false;
         }
 
-        const int64_t *value = prefixNTensor->GetData<int64_t>();
+        const int64_t* value = prefixNTensor->GetData<int64_t>();
         if (value == nullptr) {
             OP_LOGW(context_, "FAG S1s2Bn2gs1s2 sparseMode is prefix, but prefixN data is null pointer!");
             return false;
@@ -331,7 +331,7 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2::SetSparseParams()
     return false;
 }
 
-ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessPseNormal(const char *inputLayout)
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessPseNormal(const char* inputLayout)
 {
     auto pseShape = context_->GetOptionalInputShape(PSE_SHIFT);
     OP_CHECK_IF(pseShape == nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "pseShiftOptional"),
@@ -399,7 +399,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetMaxWorkspaceFlag()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessPseInfo(const char *inputLayout)
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessPseInfo(const char* inputLayout)
 {
     if (context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(PSETYPE)) {
         fBaseParams.pseType = *(context_->GetAttrs()->GetAttrPointer<int64_t>(PSETYPE)); // 8
@@ -521,7 +521,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessPseInfo(const 
     } else if (pseShapeDim == PSE_DIM_NUM_1 && isTnd) {
         auto dim0 = pseShape->GetStorageShape().GetDim(DIM_0);
         int64_t effectiveT2 = 0;
-        for (const auto &kvlen : fBaseParams.actualSeqKvlen) {
+        for (const auto& kvlen : fBaseParams.actualSeqKvlen) {
             effectiveT2 += kvlen;
         }
         bool isTndPseBN1S = isTnd && (dim0 == effectiveT2 * fBaseParams.n1);
@@ -637,7 +637,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessSparseModeInfo
 
     if ((fBaseParams.layoutType != INPUT_FORMAT_TND) &&
         (fBaseParams.sparseMode == RIGHT_DOWN_CASUAL_BAND || fBaseParams.sparseMode == BAND_LEFT_UP_CASUAL)) {
-        const char *inputLayout = attrs->GetAttrPointer<char>(INPUT_LAYOUT);
+        const char* inputLayout = attrs->GetAttrPointer<char>(INPUT_LAYOUT);
         std::string valuesMsg = "{" + std::string(inputLayout) + ", " + std::to_string(fBaseParams.sparseMode) + "}";
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad", "inputLayout, sparseMode", valuesMsg.c_str(),
                                                "sparseMode 7 and 8 are supported only for the TND input layout");
@@ -699,15 +699,15 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::PrintShapeInfo()
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo()
 {
     // 待公共模板实现后，会删除该函数  直接继承基类
-    const gert::StorageShape *queryShape = context_->GetInputShape(QUERY); // [B, N2, G, S1, D]
-    const gert::StorageShape *keyShape = context_->GetInputShape(KEY);     // [B, N2, 1, S2, D]
-    const gert::StorageShape *valueShape = context_->GetInputShape(VALUE);
-    const gert::StorageShape *dyShape = context_->GetInputShape(DY);
-    const gert::StorageShape *queryRopeShape = context_->GetOptionalInputShape(QUERY_ROPE); // [B, N2, G, S2, D_Rope]
-    const gert::StorageShape *keyRopeShape = context_->GetOptionalInputShape(KEY_ROPE);     // [B, N2, 1, S2, D_Rope]
+    const gert::StorageShape* queryShape = context_->GetInputShape(QUERY); // [B, N2, G, S1, D]
+    const gert::StorageShape* keyShape = context_->GetInputShape(KEY);     // [B, N2, 1, S2, D]
+    const gert::StorageShape* valueShape = context_->GetInputShape(VALUE);
+    const gert::StorageShape* dyShape = context_->GetInputShape(DY);
+    const gert::StorageShape* queryRopeShape = context_->GetOptionalInputShape(QUERY_ROPE); // [B, N2, G, S2, D_Rope]
+    const gert::StorageShape* keyRopeShape = context_->GetOptionalInputShape(KEY_ROPE);     // [B, N2, 1, S2, D_Rope]
 
     int64_t headNum = *context_->GetAttrs()->GetAttrPointer<int>(HEAD_NUM);
-    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
+    const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
 
     OP_CHECK_IF(headNum == 0,
                 OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "headNum", std::to_string(headNum).c_str(),
@@ -838,8 +838,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo()
                         "The shape sizes must be equal and greater than 0"),
                     return ge::GRAPH_FAILED);
         if (!isMaxWorkspace_) {
-            const int64_t *qValue = actualSeqQlenTensor->GetData<int64_t>();
-            const int64_t *kvValue = actualSeqKvlenTensor->GetData<int64_t>();
+            const int64_t* qValue = actualSeqQlenTensor->GetData<int64_t>();
+            const int64_t* kvValue = actualSeqKvlenTensor->GetData<int64_t>();
             OP_CHECK_IF((qValue == nullptr || kvValue == nullptr),
                         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                             "FlashAttentionScoreGrad", "actualSeqQLenOptional or actualSeqKvLenOptional",
@@ -950,7 +950,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessDropInfo(const char *inputLayout)
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessDropInfo(const char* inputLayout)
 {
     auto dropMask = context_->GetOptionalInputDesc(DROP_MASK);
     OP_CHECK_IF(
@@ -1023,7 +1023,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
         return ret;
     }
 
-    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
+    const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
 
     fBaseParams.n1 = fBaseParams.n2 * fBaseParams.g;
     fBaseParams.s1Align = (fBaseParams.s1 + INPUT_ALIGN - 1) / INPUT_ALIGN * INPUT_ALIGN;
@@ -1141,7 +1141,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
         return ret;
     }
 
-    const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
+    const char* tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
                                    context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) :
                                    "";
     fBaseParams.tndSoftmaxIn = strcmp(tndSoftmaxIn, "same_as_input") == 0;
@@ -1589,7 +1589,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::SetMatmulTilingBufferInfo(AscendC::tiling::TCubeTiling *mmTiling)
+void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::SetMatmulTilingBufferInfo(AscendC::tiling::TCubeTiling* mmTiling)
 {
     mmTiling->shareMode = 0;
     mmTiling->shareL1Size = fBaseParams.l1Size;
@@ -1598,7 +1598,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::SetMatmulTilingBufferInfo(Ascend
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     size_t workspaceSize = MUL_CORE_SYNC_BUFFER;
     uint32_t s1Inner = std::min(INITIAL_S1_SPLIT_NUM, fBaseParams.s1Align);
 
@@ -1884,7 +1884,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessTokensInfo()
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessTndToBsh()
 {
-    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
+    const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
     auto pse = context_->GetOptionalInputDesc(PSE_SHIFT);
     if (strcmp(inputLayout, "TND") == 0) {
         tnd2bsh =
@@ -2005,7 +2005,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseBlockInfo()
 }
 
 void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetCommS1S2OuterInfo(
-    const int64_t prefixN, std::vector<std::pair<int64_t, int64_t>> &s1ValidIdx)
+    const int64_t prefixN, std::vector<std::pair<int64_t, int64_t>>& s1ValidIdx)
 {
     for (int64_t i = 0; i < fBaseParams.s2Outer; i++) {
         int64_t s1Start = 0;
@@ -2027,7 +2027,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetCommS1S2OuterInfo(
 }
 
 bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2::CheckPrefixNExist(
-    const int64_t bIdx, const int64_t prefixN, std::vector<std::vector<std::pair<int64_t, int64_t>>> &s1ValidIdx)
+    const int64_t bIdx, const int64_t prefixN, std::vector<std::vector<std::pair<int64_t, int64_t>>>& s1ValidIdx)
 {
     for (int64_t i = 0; i < bIdx; ++i) {
         if (fBaseParams.prefixN[i] == prefixN) {
@@ -2145,8 +2145,8 @@ int64_t FlashAttentionScoreGradTilingS1s2Bn2gs1s2::FindBandIdx()
 }
 
 void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::FillBlockInfo(
-    std::vector<std::vector<std::vector<int64_t>>> &calculatedBlockInfo,
-    std::vector<std::vector<int64_t>> &totalBlockInfo)
+    std::vector<std::vector<std::vector<int64_t>>>& calculatedBlockInfo,
+    std::vector<std::vector<int64_t>>& totalBlockInfo)
 {
     OP_LOGD(context_, " Starting load balancing calculation in TND scenario");
     OP_LOGD(context_, "SparseMode %u, find band index %ld", fBaseParams.sparseMode, fBaseParams.bandIdx);
@@ -2229,7 +2229,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::FillBlockInfo(
     }
 }
 
-bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2::CheckForDichotomy(std::vector<int64_t> &nums, int64_t x, int64_t m)
+bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2::CheckForDichotomy(std::vector<int64_t>& nums, int64_t x, int64_t m)
 {
     int64_t sum = 0;
     int64_t cnt = 1;
@@ -2244,7 +2244,7 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2::CheckForDichotomy(std::vector<in
     return (cnt <= m);
 }
 
-int64_t FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSplitArrayMinMaxSum(std::vector<int64_t> &s1s2WeightNums,
+int64_t FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSplitArrayMinMaxSum(std::vector<int64_t>& s1s2WeightNums,
                                                                           int64_t coreNum)
 {
     int64_t left = 0;
@@ -2266,7 +2266,7 @@ int64_t FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSplitArrayMinMaxSum(std::v
     return left;
 }
 
-void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::FillEveryBlockInfo(std::vector<std::vector<int64_t>> &everyBlockInfo)
+void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::FillEveryBlockInfo(std::vector<std::vector<int64_t>>& everyBlockInfo)
 {
     for (int64_t i = 0; i < fBaseParams.b; i++) {
         int64_t actualS1Len = fBaseParams.actualSeqQlen[i];
@@ -2288,8 +2288,8 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::FillEveryBlockInfo(std::vector<s
     }
 }
 
-void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::FillS1s2WeightVec(std::vector<std::vector<int64_t>> &everyBlockInfo,
-                                                                  std::vector<int64_t> &s1s2Weight)
+void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::FillS1s2WeightVec(std::vector<std::vector<int64_t>>& everyBlockInfo,
+                                                                  std::vector<int64_t>& s1s2Weight)
 {
     // mte + pipe
     for (int64_t bIndex = 0; bIndex < fBaseParams.b; bIndex++) {

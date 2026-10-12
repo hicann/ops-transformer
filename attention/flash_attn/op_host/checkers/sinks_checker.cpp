@@ -31,7 +31,7 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35FA;
 
-ge::graphStatus SinksChecker::CheckSinglePara(const FaTilingInfo &faInfo)
+ge::graphStatus SinksChecker::CheckSinglePara(const FaTilingInfo& faInfo)
 {
     if (faInfo.sinksFlag) {
         if (faInfo.opParamInfo.sinks.tensor == nullptr || faInfo.opParamInfo.sinks.desc == nullptr) {
@@ -44,7 +44,7 @@ ge::graphStatus SinksChecker::CheckSinglePara(const FaTilingInfo &faInfo)
                     ge::TypeUtils::DataTypeToSerialString(dtype).c_str());
             return ge::GRAPH_FAILED;
         }
-        auto &shape = faInfo.opParamInfo.sinks.tensor->GetStorageShape();
+        auto& shape = faInfo.opParamInfo.sinks.tensor->GetStorageShape();
         if (shape.GetDimNum() != 1) {
             OP_LOGE(faInfo.opName, "sinks shape must be 1D (Q_N,), but got %lu dims.", shape.GetDimNum());
             return ge::GRAPH_FAILED;

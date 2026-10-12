@@ -30,7 +30,7 @@ public:
                                 GM_ADDR deqScaleK, GM_ADDR deqScaleV, GM_ADDR deqScaleDy, GM_ADDR queryRope,
                                 GM_ADDR keyRope, GM_ADDR sink, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dpse,
                                 GM_ADDR dqRope, GM_ADDR dkRope, GM_ADDR dsink, GM_ADDR workspace,
-                                FagTilingType ordTilingData, TPipe *pipeIn);
+                                FagTilingType ordTilingData, TPipe* pipeIn);
     __aicore__ inline void UnInit();
     __aicore__ inline void InitCVCommonBuffer();
     __aicore__ inline void InitCVCommonGlobalBuffer(GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR deqScaleQ,
@@ -39,44 +39,44 @@ public:
     __aicore__ inline void SetConstInfo();
     __aicore__ inline void SetOptionalInfo();
     __aicore__ inline void SetSwizzleConstInfo();
-    __aicore__ inline void SetAxisRunInfo(FagRunInfo &runInfo, int64_t s2CvBegin, int64_t s2CvEnd, int64_t boIdx,
+    __aicore__ inline void SetAxisRunInfo(FagRunInfo& runInfo, int64_t s2CvBegin, int64_t s2CvEnd, int64_t boIdx,
                                           int64_t n2oIdx, int64_t goIdx, int64_t s1oIdx, int64_t s2oIdx);
-    __aicore__ inline void SetRunInfo(FagRunInfo &runInfo, FagRunInfo &nextRunInfo, int64_t taskId, int64_t index,
+    __aicore__ inline void SetRunInfo(FagRunInfo& runInfo, FagRunInfo& nextRunInfo, int64_t taskId, int64_t index,
                                       int64_t nextIndex = -1);
     __aicore__ inline void Process();
-    __aicore__ inline bool IsValid(FagRunInfo &runInfo, int64_t taskId, int64_t index);
-    __aicore__ inline bool IsValidForTND(FagRunInfo &runInfo, int64_t taskId, int64_t index);
-    __aicore__ inline bool IsValidForDeter(FagRunInfo &runInfo, int64_t taskId, int64_t index);
-    __aicore__ inline void UpdateToken(FagRunInfo &runInfo, int64_t bIdx);
-    __aicore__ inline bool CheckIsValidBlock(FagRunInfo &runInfo, int64_t baseIdx, int64_t s1oDimIdx, int64_t s2oDimIdx,
+    __aicore__ inline bool IsValid(FagRunInfo& runInfo, int64_t taskId, int64_t index);
+    __aicore__ inline bool IsValidForTND(FagRunInfo& runInfo, int64_t taskId, int64_t index);
+    __aicore__ inline bool IsValidForDeter(FagRunInfo& runInfo, int64_t taskId, int64_t index);
+    __aicore__ inline void UpdateToken(FagRunInfo& runInfo, int64_t bIdx);
+    __aicore__ inline bool CheckIsValidBlock(FagRunInfo& runInfo, int64_t baseIdx, int64_t s1oDimIdx, int64_t s2oDimIdx,
                                              int64_t taskId);
-    __aicore__ inline bool CheckIsValidBlockForDeter(FagRunInfo &runInfo, int64_t baseIdx, int64_t s1oDimIdx,
+    __aicore__ inline bool CheckIsValidBlockForDeter(FagRunInfo& runInfo, int64_t baseIdx, int64_t s1oDimIdx,
                                                      int64_t s2oDimIdx, int64_t taskId);
-    __aicore__ inline int64_t GetNextValidIdx(FagRunInfo &runInfo, int64_t taskId, int64_t startIndex,
+    __aicore__ inline int64_t GetNextValidIdx(FagRunInfo& runInfo, int64_t taskId, int64_t startIndex,
                                               int64_t loopIdx = 0);
-    __aicore__ inline int64_t GetNextValidIdxForTndSwizzleDense(FagRunInfo &runInfo, int64_t loopIdx);
-    __aicore__ inline int64_t GetNextValidIdxForTndSwizzleCasual(FagRunInfo &runInfo, int64_t loopIdx);
-    __aicore__ inline int64_t GetNextValidIdxForTndSwizzleBand(FagRunInfo &runInfo, int64_t loopIdx);
-    __aicore__ inline int64_t GetNextValidIdxForSwizzle(FagRunInfo &runInfo, int64_t loopIdx);
-    __aicore__ inline int64_t GetNextValidIdxForSwizzleDense(FagRunInfo &runInfo, int64_t loopIdx);
-    __aicore__ inline int64_t GetNextValidIdxForSwizzleCasual(FagRunInfo &runInfo, int64_t loopIdx);
+    __aicore__ inline int64_t GetNextValidIdxForTndSwizzleDense(FagRunInfo& runInfo, int64_t loopIdx);
+    __aicore__ inline int64_t GetNextValidIdxForTndSwizzleCasual(FagRunInfo& runInfo, int64_t loopIdx);
+    __aicore__ inline int64_t GetNextValidIdxForTndSwizzleBand(FagRunInfo& runInfo, int64_t loopIdx);
+    __aicore__ inline int64_t GetNextValidIdxForSwizzle(FagRunInfo& runInfo, int64_t loopIdx);
+    __aicore__ inline int64_t GetNextValidIdxForSwizzleDense(FagRunInfo& runInfo, int64_t loopIdx);
+    __aicore__ inline int64_t GetNextValidIdxForSwizzleCasual(FagRunInfo& runInfo, int64_t loopIdx);
     template <bool IS_MM1_MM2 = true>
-    __aicore__ inline int64_t GetQueryOffset(FagRunInfo &runInfo);
-    __aicore__ inline int64_t GetQueryRopeOffset(FagRunInfo &runInfo);
-    __aicore__ inline int64_t GetDxOffset(FagRunInfo &runInfo);
+    __aicore__ inline int64_t GetQueryOffset(FagRunInfo& runInfo);
+    __aicore__ inline int64_t GetQueryRopeOffset(FagRunInfo& runInfo);
+    __aicore__ inline int64_t GetDxOffset(FagRunInfo& runInfo);
     template <bool IS_MM1_MM2 = true>
-    __aicore__ inline int64_t GetKeyOffset(FagRunInfo &runInfo);
-    __aicore__ inline int64_t GetKeyRopeOffset(FagRunInfo &runInfo);
-    __aicore__ inline int64_t GetValueOffset(FagRunInfo &runInfo);
-    __aicore__ inline void GetNextDxAndQueryOffset(FagRunInfo &runInfo, FagRunInfo &nextRunInfo, int64_t nextIndex,
-                                                   PreloadArgs<IS_ROPE> &preloadArgs);
+    __aicore__ inline int64_t GetKeyOffset(FagRunInfo& runInfo);
+    __aicore__ inline int64_t GetKeyRopeOffset(FagRunInfo& runInfo);
+    __aicore__ inline int64_t GetValueOffset(FagRunInfo& runInfo);
+    __aicore__ inline void GetNextDxAndQueryOffset(FagRunInfo& runInfo, FagRunInfo& nextRunInfo, int64_t nextIndex,
+                                                   PreloadArgs<IS_ROPE>& preloadArgs);
     __aicore__ inline void SyncALLCores();
-    __aicore__ inline void GetSeqQlenKvlenByBidx(int64_t bIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvlen);
+    __aicore__ inline void GetSeqQlenKvlenByBidx(int64_t bIdx, int64_t& actualSeqQlen, int64_t& actualSeqKvlen);
     __aicore__ inline void CheckS1RangeInBn2(int64_t taskId);
-    __aicore__ inline void UpdateMNPQ(int64_t &m, int64_t &n, int64_t &p, int64_t &q, int64_t &mGap, int64_t &nGap);
-    __aicore__ inline ChildClass *GetDerived()
+    __aicore__ inline void UpdateMNPQ(int64_t& m, int64_t& n, int64_t& p, int64_t& q, int64_t& mGap, int64_t& nGap);
+    __aicore__ inline ChildClass* GetDerived()
     {
-        return static_cast<ChildClass *>(this);
+        return static_cast<ChildClass*>(this);
     }
     constexpr static bool IS_FP32_INPUT = IsSameType<INPUT_TYPE, float>::value;
     constexpr static uint8_t ALIGN_NUM_32 = 32;
@@ -97,7 +97,7 @@ public:
 
     constexpr static bool IS_DQ_RES_EXCEED_UB = HEAD_DIM_ALIGN > VECTOR_BASEN;
     constexpr static bool IS_DKV_RES_EXCEED_UB =
-        VECTOR_BASEN / CV_CORE_RATIO * HEAD_DIM_ALIGN > VECTOR_BASEM *VECTOR_BASEN;
+        VECTOR_BASEN / CV_CORE_RATIO * HEAD_DIM_ALIGN > VECTOR_BASEM* VECTOR_BASEN;
     constexpr static bool IS_DQ_WRITE_UB = (SPLIT_AXIS == BN2 && !IS_BN2_MULTIBLK && !IS_DQ_RES_EXCEED_UB);
     constexpr static bool IS_DK_WRITE_UB =
         (((SPLIT_AXIS == BN2 && !IS_BN2_MULTIBLK) || (SPLIT_AXIS == BN2S2 && DETER_SPARSE_TYPE == NO_DETER)) &&
@@ -115,7 +115,7 @@ public:
                                                  !IS_FP32_INPUT;
 
 protected:
-    TPipe *pipe;
+    TPipe* pipe;
 
     // output global mmemory
     GlobalTensor<OUTDTYPE> dqGm, dkGm, dvGm;
@@ -190,7 +190,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
     GM_ADDR y, GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR prefixN, GM_ADDR actualSeqQlen, GM_ADDR actualSeqKvlen,
     GM_ADDR deqScaleQ, GM_ADDR deqScaleK, GM_ADDR deqScaleV, GM_ADDR deqScaleDy, GM_ADDR queryRope, GM_ADDR keyRope,
     GM_ADDR sink, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dpse, GM_ADDR dqRope, GM_ADDR dkRope, GM_ADDR dsink,
-    GM_ADDR workspace, FagTilingType ordTilingData, TPipe *pipeIn)
+    GM_ADDR workspace, FagTilingType ordTilingData, TPipe* pipeIn)
 {
     // init current core tilingInfo
     if ASCEND_IS_AIV {
@@ -255,32 +255,32 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::Init
     GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR deqScaleQ, GM_ADDR deqScaleK, GM_ADDR deqScaleV, GM_ADDR deqScaleDy,
     GM_ADDR workspace)
 {
-    dqGm.SetGlobalBuffer((__gm__ OUTDTYPE *)dq);
-    dkGm.SetGlobalBuffer((__gm__ OUTDTYPE *)dk);
-    dvGm.SetGlobalBuffer((__gm__ OUTDTYPE *)dv);
+    dqGm.SetGlobalBuffer((__gm__ OUTDTYPE*)dq);
+    dkGm.SetGlobalBuffer((__gm__ OUTDTYPE*)dk);
+    dvGm.SetGlobalBuffer((__gm__ OUTDTYPE*)dv);
     // init workspace address
     if constexpr (!IS_FP32_INPUT) {
         if constexpr (SPLIT_AXIS == BN2 && !IS_BN2_MULTIBLK) {
             uint64_t qPostBlockTotal = CUBE_BASEM * HEAD_DIM_ALIGN * MAX_CUBE_CORE_NUM;
             uint64_t kPostBlockTotal = CUBE_BASEN * HEAD_DIM_ALIGN * MAX_CUBE_CORE_NUM;
             uint64_t workspaceOffsets = RESERVED_WORKSPACE_SIZE;
-            dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + workspaceOffsets / sizeof(CALC_TYPE));
+            dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + workspaceOffsets / sizeof(CALC_TYPE));
             workspaceOffsets = workspaceOffsets + qPostBlockTotal * sizeof(float);
-            dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + workspaceOffsets / sizeof(CALC_TYPE));
+            dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + workspaceOffsets / sizeof(CALC_TYPE));
             workspaceOffsets = workspaceOffsets + kPostBlockTotal * sizeof(float);
         } else {
-            dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           tilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
-            dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           tilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
-            dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           tilingData->postTilingData.dvWorkSpaceOffset / sizeof(float));
         }
     } else {
         // input type fp32, dq dk dv write to output gm directly
-        dqWorkSpaceGm.SetGlobalBuffer((__gm__ INPUT_TYPE *)dq);
-        dkWorkSpaceGm.SetGlobalBuffer((__gm__ INPUT_TYPE *)dk);
-        dvWorkSpaceGm.SetGlobalBuffer((__gm__ INPUT_TYPE *)dv);
+        dqWorkSpaceGm.SetGlobalBuffer((__gm__ INPUT_TYPE*)dq);
+        dkWorkSpaceGm.SetGlobalBuffer((__gm__ INPUT_TYPE*)dk);
+        dvWorkSpaceGm.SetGlobalBuffer((__gm__ INPUT_TYPE*)dv);
     }
 }
 
@@ -305,8 +305,8 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
 {
     if constexpr (!IS_DETER_NEW(DETER_SPARSE_TYPE) && IS_TND && !IS_TND_SWIZZLE) {
         curBatchIdx = tilingData->tndParam.tndStartBIdx[cBlockIdx];
-        int64_t tndS1PrefixSum = (curBatchIdx == 0 ? 0 : ((__gm__ int64_t *)actualSeqQlenAddr)[curBatchIdx - 1]);
-        int64_t tndS2PrefixSum = (curBatchIdx == 0 ? 0 : ((__gm__ int64_t *)actualSeqKvlenAddr)[curBatchIdx - 1]);
+        int64_t tndS1PrefixSum = (curBatchIdx == 0 ? 0 : ((__gm__ int64_t*)actualSeqQlenAddr)[curBatchIdx - 1]);
+        int64_t tndS2PrefixSum = (curBatchIdx == 0 ? 0 : ((__gm__ int64_t*)actualSeqKvlenAddr)[curBatchIdx - 1]);
         curBatchTotalBaseIdx = tilingData->tndParam.tndPrefixSum[cBlockIdx] * constInfo.commonConstInfo.n2G;
         curBatchTotalS1BOffset = tndS1PrefixSum * constInfo.commonConstInfo.n2GD;
         curBatchTotalS2BOffset = tndS2PrefixSum * constInfo.commonConstInfo.n2D;
@@ -641,7 +641,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
     if ASCEND_IS_AIV {
         constInfo.commonConstInfo.s1BaseSize = CUBE_BASEM;
         constInfo.commonConstInfo.s2BaseSize = CUBE_BASEN;
-        constInfo.attenMaskMinValue = *((float *)&tmp);
+        constInfo.attenMaskMinValue = *((float*)&tmp);
         constInfo.commonConstInfo.keepProb = tilingData->s1s2BNGS1S2BaseParams.keepProb;
         constInfo.sfmgMaxLoopSize = VECTOR_BASEM * VECTOR_BASEN / HEAD_DIM_ALIGN; // softmaxGrad每次最大能处理的m轴大小
         constInfo.dAlignToBlock = AlignTo(constInfo.commonConstInfo.dSizeV, INPUT_BLOCK_NUM);
@@ -653,23 +653,22 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType,
                                                          VecBlockType>::GetSeqQlenKvlenByBidx(int64_t bIdx,
-                                                                                              int64_t &actualSeqQlen,
-                                                                                              int64_t &actualSeqKvlen)
+                                                                                              int64_t& actualSeqQlen,
+                                                                                              int64_t& actualSeqKvlen)
 {
     if (unlikely(bIdx == 0)) {
-        actualSeqQlen = ((__gm__ int64_t *)actualSeqQlenAddr)[0];
-        actualSeqKvlen = ((__gm__ int64_t *)actualSeqKvlenAddr)[0];
+        actualSeqQlen = ((__gm__ int64_t*)actualSeqQlenAddr)[0];
+        actualSeqKvlen = ((__gm__ int64_t*)actualSeqKvlenAddr)[0];
     } else {
-        actualSeqQlen = ((__gm__ int64_t *)actualSeqQlenAddr)[bIdx] - ((__gm__ int64_t *)actualSeqQlenAddr)[bIdx - 1];
-        actualSeqKvlen =
-            ((__gm__ int64_t *)actualSeqKvlenAddr)[bIdx] - ((__gm__ int64_t *)actualSeqKvlenAddr)[bIdx - 1];
+        actualSeqQlen = ((__gm__ int64_t*)actualSeqQlenAddr)[bIdx] - ((__gm__ int64_t*)actualSeqQlenAddr)[bIdx - 1];
+        actualSeqKvlen = ((__gm__ int64_t*)actualSeqKvlenAddr)[bIdx] - ((__gm__ int64_t*)actualSeqKvlenAddr)[bIdx - 1];
     }
     return;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::UpdateToken(
-    FagRunInfo &runInfo, int64_t bIdx)
+    FagRunInfo& runInfo, int64_t bIdx)
 {
     // sparse_mode == band 或者 RIGHT_DOWN_CASUAL时，token以右下角为基本，需要校正
     if constexpr (IS_ATTEN_MASK) {
@@ -694,7 +693,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline bool FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::CheckIsValidBlock(
-    FagRunInfo &runInfo, int64_t baseIdx, int64_t s1oDimIdx, int64_t s2oDimIdx, int64_t taskId)
+    FagRunInfo& runInfo, int64_t baseIdx, int64_t s1oDimIdx, int64_t s2oDimIdx, int64_t taskId)
 {
     int64_t s2IdxLeft = s2oDimIdx * CUBE_BASEN;
     int64_t s2IdxRight = Min((s2oDimIdx + 1) * CUBE_BASEN, constInfo.commonConstInfo.s2Size);
@@ -709,7 +708,7 @@ __aicore__ inline bool FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
 
     if (constInfo.sparseMode == PREFIX || constInfo.sparseMode == PREFIX_COMPRESS) {
         int64_t curBIdx = baseIdx / constInfo.n2GS1oS2o;
-        s2EndLen = Min(Max(s2EndLen, ((__gm__ int64_t *)prefixNAddr)[curBIdx]),
+        s2EndLen = Min(Max(s2EndLen, ((__gm__ int64_t*)prefixNAddr)[curBIdx]),
                        static_cast<int64_t>(constInfo.commonConstInfo.s2Size));
     } else {
         if (constInfo.sparseMode == RIGHT_DOWN_CAUSAL) {
@@ -736,7 +735,7 @@ __aicore__ inline bool FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline bool
 FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::CheckIsValidBlockForDeter(
-    FagRunInfo &runInfo, int64_t baseIdx, int64_t s1oDimIdx, int64_t s2oDimIdx, int64_t taskId)
+    FagRunInfo& runInfo, int64_t baseIdx, int64_t s1oDimIdx, int64_t s2oDimIdx, int64_t taskId)
 {
     int64_t s2IdxLeft = s2oDimIdx * CUBE_BASEN;
     int64_t s2IdxRight = (s2oDimIdx + 1) * CUBE_BASEN;
@@ -751,7 +750,7 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::Chec
 
     if (constInfo.sparseMode == PREFIX || constInfo.sparseMode == PREFIX_COMPRESS) {
         int64_t curBIdx = baseIdx / constInfo.n2GS1oS2o;
-        s2EndLen = Min(Max(s2EndLen, ((__gm__ int64_t *)prefixNAddr)[curBIdx]),
+        s2EndLen = Min(Max(s2EndLen, ((__gm__ int64_t*)prefixNAddr)[curBIdx]),
                        static_cast<int64_t>(constInfo.commonConstInfo.s2Size));
     } else {
         if (constInfo.sparseMode == RIGHT_DOWN_CAUSAL) {
@@ -778,15 +777,15 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::Chec
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::SetRunInfo(
-    FagRunInfo &runInfo, FagRunInfo &nextRunInfo, int64_t taskId, int64_t index, int64_t nextIndex)
+    FagRunInfo& runInfo, FagRunInfo& nextRunInfo, int64_t taskId, int64_t index, int64_t nextIndex)
 {
     if constexpr (IS_TND_SWIZZLE) {
         int64_t tndS1PrefixSum =
             (runInfo.commonRunInfo.boIdx == 0 ? 0 :
-                                                ((__gm__ int64_t *)actualSeqQlenAddr)[runInfo.commonRunInfo.boIdx - 1]);
-        int64_t tndS2PrefixSum = (runInfo.commonRunInfo.boIdx == 0 ?
-                                      0 :
-                                      ((__gm__ int64_t *)actualSeqKvlenAddr)[runInfo.commonRunInfo.boIdx - 1]);
+                                                ((__gm__ int64_t*)actualSeqQlenAddr)[runInfo.commonRunInfo.boIdx - 1]);
+        int64_t tndS2PrefixSum =
+            (runInfo.commonRunInfo.boIdx == 0 ? 0 :
+                                                ((__gm__ int64_t*)actualSeqKvlenAddr)[runInfo.commonRunInfo.boIdx - 1]);
         runInfo.lastBatchTotalS1BOffset = tndS1PrefixSum * constInfo.commonConstInfo.n2GD;
         runInfo.lastBatchTotalS2BOffset = tndS2PrefixSum * constInfo.commonConstInfo.n2D;
         runInfo.lastBatchTotalS1BOffsetForDv = tndS1PrefixSum * constInfo.commonConstInfo.n2GDv;
@@ -1089,7 +1088,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::SetAxisRunInfo(
-    FagRunInfo &runInfo, int64_t s2CvBegin, int64_t s2CvEnd, int64_t boIdx, int64_t n2oIdx, int64_t goIdx,
+    FagRunInfo& runInfo, int64_t s2CvBegin, int64_t s2CvEnd, int64_t boIdx, int64_t n2oIdx, int64_t goIdx,
     int64_t s1oIdx, int64_t s2oIdx)
 {
     runInfo.s2CvBegin = s2CvBegin;
@@ -1103,7 +1102,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline bool FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::IsValidForTND(
-    FagRunInfo &runInfo, int64_t taskId, int64_t index)
+    FagRunInfo& runInfo, int64_t taskId, int64_t index)
 {
     int64_t resbaseIdx = 0;
     int64_t startBIdx = 0;
@@ -1141,7 +1140,7 @@ __aicore__ inline bool FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
                         s2EndLen = actualS2Len - s2IgnoredEndLen;
                     }
                     if (constInfo.sparseMode == PREFIX || constInfo.sparseMode == PREFIX_COMPRESS) {
-                        s2EndLen = Min(Max(s2EndLen, ((__gm__ int64_t *)prefixNAddr)[bIdx]), actualS2Len);
+                        s2EndLen = Min(Max(s2EndLen, ((__gm__ int64_t*)prefixNAddr)[bIdx]), actualS2Len);
                     }
                     bool isValid = s2IdxLeft < s2EndLen;
                     if (isValid) {
@@ -1214,7 +1213,7 @@ __aicore__ inline bool FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline bool FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::IsValid(
-    FagRunInfo &runInfo, int64_t taskId, int64_t index)
+    FagRunInfo& runInfo, int64_t taskId, int64_t index)
 {
     if constexpr (IS_TND) {
         return IsValidForTND(runInfo, taskId, index);
@@ -1271,7 +1270,7 @@ __aicore__ inline bool FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline bool FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::IsValidForDeter(
-    FagRunInfo &runInfo, int64_t taskId, int64_t index)
+    FagRunInfo& runInfo, int64_t taskId, int64_t index)
 {
     int64_t gDimTail = index % constInfo.s1oS2o;
     int64_t s2oDimIdx = gDimTail / constInfo.s1Outer;
@@ -1319,7 +1318,7 @@ __aicore__ inline bool FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetNextValidIdx(
-    FagRunInfo &runInfo, int64_t taskId, int64_t blockInnerIdx, int64_t curLoopIdx)
+    FagRunInfo& runInfo, int64_t taskId, int64_t blockInnerIdx, int64_t curLoopIdx)
 {
     if constexpr (IS_TND_SWIZZLE) {
         uint8_t sparseType = static_cast<uint8_t>(tilingData->s1s2BNGS1S2BaseParams.sparseType);
@@ -1368,7 +1367,7 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBloc
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t
 FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetNextValidIdxForTndSwizzleDense(
-    FagRunInfo &runInfo, int64_t loopIdx)
+    FagRunInfo& runInfo, int64_t loopIdx)
 {
     bool isEnd = true;
     for (int64_t bIdx = 0; bIdx < constInfo.bSize; bIdx++) {
@@ -1410,7 +1409,7 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetN
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t
 FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetNextValidIdxForTndSwizzleCasual(
-    FagRunInfo &runInfo, int64_t loopIdx)
+    FagRunInfo& runInfo, int64_t loopIdx)
 {
     bool isEnd = true;
     int64_t halfN1 = constInfo.commonConstInfo.n2G >> 1;
@@ -1491,7 +1490,7 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetN
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t
 FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetNextValidIdxForTndSwizzleBand(
-    FagRunInfo &runInfo, int64_t loopIdx)
+    FagRunInfo& runInfo, int64_t loopIdx)
 {
     int64_t oriPreTokenBlock = (attenMaskInfo.preTokens + CUBE_BASEM - 1) / CUBE_BASEM + 1;
     int64_t oriNextTokenBlock = (attenMaskInfo.nextTokens + CUBE_BASEN - 1) / CUBE_BASEN + 1;
@@ -1615,7 +1614,7 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetN
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t
 FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetNextValidIdxForSwizzleDense(
-    FagRunInfo &runInfo, int64_t loopIdx)
+    FagRunInfo& runInfo, int64_t loopIdx)
 {
     int64_t m = constInfo.s1Outer;
     int64_t k = constInfo.aicCoreNum;
@@ -1653,7 +1652,7 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetN
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t
 FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetNextValidIdxForSwizzleCasual(
-    FagRunInfo &runInfo, int64_t loopIdx)
+    FagRunInfo& runInfo, int64_t loopIdx)
 {
     int64_t m = constInfo.s1Outer;
     int64_t k = constInfo.aicCoreNum;
@@ -1738,7 +1737,7 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetN
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t
 FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetNextValidIdxForSwizzle(
-    FagRunInfo &runInfo, int64_t loopIdx)
+    FagRunInfo& runInfo, int64_t loopIdx)
 {
     if (enableDenseSwizzle) {
         return GetNextValidIdxForSwizzleDense(runInfo, loopIdx);
@@ -1860,7 +1859,7 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetN
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 template <bool IS_MM1_MM2>
 __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetQueryOffset(
-    FagRunInfo &runInfo)
+    FagRunInfo& runInfo)
 {
     int64_t leftMatrixOffset = 0;
     int64_t bOffset = 0;
@@ -1920,7 +1919,7 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBloc
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t
-FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetQueryRopeOffset(FagRunInfo &runInfo)
+FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetQueryRopeOffset(FagRunInfo& runInfo)
 {
     int64_t leftMatrixOffset = 0;
     int64_t bOffset = 0;
@@ -1956,7 +1955,7 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetQ
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetDxOffset(
-    FagRunInfo &runInfo)
+    FagRunInfo& runInfo)
 {
     int64_t leftMatrixOffset = 0;
     int64_t bOffset = 0;
@@ -1993,7 +1992,7 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBloc
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 template <bool IS_MM1_MM2>
 __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetKeyOffset(
-    FagRunInfo &runInfo)
+    FagRunInfo& runInfo)
 {
     int64_t rightMatrixOffset = 0;
     int64_t bOffset = 0;
@@ -2065,7 +2064,7 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBloc
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetKeyRopeOffset(
-    FagRunInfo &runInfo)
+    FagRunInfo& runInfo)
 {
     int64_t rightMatrixOffset = 0;
     int64_t bOffset = 0;
@@ -2096,7 +2095,7 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBloc
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetValueOffset(
-    FagRunInfo &runInfo)
+    FagRunInfo& runInfo)
 {
     int64_t rightMatrixOffset = 0;
     int64_t bOffset = 0;
@@ -2140,7 +2139,7 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBloc
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void
 FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetNextDxAndQueryOffset(
-    FagRunInfo &runInfo, FagRunInfo &nextRunInfo, int64_t nextIndex, PreloadArgs<IS_ROPE> &preloadArgs)
+    FagRunInfo& runInfo, FagRunInfo& nextRunInfo, int64_t nextIndex, PreloadArgs<IS_ROPE>& preloadArgs)
 {
     preloadArgs.copyNext = !(nextIndex == -1);
     preloadArgs.copyCurrent = (runInfo.commonRunInfo.taskId == 0);
@@ -2172,8 +2171,8 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetN
         nextGoIdx = nextRunInfo.commonRunInfo.goIdx;
         nextS1oIdx = nextRunInfo.commonRunInfo.s1oIdx;
         nextS2oIdx = nextRunInfo.s2oIdx;
-        int64_t tndS1PrefixSum = (nextBoIdx == 0 ? 0 : ((__gm__ int64_t *)actualSeqQlenAddr)[nextBoIdx - 1]);
-        int64_t tndS2PrefixSum = (nextBoIdx == 0 ? 0 : ((__gm__ int64_t *)actualSeqKvlenAddr)[nextBoIdx - 1]);
+        int64_t tndS1PrefixSum = (nextBoIdx == 0 ? 0 : ((__gm__ int64_t*)actualSeqQlenAddr)[nextBoIdx - 1]);
+        int64_t tndS2PrefixSum = (nextBoIdx == 0 ? 0 : ((__gm__ int64_t*)actualSeqKvlenAddr)[nextBoIdx - 1]);
         bOffset = tndS1PrefixSum * constInfo.commonConstInfo.n2GD;
         s1Offset = nextS1oIdx * CUBE_BASEM * constInfo.commonConstInfo.n2GD;
         n2Offset = nextN2oIdx * constInfo.commonConstInfo.gD;
@@ -2343,7 +2342,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::UpdateMNPQ(
-    int64_t &m, int64_t &n, int64_t &p, int64_t &q, int64_t &mGap, int64_t &nGap)
+    int64_t& m, int64_t& n, int64_t& p, int64_t& q, int64_t& mGap, int64_t& nGap)
 {
     // 注意：与tiling中GetTotalPerBatchNum函数的有效块计算逻辑要保持一致
     m = constInfo.s1Outer;

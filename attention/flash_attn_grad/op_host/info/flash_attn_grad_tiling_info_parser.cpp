@@ -21,7 +21,7 @@
 namespace optiling {
 namespace {
 
-bool OptionalInputExists(gert::TilingContext *context, size_t index)
+bool OptionalInputExists(gert::TilingContext* context, size_t index)
 {
     const auto shape = context->GetOptionalInputShape(index);
     return (shape != nullptr) && (shape->GetStorageShape().GetDimNum() > 0);
@@ -29,7 +29,7 @@ bool OptionalInputExists(gert::TilingContext *context, size_t index)
 
 // attn_mask 只在 mask_mode 为 3/4 时有意义；mask_mode=0 下即便传了也不算数
 // （checker 会拒绝这种组合，这里保持与之一致的判定）。
-bool HasAttenMask(gert::TilingContext *context, int64_t maskMode)
+bool HasAttenMask(gert::TilingContext* context, int64_t maskMode)
 {
     if (maskMode == MASK_MODE_NO_MASK || (maskMode != MASK_MODE_CAUSAL && maskMode != MASK_MODE_WINDOW)) {
         return false;
@@ -44,7 +44,7 @@ bool HasAttenMask(gert::TilingContext *context, int64_t maskMode)
 // 于是 kernel 只需一份 pl.load，布局差异退化成运行期算术，不占 tilingkey 位。
 // Q 侧有 N1 = N2*G 个 head、KV 侧只有 N2 个，故 view/coefB0 分两套；
 // coefN0/coefN2 只取决于布局，两套共用。
-void FillLayoutView(FagParsedInfo &info)
+void FillLayoutView(FagParsedInfo& info)
 {
     if (info.isBnsd) {
         info.viewD0Q = info.b * info.n1;
@@ -67,7 +67,7 @@ void FillLayoutView(FagParsedInfo &info)
     }
 }
 
-ge::graphStatus ParseAttrs(gert::TilingContext *context, FagParsedInfo &info)
+ge::graphStatus ParseAttrs(gert::TilingContext* context, FagParsedInfo& info)
 {
     const auto attrs = context->GetAttrs();
     if (attrs != nullptr) {
@@ -107,7 +107,7 @@ ge::graphStatus ParseAttrs(gert::TilingContext *context, FagParsedInfo &info)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ParseShapes(gert::TilingContext *context, FagParsedInfo &info)
+ge::graphStatus ParseShapes(gert::TilingContext* context, FagParsedInfo& info)
 {
     const auto qShape = context->GetInputShape(Q_INDEX);
     const auto kShape = context->GetInputShape(K_INDEX);
@@ -161,13 +161,13 @@ ge::graphStatus ParseShapes(gert::TilingContext *context, FagParsedInfo &info)
 
 } // namespace
 
-ge::graphStatus ParsePlatform(gert::TilingContext *context, FagParsedInfo &info)
+ge::graphStatus ParsePlatform(gert::TilingContext* context, FagParsedInfo& info)
 {
     const auto platformInfo = context->GetPlatformInfo();
     if (platformInfo == nullptr) {
         // 图模式下 Tiling 阶段可能拿不到 platform，回退到 TilingParse 缓存的那份。
         // 两路都空才是真失败。
-        auto compileInfo = reinterpret_cast<const FlashAttnGradCompileInfo *>(context->GetCompileInfo());
+        auto compileInfo = reinterpret_cast<const FlashAttnGradCompileInfo*>(context->GetCompileInfo());
         OP_CHECK_IF(compileInfo == nullptr,
                     OP_LOGE(context->GetNodeName(), "both platform info and compile info are nullptr."),
                     return ge::GRAPH_PARAM_INVALID);
@@ -203,7 +203,7 @@ ge::graphStatus ParsePlatform(gert::TilingContext *context, FagParsedInfo &info)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ParseFlashAttnGradInfo(gert::TilingContext *context, FagParsedInfo &info)
+ge::graphStatus ParseFlashAttnGradInfo(gert::TilingContext* context, FagParsedInfo& info)
 {
     ge::graphStatus ret = ParseAttrs(context, info);
     if (ret != ge::GRAPH_SUCCESS) {
@@ -223,7 +223,7 @@ ge::graphStatus ParseFlashAttnGradInfo(gert::TilingContext *context, FagParsedIn
     return ge::GRAPH_SUCCESS;
 }
 
-bool IsEmptyShape(const FagParsedInfo &info)
+bool IsEmptyShape(const FagParsedInfo& info)
 {
     return info.b <= 0 || info.s1 <= 0 || info.s2 <= 0 || info.d <= 0 || info.dv <= 0;
 }

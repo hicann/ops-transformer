@@ -115,11 +115,11 @@ public:
     uint64_t s2 = 0;
     uint64_t d = 0;
 
-    __aicore__ inline BlockPost(Params const &params)
+    __aicore__ inline BlockPost(Params const& params)
     {
         cBlockIdx = GetBlockIdx();
-        __gm__ BlockSparseAttentionGradTilingData *tilingData =
-            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData *>(params.tilingData);
+        __gm__ BlockSparseAttentionGradTilingData* tilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData*>(params.tilingData);
         usedCoreNum = tilingData->usedVecCoreNum;
         if (cBlockIdx >= usedCoreNum) {
             return;
@@ -164,18 +164,18 @@ public:
                                                    kvPostBlockEeachCore; // 当前核需要计算的dkv的行数
         dkvOffset = ((uint64_t)cBlockIdx) * kvPostBlockNumEeachCore;     // 当前核dkv的偏移元素个数
 
-        dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)params.dqWrk + dqOffset);
-        dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)params.dkWrk + dkvOffset);
-        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)params.dvWrk + dkvOffset);
+        dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)params.dqWrk + dqOffset);
+        dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)params.dkWrk + dkvOffset);
+        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)params.dvWrk + dkvOffset);
 
         if constexpr (INPUT_LAYOUT == TND) {
-            dqGm.SetGlobalBuffer((__gm__ OutputDtype_ *)params.dq + dqOffset);
-            dkGm.SetGlobalBuffer((__gm__ OutputDtype_ *)params.dk + dkvOffset);
-            dvGm.SetGlobalBuffer((__gm__ OutputDtype_ *)params.dv + dkvOffset);
+            dqGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dq + dqOffset);
+            dkGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dk + dkvOffset);
+            dvGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dv + dkvOffset);
         } else if constexpr (INPUT_LAYOUT == BNSD) {
-            dqGm.SetGlobalBuffer((__gm__ OutputDtype_ *)params.dq);
-            dkGm.SetGlobalBuffer((__gm__ OutputDtype_ *)params.dk);
-            dvGm.SetGlobalBuffer((__gm__ OutputDtype_ *)params.dv);
+            dqGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dq);
+            dkGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dk);
+            dvGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dv);
         }
 
         ubBasePreBufferSize = ubBaseSize / BUFFER_NUM / BASE_BLOCK_BYTE * BASE_BLOCK_BYTE; // double buffer
@@ -205,13 +205,13 @@ public:
      * bIdx, nIdx, sIdx : 当前元素索引
      * shape : 矩阵的shape
      */
-    __aicore__ inline void InitIndex(uint64_t startIdx, uint64_t &curS, GM_ADDR seqS, uint64_t &bIdx, uint64_t &nIdx,
-                                     uint64_t &sIdx, struct ShapeBnsd shape)
+    __aicore__ inline void InitIndex(uint64_t startIdx, uint64_t& curS, GM_ADDR seqS, uint64_t& bIdx, uint64_t& nIdx,
+                                     uint64_t& sIdx, struct ShapeBnsd shape)
     {
         if constexpr (INPUT_LAYOUT == TND) {
             uint64_t prefixSum = 0;
             for (uint64_t bDimIdx = 0; bDimIdx < shape.b; bDimIdx++) {
-                uint64_t curBatchLen = ((__gm__ int64_t *)seqS)[bDimIdx];
+                uint64_t curBatchLen = ((__gm__ int64_t*)seqS)[bDimIdx];
                 uint64_t curBatchElements = curBatchLen * shape.n * shape.d;
 
                 if (startIdx < prefixSum + curBatchElements) {
@@ -266,12 +266,12 @@ public:
         uint64_t n = (qkvFlag > 0) ? n1 : n2;
         uint64_t s = (qkvFlag > 0) ? s1 : s2;
         uint64_t dstOffset = 0;
-        uint64_t &nIdx = (qkvFlag > 0) ? curN1Idx : curN2Idx;
-        uint64_t &sIdx = (qkvFlag > 0) ? curS1Idx : curS2Idx;
-        uint64_t &bIdx = (qkvFlag > 0) ? curBatch1 : curBatch2;
+        uint64_t& nIdx = (qkvFlag > 0) ? curN1Idx : curN2Idx;
+        uint64_t& sIdx = (qkvFlag > 0) ? curS1Idx : curS2Idx;
+        uint64_t& bIdx = (qkvFlag > 0) ? curBatch1 : curBatch2;
 
         // 要兼容BNSD没有seqList的情况，得从tiling传个参数过来
-        uint64_t curS = ((__gm__ uint64_t *)seqS)[bIdx];
+        uint64_t curS = ((__gm__ uint64_t*)seqS)[bIdx];
         uint64_t count = 0;
 
         while (leftNburst > 0) { // 当前leftNburst 搬运量不会到下一个n
@@ -289,7 +289,7 @@ public:
                     if (bIdx < b - 1) { // 需要借B
                         bIdx += 1;
                         if constexpr (INPUT_LAYOUT == TND) {
-                            curS = ((__gm__ int64_t *)seqS)[bIdx];
+                            curS = ((__gm__ int64_t*)seqS)[bIdx];
                         } else {
                             curS = s;
                         }
@@ -330,7 +330,7 @@ public:
             // TODO: 这里太耗时了，提到外面，每个batch只算一次
             uint64_t prefixSum = 0;
             for (uint64_t b = 0; b < curBatch; b++) {
-                prefixSum += ((__gm__ uint64_t *)seqLen)[b];
+                prefixSum += ((__gm__ uint64_t*)seqLen)[b];
             }
             bOffset = prefixSum * n * d;
             outOffset = bOffset + (curS * n + nIdx) * d;

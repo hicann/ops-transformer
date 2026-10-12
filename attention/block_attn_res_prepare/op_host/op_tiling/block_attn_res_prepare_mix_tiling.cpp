@@ -211,7 +211,7 @@ BlockAttnResPrepareMixTiling::TileCandidate BlockAttnResPrepareMixTiling::BuildT
 }
 
 BlockAttnResPrepareMixTiling::ResourceUsage BlockAttnResPrepareMixTiling::CalculateResourceUsage(
-    const TileCandidate &candidate) const
+    const TileCandidate& candidate) const
 {
     ResourceUsage usage{};
     usage.l1Bytes = (candidate.qL1BufferNum * candidate.qL1Elems + candidate.vL1BufferNum * candidate.vL1Elems +
@@ -235,7 +235,7 @@ BlockAttnResPrepareMixTiling::ResourceUsage BlockAttnResPrepareMixTiling::Calcul
     return usage;
 }
 
-bool BlockAttnResPrepareMixTiling::DoesCandidateFit(const ResourceUsage &usage, uint64_t usableL1Bytes,
+bool BlockAttnResPrepareMixTiling::DoesCandidateFit(const ResourceUsage& usage, uint64_t usableL1Bytes,
                                                     uint64_t usableUbBytes) const
 {
     return usage.l1Bytes <= usableL1Bytes && usage.ubBytes <= usableUbBytes &&
@@ -244,7 +244,7 @@ bool BlockAttnResPrepareMixTiling::DoesCandidateFit(const ResourceUsage &usage, 
            usage.mm2L0BBytes <= l0BSize_ && usage.mm1L0CBytes <= l0CSize_ && usage.mm2L0CBytes <= l0CSize_;
 }
 
-void BlockAttnResPrepareMixTiling::ApplyTileCandidate(const TileCandidate &candidate)
+void BlockAttnResPrepareMixTiling::ApplyTileCandidate(const TileCandidate& candidate)
 {
     tilingData_.baseT = static_cast<uint32_t>(candidate.baseT);
     tilingData_.baseS = static_cast<uint32_t>(candidate.baseS);
@@ -281,7 +281,7 @@ ge::graphStatus BlockAttnResPrepareMixTiling::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BlockAttnResPrepareMixTiling::CalculateMixWork(uint64_t &totalWorkUnits)
+ge::graphStatus BlockAttnResPrepareMixTiling::CalculateMixWork(uint64_t& totalWorkUnits)
 {
     tilingData_.sTileNum = static_cast<uint32_t>(CeilDiv<uint64_t>(totalS_, tilingData_.baseS));
     const uint64_t tTileNum = CeilDiv<uint64_t>(totalT_, tilingData_.baseT);

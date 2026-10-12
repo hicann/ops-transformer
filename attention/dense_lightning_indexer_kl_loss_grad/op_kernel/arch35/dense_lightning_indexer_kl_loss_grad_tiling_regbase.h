@@ -250,7 +250,7 @@ public:
         this->totalSize = totalSizeParam;
     }
 
-    int64_t *get_bS1Ptr()
+    int64_t* get_bS1Ptr()
     {
         return bS1Index;
     }

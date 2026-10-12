@@ -31,31 +31,31 @@ extern "C" {
 
 namespace {
 struct BSAGParams {
-    const aclTensor *query = nullptr;
-    const aclTensor *key = nullptr;
-    const aclTensor *value = nullptr;
-    const aclTensor *attentionOut = nullptr;
-    const aclTensor *attentionOutGrad = nullptr;
-    const aclTensor *softmaxLse = nullptr;
-    const aclTensor *blockSparseMaskOptional = nullptr;
-    const aclTensor *attenMaskOptional = nullptr;
-    const aclIntArray *actualSeqLengthsOptional = nullptr;
-    const aclIntArray *actualSeqLengthsKvOptional = nullptr;
-    char *qInputLayout;
-    char *kvInputLayout;
-    const aclIntArray *blockShapeOptional;
+    const aclTensor* query = nullptr;
+    const aclTensor* key = nullptr;
+    const aclTensor* value = nullptr;
+    const aclTensor* attentionOut = nullptr;
+    const aclTensor* attentionOutGrad = nullptr;
+    const aclTensor* softmaxLse = nullptr;
+    const aclTensor* blockSparseMaskOptional = nullptr;
+    const aclTensor* attenMaskOptional = nullptr;
+    const aclIntArray* actualSeqLengthsOptional = nullptr;
+    const aclIntArray* actualSeqLengthsKvOptional = nullptr;
+    char* qInputLayout;
+    char* kvInputLayout;
+    const aclIntArray* blockShapeOptional;
     int64_t numKeyValueHeads;
     int64_t maskType;
     int64_t preTokens;
     int64_t nextTokens;
-    const aclTensor *dqOut = nullptr;
-    const aclTensor *dkOut = nullptr;
-    const aclTensor *dvOut = nullptr;
+    const aclTensor* dqOut = nullptr;
+    const aclTensor* dkOut = nullptr;
+    const aclTensor* dvOut = nullptr;
 };
 
-static aclnnStatus CheckMandatoryTensors(const aclTensor *dout, const aclTensor *query, const aclTensor *key,
-                                         const aclTensor *value, const aclTensor *attentionOut,
-                                         const aclTensor *softmaxLse, const aclTensor *blockSparseMaskOptional)
+static aclnnStatus CheckMandatoryTensors(const aclTensor* dout, const aclTensor* query, const aclTensor* key,
+                                         const aclTensor* value, const aclTensor* attentionOut,
+                                         const aclTensor* softmaxLse, const aclTensor* blockSparseMaskOptional)
 {
     CHECK_RET(dout != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -67,7 +67,7 @@ static aclnnStatus CheckMandatoryTensors(const aclTensor *dout, const aclTensor 
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ParseBlockShape(const aclIntArray *blockShapeOptional)
+static aclnnStatus ParseBlockShape(const aclIntArray* blockShapeOptional)
 {
     if (blockShapeOptional == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "blockShapeOptional is null.");
@@ -80,7 +80,7 @@ static aclnnStatus ParseBlockShape(const aclIntArray *blockShapeOptional)
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    const int64_t *data = blockShapeOptional->GetData();
+    const int64_t* data = blockShapeOptional->GetData();
     if (data == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "blockShapeOptional data is null.");
         return ACLNN_ERR_PARAM_INVALID;
@@ -94,7 +94,7 @@ static aclnnStatus ParseBlockShape(const aclIntArray *blockShapeOptional)
 
     return ACLNN_SUCCESS;
 }
-static aclnnStatus ValidateParams(const BSAGParams &params)
+static aclnnStatus ValidateParams(const BSAGParams& params)
 {
     CHECK_COND(params.qInputLayout != nullptr && params.kvInputLayout != nullptr, ACLNN_ERR_PARAM_INVALID,
                "qInputLayout or kvInputLayout is nullptr.");
@@ -240,10 +240,10 @@ static aclnnStatus ValidateParams(const BSAGParams &params)
     return ParseBlockShape(params.blockShapeOptional);
 }
 
-static aclnnStatus MakeContiguous(const aclTensor *&dout, const aclTensor *&query, const aclTensor *&key,
-                                  const aclTensor *&value, const aclTensor *&attentionOut, const aclTensor *&softmaxLse,
-                                  const aclTensor *&blockSparseMaskOptional, const aclTensor *&attenMaskOptional,
-                                  aclOpExecutor *executor)
+static aclnnStatus MakeContiguous(const aclTensor*& dout, const aclTensor*& query, const aclTensor*& key,
+                                  const aclTensor*& value, const aclTensor*& attentionOut, const aclTensor*& softmaxLse,
+                                  const aclTensor*& blockSparseMaskOptional, const aclTensor*& attenMaskOptional,
+                                  aclOpExecutor* executor)
 {
     dout = l0op::Contiguous(dout, executor);
     CHECK_RET(dout != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -274,7 +274,7 @@ static aclnnStatus MakeContiguous(const aclTensor *&dout, const aclTensor *&quer
     return ACLNN_SUCCESS;
 }
 
-static string ConvertLayoutString(char *layoutStr)
+static string ConvertLayoutString(char* layoutStr)
 {
     return op::ToString(layoutStr).GetString();
 }
@@ -282,12 +282,12 @@ static string ConvertLayoutString(char *layoutStr)
 } // namespace
 
 __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGradGetWorkspaceSize(
-    const aclTensor *dout, const aclTensor *query, const aclTensor *key, const aclTensor *value,
-    const aclTensor *attentionOut, const aclTensor *softmaxLse, const aclTensor *blockSparseMaskOptional,
-    const aclTensor *attenMaskOptional, const aclIntArray *blockShapeOptional,
-    const aclIntArray *actualSeqLengthsOptional, const aclIntArray *actualSeqLengthsKvOptional, char *qInputLayout,
-    char *kvInputLayout, int64_t numKeyValueHeads, int64_t maskType, double scaleValue, int64_t preTokens,
-    int64_t nextTokens, aclTensor *dq, aclTensor *dk, aclTensor *dv, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* dout, const aclTensor* query, const aclTensor* key, const aclTensor* value,
+    const aclTensor* attentionOut, const aclTensor* softmaxLse, const aclTensor* blockSparseMaskOptional,
+    const aclTensor* attenMaskOptional, const aclIntArray* blockShapeOptional,
+    const aclIntArray* actualSeqLengthsOptional, const aclIntArray* actualSeqLengthsKvOptional, char* qInputLayout,
+    char* kvInputLayout, int64_t numKeyValueHeads, int64_t maskType, double scaleValue, int64_t preTokens,
+    int64_t nextTokens, aclTensor* dq, aclTensor* dk, aclTensor* dv, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     BSAGParams bsag_params;
     bsag_params.query = query;
@@ -322,7 +322,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGrad
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    auto *executorImpl = uniqueExecutor.get();
+    auto* executorImpl = uniqueExecutor.get();
 
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         if (blockSparseMaskOptional != nullptr) {
@@ -346,7 +346,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGrad
     auto outputs = l0op::BlockSparseAttentionGrad(
         dout, query, key, value, attentionOut, softmaxLse, blockSparseMaskOptional, attenMaskOptional,
         blockShapeOptional, actualSeqLengthsOptional, actualSeqLengthsKvOptional,
-        const_cast<char *>(qInputLayoutStr.c_str()), const_cast<char *>(kvInputLayoutStr.c_str()), numKeyValueHeads,
+        const_cast<char*>(qInputLayoutStr.c_str()), const_cast<char*>(kvInputLayoutStr.c_str()), numKeyValueHeads,
         maskType, scaleValue, preTokens, nextTokens, executorImpl);
     if (outputs[0] == nullptr || outputs[1] == nullptr || outputs[2] == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "BlockSparseAttentionGrad returned nullptr outputs.");
@@ -365,9 +365,9 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGrad
     return ACLNN_SUCCESS;
 }
 
-__attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGrad(void *workspace,
+__attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGrad(void* workspace,
                                                                                  uint64_t workspaceSize,
-                                                                                 aclOpExecutor *executor,
+                                                                                 aclOpExecutor* executor,
                                                                                  const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnBlockSparseAttentionGrad);

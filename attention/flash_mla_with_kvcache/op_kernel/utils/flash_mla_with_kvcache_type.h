@@ -200,10 +200,10 @@ public:
     ActualSeqLensParser<Q_MODE, SEQLEN_T, Q_WITH_ZERO_HEAD> qActSeqLensParser;
     ActualSeqLensParser<KV_MODE, SEQLEN_T, false> kvActSeqLensParser;
 
-    __aicore__ inline void InitQ(__gm__ uint8_t *cuSeqlensQAddr, __gm__ uint8_t *sequsedQAddr,
+    __aicore__ inline void InitQ(__gm__ uint8_t* cuSeqlensQAddr, __gm__ uint8_t* sequsedQAddr,
                                  uint32_t actualSeqLenSize, uint64_t s1Size, uint32_t batchSize)
     {
-        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ SEQLEN_T *)cuSeqlensQAddr, actualSeqLenSize);
+        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ SEQLEN_T*)cuSeqlensQAddr, actualSeqLenSize);
         if (sequsedQAddr == nullptr) {
             // 双分支 1（保留，不压平）：无 seqused_q → cu_seqlens_q 差分语义（含首零头累加）
             qActSeqLensParser.Init(actualSeqLengthsGmQ, actualSeqLenSize, s1Size);
@@ -211,17 +211,17 @@ public:
             // seqused_q 的元素数为 B；只有 TND 的 cu_seqlens_q 元素数为 B+1。
             // BSND/BNSD 不传 cu_seqlens_q，使用 tiling 中由 shape 得到的 batchSize。
             if constexpr (Q_WITH_ZERO_HEAD) {
-                qActSeqLensParser.Init((__gm__ uint8_t *)cuSeqlensQAddr, actualSeqLenSize,
-                                       (__gm__ uint8_t *)sequsedQAddr, actualSeqLenSize - 1);
+                qActSeqLensParser.Init((__gm__ uint8_t*)cuSeqlensQAddr, actualSeqLenSize, (__gm__ uint8_t*)sequsedQAddr,
+                                       actualSeqLenSize - 1);
             } else {
-                qActSeqLensParser.Init((__gm__ uint8_t *)sequsedQAddr, batchSize, s1Size);
+                qActSeqLensParser.Init((__gm__ uint8_t*)sequsedQAddr, batchSize, s1Size);
             }
         }
     }
 
-    __aicore__ inline void InitKv(__gm__ uint8_t *cacheSeqlensAddr, uint32_t actualSeqLenKVSize, uint64_t s2Size)
+    __aicore__ inline void InitKv(__gm__ uint8_t* cacheSeqlensAddr, uint32_t actualSeqLenKVSize, uint64_t s2Size)
     {
-        actualSeqLengthsGm.SetGlobalBuffer((__gm__ SEQLEN_T *)cacheSeqlensAddr, actualSeqLenKVSize);
+        actualSeqLengthsGm.SetGlobalBuffer((__gm__ SEQLEN_T*)cacheSeqlensAddr, actualSeqLenKVSize);
         kvActSeqLensParser.Init(actualSeqLengthsGm, actualSeqLenKVSize, s2Size);
     }
 };

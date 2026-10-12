@@ -30,7 +30,7 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetPlatformInfo()
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
         // 无运行时平台信息，降级使用编译期 CompileInfo
-        auto compileInfoPtr = reinterpret_cast<const FusedCausalConv1dCutBHCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const FusedCausalConv1dCutBHCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         // 与运行时路径对齐：coreNum/ubSize 必须 > 0，否则后续核内 UB 切分会下溢
         if (compileInfoPtr->coreNum == 0UL) {
@@ -257,37 +257,37 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetAttrInfo()
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
     // 激活函数模式（可选，默认 0=无激活）
-    const int64_t *activationModePtr = attrs->GetAttrPointer<int64_t>(ATTR_ACTIVATION_MODE_INDEX);
+    const int64_t* activationModePtr = attrs->GetAttrPointer<int64_t>(ATTR_ACTIVATION_MODE_INDEX);
     if (activationModePtr != nullptr) {
         activationMode_ = *activationModePtr;
     }
 
     // padding slot id（可选，默认 -1 表示不使用 padding）
-    const int64_t *padSlotIdPtr = attrs->GetAttrPointer<int64_t>(ATTR_PAD_SLOT_ID_INDEX);
+    const int64_t* padSlotIdPtr = attrs->GetAttrPointer<int64_t>(ATTR_PAD_SLOT_ID_INDEX);
     if (padSlotIdPtr != nullptr) {
         padSlotId_ = *padSlotIdPtr;
     }
 
     // 运行模式（可选，预留扩展）
-    const int64_t *runModePtr = attrs->GetAttrPointer<int64_t>(ATTR_RUN_MODE_INDEX);
+    const int64_t* runModePtr = attrs->GetAttrPointer<int64_t>(ATTR_RUN_MODE_INDEX);
     if (runModePtr != nullptr) {
         runMode_ = *runModePtr;
     }
 
     // 2D 输入时的最大序列长度（决定 UB 分配时 seqLen 取值）
-    const int64_t *maxQueryLenPtr = attrs->GetAttrPointer<int64_t>(ATTR_MAX_QUERY_LEN_INDEX);
+    const int64_t* maxQueryLenPtr = attrs->GetAttrPointer<int64_t>(ATTR_MAX_QUERY_LEN_INDEX);
     if (maxQueryLenPtr != nullptr) {
         maxQueryLen_ = *maxQueryLenPtr;
     }
 
     // 是否使用残差连接（0=否，1=是）
-    const int64_t *residualConnectionPtr = attrs->GetAttrPointer<int64_t>(ATTR_RESIDUAL_CONNECTION_INDEX);
+    const int64_t* residualConnectionPtr = attrs->GetAttrPointer<int64_t>(ATTR_RESIDUAL_CONNECTION_INDEX);
     if (residualConnectionPtr != nullptr) {
         residualConnection_ = *residualConnectionPtr;
     }
 
     // APC block 大小（APC 开启时必须非零）
-    const int64_t *blockSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_BLOCK_SIZE_INDEX);
+    const int64_t* blockSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_BLOCK_SIZE_INDEX);
     if (blockSizePtr != nullptr) {
         blockSize_ = *blockSizePtr;
     }
@@ -300,12 +300,12 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetAttrInfo()
     }
 
     // 卷积模式（0=Qwen3 默认，1=Pangu v2 前 width-1 token 置零）
-    const int64_t *convModePtr = attrs->GetAttrPointer<int64_t>(ATTR_CONV_MODE_INDEX);
+    const int64_t* convModePtr = attrs->GetAttrPointer<int64_t>(ATTR_CONV_MODE_INDEX);
     if (convModePtr != nullptr) {
         convMode_ = *convModePtr;
     }
 
-    const int64_t *maxDraftTokens = attrs->GetAttrPointer<int64_t>(ATTR_MAX_DRAFT_TOKENS_INDEX);
+    const int64_t* maxDraftTokens = attrs->GetAttrPointer<int64_t>(ATTR_MAX_DRAFT_TOKENS_INDEX);
     if (maxDraftTokens != nullptr) {
         maxDraftTokens_ = *maxDraftTokens;
     }
@@ -331,7 +331,7 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetStrideInfo()
     // 获取 x 的 stride（3D 输入取 DIM_1 stride；2D 输入取 DIM_0 stride）
     bool xIsView = context_->InputIsView(X_INDEX);
     if (xIsView) {
-        auto *xStride = context_->GetInputStride(X_INDEX);
+        auto* xStride = context_->GetInputStride(X_INDEX);
         OP_CHECK_IF(xStride == nullptr, OP_LOGE(context_->GetNodeName(), "x stride is invalid."),
                     return ge::GRAPH_FAILED);
 
@@ -379,7 +379,7 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetStrideInfo()
     // 获取 conv_states 的 stride（形状为 [batch, state_len, dim]）
     bool cacheIsView = context_->InputIsView(CONV_STATES_INDEX);
     if (cacheIsView) {
-        auto *cacheStride = context_->GetInputStride(CONV_STATES_INDEX);
+        auto* cacheStride = context_->GetInputStride(CONV_STATES_INDEX);
         OP_CHECK_IF(cacheStride == nullptr, OP_LOGE(context_->GetNodeName(), "conv_states stride is invalid."),
                     return ge::GRAPH_FAILED);
         if (cacheStride->GetDimNum() != DIM_3) {
@@ -922,8 +922,8 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ComputeInterCoreSplit()
 //   x 部分（包含 x_in 和 y_out 双 buffer）：BUFFER_NUM * coreBS * seqLen * DTYPE_SIZE * 2
 // 优先保持 batch 完整（outUbBS = coreBS），若 UB 不足则逐步减小 batch
 void FusedCausalConv1dCutBHTiling::ComputeUbFor(int64_t coreDimElems, int64_t coreBS, int64_t availableUbSize,
-                                                int64_t &outUbDim, int64_t &outUbBS, int64_t &outLoopDim,
-                                                int64_t &outLoopBS, int64_t &outUbTailDim, int64_t &outUbTailBS)
+                                                int64_t& outUbDim, int64_t& outUbBS, int64_t& outLoopDim,
+                                                int64_t& outLoopBS, int64_t& outUbTailDim, int64_t& outUbTailBS)
 {
     // 2D 输入模式：seqLen 不固定，用属性中的最大值保守估算 UB 需求
     if (xInputMode_ == X_INPUT_2D) {
@@ -1195,7 +1195,7 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::PostTiling()
     // 将 tilingData_ 序列化到 RawTilingData（供 kernel 侧反序列化）
     auto tilingDataSize = sizeof(FusedCausalConv1dCutBHTilingData);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
@@ -1283,7 +1283,7 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetWorkspaceSize()
     auto platformInfo = context_->GetPlatformInfo();
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     uint32_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     currentWorkspace[0] = static_cast<size_t>(0UL + sysWorkspaceSize);
     return ge::GRAPH_SUCCESS;
 }
@@ -1353,8 +1353,8 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ComputeInterCoreSplitCoarse()
 
 // ComputeUbForCoarse（粗粒度 UB 切分核心计算）
 void FusedCausalConv1dCutBHTiling::ComputeUbForCoarse(int64_t coreDimElems, int64_t coreBS, int64_t availableUbSize,
-                                                      int64_t &outUbDim, int64_t &outUbBS, int64_t &outLoopDim,
-                                                      int64_t &outLoopBS, int64_t &outUbTailDim, int64_t &outUbTailBS)
+                                                      int64_t& outUbDim, int64_t& outUbBS, int64_t& outLoopDim,
+                                                      int64_t& outLoopBS, int64_t& outUbTailDim, int64_t& outUbTailBS)
 {
     // 2D 输入模式：用最大序列长度估算 UB
     if (xInputMode_ == X_INPUT_2D) {

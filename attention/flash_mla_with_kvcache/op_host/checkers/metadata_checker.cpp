@@ -31,15 +31,15 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35MLA;
 
-ge::graphStatus MetadataChecker::CheckSinglePara(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus MetadataChecker::CheckSinglePara(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
-    auto &metadataTensor = faInfo.opParamInfo.metadata.tensor;
+    auto& metadataTensor = faInfo.opParamInfo.metadata.tensor;
     if (metadataTensor == nullptr) {
         OP_LOGE(faInfo.opName, "metadata is required but is null!");
         return ge::GRAPH_FAILED;
     }
 
-    const gert::CompileTimeTensorDesc *metadataDesc = faInfo.opParamInfo.metadata.desc;
+    const gert::CompileTimeTensorDesc* metadataDesc = faInfo.opParamInfo.metadata.desc;
     OP_CHECK_IF(metadataDesc == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "metadata", "metadata desc cannot be empty"),
                 return ge::GRAPH_FAILED);

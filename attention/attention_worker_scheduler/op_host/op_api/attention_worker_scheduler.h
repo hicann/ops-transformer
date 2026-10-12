@@ -19,8 +19,8 @@
 
 namespace l0op {
 
-const aclTensor *AttentionWorkerScheduler(const aclTensor *scheduleContext, aclTensor *scheduleContextOut,
-                                          aclOpExecutor *executor);
+const aclTensor* AttentionWorkerScheduler(const aclTensor* scheduleContext, aclTensor* scheduleContextOut,
+                                          aclOpExecutor* executor);
 } // namespace l0op
 
 #endif // OP_API_INC_LEVEL0_OP_ATTENTION_WORKER_SCHEDULER_H_

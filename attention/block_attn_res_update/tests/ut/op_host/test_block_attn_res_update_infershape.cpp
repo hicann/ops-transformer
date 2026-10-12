@@ -31,16 +31,16 @@
 
 namespace {
 
-constexpr const char *OP_NAME = "BlockAttnResUpdate";
-constexpr const char *SOC_VERSION = "Ascend950";
+constexpr const char* OP_NAME = "BlockAttnResUpdate";
+constexpr const char* SOC_VERSION = "Ascend950";
 constexpr size_t CSV_COLUMN_COUNT = 15UL;
 
-ge::DataType ParseDtype(const std::string &value)
+ge::DataType ParseDtype(const std::string& value)
 {
     return ops::ut::ParseGeDtype(ops::ut::Trim(value));
 }
 
-gert::StorageShape ParseShape(const std::string &value)
+gert::StorageShape ParseShape(const std::string& value)
 {
     return ops::ut::MakeGertStorageShape(ops::ut::ParseDims(ops::ut::Trim(value)));
 }
@@ -204,7 +204,7 @@ InferCsvLoadResult LoadInferCases()
             testCase.expectPartialDtype = ParseDtype(items[index++]);
             testCase.expectHDtype = ParseDtype(items[index++]);
             result.cases.emplace_back(std::move(testCase));
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             result.errors.emplace_back(ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error));
         }
     }
@@ -214,13 +214,13 @@ InferCsvLoadResult LoadInferCases()
     return result;
 }
 
-const InferCsvLoadResult &GetInferCases()
+const InferCsvLoadResult& GetInferCases()
 {
     static const InferCsvLoadResult result = LoadInferCases();
     return result;
 }
 
-std::string MakeParamName(const testing::TestParamInfo<BlockAttnResUpdateInferCase> &info)
+std::string MakeParamName(const testing::TestParamInfo<BlockAttnResUpdateInferCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
@@ -229,8 +229,8 @@ class BlockAttnResUpdateInferTest : public testing::TestWithParam<BlockAttnResUp
 
 TEST(BlockAttnResUpdateInferCsv, LoadsEnabledCases)
 {
-    const auto &result = GetInferCases();
-    for (const auto &error : result.errors) {
+    const auto& result = GetInferCases();
+    for (const auto& error : result.errors) {
         ADD_FAILURE() << error;
     }
     EXPECT_FALSE(result.cases.empty());

@@ -65,10 +65,10 @@ struct IndexParams {
     int64_t s1oIdx;
 };
 
-__aicore__ inline void DataCopyOutForNz(const __gm__ void *gm, const LocalTensor<int8_t> &co1Local,
-                                        const void *dataCopyOutParams, const uint64_t tilingPtr, const uint64_t dataPtr)
+__aicore__ inline void DataCopyOutForNz(const __gm__ void* gm, const LocalTensor<int8_t>& co1Local,
+                                        const void* dataCopyOutParams, const uint64_t tilingPtr, const uint64_t dataPtr)
 {
-    const DataCopyOutParams *param = reinterpret_cast<const DataCopyOutParams *>(dataCopyOutParams);
+    const DataCopyOutParams* param = reinterpret_cast<const DataCopyOutParams*>(dataCopyOutParams);
     uint64_t dstStride = tilingPtr * 16 / 8 - param->burstLen;
     FixpipeParams<float> fixpipeParams(param->cBurstNum, param->burstLen, param->srcStride,
                                        static_cast<uint32_t>(dstStride));
@@ -78,7 +78,7 @@ __aicore__ inline void DataCopyOutForNz(const __gm__ void *gm, const LocalTensor
     }
     LocalTensor<float> tmpLocal = co1Local.template ReinterpretCast<float>();
     GlobalTensor<float> tmpGm;
-    tmpGm.SetGlobalBuffer((__gm__ float *)(gm));
+    tmpGm.SetGlobalBuffer((__gm__ float*)(gm));
     Fixpipe(tmpGm, tmpLocal, fixpipeParams);
 }
 
@@ -110,15 +110,15 @@ class FlashAttentionScoreGradS1s2Bn2gs1s2SameAB {
 public:
     __aicore__ inline FlashAttentionScoreGradS1s2Bn2gs1s2SameAB(){};
 
-    __aicore__ inline void Init(__gm__ uint8_t *key, __gm__ uint8_t *keyRope, __gm__ uint8_t *value, __gm__ uint8_t *dx,
-                                __gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *pse_shift,
-                                __gm__ uint8_t *drop_mask, __gm__ uint8_t *atten_mask, __gm__ uint8_t *forward_res,
-                                __gm__ uint8_t *softmax_max, __gm__ uint8_t *softmax_sum, __gm__ uint8_t *sink,
-                                __gm__ uint8_t *prefixN, __gm__ uint8_t *actual_seq_qlen,
-                                __gm__ uint8_t *actual_seq_kvlen, __gm__ uint8_t *dq, __gm__ uint8_t *dqRope,
-                                __gm__ uint8_t *dk, __gm__ uint8_t *dkRope, __gm__ uint8_t *dv, __gm__ uint8_t *dpse,
-                                __gm__ uint8_t *dsink, __gm__ uint8_t *workspace,
-                                const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb *__restrict ordTilingData);
+    __aicore__ inline void Init(__gm__ uint8_t* key, __gm__ uint8_t* keyRope, __gm__ uint8_t* value, __gm__ uint8_t* dx,
+                                __gm__ uint8_t* query, __gm__ uint8_t* queryRope, __gm__ uint8_t* pse_shift,
+                                __gm__ uint8_t* drop_mask, __gm__ uint8_t* atten_mask, __gm__ uint8_t* forward_res,
+                                __gm__ uint8_t* softmax_max, __gm__ uint8_t* softmax_sum, __gm__ uint8_t* sink,
+                                __gm__ uint8_t* prefixN, __gm__ uint8_t* actual_seq_qlen,
+                                __gm__ uint8_t* actual_seq_kvlen, __gm__ uint8_t* dq, __gm__ uint8_t* dqRope,
+                                __gm__ uint8_t* dk, __gm__ uint8_t* dkRope, __gm__ uint8_t* dv, __gm__ uint8_t* dpse,
+                                __gm__ uint8_t* dsink, __gm__ uint8_t* workspace,
+                                const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb* __restrict ordTilingData);
 
     using T1 = typename FAGT::t1;
     using T2 = typename FAGT::t2;
@@ -134,43 +134,43 @@ public:
     static constexpr DTemplateType DTEMPLATETYPE = FAGT::dTemplateType;
     static constexpr uint32_t HAS_ROPE = FAGT::hasRope;
 
-    __aicore__ inline void InitBuffer(TPipe *pipe_in);
-    __aicore__ inline void InitTscmBuffer(TPipe *pipe_in);
-    __aicore__ inline void CopyInSoftMax(LocalTensor<float> &dstTensor, uint32_t s1Extend, uint32_t softMaxOffset);
-    __aicore__ inline void CalcSoftMax(LocalTensor<T2> &dstTensor, LocalTensor<float> &src0Tensor,
-                                       LocalTensor<float> &src1Tensor, uint32_t s1Extend, uint32_t s2Extend,
-                                       uint32_t s2ExtendAlign, const SoftMaxTiling &tiling);
-    __aicore__ inline void CopyInAttenMaskBool(LocalTensor<uint8_t> &dstTensor, int64_t attenMaskOffset,
+    __aicore__ inline void InitBuffer(TPipe* pipe_in);
+    __aicore__ inline void InitTscmBuffer(TPipe* pipe_in);
+    __aicore__ inline void CopyInSoftMax(LocalTensor<float>& dstTensor, uint32_t s1Extend, uint32_t softMaxOffset);
+    __aicore__ inline void CalcSoftMax(LocalTensor<T2>& dstTensor, LocalTensor<float>& src0Tensor,
+                                       LocalTensor<float>& src1Tensor, uint32_t s1Extend, uint32_t s2Extend,
+                                       uint32_t s2ExtendAlign, const SoftMaxTiling& tiling);
+    __aicore__ inline void CopyInAttenMaskBool(LocalTensor<uint8_t>& dstTensor, int64_t attenMaskOffset,
                                                uint32_t s1Extend, uint32_t s2Extend);
-    __aicore__ inline void CalcAttenMaskBool(LocalTensor<T2> &dstTensor, LocalTensor<uint8_t> srcTensor,
+    __aicore__ inline void CalcAttenMaskBool(LocalTensor<T2>& dstTensor, LocalTensor<uint8_t> srcTensor,
                                              uint32_t s1Extend, uint32_t s2Extend, uint8_t maskType = 0);
-    __aicore__ inline void CalcAttenMaskOffset(int64_t &attenMaskOffset, const int64_t delta, uint32_t s1VSize,
+    __aicore__ inline void CalcAttenMaskOffset(int64_t& attenMaskOffset, const int64_t delta, uint32_t s1VSize,
                                                uint32_t s2VSize);
-    __aicore__ inline void CalcAttenBandMode(int64_t compressMode, int64_t causal_delta, DBParams &dbParam);
-    __aicore__ inline void CalcAttenMaskOffsetForPrefixCompressMode(int64_t &attenMaskOffset, int64_t &attenMaskOffse2,
+    __aicore__ inline void CalcAttenBandMode(int64_t compressMode, int64_t causal_delta, DBParams& dbParam);
+    __aicore__ inline void CalcAttenMaskOffsetForPrefixCompressMode(int64_t& attenMaskOffset, int64_t& attenMaskOffse2,
                                                                     const int64_t delta, uint32_t s1VSize,
                                                                     uint32_t s2VSize, uint32_t s2VBegin,
-                                                                    bool &canSimplify, DBParams &dbParam);
-    __aicore__ inline void CalcAttenMaskOffsetWithSparseMode(int64_t &attenMaskOffset, int64_t &attenMaskOffset2,
+                                                                    bool& canSimplify, DBParams& dbParam);
+    __aicore__ inline void CalcAttenMaskOffsetWithSparseMode(int64_t& attenMaskOffset, int64_t& attenMaskOffset2,
                                                              uint32_t s1VSize, uint32_t s2VSize, int64_t curS1Idx,
-                                                             uint32_t s2VBegin, bool &canSimplify, DBParams &dbParam);
-    __aicore__ inline void CalcAttenMaskOffsetWithSparseModeForUnpad(int64_t &attenMaskOffset,
-                                                                     int64_t &attenMaskOffset2, uint32_t s1VSize,
+                                                             uint32_t s2VBegin, bool& canSimplify, DBParams& dbParam);
+    __aicore__ inline void CalcAttenMaskOffsetWithSparseModeForUnpad(int64_t& attenMaskOffset,
+                                                                     int64_t& attenMaskOffset2, uint32_t s1VSize,
                                                                      uint32_t s2VSize, int64_t curS1Idx,
                                                                      uint32_t s2VBegin, bool unpadUseBand,
-                                                                     bool &canSimplify, DBParams &dbParam);
-    __aicore__ inline void DropOutCopy(LocalTensor<uint8_t> &vecInDropBuffer, int64_t curS1Idx, int64_t s2VBegin);
+                                                                     bool& canSimplify, DBParams& dbParam);
+    __aicore__ inline void DropOutCopy(LocalTensor<uint8_t>& vecInDropBuffer, int64_t curS1Idx, int64_t s2VBegin);
 
     __aicore__ inline void Process();
     __aicore__ inline void ProcessFirstMM();
     __aicore__ inline void UpdateToken(int64_t bIdx);
-    __aicore__ inline void SubGrapA(int64_t curIdx, int64_t curS1Idx, int64_t curS2Idx, DBParams &dbParam,
+    __aicore__ inline void SubGrapA(int64_t curIdx, int64_t curS1Idx, int64_t curS2Idx, DBParams& dbParam,
                                     event_t mte2WaitMte3A);
     __aicore__ inline void SubGrapB(int64_t curIdx, int64_t s1VecLoop, int64_t s2VecLoop, int64_t curS1Idx,
-                                    int64_t curS2Idx, DBParams &dbParam, event_t mte2WaitMte3B, float *dsinkSumLocal);
-    __aicore__ inline void ComputeVec(DBParams &dbParam);
+                                    int64_t curS2Idx, DBParams& dbParam, event_t mte2WaitMte3B, float* dsinkSumLocal);
+    __aicore__ inline void ComputeVec(DBParams& dbParam);
     __aicore__ inline void SyncALLCores();
-    __aicore__ inline void GetSeqQlenKvlenByBidx(int64_t bIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvlen);
+    __aicore__ inline void GetSeqQlenKvlenByBidx(int64_t bIdx, int64_t& actualSeqQlen, int64_t& actualSeqKvlen);
 
     using aType1 = typename AscendC::Conditional<
         S1TEMPLATETYPE == STemplateType::Aligned512 && S2TEMPLATETYPE == STemplateType::Aligned512 &&
@@ -226,29 +226,29 @@ public:
     modeTypeMm mm3;
     modeTypeMm mm4;
 
-    __aicore__ inline void NZCopyIn(int64_t mmAddr, GlobalTensor<T2> &mmWspGm, LocalTensor<T2> &mmTensorCurr,
+    __aicore__ inline void NZCopyIn(int64_t mmAddr, GlobalTensor<T2>& mmWspGm, LocalTensor<T2>& mmTensorCurr,
                                     uint32_t s1VecSize, uint32_t s2VecSize, uint32_t s1CvInner);
-    __aicore__ inline void NZ2ND(LocalTensor<T2> &mmTensorCurr, LocalTensor<T2> &tmpTensor, uint32_t s1VecSize,
+    __aicore__ inline void NZ2ND(LocalTensor<T2>& mmTensorCurr, LocalTensor<T2>& tmpTensor, uint32_t s1VecSize,
                                  uint32_t s2VecSize);
-    __aicore__ inline void ND2NZ(LocalTensor<T1> &mmTensorCurr, LocalTensor<T1> &tmpTensor, uint32_t s1VecSize,
+    __aicore__ inline void ND2NZ(LocalTensor<T1>& mmTensorCurr, LocalTensor<T1>& tmpTensor, uint32_t s1VecSize,
                                  uint32_t s2VecSize);
-    __aicore__ inline bool CalcValidBlock(int64_t &baseIdx, int64_t &startCoreId, DBParams &dbParam);
+    __aicore__ inline bool CalcValidBlock(int64_t& baseIdx, int64_t& startCoreId, DBParams& dbParam);
     __aicore__ inline void UpdateIndex();
-    __aicore__ inline void ComputeMM1(DBParams &dbParam);
-    __aicore__ inline void ComputeMMDqkv(DBParams &dbParam, int64_t nextBlockId);
-    __aicore__ inline void DTMComputeMMDqkv(DBParams &dbParam, int64_t nextBlockId);
-    __aicore__ inline void ComputeL1CustomMMDqkv(DBParams &dbParam, int64_t nextBlockId);
-    __aicore__ inline void CalckvReduce(DBParams &dbParam, GlobalTensor<float> &srcTensor,
-                                        GlobalTensor<float> &dstTensor);
-    __aicore__ inline void GetIndex(int64_t baseIdx, IndexParams &idx);
-    __aicore__ inline void CalcDqReduce(DBParams &dbParam, GlobalTensor<float> &srcTensor,
-                                        GlobalTensor<float> &dstTensor, int64_t d, int64_t dAlign,
+    __aicore__ inline void ComputeMM1(DBParams& dbParam);
+    __aicore__ inline void ComputeMMDqkv(DBParams& dbParam, int64_t nextBlockId);
+    __aicore__ inline void DTMComputeMMDqkv(DBParams& dbParam, int64_t nextBlockId);
+    __aicore__ inline void ComputeL1CustomMMDqkv(DBParams& dbParam, int64_t nextBlockId);
+    __aicore__ inline void CalckvReduce(DBParams& dbParam, GlobalTensor<float>& srcTensor,
+                                        GlobalTensor<float>& dstTensor);
+    __aicore__ inline void GetIndex(int64_t baseIdx, IndexParams& idx);
+    __aicore__ inline void CalcDqReduce(DBParams& dbParam, GlobalTensor<float>& srcTensor,
+                                        GlobalTensor<float>& dstTensor, int64_t d, int64_t dAlign,
                                         uint32_t vecCalBlockNum);
-    __aicore__ inline void CalcDkvReduce(DBParams &dbParam, GlobalTensor<float> &srcTensor,
-                                         GlobalTensor<float> &dstTensor, int64_t d, int64_t dAlign,
+    __aicore__ inline void CalcDkvReduce(DBParams& dbParam, GlobalTensor<float>& srcTensor,
+                                         GlobalTensor<float>& dstTensor, int64_t d, int64_t dAlign,
                                          uint32_t vecCalBlockNum);
-    __aicore__ inline void ComputeVecAdd(DBParams &dbParam);
-    __aicore__ inline void CopyGmToL1(const LocalTensor<T1> &l1Tensor, const GlobalTensor<T1> &gmSrcTensor,
+    __aicore__ inline void ComputeVecAdd(DBParams& dbParam);
+    __aicore__ inline void CopyGmToL1(const LocalTensor<T1>& l1Tensor, const GlobalTensor<T1>& gmSrcTensor,
                                       uint32_t srcN, uint32_t srcD, uint32_t srcDstride);
     __aicore__ inline void LoadDataAToL1(LocalTensor<T1> dstTensor, GlobalTensor<T1> srcTensor, const int32_t mSize,
                                          const int32_t kSize, uint32_t srcKstride);
@@ -262,9 +262,9 @@ public:
                                      LocalTensor<T1> srcBTensor, const int32_t m_mad_, const int32_t n_mad_,
                                      const int32_t k0);
     __aicore__ inline void Cube1CopyOut(GlobalTensor<float> dstTensor, LocalTensor<float> srcTensor,
-                                        const int32_t mSize, const int32_t nSize, DBParams &dbParam);
-    __aicore__ inline void Cube1Compute(const GlobalTensor<T1> &left, const GlobalTensor<T1> &right,
-                                        const GlobalTensor<float> &out, const int32_t headDim, DBParams &dbParam);
+                                        const int32_t mSize, const int32_t nSize, DBParams& dbParam);
+    __aicore__ inline void Cube1Compute(const GlobalTensor<T1>& left, const GlobalTensor<T1>& right,
+                                        const GlobalTensor<float>& out, const int32_t headDim, DBParams& dbParam);
     __aicore__ inline void ReleaseTSCMAllocEventID();
     AscendC::Nd2NzParams commonNd2NzParamsFp32_{1, 128, MMAD_BASE_SIZE, 0, MMAD_BASE_SIZE, MMAD_BASE_SIZE, 1, 0};
     AscendC::MmadParams cube3MadParams{MMAD_BASE_SIZE, MMAD_BASE_SIZE, MMAD_BASE_SIZE, 3, false, true};
@@ -278,7 +278,7 @@ public:
                                                        false};
 
 protected:
-    TPipe *pipe;
+    TPipe* pipe;
     TBuf<> unifiedBuffer;
 
     uint32_t coreNum;
@@ -289,7 +289,7 @@ protected:
 
     uint32_t vecBlockNum;
 
-    const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb *__restrict TilingData;
+    const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb* __restrict TilingData;
 
     // input
     GlobalTensor<T1> keyGm, valueGm, dxGm, queryGm, forwardResGm, pseGm;
@@ -347,9 +347,9 @@ protected:
 
     AsdopsBuffer<ArchType::ASCEND_V220> asdopsBuf;
 
-    __gm__ uint8_t *prefixN_addr;
-    __gm__ uint8_t *actual_seq_qlen_addr;
-    __gm__ uint8_t *actual_seq_kvlen_addr;
+    __gm__ uint8_t* prefixN_addr;
+    __gm__ uint8_t* actual_seq_qlen_addr;
+    __gm__ uint8_t* actual_seq_kvlen_addr;
 
     GM_ADDR workspaceAddr;
 
@@ -358,7 +358,7 @@ protected:
 
     GlobalTensor<half> pseAlibiGm;
     GlobalTensor<float> dvGm;
-    __gm__ uint8_t *pseSlope;
+    __gm__ uint8_t* pseSlope;
 
     PseInfo pseInfo = {0};
 
@@ -498,33 +498,33 @@ protected:
 
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::Init(
-    __gm__ uint8_t *key, __gm__ uint8_t *keyRope, __gm__ uint8_t *value, __gm__ uint8_t *dx, __gm__ uint8_t *query,
-    __gm__ uint8_t *queryRope, __gm__ uint8_t *pse_shift, __gm__ uint8_t *drop_mask, __gm__ uint8_t *atten_mask,
-    __gm__ uint8_t *forward_res, __gm__ uint8_t *softmax_max, __gm__ uint8_t *softmax_sum, __gm__ uint8_t *sink,
-    __gm__ uint8_t *prefixN, __gm__ uint8_t *actual_seq_qlen, __gm__ uint8_t *actual_seq_kvlen, __gm__ uint8_t *dq,
-    __gm__ uint8_t *dqRope, __gm__ uint8_t *dk, __gm__ uint8_t *dkRope, __gm__ uint8_t *dv, __gm__ uint8_t *dpse,
-    __gm__ uint8_t *dsink, __gm__ uint8_t *workspace,
-    const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb *__restrict ordTilingData)
+    __gm__ uint8_t* key, __gm__ uint8_t* keyRope, __gm__ uint8_t* value, __gm__ uint8_t* dx, __gm__ uint8_t* query,
+    __gm__ uint8_t* queryRope, __gm__ uint8_t* pse_shift, __gm__ uint8_t* drop_mask, __gm__ uint8_t* atten_mask,
+    __gm__ uint8_t* forward_res, __gm__ uint8_t* softmax_max, __gm__ uint8_t* softmax_sum, __gm__ uint8_t* sink,
+    __gm__ uint8_t* prefixN, __gm__ uint8_t* actual_seq_qlen, __gm__ uint8_t* actual_seq_kvlen, __gm__ uint8_t* dq,
+    __gm__ uint8_t* dqRope, __gm__ uint8_t* dk, __gm__ uint8_t* dkRope, __gm__ uint8_t* dv, __gm__ uint8_t* dpse,
+    __gm__ uint8_t* dsink, __gm__ uint8_t* workspace,
+    const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb* __restrict ordTilingData)
 {
-    keyGm.SetGlobalBuffer((__gm__ T1 *)key);
-    valueGm.SetGlobalBuffer((__gm__ T1 *)value);
-    dxGm.SetGlobalBuffer((__gm__ T1 *)dx);
-    queryGm.SetGlobalBuffer((__gm__ T1 *)query);
-    forwardResGm.SetGlobalBuffer((__gm__ T1 *)forward_res);
-    pseGm.SetGlobalBuffer((__gm__ T1 *)pse_shift);
-    sinkGm.SetGlobalBuffer((__gm__ float *)sink);
+    keyGm.SetGlobalBuffer((__gm__ T1*)key);
+    valueGm.SetGlobalBuffer((__gm__ T1*)value);
+    dxGm.SetGlobalBuffer((__gm__ T1*)dx);
+    queryGm.SetGlobalBuffer((__gm__ T1*)query);
+    forwardResGm.SetGlobalBuffer((__gm__ T1*)forward_res);
+    pseGm.SetGlobalBuffer((__gm__ T1*)pse_shift);
+    sinkGm.SetGlobalBuffer((__gm__ float*)sink);
     if constexpr (HAS_ROPE == ENABLE) {
-        keyRopeGm.SetGlobalBuffer((__gm__ T1 *)keyRope);
-        queryRopeGm.SetGlobalBuffer((__gm__ T1 *)queryRope);
+        keyRopeGm.SetGlobalBuffer((__gm__ T1*)keyRope);
+        queryRopeGm.SetGlobalBuffer((__gm__ T1*)queryRope);
     }
 
     pseSlope = pse_shift;
 
-    dropMaskGm.SetGlobalBuffer((__gm__ uint8_t *)drop_mask);
-    attenMaskU8Gm.SetGlobalBuffer((__gm__ uint8_t *)atten_mask);
-    softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmax_max);
-    softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmax_sum);
-    dvGm.SetGlobalBuffer((__gm__ float *)dv);
+    dropMaskGm.SetGlobalBuffer((__gm__ uint8_t*)drop_mask);
+    attenMaskU8Gm.SetGlobalBuffer((__gm__ uint8_t*)atten_mask);
+    softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmax_max);
+    softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmax_sum);
+    dvGm.SetGlobalBuffer((__gm__ float*)dv);
 
     // init current core tilingInfo
     if ASCEND_IS_AIV {
@@ -592,13 +592,13 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::Init(
     int64_t sfmgOutputSize = b * n2 * g * s1 * 8;
     if constexpr (INPUT_LAYOUT == TND) {
         int64_t seqS2Len = 0;
-        seqS2Len = ((__gm__ int64_t *)actual_seq_kvlen)[0];
+        seqS2Len = ((__gm__ int64_t*)actual_seq_kvlen)[0];
         dropBitMode = (seqS2Len % 8 == 0);
         for (int64_t i = 0; i + 1 < b; i++) {
-            seqS2Len = ((__gm__ int64_t *)actual_seq_kvlen)[i + 1] - ((__gm__ int64_t *)actual_seq_kvlen)[i];
+            seqS2Len = ((__gm__ int64_t*)actual_seq_kvlen)[i + 1] - ((__gm__ int64_t*)actual_seq_kvlen)[i];
             dropBitMode = (dropBitMode && (seqS2Len % 8 == 0));
         }
-        sfmgOutputSize = ((__gm__ int64_t *)actual_seq_qlen)[b - 1] * n2 * g * 8;
+        sfmgOutputSize = ((__gm__ int64_t*)actual_seq_qlen)[b - 1] * n2 * g * 8;
     }
 
     int64_t maskPreBlockTotal = TilingData->preTilingData.maskPreBlockTotal;
@@ -616,29 +616,29 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::Init(
     workspaceAddr = workspace;
 
     // init workspace address
-    syncGlobal.SetGlobalBuffer((__gm__ int32_t *)workspace);
+    syncGlobal.SetGlobalBuffer((__gm__ int32_t*)workspace);
     InitOutput<int32_t>(syncGlobal[GetBlockIdx() * 256], 256, 0); // 前64K留给同步使用，每个
 
-    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                   TilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
-    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                   TilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
-    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                   TilingData->postTilingData.dvWorkSpaceOffset / sizeof(float));
     if constexpr (HAS_ROPE == ENABLE) {
-        dqRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dqRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           TilingData->postTilingData.dqRopeWorkSpaceOffset / sizeof(float));
-        dkRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dkRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           TilingData->postTilingData.dkRopeWorkSpaceOffset / sizeof(float));
     }
 
     if constexpr (IS_DROP == ENABLE) {
         if (!dropBitMode) {
-            maskWorkSpaceGm.SetGlobalBuffer((__gm__ uint8_t *)workspace + TilingData->preTilingData.dropBeginAddr);
+            maskWorkSpaceGm.SetGlobalBuffer((__gm__ uint8_t*)workspace + TilingData->preTilingData.dropBeginAddr);
         }
     }
     // sfmg, softmax grad
-    sfmgWorkspaceGm.SetGlobalBuffer((__gm__ T2 *)workspace +
+    sfmgWorkspaceGm.SetGlobalBuffer((__gm__ T2*)workspace +
                                     TilingData->preSfmgTilingData.sfmgPreBeginAddr / sizeof(T2));
     int64_t workspaceOffsets =
         (TilingData->preSfmgTilingData.sfmgPreBeginAddr + sfmgOutputSize * sizeof(float) + ADDR_ALIGN_SIZE) /
@@ -651,57 +651,57 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::Init(
     // matmul1 and matmul2 workspace size
     uint32_t matmulWorkspaceSize = cubeBaseMN * sizeof(float);
     mm1WorkspaceGm.SetGlobalBuffer(
-        (__gm__ T2 *)(workspace + workspaceOffsets + cCubeBlockIdx * matmulWorkspaceSize * GM_DOUBLE_BUFFER));
-    mm2WorkspaceGm.SetGlobalBuffer((__gm__ T2 *)(workspace + workspaceOffsets +
+        (__gm__ T2*)(workspace + workspaceOffsets + cCubeBlockIdx * matmulWorkspaceSize * GM_DOUBLE_BUFFER));
+    mm2WorkspaceGm.SetGlobalBuffer((__gm__ T2*)(workspace + workspaceOffsets +
+                                                cubeCoreNum * matmulWorkspaceSize * GM_DOUBLE_BUFFER +
+                                                cCubeBlockIdx * matmulWorkspaceSize * GM_DOUBLE_BUFFER));
+
+    // drop workspace offset 和 mm2WorkspaceGm 地址相同
+    dropWorkSpaceGm.SetGlobalBuffer((__gm__ T1*)(workspace + workspaceOffsets +
                                                  cubeCoreNum * matmulWorkspaceSize * GM_DOUBLE_BUFFER +
                                                  cCubeBlockIdx * matmulWorkspaceSize * GM_DOUBLE_BUFFER));
 
-    // drop workspace offset 和 mm2WorkspaceGm 地址相同
-    dropWorkSpaceGm.SetGlobalBuffer((__gm__ T1 *)(workspace + workspaceOffsets +
-                                                  cubeCoreNum * matmulWorkspaceSize * GM_DOUBLE_BUFFER +
-                                                  cCubeBlockIdx * matmulWorkspaceSize * GM_DOUBLE_BUFFER));
-
     // mul workspace offset 和 mm1WorkspaceGm 地址相同
     mulWorkSpaceGm.SetGlobalBuffer(
-        (__gm__ T1 *)(workspace + workspaceOffsets + cCubeBlockIdx * matmulWorkspaceSize * GM_DOUBLE_BUFFER));
+        (__gm__ T1*)(workspace + workspaceOffsets + cCubeBlockIdx * matmulWorkspaceSize * GM_DOUBLE_BUFFER));
 
-    dsinksumWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dsinksumWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                         TilingData->postTilingData.dsinksumWorkSpaceOffset / sizeof(float));
 
     uint64_t pseAlibiAddr =
         (workspaceOffsets + cubeCoreNum * matmulWorkspaceSize * INPUT_NUMS * GM_DOUBLE_BUFFER + ADDR_ALIGN_SIZE) /
         ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
-    this->pseAlibiGm.SetGlobalBuffer((__gm__ half *)(workspace + pseAlibiAddr + cBlockIdx * pseAlibiOffset));
+    this->pseAlibiGm.SetGlobalBuffer((__gm__ half*)(workspace + pseAlibiAddr + cBlockIdx * pseAlibiOffset));
 
     if constexpr (IS_DTM == ENABLE) {
         workspaceOffsets =
             (pseAlibiAddr + coreNum * pseAlibiOffset + ADDR_ALIGN_SIZE - 1) / ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
 
-        dqDtmWsGm.SetGlobalBuffer((__gm__ float *)(workspace + workspaceOffsets));
+        dqDtmWsGm.SetGlobalBuffer((__gm__ float*)(workspace + workspaceOffsets));
         workspaceOffsets = (workspaceOffsets + s1CvInner * dAlign * sizeof(float) * cubeCoreNum * GM_DOUBLE_BUFFER +
                             ADDR_ALIGN_SIZE - 1) /
                            ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
         if constexpr (HAS_ROPE == ENABLE) {
-            dqRopeDtmWsGm.SetGlobalBuffer((__gm__ float *)(workspace + workspaceOffsets));
+            dqRopeDtmWsGm.SetGlobalBuffer((__gm__ float*)(workspace + workspaceOffsets));
             workspaceOffsets =
                 (workspaceOffsets + s1CvInner * rope_dAlign * sizeof(float) * cubeCoreNum * GM_DOUBLE_BUFFER +
                  ADDR_ALIGN_SIZE - 1) /
                 ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
         }
 
-        dkDtmWsGm.SetGlobalBuffer((__gm__ float *)(workspace + workspaceOffsets));
+        dkDtmWsGm.SetGlobalBuffer((__gm__ float*)(workspace + workspaceOffsets));
         workspaceOffsets = (workspaceOffsets + s2CvInner * dAlign * sizeof(float) * cubeCoreNum * GM_DOUBLE_BUFFER +
                             ADDR_ALIGN_SIZE - 1) /
                            ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
         if constexpr (HAS_ROPE == ENABLE) {
-            dkRopeDtmWsGm.SetGlobalBuffer((__gm__ float *)(workspace + workspaceOffsets));
+            dkRopeDtmWsGm.SetGlobalBuffer((__gm__ float*)(workspace + workspaceOffsets));
             workspaceOffsets =
                 (workspaceOffsets + s2CvInner * rope_dAlign * sizeof(float) * cubeCoreNum * GM_DOUBLE_BUFFER +
                  ADDR_ALIGN_SIZE - 1) /
                 ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
         }
 
-        dvDtmWsGm.SetGlobalBuffer((__gm__ float *)(workspace + workspaceOffsets));
+        dvDtmWsGm.SetGlobalBuffer((__gm__ float*)(workspace + workspaceOffsets));
     }
 
     if constexpr (IS_DROP == ENABLE) {
@@ -724,7 +724,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::Init(
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::InitBuffer(TPipe *pipe_in)
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::InitBuffer(TPipe* pipe_in)
 {
     pipe = pipe_in;
     if ASCEND_IS_AIV {
@@ -766,7 +766,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::InitBuff
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::InitTscmBuffer(TPipe *pipe_in)
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::InitTscmBuffer(TPipe* pipe_in)
 {
     pipe = pipe_in;
     if ASCEND_IS_AIC {
@@ -827,23 +827,23 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::InitTscm
 
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::GetSeqQlenKvlenByBidx(int64_t bIdx,
-                                                                                              int64_t &actualSeqQlen,
-                                                                                              int64_t &actualSeqKvlen)
+                                                                                              int64_t& actualSeqQlen,
+                                                                                              int64_t& actualSeqKvlen)
 {
     if (unlikely(bIdx == 0)) {
-        actualSeqQlen = ((__gm__ int64_t *)actual_seq_qlen_addr)[0];
-        actualSeqKvlen = ((__gm__ int64_t *)actual_seq_kvlen_addr)[0];
+        actualSeqQlen = ((__gm__ int64_t*)actual_seq_qlen_addr)[0];
+        actualSeqKvlen = ((__gm__ int64_t*)actual_seq_kvlen_addr)[0];
     } else {
         actualSeqQlen =
-            ((__gm__ int64_t *)actual_seq_qlen_addr)[bIdx] - ((__gm__ int64_t *)actual_seq_qlen_addr)[bIdx - 1];
+            ((__gm__ int64_t*)actual_seq_qlen_addr)[bIdx] - ((__gm__ int64_t*)actual_seq_qlen_addr)[bIdx - 1];
         actualSeqKvlen =
-            ((__gm__ int64_t *)actual_seq_kvlen_addr)[bIdx] - ((__gm__ int64_t *)actual_seq_kvlen_addr)[bIdx - 1];
+            ((__gm__ int64_t*)actual_seq_kvlen_addr)[bIdx] - ((__gm__ int64_t*)actual_seq_kvlen_addr)[bIdx - 1];
     }
     return;
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CopyInSoftMax(LocalTensor<float> &dstTensor,
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CopyInSoftMax(LocalTensor<float>& dstTensor,
                                                                                       uint32_t s1Extend,
                                                                                       uint32_t softMaxOffset)
 {
@@ -855,8 +855,8 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CopyInSo
 
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcSoftMax(
-    LocalTensor<T2> &dstTensor, LocalTensor<float> &src0Tensor, LocalTensor<float> &src1Tensor, uint32_t s1Extend,
-    uint32_t s2Extend, uint32_t s2ExtendAlign, const SoftMaxTiling &tiling)
+    LocalTensor<T2>& dstTensor, LocalTensor<float>& src0Tensor, LocalTensor<float>& src1Tensor, uint32_t s1Extend,
+    uint32_t s2Extend, uint32_t s2ExtendAlign, const SoftMaxTiling& tiling)
 {
     bool isBasicBlock = (s1Extend % 8 == 0) && (s2Extend % 64 == 0);
 
@@ -897,7 +897,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcSoft
 
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CopyInAttenMaskBool(
-    LocalTensor<uint8_t> &dstTensor, int64_t attenMaskOffset, uint32_t s1Extend, uint32_t s2Extend)
+    LocalTensor<uint8_t>& dstTensor, int64_t attenMaskOffset, uint32_t s1Extend, uint32_t s2Extend)
 {
     AscendC::DataCopyExtParams intriParams;
     intriParams.blockCount = s1Extend;
@@ -910,7 +910,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CopyInAt
 
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAttenMaskBool(
-    LocalTensor<T2> &dstTensor, LocalTensor<uint8_t> srcTensor, uint32_t s1Extend, uint32_t s2Extend, uint8_t maskType)
+    LocalTensor<T2>& dstTensor, LocalTensor<uint8_t> srcTensor, uint32_t s1Extend, uint32_t s2Extend, uint8_t maskType)
 {
     LocalTensor<uint8_t> tmpUbBuffer =
         unifiedBuffer.GetWithOffset<uint8_t>(TMP_UB_SIZE / sizeof(uint8_t), TMP_UB_OFFSET);
@@ -918,10 +918,10 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAtte
     T2 scalar;
     if constexpr (IsSameType<T2, float>::value) {
         uint32_t tmp = 0xFF7FFFFF;
-        scalar = *((float *)&tmp);
+        scalar = *((float*)&tmp);
     } else {
         uint16_t tmp = 0xFBFF;
-        scalar = *((half *)&tmp);
+        scalar = *((half*)&tmp);
     }
 
     SelectWithBytesMaskShapeInfo info;
@@ -981,9 +981,9 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::UpdateIn
 }
 
 template <typename FAGT>
-__aicore__ inline bool FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcValidBlock(int64_t &baseIdx,
-                                                                                       int64_t &startCoreId,
-                                                                                       DBParams &dbParam)
+__aicore__ inline bool FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcValidBlock(int64_t& baseIdx,
+                                                                                       int64_t& startCoreId,
+                                                                                       DBParams& dbParam)
 {
     if (bDimIdx >= b) { // 越界情形
         if (cCubeBlockIdx >= startCoreId) {
@@ -1009,7 +1009,7 @@ __aicore__ inline bool FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcVali
     int64_t curPrefixN = 0;
     int64_t s1IdxUp = s2oCvDimIdx * s2CvInner - actualCalcS2Token;
     if (sparseMode == 5 || sparseMode == 6) { // prefix场景
-        curPrefixN = ((__gm__ int64_t *)prefixN_addr)[bDimIdx];
+        curPrefixN = ((__gm__ int64_t*)prefixN_addr)[bDimIdx];
         s1IdxUp = s2oCvDimIdx * s2CvInner < curPrefixN ? 0 : s1IdxUp;
     }
 
@@ -1127,8 +1127,8 @@ __aicore__ inline bool FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcVali
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CopyGmToL1(const LocalTensor<T1> &l1Tensor,
-                                                                                   const GlobalTensor<T1> &gmSrcTensor,
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CopyGmToL1(const LocalTensor<T1>& l1Tensor,
+                                                                                   const GlobalTensor<T1>& gmSrcTensor,
                                                                                    uint32_t srcN, uint32_t srcD,
                                                                                    uint32_t srcDstride)
 {
@@ -1198,7 +1198,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::Cube1Cop
                                                                                      LocalTensor<float> srcTensor,
                                                                                      const int32_t mSize,
                                                                                      const int32_t nSize,
-                                                                                     DBParams &dbParam)
+                                                                                     DBParams& dbParam)
 {
     int32_t mSizeAlign = RoundUp(mSize, (int32_t)C0_SIZE);
     int32_t nSizeAlign = RoundUp(nSize, (int32_t)C0_SIZE);
@@ -1212,11 +1212,11 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::Cube1Cop
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::Cube1Compute(const GlobalTensor<T1> &left,
-                                                                                     const GlobalTensor<T1> &right,
-                                                                                     const GlobalTensor<float> &out,
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::Cube1Compute(const GlobalTensor<T1>& left,
+                                                                                     const GlobalTensor<T1>& right,
+                                                                                     const GlobalTensor<float>& out,
                                                                                      const int32_t headDim,
-                                                                                     DBParams &dbParam)
+                                                                                     DBParams& dbParam)
 {
     event_t eventIdMte2ToMte1 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_MTE1));
     event_t eventIdMte1ToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE1_MTE2));
@@ -1241,7 +1241,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::Cube1Com
         subMSizeActAlign = CeilDiv(subMSizeAct, C0_SIZE) * C0_SIZE;
         // A矩阵
         uint64_t aL1Offset = m * mSplitSize * headDimAlign;
-        LocalTensor<T1> *l0_a_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
+        LocalTensor<T1>* l0_a_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
         CopyGmToL1(qL1Tensor[aL1Offset],
                    left[specify_for_v_aTensorOffsetCv + m * mSplitSize * dbParam.s1Stride / d * headDim], subMSizeAct,
                    headDim, dbParam.s1Stride / d * headDim);
@@ -1253,8 +1253,8 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::Cube1Com
             subNSizeAct = n == (nLoops - 1) ? nTail : nSplitSize;
             subNSizeActAlign = CeilDiv(subNSizeAct, C0_SIZE) * C0_SIZE;
             uint64_t bL1Offset = n * nSplitSize * headDimAlign;
-            LocalTensor<T1> *l0_b_tensor = ping_pong_flag_l0_b_ ? &l0_b_pong_tensor : &l0_b_ping_tensor;
-            LocalTensor<float> *l0_c_tensor = ping_pong_flag_l0_c_ ? &l0_c_pong_tensor : &l0_c_ping_tensor;
+            LocalTensor<T1>* l0_b_tensor = ping_pong_flag_l0_b_ ? &l0_b_pong_tensor : &l0_b_ping_tensor;
+            LocalTensor<float>* l0_c_tensor = ping_pong_flag_l0_c_ ? &l0_c_pong_tensor : &l0_c_ping_tensor;
             // B矩阵
             if (m == 0) {
                 CopyGmToL1(kL1Tensor[bL1Offset],
@@ -1285,7 +1285,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::Cube1Com
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeMM1(DBParams &dbParam)
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeMM1(DBParams& dbParam)
 {
     pingpongIdx = dbParam.taskId % 2;
     dbParam.actualS1Len = s1;
@@ -1300,10 +1300,10 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeM
         dbParam.bTensorOffsetCv = 0;
         dbParam.bTensorOffsetCv_rope = 0;
         if (dbParam.bIdx > 0) {
-            dbParam.aTensorOffsetCv = ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * d;
-            dbParam.aTensorOffsetCv_rope = ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * rope_d;
-            dbParam.bTensorOffsetCv = ((__gm__ int64_t *)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * d;
-            dbParam.bTensorOffsetCv_rope = ((__gm__ int64_t *)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * rope_d;
+            dbParam.aTensorOffsetCv = ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * d;
+            dbParam.aTensorOffsetCv_rope = ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * rope_d;
+            dbParam.bTensorOffsetCv = ((__gm__ int64_t*)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * d;
+            dbParam.bTensorOffsetCv_rope = ((__gm__ int64_t*)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * rope_d;
         }
         dbParam.aTensorOffsetCv += ((dbParam.s1oIdx * s1CvInner * n2 + dbParam.n2Idx) * g + dbParam.gIdx) * d;
         dbParam.aTensorOffsetCv_rope += ((dbParam.s1oIdx * s1CvInner * n2 + dbParam.n2Idx) * g + dbParam.gIdx) * rope_d;
@@ -1627,7 +1627,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeM
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::DTMComputeMMDqkv(DBParams &dbParam,
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::DTMComputeMMDqkv(DBParams& dbParam,
                                                                                          int64_t nextBlockId)
 {
     pingpongIdx = dbParam.taskId % 2;
@@ -1646,11 +1646,11 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::DTMCompu
     } else if constexpr (INPUT_LAYOUT == TND) { // TND Nz
         UpdateToken(dbParam.bIdx);
         if (dbParam.bIdx > 0) {
-            dqOffset = ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * dAlign;
-            dqRopeOffset = ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * rope_dAlign;
-            dkvOffset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * dAlign;
-            dkRopeOffset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * rope_dAlign;
-            dvOffset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * value_dAlign;
+            dqOffset = ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * dAlign;
+            dqRopeOffset = ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * rope_dAlign;
+            dkvOffset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * dAlign;
+            dkRopeOffset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * rope_dAlign;
+            dvOffset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * value_dAlign;
         }
         dqOffset +=
             ((dbParam.n2Idx * g + dbParam.gIdx) * dbParam.actualS1Len) * dAlign + dbParam.s1oIdx * s1CvInner * C0_SIZE;
@@ -1806,7 +1806,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::DTMCompu
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeMMDqkv(DBParams &dbParam,
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeMMDqkv(DBParams& dbParam,
                                                                                       int64_t nextBlockId)
 {
     pingpongIdx = dbParam.taskId % 2;
@@ -1826,12 +1826,12 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeM
     } else if constexpr (INPUT_LAYOUT == TND) { // TND Nz
         UpdateToken(dbParam.bIdx);
         if (dbParam.bIdx > 0) {
-            dqOffset = ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * dAlign;
-            dkvOffset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * dAlign;
-            dvOffset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * value_dAlign;
+            dqOffset = ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * dAlign;
+            dkvOffset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * dAlign;
+            dvOffset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * value_dAlign;
             if constexpr (HAS_ROPE == ENABLE) {
-                dqRopeOffset = ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * rope_dAlign;
-                dkRopeOffset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * rope_dAlign;
+                dqRopeOffset = ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * rope_dAlign;
+                dkRopeOffset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * rope_dAlign;
             }
         }
         dqOffset +=
@@ -2408,7 +2408,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ReleaseT
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeL1CustomMMDqkv(DBParams &dbParam,
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeL1CustomMMDqkv(DBParams& dbParam,
                                                                                               int64_t nextBlockId)
 {
     pingpongIdx = dbParam.taskId % 2;
@@ -2427,11 +2427,11 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeL
     } else if constexpr (INPUT_LAYOUT == TND) { // TND Nz
         UpdateToken(dbParam.bIdx);
         if (dbParam.bIdx > 0) {
-            dqOffset = ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * dAlign;
-            dkvOffset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * dAlign;
-            dqRopeOffset = ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * rope_dAlign;
-            dkRopeOffset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * rope_dAlign;
-            dvOffset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * value_dAlign;
+            dqOffset = ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * dAlign;
+            dkvOffset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * dAlign;
+            dqRopeOffset = ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * rope_dAlign;
+            dkRopeOffset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * rope_dAlign;
+            dvOffset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[dbParam.bIdx - 1] * n2 * value_dAlign;
         }
         dqOffset +=
             ((dbParam.n2Idx * g + dbParam.gIdx) * dbParam.actualS1Len) * dAlign + dbParam.s1oIdx * s1CvInner * C0_SIZE;
@@ -2521,14 +2521,14 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeL
         for (uint32_t m = 0; m < mLoops; m++) {
             subMSizeAct = m == (mLoops - 1) ? mTail : mSplitSize;
             subMSizeActAlign = CeilDiv(subMSizeAct, C0_SIZE) * C0_SIZE;
-            LocalTensor<float> *l0_c_tensor = ping_pong_flag_l0_c_ ? &l0_c_pong_tensor : &l0_c_ping_tensor;
+            LocalTensor<float>* l0_c_tensor = ping_pong_flag_l0_c_ ? &l0_c_pong_tensor : &l0_c_ping_tensor;
             for (uint32_t n = 0; n < nInnerLoops; n++) {
                 subNSizeAct = n == (nInnerLoops - 1) ? nInnerTail : nSplitSize;
                 subNSizeActAlign = CeilDiv(subNSizeAct, C0_SIZE) * C0_SIZE;
                 uint64_t bL1Offset = n * MMAD_BASE_SIZE * MMAD_BASE_SIZE + sliceIdx * S_SPLITT_SIZE * MMAD_BASE_SIZE;
                 uint64_t aL1Offset = m * MMAD_BASE_SIZE * S_SPLITT_SIZE + MMAD_BASE_SIZE * n * MMAD_BASE_SIZE;
-                LocalTensor<T1> *l0_a_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
-                LocalTensor<T1> *l0_b_tensor = ping_pong_flag_l0_b_ ? &l0_b_pong_tensor : &l0_b_ping_tensor;
+                LocalTensor<T1>* l0_a_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
+                LocalTensor<T1>* l0_b_tensor = ping_pong_flag_l0_b_ ? &l0_b_pong_tensor : &l0_b_ping_tensor;
                 // load gm to L1A
                 uint16_t blockCount = subNSizeActAlign / C0_SIZE;
                 uint16_t blockLen = subMSizeActAlign * C0_SIZE * sizeof(T1) / 32;
@@ -2621,14 +2621,14 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeL
         for (uint32_t n_loop = 0; n_loop < nInnerLoops; n_loop++) {
             subNSizeAct = n_loop == (nInnerLoops - 1) ? nInnerTail : nSplitSize;
             subNSizeActAlign = CeilDiv(subNSizeAct, C0_SIZE) * C0_SIZE;
-            LocalTensor<float> *l0_c_tensor = ping_pong_flag_l0_c_ ? &l0_c_pong_tensor : &l0_c_ping_tensor;
+            LocalTensor<float>* l0_c_tensor = ping_pong_flag_l0_c_ ? &l0_c_pong_tensor : &l0_c_ping_tensor;
             for (uint32_t m_loop = 0; m_loop < mLoops; m_loop++) {
                 subMSizeAct = m_loop == (mLoops - 1) ? mTail : mSplitSize;
                 subMSizeActAlign = CeilDiv(subMSizeAct, C0_SIZE) * C0_SIZE;
                 uint64_t bL1Offset = m_loop * MMAD_BASE_SIZE * MMAD_BASE_SIZE;
                 uint64_t aL1Offset = m_loop * MMAD_BASE_SIZE * S_SPLITT_SIZE + n_loop * MMAD_BASE_SIZE * MMAD_BASE_SIZE;
-                LocalTensor<T1> *l0_a_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
-                LocalTensor<T1> *l0_b_tensor = ping_pong_flag_l0_b_ ? &l0_b_pong_tensor : &l0_b_ping_tensor;
+                LocalTensor<T1>* l0_a_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
+                LocalTensor<T1>* l0_b_tensor = ping_pong_flag_l0_b_ ? &l0_b_pong_tensor : &l0_b_ping_tensor;
 
                 // load gm to L1B
                 if (n_loop == 0 && sliceIdx == 0) {
@@ -2769,7 +2769,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeL
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::GetIndex(int64_t baseIdx, IndexParams &idx)
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::GetIndex(int64_t baseIdx, IndexParams& idx)
 {
     if constexpr (INPUT_LAYOUT == TND) {
         int64_t actualSeqQlen = 0;
@@ -2806,9 +2806,9 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::GetIndex
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcDkvReduce(DBParams &dbParam,
-                                                                                      GlobalTensor<float> &srcTensor,
-                                                                                      GlobalTensor<float> &dstTensor,
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcDkvReduce(DBParams& dbParam,
+                                                                                      GlobalTensor<float>& srcTensor,
+                                                                                      GlobalTensor<float>& dstTensor,
                                                                                       int64_t d, int64_t dAlign,
                                                                                       uint32_t vecCalBlockNum)
 {
@@ -2909,7 +2909,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcDkvR
                     int64_t actualS2Len = 0;
                     GetSeqQlenKvlenByBidx(idx.bIdx, actualS1Len, actualS2Len);
                     if (idx.bIdx > 0) {
-                        dstOffset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[idx.bIdx - 1] * n2 * dAlign;
+                        dstOffset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[idx.bIdx - 1] * n2 * dAlign;
                     }
                     dstOffset += (idx.n2Idx * actualS2Len) * dAlign +
                                  (idx.s2oIdx * s2CvInner + cBlockIdx % vecCalBlockNum * s2CalcInner) * C0_SIZE;
@@ -2922,7 +2922,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcDkvR
             } else {
                 if constexpr (INPUT_LAYOUT == TND) {
                     if (idx.bIdx > 0) {
-                        dstOffset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[idx.bIdx - 1] * n2 * d;
+                        dstOffset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[idx.bIdx - 1] * n2 * d;
                     }
                     dstOffset +=
                         ((idx.s2oIdx * s2CvInner + cBlockIdx % vecCalBlockNum * s2CalcInner) * n2 + idx.n2Idx) * d;
@@ -2966,9 +2966,9 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcDkvR
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcDqReduce(DBParams &dbParam,
-                                                                                     GlobalTensor<float> &srcTensor,
-                                                                                     GlobalTensor<float> &dstTensor,
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcDqReduce(DBParams& dbParam,
+                                                                                     GlobalTensor<float>& srcTensor,
+                                                                                     GlobalTensor<float>& dstTensor,
                                                                                      int64_t d, int64_t dAlign,
                                                                                      uint32_t vecCalBlockNum)
 {
@@ -3069,7 +3069,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcDqRe
                     int64_t actualS2Len = 0;
                     GetSeqQlenKvlenByBidx(idx.bIdx, actualS1Len, actualS2Len);
                     if (idx.bIdx > 0) {
-                        dstOffset = ((__gm__ int64_t *)actual_seq_qlen_addr)[idx.bIdx - 1] * n2 * g * dAlign;
+                        dstOffset = ((__gm__ int64_t*)actual_seq_qlen_addr)[idx.bIdx - 1] * n2 * g * dAlign;
                     }
                     dstOffset += ((idx.n2Idx * g + idx.gIdx) * actualS1Len) * dAlign +
                                  (idx.s1oIdx * s1CvInner + cBlockIdx % vecCalBlockNum * s1CalcInner) * C0_SIZE;
@@ -3082,7 +3082,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcDqRe
             } else {
                 if constexpr (INPUT_LAYOUT == TND) {
                     if (idx.bIdx > 0) {
-                        dstOffset = ((__gm__ int64_t *)actual_seq_qlen_addr)[idx.bIdx - 1] * n2 * g * d;
+                        dstOffset = ((__gm__ int64_t*)actual_seq_qlen_addr)[idx.bIdx - 1] * n2 * g * d;
                     }
                     dstOffset +=
                         (((idx.s1oIdx * s1CvInner + cBlockIdx % vecCalBlockNum * s1CalcInner) * n2 + idx.n2Idx) * g +
@@ -3133,7 +3133,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcDqRe
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeVecAdd(DBParams &dbParam)
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeVecAdd(DBParams& dbParam)
 {
     int64_t s1CalcInner = (s1CvInner + vecBlockNum - 1) / vecBlockNum;
     int64_t s2CalcInner = (s2CvInner + vecBlockNum - 1) / vecBlockNum;
@@ -3319,7 +3319,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::UpdateTo
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAttenMaskOffset(int64_t &attenMaskOffset,
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAttenMaskOffset(int64_t& attenMaskOffset,
                                                                                             const int64_t delta,
                                                                                             uint32_t s1VSize,
                                                                                             uint32_t s2VSize)
@@ -3343,8 +3343,8 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAtte
 
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAttenMaskOffsetForPrefixCompressMode(
-    int64_t &attenMaskOffset, int64_t &attenMaskOffset2, const int64_t delta, uint32_t s1VSize, uint32_t s2VSize,
-    uint32_t s2VBegin, bool &canSimplify, DBParams &dbParam)
+    int64_t& attenMaskOffset, int64_t& attenMaskOffset2, const int64_t delta, uint32_t s1VSize, uint32_t s2VSize,
+    uint32_t s2VBegin, bool& canSimplify, DBParams& dbParam)
 {
     /*
       prefix压缩attenmask形状:
@@ -3373,7 +3373,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAtte
         S2 = dbParam.actualS2Len;
     }
 
-    int64_t N = ((__gm__ int64_t *)prefixN_addr)[curBatchDimIdx];
+    int64_t N = ((__gm__ int64_t*)prefixN_addr)[curBatchDimIdx];
 
     // s1 + N <= s2, equivalent to RightDownCausal
     if (S1 + N <= S2) {
@@ -3410,8 +3410,8 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAtte
 
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAttenMaskOffsetWithSparseModeForUnpad(
-    int64_t &attenMaskOffset, int64_t &attenMaskOffset2, uint32_t s1VSize, uint32_t s2VSize, int64_t curS1Idx,
-    uint32_t s2VBegin, bool unpadUseBand, bool &canSimplify, DBParams &dbParam)
+    int64_t& attenMaskOffset, int64_t& attenMaskOffset2, uint32_t s1VSize, uint32_t s2VSize, int64_t curS1Idx,
+    uint32_t s2VBegin, bool unpadUseBand, bool& canSimplify, DBParams& dbParam)
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
@@ -3470,8 +3470,8 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAtte
 
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAttenMaskOffsetWithSparseMode(
-    int64_t &attenMaskOffset, int64_t &attenMaskOffset2, uint32_t s1VSize, uint32_t s2VSize, int64_t curS1Idx,
-    uint32_t s2VBegin, bool &canSimplify, DBParams &dbParam)
+    int64_t& attenMaskOffset, int64_t& attenMaskOffset2, uint32_t s1VSize, uint32_t s2VSize, int64_t curS1Idx,
+    uint32_t s2VBegin, bool& canSimplify, DBParams& dbParam)
 {
     uint64_t compressMode = TilingData->s1s2BNGS1S2BaseParams.attenMaskCompressMode;
     int64_t causal_delta =
@@ -3518,8 +3518,8 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAtte
 
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::NZCopyIn(int64_t mmAddr,
-                                                                                 GlobalTensor<T2> &mmWspGm,
-                                                                                 LocalTensor<T2> &mmTensorCurr,
+                                                                                 GlobalTensor<T2>& mmWspGm,
+                                                                                 LocalTensor<T2>& mmTensorCurr,
                                                                                  uint32_t s1VecSize, uint32_t s2VecSize,
                                                                                  uint32_t s1CvInner)
 {
@@ -3536,8 +3536,8 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::NZCopyIn
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::NZ2ND(LocalTensor<T2> &mmTensorCurr,
-                                                                              LocalTensor<T2> &tmpTensor,
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::NZ2ND(LocalTensor<T2>& mmTensorCurr,
+                                                                              LocalTensor<T2>& tmpTensor,
                                                                               uint32_t s1VecSize, uint32_t s2VecSize)
 {
     /*
@@ -3570,8 +3570,8 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::NZ2ND(Lo
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ND2NZ(LocalTensor<T1> &mmTensorCurr,
-                                                                              LocalTensor<T1> &tmpTensor,
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ND2NZ(LocalTensor<T1>& mmTensorCurr,
+                                                                              LocalTensor<T1>& tmpTensor,
                                                                               uint32_t s1VecSize, uint32_t s2VecSize)
 {
     /*
@@ -3605,7 +3605,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ND2NZ(Lo
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAttenBandMode(int64_t compressMode,
                                                                                           int64_t causal_delta,
-                                                                                          DBParams &dbParam)
+                                                                                          DBParams& dbParam)
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
@@ -3643,7 +3643,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::CalcAtte
 
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::DropOutCopy(
-    LocalTensor<uint8_t> &vecInDropBuffer, int64_t curS1Idx, int64_t s2VBegin)
+    LocalTensor<uint8_t>& vecInDropBuffer, int64_t curS1Idx, int64_t s2VBegin)
 {
     // for compute dropout mask offset
     dropMaskInfo.s2StartIdx = s2VBegin;
@@ -3655,7 +3655,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::DropOutC
 
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::SubGrapA(int64_t curIdx, int64_t curS1Idx,
-                                                                                 int64_t curS2Idx, DBParams &dbParam,
+                                                                                 int64_t curS2Idx, DBParams& dbParam,
                                                                                  event_t mte2WaitMte3A)
 {
     pingpongIdx = dbParam.taskId % 2;
@@ -3678,17 +3678,16 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::SubGrapA
             int64_t innerRowOffsetLeft =
                 unlikely(dbParam.bIdx == 0) ?
                     0 :
-                    ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * 32 / sizeof(float);
+                    ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * 32 / sizeof(float);
             int64_t originInnerBatchOffset = ((dbParam.n2Idx * g + dbParam.gIdx) * dbParam.actualS1Len +
                                               dbParam.s1oIdx * s1CvInner + curS1Idx * s1VecSize) *
                                              32 / sizeof(float);
-            softMaxOffset = ((((__gm__ int64_t *)actual_seq_qlen_addr)[b - 1] * 32 / sizeof(float)) *
+            softMaxOffset = ((((__gm__ int64_t*)actual_seq_qlen_addr)[b - 1] * 32 / sizeof(float)) *
                                  (dbParam.n2Idx * g + dbParam.gIdx) +
                              innerRowOffsetLeft + originInnerBatchOffset % (dbParam.actualS1Len * 32 / sizeof(float)));
         } else {
             if (dbParam.bIdx > 0) {
-                softMaxOffset =
-                    ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * 32 / sizeof(float);
+                softMaxOffset = ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * 32 / sizeof(float);
             }
             softMaxOffset += ((dbParam.n2Idx * g + dbParam.gIdx) * dbParam.actualS1Len + dbParam.s1oIdx * s1CvInner +
                               curS1Idx * s1VecSize) *
@@ -3959,9 +3958,9 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::SubGrapA
 template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::SubGrapB(int64_t curIdx, int64_t s1VecLoop,
                                                                                  int64_t s2VecLoop, int64_t curS1Idx,
-                                                                                 int64_t curS2Idx, DBParams &dbParam,
+                                                                                 int64_t curS2Idx, DBParams& dbParam,
                                                                                  event_t mte2WaitMte3B,
-                                                                                 float *dsinkSumLocal)
+                                                                                 float* dsinkSumLocal)
 {
     pingpongIdx = dbParam.taskId % 2;
     uint32_t ubBufferOffset = DbBegin;
@@ -4098,18 +4097,18 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::SubGrapB
                 int64_t innerRowOffsetLeft =
                     unlikely(dbParam.bIdx == 0) ?
                         0 :
-                        ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * 32 / sizeof(float);
+                        ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * 32 / sizeof(float);
                 int64_t originInnerBatchOffset = ((dbParam.n2Idx * g + dbParam.gIdx) * dbParam.actualS1Len +
                                                   dbParam.s1oIdx * s1CvInner + curS1Idx * s1VecSize) *
                                                  32 / sizeof(float);
                 softMaxOffset =
-                    ((((__gm__ int64_t *)actual_seq_qlen_addr)[b - 1] * 32 / sizeof(float)) *
+                    ((((__gm__ int64_t*)actual_seq_qlen_addr)[b - 1] * 32 / sizeof(float)) *
                          (dbParam.n2Idx * g + dbParam.gIdx) +
                      innerRowOffsetLeft + originInnerBatchOffset % (dbParam.actualS1Len * 32 / sizeof(float)));
             } else {
                 if (dbParam.bIdx > 0) {
                     softMaxOffset =
-                        ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * 32 / sizeof(float);
+                        ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * n2 * g * 32 / sizeof(float);
                 }
                 softMaxOffset += ((dbParam.n2Idx * g + dbParam.gIdx) * dbParam.actualS1Len +
                                   dbParam.s1oIdx * s1CvInner + curS1Idx * s1VecSize) *
@@ -4185,7 +4184,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::SubGrapB
 }
 
 template <typename FAGT>
-__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeVec(DBParams &dbParam)
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeVec(DBParams& dbParam)
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
@@ -4248,7 +4247,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeV
     sfmgOffset = 0;
     if constexpr (INPUT_LAYOUT == TND) {
         if (dbParam.bIdx > 0) {
-            sfmgOffset = n2 * g * ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * 8;
+            sfmgOffset = n2 * g * ((__gm__ int64_t*)actual_seq_qlen_addr)[dbParam.bIdx - 1] * 8;
         }
         sfmgOffset += ((dbParam.n2Idx * g + dbParam.gIdx) * dbParam.actualS1Len + dbParam.s1oIdx * s1CvInner) * 8;
     } else {

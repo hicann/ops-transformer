@@ -43,7 +43,7 @@ public:
 
     using CopyUbToGmO = typename TileCopy::CopyUbToGmO;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource)
     {
         oTmpUBTensor = resource.ubBuf.template GetBufferByByte<ElementOTmp>(MXFP4::UB_OTMP_BUF_OFFSET);
         localRowSumUBTensor = resource.ubBuf.template GetBufferByByte<ElementSum>(MXFP4::UB_LOCAL_ROW_SUM_BUF_OFFSET);
@@ -59,8 +59,8 @@ public:
     __aicore__ inline ~BlockEpilogue() {}
 
     template <class TensorO>
-    __aicore__ inline void operator()(TensorO &gOTensor, GemmCoord &actualOriShape, TaskInfo &taskInfo,
-                                      TileInfo &tileInfo)
+    __aicore__ inline void operator()(TensorO& gOTensor, GemmCoord& actualOriShape, TaskInfo& taskInfo,
+                                      TileInfo& tileInfo)
     {
         uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
         AscendC::LocalTensor<ElementDm> dm = dmUBTensor[tileInfo.updateScaleIdx];

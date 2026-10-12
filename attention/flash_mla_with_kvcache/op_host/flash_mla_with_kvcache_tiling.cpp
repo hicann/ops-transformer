@@ -31,13 +31,13 @@ using namespace Ops::Transformer::OpTiling;
 namespace optiling {
 using namespace flash_mla_with_kvcache;
 
-static bool IsEmptyInput(gert::TilingContext *context)
+static bool IsEmptyInput(gert::TilingContext* context)
 {
     (void)context;
     return false;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingFlashMlaWithKvcache(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingFlashMlaWithKvcache(gert::TilingContext* context)
 {
     OP_LOGW(context, "FlashMlaWithKvcache TilingFlashMlaWithKvcache start.");
 
@@ -65,7 +65,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFlashMlaWithKvcache(gert::TilingContext *
     return FiaTilingRegistry::GetInstance().DoTilingImpl(context, &faInfo);
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashMlaWithKvcache(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashMlaWithKvcache(gert::TilingParseContext* context)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context, "platformInfoPtr is null"), return ge::GRAPH_FAILED);

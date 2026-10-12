@@ -44,7 +44,7 @@
 
 constexpr size_t FIRST_ELEMENT_INDEX = 0UL;
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto dim : shape) {
@@ -69,7 +69,7 @@ float Bfloat16ToFloat(uint16_t value)
     return result;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -88,8 +88,8 @@ void Finalize(int32_t deviceId, aclrtStream stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclFormat formatType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclFormat formatType, aclTensor** tensor)
 {
     const size_t size = static_cast<size_t>(GetShapeSize(shape)) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -109,7 +109,7 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return ACL_SUCCESS;
 }
 
-int RunBlockAttnResUpdate(int32_t deviceId, aclrtStream &stream)
+int RunBlockAttnResUpdate(int32_t deviceId, aclrtStream& stream)
 {
     auto ret = Init(deviceId, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
@@ -128,76 +128,76 @@ int RunBlockAttnResUpdate(int32_t deviceId, aclrtStream &stream)
     std::vector<float> expSumHostData(GetShapeSize(statsShape), 1.0F);
     std::vector<uint16_t> hHostData(GetShapeSize(matrixShape), 0U);
 
-    void *partialBlockRefDeviceAddr = nullptr;
-    void *deltaDeviceAddr = nullptr;
-    void *pseudoQueryDeviceAddr = nullptr;
-    void *numeratorDeviceAddr = nullptr;
-    void *logitMaxDeviceAddr = nullptr;
-    void *expSumDeviceAddr = nullptr;
-    void *hDeviceAddr = nullptr;
+    void* partialBlockRefDeviceAddr = nullptr;
+    void* deltaDeviceAddr = nullptr;
+    void* pseudoQueryDeviceAddr = nullptr;
+    void* numeratorDeviceAddr = nullptr;
+    void* logitMaxDeviceAddr = nullptr;
+    void* expSumDeviceAddr = nullptr;
+    void* hDeviceAddr = nullptr;
 
-    aclTensor *partialBlockRef = nullptr;
-    aclTensor *delta = nullptr;
-    aclTensor *pseudoQuery = nullptr;
-    aclTensor *numerator = nullptr;
-    aclTensor *logitMax = nullptr;
-    aclTensor *expSum = nullptr;
-    aclTensor *h = nullptr;
+    aclTensor* partialBlockRef = nullptr;
+    aclTensor* delta = nullptr;
+    aclTensor* pseudoQuery = nullptr;
+    aclTensor* numerator = nullptr;
+    aclTensor* logitMax = nullptr;
+    aclTensor* expSum = nullptr;
+    aclTensor* h = nullptr;
 
     ret = CreateAclTensor<float>(partialBlockRefHostData, matrixShape, &partialBlockRefDeviceAddr,
                                  aclDataType::ACL_FLOAT, aclFormat::ACL_FORMAT_ND, &partialBlockRef);
-    std::unique_ptr<void, aclError (*)(void *)> partialBlockRefDeviceAddrPtr(partialBlockRefDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> partialBlockRefTensorPtr(partialBlockRef,
-                                                                                            aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> partialBlockRefDeviceAddrPtr(partialBlockRefDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> partialBlockRefTensorPtr(partialBlockRef,
+                                                                                           aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor<uint16_t>(deltaHostData, matrixShape, &deltaDeviceAddr, aclDataType::ACL_BF16,
                                     aclFormat::ACL_FORMAT_ND, &delta);
-    std::unique_ptr<void, aclError (*)(void *)> deltaDeviceAddrPtr(deltaDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> deltaTensorPtr(delta, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> deltaDeviceAddrPtr(deltaDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> deltaTensorPtr(delta, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor<float>(pseudoQueryHostData, queryShape, &pseudoQueryDeviceAddr, aclDataType::ACL_FLOAT,
                                  aclFormat::ACL_FORMAT_ND, &pseudoQuery);
-    std::unique_ptr<void, aclError (*)(void *)> pseudoQueryDeviceAddrPtr(pseudoQueryDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> pseudoQueryTensorPtr(pseudoQuery, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> pseudoQueryDeviceAddrPtr(pseudoQueryDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> pseudoQueryTensorPtr(pseudoQuery, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor<float>(numeratorHostData, matrixShape, &numeratorDeviceAddr, aclDataType::ACL_FLOAT,
                                  aclFormat::ACL_FORMAT_ND, &numerator);
-    std::unique_ptr<void, aclError (*)(void *)> numeratorDeviceAddrPtr(numeratorDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> numeratorTensorPtr(numerator, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> numeratorDeviceAddrPtr(numeratorDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> numeratorTensorPtr(numerator, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor<float>(logitMaxHostData, statsShape, &logitMaxDeviceAddr, aclDataType::ACL_FLOAT,
                                  aclFormat::ACL_FORMAT_ND, &logitMax);
-    std::unique_ptr<void, aclError (*)(void *)> logitMaxDeviceAddrPtr(logitMaxDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> logitMaxTensorPtr(logitMax, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> logitMaxDeviceAddrPtr(logitMaxDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> logitMaxTensorPtr(logitMax, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor<float>(expSumHostData, statsShape, &expSumDeviceAddr, aclDataType::ACL_FLOAT,
                                  aclFormat::ACL_FORMAT_ND, &expSum);
-    std::unique_ptr<void, aclError (*)(void *)> expSumDeviceAddrPtr(expSumDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> expSumTensorPtr(expSum, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> expSumDeviceAddrPtr(expSumDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> expSumTensorPtr(expSum, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor<uint16_t>(hHostData, matrixShape, &hDeviceAddr, aclDataType::ACL_BF16,
                                     aclFormat::ACL_FORMAT_ND, &h);
-    std::unique_ptr<void, aclError (*)(void *)> hDeviceAddrPtr(hDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> hTensorPtr(h, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> hDeviceAddrPtr(hDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> hTensorPtr(h, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     constexpr double eps = 1.0e-6;
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
 
     ret = aclnnBlockAttnResUpdateGetWorkspaceSize(partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum, eps,
                                                   h, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnBlockAttnResUpdateGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    std::unique_ptr<void, aclError (*)(void *)> workspaceAddrPtr(nullptr, aclrtFree);
+    std::unique_ptr<void, aclError (*)(void*)> workspaceAddrPtr(nullptr, aclrtFree);
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

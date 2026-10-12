@@ -77,20 +77,20 @@ typedef struct FagInShapeInfoS {
 } FagInShapeInfo;
 
 typedef struct FagShapeArrayS {
-    aclIntArray *queryShapeArray = nullptr;
-    aclIntArray *keyShapeArray = nullptr;
-    aclIntArray *dqShapeArray = nullptr;
-    aclIntArray *dkShapeArray = nullptr;
-    aclIntArray *queryBwShapeArray = nullptr;
-    aclIntArray *keyBwShapeArray = nullptr;
-    aclIntArray *dqBwShapeArray = nullptr;
-    aclIntArray *dkBwShapeArray = nullptr;
-    aclIntArray *valueReshapeBefore = nullptr;
-    aclIntArray *valueReshapeAfter = nullptr;
-    aclIntArray *attenInReshapeBefore = nullptr;
-    aclIntArray *attenInReshapeAfter = nullptr;
-    aclIntArray *dvReshapeBefore = nullptr;
-    aclIntArray *dvReshapeAfter = nullptr;
+    aclIntArray* queryShapeArray = nullptr;
+    aclIntArray* keyShapeArray = nullptr;
+    aclIntArray* dqShapeArray = nullptr;
+    aclIntArray* dkShapeArray = nullptr;
+    aclIntArray* queryBwShapeArray = nullptr;
+    aclIntArray* keyBwShapeArray = nullptr;
+    aclIntArray* dqBwShapeArray = nullptr;
+    aclIntArray* dkBwShapeArray = nullptr;
+    aclIntArray* valueReshapeBefore = nullptr;
+    aclIntArray* valueReshapeAfter = nullptr;
+    aclIntArray* attenInReshapeBefore = nullptr;
+    aclIntArray* attenInReshapeAfter = nullptr;
+    aclIntArray* dvReshapeBefore = nullptr;
+    aclIntArray* dvReshapeAfter = nullptr;
 } FagShapeArray;
 
 static constexpr int64_t ALIGN_D_DIM_SIZE = 128;
@@ -130,12 +130,12 @@ static bool IsAscend950()
     return GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
 }
 
-static bool NeedTransposeSoftmaxTensor(const char *softmaxInLayout)
+static bool NeedTransposeSoftmaxTensor(const char* softmaxInLayout)
 {
     return softmaxInLayout != nullptr && strcmp(softmaxInLayout, "same_as_input") == 0 && !IsAscend950();
 }
 
-static bool CheckIsNeedPad(const FagInShapeInfo &fagShape)
+static bool CheckIsNeedPad(const FagInShapeInfo& fagShape)
 {
     if (fagShape.dDim == HEAD_DIM_192 && fagShape.inputLayoutStr != "TND" && fagShape.needTranspose == false) {
         OP_LOGD("D=192, Scenarios that do not require pad processing");
@@ -150,7 +150,7 @@ static bool CheckIsNeedPad(const FagInShapeInfo &fagShape)
     return true;
 }
 
-static int64_t GetSumIntArrayMaxValue(const aclIntArray *intArrayValue)
+static int64_t GetSumIntArrayMaxValue(const aclIntArray* intArrayValue)
 {
     // 获取targetLengthsList中的最大值
     int64_t maxLength = 0;
@@ -169,7 +169,7 @@ static int64_t GetSumIntArrayMaxValue(const aclIntArray *intArrayValue)
     return maxLength;
 }
 
-static int64_t getSeqLenQSum(const aclIntArray *actualSeqQLenOptional)
+static int64_t getSeqLenQSum(const aclIntArray* actualSeqQLenOptional)
 {
     if (actualSeqQLenOptional->Size() < 1) {
         return 0;
@@ -184,7 +184,7 @@ static int64_t getSeqLenQSum(const aclIntArray *actualSeqQLenOptional)
     return sQLenSum;
 }
 
-static void GetActSeqLen(const aclIntArray *cuSeqLen, int64_t &sum)
+static void GetActSeqLen(const aclIntArray* cuSeqLen, int64_t& sum)
 {
     if (cuSeqLen->Size() < 1) {
         return;
@@ -198,8 +198,8 @@ static void GetActSeqLen(const aclIntArray *cuSeqLen, int64_t &sum)
     }
 }
 
-static bool CheckDimT(const FagInShapeInfo &fagShape, const aclIntArray *actualSeqQLenOptional,
-                      const aclIntArray *actualSeqKvLenOptional, int64_t &sumSeqQLen, int64_t &sumSeqKvLen)
+static bool CheckDimT(const FagInShapeInfo& fagShape, const aclIntArray* actualSeqQLenOptional,
+                      const aclIntArray* actualSeqKvLenOptional, int64_t& sumSeqQLen, int64_t& sumSeqKvLen)
 {
     if (actualSeqQLenOptional == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "actualSeqQLenOptional");
@@ -217,8 +217,8 @@ static bool CheckDimT(const FagInShapeInfo &fagShape, const aclIntArray *actualS
     return true;
 }
 
-static bool CheckTndIsNeedPad(const FagInShapeInfo &fagShape, const aclIntArray *actualSeqQLenOptional,
-                              const aclIntArray *actualSeqKvLenOptional, int64_t dDim, double keepProb)
+static bool CheckTndIsNeedPad(const FagInShapeInfo& fagShape, const aclIntArray* actualSeqQLenOptional,
+                              const aclIntArray* actualSeqKvLenOptional, int64_t dDim, double keepProb)
 {
     int64_t sKvLenMax = 0;
     int64_t sQLenSum = 0;
@@ -258,11 +258,11 @@ static bool CheckTndIsNeedPad(const FagInShapeInfo &fagShape, const aclIntArray 
     return true;
 }
 
-static aclnnStatus InvalidTensorDimCheck(const aclTensor *query, const aclTensor *queryRope, const aclTensor *key,
-                                         const aclTensor *keyRope, const aclTensor *value, const aclTensor *dy,
-                                         const aclTensor *attentionIn, const aclTensor *dq, const aclTensor *dqRope,
-                                         const aclTensor *dk, const aclTensor *dkRope, const aclTensor *dv,
-                                         const aclTensor *sinkIn, const aclTensor *dsinkOut)
+static aclnnStatus InvalidTensorDimCheck(const aclTensor* query, const aclTensor* queryRope, const aclTensor* key,
+                                         const aclTensor* keyRope, const aclTensor* value, const aclTensor* dy,
+                                         const aclTensor* attentionIn, const aclTensor* dq, const aclTensor* dqRope,
+                                         const aclTensor* dk, const aclTensor* dkRope, const aclTensor* dv,
+                                         const aclTensor* sinkIn, const aclTensor* dsinkOut)
 {
     if (queryRope != nullptr && keyRope != nullptr && dqRope != nullptr && dkRope != nullptr) {
         auto queryRopeDimNum = queryRope->GetViewShape().GetDimNum();
@@ -313,10 +313,10 @@ static aclnnStatus InvalidTensorDimCheck(const aclTensor *query, const aclTensor
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus isSupportMultiInput(const aclTensor *query, const aclTensor *queryRope, const aclTensor *key,
-                                       const aclTensor *keyRope, const aclTensor *value,
-                                       const aclTensor *attenMaskOptional, const aclTensor *pseShiftOptional,
-                                       const aclTensor *dropMaskOptional, double keepProb, FagInShapeInfo &fagShape,
+static aclnnStatus isSupportMultiInput(const aclTensor* query, const aclTensor* queryRope, const aclTensor* key,
+                                       const aclTensor* keyRope, const aclTensor* value,
+                                       const aclTensor* attenMaskOptional, const aclTensor* pseShiftOptional,
+                                       const aclTensor* dropMaskOptional, double keepProb, FagInShapeInfo& fagShape,
                                        int64_t sparseMode)
 {
     CHECK_RET((queryRope == nullptr && keyRope == nullptr) || (queryRope != nullptr && keyRope != nullptr),
@@ -405,10 +405,10 @@ static aclnnStatus isSupportMultiInput(const aclTensor *query, const aclTensor *
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus GetInputShapeInfo(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                                     int64_t headNum, const char *inputLayout, FagInShapeInfo &fagShape,
-                                     const aclIntArray *actualSeqQLenOptional,
-                                     const aclIntArray *actualSeqKvLenOptional, double keepProb)
+static aclnnStatus GetInputShapeInfo(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                     int64_t headNum, const char* inputLayout, FagInShapeInfo& fagShape,
+                                     const aclIntArray* actualSeqQLenOptional,
+                                     const aclIntArray* actualSeqKvLenOptional, double keepProb)
 {
     auto queryShape = query->GetViewShape();
     auto keyShape = key->GetViewShape();
@@ -639,8 +639,8 @@ static aclnnStatus GetInputShapeInfo(const aclTensor *query, const aclTensor *ke
     return ACLNN_SUCCESS;
 }
 
-static inline aclnnStatus ContiguousTensorWithCheck(const aclTensor *inputTensor, const aclTensor **outTensor,
-                                                    aclOpExecutor *executor)
+static inline aclnnStatus ContiguousTensorWithCheck(const aclTensor* inputTensor, const aclTensor** outTensor,
+                                                    aclOpExecutor* executor)
 {
     if (inputTensor != nullptr && inputTensor->GetViewShape().GetDimNum() != 0) {
         *outTensor = l0op::Contiguous(inputTensor, executor);
@@ -653,7 +653,7 @@ static inline aclnnStatus ContiguousTensorWithCheck(const aclTensor *inputTensor
     return ACLNN_SUCCESS;
 }
 
-static inline void ConvertInputLayout(FagInShapeInfo fagShape, const char *inputLayout, char *inputLayoutUnderTrans,
+static inline void ConvertInputLayout(FagInShapeInfo fagShape, const char* inputLayout, char* inputLayoutUnderTrans,
                                       size_t layoutUnderTransSize)
 {
     if (fagShape.needTranspose) {                  // 1. 只要是需要transpose，输入FAG layout必然是BNSD
@@ -686,13 +686,13 @@ static inline void ConvertInputLayout(FagInShapeInfo fagShape, const char *input
     }
 }
 
-static aclnnStatus ContiguousInputTensor(const aclTensor *query, const aclTensor *queryRope, const aclTensor *key,
-                                         const aclTensor *keyRope, const aclTensor *value, const aclTensor *dy,
-                                         const aclTensor *attentionInOptional, const aclTensor **queryCngs,
-                                         const aclTensor **queryRopeCngs, const aclTensor **keyCngs,
-                                         const aclTensor **keyRopeCngs, const aclTensor **valueCngs,
-                                         const aclTensor **dyCngs, const aclTensor **attentionInOptionalCngs,
-                                         aclOpExecutor *executor)
+static aclnnStatus ContiguousInputTensor(const aclTensor* query, const aclTensor* queryRope, const aclTensor* key,
+                                         const aclTensor* keyRope, const aclTensor* value, const aclTensor* dy,
+                                         const aclTensor* attentionInOptional, const aclTensor** queryCngs,
+                                         const aclTensor** queryRopeCngs, const aclTensor** keyCngs,
+                                         const aclTensor** keyRopeCngs, const aclTensor** valueCngs,
+                                         const aclTensor** dyCngs, const aclTensor** attentionInOptionalCngs,
+                                         aclOpExecutor* executor)
 {
     auto ret = ACLNN_SUCCESS;
 
@@ -732,18 +732,18 @@ static aclnnStatus ContiguousInputTensor(const aclTensor *query, const aclTensor
 }
 
 static aclnnStatus ContiguousOptionalInputTensor(
-    const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional,
-    const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional, const aclTensor *softmaxSumOptional,
-    const aclTensor *softmaxInOptional, const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
-    const aclTensor *dScaleQOptional, const aclTensor *dScaleKOptional, const aclTensor *dScaleVOptional,
-    const aclTensor *dScaleDyOptional, const aclTensor *dScaleOOptional, const aclTensor *sinkInOptional,
-    const aclTensor **pseShiftOptionalCngs, const aclTensor **dropMaskOptionalCngs,
-    const aclTensor **paddingMaskOptionalCngs, const aclTensor **attenMaskOptionalCngs,
-    const aclTensor **softmaxMaxOptionalCngs, const aclTensor **softmaxSumOptionalCngs,
-    const aclTensor **softmaxInOptionalCngs, const aclTensor **queryRopeOptionalCngs,
-    const aclTensor **keyRopeOptionalCngs, const aclTensor **dScaleQOptionalCngs, const aclTensor **dScaleKOptionalCngs,
-    const aclTensor **dScaleVOptionalCngs, const aclTensor **dScaleDyOptionalCngs,
-    const aclTensor **dScaleOOptionalCngs, const aclTensor **sinkInOptionalCngs, aclOpExecutor *executor)
+    const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional,
+    const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional,
+    const aclTensor* softmaxInOptional, const aclTensor* queryRopeOptional, const aclTensor* keyRopeOptional,
+    const aclTensor* dScaleQOptional, const aclTensor* dScaleKOptional, const aclTensor* dScaleVOptional,
+    const aclTensor* dScaleDyOptional, const aclTensor* dScaleOOptional, const aclTensor* sinkInOptional,
+    const aclTensor** pseShiftOptionalCngs, const aclTensor** dropMaskOptionalCngs,
+    const aclTensor** paddingMaskOptionalCngs, const aclTensor** attenMaskOptionalCngs,
+    const aclTensor** softmaxMaxOptionalCngs, const aclTensor** softmaxSumOptionalCngs,
+    const aclTensor** softmaxInOptionalCngs, const aclTensor** queryRopeOptionalCngs,
+    const aclTensor** keyRopeOptionalCngs, const aclTensor** dScaleQOptionalCngs, const aclTensor** dScaleKOptionalCngs,
+    const aclTensor** dScaleVOptionalCngs, const aclTensor** dScaleDyOptionalCngs,
+    const aclTensor** dScaleOOptionalCngs, const aclTensor** sinkInOptionalCngs, aclOpExecutor* executor)
 {
     auto ret = ACLNN_SUCCESS;
 
@@ -811,9 +811,9 @@ static aclnnStatus ContiguousOptionalInputTensor(
     return ret;
 }
 
-static aclnnStatus ContiguousQuantOptionalInputTensor(const aclTensor *dsScaleOptional, const aclTensor *pScaleOptional,
-                                                      const aclTensor **dsScaleOptionalCngs,
-                                                      const aclTensor **pScaleOptionalCngs, aclOpExecutor *executor)
+static aclnnStatus ContiguousQuantOptionalInputTensor(const aclTensor* dsScaleOptional, const aclTensor* pScaleOptional,
+                                                      const aclTensor** dsScaleOptionalCngs,
+                                                      const aclTensor** pScaleOptionalCngs, aclOpExecutor* executor)
 {
     auto ret = ACLNN_SUCCESS;
 
@@ -826,8 +826,8 @@ static aclnnStatus ContiguousQuantOptionalInputTensor(const aclTensor *dsScaleOp
     return ret;
 }
 
-static void GetInputAndOutputReshapeArray(const aclTensor *query, const aclTensor *key, FagInShapeInfo fagShape,
-                                          FagShapeArray &fagShapeArray, aclOpExecutor *executor)
+static void GetInputAndOutputReshapeArray(const aclTensor* query, const aclTensor* key, FagInShapeInfo fagShape,
+                                          FagShapeArray& fagShapeArray, aclOpExecutor* executor)
 {
     if (fagShape.passThrowInnerFag) {
         return;
@@ -866,9 +866,9 @@ static void GetInputAndOutputReshapeArray(const aclTensor *query, const aclTenso
     return;
 }
 
-static void GetInputAndOutputBackwordReshapeArrayForSBH(const aclTensor *query, const aclTensor *key,
-                                                        FagInShapeInfo fagShape, FagShapeArray &fagShapeArray,
-                                                        aclOpExecutor *executor)
+static void GetInputAndOutputBackwordReshapeArrayForSBH(const aclTensor* query, const aclTensor* key,
+                                                        FagInShapeInfo fagShape, FagShapeArray& fagShapeArray,
+                                                        aclOpExecutor* executor)
 {
     if (!(fagShape.needBackwordReshape)) {
         return;
@@ -911,8 +911,8 @@ static void GetInputAndOutputBackwordReshapeArrayForSBH(const aclTensor *query, 
     return;
 }
 
-static void GetKvUnequalReshapeArray(const aclTensor *value, FagInShapeInfo fagShape, FagShapeArray &fagShapeArray,
-                                     aclOpExecutor *executor)
+static void GetKvUnequalReshapeArray(const aclTensor* value, FagInShapeInfo fagShape, FagShapeArray& fagShapeArray,
+                                     aclOpExecutor* executor)
 {
     if (!(fagShape.needPadValueD)) {
         return;
@@ -961,10 +961,10 @@ static void GetKvUnequalReshapeArray(const aclTensor *value, FagInShapeInfo fagS
     fagShapeArray.dvReshapeAfter = executor->AllocIntArray(dvReshapeAfterList.data(), dvReshapeAfterList.size());
 }
 
-static aclnnStatus ReshapeInputTensor(const aclTensor **query, const aclTensor **key, const aclTensor **value,
-                                      const aclTensor **dy, const aclTensor **attentionInOptional,
+static aclnnStatus ReshapeInputTensor(const aclTensor** query, const aclTensor** key, const aclTensor** value,
+                                      const aclTensor** dy, const aclTensor** attentionInOptional,
                                       FagInShapeInfo fagShape, FagShapeArray fagShapeArray, bool isBackWord,
-                                      aclOpExecutor *executor)
+                                      aclOpExecutor* executor)
 {
     bool needReshape = isBackWord ? fagShape.needBackwordReshape : !(fagShape.passThrowInnerFag);
     if (!needReshape) {
@@ -1011,9 +1011,9 @@ static aclnnStatus ReshapeInputTensor(const aclTensor **query, const aclTensor *
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ReshapeOutputTensor(std::array<const aclTensor *, l0op::MAX_FAG_OUTPUT_CNT> &fagOut,
+static aclnnStatus ReshapeOutputTensor(std::array<const aclTensor*, l0op::MAX_FAG_OUTPUT_CNT>& fagOut,
                                        FagInShapeInfo fagShape, FagShapeArray fagShapeArray, bool isBackWord,
-                                       aclOpExecutor *executor)
+                                       aclOpExecutor* executor)
 {
     bool needReshape = isBackWord ? fagShape.needBackwordReshape : !(fagShape.passThrowInnerFag);
     if (!needReshape) {
@@ -1024,8 +1024,8 @@ static aclnnStatus ReshapeOutputTensor(std::array<const aclTensor *, l0op::MAX_F
         return ACLNN_SUCCESS;
     }
 
-    aclIntArray *dqShapeArray = isBackWord ? fagShapeArray.dqBwShapeArray : fagShapeArray.dqShapeArray;
-    aclIntArray *dkShapeArray = isBackWord ? fagShapeArray.dkBwShapeArray : fagShapeArray.dkShapeArray;
+    aclIntArray* dqShapeArray = isBackWord ? fagShapeArray.dqBwShapeArray : fagShapeArray.dqShapeArray;
+    aclIntArray* dkShapeArray = isBackWord ? fagShapeArray.dkBwShapeArray : fagShapeArray.dkShapeArray;
 
     // reshape
     fagOut[0] = l0op::Reshape(fagOut[0], dqShapeArray, executor);
@@ -1047,9 +1047,9 @@ static aclnnStatus ReshapeOutputTensor(std::array<const aclTensor *, l0op::MAX_F
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus PaddingInputTensorDdim(const aclTensor **query, const aclTensor **key, const aclTensor **value,
-                                          const aclTensor **dy, const aclTensor **attentionInOptional,
-                                          FagInShapeInfo fagShape, aclOpExecutor *executor)
+static aclnnStatus PaddingInputTensorDdim(const aclTensor** query, const aclTensor** key, const aclTensor** value,
+                                          const aclTensor** dy, const aclTensor** attentionInOptional,
+                                          FagInShapeInfo fagShape, aclOpExecutor* executor)
 {
     if (!(fagShape.needPadDimD)) {
         OP_LOGD("Fag aclnn case do not do pad dimD operation.");
@@ -1060,7 +1060,7 @@ static aclnnStatus PaddingInputTensorDdim(const aclTensor **query, const aclTens
     // padding
     // query
     auto padSize = (fagShape.dDim + fagShape.alignDim - 1) / fagShape.alignDim * fagShape.alignDim - fagShape.dDim;
-    aclIntArray *paddingArray = nullptr;
+    aclIntArray* paddingArray = nullptr;
     if (fagShape.inputLayoutStr == "TND") {
         FVector<int64_t> padding = {0, 0, 0, 0, 0, padSize};
         paddingArray = executor->AllocIntArray(padding.data(), 6); // 6: TND 3dims, padding D dim
@@ -1110,8 +1110,8 @@ static aclnnStatus PaddingInputTensorDdim(const aclTensor **query, const aclTens
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus SliceOutputTensorDdim(std::array<const aclTensor *, l0op::MAX_FAG_OUTPUT_CNT> &fagOut,
-                                         FagInShapeInfo fagShape, aclOpExecutor *executor)
+static aclnnStatus SliceOutputTensorDdim(std::array<const aclTensor*, l0op::MAX_FAG_OUTPUT_CNT>& fagOut,
+                                         FagInShapeInfo fagShape, aclOpExecutor* executor)
 {
     if (!(fagShape.needPadDimD)) {
         return ACLNN_SUCCESS;
@@ -1131,7 +1131,7 @@ static aclnnStatus SliceOutputTensorDdim(std::array<const aclTensor *, l0op::MAX
         dkOutSizeVector.emplace_back(dkOutShape.GetDim(i));
     }
 
-    aclIntArray *offsets = nullptr;
+    aclIntArray* offsets = nullptr;
     if (fagShape.inputLayoutStr == "TND") {
         FVector<int64_t> offsetsVector = {0, 0, 0};
         offsets = executor->AllocIntArray(offsetsVector.data(), offsetsVector.size());
@@ -1164,7 +1164,7 @@ static aclnnStatus SliceOutputTensorDdim(std::array<const aclTensor *, l0op::MAX
     return ACLNN_SUCCESS;
 }
 
-static inline const aclTensor *GeneratePaddings(int32_t dimNum, int32_t padNum, aclOpExecutor *executor)
+static inline const aclTensor* GeneratePaddings(int32_t dimNum, int32_t padNum, aclOpExecutor* executor)
 {
     // 2代表每根轴的前后都可以补0
     FVector<int64_t> padVec(dimNum * 2, 0);
@@ -1181,8 +1181,8 @@ static inline const aclTensor *GeneratePaddings(int32_t dimNum, int32_t padNum, 
     return padTensor;
 }
 
-static aclnnStatus PaddingValueDim(const aclTensor **value, const aclTensor **dy, const aclTensor **attentionInOptional,
-                                   FagInShapeInfo fagShape, FagShapeArray fagShapeArray, aclOpExecutor *executor)
+static aclnnStatus PaddingValueDim(const aclTensor** value, const aclTensor** dy, const aclTensor** attentionInOptional,
+                                   FagInShapeInfo fagShape, FagShapeArray fagShapeArray, aclOpExecutor* executor)
 {
     if (!(fagShape.needPadValueD)) {
         return ACLNN_SUCCESS;
@@ -1248,8 +1248,8 @@ static aclnnStatus PaddingValueDim(const aclTensor **value, const aclTensor **dy
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus SliceDvOut(std::array<const aclTensor *, l0op::MAX_FAG_OUTPUT_CNT> &fagOut, FagInShapeInfo fagShape,
-                              FagShapeArray fagShapeArray, aclOpExecutor *executor)
+static aclnnStatus SliceDvOut(std::array<const aclTensor*, l0op::MAX_FAG_OUTPUT_CNT>& fagOut, FagInShapeInfo fagShape,
+                              FagShapeArray fagShapeArray, aclOpExecutor* executor)
 {
     if (!(fagShape.needPadValueD)) {
         return ACLNN_SUCCESS;
@@ -1297,9 +1297,9 @@ static aclnnStatus SliceDvOut(std::array<const aclTensor *, l0op::MAX_FAG_OUTPUT
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus TransposeInputTensor(const aclTensor **query, const aclTensor **key, const aclTensor **value,
-                                        const aclTensor **dy, const aclTensor **attentionInOptional,
-                                        FagInShapeInfo fagShape, aclOpExecutor *executor)
+static aclnnStatus TransposeInputTensor(const aclTensor** query, const aclTensor** key, const aclTensor** value,
+                                        const aclTensor** dy, const aclTensor** attentionInOptional,
+                                        FagInShapeInfo fagShape, aclOpExecutor* executor)
 {
     if (!(fagShape.needTranspose)) {
         return ACLNN_SUCCESS;
@@ -1358,8 +1358,8 @@ static aclnnStatus TransposeInputTensor(const aclTensor **query, const aclTensor
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus TransposeSoftMaxTensor(const aclTensor **softmax, const aclTensor **softmaxSum,
-                                          FagInShapeInfo fagShape, aclOpExecutor *executor)
+static aclnnStatus TransposeSoftMaxTensor(const aclTensor** softmax, const aclTensor** softmaxSum,
+                                          FagInShapeInfo fagShape, aclOpExecutor* executor)
 {
     if (fagShape.inputLayoutStr == "TND") {
         FVector<int64_t> transposeDim = {1, 0, 2};
@@ -1373,8 +1373,8 @@ static aclnnStatus TransposeSoftMaxTensor(const aclTensor **softmax, const aclTe
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus TransposeOutputTensor(std::array<const aclTensor *, l0op::MAX_FAG_OUTPUT_CNT> &fagOut,
-                                         FagInShapeInfo fagShape, aclOpExecutor *executor)
+static aclnnStatus TransposeOutputTensor(std::array<const aclTensor*, l0op::MAX_FAG_OUTPUT_CNT>& fagOut,
+                                         FagInShapeInfo fagShape, aclOpExecutor* executor)
 {
     if (!(fagShape.needTranspose)) {
         return ACLNN_SUCCESS;
@@ -1418,8 +1418,8 @@ static aclnnStatus TransposeOutputTensor(std::array<const aclTensor *, l0op::MAX
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus InputDtypeCheck(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                                   const aclTensor *dy)
+static aclnnStatus InputDtypeCheck(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                   const aclTensor* dy)
 {
     auto vDtype = value->GetDataType();
     auto kDtype = key->GetDataType();
@@ -1463,7 +1463,7 @@ static aclnnStatus InputDtypeCheck(const aclTensor *query, const aclTensor *key,
     return ACLNN_SUCCESS;
 }
 
-static bool IsSameShapeExceptLastDim(const op::Shape &leftShape, const op::Shape &rightShape)
+static bool IsSameShapeExceptLastDim(const op::Shape& leftShape, const op::Shape& rightShape)
 {
     if (leftShape.GetDimNum() != rightShape.GetDimNum()) {
         return false;
@@ -1476,11 +1476,11 @@ static bool IsSameShapeExceptLastDim(const op::Shape &leftShape, const op::Shape
     return true;
 }
 
-static aclnnStatus InputOutputShapeCheck(const aclTensor *query, const aclTensor *queryRope, const aclTensor *key,
-                                         const aclTensor *keyRope, const aclTensor *value, const aclTensor *dy,
-                                         const aclTensor *attentionIn, const aclTensor *dq, const aclTensor *dqRope,
-                                         const aclTensor *dk, const aclTensor *dkRope, const aclTensor *dv,
-                                         const aclTensor *sinkIn, const aclTensor *dsinkOut, const char *inputLayout)
+static aclnnStatus InputOutputShapeCheck(const aclTensor* query, const aclTensor* queryRope, const aclTensor* key,
+                                         const aclTensor* keyRope, const aclTensor* value, const aclTensor* dy,
+                                         const aclTensor* attentionIn, const aclTensor* dq, const aclTensor* dqRope,
+                                         const aclTensor* dk, const aclTensor* dkRope, const aclTensor* dv,
+                                         const aclTensor* sinkIn, const aclTensor* dsinkOut, const char* inputLayout)
 {
     auto queryShape = query->GetViewShape();
     auto keyShape = key->GetViewShape();
@@ -1611,12 +1611,12 @@ static aclnnStatus InputOutputShapeCheck(const aclTensor *query, const aclTensor
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus InputOutputDtypeAndShapeCheck(const aclTensor *query, const aclTensor *queryRope,
-                                                 const aclTensor *key, const aclTensor *keyRope, const aclTensor *value,
-                                                 const aclTensor *dy, const aclTensor *attentionIn, const aclTensor *dq,
-                                                 const aclTensor *dqRope, const aclTensor *dk, const aclTensor *dkRope,
-                                                 const aclTensor *dv, const aclTensor *sinkIn,
-                                                 const aclTensor *dsinkOut, const char *inputLayout)
+static aclnnStatus InputOutputDtypeAndShapeCheck(const aclTensor* query, const aclTensor* queryRope,
+                                                 const aclTensor* key, const aclTensor* keyRope, const aclTensor* value,
+                                                 const aclTensor* dy, const aclTensor* attentionIn, const aclTensor* dq,
+                                                 const aclTensor* dqRope, const aclTensor* dk, const aclTensor* dkRope,
+                                                 const aclTensor* dv, const aclTensor* sinkIn,
+                                                 const aclTensor* dsinkOut, const char* inputLayout)
 {
     auto ret = InputDtypeCheck(query, key, value, dy);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -1666,10 +1666,10 @@ static aclnnStatus InputOutputDtypeAndShapeCheck(const aclTensor *query, const a
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus PreFlashAttentionScoreGrad(const aclTensor **query, const aclTensor **key, const aclTensor **value,
-                                              const aclTensor **dy, const aclTensor **attentionInOptional,
-                                              FagInShapeInfo fagShape, FagShapeArray &fagShapeArray,
-                                              aclOpExecutor *executor)
+static aclnnStatus PreFlashAttentionScoreGrad(const aclTensor** query, const aclTensor** key, const aclTensor** value,
+                                              const aclTensor** dy, const aclTensor** attentionInOptional,
+                                              FagInShapeInfo fagShape, FagShapeArray& fagShapeArray,
+                                              aclOpExecutor* executor)
 {
     // 输入dtype异常拦截校验
     CHECK_RET(InputDtypeCheck(*query, *key, *value, *dy) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
@@ -1704,12 +1704,12 @@ static aclnnStatus PreFlashAttentionScoreGrad(const aclTensor **query, const acl
 
     return ACLNN_SUCCESS;
 }
-static aclnnStatus PostFlashAttentionScoreGrad(std::array<const aclTensor *, l0op::MAX_FAG_OUTPUT_CNT> &fagOut,
-                                               const aclTensor **dqOut, const aclTensor **dqRopeOut,
-                                               const aclTensor **dkOut, const aclTensor **dkRopeOut,
-                                               const aclTensor **dvOut, const aclTensor **dpseOut,
-                                               const aclTensor **dsinkOut, FagInShapeInfo fagShape,
-                                               FagShapeArray &fagShapeArray, aclOpExecutor *executor)
+static aclnnStatus PostFlashAttentionScoreGrad(std::array<const aclTensor*, l0op::MAX_FAG_OUTPUT_CNT>& fagOut,
+                                               const aclTensor** dqOut, const aclTensor** dqRopeOut,
+                                               const aclTensor** dkOut, const aclTensor** dkRopeOut,
+                                               const aclTensor** dvOut, const aclTensor** dpseOut,
+                                               const aclTensor** dsinkOut, FagInShapeInfo fagShape,
+                                               FagShapeArray& fagShapeArray, aclOpExecutor* executor)
 {
     // 如果是SBH特殊场景，在调用FAG后，需要将SBH重新改成SBND，以完成后续的slice等操作
     auto ret = ReshapeOutputTensor(fagOut, fagShape, fagShapeArray, true, executor);
@@ -1829,14 +1829,14 @@ static aclnnStatus PostFlashAttentionScoreGrad(std::array<const aclTensor *, l0o
 }
 
 static aclnnStatus FlashAttentionScoreGradGetWorkspace(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *dy,
-    const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional,
-    const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional, const aclTensor *softmaxSumOptional,
-    const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional, const aclIntArray *prefixOptional,
-    const aclIntArray *actualSeqQLenOptional, const aclIntArray *actualSeqKvLenOptional, double scaleValue,
-    double keepProb, int64_t preTokens, int64_t nextTokens, int64_t headNum, char *inputLayout, int64_t innerPrecise,
-    int64_t sparseMode, const aclTensor *dqOut, const aclTensor *dkOut, const aclTensor *dvOut,
-    const aclTensor *dpseOut, char *softmaxInLayout, const uint64_t *workspaceSize, aclOpExecutor *executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* dy,
+    const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional,
+    const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional,
+    const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional, const aclIntArray* prefixOptional,
+    const aclIntArray* actualSeqQLenOptional, const aclIntArray* actualSeqKvLenOptional, double scaleValue,
+    double keepProb, int64_t preTokens, int64_t nextTokens, int64_t headNum, char* inputLayout, int64_t innerPrecise,
+    int64_t sparseMode, const aclTensor* dqOut, const aclTensor* dkOut, const aclTensor* dvOut,
+    const aclTensor* dpseOut, char* softmaxInLayout, const uint64_t* workspaceSize, aclOpExecutor* executor)
 {
     (void)workspaceSize;
     // 检查tensor维度是否大于2
@@ -1852,18 +1852,18 @@ static aclnnStatus FlashAttentionScoreGradGetWorkspace(
     }
 
     // 输入连续性转换
-    const aclTensor *queryCngs = nullptr;
-    const aclTensor *keyCngs = nullptr;
-    const aclTensor *valueCngs = nullptr;
-    const aclTensor *dyCngs = nullptr;
-    const aclTensor *attentionInOptionalCngs = nullptr;
-    const aclTensor *pseShiftOptionalCngs = nullptr;
-    const aclTensor *dropMaskOptionalCngs = nullptr;
-    const aclTensor *paddingMaskOptionalCngs = nullptr;
-    const aclTensor *attenMaskOptionalCngs = nullptr;
-    const aclTensor *softmaxMaxOptionalCngs = nullptr;
-    const aclTensor *softmaxSumOptionalCngs = nullptr;
-    const aclTensor *softmaxInOptionalCngs = nullptr;
+    const aclTensor* queryCngs = nullptr;
+    const aclTensor* keyCngs = nullptr;
+    const aclTensor* valueCngs = nullptr;
+    const aclTensor* dyCngs = nullptr;
+    const aclTensor* attentionInOptionalCngs = nullptr;
+    const aclTensor* pseShiftOptionalCngs = nullptr;
+    const aclTensor* dropMaskOptionalCngs = nullptr;
+    const aclTensor* paddingMaskOptionalCngs = nullptr;
+    const aclTensor* attenMaskOptionalCngs = nullptr;
+    const aclTensor* softmaxMaxOptionalCngs = nullptr;
+    const aclTensor* softmaxSumOptionalCngs = nullptr;
+    const aclTensor* softmaxInOptionalCngs = nullptr;
     ret = ContiguousInputTensor(query, nullptr, key, nullptr, value, dy, attentionInOptional, &queryCngs, nullptr,
                                 &keyCngs, nullptr, &valueCngs, &dyCngs, &attentionInOptionalCngs, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -1911,13 +1911,13 @@ static aclnnStatus FlashAttentionScoreGradGetWorkspace(
 }
 
 aclnnStatus aclnnFlashAttentionScoreGradGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *keyIn, const aclTensor *value, const aclTensor *dy,
-    const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional,
-    const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional, const aclTensor *softmaxSumOptional,
-    const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional, const aclIntArray *prefixOptional,
-    double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens, int64_t headNum, char *inputLayout,
-    int64_t innerPrecise, int64_t sparseMode, const aclTensor *dqOut, const aclTensor *dkOut, const aclTensor *dvOut,
-    const aclTensor *dpseOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* keyIn, const aclTensor* value, const aclTensor* dy,
+    const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional,
+    const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional,
+    const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional, const aclIntArray* prefixOptional,
+    double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens, int64_t headNum, char* inputLayout,
+    int64_t innerPrecise, int64_t sparseMode, const aclTensor* dqOut, const aclTensor* dkOut, const aclTensor* dvOut,
+    const aclTensor* dpseOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(
         aclnnFlashAttentionScoreGrad,
@@ -1987,7 +1987,7 @@ aclnnStatus aclnnFlashAttentionScoreGradGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnFlashAttentionScoreGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnFlashAttentionScoreGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                          const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnFlashAttentionScoreGrad);
@@ -1995,14 +1995,14 @@ aclnnStatus aclnnFlashAttentionScoreGrad(void *workspace, uint64_t workspaceSize
 }
 
 aclnnStatus aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *keyIn, const aclTensor *value, const aclTensor *dy,
-    const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional,
-    const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional, const aclTensor *softmaxSumOptional,
-    const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional, const aclIntArray *prefixOptional,
-    const aclIntArray *actualSeqQLenOptional, const aclIntArray *actualSeqKvLenOptional, double scaleValue,
-    double keepProb, int64_t preTokens, int64_t nextTokens, int64_t headNum, char *inputLayout, int64_t innerPrecise,
-    int64_t sparseMode, const aclTensor *dqOut, const aclTensor *dkOut, const aclTensor *dvOut,
-    const aclTensor *dpseOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* keyIn, const aclTensor* value, const aclTensor* dy,
+    const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional,
+    const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional,
+    const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional, const aclIntArray* prefixOptional,
+    const aclIntArray* actualSeqQLenOptional, const aclIntArray* actualSeqKvLenOptional, double scaleValue,
+    double keepProb, int64_t preTokens, int64_t nextTokens, int64_t headNum, char* inputLayout, int64_t innerPrecise,
+    int64_t sparseMode, const aclTensor* dqOut, const aclTensor* dkOut, const aclTensor* dvOut,
+    const aclTensor* dpseOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnFlashAttentionUnpaddingScoreGrad,
                    DFX_IN(query, keyIn, value, dy, pseShiftOptional, dropMaskOptional, paddingMaskOptional,
@@ -2079,7 +2079,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnFlashAttentionUnpaddingScoreGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnFlashAttentionUnpaddingScoreGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                   const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnFlashAttentionUnpaddingScoreGrad);
@@ -2087,15 +2087,15 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGrad(void *workspace, uint64_t work
 }
 
 static aclnnStatus FlashAttentionScoreGradV2GetWorkspace(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *dy,
-    const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional,
-    const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional, const aclTensor *softmaxSumOptional,
-    const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional, const aclIntArray *prefixOptional,
-    const aclIntArray *actualSeqQLenOptional, const aclIntArray *actualSeqKvLenOptional,
-    const aclIntArray *qStartIdxOptional, const aclIntArray *kvStartIdxOptional, double scaleValue, double keepProb,
-    int64_t preTokens, int64_t nextTokens, int64_t headNum, char *inputLayout, int64_t innerPrecise, int64_t sparseMode,
-    int64_t pseType, const aclTensor *dqOut, const aclTensor *dkOut, const aclTensor *dvOut, const aclTensor *dpseOut,
-    const uint64_t *workspaceSize, aclOpExecutor *executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* dy,
+    const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional,
+    const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional,
+    const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional, const aclIntArray* prefixOptional,
+    const aclIntArray* actualSeqQLenOptional, const aclIntArray* actualSeqKvLenOptional,
+    const aclIntArray* qStartIdxOptional, const aclIntArray* kvStartIdxOptional, double scaleValue, double keepProb,
+    int64_t preTokens, int64_t nextTokens, int64_t headNum, char* inputLayout, int64_t innerPrecise, int64_t sparseMode,
+    int64_t pseType, const aclTensor* dqOut, const aclTensor* dkOut, const aclTensor* dvOut, const aclTensor* dpseOut,
+    const uint64_t* workspaceSize, aclOpExecutor* executor)
 {
     (void)workspaceSize;
     // 检查tensor维度是否大于2
@@ -2111,18 +2111,18 @@ static aclnnStatus FlashAttentionScoreGradV2GetWorkspace(
     }
 
     // 输入连续性转换
-    const aclTensor *queryCngs = nullptr;
-    const aclTensor *keyCngs = nullptr;
-    const aclTensor *valueCngs = nullptr;
-    const aclTensor *dyCngs = nullptr;
-    const aclTensor *attentionInOptionalCngs = nullptr;
-    const aclTensor *pseShiftOptionalCngs = nullptr;
-    const aclTensor *dropMaskOptionalCngs = nullptr;
-    const aclTensor *paddingMaskOptionalCngs = nullptr;
-    const aclTensor *attenMaskOptionalCngs = nullptr;
-    const aclTensor *softmaxMaxOptionalCngs = nullptr;
-    const aclTensor *softmaxSumOptionalCngs = nullptr;
-    const aclTensor *softmaxInOptionalCngs = nullptr;
+    const aclTensor* queryCngs = nullptr;
+    const aclTensor* keyCngs = nullptr;
+    const aclTensor* valueCngs = nullptr;
+    const aclTensor* dyCngs = nullptr;
+    const aclTensor* attentionInOptionalCngs = nullptr;
+    const aclTensor* pseShiftOptionalCngs = nullptr;
+    const aclTensor* dropMaskOptionalCngs = nullptr;
+    const aclTensor* paddingMaskOptionalCngs = nullptr;
+    const aclTensor* attenMaskOptionalCngs = nullptr;
+    const aclTensor* softmaxMaxOptionalCngs = nullptr;
+    const aclTensor* softmaxSumOptionalCngs = nullptr;
+    const aclTensor* softmaxInOptionalCngs = nullptr;
     ret = ContiguousInputTensor(query, nullptr, key, nullptr, value, dy, attentionInOptional, &queryCngs, nullptr,
                                 &keyCngs, nullptr, &valueCngs, &dyCngs, &attentionInOptionalCngs, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -2164,14 +2164,14 @@ static aclnnStatus FlashAttentionScoreGradV2GetWorkspace(
 }
 
 aclnnStatus aclnnFlashAttentionScoreGradV2GetWorkspaceSize(
-    const aclTensor *query, const aclTensor *keyIn, const aclTensor *value, const aclTensor *dy,
-    const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional,
-    const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional, const aclTensor *softmaxSumOptional,
-    const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional, const aclIntArray *prefixOptional,
-    const aclIntArray *qStartIdxOptional, const aclIntArray *kvStartIdxOptional, double scaleValue, double keepProb,
-    int64_t preTokens, int64_t nextTokens, int64_t headNum, char *inputLayout, int64_t innerPrecise, int64_t sparseMode,
-    int64_t pseType, const aclTensor *dqOut, const aclTensor *dkOut, const aclTensor *dvOut, const aclTensor *dpseOut,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* keyIn, const aclTensor* value, const aclTensor* dy,
+    const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional,
+    const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional,
+    const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional, const aclIntArray* prefixOptional,
+    const aclIntArray* qStartIdxOptional, const aclIntArray* kvStartIdxOptional, double scaleValue, double keepProb,
+    int64_t preTokens, int64_t nextTokens, int64_t headNum, char* inputLayout, int64_t innerPrecise, int64_t sparseMode,
+    int64_t pseType, const aclTensor* dqOut, const aclTensor* dkOut, const aclTensor* dvOut, const aclTensor* dpseOut,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnFlashAttentionScoreGradV2,
                    DFX_IN(query, keyIn, value, dy, pseShiftOptional, dropMaskOptional, paddingMaskOptional,
@@ -2242,7 +2242,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV2GetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnFlashAttentionScoreGradV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnFlashAttentionScoreGradV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnFlashAttentionScoreGradV2);
@@ -2250,15 +2250,15 @@ aclnnStatus aclnnFlashAttentionScoreGradV2(void *workspace, uint64_t workspaceSi
 }
 
 aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV2GetWorkspaceSize(
-    const aclTensor *query, const aclTensor *keyIn, const aclTensor *value, const aclTensor *dy,
-    const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional,
-    const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional, const aclTensor *softmaxSumOptional,
-    const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional, const aclIntArray *prefixOptional,
-    const aclIntArray *actualSeqQLenOptional, const aclIntArray *actualSeqKvLenOptional,
-    const aclIntArray *qStartIdxOptional, const aclIntArray *kvStartIdxOptional, double scaleValue, double keepProb,
-    int64_t preTokens, int64_t nextTokens, int64_t headNum, char *inputLayout, int64_t innerPrecise, int64_t sparseMode,
-    int64_t pseType, const aclTensor *dqOut, const aclTensor *dkOut, const aclTensor *dvOut, const aclTensor *dpseOut,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* keyIn, const aclTensor* value, const aclTensor* dy,
+    const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional,
+    const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional,
+    const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional, const aclIntArray* prefixOptional,
+    const aclIntArray* actualSeqQLenOptional, const aclIntArray* actualSeqKvLenOptional,
+    const aclIntArray* qStartIdxOptional, const aclIntArray* kvStartIdxOptional, double scaleValue, double keepProb,
+    int64_t preTokens, int64_t nextTokens, int64_t headNum, char* inputLayout, int64_t innerPrecise, int64_t sparseMode,
+    int64_t pseType, const aclTensor* dqOut, const aclTensor* dkOut, const aclTensor* dvOut, const aclTensor* dpseOut,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(
         aclnnFlashAttentionUnpaddingScoreGradV2,
@@ -2336,7 +2336,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV2GetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                     const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnFlashAttentionUnpaddingScoreGradV2);
@@ -2344,16 +2344,16 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV2(void *workspace, uint64_t wo
 }
 
 static aclnnStatus FlashAttentionScoreGradV3GetWorkspace(
-    const aclTensor *query, const aclTensor *queryRope, const aclTensor *key, const aclTensor *keyRope,
-    const aclTensor *value, const aclTensor *dy, const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional,
-    const aclTensor *paddingMaskOptional, const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional,
-    const aclTensor *softmaxSumOptional, const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional,
-    const aclIntArray *prefixOptional, const aclIntArray *actualSeqQLenOptional,
-    const aclIntArray *actualSeqKvLenOptional, const aclIntArray *qStartIdxOptional,
-    const aclIntArray *kvStartIdxOptional, double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens,
-    int64_t headNum, char *inputLayout, int64_t innerPrecise, int64_t sparseMode, int64_t pseType,
-    const aclTensor *dqOut, const aclTensor *dqRopeOut, const aclTensor *dkOut, const aclTensor *dkRopeOut,
-    const aclTensor *dvOut, const aclTensor *dpseOut, const uint64_t *workspaceSize, aclOpExecutor *executor)
+    const aclTensor* query, const aclTensor* queryRope, const aclTensor* key, const aclTensor* keyRope,
+    const aclTensor* value, const aclTensor* dy, const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional,
+    const aclTensor* paddingMaskOptional, const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional,
+    const aclTensor* softmaxSumOptional, const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional,
+    const aclIntArray* prefixOptional, const aclIntArray* actualSeqQLenOptional,
+    const aclIntArray* actualSeqKvLenOptional, const aclIntArray* qStartIdxOptional,
+    const aclIntArray* kvStartIdxOptional, double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens,
+    int64_t headNum, char* inputLayout, int64_t innerPrecise, int64_t sparseMode, int64_t pseType,
+    const aclTensor* dqOut, const aclTensor* dqRopeOut, const aclTensor* dkOut, const aclTensor* dkRopeOut,
+    const aclTensor* dvOut, const aclTensor* dpseOut, const uint64_t* workspaceSize, aclOpExecutor* executor)
 {
     (void)workspaceSize;
     // 检查tensor维度是否大于2
@@ -2374,20 +2374,20 @@ static aclnnStatus FlashAttentionScoreGradV3GetWorkspace(
     }
 
     // 输入连续性转换
-    const aclTensor *queryCngs = nullptr;
-    const aclTensor *queryRopeCngs = nullptr;
-    const aclTensor *keyCngs = nullptr;
-    const aclTensor *keyRopeCngs = nullptr;
-    const aclTensor *valueCngs = nullptr;
-    const aclTensor *dyCngs = nullptr;
-    const aclTensor *attentionInOptionalCngs = nullptr;
-    const aclTensor *pseShiftOptionalCngs = nullptr;
-    const aclTensor *dropMaskOptionalCngs = nullptr;
-    const aclTensor *paddingMaskOptionalCngs = nullptr;
-    const aclTensor *attenMaskOptionalCngs = nullptr;
-    const aclTensor *softmaxMaxOptionalCngs = nullptr;
-    const aclTensor *softmaxSumOptionalCngs = nullptr;
-    const aclTensor *softmaxInOptionalCngs = nullptr;
+    const aclTensor* queryCngs = nullptr;
+    const aclTensor* queryRopeCngs = nullptr;
+    const aclTensor* keyCngs = nullptr;
+    const aclTensor* keyRopeCngs = nullptr;
+    const aclTensor* valueCngs = nullptr;
+    const aclTensor* dyCngs = nullptr;
+    const aclTensor* attentionInOptionalCngs = nullptr;
+    const aclTensor* pseShiftOptionalCngs = nullptr;
+    const aclTensor* dropMaskOptionalCngs = nullptr;
+    const aclTensor* paddingMaskOptionalCngs = nullptr;
+    const aclTensor* attenMaskOptionalCngs = nullptr;
+    const aclTensor* softmaxMaxOptionalCngs = nullptr;
+    const aclTensor* softmaxSumOptionalCngs = nullptr;
+    const aclTensor* softmaxInOptionalCngs = nullptr;
     ret = ContiguousInputTensor(query, queryRope, key, keyRope, value, dy, attentionInOptional, &queryCngs,
                                 &queryRopeCngs, &keyCngs, &keyRopeCngs, &valueCngs, &dyCngs, &attentionInOptionalCngs,
                                 executor);
@@ -2438,16 +2438,16 @@ static aclnnStatus FlashAttentionScoreGradV3GetWorkspace(
 }
 
 aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3GetWorkspaceSize(
-    const aclTensor *query, const aclTensor *queryRope, const aclTensor *keyIn, const aclTensor *keyInRope,
-    const aclTensor *value, const aclTensor *dy, const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional,
-    const aclTensor *paddingMaskOptional, const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional,
-    const aclTensor *softmaxSumOptional, const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional,
-    const aclIntArray *prefixOptional, const aclIntArray *actualSeqQLenOptional,
-    const aclIntArray *actualSeqKvLenOptional, const aclIntArray *qStartIdxOptional,
-    const aclIntArray *kvStartIdxOptional, double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens,
-    int64_t headNum, char *inputLayout, int64_t innerPrecise, int64_t sparseMode, int64_t pseType,
-    const aclTensor *dqOut, const aclTensor *dqRopeOut, const aclTensor *dkOut, const aclTensor *dkRopeOut,
-    const aclTensor *dvOut, const aclTensor *dpseOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* queryRope, const aclTensor* keyIn, const aclTensor* keyInRope,
+    const aclTensor* value, const aclTensor* dy, const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional,
+    const aclTensor* paddingMaskOptional, const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional,
+    const aclTensor* softmaxSumOptional, const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional,
+    const aclIntArray* prefixOptional, const aclIntArray* actualSeqQLenOptional,
+    const aclIntArray* actualSeqKvLenOptional, const aclIntArray* qStartIdxOptional,
+    const aclIntArray* kvStartIdxOptional, double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens,
+    int64_t headNum, char* inputLayout, int64_t innerPrecise, int64_t sparseMode, int64_t pseType,
+    const aclTensor* dqOut, const aclTensor* dqRopeOut, const aclTensor* dkOut, const aclTensor* dkRopeOut,
+    const aclTensor* dvOut, const aclTensor* dpseOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(
         aclnnFlashAttentionUnpaddingScoreGradV3,
@@ -2526,7 +2526,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3GetWorkspaceSize(
     uniqueExecutor.ReleaseTo(executor);
     return ACLNN_SUCCESS;
 }
-aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                     const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnFlashAttentionUnpaddingScoreGradV3);
@@ -2534,14 +2534,14 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3(void *workspace, uint64_t wo
 }
 
 aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV4GetWorkspaceSize(
-    const aclTensor *query, const aclTensor *keyIn, const aclTensor *value, const aclTensor *dy,
-    const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional,
-    const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional, const aclTensor *softmaxSumOptional,
-    const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional, const aclIntArray *prefixOptional,
-    const aclIntArray *actualSeqQLenOptional, const aclIntArray *actualSeqKvLenOptional, double scaleValue,
-    double keepProb, int64_t preTokens, int64_t nextTokens, int64_t headNum, char *inputLayout, int64_t innerPrecise,
-    int64_t sparseMode, const aclTensor *dqOut, const aclTensor *dkOut, const aclTensor *dvOut,
-    const aclTensor *dpseOut, char *softmaxInLayout, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* keyIn, const aclTensor* value, const aclTensor* dy,
+    const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional,
+    const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional,
+    const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional, const aclIntArray* prefixOptional,
+    const aclIntArray* actualSeqQLenOptional, const aclIntArray* actualSeqKvLenOptional, double scaleValue,
+    double keepProb, int64_t preTokens, int64_t nextTokens, int64_t headNum, char* inputLayout, int64_t innerPrecise,
+    int64_t sparseMode, const aclTensor* dqOut, const aclTensor* dkOut, const aclTensor* dvOut,
+    const aclTensor* dpseOut, char* softmaxInLayout, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(
         aclnnFlashAttentionUnpaddingScoreGradV4,
@@ -2611,7 +2611,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV4GetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV4(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV4(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                     const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnFlashAttentionUnpaddingScoreGradV4);
@@ -2619,17 +2619,17 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV4(void *workspace, uint64_t wo
 }
 
 static aclnnStatus FlashAttentionScoreGradV5GetWorkspace(
-    const aclTensor *query, const aclTensor *queryRope, const aclTensor *key, const aclTensor *keyRope,
-    const aclTensor *value, const aclTensor *dy, const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional,
-    const aclTensor *paddingMaskOptional, const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional,
-    const aclTensor *softmaxSumOptional, const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional,
-    const aclTensor *sinkInOptional, const aclIntArray *prefixOptional, // already 补充了sink
-    const aclIntArray *actualSeqQLenOptional, const aclIntArray *actualSeqKvLenOptional,
-    const aclIntArray *qStartIdxOptional, const aclIntArray *kvStartIdxOptional, double scaleValue, double keepProb,
-    int64_t preTokens, int64_t nextTokens, int64_t headNum, char *inputLayout, int64_t innerPrecise, int64_t sparseMode,
-    int64_t pseType, const aclTensor *dqOut, const aclTensor *dqRopeOut, const aclTensor *dkOut,
-    const aclTensor *dkRopeOut, const aclTensor *dvOut, const aclTensor *dpseOut, const aclTensor *dsinkOut,
-    char *softmaxInLayout, const uint64_t *workspaceSize, aclOpExecutor *executor, bool isMaxWorkspace = false)
+    const aclTensor* query, const aclTensor* queryRope, const aclTensor* key, const aclTensor* keyRope,
+    const aclTensor* value, const aclTensor* dy, const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional,
+    const aclTensor* paddingMaskOptional, const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional,
+    const aclTensor* softmaxSumOptional, const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional,
+    const aclTensor* sinkInOptional, const aclIntArray* prefixOptional, // already 补充了sink
+    const aclIntArray* actualSeqQLenOptional, const aclIntArray* actualSeqKvLenOptional,
+    const aclIntArray* qStartIdxOptional, const aclIntArray* kvStartIdxOptional, double scaleValue, double keepProb,
+    int64_t preTokens, int64_t nextTokens, int64_t headNum, char* inputLayout, int64_t innerPrecise, int64_t sparseMode,
+    int64_t pseType, const aclTensor* dqOut, const aclTensor* dqRopeOut, const aclTensor* dkOut,
+    const aclTensor* dkRopeOut, const aclTensor* dvOut, const aclTensor* dpseOut, const aclTensor* dsinkOut,
+    char* softmaxInLayout, const uint64_t* workspaceSize, aclOpExecutor* executor, bool isMaxWorkspace = false)
 {
     (void)workspaceSize;
 
@@ -2663,21 +2663,21 @@ static aclnnStatus FlashAttentionScoreGradV5GetWorkspace(
     }
 
     // 输入连续性转换
-    const aclTensor *queryCngs = nullptr;
-    const aclTensor *queryRopeCngs = nullptr;
-    const aclTensor *keyCngs = nullptr;
-    const aclTensor *keyRopeCngs = nullptr;
-    const aclTensor *valueCngs = nullptr;
-    const aclTensor *dyCngs = nullptr;
-    const aclTensor *attentionInOptionalCngs = nullptr;
-    const aclTensor *pseShiftOptionalCngs = nullptr;
-    const aclTensor *dropMaskOptionalCngs = nullptr;
-    const aclTensor *paddingMaskOptionalCngs = nullptr;
-    const aclTensor *attenMaskOptionalCngs = nullptr;
-    const aclTensor *softmaxMaxOptionalCngs = nullptr;
-    const aclTensor *softmaxSumOptionalCngs = nullptr;
-    const aclTensor *softmaxInOptionalCngs = nullptr;
-    const aclTensor *sinkInOptionalCngs = nullptr;
+    const aclTensor* queryCngs = nullptr;
+    const aclTensor* queryRopeCngs = nullptr;
+    const aclTensor* keyCngs = nullptr;
+    const aclTensor* keyRopeCngs = nullptr;
+    const aclTensor* valueCngs = nullptr;
+    const aclTensor* dyCngs = nullptr;
+    const aclTensor* attentionInOptionalCngs = nullptr;
+    const aclTensor* pseShiftOptionalCngs = nullptr;
+    const aclTensor* dropMaskOptionalCngs = nullptr;
+    const aclTensor* paddingMaskOptionalCngs = nullptr;
+    const aclTensor* attenMaskOptionalCngs = nullptr;
+    const aclTensor* softmaxMaxOptionalCngs = nullptr;
+    const aclTensor* softmaxSumOptionalCngs = nullptr;
+    const aclTensor* softmaxInOptionalCngs = nullptr;
+    const aclTensor* sinkInOptionalCngs = nullptr;
     ret = ContiguousInputTensor(query, queryRope, key, keyRope, value, dy, attentionInOptional, &queryCngs,
                                 &queryRopeCngs, &keyCngs, &keyRopeCngs, &valueCngs, &dyCngs, &attentionInOptionalCngs,
                                 executor);
@@ -2725,15 +2725,15 @@ static aclnnStatus FlashAttentionScoreGradV5GetWorkspace(
 }
 
 aclnnStatus aclnnFlashAttentionScoreGradV3GetWorkspaceSize(
-    const aclTensor *query, const aclTensor *keyIn, const aclTensor *value, const aclTensor *dy,
-    const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional,
-    const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional, const aclTensor *softmaxSumOptional,
-    const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional, const aclTensor *sinkInOptional,
-    const aclIntArray *prefixOptional, const aclIntArray *qStartIdxOptional, const aclIntArray *kvStartIdxOptional,
-    double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens, int64_t headNum, char *inputLayout,
-    int64_t innerPrecise, int64_t sparseMode, int64_t pseType, const aclTensor *dqOut, const aclTensor *dkOut,
-    const aclTensor *dvOut, const aclTensor *dpseOut, const aclTensor *dsinkOut, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* keyIn, const aclTensor* value, const aclTensor* dy,
+    const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional,
+    const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional,
+    const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional, const aclTensor* sinkInOptional,
+    const aclIntArray* prefixOptional, const aclIntArray* qStartIdxOptional, const aclIntArray* kvStartIdxOptional,
+    double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens, int64_t headNum, char* inputLayout,
+    int64_t innerPrecise, int64_t sparseMode, int64_t pseType, const aclTensor* dqOut, const aclTensor* dkOut,
+    const aclTensor* dvOut, const aclTensor* dpseOut, const aclTensor* dsinkOut, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(
         aclnnFlashAttentionScoreGradV3,
@@ -2805,7 +2805,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV3GetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnFlashAttentionScoreGradV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnFlashAttentionScoreGradV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnFlashAttentionScoreGradV3);
@@ -2813,17 +2813,17 @@ aclnnStatus aclnnFlashAttentionScoreGradV3(void *workspace, uint64_t workspaceSi
 }
 
 aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5GetWorkspaceSize(
-    const aclTensor *query, const aclTensor *queryRope, const aclTensor *keyIn, const aclTensor *keyInRope,
-    const aclTensor *value, const aclTensor *dy, const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional,
-    const aclTensor *paddingMaskOptional, const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional,
-    const aclTensor *softmaxSumOptional, const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional,
-    const aclTensor *sinkInOptional, const aclIntArray *prefixOptional, const aclIntArray *actualSeqQLenOptional,
-    const aclIntArray *actualSeqKvLenOptional, const aclIntArray *qStartIdxOptional,
-    const aclIntArray *kvStartIdxOptional, double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens,
-    int64_t headNum, char *inputLayout, int64_t innerPrecise, int64_t sparseMode, int64_t pseType,
-    char *softmaxInLayout, const aclTensor *dqOut, const aclTensor *dqRopeOut, const aclTensor *dkOut,
-    const aclTensor *dkRopeOut, const aclTensor *dvOut, const aclTensor *dpseOut, const aclTensor *dsinkOut,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* queryRope, const aclTensor* keyIn, const aclTensor* keyInRope,
+    const aclTensor* value, const aclTensor* dy, const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional,
+    const aclTensor* paddingMaskOptional, const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional,
+    const aclTensor* softmaxSumOptional, const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional,
+    const aclTensor* sinkInOptional, const aclIntArray* prefixOptional, const aclIntArray* actualSeqQLenOptional,
+    const aclIntArray* actualSeqKvLenOptional, const aclIntArray* qStartIdxOptional,
+    const aclIntArray* kvStartIdxOptional, double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens,
+    int64_t headNum, char* inputLayout, int64_t innerPrecise, int64_t sparseMode, int64_t pseType,
+    char* softmaxInLayout, const aclTensor* dqOut, const aclTensor* dqRopeOut, const aclTensor* dkOut,
+    const aclTensor* dkRopeOut, const aclTensor* dvOut, const aclTensor* dpseOut, const aclTensor* dsinkOut,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(
         aclnnFlashAttentionUnpaddingScoreGradV5,
@@ -2904,7 +2904,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5GetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                     const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnFlashAttentionUnpaddingScoreGradV5);
@@ -2912,17 +2912,17 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5(void *workspace, uint64_t wo
 }
 
 aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5GetMaxWorkspaceSize(
-    const aclTensor *query, const aclTensor *queryRope, const aclTensor *keyIn, const aclTensor *keyInRope,
-    const aclTensor *value, const aclTensor *dy, const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional,
-    const aclTensor *paddingMaskOptional, const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional,
-    const aclTensor *softmaxSumOptional, const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional,
-    const aclTensor *sinkInOptional, const aclIntArray *prefixOptional, const aclIntArray *actualSeqQLenOptional,
-    const aclIntArray *actualSeqKvLenOptional, const aclIntArray *qStartIdxOptional,
-    const aclIntArray *kvStartIdxOptional, double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens,
-    int64_t headNum, char *inputLayout, int64_t innerPrecise, int64_t sparseMode, int64_t pseType,
-    char *softmaxInLayout, const aclTensor *dqOut, const aclTensor *dqRopeOut, const aclTensor *dkOut,
-    const aclTensor *dkRopeOut, const aclTensor *dvOut, const aclTensor *dpseOut, const aclTensor *dsinkOut,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* queryRope, const aclTensor* keyIn, const aclTensor* keyInRope,
+    const aclTensor* value, const aclTensor* dy, const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional,
+    const aclTensor* paddingMaskOptional, const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional,
+    const aclTensor* softmaxSumOptional, const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional,
+    const aclTensor* sinkInOptional, const aclIntArray* prefixOptional, const aclIntArray* actualSeqQLenOptional,
+    const aclIntArray* actualSeqKvLenOptional, const aclIntArray* qStartIdxOptional,
+    const aclIntArray* kvStartIdxOptional, double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens,
+    int64_t headNum, char* inputLayout, int64_t innerPrecise, int64_t sparseMode, int64_t pseType,
+    char* softmaxInLayout, const aclTensor* dqOut, const aclTensor* dqRopeOut, const aclTensor* dkOut,
+    const aclTensor* dkRopeOut, const aclTensor* dvOut, const aclTensor* dpseOut, const aclTensor* dsinkOut,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (dropMaskOptional != nullptr) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
@@ -3001,11 +3001,11 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5GetMaxWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckSinkOptionalInput(const aclTensor *sinkInOptional, const aclTensor *dsinkOut,
-                                          const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                                          const aclTensor *dy, const aclTensor *attentionInOptional,
-                                          const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
-                                          const aclTensor *dqOut, const aclTensor *dkOut, const aclTensor *dvOut)
+static aclnnStatus CheckSinkOptionalInput(const aclTensor* sinkInOptional, const aclTensor* dsinkOut,
+                                          const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                          const aclTensor* dy, const aclTensor* attentionInOptional,
+                                          const aclTensor* queryRopeOptional, const aclTensor* keyRopeOptional,
+                                          const aclTensor* dqOut, const aclTensor* dkOut, const aclTensor* dvOut)
 {
     if (sinkInOptional != nullptr) {
         OP_CHECK(dsinkOut != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "dsinkOut"),
@@ -3092,19 +3092,19 @@ static aclnnStatus CheckSinkOptionalInput(const aclTensor *sinkInOptional, const
 }
 
 static aclnnStatus FlashAttentionScoreGradV4GetWorkspace(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *dy,
-    const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional,
-    const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional, const aclTensor *softmaxSumOptional,
-    const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional, const aclTensor *sinkInOptional,
-    const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional, const aclTensor *dScaleQOptional,
-    const aclTensor *dScaleKOptional, const aclTensor *dScaleVOptional, const aclTensor *dScaleDyOptional,
-    const aclTensor *dScaleOOptional, const aclIntArray *prefixOptional, const aclIntArray *actualSeqQLenOptional,
-    const aclIntArray *actualSeqKvLenOptional, const aclIntArray *qStartIdxOptional,
-    const aclIntArray *kvStartIdxOptional, double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens,
-    int64_t headNum, char *inputLayout, char *softmaxInLayout, int64_t innerPrecise, int64_t sparseMode,
-    int64_t pseType, int64_t seed, int64_t offset, int64_t outDtype, const aclTensor *dqOut, const aclTensor *dkOut,
-    const aclTensor *dvOut, const aclTensor *dqRopeOut, const aclTensor *dkRopeOut, const aclTensor *dpseOut,
-    const aclTensor *dsinkOut, aclOpExecutor *executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* dy,
+    const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional,
+    const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional,
+    const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional, const aclTensor* sinkInOptional,
+    const aclTensor* queryRopeOptional, const aclTensor* keyRopeOptional, const aclTensor* dScaleQOptional,
+    const aclTensor* dScaleKOptional, const aclTensor* dScaleVOptional, const aclTensor* dScaleDyOptional,
+    const aclTensor* dScaleOOptional, const aclIntArray* prefixOptional, const aclIntArray* actualSeqQLenOptional,
+    const aclIntArray* actualSeqKvLenOptional, const aclIntArray* qStartIdxOptional,
+    const aclIntArray* kvStartIdxOptional, double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens,
+    int64_t headNum, char* inputLayout, char* softmaxInLayout, int64_t innerPrecise, int64_t sparseMode,
+    int64_t pseType, int64_t seed, int64_t offset, int64_t outDtype, const aclTensor* dqOut, const aclTensor* dkOut,
+    const aclTensor* dvOut, const aclTensor* dqRopeOut, const aclTensor* dkRopeOut, const aclTensor* dpseOut,
+    const aclTensor* dsinkOut, aclOpExecutor* executor)
 {
     // 获取基本参数
     FagInShapeInfo fagShape;
@@ -3137,28 +3137,28 @@ static aclnnStatus FlashAttentionScoreGradV4GetWorkspace(
     }
 
     // 输入连续性转换
-    const aclTensor *queryCngs = nullptr;
-    const aclTensor *keyCngs = nullptr;
-    const aclTensor *valueCngs = nullptr;
-    const aclTensor *dyCngs = nullptr;
+    const aclTensor* queryCngs = nullptr;
+    const aclTensor* keyCngs = nullptr;
+    const aclTensor* valueCngs = nullptr;
+    const aclTensor* dyCngs = nullptr;
 
-    const aclTensor *attentionInOptionalCngs = nullptr;
-    const aclTensor *pseShiftOptionalCngs = nullptr;
-    const aclTensor *dropMaskOptionalCngs = nullptr;
-    const aclTensor *paddingMaskOptionalCngs = nullptr;
-    const aclTensor *attenMaskOptionalCngs = nullptr;
-    const aclTensor *softmaxMaxOptionalCngs = nullptr;
-    const aclTensor *softmaxSumOptionalCngs = nullptr;
-    const aclTensor *softmaxInOptionalCngs = nullptr;
-    const aclTensor *queryRopeOptionalCngs = nullptr;
-    const aclTensor *keyRopeOptionalCngs = nullptr;
-    const aclTensor *dScaleQOptionalCngs = nullptr;
-    const aclTensor *dScaleKOptionalCngs = nullptr;
-    const aclTensor *dScaleVOptionalCngs = nullptr;
-    const aclTensor *dScaleDyOptionalCngs = nullptr;
-    const aclTensor *dScaleOOptionalCngs = nullptr;
-    const aclTensor *sinkInOptionalCngs = nullptr;
-    const aclTensor *dsink = nullptr;
+    const aclTensor* attentionInOptionalCngs = nullptr;
+    const aclTensor* pseShiftOptionalCngs = nullptr;
+    const aclTensor* dropMaskOptionalCngs = nullptr;
+    const aclTensor* paddingMaskOptionalCngs = nullptr;
+    const aclTensor* attenMaskOptionalCngs = nullptr;
+    const aclTensor* softmaxMaxOptionalCngs = nullptr;
+    const aclTensor* softmaxSumOptionalCngs = nullptr;
+    const aclTensor* softmaxInOptionalCngs = nullptr;
+    const aclTensor* queryRopeOptionalCngs = nullptr;
+    const aclTensor* keyRopeOptionalCngs = nullptr;
+    const aclTensor* dScaleQOptionalCngs = nullptr;
+    const aclTensor* dScaleKOptionalCngs = nullptr;
+    const aclTensor* dScaleVOptionalCngs = nullptr;
+    const aclTensor* dScaleDyOptionalCngs = nullptr;
+    const aclTensor* dScaleOOptionalCngs = nullptr;
+    const aclTensor* sinkInOptionalCngs = nullptr;
+    const aclTensor* dsink = nullptr;
     ret = ContiguousInputTensor(query, queryRopeOptional, key, keyRopeOptional, value, dy, attentionInOptional,
                                 &queryCngs, &queryRopeOptionalCngs, &keyCngs, &keyRopeOptionalCngs, &valueCngs, &dyCngs,
                                 &attentionInOptionalCngs, executor);
@@ -3205,19 +3205,19 @@ static aclnnStatus FlashAttentionScoreGradV4GetWorkspace(
 }
 
 aclnnStatus aclnnFlashAttentionScoreGradV4GetWorkspaceSize(
-    const aclTensor *query, const aclTensor *keyIn, const aclTensor *value, const aclTensor *dy,
-    const aclTensor *pseShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional,
-    const aclTensor *attenMaskOptional, const aclTensor *softmaxMaxOptional, const aclTensor *softmaxSumOptional,
-    const aclTensor *softmaxInOptional, const aclTensor *attentionInOptional, const aclTensor *sinkInOptional,
-    const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional, const aclTensor *dScaleQOptional,
-    const aclTensor *dScaleKOptional, const aclTensor *dScaleVOptional, const aclTensor *dScaleDyOptional,
-    const aclTensor *dScaleOOptional, const aclIntArray *prefixOptional, const aclIntArray *actualSeqQLenOptional,
-    const aclIntArray *actualSeqKvLenOptional, const aclIntArray *qStartIdxOptional,
-    const aclIntArray *kvStartIdxOptional, double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens,
-    int64_t headNum, char *inputLayout, char *softmaxInLayout, int64_t innerPrecise, int64_t sparseMode,
-    int64_t pseType, int64_t seed, int64_t offset, int64_t outDtype, const aclTensor *dqOut, const aclTensor *dkOut,
-    const aclTensor *dvOut, const aclTensor *dqRopeOut, const aclTensor *dkRopeOut, const aclTensor *dpseOut,
-    const aclTensor *dsinkOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* keyIn, const aclTensor* value, const aclTensor* dy,
+    const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional,
+    const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional,
+    const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional, const aclTensor* sinkInOptional,
+    const aclTensor* queryRopeOptional, const aclTensor* keyRopeOptional, const aclTensor* dScaleQOptional,
+    const aclTensor* dScaleKOptional, const aclTensor* dScaleVOptional, const aclTensor* dScaleDyOptional,
+    const aclTensor* dScaleOOptional, const aclIntArray* prefixOptional, const aclIntArray* actualSeqQLenOptional,
+    const aclIntArray* actualSeqKvLenOptional, const aclIntArray* qStartIdxOptional,
+    const aclIntArray* kvStartIdxOptional, double scaleValue, double keepProb, int64_t preTokens, int64_t nextTokens,
+    int64_t headNum, char* inputLayout, char* softmaxInLayout, int64_t innerPrecise, int64_t sparseMode,
+    int64_t pseType, int64_t seed, int64_t offset, int64_t outDtype, const aclTensor* dqOut, const aclTensor* dkOut,
+    const aclTensor* dvOut, const aclTensor* dqRopeOut, const aclTensor* dkRopeOut, const aclTensor* dpseOut,
+    const aclTensor* dsinkOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(
         aclnnFlashAttentionScoreGradV4,
@@ -3290,7 +3290,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV4GetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnFlashAttentionScoreGradV4(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnFlashAttentionScoreGradV4(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnFlashAttentionScoreGradV4);

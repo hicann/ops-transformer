@@ -41,12 +41,12 @@ public:
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates, GM_ADDR queryStartLoc,
                                 GM_ADDR cacheIndices, GM_ADDR numAcceptedToken, GM_ADDR numComputedTokens,
                                 GM_ADDR blockIdxFirst, GM_ADDR blockIdxLast, GM_ADDR initialStateIdx, GM_ADDR y,
-                                GM_ADDR workspace, const FusedCausalConv1dCutBSHTilingData *tiling);
+                                GM_ADDR workspace, const FusedCausalConv1dCutBSHTilingData* tiling);
     __aicore__ inline void Process();
 
 private:
     // ---- Init helpers ----
-    __aicore__ inline void ParseTiling(const FusedCausalConv1dCutBSHTilingData *t);
+    __aicore__ inline void ParseTiling(const FusedCausalConv1dCutBSHTilingData* t);
     __aicore__ inline void InitQueues();
     __aicore__ inline void LoadMetadata();
 
@@ -56,9 +56,9 @@ private:
     // Compute: DeQue, load cache per-batch, conv all tokens, write cache, output y
     __aicore__ inline void Compute(uint32_t curBsStart, uint32_t curBS, uint32_t dimStart, uint32_t dimSize,
                                    uint32_t dimBlocks, uint32_t iStart, uint32_t batchIdx, uint32_t curSeqIdx,
-                                   uint64_t coreGlobalEnd, uint32_t &endBatchIdx);
+                                   uint64_t coreGlobalEnd, uint32_t& endBatchIdx);
 
-    __aicore__ inline void WriteCacheToStates(LocalTensor<T> &cacheLocal, LocalTensor<T> &xLocal, uint32_t chunkEnd,
+    __aicore__ inline void WriteCacheToStates(LocalTensor<T>& cacheLocal, LocalTensor<T>& xLocal, uint32_t chunkEnd,
                                               uint32_t curBatchLen, uint32_t cachedStateLen, bool hasCacheLocal,
                                               int64_t writeCIdx, uint32_t dimStart, uint32_t dimSize,
                                               uint32_t dimBlocks, uint32_t cacheSkipBlocks, uint64_t batchGmEnd);
@@ -70,7 +70,7 @@ private:
 
     // ---- Distributed APC prefix fill ----
     __aicore__ inline void FillApcChunksInRange(uint32_t curBatch, uint64_t batchSt, uint32_t batchLen,
-                                                uint32_t curBsStart, uint32_t curBS, LocalTensor<T> &xLocal,
+                                                uint32_t curBsStart, uint32_t curBS, LocalTensor<T>& xLocal,
                                                 uint32_t dimStart, uint32_t dimSize, uint32_t dimBlocks,
                                                 uint32_t cacheSkip);
     // cache-prefix + collision-deferred chunks: handled once pre-SyncAll.
@@ -91,11 +91,11 @@ private:
         bool useZeroCache;
         uint32_t lastResetIdx; // conv_mode==1: number of leading tokens to zero out
     };
-    __aicore__ inline void PrepareBatchMeta(uint32_t batchIdx, uint32_t curSeqIdx, BatchMeta &m);
+    __aicore__ inline void PrepareBatchMeta(uint32_t batchIdx, uint32_t curSeqIdx, BatchMeta& m);
 
     // ---- Helpers ----
     __aicore__ inline uint32_t FindBatchIdx(uint64_t globalSeqIdx);
-    __aicore__ inline void ResolveCacheIndices(uint32_t batchIdx, int64_t &readCIdx, int64_t &writeCIdx);
+    __aicore__ inline void ResolveCacheIndices(uint32_t batchIdx, int64_t& readCIdx, int64_t& writeCIdx);
     template <HardEvent E>
     __aicore__ inline void SetWaitFlag(HardEvent evt)
     {
@@ -276,7 +276,7 @@ private:
 };
 
 template <typename T>
-__aicore__ inline void FusedCausalConv1dCutBSH<T>::ParseTiling(const FusedCausalConv1dCutBSHTilingData *tiling)
+__aicore__ inline void FusedCausalConv1dCutBSH<T>::ParseTiling(const FusedCausalConv1dCutBSHTilingData* tiling)
 {
     dim_ = tiling->dim;
     kernelWidth_ = tiling->kernelWidth;
@@ -337,7 +337,7 @@ __aicore__ inline void FusedCausalConv1dCutBSH<T>::Init(GM_ADDR x, GM_ADDR weigh
                                                         GM_ADDR numAcceptedToken, GM_ADDR numComputedTokens,
                                                         GM_ADDR blockIdxFirst, GM_ADDR blockIdxLast,
                                                         GM_ADDR initialStateIdx, GM_ADDR y, GM_ADDR workspace,
-                                                        const FusedCausalConv1dCutBSHTilingData *tiling)
+                                                        const FusedCausalConv1dCutBSHTilingData* tiling)
 {
     (void)y; // y may be unused when inplace_==true; suppress warning
     ParseTiling(tiling);
@@ -354,42 +354,42 @@ __aicore__ inline void FusedCausalConv1dCutBSH<T>::Init(GM_ADDR x, GM_ADDR weigh
     // ---- GM binding ----
     uint64_t cuSeqLen = tiling->cuSeqLen;
 
-    xGM_.SetGlobalBuffer((__gm__ T *)x, cuSeqLen * static_cast<uint64_t>(xStride_));
-    weightGM_.SetGlobalBuffer((__gm__ T *)weight, static_cast<uint64_t>(kernelWidth_) * dim_);
-    cacheStatesGM_.SetGlobalBuffer((__gm__ T *)convStates);
-    seqStartIndexGM_.SetGlobalBuffer((__gm__ int32_t *)queryStartLoc, batchSize_ + 1);
+    xGM_.SetGlobalBuffer((__gm__ T*)x, cuSeqLen * static_cast<uint64_t>(xStride_));
+    weightGM_.SetGlobalBuffer((__gm__ T*)weight, static_cast<uint64_t>(kernelWidth_) * dim_);
+    cacheStatesGM_.SetGlobalBuffer((__gm__ T*)convStates);
+    seqStartIndexGM_.SetGlobalBuffer((__gm__ int32_t*)queryStartLoc, batchSize_ + 1);
 
     // inplace=true: yGM_ 指向 workspace 上的 y backup 区（避免污染 xGM_）。
     uint64_t yStride = inplace_ ? static_cast<uint64_t>(xStride_) : static_cast<uint64_t>(dim_);
     if (inplace_) {
-        yGM_.SetGlobalBuffer((__gm__ T *)workspace, cuSeqLen * yStride);
+        yGM_.SetGlobalBuffer((__gm__ T*)workspace, cuSeqLen * yStride);
     } else {
-        yGM_.SetGlobalBuffer((__gm__ T *)y, cuSeqLen * yStride);
+        yGM_.SetGlobalBuffer((__gm__ T*)y, cuSeqLen * yStride);
     }
 
     if (apcEnabled_) {
-        cacheIndices2DGM_.SetGlobalBuffer((__gm__ int32_t *)cacheIndices,
+        cacheIndices2DGM_.SetGlobalBuffer((__gm__ int32_t*)cacheIndices,
                                           static_cast<uint64_t>(batchSize_) * maxNumBlocks_);
         if (initialStateIdx != nullptr) {
-            initialStateIdxGM_.SetGlobalBuffer((__gm__ int32_t *)initialStateIdx, batchSize_);
+            initialStateIdxGM_.SetGlobalBuffer((__gm__ int32_t*)initialStateIdx, batchSize_);
         }
         if (blockIdxFirst != nullptr) {
-            blockIdxFirstGM_.SetGlobalBuffer((__gm__ int32_t *)blockIdxFirst, batchSize_);
+            blockIdxFirstGM_.SetGlobalBuffer((__gm__ int32_t*)blockIdxFirst, batchSize_);
         }
         if (blockIdxLast != nullptr) {
-            blockIdxLastGM_.SetGlobalBuffer((__gm__ int32_t *)blockIdxLast, batchSize_);
+            blockIdxLastGM_.SetGlobalBuffer((__gm__ int32_t*)blockIdxLast, batchSize_);
         }
     } else {
         if (hasCacheIndices_) {
-            cacheIndicesGM_.SetGlobalBuffer((__gm__ int32_t *)cacheIndices, batchSize_);
+            cacheIndicesGM_.SetGlobalBuffer((__gm__ int32_t*)cacheIndices, batchSize_);
         }
     }
 
     if (hasNumComputedTokens_ && numComputedTokens != nullptr) {
-        numComputedTokensGM_.SetGlobalBuffer((__gm__ int32_t *)numComputedTokens, batchSize_);
+        numComputedTokensGM_.SetGlobalBuffer((__gm__ int32_t*)numComputedTokens, batchSize_);
     }
     if (hasAcceptTokenNum_ && numAcceptedToken != nullptr) {
-        acceptTokenGM_.SetGlobalBuffer((__gm__ int32_t *)numAcceptedToken, batchSize_);
+        acceptTokenGM_.SetGlobalBuffer((__gm__ int32_t*)numAcceptedToken, batchSize_);
     }
 
     InitQueues();
@@ -500,8 +500,8 @@ __aicore__ inline uint32_t FusedCausalConv1dCutBSH<T>::FindBatchIdx(uint64_t glo
 }
 
 template <typename T>
-__aicore__ inline void FusedCausalConv1dCutBSH<T>::ResolveCacheIndices(uint32_t batchIdx, int64_t &readCIdx,
-                                                                       int64_t &writeCIdx)
+__aicore__ inline void FusedCausalConv1dCutBSH<T>::ResolveCacheIndices(uint32_t batchIdx, int64_t& readCIdx,
+                                                                       int64_t& writeCIdx)
 {
     if (apcEnabled_) {
         int32_t initIdx = initialStateIdxLocal_.GetValue(batchIdx);
@@ -518,7 +518,7 @@ __aicore__ inline void FusedCausalConv1dCutBSH<T>::ResolveCacheIndices(uint32_t 
 }
 
 template <typename T>
-__aicore__ inline void FusedCausalConv1dCutBSH<T>::PrepareBatchMeta(uint32_t batchIdx, uint32_t curSeqIdx, BatchMeta &m)
+__aicore__ inline void FusedCausalConv1dCutBSH<T>::PrepareBatchMeta(uint32_t batchIdx, uint32_t curSeqIdx, BatchMeta& m)
 {
     uint32_t K = kernelWidth_;
 
@@ -755,7 +755,7 @@ template <typename T>
 __aicore__ inline void FusedCausalConv1dCutBSH<T>::Compute(uint32_t curBsStart, uint32_t curBS, uint32_t dimStart,
                                                            uint32_t dimSize, uint32_t dimBlocks, uint32_t iStart,
                                                            uint32_t batchIdx, uint32_t curSeqIdx,
-                                                           uint64_t coreGlobalEnd, uint32_t &endBatchIdx)
+                                                           uint64_t coreGlobalEnd, uint32_t& endBatchIdx)
 {
     uint32_t K = kernelWidth_;
     uint32_t N = curBS;
@@ -1026,7 +1026,7 @@ __aicore__ inline void FusedCausalConv1dCutBSH<T>::Compute(uint32_t curBsStart, 
 
 template <typename T>
 __aicore__ inline void FusedCausalConv1dCutBSH<T>::WriteCacheToStates(
-    LocalTensor<T> &cacheLocal, LocalTensor<T> &xLocal, uint32_t chunkEnd, uint32_t curBatchLen,
+    LocalTensor<T>& cacheLocal, LocalTensor<T>& xLocal, uint32_t chunkEnd, uint32_t curBatchLen,
     uint32_t cachedStateLen, bool hasCacheLocal, int64_t writeCIdx, uint32_t dimStart, uint32_t dimSize,
     uint32_t dimBlocks, uint32_t cacheSkipBlocks, uint64_t batchGmEnd)
 {
@@ -1281,7 +1281,7 @@ __aicore__ inline void FusedCausalConv1dCutBSH<T>::RefreshApcState(uint32_t curB
 template <typename T>
 __aicore__ inline void FusedCausalConv1dCutBSH<T>::FillApcChunksInRange(uint32_t curBatch, uint64_t batchSt,
                                                                         uint32_t batchLen, uint32_t curBsStart,
-                                                                        uint32_t curBS, LocalTensor<T> &xLocal,
+                                                                        uint32_t curBS, LocalTensor<T>& xLocal,
                                                                         uint32_t dimStart, uint32_t dimSize,
                                                                         uint32_t dimBlocks, uint32_t cacheSkip)
 {

@@ -16,7 +16,7 @@
 #include "blaze_kernel_stub.h"
 #include "tikicpulib.h"
 
-inline void copy_gm_to_cbuf_v2(__cbuf__ void *dst, __gm__ void *src, uint8_t sid, uint32_t nBurst, uint32_t lenBurst,
+inline void copy_gm_to_cbuf_v2(__cbuf__ void* dst, __gm__ void* src, uint8_t sid, uint32_t nBurst, uint32_t lenBurst,
                                uint8_t padFuncMode, uint64_t l2CacheCtl, uint64_t srcStride, uint32_t dstStride)
 {
     (void)l2CacheCtl;
@@ -29,11 +29,11 @@ inline void copy_gm_to_cbuf_v2(__cbuf__ void *dst, __gm__ void *src, uint8_t sid
 namespace BlockAttnResPrepareOps::CpuDebug {
 
 template <typename T>
-__ubuf__ T *ToPhysicalUbAddress(uint64_t byteOffset)
+__ubuf__ T* ToPhysicalUbAddress(uint64_t byteOffset)
 {
     const uint32_t offset = static_cast<uint32_t>(byteOffset);
     AscendC::LocalTensor<uint8_t> localTensor(AscendC::TPosition::VECCALC, offset, AscendC::TOTAL_UB_SIZE - offset);
-    return reinterpret_cast<__ubuf__ T *>(localTensor.GetPhyAddr());
+    return reinterpret_cast<__ubuf__ T*>(localTensor.GetPhyAddr());
 }
 
 } // namespace BlockAttnResPrepareOps::CpuDebug
@@ -43,7 +43,7 @@ namespace AscendC::Te {
 template <typename PtrPattern, typename DataType, typename Addr, EnableMakePtrByTrait<PtrPattern, Addr> = 0>
 __aicore__ inline auto BlockAttnResPrepareMakeMemPtr(Addr byteOffset)
 {
-    auto *physicalAddress = BlockAttnResPrepareOps::CpuDebug::ToPhysicalUbAddress<DataType>(byteOffset);
+    auto* physicalAddress = BlockAttnResPrepareOps::CpuDebug::ToPhysicalUbAddress<DataType>(byteOffset);
     return MakeMemPtr<PtrPattern>(physicalAddress);
 }
 

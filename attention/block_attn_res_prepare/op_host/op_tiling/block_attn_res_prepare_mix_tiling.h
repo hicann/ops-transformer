@@ -23,7 +23,7 @@ namespace optiling {
 
 class BlockAttnResPrepareMixTiling final : public BlockAttnResPrepareBaseTiling {
 public:
-    explicit BlockAttnResPrepareMixTiling(gert::TilingContext *context)
+    explicit BlockAttnResPrepareMixTiling(gert::TilingContext* context)
         : BlockAttnResPrepareBaseTiling(context)
     {}
     ~BlockAttnResPrepareMixTiling() override = default;
@@ -43,10 +43,10 @@ private:
     bool TrySelectTileForS(uint64_t sCandidate, uint64_t mixedCoreNum, uint64_t usableL1Bytes, uint64_t usableUbBytes);
     bool TrySelectTileForT(uint64_t sCandidate, uint64_t candidateT, uint64_t usableL1Bytes, uint64_t usableUbBytes);
     TileCandidate BuildTileCandidate(uint64_t sCandidate, uint64_t candidateT, uint64_t candidateD) const;
-    ResourceUsage CalculateResourceUsage(const TileCandidate &candidate) const;
-    bool DoesCandidateFit(const ResourceUsage &usage, uint64_t usableL1Bytes, uint64_t usableUbBytes) const;
-    void ApplyTileCandidate(const TileCandidate &candidate);
-    ge::graphStatus CalculateMixWork(uint64_t &totalWorkUnits);
+    ResourceUsage CalculateResourceUsage(const TileCandidate& candidate) const;
+    bool DoesCandidateFit(const ResourceUsage& usage, uint64_t usableL1Bytes, uint64_t usableUbBytes) const;
+    void ApplyTileCandidate(const TileCandidate& candidate);
+    ge::graphStatus CalculateMixWork(uint64_t& totalWorkUnits);
     ge::graphStatus CalculateWorkspaceSize();
     void FillTilingData(uint64_t totalWorkUnits);
 

@@ -21,10 +21,12 @@ using namespace std;
 
 class block_sparse_attention_infershape_ut : public testing::Test {
 protected:
-    static void SetUpTestCase() {
+    static void SetUpTestCase()
+    {
         cout << "block_sparse_attention_infershape_ut SetUp" << endl;
     }
-    static void TearDownTestCase() {
+    static void TearDownTestCase()
+    {
         cout << "block_sparse_attention_infershape_ut TearDown" << endl;
     }
 };
@@ -48,45 +50,37 @@ constexpr float scaleValue = 1.0 / sqrt(static_cast<float>(headDim));
 // ============================================================================
 // 用例 1: TND正常场景
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, tnd_normal) {
+TEST_F(block_sparse_attention_infershape_ut, tnd_normal)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{tokenQ, numHeads, headDim}, {tokenQ, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{tokenQ, numHeads, headDim}, {tokenQ, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {tokenQ, numHeads, headDim},
-        {tokenQ, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{tokenQ, numHeads, headDim}, {tokenQ, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
@@ -94,45 +88,42 @@ TEST_F(block_sparse_attention_infershape_ut, tnd_normal) {
 // ============================================================================
 // 用例 2: BNSD正常场景
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, bnsd_normal) {
+TEST_F(block_sparse_attention_infershape_ut, bnsd_normal)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{batch, numHeads, qSeqlen, headDim}, {batch, numHeads, qSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{batch, numHeads, qSeqlen, headDim}, {batch, numHeads, qSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {batch, numHeads, qSeqlen, headDim},
-        {batch, numHeads, qSeqlen, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{batch, numHeads, qSeqlen, headDim},
+                                                           {batch, numHeads, qSeqlen, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
@@ -140,45 +131,42 @@ TEST_F(block_sparse_attention_infershape_ut, bnsd_normal) {
 // ============================================================================
 // 用例 3: BSND正常场景
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, bsnd_normal) {
+TEST_F(block_sparse_attention_infershape_ut, bsnd_normal)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{batch, qSeqlen, numHeads, headDim}, {batch, qSeqlen, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{batch, qSeqlen, numHeads, headDim}, {batch, qSeqlen, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {batch, qSeqlen, numHeads, headDim},
-        {batch, qSeqlen, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{batch, qSeqlen, numHeads, headDim},
+                                                           {batch, qSeqlen, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
@@ -186,45 +174,37 @@ TEST_F(block_sparse_attention_infershape_ut, bsnd_normal) {
 // ============================================================================
 // 用例 4: TND query的维度不为3
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, tnd_q_wrong_dim) {
+TEST_F(block_sparse_attention_infershape_ut, tnd_q_wrong_dim)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{tokenQ, numHeads, headDim, 1}, {tokenQ, numHeads, headDim, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{tokenQ, numHeads, headDim, 1}, {tokenQ, numHeads, headDim, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {tokenQ, numHeads, headDim},
-        {tokenQ, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{tokenQ, numHeads, headDim}, {tokenQ, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -232,45 +212,44 @@ TEST_F(block_sparse_attention_infershape_ut, tnd_q_wrong_dim) {
 // ============================================================================
 // 用例 5: BNSD query的维度不为4
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, bnsd_q_wrong_dim) {
+TEST_F(block_sparse_attention_infershape_ut, bnsd_q_wrong_dim)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{batch, numHeads, qSeqlen, headDim, 1}, {batch, numHeads, qSeqlen, headDim, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{batch, numHeads, qSeqlen, headDim, 1}, {batch, numHeads, qSeqlen, headDim, 1}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {batch, numHeads, qSeqlen, headDim},
-        {batch, numHeads, qSeqlen, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{batch, numHeads, qSeqlen, headDim},
+                                                           {batch, numHeads, qSeqlen, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -278,45 +257,44 @@ TEST_F(block_sparse_attention_infershape_ut, bnsd_q_wrong_dim) {
 // ============================================================================
 // 用例 6: BSND query的维度不为4
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, bsnd_q_wrong_dim) {
+TEST_F(block_sparse_attention_infershape_ut, bsnd_q_wrong_dim)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{batch, qSeqlen, numHeads, headDim, 1}, {batch, qSeqlen, numHeads, headDim, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{batch, qSeqlen, numHeads, headDim, 1}, {batch, qSeqlen, numHeads, headDim, 1}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {batch, qSeqlen, numHeads, headDim},
-        {batch, qSeqlen, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{batch, qSeqlen, numHeads, headDim},
+                                                           {batch, qSeqlen, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -324,45 +302,37 @@ TEST_F(block_sparse_attention_infershape_ut, bsnd_q_wrong_dim) {
 // ============================================================================
 // 用例 7: 不支持的qInputLayout
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, unsupported_qInputLayout) {
+TEST_F(block_sparse_attention_infershape_ut, unsupported_qInputLayout)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{tokenQ, numHeads, headDim}, {tokenQ, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSH")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{tokenQ, numHeads, headDim}, {tokenQ, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSH")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {tokenQ, numHeads, headDim},
-        {tokenQ, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{tokenQ, numHeads, headDim}, {tokenQ, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -370,45 +340,37 @@ TEST_F(block_sparse_attention_infershape_ut, unsupported_qInputLayout) {
 // ============================================================================
 // 用例 8: qInputLayout和kvInputLayout不一致
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, qInputLayout_kvInputLayout_not_equal) {
+TEST_F(block_sparse_attention_infershape_ut, qInputLayout_kvInputLayout_not_equal)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{tokenQ, numHeads, headDim}, {tokenQ, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{tokenQ, numHeads, headDim}, {tokenQ, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {tokenQ, numHeads, headDim},
-        {tokenQ, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{tokenQ, numHeads, headDim}, {tokenQ, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -416,45 +378,37 @@ TEST_F(block_sparse_attention_infershape_ut, qInputLayout_kvInputLayout_not_equa
 // ============================================================================
 // 用例 9: TND key/value的维度不为3
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, tnd_kv_wrong_dim) {
+TEST_F(block_sparse_attention_infershape_ut, tnd_kv_wrong_dim)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{tokenQ, numHeads, headDim}, {tokenQ, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim, 1}, {tokenKv, numKvHeads, headDim, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim, 1}, {tokenKv, numKvHeads, headDim, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{tokenQ, numHeads, headDim}, {tokenQ, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim, 1}, {tokenKv, numKvHeads, headDim, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim, 1}, {tokenKv, numKvHeads, headDim, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {tokenQ, numHeads, headDim},
-        {tokenQ, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{tokenQ, numHeads, headDim}, {tokenQ, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -462,45 +416,37 @@ TEST_F(block_sparse_attention_infershape_ut, tnd_kv_wrong_dim) {
 // ============================================================================
 // 用例 10: TND key/value numKvHeads维度不一致
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, tnd_kv_numHeads_not_equal) {
+TEST_F(block_sparse_attention_infershape_ut, tnd_kv_numHeads_not_equal)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{tokenQ, numHeads, headDim}, {tokenQ, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads + 1)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{tokenQ, numHeads, headDim}, {tokenQ, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads + 1)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {tokenQ, numHeads, headDim},
-        {tokenQ, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{tokenQ, numHeads, headDim}, {tokenQ, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -508,45 +454,37 @@ TEST_F(block_sparse_attention_infershape_ut, tnd_kv_numHeads_not_equal) {
 // ============================================================================
 // 用例 11: TND key/value headDim维度不一致
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, tnd_kv_headDim_not_equal) {
+TEST_F(block_sparse_attention_infershape_ut, tnd_kv_headDim_not_equal)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{tokenQ, numHeads, headDim}, {tokenQ, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{tokenKv, numKvHeads, headDim + 1}, {tokenKv, numKvHeads, headDim + 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{tokenQ, numHeads, headDim}, {tokenQ, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim}, {tokenKv, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{tokenKv, numKvHeads, headDim + 1}, {tokenKv, numKvHeads, headDim + 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {tokenQ, numHeads, headDim},
-        {tokenQ, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{tokenQ, numHeads, headDim}, {tokenQ, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -554,45 +492,42 @@ TEST_F(block_sparse_attention_infershape_ut, tnd_kv_headDim_not_equal) {
 // ============================================================================
 // 用例 12: BNSD key/value的维度不为4
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, bnsd_kv_wrong_dim) {
+TEST_F(block_sparse_attention_infershape_ut, bnsd_kv_wrong_dim)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{batch, numHeads, qSeqlen, headDim}, {batch, numHeads, qSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numKvHeads, kvSeqlen, headDim, 1}, {batch, numKvHeads, kvSeqlen, headDim, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numKvHeads, kvSeqlen, headDim, 1}, {batch, numKvHeads, kvSeqlen, headDim, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{batch, numHeads, qSeqlen, headDim}, {batch, numHeads, qSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numKvHeads, kvSeqlen, headDim, 1}, {batch, numKvHeads, kvSeqlen, headDim, 1}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numKvHeads, kvSeqlen, headDim, 1}, {batch, numKvHeads, kvSeqlen, headDim, 1}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {batch, numHeads, qSeqlen, headDim},
-        {batch, numHeads, qSeqlen, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{batch, numHeads, qSeqlen, headDim},
+                                                           {batch, numHeads, qSeqlen, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -600,45 +535,42 @@ TEST_F(block_sparse_attention_infershape_ut, bnsd_kv_wrong_dim) {
 // ============================================================================
 // 用例 13: BNSD key/value numKvHeads维度不一致
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, bnsd_kv_numHeads_not_equal) {
+TEST_F(block_sparse_attention_infershape_ut, bnsd_kv_numHeads_not_equal)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{batch, numHeads, qSeqlen, headDim}, {batch, numHeads, qSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads + 1)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{batch, numHeads, qSeqlen, headDim}, {batch, numHeads, qSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads + 1)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {batch, numHeads, qSeqlen, headDim},
-        {batch, numHeads, qSeqlen, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{batch, numHeads, qSeqlen, headDim},
+                                                           {batch, numHeads, qSeqlen, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -646,45 +578,42 @@ TEST_F(block_sparse_attention_infershape_ut, bnsd_kv_numHeads_not_equal) {
 // ============================================================================
 // 用例 14: BNSD key/value batch维度不一致
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, bnsd_kv_batch_not_equal) {
+TEST_F(block_sparse_attention_infershape_ut, bnsd_kv_batch_not_equal)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{batch, numHeads, qSeqlen, headDim}, {batch, numHeads, qSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch + 1, numKvHeads, kvSeqlen, headDim}, {batch + 1, numKvHeads, kvSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{batch, numHeads, qSeqlen, headDim}, {batch, numHeads, qSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch + 1, numKvHeads, kvSeqlen, headDim}, {batch + 1, numKvHeads, kvSeqlen, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {batch, numHeads, qSeqlen, headDim},
-        {batch, numHeads, qSeqlen, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{batch, numHeads, qSeqlen, headDim},
+                                                           {batch, numHeads, qSeqlen, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -692,45 +621,42 @@ TEST_F(block_sparse_attention_infershape_ut, bnsd_kv_batch_not_equal) {
 // ============================================================================
 // 用例 15: BNSD key/value headDim维度不一致
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, bnsd_kv_headDim_not_equal) {
+TEST_F(block_sparse_attention_infershape_ut, bnsd_kv_headDim_not_equal)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{batch, numHeads, qSeqlen, headDim}, {batch, numHeads, qSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numKvHeads, kvSeqlen, headDim + 1}, {batch, numKvHeads, kvSeqlen, headDim + 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{batch, numHeads, qSeqlen, headDim}, {batch, numHeads, qSeqlen, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numKvHeads, kvSeqlen, headDim}, {batch, numKvHeads, kvSeqlen, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numKvHeads, kvSeqlen, headDim + 1}, {batch, numKvHeads, kvSeqlen, headDim + 1}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {batch, numHeads, qSeqlen, headDim},
-        {batch, numHeads, qSeqlen, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{batch, numHeads, qSeqlen, headDim},
+                                                           {batch, numHeads, qSeqlen, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -738,45 +664,42 @@ TEST_F(block_sparse_attention_infershape_ut, bnsd_kv_headDim_not_equal) {
 // ============================================================================
 // 用例 16: BSND key/value的维度不为4
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, bsnd_kv_wrong_dim) {
+TEST_F(block_sparse_attention_infershape_ut, bsnd_kv_wrong_dim)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{batch, qSeqlen, numHeads, headDim}, {batch, qSeqlen, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, kvSeqlen, numKvHeads, headDim, 1}, {batch, kvSeqlen, numKvHeads, headDim, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, kvSeqlen, numKvHeads, headDim, 1}, {batch, kvSeqlen, numKvHeads, headDim, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{batch, qSeqlen, numHeads, headDim}, {batch, qSeqlen, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, kvSeqlen, numKvHeads, headDim, 1}, {batch, kvSeqlen, numKvHeads, headDim, 1}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, kvSeqlen, numKvHeads, headDim, 1}, {batch, kvSeqlen, numKvHeads, headDim, 1}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {batch, qSeqlen, numHeads, headDim},
-        {batch, qSeqlen, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{batch, qSeqlen, numHeads, headDim},
+                                                           {batch, qSeqlen, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -784,45 +707,42 @@ TEST_F(block_sparse_attention_infershape_ut, bsnd_kv_wrong_dim) {
 // ============================================================================
 // 用例 17: BSND key/value numKvHeads维度不一致
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, bsnd_kv_numHeads_not_equal) {
+TEST_F(block_sparse_attention_infershape_ut, bsnd_kv_numHeads_not_equal)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{batch, qSeqlen, numHeads, headDim}, {batch, qSeqlen, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads + 1)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{batch, qSeqlen, numHeads, headDim}, {batch, qSeqlen, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads + 1)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {batch, qSeqlen, numHeads, headDim},
-        {batch, qSeqlen, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{batch, qSeqlen, numHeads, headDim},
+                                                           {batch, qSeqlen, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -830,45 +750,42 @@ TEST_F(block_sparse_attention_infershape_ut, bsnd_kv_numHeads_not_equal) {
 // ============================================================================
 // 用例 18: BSND key/value batch维度不一致
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, bsnd_kv_batch_not_equal) {
+TEST_F(block_sparse_attention_infershape_ut, bsnd_kv_batch_not_equal)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{batch, qSeqlen, numHeads, headDim}, {batch, qSeqlen, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch + 1, kvSeqlen, numKvHeads, headDim}, {batch + 1, kvSeqlen, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{batch, qSeqlen, numHeads, headDim}, {batch, qSeqlen, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch + 1, kvSeqlen, numKvHeads, headDim}, {batch + 1, kvSeqlen, numKvHeads, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {batch, qSeqlen, numHeads, headDim},
-        {batch, qSeqlen, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{batch, qSeqlen, numHeads, headDim},
+                                                           {batch, qSeqlen, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -876,45 +793,42 @@ TEST_F(block_sparse_attention_infershape_ut, bsnd_kv_batch_not_equal) {
 // ============================================================================
 // 用例 19: BSND key/value headDim维度不一致
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, bsnd_kv_headDim_not_equal) {
+TEST_F(block_sparse_attention_infershape_ut, bsnd_kv_headDim_not_equal)
+{
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{batch, qSeqlen, numHeads, headDim}, {batch, qSeqlen, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, kvSeqlen, numKvHeads, headDim + 1}, {batch, kvSeqlen, numKvHeads, headDim + 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{batch, qSeqlen, numHeads, headDim}, {batch, qSeqlen, numHeads, headDim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, kvSeqlen, numKvHeads, headDim}, {batch, kvSeqlen, numKvHeads, headDim}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, kvSeqlen, numKvHeads, headDim + 1}, {batch, kvSeqlen, numKvHeads, headDim + 1}},
+          ge::DT_FLOAT16,
+          ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {batch, qSeqlen, numHeads, headDim},
-        {batch, qSeqlen, numHeads, 1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{batch, qSeqlen, numHeads, headDim},
+                                                           {batch, qSeqlen, numHeads, 1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }
@@ -922,46 +836,38 @@ TEST_F(block_sparse_attention_infershape_ut, bsnd_kv_headDim_not_equal) {
 // ============================================================================
 // 用例 20: UNKNOWN DIM场景
 // ============================================================================
-TEST_F(block_sparse_attention_infershape_ut, unknown_shape) {
+TEST_F(block_sparse_attention_infershape_ut, unknown_shape)
+{
     constexpr int64_t UNKNOWN_DIMS = -2;
     gert::InfershapeContextPara infershapeContextPara(
         "BlockSparseAttention",
-        {
-            {{{UNKNOWN_DIMS}, {UNKNOWN_DIMS}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{UNKNOWN_DIMS}, {UNKNOWN_DIMS}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{UNKNOWN_DIMS}, {UNKNOWN_DIMS}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
-            {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
-            {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-            {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
-        }
-    );
+        {{{{UNKNOWN_DIMS}, {UNKNOWN_DIMS}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{UNKNOWN_DIMS}, {UNKNOWN_DIMS}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{UNKNOWN_DIMS}, {UNKNOWN_DIMS}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{batch, numHeads, qBlockNum, kvBlockNum}, {batch, numHeads, qBlockNum, kvBlockNum}},
+          ge::DT_INT8,
+          ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"kvInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"numKeyValueHeads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numKvHeads)},
+         {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+         {"innerPrecise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {UNKNOWN_DIMS},
-        {UNKNOWN_DIMS}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{UNKNOWN_DIMS}, {UNKNOWN_DIMS}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }

@@ -30,31 +30,31 @@ public:
     FABaseChecker() = default;
     virtual ~FABaseChecker() = default;
 
-    virtual ge::graphStatus CheckSinglePara(const FaTilingInfo &faInfo)
+    virtual ge::graphStatus CheckSinglePara(const FaTilingInfo& faInfo)
     {
         (void)faInfo;
         return ge::GRAPH_SUCCESS;
     }
-    virtual ge::graphStatus CheckParaExistence(const FaTilingInfo &faInfo)
+    virtual ge::graphStatus CheckParaExistence(const FaTilingInfo& faInfo)
     {
         (void)faInfo;
         return ge::GRAPH_SUCCESS;
     }
-    virtual ge::graphStatus CheckFeature(const FaTilingInfo &faInfo)
+    virtual ge::graphStatus CheckFeature(const FaTilingInfo& faInfo)
     {
         (void)faInfo;
         return ge::GRAPH_SUCCESS;
     }
-    virtual ge::graphStatus CheckMultiPara(const FaTilingInfo &faInfo)
+    virtual ge::graphStatus CheckMultiPara(const FaTilingInfo& faInfo)
     {
         (void)faInfo;
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
-    ge::graphStatus CheckFormatSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
+    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const;
+    ge::graphStatus CheckFormatSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const;
     template <typename T>
-    ge::graphStatus CheckValueSupport(const T value, const std::vector<T> &expectValList) const
+    ge::graphStatus CheckValueSupport(const T value, const std::vector<T>& expectValList) const
     {
         if (std::find(expectValList.begin(), expectValList.end(), value) == expectValList.end()) {
             return ge::GRAPH_FAILED;

@@ -22,7 +22,7 @@ namespace AttentionUpdateOpt {
 template <typename goType>
 class AttentionUpdateWithLse {
 public:
-    __aicore__ inline AttentionUpdateWithLse(TPipe *pipe, const AttentionUpdateTilingData *__restrict tiling)
+    __aicore__ inline AttentionUpdateWithLse(TPipe* pipe, const AttentionUpdateTilingData* __restrict tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR lse, GM_ADDR go, GM_ADDR out, GM_ADDR outLseMax, GM_ADDR workSpace);
@@ -40,8 +40,8 @@ private:
     __aicore__ inline void ComputeOutVF(uint32_t lseUbOffset, uint32_t bshNum, uint16_t bshInLoopNum,
                                         uint32_t dAlignNum, uint32_t goAlignNum, uint16_t unrollLoops);
 
-    TPipe *pipe_ = nullptr;
-    const AttentionUpdateTilingData *tilingData_;
+    TPipe* pipe_ = nullptr;
+    const AttentionUpdateTilingData* tilingData_;
 
     uint32_t blockIdx_;
     uint64_t bshInLoop_;
@@ -83,11 +83,11 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::Init(GM_ADDR lse, GM_ADDR
     uint64_t perCorePerLoopCountAlign = Ops::Base::CeilAlign(perCorePerLoopCount_, lseBlockNum_);
     dAlignNum_ = Ops::Base::CeilAlign(tilingData_->d, goBlockNum_);
 
-    lseList_ = AscendC::ListTensorDesc(reinterpret_cast<__gm__ void *>(lse));
-    goList_ = AscendC::ListTensorDesc(reinterpret_cast<__gm__ void *>(go));
+    lseList_ = AscendC::ListTensorDesc(reinterpret_cast<__gm__ void*>(lse));
+    goList_ = AscendC::ListTensorDesc(reinterpret_cast<__gm__ void*>(go));
 
-    outLseMaxGm_.SetGlobalBuffer((__gm__ float *)outLseMax);
-    outGm_.SetGlobalBuffer((__gm__ goType *)out);
+    outLseMaxGm_.SetGlobalBuffer((__gm__ float*)outLseMax);
+    outGm_.SetGlobalBuffer((__gm__ goType*)out);
 
     pipe_->InitBuffer(lseQueue_, BUFFER_NUM, tilingData_->sp * perCorePerLoopCountAlign * sizeof(float));
     pipe_->InitBuffer(goQueue_, BUFFER_NUM, tilingData_->sp * bshInLoop_ * dAlignNum_ * sizeof(goType));
@@ -160,7 +160,7 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::CopyLseToUb(uint64_t lseG
                                                static_cast<float>(0)};
 
     for (uint32_t i = 0; i < tilingData_->sp; i++) {
-        lseGm_.SetGlobalBuffer((__gm__ float *)lseList_.GetDataPtr<float>(i));
+        lseGm_.SetGlobalBuffer((__gm__ float*)lseList_.GetDataPtr<float>(i));
         DataCopyPad(lseTensor[i * curBlockNumAlign], lseGm_[lseGmOffset], params, padParamIdx);
     }
     lseQueue_.template EnQue<float>(lseTensor);
@@ -173,9 +173,9 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::ComputeMaxVF(uint32_t cur
     LocalTensor<float> expTensor = ubTmpBuf_.Get<float>(tilingData_->sp * curBlockNum);
     LocalTensor<float> maxTensor = outLseMaxQueue_.template AllocTensor<float>();
 
-    __ubuf__ float *lseAddr = (__ubuf__ float *)lseTensor.GetPhyAddr();
-    __ubuf__ float *expAddr = (__ubuf__ float *)expTensor.GetPhyAddr();
-    __ubuf__ float *maxAddr = (__ubuf__ float *)maxTensor.GetPhyAddr();
+    __ubuf__ float* lseAddr = (__ubuf__ float*)lseTensor.GetPhyAddr();
+    __ubuf__ float* expAddr = (__ubuf__ float*)expTensor.GetPhyAddr();
+    __ubuf__ float* maxAddr = (__ubuf__ float*)maxTensor.GetPhyAddr();
 
     uint32_t blockStride = static_cast<uint32_t>(curBlockNum);
     uint16_t spSize = static_cast<uint16_t>(tilingData_->sp);
@@ -267,7 +267,7 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::CopyGoToUb(uint64_t goOff
     DataCopyPadExtParams<goType> padParamIdx = {false, static_cast<uint8_t>(0), static_cast<uint8_t>(0),
                                                 static_cast<goType>(0)};
     for (uint32_t i = 0; i < tilingData_->sp; i++) {
-        goGm_.SetGlobalBuffer((__gm__ goType *)goList_.GetDataPtr<goType>(i));
+        goGm_.SetGlobalBuffer((__gm__ goType*)goList_.GetDataPtr<goType>(i));
         DataCopyPad(goTensor[i * goAlignNum], goGm_[goOffset], params, padParamIdx);
     }
     goQueue_.template EnQue<goType>(goTensor);
@@ -283,9 +283,9 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::ComputeOutVF(uint32_t lse
     LocalTensor<float> expTensor = ubTmpBuf_.Get<float>(tilingData_->sp * bshNum);
     LocalTensor<goType> goTensor = goQueue_.template DeQue<goType>();
 
-    __ubuf__ goType *sumAddr = (__ubuf__ goType *)sumTensor.GetPhyAddr();
-    __ubuf__ float *expAddr = (__ubuf__ float *)expTensor.GetPhyAddr();
-    __ubuf__ goType *goAddr = (__ubuf__ goType *)goTensor.GetPhyAddr();
+    __ubuf__ goType* sumAddr = (__ubuf__ goType*)sumTensor.GetPhyAddr();
+    __ubuf__ float* expAddr = (__ubuf__ float*)expTensor.GetPhyAddr();
+    __ubuf__ goType* goAddr = (__ubuf__ goType*)goTensor.GetPhyAddr();
 
     uint32_t dNum = static_cast<uint32_t>(tilingData_->d);
     uint16_t spSize = static_cast<uint16_t>(tilingData_->sp);

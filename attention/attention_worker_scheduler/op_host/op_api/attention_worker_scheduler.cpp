@@ -22,16 +22,16 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(AttentionWorkerScheduler);
 
-const aclTensor* AttentionWorkerScheduler(
-    const aclTensor* scheduleContext, aclTensor* scheduleContextOut, aclOpExecutor* executor) {
+const aclTensor* AttentionWorkerScheduler(const aclTensor* scheduleContext, aclTensor* scheduleContextOut,
+                                          aclOpExecutor* executor)
+{
     L0_DFX(AttentionWorkerScheduler, scheduleContext, scheduleContextOut);
     static internal::AicpuTaskSpace space("AttentionWorkerScheduler");
-    auto ret = ADD_TO_LAUNCHER_LIST_AICPU(
-        AttentionWorkerScheduler, OP_ATTR_NAMES(), OP_INPUT(scheduleContext), OP_OUTPUT(scheduleContextOut));
-    OP_CHECK(
-        ret == ACL_SUCCESS,
-        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "AttentionWorkerScheduler ADD_TO_LAUNCHER_LIST_AICPU failed."),
-        return nullptr);
+    auto ret = ADD_TO_LAUNCHER_LIST_AICPU(AttentionWorkerScheduler, OP_ATTR_NAMES(), OP_INPUT(scheduleContext),
+                                          OP_OUTPUT(scheduleContextOut));
+    OP_CHECK(ret == ACL_SUCCESS,
+             OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "AttentionWorkerScheduler ADD_TO_LAUNCHER_LIST_AICPU failed."),
+             return nullptr);
     return scheduleContextOut;
 }
 

@@ -50,13 +50,14 @@ TEST_F(CompressorInfershape, bsh_c4a_bf16)
                                          {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                          // optional inputs (not used in BSH layout)
                                          {{{2, 4}, {2, 4}}, ge::DT_INT32, ge::FORMAT_ND}, // state_block_table
-                                         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // cu_seqlens
-                                         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // seqused
-                                         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // start_pos
+                                         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},         // cu_seqlens
+                                         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},         // seqused
+                                         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},         // start_pos
                                      },
                                      {
                                          // output 0: cmp_kv (placeholder)
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
 
@@ -86,7 +87,8 @@ TEST_F(CompressorInfershape, bsh_c4a_fp16)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
 
@@ -116,7 +118,8 @@ TEST_F(CompressorInfershape, bsh_c4li_bf16)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
 
@@ -146,7 +149,8 @@ TEST_F(CompressorInfershape, bsh_c128a_bf16)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
 
@@ -176,7 +180,8 @@ TEST_F(CompressorInfershape, bsh_non_divisible)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
 
@@ -211,13 +216,14 @@ TEST_F(CompressorInfershape, th_c4a_bf16)
                                          {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                          // optional inputs
                                          {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND}, // state_block_table
-                                                                                  // cu_seqlens [B+1] = [3]
+                                                                                          // cu_seqlens [B+1] = [3]
                                          {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND},
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // seqused
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // start_pos
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
 
@@ -247,7 +253,8 @@ TEST_F(CompressorInfershape, th_c4a_multi_batch)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
 
@@ -279,7 +286,8 @@ TEST_F(CompressorInfershape, bsh_empty_batch)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
 
@@ -306,24 +314,24 @@ TEST_F(CompressorInfershape, inferdatatype_bf16)
     ge::DataType dtBf16 = ge::DT_BF16;
     ge::DataType dtFp32 = ge::DT_FLOAT;
     ge::DataType dtInt32 = ge::DT_INT32;
-    auto context_holder = gert::InferDataTypeContextFaker()
-                              .IrInputNum(9)
-                              .NodeIoNum(9, 2)
-                              .NodeInputTd(0, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(1, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(2, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(3, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(4, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(5, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(6, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(7, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(8, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .InputDataTypes({&dtBf16, &dtBf16, &dtBf16, &dtFp32, &dtFp32,
-                                               &dtInt32, &dtInt32, &dtInt32, &dtInt32})
-                              .OutputDataTypes({&dtBf16, &dtFp32})
-                              .Build();
+    auto context_holder =
+        gert::InferDataTypeContextFaker()
+            .IrInputNum(9)
+            .NodeIoNum(9, 2)
+            .NodeInputTd(0, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(1, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(2, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(3, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(4, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(5, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(6, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(7, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(8, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+            .InputDataTypes({&dtBf16, &dtBf16, &dtBf16, &dtFp32, &dtFp32, &dtInt32, &dtInt32, &dtInt32, &dtInt32})
+            .OutputDataTypes({&dtBf16, &dtFp32})
+            .Build();
     auto context = context_holder.GetContext<gert::InferDataTypeContext>();
     EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
     ASSERT_NE(context, nullptr);

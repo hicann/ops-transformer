@@ -30,9 +30,9 @@ using namespace Reg;
 
 // T: half
 template <MXQuantMode MX_QUANT_MODE = MXQuantMode::OCP, bool clear_gmax, typename T, uint16_t m = 128>
-__simd_vf__ inline void compute_pscale_vf(__ubuf__ uint8_t *mxscale1, __ubuf__ uint8_t *mxscale2, __ubuf__ T *ulmax1,
-                                          __ubuf__ T *ulmax2, __ubuf__ T *umax1, __ubuf__ T *umax2,
-                                          __ubuf__ T *ugmax_old, __ubuf__ float *urs, uint16_t firstLoop,
+__simd_vf__ inline void compute_pscale_vf(__ubuf__ uint8_t* mxscale1, __ubuf__ uint8_t* mxscale2, __ubuf__ T* ulmax1,
+                                          __ubuf__ T* ulmax2, __ubuf__ T* umax1, __ubuf__ T* umax2,
+                                          __ubuf__ T* ugmax_old, __ubuf__ float* urs, uint16_t firstLoop,
                                           uint16_t secondLoop, uint16_t coreIndex, const T LOG2_CX_CEIL)
 {
     MaskReg preg_all16 = CreateMask<uint16_t, MaskPattern::ALL>();
@@ -62,13 +62,13 @@ __simd_vf__ inline void compute_pscale_vf(__ubuf__ uint8_t *mxscale1, __ubuf__ u
         Sub(vreg_rs16, vreg_gmax_old, vreg_gmax, preg_all16);
         Adds(vreg_rs16, vreg_rs16, NUM_127, preg_all16);
         Maxs(vreg_rs16, vreg_rs16, ZERO_VALUE, preg_all16);
-        Cast<int32_t, T, h2iZero>((RegTensor<int32_t> &)vreg_rs1, vreg_rs16, preg_all16);
-        Cast<int32_t, T, h2iOne>((RegTensor<int32_t> &)vreg_rs2, vreg_rs16, preg_all16);
-        ShiftLefts((RegTensor<int32_t> &)vreg_rs1, (RegTensor<int32_t> &)vreg_rs1, SHIFT_VALUE, preg_all_32);
-        ShiftLefts((RegTensor<int32_t> &)vreg_rs2, (RegTensor<int32_t> &)vreg_rs2, SHIFT_VALUE, preg_all_32);
+        Cast<int32_t, T, h2iZero>((RegTensor<int32_t>&)vreg_rs1, vreg_rs16, preg_all16);
+        Cast<int32_t, T, h2iOne>((RegTensor<int32_t>&)vreg_rs2, vreg_rs16, preg_all16);
+        ShiftLefts((RegTensor<int32_t>&)vreg_rs1, (RegTensor<int32_t>&)vreg_rs1, SHIFT_VALUE, preg_all_32);
+        ShiftLefts((RegTensor<int32_t>&)vreg_rs2, (RegTensor<int32_t>&)vreg_rs2, SHIFT_VALUE, preg_all_32);
 
-        Interleave((RegTensor<int32_t> &)vreg_rs1, (RegTensor<int32_t> &)vreg_rs2, (RegTensor<int32_t> &)vreg_rs1,
-                   (RegTensor<int32_t> &)vreg_rs2);
+        Interleave((RegTensor<int32_t>&)vreg_rs1, (RegTensor<int32_t>&)vreg_rs2, (RegTensor<int32_t>&)vreg_rs1,
+                   (RegTensor<int32_t>&)vreg_rs2);
         for (uint16_t i = 0; i < 1 - coreIndex; ++i) {
             StoreAlign(urs, vreg_rs1, preg_all_32);
         }
@@ -191,21 +191,21 @@ __simd_vf__ inline void compute_pscale_vf(__ubuf__ uint8_t *mxscale1, __ubuf__ u
 }
 
 template <MXQuantMode MX_QUANT_MODE = MXQuantMode::OCP, bool clear_gmax, typename T, uint16_t QsBase = 128>
-__aicore__ inline void ComputePscaleAndDmCallVF(const LocalTensor<uint8_t> &mxscale1,
-                                                const LocalTensor<uint8_t> &mxscale2, const LocalTensor<T> &ulmax1,
-                                                const LocalTensor<T> &ulmax2, const LocalTensor<T> &umax1,
-                                                const LocalTensor<T> &umax2, const LocalTensor<T> &ugmaxOld,
-                                                const LocalTensor<float> &urs, uint16_t firstLoop, uint16_t secondLoop,
+__aicore__ inline void ComputePscaleAndDmCallVF(const LocalTensor<uint8_t>& mxscale1,
+                                                const LocalTensor<uint8_t>& mxscale2, const LocalTensor<T>& ulmax1,
+                                                const LocalTensor<T>& ulmax2, const LocalTensor<T>& umax1,
+                                                const LocalTensor<T>& umax2, const LocalTensor<T>& ugmaxOld,
+                                                const LocalTensor<float>& urs, uint16_t firstLoop, uint16_t secondLoop,
                                                 uint16_t coreIndex, const T LOG2_CX_CEIL)
 {
-    __ubuf__ uint8_t *mxscale1_buf = (__ubuf__ uint8_t *)mxscale1.GetPhyAddr();
-    __ubuf__ uint8_t *mxscale2_buf = (__ubuf__ uint8_t *)mxscale2.GetPhyAddr();
-    __ubuf__ T *ulmax1_buf = (__ubuf__ T *)ulmax1.GetPhyAddr();
-    __ubuf__ T *ulmax2_buf = (__ubuf__ T *)ulmax2.GetPhyAddr();
-    __ubuf__ T *umax1_buf = (__ubuf__ T *)umax1.GetPhyAddr();
-    __ubuf__ T *umax2_buf = (__ubuf__ T *)umax2.GetPhyAddr();
-    __ubuf__ T *ugmax_old_buf = (__ubuf__ T *)ugmaxOld.GetPhyAddr();
-    __ubuf__ float *urs_buf = (__ubuf__ float *)urs.GetPhyAddr();
+    __ubuf__ uint8_t* mxscale1_buf = (__ubuf__ uint8_t*)mxscale1.GetPhyAddr();
+    __ubuf__ uint8_t* mxscale2_buf = (__ubuf__ uint8_t*)mxscale2.GetPhyAddr();
+    __ubuf__ T* ulmax1_buf = (__ubuf__ T*)ulmax1.GetPhyAddr();
+    __ubuf__ T* ulmax2_buf = (__ubuf__ T*)ulmax2.GetPhyAddr();
+    __ubuf__ T* umax1_buf = (__ubuf__ T*)umax1.GetPhyAddr();
+    __ubuf__ T* umax2_buf = (__ubuf__ T*)umax2.GetPhyAddr();
+    __ubuf__ T* ugmax_old_buf = (__ubuf__ T*)ugmaxOld.GetPhyAddr();
+    __ubuf__ float* urs_buf = (__ubuf__ float*)urs.GetPhyAddr();
 
     compute_pscale_vf<MX_QUANT_MODE, clear_gmax, T, QsBase>(mxscale1_buf, mxscale2_buf, ulmax1_buf, ulmax2_buf,
                                                             umax1_buf, umax2_buf, ugmax_old_buf, urs_buf, firstLoop,

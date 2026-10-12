@@ -27,8 +27,8 @@ namespace optiling {
 
 // 前置条件：kernel（模板选择）必须已经定下来，因为 BN2 与 BN2GS1S2 的
 // fusedOuter 口径不同。
-ge::graphStatus BuildSchedulePlan(gert::TilingContext *context, const FagParsedInfo &info, const FagKernelPlan &kernel,
-                                  FagSchedulePlan &schedule);
+ge::graphStatus BuildSchedulePlan(gert::TilingContext* context, const FagParsedInfo& info, const FagKernelPlan& kernel,
+                                  FagSchedulePlan& schedule);
 
 } // namespace optiling
 

@@ -31,14 +31,14 @@ using namespace AscendC;
 namespace optiling {
 class DenseLightningIndexerKLLossGradTilingGeneralRegbase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit DenseLightningIndexerKLLossGradTilingGeneralRegbase(gert::TilingContext *context)
+    explicit DenseLightningIndexerKLLossGradTilingGeneralRegbase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {
         Reset();
     }
     ~DenseLightningIndexerKLLossGradTilingGeneralRegbase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
@@ -72,7 +72,7 @@ protected:
         maxSeqlenK = 0;
     }
 
-    [[nodiscard]] gert::TilingContext *GetContext()
+    [[nodiscard]] gert::TilingContext* GetContext()
     {
         return context_;
     }
@@ -94,27 +94,27 @@ protected:
     // 6、计算Workspace 大小
     ge::graphStatus GetWorkspaceSize() override;
     // 7、保存Tiling数据
-    ge::graphStatus CheckOutShape(gert::Shape &inputshape, const char *inputName, gert::Shape &outputshape);
+    ge::graphStatus CheckOutShape(gert::Shape& inputshape, const char* inputName, gert::Shape& outputshape);
     ge::graphStatus CheckOutPut();
     ge::graphStatus CheckContext();
     ge::graphStatus ValidateRequiredInputs();
     bool AnalyzeAttrs();
     bool CrossShapeVerify();
-    bool AnalyzeDimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &weightsShape,
-                          const gert::Shape &topKShape, size_t layoutLen);
+    bool AnalyzeDimLayout(const gert::Shape& queryShape, const gert::Shape& keyShape, const gert::Shape& weightsShape,
+                          const gert::Shape& topKShape, size_t layoutLen);
     bool AnalyzeDtype();
     bool AnalyzeOptionalDtype();
     bool CheckOptionalShape();
     bool AnalyzeLayout();
     int64_t GetS2RealSize(int32_t sparseMode, int32_t s1Size, int32_t s2Size, int32_t s1Idx);
-    bool InitSparseValidArray(std::vector<int64_t> &sparseValidArray);
-    inline bool InitLoadValue(const std::vector<int64_t> &sparseValidArray, int64_t validAicNum, int64_t totalSize,
-                              const std::vector<int64_t> &sparseStartIdx, std::vector<int64_t> &localValue);
-    bool BalanceLoad(const std::vector<int64_t> &sparseValidArray, std::vector<int64_t> &localValue,
-                     std::vector<int64_t> &sparseStartIdx);
-    bool Balance4DLoad(std::vector<int64_t> &tmpSparseValue, const std::vector<int64_t> sparseValidArray,
+    bool InitSparseValidArray(std::vector<int64_t>& sparseValidArray);
+    inline bool InitLoadValue(const std::vector<int64_t>& sparseValidArray, int64_t validAicNum, int64_t totalSize,
+                              const std::vector<int64_t>& sparseStartIdx, std::vector<int64_t>& localValue);
+    bool BalanceLoad(const std::vector<int64_t>& sparseValidArray, std::vector<int64_t>& localValue,
+                     std::vector<int64_t>& sparseStartIdx);
+    bool Balance4DLoad(std::vector<int64_t>& tmpSparseValue, const std::vector<int64_t> sparseValidArray,
                        const int64_t balanceNum);
-    bool SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray, int64_t maxCoreNum);
+    bool SetSparseStartIdx(const std::vector<int64_t>& sparseValidArray, int64_t maxCoreNum);
     void SetSparseParamsRegbase(int64_t maxCoreNum);
     int64_t CalcTotalSize();
     void SetMultiCoreParamsRegbase(int64_t totalSize, int64_t coreNum);
@@ -140,7 +140,7 @@ protected:
     int32_t deterMode;
     float scaleValue;
     uint32_t maxSeqlenK;
-    const char *templateName = "dlikgbase";
+    const char* templateName = "dlikgbase";
 
     // TilingKey
     LayoutTypeRegbase tilingKeyLayout;
@@ -163,15 +163,15 @@ protected:
     platform_ascendc::SocVersion socVersion;
     bool deterministic = false;
 
-    const char *opName;
-    const char *inputLayout;
-    const char *layoutQuery;
-    const char *layoutKey;
+    const char* opName;
+    const char* inputLayout;
+    const char* layoutQuery;
+    const char* layoutKey;
 
-    DenseLightningIndexerGradRegBaseTilingData *tilingData =
+    DenseLightningIndexerGradRegBaseTilingData* tilingData =
         context_->GetTilingData<DenseLightningIndexerGradRegBaseTilingData>();
-    DLIKGradBaseParamsRegbase *dlikGradBaseParams_ = &tilingData->baseParams;
-    DLIKGradMultiCoreParamsRegbase *dlikGradMultiCoreParams_ = &tilingData->multiCoreParams;
+    DLIKGradBaseParamsRegbase* dlikGradBaseParams_ = &tilingData->baseParams;
+    DLIKGradMultiCoreParamsRegbase* dlikGradMultiCoreParams_ = &tilingData->multiCoreParams;
 };
 } // namespace optiling
 #endif

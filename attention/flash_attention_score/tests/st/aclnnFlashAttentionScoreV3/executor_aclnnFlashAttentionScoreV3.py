@@ -21,6 +21,7 @@ import ctypes
 from einops import rearrange
 import numpy as np
 
+
 def tsoftmax(x):
     softmax_max = torch.max(x, dim=-1, keepdims=True)[0]
     x_sub = x.sub(softmax_max)
@@ -29,7 +30,10 @@ def tsoftmax(x):
     softmax_res = y.div(softmax_sum)
     return softmax_res, softmax_max, softmax_sum
 
-def tforward(q, k, v, drop_mask, atten_mask, pse, headNum, inputLayout, scale, keep_prob):
+
+def tforward(
+    q, k, v, drop_mask, atten_mask, pse, headNum, inputLayout, scale, keep_prob
+):
     if inputLayout == "BSH":
         # (B, S, N*D) => (B, N, S, D)
         B = q.shape[0]
@@ -91,19 +95,29 @@ def tforward(q, k, v, drop_mask, atten_mask, pse, headNum, inputLayout, scale, k
     if inputLayout == "BSND":
         attention_out = attention_out.permute(0, 2, 1, 3).contiguous()
     elif inputLayout == "BSH":
-        attention_out = attention_out.permute(0, 2, 1, 3).reshape(B, S1, -1).contiguous()
+        attention_out = (
+            attention_out.permute(0, 2, 1, 3).reshape(B, S1, -1).contiguous()
+        )
     elif inputLayout == "SBH":
-        attention_out = attention_out.permute(2, 0, 1, 3).reshape(S1, B, -1).contiguous()
-    
+        attention_out = (
+            attention_out.permute(2, 0, 1, 3).reshape(S1, B, -1).contiguous()
+        )
+
     if q_ori_dtype == torch.float32 and gtype == torch.float64:
         softmax_sum = softmax_sum.to(q_ori_dtype)
         softmax_max = softmax_max.to(q_ori_dtype)
         attention_out = attention_out.to(q_ori_dtype)
     elif q_ori_dtype == torch.float16 or q_ori_dtype == torch.bfloat16:
         attention_out = attention_out.to(q_ori_dtype)
-    return softmax_max, softmax_sum, torch.Tensor(0).to(softmax_sum.dtype), attention_out
+    return (
+        softmax_max,
+        softmax_sum,
+        torch.Tensor(0).to(softmax_sum.dtype),
+        attention_out,
+    )
 
-def aclnn_op_func_fa_cpu(input_data : InputDataset):
+
+def aclnn_op_func_fa_cpu(input_data: InputDataset):
     input_dtype = input_data.kwargs["query"].dtype
     query = input_data.kwargs["query"]
     key = input_data.kwargs["key"]
@@ -116,7 +130,19 @@ def aclnn_op_func_fa_cpu(input_data : InputDataset):
     scaleValue = input_data.kwargs["scaleValue"]
     keep_prob = input_data.kwargs["keepProb"]
 
-    return tforward(query, key, value, drop_mask, atten_mask, real_shift, headNum, inputLayout, scaleValue, keep_prob)
+    return tforward(
+        query,
+        key,
+        value,
+        drop_mask,
+        atten_mask,
+        real_shift,
+        headNum,
+        inputLayout,
+        scaleValue,
+        keep_prob,
+    )
+
 
 @register("executor_flash_attention_score_v3")
 class aclnnFlashAttentionScoreApi(BaseApi):
@@ -132,11 +158,12 @@ class aclnnFlashAttentionScoreApi(BaseApi):
             int64_t innerPrecise, int64_t sparseMode, int64_t pseType, const aclTensor *softmaxMaxOut,\
             const aclTensor *softmaxSumOut, const aclTensor *softmaxOutOut, const aclTensor *attentionOutOut,\
             uint64_t *workspaceSize, aclOpExecutor **executor)"
-        
+
     def __call__(self, input_data: InputDataset, with_output: bool = False):
         output = aclnn_op_func_fa_cpu(input_data)
         return output
-    
+
+
 @register("aclnn_flash_attention_score_v3")
 class FlashAttentionScoreApi(AclnnBaseApi):
     def __call__(self):

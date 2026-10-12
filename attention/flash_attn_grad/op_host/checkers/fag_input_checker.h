@@ -26,8 +26,8 @@ namespace optiling {
 // 放在最前面：后面所有 checker 都直接解引用这些指针。
 class FagInputExistenceChecker : public FagBaseChecker {
 public:
-    ge::graphStatus Check(FagCheckCtx &ctx) override;
-    const char *Name() const override
+    ge::graphStatus Check(FagCheckCtx& ctx) override;
+    const char* Name() const override
     {
         return "InputExistence";
     }
@@ -37,8 +37,8 @@ public:
 // 具体取值范围由 flash_attn_grad_def.cpp 的注册信息挡在 tiling 之前。
 class FagDtypeChecker : public FagBaseChecker {
 public:
-    ge::graphStatus Check(FagCheckCtx &ctx) override;
-    const char *Name() const override
+    ge::graphStatus Check(FagCheckCtx& ctx) override;
+    const char* Name() const override
     {
         return "Dtype";
     }

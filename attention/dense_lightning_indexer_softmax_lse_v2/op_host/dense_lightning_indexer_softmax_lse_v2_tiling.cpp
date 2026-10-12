@@ -22,8 +22,8 @@ using namespace ge;
 namespace optiling {
 
 ge::graphStatus DenseLISoftmaxLseV2CompileInfo::ParamCheck(
-    gert::TilingContext *context, int64_t layout, int64_t maskMode, int64_t cmpRatio, const std::string &layoutQStr,
-    const std::string &layoutKStr, int64_t bSize, int64_t s1Size, int64_t s2Size, int64_t n1Size, int64_t n2Size,
+    gert::TilingContext* context, int64_t layout, int64_t maskMode, int64_t cmpRatio, const std::string& layoutQStr,
+    const std::string& layoutKStr, int64_t bSize, int64_t s1Size, int64_t s2Size, int64_t n1Size, int64_t n2Size,
     int64_t dSize, int64_t keyB, int64_t keyD, int64_t weightB, int64_t weightS1, int64_t weightN1, int64_t outDim0,
     int64_t outDim1, int64_t outDim2)
 {
@@ -183,10 +183,10 @@ ge::graphStatus DenseLISoftmaxLseV2CompileInfo::ParamCheck(
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DenseLISoftmaxLseV2CompileInfo::CheckShapeDims(gert::TilingContext *context, int64_t layout,
-                                                               const gert::StorageShape *queryShape,
-                                                               const gert::StorageShape *keyShape,
-                                                               const gert::StorageShape *weightShape)
+ge::graphStatus DenseLISoftmaxLseV2CompileInfo::CheckShapeDims(gert::TilingContext* context, int64_t layout,
+                                                               const gert::StorageShape* queryShape,
+                                                               const gert::StorageShape* keyShape,
+                                                               const gert::StorageShape* weightShape)
 {
     if (layout == 1) {
         // TND: query [T1, N1, D], key [T2, N2, D], weight [T1, N1]
@@ -220,7 +220,7 @@ ge::graphStatus DenseLISoftmaxLseV2CompileInfo::CheckShapeDims(gert::TilingConte
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingContext *context)
+static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingContext* context)
 {
     auto platformInfo = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context->GetNodeName(), "GetPlatformInfo is nullptr."),
@@ -321,7 +321,7 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
     OP_CHECK_IF(context->GetOptionalInputShape(8) == nullptr,
                 OP_LOGE(context->GetNodeName(), "metadata must be provided."), return ge::GRAPH_PARAM_INVALID);
 
-    const char *optInputNames[] = {"cu_seq_lens_q", "cu_seq_lens_k",  "seq_used_q",
+    const char* optInputNames[] = {"cu_seq_lens_q", "cu_seq_lens_k",  "seq_used_q",
                                    "seq_used_k",    "cmp_residual_k", "metadata"};
     for (int32_t i = 3; i <= 8; i++) {
         auto optShape = context->GetOptionalInputShape(i);
@@ -409,7 +409,7 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
                 return ge::GRAPH_PARAM_INVALID);
 
     // DenseLILseV2Tiling comes from the pypto kernel (.py dataclass) via force-include.
-    DenseLILseV2Tiling *tilingData = context->GetTilingData<DenseLILseV2Tiling>();
+    DenseLILseV2Tiling* tilingData = context->GetTilingData<DenseLILseV2Tiling>();
     tilingData->b = bSize;
     tilingData->s1 = s1Size;
     tilingData->s2 = s2Size;
@@ -452,7 +452,7 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
         int64_t s2SizeAligned = (s2Size + TKV - 1) / TKV * TKV;
         workspaceSize += static_cast<size_t>(WS_MAX_CORES) * static_cast<size_t>(s2SizeAligned) * sizeof(float);
     }
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
 
     OP_LOGI(context->GetNodeName(),
@@ -464,7 +464,7 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingParseForDenseLightningIndexerSoftmaxLseV2(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForDenseLightningIndexerSoftmaxLseV2(gert::TilingParseContext* context)
 {
     return ge::GRAPH_SUCCESS;
 }

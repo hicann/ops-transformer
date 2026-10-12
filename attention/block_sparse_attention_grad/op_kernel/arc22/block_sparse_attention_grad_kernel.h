@@ -193,7 +193,7 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(EVENT_ID7);
     }
 
-    __aicore__ inline void UpdateTaskInfoCalQSize(uint32_t blockShapeX, uint32_t basicQBlockSize, TaskInfo &taskInfo)
+    __aicore__ inline void UpdateTaskInfoCalQSize(uint32_t blockShapeX, uint32_t basicQBlockSize, TaskInfo& taskInfo)
     {
         taskInfo.curQBlcokIdx = taskInfo.curQSeqIdx / blockShapeX;
         uint32_t curQBlcokSeqIdx = taskInfo.curQBlcokIdx * blockShapeX;
@@ -220,10 +220,10 @@ public:
 
     __aicore__ inline void initTaskInfo(AscendC::GlobalTensor<int64_t> gActualQseqlen,
                                         AscendC::GlobalTensor<int64_t> gActualKvseqlen,
-                                        __gm__ BlockSparseAttentionGradTilingData *tilingData, uint32_t numHeads,
+                                        __gm__ BlockSparseAttentionGradTilingData* tilingData, uint32_t numHeads,
                                         uint32_t kvHeads, uint32_t groupSize, uint32_t headDim, uint32_t maxQSeqlen,
                                         uint32_t maxKvSeqlen, uint32_t blockShapeX, uint32_t basicQBlockSize,
-                                        uint32_t inputLayout, uint32_t coreIdx, TaskInfo &taskInfo)
+                                        uint32_t inputLayout, uint32_t coreIdx, TaskInfo& taskInfo)
     {
         // BNSD:curBatch * numHeads * maxQSeqlen + curQSeqOffset; TND:cusum(gActualQseqlen[0:curBatch-1]) +
         // curQSeqOffset
@@ -253,7 +253,7 @@ public:
                                               AscendC::GlobalTensor<int64_t> gActualKvseqlen, uint32_t numHeads,
                                               uint32_t kvHeads, uint32_t groupSize, uint32_t headDim,
                                               uint32_t blockShapeX, uint32_t basicQBlockSize, uint32_t inputLayout,
-                                              const TaskInfo &taskInfo, TaskInfo &nextTask)
+                                              const TaskInfo& taskInfo, TaskInfo& nextTask)
     {
         nextTask = taskInfo;
         if (inputLayout == 0) { // TND, Traverse N-axis first
@@ -305,16 +305,16 @@ public:
     __aicore__ inline BlockSparseAttentionGradKernel() {}
 
     template <int32_t CORE_TYPE = g_coreType>
-    __aicore__ inline void operator()(Params const &params);
+    __aicore__ inline void operator()(Params const& params);
 
     template <>
-    __aicore__ inline void operator()<AscendC::AIC>(Params const &params)
+    __aicore__ inline void operator()<AscendC::AIC>(Params const& params)
     {
         uint32_t coreIdx = AscendC::GetBlockIdx();
         uint32_t coreNum = AscendC::GetBlockNum();
 
-        __gm__ BlockSparseAttentionGradTilingData *tilingData =
-            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData *>(params.tiling);
+        __gm__ BlockSparseAttentionGradTilingData* tilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData*>(params.tiling);
         uint32_t batch = tilingData->batch;
         uint32_t numHeads = tilingData->numHeads;
         uint32_t kvHeads = tilingData->kvHeads;
@@ -343,31 +343,31 @@ public:
         }
         // Initialize global tensors
         AscendC::GlobalTensor<ElementA1> gDout;
-        gDout.SetGlobalBuffer((__gm__ ElementInput *)params.dout);
+        gDout.SetGlobalBuffer((__gm__ ElementInput*)params.dout);
         AscendC::GlobalTensor<ElementInput> gQ;
-        gQ.SetGlobalBuffer((__gm__ ElementInput *)params.q);
+        gQ.SetGlobalBuffer((__gm__ ElementInput*)params.q);
         AscendC::GlobalTensor<ElementInput> gK;
-        gK.SetGlobalBuffer((__gm__ ElementInput *)params.k);
+        gK.SetGlobalBuffer((__gm__ ElementInput*)params.k);
         AscendC::GlobalTensor<ElementInput> gV;
-        gV.SetGlobalBuffer((__gm__ ElementInput *)params.v);
+        gV.SetGlobalBuffer((__gm__ ElementInput*)params.v);
         AscendC::GlobalTensor<bool> gBlcokSpaseMask;
-        gBlcokSpaseMask.SetGlobalBuffer((__gm__ bool *)params.blockSparseMask);
+        gBlcokSpaseMask.SetGlobalBuffer((__gm__ bool*)params.blockSparseMask);
         AscendC::GlobalTensor<int64_t> gActualQseqlen;
-        gActualQseqlen.SetGlobalBuffer((__gm__ int64_t *)params.actualQseqlen);
+        gActualQseqlen.SetGlobalBuffer((__gm__ int64_t*)params.actualQseqlen);
         AscendC::GlobalTensor<int64_t> gActualKvseqlen;
-        gActualKvseqlen.SetGlobalBuffer((__gm__ int64_t *)params.actualKvseqlen);
+        gActualKvseqlen.SetGlobalBuffer((__gm__ int64_t*)params.actualKvseqlen);
 
         AscendC::GlobalTensor<float> gS;
-        gS.SetGlobalBuffer((__gm__ float *)params.workspace);
+        gS.SetGlobalBuffer((__gm__ float*)params.workspace);
         AscendC::GlobalTensor<ElementInput> gP;
-        gP.SetGlobalBuffer((__gm__ ElementInput *)(params.workspace + WORKSPACE_P16_OFFSET));
+        gP.SetGlobalBuffer((__gm__ ElementInput*)(params.workspace + WORKSPACE_P16_OFFSET));
 
         AscendC::GlobalTensor<float> gDp;
-        gDp.SetGlobalBuffer((__gm__ float *)(params.workspace + sOutSize));
+        gDp.SetGlobalBuffer((__gm__ float*)(params.workspace + sOutSize));
         AscendC::GlobalTensor<ElementInput> gDs;
-        gDs.SetGlobalBuffer((__gm__ ElementInput *)(params.workspace + sOutSize + WORKSPACE_P16_OFFSET));
+        gDs.SetGlobalBuffer((__gm__ ElementInput*)(params.workspace + sOutSize + WORKSPACE_P16_OFFSET));
         AscendC::GlobalTensor<float> gDq;
-        gDq.SetGlobalBuffer((__gm__ float *)(params.workspace + sOutSize + dPOutSize));
+        gDq.SetGlobalBuffer((__gm__ float*)(params.workspace + sOutSize + dPOutSize));
         uint8_t deterministic = tilingData->deterministic;
         uint64_t gradSize = tilingData->gradSize;
         uint64_t dkvElementSize = tilingData->dkvSize;
@@ -382,8 +382,8 @@ public:
         uint64_t detDvBaseCore = detDvOffset + (uint64_t)coreIdx * perCoreDetSize;
         if (!deterministic) {
             // Non-deterministic path: shared workspace (original behavior)
-            gDk.SetGlobalBuffer((__gm__ float *)(params.workspace + sOutSize + dPOutSize + dQOutSize));
-            gDv.SetGlobalBuffer((__gm__ float *)(params.workspace + sOutSize + dPOutSize + dQOutSize + dKOutSize));
+            gDk.SetGlobalBuffer((__gm__ float*)(params.workspace + sOutSize + dPOutSize + dQOutSize));
+            gDv.SetGlobalBuffer((__gm__ float*)(params.workspace + sOutSize + dPOutSize + dQOutSize + dKOutSize));
         }
 
         TaskInfo taskInfo[2];
@@ -484,16 +484,16 @@ public:
                                        layoutA2, layoutB2, layoutC2, actualShape2, mmadFlag);
 
                             if (deterministic)
-                                gDv.SetGlobalBuffer((__gm__ float *)(params.workspace + detDvBaseCore +
-                                                                     (uint64_t)(preTaskInfo.curHeadIdx % groupSizeDet) *
-                                                                         dkvElementSize * sizeof(float)));
+                                gDv.SetGlobalBuffer((__gm__ float*)(params.workspace + detDvBaseCore +
+                                                                    (uint64_t)(preTaskInfo.curHeadIdx % groupSizeDet) *
+                                                                        dkvElementSize * sizeof(float)));
                             blockMmad3(gP[preTaskInfo.sOffset], gDout[preTaskInfo.qOffset], gDv[preTaskInfo.kvOffset],
                                        layoutA3, layoutB3, layoutC3, actualShape3, mmadFlag);
 
                             if (deterministic)
-                                gDk.SetGlobalBuffer((__gm__ float *)(params.workspace + detDkBaseCore +
-                                                                     (uint64_t)(preTaskInfo.curHeadIdx % groupSizeDet) *
-                                                                         dkvElementSize * sizeof(float)));
+                                gDk.SetGlobalBuffer((__gm__ float*)(params.workspace + detDkBaseCore +
+                                                                    (uint64_t)(preTaskInfo.curHeadIdx % groupSizeDet) *
+                                                                        dkvElementSize * sizeof(float)));
                             blockMmad3(gDs[preTaskInfo.sOffset], gQ[preTaskInfo.qOffset], gDk[preTaskInfo.kvOffset],
                                        layoutA3, layoutB3, layoutC3, actualShape3, mmadFlag);
                         }
@@ -537,15 +537,15 @@ public:
             blockMmad2(gDs[preTaskInfo.sOffset], gK[preTaskInfo.kvOffset], gDq[preTaskInfo.qOffset], layoutA2, layoutB2,
                        layoutC2, actualShape2, mmadFlag);
             if (deterministic)
-                gDv.SetGlobalBuffer((__gm__ float *)(params.workspace + detDvBaseCore +
-                                                     (uint64_t)(preTaskInfo.curHeadIdx % groupSizeDet) *
-                                                         dkvElementSize * sizeof(float)));
+                gDv.SetGlobalBuffer((__gm__ float*)(params.workspace + detDvBaseCore +
+                                                    (uint64_t)(preTaskInfo.curHeadIdx % groupSizeDet) * dkvElementSize *
+                                                        sizeof(float)));
             blockMmad3(gP[preTaskInfo.sOffset], gDout[preTaskInfo.qOffset], gDv[preTaskInfo.kvOffset], layoutA3,
                        layoutB3, layoutC3, actualShape3, mmadFlag);
             if (deterministic)
-                gDk.SetGlobalBuffer((__gm__ float *)(params.workspace + detDkBaseCore +
-                                                     (uint64_t)(preTaskInfo.curHeadIdx % groupSizeDet) *
-                                                         dkvElementSize * sizeof(float)));
+                gDk.SetGlobalBuffer((__gm__ float*)(params.workspace + detDkBaseCore +
+                                                    (uint64_t)(preTaskInfo.curHeadIdx % groupSizeDet) * dkvElementSize *
+                                                        sizeof(float)));
             blockMmad3(gDs[preTaskInfo.sOffset], gQ[preTaskInfo.qOffset], gDk[preTaskInfo.kvOffset], layoutA3, layoutB3,
                        layoutC3, actualShape3, mmadFlag);
         }
@@ -554,10 +554,10 @@ public:
     }
 
     template <>
-    __aicore__ inline void operator()<AscendC::AIV>(Params const &params)
+    __aicore__ inline void operator()<AscendC::AIV>(Params const& params)
     {
-        __gm__ BlockSparseAttentionGradTilingData *tilingData =
-            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData *>(params.tiling);
+        __gm__ BlockSparseAttentionGradTilingData* tilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData*>(params.tiling);
         // pre
         VecPre(params);
         AscendC::SyncAll<false>();
@@ -576,13 +576,13 @@ public:
         VecPost(params);
     }
 
-    __aicore__ inline void VecOp(Params const &params)
+    __aicore__ inline void VecOp(Params const& params)
     {
         uint32_t vecCoreIdx = AscendC::GetBlockIdx(); // vecore 核数idx
         uint32_t coreIdx = vecCoreIdx / 2;            // cube 核数idx
 
-        __gm__ BlockSparseAttentionGradTilingData *tilingData =
-            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData *>(params.tiling);
+        __gm__ BlockSparseAttentionGradTilingData* tilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData*>(params.tiling);
         uint32_t batch = tilingData->batch;
         uint32_t numHeads = tilingData->numHeads;
         uint32_t kvHeads = tilingData->kvHeads;
@@ -608,11 +608,11 @@ public:
 
         // Initialize global tensors
         AscendC::GlobalTensor<bool> gBlcokSpaseMask;
-        gBlcokSpaseMask.SetGlobalBuffer((__gm__ bool *)params.blockSparseMask);
+        gBlcokSpaseMask.SetGlobalBuffer((__gm__ bool*)params.blockSparseMask);
         AscendC::GlobalTensor<int64_t> gActualQseqlen;
-        gActualQseqlen.SetGlobalBuffer((__gm__ int64_t *)params.actualQseqlen);
+        gActualQseqlen.SetGlobalBuffer((__gm__ int64_t*)params.actualQseqlen);
         AscendC::GlobalTensor<int64_t> gActualKvseqlen;
-        gActualKvseqlen.SetGlobalBuffer((__gm__ int64_t *)params.actualKvseqlen);
+        gActualKvseqlen.SetGlobalBuffer((__gm__ int64_t*)params.actualKvseqlen);
 
         TaskInfo taskInfoVec[2]; // 索引以及shape信息
         TaskInfo preTaskInfo;
@@ -733,10 +733,10 @@ public:
         }
     }
 
-    __aicore__ inline void VecPost(Params const &params)
+    __aicore__ inline void VecPost(Params const& params)
     {
-        __gm__ BlockSparseAttentionGradTilingData *tilingData =
-            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData *>(params.tiling);
+        __gm__ BlockSparseAttentionGradTilingData* tilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData*>(params.tiling);
 
         uint64_t sOutSize = tilingData->sOutSize;
         uint64_t dPOutSize = tilingData->dPOutSize;
@@ -756,10 +756,10 @@ public:
         vecPost();
     }
 
-    __aicore__ inline void VecPre(Params const &params)
+    __aicore__ inline void VecPre(Params const& params)
     {
-        __gm__ BlockSparseAttentionGradTilingData *tilingData =
-            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData *>(params.tiling);
+        __gm__ BlockSparseAttentionGradTilingData* tilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData*>(params.tiling);
 
         uint64_t sOutSize = tilingData->sOutSize;
         uint64_t dPOutSize = tilingData->dPOutSize;
@@ -781,10 +781,10 @@ public:
         }
     }
 
-    __aicore__ inline void ZeroDetWorkspace(Params const &params)
+    __aicore__ inline void ZeroDetWorkspace(Params const& params)
     {
-        __gm__ BlockSparseAttentionGradTilingData *tilingData =
-            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData *>(params.tiling);
+        __gm__ BlockSparseAttentionGradTilingData* tilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData*>(params.tiling);
         uint32_t vecCoreIdx = AscendC::GetBlockIdx();
         uint32_t usedCoreNum = tilingData->usedVecCoreNum;
         if (vecCoreIdx >= usedCoreNum) {
@@ -830,7 +830,7 @@ public:
 
         // Zero dk workspace
         AscendC::GlobalTensor<float> detDkGm;
-        detDkGm.SetGlobalBuffer((__gm__ float *)(params.workspace + detDkOffset));
+        detDkGm.SetGlobalBuffer((__gm__ float*)(params.workspace + detDkOffset));
         uint64_t cOutElement = initSize;
         uint64_t totalLoop = cOutElement / maxDataCount;
         uint64_t remainOutNum = cOutElement % maxDataCount;
@@ -848,7 +848,7 @@ public:
 
         // Zero dv workspace
         AscendC::GlobalTensor<float> detDvGm;
-        detDvGm.SetGlobalBuffer((__gm__ float *)(params.workspace + detDvOffset));
+        detDvGm.SetGlobalBuffer((__gm__ float*)(params.workspace + detDvOffset));
         for (uint64_t i = 0; i < totalLoop; i++) {
             AscendC::DataCopy(detDvGm[offset + i * maxDataCount], zeroTensor, maxDataCount);
         }
@@ -865,9 +865,9 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID0);
     }
 
-    __aicore__ inline void VecDeterReduceKernel(AscendC::GlobalTensor<float> &detGm,
-                                                AscendC::GlobalTensor<float> &sharedGm, LocalTensor<float> &accumUb,
-                                                LocalTensor<float> &tempUb, uint32_t aicNum, uint64_t dkvSize,
+    __aicore__ inline void VecDeterReduceKernel(AscendC::GlobalTensor<float>& detGm,
+                                                AscendC::GlobalTensor<float>& sharedGm, LocalTensor<float>& accumUb,
+                                                LocalTensor<float>& tempUb, uint32_t aicNum, uint64_t dkvSize,
                                                 uint64_t offset, uint64_t totalElements, uint64_t maxDataCount)
     {
         uint64_t totalLoop = totalElements / maxDataCount;
@@ -945,10 +945,10 @@ public:
         }
     }
 
-    __aicore__ inline void VecDeterReduce(Params const &params)
+    __aicore__ inline void VecDeterReduce(Params const& params)
     {
-        __gm__ BlockSparseAttentionGradTilingData *tilingData =
-            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData *>(params.tiling);
+        __gm__ BlockSparseAttentionGradTilingData* tilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData*>(params.tiling);
         uint32_t vecCoreIdx = AscendC::GetBlockIdx();
         uint32_t usedCoreNum = tilingData->usedVecCoreNum;
         if (vecCoreIdx >= usedCoreNum) {
@@ -972,15 +972,15 @@ public:
 
         // Shared workspace (reduction target, VecPost reads from here)
         AscendC::GlobalTensor<float> sharedDkGm;
-        sharedDkGm.SetGlobalBuffer((__gm__ float *)(params.workspace + sOutSize + dPOutSize + dQOutSize));
+        sharedDkGm.SetGlobalBuffer((__gm__ float*)(params.workspace + sOutSize + dPOutSize + dQOutSize));
         AscendC::GlobalTensor<float> sharedDvGm;
-        sharedDvGm.SetGlobalBuffer((__gm__ float *)(params.workspace + sOutSize + dPOutSize + dQOutSize + dKOutSize));
+        sharedDvGm.SetGlobalBuffer((__gm__ float*)(params.workspace + sOutSize + dPOutSize + dQOutSize + dKOutSize));
 
         // Per-core workspace
         AscendC::GlobalTensor<float> detDkGm;
-        detDkGm.SetGlobalBuffer((__gm__ float *)(params.workspace + detDkOffset));
+        detDkGm.SetGlobalBuffer((__gm__ float*)(params.workspace + detDkOffset));
         AscendC::GlobalTensor<float> detDvGm;
-        detDvGm.SetGlobalBuffer((__gm__ float *)(params.workspace + detDvOffset));
+        detDvGm.SetGlobalBuffer((__gm__ float*)(params.workspace + detDvOffset));
 
         // Partition dk/dv data among AIV cores (same as VecPost)
         uint64_t kvPostSize = dkvSize / headDim;

@@ -29,7 +29,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -38,7 +38,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shape_size;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，AscendCL初始化
     auto ret = aclInit(nullptr);
@@ -51,8 +51,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -90,16 +90,16 @@ int main()
     std::vector<int64_t> localOutShape = {local_out_batch, local_out_feat};
     std::vector<int64_t> outShape = {local_out_batch, local_out_feat};
 
-    void *lseDeviceAddr[2] = {nullptr, nullptr};
-    void *localOutDeviceAddr[2] = {nullptr, nullptr};
-    void *outDeviceAddr = nullptr;
-    void *workspaceAddr = nullptr;
+    void* lseDeviceAddr[2] = {nullptr, nullptr};
+    void* localOutDeviceAddr[2] = {nullptr, nullptr};
+    void* outDeviceAddr = nullptr;
+    void* workspaceAddr = nullptr;
 
-    aclTensor *lse[2] = {nullptr, nullptr};
-    aclTensor *localOut[2] = {nullptr, nullptr};
-    aclTensor *out = nullptr;
-    aclTensorList *lseList = nullptr;
-    aclTensorList *localOutList = nullptr;
+    aclTensor* lse[2] = {nullptr, nullptr};
+    aclTensor* localOut[2] = {nullptr, nullptr};
+    aclTensor* out = nullptr;
+    aclTensorList* lseList = nullptr;
+    aclTensorList* localOutList = nullptr;
 
     std::vector<float> lse1HostData(GetShapeSize(lseShape), 1.0f);
     std::vector<float> lse2HostData(GetShapeSize(lseShape), 1.0f);
@@ -114,9 +114,11 @@ int main()
     lseList = aclCreateTensorList(lse, 2);
     CHECK_RET(lseList != nullptr, LOG_PRINT("Create lse TensorList failed\n"); return -1);
 
-    ret = CreateAclTensor(localOut1HostData, localOutShape, &localOutDeviceAddr[0], aclDataType::ACL_FLOAT, &localOut[0]);
+    ret =
+        CreateAclTensor(localOut1HostData, localOutShape, &localOutDeviceAddr[0], aclDataType::ACL_FLOAT, &localOut[0]);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Create localOut1 tensor failed. ERROR: %d\n", ret); return ret);
-    ret = CreateAclTensor(localOut2HostData, localOutShape, &localOutDeviceAddr[1], aclDataType::ACL_FLOAT, &localOut[1]);
+    ret =
+        CreateAclTensor(localOut2HostData, localOutShape, &localOutDeviceAddr[1], aclDataType::ACL_FLOAT, &localOut[1]);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Create localOut2 tensor failed. ERROR: %d\n", ret); return ret);
     localOutList = aclCreateTensorList(localOut, 2);
     CHECK_RET(localOutList != nullptr, LOG_PRINT("Create localOut TensorList failed\n"); return -1);
@@ -125,10 +127,11 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Create out tensor failed. ERROR: %d\n", ret); return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    ret = aclnnAttentionUpdateGetWorkspaceSize(lseList, localOutList, update_type, out, nullptr,
-                                               &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnAttentionUpdateGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+    aclOpExecutor* executor = nullptr;
+    ret = aclnnAttentionUpdateGetWorkspaceSize(lseList, localOutList, update_type, out, nullptr, &workspaceSize,
+                                               &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnAttentionUpdateGetWorkspaceSize failed. ERROR: %d\n", ret);
+              return ret);
 
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -143,8 +146,8 @@ int main()
 
     auto out_size = GetShapeSize(outShape);
     std::vector<float> outData(out_size, 0.0f);
-    ret = aclrtMemcpy(outData.data(), out_size * sizeof(float), outDeviceAddr,
-                      out_size * sizeof(float), ACL_MEMCPY_DEVICE_TO_HOST);
+    ret = aclrtMemcpy(outData.data(), out_size * sizeof(float), outDeviceAddr, out_size * sizeof(float),
+                      ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
 
     constexpr int64_t printLen = 16;

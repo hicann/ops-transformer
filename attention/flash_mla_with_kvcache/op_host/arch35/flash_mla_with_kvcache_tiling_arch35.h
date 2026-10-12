@@ -52,13 +52,13 @@ struct FlashMlaWithKvcachePlatFormInfo {
 
 class FlashMlaWithKvcacheTilingImpl : public FiaTilingBase {
 public:
-    explicit FlashMlaWithKvcacheTilingImpl(gert::TilingContext *context)
+    explicit FlashMlaWithKvcacheTilingImpl(gert::TilingContext* context)
         : FiaTilingBase(context)
     {}
     ~FlashMlaWithKvcacheTilingImpl() override = default;
 
 protected:
-    void InitTilingInfo(TilingInfo *tilingInfo) override;
+    void InitTilingInfo(TilingInfo* tilingInfo) override;
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
 
@@ -79,7 +79,7 @@ private:
     void PrintAllTilingData();
     void CalcScheduleMode();
     bool CheckNeedInitOutput() const;
-    ge::graphStatus SetTilingData(FlashMlaWithKvcacheTilingData &tilingData);
+    ge::graphStatus SetTilingData(FlashMlaWithKvcacheTilingData& tilingData);
 
     FlashMlaWithKvcacheTilingData tilingData_;
     FlashMlaWithKvcacheTilingKeyInfo tilingKeyInfo_;
@@ -95,7 +95,7 @@ private:
     ScheduleMode scheduleMode_ = ScheduleMode::BATCH_MODE;
     uint32_t numBlocks_ = 0;
 
-    FlashMlaWithKvcacheTilingInfo *faInfo_ = nullptr;
+    FlashMlaWithKvcacheTilingInfo* faInfo_ = nullptr;
 };
 
 } // namespace flash_mla_with_kvcache

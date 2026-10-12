@@ -50,7 +50,7 @@ public:
     using LayoutPL1 = typename OutputType_::Layout;
     using LayoutPUB = layout::RowMajor;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource, ElementInput NEG_LOG2_CX)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource, ElementInput NEG_LOG2_CX)
     {
         // FIXPIPE<->V 区
         for (uint32_t i = 0; i < MXFP4::UB_S_BUF_CNT; i++) {
@@ -82,8 +82,8 @@ public:
     __aicore__ inline ~BlockEpilogue() {}
 
     template <class TensorL1P>
-    __aicore__ inline void operator()(TensorL1P &l1PTensorTla, GemmCoord &actualBlockShape, TileInfo const &tileInfo,
-                                      TaskInfo const &taskInfo)
+    __aicore__ inline void operator()(TensorL1P& l1PTensorTla, GemmCoord& actualBlockShape, TileInfo const& tileInfo,
+                                      TaskInfo const& taskInfo)
     {
         uint32_t spBuffIdx = GetSPBufferIdx(tileInfo.loop);
         // 跨 tile 同步: 每个 vec core 都需要一个跨 tile 的同步
@@ -175,8 +175,8 @@ public:
     }
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void CopyPUBToPL1(TensorDst const &l1PTensorTla, TensorSrc const &ubPTensorTla,
-                                        TileInfo const &tileInfo, TaskInfo const &taskInfo, uint32_t spBuffIdx)
+    __aicore__ inline void CopyPUBToPL1(TensorDst const& l1PTensorTla, TensorSrc const& ubPTensorTla,
+                                        TileInfo const& tileInfo, TaskInfo const& taskInfo, uint32_t spBuffIdx)
     {
         uint32_t pUBTlaMSize = tla::get<0>(ubPTensorTla.shape());
         uint32_t pUBTlaNSize = tla::get<1>(ubPTensorTla.shape());

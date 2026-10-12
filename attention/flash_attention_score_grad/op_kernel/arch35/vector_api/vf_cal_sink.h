@@ -65,12 +65,12 @@ __simd_vf__ inline void CalculateSinkVF(T sinkScale, uint64_t dstLocalInt, uint6
     Duplicate(vregRes, 0);
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
         LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_BRC_B32>(vregMax,
-                                                                                      ((__ubuf__ T *&)maxLocalInt), 8);
+                                                                                      ((__ubuf__ T*&)maxLocalInt), 8);
         LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_BRC_B32>(vregSum,
-                                                                                      ((__ubuf__ T *&)sumLocalInt), 8);
+                                                                                      ((__ubuf__ T*&)sumLocalInt), 8);
         for (uint16_t n = 0; n < loopTimes; n++) {
-            LoadAlign(vregP, ((__ubuf__ T *&)pLocalInt + m * srcN + n * fullExeSize));
-            LoadAlign(vregDp, ((__ubuf__ T *&)dpLocalInt + m * srcN + n * fullExeSize));
+            LoadAlign(vregP, ((__ubuf__ T*&)pLocalInt + m * srcN + n * fullExeSize));
+            LoadAlign(vregDp, ((__ubuf__ T*&)dpLocalInt + m * srcN + n * fullExeSize));
             Mul(vregMul, vregP, vregDp, pregFullExe);
             ExpSub(vregSub, vregSink, vregMax, pregFullExe);
             Div(vregDiv, vregSub, vregSum, pregFullExe);
@@ -79,8 +79,8 @@ __simd_vf__ inline void CalculateSinkVF(T sinkScale, uint64_t dstLocalInt, uint6
             Add(vregRes, vregRes, vregReduceSum, pregAccu);
         }
         // 尾块
-        LoadAlign(vregPTail, ((__ubuf__ T *&)pLocalIntTail + m * srcN));
-        LoadAlign(vregDpTail, ((__ubuf__ T *&)dpLocalIntTail + m * srcN));
+        LoadAlign(vregPTail, ((__ubuf__ T*&)pLocalIntTail + m * srcN));
+        LoadAlign(vregDpTail, ((__ubuf__ T*&)dpLocalIntTail + m * srcN));
         Mul(vregMulTail, vregPTail, vregDpTail, pregTailExe);
         ExpSub(vregSubTail, vregSink, vregMax, pregFullExe);
         Div(vregDivTail, vregSubTail, vregSum, pregFullExe);
@@ -88,14 +88,14 @@ __simd_vf__ inline void CalculateSinkVF(T sinkScale, uint64_t dstLocalInt, uint6
         Reduce<Reg::ReduceType::SUM>(vregReduceSumTail, vregMulTail, pregTailExe);
         Add(vregRes, vregRes, vregReduceSumTail, pregAccu);
     }
-    StoreUnAlign<T>(((__ubuf__ T *&)dstLocalInt), vregRes, uregRes, 1);
-    StoreUnAlignPost<T>(((__ubuf__ T *&)dstLocalInt), uregRes, 0);
+    StoreUnAlign<T>(((__ubuf__ T*&)dstLocalInt), vregRes, uregRes, 1);
+    StoreUnAlignPost<T>(((__ubuf__ T*&)dstLocalInt), uregRes, 0);
 }
 
 template <typename T, uint16_t srcN>
-__aicore__ inline void CalculateSink(const LocalTensor<T> &dstTensor, const LocalTensor<T> &pTensor,
-                                     const LocalTensor<T> &dpTensor, const LocalTensor<T> &maxTensor,
-                                     const LocalTensor<T> &sumTensor, T sinkScale, uint16_t srcM, uint16_t realN = srcN)
+__aicore__ inline void CalculateSink(const LocalTensor<T>& dstTensor, const LocalTensor<T>& pTensor,
+                                     const LocalTensor<T>& dpTensor, const LocalTensor<T>& maxTensor,
+                                     const LocalTensor<T>& sumTensor, T sinkScale, uint16_t srcM, uint16_t realN = srcN)
 {
     const uint16_t fullExeSize = 64;
     uint16_t loopTimes = CeilDivision(realN, fullExeSize) - 1;
@@ -114,9 +114,9 @@ __aicore__ inline void CalculateSink(const LocalTensor<T> &dstTensor, const Loca
 }
 #else
 template <typename T, uint16_t srcN>
-__aicore__ inline void CalculateSink(const LocalTensor<T> &dstTensor, const LocalTensor<T> &pTensor,
-                                     const LocalTensor<T> &dpTensor, const LocalTensor<T> &maxTensor,
-                                     const LocalTensor<T> &sumTensor, T sinkScale, uint16_t srcM, uint16_t realN = srcN)
+__aicore__ inline void CalculateSink(const LocalTensor<T>& dstTensor, const LocalTensor<T>& pTensor,
+                                     const LocalTensor<T>& dpTensor, const LocalTensor<T>& maxTensor,
+                                     const LocalTensor<T>& sumTensor, T sinkScale, uint16_t srcM, uint16_t realN = srcN)
 {}
 #endif
 } // namespace AscendC

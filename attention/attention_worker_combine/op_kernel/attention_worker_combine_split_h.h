@@ -25,7 +25,7 @@ class KernelAttentionWorkerCombineSplitH {
 public:
     __aicore__ inline KernelAttentionWorkerCombineSplitH() {}
 
-    __aicore__ inline KernelAttentionWorkerCombineSplitH(TPipe *pipe, const AttentionWorkerCombineTilingData *tiling)
+    __aicore__ inline KernelAttentionWorkerCombineSplitH(TPipe* pipe, const AttentionWorkerCombineTilingData* tiling)
         : pipe_(pipe),
           tl_(tiling)
     {}
@@ -45,8 +45,8 @@ protected:
     __aicore__ inline void ComputePost(int64_t hLength);
     __aicore__ inline void SToVSync();
 
-    TPipe *pipe_ = nullptr;
-    const AttentionWorkerCombineTilingData *tl_;
+    TPipe* pipe_ = nullptr;
+    const AttentionWorkerCombineTilingData* tl_;
     constexpr static int64_t blockSize = 32;
     GlobalTensor<uint32_t> contextGm0;
     GlobalTensor<uint64_t> contextGm1;
@@ -70,8 +70,8 @@ template <typename T>
 __aicore__ inline void KernelAttentionWorkerCombineSplitH<T>::Init(GM_ADDR schedule_context, GM_ADDR expert_scales,
                                                                    GM_ADDR layer_id, GM_ADDR y, GM_ADDR next_layer_id)
 {
-    contextGm0.SetGlobalBuffer((__gm__ uint32_t *)schedule_context);
-    contextGm1.SetGlobalBuffer((__gm__ uint64_t *)schedule_context);
+    contextGm0.SetGlobalBuffer((__gm__ uint32_t*)schedule_context);
+    contextGm1.SetGlobalBuffer((__gm__ uint64_t*)schedule_context);
 
     if (tl_->needSchedule == 1) {
         uint32_t micro_batch_num = contextGm0(GET_OFFSET_B32(ScheduleContext, common.micro_batch_num));
@@ -83,13 +83,13 @@ __aicore__ inline void KernelAttentionWorkerCombineSplitH<T>::Init(GM_ADDR sched
     uint64_t token_info_addr = contextGm1(GET_OFFSET_B64(ScheduleContext, attention.token_info_buf));
 
     srcTokenGm.SetGlobalBuffer(
-        (__gm__ T *)(token_data_addr + micro_batch_id * tl_->BS * (tl_->K + 1) * tl_->H * sizeof(T)));
+        (__gm__ T*)(token_data_addr + micro_batch_id * tl_->BS * (tl_->K + 1) * tl_->H * sizeof(T)));
     srcTokenInfoGm.SetGlobalBuffer(
-        (__gm__ int32_t *)(token_info_addr + micro_batch_id * tl_->BS * (tl_->K + 1) * sizeof(int32_t)));
-    srcScalesGm.SetGlobalBuffer((__gm__ float *)expert_scales);
-    srcLayerIdGm.SetGlobalBuffer((__gm__ int32_t *)layer_id);
-    dstGm.SetGlobalBuffer((__gm__ T *)y);
-    dstNextLayerIdGm.SetGlobalBuffer((__gm__ int32_t *)next_layer_id);
+        (__gm__ int32_t*)(token_info_addr + micro_batch_id * tl_->BS * (tl_->K + 1) * sizeof(int32_t)));
+    srcScalesGm.SetGlobalBuffer((__gm__ float*)expert_scales);
+    srcLayerIdGm.SetGlobalBuffer((__gm__ int32_t*)layer_id);
+    dstGm.SetGlobalBuffer((__gm__ T*)y);
+    dstNextLayerIdGm.SetGlobalBuffer((__gm__ int32_t*)next_layer_id);
 
     this->pipe_->InitBuffer(inQue, 2, tl_->HSplitFactor * sizeof(T));
     this->pipe_->InitBuffer(outQue, 2, tl_->HSplitFactor * sizeof(T));

@@ -60,7 +60,7 @@ public:
     static constexpr uint32_t MAX_ROW_NUM_SUB_CORE = 256;
     static constexpr uint32_t SIZE_OF_16BIT = 2;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource)
     {
         // Allocate UB space
         constexpr uint32_t LO_UB_TENSOR_OFFSET = 6 * UB_UINT8_BLOCK_SIZE;
@@ -131,8 +131,8 @@ public:
     __aicore__ inline void SubCoreCompute(AscendC::GlobalTensor<ElementOutput> gOutput,
                                           AscendC::GlobalTensor<ElementInput> gInput,
                                           AscendC::GlobalTensor<ElementUpdate> gUpdate,
-                                          const LayoutOutput &layoutOutput, const LayoutInput &layoutInput,
-                                          const LayoutUpdate &layoutUpdate, uint32_t qNThisSubBlock,
+                                          const LayoutOutput& layoutOutput, const LayoutInput& layoutInput,
+                                          const LayoutUpdate& layoutUpdate, uint32_t qNThisSubBlock,
                                           uint32_t qSThisSubBlock, uint32_t totalRowNum, uint32_t isFirstStackTile,
                                           uint32_t isLastStackTile, uint32_t curStackTileMod, uint32_t needRowLoop,
                                           uint32_t isLastRowLoop, uint32_t rowOffsetLoop, uint32_t proTokenIdx,
@@ -238,8 +238,8 @@ public:
 
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementOutput> gOutput,
                                       AscendC::GlobalTensor<ElementInput> gInput,
-                                      AscendC::GlobalTensor<ElementUpdate> gUpdate, const LayoutOutput &layoutOutput,
-                                      const LayoutInput &layoutInput, const LayoutUpdate &layoutUpdate,
+                                      AscendC::GlobalTensor<ElementUpdate> gUpdate, const LayoutOutput& layoutOutput,
+                                      const LayoutInput& layoutInput, const LayoutUpdate& layoutUpdate,
                                       GemmCoord actualBlockShape, uint32_t qSBlockSize, uint32_t qNBlockSize,
                                       uint32_t isFirstStackTile, uint32_t isLastStackTile, uint32_t curStackTileMod)
     {

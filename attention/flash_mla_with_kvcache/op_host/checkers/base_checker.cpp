@@ -28,16 +28,16 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35MLA;
 
-ge::graphStatus FlashMlaWithKvcacheBaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc,
-                                                                  const std::string &name) const
+ge::graphStatus FlashMlaWithKvcacheBaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorDesc* desc,
+                                                                  const std::string& name) const
 {
     if (desc != nullptr) {
-        const auto &it = DTYPE_SUPPORT_MAP.find(name);
+        const auto& it = DTYPE_SUPPORT_MAP.find(name);
         OP_CHECK_IF(it == DTYPE_SUPPORT_MAP.end(),
                     OP_LOGE("FlashMlaWithKvcache", "%s datatype support list should be specify in DTYPE_SUPPORT_MAP",
                             name.c_str()),
                     return ge::GRAPH_FAILED);
-        auto &expectDtypeList = it->second;
+        auto& expectDtypeList = it->second;
         if (std::find(expectDtypeList.begin(), expectDtypeList.end(), desc->GetDataType()) == expectDtypeList.end()) {
             std::string dtypeStr = DataTypeToSerialString(desc->GetDataType());
             std::string expectedDtypes;
@@ -53,8 +53,8 @@ ge::graphStatus FlashMlaWithKvcacheBaseChecker::CheckDtypeSupport(const gert::Co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashMlaWithKvcacheBaseChecker::CheckFormatSupport(const gert::CompileTimeTensorDesc *desc,
-                                                                   const std::string &name) const
+ge::graphStatus FlashMlaWithKvcacheBaseChecker::CheckFormatSupport(const gert::CompileTimeTensorDesc* desc,
+                                                                   const std::string& name) const
 {
     if (desc != nullptr) {
         auto format = desc->GetOriginFormat();

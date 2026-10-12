@@ -204,18 +204,18 @@ public:
     __aicore__ inline ~SimpltSoftmax() {}
 
     template <int32_t CORE_TYPE = g_coreType>
-    __aicore__ inline void operator()(Params const &params);
+    __aicore__ inline void operator()(Params const& params);
 
     template <>
-    __aicore__ inline void operator()<AscendC::AIC>(Params const &params)
+    __aicore__ inline void operator()<AscendC::AIC>(Params const& params)
     {}
 
-    __aicore__ inline void Init(Params const &params)
+    __aicore__ inline void Init(Params const& params)
     {
         vecCoreIdx = GetBlockIdx();
         cBlockIdx = vecCoreIdx;
-        __gm__ BlockSparseAttentionGradTilingData *tilingData =
-            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData *>(params.tilingData);
+        __gm__ BlockSparseAttentionGradTilingData* tilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData*>(params.tilingData);
         usedVecCoreNums = tilingData->usedVecCoreNum;
 
         if (cBlockIdx >= usedVecCoreNums) {
@@ -237,7 +237,7 @@ public:
         actualKvSeqlen = params.actualKvSeqlen;
         scaleValue = tilingData->scaleValue;
 
-        uint64_t s2 = ((__gm__ uint64_t *)actualKvSeqlen)[curCoreBatch];
+        uint64_t s2 = ((__gm__ uint64_t*)actualKvSeqlen)[curCoreBatch];
         row = params.actualRow;
         if (row <= 0) {
             return;
@@ -248,16 +248,16 @@ public:
         }
 
         // 初始化 GM
-        sGm.SetGlobalBuffer((__gm__ float *)params.s);
-        softmaxLseGm.SetGlobalBuffer((__gm__ float *)params.softmaxLse);
-        dpGm.SetGlobalBuffer((__gm__ float *)params.dp);
-        pWorkspaceGm.SetGlobalBuffer((__gm__ InputDType *)params.pWorkspace);
-        softGradworkspaceGm.SetGlobalBuffer((__gm__ float *)params.softGradworkspace);
-        dsWorkspaceGm.SetGlobalBuffer((__gm__ InputDType *)params.dsWorkspace);
+        sGm.SetGlobalBuffer((__gm__ float*)params.s);
+        softmaxLseGm.SetGlobalBuffer((__gm__ float*)params.softmaxLse);
+        dpGm.SetGlobalBuffer((__gm__ float*)params.dp);
+        pWorkspaceGm.SetGlobalBuffer((__gm__ InputDType*)params.pWorkspace);
+        softGradworkspaceGm.SetGlobalBuffer((__gm__ float*)params.softGradworkspace);
+        dsWorkspaceGm.SetGlobalBuffer((__gm__ InputDType*)params.dsWorkspace);
     }
 
     template <>
-    __aicore__ inline void operator()<AscendC::AIV>(Params const &params)
+    __aicore__ inline void operator()<AscendC::AIV>(Params const& params)
     {
         Init(params);
 
@@ -331,11 +331,11 @@ public:
                                          uint64_t curS1Idx, uint64_t ping)
     {
         // simply softtmax
-        LocalTensor<float> &sLocal = runSftInfo.sTensor;
-        LocalTensor<float> &lse = runSftInfo.lseTensor;
-        LocalTensor<float> &lseFp32Brc = runSftInfo.lseBrocTensor;
-        LocalTensor<float> &p32Local = runSftInfo.pFp32Tensor;
-        LocalTensor<InputDType> &p16Local = runSftInfo.pFp16Tensor;
+        LocalTensor<float>& sLocal = runSftInfo.sTensor;
+        LocalTensor<float>& lse = runSftInfo.lseTensor;
+        LocalTensor<float>& lseFp32Brc = runSftInfo.lseBrocTensor;
+        LocalTensor<float>& p32Local = runSftInfo.pFp32Tensor;
+        LocalTensor<InputDType>& p16Local = runSftInfo.pFp16Tensor;
 
         GlobalTensor<float> s = runSftInfo.sGm;
         GlobalTensor<float> lseGm = runSftInfo.lseGm;
@@ -398,7 +398,7 @@ public:
         LocalTensor<float> dpLocal = runDsInfo.dpFp32Tensor;
         LocalTensor<float> dLocal = runDsInfo.softmaxGradTensor;
         LocalTensor<InputDType> ds16Tensor = runDsInfo.dsFp16Tensor;
-        LocalTensor<float> &p32Local = runDsInfo.pFp32Tensor;
+        LocalTensor<float>& p32Local = runDsInfo.pFp32Tensor;
 
         GlobalTensor<float> dp = runDsInfo.dpGm;
         GlobalTensor<float> d = runDsInfo.softmaxGradGm;
@@ -442,7 +442,7 @@ public:
      * out shape (b n s 8) or (n s 8)
      * dtype float
      */
-    __aicore__ inline void LseCopy(GlobalTensor<float> &LseGm, LocalTensor<float> &lse, LocalTensor<float> &lseFp32Brc,
+    __aicore__ inline void LseCopy(GlobalTensor<float>& LseGm, LocalTensor<float>& lse, LocalTensor<float>& lseFp32Brc,
                                    uint64_t count, uint64_t curS1Idx)
     {
         uint64_t startOffset = 0;
@@ -450,7 +450,7 @@ public:
         if constexpr (INPUT_LAYOUT == TND) {
             uint64_t prefixSum = 0;
             for (uint64_t b = 0; b < curCoreBatch; b++) {
-                prefixSum += ((__gm__ int64_t *)actualQSeqlen)[b];
+                prefixSum += ((__gm__ int64_t*)actualQSeqlen)[b];
             }
             uint64_t bOffset = n1 * prefixSum;
             startOffset = bOffset + curS1Idx * n1 + curCoreN1Idx;
@@ -472,8 +472,8 @@ public:
      * brief: Compute the elementwise multiplication of a tensor of shape (m, n) and a tensor of shape
      * ubIn0:[m, n], ubIn1[m, 8]
      */
-    __aicore__ inline void SubBrcb(LocalTensor<float> const &ubOut, LocalTensor<float> const &ubIn0,
-                                   LocalTensor<float> const &ubIn1, uint64_t row, uint64_t col)
+    __aicore__ inline void SubBrcb(LocalTensor<float> const& ubOut, LocalTensor<float> const& ubIn0,
+                                   LocalTensor<float> const& ubIn1, uint64_t row, uint64_t col)
     {
         // 分核逻辑的关系，矩阵shape不会超过[128,128], 若启动俩个vector，shape不会超过[64, 128]
         // 所以，一次sub， 最大可计算[128, 64], 迭代次数为行数, 一次迭代计算元素大小最多为64
@@ -504,7 +504,7 @@ public:
     /*
      * D shape ((n s1 8) or (b n s1 8) fp32
      */
-    __aicore__ inline void CopyDIn(GlobalTensor<float> &d, LocalTensor<float> &dLocal, uint64_t count,
+    __aicore__ inline void CopyDIn(GlobalTensor<float>& d, LocalTensor<float>& dLocal, uint64_t count,
                                    uint64_t curS1Idx)
     {
         uint64_t startOffset = 0;
@@ -512,7 +512,7 @@ public:
         if constexpr (INPUT_LAYOUT == TND) {
             uint64_t prefixSum = 0;
             for (uint64_t b = 0; b < curCoreBatch; b++) {
-                prefixSum += ((__gm__ int64_t *)actualQSeqlen)[b];
+                prefixSum += ((__gm__ int64_t*)actualQSeqlen)[b];
             }
             uint64_t bOffset = prefixSum * n1 * BRCB_BASE_NUM;
             startOffset = bOffset + curS1Idx * n1 * BRCB_BASE_NUM + curCoreN1Idx * BRCB_BASE_NUM;

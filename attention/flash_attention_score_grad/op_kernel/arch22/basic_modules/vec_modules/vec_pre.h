@@ -23,14 +23,14 @@ template <class TILING_TYPE>
 class VectorInitOuput {
 public:
     __aicore__ inline VectorInitOuput() {}
-    __aicore__ inline void Init(TPipe *pipe_in, __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv,
-                                __gm__ uint8_t *workspace, const TILING_TYPE *orgTilingData);
+    __aicore__ inline void Init(TPipe* pipe_in, __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv,
+                                __gm__ uint8_t* workspace, const TILING_TYPE* orgTilingData);
     __aicore__ inline void Process();
 
-    TPipe *pipe;
+    TPipe* pipe;
     GlobalTensor<float> dqWorkSpaceGm, dkWorkSpaceGm, dvWorkSpaceGm;
 
-    const TILING_TYPE *tilingData;
+    const TILING_TYPE* tilingData;
 
     uint32_t cBlockIdx;
     // query
@@ -48,9 +48,9 @@ public:
 };
 
 template <class TILING_TYPE>
-__aicore__ inline void VectorInitOuput<TILING_TYPE>::Init(TPipe *pipe_in, __gm__ uint8_t *dq, __gm__ uint8_t *dk,
-                                                          __gm__ uint8_t *dv, __gm__ uint8_t *workspace,
-                                                          const TILING_TYPE *orgTilingData)
+__aicore__ inline void VectorInitOuput<TILING_TYPE>::Init(TPipe* pipe_in, __gm__ uint8_t* dq, __gm__ uint8_t* dk,
+                                                          __gm__ uint8_t* dv, __gm__ uint8_t* workspace,
+                                                          const TILING_TYPE* orgTilingData)
 {
     cBlockIdx = GetBlockIdx();
 
@@ -70,11 +70,11 @@ __aicore__ inline void VectorInitOuput<TILING_TYPE>::Init(TPipe *pipe_in, __gm__
     int64_t kvPreTailNumTmp = tilingData->mlaTensorTilingData.kvSize % kvPreBlockFactor;
     kvPreBlockTail = kvPreTailNumTmp == 0 ? kvPreBlockFactor : kvPreTailNumTmp;
 
-    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                   tilingData->mlaTensorTilingData.dqWorkSpaceOffset / sizeof(float));
-    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                   tilingData->mlaTensorTilingData.dkWorkSpaceOffset / sizeof(float));
-    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                   tilingData->mlaTensorTilingData.dvWorkSpaceOffset / sizeof(float));
 
     initdqSize = cBlockIdx == qPreBlockTotal - 1 ? qPreBlockTail : qPreBlockFactor;

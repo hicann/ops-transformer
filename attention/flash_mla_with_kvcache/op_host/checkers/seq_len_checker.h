@@ -36,17 +36,17 @@ public:
     ActualSeqLenChecker() = default;
     ~ActualSeqLenChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const FlashMlaWithKvcacheTilingInfo &faInfo) override;
-    ge::graphStatus CheckParaExistence(const FlashMlaWithKvcacheTilingInfo &faInfo) override;
-    ge::graphStatus CheckFeature(const FlashMlaWithKvcacheTilingInfo &faInfo) override;
-    ge::graphStatus CheckMultiPara(const FlashMlaWithKvcacheTilingInfo &faInfo) override;
+    ge::graphStatus CheckSinglePara(const FlashMlaWithKvcacheTilingInfo& faInfo) override;
+    ge::graphStatus CheckParaExistence(const FlashMlaWithKvcacheTilingInfo& faInfo) override;
+    ge::graphStatus CheckFeature(const FlashMlaWithKvcacheTilingInfo& faInfo) override;
+    ge::graphStatus CheckMultiPara(const FlashMlaWithKvcacheTilingInfo& faInfo) override;
 
 private:
-    ge::graphStatus CheckSingleParaSequsedQ(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckSingleParaCuSeqlensQ(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckSingleParaCacheSeqlens(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckSingleParaMaxSeqlenQ(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckSingleParaMaxSeqlenKv(const FlashMlaWithKvcacheTilingInfo &faInfo);
+    ge::graphStatus CheckSingleParaSequsedQ(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckSingleParaCuSeqlensQ(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckSingleParaCacheSeqlens(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckSingleParaMaxSeqlenQ(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckSingleParaMaxSeqlenKv(const FlashMlaWithKvcacheTilingInfo& faInfo);
 };
 
 } // namespace flash_mla_with_kvcache

@@ -30,8 +30,8 @@ namespace optiling {
 // 预留扩展点：待 TND 专用流水（varlen 模板）落地后，在 BuildTilingPlan 内按
 // info.isTnd 分派到独立的 BuildVarlenTilingPlan，届时本函数保持非 TND 语义。
 // 现在不提前拆，是因为拆了会立刻产生一条永远走不到的死分支。
-ge::graphStatus BuildTilingPlan(gert::TilingContext *context, const FagParsedInfo &info, FagTilingPlan &plan,
-                                FagRouteTrace &trace);
+ge::graphStatus BuildTilingPlan(gert::TilingContext* context, const FagParsedInfo& info, FagTilingPlan& plan,
+                                FagRouteTrace& trace);
 
 } // namespace optiling
 

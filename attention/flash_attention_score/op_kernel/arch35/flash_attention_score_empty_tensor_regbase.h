@@ -30,8 +30,8 @@ template <typename INPUT_T>
 class FlashAttentionScoreEmptyTensorRegbase {
 public:
     __aicore__ inline FlashAttentionScoreEmptyTensorRegbase(){};
-    __aicore__ inline void Init(__gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *attentionOut,
-                                const FlashAttentionScoreEmptyInputTilingDataRegbase *__restrict tiling);
+    __aicore__ inline void Init(__gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum, __gm__ uint8_t* attentionOut,
+                                const FlashAttentionScoreEmptyInputTilingDataRegbase* __restrict tiling);
     __aicore__ inline void Process();
 
 protected:
@@ -39,20 +39,20 @@ protected:
     AscendC::GlobalTensor<float> softmaxSumGm;
     AscendC::GlobalTensor<INPUT_T> attentionOutGm;
     uint32_t tmpBlockIdx;
-    const FlashAttentionScoreEmptyInputTilingDataRegbase *__restrict tilingData;
+    const FlashAttentionScoreEmptyInputTilingDataRegbase* __restrict tilingData;
     __aicore__ inline void ComputeEachCore();
 };
 
 template <typename INPUT_T>
 __aicore__ inline void FlashAttentionScoreEmptyTensorRegbase<INPUT_T>::Init(
-    __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *attentionOut,
-    const FlashAttentionScoreEmptyInputTilingDataRegbase *__restrict tiling)
+    __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum, __gm__ uint8_t* attentionOut,
+    const FlashAttentionScoreEmptyInputTilingDataRegbase* __restrict tiling)
 {
     tmpBlockIdx = AscendC::GetBlockIdx();
     tilingData = tiling;
-    softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmaxMax);
-    softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmaxSum);
-    attentionOutGm.SetGlobalBuffer((__gm__ INPUT_T *)attentionOut);
+    softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmaxMax);
+    softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmaxSum);
+    attentionOutGm.SetGlobalBuffer((__gm__ INPUT_T*)attentionOut);
 }
 
 template <typename INPUT_T>

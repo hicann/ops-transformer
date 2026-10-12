@@ -158,7 +158,7 @@ public:
 
     /// Construct
     CATLASS_DEVICE
-    BlockMmadTla(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart = 0)
+    BlockMmadTla(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart = 0)
     {
         if ASCEND_IS_AIC {
             uint32_t l1AOffset = l1BufAddrStart;
@@ -259,7 +259,7 @@ public:
 
     /// Perform a block-scoped matrix multiply-accumulate
     template <class TensorA, class TensorB, class TensorC, class TensorBias = EmptyClass>
-    CATLASS_DEVICE void operator()(TensorA &tensorA, TensorB &tensorB, TensorC &tensorC, GemmCoord const &actualShape)
+    CATLASS_DEVICE void operator()(TensorA& tensorA, TensorB& tensorB, TensorC& tensorC, GemmCoord const& actualShape)
     {
         using CopyGmToL1A = typename TileCopy_::template CopyGmToL1A<TensorA>;
         CopyGmToL1A copyGmToL1A;
@@ -450,7 +450,7 @@ public:
 
 protected:
     template <class TensorA>
-    CATLASS_DEVICE auto GetTileA(TensorA &tensorA, uint32_t mIndex, uint32_t kIndex, uint32_t mSize, uint32_t kSize)
+    CATLASS_DEVICE auto GetTileA(TensorA& tensorA, uint32_t mIndex, uint32_t kIndex, uint32_t mSize, uint32_t kSize)
     {
         if constexpr (tla::detail::isVector<LayoutA>::value) {
             return GetTile(tensorA, tla::MakeCoord(kIndex), tla::MakeShape(kSize));
@@ -475,8 +475,8 @@ protected:
     int32_t l0BEventList[L0B_STAGES];
     int32_t l0CEventList[L0C_STAGES];
 
-    __gm__ typename AscendC::GlobalTensor<ElementA>::PrimType *lastAddrA[L1A_STAGES];
-    __gm__ typename AscendC::GlobalTensor<ElementB>::PrimType *lastAddrB[L1B_STAGES];
+    __gm__ typename AscendC::GlobalTensor<ElementA>::PrimType* lastAddrA[L1A_STAGES];
+    __gm__ typename AscendC::GlobalTensor<ElementB>::PrimType* lastAddrB[L1B_STAGES];
     MatrixCoord lastCoordA[L1A_STAGES];
     MatrixCoord lastCoordB[L1B_STAGES];
 

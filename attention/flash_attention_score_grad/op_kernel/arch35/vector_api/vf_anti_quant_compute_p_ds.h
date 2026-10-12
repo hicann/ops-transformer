@@ -64,10 +64,10 @@ __aicore__ inline void ComputePDS_VF_unalign(uint64_t sp, uint64_t dpds, uint64_
         RegTensor<hifloat8_t> vreg_ds1, vreg_ds2, vreg_ds3, vreg_ds4;
         RegTensor<float> vreg_d, vreg_max, vreg_sum, vreg_dps, vreg_ps;
         RegTensor<uint16_t> vreg_perm;
-        DataCopy(vreg_d, (__ubuf__ float *)d);
-        DataCopy(vreg_max, (__ubuf__ float *)max);
-        DataCopy(vreg_sum, (__ubuf__ float *)sum);
-        DataCopy(vreg_perm, (__ubuf__ uint16_t *)perm_ub);
+        DataCopy(vreg_d, (__ubuf__ float*)d);
+        DataCopy(vreg_max, (__ubuf__ float*)max);
+        DataCopy(vreg_sum, (__ubuf__ float*)sum);
+        DataCopy(vreg_perm, (__ubuf__ uint16_t*)perm_ub);
 
         // (max + log(sum) + log(ps)
         Duplicate(vreg_ps, pscale, preg_all);
@@ -81,10 +81,10 @@ __aicore__ inline void ComputePDS_VF_unalign(uint64_t sp, uint64_t dpds, uint64_
         Duplicate(vreg_dps, dps, preg_all);
         Muls(vreg_dps, vreg_dps, dscale, preg_all);
         for (uint16_t i = 0; i < srcM; i += 8) {
-            DataCopy(vreg_sp1, (__ubuf__ float *)sp + (i + 0) * 128);
-            DataCopy(vreg_sp2, (__ubuf__ float *)sp + (i + 1) * 128);
-            DataCopy(vreg_sp3, (__ubuf__ float *)sp + (i + 2) * 128);
-            DataCopy(vreg_sp4, (__ubuf__ float *)sp + (i + 3) * 128);
+            DataCopy(vreg_sp1, (__ubuf__ float*)sp + (i + 0) * 128);
+            DataCopy(vreg_sp2, (__ubuf__ float*)sp + (i + 1) * 128);
+            DataCopy(vreg_sp3, (__ubuf__ float*)sp + (i + 2) * 128);
+            DataCopy(vreg_sp4, (__ubuf__ float*)sp + (i + 3) * 128);
 
             Muls(vreg_sp1, vreg_sp1, ss, preg_all);
             Muls(vreg_sp2, vreg_sp2, ss, preg_all);
@@ -101,21 +101,19 @@ __aicore__ inline void ComputePDS_VF_unalign(uint64_t sp, uint64_t dpds, uint64_
             Cast<hifloat8_t, float, castTraitB322B8Two>(vreg_p3, vreg_sp3, preg_all);
             Cast<hifloat8_t, float, castTraitB322B8Two>(vreg_p4, vreg_sp4, preg_all);
 
-            Or((RegTensor<uint8_t> &)vreg_p1, (RegTensor<uint8_t> &)vreg_p1, (RegTensor<uint8_t> &)vreg_p3, preg_all8);
-            Or((RegTensor<uint8_t> &)vreg_p2, (RegTensor<uint8_t> &)vreg_p2, (RegTensor<uint8_t> &)vreg_p4, preg_all8);
+            Or((RegTensor<uint8_t>&)vreg_p1, (RegTensor<uint8_t>&)vreg_p1, (RegTensor<uint8_t>&)vreg_p3, preg_all8);
+            Or((RegTensor<uint8_t>&)vreg_p2, (RegTensor<uint8_t>&)vreg_p2, (RegTensor<uint8_t>&)vreg_p4, preg_all8);
 
-            Interleave((RegTensor<half> &)vreg_p1, (RegTensor<half> &)vreg_p2, (RegTensor<half> &)vreg_p1,
-                       (RegTensor<half> &)vreg_p2);
+            Interleave((RegTensor<half>&)vreg_p1, (RegTensor<half>&)vreg_p2, (RegTensor<half>&)vreg_p1,
+                       (RegTensor<half>&)vreg_p2);
 
-            DataCopyScatter((__ubuf__ uint8_t *)sp + (i + 0) * 512, (RegTensor<uint8_t> &)vreg_p1, vreg_perm,
-                            preg_all8);
-            DataCopyScatter((__ubuf__ uint8_t *)sp + (i + 1) * 512, (RegTensor<uint8_t> &)vreg_p2, vreg_perm,
-                            preg_all8);
+            DataCopyScatter((__ubuf__ uint8_t*)sp + (i + 0) * 512, (RegTensor<uint8_t>&)vreg_p1, vreg_perm, preg_all8);
+            DataCopyScatter((__ubuf__ uint8_t*)sp + (i + 1) * 512, (RegTensor<uint8_t>&)vreg_p2, vreg_perm, preg_all8);
 
-            DataCopy(vreg_dps1, (__ubuf__ float *)dpds + (i + 0) * 128);
-            DataCopy(vreg_dps2, (__ubuf__ float *)dpds + (i + 1) * 128);
-            DataCopy(vreg_dps3, (__ubuf__ float *)dpds + (i + 2) * 128);
-            DataCopy(vreg_dps4, (__ubuf__ float *)dpds + (i + 3) * 128);
+            DataCopy(vreg_dps1, (__ubuf__ float*)dpds + (i + 0) * 128);
+            DataCopy(vreg_dps2, (__ubuf__ float*)dpds + (i + 1) * 128);
+            DataCopy(vreg_dps3, (__ubuf__ float*)dpds + (i + 2) * 128);
+            DataCopy(vreg_dps4, (__ubuf__ float*)dpds + (i + 3) * 128);
 
             FusedMulDstAdd(vreg_dps1, vreg_dps, vreg_d, preg_all);
             FusedMulDstAdd(vreg_dps2, vreg_dps, vreg_d, preg_all);
@@ -132,26 +130,24 @@ __aicore__ inline void ComputePDS_VF_unalign(uint64_t sp, uint64_t dpds, uint64_
             Cast<hifloat8_t, float, castTraitB322B8Two>(vreg_ds3, vreg_dps3, preg_all);
             Cast<hifloat8_t, float, castTraitB322B8Two>(vreg_ds4, vreg_dps4, preg_all);
 
-            Or((RegTensor<uint8_t> &)vreg_ds1, (RegTensor<uint8_t> &)vreg_ds1, (RegTensor<uint8_t> &)vreg_ds3,
-               preg_all8);
-            Or((RegTensor<uint8_t> &)vreg_ds2, (RegTensor<uint8_t> &)vreg_ds2, (RegTensor<uint8_t> &)vreg_ds4,
-               preg_all8);
-            Interleave((RegTensor<half> &)vreg_ds1, (RegTensor<half> &)vreg_ds2, (RegTensor<half> &)vreg_ds1,
-                       (RegTensor<half> &)vreg_ds2);
+            Or((RegTensor<uint8_t>&)vreg_ds1, (RegTensor<uint8_t>&)vreg_ds1, (RegTensor<uint8_t>&)vreg_ds3, preg_all8);
+            Or((RegTensor<uint8_t>&)vreg_ds2, (RegTensor<uint8_t>&)vreg_ds2, (RegTensor<uint8_t>&)vreg_ds4, preg_all8);
+            Interleave((RegTensor<half>&)vreg_ds1, (RegTensor<half>&)vreg_ds2, (RegTensor<half>&)vreg_ds1,
+                       (RegTensor<half>&)vreg_ds2);
 
-            DataCopyScatter((__ubuf__ uint8_t *)dpds + (i + 0) * 512, (RegTensor<uint8_t> &)vreg_ds1, vreg_perm,
+            DataCopyScatter((__ubuf__ uint8_t*)dpds + (i + 0) * 512, (RegTensor<uint8_t>&)vreg_ds1, vreg_perm,
                             preg_all8);
-            DataCopyScatter((__ubuf__ uint8_t *)dpds + (i + 1) * 512, (RegTensor<uint8_t> &)vreg_ds2, vreg_perm,
+            DataCopyScatter((__ubuf__ uint8_t*)dpds + (i + 1) * 512, (RegTensor<uint8_t>&)vreg_ds2, vreg_perm,
                             preg_all8);
         }
 
         LocalMemBar<MemType::VEC_LOAD, MemType::VEC_STORE>();
 
         for (uint16_t i = 0; i < srcM; i += 8) {
-            DataCopy(vreg_sp1, (__ubuf__ float *)sp + (i + 4) * 128);
-            DataCopy(vreg_sp2, (__ubuf__ float *)sp + (i + 5) * 128);
-            DataCopy(vreg_sp3, (__ubuf__ float *)sp + (i + 6) * 128);
-            DataCopy(vreg_sp4, (__ubuf__ float *)sp + (i + 7) * 128);
+            DataCopy(vreg_sp1, (__ubuf__ float*)sp + (i + 4) * 128);
+            DataCopy(vreg_sp2, (__ubuf__ float*)sp + (i + 5) * 128);
+            DataCopy(vreg_sp3, (__ubuf__ float*)sp + (i + 6) * 128);
+            DataCopy(vreg_sp4, (__ubuf__ float*)sp + (i + 7) * 128);
 
             Muls(vreg_sp1, vreg_sp1, ss, preg_all);
             Muls(vreg_sp2, vreg_sp2, ss, preg_all);
@@ -168,21 +164,21 @@ __aicore__ inline void ComputePDS_VF_unalign(uint64_t sp, uint64_t dpds, uint64_
             Cast<hifloat8_t, float, castTraitB322B8Two>(vreg_p3, vreg_sp3, preg_all);
             Cast<hifloat8_t, float, castTraitB322B8Two>(vreg_p4, vreg_sp4, preg_all);
 
-            Or((RegTensor<uint8_t> &)vreg_p1, (RegTensor<uint8_t> &)vreg_p1, (RegTensor<uint8_t> &)vreg_p3, preg_all8);
-            Or((RegTensor<uint8_t> &)vreg_p2, (RegTensor<uint8_t> &)vreg_p2, (RegTensor<uint8_t> &)vreg_p4, preg_all8);
+            Or((RegTensor<uint8_t>&)vreg_p1, (RegTensor<uint8_t>&)vreg_p1, (RegTensor<uint8_t>&)vreg_p3, preg_all8);
+            Or((RegTensor<uint8_t>&)vreg_p2, (RegTensor<uint8_t>&)vreg_p2, (RegTensor<uint8_t>&)vreg_p4, preg_all8);
 
-            Interleave((RegTensor<half> &)vreg_p1, (RegTensor<half> &)vreg_p2, (RegTensor<half> &)vreg_p1,
-                       (RegTensor<half> &)vreg_p2);
+            Interleave((RegTensor<half>&)vreg_p1, (RegTensor<half>&)vreg_p2, (RegTensor<half>&)vreg_p1,
+                       (RegTensor<half>&)vreg_p2);
 
-            DataCopyScatter((__ubuf__ uint8_t *)sp + (i + 0) * 512 + 128, (RegTensor<uint8_t> &)vreg_p1, vreg_perm,
+            DataCopyScatter((__ubuf__ uint8_t*)sp + (i + 0) * 512 + 128, (RegTensor<uint8_t>&)vreg_p1, vreg_perm,
                             preg_all8);
-            DataCopyScatter((__ubuf__ uint8_t *)sp + (i + 1) * 512 + 128, (RegTensor<uint8_t> &)vreg_p2, vreg_perm,
+            DataCopyScatter((__ubuf__ uint8_t*)sp + (i + 1) * 512 + 128, (RegTensor<uint8_t>&)vreg_p2, vreg_perm,
                             preg_all8);
 
-            DataCopy(vreg_dps1, (__ubuf__ float *)dpds + (i + 4) * 128);
-            DataCopy(vreg_dps2, (__ubuf__ float *)dpds + (i + 5) * 128);
-            DataCopy(vreg_dps3, (__ubuf__ float *)dpds + (i + 6) * 128);
-            DataCopy(vreg_dps4, (__ubuf__ float *)dpds + (i + 7) * 128);
+            DataCopy(vreg_dps1, (__ubuf__ float*)dpds + (i + 4) * 128);
+            DataCopy(vreg_dps2, (__ubuf__ float*)dpds + (i + 5) * 128);
+            DataCopy(vreg_dps3, (__ubuf__ float*)dpds + (i + 6) * 128);
+            DataCopy(vreg_dps4, (__ubuf__ float*)dpds + (i + 7) * 128);
 
             FusedMulDstAdd(vreg_dps1, vreg_dps, vreg_d, preg_all);
             FusedMulDstAdd(vreg_dps2, vreg_dps, vreg_d, preg_all);
@@ -199,25 +195,23 @@ __aicore__ inline void ComputePDS_VF_unalign(uint64_t sp, uint64_t dpds, uint64_
             Cast<hifloat8_t, float, castTraitB322B8Two>(vreg_ds3, vreg_dps3, preg_all);
             Cast<hifloat8_t, float, castTraitB322B8Two>(vreg_ds4, vreg_dps4, preg_all);
 
-            Or((RegTensor<uint8_t> &)vreg_ds1, (RegTensor<uint8_t> &)vreg_ds1, (RegTensor<uint8_t> &)vreg_ds3,
-               preg_all8);
-            Or((RegTensor<uint8_t> &)vreg_ds2, (RegTensor<uint8_t> &)vreg_ds2, (RegTensor<uint8_t> &)vreg_ds4,
-               preg_all8);
-            Interleave((RegTensor<half> &)vreg_ds1, (RegTensor<half> &)vreg_ds2, (RegTensor<half> &)vreg_ds1,
-                       (RegTensor<half> &)vreg_ds2);
+            Or((RegTensor<uint8_t>&)vreg_ds1, (RegTensor<uint8_t>&)vreg_ds1, (RegTensor<uint8_t>&)vreg_ds3, preg_all8);
+            Or((RegTensor<uint8_t>&)vreg_ds2, (RegTensor<uint8_t>&)vreg_ds2, (RegTensor<uint8_t>&)vreg_ds4, preg_all8);
+            Interleave((RegTensor<half>&)vreg_ds1, (RegTensor<half>&)vreg_ds2, (RegTensor<half>&)vreg_ds1,
+                       (RegTensor<half>&)vreg_ds2);
 
-            DataCopyScatter((__ubuf__ uint8_t *)dpds + (i + 0) * 512 + 128, (RegTensor<uint8_t> &)vreg_ds1, vreg_perm,
+            DataCopyScatter((__ubuf__ uint8_t*)dpds + (i + 0) * 512 + 128, (RegTensor<uint8_t>&)vreg_ds1, vreg_perm,
                             preg_all8);
-            DataCopyScatter((__ubuf__ uint8_t *)dpds + (i + 1) * 512 + 128, (RegTensor<uint8_t> &)vreg_ds2, vreg_perm,
+            DataCopyScatter((__ubuf__ uint8_t*)dpds + (i + 1) * 512 + 128, (RegTensor<uint8_t>&)vreg_ds2, vreg_perm,
                             preg_all8);
         }
     }
 }
 
 template <typename T>
-__aicore__ inline void ComputePDS(const LocalTensor<T> &spTensor, const LocalTensor<T> &dpdsTensor,
-                                  const LocalTensor<uint16_t> &permTensor, const LocalTensor<T> &maxTensor,
-                                  const LocalTensor<T> &sumTensor, const LocalTensor<T> &dTensor, uint16_t srcM,
+__aicore__ inline void ComputePDS(const LocalTensor<T>& spTensor, const LocalTensor<T>& dpdsTensor,
+                                  const LocalTensor<uint16_t>& permTensor, const LocalTensor<T>& maxTensor,
+                                  const LocalTensor<T>& sumTensor, const LocalTensor<T>& dTensor, uint16_t srcM,
                                   uint16_t srcN, float ss, float dps, float pscale, float dscale)
 {
     uint64_t sp = spTensor.GetPhyAddr();
@@ -231,9 +225,9 @@ __aicore__ inline void ComputePDS(const LocalTensor<T> &spTensor, const LocalTen
 
 #else
 template <typename T>
-__aicore__ inline void ComputePDS(const LocalTensor<T> &spTensor, const LocalTensor<T> &dpdsTensor,
-                                  const LocalTensor<uint16_t> &permTensor, const LocalTensor<T> &maxTensor,
-                                  const LocalTensor<T> &sumTensor, const LocalTensor<T> &dTensor, uint16_t srcM,
+__aicore__ inline void ComputePDS(const LocalTensor<T>& spTensor, const LocalTensor<T>& dpdsTensor,
+                                  const LocalTensor<uint16_t>& permTensor, const LocalTensor<T>& maxTensor,
+                                  const LocalTensor<T>& sumTensor, const LocalTensor<T>& dTensor, uint16_t srcM,
                                   uint16_t srcN, float ss, float dps, float pscale, float dscale)
 {}
 #endif

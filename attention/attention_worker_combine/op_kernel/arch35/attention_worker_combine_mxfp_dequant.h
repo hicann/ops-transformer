@@ -52,11 +52,11 @@ class KernelAttentionWorkerCombineMxfpDequant {
 public:
     __aicore__ inline void Init(GM_ADDR scheduleContext, GM_ADDR expertScales, GM_ADDR layerId, GM_ADDR y,
                                 GM_ADDR nextLayerId, GM_ADDR workspace,
-                                const AttentionWorkerCombineRegbaseTilingData *tiling, TPipe *pipe)
+                                const AttentionWorkerCombineRegbaseTilingData* tiling, TPipe* pipe)
     {
         t_ = tiling;
-        context32_.SetGlobalBuffer((__gm__ uint32_t *)scheduleContext);
-        context64_.SetGlobalBuffer((__gm__ uint64_t *)scheduleContext);
+        context32_.SetGlobalBuffer((__gm__ uint32_t*)scheduleContext);
+        context64_.SetGlobalBuffer((__gm__ uint64_t*)scheduleContext);
         microBatch_ = context32_.GetValue(GET_OFFSET_B32(ScheduleContext, attention.micro_batch_id));
         if (t_->needSchedule == 1) {
             const uint32_t count = context32_.GetValue(GET_OFFSET_B32(ScheduleContext, common.micro_batch_num));
@@ -65,12 +65,12 @@ public:
         const uint64_t data = context64_.GetValue(GET_OFFSET_B64(ScheduleContext, attention.token_data_buf));
         const uint64_t info = context64_.GetValue(GET_OFFSET_B64(ScheduleContext, attention.token_info_buf));
         tokenRowBytes_ = PackedFp4 ? (t_->H + FP4_ELEMENTS_PER_BYTE - 1) / FP4_ELEMENTS_PER_BYTE : t_->H;
-        tokens_.SetGlobalBuffer((__gm__ uint8_t *)(data + microBatch_ * t_->BS * t_->K * tokenRowBytes_));
-        flags_.SetGlobalBuffer((__gm__ int32_t *)(info + microBatch_ * t_->BS * t_->K * sizeof(int32_t)));
-        scales_.SetGlobalBuffer((__gm__ uint8_t *)expertScales);
-        output_.SetGlobalBuffer((__gm__ bfloat16_t *)y);
-        layer_.SetGlobalBuffer((__gm__ int32_t *)layerId);
-        nextLayer_.SetGlobalBuffer((__gm__ int32_t *)nextLayerId);
+        tokens_.SetGlobalBuffer((__gm__ uint8_t*)(data + microBatch_ * t_->BS * t_->K * tokenRowBytes_));
+        flags_.SetGlobalBuffer((__gm__ int32_t*)(info + microBatch_ * t_->BS * t_->K * sizeof(int32_t)));
+        scales_.SetGlobalBuffer((__gm__ uint8_t*)expertScales);
+        output_.SetGlobalBuffer((__gm__ bfloat16_t*)y);
+        layer_.SetGlobalBuffer((__gm__ int32_t*)layerId);
+        nextLayer_.SetGlobalBuffer((__gm__ int32_t*)nextLayerId);
         scaleStride_ = Ops::Base::CeilAlign<int64_t>((t_->H + MXFP_SCALE_GROUP_SIZE - 1) / MXFP_SCALE_GROUP_SIZE,
                                                      MXFP_SCALE_ALIGN);
         inputRowStride_ = Ops::Base::CeilAlign<int64_t>(
@@ -244,7 +244,7 @@ private:
         outputQueue_.FreeTensor(out);
     }
 
-    const AttentionWorkerCombineRegbaseTilingData *t_ = nullptr;
+    const AttentionWorkerCombineRegbaseTilingData* t_ = nullptr;
     uint32_t microBatch_ = 0;
     int64_t scaleStride_ = 0;
     int64_t tokenRowBytes_ = 0;

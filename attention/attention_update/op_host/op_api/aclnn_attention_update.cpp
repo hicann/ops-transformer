@@ -47,14 +47,14 @@ static const int64_t HD_MAX = 512;
 static const int64_t SP_MAX = 128;
 static const int64_t SP_MAX_95 = 16;
 
-static const std::initializer_list<op::DataType> ATTENTION_UPDATE_DTYPE_SUPPORT_LIST = {
-                                DataType::DT_FLOAT};
+static const std::initializer_list<op::DataType> ATTENTION_UPDATE_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
 static const std::initializer_list<op::DataType> ATTENTION_UPDATE_DTYPE_SUPPORT_LIST_LOCALOUT = {
-                                DataType::DT_FLOAT, DataType::DT_FLOAT16, DataType::DT_BF16};
+    DataType::DT_FLOAT, DataType::DT_FLOAT16, DataType::DT_BF16};
 static const std::initializer_list<op::DataType> ATTENTION_UPDATE_DTYPE_SUPPORT_LIST_95 = {
     DataType::DT_FLOAT, DataType::DT_FLOAT16, DataType::DT_BF16};
 
-static inline bool CheckNotNull(const aclTensorList* lse, const aclTensorList* localOut, const aclTensor* out) {
+static inline bool CheckNotNull(const aclTensorList* lse, const aclTensorList* localOut, const aclTensor* out)
+{
     OP_CHECK_NULL(lse, return false);
     for (uint64_t i = 0; i < lse->Size(); i++) {
         OP_CHECK_NULL((*lse)[i], return false);
@@ -67,7 +67,8 @@ static inline bool CheckNotNull(const aclTensorList* lse, const aclTensorList* l
     return true;
 }
 
-static inline bool CheckDtypeValid(const aclTensorList* lse, const aclTensorList* localOut, const aclTensor* out) {
+static inline bool CheckDtypeValid(const aclTensorList* lse, const aclTensorList* localOut, const aclTensor* out)
+{
     for (size_t i = 0; i < lse->Size(); i++) {
         if ((*lse)[i]->GetViewShape().GetShapeSize() != 0) {
             OP_CHECK_DTYPE_NOT_SUPPORT((*lse)[i], ATTENTION_UPDATE_DTYPE_SUPPORT_LIST, return false);
@@ -83,8 +84,8 @@ static inline bool CheckDtypeValid(const aclTensorList* lse, const aclTensorList
     return true;
 }
 
-static inline bool CheckDtypeValid_95(const aclTensorList *lse, const aclTensorList *localOut, const aclTensor *out,
-                                      const aclTensor *lseOut, uint64_t updateType)
+static inline bool CheckDtypeValid_95(const aclTensorList* lse, const aclTensorList* localOut, const aclTensor* out,
+                                      const aclTensor* lseOut, uint64_t updateType)
 {
     for (size_t i = 0; i < lse->Size(); i++) {
         if ((*lse)[i]->GetViewShape().GetShapeSize() != 0) {
@@ -113,83 +114,88 @@ static inline bool CheckDtypeValid_95(const aclTensorList *lse, const aclTensorL
 }
 
 static inline bool CheckShape(const aclTensorList* lse, const aclTensorList* localOut, const aclTensor* out,
-                                const aclTensor* lseOut, const int64_t updateType) {
+                              const aclTensor* lseOut, const int64_t updateType)
+{
     auto lseSp = lse->Size();
     auto localOutSp = localOut->Size();
 
     OP_CHECK(lseSp > 0 && lseSp <= SP_MAX,
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of lse must be greater than zero and less than %ld, "
-                                         "but which is %ld.", SP_MAX, lseSp), return false);
-    OP_CHECK(localOutSp == lseSp,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                     "Size of lse must be greater than zero and less than %ld, "
+                     "but which is %ld.",
+                     SP_MAX, lseSp),
+             return false);
+    OP_CHECK(
+        localOutSp == lseSp,
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of lse: %ld must equal to size of localOut: %ld.", lseSp, localOutSp),
         return false);
-    
+
     auto lseShape = (*lse)[0]->GetViewShape();
     auto goShape = (*localOut)[0]->GetViewShape();
 
     OP_CHECK(lseShape.GetDimNum() == LSE_DIM_NUM,
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Dim num of lse should be %ld, but which is %ld.",
-                                                    LSE_DIM_NUM, lseShape.GetDimNum()),
-        return false);
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Dim num of lse should be %ld, but which is %ld.", LSE_DIM_NUM,
+                     lseShape.GetDimNum()),
+             return false);
     OP_CHECK(goShape.GetDimNum() == GO_DIM_NUM,
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Dim num of localOut should be %ld, but which is %ld.",
-                                                    GO_DIM_NUM, goShape.GetDimNum()),
-        return false);
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Dim num of localOut should be %ld, but which is %ld.", GO_DIM_NUM,
+                     goShape.GetDimNum()),
+             return false);
     for (size_t i = 1; i < lseSp; i++) {
         OP_CHECK(lseShape == (*lse)[i]->GetViewShape(),
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The shape of every tensor of lse must be same."),
-            return false);
+                 OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The shape of every tensor of lse must be same."), return false);
         OP_CHECK(goShape == (*localOut)[i]->GetViewShape(),
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The shape of every tensor of localOut must be same."),
-            return false);
+                 OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The shape of every tensor of localOut must be same."), return false);
     }
 
     auto outShape = out->GetViewShape();
 
-    auto lseBshc =  lseShape.GetDim(LSE_TOTAL_LENGTH_DIM);
-    auto localOutBshc =  goShape.GetDim(GO_TOTAL_LENGTH_DIM);
+    auto lseBshc = lseShape.GetDim(LSE_TOTAL_LENGTH_DIM);
+    auto localOutBshc = goShape.GetDim(GO_TOTAL_LENGTH_DIM);
 
-    auto goHd =  goShape.GetDim(GO_HD_DIM);
+    auto goHd = goShape.GetDim(GO_HD_DIM);
 
-    OP_CHECK(goHd > 0 && goHd % HD_MULTIPLE == 0 && goHd <= HD_MAX ,
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of localOut[1] must be a multiple of 8 and less than %ld, but which is %ld.",
-                HD_MAX, goHd), return false);
+    OP_CHECK(goHd > 0 && goHd % HD_MULTIPLE == 0 && goHd <= HD_MAX,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                     "Size of localOut[1] must be a multiple of 8 and less than %ld, but which is %ld.", HD_MAX, goHd),
+             return false);
 
     OP_CHECK(lseBshc == localOutBshc,
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of lse[0]: %ld must equal to size of localOut[0]: %ld.",
-                lseBshc, localOutBshc), return false);
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of lse[0]: %ld must equal to size of localOut[0]: %ld.", lseBshc,
+                     localOutBshc),
+             return false);
 
     if (updateType == 0 || updateType == 1) { // ATTENTION_UPDATE
         auto outDimNum = outShape.GetDimNum();
         OP_CHECK(outDimNum == ATTENTION_UPDATE_OUT_DIM_NUM,
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Dim num of out should be %ld, but which is %ld.",
-                                                    ATTENTION_UPDATE_OUT_DIM_NUM, outDimNum),
-        return false);
+                 OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Dim num of out should be %ld, but which is %ld.",
+                         ATTENTION_UPDATE_OUT_DIM_NUM, outDimNum),
+                 return false);
 
         auto outBshc = outShape.GetDim(OUT_TOTAL_LENGTH_DIM);
         OP_CHECK(lseBshc == outBshc,
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of lse[%ld]: %ld must equal to size of out[%ld]: %ld.",
-                                LSE_TOTAL_LENGTH_DIM, lseBshc, OUT_TOTAL_LENGTH_DIM, outBshc),
-        return false);
+                 OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of lse[%ld]: %ld must equal to size of out[%ld]: %ld.",
+                         LSE_TOTAL_LENGTH_DIM, lseBshc, OUT_TOTAL_LENGTH_DIM, outBshc),
+                 return false);
 
         auto outHd = outShape.GetDim(OUT_HD_DIM);
         OP_CHECK(goHd == outHd,
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of localOut[%ld]: %ld must equal to size of out[%ld]: %ld.",
-                                GO_HD_DIM, goHd, OUT_HD_DIM, outHd),
-        return false);
+                 OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of localOut[%ld]: %ld must equal to size of out[%ld]: %ld.",
+                         GO_HD_DIM, goHd, OUT_HD_DIM, outHd),
+                 return false);
         if (updateType == 1) {
             auto lseOutShape = lseOut->GetViewShape();
             auto lseOutDimNum = lseOutShape.GetDimNum();
-            OP_CHECK(lseOutDimNum  == LSE_DIM_NUM,
-                OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Dim num of lseOut should be %ld, but which is %ld.",
-                                                        LSE_DIM_NUM, lseOutDimNum),
-                return false);
+            OP_CHECK(lseOutDimNum == LSE_DIM_NUM,
+                     OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Dim num of lseOut should be %ld, but which is %ld.", LSE_DIM_NUM,
+                             lseOutDimNum),
+                     return false);
 
             auto lseOutBshc = lseOutShape.GetDim(OUT_TOTAL_LENGTH_DIM);
             OP_CHECK(lseBshc == lseOutBshc,
-                OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of lse[%ld]: %ld must equal to size of lseOut[%ld]: %ld.",
-                                    LSE_TOTAL_LENGTH_DIM, lseBshc, OUT_TOTAL_LENGTH_DIM, lseOutBshc),
-                return false);
+                     OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of lse[%ld]: %ld must equal to size of lseOut[%ld]: %ld.",
+                             LSE_TOTAL_LENGTH_DIM, lseBshc, OUT_TOTAL_LENGTH_DIM, lseOutBshc),
+                     return false);
         }
     } else {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Unsupported updateType: %ld.", updateType);
@@ -198,8 +204,8 @@ static inline bool CheckShape(const aclTensorList* lse, const aclTensorList* loc
     return true;
 }
 
-static inline bool CheckShape_95(const aclTensorList *lse, const aclTensorList *localOut, const aclTensor *out,
-                                 const aclTensor *lseOut, const int64_t updateType)
+static inline bool CheckShape_95(const aclTensorList* lse, const aclTensorList* localOut, const aclTensor* out,
+                                 const aclTensor* lseOut, const int64_t updateType)
 {
     auto lseShape = (*lse)[0]->GetViewShape();
     auto goShape = (*localOut)[0]->GetViewShape();
@@ -283,7 +289,7 @@ static inline bool CheckShape_95(const aclTensorList *lse, const aclTensorList *
     return true;
 }
 
-static inline bool CheckSp(const aclTensorList *lse, const aclTensorList *localOut)
+static inline bool CheckSp(const aclTensorList* lse, const aclTensorList* localOut)
 {
     auto lseSp = lse->Size();
     auto localOutSp = localOut->Size();
@@ -301,7 +307,7 @@ static inline bool CheckSp(const aclTensorList *lse, const aclTensorList *localO
     return true;
 }
 
-static inline bool CheckSp_95(const aclTensorList *lse, const aclTensorList *localOut)
+static inline bool CheckSp_95(const aclTensorList* lse, const aclTensorList* localOut)
 {
     auto lseSp = lse->Size();
     auto localOutSp = localOut->Size();
@@ -319,7 +325,7 @@ static inline bool CheckSp_95(const aclTensorList *lse, const aclTensorList *loc
     return true;
 }
 
-static inline bool CheckUpdateTypeAndLseOut(int64_t updateType, const aclTensor *lseOut)
+static inline bool CheckUpdateTypeAndLseOut(int64_t updateType, const aclTensor* lseOut)
 {
     if (updateType == 0 && lseOut != nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "lseOut should be nullptr when updateType is %ld.", updateType);
@@ -337,8 +343,8 @@ static inline bool CheckUpdateTypeAndLseOut(int64_t updateType, const aclTensor 
     return true;
 }
 
-static aclnnStatus CheckParams_95(const aclTensorList *lse, const aclTensorList *localOut, const aclTensor *out,
-                                  const aclTensor *lseOut, const int64_t updateType)
+static aclnnStatus CheckParams_95(const aclTensorList* lse, const aclTensorList* localOut, const aclTensor* out,
+                                  const aclTensor* lseOut, const int64_t updateType)
 {
     // lseOut作输出
     CHECK_RET(CheckUpdateTypeAndLseOut(updateType, lseOut), ACLNN_ERR_PARAM_INVALID);
@@ -358,8 +364,9 @@ static aclnnStatus CheckParams_95(const aclTensorList *lse, const aclTensorList 
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckParams(const aclTensorList* lse, const aclTensorList* localOut,
-            const aclTensor* out, const aclTensor* lseOut, const int64_t updateType) {
+static aclnnStatus CheckParams(const aclTensorList* lse, const aclTensorList* localOut, const aclTensor* out,
+                               const aclTensor* lseOut, const int64_t updateType)
+{
     // 启用lseout
     CHECK_RET(CheckUpdateTypeAndLseOut(updateType, lseOut), ACLNN_ERR_PARAM_INVALID);
 
@@ -384,20 +391,17 @@ static aclnnStatus CheckParams(const aclTensorList* lse, const aclTensorList* lo
 extern "C" {
 #endif
 
-aclnnStatus aclnnAttentionUpdateGetWorkspaceSize(
-    const aclTensorList* lse, const aclTensorList* localOut, int64_t updateType,
-    aclTensor* out, aclTensor* lseOut, uint64_t* workspaceSize,
-    aclOpExecutor** executor)
+aclnnStatus aclnnAttentionUpdateGetWorkspaceSize(const aclTensorList* lse, const aclTensorList* localOut,
+                                                 int64_t updateType, aclTensor* out, aclTensor* lseOut,
+                                                 uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
-    L2_DFX_PHASE_1(aclnnAttentionUpdate,
-                   DFX_IN(lse, localOut, updateType),
-                   DFX_OUT(out, lseOut));
-    
+    L2_DFX_PHASE_1(aclnnAttentionUpdate, DFX_IN(lse, localOut, updateType), DFX_OUT(out, lseOut));
+
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-    
+
     // 固定写法，参数检查
     aclnnStatus ret;
     if (Ops::Transformer::AclnnUtil::IsRegbase()) {
@@ -405,7 +409,7 @@ aclnnStatus aclnnAttentionUpdateGetWorkspaceSize(
     } else {
         ret = attention_update::CheckParams(lse, localOut, out, lseOut, updateType);
     }
-    
+
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     if ((*lse)[0]->IsEmpty() || (*localOut)[0]->IsEmpty()) {
         *workspaceSize = 0;
@@ -427,7 +431,8 @@ aclnnStatus aclnnAttentionUpdateGetWorkspaceSize(
     auto lseContiguous = uniqueExecutor.get()->AllocTensorList(lseContiguousVec.data(), sp);
     auto localOutContiguous = uniqueExecutor.get()->AllocTensorList(localOutContiguousVec.data(), sp);
 
-    auto [AttentionUpdateRes, lseM] = l0op::AttentionUpdate(lseContiguous, localOutContiguous, updateType, sp, uniqueExecutor.get());
+    auto [AttentionUpdateRes, lseM] =
+        l0op::AttentionUpdate(lseContiguous, localOutContiguous, updateType, sp, uniqueExecutor.get());
     CHECK_RET(AttentionUpdateRes != nullptr, ACLNN_ERR_INNER_NULLPTR);
     auto viewCopyResult = l0op::ViewCopy(AttentionUpdateRes, out, uniqueExecutor.get());
     CHECK_RET(viewCopyResult != nullptr, ACLNN_ERR_INNER_NULLPTR);

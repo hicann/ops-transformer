@@ -38,7 +38,7 @@ struct FlashAttentionScoreHostUtParamBase : public HostUtParamBase {
     int64_t out_dtype = 0;
     std::string softmax_out_layout = "";
 
-    FlashAttentionScoreHostUtParamBase(const csv_map &csvMap)
+    FlashAttentionScoreHostUtParamBase(const csv_map& csvMap)
         : HostUtParamBase(csvMap)
     {
         scale_value = std::stof(ReadMap(csvMap, "scale_value", "0.0"));
@@ -57,8 +57,8 @@ struct FlashAttentionScoreHostUtParamBase : public HostUtParamBase {
     }
 };
 
-static void ApplyConstData(const csv_map &csvMap, const std::string &name,
-                           gert::TilingContextPara::TensorDescription &desc, std::shared_ptr<std::vector<int64_t>> &buf)
+static void ApplyConstData(const csv_map& csvMap, const std::string& name,
+                           gert::TilingContextPara::TensorDescription& desc, std::shared_ptr<std::vector<int64_t>>& buf)
 {
     std::string dataStr = ReadMap(csvMap, name + "_data");
     if (!dataStr.empty()) {
@@ -72,9 +72,9 @@ static void ApplyConstData(const csv_map &csvMap, const std::string &name,
     }
 }
 
-static void ApplyConstDataIS(const csv_map &csvMap, const std::string &name,
-                             gert::InfershapeContextPara::TensorDescription &desc,
-                             std::shared_ptr<std::vector<int64_t>> &buf)
+static void ApplyConstDataIS(const csv_map& csvMap, const std::string& name,
+                             gert::InfershapeContextPara::TensorDescription& desc,
+                             std::shared_ptr<std::vector<int64_t>>& buf)
 {
     std::string dataStr = ReadMap(csvMap, name + "_data");
     if (!dataStr.empty()) {
@@ -88,7 +88,7 @@ static void ApplyConstDataIS(const csv_map &csvMap, const std::string &name,
     }
 }
 
-static std::vector<size_t> ParseWorkspaces(const std::string &s)
+static std::vector<size_t> ParseWorkspaces(const std::string& s)
 {
     std::vector<size_t> ws;
     if (s.empty())
@@ -132,7 +132,7 @@ struct FlashAttentionScoreTilingUtParam : public FlashAttentionScoreHostUtParamB
     std::shared_ptr<std::vector<int64_t>> actual_seq_qlen_data;
     std::shared_ptr<std::vector<int64_t>> actual_seq_kvlen_data;
 
-    FlashAttentionScoreTilingUtParam(const csv_map &csvMap)
+    FlashAttentionScoreTilingUtParam(const csv_map& csvMap)
         : FlashAttentionScoreHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(
@@ -218,7 +218,7 @@ struct FlashAttentionScoreInferShapeUtParam : public FlashAttentionScoreHostUtPa
     std::shared_ptr<std::vector<int64_t>> actual_seq_qlen_data;
     std::shared_ptr<std::vector<int64_t>> actual_seq_kvlen_data;
 
-    FlashAttentionScoreInferShapeUtParam(const csv_map &csvMap)
+    FlashAttentionScoreInferShapeUtParam(const csv_map& csvMap)
         : FlashAttentionScoreHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(
@@ -314,7 +314,7 @@ struct FlashAttentionScoreInferDTypeUtParam : public FlashAttentionScoreHostUtPa
     ge::DataType softmaxOut_dtype = ge::DT_UNDEFINED;
     ge::DataType attentionOut_dtype = ge::DT_UNDEFINED;
 
-    FlashAttentionScoreInferDTypeUtParam(const csv_map &csvMap)
+    FlashAttentionScoreInferDTypeUtParam(const csv_map& csvMap)
         : FlashAttentionScoreHostUtParamBase(csvMap)
     {
         GetDataTypeGE(csvMap, "input_dtype", this->input_dtype);

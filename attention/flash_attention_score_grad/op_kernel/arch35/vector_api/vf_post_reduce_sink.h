@@ -47,20 +47,20 @@ __simd_vf__ inline void ReduceSinkVF(uint64_t dstLocalInt, uint64_t srcLocalInt,
 
     Duplicate(vregRes, 0);
     for (uint16_t n = 0; n < loopTimes; n++) {
-        LoadAlign(vregSrc, ((__ubuf__ T *&)srcLocalInt + n * fullExeSize));
+        LoadAlign(vregSrc, ((__ubuf__ T*&)srcLocalInt + n * fullExeSize));
         Reduce<Reg::ReduceType::SUM>(vregReduceSum, vregSrc, pregFullExe);
         Add(vregRes, vregRes, vregReduceSum, pregAccu);
     }
     // 尾块
-    LoadAlign(vregSrcTail, ((__ubuf__ T *&)srcLocalIntTail));
+    LoadAlign(vregSrcTail, ((__ubuf__ T*&)srcLocalIntTail));
     Reduce<Reg::ReduceType::SUM>(vregReduceSumTail, vregSrcTail, pregTailExe);
     Add(vregRes, vregRes, vregReduceSumTail, pregAccu);
-    StoreUnAlign<T>(((__ubuf__ T *&)dstLocalInt), vregRes, uregRes, 1);
-    StoreUnAlignPost<T>(((__ubuf__ T *&)dstLocalInt), uregRes, 0);
+    StoreUnAlign<T>(((__ubuf__ T*&)dstLocalInt), vregRes, uregRes, 1);
+    StoreUnAlignPost<T>(((__ubuf__ T*&)dstLocalInt), uregRes, 0);
 }
 
 template <typename T>
-__aicore__ inline void ReduceSink(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor, uint64_t pingSize)
+__aicore__ inline void ReduceSink(const LocalTensor<T>& dstTensor, const LocalTensor<T>& srcTensor, uint64_t pingSize)
 {
     const uint16_t fullExeSize = 64;
     uint16_t loopTimes = static_cast<uint16_t>(((pingSize + fullExeSize - 1) / fullExeSize) - 1);
@@ -74,7 +74,7 @@ __aicore__ inline void ReduceSink(const LocalTensor<T> &dstTensor, const LocalTe
 }
 #else
 template <typename T>
-__aicore__ inline void ReduceSink(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor, uint64_t pingSize)
+__aicore__ inline void ReduceSink(const LocalTensor<T>& dstTensor, const LocalTensor<T>& srcTensor, uint64_t pingSize)
 {}
 #endif
 } // namespace AscendC

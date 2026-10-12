@@ -27,13 +27,13 @@ public:
     using BaseClass = FlashAttentionNoQuantKernelBase<FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockType>,
                                                       CubeBlockType, VecBlockType>;
     __aicore__ inline void InitUniqueConstInfo();
-    __aicore__ inline void InitUniqueRunInfo(const RunParamStr<isInfer> &runParam, RunInfo<isInfer> &runInfo);
+    __aicore__ inline void InitUniqueRunInfo(const RunParamStr<isInfer>& runParam, RunInfo<isInfer>& runInfo);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void GetAttentionOffset(RunParamStr<isInfer> &runParam);
-    __aicore__ inline void CalS1OuterSize(const int64_t &multiCoreInnerOffset, RunParamStr<isInfer> &runParam);
-    __aicore__ inline void GetS2LoopRange(RunParamStr<isInfer> &runParam);
+    __aicore__ inline void GetAttentionOffset(RunParamStr<isInfer>& runParam);
+    __aicore__ inline void CalS1OuterSize(const int64_t& multiCoreInnerOffset, RunParamStr<isInfer>& runParam);
+    __aicore__ inline void GetS2LoopRange(RunParamStr<isInfer>& runParam);
     __aicore__ inline int64_t CalcRealTimes(int64_t relativePos, int64_t length);
     __aicore__ inline int64_t CalcRealCoreIdx(int64_t relativePos, int64_t times, int64_t offsetCoreIdx,
                                               bool isPartialCalc);
@@ -50,7 +50,7 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockType>::InitUniqueRunInfo(
-    const RunParamStr<isInfer> &runParam, RunInfo<isInfer> &runInfo)
+    const RunParamStr<isInfer>& runParam, RunInfo<isInfer>& runInfo)
 {
     // 训练的TND场景的Mask以及Pse都是不带padding的
     runInfo.b1SSOffset = runParam.b1SSOffset;
@@ -295,7 +295,7 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
         }
         for (int64_t s2LoopCount = 0; s2LoopCount <= s2LoopLimit; s2LoopCount++) {
             if (notLastThreeLoop) {
-                RunInfo<isInfer> &runInfo1 = runInfo[taskId & 3];
+                RunInfo<isInfer>& runInfo1 = runInfo[taskId & 3];
                 this->SetRunInfo(runInfo1, runParam, taskId, s2LoopCount, s2LoopLimit, realCoreInnerIdx);
                 if (this->sharedParams.splitCoreMode == 1) {
                     runInfo1.multiCoreIdxMod3 = realMultiCoreInnerIdxInS2 % 3;
@@ -306,13 +306,13 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
             }
             if (taskId > 0 && notLastTwoLoop) {
                 if ASCEND_IS_AIV {
-                    auto &runInfo3 = runInfo[(taskId + 3) & 3];
+                    auto& runInfo3 = runInfo[(taskId + 3) & 3];
                     this->vecBlock.ProcessVec1(this->l1PBuffers.Get(), this->bmm1Buffers.Get(), runInfo3,
                                                this->constInfo);
                 }
             }
             if (taskId > 1 && notLast) {
-                RunInfo<isInfer> &runInfo2 = runInfo[(taskId + 2) & 3];
+                RunInfo<isInfer>& runInfo2 = runInfo[(taskId + 2) & 3];
                 if ASCEND_IS_AIC {
                     if constexpr (BaseClass::bmm2Write2Ub) {
                         this->cubeBlock.IterateBmm2(this->bmm2Buffers.Get(), this->l1PBuffers, runInfo2,
@@ -325,7 +325,7 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
             }
             if (taskId > 2) {
                 if ASCEND_IS_AIV {
-                    RunInfo<isInfer> &runInfo3 = runInfo[(taskId + 1) & 3];
+                    RunInfo<isInfer>& runInfo3 = runInfo[(taskId + 1) & 3];
                     if constexpr (BaseClass::bmm2Write2Ub) {
                         this->vecBlock.ProcessVec2(this->bmm2Buffers.Get(), runInfo3, this->constInfo);
                     } else {
@@ -341,7 +341,7 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
 // =========================================== private functions ===========================================
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockType>::GetAttentionOffset(
-    RunParamStr<isInfer> &runParam)
+    RunParamStr<isInfer>& runParam)
 {
     if ASCEND_IS_AIV {
         int64_t bOffsetOut = 0;
@@ -384,7 +384,7 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockType>::CalS1OuterSize(
-    const int64_t &multiCoreInnerOffset, RunParamStr<isInfer> &runParam)
+    const int64_t& multiCoreInnerOffset, RunParamStr<isInfer>& runParam)
 {
     int64_t actualS1Outersize = 0;
     runParam.boIdx = 0;
@@ -427,7 +427,7 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockType>::GetS2LoopRange(
-    RunParamStr<isInfer> &runParam)
+    RunParamStr<isInfer>& runParam)
 {
     if constexpr (layout == LayOutTypeEnum::LAYOUT_TND) {
         int64_t actualS1Len;
@@ -487,7 +487,7 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
             } else if (this->sharedParams.sparseType == static_cast<uint8_t>(SparseModeEnum::PREFIX)) {
                 runParam.s2LineStartIdx = 0;
                 runParam.s2LineEndIdx = Max((runParam.s1oIdx + 1) * this->s1BaseSize - actualS1Len + actualS2Len,
-                                            ((__gm__ int64_t *)(this->attenMaskInfo.prefixNAddr))[runParam.boIdx]);
+                                            ((__gm__ int64_t*)(this->attenMaskInfo.prefixNAddr))[runParam.boIdx]);
                 runParam.s2LineEndIdx = Min(runParam.s2LineEndIdx, actualS2Len);
                 if (runParam.s2LineEndIdx - runParam.s2LineStartIdx <= 0) {
                     runParam.s2LineEndIdx = actualS2Len;
@@ -523,7 +523,7 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
                 runParam.s2LineStartIdx = 0;
                 runParam.s2LineEndIdx =
                     Max(this->s1BaseSize * (runParam.s1oIdx + 1) - this->constInfo.s1Size + this->constInfo.s2Size,
-                        ((__gm__ int64_t *)(this->attenMaskInfo.prefixNAddr))[runParam.boIdx]);
+                        ((__gm__ int64_t*)(this->attenMaskInfo.prefixNAddr))[runParam.boIdx]);
                 if (runParam.s2LineEndIdx <= runParam.s2LineStartIdx) {
                     // 无效行场景至少要算一个基本块
                     runParam.s2LineEndIdx = this->s2BaseSize;

@@ -30,11 +30,11 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKOptional, const aclTensor *cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
-    int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, char *layoutQOptional,
-    char *layoutKOptional, int64_t maskMode, int64_t cmpRatio, const aclTensor *metadata, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
+    int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, char* layoutQOptional,
+    char* layoutKOptional, int64_t maskMode, int64_t cmpRatio, const aclTensor* metadata, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     if (workspaceSize == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "workspaceSize is nullptr");
@@ -53,7 +53,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
+    const op::PlatformInfo& npuInfo = op::GetCurrentPlatformInfo();
     uint32_t aicCoreNum = npuInfo.GetCubeCoreNum();
     uint32_t aivCoreNum = npuInfo.GetVectorCoreNum();
     const std::string socVersion = npuInfo.GetSocLongVersion();
@@ -64,7 +64,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
                        layoutKOptional, maskMode, cmpRatio, metadata, aicCoreNum, aivCoreNum, socVersion);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    const aclTensor *cuSeqlensQOptionalContiguous = nullptr;
+    const aclTensor* cuSeqlensQOptionalContiguous = nullptr;
     if (cuSeqlensQOptional != nullptr) {
         cuSeqlensQOptionalContiguous = l0op::Contiguous(cuSeqlensQOptional, uniqueExecutor.get());
         if (cuSeqlensQOptionalContiguous == nullptr) {
@@ -72,7 +72,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *cuSeqlensKOptionalContiguous = nullptr;
+    const aclTensor* cuSeqlensKOptionalContiguous = nullptr;
     if (cuSeqlensKOptional != nullptr) {
         cuSeqlensKOptionalContiguous = l0op::Contiguous(cuSeqlensKOptional, uniqueExecutor.get());
         if (cuSeqlensKOptionalContiguous == nullptr) {
@@ -80,7 +80,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *sequsedQOptionalContiguous = nullptr;
+    const aclTensor* sequsedQOptionalContiguous = nullptr;
     if (sequsedQOptional != nullptr) {
         sequsedQOptionalContiguous = l0op::Contiguous(sequsedQOptional, uniqueExecutor.get());
         if (sequsedQOptionalContiguous == nullptr) {
@@ -88,7 +88,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *sequsedKOptionalContiguous = nullptr;
+    const aclTensor* sequsedKOptionalContiguous = nullptr;
     if (sequsedKOptional != nullptr) {
         sequsedKOptionalContiguous = l0op::Contiguous(sequsedKOptional, uniqueExecutor.get());
         if (sequsedKOptionalContiguous == nullptr) {
@@ -96,7 +96,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *cmpResidualLKOptionalContiguous = nullptr;
+    const aclTensor* cmpResidualLKOptionalContiguous = nullptr;
     if (cmpResidualKOptional != nullptr) {
         cmpResidualLKOptionalContiguous = l0op::Contiguous(cmpResidualKOptional, uniqueExecutor.get());
         if (cmpResidualLKOptionalContiguous == nullptr) {
@@ -117,8 +117,8 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(void *workspace, uint64_t workspaceSize,
-                                                         aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(void* workspace, uint64_t workspaceSize,
+                                                         aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnDenseLightningIndexerKLLossGradMetadata);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);

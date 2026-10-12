@@ -31,9 +31,9 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35MLA;
 
-ge::graphStatus SoftmaxLSEChecker::CheckSinglePara(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus SoftmaxLSEChecker::CheckSinglePara(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
-    auto &returnSoftmaxLse = faInfo.opParamInfo.returnSoftMaxLse;
+    auto& returnSoftmaxLse = faInfo.opParamInfo.returnSoftMaxLse;
     if (returnSoftmaxLse != nullptr) {
         int64_t returnSoftmaxLseVal = *returnSoftmaxLse;
         OP_CHECK_IF(returnSoftmaxLseVal != 0 && returnSoftmaxLseVal != 1,
@@ -46,7 +46,7 @@ ge::graphStatus SoftmaxLSEChecker::CheckSinglePara(const FlashMlaWithKvcacheTili
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::CompileTimeTensorDesc *lseOutDesc = faInfo.opParamInfo.lseOut.desc;
+    const gert::CompileTimeTensorDesc* lseOutDesc = faInfo.opParamInfo.lseOut.desc;
     if (lseOutDesc == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -63,10 +63,10 @@ ge::graphStatus SoftmaxLSEChecker::CheckSinglePara(const FlashMlaWithKvcacheTili
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SoftmaxLSEChecker::CheckParaExistence(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus SoftmaxLSEChecker::CheckParaExistence(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     if (faInfo.softmaxLseFlag) {
-        const gert::StorageShape *lseOutShape = faInfo.opParamInfo.lseOut.shape;
+        const gert::StorageShape* lseOutShape = faInfo.opParamInfo.lseOut.shape;
         OP_CHECK_IF(lseOutShape == nullptr,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "lse_out", "empty",
                                                           "When softmaxLSE is enabled, lse_out cannot be empty"),

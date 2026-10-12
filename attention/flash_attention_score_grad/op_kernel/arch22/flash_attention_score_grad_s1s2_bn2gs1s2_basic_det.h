@@ -48,25 +48,25 @@ public:
     __aicore__ inline void Process(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR drop_mask,
                                    GM_ADDR atten_mask, GM_ADDR softmax_max, GM_ADDR softmax_sum, GM_ADDR attention_in,
                                    GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq, GM_ADDR dk,
-                                   GM_ADDR dv, GM_ADDR user, const TILING_CLASS *tilingData);
+                                   GM_ADDR dv, GM_ADDR user, const TILING_CLASS* tilingData);
 
 private:
     __aicore__ inline void CubeProcess(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR atten_mask,
                                        GM_ADDR softmax_max, GM_ADDR softmax_sum, GM_ADDR attention_in,
                                        GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq, GM_ADDR dk,
-                                       GM_ADDR dv, GM_ADDR user, const TILING_CLASS *tilingData);
+                                       GM_ADDR dv, GM_ADDR user, const TILING_CLASS* tilingData);
 
     __aicore__ inline void VectorProcess(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR drop_mask,
                                          GM_ADDR atten_mask, GM_ADDR softmax_max, GM_ADDR softmax_sum,
                                          GM_ADDR attention_in, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen,
                                          GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR user,
-                                         const TILING_CLASS *tilingData);
+                                         const TILING_CLASS* tilingData);
 
     __aicore__ inline void VecDetMainProcess(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR drop_mask,
                                              GM_ADDR atten_mask, GM_ADDR softmax_max, GM_ADDR softmax_sum,
                                              GM_ADDR attention_in, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen,
                                              GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR user,
-                                             const TILING_CLASS *tilingData);
+                                             const TILING_CLASS* tilingData);
     int64_t dimB;
     int64_t dimD;
     uint32_t cubeCoreNum; // Cube核数量
@@ -87,7 +87,7 @@ template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradBasicDet<FAGT>::Process(
     GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR drop_mask, GM_ADDR atten_mask, GM_ADDR softmax_max,
     GM_ADDR softmax_sum, GM_ADDR attention_in, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq,
-    GM_ADDR dk, GM_ADDR dv, GM_ADDR user, const TILING_CLASS *tilingData)
+    GM_ADDR dk, GM_ADDR dv, GM_ADDR user, const TILING_CLASS* tilingData)
 {
     dimB = tilingData->basicDetTensorTilingData.b;
     dimD = tilingData->basicDetTensorTilingData.d;
@@ -123,7 +123,7 @@ template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradBasicDet<FAGT>::CubeProcess(
     GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR atten_mask, GM_ADDR softmax_max, GM_ADDR softmax_sum,
     GM_ADDR attention_in, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
-    GM_ADDR user, const TILING_CLASS *tilingData)
+    GM_ADDR user, const TILING_CLASS* tilingData)
 {
     AscendC::TPipe pipeCube;
     FAG_DET::CubeOpDet<FAGT> cubeOp;
@@ -131,11 +131,10 @@ __aicore__ inline void FlashAttentionScoreGradBasicDet<FAGT>::CubeProcess(
     CubeAddrInfoDet cubeAddrInfo[2];
     uint32_t taskId = 0;
 
-    cubeOp.Init(&pipeCube, tilingData, (__gm__ INPUT_TYPE *)query, (__gm__ INPUT_TYPE *)key, (__gm__ INPUT_TYPE *)dy,
-                (__gm__ INPUT_TYPE *)value, (__gm__ float *)mm1WorkSpaceAddr, (__gm__ float *)mm2WorkSpaceAddr,
-                (__gm__ float *)dqDetWorkSpaceAddr, (__gm__ float *)dkDetWorkSpaceAddr,
-                (__gm__ float *)dvDetWorkSpaceAddr, (__gm__ float *)dqWorkSpaceAddr, (__gm__ float *)dkWorkSpaceAddr,
-                (__gm__ float *)dvWorkSpaceAddr);
+    cubeOp.Init(&pipeCube, tilingData, (__gm__ INPUT_TYPE*)query, (__gm__ INPUT_TYPE*)key, (__gm__ INPUT_TYPE*)dy,
+                (__gm__ INPUT_TYPE*)value, (__gm__ float*)mm1WorkSpaceAddr, (__gm__ float*)mm2WorkSpaceAddr,
+                (__gm__ float*)dqDetWorkSpaceAddr, (__gm__ float*)dkDetWorkSpaceAddr, (__gm__ float*)dvDetWorkSpaceAddr,
+                (__gm__ float*)dqWorkSpaceAddr, (__gm__ float*)dkWorkSpaceAddr, (__gm__ float*)dvWorkSpaceAddr);
     addrComputeDet.Init(actual_seq_qlen, actual_seq_kvlen, cubeCoreNum, cubeCoreIdx, tilingData);
 
     while (true) {
@@ -175,7 +174,7 @@ template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradBasicDet<FAGT>::VectorProcess(
     GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR drop_mask, GM_ADDR atten_mask, GM_ADDR softmax_max,
     GM_ADDR softmax_sum, GM_ADDR attention_in, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq,
-    GM_ADDR dk, GM_ADDR dv, GM_ADDR user, const TILING_CLASS *tilingData)
+    GM_ADDR dk, GM_ADDR dv, GM_ADDR user, const TILING_CLASS* tilingData)
 {
     AscendC::TPipe pipePre;
     VectorInitOuputDet<TILING_CLASS, DETERMINISTIC_ENABLE> opPre;
@@ -206,7 +205,7 @@ template <typename FAGT>
 __aicore__ inline void FlashAttentionScoreGradBasicDet<FAGT>::VecDetMainProcess(
     GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR drop_mask, GM_ADDR atten_mask, GM_ADDR softmax_max,
     GM_ADDR softmax_sum, GM_ADDR attention_in, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq,
-    GM_ADDR dk, GM_ADDR dv, GM_ADDR user, const TILING_CLASS *tilingData)
+    GM_ADDR dk, GM_ADDR dv, GM_ADDR user, const TILING_CLASS* tilingData)
 {
     AscendC::TPipe pipeVec;
     VecOpDet<FAGT> op;

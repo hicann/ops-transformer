@@ -25,18 +25,19 @@
 using namespace std;
 
 #define CHECK_RET(cond, return_expr) \
-    do {                               \
-        if (!(cond)) {                   \
-            return_expr;                   \
-        }                                \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)     \
-    do {                              \
+#define LOG_PRINT(message, ...) \
+    do { \
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t>& shape) {
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
+{
     int64_t shapeSize = 1;
     for (auto i : shape) {
         shapeSize *= i;
@@ -44,7 +45,8 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape) {
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream* stream) {
+int Init(int32_t deviceId, aclrtStream* stream)
+{
     // 固定写法，AscendCL初始化
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -57,7 +59,8 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 
 template <typename T>
 int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor) {
+                    aclDataType dataType, aclTensor** tensor)
+{
     // 检查shape是否有效
     if (shape.empty()) {
         LOG_PRINT("CreateAclTensor: ERROR - shape is empty\n");
@@ -69,26 +72,26 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
             return -1;
         }
     }
-    
+
     auto size = GetShapeSize(shape) * sizeof(T);
-    
+
     // 检查hostData大小是否匹配
     if (hostData.size() != static_cast<size_t>(GetShapeSize(shape))) {
-        LOG_PRINT("CreateAclTensor: ERROR - hostData size mismatch: %zu vs %ld\n", 
-                  hostData.size(), GetShapeSize(shape));
+        LOG_PRINT("CreateAclTensor: ERROR - hostData size mismatch: %zu vs %ld\n", hostData.size(),
+                  GetShapeSize(shape));
         return -1;
     }
-    
+
     // 调用aclrtMalloc申请device侧内存
     *deviceAddr = nullptr;
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
-    
+
     // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
     ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); 
-              aclrtFree(*deviceAddr); *deviceAddr = nullptr; return ret);
-    
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); aclrtFree(*deviceAddr);
+              *deviceAddr = nullptr; return ret);
+
     // 计算连续tensor的strides
     std::vector<int64_t> strides(shape.size(), 1);
     if (shape.size() > 1) {
@@ -100,13 +103,14 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
     // 调用aclCreateTensor接口创建aclTensor
     *tensor = nullptr;
     *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
-                                shape.data(), shape.size(), *deviceAddr);
-    CHECK_RET(*tensor != nullptr, LOG_PRINT("aclCreateTensor failed - returned nullptr\n"); 
-              aclrtFree(*deviceAddr); *deviceAddr = nullptr; return -1);
+                              shape.data(), shape.size(), *deviceAddr);
+    CHECK_RET(*tensor != nullptr, LOG_PRINT("aclCreateTensor failed - returned nullptr\n"); aclrtFree(*deviceAddr);
+              *deviceAddr = nullptr; return -1);
     return 0;
 }
 
-int main() {
+int main()
+{
     // 1. device/stream初始化
     int32_t deviceId = 0;
     aclrtStream stream;
@@ -141,11 +145,11 @@ int main() {
     std::vector<op::fp16_t> qData(qSize, 0.1f);
     std::vector<op::fp16_t> kData(kvSize, 0.1f);
     std::vector<op::fp16_t> vData(kvSize, 0.1f);
-    
+
     // 梯度初始值可以给一个小正数
     std::vector<op::fp16_t> doutData(qSize, 0.01f);
     std::vector<op::fp16_t> outData(qSize, 0.1f);
-    
+
     // LSE 给一个合理的正数，比如 5.0f，这样 exp(S - LSE) 就是一个非常安全的负指数，绝对不会溢出
     std::vector<float> lseData(GetShapeSize(lseShape), 5.0f);
     std::vector<uint8_t> maskData(GetShapeSize(maskShape), 1);
@@ -154,7 +158,7 @@ int main() {
     void *qAddr = nullptr, *kAddr = nullptr, *vAddr = nullptr;
     void *doutAddr = nullptr, *outAddr = nullptr;
     void *lseAddr = nullptr, *maskAddr = nullptr;
-    
+
     aclTensor *qTensor = nullptr, *kTensor = nullptr, *vTensor = nullptr;
     aclTensor *doutTensor = nullptr, *outTensor = nullptr;
     aclTensor *lseTensor = nullptr, *maskTensor = nullptr;
@@ -164,7 +168,7 @@ int main() {
     CreateAclTensor(vData, kvShape, &vAddr, aclDataType::ACL_FLOAT16, &vTensor);
     CreateAclTensor(doutData, qShape, &doutAddr, aclDataType::ACL_FLOAT16, &doutTensor);
     CreateAclTensor(outData, qShape, &outAddr, aclDataType::ACL_FLOAT16, &outTensor);
-    
+
     CreateAclTensor(lseData, lseShape, &lseAddr, aclDataType::ACL_FLOAT, &lseTensor);     // 严格使用 FP32
     CreateAclTensor(maskData, maskShape, &maskAddr, aclDataType::ACL_UINT8, &maskTensor); // 严格使用 UINT8
 
@@ -172,7 +176,7 @@ int main() {
     std::vector<op::fp16_t> dqData(qSize, 0.0f);
     std::vector<op::fp16_t> dkData(kvSize, 0.0f);
     std::vector<op::fp16_t> dvData(kvSize, 0.0f);
-    
+
     void *dqAddr = nullptr, *dkAddr = nullptr, *dvAddr = nullptr;
     aclTensor *dqTensor = nullptr, *dkTensor = nullptr, *dvTensor = nullptr;
 
@@ -182,12 +186,12 @@ int main() {
 
     // 6. 创建 aclIntArray 属性参数 (BlockShape & ActualSeqLengths)
     std::vector<int64_t> blockShapeVec = {blockShapeX, blockShapeY};
-    aclIntArray *blockShapeArr = aclCreateIntArray(blockShapeVec.data(), blockShapeVec.size());
-    
+    aclIntArray* blockShapeArr = aclCreateIntArray(blockShapeVec.data(), blockShapeVec.size());
+
     std::vector<int64_t> qSeqLenVec(batch, static_cast<int64_t>(qSeqlen));
     std::vector<int64_t> kvSeqLenVec(batch, static_cast<int64_t>(kvSeqlen));
-    aclIntArray *qSeqLenArr = aclCreateIntArray(qSeqLenVec.data(), batch);
-    aclIntArray *kvSeqLenArr = aclCreateIntArray(kvSeqLenVec.data(), batch);
+    aclIntArray* qSeqLenArr = aclCreateIntArray(qSeqLenVec.data(), batch);
+    aclIntArray* kvSeqLenArr = aclCreateIntArray(kvSeqLenVec.data(), batch);
 
     // 7. 标量与字符串参数配置
     char qLayoutBuffer[16] = "BNSD";
@@ -195,7 +199,7 @@ int main() {
     int64_t maskType = 0;
     double scaleValue = 1.0 / std::sqrt(static_cast<double>(headDim));
     // 强制规定滑动窗口极大值
-    int64_t preTokens = 2147483647; 
+    int64_t preTokens = 2147483647;
     int64_t nextTokens = 2147483647;
 
     // 8. 调用第一段接口: GetWorkspaceSize
@@ -204,30 +208,11 @@ int main() {
 
     LOG_PRINT("Calling aclnnBlockSparseAttentionGradGetWorkspaceSize...\n");
     ret = aclnnBlockSparseAttentionGradGetWorkspaceSize(
-        doutTensor, 
-        qTensor, 
-        kTensor, 
-        vTensor, 
-        outTensor, 
-        lseTensor, 
-        maskTensor,                 // blockSparseMaskOptional
-        nullptr,                    // attenMaskOptional 必须为空
-        blockShapeArr, 
-        qSeqLenArr, 
-        kvSeqLenArr, 
-        qLayoutBuffer, 
-        kvLayoutBuffer, 
-        static_cast<int64_t>(numKvHeads), 
-        maskType, 
-        scaleValue, 
-        preTokens, 
-        nextTokens, 
-        dqTensor, 
-        dkTensor, 
-        dvTensor, 
-        &workspaceSize, 
-        &executor
-    );
+        doutTensor, qTensor, kTensor, vTensor, outTensor, lseTensor,
+        maskTensor, // blockSparseMaskOptional
+        nullptr,    // attenMaskOptional 必须为空
+        blockShapeArr, qSeqLenArr, kvSeqLenArr, qLayoutBuffer, kvLayoutBuffer, static_cast<int64_t>(numKvHeads),
+        maskType, scaleValue, preTokens, nextTokens, dqTensor, dkTensor, dvTensor, &workspaceSize, &executor);
 
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
     CHECK_RET(executor != nullptr, LOG_PRINT("executor is null after GetWorkspaceSize\n"); return -1);
@@ -250,7 +235,8 @@ int main() {
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
     // 12. 将结果拷贝回 Host 侧打印
-    ret = aclrtMemcpy(dqData.data(), qSize * sizeof(op::fp16_t), dqAddr, qSize * sizeof(op::fp16_t), ACL_MEMCPY_DEVICE_TO_HOST);
+    ret = aclrtMemcpy(dqData.data(), qSize * sizeof(op::fp16_t), dqAddr, qSize * sizeof(op::fp16_t),
+                      ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed.\n"); return ret);
 
     LOG_PRINT("Execution Success! Output results (first 10 elements of dQ):\n");
@@ -260,18 +246,31 @@ int main() {
 
     // 13. 释放所有资源
     LOG_PRINT("Cleaning up resources...\n");
-    if (workspaceAddr) aclrtFree(workspaceAddr);
-    
-    aclrtFree(qAddr); aclrtFree(kAddr); aclrtFree(vAddr);
-    aclrtFree(doutAddr); aclrtFree(outAddr);
-    aclrtFree(lseAddr); aclrtFree(maskAddr);
-    aclrtFree(dqAddr); aclrtFree(dkAddr); aclrtFree(dvAddr);
+    if (workspaceAddr)
+        aclrtFree(workspaceAddr);
 
-    aclDestroyTensor(qTensor); aclDestroyTensor(kTensor); aclDestroyTensor(vTensor);
-    aclDestroyTensor(doutTensor); aclDestroyTensor(outTensor);
-    aclDestroyTensor(lseTensor); aclDestroyTensor(maskTensor);
-    aclDestroyTensor(dqTensor); aclDestroyTensor(dkTensor); aclDestroyTensor(dvTensor);
-    
+    aclrtFree(qAddr);
+    aclrtFree(kAddr);
+    aclrtFree(vAddr);
+    aclrtFree(doutAddr);
+    aclrtFree(outAddr);
+    aclrtFree(lseAddr);
+    aclrtFree(maskAddr);
+    aclrtFree(dqAddr);
+    aclrtFree(dkAddr);
+    aclrtFree(dvAddr);
+
+    aclDestroyTensor(qTensor);
+    aclDestroyTensor(kTensor);
+    aclDestroyTensor(vTensor);
+    aclDestroyTensor(doutTensor);
+    aclDestroyTensor(outTensor);
+    aclDestroyTensor(lseTensor);
+    aclDestroyTensor(maskTensor);
+    aclDestroyTensor(dqTensor);
+    aclDestroyTensor(dkTensor);
+    aclDestroyTensor(dvTensor);
+
     aclDestroyIntArray(blockShapeArr);
     aclDestroyIntArray(qSeqLenArr);
     aclDestroyIntArray(kvSeqLenArr);

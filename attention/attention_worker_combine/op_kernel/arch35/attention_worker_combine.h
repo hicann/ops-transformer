@@ -39,13 +39,13 @@ class KernelAttentionWorkerCombine {
 public:
     __aicore__ inline void Init(GM_ADDR schedule_context, GM_ADDR expert_scales, GM_ADDR layer_id, GM_ADDR y,
                                 GM_ADDR next_layer_id, GM_ADDR workspace,
-                                const AttentionWorkerCombineRegbaseTilingData *tilingDataPtr, TPipe *pipePtr)
+                                const AttentionWorkerCombineRegbaseTilingData* tilingDataPtr, TPipe* pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
 
-        contextGm0.SetGlobalBuffer((__gm__ uint32_t *)schedule_context);
-        contextGm1.SetGlobalBuffer((__gm__ uint64_t *)schedule_context);
+        contextGm0.SetGlobalBuffer((__gm__ uint32_t*)schedule_context);
+        contextGm1.SetGlobalBuffer((__gm__ uint64_t*)schedule_context);
 
         if (tilingData->needSchedule == 1) {
             uint32_t micro_batch_num = contextGm0(GET_OFFSET_B32(ScheduleContext, common.micro_batch_num));
@@ -58,14 +58,14 @@ public:
         uint64_t token_data_addr = contextGm1(GET_OFFSET_B64(ScheduleContext, attention.token_data_buf));
         uint64_t token_info_addr = contextGm1(GET_OFFSET_B64(ScheduleContext, attention.token_info_buf));
 
-        srcTokenGm.SetGlobalBuffer((__gm__ T *)(token_data_addr + micro_batch_id * tilingData->BS *
-                                                                      (tilingData->K + 1) * tilingData->H * sizeof(T)));
-        srcTokenInfoGm.SetGlobalBuffer((__gm__ int32_t *)(token_info_addr + micro_batch_id * tilingData->BS *
-                                                                                (tilingData->K + 1) * sizeof(int32_t)));
-        srcScalesGm.SetGlobalBuffer((__gm__ float *)expert_scales);
-        srcLayerIdGm.SetGlobalBuffer((__gm__ int32_t *)layer_id);
-        dstGm.SetGlobalBuffer((__gm__ T *)y);
-        dstNextLayerIdGm.SetGlobalBuffer((__gm__ int32_t *)next_layer_id);
+        srcTokenGm.SetGlobalBuffer((__gm__ T*)(token_data_addr + micro_batch_id * tilingData->BS * (tilingData->K + 1) *
+                                                                     tilingData->H * sizeof(T)));
+        srcTokenInfoGm.SetGlobalBuffer((__gm__ int32_t*)(token_info_addr + micro_batch_id * tilingData->BS *
+                                                                               (tilingData->K + 1) * sizeof(int32_t)));
+        srcScalesGm.SetGlobalBuffer((__gm__ float*)expert_scales);
+        srcLayerIdGm.SetGlobalBuffer((__gm__ int32_t*)layer_id);
+        dstGm.SetGlobalBuffer((__gm__ T*)y);
+        dstNextLayerIdGm.SetGlobalBuffer((__gm__ int32_t*)next_layer_id);
 
         const int64_t inputRows =
             Split == NonquantSplit::BS ? tilingData->K + 1 : (Split == NonquantSplit::K ? tilingData->KSplitFactor : 1);
@@ -241,8 +241,8 @@ private:
         yQue.FreeTensor(output);
     }
 
-    TPipe *pipe = nullptr;
-    const AttentionWorkerCombineRegbaseTilingData *tilingData = nullptr;
+    TPipe* pipe = nullptr;
+    const AttentionWorkerCombineRegbaseTilingData* tilingData = nullptr;
 
     GlobalTensor<uint32_t> contextGm0;
     GlobalTensor<uint64_t> contextGm1;

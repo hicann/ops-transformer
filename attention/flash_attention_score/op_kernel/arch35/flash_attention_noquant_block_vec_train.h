@@ -31,13 +31,13 @@ public:
     using BaseClass = FANoQuantBlockVecBase<FANoQuantBlockVecTrain<TEMPLATE_ARGS>, TEMPLATE_ARGS>;
 
 public:
-    __aicore__ inline void InitDropOut(__gm__ uint8_t *dropMask, __gm__ uint8_t *workspace);
+    __aicore__ inline void InitDropOut(__gm__ uint8_t* dropMask, __gm__ uint8_t* workspace);
     __aicore__ inline void InitGlobalBuffer(
-        __gm__ uint8_t *pse, __gm__ uint8_t *deqScaleQ, __gm__ uint8_t *deqScaleK, __gm__ uint8_t *deqScaleV,
-        __gm__ uint8_t *pScale, __gm__ uint8_t *postQuantScale, __gm__ uint8_t *postQuantOffset, __gm__ uint8_t *prefix,
-        __gm__ uint8_t *attenMask, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-        __gm__ uint8_t *learnableSink, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-        __gm__ uint8_t *&workspace, uint64_t singleCoreOffset, uint32_t aicIdx, ConstInfo<isInfer, hasRope> &constInfo);
+        __gm__ uint8_t* pse, __gm__ uint8_t* deqScaleQ, __gm__ uint8_t* deqScaleK, __gm__ uint8_t* deqScaleV,
+        __gm__ uint8_t* pScale, __gm__ uint8_t* postQuantScale, __gm__ uint8_t* postQuantOffset, __gm__ uint8_t* prefix,
+        __gm__ uint8_t* attenMask, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+        __gm__ uint8_t* learnableSink, __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum,
+        __gm__ uint8_t*& workspace, uint64_t singleCoreOffset, uint32_t aicIdx, ConstInfo<isInfer, hasRope>& constInfo);
     /* =====================GM变量==================== */
     GlobalTensor<uint8_t> dropMaskGm;
     GlobalTensor<float> softmaxMaxGm;
@@ -50,62 +50,62 @@ public:
     /* =================编译期常量的基本块信息================= */
 
     __aicore__ inline FANoQuantBlockVecTrain(){};
-    __aicore__ inline void CleanOutput(__gm__ uint8_t *softmaxLse, __gm__ uint8_t *attentionOut,
-                                       ConstInfo<isInfer, hasRope> &constInfo)
+    __aicore__ inline void CleanOutput(__gm__ uint8_t* softmaxLse, __gm__ uint8_t* attentionOut,
+                                       ConstInfo<isInfer, hasRope>& constInfo)
     {
-        this->attentionOutGm.SetGlobalBuffer((__gm__ OUTPUT_T *)attentionOut);
+        this->attentionOutGm.SetGlobalBuffer((__gm__ OUTPUT_T*)attentionOut);
     }
-    __aicore__ inline void InitUniqueLocalBuffer(ConstInfo<isInfer, hasRope> &constInfo);
+    __aicore__ inline void InitUniqueLocalBuffer(ConstInfo<isInfer, hasRope>& constInfo);
     /* ================共享参数v侧优先初始化，通过ssbuf拷贝到c侧=================*/
-    __aicore__ inline void InitCubeVecSharedParams(CVSharedParams<isInfer, isPa> &sharedParams, int32_t aicIdx,
+    __aicore__ inline void InitCubeVecSharedParams(CVSharedParams<isInfer, isPa>& sharedParams, int32_t aicIdx,
                                                    uint8_t subBlockIdx);
     /* 多核切分根据cube核数做切分，因此这里需要传入aicIdx */
-    __aicore__ inline void GetS1LoopRange(CVSharedParams<isInfer, isPa> &sharedParams, const int64_t &aicIdx);
-    __aicore__ inline void GenerateDropoutMask(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo,
-                                               LocalTensor<uint8_t> &dropMaskUb);
-    __aicore__ inline void SoftmaxDataCopyOut(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo,
-                                              LocalTensor<float> &sumUb, LocalTensor<float> &maxUb);
-    __aicore__ inline void SoftmaxDataCopyOutFp8(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo,
-                                                 LocalTensor<half> &sumUb, LocalTensor<half> &maxUb);
+    __aicore__ inline void GetS1LoopRange(CVSharedParams<isInfer, isPa>& sharedParams, const int64_t& aicIdx);
+    __aicore__ inline void GenerateDropoutMask(RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo,
+                                               LocalTensor<uint8_t>& dropMaskUb);
+    __aicore__ inline void SoftmaxDataCopyOut(RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo,
+                                              LocalTensor<float>& sumUb, LocalTensor<float>& maxUb);
+    __aicore__ inline void SoftmaxDataCopyOutFp8(RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo,
+                                                 LocalTensor<half>& sumUb, LocalTensor<half>& maxUb);
     template <typename VEC2_RES_T>
-    __aicore__ inline void CopyOutAttentionOut(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo,
-                                               LocalTensor<VEC2_RES_T> &vec2ResUb, int64_t vec2S1Idx,
+    __aicore__ inline void CopyOutAttentionOut(RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo,
+                                               LocalTensor<VEC2_RES_T>& vec2ResUb, int64_t vec2S1Idx,
                                                int64_t vec2CalcSize);
 
 private:
 };
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::InitDropOut(__gm__ uint8_t *dropMask,
-                                                                          __gm__ uint8_t *workspace)
+__aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::InitDropOut(__gm__ uint8_t* dropMask,
+                                                                          __gm__ uint8_t* workspace)
 {
     if constexpr (hasDrop) {
         dropMaskInfo.boolMode = this->tilingData->inputParamsRegbase.needDropMaskOp == 1;
         if (dropMaskInfo.boolMode) {
             dropMaskGm.SetGlobalBuffer(workspace + this->tilingData->dropmaskParamsRegbase.dropMaskAddrOffset);
         } else {
-            dropMaskGm.SetGlobalBuffer((__gm__ uint8_t *)dropMask);
+            dropMaskGm.SetGlobalBuffer((__gm__ uint8_t*)dropMask);
         }
     }
 }
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::InitGlobalBuffer(
-    __gm__ uint8_t *pse, __gm__ uint8_t *deqScaleQ, __gm__ uint8_t *deqScaleK, __gm__ uint8_t *deqScaleV,
-    __gm__ uint8_t *pScale, __gm__ uint8_t *postQuantScale, __gm__ uint8_t *postQuantOffset, __gm__ uint8_t *prefix,
-    __gm__ uint8_t *attenMask, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-    __gm__ uint8_t *learnableSink, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *&workspace,
-    uint64_t singleCoreOffset, uint32_t aicIdx, ConstInfo<isInfer, hasRope> &constInfo)
+    __gm__ uint8_t* pse, __gm__ uint8_t* deqScaleQ, __gm__ uint8_t* deqScaleK, __gm__ uint8_t* deqScaleV,
+    __gm__ uint8_t* pScale, __gm__ uint8_t* postQuantScale, __gm__ uint8_t* postQuantOffset, __gm__ uint8_t* prefix,
+    __gm__ uint8_t* attenMask, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+    __gm__ uint8_t* learnableSink, __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum, __gm__ uint8_t*& workspace,
+    uint64_t singleCoreOffset, uint32_t aicIdx, ConstInfo<isInfer, hasRope>& constInfo)
 {
     BaseClass::InitCommonGlobalBuffer(pse, deqScaleQ, deqScaleK, deqScaleV, pScale, postQuantScale, prefix, attenMask,
                                       learnableSink, workspace, constInfo);
-    softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmaxMax);
-    softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmaxSum);
+    softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmaxMax);
+    softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmaxSum);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::InitUniqueLocalBuffer(
-    ConstInfo<isInfer, hasRope> &constInfo)
+    ConstInfo<isInfer, hasRope>& constInfo)
 {
     if constexpr (hasDrop) {
         if constexpr (!IsSameType<INPUT_T, float>::value || !BaseClass::containAllOptionalInput) {
@@ -123,9 +123,9 @@ __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::InitUniqueLocalBuf
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::InitCubeVecSharedParams(
-    CVSharedParams<isInfer, isPa> &sharedParams, int32_t aicIdx, uint8_t subBlockIdx)
+    CVSharedParams<isInfer, isPa>& sharedParams, int32_t aicIdx, uint8_t subBlockIdx)
 {
-    auto &inputParamsRegbase = this->tilingData->inputParamsRegbase;
+    auto& inputParamsRegbase = this->tilingData->inputParamsRegbase;
     sharedParams.bSize = inputParamsRegbase.bSize;
     sharedParams.n2Size = inputParamsRegbase.n2Size;
     sharedParams.gSize = inputParamsRegbase.gSize;
@@ -148,7 +148,7 @@ __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::InitCubeVecSharedP
     sharedParams.layoutType = inputParamsRegbase.layoutType;
     sharedParams.sparseType = inputParamsRegbase.sparseType;
 
-    auto &multiCoreParamsRegbase = this->tilingData->multiCoreParamsRegbase;
+    auto& multiCoreParamsRegbase = this->tilingData->multiCoreParamsRegbase;
     sharedParams.s1OuterSize = multiCoreParamsRegbase.s1OuterSize;
     /* 多核切分偏移计算 */
     sharedParams.multiCoreInnerOffset = aicIdx * multiCoreParamsRegbase.splitFactorSize;
@@ -165,8 +165,8 @@ __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::InitCubeVecSharedP
     /* ssbuf send message */
     if ASCEND_IS_AIV {
         if (subBlockIdx == 0) {
-            auto tempTilingSSbuf = reinterpret_cast<__ssbuf__ uint32_t *>(0); // 从ssbuf的0地址开始拷贝
-            auto tempTiling = reinterpret_cast<uint32_t *>(&sharedParams);
+            auto tempTilingSSbuf = reinterpret_cast<__ssbuf__ uint32_t*>(0); // 从ssbuf的0地址开始拷贝
+            auto tempTiling = reinterpret_cast<uint32_t*>(&sharedParams);
 #pragma unroll
             for (int i = 0; i < sizeof(CVSharedParams<isInfer, isPa>) / sizeof(uint32_t);
                  ++i, ++tempTilingSSbuf, ++tempTiling) {
@@ -179,7 +179,7 @@ __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::InitCubeVecSharedP
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::GetS1LoopRange(
-    CVSharedParams<isInfer, isPa> &sharedParams, const int64_t &aicIdx)
+    CVSharedParams<isInfer, isPa>& sharedParams, const int64_t& aicIdx)
 {
     if constexpr (layout != LayOutTypeEnum::LAYOUT_TND) {
         if constexpr (!hasAtten) {
@@ -201,7 +201,7 @@ __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::GetS1LoopRange(
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::GenerateDropoutMask(
-    RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo, LocalTensor<uint8_t> &dropMaskUb)
+    RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo, LocalTensor<uint8_t>& dropMaskUb)
 {
     if constexpr (hasDrop == true) {
         if (dropMaskInfo.dropMaskOuter == 1) {
@@ -219,10 +219,10 @@ __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::GenerateDropoutMas
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::SoftmaxDataCopyOut(RunInfo<isInfer> &runInfo,
-                                                                                 ConstInfo<isInfer, hasRope> &constInfo,
-                                                                                 LocalTensor<float> &sumUb,
-                                                                                 LocalTensor<float> &maxUb)
+__aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::SoftmaxDataCopyOut(RunInfo<isInfer>& runInfo,
+                                                                                 ConstInfo<isInfer, hasRope>& constInfo,
+                                                                                 LocalTensor<float>& sumUb,
+                                                                                 LocalTensor<float>& maxUb)
 {
     if (unlikely(runInfo.halfS1RealSize == 0)) {
         return;
@@ -263,8 +263,8 @@ __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::SoftmaxDataCopyOut
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::SoftmaxDataCopyOutFp8(
-    RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo, LocalTensor<half> &sumUb,
-    LocalTensor<half> &maxUb)
+    RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo, LocalTensor<half>& sumUb,
+    LocalTensor<half>& maxUb)
 {
     if (unlikely(runInfo.halfS1RealSize == 0)) {
         return;
@@ -290,7 +290,7 @@ __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::SoftmaxDataCopyOut
 TEMPLATES_DEF_NO_DEFAULT
 template <typename VEC2_RES_T>
 __aicore__ inline void FANoQuantBlockVecTrain<TEMPLATE_ARGS>::CopyOutAttentionOut(
-    RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo, LocalTensor<VEC2_RES_T> &vec2ResUb,
+    RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo, LocalTensor<VEC2_RES_T>& vec2ResUb,
     int64_t vec2S1Idx, int64_t vec2CalcSize)
 {
     this->Bmm2DataCopyOut(runInfo, constInfo, vec2ResUb, vec2S1Idx, vec2CalcSize);

@@ -127,27 +127,27 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube1CopyOut
 }
 
 template <typename TYPE>
-__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube1Compute(const AddrInfo &shapeInfo,
-                                                                                 __gm__ TYPE *left, __gm__ TYPE *right,
-                                                                                 __gm__ float *out)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube1Compute(const AddrInfo& shapeInfo,
+                                                                                 __gm__ TYPE* left, __gm__ TYPE* right,
+                                                                                 __gm__ float* out)
 {
     int32_t cube1Cnt = 0;
     int32_t km = shapeInfo.ky;
     int32_t kn = shapeInfo.kx;
     int32_t nLoop = CeilDiv(kn, SIZE_128);
-    uint64_t left_offset = left + shapeInfo.left - (__gm__ TYPE *)0;
-    uint64_t right_offset = right + shapeInfo.right - (__gm__ TYPE *)0;
-    uint64_t gm_out_offset = out + shapeInfo.out + globalBlockOffset - (__gm__ float *)0;
+    uint64_t left_offset = left + shapeInfo.left - (__gm__ TYPE*)0;
+    uint64_t right_offset = right + shapeInfo.right - (__gm__ TYPE*)0;
+    uint64_t gm_out_offset = out + shapeInfo.out + globalBlockOffset - (__gm__ float*)0;
     bool upperRight = !shapeInfo.upperRight;
-    LocalTensor<TYPE> *l1_a_tensor = ping_pong_flag_l1_a_ ? &l1_a_pong_tensor : &l1_a_ping_tensor;
+    LocalTensor<TYPE>* l1_a_tensor = ping_pong_flag_l1_a_ ? &l1_a_pong_tensor : &l1_a_ping_tensor;
     int32_t mSizeL1 = km;
     int32_t kSizeL1 = headDim;
 
     LoadDataAToL1(*l1_a_tensor, temp_tensor_bf16[left_offset], mSizeL1, kSizeL1);
 
     for (int32_t nIdx = 0; nIdx < nLoop; nIdx++) {
-        LocalTensor<TYPE> *l1_b_tensor = ping_pong_flag_l1_b_ ? &l1_b_pong_tensor : &l1_b_ping_tensor;
-        LocalTensor<TYPE> *l0_b_tensor = ping_pong_flag_l0_b_ ? &l0_b_pong_tensor : &l0_b_ping_tensor;
+        LocalTensor<TYPE>* l1_b_tensor = ping_pong_flag_l1_b_ ? &l1_b_pong_tensor : &l1_b_ping_tensor;
+        LocalTensor<TYPE>* l0_b_tensor = ping_pong_flag_l0_b_ ? &l0_b_pong_tensor : &l0_b_ping_tensor;
         int32_t nSizeL1 = (nIdx == nLoop - 1) ? (kn - nIdx * SIZE_128) : SIZE_128;
         bool upper_right_flag = (sparseType != 0 && upperRight && nIdx == nLoop - 1);
 
@@ -156,8 +156,8 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube1Compute
         LoadDataBToL0((*l0_b_tensor), (*l1_b_tensor), headDim, nSizeL1);
 
         for (int32_t mOffset = 0; mOffset < mSizeL1; mOffset += SIZE_128) {
-            LocalTensor<TYPE> *l0_a_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
-            LocalTensor<float> *l0_c_tensor = ping_pong_flag_l0_c_ ? &l0_c_pong_tensor : &l0_c_ping_tensor;
+            LocalTensor<TYPE>* l0_a_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
+            LocalTensor<float>* l0_c_tensor = ping_pong_flag_l0_c_ ? &l0_c_pong_tensor : &l0_c_ping_tensor;
             int32_t mSizeL0 = Min((mSizeL1 - mOffset), SIZE_128);
             bool l0_skip_flag = (upper_right_flag && mOffset == 0);
 

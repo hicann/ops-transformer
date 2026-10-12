@@ -24,7 +24,7 @@ namespace optiling {
 namespace block_attn_res_update {
 namespace {
 
-constexpr const char *OP_NAME = "BlockAttnResUpdate";
+constexpr const char* OP_NAME = "BlockAttnResUpdate";
 constexpr uint32_t FP32_ALIGN_ELEMENTS = 8U;  // 8 * 4 B = 32 B
 constexpr uint32_t BF16_ALIGN_ELEMENTS = 16U; // 16 * 2 B = 32 B
 constexpr uint32_t FP32_BYTES = 4U;
@@ -88,7 +88,7 @@ ge::graphStatus BlockAttnResUpdateFullDTiling::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-uint64_t BlockAttnResUpdateFullDTiling::CalcUbBytes(uint32_t tileT, uint32_t &statsTStride) const
+uint64_t BlockAttnResUpdateFullDTiling::CalcUbBytes(uint32_t tileT, uint32_t& statsTStride) const
 {
     statsTStride = Ops::Base::CeilAlign(tileT, FP32_ALIGN_ELEMENTS);
     const uint64_t queryBytes = static_cast<uint64_t>(tilingInfo_.dAlignFp32) * FP32_BYTES;
@@ -173,9 +173,9 @@ void BlockAttnResUpdateFullDTiling::SetTilingData()
 ge::graphStatus BlockAttnResUpdateFullDTiling::PostTiling()
 {
     OP_CHECK_IF(context_ == nullptr, OP_LOGE(OP_NAME, "Context is nullptr."), return ge::GRAPH_FAILED);
-    auto *rawTilingData = context_->GetRawTilingData();
+    auto* rawTilingData = context_->GetRawTilingData();
     OP_CHECK_IF(rawTilingData == nullptr, OP_LOGE(opName_, "Raw tiling data is nullptr."), return ge::GRAPH_FAILED);
-    void *tilingDataBuffer = rawTilingData->GetData();
+    void* tilingDataBuffer = rawTilingData->GetData();
     OP_CHECK_IF(tilingDataBuffer == nullptr, OP_LOGE(opName_, "Raw tiling data buffer is nullptr."),
                 return ge::GRAPH_FAILED);
     constexpr size_t tilingDataSize = sizeof(BlockAttnResUpdateTilingData);
@@ -183,7 +183,7 @@ ge::graphStatus BlockAttnResUpdateFullDTiling::PostTiling()
                 OP_LOGE(opName_, "Context tiling data capacity %zu is less than actual tiling data size %zu.",
                         rawTilingData->GetCapacity(), tilingDataSize),
                 return ge::GRAPH_FAILED);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(workspaces == nullptr, OP_LOGE(opName_, "Workspace size buffer is nullptr."), return ge::GRAPH_FAILED);
 
     const errno_t ret = memcpy_s(tilingDataBuffer, rawTilingData->GetCapacity(), &tilingData_, tilingDataSize);

@@ -41,28 +41,23 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::CheckRequiredInOutExistence() const
     OP_CHECK_IF(opParamInfo_.weights.desc == nullptr, OP_LOGE(opName_, "Desc of tensor weights is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.softmaxMaxOut.shape == nullptr,
-                OP_LOGE(opName_, "Shape of tensor output softmaxMax is nullptr"),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(opName_, "Shape of tensor output softmaxMax is nullptr"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.softmaxMaxOut.desc == nullptr,
-                OP_LOGE(opName_, "Desc of tensor output softmaxMax is nullptr"),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(opName_, "Desc of tensor output softmaxMax is nullptr"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.softmaxSumOut.shape == nullptr,
-                OP_LOGE(opName_, "Shape of tensor output softmaxSum is nullptr"),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(opName_, "Shape of tensor output softmaxSum is nullptr"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.softmaxSumOut.desc == nullptr,
-                OP_LOGE(opName_, "Desc of tensor output softmaxSum is nullptr"),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(opName_, "Desc of tensor output softmaxSum is nullptr"), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus DenseLISoftmaxLseInfoParser::CheckRequiredAttrExistence() const
 {
-    OP_CHECK_IF(opParamInfo_.layOut == nullptr, OP_LOGE(opName_, "attr layout is nullptr"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(opParamInfo_.layOut == nullptr, OP_LOGE(opName_, "attr layout is nullptr"), return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(opParamInfo_.sparseMode == nullptr, OP_LOGE(opName_, "attr sparse_mode is nullptr"),
-               return ge::GRAPH_FAILED);
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -190,8 +185,7 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::GetAndCheckInOutDataType()
     softmaxSumOutType_ = opParamInfo_.softmaxSumOut.desc->GetDataType();
 
     bool inDTypeAllEqual = inputQType_ == inputKType_;
-    OP_CHECK_IF(!inDTypeAllEqual,
-                OP_LOGE(opName_, "The data types of the input query and key must be the same."),
+    OP_CHECK_IF(!inDTypeAllEqual, OP_LOGE(opName_, "The data types of the input query and key must be the same."),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(((inputQType_ != ge::DT_FLOAT16) && (inputQType_ != ge::DT_BF16)),
@@ -199,8 +193,7 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::GetAndCheckInOutDataType()
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(softmaxMaxOutType_ != ge::DT_FLOAT,
-                OP_LOGE(opName_, "The data types of the output softmax max must be float."),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(opName_, "The data types of the output softmax max must be float."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(softmaxSumOutType_ != softmaxMaxOutType_,
                 OP_LOGE(opName_, "The data types of the output softmax sum must be same as softmax max datatype."),
                 return ge::GRAPH_FAILED);
@@ -211,10 +204,7 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::GetAndCheckInOutDataType()
 ge::graphStatus DenseLISoftmaxLseInfoParser::GetQueryKeyAndOutLayout()
 {
     // 获取query,key的Layout基准值
-    const map<string, DataLayout> layoutMap = {
-        {"BSND", DataLayout::BSND},
-        {"TND", DataLayout::TND}
-    };
+    const map<string, DataLayout> layoutMap = {{"BSND", DataLayout::BSND}, {"TND", DataLayout::TND}};
 
     std::string layout(opParamInfo_.layOut);
     auto it = layoutMap.find(layout);
@@ -235,14 +225,13 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::GetAndCheckOptionalInput()
                     return ge::GRAPH_FAILED);
     }
     OP_CHECK_IF(opParamInfo_.actualSeqLengthsQ.tensor != nullptr &&
-                opParamInfo_.actualSeqLengthsQ.desc->GetDataType() != ge::DT_INT64,
+                    opParamInfo_.actualSeqLengthsQ.desc->GetDataType() != ge::DT_INT64,
                 OP_LOGE(opName_, "input actual_seq_lengths_query data type only support int64"),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(opParamInfo_.actualSeqLengths.tensor != nullptr &&
-                opParamInfo_.actualSeqLengths.desc->GetDataType() != ge::DT_INT64,
-                OP_LOGE(opName_, "input actual_seq_lengths_key data type only support int64"),
-                return ge::GRAPH_FAILED);
+                    opParamInfo_.actualSeqLengths.desc->GetDataType() != ge::DT_INT64,
+                OP_LOGE(opName_, "input actual_seq_lengths_key data type only support int64"), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -265,21 +254,21 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::CheckShapeDim()
     OP_CHECK_IF(kShapeDim != kExpectShapeDim,
                 OP_LOGE(opName_, "the dim num of key's shape should be %u, but now is %u", kExpectShapeDim, kShapeDim),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(qShapeDim != qExpectShapeDim,
-                OP_LOGE(opName_, "the dim num of query's shape should be %u, but now is %u",
-                qExpectShapeDim, qShapeDim),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        qShapeDim != qExpectShapeDim,
+        OP_LOGE(opName_, "the dim num of query's shape should be %u, but now is %u", qExpectShapeDim, qShapeDim),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(softmaxMaxOutShapeDim != qExpectShapeDim - DIM_NUM_ONE,
                 OP_LOGE(opName_, "the dim num of softmaxMax's shape should be %u, but now is %u",
-                qExpectShapeDim - DIM_NUM_ONE, softmaxMaxOutShapeDim),
+                        qExpectShapeDim - DIM_NUM_ONE, softmaxMaxOutShapeDim),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(softmaxSumOutShapeDim != qExpectShapeDim - DIM_NUM_ONE,
                 OP_LOGE(opName_, "the dim num of softmaxSum's shape should be %u, but now is %u",
-                qExpectShapeDim - DIM_NUM_ONE, softmaxSumOutShapeDim),
+                        qExpectShapeDim - DIM_NUM_ONE, softmaxSumOutShapeDim),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(!(weightsShapeDim == qExpectShapeDim - DIM_NUM_ONE),
                 OP_LOGE(opName_, "the dim num of weights's shape should be %u, but now is %u", qExpectShapeDim - 1,
-                weightsShapeDim),
+                        weightsShapeDim),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -297,8 +286,8 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::GetN1Size()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DenseLISoftmaxLseInfoParser::GetActualSeqLenSize(uint32_t &size, const gert::Tensor *tensor,
-                                                              const std::string &actualSeqLenName)
+ge::graphStatus DenseLISoftmaxLseInfoParser::GetActualSeqLenSize(uint32_t& size, const gert::Tensor* tensor,
+                                                                 const std::string& actualSeqLenName)
 {
     size = static_cast<uint32_t>(tensor->GetShapeSize());
     if (size <= DIM_NUM_ZERO) {
@@ -314,7 +303,7 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::GetAndCheckN2Size()
     n2Size_ = static_cast<uint32_t>(opParamInfo_.key.shape->GetStorageShape().GetDim(n2Index));
     OP_LOGI(context_->GetNodeName(), "n2Size_ is %d", n2Size_);
     OP_CHECK_IF(n2Size_ != N2_SIZE_LIMIT, OP_LOGE(opName_, "key shape[%u] is numhead, only support 1.", n2Index),
-    return ge::GRAPH_FAILED);
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -410,13 +399,13 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::GetStorageSeqSize()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DenseLISoftmaxLseInfoParser::GetMaxSeqLenFromTensor(const gert::Tensor *tensor, uint64_t &maxSeqLen,
-    bool isAccumSeq)
+ge::graphStatus DenseLISoftmaxLseInfoParser::GetMaxSeqLenFromTensor(const gert::Tensor* tensor, uint64_t& maxSeqLen,
+                                                                    bool isAccumSeq)
 {
     if (tensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
-    const int64_t *data = tensor->GetData<int64_t>();
+    const int64_t* data = tensor->GetData<int64_t>();
     if (data == nullptr) {
         OP_LOGE(opName_, "actualSeqLengths tensor data is nullptr.");
         return ge::GRAPH_FAILED;
@@ -448,20 +437,22 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::ValidateInputShapesMatchTnd()
     // -----------------------check BatchSize-------------------
     // bSize_ 来源于act_seq_q
     OP_CHECK_IF((opParamInfo_.actualSeqLengths.tensor->GetShapeSize() != bSize_),
-                OP_LOGE(opName_, "TND case input actual_seq_lengths_query, actual_seq_lengths_key are "
-                "%u, %ld respectively, they must be same.",
-                bSize_, opParamInfo_.actualSeqLengths.tensor->GetShapeSize()),
+                OP_LOGE(opName_,
+                        "TND case input actual_seq_lengths_query, actual_seq_lengths_key are "
+                        "%u, %ld respectively, they must be same.",
+                        bSize_, opParamInfo_.actualSeqLengths.tensor->GetShapeSize()),
                 return ge::GRAPH_FAILED);
     // -----------------------check T-------------------
     uint32_t qTsize = opParamInfo_.query.shape->GetStorageShape().GetDim(DIM_IDX_ZERO);
     OP_CHECK_IF((opParamInfo_.weights.shape->GetStorageShape().GetDim(DIM_IDX_ZERO) != qTsize) ||
-                (opParamInfo_.softmaxMaxOut.shape->GetStorageShape().GetDim(DIM_IDX_ONE) != qTsize) ||
-                (opParamInfo_.softmaxSumOut.shape->GetStorageShape().GetDim(DIM_IDX_ONE) != qTsize),
-                OP_LOGE(opName_, "TND case input query, weights, output softmaxMax, "
-                "softmaxSum dim 1 are %u, %ld, %ld, %ld respectively, they must be same.",
-                qTsize, opParamInfo_.weights.shape->GetStorageShape().GetDim(DIM_IDX_ZERO),
-                opParamInfo_.softmaxMaxOut.shape->GetStorageShape().GetDim(DIM_IDX_ONE),
-                opParamInfo_.softmaxSumOut.shape->GetStorageShape().GetDim(DIM_IDX_ONE)),
+                    (opParamInfo_.softmaxMaxOut.shape->GetStorageShape().GetDim(DIM_IDX_ONE) != qTsize) ||
+                    (opParamInfo_.softmaxSumOut.shape->GetStorageShape().GetDim(DIM_IDX_ONE) != qTsize),
+                OP_LOGE(opName_,
+                        "TND case input query, weights, output softmaxMax, "
+                        "softmaxSum dim 1 are %u, %ld, %ld, %ld respectively, they must be same.",
+                        qTsize, opParamInfo_.weights.shape->GetStorageShape().GetDim(DIM_IDX_ZERO),
+                        opParamInfo_.softmaxMaxOut.shape->GetStorageShape().GetDim(DIM_IDX_ONE),
+                        opParamInfo_.softmaxSumOut.shape->GetStorageShape().GetDim(DIM_IDX_ONE)),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -472,37 +463,42 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::ValidateInputShapesMatchBsnd()
     // bSize_ 来源于query
     OP_CHECK_IF(opParamInfo_.key.shape->GetStorageShape().GetDim(DIM_IDX_ZERO) != bSize_,
                 OP_LOGE(opName_, "BSND case input query, key dim 0 are %u, %ld respectively, they must be same.",
-                bSize_, opParamInfo_.key.shape->GetStorageShape().GetDim(DIM_IDX_ZERO)),
+                        bSize_, opParamInfo_.key.shape->GetStorageShape().GetDim(DIM_IDX_ZERO)),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF((opParamInfo_.actualSeqLengths.tensor != nullptr) &&
-                (opParamInfo_.actualSeqLengths.tensor->GetShapeSize() != bSize_),
-                OP_LOGE(opName_, "BSND case input query, actual_seq_lengths_key dim 0 are "
-                "%u, %ld respectively, they must be same.",
-                bSize_, opParamInfo_.actualSeqLengths.tensor->GetShapeSize()),
-            return ge::GRAPH_FAILED);
+                    (opParamInfo_.actualSeqLengths.tensor->GetShapeSize() != bSize_),
+                OP_LOGE(opName_,
+                        "BSND case input query, actual_seq_lengths_key dim 0 are "
+                        "%u, %ld respectively, they must be same.",
+                        bSize_, opParamInfo_.actualSeqLengths.tensor->GetShapeSize()),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF((opParamInfo_.weights.shape->GetStorageShape().GetDim(DIM_IDX_ZERO) != bSize_) ||
-                (opParamInfo_.softmaxMaxOut.shape->GetStorageShape().GetDim(DIM_IDX_ZERO) != bSize_) ||
-                (opParamInfo_.softmaxSumOut.shape->GetStorageShape().GetDim(DIM_IDX_ZERO) != bSize_),
-                OP_LOGE(opName_, "BSND case input query, weight, output softmaxMax, "
-                "softmaxSumOut dim 0 are %u, %ld, %ld, %ld respectively, they must be same.",
-                bSize_, opParamInfo_.weights.shape->GetStorageShape().GetDim(DIM_IDX_ZERO),
-                opParamInfo_.softmaxMaxOut.shape->GetStorageShape().GetDim(DIM_IDX_ZERO),
-                opParamInfo_.softmaxSumOut.shape->GetStorageShape().GetDim(DIM_IDX_ZERO)),
+                    (opParamInfo_.softmaxMaxOut.shape->GetStorageShape().GetDim(DIM_IDX_ZERO) != bSize_) ||
+                    (opParamInfo_.softmaxSumOut.shape->GetStorageShape().GetDim(DIM_IDX_ZERO) != bSize_),
+                OP_LOGE(opName_,
+                        "BSND case input query, weight, output softmaxMax, "
+                        "softmaxSumOut dim 0 are %u, %ld, %ld, %ld respectively, they must be same.",
+                        bSize_, opParamInfo_.weights.shape->GetStorageShape().GetDim(DIM_IDX_ZERO),
+                        opParamInfo_.softmaxMaxOut.shape->GetStorageShape().GetDim(DIM_IDX_ZERO),
+                        opParamInfo_.softmaxSumOut.shape->GetStorageShape().GetDim(DIM_IDX_ZERO)),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF((opParamInfo_.actualSeqLengthsQ.tensor != nullptr) &&
-                (opParamInfo_.actualSeqLengthsQ.tensor->GetShapeSize() != bSize_),
-                OP_LOGE(opName_, "BSND case input query, actual_seq_lengths_query dim 0 are %u, %ld "
-                "respectively, they must be same", bSize_, opParamInfo_.actualSeqLengthsQ.tensor->GetShapeSize()),
+                    (opParamInfo_.actualSeqLengthsQ.tensor->GetShapeSize() != bSize_),
+                OP_LOGE(opName_,
+                        "BSND case input query, actual_seq_lengths_query dim 0 are %u, %ld "
+                        "respectively, they must be same",
+                        bSize_, opParamInfo_.actualSeqLengthsQ.tensor->GetShapeSize()),
                 return ge::GRAPH_FAILED);
     // -----------------------check S1-------------------
     OP_CHECK_IF((opParamInfo_.weights.shape->GetStorageShape().GetDim(DIM_IDX_ONE) != s1Size_) ||
-                (opParamInfo_.softmaxMaxOut.shape->GetStorageShape().GetDim(DIM_IDX_TWO) != s1Size_) ||
-                (opParamInfo_.softmaxSumOut.shape->GetStorageShape().GetDim(DIM_IDX_TWO) != s1Size_),
-                OP_LOGE(opName_, "BSND case input query, weight, output softmaxMax, softmaxSum dim 2 "
-                "are %u, %ld, %ld, %ld, they must be same.",
-                s1Size_, opParamInfo_.weights.shape->GetStorageShape().GetDim(DIM_IDX_ONE),
-                opParamInfo_.softmaxMaxOut.shape->GetStorageShape().GetDim(DIM_IDX_TWO),
-                opParamInfo_.softmaxSumOut.shape->GetStorageShape().GetDim(DIM_IDX_TWO)),
+                    (opParamInfo_.softmaxMaxOut.shape->GetStorageShape().GetDim(DIM_IDX_TWO) != s1Size_) ||
+                    (opParamInfo_.softmaxSumOut.shape->GetStorageShape().GetDim(DIM_IDX_TWO) != s1Size_),
+                OP_LOGE(opName_,
+                        "BSND case input query, weight, output softmaxMax, softmaxSum dim 2 "
+                        "are %u, %ld, %ld, %ld, they must be same.",
+                        s1Size_, opParamInfo_.weights.shape->GetStorageShape().GetDim(DIM_IDX_ONE),
+                        opParamInfo_.softmaxMaxOut.shape->GetStorageShape().GetDim(DIM_IDX_TWO),
+                        opParamInfo_.softmaxSumOut.shape->GetStorageShape().GetDim(DIM_IDX_TWO)),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -522,17 +518,15 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::ValidateInputShapesMatch()
     }
     // -----------------------check N1-------------------
     OP_CHECK_IF((opParamInfo_.weights.shape->GetStorageShape().GetDim(queryWeightsN1Dim) != n1Size_),
-                OP_LOGE(opName_, "input query, weight shape dim N1 must be same."),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(opName_, "input query, weight shape dim N1 must be same."), return ge::GRAPH_FAILED);
     // -----------------------check D-------------------
     uint32_t keyDDim = layout_ == DataLayout::TND ? DIM_IDX_TWO : DIM_IDX_THREE;
     OP_CHECK_IF((opParamInfo_.key.shape->GetStorageShape().GetDim(keyDDim) != headDim_),
-                OP_LOGE(opName_, "input query, key shape last dim must be same."),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(opName_, "input query, key shape last dim must be same."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-void DenseLISoftmaxLseInfoParser::GenerateInfo(DenseLISoftmaxLseTilingInfo &denseLISoftmaxTilingInfo)
+void DenseLISoftmaxLseInfoParser::GenerateInfo(DenseLISoftmaxLseTilingInfo& denseLISoftmaxTilingInfo)
 {
     denseLISoftmaxTilingInfo.opName = opName_;
     denseLISoftmaxTilingInfo.platformInfo = platformInfo_;
@@ -558,7 +552,7 @@ void DenseLISoftmaxLseInfoParser::GenerateInfo(DenseLISoftmaxLseTilingInfo &dens
     denseLISoftmaxTilingInfo.layout = layout_;
 }
 
-ge::graphStatus DenseLISoftmaxLseInfoParser::ParseAndCheck(DenseLISoftmaxLseTilingInfo &denseLISoftmaxTilingInfo)
+ge::graphStatus DenseLISoftmaxLseInfoParser::ParseAndCheck(DenseLISoftmaxLseTilingInfo& denseLISoftmaxTilingInfo)
 {
     if (ge::GRAPH_SUCCESS != GetOpName() || ge::GRAPH_SUCCESS != GetNpuInfo() || ge::GRAPH_SUCCESS != GetOpParaInfo() ||
         ge::GRAPH_SUCCESS != CheckRequiredParaExistence()) {
@@ -590,7 +584,7 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::ParseAndCheck(DenseLISoftmaxLseTili
 }
 
 // --------------------------DenseLightningIndexerSoftmaxLseTiling类成员函数定义-----------------------
-ge::graphStatus DenseLightningIndexerSoftmaxLseTiling::DoTiling(DenseLISoftmaxLseTilingInfo *tilingInfo)
+ge::graphStatus DenseLightningIndexerSoftmaxLseTiling::DoTiling(DenseLISoftmaxLseTilingInfo* tilingInfo)
 {
     // -------------set blockdim-----------------
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
@@ -603,7 +597,7 @@ ge::graphStatus DenseLightningIndexerSoftmaxLseTiling::DoTiling(DenseLISoftmaxLs
     workspaceSize += M_BASE_SIZE * S2_BASE_SIZE * MM1_RES_ELEM_SIZE * DOUBLE_BUFFER * aicNum;
     uint64_t s2AlignSize = (tilingInfo->s2Size + S2_BASE_SIZE - 1) / S2_BASE_SIZE * S2_BASE_SIZE;
     workspaceSize += aicNum * S1_BASE_SIZE * s2AlignSize * MM1_RES_ELEM_SIZE;
-    size_t *workSpaces = context_->GetWorkspaceSizes(1);
+    size_t* workSpaces = context_->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
 
     // -------------set tilingdata-----------------

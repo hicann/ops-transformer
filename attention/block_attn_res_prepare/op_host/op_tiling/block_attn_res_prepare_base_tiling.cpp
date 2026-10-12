@@ -27,7 +27,7 @@
 namespace optiling {
 namespace {
 
-constexpr const char *OP_NAME = "BlockAttnResPrepare";
+constexpr const char* OP_NAME = "BlockAttnResPrepare";
 constexpr size_t BLOCK_RES_INDEX = 0;
 constexpr size_t VALID_BLOCKS_INDEX = 1;
 constexpr size_t PSEUDO_QUERY_INDEX = 2;
@@ -46,7 +46,7 @@ constexpr uint64_t MAX_HEAD_DIM = 8192UL;
 constexpr uint32_t MAX_BLOCK_NUM = 64U;
 constexpr uint64_t MAX_ALIGNED_D = static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()) - (D_ALIGN_ELEMS - 1U);
 
-bool IsPositiveShape(const gert::Shape &shape)
+bool IsPositiveShape(const gert::Shape& shape)
 {
     for (size_t i = 0; i < shape.GetDimNum(); ++i) {
         if (shape.GetDim(i) <= 0) {
@@ -60,7 +60,7 @@ bool IsPositiveShape(const gert::Shape &shape)
 
 ge::graphStatus BlockAttnResPrepareBaseTiling::GetPlatformInfo()
 {
-    auto *platformInfo = context_->GetPlatformInfo();
+    auto* platformInfo = context_->GetPlatformInfo();
     const auto platform = platform_ascendc::PlatformAscendC(platformInfo);
     aicCoreNum_ = platform.GetCoreNumAic();
     aivCoreNum_ = platform.GetCoreNumAiv();
@@ -83,9 +83,9 @@ ge::graphStatus BlockAttnResPrepareBaseTiling::GetPlatformInfo()
 
 ge::graphStatus BlockAttnResPrepareBaseTiling::CheckInputShapes()
 {
-    const auto *blockResStorageShape = context_->GetInputShape(BLOCK_RES_INDEX);
-    const auto *validStorageShape = context_->GetInputShape(VALID_BLOCKS_INDEX);
-    const auto *pseudoQueryStorageShape = context_->GetInputShape(PSEUDO_QUERY_INDEX);
+    const auto* blockResStorageShape = context_->GetInputShape(BLOCK_RES_INDEX);
+    const auto* validStorageShape = context_->GetInputShape(VALID_BLOCKS_INDEX);
+    const auto* pseudoQueryStorageShape = context_->GetInputShape(PSEUDO_QUERY_INDEX);
     OP_CHECK_IF(blockResStorageShape == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "block_res", "nullptr",
                                                       "the input shape of block_res must not be nullptr"),
@@ -99,9 +99,9 @@ ge::graphStatus BlockAttnResPrepareBaseTiling::CheckInputShapes()
                                                       "the input shape of pseudo_query must not be nullptr"),
                 return ge::GRAPH_FAILED);
 
-    const gert::Shape &blockResShape = blockResStorageShape->GetOriginShape();
-    const gert::Shape &validShape = validStorageShape->GetOriginShape();
-    const gert::Shape &pseudoQueryShape = pseudoQueryStorageShape->GetOriginShape();
+    const gert::Shape& blockResShape = blockResStorageShape->GetOriginShape();
+    const gert::Shape& validShape = validStorageShape->GetOriginShape();
+    const gert::Shape& pseudoQueryShape = pseudoQueryStorageShape->GetOriginShape();
     OP_CHECK_IF(blockResShape.GetDimNum() != BLOCK_RES_RANK,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "block_res",
                                              (std::to_string(blockResShape.GetDimNum()) + "D").c_str(), "3D"),
@@ -166,9 +166,9 @@ ge::graphStatus BlockAttnResPrepareBaseTiling::CheckInputShapes()
 
 ge::graphStatus BlockAttnResPrepareBaseTiling::CheckInputDtypes() const
 {
-    const auto *blockResDesc = context_->GetInputDesc(BLOCK_RES_INDEX);
-    const auto *validDesc = context_->GetInputDesc(VALID_BLOCKS_INDEX);
-    const auto *pseudoQueryDesc = context_->GetInputDesc(PSEUDO_QUERY_INDEX);
+    const auto* blockResDesc = context_->GetInputDesc(BLOCK_RES_INDEX);
+    const auto* validDesc = context_->GetInputDesc(VALID_BLOCKS_INDEX);
+    const auto* pseudoQueryDesc = context_->GetInputDesc(PSEUDO_QUERY_INDEX);
     OP_CHECK_IF(blockResDesc == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "block_res", "nullptr",
                                                       "the input descriptor of block_res must not be nullptr"),
@@ -204,9 +204,9 @@ ge::graphStatus BlockAttnResPrepareBaseTiling::GetShapeAttrsInfo()
         return ge::GRAPH_FAILED;
     }
 
-    const auto *attrs = context_->GetAttrs();
+    const auto* attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is null"), return ge::GRAPH_FAILED);
-    const float *eps = attrs->GetFloat(EPS_ATTR_INDEX);
+    const float* eps = attrs->GetFloat(EPS_ATTR_INDEX);
     eps_ = eps == nullptr ? BLOCK_ATTN_RES_PREPARE_DEFAULT_EPS : *eps;
     OP_CHECK_IF(!std::isfinite(eps_) || eps_ <= 0.0F,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "eps", std::to_string(eps_).c_str(),
@@ -216,8 +216,8 @@ ge::graphStatus BlockAttnResPrepareBaseTiling::GetShapeAttrsInfo()
 }
 
 ge::graphStatus BlockAttnResPrepareBaseTiling::CalculateWorkDistribution(uint64_t totalWorkUnits, uint64_t maxCoreNum,
-                                                                         const char *templateName,
-                                                                         WorkDistribution &distribution) const
+                                                                         const char* templateName,
+                                                                         WorkDistribution& distribution) const
 {
     OP_CHECK_IF(totalWorkUnits > std::numeric_limits<uint32_t>::max(),
                 OP_LOGE(context_->GetNodeName(), "%s totalWorkUnits=%lu exceeds uint32 maximum=%u", templateName,
@@ -249,7 +249,7 @@ ge::graphStatus BlockAttnResPrepareBaseTiling::DoLibApiTiling()
 
 ge::graphStatus BlockAttnResPrepareBaseTiling::GetWorkspaceSize()
 {
-    size_t *workspaceSizes = context_->GetWorkspaceSizes(1);
+    size_t* workspaceSizes = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(workspaceSizes == nullptr, OP_LOGE(context_->GetNodeName(), "workspace size address is null"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(workspaceSize_ > std::numeric_limits<size_t>::max(),
@@ -266,13 +266,13 @@ ge::graphStatus BlockAttnResPrepareBaseTiling::PostTiling()
     context_->SetTilingKey(GetTilingKey());
 
     const TilingDataView tilingDataView = GetTilingDataView();
-    const char *templateName = tilingDataView.templateName == nullptr ? "unknown" : tilingDataView.templateName;
+    const char* templateName = tilingDataView.templateName == nullptr ? "unknown" : tilingDataView.templateName;
     OP_CHECK_IF(tilingDataView.data == nullptr || tilingDataView.size == 0U,
                 OP_LOGE(context_->GetNodeName(), "%s tiling data is empty", templateName), return ge::GRAPH_FAILED);
-    auto *rawTilingData = context_->GetRawTilingData();
+    auto* rawTilingData = context_->GetRawTilingData();
     OP_CHECK_IF(rawTilingData == nullptr, OP_LOGE(context_->GetNodeName(), "raw tiling data is null"),
                 return ge::GRAPH_FAILED);
-    auto *rawData = rawTilingData->GetData();
+    auto* rawData = rawTilingData->GetData();
     OP_CHECK_IF(rawData == nullptr, OP_LOGE(context_->GetNodeName(), "raw tiling data buffer is null"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(rawTilingData->GetCapacity() < tilingDataView.size,
@@ -284,19 +284,19 @@ ge::graphStatus BlockAttnResPrepareBaseTiling::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingBlockAttnResPrepare(gert::TilingContext *context)
+ge::graphStatus TilingBlockAttnResPrepare(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE(OP_NAME, "tiling context is null"), return ge::GRAPH_FAILED);
     return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingPrepareBlockAttnResPrepare(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareBlockAttnResPrepare(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE(OP_NAME, "tiling parse context is null"), return ge::GRAPH_FAILED);
-    auto *compileInfo = context->GetCompiledInfo<BlockAttnResPrepareCompileInfo>();
+    auto* compileInfo = context->GetCompiledInfo<BlockAttnResPrepareCompileInfo>();
     OP_CHECK_IF(compileInfo == nullptr, OP_LOGE(context->GetNodeName(), "compiled info is null"),
                 return ge::GRAPH_FAILED);
-    auto *platformInfo = context->GetPlatformInfo();
+    auto* platformInfo = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context->GetNodeName(), "platform info is null"),
                 return ge::GRAPH_FAILED);
     const auto platform = platform_ascendc::PlatformAscendC(platformInfo);

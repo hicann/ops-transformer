@@ -35,14 +35,14 @@ constexpr size_t T_DIM_INDEX = 0;
 constexpr size_t D_DIM_INDEX = 2;
 constexpr size_t S_DIM_INDEX = 0;
 constexpr size_t PSEUDO_QUERY_D_DIM_INDEX = 1;
-constexpr const char *OP_NAME = "BlockAttnResPrepare";
+constexpr const char* OP_NAME = "BlockAttnResPrepare";
 
-ge::graphStatus InferShapeBlockAttnResPrepare(gert::InferShapeContext *context)
+ge::graphStatus InferShapeBlockAttnResPrepare(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE(OP_NAME, "infer shape context is null"), return ge::GRAPH_FAILED);
-    const gert::Shape *blockResShape = context->GetInputShape(BLOCK_RES_INDEX);
-    const gert::Shape *validBlocksShape = context->GetInputShape(VALID_BLOCKS_INDEX);
-    const gert::Shape *pseudoQueryShape = context->GetInputShape(PSEUDO_QUERY_INDEX);
+    const gert::Shape* blockResShape = context->GetInputShape(BLOCK_RES_INDEX);
+    const gert::Shape* validBlocksShape = context->GetInputShape(VALID_BLOCKS_INDEX);
+    const gert::Shape* pseudoQueryShape = context->GetInputShape(PSEUDO_QUERY_INDEX);
     OP_CHECK_IF(blockResShape == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "block_res", "nullptr",
                                                       "the input shape of block_res must not be nullptr"),
@@ -79,9 +79,9 @@ ge::graphStatus InferShapeBlockAttnResPrepare(gert::InferShapeContext *context)
                     "block_res.shape[2] must equal pseudo_query.shape[1]"),
                 return ge::GRAPH_FAILED);
 
-    gert::Shape *numeratorShape = context->GetOutputShape(NUMERATOR_INDEX);
-    gert::Shape *logitMaxShape = context->GetOutputShape(LOGIT_MAX_INDEX);
-    gert::Shape *expSumShape = context->GetOutputShape(EXP_SUM_INDEX);
+    gert::Shape* numeratorShape = context->GetOutputShape(NUMERATOR_INDEX);
+    gert::Shape* logitMaxShape = context->GetOutputShape(LOGIT_MAX_INDEX);
+    gert::Shape* expSumShape = context->GetOutputShape(EXP_SUM_INDEX);
     OP_CHECK_IF(numeratorShape == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "numerator", "nullptr",
                                                       "the output shape of numerator must not be nullptr"),
@@ -101,7 +101,7 @@ ge::graphStatus InferShapeBlockAttnResPrepare(gert::InferShapeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeBlockAttnResPrepare(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeBlockAttnResPrepare(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE(OP_NAME, "infer data type context is null"), return ge::GRAPH_FAILED);
     context->SetOutputDataType(NUMERATOR_INDEX, ge::DT_FLOAT);

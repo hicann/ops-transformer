@@ -37,11 +37,11 @@ extern "C" {
 #define ACLNN_API __attribute__((visibility("default")))
 
 ACLNN_API aclnnStatus aclnnFlashAttnMetadataGetWorkspaceSize(
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
     int64_t numHeadsKv, int64_t headDim, int64_t headDimV, int64_t maskMode, int64_t winLeft, int64_t winRight,
-    const char *layoutQ, const char *layoutKv, const char *layoutOut, bool isGradEnabled, const aclTensor *metaData,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    const char* layoutQ, const char* layoutKv, const char* layoutOut, bool isGradEnabled, const aclTensor* metaData,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnFlashAttnMetadata,
                    DFX_IN(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, batchSize,
@@ -58,7 +58,7 @@ ACLNN_API aclnnStatus aclnnFlashAttnMetadataGetWorkspaceSize(
                                                    layoutKv, layoutOut, metaData, isGradEnabled);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
+    const op::PlatformInfo& npuInfo = op::GetCurrentPlatformInfo();
     // Match the effective resources used by ACLNN tiling, including stream core limits.
     // Keep the same per-resource fallback as opbase InitL2Phase1Context.
     uint32_t aicCoreNum = 0;
@@ -69,7 +69,7 @@ ACLNN_API aclnnStatus aclnnFlashAttnMetadataGetWorkspaceSize(
     if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivCoreNum) != ACL_SUCCESS) {
         aivCoreNum = npuInfo.GetVectorCoreNum();
     }
-    const char *socVersion = npuInfo.GetSocLongVersion().c_str();
+    const char* socVersion = npuInfo.GetSocLongVersion().c_str();
 
     auto output = l0op::FlashAttnMetadata(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional,
                                           batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV,
@@ -82,7 +82,7 @@ ACLNN_API aclnnStatus aclnnFlashAttnMetadataGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-ACLNN_API aclnnStatus aclnnFlashAttnMetadata(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnFlashAttnMetadata(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                              aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnFlashAttnMetadata);

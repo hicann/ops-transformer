@@ -50,7 +50,7 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35MLA;
 
-ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     // only {0 (NO_MASK), 3 (CAUSAL == FIA SPARSE_MODE_RIGHT_DOWN)} are valid.
     // BAND(4)/LEFT_UP/etc. route in FIA MLA to nothing — reject.
@@ -64,14 +64,14 @@ ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const FlashMlaWithKvcacheTi
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
-    auto &attnMaskTensor = faInfo.opParamInfo.attnMask.tensor;
+    auto& attnMaskTensor = faInfo.opParamInfo.attnMask.tensor;
     if (attnMaskTensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::CompileTimeTensorDesc *attnMaskDesc = faInfo.opParamInfo.attnMask.desc;
+    const gert::CompileTimeTensorDesc* attnMaskDesc = faInfo.opParamInfo.attnMask.desc;
     OP_CHECK_IF(attnMaskDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(faInfo.opName, "TensorDesc of attn_mask"),
                 return ge::GRAPH_FAILED);
 
@@ -100,7 +100,7 @@ ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const FlashMlaWithKvcacheTi
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckSinglePara(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus MaskChecker::CheckSinglePara(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     if (CheckSingleParaMaskMode(faInfo) != ge::GRAPH_SUCCESS || CheckSingleParaAttnMask(faInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -108,9 +108,9 @@ ge::graphStatus MaskChecker::CheckSinglePara(const FlashMlaWithKvcacheTilingInfo
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckParaExistence(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus MaskChecker::CheckParaExistence(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
-    auto &attnMaskTensor = faInfo.opParamInfo.attnMask.tensor;
+    auto& attnMaskTensor = faInfo.opParamInfo.attnMask.tensor;
 
     if (faInfo.maskMode == static_cast<int64_t>(MaskMode::NO_MASK)) {
         OP_CHECK_IF(attnMaskTensor != nullptr,

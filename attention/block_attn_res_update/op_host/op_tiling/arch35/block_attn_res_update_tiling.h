@@ -15,8 +15,8 @@
 
 namespace optiling {
 
-ge::graphStatus Tiling4BlockAttnResUpdate(gert::TilingContext *context);
-ge::graphStatus TilingPrepare4BlockAttnResUpdate(gert::TilingParseContext *context);
+ge::graphStatus Tiling4BlockAttnResUpdate(gert::TilingContext* context);
+ge::graphStatus TilingPrepare4BlockAttnResUpdate(gert::TilingParseContext* context);
 
 } // namespace optiling
 

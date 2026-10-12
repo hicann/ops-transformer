@@ -32,9 +32,9 @@ namespace flash_mla_with_kvcache {
 
 constexpr uint64_t PRE_LOAD_NUM_MLA_ARCH35 = 2;
 
-void FlashMlaWithKvcacheTilingImpl::InitTilingInfo(TilingInfo *tilingInfo)
+void FlashMlaWithKvcacheTilingImpl::InitTilingInfo(TilingInfo* tilingInfo)
 {
-    faInfo_ = static_cast<FlashMlaWithKvcacheTilingInfo *>(tilingInfo);
+    faInfo_ = static_cast<FlashMlaWithKvcacheTilingInfo*>(tilingInfo);
 }
 
 bool FlashMlaWithKvcacheTilingImpl::IsCapable()
@@ -100,9 +100,9 @@ ge::graphStatus FlashMlaWithKvcacheTilingImpl::SetPlatMemoryInfo()
 void FlashMlaWithKvcacheTilingImpl::InitImplParam()
 {
     // Tiling only reads tensor shapes; sequence values are consumed on device.
-    const gert::Tensor *cuSeqLenQ = faInfo_->opParamInfo.cuSeqlensQ.tensor;
-    const gert::Tensor *seqUsedQ = faInfo_->opParamInfo.sequsedQ.tensor;
-    const gert::Tensor *cacheSeqlens = faInfo_->opParamInfo.cacheSeqlens.tensor;
+    const gert::Tensor* cuSeqLenQ = faInfo_->opParamInfo.cuSeqlensQ.tensor;
+    const gert::Tensor* seqUsedQ = faInfo_->opParamInfo.sequsedQ.tensor;
+    const gert::Tensor* cacheSeqlens = faInfo_->opParamInfo.cacheSeqlens.tensor;
     cuSeqLenQFlag_ = cuSeqLenQ != nullptr && cuSeqLenQ->GetShapeSize() > 0;
     seqUsedQFlag_ = seqUsedQ != nullptr && seqUsedQ->GetShapeSize() > 0;
     cacheSeqlensFlag_ = cacheSeqlens != nullptr && cacheSeqlens->GetShapeSize() > 0;
@@ -215,20 +215,20 @@ void FlashMlaWithKvcacheTilingImpl::FillTiling()
 
 void FlashMlaWithKvcacheTilingImpl::ComputeTilingData()
 {
-    auto &maskParams = tilingData_.baseTiling.flashMlaWithKvcacheAttenMaskParams;
+    auto& maskParams = tilingData_.baseTiling.flashMlaWithKvcacheAttenMaskParams;
     maskParams.sparseMode = static_cast<uint8_t>(faInfo_->maskMode);
     maskParams.preTokens = static_cast<int32_t>(faInfo_->preTokens);
     maskParams.nextTokens = static_cast<int32_t>(faInfo_->nextTokens);
     tilingKeyInfo_.hasAttenMask = faInfo_->maskMode != static_cast<int64_t>(MaskMode::NO_MASK);
     if (tilingKeyInfo_.hasAttenMask) {
         // The checker requires one shared [2048, 2048] mask for all batches.
-        const auto &maskShape = faInfo_->opParamInfo.attnMask.tensor->GetStorageShape();
+        const auto& maskShape = faInfo_->opParamInfo.attnMask.tensor->GetStorageShape();
         maskParams.attenMaskBatch = 1;
         maskParams.attenMaskS1Size = maskShape.GetDim(0);
         maskParams.attenMaskS2Size = maskShape.GetDim(1);
     }
 
-    auto &pageParams = tilingData_.baseTiling.flashMlaWithKvcachePageAttentionParams;
+    auto& pageParams = tilingData_.baseTiling.flashMlaWithKvcachePageAttentionParams;
     if (faInfo_->kvLayout == FlashMlaWithKvcacheLayout::PA_BBND) {
         pageParams.paLayoutType = 1;
     } else if (faInfo_->kvLayout == FlashMlaWithKvcacheLayout::PA_BNBD) {
@@ -303,9 +303,9 @@ bool FlashMlaWithKvcacheTilingImpl::CheckNeedInitOutput() const
     return false;
 }
 
-ge::graphStatus FlashMlaWithKvcacheTilingImpl::SetTilingData(FlashMlaWithKvcacheTilingData &tilingData)
+ge::graphStatus FlashMlaWithKvcacheTilingImpl::SetTilingData(FlashMlaWithKvcacheTilingData& tilingData)
 {
-    FlashMlaWithKvcacheTilingData *tiling = context_->GetTilingData<FlashMlaWithKvcacheTilingData>();
+    FlashMlaWithKvcacheTilingData* tiling = context_->GetTilingData<FlashMlaWithKvcacheTilingData>();
     OP_CHECK_IF(tiling == nullptr, OP_LOGE(faInfo_->opName, "The tiling data is nullptr"), return ge::GRAPH_FAILED);
     *tiling = tilingData;
     return ge::GRAPH_SUCCESS;
@@ -313,11 +313,11 @@ ge::graphStatus FlashMlaWithKvcacheTilingImpl::SetTilingData(FlashMlaWithKvcache
 
 void FlashMlaWithKvcacheTilingImpl::PrintAllTilingData()
 {
-    const auto &base = tilingData_.baseTiling.flashMlaWithKvcacheBaseParams;
-    const auto &mask = tilingData_.baseTiling.flashMlaWithKvcacheAttenMaskParams;
-    const auto &page = tilingData_.baseTiling.flashMlaWithKvcachePageAttentionParams;
-    const auto &workspace = tilingData_.baseTiling.flashMlaWithKvcacheWorkspaceParams;
-    const auto &output = tilingData_.baseTiling.flashMlaWithKvcacheEmptyTensorParams;
+    const auto& base = tilingData_.baseTiling.flashMlaWithKvcacheBaseParams;
+    const auto& mask = tilingData_.baseTiling.flashMlaWithKvcacheAttenMaskParams;
+    const auto& page = tilingData_.baseTiling.flashMlaWithKvcachePageAttentionParams;
+    const auto& workspace = tilingData_.baseTiling.flashMlaWithKvcacheWorkspaceParams;
+    const auto& output = tilingData_.baseTiling.flashMlaWithKvcacheEmptyTensorParams;
     OP_LOGD(faInfo_->opName, "B:%u T:%u N2:%u G:%u S1:%u S2:%u D:%u DV:%u Rope:%u", base.bSize, base.t1Size,
             base.n2Size, base.gSize, base.s1Size, base.s2Size, base.dSize, base.dSizeV, base.dSizeRope);
     OP_LOGD(faInfo_->opName, "QSeqDims:%u KVSeqDims:%u scale:%f LSE:%u cores:%u outputLayout:%u L2Off:%u",

@@ -31,25 +31,25 @@ public:
                                 GM_ADDR cuSeqlensQ, GM_ADDR cuSeqlensK, GM_ADDR sequsedQ, GM_ADDR sequsedK,
                                 GM_ADDR cmpResidualK, GM_ADDR metadata, GM_ADDR dQuery, GM_ADDR dKey, GM_ADDR dWeight,
                                 GM_ADDR softmaxOut, GM_ADDR workspace,
-                                const optiling::DenseLightningIndexerGradRegBaseTilingData *__restrict tiling,
-                                TPipe *tPipe);
+                                const optiling::DenseLightningIndexerGradRegBaseTilingData* __restrict tiling,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessDeter();
     __aicore__ inline void ProcessNormal();
     __aicore__ inline void InitMMResBuf();
     __aicore__ inline void FreeBuf();
-    __aicore__ inline void InitWorkspace(__gm__ uint8_t *workspace);
+    __aicore__ inline void InitWorkspace(__gm__ uint8_t* workspace);
     __aicore__ inline int32_t GetS2SparseLen(int32_t s1Idx, int32_t actualSeqLensQ, int32_t actualSeqLensK,
                                              int32_t cmpResidualK, int64_t cmpRatio, DLISparseMode sparseMode);
-    __aicore__ inline void SetRunInfo(DLIKGradRunInfo &runInfo, int64_t taskId, int64_t sTaskId, int64_t deterTaskId);
-    __aicore__ inline void SetDeterRunInfo(DLIKGradRunInfo &runInfo, int64_t taskId, int64_t sTaskId,
+    __aicore__ inline void SetRunInfo(DLIKGradRunInfo& runInfo, int64_t taskId, int64_t sTaskId, int64_t deterTaskId);
+    __aicore__ inline void SetDeterRunInfo(DLIKGradRunInfo& runInfo, int64_t taskId, int64_t sTaskId,
                                            int64_t deterTaskId, int64_t s2BlockOffset);
     __aicore__ inline void SetConstInfo();
     __aicore__ inline int32_t GetCmpResidualK(int32_t bIdx, int32_t defaultLens);
-    __aicore__ inline void GetTndSeqLen(const int64_t t1Idx, int64_t &bIdx);
+    __aicore__ inline void GetTndSeqLen(const int64_t t1Idx, int64_t& bIdx);
 
-    TPipe *pipe = nullptr;
-    const optiling::DenseLightningIndexerGradRegBaseTilingData *__restrict tilingData = nullptr;
+    TPipe* pipe = nullptr;
+    const optiling::DenseLightningIndexerGradRegBaseTilingData* __restrict tilingData = nullptr;
 
     GM_ADDR actualSeqQlenAddr;
     GM_ADDR actualSeqKvlenAddr;
@@ -129,7 +129,7 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
     GM_ADDR query, GM_ADDR key, GM_ADDR weight, GM_ADDR attnSoftmaxL1, GM_ADDR softmaxLse, GM_ADDR cuSeqlensQ,
     GM_ADDR cuSeqlensK, GM_ADDR sequsedQ, GM_ADDR sequsedK, GM_ADDR cmpResidualK, GM_ADDR metadata, GM_ADDR dQuery,
     GM_ADDR dKey, GM_ADDR dWeight, GM_ADDR softmaxOut, GM_ADDR workspace,
-    const optiling::DenseLightningIndexerGradRegBaseTilingData *__restrict tiling, TPipe *tPipe)
+    const optiling::DenseLightningIndexerGradRegBaseTilingData* __restrict tiling, TPipe* tPipe)
 {
     pipe = tPipe;
     tilingData = tiling;
@@ -140,10 +140,10 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
     usedSeqQlenAddr = sequsedQ;
     usedSeqKvlenAddr = sequsedK;
     cmpResidualKAddr = cmpResidualK;
-    softmaxOutGm.SetGlobalBuffer((__gm__ T *)softmaxOut);
-    dWeightGm.SetGlobalBuffer((__gm__ T *)dWeight);
-    dqGm.SetGlobalBuffer((__gm__ OUT_T *)dQuery);
-    dkGm.SetGlobalBuffer((__gm__ OUT_T *)dKey);
+    softmaxOutGm.SetGlobalBuffer((__gm__ T*)softmaxOut);
+    dWeightGm.SetGlobalBuffer((__gm__ T*)dWeight);
+    dqGm.SetGlobalBuffer((__gm__ OUT_T*)dQuery);
+    dkGm.SetGlobalBuffer((__gm__ OUT_T*)dKey);
 
     InitMMResBuf();
     InitWorkspace(workspace);
@@ -162,19 +162,19 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::GetTndSeqLen(
-    const int64_t t1Idx, int64_t &bIdx)
+    const int64_t t1Idx, int64_t& bIdx)
 {
     int64_t t1Offset = 0;
     int64_t t2Offset = 0;
 
     if constexpr (!HasSequsedQ) {
         if constexpr (Layout_Q == DLILayout::TND) {
-            int64_t curT1 = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            int64_t curT1 = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
             while (usedT1Index >= curT1) {
-                curT1 = ((__gm__ int32_t *)actualSeqQlenAddr)[++bIndex];
+                curT1 = ((__gm__ int32_t*)actualSeqQlenAddr)[++bIndex];
             }
             bIndex = bIndex - 1;
-            t1Offset = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            t1Offset = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
             s1Index = usedT1Index - t1Offset;
         } else {
             t1Offset = usedT1Index;
@@ -185,11 +185,11 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
     } else {
         while (usedT1Index >= nextUsedT1Offset) {
             usedT1Offset = nextUsedT1Offset;
-            nextUsedT1Offset = ((__gm__ int32_t *)usedSeqQlenAddr)[++bIndex] + usedT1Offset;
+            nextUsedT1Offset = ((__gm__ int32_t*)usedSeqQlenAddr)[++bIndex] + usedT1Offset;
         }
         s1Index = usedT1Index - usedT1Offset;
         if constexpr (Layout_Q == DLILayout::TND) {
-            t1Offset = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            t1Offset = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
         } else {
             t1Offset = bIndex * constInfo.s1Size;
         }
@@ -200,24 +200,24 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
     if constexpr (Layout_Q == DLILayout::TND) {
         if (unlikely(bIndex == 0)) {
             t2Offset = 0;
-            curS1 = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex + 1];
-            curS2 = ((__gm__ int32_t *)actualSeqKvlenAddr)[bIndex + 1];
+            curS1 = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex + 1];
+            curS2 = ((__gm__ int32_t*)actualSeqKvlenAddr)[bIndex + 1];
         } else {
-            curS1 = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex + 1] - ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
-            curS2 = ((__gm__ int32_t *)actualSeqKvlenAddr)[bIndex + 1] - ((__gm__ int32_t *)actualSeqKvlenAddr)[bIndex];
-            t2Offset = ((__gm__ int32_t *)actualSeqKvlenAddr)[bIndex];
+            curS1 = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex + 1] - ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
+            curS2 = ((__gm__ int32_t*)actualSeqKvlenAddr)[bIndex + 1] - ((__gm__ int32_t*)actualSeqKvlenAddr)[bIndex];
+            t2Offset = ((__gm__ int32_t*)actualSeqKvlenAddr)[bIndex];
         }
     } else {
         t2Offset = bIndex * curS2;
     }
 
     if constexpr (HasSequsedQ) {
-        usedS1 = ((__gm__ int32_t *)usedSeqQlenAddr)[bIndex];
+        usedS1 = ((__gm__ int32_t*)usedSeqQlenAddr)[bIndex];
     } else {
         usedS1 = curS1;
     }
     if constexpr (HasSequsedK) {
-        usedS2 = ((__gm__ int32_t *)usedSeqKvlenAddr)[bIndex];
+        usedS2 = ((__gm__ int32_t*)usedSeqKvlenAddr)[bIndex];
     } else {
         usedS2 = curS2;
     }
@@ -255,9 +255,9 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
             continue;
         }
         for (this->s2Offset = 0; this->s2Offset < currentS2Size; this->s2Offset += VEC_SY_BASESIZE) {
-            DLIKGradRunInfo &runInfoNeg0 = runInfo[s2TaskId % MODE_NUM_3];
-            DLIKGradRunInfo &runInfoNeg2 = runInfo[(s2TaskId + 1) % MODE_NUM_3];
-            DLIKGradRunInfo &runInfoNeg1 = runInfo[(s2TaskId + 2) % MODE_NUM_3];
+            DLIKGradRunInfo& runInfoNeg0 = runInfo[s2TaskId % MODE_NUM_3];
+            DLIKGradRunInfo& runInfoNeg2 = runInfo[(s2TaskId + 1) % MODE_NUM_3];
+            DLIKGradRunInfo& runInfoNeg1 = runInfo[(s2TaskId + 2) % MODE_NUM_3];
             SetRunInfo(runInfoNeg0, s2TaskId, sTaskId, 0);
             if (s2Offset == 0) {
                 if ASCEND_IS_AIV {
@@ -338,9 +338,9 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
             processSize = Max(processSize, 0);
             for (this->s2Offset = blockSize; this->s2Offset < blockSize + processSize;
                  this->s2Offset += VEC_SY_BASESIZE) {
-                DLIKGradRunInfo &runInfoNeg0 = runInfo[s2TaskId % MODE_NUM_3];
-                DLIKGradRunInfo &runInfoNeg2 = runInfo[(s2TaskId + 1) % MODE_NUM_3];
-                DLIKGradRunInfo &runInfoNeg1 = runInfo[(s2TaskId + 2) % MODE_NUM_3];
+                DLIKGradRunInfo& runInfoNeg0 = runInfo[s2TaskId % MODE_NUM_3];
+                DLIKGradRunInfo& runInfoNeg2 = runInfo[(s2TaskId + 1) % MODE_NUM_3];
+                DLIKGradRunInfo& runInfoNeg1 = runInfo[(s2TaskId + 2) % MODE_NUM_3];
                 SetRunInfo(runInfoNeg0, s2TaskId, sTaskId, deterTaskId);
                 if (s2Offset == 0) {
                     if ASCEND_IS_AIV {
@@ -521,7 +521,7 @@ __aicore__ inline int32_t DenseLightningIndexerKLLossGradKernelBase<CubeBlockTyp
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::SetRunInfo(
-    DLIKGradRunInfo &runInfo, int64_t taskId, int64_t sTaskId, int64_t deterTaskId)
+    DLIKGradRunInfo& runInfo, int64_t taskId, int64_t sTaskId, int64_t deterTaskId)
 {
     runInfo.sTaskId = sTaskId;
     runInfo.sTaskIdMod3 = sTaskId % 3;
@@ -575,7 +575,7 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::SetDeterRunInfo(
-    DLIKGradRunInfo &runInfo, int64_t taskId, int64_t sTaskId, int64_t deterTaskId, int64_t s2BlockOffset)
+    DLIKGradRunInfo& runInfo, int64_t taskId, int64_t sTaskId, int64_t deterTaskId, int64_t s2BlockOffset)
 {
     runInfo.s2BlockOffset = s2BlockOffset;
     runInfo.sTaskId = sTaskId;
@@ -602,7 +602,7 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
     }
     coreNum = static_cast<int64_t>(GetBlockNum());
     constInfo.totalSize = tilingData->multiCoreParams.totalSize;
-    auto &baseInfo = tilingData->baseParams;
+    auto& baseInfo = tilingData->baseParams;
     constInfo.bSize = baseInfo.bSize;
     constInfo.n2Size = baseInfo.n2Size;
     constInfo.gSizeQueryIndex = baseInfo.gSizeQueryIndex;
@@ -615,11 +615,11 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
     constInfo.sparseBlockSize = 1;
     constInfo.pKBaseSize = 128;
     constInfo.syKBaseSize = 128;
-    constInfo.totalNum = ((__gm__ uint32_t *)metadataGm)[0];
-    constInfo.formerCoreProcessNNum = ((__gm__ uint32_t *)metadataGm)[1];
-    constInfo.remainCoreProcessNNum = ((__gm__ uint32_t *)metadataGm)[2];
-    constInfo.remainCoreNum = ((__gm__ uint32_t *)metadataGm)[3];
-    constInfo.usedCoreNum = ((__gm__ uint32_t *)metadataGm)[4];
+    constInfo.totalNum = ((__gm__ uint32_t*)metadataGm)[0];
+    constInfo.formerCoreProcessNNum = ((__gm__ uint32_t*)metadataGm)[1];
+    constInfo.remainCoreProcessNNum = ((__gm__ uint32_t*)metadataGm)[2];
+    constInfo.remainCoreNum = ((__gm__ uint32_t*)metadataGm)[3];
+    constInfo.usedCoreNum = ((__gm__ uint32_t*)metadataGm)[4];
     constInfo.maxSeqKV = constInfo.maxSeqlenK;
     usedCoreNum = constInfo.usedCoreNum;
     int64_t totalCoreNum = static_cast<int64_t>(GetBlockNum());
@@ -676,7 +676,7 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
 }
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::InitWorkspace(
-    __gm__ uint8_t *workspace)
+    __gm__ uint8_t* workspace)
 {
     int64_t reduceSumOffset = 3 * VEC_SY_BASESIZE * sizeof(float) * 2;
     int64_t deterResOffset = 0;
@@ -688,17 +688,17 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
     uint64_t offset = 0;
 
     if constexpr (Layout_Q == DLILayout::TND) {
-        constInfo.totalCost = ((__gm__ int32_t *)actualSeqKvlenAddr)[constInfo.bSize];
+        constInfo.totalCost = ((__gm__ int32_t*)actualSeqKvlenAddr)[constInfo.bSize];
     } else if constexpr (Layout_Q == DLILayout::BSND) {
         constInfo.totalCost = constInfo.bSize * constInfo.s2Size;
     }
-    reduceSumRes.SetGlobalBuffer((__gm__ T *)(workspace + offset + coreTotalOffset));
+    reduceSumRes.SetGlobalBuffer((__gm__ T*)(workspace + offset + coreTotalOffset));
     offset += reduceSumOffset;
     if constexpr (Deterministic) {
-        deterRes.SetGlobalBuffer((__gm__ T *)(workspace + totalOffset));
+        deterRes.SetGlobalBuffer((__gm__ T*)(workspace + totalOffset));
         totalOffset += GetBlockNum() * deterResOffset;
     }
-    bmm3Res.SetGlobalBuffer((__gm__ T *)(workspace + totalOffset));
+    bmm3Res.SetGlobalBuffer((__gm__ T*)(workspace + totalOffset));
 
     if ASCEND_IS_AIV {
         qPreBlockFactor = tilingData->multiCoreParams.qPreBlockFactor;
@@ -736,7 +736,7 @@ __aicore__ inline int32_t DenseLightningIndexerKLLossGradKernelBase<CubeBlockTyp
     int32_t bIdx, int32_t defaultLens)
 {
     if constexpr (HasCmpResidualK) {
-        return ((__gm__ uint32_t *)cmpResidualKAddr)[bIdx];
+        return ((__gm__ uint32_t*)cmpResidualKAddr)[bIdx];
     } else {
         return defaultLens;
     }

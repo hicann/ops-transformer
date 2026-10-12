@@ -23,8 +23,8 @@ using namespace Reg;
  *   dst[i, j] = BF16(FP32(qkt[i, j]) * scale * decay[i, j] * mask[i, j])。
  * g 向量只加载一次，每行的 decay、Cast 和逐元素计算都保留在寄存器中，不写中间 UB。
  */
-__simd_vf__ inline void ComputeMaskedQktGatedVF(__ubuf__ bfloat16_t *dstAddr, __ubuf__ bfloat16_t *qktAddr,
-                                                __ubuf__ float *gAddr, __ubuf__ float *maskAddr, float scale,
+__simd_vf__ inline void ComputeMaskedQktGatedVF(__ubuf__ bfloat16_t* dstAddr, __ubuf__ bfloat16_t* qktAddr,
+                                                __ubuf__ float* gAddr, __ubuf__ float* maskAddr, float scale,
                                                 uint16_t validSize, uint16_t rowStride)
 {
     static constexpr CastTrait castBf16ToFp32 = {RegLayout::ZERO, SatMode::UNKNOWN, MaskMergeMode::ZEROING,
@@ -66,8 +66,8 @@ __simd_vf__ inline void ComputeMaskedQktGatedVF(__ubuf__ bfloat16_t *dstAddr, __
  *   dst[i, j] = BF16(FP32(qkt[i, j]) * scale * 1.0 * mask[i, j])。
  * 保留原来的乘 1.0 计算顺序，但所有中间结果均位于寄存器。
  */
-__simd_vf__ inline void ComputeMaskedQktNoGateVF(__ubuf__ bfloat16_t *dstAddr, __ubuf__ bfloat16_t *qktAddr,
-                                                 __ubuf__ float *maskAddr, float scale, uint16_t validSize,
+__simd_vf__ inline void ComputeMaskedQktNoGateVF(__ubuf__ bfloat16_t* dstAddr, __ubuf__ bfloat16_t* qktAddr,
+                                                 __ubuf__ float* maskAddr, float scale, uint16_t validSize,
                                                  uint16_t rowStride)
 {
     static constexpr CastTrait castBf16ToFp32 = {RegLayout::ZERO, SatMode::UNKNOWN, MaskMergeMode::ZEROING,

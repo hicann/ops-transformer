@@ -68,7 +68,7 @@ public:
     static constexpr uint32_t QK_L0C_EVENT0 = 2;
     static constexpr uint32_t QK_L0C_EVENT1 = 3;
 
-    __aicore__ inline BlockMmadTla(Arch::Resource<ArchTag> &resource, uint32_t &kvBufId, uint64_t softmaxScale)
+    __aicore__ inline BlockMmadTla(Arch::Resource<ArchTag>& resource, uint32_t& kvBufId, uint64_t softmaxScale)
         : kBufId(kvBufId)
     {
         softmaxScale_ = softmaxScale;
@@ -160,7 +160,7 @@ public:
 
     // Q-scale 稠密 GM → L1（Host 沿 D Dn2Nz）
     __aicore__ inline void CopyQScaleGmToL1(uint32_t qsActBaseTile, uint32_t scaleK,
-                                            AscendC::GlobalTensor<uint8_t> &gQDequantScale, uint32_t qBufId,
+                                            AscendC::GlobalTensor<uint8_t>& gQDequantScale, uint32_t qBufId,
                                             uint32_t qHeadMul)
     {
         copyGmToL1MxScaleDn2Nz(l1BScaleTensor[qBufId], gQDequantScale, qsActBaseTile, scaleK, 0, 0, qHeadMul);
@@ -280,7 +280,7 @@ public:
 
     // L0C → UB fixpipe（NO_SPLIT 模式，subBlockId 选目标 AIV）
     template <class TensorUB>
-    __aicore__ inline void FixpipeMm1(uint32_t qsActBaseTileAlign16, uint32_t n, TensorUB &ubSTensorTla,
+    __aicore__ inline void FixpipeMm1(uint32_t qsActBaseTileAlign16, uint32_t n, TensorUB& ubSTensorTla,
                                       bool subBlockId, uint32_t qkL0cBufId)
     {
         auto l0CTensorTla =
@@ -298,7 +298,7 @@ public:
     //   用它的发射时间掩盖跨流水 flag 的往返延迟。
     template <class TensorUB>
     __aicore__ inline void EmitFixpipeMm1(uint32_t l0cBufId, uint32_t nSubRowStart, uint32_t nCur,
-                                          uint32_t qsActBaseTileAlign16, TensorUB &ubSTensorTla, uint32_t subBlockIdx)
+                                          uint32_t qsActBaseTileAlign16, TensorUB& ubSTensorTla, uint32_t subBlockIdx)
     {
         AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(QK_L0C_EVENT0 + l0cBufId);
         // nCur 偶数对齐用于 Fixpipe mSize
@@ -310,11 +310,11 @@ public:
     }
 
     template <class TensorQ, class TensorK, class TensorUB, class TaskInfoT, class TileInfoT>
-    __aicore__ inline void operator()(TensorQ &gQTensorTla, TensorK &gKTensorTla,
+    __aicore__ inline void operator()(TensorQ& gQTensorTla, TensorK& gKTensorTla,
                                       AscendC::GlobalTensor<uint8_t> gQDequantScale,
                                       AscendC::GlobalTensor<uint8_t> gKDequantScale,
-                                      AscendC::GlobalTensor<int32_t> gSparseBlockIdx, TensorUB &ubSTensorTla,
-                                      TaskInfoT &curTaskInfo, TileInfoT &curTileInfo, uint32_t embed,
+                                      AscendC::GlobalTensor<int32_t> gSparseBlockIdx, TensorUB& ubSTensorTla,
+                                      TaskInfoT& curTaskInfo, TileInfoT& curTileInfo, uint32_t embed,
                                       uint32_t kvSBaseTile, uint32_t blockShapeY, uint32_t subBlockIdx,
                                       uint32_t kvHeadMul, uint32_t qHeadMul)
     {
@@ -448,7 +448,7 @@ protected:
     Tile::CopyGmToL1MxScaleDn2NzA5 copyGmToL1MxScaleDn2Nz;
 
     uint32_t qBufId = 0;
-    uint32_t &kBufId;
+    uint32_t& kBufId;
     uint32_t qkL0abBufId = 0;
     uint32_t qkL0cBufId = 0;
     uint64_t softmaxScale_;

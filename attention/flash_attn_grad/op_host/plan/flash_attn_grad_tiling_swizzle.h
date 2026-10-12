@@ -26,8 +26,8 @@ namespace optiling {
 
 // 前置条件：kernel.tmpl 与 schedule.usedCube 必须已经定下来 —— swizzle 只在
 // BN2GS1S2 且满片启动时才可能开。调用顺序不可与 BuildSchedulePlan 对调。
-void DecideSwizzle(const FagParsedInfo &info, const FagKernelPlan &kernel, FagSchedulePlan &schedule,
-                   FagRouteTrace &trace);
+void DecideSwizzle(const FagParsedInfo& info, const FagKernelPlan& kernel, FagSchedulePlan& schedule,
+                   FagRouteTrace& trace);
 
 } // namespace optiling
 

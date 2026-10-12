@@ -110,7 +110,7 @@ GQADenseScheduleResult SelectGQADenseSchedule(int64_t k, int64_t m, int64_t n, i
     return result;
 }
 
-bool IsTndDeterSwizzleScheduleSafe(const FuzzyBaseInfoParamsRegbase &params)
+bool IsTndDeterSwizzleScheduleSafe(const FuzzyBaseInfoParamsRegbase& params)
 {
     if (params.aicNum == 0 || params.n1 <= 0) {
         return false;
@@ -140,7 +140,7 @@ bool IsTndDeterSwizzleScheduleSafe(const FuzzyBaseInfoParamsRegbase &params)
     return true;
 }
 
-bool IsTndDeterSwizzlePerformanceEnough(const FuzzyBaseInfoParamsRegbase &params)
+bool IsTndDeterSwizzlePerformanceEnough(const FuzzyBaseInfoParamsRegbase& params)
 {
     if (params.aicNum == 0 || params.n2 <= 0 || params.g <= 0 ||
         params.actualSeqQlen.size() != params.actualSeqKvlen.size()) {
@@ -184,7 +184,7 @@ bool IsTndDeterSwizzlePerformanceEnough(const FuzzyBaseInfoParamsRegbase &params
     return slotUtilizationEnough && roundGrowthWithinLimit;
 }
 
-bool IsTndDeterSwizzleSupported(const FuzzyBaseInfoParamsRegbase &params)
+bool IsTndDeterSwizzleSupported(const FuzzyBaseInfoParamsRegbase& params)
 {
     if (!IsTndDeterSwizzleScheduleSafe(params)) {
         return false;
@@ -192,7 +192,7 @@ bool IsTndDeterSwizzleSupported(const FuzzyBaseInfoParamsRegbase &params)
     return IsTndDeterSwizzlePerformanceEnough(params);
 }
 
-bool IsShortTndNonDeterSwizzleBeneficial(const FuzzyBaseInfoParamsRegbase &params, const TndBaseInfo &tndBaseInfo)
+bool IsShortTndNonDeterSwizzleBeneficial(const FuzzyBaseInfoParamsRegbase& params, const TndBaseInfo& tndBaseInfo)
 {
     if (params.b <= 0 || params.b >= TND_SWIZZLE_PREFIX_NUM || tndBaseInfo.normalMaxValidBlockCount == 0) {
         return false;
@@ -204,7 +204,7 @@ bool IsShortTndNonDeterSwizzleBeneficial(const FuzzyBaseInfoParamsRegbase &param
                                      tndBaseInfo.normalMaxValidBlockCount * TND_NONDETER_SWIZZLE_MAX_LOAD_PERCENT;
 }
 
-void ConfigureTndDeterBn2S2Swizzle(FuzzyBaseInfoParamsRegbase &params, const TndBaseInfo &tndBaseInfo)
+void ConfigureTndDeterBn2S2Swizzle(FuzzyBaseInfoParamsRegbase& params, const TndBaseInfo& tndBaseInfo)
 {
     // Mode 2 keeps every (B, N2, S2) column on one core, so dK/dV never need a cross-core tail merge.
     std::fill(std::begin(params.deterPrefix2), std::end(params.deterPrefix2), static_cast<int64_t>(-1));
@@ -350,7 +350,7 @@ DeterBandScheduleResult SelectDeterBandSchedule(int64_t k, int64_t m, int64_t n,
     return result;
 }
 
-BlockScheduleResult SelectBlockSchedule(const FuzzyBaseInfoParamsRegbase &params)
+BlockScheduleResult SelectBlockSchedule(const FuzzyBaseInfoParamsRegbase& params)
 {
     BlockScheduleResult result;
     const bool canSplitByBlockIdx = params.enableSwizzle && params.layoutType != INPUT_FORMAT_TND &&
@@ -404,7 +404,7 @@ BlockScheduleResult SelectBlockSchedule(const FuzzyBaseInfoParamsRegbase &params
 }
 } // namespace
 
-bool IsSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape)
+bool IsSameShape(const gert::StorageShape* aShape, const gert::StorageShape* bShape)
 {
     OP_CHECK_IF((aShape == nullptr) || (bShape == nullptr),
                 OP_LOGW("flash_attention_score_grad_tiling_normal_regbase", "aShape or bShape is nullptr."),
@@ -428,29 +428,29 @@ bool IsSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bSh
 ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::GetShapeAttrsInfo()
 {
     fBaseParams.isDeterministic = (context_->GetDeterministic() == 1);
-    const gert::StorageShape *queryShape = context_->GetInputShape(QUERY_IDX); // [B, N2, G, S1, D]
-    const gert::StorageShape *keyShape = context_->GetInputShape(KEY_IDX);     // [B, N2, 1, S2, D]
-    const gert::StorageShape *valueShape = context_->GetInputShape(VALUE_IDX); // [B, N2, 1, S2, D_V]
+    const gert::StorageShape* queryShape = context_->GetInputShape(QUERY_IDX); // [B, N2, G, S1, D]
+    const gert::StorageShape* keyShape = context_->GetInputShape(KEY_IDX);     // [B, N2, 1, S2, D]
+    const gert::StorageShape* valueShape = context_->GetInputShape(VALUE_IDX); // [B, N2, 1, S2, D_V]
 
     int64_t headNum = *context_->GetAttrs()->GetAttrPointer<int>(HEAD_ATTR_IDX);
-    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
+    const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
 
     // get rope
     auto queryRope = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::QUERY_ROPE_IDX));
-    const gert::Shape *queryRopeShape = queryRope == nullptr ? nullptr : &queryRope->GetStorageShape();
+    const gert::Shape* queryRopeShape = queryRope == nullptr ? nullptr : &queryRope->GetStorageShape();
     bool hasQueryRope = queryRopeShape != nullptr && queryRopeShape->GetDimNum() != 0;
     auto keyRope = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::KEY_ROPE_IDX));
-    const gert::Shape *keyRopeShape = keyRope == nullptr ? nullptr : &keyRope->GetStorageShape();
+    const gert::Shape* keyRopeShape = keyRope == nullptr ? nullptr : &keyRope->GetStorageShape();
     bool hasKeyRope = keyRopeShape != nullptr && keyRopeShape->GetDimNum() != 0;
 
     // get dy/attentionIn
     auto dy = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::DY));
-    const gert::Shape *dyShape = &dy->GetStorageShape();
+    const gert::Shape* dyShape = &dy->GetStorageShape();
     auto attentionIn = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::ATTENTION_IN));
-    const gert::Shape *attentionInShape = attentionIn == nullptr ? nullptr : &attentionIn->GetStorageShape();
-    const gert::Shape &qShape = queryShape->GetStorageShape();
-    const gert::Shape &kShape = keyShape->GetStorageShape();
-    const gert::Shape &vShape = valueShape->GetStorageShape();
+    const gert::Shape* attentionInShape = attentionIn == nullptr ? nullptr : &attentionIn->GetStorageShape();
+    const gert::Shape& qShape = queryShape->GetStorageShape();
+    const gert::Shape& kShape = keyShape->GetStorageShape();
+    const gert::Shape& vShape = valueShape->GetStorageShape();
 
     std::string qdyShapesMsg = "{" + Ops::Base::ToString(qShape) + ", " + Ops::Base::ToString(*dyShape) + "}";
     std::string kvShapesMsg = "{" + Ops::Base::ToString(kShape) + ", " + Ops::Base::ToString(vShape) + "}";
@@ -630,8 +630,8 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::GetShapeAttrsInfo()
             return ge::GRAPH_PARAM_INVALID;
         }
 
-        const int64_t *qValue = actualSeqQlenTensor->GetData<int64_t>();
-        const int64_t *kvValue = actualSeqKvlenTensor->GetData<int64_t>();
+        const int64_t* qValue = actualSeqQlenTensor->GetData<int64_t>();
+        const int64_t* kvValue = actualSeqKvlenTensor->GetData<int64_t>();
 
         int64_t lastQLen = 0;
         int64_t lastKvLen = 0;
@@ -798,7 +798,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::GetPlatformInfo()
 
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr,
                     OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(), "compile_info is null"),
                     return ge::GRAPH_FAILED);
@@ -834,7 +834,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::GetPlatformInfo()
 
 bool FlashAttentionScoreGradTilingNormalRegbase::IsCapable()
 {
-    const char *tndSoftmaxIn =
+    const char* tndSoftmaxIn =
         context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(AttrIndex::TND_SOFTMAX_IN) ?
             context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::TND_SOFTMAX_IN)) :
             "";
@@ -1776,7 +1776,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::DoLibApiTiling()
 
 ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     size_t workspaceSize = 0;
     workspaceSize = RESERVED_WORKSPACE_SIZE;
     int64_t qSize =
@@ -1887,7 +1887,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::GetWorkspaceSize()
     return ge::GRAPH_SUCCESS;
 }
 
-void FlashAttentionScoreGradTilingNormalRegbase::GetWorkspaceSize4Deter(size_t &workspaceSize)
+void FlashAttentionScoreGradTilingNormalRegbase::GetWorkspaceSize4Deter(size_t& workspaceSize)
 {
     if (fBaseParams.deterSparseType == static_cast<uint32_t>(DeterSparseType::DETER_OLD)) {
         baseDeterParam_->set_deterGmOffset(workspaceSize);
@@ -2158,7 +2158,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::GetSparsePrefixBlock
 }
 
 void FlashAttentionScoreGradTilingNormalRegbase::FillBlockInfoLoadBalance(
-    std::vector<std::vector<int64_t>> &totalBlockInfo, std::vector<std::vector<float>> &acturalBlockInfo)
+    std::vector<std::vector<int64_t>>& totalBlockInfo, std::vector<std::vector<float>>& acturalBlockInfo)
 {
     acturalBlockInfo[fBaseParams.b][0] = 0;
     acturalBlockInfo[fBaseParams.b + 1][0] = 0;
@@ -2228,7 +2228,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitTilingData()
 {
     bool isTnd = (fBaseParams.layoutType == INPUT_FORMAT_TND);
     if (IsNewDeter(fBaseParams) && tndBaseInfo.isTndSwizzle) {
-        FagTilingWithTemplateTTTT *tilingData = this->context_->GetTilingData<FagTilingWithTemplateTTTT>();
+        FagTilingWithTemplateTTTT* tilingData = this->context_->GetTilingData<FagTilingWithTemplateTTTT>();
         if (tilingData == nullptr) {
             OP_LOGE("InitTilingData", "InitTilingData failed.");
             return ge::GRAPH_FAILED;
@@ -2242,7 +2242,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitTilingData()
         tndSwizzleParam_ = &tilingData->tndSwizzleParam;
         baseDeterParam_ = &tilingData->baseDeterParam;
     } else if (IsNewDeter(fBaseParams)) {
-        FagTilingWithTemplateTTTF *tilingData = this->context_->GetTilingData<FagTilingWithTemplateTTTF>();
+        FagTilingWithTemplateTTTF* tilingData = this->context_->GetTilingData<FagTilingWithTemplateTTTF>();
         if (tilingData == nullptr) {
             OP_LOGE("InitTilingData", "InitTilingData failed.");
             return ge::GRAPH_FAILED;
@@ -2255,7 +2255,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitTilingData()
         deterParam = &tilingData->deterParam;
         baseDeterParam_ = &tilingData->baseDeterParam;
     } else if (tndBaseInfo.isTndSwizzle) {
-        FagTilingWithTemplateFFTT *tilingData = this->context_->GetTilingData<FagTilingWithTemplateFFTT>();
+        FagTilingWithTemplateFFTT* tilingData = this->context_->GetTilingData<FagTilingWithTemplateFFTT>();
         if (tilingData == nullptr) {
             OP_LOGE("InitTilingData", "InitTilingData failed.");
             return ge::GRAPH_FAILED;
@@ -2268,7 +2268,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitTilingData()
         tndSwizzleParam_ = &tilingData->tndSwizzleParam;
     } else if (isTnd) {
         if (fBaseParams.isDeterministic) {
-            FagTilingWithTemplateTFTF *tilingData = this->context_->GetTilingData<FagTilingWithTemplateTFTF>();
+            FagTilingWithTemplateTFTF* tilingData = this->context_->GetTilingData<FagTilingWithTemplateTFTF>();
             if (tilingData == nullptr) {
                 OP_LOGE("InitTilingData", "InitTilingData failed.");
                 return ge::GRAPH_FAILED;
@@ -2276,7 +2276,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitTilingData()
             TND_TILING_DATA_COMMON_ASSIGN(tilingData);
             baseDeterParam_ = &tilingData->baseDeterParam;
         } else {
-            FagTilingWithTemplateFFTF *tilingData = this->context_->GetTilingData<FagTilingWithTemplateFFTF>();
+            FagTilingWithTemplateFFTF* tilingData = this->context_->GetTilingData<FagTilingWithTemplateFFTF>();
             if (tilingData == nullptr) {
                 OP_LOGE("InitTilingData", "InitTilingData failed.");
                 return ge::GRAPH_FAILED;
@@ -2285,7 +2285,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitTilingData()
         }
     } else {
         if (fBaseParams.isDeterministic) {
-            FagTilingWithTemplateTFFF *tilingData = this->context_->GetTilingData<FagTilingWithTemplateTFFF>();
+            FagTilingWithTemplateTFFF* tilingData = this->context_->GetTilingData<FagTilingWithTemplateTFFF>();
             if (tilingData == nullptr) {
                 OP_LOGE("InitTilingData", "InitTilingData failed.");
                 return ge::GRAPH_FAILED;
@@ -2293,7 +2293,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitTilingData()
             BASE_TILING_DATA_COMMON_ASSIGN(tilingData);
             baseDeterParam_ = &tilingData->baseDeterParam;
         } else {
-            FagTilingWithTemplateFFFF *tilingData = this->context_->GetTilingData<FagTilingWithTemplateFFFF>();
+            FagTilingWithTemplateFFFF* tilingData = this->context_->GetTilingData<FagTilingWithTemplateFFFF>();
             if (tilingData == nullptr) {
                 OP_LOGE("InitTilingData", "InitTilingData failed.");
                 return ge::GRAPH_FAILED;

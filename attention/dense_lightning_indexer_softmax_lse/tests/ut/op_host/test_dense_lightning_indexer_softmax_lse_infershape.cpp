@@ -17,11 +17,13 @@
 
 class DenseLightningIndexerSoftmaxLseInferShapeTest : public testing::Test {
 protected:
-    static void SetUpTestCase() {
+    static void SetUpTestCase()
+    {
         std::cout << "--- DenseLightningIndexerSoftmaxLse InferShape UT SetUp ---" << std::endl;
     }
 
-    static void TearDownTestCase() {
+    static void TearDownTestCase()
+    {
         std::cout << "--- DenseLightningIndexerSoftmaxLse InferShape UT TearDown ---" << std::endl;
     }
 };
@@ -32,29 +34,18 @@ TEST_F(DenseLightningIndexerSoftmaxLseInferShapeTest, infershape_bsnd_layout)
 
     gert::InfershapeContextPara infershapeContextPara(
         "DenseLightningIndexerSoftmaxLse",
-        {
-            {{ {b, s1, nidx1, d}, {b, s1, nidx1, d} }, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{ {b, s2, nidx2, d}, {b, s2, nidx2, d} }, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{ {b, s1, nidx1}, {b, s1, nidx1} }, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{ {b}, {b} }, ge::DT_INT64, ge::FORMAT_ND},
-            {{ {b}, {b} }, ge::DT_INT64, ge::FORMAT_ND}
-        },
-        {
-            {{ {-1}, {-1} }, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{ {-1}, {-1} }, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"sparseMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(9223372036854775807)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(9223372036854775807)}
-        }
-    );
+        {{{{b, s1, nidx1, d}, {b, s1, nidx1, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{b, s2, nidx2, d}, {b, s2, nidx2, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{b, s1, nidx1}, {b, s1, nidx1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND}},
+        {{{{-1}, {-1}}, ge::DT_FLOAT, ge::FORMAT_ND}, {{{-1}, {-1}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"sparseMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(9223372036854775807)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(9223372036854775807)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {b, nidx2, s1},
-        {b, nidx2, s1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{b, nidx2, s1}, {b, nidx2, s1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
@@ -65,29 +56,18 @@ TEST_F(DenseLightningIndexerSoftmaxLseInferShapeTest, infershape_tnd_layout)
 
     gert::InfershapeContextPara infershapeContextPara(
         "DenseLightningIndexerSoftmaxLse",
-        {
-            {{ {t1, nidx1, d}, {t1, nidx1, d} }, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{ {t2, nidx2, d}, {t2, nidx2, d} }, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{ {t1, nidx1}, {t1, nidx1} }, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{ {b}, {b} }, ge::DT_INT64, ge::FORMAT_ND},
-            {{ {b}, {b} }, ge::DT_INT64, ge::FORMAT_ND}
-        },
-        {
-            {{ {-1}, {-1} }, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{ {-1}, {-1} }, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        {
-            {"layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"sparseMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
-            {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(9223372036854775807)},
-            {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(9223372036854775807)}
-        }
-    );
+        {{{{t1, nidx1, d}, {t1, nidx1, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{t2, nidx2, d}, {t2, nidx2, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{t1, nidx1}, {t1, nidx1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND}},
+        {{{{-1}, {-1}}, ge::DT_FLOAT, ge::FORMAT_ND}, {{{-1}, {-1}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"sparseMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(9223372036854775807)},
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(9223372036854775807)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {nidx2, t1},
-        {nidx2, t1}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{nidx2, t1}, {nidx2, t1}};
 
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }

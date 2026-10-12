@@ -16,9 +16,9 @@
 #define _CUBE3_OP_H_
 
 template <typename TYPE>
-__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube3Compute(const AddrInfo &shapeInfo,
-                                                                                 __gm__ TYPE *left, __gm__ TYPE *right,
-                                                                                 __gm__ float *out)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube3Compute(const AddrInfo& shapeInfo,
+                                                                                 __gm__ TYPE* left, __gm__ TYPE* right,
+                                                                                 __gm__ float* out)
 {
     ping_pong_flag_l0_b_ = 0;
     ping_pong_flag_l0_b_last = 0;
@@ -40,15 +40,15 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube3Compute
     int32_t m_loop = CeilDiv(km, SIZE_128);
     int32_t n_loop = CeilDiv(kn, SIZE_128);
 
-    __gm__ TYPE *gm_a = left + (shapeInfo.out + globalBlockOffset) * 2;
-    __gm__ TYPE *gm_b = right + shapeInfo.left;
-    __gm__ float *gm_out = out + shapeInfo.right;
+    __gm__ TYPE* gm_a = left + (shapeInfo.out + globalBlockOffset) * 2;
+    __gm__ TYPE* gm_b = right + shapeInfo.left;
+    __gm__ float* gm_out = out + shapeInfo.right;
 
-    uint64_t left_offset = gm_a - (__gm__ TYPE *)0;
-    uint64_t right_offset = gm_b - (__gm__ TYPE *)0;
-    uint64_t out_offset = gm_out - (__gm__ float *)0;
+    uint64_t left_offset = gm_a - (__gm__ TYPE*)0;
+    uint64_t right_offset = gm_b - (__gm__ TYPE*)0;
+    uint64_t out_offset = gm_out - (__gm__ float*)0;
 
-    LocalTensor<TYPE> *l1_b_buf_tensor = ping_pong_flag_l1_b_ ? &l1_b_pong_tensor : &l1_b_ping_tensor;
+    LocalTensor<TYPE>* l1_b_buf_tensor = ping_pong_flag_l1_b_ ? &l1_b_pong_tensor : &l1_b_ping_tensor;
 
     WAIT_FLAG(MTE1, MTE2, ping_pong_flag_l1_b_);
 
@@ -89,10 +89,10 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube3Compute
                 continue;
             }
 
-            LocalTensor<TYPE> *l1_a_buf_tensor = ping_pong_flag_l1_a_ ? &l1_a_pong_tensor : &l1_a_ping_tensor;
-            LocalTensor<TYPE> *l0_a_buf_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
-            LocalTensor<TYPE> *l0_b_buf_tensor = (ping_pong_flag_l0_b_last) ? &l0_b_ping_tensor : &l0_b_pong_tensor;
-            LocalTensor<float> *l0_c_buf_tensor = ping_pong_flag_l0_c_ ? &l0_c_pong_tensor : &l0_c_ping_tensor;
+            LocalTensor<TYPE>* l1_a_buf_tensor = ping_pong_flag_l1_a_ ? &l1_a_pong_tensor : &l1_a_ping_tensor;
+            LocalTensor<TYPE>* l0_a_buf_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
+            LocalTensor<TYPE>* l0_b_buf_tensor = (ping_pong_flag_l0_b_last) ? &l0_b_ping_tensor : &l0_b_pong_tensor;
+            LocalTensor<float>* l0_c_buf_tensor = ping_pong_flag_l0_c_ ? &l0_c_pong_tensor : &l0_c_ping_tensor;
 
             if (!is_skip) {
                 WAIT_FLAG(M, MTE1, ping_pong_flag_l0_b_last + 2 + FLAG_SHIFT);

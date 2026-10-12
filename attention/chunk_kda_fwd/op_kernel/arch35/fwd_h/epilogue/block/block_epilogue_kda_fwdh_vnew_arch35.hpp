@@ -42,7 +42,7 @@ public:
     using FinalStateElement = typename FinalStateType_::Element;
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource)
+    BlockEpilogue(Arch::Resource<ArchTag>& resource)
     {
         constexpr uint32_t CALC_BUF_OFFSET = 0;
         constexpr uint32_t PING_BUF_0_OFFSET = 32 * 1024;
@@ -174,8 +174,8 @@ public:
     void ApplyRowScale(AscendC::LocalTensor<float> matrix, AscendC::LocalTensor<float> rowScale,
                        uint32_t rowScaleOffset, uint32_t rows, uint32_t cols)
     {
-        __ubuf__ float *matrixAddr = reinterpret_cast<__ubuf__ float *>(matrix.GetPhyAddr());
-        __ubuf__ float *rowScaleAddr = reinterpret_cast<__ubuf__ float *>(rowScale.GetPhyAddr());
+        __ubuf__ float* matrixAddr = reinterpret_cast<__ubuf__ float*>(matrix.GetPhyAddr());
+        __ubuf__ float* rowScaleAddr = reinterpret_cast<__ubuf__ float*>(rowScale.GetPhyAddr());
         AscendC::VF_CALL<detail::ApplyRowScaleDualIssue>(matrixAddr, rowScaleAddr, rowScaleOffset,
                                                          static_cast<uint16_t>(rows), static_cast<uint16_t>(cols));
         AscendC::PipeBarrier<PIPE_V>();
@@ -184,8 +184,8 @@ public:
     CATLASS_DEVICE
     void ComputeVNew(AscendC::LocalTensor<float> workspace, AscendC::LocalTensor<UElementInput> uInput, uint32_t count)
     {
-        __ubuf__ float *workspaceAddr = reinterpret_cast<__ubuf__ float *>(workspace.GetPhyAddr());
-        __ubuf__ UElementInput *uInputAddr = reinterpret_cast<__ubuf__ UElementInput *>(uInput.GetPhyAddr());
+        __ubuf__ float* workspaceAddr = reinterpret_cast<__ubuf__ float*>(workspace.GetPhyAddr());
+        __ubuf__ UElementInput* uInputAddr = reinterpret_cast<__ubuf__ UElementInput*>(uInput.GetPhyAddr());
         AscendC::VF_CALL<detail::ComputeVNewRegbaseDualIssue<UElementInput>>(workspaceAddr, uInputAddr, count);
         AscendC::PipeBarrier<PIPE_V>();
     }

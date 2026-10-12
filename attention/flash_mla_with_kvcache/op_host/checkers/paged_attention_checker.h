@@ -29,9 +29,9 @@ public:
     PagedAttentionChecker() = default;
     ~PagedAttentionChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const FlashMlaWithKvcacheTilingInfo &faInfo) override;
-    ge::graphStatus CheckParaExistence(const FlashMlaWithKvcacheTilingInfo &faInfo) override;
-    ge::graphStatus CheckMultiPara(const FlashMlaWithKvcacheTilingInfo &faInfo) override;
+    ge::graphStatus CheckSinglePara(const FlashMlaWithKvcacheTilingInfo& faInfo) override;
+    ge::graphStatus CheckParaExistence(const FlashMlaWithKvcacheTilingInfo& faInfo) override;
+    ge::graphStatus CheckMultiPara(const FlashMlaWithKvcacheTilingInfo& faInfo) override;
 };
 
 } // namespace flash_mla_with_kvcache

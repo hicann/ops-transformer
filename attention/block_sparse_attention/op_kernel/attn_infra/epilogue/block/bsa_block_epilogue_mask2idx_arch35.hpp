@@ -33,7 +33,7 @@ public:
     static constexpr uint32_t PRE_COL_TILE = 64;
     static constexpr uint32_t PRE_ELEM_NUM_PER_LOOP = PRE_ROW_TILE * PRE_COL_TILE;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource)
     {
         constexpr uint32_t MASK_PAT_IN_UINT8 = 0;
         constexpr uint32_t MASK_PAT_IN_FP16 = 2 * PRE_ELEM_NUM_PER_LOOP;

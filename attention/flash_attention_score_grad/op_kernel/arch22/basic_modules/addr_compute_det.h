@@ -29,7 +29,7 @@ class AddrComputeDet {
     static constexpr bool DETERMINISTIC_ENABLE = FAGT::deterministic_enable;
 
 public:
-    __aicore__ inline void GetCubeAddrInfo(CubeAddrInfoDet *cubeAddrInfo)
+    __aicore__ inline void GetCubeAddrInfo(CubeAddrInfoDet* cubeAddrInfo)
     {
         globalCubeAddr = cubeAddrInfo;
         globalCubeAddr->blockLength = 0;
@@ -48,7 +48,7 @@ public:
         }
     }
 
-    __aicore__ inline void GetVecAddrInfo(VecAddrInfoDet *vecAddrInfo)
+    __aicore__ inline void GetVecAddrInfo(VecAddrInfoDet* vecAddrInfo)
     {
         globalVecAddr = vecAddrInfo;
         if (globalVecAddr->taskId == 0) {
@@ -70,8 +70,8 @@ public:
         globalVecAddr->s2GroupNum = s2GroupNum;
     }
 
-    __aicore__ void Init(__gm__ uint8_t *seqLenQ, __gm__ uint8_t *seqLenK, uint32_t cubeCoreNum, uint32_t cubeCoreIdx,
-                         const TILING_CLASS *tilingData)
+    __aicore__ void Init(__gm__ uint8_t* seqLenQ, __gm__ uint8_t* seqLenK, uint32_t cubeCoreNum, uint32_t cubeCoreIdx,
+                         const TILING_CLASS* tilingData)
     {
         this->seqLenQ = seqLenQ;
         this->seqLenK = seqLenK;
@@ -110,10 +110,10 @@ public:
     }
 
 private:
-    __gm__ uint8_t *seqLenQ;
-    __gm__ uint8_t *seqLenK;
-    CubeAddrInfoDet *globalCubeAddr; // 用于存储Cube计算相关的地址信息
-    VecAddrInfoDet *globalVecAddr;   // 用于存储Vector计算相关的地址信息
+    __gm__ uint8_t* seqLenQ;
+    __gm__ uint8_t* seqLenK;
+    CubeAddrInfoDet* globalCubeAddr; // 用于存储Cube计算相关的地址信息
+    VecAddrInfoDet* globalVecAddr;   // 用于存储Vector计算相关的地址信息
     uint32_t cubeCoreIdx{0};         // 当前核所对应的Cube核的下标
     uint32_t cubeCoreNum{0};         // Cube核的数量
     uint32_t layout{0};              // 新增：数据布局格式
@@ -171,7 +171,7 @@ private:
         sparseRightBound = dimS1 - dimS2 - nextToken;
     }
 
-    __aicore__ inline SEQLEN_TYPE getSeqLen(int32_t i, __gm__ uint8_t *seq_Len, bool isQ = true)
+    __aicore__ inline SEQLEN_TYPE getSeqLen(int32_t i, __gm__ uint8_t* seq_Len, bool isQ = true)
     {
         if (layout != TND) {
             return isQ ? dimS1 : dimS2;
@@ -179,16 +179,16 @@ private:
 
         SEQLEN_TYPE actualSeqlen;
         if (i == 0) {
-            actualSeqlen = ((__gm__ SEQLEN_TYPE *)seq_Len)[0];
+            actualSeqlen = ((__gm__ SEQLEN_TYPE*)seq_Len)[0];
         } else {
-            actualSeqlen = ((__gm__ SEQLEN_TYPE *)seq_Len)[i] - ((__gm__ SEQLEN_TYPE *)seq_Len)[i - 1];
+            actualSeqlen = ((__gm__ SEQLEN_TYPE*)seq_Len)[i] - ((__gm__ SEQLEN_TYPE*)seq_Len)[i - 1];
         }
         return actualSeqlen;
     }
 
-    __aicore__ inline SEQLEN_TYPE getTotalLen(int32_t i, __gm__ uint8_t *seq_Len)
+    __aicore__ inline SEQLEN_TYPE getTotalLen(int32_t i, __gm__ uint8_t* seq_Len)
     {
-        SEQLEN_TYPE actualTotalSeqlen = ((__gm__ SEQLEN_TYPE *)seq_Len)[i];
+        SEQLEN_TYPE actualTotalSeqlen = ((__gm__ SEQLEN_TYPE*)seq_Len)[i];
         return actualTotalSeqlen;
     }
 
@@ -233,7 +233,7 @@ private:
 
     template <bool IS_DQ>
     __aicore__ inline void DetInfoProcess(DetGroup (&detGroupList)[24], int32_t recoderS1, int32_t recoderS2,
-                                          int32_t &groupNum, uint64_t outAddr)
+                                          int32_t& groupNum, uint64_t outAddr)
     {
         uint32_t groupIdx;
         int32_t find{0};

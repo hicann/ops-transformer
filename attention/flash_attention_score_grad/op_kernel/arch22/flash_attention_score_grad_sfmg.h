@@ -22,13 +22,13 @@ template <typename T1, typename T2, typename TILING_TYPE, const uint32_t INPUT_L
 class FlashAttentionScoreGradSfmg {
 public:
     __aicore__ inline FlashAttentionScoreGradSfmg(){};
-    __aicore__ inline void Init(__gm__ uint8_t *dy, __gm__ uint8_t *attenIn, __gm__ uint8_t *actual_seq_qlen,
-                                __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *drop_mask,
-                                __gm__ uint8_t *workspace, const TILING_TYPE *ordTilingData, TPipe *pipe_in);
+    __aicore__ inline void Init(__gm__ uint8_t* dy, __gm__ uint8_t* attenIn, __gm__ uint8_t* actual_seq_qlen,
+                                __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* drop_mask,
+                                __gm__ uint8_t* workspace, const TILING_TYPE* ordTilingData, TPipe* pipe_in);
     __aicore__ inline void Process();
     __aicore__ inline void SyncALLCores();
-    __aicore__ inline void InitIndex(int64_t startIdx, int64_t &curS, GM_ADDR seqS);
-    __aicore__ inline void CopyInSfmg(int64_t leftNburst, int64_t &curS, GM_ADDR seqS);
+    __aicore__ inline void InitIndex(int64_t startIdx, int64_t& curS, GM_ADDR seqS);
+    __aicore__ inline void CopyInSfmg(int64_t leftNburst, int64_t& curS, GM_ADDR seqS);
     __aicore__ inline void DoCopyIn(int64_t curS, int64_t curNBurst, int64_t dstOffset, GM_ADDR seqS);
 
 protected:
@@ -41,10 +41,10 @@ protected:
     constexpr static int64_t SFMG_HIGH_PERF_N_FACTOR = 8;
     constexpr static int64_t SFMG_HIGH_PERF_D_FACTOR = 64;
 
-    TPipe *pipe;
+    TPipe* pipe;
     uint32_t cBlockIdx;
 
-    const TILING_TYPE *TilingData;
+    const TILING_TYPE* TilingData;
 
     GlobalTensor<T2> sfmgWorkspaceGm;
     GlobalTensor<T1> dyGm;
@@ -75,16 +75,16 @@ protected:
 
 template <typename T1, typename T2, typename TILING_TYPE, const uint32_t INPUT_LAYOUT>
 __aicore__ inline void FlashAttentionScoreGradSfmg<T1, T2, TILING_TYPE, INPUT_LAYOUT>::Init(
-    __gm__ uint8_t *dy, __gm__ uint8_t *attenIn, __gm__ uint8_t *actual_seq_qlen, __gm__ uint8_t *dq,
-    __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *drop_mask, __gm__ uint8_t *workspace,
-    const TILING_TYPE *orgTilingData, TPipe *pipe_in)
+    __gm__ uint8_t* dy, __gm__ uint8_t* attenIn, __gm__ uint8_t* actual_seq_qlen, __gm__ uint8_t* dq,
+    __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* drop_mask, __gm__ uint8_t* workspace,
+    const TILING_TYPE* orgTilingData, TPipe* pipe_in)
 {
     cBlockIdx = GetBlockIdx();
     TilingData = orgTilingData;
     pipe = pipe_in;
-    dyGm.SetGlobalBuffer((__gm__ T1 *)dy);
-    attenInGm.SetGlobalBuffer((__gm__ T1 *)attenIn);
-    sfmgWorkspaceGm.SetGlobalBuffer((__gm__ T2 *)workspace +
+    dyGm.SetGlobalBuffer((__gm__ T1*)dy);
+    attenInGm.SetGlobalBuffer((__gm__ T1*)attenIn);
+    sfmgWorkspaceGm.SetGlobalBuffer((__gm__ T2*)workspace +
                                     TilingData->preSfmgTilingData.sfmgPreBeginAddr / sizeof(T2));
 
     pipe->InitBuffer(input1Que, 1, TilingData->preSfmgTilingData.inputBufferLen); // 24K
@@ -115,17 +115,17 @@ __aicore__ inline void FlashAttentionScoreGradSfmg<T1, T2, TILING_TYPE, INPUT_LA
 
 template <typename T1, typename T2, typename TILING_TYPE, const uint32_t INPUT_LAYOUT>
 __aicore__ inline void FlashAttentionScoreGradSfmg<T1, T2, TILING_TYPE, INPUT_LAYOUT>::InitIndex(int64_t startIdx,
-                                                                                                 int64_t &curS,
+                                                                                                 int64_t& curS,
                                                                                                  GM_ADDR seqS)
 {
     if constexpr (INPUT_LAYOUT == TND) {
         int64_t totalLen = 0;
         for (int64_t bDimIdx = bIdx; bDimIdx < b; bDimIdx++) {
-            totalLen = n1 * ((__gm__ int64_t *)seqS)[bDimIdx] * d;
+            totalLen = n1 * ((__gm__ int64_t*)seqS)[bDimIdx] * d;
             if (totalLen > startIdx) {
                 bIdx = bDimIdx;
-                curS = (bIdx == 0) ? ((__gm__ int64_t *)seqS)[bIdx] :
-                                     (((__gm__ int64_t *)seqS)[bIdx] - ((__gm__ int64_t *)seqS)[bIdx - 1]);
+                curS = (bIdx == 0) ? ((__gm__ int64_t*)seqS)[bIdx] :
+                                     (((__gm__ int64_t*)seqS)[bIdx] - ((__gm__ int64_t*)seqS)[bIdx - 1]);
                 int64_t bTail = startIdx - (totalLen - n1 * curS * d);
                 nIdx = bTail / (curS * d);
                 int64_t nTail = bTail % (curS * d);
@@ -150,7 +150,7 @@ __aicore__ inline void FlashAttentionScoreGradSfmg<T1, T2, TILING_TYPE, INPUT_LA
 {
     int64_t srcOffset = 0;
     if constexpr (INPUT_LAYOUT == TND) {
-        int64_t bOffset = bIdx == 0 ? 0 : n1 * ((__gm__ int64_t *)seqS)[bIdx - 1] * d;
+        int64_t bOffset = bIdx == 0 ? 0 : n1 * ((__gm__ int64_t*)seqS)[bIdx - 1] * d;
         srcOffset = bOffset + (sIdx * n1 + nIdx) * d;
     } else {
         if constexpr (INPUT_LAYOUT == BNGSD) {
@@ -174,7 +174,7 @@ __aicore__ inline void FlashAttentionScoreGradSfmg<T1, T2, TILING_TYPE, INPUT_LA
 
 template <typename T1, typename T2, typename TILING_TYPE, const uint32_t INPUT_LAYOUT>
 __aicore__ inline void FlashAttentionScoreGradSfmg<T1, T2, TILING_TYPE, INPUT_LAYOUT>::CopyInSfmg(int64_t leftNburst,
-                                                                                                  int64_t &curS,
+                                                                                                  int64_t& curS,
                                                                                                   GM_ADDR seqS)
 {
     int64_t dstOffset = 0;
@@ -192,7 +192,7 @@ __aicore__ inline void FlashAttentionScoreGradSfmg<T1, T2, TILING_TYPE, INPUT_LA
                 if (bIdx < b - 1) { // 需要借B
                     bIdx += 1;
                     if constexpr (INPUT_LAYOUT == TND) {
-                        curS = ((__gm__ int64_t *)seqS)[bIdx] - ((__gm__ int64_t *)seqS)[bIdx - 1];
+                        curS = ((__gm__ int64_t*)seqS)[bIdx] - ((__gm__ int64_t*)seqS)[bIdx - 1];
                     } else {
                         curS = s1;
                     }

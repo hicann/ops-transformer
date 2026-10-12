@@ -20,35 +20,46 @@
 using namespace ge;
 
 namespace ops {
-enum InputIdx { qEnum = 0, kEnum, wEnum, attnSoftmaxL1NormEnum, softmaxLse };
+enum InputIdx {
+    qEnum = 0,
+    kEnum,
+    wEnum,
+    attnSoftmaxL1NormEnum,
+    softmaxLse
+};
 
-enum OutputIdx { dqEnum = 0, dkEnum, dwEnum, softmaxOutEnum };
+enum OutputIdx {
+    dqEnum = 0,
+    dkEnum,
+    dwEnum,
+    softmaxOutEnum
+};
 
-ge::graphStatus InferShapeDenseLightningIndexerKLLossGrad(gert::InferShapeContext *context)
+ge::graphStatus InferShapeDenseLightningIndexerKLLossGrad(gert::InferShapeContext* context)
 {
     OP_LOGI(context, "Start enter DenseLightningIndexerKLLossGrad infershape impl.");
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
 
-    const gert::Shape *qShape = context->GetInputShape(qEnum);
+    const gert::Shape* qShape = context->GetInputShape(qEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, qShape);
-    const gert::Shape *kShape = context->GetInputShape(kEnum);
+    const gert::Shape* kShape = context->GetInputShape(kEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, kShape);
-    const gert::Shape *wShape = context->GetInputShape(wEnum);
+    const gert::Shape* wShape = context->GetInputShape(wEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, wShape);
-    const gert::Shape *softmaxShape = context->GetInputShape(attnSoftmaxL1NormEnum);
+    const gert::Shape* softmaxShape = context->GetInputShape(attnSoftmaxL1NormEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxShape);
-    const gert::Shape *softmaxLseShape = context->GetInputShape(softmaxLse);
+    const gert::Shape* softmaxLseShape = context->GetInputShape(softmaxLse);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxLseShape);
 
-    gert::Shape *dqShape = context->GetOutputShape(dqEnum);
+    gert::Shape* dqShape = context->GetOutputShape(dqEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, dqShape);
-    gert::Shape *dkShape = context->GetOutputShape(dkEnum);
+    gert::Shape* dkShape = context->GetOutputShape(dkEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, dkShape);
-    gert::Shape *dwShape = context->GetOutputShape(dwEnum);
+    gert::Shape* dwShape = context->GetOutputShape(dwEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, dwShape);
-    gert::Shape *softmaxOutShape = context->GetOutputShape(softmaxOutEnum);
+    gert::Shape* softmaxOutShape = context->GetOutputShape(softmaxOutEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxOutShape);
 
     *dqShape = *qShape;
@@ -58,7 +69,7 @@ ge::graphStatus InferShapeDenseLightningIndexerKLLossGrad(gert::InferShapeContex
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeDenseLightningIndexerKLLossGrad(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeDenseLightningIndexerKLLossGrad(gert::InferDataTypeContext* context)
 {
     OP_LOGI(context, "Start enter DenseLightningIndexerKLLossGrad infer dtype impl.");
     if (context == nullptr) {

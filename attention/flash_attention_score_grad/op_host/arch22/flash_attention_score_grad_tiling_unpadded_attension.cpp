@@ -20,19 +20,21 @@ namespace optiling {
 
 class FlashAttentionScoreGradTilingUnpaddedAttension : public FlashAttentionScoreGradTilingS1s2Bn2gs1s2 {
 public:
-    explicit FlashAttentionScoreGradTilingUnpaddedAttension(gert::TilingContext *context)
+    explicit FlashAttentionScoreGradTilingUnpaddedAttension(gert::TilingContext* context)
         : FlashAttentionScoreGradTilingS1s2Bn2gs1s2(context)
-    {
-    }
+    {}
 
     bool IsCapable() override
     {
         auto sinkShape = context_->GetOptionalInputShape(SINK_IN);
-        if (sinkShape != nullptr && sinkShape->GetStorageShape().GetDimNum() == 1 ) {
+        if (sinkShape != nullptr && sinkShape->GetStorageShape().GetDimNum() == 1) {
             return false;
         }
-        const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ? context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) : "";
-        if (strcmp(tndSoftmaxIn, "") != 0) return false;
+        const char* tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
+                                       context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) :
+                                       "";
+        if (strcmp(tndSoftmaxIn, "") != 0)
+            return false;
 
         if (tnd2bsh) {
             OP_LOGI(context_, "FlashAttentionScoreGradTilingUnpaddedAttension is not support tnd to bsh.");
@@ -57,9 +59,7 @@ public:
     };
 };
 
-REGISTER_TILING_TEMPLATE_WITH_ARCH(
-    FlashAttentionScoreGrad, FlashAttentionScoreGradTilingUnpaddedAttension,
-    std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}),
-    2000);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGradTilingUnpaddedAttension,
+                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 2000);
 
 } // namespace optiling

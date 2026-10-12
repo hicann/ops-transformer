@@ -56,8 +56,8 @@ constexpr AscendC::Reg::CastTrait castTraitFp322Fp16Even = {
  */
 
 template <typename T1, typename T, uint32_t srcN>
-__aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1> &dstTensor, const LocalTensor<T> &srcTensor,
-                                               const LocalTensor<uint8_t> &selrIndexesTensor, uint32_t srcM)
+__aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1>& dstTensor, const LocalTensor<T>& srcTensor,
+                                               const LocalTensor<uint8_t>& selrIndexesTensor, uint32_t srcM)
 {
     const uint32_t blockSize = 32;
     const uint32_t blockN = blockSize / sizeof(T1); // 16
@@ -83,15 +83,15 @@ __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1> &dstTensor,
 
                 for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
                     LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
-                        vregSrcEven, vregSrcOdd, ((__ubuf__ T *&)srcLocalInt), fullExeSize);
+                        vregSrcEven, vregSrcOdd, ((__ubuf__ T*&)srcLocalInt), fullExeSize);
                     Cast<T1, T, castTraitFp322Fp16Even>(vregCastEven, vregSrcEven, pregFullExe);
                     Cast<T1, T, castTraitFp322Fp16Odd>(vregCastOdd, vregSrcOdd, pregFullExe);
                     // 0101: b16 0001: b32 1111: b8
-                    Or((RegTensor<uint16_t> &)vregCastRes, (RegTensor<uint16_t> &)vregCastEven,
-                       (RegTensor<uint16_t> &)vregCastOdd, pregFullExe);
+                    Or((RegTensor<uint16_t>&)vregCastRes, (RegTensor<uint16_t>&)vregCastEven,
+                       (RegTensor<uint16_t>&)vregCastOdd, pregFullExe);
                     // high 16bits represents stride with each 8 blocks（256B) low 16bits represent repeat stride
                     DataCopy<T1, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                        ((__ubuf__ T1 *&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregFullExe);
+                        ((__ubuf__ T1*&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregFullExe);
                 }
             }
         } else if constexpr (srcN <= 256) {
@@ -112,28 +112,28 @@ __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1> &dstTensor,
                 // 处理左边的32*128
                 for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
                     LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
-                        vregSrcEven, vregSrcOdd, ((__ubuf__ T *&)srcLocalInt), fullExeSize);
+                        vregSrcEven, vregSrcOdd, ((__ubuf__ T*&)srcLocalInt), fullExeSize);
                     Cast<T1, T, castTraitFp322Fp16Even>(vregCastEven, vregSrcEven, pregFullExe);
                     Cast<T1, T, castTraitFp322Fp16Odd>(vregCastOdd, vregSrcOdd, pregFullExe);
                     // 0101: b16 0001: b32 1111: b8
-                    Or((RegTensor<uint16_t> &)vregCastRes, (RegTensor<uint16_t> &)vregCastEven,
-                       (RegTensor<uint16_t> &)vregCastOdd, pregFullExe);
+                    Or((RegTensor<uint16_t>&)vregCastRes, (RegTensor<uint16_t>&)vregCastEven,
+                       (RegTensor<uint16_t>&)vregCastOdd, pregFullExe);
                     // high 16bits represents stride with each 8 blocks（256B) low 16bits represent repeat stride
                     DataCopy<T1, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                        ((__ubuf__ T1 *&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregFullExe);
+                        ((__ubuf__ T1*&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregFullExe);
                 }
                 // 处理右边的32*128
                 for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
                     LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
-                        vregSrcEven, vregSrcOdd, ((__ubuf__ T *&)srcLocalIntTail), fullExeSize);
+                        vregSrcEven, vregSrcOdd, ((__ubuf__ T*&)srcLocalIntTail), fullExeSize);
                     Cast<T1, T, castTraitFp322Fp16Even>(vregCastEven, vregSrcEven, pregFullExe);
                     Cast<T1, T, castTraitFp322Fp16Odd>(vregCastOdd, vregSrcOdd, pregFullExe);
                     // 0101: b16 0001: b32 1111: b8
-                    Or((RegTensor<uint16_t> &)vregCastRes, (RegTensor<uint16_t> &)vregCastEven,
-                       (RegTensor<uint16_t> &)vregCastOdd, pregFullExe);
+                    Or((RegTensor<uint16_t>&)vregCastRes, (RegTensor<uint16_t>&)vregCastEven,
+                       (RegTensor<uint16_t>&)vregCastOdd, pregFullExe);
                     // high 16bits represents stride with each 8 blocks（256B) low 16bits represent repeat stride
                     DataCopy<T1, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                        ((__ubuf__ T1 *&)dstLocalIntTail), vregCastRes, blockStride, repeatStride, pregFullExe);
+                        ((__ubuf__ T1*&)dstLocalIntTail), vregCastRes, blockStride, repeatStride, pregFullExe);
                 }
             }
         }
@@ -152,15 +152,15 @@ __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1> &dstTensor,
 
                 for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
                     LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
-                        vregSrcEven, vregSrcOdd, ((__ubuf__ T *&)srcLocalInt), fullExeSize);
+                        vregSrcEven, vregSrcOdd, ((__ubuf__ T*&)srcLocalInt), fullExeSize);
                     Cast<T1, T, castTraitFp322Fp16Even>(vregCastEven, vregSrcEven, pregFullExe);
                     Cast<T1, T, castTraitFp322Fp16Odd>(vregCastOdd, vregSrcOdd, pregFullExe);
                     // 0101: b16 0001: b32 1111: b8
-                    Or((RegTensor<uint16_t> &)vregCastRes, (RegTensor<uint16_t> &)vregCastEven,
-                       (RegTensor<uint16_t> &)vregCastOdd, pregFullExe);
+                    Or((RegTensor<uint16_t>&)vregCastRes, (RegTensor<uint16_t>&)vregCastEven,
+                       (RegTensor<uint16_t>&)vregCastOdd, pregFullExe);
                     // high 16bits represents stride with each 8 blocks（256B) low 16bits represent repeat stride
                     DataCopy<T1, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                        ((__ubuf__ T1 *&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregFullExe);
+                        ((__ubuf__ T1*&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregFullExe);
                 }
             }
         } else if constexpr (srcN <= 256) {
@@ -181,28 +181,28 @@ __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1> &dstTensor,
                 // 处理左边的32*128
                 for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
                     LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
-                        vregSrcEven, vregSrcOdd, ((__ubuf__ T *&)srcLocalInt), fullExeSize);
+                        vregSrcEven, vregSrcOdd, ((__ubuf__ T*&)srcLocalInt), fullExeSize);
                     Cast<T1, T, castTraitFp322Fp16Even>(vregCastEven, vregSrcEven, pregFullExe);
                     Cast<T1, T, castTraitFp322Fp16Odd>(vregCastOdd, vregSrcOdd, pregFullExe);
                     // 0101: b16 0001: b32 1111: b8
-                    Or((RegTensor<uint16_t> &)vregCastRes, (RegTensor<uint16_t> &)vregCastEven,
-                       (RegTensor<uint16_t> &)vregCastOdd, pregFullExe);
+                    Or((RegTensor<uint16_t>&)vregCastRes, (RegTensor<uint16_t>&)vregCastEven,
+                       (RegTensor<uint16_t>&)vregCastOdd, pregFullExe);
                     // high 16bits represents stride with each 8 blocks（256B) low 16bits represent repeat stride
                     DataCopy<T1, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                        ((__ubuf__ T1 *&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregFullExe);
+                        ((__ubuf__ T1*&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregFullExe);
                 }
                 // 处理右边的32*128
                 for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
                     LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
-                        vregSrcEven, vregSrcOdd, ((__ubuf__ T *&)srcLocalIntTail), fullExeSize);
+                        vregSrcEven, vregSrcOdd, ((__ubuf__ T*&)srcLocalIntTail), fullExeSize);
                     Cast<T1, T, castTraitFp322Fp16Even>(vregCastEven, vregSrcEven, pregFullExe);
                     Cast<T1, T, castTraitFp322Fp16Odd>(vregCastOdd, vregSrcOdd, pregFullExe);
                     // 0101: b16 0001: b32 1111: b8
-                    Or((RegTensor<uint16_t> &)vregCastRes, (RegTensor<uint16_t> &)vregCastEven,
-                       (RegTensor<uint16_t> &)vregCastOdd, pregFullExe);
+                    Or((RegTensor<uint16_t>&)vregCastRes, (RegTensor<uint16_t>&)vregCastEven,
+                       (RegTensor<uint16_t>&)vregCastOdd, pregFullExe);
                     // high 16bits represents stride with each 8 blocks（256B) low 16bits represent repeat stride
                     DataCopy<T1, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                        ((__ubuf__ T1 *&)dstLocalIntTail), vregCastRes, blockStride, repeatStride, pregFullExe);
+                        ((__ubuf__ T1*&)dstLocalIntTail), vregCastRes, blockStride, repeatStride, pregFullExe);
                 }
             }
         }
@@ -215,13 +215,13 @@ __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1> &dstTensor,
             MaskReg pregFullExe = CreateMask<T, MaskPattern::ALL>();
             // [m,n] -> [n1,m1,16,16] -> [n1,m1*16,16] -> [n1,m1*16+1,16]
             for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
-                DataCopy<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrc, ((__ubuf__ T1 *&)srcLocalInt), 64);
-                DataCopy<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcTail, ((__ubuf__ T1 *&)srcLocalInt), 64);
+                DataCopy<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrc, ((__ubuf__ T1*&)srcLocalInt), 64);
+                DataCopy<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcTail, ((__ubuf__ T1*&)srcLocalInt), 64);
                 // high 16bits represents stride with each 8 blocks（256B) low 16bits represent repeat stride
                 DataCopy<T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    ((__ubuf__ T *&)dstLocalInt), vregSrc, blockStride, repeatStride, pregFullExe);
+                    ((__ubuf__ T*&)dstLocalInt), vregSrc, blockStride, repeatStride, pregFullExe);
                 DataCopy<T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    ((__ubuf__ T *&)dstLocalIntTail), vregSrcTail, blockStride, repeatStride, pregFullExe);
+                    ((__ubuf__ T*&)dstLocalIntTail), vregSrcTail, blockStride, repeatStride, pregFullExe);
             }
         }
     } else if constexpr (IsSameType<T1, fp8_e5m2_t>::value || IsSameType<T1, fp8_e4m3fn_t>::value ||
@@ -243,19 +243,19 @@ __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1> &dstTensor,
 
                 for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
                     LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
-                        vregSrcEven, vregSrcOdd, ((__ubuf__ T *&)srcLocalInt), fullExeSize);
+                        vregSrcEven, vregSrcOdd, ((__ubuf__ T*&)srcLocalInt), fullExeSize);
                     Cast<T1, T, castTraitFp322Fp8Zero<IsSameType<T1, hifloat8_t>::value>>(vregCastEven, vregSrcEven,
                                                                                           preg_all);
                     Cast<T1, T, castTraitFp322Fp8Two<IsSameType<T1, hifloat8_t>::value>>(vregCastOdd, vregSrcOdd,
                                                                                          preg_all);
-                    Or((RegTensor<uint8_t> &)vregCastResTmp, (RegTensor<uint8_t> &)vregCastEven,
-                       (RegTensor<uint8_t> &)vregCastOdd, preg_all_b8);
-                    DataCopy<uint8_t, Reg::LoadDist::DIST_NORM>((RegTensor<uint8_t> &)vregIndexes,
-                                                                ((__ubuf__ uint8_t *&)selrIndexesInt));
-                    Gather<uint8_t>((RegTensor<uint8_t> &)vregCastRes, (RegTensor<uint8_t> &)vregCastResTmp,
-                                    (RegTensor<uint8_t> &)vregIndexes);
+                    Or((RegTensor<uint8_t>&)vregCastResTmp, (RegTensor<uint8_t>&)vregCastEven,
+                       (RegTensor<uint8_t>&)vregCastOdd, preg_all_b8);
+                    DataCopy<uint8_t, Reg::LoadDist::DIST_NORM>((RegTensor<uint8_t>&)vregIndexes,
+                                                                ((__ubuf__ uint8_t*&)selrIndexesInt));
+                    Gather<uint8_t>((RegTensor<uint8_t>&)vregCastRes, (RegTensor<uint8_t>&)vregCastResTmp,
+                                    (RegTensor<uint8_t>&)vregIndexes);
                     DataCopy<T1, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                        ((__ubuf__ T1 *&)dstLocalInt), vregCastRes, blockStride, repeatStride, preg_all_b8);
+                        ((__ubuf__ T1*&)dstLocalInt), vregCastRes, blockStride, repeatStride, preg_all_b8);
                 }
             }
         } else if constexpr (srcN <= 256) {
@@ -277,35 +277,35 @@ __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1> &dstTensor,
 
                 for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
                     LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
-                        vregSrcEven, vregSrcOdd, ((__ubuf__ T *&)srcLocalInt), fullExeSize);
+                        vregSrcEven, vregSrcOdd, ((__ubuf__ T*&)srcLocalInt), fullExeSize);
                     Cast<T1, T, castTraitFp322Fp8Zero<IsSameType<T1, hifloat8_t>::value>>(vregCastEven, vregSrcEven,
                                                                                           preg_all);
                     Cast<T1, T, castTraitFp322Fp8Two<IsSameType<T1, hifloat8_t>::value>>(vregCastOdd, vregSrcOdd,
                                                                                          preg_all);
-                    Or((RegTensor<uint8_t> &)vregCastResTmp, (RegTensor<uint8_t> &)vregCastEven,
-                       (RegTensor<uint8_t> &)vregCastOdd, preg_all_b8);
-                    DataCopy<uint8_t, Reg::LoadDist::DIST_NORM>((RegTensor<uint8_t> &)vregIndexes,
-                                                                ((__ubuf__ uint8_t *&)selrIndexesInt));
-                    Gather<uint8_t>((RegTensor<uint8_t> &)vregCastRes, (RegTensor<uint8_t> &)vregCastResTmp,
-                                    (RegTensor<uint8_t> &)vregIndexes);
+                    Or((RegTensor<uint8_t>&)vregCastResTmp, (RegTensor<uint8_t>&)vregCastEven,
+                       (RegTensor<uint8_t>&)vregCastOdd, preg_all_b8);
+                    DataCopy<uint8_t, Reg::LoadDist::DIST_NORM>((RegTensor<uint8_t>&)vregIndexes,
+                                                                ((__ubuf__ uint8_t*&)selrIndexesInt));
+                    Gather<uint8_t>((RegTensor<uint8_t>&)vregCastRes, (RegTensor<uint8_t>&)vregCastResTmp,
+                                    (RegTensor<uint8_t>&)vregIndexes);
                     DataCopy<T1, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                        ((__ubuf__ T1 *&)dstLocalInt), vregCastRes, blockStride, repeatStride, preg_all_b8);
+                        ((__ubuf__ T1*&)dstLocalInt), vregCastRes, blockStride, repeatStride, preg_all_b8);
                 }
                 for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
                     LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
-                        vregSrcEven, vregSrcOdd, ((__ubuf__ T *&)srcLocalIntTail), fullExeSize);
+                        vregSrcEven, vregSrcOdd, ((__ubuf__ T*&)srcLocalIntTail), fullExeSize);
                     Cast<T1, T, castTraitFp322Fp8Zero<IsSameType<T1, hifloat8_t>::value>>(vregCastEven, vregSrcEven,
                                                                                           preg_all);
                     Cast<T1, T, castTraitFp322Fp8Two<IsSameType<T1, hifloat8_t>::value>>(vregCastOdd, vregSrcOdd,
                                                                                          preg_all);
-                    Or((RegTensor<uint8_t> &)vregCastResTmp, (RegTensor<uint8_t> &)vregCastEven,
-                       (RegTensor<uint8_t> &)vregCastOdd, preg_all_b8);
-                    DataCopy<uint8_t, Reg::LoadDist::DIST_NORM>((RegTensor<uint8_t> &)vregIndexes,
-                                                                ((__ubuf__ uint8_t *&)selrIndexesIntTail));
-                    Gather<uint8_t>((RegTensor<uint8_t> &)vregCastRes, (RegTensor<uint8_t> &)vregCastResTmp,
-                                    (RegTensor<uint8_t> &)vregIndexes);
+                    Or((RegTensor<uint8_t>&)vregCastResTmp, (RegTensor<uint8_t>&)vregCastEven,
+                       (RegTensor<uint8_t>&)vregCastOdd, preg_all_b8);
+                    DataCopy<uint8_t, Reg::LoadDist::DIST_NORM>((RegTensor<uint8_t>&)vregIndexes,
+                                                                ((__ubuf__ uint8_t*&)selrIndexesIntTail));
+                    Gather<uint8_t>((RegTensor<uint8_t>&)vregCastRes, (RegTensor<uint8_t>&)vregCastResTmp,
+                                    (RegTensor<uint8_t>&)vregIndexes);
                     DataCopy<T1, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                        ((__ubuf__ T1 *&)dstLocalIntTail), vregCastRes, blockStride, repeatStride, preg_all_b8);
+                        ((__ubuf__ T1*&)dstLocalIntTail), vregCastRes, blockStride, repeatStride, preg_all_b8);
                 }
             }
         }
@@ -313,8 +313,8 @@ __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1> &dstTensor,
 }
 #else
 template <typename T1, typename T, uint32_t srcN>
-__aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1> &dstTensor, const LocalTensor<T> &srcTensor,
-                                               const LocalTensor<uint8_t> &selrIndexesTensor, uint32_t srcM)
+__aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1>& dstTensor, const LocalTensor<T>& srcTensor,
+                                               const LocalTensor<uint8_t>& selrIndexesTensor, uint32_t srcM)
 {}
 #endif
 } // namespace AscendC

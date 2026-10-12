@@ -57,7 +57,7 @@ public:
 
     static constexpr uint32_t SPLIT_COL_IDX_2 = 2;
     static constexpr uint32_t SPLIT_COL_IDX_3 = 3;
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource, float scaleValue_)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource, float scaleValue_)
     {
         // Allocate UB space
         constexpr uint32_t LS_UB_TENSOR_OFFSET = 0;
@@ -122,7 +122,7 @@ public:
         AscendC::SetVectorMask<int8_t>(maskValue, maskValue);
     }
 
-    __aicore__ inline void ReduceSumByPair(const AscendC::LocalTensor<half> &srcUb, uint32_t numRowsRound,
+    __aicore__ inline void ReduceSumByPair(const AscendC::LocalTensor<half>& srcUb, uint32_t numRowsRound,
                                            uint32_t loopCount, uint32_t columnStrideIndex, uint8_t dataBlockStride,
                                            uint8_t repeatStride)
     {
@@ -137,8 +137,8 @@ public:
         }
     }
 
-    __aicore__ inline void RowsumTileFlexible(const AscendC::LocalTensor<half> &srcUb,
-                                              const AscendC::LocalTensor<half> &rowsumUb, uint32_t numRowsRound,
+    __aicore__ inline void RowsumTileFlexible(const AscendC::LocalTensor<half>& srcUb,
+                                              const AscendC::LocalTensor<half>& rowsumUb, uint32_t numRowsRound,
                                               uint32_t numElemsAligned)
     {
         // Vector计算单元每个迭代最多处理256Byte数据，因此half低精度场景，每次迭代最多处理256/2=128个元素
@@ -162,25 +162,25 @@ public:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void RowsumSPECTILE1024(const AscendC::LocalTensor<half> &srcUb,
-                                              const AscendC::LocalTensor<half> &rowsumUb,
-                                              const AscendC::LocalTensor<half> &tvUbTensor, uint32_t numRowsRound,
+    __aicore__ inline void RowsumSPECTILE1024(const AscendC::LocalTensor<half>& srcUb,
+                                              const AscendC::LocalTensor<half>& rowsumUb,
+                                              const AscendC::LocalTensor<half>& tvUbTensor, uint32_t numRowsRound,
                                               uint32_t numElems, uint32_t numElemsAligned)
     {
         RowsumTileFlexible(srcUb, rowsumUb, numRowsRound, numElemsAligned);
     }
 
-    __aicore__ inline void RowsumSPECTILE512(const AscendC::LocalTensor<half> &srcUb,
-                                             const AscendC::LocalTensor<half> &rowsumUb,
-                                             const AscendC::LocalTensor<half> &tvUbTensor, uint32_t numRowsRound,
+    __aicore__ inline void RowsumSPECTILE512(const AscendC::LocalTensor<half>& srcUb,
+                                             const AscendC::LocalTensor<half>& rowsumUb,
+                                             const AscendC::LocalTensor<half>& tvUbTensor, uint32_t numRowsRound,
                                              uint32_t numElems, uint32_t numElemsAligned)
     {
         RowsumTileFlexible(srcUb, rowsumUb, numRowsRound, numElemsAligned);
     }
 
-    __aicore__ inline void RowsumTAILTILE(const AscendC::LocalTensor<half> &srcUb,
-                                          const AscendC::LocalTensor<half> &rowsumUb,
-                                          const AscendC::LocalTensor<half> &tvUbTensor, uint32_t numRowsRound,
+    __aicore__ inline void RowsumTAILTILE(const AscendC::LocalTensor<half>& srcUb,
+                                          const AscendC::LocalTensor<half>& rowsumUb,
+                                          const AscendC::LocalTensor<half>& tvUbTensor, uint32_t numRowsRound,
                                           uint32_t numElems, uint32_t numElemsAligned)
     {
         if (numElems <= HALF_VECTOR_SIZE) {
@@ -211,8 +211,8 @@ public:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void ReduceMaxByPair(const AscendC::LocalTensor<half> &dstUb,
-                                           const AscendC::LocalTensor<half> &srcUb, uint32_t numRowsRound,
+    __aicore__ inline void ReduceMaxByPair(const AscendC::LocalTensor<half>& dstUb,
+                                           const AscendC::LocalTensor<half>& srcUb, uint32_t numRowsRound,
                                            uint32_t loopCount, uint32_t columnStrideIndex, uint8_t dataBlockStride,
                                            uint8_t repeatStride)
     {
@@ -227,8 +227,8 @@ public:
         }
     }
 
-    __aicore__ inline void RowmaxTileFlexible(const AscendC::LocalTensor<half> &srcUb,
-                                              const AscendC::LocalTensor<half> &rowmaxUb, uint32_t numRowsRound,
+    __aicore__ inline void RowmaxTileFlexible(const AscendC::LocalTensor<half>& srcUb,
+                                              const AscendC::LocalTensor<half>& rowmaxUb, uint32_t numRowsRound,
                                               uint32_t numElemsAligned)
     {
         // Vector计算单元每个迭代最多处理256Byte数据，因此half低精度场景，每次迭代最多处理256/2=128个元素
@@ -260,25 +260,25 @@ public:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void RowmaxSPECTILE1024(const AscendC::LocalTensor<half> &srcUb,
-                                              const AscendC::LocalTensor<half> &rowmaxUb,
-                                              const AscendC::LocalTensor<half> &tvUbTensor, uint32_t numRowsRound,
+    __aicore__ inline void RowmaxSPECTILE1024(const AscendC::LocalTensor<half>& srcUb,
+                                              const AscendC::LocalTensor<half>& rowmaxUb,
+                                              const AscendC::LocalTensor<half>& tvUbTensor, uint32_t numRowsRound,
                                               uint32_t numElems, uint32_t numElemsAligned)
     {
         RowmaxTileFlexible(srcUb, rowmaxUb, numRowsRound, numElemsAligned);
     }
 
-    __aicore__ inline void RowmaxSPECTILE512(const AscendC::LocalTensor<half> &srcUb,
-                                             const AscendC::LocalTensor<half> &rowmaxUb,
-                                             const AscendC::LocalTensor<half> &tvUbTensor, uint32_t numRowsRound,
+    __aicore__ inline void RowmaxSPECTILE512(const AscendC::LocalTensor<half>& srcUb,
+                                             const AscendC::LocalTensor<half>& rowmaxUb,
+                                             const AscendC::LocalTensor<half>& tvUbTensor, uint32_t numRowsRound,
                                              uint32_t numElems, uint32_t numElemsAligned)
     {
         RowmaxTileFlexible(srcUb, rowmaxUb, numRowsRound, numElemsAligned);
     }
 
-    __aicore__ inline void RowmaxTAILTILE(const AscendC::LocalTensor<half> &srcUb,
-                                          const AscendC::LocalTensor<half> &rowmaxUb,
-                                          const AscendC::LocalTensor<half> &tvUbTensor, uint32_t numRowsRound,
+    __aicore__ inline void RowmaxTAILTILE(const AscendC::LocalTensor<half>& srcUb,
+                                          const AscendC::LocalTensor<half>& rowmaxUb,
+                                          const AscendC::LocalTensor<half>& tvUbTensor, uint32_t numRowsRound,
                                           uint32_t numElems, uint32_t numElemsAligned)
     {
         if (numElems <= HALF_VECTOR_SIZE) {
@@ -362,8 +362,8 @@ public:
     }
 
     template <typename ElementMaskDst, typename ElementMaskSrc>
-    __aicore__ inline void UpCastMask(const AscendC::LocalTensor<ElementMaskDst> &maskUbTensorDst,
-                                      const AscendC::LocalTensor<ElementMaskSrc> &maskUbTensorSrc,
+    __aicore__ inline void UpCastMask(const AscendC::LocalTensor<ElementMaskDst>& maskUbTensorDst,
+                                      const AscendC::LocalTensor<ElementMaskSrc>& maskUbTensorSrc,
                                       uint32_t rowNumCurLoop, uint32_t columnNumRound)
     {
         AscendC::Cast<ElementMaskDst, ElementMaskSrc, false>(
@@ -546,7 +546,7 @@ public:
     }
 
     __aicore__ inline void SubCoreCompute(AscendC::GlobalTensor<ElementOutput> gOutput,
-                                          const LayoutOutput &layoutOutput, uint32_t rowOffset,
+                                          const LayoutOutput& layoutOutput, uint32_t rowOffset,
                                           uint32_t isFirstStackTile, uint32_t isFirstRowLoop, uint32_t columnNumRound,
                                           uint32_t pingpongFlag, uint32_t curStackTileMod,
                                           Arch::CrossCoreFlag softmaxFlag, uint32_t isLastLoop)
@@ -588,7 +588,7 @@ public:
     }
 
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<half> gInput,
-                                      const LayoutOutput &layoutOutput, const LayoutInput &layoutInput,
+                                      const LayoutOutput& layoutOutput, const LayoutInput& layoutInput,
                                       GemmCoord actualBlockShape, uint32_t isFirstStackTile,
                                       uint32_t isLastNoMaskStackTile, uint32_t qSBlockSize, uint32_t qNBlockSize,
                                       uint32_t curStackTileMod, Arch::CrossCoreFlag softmaxFlag)
@@ -643,8 +643,8 @@ public:
     }
 
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<half> gInput,
-                                      AscendC::GlobalTensor<ElementMask> gMask, const LayoutOutput &layoutOutput,
-                                      const LayoutInput &layoutInput, const LayoutInput &layoutMask,
+                                      AscendC::GlobalTensor<ElementMask> gMask, const LayoutOutput& layoutOutput,
+                                      const LayoutInput& layoutInput, const LayoutInput& layoutMask,
                                       GemmCoord actualBlockShape, uint32_t isFirstStackTile, uint32_t qSBlockSize,
                                       uint32_t qNBlockSize, uint32_t curStackTileMod, Arch::CrossCoreFlag qkReady,
                                       uint32_t triUp, uint32_t triDown, uint32_t kvSStartIdx, uint32_t kvSEndIdx,

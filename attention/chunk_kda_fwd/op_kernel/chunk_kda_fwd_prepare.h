@@ -170,42 +170,42 @@ public:
                                 GM_ADDR cuSeqlens, GM_ADDR chunkIndices, GM_ADDR preparedQG, GM_ADDR preparedAqk,
                                 GM_ADDR propagatedVNew, GM_ADDR propagatedH, GM_ADDR o, GM_ADDR finalState, GM_ADDR aqk,
                                 GM_ADDR akk, GM_ADDR w, GM_ADDR u, GM_ADDR qg, GM_ADDR kg, GM_ADDR vNew, GM_ADDR h,
-                                GM_ADDR workspace, const TilingData &tiling, TPipe *pipe, bool initVecBuffers = true)
+                                GM_ADDR workspace, const TilingData& tiling, TPipe* pipe, bool initVecBuffers = true)
     {
         pipe_ = pipe;
-        q_.SetGlobalBuffer((__gm__ T *)q);
-        k_.SetGlobalBuffer((__gm__ T *)k);
-        v_.SetGlobalBuffer((__gm__ T *)v);
-        gk_.SetGlobalBuffer((__gm__ GK_T *)gk);
-        beta_.SetGlobalBuffer((__gm__ BETA_T *)beta);
+        q_.SetGlobalBuffer((__gm__ T*)q);
+        k_.SetGlobalBuffer((__gm__ T*)k);
+        v_.SetGlobalBuffer((__gm__ T*)v);
+        gk_.SetGlobalBuffer((__gm__ GK_T*)gk);
+        beta_.SetGlobalBuffer((__gm__ BETA_T*)beta);
         if (initialState != nullptr) {
-            initialState_.SetGlobalBuffer((__gm__ float *)initialState);
+            initialState_.SetGlobalBuffer((__gm__ float*)initialState);
         }
-        cuSeqlensAddr_ = reinterpret_cast<__gm__ int64_t *>(cuSeqlens);
+        cuSeqlensAddr_ = reinterpret_cast<__gm__ int64_t*>(cuSeqlens);
         if (preparedQG != nullptr) {
-            preparedQG_.SetGlobalBuffer((__gm__ T *)preparedQG);
+            preparedQG_.SetGlobalBuffer((__gm__ T*)preparedQG);
         }
         if (preparedAqk != nullptr) {
-            preparedAqk_.SetGlobalBuffer((__gm__ T *)preparedAqk);
+            preparedAqk_.SetGlobalBuffer((__gm__ T*)preparedAqk);
         }
         if (propagatedVNew != nullptr) {
-            propagatedVNew_.SetGlobalBuffer((__gm__ T *)propagatedVNew);
+            propagatedVNew_.SetGlobalBuffer((__gm__ T*)propagatedVNew);
         }
         if (propagatedH != nullptr) {
-            propagatedH_.SetGlobalBuffer((__gm__ T *)propagatedH);
+            propagatedH_.SetGlobalBuffer((__gm__ T*)propagatedH);
         }
-        chunkIndicesAddr_ = reinterpret_cast<__gm__ int64_t *>(chunkIndices);
-        o_.SetGlobalBuffer((__gm__ OUT_T *)o);
-        finalState_.SetGlobalBuffer((__gm__ float *)finalState);
-        aqk_.SetGlobalBuffer((__gm__ float *)aqk);
-        akk_.SetGlobalBuffer((__gm__ AKK_T *)akk);
-        w_.SetGlobalBuffer((__gm__ T *)w);
-        u_.SetGlobalBuffer((__gm__ OUT_T *)u);
-        qg_.SetGlobalBuffer((__gm__ T *)qg);
-        kg_.SetGlobalBuffer((__gm__ T *)kg);
-        vNew_.SetGlobalBuffer((__gm__ T *)vNew);
-        h_.SetGlobalBuffer((__gm__ float *)h);
-        solveWorkspace_.SetGlobalBuffer((__gm__ float *)workspace);
+        chunkIndicesAddr_ = reinterpret_cast<__gm__ int64_t*>(chunkIndices);
+        o_.SetGlobalBuffer((__gm__ OUT_T*)o);
+        finalState_.SetGlobalBuffer((__gm__ float*)finalState);
+        aqk_.SetGlobalBuffer((__gm__ float*)aqk);
+        akk_.SetGlobalBuffer((__gm__ AKK_T*)akk);
+        w_.SetGlobalBuffer((__gm__ T*)w);
+        u_.SetGlobalBuffer((__gm__ OUT_T*)u);
+        qg_.SetGlobalBuffer((__gm__ T*)qg);
+        kg_.SetGlobalBuffer((__gm__ T*)kg);
+        vNew_.SetGlobalBuffer((__gm__ T*)vNew);
+        h_.SetGlobalBuffer((__gm__ float*)h);
+        solveWorkspace_.SetGlobalBuffer((__gm__ float*)workspace);
 
         B_ = tiling.batch;
         N_ = tiling.seqNum;
@@ -226,7 +226,7 @@ public:
             usedCoreNum_ * solvePipelineDepth * KDA_SOLVE_SCRATCH_SLOTS * BT_ * BT_ * sizeof(float);
         const uint64_t alignedSolveBytes =
             (solveBytes + KDA_WORKSPACE_ALIGN - 1) / KDA_WORKSPACE_ALIGN * KDA_WORKSPACE_ALIGN;
-        scoreWorkspace_.SetGlobalBuffer((__gm__ SCORE_T *)(workspace + alignedSolveBytes));
+        scoreWorkspace_.SetGlobalBuffer((__gm__ SCORE_T*)(workspace + alignedSolveBytes));
         if ASCEND_IS_AIV {
             uint64_t subBlockNum = static_cast<uint64_t>(GetSubBlockNum());
             solveCoreIdx_ = subBlockNum == 0 ? 0 : static_cast<uint64_t>(GetBlockIdx()) / subBlockNum;
@@ -382,7 +382,7 @@ private:
         return start + ref;
     }
 
-    __aicore__ inline void RunExp2(LocalTensor<float> &tensor, uint32_t count)
+    __aicore__ inline void RunExp2(LocalTensor<float>& tensor, uint32_t count)
     {
         SetFlag<HardEvent::S_V>(EXP2_EVENT_ID);
         WaitFlag<HardEvent::S_V>(EXP2_EVENT_ID);
@@ -393,7 +393,7 @@ private:
         WaitFlag<HardEvent::V_S>(EXP2_EVENT_ID);
     }
 
-    __aicore__ inline void ClampExpInput(LocalTensor<float> &tensor, uint32_t count)
+    __aicore__ inline void ClampExpInput(LocalTensor<float>& tensor, uint32_t count)
     {
         Mins(tensor, tensor, KDA_EXP_INPUT_MAX, count);
         PipeBarrier<PIPE_V>();
@@ -401,7 +401,7 @@ private:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void ClampScoreExpInput(LocalTensor<float> &tensor, uint32_t count)
+    __aicore__ inline void ClampScoreExpInput(LocalTensor<float>& tensor, uint32_t count)
     {
         constexpr float expInputMax =
             IsSameType<SCORE_T, bfloat16_t>::value ? KDA_SCORE_EXP_INPUT_MAX : KDA_EXP_INPUT_MAX;
@@ -414,7 +414,7 @@ private:
     }
 
     template <typename OutputT>
-    __aicore__ inline void ClampFp32ForCast(LocalTensor<float> &tensor, uint32_t count)
+    __aicore__ inline void ClampFp32ForCast(LocalTensor<float>& tensor, uint32_t count)
     {
         if constexpr (IsSameType<OutputT, half>::value) {
             Mins(tensor, tensor, KDA_FP16_MAX, count);
@@ -424,13 +424,13 @@ private:
         }
     }
 
-    __aicore__ inline void ClampFp32ToOutputType(LocalTensor<float> &tensor, uint32_t count)
+    __aicore__ inline void ClampFp32ToOutputType(LocalTensor<float>& tensor, uint32_t count)
     {
         ClampFp32ForCast<T>(tensor, count);
     }
 
     template <typename CopyT>
-    __aicore__ inline void CopyVectorIn(LocalTensor<CopyT> &dst, GlobalTensor<CopyT> &src, uint64_t offset,
+    __aicore__ inline void CopyVectorIn(LocalTensor<CopyT>& dst, GlobalTensor<CopyT>& src, uint64_t offset,
                                         uint64_t count)
     {
         uint64_t rowBytes = count * static_cast<uint64_t>(sizeof(CopyT));
@@ -444,7 +444,7 @@ private:
     }
 
     template <typename CopyT>
-    __aicore__ inline void CopyRowsIn(LocalTensor<CopyT> &dst, GlobalTensor<CopyT> &src, uint64_t offset, uint64_t rows,
+    __aicore__ inline void CopyRowsIn(LocalTensor<CopyT>& dst, GlobalTensor<CopyT>& src, uint64_t offset, uint64_t rows,
                                       uint64_t cols, uint64_t rowStride)
     {
         if (rows == 0 || cols == 0) {
@@ -461,7 +461,7 @@ private:
     }
 
     template <typename CopyT>
-    __aicore__ inline void CopyVectorOut(GlobalTensor<CopyT> &dst, uint64_t offset, LocalTensor<CopyT> &src,
+    __aicore__ inline void CopyVectorOut(GlobalTensor<CopyT>& dst, uint64_t offset, LocalTensor<CopyT>& src,
                                          uint64_t count)
     {
         uint64_t rowBytes = count * static_cast<uint64_t>(sizeof(CopyT));
@@ -474,13 +474,13 @@ private:
     }
 
     template <typename CopyT>
-    __aicore__ inline void CopyRowIn(LocalTensor<CopyT> &dst, GlobalTensor<CopyT> &src, uint64_t offset)
+    __aicore__ inline void CopyRowIn(LocalTensor<CopyT>& dst, GlobalTensor<CopyT>& src, uint64_t offset)
     {
         CopyVectorIn(dst, src, offset, K_);
     }
 
     template <typename CopyT>
-    __aicore__ inline void CopyRowOut(GlobalTensor<CopyT> &dst, uint64_t offset, LocalTensor<CopyT> &src)
+    __aicore__ inline void CopyRowOut(GlobalTensor<CopyT>& dst, uint64_t offset, LocalTensor<CopyT>& src)
     {
         CopyVectorOut(dst, offset, src, K_);
     }
@@ -584,7 +584,7 @@ private:
     }
 
     template <typename CopyT>
-    __aicore__ inline void LoadAsFloatRow(GlobalTensor<CopyT> &src, uint64_t srcOffset, LocalTensor<float> &dst,
+    __aicore__ inline void LoadAsFloatRow(GlobalTensor<CopyT>& src, uint64_t srcOffset, LocalTensor<float>& dst,
                                           uint64_t count)
     {
         if constexpr (IsSameType<CopyT, float>::value) {
@@ -610,8 +610,8 @@ private:
     }
 
     template <typename CopyT>
-    __aicore__ inline void LoadAsFloatVector(GlobalTensor<CopyT> &src, uint64_t srcOffset, LocalTensor<float> &dst,
-                                             LocalTensor<CopyT> &typedScratch, uint64_t count)
+    __aicore__ inline void LoadAsFloatVector(GlobalTensor<CopyT>& src, uint64_t srcOffset, LocalTensor<float>& dst,
+                                             LocalTensor<CopyT>& typedScratch, uint64_t count)
     {
         if constexpr (IsSameType<CopyT, float>::value) {
             CopyVectorIn(dst, src, srcOffset, count);
@@ -627,7 +627,7 @@ private:
     }
 
     template <typename CopyT>
-    __aicore__ inline void StoreFloatRow(GlobalTensor<CopyT> &dst, uint64_t dstOffset, LocalTensor<float> &src,
+    __aicore__ inline void StoreFloatRow(GlobalTensor<CopyT>& dst, uint64_t dstOffset, LocalTensor<float>& src,
                                          uint64_t count)
     {
         if constexpr (IsSameType<CopyT, float>::value) {
@@ -1236,8 +1236,8 @@ private:
     __aicore__ inline void BuildCausalSelectMasks(LocalTensor<uint8_t> aqkMask, LocalTensor<uint8_t> akkMask,
                                                   uint64_t rowBegin, uint64_t rowCount, uint64_t colBegin)
     {
-        __ubuf__ uint64_t *aqkMaskPtr = reinterpret_cast<__ubuf__ uint64_t *>(aqkMask.GetPhyAddr());
-        __ubuf__ uint64_t *akkMaskPtr = reinterpret_cast<__ubuf__ uint64_t *>(akkMask.GetPhyAddr());
+        __ubuf__ uint64_t* aqkMaskPtr = reinterpret_cast<__ubuf__ uint64_t*>(aqkMask.GetPhyAddr());
+        __ubuf__ uint64_t* akkMaskPtr = reinterpret_cast<__ubuf__ uint64_t*>(akkMask.GetPhyAddr());
         for (uint32_t localRow = 0; localRow < rowCount; ++localRow) {
             uint32_t row = static_cast<uint32_t>(rowBegin + localRow);
             aqkMaskPtr[localRow] = BuildCausalMask(static_cast<uint64_t>(row) + 1, colBegin);
@@ -1388,7 +1388,7 @@ private:
     }
 
     __aicore__ inline void GetSolveRowRange(uint64_t curT, uint64_t subBlockIdx, uint64_t subBlockNum,
-                                            uint64_t &rowBegin, uint64_t &rowEnd) const
+                                            uint64_t& rowBegin, uint64_t& rowEnd) const
     {
         if (subBlockNum == 0 || subBlockIdx >= subBlockNum) {
             rowBegin = 0;
@@ -1487,9 +1487,9 @@ private:
         WaitFlag<HardEvent::MTE3_V>(mte3ToVEvent_);
     }
 
-    __aicore__ inline void CubeGemmSolveSub(GlobalTensor<float> &tensorA, uint64_t baseA, uint64_t rowA, uint64_t colA,
-                                            GlobalTensor<float> &tensorB, uint64_t baseB, uint64_t rowB, uint64_t colB,
-                                            GlobalTensor<float> &tensorC, uint64_t baseC, uint64_t rowC, uint64_t colC,
+    __aicore__ inline void CubeGemmSolveSub(GlobalTensor<float>& tensorA, uint64_t baseA, uint64_t rowA, uint64_t colA,
+                                            GlobalTensor<float>& tensorB, uint64_t baseB, uint64_t rowB, uint64_t colB,
+                                            GlobalTensor<float>& tensorC, uint64_t baseC, uint64_t rowC, uint64_t colC,
                                             uint32_t m, uint32_t n, uint32_t k)
     {
         using ElementA = float;
@@ -1798,10 +1798,10 @@ private:
         Catlass::Arch::CrossCoreSetFlagWithReverse<0x2, PIPE_FIX>(mchSyncDoneFlag_);
     }
 
-    __aicore__ inline void ScaleRowsByBeta(GlobalTensor<T> &src, GlobalTensor<T> &dst, uint64_t b, uint64_t hv,
+    __aicore__ inline void ScaleRowsByBeta(GlobalTensor<T>& src, GlobalTensor<T>& dst, uint64_t b, uint64_t hv,
                                            uint64_t start, uint64_t rowBegin, uint64_t rowCount, uint64_t dim,
-                                           LocalTensor<float> &betaLocal, LocalTensor<float> &betaBrcb,
-                                           LocalTensor<float> &matrixLocal, bool sourceSequenceMajor = false)
+                                           LocalTensor<float>& betaLocal, LocalTensor<float>& betaBrcb,
+                                           LocalTensor<float>& matrixLocal, bool sourceSequenceMajor = false)
     {
         constexpr uint64_t vecElemsPerRepeat = 64;
         constexpr uint64_t typedOffsetFloats = 20480;
@@ -1929,8 +1929,8 @@ private:
         }
     }
 
-    __aicore__ inline bool ResolveFlatChunk(uint64_t task, uint64_t &seq, uint64_t &b, uint64_t &h, uint64_t &hv,
-                                            uint64_t &chunkIdx, uint64_t &start, uint64_t &end)
+    __aicore__ inline bool ResolveFlatChunk(uint64_t task, uint64_t& seq, uint64_t& b, uint64_t& h, uint64_t& hv,
+                                            uint64_t& chunkIdx, uint64_t& start, uint64_t& end)
     {
         hv = task % HV_;
         uint64_t flatChunk = task / HV_;
@@ -2209,8 +2209,8 @@ private:
         }
     }
 
-    __aicore__ inline bool ResolveFlatChunkForHv(uint64_t flatChunk, uint64_t hv, uint64_t &seq, uint64_t &b,
-                                                 uint64_t &h, uint64_t &chunkIdx, uint64_t &start, uint64_t &end)
+    __aicore__ inline bool ResolveFlatChunkForHv(uint64_t flatChunk, uint64_t hv, uint64_t& seq, uint64_t& b,
+                                                 uint64_t& h, uint64_t& chunkIdx, uint64_t& start, uint64_t& end)
     {
         if (!isVarLen_) {
             seq = flatChunk / NT_;
@@ -2450,7 +2450,7 @@ private:
     GlobalTensor<T> propagatedH_;
     GlobalTensor<float> solveWorkspace_;
     GlobalTensor<SCORE_T> scoreWorkspace_;
-    TPipe *pipe_ = nullptr;
+    TPipe* pipe_ = nullptr;
     TBuf<TPosition::VECCALC> exp2Buf_;
     TBuf<TPosition::VECCALC> vecBuf_;
     TBuf<TPosition::VECCALC> gateWritebackBuf_;
@@ -2490,8 +2490,8 @@ private:
     uint64_t usedCoreNum_ = 1;
     uint64_t solveCoreIdx_ = 0;
     uint64_t activeSolveSlot_ = 0;
-    __gm__ int64_t *chunkIndicesAddr_ = nullptr;
-    __gm__ int64_t *cuSeqlensAddr_ = nullptr;
+    __gm__ int64_t* chunkIndicesAddr_ = nullptr;
+    __gm__ int64_t* cuSeqlensAddr_ = nullptr;
 };
 } // namespace
 
@@ -2499,7 +2499,7 @@ template <bool SAFE_GATE, typename T, typename GK_T, typename BETA_T, typename T
 __aicore__ inline void RunChunkKdaPrepare(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR gk, GM_ADDR beta,
                                           GM_ADDR initialState, GM_ADDR cuSeqlens, GM_ADDR chunkIndices, GM_ADDR aqk,
                                           GM_ADDR akk, GM_ADDR qg, GM_ADDR qgScaled, GM_ADDR wSeed, GM_ADDR uSeed,
-                                          GM_ADDR userWorkspace, const TilingData &tiling, TPipe &pipe)
+                                          GM_ADDR userWorkspace, const TilingData& tiling, TPipe& pipe)
 {
     GM_ADDR aqkFp32 = userWorkspace + tiling.prepareAqkFp32Offset;
     GM_ADDR akkFp32 = userWorkspace + tiling.prepareAkkFp32Offset;
@@ -2526,8 +2526,8 @@ template <bool SAFE_GATE, typename T, typename GK_T, typename BETA_T, typename T
 __aicore__ inline void RunChunkKdaPrepare(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR gk, GM_ADDR, GM_ADDR, GM_ADDR,
                                           GM_ADDR beta, GM_ADDR initialState, GM_ADDR cuSeqlens, GM_ADDR chunkIndices,
                                           GM_ADDR aqk, GM_ADDR akk, GM_ADDR qg, GM_ADDR qgScaled, GM_ADDR wSeed,
-                                          GM_ADDR uSeed, GM_ADDR, GM_ADDR userWorkspace, const TilingData &tiling,
-                                          TPipe &pipe, bool = true)
+                                          GM_ADDR uSeed, GM_ADDR, GM_ADDR userWorkspace, const TilingData& tiling,
+                                          TPipe& pipe, bool = true)
 {
     RunChunkKdaPrepare<SAFE_GATE, T, GK_T, BETA_T>(q, k, v, gk, beta, initialState, cuSeqlens, chunkIndices, aqk, akk,
                                                    qg, qgScaled, wSeed, uSeed, userWorkspace, tiling, pipe);

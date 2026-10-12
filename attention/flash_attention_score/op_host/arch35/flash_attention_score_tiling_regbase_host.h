@@ -270,14 +270,14 @@ static auto CalcTailSize(T num1, T num2) -> T
 
 class FlashAttentionScoreTilingRegbase : public TilingBaseClass {
 public:
-    explicit FlashAttentionScoreTilingRegbase(gert::TilingContext *context)
+    explicit FlashAttentionScoreTilingRegbase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {
         Reset();
     }
     ~FlashAttentionScoreTilingRegbase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         Reset();
         TilingBaseClass::Reset(context);
@@ -345,13 +345,13 @@ protected:
     ge::graphStatus GetPlatformInfo() override;
     // 2、获取INPUT/OUTPUT/ATTR信息
     ge::graphStatus GetShapeAttrsInfo() override;
-    virtual bool GetSparseInfo(SparseEnum &sparseType);
+    virtual bool GetSparseInfo(SparseEnum& sparseType);
     void EnableBandInvalidLineImplMode();
-    bool SparseModeProcess(SparseEnum &sparseType);
-    void SetSparseTilingInfo(SparseEnum &sparseType);
+    bool SparseModeProcess(SparseEnum& sparseType);
+    void SetSparseTilingInfo(SparseEnum& sparseType);
     bool SparseBandModeCheck(int64_t maxS1Val, int64_t maxS2Val, int64_t minS1Val, int64_t minS2Val,
-                             SparseEnum &sparseType);
-    bool PretokenAndNexttokenAdjustment(SparseEnum &sparseType);
+                             SparseEnum& sparseType);
+    bool PretokenAndNexttokenAdjustment(SparseEnum& sparseType);
 
     // 3、计算数据切分TilingData
     ge::graphStatus DoOpTiling() override;
@@ -365,28 +365,28 @@ protected:
     // 由于这个类中不保存TilingData，子类中需要调用这个类的PostTiling并额外设置RawTilingData的DataSize
     ge::graphStatus PostTiling() override;
 
-    bool GetActualSeqLenData(int64_t inputIdx, std::vector<int64_t> &res, int64_t &actualLen) const;
+    bool GetActualSeqLenData(int64_t inputIdx, std::vector<int64_t>& res, int64_t& actualLen) const;
 
     // 关于TilingData的校验需要在子类中实现
     virtual ge::graphStatus CheckContext();
     virtual bool AnalyzeDtype();
     bool AnalyzeAttrs();
     bool AnalyzeLayout();
-    bool AnalyzeTndLayout(const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &valueShape);
-    bool Analyze3DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &valueShape,
-                           size_t layoutLen, const gert::Shape *queryRopeShape);
-    bool Analyze4DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &valueShape,
-                           size_t layoutLen, const gert::Shape *queryRopeShape);
-    bool AnalyzeTndPseOptionalInput(PseShapeType &pseShapeType, const gert::Shape &pseShapeDims, size_t pseDimNum,
+    bool AnalyzeTndLayout(const gert::Shape& queryShape, const gert::Shape& keyShape, const gert::Shape& valueShape);
+    bool Analyze3DimLayout(const gert::Shape& queryShape, const gert::Shape& keyShape, const gert::Shape& valueShape,
+                           size_t layoutLen, const gert::Shape* queryRopeShape);
+    bool Analyze4DimLayout(const gert::Shape& queryShape, const gert::Shape& keyShape, const gert::Shape& valueShape,
+                           size_t layoutLen, const gert::Shape* queryRopeShape);
+    bool AnalyzeTndPseOptionalInput(PseShapeType& pseShapeType, const gert::Shape& pseShapeDims, size_t pseDimNum,
                                     int64_t pseBSize);
-    bool AnalyzeGeneralPseOptionalInput(PseShapeType &pseShapeType, const gert::Shape &pseShapeDims, size_t pseDimNum,
+    bool AnalyzeGeneralPseOptionalInput(PseShapeType& pseShapeType, const gert::Shape& pseShapeDims, size_t pseDimNum,
                                         int64_t pseBSize);
     bool AnalyzePseOptionalInput();
-    bool Analyze4DimAttenOptionalInput(AttenMaskShapeType &attenMaskShapeType,
-                                       const gert::Shape &attenMaskStorageShape);
-    bool Analyze2DimAttenOptionalInput(AttenMaskShapeType &attenMaskShapeType,
-                                       const gert::Shape &attenMaskStorageShape);
-    bool AnalyzeAttenOptionalInputDimNumLimit(const gert::Shape &attenMaskStorageShape, size_t attenMaskDimNum);
+    bool Analyze4DimAttenOptionalInput(AttenMaskShapeType& attenMaskShapeType,
+                                       const gert::Shape& attenMaskStorageShape);
+    bool Analyze2DimAttenOptionalInput(AttenMaskShapeType& attenMaskShapeType,
+                                       const gert::Shape& attenMaskStorageShape);
+    bool AnalyzeAttenOptionalInputDimNumLimit(const gert::Shape& attenMaskStorageShape, size_t attenMaskDimNum);
     bool AnalyzeAttenOptionalInput();
     bool AnalyzeDropOptionalInput();
     bool AnalyzeFp8OptionalInput();
@@ -406,16 +406,16 @@ protected:
     virtual void SetMultiCoreParamsRegbase(int64_t totalSize, int64_t coreNum);
     virtual void SetSparseParamsRegbase(int64_t maxCoreNum);
     virtual bool SetPseAlibiParamsRegbase();
-    virtual bool InitSparseValidArray(std::vector<int64_t> &sparseValidArray, int64_t bIdx);
-    virtual bool SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray,
-                                   MultiCoreParamsRegbase &multiCoreParamsRegbase, int64_t maxCoreNum);
-    void SetPrefixSparseStartIdx(const std::vector<std::vector<int64_t>> &sparseValidArray,
-                                 MultiCoreParamsRegbase &multiCoreParamsRegbase, int64_t maxCoreNum);
-    int64_t PrintSparseMaxMinLoadPerCore(const std::vector<int64_t> &sparseValidArray, int64_t *sparseStartIdx,
+    virtual bool InitSparseValidArray(std::vector<int64_t>& sparseValidArray, int64_t bIdx);
+    virtual bool SetSparseStartIdx(const std::vector<int64_t>& sparseValidArray,
+                                   MultiCoreParamsRegbase& multiCoreParamsRegbase, int64_t maxCoreNum);
+    void SetPrefixSparseStartIdx(const std::vector<std::vector<int64_t>>& sparseValidArray,
+                                 MultiCoreParamsRegbase& multiCoreParamsRegbase, int64_t maxCoreNum);
+    int64_t PrintSparseMaxMinLoadPerCore(const std::vector<int64_t>& sparseValidArray, int64_t* sparseStartIdx,
                                          int32_t validAivNum, int64_t avgLoadSize);
-    bool PartitionSparseData(const std::vector<int64_t> &sparseRollingArray, int64_t sparseRollingArraySum,
-                             int64_t sparseArraySize, int64_t loadMaxEachCore, std::vector<int64_t> &partitionResult);
-    SparseEnum GetPrefixNList(std::ostringstream &failReason);
+    bool PartitionSparseData(const std::vector<int64_t>& sparseRollingArray, int64_t sparseRollingArraySum,
+                             int64_t sparseArraySize, int64_t loadMaxEachCore, std::vector<int64_t>& partitionResult);
+    SparseEnum GetPrefixNList(std::ostringstream& failReason);
 
     uint32_t aivNum;
     uint32_t aicNum;
@@ -484,11 +484,11 @@ protected:
     SplitCoreMode splitCoreMode = SplitCoreMode::SQ_SINGLE_CORE_FIRST;
     uint64_t l2CacheSize = 134217728; // 128M
 
-    const char *templateName = "base";
-    const char *opName;
-    const char *inputLayout;
-    const char *softmaxOutLayout;
-    const int64_t *prefixNData;
+    const char* templateName = "base";
+    const char* opName;
+    const char* inputLayout;
+    const char* softmaxOutLayout;
+    const int64_t* prefixNData;
 
     bool isSparseValidSizeAligned = false;
     bool hasPse = false;
@@ -502,11 +502,11 @@ protected:
 
     DTemplateType dTemplateType = DTemplateType::DTEMPLATEBOTTOM;
     DTemplateType dVTemplateType = DTemplateType::DTEMPLATEBOTTOM;
-    FlashAttentionScoreSimplifiedTilingData *tilingData =
+    FlashAttentionScoreSimplifiedTilingData* tilingData =
         context_->GetTilingData<FlashAttentionScoreSimplifiedTilingData>();
-    InputParamsRegbase *inputParamsRegbase_ = &tilingData->inputParamsRegbase;
-    MultiCoreParamsRegbase *multiCoreParamsRegbase_ = &tilingData->multiCoreParamsRegbase;
-    DropmaskParamsRegbase *dropmaskParamsRegbase_ = &tilingData->dropmaskParamsRegbase;
+    InputParamsRegbase* inputParamsRegbase_ = &tilingData->inputParamsRegbase;
+    MultiCoreParamsRegbase* multiCoreParamsRegbase_ = &tilingData->multiCoreParamsRegbase;
+    DropmaskParamsRegbase* dropmaskParamsRegbase_ = &tilingData->dropmaskParamsRegbase;
 };
 } // namespace FA
 } // namespace optiling

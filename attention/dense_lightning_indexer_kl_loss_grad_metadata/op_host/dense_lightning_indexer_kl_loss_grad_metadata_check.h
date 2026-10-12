@@ -32,12 +32,12 @@ inline constexpr int64_t DLI_NUM_HEADS_Q_LOWER_BOUND_A5 = 1;
 inline constexpr int64_t DLI_NUM_HEADS_Q_UPPER_BOUND_A5 = 128;
 inline constexpr int64_t DLIKG_METADATA_SIZE = 64;
 
-inline bool IsTensorExistDli(const aclTensor *tensor)
+inline bool IsTensorExistDli(const aclTensor* tensor)
 {
     return (tensor != nullptr) && (tensor->GetViewShape().GetDimNum() > 0) && (tensor->GetViewShape().GetDim(0) > 0);
 }
 
-int64_t GetDimNumDli(const aclTensor *tensor)
+int64_t GetDimNumDli(const aclTensor* tensor)
 {
     if (tensor == nullptr) {
         return -1;
@@ -45,7 +45,7 @@ int64_t GetDimNumDli(const aclTensor *tensor)
     return tensor->GetViewShape().GetDimNum();
 }
 
-aclDataType GetDataTypeDli(const aclTensor *tensor)
+aclDataType GetDataTypeDli(const aclTensor* tensor)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     if (tensor == nullptr) {
@@ -55,8 +55,8 @@ aclDataType GetDataTypeDli(const aclTensor *tensor)
     return dataType;
 }
 
-int64_t GetQueryBatchSizeDli(int64_t batchSize, const aclTensor *cuSeqlensQOptional, const aclTensor *sequsedQOptional,
-                             const char *layoutQOptional)
+int64_t GetQueryBatchSizeDli(int64_t batchSize, const aclTensor* cuSeqlensQOptional, const aclTensor* sequsedQOptional,
+                             const char* layoutQOptional)
 {
     if (IsTensorExistDli(sequsedQOptional)) {
         return sequsedQOptional->GetViewShape().GetDim(0);
@@ -69,8 +69,8 @@ int64_t GetQueryBatchSizeDli(int64_t batchSize, const aclTensor *cuSeqlensQOptio
     return batchSize;
 }
 
-int64_t GetKeyBatchSizeDli(int64_t batchSize, const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedKOptional,
-                           const char *layoutKOptional)
+int64_t GetKeyBatchSizeDli(int64_t batchSize, const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedKOptional,
+                           const char* layoutKOptional)
 {
     if (IsTensorExistDli(sequsedKOptional)) {
         return sequsedKOptional->GetViewShape().GetDim(0);
@@ -84,9 +84,9 @@ int64_t GetKeyBatchSizeDli(int64_t batchSize, const aclTensor *cuSeqlensKOptiona
 }
 
 aclnnStatus CheckSingleParamDli(int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK, int64_t numHeadsQ,
-                                int64_t numHeadsK, int64_t headDim, const char *layoutQOptional,
-                                const char *layoutKOptional, int64_t maskMode, int64_t cmpRatio, uint32_t aicCoreNum,
-                                uint32_t aivCoreNum, const std::string &socVersion)
+                                int64_t numHeadsK, int64_t headDim, const char* layoutQOptional,
+                                const char* layoutKOptional, int64_t maskMode, int64_t cmpRatio, uint32_t aicCoreNum,
+                                uint32_t aivCoreNum, const std::string& socVersion)
 {
     CHECK_COND(numHeadsQ >= DLI_NUM_HEADS_Q_LOWER_BOUND_A5 && numHeadsQ <= DLI_NUM_HEADS_Q_UPPER_BOUND_A5,
                ACLNN_ERR_PARAM_INVALID, "num_heads_q should be [%lld, %lld], but got %lld",
@@ -112,9 +112,9 @@ aclnnStatus CheckSingleParamDli(int64_t batchSize, int64_t maxSeqlenQ, int64_t m
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckExistenceDli(int64_t maskMode, int64_t cmpRatio, const aclTensor *cuSeqlensQOptional,
-                              const aclTensor *cuSeqlensKOptional, const aclTensor *cmpResidualKOptional,
-                              const char *layoutQOptional, const char *layoutKOptional, const aclTensor *metadata)
+aclnnStatus CheckExistenceDli(int64_t maskMode, int64_t cmpRatio, const aclTensor* cuSeqlensQOptional,
+                              const aclTensor* cuSeqlensKOptional, const aclTensor* cmpResidualKOptional,
+                              const char* layoutQOptional, const char* layoutKOptional, const aclTensor* metadata)
 {
     if (strcmp(layoutQOptional, "TND") == 0) {
         CHECK_COND(IsTensorExistDli(cuSeqlensQOptional), ACLNN_ERR_PARAM_INVALID,
@@ -132,10 +132,10 @@ aclnnStatus CheckExistenceDli(int64_t maskMode, int64_t cmpRatio, const aclTenso
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckConsistencyDli(int64_t batchSize, const aclTensor *cuSeqlensQOptional,
-                                const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedQOptional,
-                                const aclTensor *sequsedKOptional, const aclTensor *cmpResidualKOptional,
-                                const char *layoutQOptional, const char *layoutKOptional, const aclTensor *metadata)
+aclnnStatus CheckConsistencyDli(int64_t batchSize, const aclTensor* cuSeqlensQOptional,
+                                const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
+                                const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional,
+                                const char* layoutQOptional, const char* layoutKOptional, const aclTensor* metadata)
 {
     int64_t dimNum = -1;
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
@@ -218,13 +218,13 @@ aclnnStatus CheckConsistencyDli(int64_t batchSize, const aclTensor *cuSeqlensQOp
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus ParamsCheckDliA5(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKOptional,
-                             const aclTensor *sequsedQOptional, const aclTensor *sequsedKOptional,
-                             const aclTensor *cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
+aclnnStatus ParamsCheckDliA5(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional,
+                             const aclTensor* sequsedQOptional, const aclTensor* sequsedKOptional,
+                             const aclTensor* cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
                              int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim,
-                             char *layoutQOptional, char *layoutKOptional, int64_t maskMode, int64_t cmpRatio,
-                             const aclTensor *metadata, uint32_t aicCoreNum, uint32_t aivCoreNum,
-                             const std::string &socVersion)
+                             char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio,
+                             const aclTensor* metadata, uint32_t aicCoreNum, uint32_t aivCoreNum,
+                             const std::string& socVersion)
 {
     auto ret = CheckSingleParamDli(batchSize, maxSeqlenQ, maxSeqlenK, numHeadsQ, numHeadsK, headDim, layoutQOptional,
                                    layoutKOptional, maskMode, cmpRatio, aicCoreNum, aivCoreNum, socVersion);
@@ -241,13 +241,13 @@ aclnnStatus ParamsCheckDliA5(const aclTensor *cuSeqlensQOptional, const aclTenso
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus ParamsCheckDli(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKOptional,
-                           const aclTensor *sequsedQOptional, const aclTensor *sequsedKOptional,
-                           const aclTensor *cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
+aclnnStatus ParamsCheckDli(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional,
+                           const aclTensor* sequsedQOptional, const aclTensor* sequsedKOptional,
+                           const aclTensor* cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
                            int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim,
-                           char *layoutQOptional, char *layoutKOptional, int64_t maskMode, int64_t cmpRatio,
-                           const aclTensor *metadata, uint32_t aicCoreNum, uint32_t aivCoreNum,
-                           const std::string &socVersion)
+                           char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio,
+                           const aclTensor* metadata, uint32_t aicCoreNum, uint32_t aivCoreNum,
+                           const std::string& socVersion)
 {
     const std::string ascend950 = "Ascend950";
     if (socVersion.find(ascend950) == std::string::npos) {

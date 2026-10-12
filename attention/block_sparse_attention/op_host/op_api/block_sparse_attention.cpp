@@ -24,11 +24,11 @@ namespace l0op {
 
 OP_TYPE_REGISTER(BlockSparseAttention);
 
-static const aclTensor *ConvertIntArrayToTensor(const aclIntArray *intArray, aclOpExecutor *executor, DataType dtype)
+static const aclTensor* ConvertIntArrayToTensor(const aclIntArray* intArray, aclOpExecutor* executor, DataType dtype)
 {
     if (intArray != nullptr) {
-        const aclTensor *tensor = executor->ConvertToTensor(intArray, dtype);
-        auto mutableTensor = const_cast<aclTensor *>(tensor);
+        const aclTensor* tensor = executor->ConvertToTensor(intArray, dtype);
+        auto mutableTensor = const_cast<aclTensor*>(tensor);
         mutableTensor->SetStorageFormat(Format::FORMAT_ND);
         mutableTensor->SetViewFormat(Format::FORMAT_ND);
         mutableTensor->SetOriginalFormat(Format::FORMAT_ND);
@@ -37,17 +37,17 @@ static const aclTensor *ConvertIntArrayToTensor(const aclIntArray *intArray, acl
     return executor->AllocTensor(dtype, Format::FORMAT_ND, Format::FORMAT_ND);
 }
 
-const std::array<const aclTensor *, 2> BlockSparseAttention(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *blockSparseMaskOptional,
-    const aclTensor *attenMaskOptional, const aclIntArray *blockShapeOptional,
-    const aclIntArray *actualSeqLengthsOptional, const aclIntArray *actualSeqLengthsKvOptional,
-    const aclTensor *blockTableOptional, const aclTensor *qDequantScaleOptional, const aclTensor *kDequantScaleOptional,
-    const aclTensor *vDequantScaleOptional, const aclTensor *pQuantScaleOptional, const char *qInputLayout,
-    const char *kvInputLayout, int64_t numKeyValueHeads, int64_t maskType, double scaleValue, int64_t innerPrecise,
+const std::array<const aclTensor*, 2> BlockSparseAttention(
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* blockSparseMaskOptional,
+    const aclTensor* attenMaskOptional, const aclIntArray* blockShapeOptional,
+    const aclIntArray* actualSeqLengthsOptional, const aclIntArray* actualSeqLengthsKvOptional,
+    const aclTensor* blockTableOptional, const aclTensor* qDequantScaleOptional, const aclTensor* kDequantScaleOptional,
+    const aclTensor* vDequantScaleOptional, const aclTensor* pQuantScaleOptional, const char* qInputLayout,
+    const char* kvInputLayout, int64_t numKeyValueHeads, int64_t maskType, double scaleValue, int64_t innerPrecise,
     int64_t blockSize, int64_t preTokens, int64_t nextTokens, int64_t softmaxLseFlag, int64_t quantMode,
-    double dstTypeMax, const aclTensor *attentionOut, aclOpExecutor *executor)
+    double dstTypeMax, const aclTensor* attentionOut, aclOpExecutor* executor)
 {
-    const char *safeKvInputLayout = (kvInputLayout != nullptr) ? kvInputLayout : qInputLayout;
+    const char* safeKvInputLayout = (kvInputLayout != nullptr) ? kvInputLayout : qInputLayout;
 
     L0_DFX(BlockSparseAttention, query, key, value, blockSparseMaskOptional, attenMaskOptional, blockShapeOptional,
            actualSeqLengthsOptional, actualSeqLengthsKvOptional, blockTableOptional, qDequantScaleOptional,
@@ -55,15 +55,15 @@ const std::array<const aclTensor *, 2> BlockSparseAttention(
            numKeyValueHeads, maskType, scaleValue, innerPrecise, blockSize, preTokens, nextTokens, softmaxLseFlag,
            quantMode, dstTypeMax);
 
-    const aclTensor *blockShapeOptionalTensor = nullptr;
+    const aclTensor* blockShapeOptionalTensor = nullptr;
     if (blockShapeOptional) {
         blockShapeOptionalTensor = ConvertIntArrayToTensor(blockShapeOptional, executor, DataType::DT_INT64);
     }
-    const aclTensor *actualSeqTensor = nullptr;
+    const aclTensor* actualSeqTensor = nullptr;
     if (actualSeqLengthsOptional) {
         actualSeqTensor = ConvertIntArrayToTensor(actualSeqLengthsOptional, executor, DataType::DT_INT64);
     }
-    const aclTensor *actualSeqKvTensor = nullptr;
+    const aclTensor* actualSeqKvTensor = nullptr;
     if (actualSeqLengthsKvOptional) {
         actualSeqKvTensor = ConvertIntArrayToTensor(actualSeqLengthsKvOptional, executor, DataType::DT_INT64);
     }

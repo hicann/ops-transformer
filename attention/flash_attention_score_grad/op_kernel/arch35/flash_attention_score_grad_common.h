@@ -230,7 +230,7 @@ __aicore__ constexpr bool NEED_DETER(const uint8_t deterSparseType)
 
 template <typename T, bool IS_WRITE_UB>
 struct DqkvResPos {
-    using PosType = typename std::conditional<IS_WRITE_UB, LocalTensor<T> &, GlobalTensor<T> &>::type;
+    using PosType = typename std::conditional<IS_WRITE_UB, LocalTensor<T>&, GlobalTensor<T>&>::type;
 };
 
 template <typename T1>
@@ -336,12 +336,12 @@ __aicore__ constexpr bool GET_IS_NZ_OUT(const uint8_t SPLIT_AXIS, const uint32_t
 
 #define FagOldTilingType \
     const FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase< \
-        NEED_DETER(DETER_SPARSE_TYPE), NEED_DETER_PREFIX(DETER_SPARSE_TYPE, IS_TND), IS_TND, false> *__restrict
+        NEED_DETER(DETER_SPARSE_TYPE), NEED_DETER_PREFIX(DETER_SPARSE_TYPE, IS_TND), IS_TND, false>* __restrict
 
 #define FagTilingType \
     const __gm__ FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<NEED_DETER(DETER_SPARSE_TYPE), \
                                                                         NEED_DETER_PREFIX(DETER_SPARSE_TYPE, IS_TND), \
-                                                                        IS_TND, IS_TND_SWIZZLE> *__restrict
+                                                                        IS_TND, IS_TND_SWIZZLE>* __restrict
 
 struct LoopInfo {
     int64_t bIdx{0};
@@ -407,8 +407,8 @@ struct FagConstInfo {
     int64_t gS1oS2o;
     int64_t s1oS2o;
 
-    __gm__ uint8_t *seqS1_addr;
-    __gm__ uint8_t *seqS2_addr;
+    __gm__ uint8_t* seqS1_addr;
+    __gm__ uint8_t* seqS2_addr;
 
     int64_t s1Token;
     int64_t s2Token;

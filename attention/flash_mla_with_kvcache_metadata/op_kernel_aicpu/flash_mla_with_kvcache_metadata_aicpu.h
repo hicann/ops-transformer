@@ -31,12 +31,12 @@ class FlashMlaWithKvcacheMetadataCpuKernel : public CpuKernel {
 public:
     FlashMlaWithKvcacheMetadataCpuKernel() = default;
     ~FlashMlaWithKvcacheMetadataCpuKernel() = default;
-    uint32_t Compute(CpuKernelContext &ctx) override;
+    uint32_t Compute(CpuKernelContext& ctx) override;
 
 private:
-    bool Prepare(CpuKernelContext &ctx);
-    bool BalanceSchedule(load_balance::SectionStreamKResult &splitRes);
-    bool GenMetadata(load_balance::SectionStreamKResult &splitRes);
+    bool Prepare(CpuKernelContext& ctx);
+    bool BalanceSchedule(load_balance::SectionStreamKResult& splitRes);
+    bool GenMetadata(load_balance::SectionStreamKResult& splitRes);
 
     bool ParamsCheck();
     bool CheckAttrs();
@@ -51,13 +51,13 @@ private:
     void InitLoadBalanceParams();
 
 private:
-    CpuKernelContext *context_ = nullptr;
+    CpuKernelContext* context_ = nullptr;
     // input tensor
-    Tensor *cuSeqlensQ_ = nullptr;
-    Tensor *cacheSeqlens_ = nullptr;
-    Tensor *sequsedQ_ = nullptr;
+    Tensor* cuSeqlensQ_ = nullptr;
+    Tensor* cacheSeqlens_ = nullptr;
+    Tensor* sequsedQ_ = nullptr;
     // output tensor
-    Tensor *metadata_ = nullptr;
+    Tensor* metadata_ = nullptr;
 
     // input attr
     int32_t maxSeqlenQ_ = -1;

@@ -19,8 +19,8 @@
 
 namespace optiling {
 
-ge::graphStatus BuildTilingPlan(gert::TilingContext *context, const FagParsedInfo &info, FagTilingPlan &plan,
-                                FagRouteTrace &trace)
+ge::graphStatus BuildTilingPlan(gert::TilingContext* context, const FagParsedInfo& info, FagTilingPlan& plan,
+                                FagRouteTrace& trace)
 {
     // 顺序不可调换：
     //   route    产出 tmpl，schedule 要用它区分 BN2 与 BN2GS1S2 的 fusedOuter 口径；

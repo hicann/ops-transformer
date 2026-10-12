@@ -30,8 +30,8 @@ namespace optiling {
 // 依赖 FagAttrRangeChecker 已把 layout 填进 ctx。
 class FagShapeChecker : public FagBaseChecker {
 public:
-    ge::graphStatus Check(FagCheckCtx &ctx) override;
-    const char *Name() const override
+    ge::graphStatus Check(FagCheckCtx& ctx) override;
+    const char* Name() const override
     {
         return "Shape";
     }

@@ -50,7 +50,7 @@ constexpr uint32_t DSIZE_256 = 256;
  */
 inline void AdjustSinnerAndSouter(uint32_t vHeadDim, uint32_t gSize, int64_t maxSeqQ, int64_t maxSeqKv,
                                   int32_t maskMode, int64_t winLeft, int64_t winRight, uint32_t qLayout,
-                                  uint32_t &sOuterFactor, uint32_t &sInnerFactor)
+                                  uint32_t& sOuterFactor, uint32_t& sInnerFactor)
 {
     if (maxSeqQ == -1) {
         maxSeqQ = MAX_SEQ_LEN_DEFAULT;

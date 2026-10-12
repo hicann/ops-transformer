@@ -27,11 +27,11 @@ template <size_t N, class T>
 struct EBO<N, T, true> {
     HOST_DEVICE constexpr EBO() {}
 
-    HOST_DEVICE constexpr EBO(T const &) {}
+    HOST_DEVICE constexpr EBO(T const&) {}
 };
 
 template <size_t N, class T>
-HOST_DEVICE constexpr T getv(EBO<N, T, true> const &)
+HOST_DEVICE constexpr T getv(EBO<N, T, true> const&)
 {
     return {};
 }
@@ -43,7 +43,7 @@ struct EBO<N, T, false> {
         : t_{}
     {}
 
-    HOST_DEVICE constexpr EBO(T const &t)
+    HOST_DEVICE constexpr EBO(T const& t)
         : t_{t}
     {}
 
@@ -51,13 +51,13 @@ struct EBO<N, T, false> {
 };
 
 template <size_t N, class T>
-HOST_DEVICE constexpr T const &getv(EBO<N, T, false> const &x)
+HOST_DEVICE constexpr T const& getv(EBO<N, T, false> const& x)
 {
     return x.t_;
 }
 
 template <size_t N, class T>
-HOST_DEVICE constexpr T &getv(EBO<N, T, false> &x)
+HOST_DEVICE constexpr T& getv(EBO<N, T, false>& x)
 {
     return x.t_;
 }
@@ -70,7 +70,7 @@ template <size_t... I, class... T>
 struct TupleBase<index_sequence<I...>, T...> : EBO<I, T>... {
     HOST_DEVICE constexpr TupleBase() {}
 
-    HOST_DEVICE constexpr TupleBase(T const &...t)
+    HOST_DEVICE constexpr TupleBase(T const&... t)
         : EBO<I, T>(t)...
     {}
 };
@@ -82,7 +82,7 @@ template <class... T>
 struct tuple : detail::TupleBase<make_index_sequence<sizeof...(T)>, T...> {
     HOST_DEVICE constexpr tuple() {}
 
-    HOST_DEVICE constexpr tuple(T const &...t)
+    HOST_DEVICE constexpr tuple(T const&... t)
         : detail::TupleBase<make_index_sequence<sizeof...(T)>, T...>(t...)
     {}
 };
@@ -92,36 +92,36 @@ struct tuple<> {};
 
 // get for tla::tuple
 template <size_t I, class... T>
-HOST_DEVICE constexpr decltype(auto) get(tuple<T...> const &t) noexcept
+HOST_DEVICE constexpr decltype(auto) get(tuple<T...> const& t) noexcept
 {
     static_assert(I < sizeof...(T), "Index out of range");
     return detail::getv<I>(t);
 }
 
 template <size_t I, class... T>
-HOST_DEVICE constexpr decltype(auto) get(tuple<T...> &t) noexcept
+HOST_DEVICE constexpr decltype(auto) get(tuple<T...>& t) noexcept
 {
     static_assert(I < sizeof...(T), "Index out of range");
     return detail::getv<I>(t);
 }
 
 template <size_t I, class... T>
-HOST_DEVICE constexpr decltype(auto) get(tuple<T...> &&t) noexcept
+HOST_DEVICE constexpr decltype(auto) get(tuple<T...>&& t) noexcept
 {
     static_assert(I < sizeof...(T), "Index out of range");
-    return detail::getv<I>(static_cast<tuple<T...> &&>(t));
+    return detail::getv<I>(static_cast<tuple<T...>&&>(t));
 }
 
 namespace detail {
 
 template <class T>
-auto has_tuple_size(T *) -> bool_constant<(0 <= tuple_size<T>::value)>;
+auto has_tuple_size(T*) -> bool_constant<(0 <= tuple_size<T>::value)>;
 auto has_tuple_size(...) -> false_type;
 
 } // end namespace detail
 
 template <class T>
-struct is_tuple : decltype(detail::has_tuple_size((T *)0)){};
+struct is_tuple : decltype(detail::has_tuple_size((T*)0)){};
 
 template <class... T>
 struct tuple_size<tla::tuple<T...>> : std::integral_constant<size_t, sizeof...(T)> {};
@@ -131,7 +131,7 @@ struct tuple_size<const tla::tuple<T...>> : std::integral_constant<size_t, sizeo
 
 // make_tuple
 template <class... T>
-HOST_DEVICE constexpr tuple<T...> MakeTuple(T const &...t)
+HOST_DEVICE constexpr tuple<T...> MakeTuple(T const&... t)
 {
     return {t...};
 }

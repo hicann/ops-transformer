@@ -44,7 +44,7 @@ class CGDR {
 public:
     static constexpr bool kStateIsFp32 = std::is_same_v<stateType, float>;
     using vInnerType = std::conditional_t<kStateIsFp32, float, lowType>;
-    __aicore__ inline CGDR(TPipe *pipe, const ChunkGatedDeltaRuleTilingData *tilingData)
+    __aicore__ inline CGDR(TPipe* pipe, const ChunkGatedDeltaRuleTilingData* tilingData)
     {
         pipe_ = pipe;
         tiling_ = tilingData;
@@ -84,65 +84,65 @@ public:
         }
     }
 
-    __aicore__ inline void Init(const CGDRInitParams &initParams, GM_ADDR user)
+    __aicore__ inline void Init(const CGDRInitParams& initParams, GM_ADDR user)
     {
         uint64_t dataSize = tiling_->t * tiling_->nk * tiling_->dk;
-        query_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.query), dataSize);
-        key_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.key), dataSize);
+        query_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(initParams.query), dataSize);
+        key_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(initParams.key), dataSize);
 
         dataSize = tiling_->t * tiling_->nv * tiling_->dv;
-        value_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.value), dataSize);
-        out_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.attnOut), dataSize);
+        value_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(initParams.value), dataSize);
+        out_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(initParams.attnOut), dataSize);
 
         dataSize = tiling_->t * tiling_->nv;
-        beta_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.beta), dataSize);
+        beta_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(initParams.beta), dataSize);
         if constexpr (gOptional) {
-            g_.SetGlobalBuffer(reinterpret_cast<__gm__ highType *>(initParams.gOptional), dataSize);
+            g_.SetGlobalBuffer(reinterpret_cast<__gm__ highType*>(initParams.gOptional), dataSize);
         }
 
         dataSize = tiling_->b * tiling_->nv * tiling_->dv * tiling_->dk;
-        initState_.SetGlobalBuffer(reinterpret_cast<__gm__ stateType *>(initParams.initState), dataSize);
-        finalState_.SetGlobalBuffer(reinterpret_cast<__gm__ stateType *>(initParams.finalState), dataSize);
+        initState_.SetGlobalBuffer(reinterpret_cast<__gm__ stateType*>(initParams.initState), dataSize);
+        finalState_.SetGlobalBuffer(reinterpret_cast<__gm__ stateType*>(initParams.finalState), dataSize);
 
-        actualSeqLens_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(initParams.seqlens), tiling_->b);
+        actualSeqLens_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(initParams.seqlens), tiling_->b);
 
         uint64_t offset = 0;
-        gCum_.SetGlobalBuffer(reinterpret_cast<__gm__ highType *>(user + offset));
+        gCum_.SetGlobalBuffer(reinterpret_cast<__gm__ highType*>(user + offset));
         offset += sizeof(highType) * tiling_->nv * tiling_->maxGroupLength;
 
-        kCumDecay_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset));
+        kCumDecay_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset));
         offset += sizeof(lowType) * tiling_->nv * tiling_->maxGroupLength * tiling_->dk;
 
-        vInner_.SetGlobalBuffer(reinterpret_cast<__gm__ vInnerType *>(user + offset));
+        vInner_.SetGlobalBuffer(reinterpret_cast<__gm__ vInnerType*>(user + offset));
         offset += sizeof(vInnerType) * tiling_->nv * tiling_->maxGroupLength * tiling_->dv;
 
         if constexpr (kStateIsFp32) {
-            vInnerBf16_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset));
+            vInnerBf16_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset));
             offset += sizeof(lowType) * tiling_->nv * tiling_->maxGroupLength * tiling_->dv;
         }
 
-        qPrime_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset));
+        qPrime_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset));
         offset += sizeof(lowType) * tiling_->nv * tiling_->maxGroupLength * tiling_->dk;
 
-        attnInter_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset));
+        attnInter_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset));
         offset += sizeof(lowType) * tiling_->nv * tiling_->maxGroupLength * tiling_->dv;
 
-        kg_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset));
+        kg_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset));
         offset += sizeof(lowType) * tiling_->nv * tiling_->maxGroupLength * tiling_->dk;
 
-        qkt_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset));
+        qkt_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset));
         offset += sizeof(lowType) * tiling_->nv * tiling_->maxGroupLength * tiling_->chunkSize;
 
         if constexpr (kStateIsFp32) {
             uint64_t stateWkElemCnt = tiling_->nv * tiling_->dv * tiling_->dk;
-            curStateBf16_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset), stateWkElemCnt);
+            curStateBf16_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset), stateWkElemCnt);
             offset += sizeof(lowType) * stateWkElemCnt;
         }
 
-        stageOneMask_.SetGlobalBuffer(reinterpret_cast<__gm__ highType *>(user + offset));
+        stageOneMask_.SetGlobalBuffer(reinterpret_cast<__gm__ highType*>(user + offset));
         offset += sizeof(highType) * tiling_->chunkSize * tiling_->chunkSize * tiling_->aiCoreNum * TASK_RATIO;
 
-        stageThreeMask_.SetGlobalBuffer(reinterpret_cast<__gm__ highType *>(user + offset));
+        stageThreeMask_.SetGlobalBuffer(reinterpret_cast<__gm__ highType*>(user + offset));
         offset += sizeof(highType) * tiling_->chunkSize * tiling_->chunkSize * tiling_->aiCoreNum * TASK_RATIO;
 
         stageWsAddr_ = user + offset;
@@ -186,7 +186,7 @@ public:
     }
 
 private:
-    __aicore__ inline void RunStage1(const ChunkGroup &cg)
+    __aicore__ inline void RunStage1(const ChunkGroup& cg)
     {
         GDRStageOneInitParams<vInnerType> initStageOneParams{query_, key_,         value_,        beta_,   g_,
                                                              gCum_,  kCumDecay_,   vInner_,       qPrime_, kg_,
@@ -197,7 +197,7 @@ private:
     }
 
     template <typename sType>
-    __aicore__ inline void RunStage2(ChunkGroup &cg, GlobalTensor<sType> stateIn, GlobalTensor<sType> stateOut,
+    __aicore__ inline void RunStage2(ChunkGroup& cg, GlobalTensor<sType> stateIn, GlobalTensor<sType> stateOut,
                                      bool isFirstGroup)
     {
         Stage2<sType, gOptional> stageTwoOp;
@@ -233,7 +233,7 @@ private:
         pipe_->Reset();
     }
 
-    __aicore__ inline void RunStage3(ChunkGroup &cg)
+    __aicore__ inline void RunStage3(ChunkGroup& cg)
     {
         GlobalTensor<lowType> vInnerBf16;
         if constexpr (kStateIsFp32) {
@@ -256,8 +256,8 @@ private:
     }
 
 private:
-    TPipe *pipe_;
-    const ChunkGatedDeltaRuleTilingData *tiling_;
+    TPipe* pipe_;
+    const ChunkGatedDeltaRuleTilingData* tiling_;
     GlobalTensor<lowType> query_;
     GlobalTensor<lowType> key_;
     GlobalTensor<lowType> value_;

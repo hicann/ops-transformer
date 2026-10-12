@@ -100,9 +100,9 @@ public:
     uint64_t normalCoreLastLoopNBurstNum = 0;
     uint64_t tailCoreLoopTimes = 0;
     uint64_t tailCoreLastLoopNBurstNum = 0;
-    const BlockSparseAttentionGradTilingData *__restrict tilingData;
+    const BlockSparseAttentionGradTilingData* __restrict tilingData;
 
-    __aicore__ inline SoftmaxGrad(Params const &params)
+    __aicore__ inline SoftmaxGrad(Params const& params)
     {
         cBlockIdx = GetBlockIdx();
         GET_TILING_DATA_WITH_STRUCT(BlockSparseAttentionGradTilingData, tiling, params.tilingData);
@@ -147,9 +147,9 @@ public:
                                                                       outputBufferLen);
 
         // 初始化 GM
-        dyGm.SetGlobalBuffer((__gm__ InputDType *)params.dout);
-        attenInGm.SetGlobalBuffer((__gm__ InputDType *)params.out);
-        sfmgWorkspaceGm.SetGlobalBuffer((__gm__ float *)params.softGradworkspace);
+        dyGm.SetGlobalBuffer((__gm__ InputDType*)params.dout);
+        attenInGm.SetGlobalBuffer((__gm__ InputDType*)params.out);
+        sfmgWorkspaceGm.SetGlobalBuffer((__gm__ float*)params.softGradworkspace);
 
         uint64_t normalAxisSize = 0;
         if (INPUT_LAYOUT == TND) {
@@ -303,12 +303,12 @@ public:
      * curS: 当前batch的seqlen, 主要要针对tnd格式，s不等场景
      * seqS: actual seqlen list
      */
-    __aicore__ inline void InitIndex(uint64_t startIdx, uint64_t &curS, GM_ADDR seqS)
+    __aicore__ inline void InitIndex(uint64_t startIdx, uint64_t& curS, GM_ADDR seqS)
     {
         if constexpr (INPUT_LAYOUT == TND) {
             uint64_t prefixSum = 0;
             for (int64_t bDimIdx = 0; bDimIdx < b; bDimIdx++) {
-                uint64_t curBatchLen = ((__gm__ int64_t *)seqS)[bDimIdx];
+                uint64_t curBatchLen = ((__gm__ int64_t*)seqS)[bDimIdx];
                 uint64_t curBatchElements = curBatchLen * n1 * d;
 
                 if (startIdx < prefixSum + curBatchElements) {
@@ -332,7 +332,7 @@ public:
         }
     }
 
-    __aicore__ inline void CopyInSfmg(uint64_t leftNburst, uint64_t &curS, GM_ADDR seqS, uint32_t ping)
+    __aicore__ inline void CopyInSfmg(uint64_t leftNburst, uint64_t& curS, GM_ADDR seqS, uint32_t ping)
     {
         uint64_t dstOffset = 0;
         while (leftNburst > 0) {
@@ -349,7 +349,7 @@ public:
                     if (bIdx < b - 1) { // 需要借B
                         bIdx += 1;
                         if constexpr (INPUT_LAYOUT == TND) {
-                            curS = ((__gm__ uint64_t *)seqS)[bIdx];
+                            curS = ((__gm__ uint64_t*)seqS)[bIdx];
                         } else {
                             curS = s1;
                         }
@@ -373,7 +373,7 @@ public:
         if constexpr (INPUT_LAYOUT == TND) {
             uint64_t prefixSum = 0;
             for (uint64_t b = 0; b < bIdx; b++) {
-                prefixSum += ((__gm__ uint64_t *)seqS)[b];
+                prefixSum += ((__gm__ uint64_t*)seqS)[b];
             }
             uint64_t bOffset = prefixSum * n1 * d;
             srcOffset = bOffset + (sIdx * n1 + nIdx) * d;

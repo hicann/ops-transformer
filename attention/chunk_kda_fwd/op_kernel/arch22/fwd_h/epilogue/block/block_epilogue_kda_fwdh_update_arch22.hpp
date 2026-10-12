@@ -39,7 +39,7 @@ public:
     using FinalStateElement = typename FinalStateType_::Element;
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource)
+    BlockEpilogue(Arch::Resource<ArchTag>& resource)
     {
         constexpr uint32_t CALC_BUF_OFFSET = 0;
         constexpr uint32_t PING_BUF_0_OFFSET = 32 * 1024;

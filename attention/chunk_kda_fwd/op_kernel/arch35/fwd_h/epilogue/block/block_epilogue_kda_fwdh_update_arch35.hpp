@@ -41,7 +41,7 @@ public:
     using FinalStateElement = typename FinalStateType_::Element;
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource)
+    BlockEpilogue(Arch::Resource<ArchTag>& resource)
     {
         constexpr uint32_t CALC_BUF_OFFSET = 0;
         constexpr uint32_t PING_BUF_0_OFFSET = 32 * 1024;
@@ -121,8 +121,8 @@ public:
     void ApplyRowScale(AscendC::LocalTensor<float> matrix, AscendC::LocalTensor<float> rowScale, uint32_t rows,
                        uint32_t cols)
     {
-        __ubuf__ float *matrixAddr = reinterpret_cast<__ubuf__ float *>(matrix.GetPhyAddr());
-        __ubuf__ float *rowScaleAddr = reinterpret_cast<__ubuf__ float *>(rowScale.GetPhyAddr());
+        __ubuf__ float* matrixAddr = reinterpret_cast<__ubuf__ float*>(matrix.GetPhyAddr());
+        __ubuf__ float* rowScaleAddr = reinterpret_cast<__ubuf__ float*>(rowScale.GetPhyAddr());
         AscendC::VF_CALL<detail::ApplyRowScaleDualIssue>(matrixAddr, rowScaleAddr, 0, static_cast<uint16_t>(rows),
                                                          static_cast<uint16_t>(cols));
         AscendC::PipeBarrier<PIPE_V>();
@@ -132,8 +132,8 @@ public:
     void PrepareKGate(AscendC::LocalTensor<float> gateOutput, AscendC::LocalTensor<GElementInput> gateInput,
                       uint32_t count)
     {
-        __ubuf__ float *gateOutputAddr = reinterpret_cast<__ubuf__ float *>(gateOutput.GetPhyAddr());
-        __ubuf__ GElementInput *gateInputAddr = reinterpret_cast<__ubuf__ GElementInput *>(gateInput.GetPhyAddr());
+        __ubuf__ float* gateOutputAddr = reinterpret_cast<__ubuf__ float*>(gateOutput.GetPhyAddr());
+        __ubuf__ GElementInput* gateInputAddr = reinterpret_cast<__ubuf__ GElementInput*>(gateInput.GetPhyAddr());
         AscendC::VF_CALL<detail::PrepareKGateRegbase<GElementInput, true>>(gateOutputAddr, gateInputAddr,
                                                                            static_cast<uint16_t>(count));
         AscendC::PipeBarrier<PIPE_V>();
@@ -143,9 +143,9 @@ public:
     CATLASS_DEVICE void ApplyKGateUpdate(AscendC::LocalTensor<float> update, AscendC::LocalTensor<StateElement> state,
                                          AscendC::LocalTensor<float> rowScale, uint32_t rows, uint32_t cols)
     {
-        __ubuf__ float *updateAddr = reinterpret_cast<__ubuf__ float *>(update.GetPhyAddr());
-        __ubuf__ StateElement *stateAddr = reinterpret_cast<__ubuf__ StateElement *>(state.GetPhyAddr());
-        __ubuf__ float *rowScaleAddr = reinterpret_cast<__ubuf__ float *>(rowScale.GetPhyAddr());
+        __ubuf__ float* updateAddr = reinterpret_cast<__ubuf__ float*>(update.GetPhyAddr());
+        __ubuf__ StateElement* stateAddr = reinterpret_cast<__ubuf__ StateElement*>(state.GetPhyAddr());
+        __ubuf__ float* rowScaleAddr = reinterpret_cast<__ubuf__ float*>(rowScale.GetPhyAddr());
         AscendC::VF_CALL<detail::ApplyKGateUpdateRegbaseDualIssue<StateElement>>(
             updateAddr, stateAddr, rowScaleAddr, static_cast<uint16_t>(rows), static_cast<uint16_t>(cols));
         AscendC::PipeBarrier<PIPE_V>();

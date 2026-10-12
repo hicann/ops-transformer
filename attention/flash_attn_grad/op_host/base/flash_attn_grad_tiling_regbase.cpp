@@ -39,8 +39,8 @@ static_assert(offsetof(FlashAttnGradTilingData, coefN2) == 128,
 static_assert(offsetof(FlashAttnGradTilingData, totalPerBatchNum) == 184,
               "trailing mask field moved; a field was added or removed.");
 
-void LogPlan(gert::TilingContext *context, const FagParsedInfo &info, const FagTilingPlan &plan,
-             const FagRouteTrace &trace)
+void LogPlan(gert::TilingContext* context, const FagParsedInfo& info, const FagTilingPlan& plan,
+             const FagRouteTrace& trace)
 {
     OP_LOGI(context->GetNodeName(),
             "FlashAttnGrad tiling: usedCube=%u, usedBlockDim=%u, useActualCores=%d, s1Outer=%ld, s2Outer=%ld, "
@@ -72,7 +72,7 @@ void LogPlan(gert::TilingContext *context, const FagParsedInfo &info, const FagT
 
 } // namespace
 
-void FlashAttnGradTilingRegbase::InitTilingInfo(const FagParsedInfo &info)
+void FlashAttnGradTilingRegbase::InitTilingInfo(const FagParsedInfo& info)
 {
     info_ = &info;
 }
@@ -90,7 +90,7 @@ bool FlashAttnGradTilingRegbase::IsCapable()
 
 ge::graphStatus FlashAttnGradTilingRegbase::DoOpTiling()
 {
-    const FagParsedInfo &info = *info_;
+    const FagParsedInfo& info = *info_;
 
     FagTilingPlan plan;
     FagRouteTrace trace;
@@ -130,9 +130,9 @@ ge::graphStatus FlashAttnGradTilingRegbase::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashAttnGradTilingRegbase::WriteTilingData(const FagParsedInfo &info)
+ge::graphStatus FlashAttnGradTilingRegbase::WriteTilingData(const FagParsedInfo& info)
 {
-    FlashAttnGradTilingData *tilingData = context_->GetTilingData<FlashAttnGradTilingData>();
+    FlashAttnGradTilingData* tilingData = context_->GetTilingData<FlashAttnGradTilingData>();
     // GetTilingData 在 capacity < sizeof(T) 时返回 nullptr，而 capacity 来自上面
     // 说的 Tmp。所以这里判空等价于「两份声明已经漂移」，不判就是段错误。
     OP_CHECK_IF(tilingData == nullptr,

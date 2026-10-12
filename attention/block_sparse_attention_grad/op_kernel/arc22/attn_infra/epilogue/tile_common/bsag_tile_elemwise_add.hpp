@@ -30,9 +30,9 @@ struct TileElemWiseAdd {
 
     __aicore__ inline TileElemWiseAdd() {}
 
-    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const &ubOut,
-                                      AscendC::LocalTensor<ElementCompute> const &ubIn0,
-                                      AscendC::LocalTensor<ElementCompute> const &ubIn1)
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const& ubOut,
+                                      AscendC::LocalTensor<ElementCompute> const& ubIn0,
+                                      AscendC::LocalTensor<ElementCompute> const& ubIn1)
     {
         // Do the calculation
         AscendC::Add(ubOut, ubIn0, ubIn1, COMPUTE_LENGTH);

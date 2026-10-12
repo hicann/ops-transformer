@@ -39,19 +39,19 @@ public:
                                 GM_ADDR deqScaleK, GM_ADDR deqScaleV, GM_ADDR deqScaleDy, GM_ADDR queryRope,
                                 GM_ADDR keyRope, GM_ADDR sink, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dpse,
                                 GM_ADDR dqRope, GM_ADDR dkRope, GM_ADDR dsink, GM_ADDR workspace,
-                                FagTilingType ordTilingData, TPipe *pipeIn);
-    __aicore__ inline void SetRunInfoDeterForTND(FagRunInfo &runInfo, int64_t taskId, int64_t index,
-                                                 CoordinateInfo &coordinateInfo, int64_t nextIndex);
+                                FagTilingType ordTilingData, TPipe* pipeIn);
+    __aicore__ inline void SetRunInfoDeterForTND(FagRunInfo& runInfo, int64_t taskId, int64_t index,
+                                                 CoordinateInfo& coordinateInfo, int64_t nextIndex);
     __aicore__ inline int64_t CalDeterMaxLoopNum();
-    __aicore__ inline void CalDeterIndex(uint32_t roundId, uint32_t maxLoopNum, int64_t &nextValidRoundId,
-                                         int64_t &nextValidIndex, int64_t taskId, CoordinateInfo &coordinateInfo,
-                                         FagRunInfo &runInfo);
-    __aicore__ inline int64_t CalDenseDeterIndex(uint32_t roundId, CoordinateInfo &coordinateInfo);
-    __aicore__ inline int64_t CalCausalDeterIndex(uint32_t roundId, CoordinateInfo &coordinateInfo);
-    __aicore__ inline int64_t CalBandDeterIndex(uint32_t roundId, CoordinateInfo &coordinateInfo);
-    __aicore__ inline bool IsValidDeterForTnd(FagRunInfo &runInfo, int64_t index, CoordinateInfo &coordinateInfo);
-    __aicore__ inline void GetNextDxAndQueryOffsetTND(FagRunInfo &runInfo, int64_t nextIndex,
-                                                      PreloadArgs<IS_ROPE> &preloadArgs);
+    __aicore__ inline void CalDeterIndex(uint32_t roundId, uint32_t maxLoopNum, int64_t& nextValidRoundId,
+                                         int64_t& nextValidIndex, int64_t taskId, CoordinateInfo& coordinateInfo,
+                                         FagRunInfo& runInfo);
+    __aicore__ inline int64_t CalDenseDeterIndex(uint32_t roundId, CoordinateInfo& coordinateInfo);
+    __aicore__ inline int64_t CalCausalDeterIndex(uint32_t roundId, CoordinateInfo& coordinateInfo);
+    __aicore__ inline int64_t CalBandDeterIndex(uint32_t roundId, CoordinateInfo& coordinateInfo);
+    __aicore__ inline bool IsValidDeterForTnd(FagRunInfo& runInfo, int64_t index, CoordinateInfo& coordinateInfo);
+    __aicore__ inline void GetNextDxAndQueryOffsetTND(FagRunInfo& runInfo, int64_t nextIndex,
+                                                      PreloadArgs<IS_ROPE>& preloadArgs);
     __aicore__ inline void Process();
     __aicore__ inline void Process_NEW_DETER();
     __aicore__ inline void Process_OLD_DETER();
@@ -87,7 +87,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBloc
     GM_ADDR y, GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR prefixN, GM_ADDR actualSeqQlen, GM_ADDR actualSeqKvlen,
     GM_ADDR deqScaleQ, GM_ADDR deqScaleK, GM_ADDR deqScaleV, GM_ADDR deqScaleDy, GM_ADDR queryRope, GM_ADDR keyRope,
     GM_ADDR sink, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dpse, GM_ADDR dqRope, GM_ADDR dkRope, GM_ADDR dsink,
-    GM_ADDR workspace, FagTilingType ordTilingData, TPipe *pipeIn)
+    GM_ADDR workspace, FagTilingType ordTilingData, TPipe* pipeIn)
 {
     BaseClass::Init(key, value, dy, query, pseShift, dropMask, attenMask, y, softmaxMax, softmaxSum, prefixN,
                     actualSeqQlen, actualSeqKvlen, deqScaleQ, deqScaleK, deqScaleV, deqScaleDy, queryRope, keyRope,
@@ -97,14 +97,14 @@ __aicore__ inline void FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBloc
     dAlign16 = AlignTo16(this->constInfo.commonConstInfo.dSize);
     dvAlign16 = AlignTo16(this->constInfo.commonConstInfo.dSizeV);
 
-    deterGm.SetGlobalBuffer((__gm__ float *)workspace +
+    deterGm.SetGlobalBuffer((__gm__ float*)workspace +
                             this->tilingData->baseDeterParam.deterGmOffset / sizeof(CALC_TYPE));
     deterGmOffset = this->cBlockIdx * this->CUBE_BASEN * this->HEAD_DIM_ALIGN * NUM_TWO;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBlockType>::GetNextDxAndQueryOffsetTND(
-    FagRunInfo &runInfo, int64_t nextIndex, PreloadArgs<IS_ROPE> &preloadArgs)
+    FagRunInfo& runInfo, int64_t nextIndex, PreloadArgs<IS_ROPE>& preloadArgs)
 {
     preloadArgs.copyNext = !(nextIndex == -1);
     preloadArgs.copyCurrent = (runInfo.commonRunInfo.taskId == 0);
@@ -134,7 +134,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBloc
         int64_t actualS1Len = coordinateInfos[nextIndex].actualS1Len;
         int64_t s1OuterTmp = coordinateInfos[nextIndex].s1Outer;
         int64_t bIdx = coordinateInfos[nextIndex].batchId;
-        int64_t seqQLenPrefix = bIdx == 0 ? 0 : ((__gm__ int64_t *)this->actualSeqQlenAddr)[bIdx - 1];
+        int64_t seqQLenPrefix = bIdx == 0 ? 0 : ((__gm__ int64_t*)this->actualSeqQlenAddr)[bIdx - 1];
         int64_t lastBatchTotalS1BOffset = seqQLenPrefix * this->constInfo.commonConstInfo.n2GD;
         int64_t lastBatchTotalS1BOffsetForDv = seqQLenPrefix * this->constInfo.commonConstInfo.n2GDv;
         int64_t s1CvTail = actualS1Len - (s1OuterTmp - 1) * this->CUBE_BASEM;
@@ -173,7 +173,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBloc
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline bool FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBlockType>::IsValidDeterForTnd(
-    FagRunInfo &runInfo, int64_t index, CoordinateInfo &coordinateInfo)
+    FagRunInfo& runInfo, int64_t index, CoordinateInfo& coordinateInfo)
 {
     if (coordinateInfo.batchId < 0 || index < 0) {
         return false;
@@ -220,7 +220,7 @@ __aicore__ inline bool FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBloc
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBlockType>::SetRunInfoDeterForTND(
-    FagRunInfo &runInfo, int64_t taskId, int64_t index, CoordinateInfo &coordinateInfo, int64_t nextIndex)
+    FagRunInfo& runInfo, int64_t taskId, int64_t index, CoordinateInfo& coordinateInfo, int64_t nextIndex)
 {
     int64_t bIdx = coordinateInfo.batchId;
     int64_t actualS1Len = coordinateInfo.actualS1Len;
@@ -230,8 +230,8 @@ __aicore__ inline void FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBloc
     runInfo.commonRunInfo.boIdx = bIdx;
 
     if (runInfo.lastBatchIdx != bIdx) {
-        int64_t seqQLenPrefix = bIdx == 0 ? 0 : ((__gm__ int64_t *)this->actualSeqQlenAddr)[bIdx - 1];
-        int64_t seqKvLenPrefix = bIdx == 0 ? 0 : ((__gm__ int64_t *)this->actualSeqKvlenAddr)[bIdx - 1];
+        int64_t seqQLenPrefix = bIdx == 0 ? 0 : ((__gm__ int64_t*)this->actualSeqQlenAddr)[bIdx - 1];
+        int64_t seqKvLenPrefix = bIdx == 0 ? 0 : ((__gm__ int64_t*)this->actualSeqKvlenAddr)[bIdx - 1];
         runInfo.lastBatchTotalS1BOffset = seqQLenPrefix * this->constInfo.commonConstInfo.n2GD;
         runInfo.lastBatchTotalS2BOffset = seqKvLenPrefix * this->constInfo.commonConstInfo.n2D;
         runInfo.lastBatchTotalS1BOffsetForDv = seqQLenPrefix * this->constInfo.commonConstInfo.n2GDv;
@@ -340,7 +340,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBloc
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBlockType>::CalCausalDeterIndex(
-    uint32_t roundId, CoordinateInfo &coordinateInfo)
+    uint32_t roundId, CoordinateInfo& coordinateInfo)
 {
     int64_t j = this->cBlockIdx + 1;
     int64_t r = roundId + 1;
@@ -436,7 +436,7 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelDeter<CubeBlockType, VecB
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBlockType>::CalDenseDeterIndex(
-    uint32_t roundId, CoordinateInfo &coordinateInfo)
+    uint32_t roundId, CoordinateInfo& coordinateInfo)
 {
     int64_t j = this->cBlockIdx + 1;
     int64_t r = roundId + 1;
@@ -502,7 +502,7 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelDeter<CubeBlockType, VecB
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBlockType>::CalBandDeterIndex(
-    uint32_t roundId, CoordinateInfo &coordinateInfo)
+    uint32_t roundId, CoordinateInfo& coordinateInfo)
 {
     int64_t j = this->cBlockIdx + 1;
     int64_t r = roundId + 1;
@@ -778,8 +778,8 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelDeter<CubeBlockType, VecB
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBlockType>::CalDeterIndex(
-    uint32_t roundId, uint32_t maxLoopNum, int64_t &nextValidRoundId, int64_t &nextValidIndex, int64_t taskId,
-    CoordinateInfo &coordinateInfo, FagRunInfo &runInfo)
+    uint32_t roundId, uint32_t maxLoopNum, int64_t& nextValidRoundId, int64_t& nextValidIndex, int64_t taskId,
+    CoordinateInfo& coordinateInfo, FagRunInfo& runInfo)
 {
     coordinateInfo.sparseMode = this->constInfo.sparseMode;
     for (uint32_t currentRoundId = roundId; currentRoundId < maxLoopNum; currentRoundId++) {

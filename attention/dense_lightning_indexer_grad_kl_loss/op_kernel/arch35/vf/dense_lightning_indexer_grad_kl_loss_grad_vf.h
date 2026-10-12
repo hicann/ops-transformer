@@ -30,8 +30,8 @@ constexpr static CastTrait CAST_GRAD_FP32_TO_B16 = {
 
 constexpr uint32_t GRAD_FP32_REG_ELEMENTS = 64;
 
-__simd_vf__ inline void ComputeDwElementwiseVF(__ubuf__ float *dwElementUb, __ubuf__ float *deltaUb,
-                                               __ubuf__ float *reluUb, uint32_t count)
+__simd_vf__ inline void ComputeDwElementwiseVF(__ubuf__ float* dwElementUb, __ubuf__ float* deltaUb,
+                                               __ubuf__ float* reluUb, uint32_t count)
 {
     RegTensor<float> deltaReg;
     RegTensor<float> reluReg;
@@ -47,19 +47,19 @@ __simd_vf__ inline void ComputeDwElementwiseVF(__ubuf__ float *dwElementUb, __ub
     }
 }
 
-__aicore__ inline void ComputeDwElementwise(const LocalTensor<float> &dwElementTensor,
-                                            const LocalTensor<float> &deltaTensor, const LocalTensor<float> &reluTensor,
+__aicore__ inline void ComputeDwElementwise(const LocalTensor<float>& dwElementTensor,
+                                            const LocalTensor<float>& deltaTensor, const LocalTensor<float>& reluTensor,
                                             uint32_t count)
 {
-    __ubuf__ float *dwElementUb = reinterpret_cast<__ubuf__ float *>(dwElementTensor.GetPhyAddr());
-    __ubuf__ float *deltaUb = reinterpret_cast<__ubuf__ float *>(deltaTensor.GetPhyAddr());
-    __ubuf__ float *reluUb = reinterpret_cast<__ubuf__ float *>(reluTensor.GetPhyAddr());
+    __ubuf__ float* dwElementUb = reinterpret_cast<__ubuf__ float*>(dwElementTensor.GetPhyAddr());
+    __ubuf__ float* deltaUb = reinterpret_cast<__ubuf__ float*>(deltaTensor.GetPhyAddr());
+    __ubuf__ float* reluUb = reinterpret_cast<__ubuf__ float*>(reluTensor.GetPhyAddr());
     ComputeDwElementwiseVF(dwElementUb, deltaUb, reluUb, count);
 }
 
 template <typename OUT_T>
-__simd_vf__ inline void ComputeReluGradElementwiseVF(__ubuf__ OUT_T *reluGradUb, __ubuf__ float *deltaUb,
-                                                     __ubuf__ float *reluUb, __ubuf__ float *weightUb, uint32_t count)
+__simd_vf__ inline void ComputeReluGradElementwiseVF(__ubuf__ OUT_T* reluGradUb, __ubuf__ float* deltaUb,
+                                                     __ubuf__ float* reluUb, __ubuf__ float* weightUb, uint32_t count)
 {
     RegTensor<float> deltaReg;
     RegTensor<float> reluReg;
@@ -86,23 +86,23 @@ __simd_vf__ inline void ComputeReluGradElementwiseVF(__ubuf__ OUT_T *reluGradUb,
 }
 
 template <typename OUT_T>
-__aicore__ inline void ComputeReluGradElementwise(const LocalTensor<OUT_T> &reluGradTensor,
-                                                  const LocalTensor<float> &deltaTensor,
-                                                  const LocalTensor<float> &reluTensor,
-                                                  const LocalTensor<float> &weightTensor, uint32_t weightOffset,
+__aicore__ inline void ComputeReluGradElementwise(const LocalTensor<OUT_T>& reluGradTensor,
+                                                  const LocalTensor<float>& deltaTensor,
+                                                  const LocalTensor<float>& reluTensor,
+                                                  const LocalTensor<float>& weightTensor, uint32_t weightOffset,
                                                   uint32_t count)
 {
-    __ubuf__ OUT_T *reluGradUb = reinterpret_cast<__ubuf__ OUT_T *>(reluGradTensor.GetPhyAddr());
-    __ubuf__ float *deltaUb = reinterpret_cast<__ubuf__ float *>(deltaTensor.GetPhyAddr());
-    __ubuf__ float *reluUb = reinterpret_cast<__ubuf__ float *>(reluTensor.GetPhyAddr());
-    __ubuf__ float *weightUb = reinterpret_cast<__ubuf__ float *>(weightTensor.GetPhyAddr()) + weightOffset;
+    __ubuf__ OUT_T* reluGradUb = reinterpret_cast<__ubuf__ OUT_T*>(reluGradTensor.GetPhyAddr());
+    __ubuf__ float* deltaUb = reinterpret_cast<__ubuf__ float*>(deltaTensor.GetPhyAddr());
+    __ubuf__ float* reluUb = reinterpret_cast<__ubuf__ float*>(reluTensor.GetPhyAddr());
+    __ubuf__ float* weightUb = reinterpret_cast<__ubuf__ float*>(weightTensor.GetPhyAddr()) + weightOffset;
     ComputeReluGradElementwiseVF<OUT_T>(reluGradUb, deltaUb, reluUb, weightUb, count);
 }
 
 template <typename OUT_T>
-__simd_vf__ inline void ComputeGradElementwiseVF(__ubuf__ float *dwElementUb, __ubuf__ OUT_T *reluGradUb,
-                                                 __ubuf__ float *deltaUb, __ubuf__ float *reluUb,
-                                                 __ubuf__ float *weightUb, uint32_t count)
+__simd_vf__ inline void ComputeGradElementwiseVF(__ubuf__ float* dwElementUb, __ubuf__ OUT_T* reluGradUb,
+                                                 __ubuf__ float* deltaUb, __ubuf__ float* reluUb,
+                                                 __ubuf__ float* weightUb, uint32_t count)
 {
     RegTensor<float> deltaReg;
     RegTensor<float> reluReg;
@@ -134,18 +134,18 @@ __simd_vf__ inline void ComputeGradElementwiseVF(__ubuf__ float *dwElementUb, __
 }
 
 template <typename OUT_T>
-__aicore__ inline void ComputeGradElementwise(const LocalTensor<float> &dwElementTensor,
-                                              const LocalTensor<OUT_T> &reluGradTensor,
-                                              const LocalTensor<float> &deltaTensor,
-                                              const LocalTensor<float> &reluTensor,
-                                              const LocalTensor<float> &weightTensor, uint32_t weightOffset,
+__aicore__ inline void ComputeGradElementwise(const LocalTensor<float>& dwElementTensor,
+                                              const LocalTensor<OUT_T>& reluGradTensor,
+                                              const LocalTensor<float>& deltaTensor,
+                                              const LocalTensor<float>& reluTensor,
+                                              const LocalTensor<float>& weightTensor, uint32_t weightOffset,
                                               uint32_t count)
 {
-    __ubuf__ float *dwElementUb = reinterpret_cast<__ubuf__ float *>(dwElementTensor.GetPhyAddr());
-    __ubuf__ OUT_T *reluGradUb = reinterpret_cast<__ubuf__ OUT_T *>(reluGradTensor.GetPhyAddr());
-    __ubuf__ float *deltaUb = reinterpret_cast<__ubuf__ float *>(deltaTensor.GetPhyAddr());
-    __ubuf__ float *reluUb = reinterpret_cast<__ubuf__ float *>(reluTensor.GetPhyAddr());
-    __ubuf__ float *weightUb = reinterpret_cast<__ubuf__ float *>(weightTensor.GetPhyAddr()) + weightOffset;
+    __ubuf__ float* dwElementUb = reinterpret_cast<__ubuf__ float*>(dwElementTensor.GetPhyAddr());
+    __ubuf__ OUT_T* reluGradUb = reinterpret_cast<__ubuf__ OUT_T*>(reluGradTensor.GetPhyAddr());
+    __ubuf__ float* deltaUb = reinterpret_cast<__ubuf__ float*>(deltaTensor.GetPhyAddr());
+    __ubuf__ float* reluUb = reinterpret_cast<__ubuf__ float*>(reluTensor.GetPhyAddr());
+    __ubuf__ float* weightUb = reinterpret_cast<__ubuf__ float*>(weightTensor.GetPhyAddr()) + weightOffset;
     ComputeGradElementwiseVF<OUT_T>(dwElementUb, reluGradUb, deltaUb, reluUb, weightUb, count);
 }
 } // namespace DenseDliGradKLLossArch35

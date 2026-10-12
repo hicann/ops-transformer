@@ -25,12 +25,12 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(DenseLightningIndexerKLLossGradMetadata);
 
-const aclTensor *DenseLightningIndexerKLLossGradMetadata(
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKOptional, const aclTensor *cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
-    int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, char *layoutQOptional,
-    char *layoutKOptional, int64_t maskMode, int64_t cmpRatio, int64_t aicCoreNum, int64_t aivCoreNum,
-    const char *socVersion, const aclTensor *metadata, aclOpExecutor *executor)
+const aclTensor* DenseLightningIndexerKLLossGradMetadata(
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
+    int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, char* layoutQOptional,
+    char* layoutKOptional, int64_t maskMode, int64_t cmpRatio, int64_t aicCoreNum, int64_t aivCoreNum,
+    const char* socVersion, const aclTensor* metadata, aclOpExecutor* executor)
 {
     L0_DFX(DenseLightningIndexerKLLossGradMetadata, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional,
            sequsedKOptional, cmpResidualKOptional, batchSize, maxSeqlenQ, maxSeqlenK, numHeadsQ, numHeadsK, headDim,

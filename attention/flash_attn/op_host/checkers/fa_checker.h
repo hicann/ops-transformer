@@ -38,18 +38,18 @@ public:
     FAChecker() = default;
     ~FAChecker() = default;
 
-    ge::graphStatus Init(const FaTilingInfo &faInfo);
-    ge::graphStatus Process(const FaTilingInfo &faInfo);
+    ge::graphStatus Init(const FaTilingInfo& faInfo);
+    ge::graphStatus Process(const FaTilingInfo& faInfo);
 
-    ge::graphStatus CheckSinglePara(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckParaExistence(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckFeature(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckMultiPara(const FaTilingInfo &faInfo);
+    ge::graphStatus CheckSinglePara(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckParaExistence(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckFeature(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckMultiPara(const FaTilingInfo& faInfo);
 
 private:
-    using CheckMethod = std::function<ge::graphStatus(FABaseChecker *, const FaTilingInfo &)>;
+    using CheckMethod = std::function<ge::graphStatus(FABaseChecker*, const FaTilingInfo&)>;
 
-    ge::graphStatus RunCheck(const CheckMethod &method, const FaTilingInfo &faInfo);
+    ge::graphStatus RunCheck(const CheckMethod& method, const FaTilingInfo& faInfo);
 
     void RegisterCheckers();
 

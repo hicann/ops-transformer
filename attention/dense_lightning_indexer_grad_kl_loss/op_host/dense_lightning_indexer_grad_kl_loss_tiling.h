@@ -41,14 +41,14 @@ struct DenseLightningIndexerGradKLLossCompileInfo {
 
 class DenseLightningIndexerGradKLLossTilingBase : public TilingBaseClass {
 public:
-    explicit DenseLightningIndexerGradKLLossTilingBase(gert::TilingContext *context)
+    explicit DenseLightningIndexerGradKLLossTilingBase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {
         Reset();
     }
     ~DenseLightningIndexerGradKLLossTilingBase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
@@ -80,7 +80,7 @@ protected:
         inputLayout = nullptr;
     }
 
-    [[nodiscard]] gert::TilingContext *GetContext()
+    [[nodiscard]] gert::TilingContext* GetContext()
     {
         return context_;
     }
@@ -104,12 +104,12 @@ protected:
     bool AnalyzeAttrs();
     bool AnalyzeDtype();
     bool AnalyzeLayout();
-    bool CrossShapeVerify(const gert::Shape &queryRopeShape, const gert::Shape &keyRopeShape);
+    bool CrossShapeVerify(const gert::Shape& queryRopeShape, const gert::Shape& keyRopeShape);
     bool CheckSeqLenLimit(int64_t querySeqLength, int64_t keySeqLength) const;
-    bool Analyze3DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape,
-                           const gert::Shape &queryIndexShape, const gert::Shape &keyIndexShape, size_t layoutLen,
-                           const gert::Shape &queryRopeShape, const gert::Shape &keyRopeShape);
-    void GetActualSeqLenData(int64_t inputIdx, std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> &res, int64_t &actualLen) const;
+    bool Analyze3DimLayout(const gert::Shape& queryShape, const gert::Shape& keyShape,
+                           const gert::Shape& queryIndexShape, const gert::Shape& keyIndexShape, size_t layoutLen,
+                           const gert::Shape& queryRopeShape, const gert::Shape& keyRopeShape);
+    void GetActualSeqLenData(int64_t inputIdx, std::array<int64_t, MAX_VAR_LEN_SEQ_LEN>& res, int64_t& actualLen) const;
     int64_t CalcTotalSize();
     void SetMultiCoreParamsRegbase(int64_t totalSize, int64_t coreNum);
     bool SetSparseParamsRegbase();
@@ -119,22 +119,22 @@ protected:
     void CalcMaxLoop();
     int32_t GetS2SparseLen(int32_t s1Idx, int32_t actualSeqLensQ, int32_t actualSeqLensK, int32_t sparseMode);
     int32_t GetActualSeqLens(int32_t bIdx, int32_t defaultLens,
-                             std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> &actualSeqLenData, LayoutType layout);
-    int64_t FindBIndex(int64_t bIndex, int64_t curBs1Index, int64_t &accumulateLen);
-    void CalcMultiCoreOffset(int64_t &bStartIdx, int64_t &s1StartIdx, int64_t &bEndIdx, int64_t &s1EndIdx,
-                             int64_t &aicIdx);
-    int64_t GetEndS1Etx(int32_t bIdx, int32_t defaultLens, std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> &actualSeqLenData,
+                             std::array<int64_t, MAX_VAR_LEN_SEQ_LEN>& actualSeqLenData, LayoutType layout);
+    int64_t FindBIndex(int64_t bIndex, int64_t curBs1Index, int64_t& accumulateLen);
+    void CalcMultiCoreOffset(int64_t& bStartIdx, int64_t& s1StartIdx, int64_t& bEndIdx, int64_t& s1EndIdx,
+                             int64_t& aicIdx);
+    int64_t GetEndS1Etx(int32_t bIdx, int32_t defaultLens, std::array<int64_t, MAX_VAR_LEN_SEQ_LEN>& actualSeqLenData,
                         LayoutType layout);
 
     int64_t GetS2RealSize(int32_t sparseMode, int32_t s1Size, int32_t s2Size, int32_t s1Idx);
-    inline bool InitLoadValue(const std::vector<int64_t> &sparseValidArray, int64_t validAicNum, int64_t totalSize,
-                              const std::vector<int64_t> &sparseStartIdx, std::vector<int64_t> &localValue);
-    bool BalanceLoad(const std::vector<int64_t> &sparseValidArray, std::vector<int64_t> &localValue,
-                     std::vector<int64_t> &sparseStartIdx);
-    bool Balance4DLoad(std::vector<int64_t> &tmpSparseValue, const std::vector<int64_t> sparseValidArray,
+    inline bool InitLoadValue(const std::vector<int64_t>& sparseValidArray, int64_t validAicNum, int64_t totalSize,
+                              const std::vector<int64_t>& sparseStartIdx, std::vector<int64_t>& localValue);
+    bool BalanceLoad(const std::vector<int64_t>& sparseValidArray, std::vector<int64_t>& localValue,
+                     std::vector<int64_t>& sparseStartIdx);
+    bool Balance4DLoad(std::vector<int64_t>& tmpSparseValue, const std::vector<int64_t> sparseValidArray,
                        const int64_t balanceNum);
-    bool SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray);
-    bool InitSparseValidArray(std::vector<int64_t> &sparseValidArray);
+    bool SetSparseStartIdx(const std::vector<int64_t>& sparseValidArray);
+    bool InitSparseValidArray(std::vector<int64_t>& sparseValidArray);
 
     // 基础输入参数
     int32_t bSize;
@@ -152,7 +152,7 @@ protected:
     float scaleValue;
 
     // 新增的一些参数
-    const char *templateName = "dlikbase";
+    const char* templateName = "dlikbase";
 
     LayoutType tilingKeyLayout;
     uint32_t aivNum;
@@ -174,16 +174,16 @@ protected:
     bool deterministic;
     bool hasRope = false;
 
-    const char *opName;
-    const char *inputLayout;
+    const char* opName;
+    const char* inputLayout;
 
     std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> actualSeqLenData;
     std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> actualSeqLenKData;
 
-    DenseLightningIndexerGradKLLossTilingData *tilingData =
+    DenseLightningIndexerGradKLLossTilingData* tilingData =
         context_->GetTilingData<DenseLightningIndexerGradKLLossTilingData>();
-    DLIGradKLLossBaseParams *dliGradkllossBaseParams_ = &tilingData->baseParams;
-    DLIGradKLLossMultiCoreParams *dliGradkllossMultiCoreParams_ = &tilingData->multiCoreParams;
+    DLIGradKLLossBaseParams* dliGradkllossBaseParams_ = &tilingData->baseParams;
+    DLIGradKLLossMultiCoreParams* dliGradkllossMultiCoreParams_ = &tilingData->multiCoreParams;
 };
 
 } // namespace optiling

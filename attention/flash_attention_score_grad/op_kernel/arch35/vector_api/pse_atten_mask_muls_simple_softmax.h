@@ -23,8 +23,8 @@
 using namespace commondef;
 
 template <typename T1, typename T2, const uint32_t IS_PSE = 0>
-__aicore__ inline void CopyInPse(FagConstInfo &constInfo, FagRunInfo &runInfo, PseInfo &pseInfo,
-                                 TQue<QuePosition::VECIN, 1> &pseInQue, GlobalTensor<T1> &pseGm)
+__aicore__ inline void CopyInPse(FagConstInfo& constInfo, FagRunInfo& runInfo, PseInfo& pseInfo,
+                                 TQue<QuePosition::VECIN, 1>& pseInQue, GlobalTensor<T1>& pseGm)
 {
     // 调用公共函数，传入LocalTensor
     if constexpr (IS_PSE) {
@@ -39,8 +39,8 @@ __aicore__ inline void CopyInPse(FagConstInfo &constInfo, FagRunInfo &runInfo, P
 }
 
 template <typename T1, const uint32_t IS_PSE = 0>
-__aicore__ inline void GenPse(FagConstInfo &constInfo, FagRunInfo &runInfo, PseInfo &pseInfo,
-                              TQue<QuePosition::VECIN, 1> &pseInQue)
+__aicore__ inline void GenPse(FagConstInfo& constInfo, FagRunInfo& runInfo, PseInfo& pseInfo,
+                              TQue<QuePosition::VECIN, 1>& pseInQue)
 {
     // 调用公共函数
     if constexpr (IS_PSE) {
@@ -51,10 +51,10 @@ __aicore__ inline void GenPse(FagConstInfo &constInfo, FagRunInfo &runInfo, PseI
 }
 
 template <const uint32_t IS_ATTEN_MASK = 0, const uint32_t VECTOR_BASEM = 64, const uint32_t VECTOR_BASEN = 128>
-__aicore__ inline void CopyInAttenMask(FagConstInfo &constInfo, FagRunInfo &runInfo, AttenMaskInfo &attenMaskInfo,
-                                       TQue<QuePosition::VECIN, 1> &attenMaskInQue,
-                                       TQue<QuePosition::VECIN, 1> &attenMaskInQuePre,
-                                       GlobalTensor<uint8_t> &attenMaskGm)
+__aicore__ inline void CopyInAttenMask(FagConstInfo& constInfo, FagRunInfo& runInfo, AttenMaskInfo& attenMaskInfo,
+                                       TQue<QuePosition::VECIN, 1>& attenMaskInQue,
+                                       TQue<QuePosition::VECIN, 1>& attenMaskInQuePre,
+                                       GlobalTensor<uint8_t>& attenMaskGm)
 {
     if constexpr (IS_ATTEN_MASK) {
         if (runInfo.commonRunInfo.halfS1RealSize == 0) {
@@ -66,9 +66,9 @@ __aicore__ inline void CopyInAttenMask(FagConstInfo &constInfo, FagRunInfo &runI
 }
 
 template <typename T2, const uint32_t VECTOR_BASEM = 64, const uint32_t IS_ROPE = 0>
-__aicore__ inline void CopyInMaxSum(FagConstInfo &constInfo, FagRunInfo &runInfo,
-                                    TQue<QuePosition::VECIN, 1> &maxSumInQue, GlobalTensor<T2> &maxGm,
-                                    GlobalTensor<T2> &sumGm)
+__aicore__ inline void CopyInMaxSum(FagConstInfo& constInfo, FagRunInfo& runInfo,
+                                    TQue<QuePosition::VECIN, 1>& maxSumInQue, GlobalTensor<T2>& maxGm,
+                                    GlobalTensor<T2>& sumGm)
 {
     if (runInfo.commonRunInfo.halfS1RealSize == 0) {
         return;
@@ -86,14 +86,14 @@ __aicore__ inline void CopyInMaxSum(FagConstInfo &constInfo, FagRunInfo &runInfo
     } else if (constInfo.commonConstInfo.layoutType == TND) { // TND + BNS8
         int64_t tndS1PrefixSum = (runInfo.commonRunInfo.boIdx == 0 ?
                                       0 :
-                                      ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1]);
+                                      ((__gm__ int64_t*)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1]);
         int64_t actualS1Len = 0;
         maxSumGmOffset = tndS1PrefixSum * constInfo.commonConstInfo.n2G * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
         if (unlikely(runInfo.commonRunInfo.boIdx == 0)) {
-            actualS1Len = ((__gm__ int64_t *)constInfo.seqS1_addr)[0];
+            actualS1Len = ((__gm__ int64_t*)constInfo.seqS1_addr)[0];
         } else {
-            actualS1Len = ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx] -
-                          ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1];
+            actualS1Len = ((__gm__ int64_t*)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx] -
+                          ((__gm__ int64_t*)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1];
         }
         maxSumGmOffset +=
             ((runInfo.commonRunInfo.n2oIdx * constInfo.commonConstInfo.gSize + runInfo.commonRunInfo.goIdx) *
@@ -133,19 +133,19 @@ __aicore__ inline void CopyInMaxSum(FagConstInfo &constInfo, FagRunInfo &runInfo
 }
 
 template <typename T2, const uint32_t VECTOR_BASEM = 64>
-__aicore__ inline int64_t GetBNSOffset(FagConstInfo &constInfo, FagRunInfo &runInfo)
+__aicore__ inline int64_t GetBNSOffset(FagConstInfo& constInfo, FagRunInfo& runInfo)
 {
     int64_t offset = 0;
     int64_t tndS1PrefixSum =
         (runInfo.commonRunInfo.boIdx == 0 ? 0 :
-                                            ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1]);
+                                            ((__gm__ int64_t*)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1]);
     int64_t actualS1Len = 0;
     offset = tndS1PrefixSum * constInfo.commonConstInfo.n2G * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
     if (unlikely(runInfo.commonRunInfo.boIdx == 0)) {
-        actualS1Len = ((__gm__ int64_t *)constInfo.seqS1_addr)[0];
+        actualS1Len = ((__gm__ int64_t*)constInfo.seqS1_addr)[0];
     } else {
-        actualS1Len = ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx] -
-                      ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1];
+        actualS1Len = ((__gm__ int64_t*)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx] -
+                      ((__gm__ int64_t*)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1];
     }
     offset +=
         ((runInfo.commonRunInfo.n2oIdx * constInfo.commonConstInfo.gSize + runInfo.commonRunInfo.goIdx) * actualS1Len +
@@ -156,9 +156,9 @@ __aicore__ inline int64_t GetBNSOffset(FagConstInfo &constInfo, FagRunInfo &runI
 }
 
 template <typename T2, const uint32_t VECTOR_BASEM = 64, const uint32_t IS_ROPE = 0>
-__aicore__ inline void CopyInMaxSumWithSfmg(FagConstInfo &constInfo, FagRunInfo &runInfo,
-                                            TQue<QuePosition::VECIN, 1> &maxSumInQue, GlobalTensor<T2> &maxGm,
-                                            GlobalTensor<T2> &sumGm, GlobalTensor<T2> &sfmgWorkspaceGm)
+__aicore__ inline void CopyInMaxSumWithSfmg(FagConstInfo& constInfo, FagRunInfo& runInfo,
+                                            TQue<QuePosition::VECIN, 1>& maxSumInQue, GlobalTensor<T2>& maxGm,
+                                            GlobalTensor<T2>& sumGm, GlobalTensor<T2>& sfmgWorkspaceGm)
 {
     if (runInfo.commonRunInfo.halfS1RealSize == 0) {
         return;
@@ -227,13 +227,13 @@ srcTensor：VF输入，入参
 template <typename T1, typename T2, const bool IS_FP8_INPUT = false, const uint32_t IS_ATTEN_MASK = 0,
           const uint32_t IS_PSE = 0, const uint32_t IS_DETER_OLD = 0, const uint32_t VECTOR_BASEM = 64,
           const uint32_t VECTOR_BASEN = 128>
-__aicore__ inline void CalculatePseMulsSelSimpleSoftMax(FagConstInfo &constInfo, FagRunInfo &runInfo, PseInfo &pseInfo,
-                                                        AttenMaskInfo &attenMaskInfo,
-                                                        TQue<QuePosition::VECIN, 1> &maxSumInQue,
-                                                        TQue<QuePosition::VECIN, 1> &attenMaskInQue,
-                                                        TQue<QuePosition::VECIN, 1> &pseInQue,
-                                                        LocalTensor<T2> &dstTensor, LocalTensor<T2> &srcTensor,
-                                                        __gm__ uint8_t *pseSlope)
+__aicore__ inline void CalculatePseMulsSelSimpleSoftMax(FagConstInfo& constInfo, FagRunInfo& runInfo, PseInfo& pseInfo,
+                                                        AttenMaskInfo& attenMaskInfo,
+                                                        TQue<QuePosition::VECIN, 1>& maxSumInQue,
+                                                        TQue<QuePosition::VECIN, 1>& attenMaskInQue,
+                                                        TQue<QuePosition::VECIN, 1>& pseInQue,
+                                                        LocalTensor<T2>& dstTensor, LocalTensor<T2>& srcTensor,
+                                                        __gm__ uint8_t* pseSlope)
 {
     if (runInfo.commonRunInfo.halfS1RealSize == 0) {
         return;

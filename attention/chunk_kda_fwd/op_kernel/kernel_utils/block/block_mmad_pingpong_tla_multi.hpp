@@ -179,7 +179,7 @@ public:
 
     /// Construct
     CATLASS_DEVICE
-    BlockMmadTla(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart = 0)
+    BlockMmadTla(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart = 0)
     {
         if ASCEND_IS_AIC {
             uint32_t l1AOffset = l1BufAddrStart;
@@ -306,8 +306,8 @@ public:
 
     /// Perform a block-scoped matrix multiply-accumulate
     template <class TensorA, class TensorB, class TensorC, class TensorBias = EmptyClass>
-    CATLASS_DEVICE void operator()(TensorA &tensorA, TensorB &tensorB, TensorC &tensorC, GemmCoord const &actualShape,
-                                   TensorBias const &tensorBias = {}, bool clearL1Padding = false)
+    CATLASS_DEVICE void operator()(TensorA& tensorA, TensorB& tensorB, TensorC& tensorC, GemmCoord const& actualShape,
+                                   TensorBias const& tensorBias = {}, bool clearL1Padding = false)
     {
         // Check L1TileShape
         if constexpr (HAS_BIAS) {
@@ -368,7 +368,7 @@ public:
                 copyGmToL1A(tensorL1A, tensorTileA);
                 lastCoordA[l1AListId] = MatrixCoord{static_cast<uint32_t>(tla::get<0>(tensorTileA.coord())),
                                                     static_cast<uint32_t>(tla::get<1>(tensorTileA.coord()))};
-                lastAddrA[l1AListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementA>::PrimType *>(
+                lastAddrA[l1AListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementA>::PrimType*>(
                     tensorTileA.data().GetPhyAddr());
             }
         } else {
@@ -392,7 +392,7 @@ public:
                 copyGmToL1B(tensorL1B, tensorTileB);
                 lastCoordB[l1BListId] = MatrixCoord{static_cast<uint32_t>(tla::get<0>(tensorTileB.coord())),
                                                     static_cast<uint32_t>(tla::get<1>(tensorTileB.coord()))};
-                lastAddrB[l1BListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType *>(
+                lastAddrB[l1BListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType*>(
                     tensorTileB.data().GetPhyAddr());
             }
         } else {
@@ -454,7 +454,7 @@ public:
                             MatrixCoord{static_cast<uint32_t>(tla::get<0>(tensorTileA.coord())),
                                         static_cast<uint32_t>(tla::get<1>(tensorTileA.coord()))};
                         lastAddrA[l1AListIdNext] =
-                            const_cast<__gm__ typename AscendC::GlobalTensor<ElementA>::PrimType *>(
+                            const_cast<__gm__ typename AscendC::GlobalTensor<ElementA>::PrimType*>(
                                 tensorTileA.data().GetPhyAddr());
                     }
                 } else {
@@ -478,7 +478,7 @@ public:
                             MatrixCoord{static_cast<uint32_t>(tla::get<0>(tensorTileB.coord())),
                                         static_cast<uint32_t>(tla::get<1>(tensorTileB.coord()))};
                         lastAddrB[l1BListIdNext] =
-                            const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType *>(
+                            const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType*>(
                                 tensorTileB.data().GetPhyAddr());
                     }
                 } else {
@@ -629,7 +629,7 @@ public:
 
 protected:
     template <class TensorA>
-    CATLASS_DEVICE auto GetTileA(TensorA &tensorA, uint32_t mIndex, uint32_t kIndex, uint32_t mSize, uint32_t kSize)
+    CATLASS_DEVICE auto GetTileA(TensorA& tensorA, uint32_t mIndex, uint32_t kIndex, uint32_t mSize, uint32_t kSize)
     {
         if constexpr (tla::detail::isVector<LayoutA>::value) {
             return GetTile(tensorA, tla::MakeCoord(kIndex), tla::MakeShape(kSize));
@@ -654,8 +654,8 @@ protected:
     int32_t l0BEventList[L0B_STAGES];
     int32_t l0CEventList[L0C_STAGES];
 
-    __gm__ typename AscendC::GlobalTensor<ElementA>::PrimType *lastAddrA[L1A_STAGES];
-    __gm__ typename AscendC::GlobalTensor<ElementB>::PrimType *lastAddrB[L1B_STAGES];
+    __gm__ typename AscendC::GlobalTensor<ElementA>::PrimType* lastAddrA[L1A_STAGES];
+    __gm__ typename AscendC::GlobalTensor<ElementB>::PrimType* lastAddrB[L1B_STAGES];
     MatrixCoord lastCoordA[L1A_STAGES];
     MatrixCoord lastCoordB[L1B_STAGES];
 

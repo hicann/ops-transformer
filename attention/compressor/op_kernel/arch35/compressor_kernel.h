@@ -31,46 +31,46 @@ namespace Compressor {
 template <typename COMP, bool IS_FULL_LOAD = false>
 class CompressorKernel {
 public:
-    __aicore__ inline CompressorKernel(TPipe *pipe, const optiling::CompressorTilingData *__restrict tilingData)
+    __aicore__ inline CompressorKernel(TPipe* pipe, const optiling::CompressorTilingData* __restrict tilingData)
         : pipe_(pipe),
           tilingData_(tilingData)
     {}
 
-    __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate,
-                                __gm__ uint8_t *stateCache, __gm__ uint8_t *ape, __gm__ uint8_t *stateBlockTable,
-                                __gm__ uint8_t *cuSeqlens, __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos,
-                                __gm__ uint8_t *cmpKvOut, __gm__ uint8_t *softmaxScoreOut, __gm__ uint8_t *kvOut,
-                                __gm__ uint8_t *workspace);
+    __aicore__ inline void Init(__gm__ uint8_t* x, __gm__ uint8_t* wKv, __gm__ uint8_t* wGate,
+                                __gm__ uint8_t* stateCache, __gm__ uint8_t* ape, __gm__ uint8_t* stateBlockTable,
+                                __gm__ uint8_t* cuSeqlens, __gm__ uint8_t* seqUsed, __gm__ uint8_t* startPos,
+                                __gm__ uint8_t* cmpKvOut, __gm__ uint8_t* softmaxScoreOut, __gm__ uint8_t* kvOut,
+                                __gm__ uint8_t* workspace);
     __aicore__ inline void Process();
 
 private:
     // ================================Init functions==================================
-    __aicore__ inline void InitWorkspace(__gm__ uint8_t *workspace);
+    __aicore__ inline void InitWorkspace(__gm__ uint8_t* workspace);
     // ================================Process functions================================
     __aicore__ inline void InitTilingData();
     // 运行时K轴切分（NORMAL独有）
     __aicore__ inline void SplitK();
     // 获取基本块数量（NORMAL独有）
     __aicore__ inline uint32_t GetLoopTimes();
-    __aicore__ inline void SkipInvalidBatch(BatchInfo &batchInfo);
+    __aicore__ inline void SkipInvalidBatch(BatchInfo& batchInfo);
     // 更新当前组信息（NORMAL独有）
-    __aicore__ inline void UpdateCurGroup(BasicBlockInfo &basicBlockInfo, BatchInfo batchInfo, uint32_t &curGroupQuota,
+    __aicore__ inline void UpdateCurGroup(BasicBlockInfo& basicBlockInfo, BatchInfo batchInfo, uint32_t& curGroupQuota,
                                           uint32_t curDealSeq);
     // 单次循环的batch切分（NORMAL独有）
-    __aicore__ inline BasicBlockInfo SkipOneLoop(BatchInfo &batchInfo);
+    __aicore__ inline BasicBlockInfo SkipOneLoop(BatchInfo& batchInfo);
     // 计算分核基本信息
     __aicore__ inline void CalcSplitCoreInfo();
 
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void ComputeMm1(const RunInfo &info, bool isNeedExcute = true);
-    __aicore__ inline void ComputeVec1(const Vec1RunInfo &info);
+    __aicore__ inline void ComputeMm1(const RunInfo& info, bool isNeedExcute = true);
+    __aicore__ inline void ComputeVec1(const Vec1RunInfo& info);
 
     __aicore__ inline bool IsNeedExcuteC1(RunInfo info);
     // 计算Cube/Vec1参数（NORMAL独有）
-    __aicore__ inline void CalcC1V1Params(RunInfo &info, Vec1RunInfo &vec1Info, BatchInfo &batchInfo, uint32_t loopIdx);
+    __aicore__ inline void CalcC1V1Params(RunInfo& info, Vec1RunInfo& vec1Info, BatchInfo& batchInfo, uint32_t loopIdx);
     // 从constInfo直接读取mStart/mEnd（FULL_LOAD独有）
-    __aicore__ inline void CalcCubeParams(RunInfo &info);
+    __aicore__ inline void CalcCubeParams(RunInfo& info);
     // 计算vec1所需的压缩TC数量（FULL_LOAD独有）
 
     // NORMAL/FULL_LOAD主循环体分离
@@ -92,8 +92,8 @@ private:
     static constexpr uint32_t SYNC_V1_C1_FLAG = 9;
 
     // ==============================TilingData&TPipe==============================
-    TPipe *pipe_;
-    const optiling::CompressorTilingData *__restrict tilingData_;
+    TPipe* pipe_;
+    const optiling::CompressorTilingData* __restrict tilingData_;
     // ===========================Workspace Global Tensor===========================
     GlobalTensor<MM1_OUT_T> mm1KvResGm;
     GlobalTensor<MM1_OUT_T> mm1ScoreResGm;
@@ -123,9 +123,9 @@ private:
 
 template <typename COMP, bool IS_FULL_LOAD>
 __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::Init(
-    __gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate, __gm__ uint8_t *stateCache, __gm__ uint8_t *ape,
-    __gm__ uint8_t *stateBlockTable, __gm__ uint8_t *cuSeqlens, __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos,
-    __gm__ uint8_t *cmpKvOut, __gm__ uint8_t *softmaxScoreOut, __gm__ uint8_t *kvOut, __gm__ uint8_t *workspace)
+    __gm__ uint8_t* x, __gm__ uint8_t* wKv, __gm__ uint8_t* wGate, __gm__ uint8_t* stateCache, __gm__ uint8_t* ape,
+    __gm__ uint8_t* stateBlockTable, __gm__ uint8_t* cuSeqlens, __gm__ uint8_t* seqUsed, __gm__ uint8_t* startPos,
+    __gm__ uint8_t* cmpKvOut, __gm__ uint8_t* softmaxScoreOut, __gm__ uint8_t* kvOut, __gm__ uint8_t* workspace)
 {
     if ASCEND_IS_AIV {
         constInfo.aiCoreIdx = GetBlockIdx() / 2;
@@ -257,7 +257,7 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::SplitK()
 }
 
 template <typename COMP, bool IS_FULL_LOAD>
-__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::SkipInvalidBatch(BatchInfo &batchInfo)
+__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::SkipInvalidBatch(BatchInfo& batchInfo)
 {
     for (; batchInfo.bIdx < constInfo.batchSize; ++batchInfo.bIdx) {
         batchInfo.seqCnt = tools_.GetSeqLength(batchInfo.bIdx);
@@ -284,9 +284,9 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::SkipInvalidBatch(Ba
 }
 
 template <typename COMP, bool IS_FULL_LOAD>
-__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::UpdateCurGroup(BasicBlockInfo &basicBlockInfo,
+__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::UpdateCurGroup(BasicBlockInfo& basicBlockInfo,
                                                                             BatchInfo batchInfo,
-                                                                            uint32_t &curGroupQuota,
+                                                                            uint32_t& curGroupQuota,
                                                                             uint32_t curDealSeq)
 {
     // 更新当前组的信息
@@ -313,7 +313,7 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::UpdateCurGroup(Basi
 }
 
 template <typename COMP, bool IS_FULL_LOAD>
-__aicore__ inline BasicBlockInfo CompressorKernel<COMP, IS_FULL_LOAD>::SkipOneLoop(BatchInfo &batchInfo)
+__aicore__ inline BasicBlockInfo CompressorKernel<COMP, IS_FULL_LOAD>::SkipOneLoop(BatchInfo& batchInfo)
 {
     BasicBlockInfo basicBlockInfo{};
     isFirstUpdateCurGroup = true;
@@ -418,38 +418,38 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::CalcSplitCoreInfo()
 }
 
 template <typename COMP, bool IS_FULL_LOAD>
-__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::InitWorkspace(__gm__ uint8_t *workspace)
+__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::InitWorkspace(__gm__ uint8_t* workspace)
 {
     uint64_t offset = 0;
     uint64_t mm1KvResStartOffset = offset;
     // mm1KvResGm
     mm1KvResGm.SetGlobalBuffer(
-        (__gm__ MM1_OUT_T *)(workspace + offset +
-                             (uint64_t)constInfo.curGroupIdx * constInfo.mm1KvResSize * sizeof(MM1_OUT_T)));
+        (__gm__ MM1_OUT_T*)(workspace + offset +
+                            (uint64_t)constInfo.curGroupIdx * constInfo.mm1KvResSize * sizeof(MM1_OUT_T)));
     offset +=
         (uint64_t)constInfo.dbWorkspaceRatio * constInfo.coreGroupNum * constInfo.mm1KvResSize * sizeof(MM1_OUT_T);
 
     uint64_t mm1ScoreResStartOffset = offset;
     // mm1ScoreResGm
     mm1ScoreResGm.SetGlobalBuffer(
-        (__gm__ MM1_OUT_T *)(workspace + offset +
-                             (uint64_t)constInfo.curGroupIdx * constInfo.mm1ScoreResSize * sizeof(MM1_OUT_T)));
+        (__gm__ MM1_OUT_T*)(workspace + offset +
+                            (uint64_t)constInfo.curGroupIdx * constInfo.mm1ScoreResSize * sizeof(MM1_OUT_T)));
     offset +=
         (uint64_t)constInfo.dbWorkspaceRatio * constInfo.coreGroupNum * constInfo.mm1ScoreResSize * sizeof(MM1_OUT_T);
 
-    Vec1InputKvGm.SetGlobalBuffer((__gm__ MM1_OUT_T *)(workspace + mm1KvResStartOffset));
+    Vec1InputKvGm.SetGlobalBuffer((__gm__ MM1_OUT_T*)(workspace + mm1KvResStartOffset));
 
-    Vec1InputScoreGm.SetGlobalBuffer((__gm__ MM1_OUT_T *)(workspace + mm1ScoreResStartOffset));
+    Vec1InputScoreGm.SetGlobalBuffer((__gm__ MM1_OUT_T*)(workspace + mm1ScoreResStartOffset));
 
-    vec1KvCacheGm.SetGlobalBuffer((__gm__ MM1_OUT_T *)(workspace + offset));
+    vec1KvCacheGm.SetGlobalBuffer((__gm__ MM1_OUT_T*)(workspace + offset));
     offset += constInfo.dbWorkspaceRatio * constInfo.vec1TailCacheSize * sizeof(MM1_OUT_T);
 
-    vec1ScoreCacheGm.SetGlobalBuffer((__gm__ MM1_OUT_T *)(workspace + offset));
+    vec1ScoreCacheGm.SetGlobalBuffer((__gm__ MM1_OUT_T*)(workspace + offset));
     offset += constInfo.dbWorkspaceRatio * constInfo.vec1TailCacheSize * sizeof(MM1_OUT_T);
 }
 
 template <typename COMP, bool IS_FULL_LOAD>
-__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::ComputeMm1(const RunInfo &info, bool isNeedExcute)
+__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::ComputeMm1(const RunInfo& info, bool isNeedExcute)
 {
     CrossCoreWaitFlag<SYNC_MODE2, PIPE_FIX>(SYNC_V1_C1_FLAG + info.cubeDbIdx);
     if (isNeedExcute) {
@@ -461,7 +461,7 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::ComputeMm1(const Ru
 }
 
 template <typename COMP, bool IS_FULL_LOAD>
-__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::ComputeVec1(const Vec1RunInfo &info)
+__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::ComputeVec1(const Vec1RunInfo& info)
 {
     CrossCoreWaitFlag<SYNC_MODE2, PIPE_MTE2>(SYNC_C1_V1_FLAG + info.c1v1DbIdx);
     CrossCoreWaitFlag<SYNC_MODE0, PIPE_MTE2>(SYNC_V1_FLAG2 + info.c1v1DbIdx);
@@ -512,8 +512,8 @@ __aicore__ inline bool CompressorKernel<COMP, IS_FULL_LOAD>::IsNeedExcuteC1(RunI
 }
 
 template <typename COMP, bool IS_FULL_LOAD>
-__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::CalcC1V1Params(RunInfo &info, Vec1RunInfo &vec1Info,
-                                                                            BatchInfo &batchInfo, uint32_t loopIdx)
+__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::CalcC1V1Params(RunInfo& info, Vec1RunInfo& vec1Info,
+                                                                            BatchInfo& batchInfo, uint32_t loopIdx)
 {
     vec1Info.bStart = batchInfo.bIdx;
     vec1Info.sStart = batchInfo.sIdx;
@@ -532,7 +532,7 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::CalcC1V1Params(RunI
 }
 
 template <typename COMP, bool IS_FULL_LOAD>
-__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::CalcCubeParams(RunInfo &info)
+__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::CalcCubeParams(RunInfo& info)
 {
     info.cubeDbIdx = (cubeLoop++ & (constInfo.dbWorkspaceRatio - 1));
     info.dealSeqCnt = constInfo.mEnd - constInfo.mStart;
@@ -547,7 +547,7 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::ProcessNormalLoop()
     Vec1RunInfo vec1Info{};
     SkipInvalidBatch(batchInfo);
     for (uint32_t i = 0; i < loopTimes; ++i) {
-        RunInfo &extraInfo0 = extraInfo[0];
+        RunInfo& extraInfo0 = extraInfo[0];
         CalcC1V1Params(extraInfo0, vec1Info, batchInfo, i);
         bool isNeedExcuteC1 = IsNeedExcuteC1(extraInfo0);
 
@@ -564,7 +564,7 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::ProcessFullLoadLoop
 {
     RunInfo extraInfo[1];
     for (uint32_t i = 0; i < loopTimes; ++i) {
-        RunInfo &extraInfo0 = extraInfo[0];
+        RunInfo& extraInfo0 = extraInfo[0];
         if ASCEND_IS_AIC {
             CalcCubeParams(extraInfo0);
             ComputeMm1(extraInfo0);

@@ -15,19 +15,19 @@
 
 namespace optiling {
 namespace {
-constexpr const char *OP_NAME = "BlockAttnResUpdate";
+constexpr const char* OP_NAME = "BlockAttnResUpdate";
 // Platform data is read directly from TilingContext, so the parse stage carries no compile-time payload.
 struct TilingParsePlaceholder {};
 } // namespace
 
-ge::graphStatus Tiling4BlockAttnResUpdate(gert::TilingContext *context)
+ge::graphStatus Tiling4BlockAttnResUpdate(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE(OP_NAME, "Context is nullptr."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(context->GetNodeType() == nullptr, OP_LOGE(OP_NAME, "Node type is nullptr."), return ge::GRAPH_FAILED);
     return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingPrepare4BlockAttnResUpdate(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepare4BlockAttnResUpdate(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE(OP_NAME, "Context is nullptr."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;

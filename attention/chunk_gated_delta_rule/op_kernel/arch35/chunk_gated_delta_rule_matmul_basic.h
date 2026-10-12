@@ -128,8 +128,8 @@ private:
     LocalTensor<bfloat16_t> l0bTensor_;
     LocalTensor<float> l0cTensor_;
 
-    __aicore__ inline void CopyGmToL1(GlobalTensor<bfloat16_t> &gm, uint32_t rows, uint32_t cols, uint32_t srcDStride,
-                                      LocalTensor<bfloat16_t> &l1Tensor)
+    __aicore__ inline void CopyGmToL1(GlobalTensor<bfloat16_t>& gm, uint32_t rows, uint32_t cols, uint32_t srcDStride,
+                                      LocalTensor<bfloat16_t>& l1Tensor)
     {
         Nd2NzParams nd2nz;
         nd2nz.ndNum = 1;
@@ -144,7 +144,7 @@ private:
     }
 
     template <bool ifTranspose>
-    __aicore__ inline void LoadL1ToL0(LocalTensor<bfloat16_t> &l0Tensor, LocalTensor<bfloat16_t> &l1Tensor,
+    __aicore__ inline void LoadL1ToL0(LocalTensor<bfloat16_t>& l0Tensor, LocalTensor<bfloat16_t>& l1Tensor,
                                       uint32_t srcRows, uint32_t srcCols)
     {
         LoadData2DParamsV2 params;
@@ -158,8 +158,8 @@ private:
         LoadData<bfloat16_t>(l0Tensor, l1Tensor, params);
     }
 
-    __aicore__ inline void DoMmad(LocalTensor<float> &l0cTensor, LocalTensor<bfloat16_t> &l0aTensor,
-                                  LocalTensor<bfloat16_t> &l0bTensor, uint32_t m, uint32_t n, uint32_t k)
+    __aicore__ inline void DoMmad(LocalTensor<float>& l0cTensor, LocalTensor<bfloat16_t>& l0aTensor,
+                                  LocalTensor<bfloat16_t>& l0bTensor, uint32_t m, uint32_t n, uint32_t k)
     {
         MmadParams mmadParams;
         mmadParams.m = (m < MM_BLOCK_CUBE) ? MM_BLOCK_CUBE : m;
@@ -171,7 +171,7 @@ private:
     }
 
     template <typename dstType, bool accum>
-    __aicore__ inline void CopyL0CToGm(GlobalTensor<dstType> &gm, LocalTensor<float> &l0cTensor, uint32_t m, uint32_t n,
+    __aicore__ inline void CopyL0CToGm(GlobalTensor<dstType>& gm, LocalTensor<float>& l0cTensor, uint32_t m, uint32_t n,
                                        uint32_t dstStride)
     {
         FixpipeParamsArch3510<CO2Layout::ROW_MAJOR> fixParams;

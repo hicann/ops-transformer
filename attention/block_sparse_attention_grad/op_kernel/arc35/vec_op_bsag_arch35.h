@@ -99,7 +99,7 @@ public:
     __aicore__ inline void Init(GM_ADDR dout, GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR attention_out,
                                 GM_ADDR softmaxLse, GM_ADDR blockSparseMask, GM_ADDR blockShape, GM_ADDR attentionMask,
                                 GM_ADDR actualQseqlen, GM_ADDR actualKvseqlen, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
-                                GM_ADDR workspace, const TILING_CLASS *tilingData, TBuf<TPosition::VECCALC> &ub_buffer,
+                                GM_ADDR workspace, const TILING_CLASS* tilingData, TBuf<TPosition::VECCALC>& ub_buffer,
                                 uint32_t ub_offset)
     {
         this->v_core_num_ = tilingData->cubeCoreNum * 2;
@@ -120,8 +120,8 @@ public:
         v_core_idx_ = GetBlockIdx();
         v_sub_core_idx_ = GetSubBlockIdx();
         // gm_tensor
-        lse_gm_.SetGlobalBuffer((__gm__ float *)softmaxLse);
-        sftg_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->sftgWorkspaceOffset));
+        lse_gm_.SetGlobalBuffer((__gm__ float*)softmaxLse);
+        sftg_workspace_.SetGlobalBuffer((__gm__ float*)(workspace + tilingData->sftgWorkspaceOffset));
         // local_tensor
         softmax_res_nz_tensor_ = ub_buffer.GetWithOffset<INPUT_TYPE>((vec_base_m + 1) * vec_base_n, ub_offset);
         ub_offset += (vec_base_m + 1) * vec_base_n * sizeof(INPUT_TYPE);
@@ -137,10 +137,10 @@ public:
         ub_offset += vec_base_m * BLOCK_FP32 * sizeof(float);
     }
 
-    __aicore__ inline void SendVecPre(const GlobalTensor<float> &dq_workspace, const GlobalTensor<float> &dk_workspace,
-                                      const GlobalTensor<float> &dv_workspace, const GlobalTensor<INPUT_TYPE> &dy_gm,
-                                      const GlobalTensor<INPUT_TYPE> &out_gm, const GlobalTensor<float> &sftg_workspace,
-                                      const TILING_CLASS *tilingData, TBuf<TPosition::VECCALC> &ub_buffer)
+    __aicore__ inline void SendVecPre(const GlobalTensor<float>& dq_workspace, const GlobalTensor<float>& dk_workspace,
+                                      const GlobalTensor<float>& dv_workspace, const GlobalTensor<INPUT_TYPE>& dy_gm,
+                                      const GlobalTensor<INPUT_TYPE>& out_gm, const GlobalTensor<float>& sftg_workspace,
+                                      const TILING_CLASS* tilingData, TBuf<TPosition::VECCALC>& ub_buffer)
     {
         constexpr static uint32_t PRE_TILE_LEN = 20 * 1024; // PRE一次处理元素的个数
         EvenCoreInfo info;
@@ -155,10 +155,10 @@ public:
         ComputeVecPre(dv_workspace, vec_in_ping_, info);
     }
 
-    __aicore__ inline void SendVecSftgFront(const GlobalTensor<INPUT_TYPE> &dy_gm,
-                                            const GlobalTensor<INPUT_TYPE> &out_gm,
-                                            const GlobalTensor<float> &sftg_workspace, const TILING_CLASS *tilingData,
-                                            TBuf<TPosition::VECCALC> &ub_buffer)
+    __aicore__ inline void SendVecSftgFront(const GlobalTensor<INPUT_TYPE>& dy_gm,
+                                            const GlobalTensor<INPUT_TYPE>& out_gm,
+                                            const GlobalTensor<float>& sftg_workspace, const TILING_CLASS* tilingData,
+                                            TBuf<TPosition::VECCALC>& ub_buffer)
     {
         EvenCoreInfo info;
         constexpr static uint32_t SFTG_TILE_LEN = 8 * 1024; // POST一次处理元素的个数
@@ -230,7 +230,7 @@ public:
         WAIT_FLAG(MTE3, MTE2, event_pong_);
     }
 
-    __aicore__ inline void SendVecSftPreProcess(const RunTimeInfo &runTimeInfo, const RunTimeInfo &nextRunTimeInfo,
+    __aicore__ inline void SendVecSftPreProcess(const RunTimeInfo& runTimeInfo, const RunTimeInfo& nextRunTimeInfo,
                                                 uint32_t pingpong_idx, bool first)
     {
         int64_t lse_gm_offset_;
@@ -291,10 +291,10 @@ public:
             }
         }
     }
-    __aicore__ inline void SendVecSoftmax(const LocalTensor<INPUT_TYPE> &p_l1_tensor,
-                                          const LocalTensor<INPUT_TYPE> &ds_l1_tensor,
-                                          const LocalTensor<float> &p_ub_tensor, const LocalTensor<float> &dp_ub_tensor,
-                                          const RunTimeInfo &runTimeInfo)
+    __aicore__ inline void SendVecSoftmax(const LocalTensor<INPUT_TYPE>& p_l1_tensor,
+                                          const LocalTensor<INPUT_TYPE>& ds_l1_tensor,
+                                          const LocalTensor<float>& p_ub_tensor, const LocalTensor<float>& dp_ub_tensor,
+                                          const RunTimeInfo& runTimeInfo)
     { /*
        * function: Compute simple softmax
        * input shape：[s1LenAlign / 2, s2LenAlign]
@@ -305,8 +305,8 @@ public:
             return;
         }
 
-        SimpleSoftmax((__ubuf__ float *)p_ub_tensor.GetPhyAddr(), (__ubuf__ float *)dp_ub_tensor.GetPhyAddr(),
-                      (__ubuf__ float *)lse_tensor_.GetPhyAddr(), (__ubuf__ float *)sftg_front_tensor_.GetPhyAddr(),
+        SimpleSoftmax((__ubuf__ float*)p_ub_tensor.GetPhyAddr(), (__ubuf__ float*)dp_ub_tensor.GetPhyAddr(),
+                      (__ubuf__ float*)lse_tensor_.GetPhyAddr(), (__ubuf__ float*)sftg_front_tensor_.GetPhyAddr(),
                       half_s1_process_align_, s2_process_align_);
 
         CastND2NZ<INPUT_TYPE>(softmax_res_nz_tensor_, p_ub_tensor, half_s1_process_align_, s2_process_align_);
@@ -327,12 +327,12 @@ public:
         SET_FLAG(V, MTE2, event_id);
     }
 
-    __aicore__ inline void SendVecPost(const GlobalTensor<INPUT_TYPE> &dq_out_gm,
-                                       const GlobalTensor<INPUT_TYPE> &dk_out_gm,
-                                       const GlobalTensor<INPUT_TYPE> &dv_out_gm,
-                                       const GlobalTensor<float> &dq_workspace, const GlobalTensor<float> &dk_workspace,
-                                       const GlobalTensor<float> &dv_workspace, const TILING_CLASS *tilingData,
-                                       TBuf<TPosition::VECCALC> &ub_buffer)
+    __aicore__ inline void SendVecPost(const GlobalTensor<INPUT_TYPE>& dq_out_gm,
+                                       const GlobalTensor<INPUT_TYPE>& dk_out_gm,
+                                       const GlobalTensor<INPUT_TYPE>& dv_out_gm,
+                                       const GlobalTensor<float>& dq_workspace, const GlobalTensor<float>& dk_workspace,
+                                       const GlobalTensor<float>& dv_workspace, const TILING_CLASS* tilingData,
+                                       TBuf<TPosition::VECCALC>& ub_buffer)
     {
         int64_t dq_size = tilingData->dqSize;
         int64_t dkv_size = tilingData->dkSize;
@@ -361,8 +361,8 @@ public:
     }
 
 private:
-    __aicore__ inline void ComputeVecPre(const GlobalTensor<float> &dst_tensor, const LocalTensor<float> &src_tensor,
-                                         const EvenCoreInfo &info)
+    __aicore__ inline void ComputeVecPre(const GlobalTensor<float>& dst_tensor, const LocalTensor<float>& src_tensor,
+                                         const EvenCoreInfo& info)
     {
         if (info.start_idx >= info.data_size) {
             return;
@@ -391,10 +391,10 @@ private:
         }
     }
 
-    __aicore__ inline void ComputeSoftmaxGradFront(const GlobalTensor<float> &dst_gm,
-                                                   const GlobalTensor<INPUT_TYPE> &dy_gm,
-                                                   const GlobalTensor<INPUT_TYPE> &out_gm, const EvenCoreInfo &info,
-                                                   const TILING_CLASS *tilingData, const uint32_t sftg_ping_pong_idx)
+    __aicore__ inline void ComputeSoftmaxGradFront(const GlobalTensor<float>& dst_gm,
+                                                   const GlobalTensor<INPUT_TYPE>& dy_gm,
+                                                   const GlobalTensor<INPUT_TYPE>& out_gm, const EvenCoreInfo& info,
+                                                   const TILING_CLASS* tilingData, const uint32_t sftg_ping_pong_idx)
     {
         if (info.start_idx >= info.data_size) {
             return;
@@ -463,9 +463,9 @@ private:
     }
 
     template <bool MULS>
-    __aicore__ inline void ComputeVecPost(const GlobalTensor<INPUT_TYPE> &dst_tensor,
-                                          const GlobalTensor<float> &src_tensor, const EvenCoreInfo &info,
-                                          uint32_t &post_ping_pong_idx)
+    __aicore__ inline void ComputeVecPost(const GlobalTensor<INPUT_TYPE>& dst_tensor,
+                                          const GlobalTensor<float>& src_tensor, const EvenCoreInfo& info,
+                                          uint32_t& post_ping_pong_idx)
     {
         if (info.start_idx >= info.data_size) {
             return;
@@ -539,8 +539,8 @@ private:
         }
     }
 
-    __simd_vf__ inline void SimpleSoftmax(__ubuf__ float *pTensor, __ubuf__ float *dpTensor, __ubuf__ float *lseTensor,
-                                          __ubuf__ float *sftFrontTensor, const uint32_t row, const uint32_t col)
+    __simd_vf__ inline void SimpleSoftmax(__ubuf__ float* pTensor, __ubuf__ float* dpTensor, __ubuf__ float* lseTensor,
+                                          __ubuf__ float* sftFrontTensor, const uint32_t row, const uint32_t col)
     {
         AscendC::Reg::RegTensor<float> p_reg;
         AscendC::Reg::RegTensor<float> lse_reg;
@@ -576,7 +576,7 @@ private:
         }
     }
 
-    __aicore__ inline void ComputeEvenCoreInfo(EvenCoreInfo &info, const uint32_t data_size,
+    __aicore__ inline void ComputeEvenCoreInfo(EvenCoreInfo& info, const uint32_t data_size,
                                                const uint32_t max_process_size)
     {
         /*
@@ -599,7 +599,7 @@ private:
         }
     }
 
-    __aicore__ inline void CopyInLSE(const LocalTensor<float> &dstTensor, const GlobalTensor<float> &srcTensor,
+    __aicore__ inline void CopyInLSE(const LocalTensor<float>& dstTensor, const GlobalTensor<float>& srcTensor,
                                      const int32_t count)
     {
         /*

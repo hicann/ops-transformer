@@ -49,7 +49,7 @@ class DecodeUpdate {
 public:
     __aicore__ inline DecodeUpdate() {}
     __aicore__ inline void Init(GM_ADDR lse, GM_ADDR in, GM_ADDR out, GM_ADDR lesout,
-                                const DecodeUpdateTilingData *tdata)
+                                const DecodeUpdateTilingData* tdata)
     {
         this->lsePtr = GetTensorPtr(lse);
         this->inPtr = GetTensorPtr(in);
@@ -58,8 +58,8 @@ public:
         // totalLength 表示 Tiling 约束下的元素个数，保证可落在 uint32_t 内；
         // 参与 GM 地址计算（如 totalLength * hDim）时再显式宽化到 uint64_t。
         // 设置全局变量的起始地址与总长度: BLOCK_LENGTH; sp, B*s*hc in1 sp; B*s*hc, hd in2
-        outGm.SetGlobalBuffer((__gm__ outType *)out, static_cast<uint64_t>(totalLength) * hDim);
-        lseoutGm.SetGlobalBuffer((__gm__ lseType *)lesout, totalLength);
+        outGm.SetGlobalBuffer((__gm__ outType*)out, static_cast<uint64_t>(totalLength) * hDim);
+        lseoutGm.SetGlobalBuffer((__gm__ lseType*)lesout, totalLength);
         InitBuffers();
     }
     __aicore__ inline void Process()
@@ -98,16 +98,16 @@ public:
     }
 
 private:
-    __aicore__ inline __gm__ uint64_t *GetTensorPtr(GM_ADDR gmAddr)
+    __aicore__ inline __gm__ uint64_t* GetTensorPtr(GM_ADDR gmAddr)
     {
-        __gm__ uint64_t *dataAddr = reinterpret_cast<__gm__ uint64_t *>(gmAddr);
+        __gm__ uint64_t* dataAddr = reinterpret_cast<__gm__ uint64_t*>(gmAddr);
         uint64_t tensorPtrOffset = *dataAddr; // The offset of the data address from the first address.
         // Moving 3 bits to the right means dividing by sizeof(uint64 t).
-        __gm__ uint64_t *tensorPtr = dataAddr + (tensorPtrOffset >> 3);
+        __gm__ uint64_t* tensorPtr = dataAddr + (tensorPtrOffset >> 3);
         return tensorPtr;
     }
 
-    __aicore__ inline void ParseTilingData(const DecodeUpdateTilingData *tdata)
+    __aicore__ inline void ParseTilingData(const DecodeUpdateTilingData* tdata)
     {
         this->hDim = tdata->hDim;
         this->sp = tdata->sp;
@@ -189,7 +189,7 @@ private:
         pipe.InitBuffer(selMaskBuffer, inQueueLseLengthAlign * sizeof(uint8_t));
     }
 
-    __aicore__ inline void CopyInSpAccData(LocalTensor<float> &lseLocal, LocalTensor<float> &inLocal, int32_t spLoopIdx,
+    __aicore__ inline void CopyInSpAccData(LocalTensor<float>& lseLocal, LocalTensor<float>& inLocal, int32_t spLoopIdx,
                                            uint32_t curLengthPad)
     {
         LocalTensor<float> lseAccLocal = lseexpsumBuffer.Get<float>();
@@ -200,10 +200,10 @@ private:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void CopyInLsePerSp(LocalTensor<float> &lseLocal, uint32_t posIdx, uint32_t gmSpIdx,
+    __aicore__ inline void CopyInLsePerSp(LocalTensor<float>& lseLocal, uint32_t posIdx, uint32_t gmSpIdx,
                                           int32_t progress, uint32_t curLengthPad)
     {
-        lseGm.SetGlobalBuffer(reinterpret_cast<__gm__ lseType *>(*(lsePtr + gmSpIdx)), totalLength);
+        lseGm.SetGlobalBuffer(reinterpret_cast<__gm__ lseType*>(*(lsePtr + gmSpIdx)), totalLength);
         if (curLength % ALIGNED_TO_8 == 0) {
             DataCopy(lseLocal[posIdx * curLengthPad],
                      lseGm[static_cast<uint64_t>(progress) * tileLength + gmStartOffset], curLength);
@@ -215,10 +215,10 @@ private:
         }
     }
 
-    __aicore__ inline void CopyInOPerSp(LocalTensor<float> &inLocal, LocalTensor<outType> &inLocalFp16, uint32_t posIdx,
+    __aicore__ inline void CopyInOPerSp(LocalTensor<float>& inLocal, LocalTensor<outType>& inLocalFp16, uint32_t posIdx,
                                         uint32_t gmSpIdx, int32_t progress)
     {
-        inGm.SetGlobalBuffer(reinterpret_cast<__gm__ outType *>(*(inPtr + gmSpIdx)),
+        inGm.SetGlobalBuffer(reinterpret_cast<__gm__ outType*>(*(inPtr + gmSpIdx)),
                              static_cast<uint64_t>(totalLength) * hDim);
         uint32_t inOffset = posIdx * curLength * hDim;
         uint64_t gmOffset = static_cast<uint64_t>(progress) * tileLength * hDim + gmStartOffset * hDim;
@@ -288,7 +288,7 @@ private:
         inQueueIn.EnQue(inLocal);
     }
 
-    __aicore__ inline void SaveAcc(LocalTensor<float> &outAccLocal)
+    __aicore__ inline void SaveAcc(LocalTensor<float>& outAccLocal)
     {
         LocalTensor<float> lseoutLocal = outQueueLse.DeQue<float>();
         LocalTensor<float> outLocal = outQueueOut.DeQue<float>();
@@ -303,7 +303,7 @@ private:
         outQueueOut.FreeTensor(outLocal);
     }
 
-    __aicore__ inline void WriteAcc(LocalTensor<float> &outAccLocal)
+    __aicore__ inline void WriteAcc(LocalTensor<float>& outAccLocal)
     {
         LocalTensor<float> lseAccLocal = lseexpsumBuffer.Get<float>();
         LocalTensor<float> outLocal = outQueueOut.AllocTensor<float>();
@@ -319,7 +319,7 @@ private:
         outQueueLse.EnQue(lseoutLocal);
     }
 
-    __aicore__ inline void ProcessLseInfReplacement(LocalTensor<float> &lseLocal, uint32_t effectiveSp)
+    __aicore__ inline void ProcessLseInfReplacement(LocalTensor<float>& lseLocal, uint32_t effectiveSp)
     {
         LocalTensor<uint8_t> selMask = selMaskBuffer.Get<uint8_t>();
         uint32_t curLengthPad = ((curLength + NUM7) / NUM8) * NUM8;
@@ -483,8 +483,8 @@ private:
     GlobalTensor<outType> outGm;
     GlobalTensor<lseType> lseoutGm;
 
-    __gm__ uint64_t *lsePtr;
-    __gm__ uint64_t *inPtr;
+    __gm__ uint64_t* lsePtr;
+    __gm__ uint64_t* inPtr;
 
     uint32_t blockLength; //  单核上数据总长度
     uint16_t tileLength;  //  单核循环的非最后一轮数据长度

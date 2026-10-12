@@ -65,19 +65,19 @@ ge::graphStatus AttentionWorkerCombineTilingBase::PostTiling()
     uint64_t tilingKey = GetTilingKey();
     context_->SetTilingKey(tilingKey);
     context_->SetScheduleMode(BATCH_MODE);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = static_cast<size_t>(DEFAULT_WORKSPACE_SIZE);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus Tiling4AttentionWorkerCombine(gert::TilingContext *context)
+ge::graphStatus Tiling4AttentionWorkerCombine(gert::TilingContext* context)
 {
     OP_LOGD(context->GetNodeName(), "TilingForAttentionWorkerCombine running.");
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingPrepare4AttentionWorkerCombine(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepare4AttentionWorkerCombine(gert::TilingParseContext* context)
 {
     OP_LOGD(context->GetNodeName(), "TilingPrepare4AttentionWorkerCombine running.");
     auto compileInfo = context->GetCompiledInfo<AttentionWorkerCombineCompileInfo>();

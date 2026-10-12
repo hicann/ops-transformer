@@ -26,27 +26,27 @@ template <typename T>
 class FlashAttentionScoreGradEmptyTensor {
 public:
     __aicore__ inline FlashAttentionScoreGradEmptyTensor(){};
-    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dpse,
-                                const FlashAttentionScoreGradTilingData *__restrict tilingData);
+    __aicore__ inline void Init(__gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dpse,
+                                const FlashAttentionScoreGradTilingData* __restrict tilingData);
     __aicore__ inline void Process();
 
 protected:
     uint64_t m_blockIdx;
     AscendC::GlobalTensor<T> m_dqGm, m_dkGm, m_dvGm, m_dpseGm;
-    const EmptyTensorTilingData *__restrict m_tilingData;
+    const EmptyTensorTilingData* __restrict m_tilingData;
 };
 
 template <typename T>
 __aicore__ inline void FlashAttentionScoreGradEmptyTensor<T>::Init(
-    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dpse,
-    const FlashAttentionScoreGradTilingData *__restrict tilingData)
+    __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dpse,
+    const FlashAttentionScoreGradTilingData* __restrict tilingData)
 {
     m_blockIdx = AscendC::GetBlockIdx();
     m_tilingData = &tilingData->emptyTensorTilingData;
-    m_dqGm.SetGlobalBuffer((__gm__ T *)dq);
-    m_dkGm.SetGlobalBuffer((__gm__ T *)dk);
-    m_dvGm.SetGlobalBuffer((__gm__ T *)dv);
-    m_dpseGm.SetGlobalBuffer((__gm__ T *)dpse);
+    m_dqGm.SetGlobalBuffer((__gm__ T*)dq);
+    m_dkGm.SetGlobalBuffer((__gm__ T*)dk);
+    m_dvGm.SetGlobalBuffer((__gm__ T*)dv);
+    m_dpseGm.SetGlobalBuffer((__gm__ T*)dpse);
 }
 
 template <typename T>

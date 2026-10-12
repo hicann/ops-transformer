@@ -89,7 +89,7 @@ static Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo MakeA5Comp
 }
 
 static gert::TilingContextPara MakeMlaRopeTilingContext(
-    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo *compileInfo, int64_t qkD, int64_t valueD)
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo* compileInfo, int64_t qkD, int64_t valueD)
 {
     return gert::TilingContextPara("FlashAttentionScoreGrad",
                                    {

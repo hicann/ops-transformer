@@ -27,7 +27,7 @@ namespace aicpu {
 inline int64_t DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CalcTotalSize() const
 {
     if (IsTensorValid(seqUsedQuery_)) {
-        auto *data = reinterpret_cast<const int32_t *>(seqUsedQuery_->GetData());
+        auto* data = reinterpret_cast<const int32_t*>(seqUsedQuery_->GetData());
         int64_t total = 0;
         for (int64_t i = 0; i < bSize_; ++i) {
             total += static_cast<int64_t>(data[i]);
@@ -36,7 +36,7 @@ inline int64_t DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CalcTotalSize
     }
     if (layoutType_ == DliLayout::TND) {
         if (IsTensorValid(cuSeqLensQuery_)) {
-            auto *data = reinterpret_cast<const int32_t *>(cuSeqLensQuery_->GetData());
+            auto* data = reinterpret_cast<const int32_t*>(cuSeqLensQuery_->GetData());
             return static_cast<int64_t>(data[bSize_]);
         }
         return 0;
@@ -79,9 +79,9 @@ inline bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::BuildMetadata()
         }
     }
 
-    auto *metadataData = reinterpret_cast<DLI_METADATA_T *>(metadata_->GetData());
+    auto* metadataData = reinterpret_cast<DLI_METADATA_T*>(metadata_->GetData());
     std::fill_n(metadataData, DLI_METADATA_SIZE, static_cast<DLI_METADATA_T>(0));
-    auto *metadata = reinterpret_cast<detail::DenseLISoftmaxLseV2MetaData *>(metadataData);
+    auto* metadata = reinterpret_cast<detail::DenseLISoftmaxLseV2MetaData*>(metadataData);
     metadata->forecore_num = static_cast<int32_t>(forecoreNum);
     metadata->tail_core_num = static_cast<int32_t>(tailCoreNum);
     metadata->b_s1_per_core = static_cast<int32_t>(bS1PerCore);

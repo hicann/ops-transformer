@@ -33,9 +33,9 @@
 
 namespace {
 
-constexpr const char *OP_NAME = "BlockAttnResUpdate";
-constexpr const char *SOC_VERSION = "Ascend950";
-constexpr const char *NPU_ARCH = "3510";
+constexpr const char* OP_NAME = "BlockAttnResUpdate";
+constexpr const char* SOC_VERSION = "Ascend950";
+constexpr const char* NPU_ARCH = "3510";
 constexpr size_t MIN_INPUT_COLUMN_COUNT = 25UL;
 constexpr size_t SUCCESS_COLUMN_COUNT = 36UL;
 constexpr size_t INPUT_COUNT = 6UL;
@@ -44,12 +44,12 @@ constexpr uint64_t VALID_AIC_NUM = 32UL;
 constexpr uint64_t VALID_UB_SIZE = 245760UL;
 constexpr uint64_t VALID_TILING_DATA_CAPACITY = 4096UL;
 
-ge::DataType ParseDtype(const std::string &value)
+ge::DataType ParseDtype(const std::string& value)
 {
     return ops::ut::ParseGeDtype(ops::ut::Trim(value));
 }
 
-gert::StorageShape ParseShape(const std::string &value)
+gert::StorageShape ParseShape(const std::string& value)
 {
     return ops::ut::MakeGertStorageShape(ops::ut::ParseDims(ops::ut::Trim(value)));
 }
@@ -112,7 +112,7 @@ struct BlockAttnResUpdateTilingCase {
         ASSERT_EQ(actual.tilingDataSize, sizeof(BlockAttnResUpdateTilingData)) << "case=" << caseName;
         ASSERT_NE(actual.tilingData, nullptr) << "case=" << caseName;
 
-        const auto *tilingData = reinterpret_cast<const BlockAttnResUpdateTilingData *>(actual.tilingData.get());
+        const auto* tilingData = reinterpret_cast<const BlockAttnResUpdateTilingData*>(actual.tilingData.get());
         EXPECT_EQ(tilingData->dSize, expectDSize) << "case=" << caseName;
         EXPECT_EQ(tilingData->tPerCore, expectTPerCore) << "case=" << caseName;
         EXPECT_EQ(tilingData->lastTPerCore, expectLastTPerCore) << "case=" << caseName;
@@ -252,7 +252,7 @@ TilingCsvLoadResult LoadTilingCases()
                 testCase.expectUsedCoreNum = static_cast<uint16_t>(std::stoul(ops::ut::Trim(items[index++])));
             }
             result.cases.emplace_back(std::move(testCase));
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             result.errors.emplace_back(ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error));
         }
     }
@@ -262,13 +262,13 @@ TilingCsvLoadResult LoadTilingCases()
     return result;
 }
 
-const TilingCsvLoadResult &GetTilingCases()
+const TilingCsvLoadResult& GetTilingCases()
 {
     static const TilingCsvLoadResult result = LoadTilingCases();
     return result;
 }
 
-std::string MakeParamName(const testing::TestParamInfo<BlockAttnResUpdateTilingCase> &info)
+std::string MakeParamName(const testing::TestParamInfo<BlockAttnResUpdateTilingCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
@@ -277,8 +277,8 @@ class BlockAttnResUpdateTilingTest : public testing::TestWithParam<BlockAttnResU
 
 TEST(BlockAttnResUpdateTilingCsv, LoadsEnabledCases)
 {
-    const auto &result = GetTilingCases();
-    for (const auto &error : result.errors) {
+    const auto& result = GetTilingCases();
+    for (const auto& error : result.errors) {
         ADD_FAILURE() << error;
     }
     EXPECT_FALSE(result.cases.empty());
@@ -308,7 +308,7 @@ TEST(BlockAttnResUpdateTilingDirect, RejectsStorageShapeDifferentFromOrigin)
 {
     for (size_t inputIndex = 0U; inputIndex < INPUT_COUNT; ++inputIndex) {
         auto para = MakeValidTilingContextPara();
-        gert::Shape &storageShape = para.inputTensorDesc_[inputIndex].shape_.MutableStorageShape();
+        gert::Shape& storageShape = para.inputTensorDesc_[inputIndex].shape_.MutableStorageShape();
         storageShape.SetDim(0U, storageShape.GetDim(0U) + 1);
 
         TilingInfo actual;
@@ -317,7 +317,7 @@ TEST(BlockAttnResUpdateTilingDirect, RejectsStorageShapeDifferentFromOrigin)
 
     for (size_t outputIndex = 0U; outputIndex < OUTPUT_COUNT; ++outputIndex) {
         auto para = MakeValidTilingContextPara();
-        gert::Shape &storageShape = para.outputTensorDesc_[outputIndex].shape_.MutableStorageShape();
+        gert::Shape& storageShape = para.outputTensorDesc_[outputIndex].shape_.MutableStorageShape();
         storageShape.SetDim(0U, storageShape.GetDim(0U) + 1);
 
         TilingInfo actual;

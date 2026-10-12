@@ -26,8 +26,8 @@ namespace optiling {
 // D2：确定性计算明确拒绝。
 class FagDeterministicChecker : public FagBaseChecker {
 public:
-    ge::graphStatus Check(FagCheckCtx &ctx) override;
-    const char *Name() const override
+    ge::graphStatus Check(FagCheckCtx& ctx) override;
+    const char* Name() const override
     {
         return "Deterministic";
     }

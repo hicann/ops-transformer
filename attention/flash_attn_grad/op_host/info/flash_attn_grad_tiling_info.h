@@ -190,14 +190,14 @@ struct FagTilingPlan {
 constexpr size_t FAG_TRACE_SLOT_NUM = 8;
 
 struct FagRouteTrace {
-    const char *chosen = "none";
-    const char *rejectedName[FAG_TRACE_SLOT_NUM] = {};
-    const char *rejectedReason[FAG_TRACE_SLOT_NUM] = {};
+    const char* chosen = "none";
+    const char* rejectedName[FAG_TRACE_SLOT_NUM] = {};
+    const char* rejectedReason[FAG_TRACE_SLOT_NUM] = {};
     size_t rejectedNum = 0;
     // swizzle 单独记：它不是候选之间的竞争，而是选中候选之后的一个开关。
-    const char *swizzleReject = "accepted";
+    const char* swizzleReject = "accepted";
 
-    void Reject(const char *name, const char *reason)
+    void Reject(const char* name, const char* reason)
     {
         if (rejectedNum < FAG_TRACE_SLOT_NUM) {
             rejectedName[rejectedNum] = name;

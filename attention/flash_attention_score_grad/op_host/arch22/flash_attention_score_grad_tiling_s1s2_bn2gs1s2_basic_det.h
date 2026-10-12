@@ -47,7 +47,7 @@ struct BasicDetBaseInfoParams {
     int64_t preTockens;
     int64_t nextTockens;
     uint32_t sparseMode;
-    const char *inputLayout;
+    const char* inputLayout;
     uint32_t dqPostAbsorb;
     bool eaqualActSeqLen{true};
     bool pseEnable{false};
@@ -87,10 +87,10 @@ struct FlashAttentionGradBasicDetCompileInfo {
 
 class FlashAttentionScoreGraTilingBasicDet : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit FlashAttentionScoreGraTilingBasicDet(gert::TilingContext *context)
+    explicit FlashAttentionScoreGraTilingBasicDet(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
-    FlashAttentionGradBasicDetTilingData *tilingData = context_->GetTilingData<FlashAttentionGradBasicDetTilingData>();
+    FlashAttentionGradBasicDetTilingData* tilingData = context_->GetTilingData<FlashAttentionGradBasicDetTilingData>();
 
 protected:
     bool IsCapable() override;

@@ -24,13 +24,13 @@ constexpr int64_t TOKEN_DIM_INDEX = 0L;
 constexpr int64_t HIDDEN_DIM_INDEX = 1L;
 constexpr int64_t MAX_HIDDEN_SIZE = 8192L;
 
-void CheckTensorDevice(const at::Tensor &tensor, const at::Device &expectedDevice, const char *name)
+void CheckTensorDevice(const at::Tensor& tensor, const at::Device& expectedDevice, const char* name)
 {
     TORCH_CHECK(tensor.device() == expectedDevice, name, " must be on device ", expectedDevice, ", but got ",
                 tensor.device(), ".");
 }
 
-void CheckTensorContiguous(const at::Tensor &tensor, const char *name)
+void CheckTensorContiguous(const at::Tensor& tensor, const char* name)
 {
     TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous, but got size ", tensor.sizes(), " and stride ",
                 tensor.strides(), ".");
@@ -41,8 +41,8 @@ void CheckEps(double eps)
     TORCH_CHECK(std::isfinite(eps) && eps > 0.0, "eps must be finite and greater than 0, but got ", eps, ".");
 }
 
-void CheckInputs(const at::Tensor &partialBlock, const at::Tensor &delta, const at::Tensor &pseudoQuery,
-                 const at::Tensor &numerator, const at::Tensor &logitMax, const at::Tensor &expSum, double eps)
+void CheckInputs(const at::Tensor& partialBlock, const at::Tensor& delta, const at::Tensor& pseudoQuery,
+                 const at::Tensor& numerator, const at::Tensor& logitMax, const at::Tensor& expSum, double eps)
 {
     TORCH_CHECK(partialBlock.scalar_type() == at::kFloat, "partial_block must be float32, but got ",
                 partialBlock.scalar_type(), ".");
@@ -105,8 +105,8 @@ void CheckInputs(const at::Tensor &partialBlock, const at::Tensor &delta, const 
 }
 } // namespace
 
-at::Tensor block_attn_res_update(at::Tensor &partialBlock, const at::Tensor &delta, const at::Tensor &pseudoQuery,
-                                 const at::Tensor &numerator, const at::Tensor &logitMax, const at::Tensor &expSum,
+at::Tensor block_attn_res_update(at::Tensor& partialBlock, const at::Tensor& delta, const at::Tensor& pseudoQuery,
+                                 const at::Tensor& numerator, const at::Tensor& logitMax, const at::Tensor& expSum,
                                  double eps)
 {
     CheckInputs(partialBlock, delta, pseudoQuery, numerator, logitMax, expSum, eps);

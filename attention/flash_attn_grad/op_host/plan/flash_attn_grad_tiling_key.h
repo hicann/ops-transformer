@@ -34,7 +34,7 @@ namespace optiling {
 //   bit8     dv_align   0=128, 1=192
 //   bit9     is_bn2_multiblk  仅 template=1 有效
 //   bit10    bn2_need_zero    仅 MultiBlk + mask 3/4 的无效行/列
-uint64_t EncodeTilingKey(const FagParsedInfo &info, const FagKernelPlan &kernel, const FagSchedulePlan &schedule);
+uint64_t EncodeTilingKey(const FagParsedInfo& info, const FagKernelPlan& kernel, const FagSchedulePlan& schedule);
 
 } // namespace optiling
 

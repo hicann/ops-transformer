@@ -26,12 +26,12 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(FlashMlaWithKvcacheMetadata);
 
-const aclTensor *FlashMlaWithKvcacheMetadata(const aclTensor *cuSeqlensQOptional, const aclTensor *cacheSeqlensOptional,
-                                             const aclTensor *sequsedQOptional, int64_t maxSeqlenQ, int64_t maxSeqlenKv,
+const aclTensor* FlashMlaWithKvcacheMetadata(const aclTensor* cuSeqlensQOptional, const aclTensor* cacheSeqlensOptional,
+                                             const aclTensor* sequsedQOptional, int64_t maxSeqlenQ, int64_t maxSeqlenKv,
                                              int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDimQk, int64_t headDimV,
-                                             int64_t maskMode, const char *layoutQ, const char *socVersion,
-                                             int64_t aicCoreNum, int64_t aivCoreNum, const aclTensor *metaData,
-                                             aclOpExecutor *executor)
+                                             int64_t maskMode, const char* layoutQ, const char* socVersion,
+                                             int64_t aicCoreNum, int64_t aivCoreNum, const aclTensor* metaData,
+                                             aclOpExecutor* executor)
 {
     L0_DFX(FlashMlaWithKvcacheMetadata, cuSeqlensQOptional, cacheSeqlensOptional, sequsedQOptional, maxSeqlenQ,
            maxSeqlenKv, numHeadsQ, numHeadsKv, headDimQk, headDimV, maskMode, layoutQ, socVersion, aicCoreNum,

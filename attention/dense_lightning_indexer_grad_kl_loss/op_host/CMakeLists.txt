@@ -30,8 +30,7 @@ else()
                     -Werror
     )
     add_modules_sources(
-        OPTYPE dense_lightning_indexer_grad_kl_loss 
+        OPTYPE dense_lightning_indexer_grad_kl_loss
         ACLNNTYPE aclnn
     )
 endif()
-

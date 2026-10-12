@@ -32,9 +32,9 @@ struct CopyUb2Gm<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>> {
 
     __aicore__ inline CopyUb2Gm() = default;
 
-    __aicore__ inline void operator()(AscendC::GlobalTensor<Element> const &dstTensor,
-                                      AscendC::LocalTensor<Element> const &srcTensor, layout::RowMajor const &layoutDst,
-                                      layout::RowMajor const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::GlobalTensor<Element> const& dstTensor,
+                                      AscendC::LocalTensor<Element> const& srcTensor, layout::RowMajor const& layoutDst,
+                                      layout::RowMajor const& layoutSrc)
     {
         AscendC::DataCopyExtParams dataCopyParams(layoutDst.shape(0), layoutDst.shape(1) * sizeof(Element),
                                                   (layoutSrc.stride(0) - layoutSrc.shape(1)) / ELE_NUM_PER_C0,
@@ -53,9 +53,9 @@ struct CopyUb2Gm<Arch::AtlasA2, Gemm::GemmType<Element, layout::VectorLayout>> {
 
     __aicore__ inline CopyUb2Gm() = default;
 
-    __aicore__ inline void operator()(AscendC::GlobalTensor<Element> const &dstTensor,
-                                      AscendC::LocalTensor<Element> const &srcTensor,
-                                      layout::VectorLayout const &layoutDst, layout::VectorLayout const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::GlobalTensor<Element> const& dstTensor,
+                                      AscendC::LocalTensor<Element> const& srcTensor,
+                                      layout::VectorLayout const& layoutDst, layout::VectorLayout const& layoutSrc)
     {
         AscendC::DataCopyExtParams dataCopyParams(1, layoutDst.shape(0) * sizeof(Element), 0, 0, 0);
         AscendC::DataCopyPad(dstTensor, srcTensor, dataCopyParams);
@@ -79,9 +79,9 @@ struct CopyUb2GmAligned<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>
 
     __aicore__ inline CopyUb2GmAligned() = default;
 
-    __aicore__ inline void operator()(AscendC::GlobalTensor<Element> const &dstTensor,
-                                      AscendC::LocalTensor<Element> const &srcTensor, layout::RowMajor const &layoutDst,
-                                      layout::RowMajor const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::GlobalTensor<Element> const& dstTensor,
+                                      AscendC::LocalTensor<Element> const& srcTensor, layout::RowMajor const& layoutDst,
+                                      layout::RowMajor const& layoutSrc)
     {
         uint32_t rows = layoutDst.shape(0);
         uint32_t cols = layoutDst.shape(1);

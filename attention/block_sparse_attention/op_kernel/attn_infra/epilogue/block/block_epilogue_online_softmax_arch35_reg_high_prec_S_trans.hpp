@@ -46,8 +46,8 @@ public:
 
     static constexpr ElementInput MIN_VALUE = -3.389531390315715675e+38f;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource, float scaleValue_,
-                                    UBufTileHelper &uBufTileHelper)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource, float scaleValue_,
+                                    UBufTileHelper& uBufTileHelper)
     {
         subBlockIdx_ = AscendC::GetSubBlockIdx();
         scaleValue = static_cast<ElementInput>(scaleValue_);
@@ -74,7 +74,7 @@ public:
     __aicore__ inline ~BlockEpilogue() {}
 
     template <class TensorP>
-    __aicore__ inline void operator()(TensorP &l1PTensorTla, GemmCoord actualBlockShape, uint32_t isFirstKvSTile,
+    __aicore__ inline void operator()(TensorP& l1PTensorTla, GemmCoord actualBlockShape, uint32_t isFirstKvSTile,
                                       uint32_t ubSBufId, uint32_t l1PBufId, Arch::CrossCoreFlag mm1ToSmFlag,
                                       Arch::CrossCoreFlag smToMm2Flag)
     {
@@ -95,15 +95,15 @@ public:
         uint32_t blockStride = mRound / 2 + 1;
         constexpr int16_t vlSize = static_cast<int16_t>(AscendC::GetVecLen() / sizeof(ElementInput));
         uint32_t tailN = (n - 1) % vlSize + 1;
-        __ubuf__ ElementOutput *pAddr = (__ubuf__ ElementOutput *)lpUbTensor[ubSBufId].GetPhyAddr();
-        __ubuf__ ElementInput *sAddr = (__ubuf__ ElementInput *)lsUbTensor[ubSBufId].GetPhyAddr();
-        __ubuf__ float *lastMaxAddr = (__ubuf__ float *)gmUbTensor.GetPhyAddr();
-        __ubuf__ float *lastMaxStartAddr = (__ubuf__ float *)gmUbTensor.GetPhyAddr();
-        __ubuf__ float *lastSumAddr = (__ubuf__ float *)glUbTensor.GetPhyAddr();
-        __ubuf__ ElementInput *nowMaxAddr = (__ubuf__ float *)lmUbTensor.GetPhyAddr();
-        __ubuf__ ElementInput *nowMaxStartAddr = (__ubuf__ float *)lmUbTensor.GetPhyAddr();
-        __ubuf__ ElementInput *nowSumAddr = (__ubuf__ float *)llUbTensor.GetPhyAddr();
-        __ubuf__ float *expMaxUbAddr = (__ubuf__ float *)dmUbTensor[l1PBufId].GetPhyAddr();
+        __ubuf__ ElementOutput* pAddr = (__ubuf__ ElementOutput*)lpUbTensor[ubSBufId].GetPhyAddr();
+        __ubuf__ ElementInput* sAddr = (__ubuf__ ElementInput*)lsUbTensor[ubSBufId].GetPhyAddr();
+        __ubuf__ float* lastMaxAddr = (__ubuf__ float*)gmUbTensor.GetPhyAddr();
+        __ubuf__ float* lastMaxStartAddr = (__ubuf__ float*)gmUbTensor.GetPhyAddr();
+        __ubuf__ float* lastSumAddr = (__ubuf__ float*)glUbTensor.GetPhyAddr();
+        __ubuf__ ElementInput* nowMaxAddr = (__ubuf__ float*)lmUbTensor.GetPhyAddr();
+        __ubuf__ ElementInput* nowMaxStartAddr = (__ubuf__ float*)lmUbTensor.GetPhyAddr();
+        __ubuf__ ElementInput* nowSumAddr = (__ubuf__ float*)llUbTensor.GetPhyAddr();
+        __ubuf__ float* expMaxUbAddr = (__ubuf__ float*)dmUbTensor[l1PBufId].GetPhyAddr();
         // wait QK Fixpipe finish
         WaitCrossCoreSync<4, PIPE_V>(mm1ToSmFlag);
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(ubSBufId + 2);
@@ -205,12 +205,12 @@ private:
     };
 
     template <typename ElementS, typename ElementP, bool isUpdate, MAlignedTileNum mTileNum>
-    __simd_vf__ inline void ComputeOnlineSoftmaxDN(__ubuf__ ElementS *srcUb, __ubuf__ ElementS *newMaxUb,
-                                                   __ubuf__ ElementS *LastMaxUbStart, __ubuf__ ElementP *expUb,
-                                                   __ubuf__ ElementS *expSumUb, uint16_t mRound, uint16_t m,
+    __simd_vf__ inline void ComputeOnlineSoftmaxDN(__ubuf__ ElementS* srcUb, __ubuf__ ElementS* newMaxUb,
+                                                   __ubuf__ ElementS* LastMaxUbStart, __ubuf__ ElementP* expUb,
+                                                   __ubuf__ ElementS* expSumUb, uint16_t mRound, uint16_t m,
                                                    uint32_t tailN, uint32_t mFirstTile, ElementInput dScale,
                                                    uint16_t s2BaseSize, uint32_t blockStride, uint32_t repeatStride,
-                                                   __ubuf__ float *expMaxUb, __ubuf__ ElementS *lastExpSumUb)
+                                                   __ubuf__ float* expMaxUb, __ubuf__ ElementS* lastExpSumUb)
     {
         using namespace AscendC::Reg;
         RegTensor<float> src0Vreg;
@@ -258,14 +258,14 @@ private:
         MaskReg pregTailN = UpdateMask<float>(tailN);
         uint32_t twoVecLenCombined = 128;
         MaskReg pregFp16VL128 = UpdateMask<uint16_t>(twoVecLenCombined);
-        __ubuf__ ElementP *exp0Ub = expUb;
-        __ubuf__ ElementP *exp1Ub = expUb + (mRound * 4);
+        __ubuf__ ElementP* exp0Ub = expUb;
+        __ubuf__ ElementP* exp1Ub = expUb + (mRound * 4);
 
-        __ubuf__ float *srcUb0 = srcUb;
-        __ubuf__ float *srcUb1 = srcUb0 + s2BaseSize;
-        __ubuf__ float *srcUb2 = srcUb0 + s2BaseSize * 2;
-        __ubuf__ float *srcUb3 = srcUb0 + s2BaseSize * 3;
-        __ubuf__ float *srcUb4 = srcUb0 + s2BaseSize * (m / 4) * 4;
+        __ubuf__ float* srcUb0 = srcUb;
+        __ubuf__ float* srcUb1 = srcUb0 + s2BaseSize;
+        __ubuf__ float* srcUb2 = srcUb0 + s2BaseSize * 2;
+        __ubuf__ float* srcUb3 = srcUb0 + s2BaseSize * 3;
+        __ubuf__ float* srcUb4 = srcUb0 + s2BaseSize * (m / 4) * 4;
         Duplicate(max0Vreg, MIN_VALUE);
         Duplicate(max1Vreg, MIN_VALUE);
         Duplicate(max2Vreg, MIN_VALUE);
@@ -299,7 +299,7 @@ private:
             StoreAlign<float, StoreDist::DIST_NORM_B32>(LastMaxUbStart, max0Vreg, pregTailN);
         }
 
-        StoreAlign<float, AscendC::Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)newMaxUb, max0Vreg, pregFull);
+        StoreAlign<float, AscendC::Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float*&)newMaxUb, max0Vreg, pregFull);
 
         Duplicate<float, AscendC::Reg::MaskMergeMode::ZEROING, float>(sum0Vreg, 0, pregFull);
         Duplicate<float, AscendC::Reg::MaskMergeMode::ZEROING, float>(sum1Vreg, 0, pregFull);
@@ -329,7 +329,7 @@ private:
             Cast<ElementP, float, castTraitZeroROUND>(exp3Vreg16, exp3Vreg32, pregFull);
             DeInterleave(deInterleave2Vreg, deInterleave3Vreg, exp1Vreg16, exp3Vreg16);
             StoreAlign<ElementP, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY,
-                       AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ ElementP *&)exp0Ub), deInterleave0Vreg,
+                       AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ ElementP*&)exp0Ub), deInterleave0Vreg,
                                                                     blockStride, 1, pregFp16VL128);
 
             if constexpr (mTileNum >= MAlignedTileNum::Zero) {
@@ -339,7 +339,7 @@ private:
                 Add(sum2Vreg, exp2Vreg32, sum2Vreg, pregTailN);
             }
             StoreAlign<ElementP, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY,
-                       AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ ElementP *&)exp1Ub), deInterleave2Vreg,
+                       AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ ElementP*&)exp1Ub), deInterleave2Vreg,
                                                                     blockStride, 1, pregFp16VL128);
             if constexpr (mTileNum >= MAlignedTileNum::One) {
                 Add(sum1Vreg, exp1Vreg32, sum1Vreg, pregTailN);
@@ -373,7 +373,7 @@ private:
                 DeInterleave(deInterleave2Vreg, deInterleave3Vreg, exp1Vreg16, exp3Vreg16);
                 StoreAlign<ElementP, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY,
                            AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(
-                    ((__ubuf__ ElementP *&)exp0Ub), deInterleave0Vreg, blockStride, 1, pregFp16VL128);
+                    ((__ubuf__ ElementP*&)exp0Ub), deInterleave0Vreg, blockStride, 1, pregFp16VL128);
 
                 if constexpr (mTileNum > MAlignedTileNum::Zero) {
                     Add(sum0Vreg, exp0Vreg32, sum0Vreg, pregTailN);
@@ -383,7 +383,7 @@ private:
                 }
                 StoreAlign<ElementP, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY,
                            AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(
-                    ((__ubuf__ ElementP *&)exp1Ub), deInterleave2Vreg, blockStride, 1, pregFp16VL128);
+                    ((__ubuf__ ElementP*&)exp1Ub), deInterleave2Vreg, blockStride, 1, pregFp16VL128);
                 if constexpr (mTileNum > MAlignedTileNum::One) {
                     Add(sum1Vreg, exp1Vreg32, sum1Vreg, pregTailN);
                 }
@@ -396,7 +396,7 @@ private:
             Add(updateExpSumVreg, updateExpSumVreg, sum0Vreg, pregFull);
             StoreAlign<float, StoreDist::DIST_NORM_B32>(lastExpSumUb, updateExpSumVreg, pregFull);
         }
-        StoreAlign<float, AscendC::Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)expSumUb, sum0Vreg, pregFull);
+        StoreAlign<float, AscendC::Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float*&)expSumUb, sum0Vreg, pregFull);
     }
 };
 } // namespace NpuArch::Epilogue::Block

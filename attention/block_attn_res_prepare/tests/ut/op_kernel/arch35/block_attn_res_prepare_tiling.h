@@ -21,7 +21,7 @@
 #include "../../../../op_kernel/arch35/block_attn_res_prepare_tiling_data.h"
 
 template <typename T>
-inline void InitBlockAttnResPrepareTilingData(const uint8_t *tiling, T *tilingData)
+inline void InitBlockAttnResPrepareTilingData(const uint8_t* tiling, T* tilingData)
 {
     std::memcpy(tilingData, tiling, sizeof(T));
 }
@@ -32,6 +32,6 @@ inline void InitBlockAttnResPrepareTilingData(const uint8_t *tiling, T *tilingDa
 
 #define GET_TILING_DATA_WITH_STRUCT(tilingStruct, tilingData, tilingArg) \
     tilingStruct tilingData; \
-    InitBlockAttnResPrepareTilingData(reinterpret_cast<const uint8_t *>(tilingArg), &tilingData)
+    InitBlockAttnResPrepareTilingData(reinterpret_cast<const uint8_t*>(tilingArg), &tilingData)
 
 #endif // TEST_BLOCK_ATTN_RES_PREPARE_TILING_H

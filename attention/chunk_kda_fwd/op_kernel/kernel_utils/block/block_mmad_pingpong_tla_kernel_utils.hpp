@@ -191,7 +191,7 @@ public:
 
     /// Construct
     CATLASS_DEVICE
-    BlockMmadTla(Catlass::Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart = 0)
+    BlockMmadTla(Catlass::Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart = 0)
     {
         if ASCEND_IS_AIC {
             // use HF32 when USE_HF32_MODE is true
@@ -298,8 +298,8 @@ public:
 
     /// Perform a block-scoped matrix multiply-accumulate
     template <class TensorA, class TensorB, class TensorC, class TensorBias = Catlass::EmptyClass>
-    CATLASS_DEVICE void operator()(TensorA &tensorA, TensorB &tensorB, TensorC &tensorC,
-                                   Catlass::GemmCoord const &actualShape, TensorBias const &tensorBias = {})
+    CATLASS_DEVICE void operator()(TensorA& tensorA, TensorB& tensorB, TensorC& tensorC,
+                                   Catlass::GemmCoord const& actualShape, TensorBias const& tensorBias = {})
     {
         // Check L1TileShape
         if constexpr (HAS_BIAS) {
@@ -355,7 +355,7 @@ public:
                 copyGmToL1A(tensorL1A, tensorTileA);
                 lastCoordA[l1AListId] =
                     Catlass::MatrixCoord{tla::get<0>(tensorTileA.coord()), tla::get<1>(tensorTileA.coord())};
-                lastAddrA[l1AListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementA>::PrimType *>(
+                lastAddrA[l1AListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementA>::PrimType*>(
                     tensorTileA.data().GetPhyAddr());
             }
         } else {
@@ -374,7 +374,7 @@ public:
                 copyGmToL1B(tensorL1B, tensorTileB);
                 lastCoordB[l1BListId] =
                     Catlass::MatrixCoord{tla::get<0>(tensorTileB.coord()), tla::get<1>(tensorTileB.coord())};
-                lastAddrB[l1BListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType *>(
+                lastAddrB[l1BListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType*>(
                     tensorTileB.data().GetPhyAddr());
             }
         } else {
@@ -430,7 +430,7 @@ public:
                         lastCoordA[l1AListIdNext] =
                             Catlass::MatrixCoord{tla::get<0>(tensorTileA.coord()), tla::get<1>(tensorTileA.coord())};
                         lastAddrA[l1AListIdNext] =
-                            const_cast<__gm__ typename AscendC::GlobalTensor<ElementA>::PrimType *>(
+                            const_cast<__gm__ typename AscendC::GlobalTensor<ElementA>::PrimType*>(
                                 tensorTileA.data().GetPhyAddr());
                     }
                 } else {
@@ -448,7 +448,7 @@ public:
                         lastCoordB[l1BListIdNext] =
                             Catlass::MatrixCoord{tla::get<0>(tensorTileB.coord()), tla::get<1>(tensorTileB.coord())};
                         lastAddrB[l1BListIdNext] =
-                            const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType *>(
+                            const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType*>(
                                 tensorTileB.data().GetPhyAddr());
                     }
                 } else {
@@ -599,10 +599,10 @@ public:
 
     /// Perform a block-scoped matrix multiply-accumulate
     template <class TensorA, class TensorB, class TensorC, class TensorBias = Catlass::EmptyClass>
-    CATLASS_DEVICE void operator()(TensorA &tensorA, TensorB &tensorB, TensorC tensorCList[MAX_CUBE_VEC_SYNC_NUM],
-                                   Catlass::GemmCoord const &actualShape, uint32_t ubRowNum, uint8_t beginSubBlockIdx,
-                                   uint64_t l0C2UBAIVAICFlag, uint64_t l0C2UBAICAIVFlag, uint32_t &ubListId,
-                                   uint8_t sendVecNum, uint64_t ubNum = 2, TensorBias const &tensorBias = {})
+    CATLASS_DEVICE void operator()(TensorA& tensorA, TensorB& tensorB, TensorC tensorCList[MAX_CUBE_VEC_SYNC_NUM],
+                                   Catlass::GemmCoord const& actualShape, uint32_t ubRowNum, uint8_t beginSubBlockIdx,
+                                   uint64_t l0C2UBAIVAICFlag, uint64_t l0C2UBAICAIVFlag, uint32_t& ubListId,
+                                   uint8_t sendVecNum, uint64_t ubNum = 2, TensorBias const& tensorBias = {})
     {
         // Check L1TileShape
         if constexpr (HAS_BIAS) {
@@ -652,7 +652,7 @@ public:
                 copyGmToL1A(tensorL1A, tensorTileA);
                 lastCoordA[l1AListId] =
                     Catlass::MatrixCoord{tla::get<0>(tensorTileA.coord()), tla::get<1>(tensorTileA.coord())};
-                lastAddrA[l1AListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementA>::PrimType *>(
+                lastAddrA[l1AListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementA>::PrimType*>(
                     tensorTileA.data().GetPhyAddr());
             }
         } else {
@@ -671,7 +671,7 @@ public:
                 copyGmToL1B(tensorL1B, tensorTileB);
                 lastCoordB[l1BListId] =
                     Catlass::MatrixCoord{tla::get<0>(tensorTileB.coord()), tla::get<1>(tensorTileB.coord())};
-                lastAddrB[l1BListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType *>(
+                lastAddrB[l1BListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType*>(
                     tensorTileB.data().GetPhyAddr());
             }
         } else {
@@ -727,7 +727,7 @@ public:
                         lastCoordA[l1AListIdNext] =
                             Catlass::MatrixCoord{tla::get<0>(tensorTileA.coord()), tla::get<1>(tensorTileA.coord())};
                         lastAddrA[l1AListIdNext] =
-                            const_cast<__gm__ typename AscendC::GlobalTensor<ElementA>::PrimType *>(
+                            const_cast<__gm__ typename AscendC::GlobalTensor<ElementA>::PrimType*>(
                                 tensorTileA.data().GetPhyAddr());
                     }
                 } else {
@@ -745,7 +745,7 @@ public:
                         lastCoordB[l1BListIdNext] =
                             Catlass::MatrixCoord{tla::get<0>(tensorTileB.coord()), tla::get<1>(tensorTileB.coord())};
                         lastAddrB[l1BListIdNext] =
-                            const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType *>(
+                            const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType*>(
                                 tensorTileB.data().GetPhyAddr());
                     }
                 } else {
@@ -966,7 +966,7 @@ public:
 
 protected:
     template <class TensorA>
-    CATLASS_DEVICE auto GetTileA(TensorA &tensorA, uint32_t mIndex, uint32_t kIndex, uint32_t mSize, uint32_t kSize)
+    CATLASS_DEVICE auto GetTileA(TensorA& tensorA, uint32_t mIndex, uint32_t kIndex, uint32_t mSize, uint32_t kSize)
     {
         if constexpr (tla::detail::isVector<LayoutA>::value) {
             return GetTile(tensorA, tla::MakeCoord(kIndex), tla::MakeShape(kSize));
@@ -991,8 +991,8 @@ protected:
     int32_t l0BEventList[L0B_STAGES];
     int32_t l0CEventList[L0C_STAGES];
 
-    __gm__ typename AscendC::GlobalTensor<ElementA>::PrimType *lastAddrA[L1A_STAGES];
-    __gm__ typename AscendC::GlobalTensor<ElementB>::PrimType *lastAddrB[L1B_STAGES];
+    __gm__ typename AscendC::GlobalTensor<ElementA>::PrimType* lastAddrA[L1A_STAGES];
+    __gm__ typename AscendC::GlobalTensor<ElementB>::PrimType* lastAddrB[L1B_STAGES];
     Catlass::MatrixCoord lastCoordA[L1A_STAGES];
     Catlass::MatrixCoord lastCoordB[L1B_STAGES];
 

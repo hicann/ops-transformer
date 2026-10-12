@@ -24,8 +24,10 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(AttentionUpdate);
 
-const std::tuple<const aclTensor*, const aclTensor*> AttentionUpdate(const aclTensorList *lse, const aclTensorList *go, int64_t updateType,
-                            int64_t sp, aclOpExecutor *executor) {
+const std::tuple<const aclTensor*, const aclTensor*> AttentionUpdate(const aclTensorList* lse, const aclTensorList* go,
+                                                                     int64_t updateType, int64_t sp,
+                                                                     aclOpExecutor* executor)
+{
     L0_DFX(AttentionUpdate, lse, go, updateType, sp);
 
     op::Shape outShape = (*go)[0]->GetViewShape();
@@ -34,15 +36,13 @@ const std::tuple<const aclTensor*, const aclTensor*> AttentionUpdate(const aclTe
     op::Shape lseOutShape = (*lse)[0]->GetViewShape();
     auto lseOut = executor->AllocTensor(lseOutShape, op::DataType::DT_FLOAT, op::Format::FORMAT_ND);
 
-    auto ret = ADD_TO_LAUNCHER_LIST_AICORE(AttentionUpdate,
-                              OP_INPUT(lse, go),
-                              OP_OUTPUT(out, lseOut),
-                              OP_ATTR(updateType, sp));
+    auto ret = ADD_TO_LAUNCHER_LIST_AICORE(AttentionUpdate, OP_INPUT(lse, go), OP_OUTPUT(out, lseOut),
+                                           OP_ATTR(updateType, sp));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "AttentionUpdateAiCore ADD_TO_LAUNCHER_LIST_AICORE failed.");
         return std::tuple<aclTensor*, aclTensor*>(nullptr, nullptr);
-    }   
+    }
 
     return std::tuple<aclTensor*, aclTensor*>(out, lseOut);
 }
-}  // namespace l0op
+} // namespace l0op

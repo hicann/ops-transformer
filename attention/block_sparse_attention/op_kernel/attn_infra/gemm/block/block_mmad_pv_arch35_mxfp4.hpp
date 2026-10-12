@@ -73,7 +73,7 @@ public:
 
     static constexpr AscendC::FixpipeConfig CFG_ROW_MAJOR_UB = {AscendC::CO2Layout::ROW_MAJOR, true};
 
-    __aicore__ inline BlockMmadTla(Arch::Resource<ArchTag> &resource, uint32_t &kvBufId)
+    __aicore__ inline BlockMmadTla(Arch::Resource<ArchTag>& resource, uint32_t& kvBufId)
         : l1ABufId(kvBufId)
     {
         for (uint32_t i = 0; i < MXFP4::L1_P_BUF_CNT; i++) {
@@ -165,7 +165,7 @@ public:
     // firstYBlockIdx / firstOriYBlockIdx 由调用方提前预取，避免首个 index 的阻塞访存落在此处。
     template <class TensorV, class TensorL1A, class TensorVScale, class TensorL1AScale>
     __aicore__ inline void SparseVFusedBaseTileL1FullLoad(
-        TensorV &gVTensor, TensorL1A &l1ATensorTla, TensorVScale &gVScaleTensor, TensorL1AScale &l1AScaleTensorTla,
+        TensorV& gVTensor, TensorL1A& l1ATensorTla, TensorVScale& gVScaleTensor, TensorL1AScale& l1AScaleTensorTla,
         AscendC::GlobalTensor<int32_t> gSparseBlockIdx, uint32_t gatheredKvSTileIdx, int64_t kvSeqlen,
         uint32_t kvSBaseTile, uint32_t blockShapeY, uint32_t yBlockNumAval, uint32_t yBlockNumRsvd,
         uint32_t curBaseTileSize, uint32_t embed, uint32_t firstYBlockIdx, uint32_t firstOriYBlockIdx)
@@ -240,7 +240,7 @@ public:
 
     // L0C → UB fixpipe（SPLIT_N 模式）
     template <class TensorUB>
-    __aicore__ inline void FixpipeMm2(uint32_t s1Align64, TensorUB &ubOTmpTensor)
+    __aicore__ inline void FixpipeMm2(uint32_t s1Align64, TensorUB& ubOTmpTensor)
     {
         auto l0CTensorTla =
             tla::MakeTensor(l0CTensor[0], tla::MakeLayoutL0C(MXFP4::PV_MMAD_M_DIM, s1Align64), Arch::PositionL0C{});
@@ -253,7 +253,7 @@ public:
 
     // L0C → UB fixpipe（NO_SPLIT 模式，s1 ≤ 64 时单 vector 核搬出）
     template <class TensorUB>
-    __aicore__ inline void FixpipeMm2SingleVect(uint32_t s1Align64, TensorUB &ubOTmpTensor)
+    __aicore__ inline void FixpipeMm2SingleVect(uint32_t s1Align64, TensorUB& ubOTmpTensor)
     {
         auto l0CTensorTla =
             tla::MakeTensor(l0CTensor[0], tla::MakeLayoutL0C(MXFP4::PV_MMAD_M_DIM, s1Align64), Arch::PositionL0C{});
@@ -340,10 +340,10 @@ public:
     }
 
     template <class TensorV, class TensorC, class TaskInfoT, class TileInfoT>
-    __aicore__ inline void operator()(TensorV &gV, AscendC::GlobalTensor<uint8_t> gVDequantScale,
-                                      AscendC::GlobalTensor<int32_t> gSparseIdx, TensorC &ubOTmpTensor,
-                                      GemmCoord actualBlockShapePV, TileInfoT &delay20TileInfo,
-                                      TaskInfoT &delay20TaskInfo, uint32_t kvSBaseTile, uint32_t blockShapeY,
+    __aicore__ inline void operator()(TensorV& gV, AscendC::GlobalTensor<uint8_t> gVDequantScale,
+                                      AscendC::GlobalTensor<int32_t> gSparseIdx, TensorC& ubOTmpTensor,
+                                      GemmCoord actualBlockShapePV, TileInfoT& delay20TileInfo,
+                                      TaskInfoT& delay20TaskInfo, uint32_t kvSBaseTile, uint32_t blockShapeY,
                                       uint32_t kvHeadMul)
     {
         uint32_t rowNum = actualBlockShapePV[0];
@@ -458,7 +458,7 @@ protected:
     Tile::CopyL1ToL0BMxA5 copyL1ToL0BMx;
 
     uint32_t pvL0abBufId = 0;
-    uint32_t &l1ABufId;
+    uint32_t& l1ABufId;
 };
 
 } // namespace NpuArch::Gemm::Block

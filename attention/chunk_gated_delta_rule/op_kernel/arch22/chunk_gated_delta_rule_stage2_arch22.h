@@ -38,9 +38,9 @@ struct StageTwoParams {
     GlobalTensor<bfloat16_t> kg;
     GlobalTensor<bfloat16_t> out;
     GM_ADDR ws;
-    StageTwoMT *mm1;
-    TPipe *pipe;
-    ChunkGroup *cg;
+    StageTwoMT* mm1;
+    TPipe* pipe;
+    ChunkGroup* cg;
     int64_t Nv;
     int64_t Nk;
     int64_t Dv;
@@ -50,7 +50,7 @@ struct StageTwoParams {
 
 class Stage2 {
 public:
-    __aicore__ inline void Init(StageTwoParams *initParams, int32_t coreNum)
+    __aicore__ inline void Init(StageTwoParams* initParams, int32_t coreNum)
     {
         sTP_ = initParams;
         pipe_ = sTP_->pipe;
@@ -241,8 +241,8 @@ public:
     }
 
 private:
-    StageTwoParams *sTP_;
-    TPipe *pipe_;
+    StageTwoParams* sTP_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, BUFFER_NUM_ONE> inQueue_;
     TQue<QuePosition::VECOUT, BUFFER_NUM_ONE> outQueue_;
     TBuf<TPosition::VECCALC> tmpBuff_;

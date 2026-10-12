@@ -122,7 +122,7 @@ public:
     ActualSeqLensParser<ActualSeqLensMode::ACCUM, SEQLEN_T, true> cuSeqLensParser;
     ActualSeqLensParser<ActualSeqLensMode::BY_BATCH, SEQLEN_T, false> seqUsedParser;
 
-    __aicore__ inline void Init(__gm__ uint8_t *cuSeqLensGmAddr, uint32_t cuSeqLensDims, __gm__ uint8_t *seqUsedGmAddr,
+    __aicore__ inline void Init(__gm__ uint8_t* cuSeqLensGmAddr, uint32_t cuSeqLensDims, __gm__ uint8_t* seqUsedGmAddr,
                                 uint32_t seqUsedDims, uint64_t defaultSeqUsedVal)
     {
         cuSeqLensParser.Init(cuSeqLensGmAddr, cuSeqLensDims, seqUsedGmAddr, seqUsedDims);

@@ -39,14 +39,14 @@ static const std::string QUERY_NAME = "query";
 static const std::string KEY_NAME = "key";
 static const std::string VALUE_NAME = "value";
 
-ge::graphStatus TilingDenseLightningIndexerKLLossGrad(gert::TilingContext *context)
+ge::graphStatus TilingDenseLightningIndexerKLLossGrad(gert::TilingContext* context)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
     auto dlikgPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingPrepareForDenseLightningIndexerKLLossGrad(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForDenseLightningIndexerKLLossGrad(gert::TilingParseContext* context)
 {
     OP_LOGW(context, "Start registering tiling.");
     auto compileInfoPtr = context->GetCompiledInfo<DenseLightningIndexerKLLossGradCompileInfo>();

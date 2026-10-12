@@ -23,7 +23,7 @@ using namespace optiling;
 
 namespace aicpu {
 
-uint32_t DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::Compute(CpuKernelContext &ctx)
+uint32_t DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::Compute(CpuKernelContext& ctx)
 {
     if (!Prepare(ctx)) {
         return KERNEL_STATUS_PARAM_INVALID;
@@ -36,7 +36,7 @@ uint32_t DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::Compute(CpuKernelCo
     return KERNEL_STATUS_PARAM_INVALID;
 }
 
-bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::Prepare(CpuKernelContext &ctx)
+bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::Prepare(CpuKernelContext& ctx)
 {
     cuSeqLensQuery_ = ctx.Input(0);
     cuSeqLensKey_ = ctx.Input(1);
@@ -102,7 +102,7 @@ bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::ParamsCheck()
 bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CheckTensorValues()
 {
     if (layoutType_ == DliLayout::TND && IsTensorValid(cuSeqLensQuery_)) {
-        auto *cuSeqQ = reinterpret_cast<const int32_t *>(cuSeqLensQuery_->GetData());
+        auto* cuSeqQ = reinterpret_cast<const int32_t*>(cuSeqLensQuery_->GetData());
         for (int64_t i = 0; i < bSize_ + 1; ++i) {
             if (static_cast<int64_t>(cuSeqQ[i]) < 0) {
                 KERNEL_LOG_ERROR("The elements in cu_seqlens_q should be >= 0, but got cu_seqlens_q[%ld] = %d", i,
@@ -118,7 +118,7 @@ bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CheckTensorValues()
         }
     }
     if (layoutType_ == DliLayout::TND && IsTensorValid(cuSeqLensKey_)) {
-        auto *cuSeqK = reinterpret_cast<const int32_t *>(cuSeqLensKey_->GetData());
+        auto* cuSeqK = reinterpret_cast<const int32_t*>(cuSeqLensKey_->GetData());
         for (int64_t i = 0; i < bSize_ + 1; ++i) {
             if (static_cast<int64_t>(cuSeqK[i]) < 0) {
                 KERNEL_LOG_ERROR("The elements in cu_seqlens_k should be >= 0, but got cu_seqlens_k[%ld] = %d", i,
@@ -134,27 +134,27 @@ bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CheckTensorValues()
         }
     }
     if (IsTensorValid(seqUsedQuery_)) {
-        auto *seqUsedQ = reinterpret_cast<const int32_t *>(seqUsedQuery_->GetData());
+        auto* seqUsedQ = reinterpret_cast<const int32_t*>(seqUsedQuery_->GetData());
         for (int64_t i = 0; i < bSize_; ++i) {
             if (static_cast<int64_t>(seqUsedQ[i]) < 0) {
-                KERNEL_LOG_ERROR("The elements in seqused_q should be >= 0, but got seqused_q[%ld] = %d",
-                                 i, seqUsedQ[i]);
+                KERNEL_LOG_ERROR("The elements in seqused_q should be >= 0, but got seqused_q[%ld] = %d", i,
+                                 seqUsedQ[i]);
                 return false;
             }
         }
     }
     if (IsTensorValid(seqUsedKey_)) {
-        auto *seqUsedK = reinterpret_cast<const int32_t *>(seqUsedKey_->GetData());
+        auto* seqUsedK = reinterpret_cast<const int32_t*>(seqUsedKey_->GetData());
         for (int64_t i = 0; i < bSize_; ++i) {
             if (static_cast<int64_t>(seqUsedK[i]) < 0) {
-                KERNEL_LOG_ERROR("The elements in seqused_k should be >= 0, but got seqused_k[%ld] = %d",
-                                 i, seqUsedK[i]);
+                KERNEL_LOG_ERROR("The elements in seqused_k should be >= 0, but got seqused_k[%ld] = %d", i,
+                                 seqUsedK[i]);
                 return false;
             }
         }
     }
     if (IsTensorValid(cmpResidualKey_)) {
-        auto *data = reinterpret_cast<const int32_t *>(cmpResidualKey_->GetData());
+        auto* data = reinterpret_cast<const int32_t*>(cmpResidualKey_->GetData());
         for (int64_t i = 0; i < bSize_; ++i) {
             if (static_cast<int64_t>(data[i]) < 0) {
                 KERNEL_LOG_ERROR("The elements in cmp_residual_k should be >= 0, but got cmp_residual_k[%ld] = %d", i,
@@ -169,9 +169,9 @@ bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CheckTensorValues()
         }
     }
     if (IsTensorValid(seqUsedQuery_)) {
-        auto *seqUsedQ = reinterpret_cast<const int32_t *>(seqUsedQuery_->GetData());
+        auto* seqUsedQ = reinterpret_cast<const int32_t*>(seqUsedQuery_->GetData());
         if (layoutType_ == DliLayout::TND && IsTensorValid(cuSeqLensQuery_)) {
-            auto *cuSeqQ = reinterpret_cast<const int32_t *>(cuSeqLensQuery_->GetData());
+            auto* cuSeqQ = reinterpret_cast<const int32_t*>(cuSeqLensQuery_->GetData());
             for (int64_t i = 0; i < bSize_; ++i) {
                 int64_t seqlenQ = static_cast<int64_t>(cuSeqQ[i + 1]) - static_cast<int64_t>(cuSeqQ[i]);
                 if (static_cast<int64_t>(seqUsedQ[i]) > seqlenQ) {
@@ -189,9 +189,9 @@ bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CheckTensorValues()
         }
     }
     if (IsTensorValid(seqUsedKey_)) {
-        auto *seqUsedK = reinterpret_cast<const int32_t *>(seqUsedKey_->GetData());
+        auto* seqUsedK = reinterpret_cast<const int32_t*>(seqUsedKey_->GetData());
         if (layoutType_ == DliLayout::TND && IsTensorValid(cuSeqLensKey_)) {
-            auto *cuSeqK = reinterpret_cast<const int32_t *>(cuSeqLensKey_->GetData());
+            auto* cuSeqK = reinterpret_cast<const int32_t*>(cuSeqLensKey_->GetData());
             for (int64_t i = 0; i < bSize_; ++i) {
                 int64_t seqlenK = static_cast<int64_t>(cuSeqK[i + 1]) - static_cast<int64_t>(cuSeqK[i]);
                 if (static_cast<int64_t>(seqUsedK[i]) > seqlenK) {
@@ -211,6 +211,6 @@ bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CheckTensorValues()
     return true;
 }
 
-static const char *kernelTypeDenseLiV2 = "DenseLightningIndexerSoftmaxLseV2Metadata";
+static const char* kernelTypeDenseLiV2 = "DenseLightningIndexerSoftmaxLseV2Metadata";
 REGISTER_CPU_KERNEL(kernelTypeDenseLiV2, DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel);
 } // namespace aicpu

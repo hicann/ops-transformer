@@ -18,7 +18,7 @@ namespace optiling {
 
 class AttentionWorkerCombineTiling : public AttentionWorkerCombineTilingBase {
 public:
-    explicit AttentionWorkerCombineTiling(gert::TilingContext *context)
+    explicit AttentionWorkerCombineTiling(gert::TilingContext* context)
         : AttentionWorkerCombineTilingBase(context)
     {}
     ~AttentionWorkerCombineTiling() override = default;
@@ -37,8 +37,8 @@ protected:
 
 private:
     void DoOpTilingFullK(int64_t batchSize, int64_t bsCoreNum, int64_t hAlign, int64_t kIn);
-    void SelectBestHCore(int64_t hAlign, int64_t hInSplitK, int64_t &bsCoreNum, int64_t &lastCoreNum,
-                         int64_t &lastBestHCore);
+    void SelectBestHCore(int64_t hAlign, int64_t hInSplitK, int64_t& bsCoreNum, int64_t& lastCoreNum,
+                         int64_t& lastBestHCore);
 
     AttentionWorkerCombineTilingData tilingData_;
 };
@@ -67,7 +67,7 @@ ge::graphStatus AttentionWorkerCombineTiling::DoGetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const AttentionWorkerCombineCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const AttentionWorkerCombineCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_->GetNodeName(), "CompileInfo is nullptr."),
                     return ge::GRAPH_FAILED);
         coreNum_ = compileInfoPtr->coreNum;
@@ -87,10 +87,10 @@ ge::graphStatus AttentionWorkerCombineTiling::DoGetShapeAttrsInfo()
     OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context_ can not be nullptr."),
                 return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *shapePtr = context_->GetInputShape(EXPERT_SCALES_INDEX);
+    const gert::StorageShape* shapePtr = context_->GetInputShape(EXPERT_SCALES_INDEX);
     OP_CHECK_IF(shapePtr == nullptr, OP_LOGE(context_->GetNodeName(), "expert_scales shape is nullptr."),
                 return ge::GRAPH_FAILED);
-    const auto &shape = shapePtr->GetStorageShape();
+    const auto& shape = shapePtr->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_SIZE,
                 OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "expert_scales",
                                                          std::to_string(shape.GetDimNum()).c_str(), "Rank must be 2."),
@@ -102,7 +102,7 @@ ge::graphStatus AttentionWorkerCombineTiling::DoGetShapeAttrsInfo()
                                                       (std::to_string(batchSize) + "," + std::to_string(k)).c_str(),
                                                       "BS must be positive and K must be in [1,64]."),
                 return ge::GRAPH_FAILED);
-    const auto *scaleDesc = context_->GetInputDesc(EXPERT_SCALES_INDEX);
+    const auto* scaleDesc = context_->GetInputDesc(EXPERT_SCALES_INDEX);
     OP_CHECK_IF(scaleDesc == nullptr, OP_LOGE(context_->GetNodeName(), "expert_scales desc is nullptr."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(scaleDesc->GetDataType() != ge::DT_FLOAT,
@@ -173,8 +173,8 @@ void AttentionWorkerCombineTiling::DoOpTilingFullK(int64_t batchSize, int64_t bs
     context_->SetBlockDim(bsCoreNum);
 }
 
-void AttentionWorkerCombineTiling::SelectBestHCore(int64_t hAlign, int64_t hInSplitK, int64_t &bsCoreNum,
-                                                   int64_t &lastCoreNum, int64_t &lastBestHCore)
+void AttentionWorkerCombineTiling::SelectBestHCore(int64_t hAlign, int64_t hInSplitK, int64_t& bsCoreNum,
+                                                   int64_t& lastCoreNum, int64_t& lastBestHCore)
 {
     int64_t bsMaxCore = 0;
     int64_t batchSize = tilingData_.get_BS();

@@ -22,7 +22,7 @@ class DenseLightningIndexerKLLossGradMetadataCpuKernel : public CpuKernel {
 public:
     DenseLightningIndexerKLLossGradMetadataCpuKernel() = default;
     ~DenseLightningIndexerKLLossGradMetadataCpuKernel() override = default;
-    uint32_t Compute(CpuKernelContext &ctx) override
+    uint32_t Compute(CpuKernelContext& ctx) override
     {
         std::string socVersion;
         if (!GetAttrValue(ctx, "soc_version", socVersion)) {
@@ -37,7 +37,7 @@ private:
 };
 
 namespace {
-static const char *kernelType = "DenseLightningIndexerKLLossGradMetadata";
+static const char* kernelType = "DenseLightningIndexerKLLossGradMetadata";
 REGISTER_CPU_KERNEL(kernelType, DenseLightningIndexerKLLossGradMetadataCpuKernel);
 } // namespace
 

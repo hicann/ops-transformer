@@ -37,12 +37,12 @@ class FlashAttnMetadataCpuKernel : public CpuKernel {
 public:
     FlashAttnMetadataCpuKernel() = default;
     ~FlashAttnMetadataCpuKernel() = default;
-    uint32_t Compute(CpuKernelContext &ctx) override;
+    uint32_t Compute(CpuKernelContext& ctx) override;
 
 private:
-    bool Prepare(CpuKernelContext &ctx);
-    bool BalanceSchedule(load_balance::SectionStreamKResult &splitRes);
-    bool GenMetadata(load_balance::SectionStreamKResult &splitRes);
+    bool Prepare(CpuKernelContext& ctx);
+    bool BalanceSchedule(load_balance::SectionStreamKResult& splitRes);
+    bool GenMetadata(load_balance::SectionStreamKResult& splitRes);
 
     bool ParamsCheck();
     bool CheckActualQuerySeq();
@@ -56,19 +56,19 @@ private:
     void LoadActualKvSeq();
     static int64_t CostFunc(uint32_t basicM, uint32_t basicS2);
 
-    void SetMetadataHead(const load_balance::SectionStreamKResult &splitRes, optiling::detail::FaMetadata &faMetadata);
-    void SetMetadataFa(const load_balance::SectionStreamKResult &splitRes, optiling::detail::FaMetadata &faMetadata);
-    void SetMetadataFd(const load_balance::SectionStreamKResult &splitRes, optiling::detail::FaMetadata &faMetadata);
+    void SetMetadataHead(const load_balance::SectionStreamKResult& splitRes, optiling::detail::FaMetadata& faMetadata);
+    void SetMetadataFa(const load_balance::SectionStreamKResult& splitRes, optiling::detail::FaMetadata& faMetadata);
+    void SetMetadataFd(const load_balance::SectionStreamKResult& splitRes, optiling::detail::FaMetadata& faMetadata);
 
 private:
-    CpuKernelContext *context_ = nullptr;
+    CpuKernelContext* context_ = nullptr;
     // input tensor
-    Tensor *cuSeqlensQ_ = nullptr;
-    Tensor *cuSeqlensKv_ = nullptr;
-    Tensor *sequsedQ_ = nullptr;
-    Tensor *sequsedKv_ = nullptr;
+    Tensor* cuSeqlensQ_ = nullptr;
+    Tensor* cuSeqlensKv_ = nullptr;
+    Tensor* sequsedQ_ = nullptr;
+    Tensor* sequsedKv_ = nullptr;
     // output tensor
-    Tensor *metadata_ = nullptr;
+    Tensor* metadata_ = nullptr;
 
     // input attr
     int32_t batchSize_ = 0;
@@ -144,26 +144,26 @@ private:
     void DoFagDenseSplit();
     void DoFagTndSplit();
     void DoFagSparseBlockInfo();
-    void GetFagParseS1S2OuterInfo(std::vector<std::vector<int64_t>> &parseInfo);
+    void GetFagParseS1S2OuterInfo(std::vector<std::vector<int64_t>>& parseInfo);
     bool FagCheckSparseLeftAndRight(int64_t s1oDimIdx, int64_t s2IdxLeft, int64_t s2IdxRight, int64_t bIdx);
     bool FagIsValid(int64_t blockIdx);
     bool FagIsValidUnpad(int64_t blockIdx);
     bool FagCheckUnpadSparseLeftAndRight(int64_t s1oDimIdx, int64_t s2IdxLeft, int64_t s2IdxRight, int64_t bIdx);
-    void FagFillBlockInfoLoadBalance(std::vector<std::vector<int64_t>> &totalBlockInfo,
-                                     std::vector<std::vector<float>> &acturalBlockInfo);
+    void FagFillBlockInfoLoadBalance(std::vector<std::vector<int64_t>>& totalBlockInfo,
+                                     std::vector<std::vector<float>>& acturalBlockInfo);
 
     // BN2S2 split implementations
     void TryBn2s2Sparse();
     void DoFagBn2s2DenseSplit();
     void DoFagBn2s2SparseTndSplit();
     float Bn2s2BinarySearchMaxBlockNumPerCore(int64_t b, int64_t n2, int64_t g, int64_t aicNum,
-                                              std::vector<std::vector<int64_t>> &totalBlockInfo,
-                                              std::vector<std::vector<float>> &acturalBlockInfo);
+                                              std::vector<std::vector<int64_t>>& totalBlockInfo,
+                                              std::vector<std::vector<float>>& acturalBlockInfo);
     bool Bn2s2IsPossible(int64_t b, int64_t n2, int64_t g, int64_t aicNum, float possibleMax,
-                         std::vector<std::vector<float>> &acturalBlockInfo);
+                         std::vector<std::vector<float>>& acturalBlockInfo);
     bool Bn2s2CaclePerCoreBlockInfo(int64_t b, int64_t n2, int64_t g, int64_t aicNum,
-                                    std::vector<std::vector<int64_t>> &totalBlockInfo,
-                                    std::vector<std::vector<float>> &acturalBlockInfo, float maxBlockNumPerCore);
+                                    std::vector<std::vector<int64_t>>& totalBlockInfo,
+                                    std::vector<std::vector<float>>& acturalBlockInfo, float maxBlockNumPerCore);
 
     // BN2 split implementations
     bool TryBn2MultiBlkSparse();

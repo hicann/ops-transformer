@@ -46,7 +46,7 @@ REGISTER_TILING_DATA_CLASS(AttentionUpdate_20001, AttentionUpdateTilingData)
 
 class AttentionUpdateTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit AttentionUpdateTiling(gert::TilingContext *context)
+    explicit AttentionUpdateTiling(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 

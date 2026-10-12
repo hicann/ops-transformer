@@ -80,19 +80,19 @@ __aicore__ inline constexpr bool IsPageAttention()
 }
 
 template <uint8_t inOutLayoutType, uint8_t KvLayoutType, bool hasAttenMask, uint8_t templateId, uint8_t config>
-__global__ __aicore__ void flash_attn(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                      __gm__ uint8_t *blockTable, __gm__ uint8_t *cuSeqLensQ,
-                                      __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedKv,
-                                      __gm__ uint8_t *sinks, __gm__ uint8_t *attnMask, __gm__ uint8_t *metadata,
-                                      __gm__ uint8_t *attnOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-                                      __gm__ uint8_t *tiling)
+__global__ __aicore__ void flash_attn(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                      __gm__ uint8_t* blockTable, __gm__ uint8_t* cuSeqLensQ,
+                                      __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sequsedKv,
+                                      __gm__ uint8_t* sinks, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
+                                      __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                                      __gm__ uint8_t* tiling)
 {
     REGISTER_TILING_DEFAULT(optiling::FlashAttnTilingData);
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     if constexpr (inOutLayoutType == InOutLayoutType_TND && KvLayoutType == KvLayoutType_NO_PA) {
-        dc_preload(reinterpret_cast<__gm__ uint64_t *>(cuSeqLensQ), 0);
-        dc_preload(reinterpret_cast<__gm__ uint64_t *>(cuSeqLensKv), 0);
+        dc_preload(reinterpret_cast<__gm__ uint64_t*>(cuSeqLensQ), 0);
+        dc_preload(reinterpret_cast<__gm__ uint64_t*>(cuSeqLensKv), 0);
     }
 
 #if (ORIG_DTYPE_Q == DT_BF16)

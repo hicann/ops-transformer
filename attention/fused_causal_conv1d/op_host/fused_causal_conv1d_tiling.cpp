@@ -30,7 +30,7 @@ struct FusedCausalConv1dCompileInfo {
 };
 
 // Main tiling function that dispatches based on x shape and max_query_len
-static ge::graphStatus TilingFusedCausalConv1d(gert::TilingContext *context)
+static ge::graphStatus TilingFusedCausalConv1d(gert::TilingContext* context)
 {
     OP_LOGD(context->GetNodeName(), "FusedCausalConv1dTiling tiling start");
 
@@ -68,7 +68,7 @@ static ge::graphStatus TilingFusedCausalConv1d(gert::TilingContext *context)
     return status;
 }
 
-static ge::graphStatus TilingPrepareFusedCausalConv1d(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareFusedCausalConv1d(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("FusedCausalConv1d", "context is null"), return ge::GRAPH_FAILED);
 

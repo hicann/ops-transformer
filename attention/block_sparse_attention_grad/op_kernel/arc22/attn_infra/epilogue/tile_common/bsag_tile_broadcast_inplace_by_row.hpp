@@ -29,7 +29,7 @@ struct TileBroadcastInplaceByRow {
 
     __aicore__ inline TileBroadcastInplaceByRow() {}
 
-    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const &ubInOut)
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const& ubInOut)
     {
         constexpr uint32_t eleNumPerVectorFractal =
             static_cast<uint32_t>(BYTE_PER_VECTOR_FRACTAL) / static_cast<uint32_t>(sizeof(ElementCompute));

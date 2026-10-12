@@ -29,13 +29,13 @@ template <uint8_t KernelTypeKey, uint8_t implMode, uint8_t layout, uint16_t s1Te
           uint16_t dTemplateType, uint16_t dvTemplateType, uint8_t pseMode, bool hasAtten, bool hasDrop, bool hasRope,
           uint8_t outDtype, uint8_t regbase, bool optionalDn>
 __global__ __aicore__ void flash_attention_score(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *dropMask,
-    __gm__ uint8_t *paddingMask, __gm__ uint8_t *attenMask, __gm__ uint8_t *prefix, __gm__ uint8_t *actualSeqLengths,
-    __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *qStartIdx, __gm__ uint8_t *kvStartIdx,
-    __gm__ uint8_t *deqScaleQ, __gm__ uint8_t *deqScaleK, __gm__ uint8_t *deqScaleV, __gm__ uint8_t *queryRope,
-    __gm__ uint8_t *keyRope, __gm__ uint8_t *sink, __gm__ uint8_t *pScale, __gm__ uint8_t *softmaxMax,
-    __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-    __gm__ uint8_t *tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pse, __gm__ uint8_t* dropMask,
+    __gm__ uint8_t* paddingMask, __gm__ uint8_t* attenMask, __gm__ uint8_t* prefix, __gm__ uint8_t* actualSeqLengths,
+    __gm__ uint8_t* actualSeqLengthsKv, __gm__ uint8_t* qStartIdx, __gm__ uint8_t* kvStartIdx,
+    __gm__ uint8_t* deqScaleQ, __gm__ uint8_t* deqScaleK, __gm__ uint8_t* deqScaleV, __gm__ uint8_t* queryRope,
+    __gm__ uint8_t* keyRope, __gm__ uint8_t* sink, __gm__ uint8_t* pScale, __gm__ uint8_t* softmaxMax,
+    __gm__ uint8_t* softmaxSum, __gm__ uint8_t* softmaxOut, __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
+    __gm__ uint8_t* tiling)
 {
     REGISTER_TILING_DEFAULT(optiling::FlashAttentionScoreSimplifiedTilingData);
     if constexpr (KernelTypeKey == 1) {
@@ -43,7 +43,7 @@ __global__ __aicore__ void flash_attention_score(
         REGISTER_TILING_FOR_TILINGKEY("(TILING_KEY_VAR & 0x1)",
                                       optiling::FlashAttentionScoreEmptyInputTilingDataRegbase);
         GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreEmptyInputTilingDataRegbase, tiling_data_in, tiling);
-        const FlashAttentionScoreEmptyInputTilingDataRegbase *__restrict tiling_data = &tiling_data_in;
+        const FlashAttentionScoreEmptyInputTilingDataRegbase* __restrict tiling_data = &tiling_data_in;
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16)
         FlashAttentionScoreEmptyTensorRegbase<half> op;
         op.Init(softmaxMax, softmaxSum, attentionOut, tiling_data);

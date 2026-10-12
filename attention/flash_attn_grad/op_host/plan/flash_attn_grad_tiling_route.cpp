@@ -32,17 +32,17 @@ constexpr int64_t BN2_ALIGN128 = 128;
 
 // ===== 能力谓词 =============================================================
 // 共同前提：BN2 系列模板本轮都不接 TND、不接 GQA、不接 D>128。
-bool Bn2FamilyFeasible(const FagParsedInfo &p)
+bool Bn2FamilyFeasible(const FagParsedInfo& p)
 {
     return !p.isTnd && p.n1 == p.n2 && p.d <= BN2_MAX_D;
 }
 
-bool Feasible_Bn2Single(const FagParsedInfo &p)
+bool Feasible_Bn2Single(const FagParsedInfo& p)
 {
     return Bn2FamilyFeasible(p) && p.s1 <= BN2_MAX_S && p.s2 <= BN2_MAX_S;
 }
 
-bool Feasible_Bn2MultiBlk(const FagParsedInfo &p)
+bool Feasible_Bn2MultiBlk(const FagParsedInfo& p)
 {
     // S 落在 (128, 640] 且 D==Dv：这些都是 MultiBlk kernel 的实现前提。
     // mask 3/4 也可以走 MultiBlk；无效行/列由 bn2NeedZero 另开一份二进制。
@@ -51,24 +51,24 @@ bool Feasible_Bn2MultiBlk(const FagParsedInfo &p)
 }
 
 // D5：BN2S2 是保留位，本轮不实现不编译，host 永不产生 template=3。
-bool Feasible_Never(const FagParsedInfo &)
+bool Feasible_Never(const FagParsedInfo&)
 {
     return false;
 }
 
-bool Feasible_Always(const FagParsedInfo &)
+bool Feasible_Always(const FagParsedInfo&)
 {
     return true;
 }
 
 // ===== 偏好谓词 =============================================================
-bool Prefer_Always(const FagParsedInfo &)
+bool Prefer_Always(const FagParsedInfo&)
 {
     return true;
 }
 
 // BN 够大时 MultiBlk 才划算：BN>=256，或 BN>=128 且 S1/S2 都按 128 对齐。
-bool Prefer_Bn2BnGate(const FagParsedInfo &p)
+bool Prefer_Bn2BnGate(const FagParsedInfo& p)
 {
     const int64_t bn = p.b * p.n1;
     return (bn >= BN2_MULTIBLK_BN_256) ||
@@ -79,12 +79,12 @@ bool Prefer_Bn2BnGate(const FagParsedInfo &p)
 // 顺序即性能优先级，越靠前越希望命中；末行必须恒可行，保证一定选得出来。
 // 新增 kernel 模板 = 加一行；实测结论变化 = 调顺序或改 prefer。
 struct FagRoute {
-    const char *name;
+    const char* name;
     int64_t tmpl;
     int64_t isBn2MultiBlk;
-    bool (*feasible)(const FagParsedInfo &);
-    bool (*prefer)(const FagParsedInfo &);
-    const char *calibration; // 该行偏好门限的依据出处
+    bool (*feasible)(const FagParsedInfo&);
+    bool (*prefer)(const FagParsedInfo&);
+    const char* calibration; // 该行偏好门限的依据出处
 };
 
 constexpr FagRoute kRoutes[] = {
@@ -105,7 +105,7 @@ static_assert(kRouteNum <= FAG_TRACE_SLOT_NUM, "trace slots must cover all route
 // 慢：L0C 会要 288KB，超出 256KB 预算，物理上放不下。
 // Dv 只决定已分配 tile 里填多少列，是纯运行期数值，不占 tilingkey；但 y/dy/prod/tmp
 // 四块 UB 的宽度由 Dv 派生，故仍需一个分配档次。
-ge::graphStatus SelectDBucket(gert::TilingContext *context, const FagParsedInfo &p, FagKernelPlan &plan)
+ge::graphStatus SelectDBucket(gert::TilingContext* context, const FagParsedInfo& p, FagKernelPlan& plan)
 {
     OP_CHECK_IF(p.d > MAX_HEAD_DIM,
                 OP_LOGE(context->GetNodeName(), "head dim of q (%ld) is not supported; only D <= %ld is implemented.",
@@ -124,12 +124,12 @@ ge::graphStatus SelectDBucket(gert::TilingContext *context, const FagParsedInfo 
 
 } // namespace
 
-ge::graphStatus SelectKernelPlan(gert::TilingContext *context, const FagParsedInfo &info, FagKernelPlan &plan,
-                                 FagRouteTrace &trace)
+ge::graphStatus SelectKernelPlan(gert::TilingContext* context, const FagParsedInfo& info, FagKernelPlan& plan,
+                                 FagRouteTrace& trace)
 {
     bool matched = false;
     for (size_t i = 0; i < kRouteNum; ++i) {
-        const FagRoute &route = kRoutes[i];
+        const FagRoute& route = kRoutes[i];
         if (!route.feasible(info)) {
             trace.Reject(route.name, "capability");
             continue;

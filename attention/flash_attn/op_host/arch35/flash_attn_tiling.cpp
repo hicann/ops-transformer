@@ -32,9 +32,9 @@ namespace optiling {
 namespace flash_attn {
 constexpr uint64_t PRE_LOAD_NUM_GQA_ARCH35 = 3;
 
-void FlashAttnTilingImpl::InitTilingInfo(TilingInfo *tilingInfo)
+void FlashAttnTilingImpl::InitTilingInfo(TilingInfo* tilingInfo)
 {
-    faInfo_ = static_cast<FaTilingInfo *>(tilingInfo);
+    faInfo_ = static_cast<FaTilingInfo*>(tilingInfo);
 }
 
 bool FlashAttnTilingImpl::IsCapable()
@@ -95,8 +95,8 @@ ge::graphStatus FlashAttnTilingImpl::SetPlatMemoryInfo()
 
 void FlashAttnTilingImpl::InitImplParam()
 {
-    const gert::Tensor *cuSeqLenQ = faInfo_->opParamInfo.cuSeqlensQ.tensor;
-    const gert::Tensor *cuSeqLenKV = faInfo_->opParamInfo.cuSeqlensKv.tensor;
+    const gert::Tensor* cuSeqLenQ = faInfo_->opParamInfo.cuSeqlensQ.tensor;
+    const gert::Tensor* cuSeqLenKV = faInfo_->opParamInfo.cuSeqlensKv.tensor;
     uint32_t cuSeqLenQDims = 0;
     uint32_t cuSeqLenKVDims = 0;
     cuSeqLenQDims = (cuSeqLenQ != nullptr) ? cuSeqLenQ->GetShapeSize() : 0;
@@ -104,8 +104,8 @@ void FlashAttnTilingImpl::InitImplParam()
     cuSeqLenQFlag_ = !((cuSeqLenQDims == 0) || (cuSeqLenQ == nullptr));
     cuSeqLenKVFlag_ = !((cuSeqLenKVDims == 0) || (cuSeqLenKV == nullptr));
 
-    const gert::Tensor *seqUsedQ = faInfo_->opParamInfo.sequsedQ.tensor;
-    const gert::Tensor *seqUsedKv = faInfo_->opParamInfo.sequsedKv.tensor;
+    const gert::Tensor* seqUsedQ = faInfo_->opParamInfo.sequsedQ.tensor;
+    const gert::Tensor* seqUsedKv = faInfo_->opParamInfo.sequsedKv.tensor;
     uint32_t seqUsedQDims = (seqUsedQ != nullptr) ? seqUsedQ->GetShapeSize() : 0;
     uint32_t seqUsedKvDims = (seqUsedKv != nullptr) ? seqUsedKv->GetShapeSize() : 0;
     seqUsedQFlag_ = !((seqUsedQDims == 0) || (seqUsedQ == nullptr));
@@ -410,9 +410,9 @@ bool FlashAttnTilingImpl::CheckNeedInitOutput() const
     return false;
 }
 
-ge::graphStatus FlashAttnTilingImpl::SetTilingData(FlashAttnTilingData &tilingData)
+ge::graphStatus FlashAttnTilingImpl::SetTilingData(FlashAttnTilingData& tilingData)
 {
-    FlashAttnTilingData *tiling = context_->GetTilingData<FlashAttnTilingData>();
+    FlashAttnTilingData* tiling = context_->GetTilingData<FlashAttnTilingData>();
     OP_CHECK_IF(tiling == nullptr, OP_LOGE(faInfo_->opName, "The tiling data is nullptr"), return ge::GRAPH_FAILED);
     *tiling = tilingData;
     return ge::GRAPH_SUCCESS;
@@ -420,12 +420,12 @@ ge::graphStatus FlashAttnTilingImpl::SetTilingData(FlashAttnTilingData &tilingDa
 
 void FlashAttnTilingImpl::PrintAllTilingData()
 {
-    FlashAttnNoQuantTilingArch35 &baseTiling = tilingData_.baseTiling;
-    FlashAttnBaseParams &flashAttnBaseParams = baseTiling.flashAttnBaseParams;
-    FlashAttnAttenMaskParams &flashAttnAttenMaskParams = baseTiling.flashAttnAttenMaskParams;
-    FlashAttnPageAttentionParams &flashAttnPageAttentionParams = baseTiling.flashAttnPageAttentionParams;
-    FlashAttnWorkspaceParams &flashAttnWorkspaceParams = baseTiling.flashAttnWorkspaceParams;
-    FlashAttnS1OuterSplitCoreParams &flashAttnS1OuterSplitCoreParams = baseTiling.flashAttnS1OuterSplitCoreParams;
+    FlashAttnNoQuantTilingArch35& baseTiling = tilingData_.baseTiling;
+    FlashAttnBaseParams& flashAttnBaseParams = baseTiling.flashAttnBaseParams;
+    FlashAttnAttenMaskParams& flashAttnAttenMaskParams = baseTiling.flashAttnAttenMaskParams;
+    FlashAttnPageAttentionParams& flashAttnPageAttentionParams = baseTiling.flashAttnPageAttentionParams;
+    FlashAttnWorkspaceParams& flashAttnWorkspaceParams = baseTiling.flashAttnWorkspaceParams;
+    FlashAttnS1OuterSplitCoreParams& flashAttnS1OuterSplitCoreParams = baseTiling.flashAttnS1OuterSplitCoreParams;
 
     OP_LOGD(faInfo_->opName, "bSize:%d", flashAttnBaseParams.bSize);
     OP_LOGD(faInfo_->opName, "t1Size:%d", flashAttnBaseParams.t1Size);

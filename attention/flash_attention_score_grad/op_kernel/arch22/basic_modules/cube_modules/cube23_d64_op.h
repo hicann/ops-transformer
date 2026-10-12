@@ -20,20 +20,20 @@
 // MTE1->MTE2 eventId flag begin from 0
 template <typename TYPE>
 __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube23Compute(
-    const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__ TYPE *right1, __gm__ TYPE *right2, __gm__ float *out1,
-    __gm__ float *out2)
+    const AddrInfo& shapeInfo, __gm__ TYPE* left, __gm__ TYPE* right1, __gm__ TYPE* right2, __gm__ float* out1,
+    __gm__ float* out2)
 {
-    __gm__ TYPE *gm_matrixA = left + (shapeInfo.out + globalBlockOffset) * 2;
-    __gm__ TYPE *gm_matrixB1 = right1 + shapeInfo.right;
-    __gm__ float *gm_matrixC1 = out1 + shapeInfo.left;
-    __gm__ TYPE *gm_matrixB2 = right2 + shapeInfo.left;
-    __gm__ float *gm_matrixC2 = out2 + shapeInfo.right;
+    __gm__ TYPE* gm_matrixA = left + (shapeInfo.out + globalBlockOffset) * 2;
+    __gm__ TYPE* gm_matrixB1 = right1 + shapeInfo.right;
+    __gm__ float* gm_matrixC1 = out1 + shapeInfo.left;
+    __gm__ TYPE* gm_matrixB2 = right2 + shapeInfo.left;
+    __gm__ float* gm_matrixC2 = out2 + shapeInfo.right;
 
-    uint64_t matrixA_offset = gm_matrixA - (__gm__ TYPE *)0;
-    uint64_t matrixB1_offset = gm_matrixB1 - (__gm__ TYPE *)0;
-    uint64_t matrixC1_offset = gm_matrixC1 - (__gm__ float *)0;
-    uint64_t matrixB2_offset = gm_matrixB2 - (__gm__ TYPE *)0;
-    uint64_t matrixC2_offset = gm_matrixC2 - (__gm__ float *)0;
+    uint64_t matrixA_offset = gm_matrixA - (__gm__ TYPE*)0;
+    uint64_t matrixB1_offset = gm_matrixB1 - (__gm__ TYPE*)0;
+    uint64_t matrixC1_offset = gm_matrixC1 - (__gm__ float*)0;
+    uint64_t matrixB2_offset = gm_matrixB2 - (__gm__ TYPE*)0;
+    uint64_t matrixC2_offset = gm_matrixC2 - (__gm__ float*)0;
 
     // pingpong happen between dQ and dK
 
@@ -85,7 +85,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube23Comput
         // load full matrixB2 from gm -> L1 ahead
         // assume l1_b2_buf_tensor stores the whole matrixB2
         WAIT_FLAG(MTE1, MTE2, L1B2_matrix_pingpong_flag + L1B2_FLAG_SHIFT);
-        LocalTensor<TYPE> *l1_b2_buf_tensor = L1B2_matrix_pingpong_flag ? &l1_b2_pong_tensor : &l1_b2_ping_tensor;
+        LocalTensor<TYPE>* l1_b2_buf_tensor = L1B2_matrix_pingpong_flag ? &l1_b2_pong_tensor : &l1_b2_ping_tensor;
         commonNd2NzParams.nValue = km;
         commonNd2NzParams.dValue = headDim;
         commonNd2NzParams.dstNzC0Stride = km_align;
@@ -116,7 +116,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube23Comput
                 // load matrixA from gm -> L1
                 // dS in workspace is divided by two part in s1 axis
                 WAIT_FLAG(MTE1, MTE2, L1A_matrix_pingpong_flag + L1A_FLAG_SHIFT);
-                AscendC::LocalTensor<TYPE> *l1_a_buf_tensor =
+                AscendC::LocalTensor<TYPE>* l1_a_buf_tensor =
                     L1A_matrix_pingpong_flag ? &l1_a_pong_tensor : &l1_a_ping_tensor;
                 int32_t s1_block_up = (s1_block_length + 1) / 2;
                 int32_t s1_block_down = s1_block_length - s1_block_up;
@@ -141,7 +141,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube23Comput
 
                 // load matrixB1 from gm -> L1
                 WAIT_FLAG(MTE1, MTE2, L1B1_matrix_pingpong_flag + L1B1_FLAG_SHIFT);
-                LocalTensor<TYPE> *l1_b1_buf_tensor =
+                LocalTensor<TYPE>* l1_b1_buf_tensor =
                     L1B1_matrix_pingpong_flag ? &l1_b1_pong_tensor : &l1_b1_ping_tensor;
                 commonNd2NzParams.nValue = s2_block_length;
                 commonNd2NzParams.dValue = headDim;
@@ -179,7 +179,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube23Comput
                 // (s1_block_length, s2_block_length) X (s2_block_length, headDim)
                 WAIT_FLAG(MTE1, M, L0A_matrix_ping_flag);
                 WAIT_FLAG(MTE1, M, L0B_matrix_ping_flag);
-                AscendC::LocalTensor<float> *l0_c1_buf_tensor =
+                AscendC::LocalTensor<float>* l0_c1_buf_tensor =
                     L0C_matrixC1_pingpong_flag ? &l0_c1_pong_tensor : &l0_c1_ping_tensor;
                 uint16_t s1_modify = (s1_block_length == 1) ? 2 : s1_block_length;
                 bool l0_c1_init_flag = (s2_idx == 0);
@@ -242,7 +242,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube23Comput
                 // (s2_block_length, s1_block_length) X (s1_block_length, headDim)
                 WAIT_FLAG(MTE1, M, L0A_matrix_pong_flag);
                 WAIT_FLAG(MTE1, M, L0B_matrix_pong_flag);
-                AscendC::LocalTensor<float> *l0_c2_buf_tensor =
+                AscendC::LocalTensor<float>* l0_c2_buf_tensor =
                     L0C_matrixC2_pingpong_flag ? &l0_c2_pong_tensor : &l0_c2_ping_tensor;
                 uint16_t s2_modify = (s2_block_length == 1) ? 2 : s2_block_length;
                 bool l0_c2_init_flag = (s1_idx == 0);

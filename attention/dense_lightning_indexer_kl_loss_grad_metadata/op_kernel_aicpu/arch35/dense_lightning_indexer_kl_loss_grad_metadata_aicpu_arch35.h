@@ -53,10 +53,10 @@ class DenseLightningIndexerKLLossGradMetadataCpuKernelArch35 : public CpuKernel 
 public:
     DenseLightningIndexerKLLossGradMetadataCpuKernelArch35() = default;
     ~DenseLightningIndexerKLLossGradMetadataCpuKernelArch35() override = default;
-    uint32_t Compute(CpuKernelContext &ctx) override;
+    uint32_t Compute(CpuKernelContext& ctx) override;
 
 private:
-    bool Prepare(CpuKernelContext &ctx);
+    bool Prepare(CpuKernelContext& ctx);
     int32_t GetQueryBatchSize();
     bool ParamsInit();
     bool ParamsCheck();
@@ -67,13 +67,13 @@ private:
     uint32_t GetS2SeqSize(uint32_t bIdx);
     void CalcSplitInfo();
 
-    CpuKernelContext *context_ = nullptr;
-    Tensor *cuSeqlensQ_ = nullptr;
-    Tensor *cuSeqlensK_ = nullptr;
-    Tensor *sequsedQ_ = nullptr;
-    Tensor *sequsedK_ = nullptr;
-    Tensor *cmpResidualK_ = nullptr;
-    Tensor *metadata_ = nullptr;
+    CpuKernelContext* context_ = nullptr;
+    Tensor* cuSeqlensQ_ = nullptr;
+    Tensor* cuSeqlensK_ = nullptr;
+    Tensor* sequsedQ_ = nullptr;
+    Tensor* sequsedK_ = nullptr;
+    Tensor* cmpResidualK_ = nullptr;
+    Tensor* metadata_ = nullptr;
 
     std::string socVersion_ = "";
     bool supportFd_ = false;
@@ -111,7 +111,7 @@ private:
     };
 };
 
-inline uint32_t DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::Compute(CpuKernelContext &ctx)
+inline uint32_t DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::Compute(CpuKernelContext& ctx)
 {
     bool success = Prepare(ctx);
     if (!success) {
@@ -121,7 +121,7 @@ inline uint32_t DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::Compute(
     return success ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
 }
 
-inline bool DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::Prepare(CpuKernelContext &ctx)
+inline bool DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::Prepare(CpuKernelContext& ctx)
 {
     cuSeqlensQ_ = ctx.Input(static_cast<uint32_t>(ParamId::actSeqLenQ));
     cuSeqlensK_ = ctx.Input(static_cast<uint32_t>(ParamId::actSeqLenK));
@@ -161,7 +161,7 @@ inline bool DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck(
     int32_t batchSize = GetQueryBatchSize();
     if (layoutQ_ == "TND") {
         if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
-            const int32_t *cuSeqlensQPtr = static_cast<const int32_t *>(cuSeqlensQ_->GetData());
+            const int32_t* cuSeqlensQPtr = static_cast<const int32_t*>(cuSeqlensQ_->GetData());
             for (int i = 0; i < batchSize + 1; i++) {
                 if (cuSeqlensQPtr[i] < 0) {
                     KERNEL_LOG_ERROR("The elements in cu_seqlens_q should be >= 0, but got cu_seqlens_q[%d] = %d", i,
@@ -179,7 +179,7 @@ inline bool DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck(
     }
     if (layoutK_ == "TND") {
         if (cuSeqlensK_ != nullptr && cuSeqlensK_->GetData() != nullptr) {
-            const int32_t *cuSeqlensKPtr = static_cast<const int32_t *>(cuSeqlensK_->GetData());
+            const int32_t* cuSeqlensKPtr = static_cast<const int32_t*>(cuSeqlensK_->GetData());
             for (int i = 0; i < batchSize + 1; i++) {
                 if (cuSeqlensKPtr[i] < 0) {
                     KERNEL_LOG_ERROR("The elements in cu_seqlens_k should be >= 0, but got cu_seqlens_k[%d] = %d", i,
@@ -196,7 +196,7 @@ inline bool DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck(
         }
     }
     if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
-        const int32_t *sequsedQPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
+        const int32_t* sequsedQPtr = static_cast<const int32_t*>(sequsedQ_->GetData());
         for (int i = 0; i < batchSize; i++) {
             if (sequsedQPtr[i] < 0) {
                 KERNEL_LOG_ERROR("The elements in seqused_q should be >= 0, but got seqused_q[%d] = %d", i,
@@ -206,7 +206,7 @@ inline bool DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck(
         }
     }
     if (sequsedK_ != nullptr && sequsedK_->GetData() != nullptr) {
-        const int32_t *sequsedKPtr = static_cast<const int32_t *>(sequsedK_->GetData());
+        const int32_t* sequsedKPtr = static_cast<const int32_t*>(sequsedK_->GetData());
         for (int i = 0; i < batchSize; i++) {
             if (sequsedKPtr[i] < 0) {
                 KERNEL_LOG_ERROR("The elements in seqused_k should be >= 0, but got seqused_k[%d] = %d", i,
@@ -216,7 +216,7 @@ inline bool DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck(
         }
     }
     if (cmpResidualK_ != nullptr && cmpResidualK_->GetData() != nullptr) {
-        const int32_t *cmpResidualKPtr = static_cast<const int32_t *>(cmpResidualK_->GetData());
+        const int32_t* cmpResidualKPtr = static_cast<const int32_t*>(cmpResidualK_->GetData());
         for (int i = 0; i < batchSize; i++) {
             if (cmpResidualKPtr[i] < 0) {
                 KERNEL_LOG_ERROR("The elements in cmp_residual_k should be >= 0, but got cmp_residual_k[%d] = %d", i,
@@ -279,12 +279,12 @@ inline bool DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsInit()
 inline uint32_t DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::GetS1SeqSize(uint32_t bIdx)
 {
     if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
-        const int32_t *seqUsedPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
+        const int32_t* seqUsedPtr = static_cast<const int32_t*>(sequsedQ_->GetData());
         return static_cast<uint32_t>(seqUsedPtr[bIdx]);
     }
     if (layoutQ_ == "TND") {
         if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
-            const int32_t *s1Ptr = static_cast<const int32_t *>(cuSeqlensQ_->GetData());
+            const int32_t* s1Ptr = static_cast<const int32_t*>(cuSeqlensQ_->GetData());
             return static_cast<uint32_t>(s1Ptr[bIdx + 1U] - s1Ptr[bIdx]);
         }
     }
@@ -294,12 +294,12 @@ inline uint32_t DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::GetS1Seq
 inline uint32_t DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::GetS2SeqSize(uint32_t bIdx)
 {
     if (sequsedK_ != nullptr && sequsedK_->GetData() != nullptr) {
-        const int32_t *seqUsedPtr = static_cast<const int32_t *>(sequsedK_->GetData());
+        const int32_t* seqUsedPtr = static_cast<const int32_t*>(sequsedK_->GetData());
         return static_cast<uint32_t>(seqUsedPtr[bIdx]);
     }
     if (layoutK_ == "TND") {
         if (cuSeqlensK_ != nullptr && cuSeqlensK_->GetData() != nullptr) {
-            const int32_t *s2Ptr = static_cast<const int32_t *>(cuSeqlensK_->GetData());
+            const int32_t* s2Ptr = static_cast<const int32_t*>(cuSeqlensK_->GetData());
             return static_cast<uint32_t>(s2Ptr[bIdx + 1U] - s2Ptr[bIdx]);
         }
     }
@@ -323,8 +323,8 @@ inline bool DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::BalanceSched
 
 inline bool DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::GenMetadata()
 {
-    optiling::detail::DlikgMetadata *gradMetadataPtr =
-        static_cast<optiling::detail::DlikgMetadata *>(metadata_->GetData());
+    optiling::detail::DlikgMetadata* gradMetadataPtr =
+        static_cast<optiling::detail::DlikgMetadata*>(metadata_->GetData());
     uint32_t formerCoreProcessNum = CeilDiv(totalNum, aicCoreNum_);
     uint32_t remainCoreProcessNum = formerCoreProcessNum - 1;
     uint32_t remainCoreNum = formerCoreProcessNum * aicCoreNum_ - totalNum;

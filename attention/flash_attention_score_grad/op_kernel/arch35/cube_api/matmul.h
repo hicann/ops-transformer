@@ -24,14 +24,14 @@ namespace fa_base_matmul {
 template <typename A, typename B, typename C, uint32_t baseM, uint32_t baseN, uint32_t baseK, ABLayout AL, ABLayout BL,
           typename AScaleType = fp8_e8m0_t, typename BScaleType = fp8_e8m0_t, typename L0ADType = A,
           typename L0BDType = B>
-__aicore__ inline void MatmulFullMutex(const LocalTensor<A> &aL1Tensor, const LocalTensor<B> &bL1Tensor,
-                                       MutexBuffersPolicyDB<BufferType::L0A, SyncType::INNER_CORE_SYNC> &aL0BuffsDb,
-                                       MutexBuffersPolicyDB<BufferType::L0B, SyncType::INNER_CORE_SYNC> &bL0BuffsDb,
-                                       const LocalTensor<C> &cL0Tensor, struct MMParam &param,
-                                       const LocalTensor<AScaleType> &aScaleL1Tensor = LocalTensor<AScaleType>(),
-                                       const LocalTensor<BScaleType> &bScaleL1Tensor = LocalTensor<AScaleType>())
+__aicore__ inline void MatmulFullMutex(const LocalTensor<A>& aL1Tensor, const LocalTensor<B>& bL1Tensor,
+                                       MutexBuffersPolicyDB<BufferType::L0A, SyncType::INNER_CORE_SYNC>& aL0BuffsDb,
+                                       MutexBuffersPolicyDB<BufferType::L0B, SyncType::INNER_CORE_SYNC>& bL0BuffsDb,
+                                       const LocalTensor<C>& cL0Tensor, struct MMParam& param,
+                                       const LocalTensor<AScaleType>& aScaleL1Tensor = LocalTensor<AScaleType>(),
+                                       const LocalTensor<BScaleType>& bScaleL1Tensor = LocalTensor<AScaleType>())
 {
-    auto &l0aBuffer = aL0BuffsDb.Get();
+    auto& l0aBuffer = aL0BuffsDb.Get();
     l0aBuffer.LockProd();
     LocalTensor<L0ADType> L0ATensor = l0aBuffer.template GetTensor<L0ADType>();
 #if ((__CCE_AICORE__ == 310) || (defined __DAV_310R6__) || (__NPU_ARCH__ == 5102))
@@ -44,7 +44,7 @@ __aicore__ inline void MatmulFullMutex(const LocalTensor<A> &aL1Tensor, const Lo
     }
     l0aBuffer.UnlockProd();
 
-    auto &l0bBuffer = bL0BuffsDb.Get();
+    auto& l0bBuffer = bL0BuffsDb.Get();
     l0bBuffer.LockProd();
     LocalTensor<L0BDType> L0BTensor = l0bBuffer.template GetTensor<L0BDType>();
 #if (__CCE_AICORE__ == 310) || (defined __DAV_310R6__)
@@ -84,12 +84,12 @@ __aicore__ inline void MatmulFullMutex(const LocalTensor<A> &aL1Tensor, const Lo
 template <typename A, typename B, typename C, uint32_t baseM, uint32_t baseN, uint32_t baseK, ABLayout AL, ABLayout BL,
           typename AScaleType = fp8_e8m0_t, typename BScaleType = fp8_e8m0_t, typename L0ADType = A,
           typename L0BDType = B>
-__aicore__ inline void MatmulKMutex(const LocalTensor<A> &aL1Tensor, const LocalTensor<B> &bL1Tensor,
-                                    MutexBuffersPolicyDB<BufferType::L0A, SyncType::INNER_CORE_SYNC> &aL0BuffsDb,
-                                    MutexBuffersPolicyDB<BufferType::L0B, SyncType::INNER_CORE_SYNC> &bL0BuffsDb,
-                                    const LocalTensor<C> &cL0Tensor, const MMParam &param,
-                                    const LocalTensor<AScaleType> &aScaleL1Tensor = LocalTensor<AScaleType>(),
-                                    const LocalTensor<BScaleType> &bScaleL1Tensor = LocalTensor<AScaleType>())
+__aicore__ inline void MatmulKMutex(const LocalTensor<A>& aL1Tensor, const LocalTensor<B>& bL1Tensor,
+                                    MutexBuffersPolicyDB<BufferType::L0A, SyncType::INNER_CORE_SYNC>& aL0BuffsDb,
+                                    MutexBuffersPolicyDB<BufferType::L0B, SyncType::INNER_CORE_SYNC>& bL0BuffsDb,
+                                    const LocalTensor<C>& cL0Tensor, const MMParam& param,
+                                    const LocalTensor<AScaleType>& aScaleL1Tensor = LocalTensor<AScaleType>(),
+                                    const LocalTensor<BScaleType>& bScaleL1Tensor = LocalTensor<AScaleType>())
 {
     uint32_t kLoops = (param.singleK + baseK - 1) / baseK;
     uint32_t tailSize = param.singleK % baseK;
@@ -110,7 +110,7 @@ __aicore__ inline void MatmulKMutex(const LocalTensor<A> &aL1Tensor, const Local
 
     for (uint32_t k = 0; k < kLoops; k++) {
         uint32_t tileK = (k == (kLoops - 1)) ? tailK : baseK;
-        auto &l0aBuffer = aL0BuffsDb.Get();
+        auto& l0aBuffer = aL0BuffsDb.Get();
         l0aBuffer.LockProd();
         LocalTensor<L0ADType> L0ATensor = l0aBuffer.template GetTensor<L0ADType>();
 #if (__CCE_AICORE__ == 310) || (defined __DAV_310R6__)
@@ -124,7 +124,7 @@ __aicore__ inline void MatmulKMutex(const LocalTensor<A> &aL1Tensor, const Local
         }
         l0aBuffer.UnlockProd();
 
-        auto &l0bBuffer = bL0BuffsDb.Get();
+        auto& l0bBuffer = bL0BuffsDb.Get();
         l0bBuffer.LockProd();
         LocalTensor<L0BDType> L0BTensor = l0bBuffer.template GetTensor<L0BDType>();
         uint64_t loopNum = param.isRightTranspose ? 1 : kLoops;
@@ -170,12 +170,12 @@ __aicore__ inline void MatmulKMutex(const LocalTensor<A> &aL1Tensor, const Local
 template <typename A, typename B, typename C, uint32_t baseM, uint32_t baseN, uint32_t baseK, ABLayout AL, ABLayout BL,
           typename AScaleType = fp8_e8m0_t, typename BScaleType = fp8_e8m0_t, typename L0ADType = A,
           typename L0BDType = B>
-__aicore__ inline void MatmulNMutex(const LocalTensor<A> &aL1Tensor, const LocalTensor<B> &bL1Tensor,
-                                    MutexBuffersPolicyDB<BufferType::L0A, SyncType::INNER_CORE_SYNC> &aL0BuffsDb,
-                                    MutexBuffersPolicyDB<BufferType::L0B, SyncType::INNER_CORE_SYNC> &bL0BuffsDb,
-                                    const LocalTensor<C> &cL0Tensor, const MMParam &param,
-                                    const LocalTensor<AScaleType> &aScaleL1Tensor = LocalTensor<AScaleType>(),
-                                    const LocalTensor<BScaleType> &bScaleL1Tensor = LocalTensor<AScaleType>())
+__aicore__ inline void MatmulNMutex(const LocalTensor<A>& aL1Tensor, const LocalTensor<B>& bL1Tensor,
+                                    MutexBuffersPolicyDB<BufferType::L0A, SyncType::INNER_CORE_SYNC>& aL0BuffsDb,
+                                    MutexBuffersPolicyDB<BufferType::L0B, SyncType::INNER_CORE_SYNC>& bL0BuffsDb,
+                                    const LocalTensor<C>& cL0Tensor, const MMParam& param,
+                                    const LocalTensor<AScaleType>& aScaleL1Tensor = LocalTensor<AScaleType>(),
+                                    const LocalTensor<BScaleType>& bScaleL1Tensor = LocalTensor<AScaleType>())
 {
     uint32_t nLoops = (param.singleN + baseN - 1) / baseN;
     uint32_t tailSize = param.singleN % baseN;
@@ -192,7 +192,7 @@ __aicore__ inline void MatmulNMutex(const LocalTensor<A> &aL1Tensor, const Local
         L0Coffset = ((param.realM + 15) >> 4 << 4) * baseN;
     }
 
-    auto &l0aBuffer = aL0BuffsDb.Get();
+    auto& l0aBuffer = aL0BuffsDb.Get();
     l0aBuffer.LockProd();
     LocalTensor<L0ADType> L0ATensor = l0aBuffer.template GetTensor<L0ADType>();
 #if (__CCE_AICORE__ == 310) || (defined __DAV_310R6__)
@@ -213,7 +213,7 @@ __aicore__ inline void MatmulNMutex(const LocalTensor<A> &aL1Tensor, const Local
     for (uint32_t n = 0; n < nLoops; n++) {
         uint32_t tileN = (n == (nLoops - 1)) ? tailN : baseN;
 
-        auto &l0bBuffer = bL0BuffsDb.Get();
+        auto& l0bBuffer = bL0BuffsDb.Get();
         l0bBuffer.LockProd();
         LocalTensor<L0BDType> L0BTensor = l0bBuffer.template GetTensor<L0BDType>();
         uint64_t loopNum = param.isRightTranspose ? nLoops : 1;

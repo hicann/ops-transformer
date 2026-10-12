@@ -32,9 +32,9 @@ struct TileRowBroadcastMul {
 
     __aicore__ inline TileRowBroadcastMul() {}
 
-    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const &ubOut,
-                                      AscendC::LocalTensor<ElementCompute> const &ubIn0,
-                                      AscendC::LocalTensor<ElementCompute> const &ubIn1)
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const& ubOut,
+                                      AscendC::LocalTensor<ElementCompute> const& ubIn0,
+                                      AscendC::LocalTensor<ElementCompute> const& ubIn1)
     {
         constexpr uint32_t maxRepeatTimes = 255;
         constexpr uint32_t eleNumPerBlk =
@@ -79,9 +79,9 @@ struct TileOneBlkColumnBroadcastMul {
 
     __aicore__ inline TileOneBlkColumnBroadcastMul() {}
 
-    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const &ubOut,
-                                      AscendC::LocalTensor<ElementCompute> const &ubIn0,
-                                      AscendC::LocalTensor<ElementCompute> const &ubIn1)
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const& ubOut,
+                                      AscendC::LocalTensor<ElementCompute> const& ubIn0,
+                                      AscendC::LocalTensor<ElementCompute> const& ubIn1)
     {
         constexpr uint32_t maxRepeatNum = 255;
         constexpr uint32_t eleNumPerBlk =

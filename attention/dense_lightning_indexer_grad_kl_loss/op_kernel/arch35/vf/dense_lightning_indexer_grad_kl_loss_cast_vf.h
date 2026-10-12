@@ -31,7 +31,7 @@ constexpr static CastTrait CAST_FP32_TO_B16 = {
 constexpr uint32_t FP32_REG_ELEMENTS = 64;
 
 template <typename OUT_T>
-__simd_vf__ inline void CastFp32ToOutVF(__ubuf__ OUT_T *dstUb, __ubuf__ float *srcUb, uint32_t count)
+__simd_vf__ inline void CastFp32ToOutVF(__ubuf__ OUT_T* dstUb, __ubuf__ float* srcUb, uint32_t count)
 {
     RegTensor<float> srcReg;
     RegTensor<OUT_T> dstReg;
@@ -50,11 +50,11 @@ __simd_vf__ inline void CastFp32ToOutVF(__ubuf__ OUT_T *dstUb, __ubuf__ float *s
 }
 
 template <typename OUT_T>
-__aicore__ inline void CastFp32ToOut(const LocalTensor<OUT_T> &dstTensor, const LocalTensor<float> &srcTensor,
+__aicore__ inline void CastFp32ToOut(const LocalTensor<OUT_T>& dstTensor, const LocalTensor<float>& srcTensor,
                                      uint32_t count)
 {
-    __ubuf__ OUT_T *dstUb = reinterpret_cast<__ubuf__ OUT_T *>(dstTensor.GetPhyAddr());
-    __ubuf__ float *srcUb = reinterpret_cast<__ubuf__ float *>(srcTensor.GetPhyAddr());
+    __ubuf__ OUT_T* dstUb = reinterpret_cast<__ubuf__ OUT_T*>(dstTensor.GetPhyAddr());
+    __ubuf__ float* srcUb = reinterpret_cast<__ubuf__ float*>(srcTensor.GetPhyAddr());
     CastFp32ToOutVF<OUT_T>(dstUb, srcUb, count);
 }
 } // namespace DenseDliGradKLLossArch35

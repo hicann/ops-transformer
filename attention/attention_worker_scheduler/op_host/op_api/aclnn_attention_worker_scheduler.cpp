@@ -29,50 +29,53 @@ using namespace op;
 extern "C" {
 #endif
 
-static aclnnStatus CheckParams(aclTensor* scheduleContextRef) {
-  OP_CHECK(
-    scheduleContextRef->GetViewShape().GetDimNum() == 1,
-    OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The input shape must be one-dimensional with the shape (1024), but got %s.",
-            op::ToString(scheduleContextRef->GetViewShape()).GetString()),
-            return ACLNN_ERR_PARAM_INVALID);
-  return ACLNN_SUCCESS;
+static aclnnStatus CheckParams(aclTensor* scheduleContextRef)
+{
+    OP_CHECK(
+        scheduleContextRef->GetViewShape().GetDimNum() == 1,
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The input shape must be one-dimensional with the shape (1024), but got %s.",
+                op::ToString(scheduleContextRef->GetViewShape()).GetString()),
+        return ACLNN_ERR_PARAM_INVALID);
+    return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnInplaceAttentionWorkerSchedulerGetWorkspaceSize(aclTensor *scheduleContextRef, uint64_t *workspaceSize,
-                                                                 aclOpExecutor **executor) {
-  L2_DFX_PHASE_1(aclnnInplaceAttentionWorkerScheduler, DFX_IN(scheduleContextRef), DFX_OUT());
-  // 固定写法，创建OpExecutor
-  auto uniqueExecutor = CREATE_EXECUTOR();
-  CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
+aclnnStatus aclnnInplaceAttentionWorkerSchedulerGetWorkspaceSize(aclTensor* scheduleContextRef, uint64_t* workspaceSize,
+                                                                 aclOpExecutor** executor)
+{
+    L2_DFX_PHASE_1(aclnnInplaceAttentionWorkerScheduler, DFX_IN(scheduleContextRef), DFX_OUT());
+    // 固定写法，创建OpExecutor
+    auto uniqueExecutor = CREATE_EXECUTOR();
+    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-  // 固定写法，参数检查
-  OP_CHECK_NULL(scheduleContextRef, return ACLNN_ERR_PARAM_NULLPTR);
+    // 固定写法，参数检查
+    OP_CHECK_NULL(scheduleContextRef, return ACLNN_ERR_PARAM_NULLPTR);
 
-  // 固定写法，参数检查
-  auto ret = CheckParams(scheduleContextRef);
-  CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    // 固定写法，参数检查
+    auto ret = CheckParams(scheduleContextRef);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-  // 空tensor处理
-  if (scheduleContextRef->IsEmpty()) {
-    OP_LOGE(ACLNN_ERR_PARAM_INVALID, "aclnnInplaceAttentionWorkerScheduler do not support empty tensor!");
-    return ACLNN_ERR_PARAM_INVALID;
-  }
+    // 空tensor处理
+    if (scheduleContextRef->IsEmpty()) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "aclnnInplaceAttentionWorkerScheduler do not support empty tensor!");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
 
-  auto output = l0op::AttentionWorkerScheduler(scheduleContextRef, scheduleContextRef, uniqueExecutor.get());
-  CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    auto output = l0op::AttentionWorkerScheduler(scheduleContextRef, scheduleContextRef, uniqueExecutor.get());
+    CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-  // 固定写法，获取计算过程中需要使用的workspace大小
-  *workspaceSize = uniqueExecutor->GetWorkspaceSize();
-  // 需要把 uniqueExecutor持有executor转移给executor
-  uniqueExecutor.ReleaseTo(executor);
-  return ACLNN_SUCCESS;
+    // 固定写法，获取计算过程中需要使用的workspace大小
+    *workspaceSize = uniqueExecutor->GetWorkspaceSize();
+    // 需要把 uniqueExecutor持有executor转移给executor
+    uniqueExecutor.ReleaseTo(executor);
+    return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnInplaceAttentionWorkerScheduler(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
-                                                 aclrtStream stream) {
-  L2_DFX_PHASE_2(aclnnInplaceAttentionWorkerScheduler);
-  // 固定写法，调用框架能力，完成计算
-  return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
+aclnnStatus aclnnInplaceAttentionWorkerScheduler(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                                 aclrtStream stream)
+{
+    L2_DFX_PHASE_2(aclnnInplaceAttentionWorkerScheduler);
+    // 固定写法，调用框架能力，完成计算
+    return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
 }
 #ifdef __cplusplus
 }

@@ -31,8 +31,8 @@ namespace optiling {
 // 必须注册在 Mask / Layout / Shape 之前，它们都依赖这里填好的字段。
 class FagAttrRangeChecker : public FagBaseChecker {
 public:
-    ge::graphStatus Check(FagCheckCtx &ctx) override;
-    const char *Name() const override
+    ge::graphStatus Check(FagCheckCtx& ctx) override;
+    const char* Name() const override
     {
         return "AttrRange";
     }
@@ -41,8 +41,8 @@ public:
 // mask_mode 与 attn_mask 是否存在、win_left/win_right 取值必须自洽。
 class FagMaskChecker : public FagBaseChecker {
 public:
-    ge::graphStatus Check(FagCheckCtx &ctx) override;
-    const char *Name() const override
+    ge::graphStatus Check(FagCheckCtx& ctx) override;
+    const char* Name() const override
     {
         return "Mask";
     }
@@ -50,8 +50,8 @@ public:
 
 class FagLayoutChecker : public FagBaseChecker {
 public:
-    ge::graphStatus Check(FagCheckCtx &ctx) override;
-    const char *Name() const override
+    ge::graphStatus Check(FagCheckCtx& ctx) override;
+    const char* Name() const override
     {
         return "Layout";
     }

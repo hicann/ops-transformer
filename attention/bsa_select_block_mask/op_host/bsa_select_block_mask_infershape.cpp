@@ -37,11 +37,11 @@ static constexpr uint32_t TND_DIM_NUM = 3;
 static constexpr uint32_t BNSD_DIM_NUM = 4;
 
 // 校验 actual_seq_lengths(_kv) 的 shape 与常量数据合法性；
-static bool GetValidatedMaxSeqLen(const gert::Shape *lensShape, const gert::Tensor *lensTensor, int64_t totalTokens,
-                                  const char *inputName, int64_t &maxSeqLen)
+static bool GetValidatedMaxSeqLen(const gert::Shape* lensShape, const gert::Tensor* lensTensor, int64_t totalTokens,
+                                  const char* inputName, int64_t& maxSeqLen)
 {
     int64_t batchCnt = lensShape->GetShapeSize();
-    const int64_t *lensData = (lensTensor != nullptr) ? lensTensor->GetData<int64_t>() : nullptr;
+    const int64_t* lensData = (lensTensor != nullptr) ? lensTensor->GetData<int64_t>() : nullptr;
     if (lensData == nullptr) {
         OP_LOGE("BSASelectBlockMask", "TND layout requires const %s, but its data is not readable at compile time.",
                 inputName);
@@ -62,7 +62,7 @@ static bool GetValidatedMaxSeqLen(const gert::Shape *lensShape, const gert::Tens
     return true;
 }
 
-ge::graphStatus InferShapeBSASelectBlockMask(gert::InferShapeContext *context)
+ge::graphStatus InferShapeBSASelectBlockMask(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("BSASelectBlockMask", "context is nullptr!");
@@ -71,12 +71,12 @@ ge::graphStatus InferShapeBSASelectBlockMask(gert::InferShapeContext *context)
 
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeBSASelectBlockMask");
 
-    const gert::Shape *queryShape = context->GetInputShape(queryEnum);
+    const gert::Shape* queryShape = context->GetInputShape(queryEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(keyEnum);
+    const gert::Shape* keyShape = context->GetInputShape(keyEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
 
-    gert::Shape *maskShape = context->GetOutputShape(maskOutEnum);
+    gert::Shape* maskShape = context->GetOutputShape(maskOutEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, maskShape);
 
     auto attrs = context->GetAttrs();
@@ -130,12 +130,12 @@ ge::graphStatus InferShapeBSASelectBlockMask(gert::InferShapeContext *context)
         numHeads = queryShape->GetDim(1);
 
         // Q 侧：actual_seq_lengths 必传
-        const gert::Shape *seqLensQShape = context->GetInputShape(actualSeqLensQEnum);
+        const gert::Shape* seqLensQShape = context->GetInputShape(actualSeqLensQEnum);
         if (seqLensQShape == nullptr || seqLensQShape->GetDimNum() == 0) {
             OP_LOGE(context->GetNodeName(), "TND layout requires actual_seq_lengths, but it is not provided.");
             return ge::GRAPH_FAILED;
         }
-        const gert::Tensor *seqLensQTensor = context->GetInputTensor(actualSeqLensQEnum);
+        const gert::Tensor* seqLensQTensor = context->GetInputTensor(actualSeqLensQEnum);
         int64_t totalQTokens = queryShape->GetDim(0);
         int64_t maxQSeqLen = 0;
         if (!GetValidatedMaxSeqLen(seqLensQShape, seqLensQTensor, totalQTokens, "actual_seq_lengths", maxQSeqLen)) {
@@ -145,12 +145,12 @@ ge::graphStatus InferShapeBSASelectBlockMask(gert::InferShapeContext *context)
         sqLen = (maxQSeqLen > 0) ? maxQSeqLen : totalQTokens;
 
         // KV 侧：与 Q 校验思路一致，actual_seq_lengths_kv 同样必传
-        const gert::Shape *seqLensKvShape = context->GetInputShape(actualSeqLensKvEnum);
+        const gert::Shape* seqLensKvShape = context->GetInputShape(actualSeqLensKvEnum);
         if (seqLensKvShape == nullptr || seqLensKvShape->GetDimNum() == 0) {
             OP_LOGE(context->GetNodeName(), "TND layout requires actual_seq_lengths_kv, but it is not provided.");
             return ge::GRAPH_FAILED;
         }
-        const gert::Tensor *seqLensKvTensor = context->GetInputTensor(actualSeqLensKvEnum);
+        const gert::Tensor* seqLensKvTensor = context->GetInputTensor(actualSeqLensKvEnum);
         int64_t totalKvTokens = keyShape->GetDim(0);
         int64_t maxKvSeqLen = 0;
         if (!GetValidatedMaxSeqLen(seqLensKvShape, seqLensKvTensor, totalKvTokens, "actual_seq_lengths_kv",
@@ -169,11 +169,11 @@ ge::graphStatus InferShapeBSASelectBlockMask(gert::InferShapeContext *context)
     // 块尺寸默认 [128,128]（与 tiling 默认值一致）；block_shape 为 [2] 常量输入时从张量取值
     int64_t blockShapeX = 128;
     int64_t blockShapeY = 128;
-    const gert::Shape *blockShapeShape = context->GetInputShape(blockShapeEnum);
+    const gert::Shape* blockShapeShape = context->GetInputShape(blockShapeEnum);
     if (blockShapeShape != nullptr && blockShapeShape->GetDimNum() != 0) {
-        const gert::Tensor *blockShapeTensor = context->GetInputTensor(blockShapeEnum);
+        const gert::Tensor* blockShapeTensor = context->GetInputTensor(blockShapeEnum);
         if (blockShapeTensor != nullptr) {
-            const int64_t *blockShapeData = blockShapeTensor->GetData<int64_t>();
+            const int64_t* blockShapeData = blockShapeTensor->GetData<int64_t>();
             if (blockShapeData != nullptr && blockShapeData[0] > 0 && blockShapeData[1] > 0) {
                 blockShapeX = blockShapeData[0];
                 blockShapeY = blockShapeData[1];
@@ -185,11 +185,11 @@ ge::graphStatus InferShapeBSASelectBlockMask(gert::InferShapeContext *context)
     // [B,N,postXBlocks,postYBlocks]（二次 pooling 语义：TopK 在粗粒度分数上选择并直接输出）
     int64_t maskDimX = (sqLen + blockShapeX - 1) / blockShapeX;
     int64_t maskDimY = (skvLen + blockShapeY - 1) / blockShapeY;
-    const gert::Shape *postBlockShapeShape = context->GetInputShape(postBlockShapeEnum);
+    const gert::Shape* postBlockShapeShape = context->GetInputShape(postBlockShapeEnum);
     if (postBlockShapeShape != nullptr && postBlockShapeShape->GetDimNum() != 0) {
-        const gert::Tensor *postBlockShapeTensor = context->GetInputTensor(postBlockShapeEnum);
+        const gert::Tensor* postBlockShapeTensor = context->GetInputTensor(postBlockShapeEnum);
         if (postBlockShapeTensor != nullptr) {
-            const int64_t *postData = postBlockShapeTensor->GetData<int64_t>();
+            const int64_t* postData = postBlockShapeTensor->GetData<int64_t>();
             if (postData != nullptr && postData[0] > 0 && postData[1] > 0) {
                 maskDimX = (maskDimX + postData[0] - 1) / postData[0];
                 maskDimY = (maskDimY + postData[1] - 1) / postData[1];
@@ -207,7 +207,7 @@ ge::graphStatus InferShapeBSASelectBlockMask(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeBSASelectBlockMask(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeBSASelectBlockMask(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("BSASelectBlockMask", "context is nullptr!");

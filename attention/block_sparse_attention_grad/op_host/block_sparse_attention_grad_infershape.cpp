@@ -47,48 +47,46 @@ static constexpr uint32_t BNSD_DIM_D = 3;
 
 static constexpr int32_t UNKNOWN_DIMS = -2;
 
-static ge::graphStatus InferShapeBlockSparseAttentionGrad(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeBlockSparseAttentionGrad(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("BlockSparseAttentionGrad", "context is nullptr!");
         return ge::GRAPH_FAILED;
     }
-    
+
     OP_LOGD(context->GetNodeName(), "Enter BlockSparseAttentionGrad InferShape impl.");
-    
+
     // 获取Query shape
-    const gert::Shape *queryShape = context->GetInputShape(QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    
+
     // 获取Key shape
-    const gert::Shape *keyShape = context->GetInputShape(KEY_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    
+
     // 获取Value shape
-    const gert::Shape *valueShape = context->GetInputShape(VALUE_INDEX);
+    const gert::Shape* valueShape = context->GetInputShape(VALUE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
-    
+
     // 获取输出shape
-    gert::Shape *dqOutShape = context->GetOutputShape(DQ_OUT_INDEX);
+    gert::Shape* dqOutShape = context->GetOutputShape(DQ_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, dqOutShape);
-    
-    gert::Shape *dkOutShape = context->GetOutputShape(DK_OUT_INDEX);
+
+    gert::Shape* dkOutShape = context->GetOutputShape(DK_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, dkOutShape);
-    
-    gert::Shape *dvOutShape = context->GetOutputShape(DV_OUT_INDEX);
+
+    gert::Shape* dvOutShape = context->GetOutputShape(DV_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, dvOutShape);
-    
+
     // 设置AttentionGradOut shape
     *dqOutShape = *queryShape;
     *dkOutShape = *keyShape;
     *dvOutShape = *valueShape;
-    
+
     OP_LOGD(context->GetNodeName(), "BlockSparseAttentionGrad InferShape success.");
     return ge::GRAPH_SUCCESS;
 }
 
-IMPL_OP_INFERSHAPE(BlockSparseAttentionGrad)
-    .InferShape(InferShapeBlockSparseAttentionGrad);
+IMPL_OP_INFERSHAPE(BlockSparseAttentionGrad).InferShape(InferShapeBlockSparseAttentionGrad);
 
-}  // namespace ops
-
+} // namespace ops

@@ -279,7 +279,6 @@ TEST_F(FusedCausalConv1dCutBHTiling, bh_2d_apc_hasNAT_fp16_b6_s48_d768)
                     {});
 }
 
-
 // ---- BH 2D: conv_mode=1 + numComputed ----
 
 TEST_F(FusedCausalConv1dCutBHTiling, bh_2d_conv1_fp16_b4_s16_d512)
@@ -522,7 +521,6 @@ TEST_F(FusedCausalConv1dCutBSHTiling, bsh_noNAT_noapc_conv1_fp16_b58_s504_d3296)
                     "3296 0 0 234 0 1 0 0 1 1 96 2 128 96 ",
                     {16777216});
 }
-
 
 // ---- BSH: residual_connection ----
 

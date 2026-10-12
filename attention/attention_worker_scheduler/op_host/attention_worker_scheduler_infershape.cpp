@@ -24,7 +24,7 @@ namespace ops {
 constexpr size_t INPUT_IDX_SCHEDULE_CONTEXT = 0;
 constexpr size_t OUTPUT_IDX_SCHEDULE_CONTEXT = 0;
 
-graphStatus InferDtype4AttentionWorkerScheduler(gert::InferDataTypeContext *context)
+graphStatus InferDtype4AttentionWorkerScheduler(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "InferDtype4AttentionWorkerScheduler enter");
 

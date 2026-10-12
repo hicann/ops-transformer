@@ -16,8 +16,8 @@
 
 namespace optiling {
 
-ge::graphStatus BuildSchedulePlan(gert::TilingContext *context, const FagParsedInfo &info, const FagKernelPlan &kernel,
-                                  FagSchedulePlan &schedule)
+ge::graphStatus BuildSchedulePlan(gert::TilingContext* context, const FagParsedInfo& info, const FagKernelPlan& kernel,
+                                  FagSchedulePlan& schedule)
 {
     const auto platformInfo = context->GetPlatformInfo();
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);

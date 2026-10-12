@@ -21,10 +21,10 @@ using namespace commondef;
 
 template <typename T1, typename T2, const uint32_t VECTOR_BASEM = 64, const uint32_t HEAD_DIM_ALIGN = 128,
           const bool IS_D_NO_EQUAL = false>
-__aicore__ inline void CopyInSoftmaxGrad(FagConstInfo &constInfo, FagRunInfo &runInfo, int32_t loopIdx,
-                                         int32_t curLoopSize, int32_t loopSize, TQue<QuePosition::VECIN, 1> &yInQue,
-                                         TQue<QuePosition::VECIN, 1> &dxInQue, GlobalTensor<T1> &dxGm,
-                                         GlobalTensor<T1> &yGm)
+__aicore__ inline void CopyInSoftmaxGrad(FagConstInfo& constInfo, FagRunInfo& runInfo, int32_t loopIdx,
+                                         int32_t curLoopSize, int32_t loopSize, TQue<QuePosition::VECIN, 1>& yInQue,
+                                         TQue<QuePosition::VECIN, 1>& dxInQue, GlobalTensor<T1>& dxGm,
+                                         GlobalTensor<T1>& yGm)
 {
     int64_t srcGmOffset = 0;
     int64_t transpose_stride = 0;
@@ -59,7 +59,7 @@ __aicore__ inline void CopyInSoftmaxGrad(FagConstInfo &constInfo, FagRunInfo &ru
     } else if (constInfo.commonConstInfo.layoutType == TND) {
         int64_t tndS1PrefixSum = (runInfo.commonRunInfo.boIdx == 0 ?
                                       0 :
-                                      ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1]);
+                                      ((__gm__ int64_t*)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1]);
         bOffset = tndS1PrefixSum * constInfo.commonConstInfo.n2G * constInfo.commonConstInfo.dSizeV;
         s1Offset = runInfo.commonRunInfo.s1oIdx * VECTOR_BASEM * CV_CORE_RATIO * constInfo.commonConstInfo.n2GDv +
                    runInfo.commonRunInfo.firstHalfS1RealSize * GetSubBlockIdx() * constInfo.commonConstInfo.n2GDv +
@@ -97,9 +97,9 @@ __aicore__ inline void CopyInSoftmaxGrad(FagConstInfo &constInfo, FagRunInfo &ru
 }
 
 template <typename T1, typename T2, const uint32_t VECTOR_BASEM = 64, const uint32_t HEAD_DIM_ALIGN = 128>
-__aicore__ inline void CalculateCastSoftmaxGrad(FagConstInfo &constInfo, int32_t curLoopSize,
-                                                TQue<QuePosition::VECIN, 1> &yInQue,
-                                                TQue<QuePosition::VECIN, 1> &dxInQue, const LocalTensor<T2> &dstTensor)
+__aicore__ inline void CalculateCastSoftmaxGrad(FagConstInfo& constInfo, int32_t curLoopSize,
+                                                TQue<QuePosition::VECIN, 1>& yInQue,
+                                                TQue<QuePosition::VECIN, 1>& dxInQue, const LocalTensor<T2>& dstTensor)
 {
     LocalTensor<T1> yTensor = yInQue.DeQue<T1>();
     LocalTensor<T1> dxTensor = dxInQue.DeQue<T1>();

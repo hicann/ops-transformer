@@ -14,7 +14,7 @@
 
 namespace optiling {
 
-ge::graphStatus FlashAttnGradCheck::CheckParams(gert::TilingContext *context)
+ge::graphStatus FlashAttnGradCheck::CheckParams(gert::TilingContext* context)
 {
     FagChecker checker;
     return checker.Process(context);

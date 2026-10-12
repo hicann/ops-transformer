@@ -20,7 +20,7 @@ namespace optiling {
 // 定义在 info/flash_attn_grad_tiling_info.h。
 class FlashAttnGradCheck {
 public:
-    static ge::graphStatus CheckParams(gert::TilingContext *context);
+    static ge::graphStatus CheckParams(gert::TilingContext* context);
 };
 
 } // namespace optiling

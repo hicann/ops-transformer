@@ -192,8 +192,8 @@ void CheckNonquantOutputType(int64_t tokenDtype, ge::DataType outputType, ge::gr
 }
 
 void CheckMxfpTiling(int64_t h, int64_t scaleCols, int64_t dtype, ge::DataType scaleType, ge::graphStatus status,
-                     int64_t r = 3, int64_t k = 2, const char *soc = "Ascend950", ge::DataType outputType = ge::DT_BF16,
-                     int64_t keyBase = 11000, int64_t schedule = 0, const std::string &expected = "")
+                     int64_t r = 3, int64_t k = 2, const char* soc = "Ascend950", ge::DataType outputType = ge::DT_BF16,
+                     int64_t keyBase = 11000, int64_t schedule = 0, const std::string& expected = "")
 {
     AttentionWorkerCombineCompileInfo compileInfo = {8, 256 * 1024};
     gert::TilingContextPara para(
@@ -209,7 +209,7 @@ void CheckMxfpTiling(int64_t h, int64_t scaleCols, int64_t dtype, ge::DataType s
     ExecuteTestCase(para, status, status == ge::GRAPH_SUCCESS ? keyBase + dtype : 0, expected);
 }
 
-void CheckNonquantInvalidInputs(const gert::StorageShape &scaleShape, ge::DataType scaleType, int64_t hiddenSize,
+void CheckNonquantInvalidInputs(const gert::StorageShape& scaleShape, ge::DataType scaleType, int64_t hiddenSize,
                                 ge::graphStatus status)
 {
     AttentionWorkerCombineCompileInfo compileInfo = {64, 256 * 1024};
@@ -264,7 +264,7 @@ TEST_F(AttentionWorkerCombineTilingTest, mxfp_bs_k_h_selection)
     for (int64_t dtype : {2, 3, 4}) {
         const int64_t bsBoundary = dtype == 4 ? 6144 : 3488;
         const int64_t kBoundary = dtype == 4 ? 24960 : 23808;
-        for (const auto &point : std::vector<std::pair<int64_t, int64_t>>{
+        for (const auto& point : std::vector<std::pair<int64_t, int64_t>>{
                  {bsBoundary, 11000}, {bsBoundary + 32, 11020}, {kBoundary, 11020}, {kBoundary + 32, 11010}}) {
             CheckMxfpTiling(point.first, ((point.first + 63) / 64) * 2, dtype, ge::DT_FLOAT8_E8M0, ge::GRAPH_SUCCESS, 3,
                             65, "Ascend950", ge::DT_BF16, point.second);

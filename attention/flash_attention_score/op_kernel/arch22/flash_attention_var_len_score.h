@@ -32,14 +32,14 @@ class FlashAttentionVarLenScore
 public:
     __aicore__ inline FlashAttentionVarLenScore(){};
 
-    __aicore__ inline void UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key,
-                                      __gm__ uint8_t *keyRope, __gm__ uint8_t *value, __gm__ uint8_t *pse,
-                                      __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix,
-                                      __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *actualSeqLengths,
-                                      __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *softmaxMax,
-                                      __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut,
-                                      __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-                                      const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void UnpackInit(__gm__ uint8_t* query, __gm__ uint8_t* queryRope, __gm__ uint8_t* key,
+                                      __gm__ uint8_t* keyRope, __gm__ uint8_t* value, __gm__ uint8_t* pse,
+                                      __gm__ uint8_t* dropMask, __gm__ uint8_t* paddingMask, __gm__ uint8_t* prefix,
+                                      __gm__ uint8_t* attenMask, __gm__ uint8_t* sink, __gm__ uint8_t* actualSeqLengths,
+                                      __gm__ uint8_t* actualSeqLengthsKv, __gm__ uint8_t* softmaxMax,
+                                      __gm__ uint8_t* softmaxSum, __gm__ uint8_t* softmaxOut,
+                                      __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
+                                      const FlashAttentionScoreGeneralTilingData* __restrict tiling, TPipe* tPipe);
 
     __aicore__ inline void Process();
     __aicore__ inline void ProcessL1Carry();
@@ -69,56 +69,56 @@ protected:
 
     __aicore__ inline void ComputeAxisIdx(int64_t multiCoreInnerIdx);
 
-    __aicore__ inline void ComputeBmm1Tail(SplitExtraInfo &extraInfo);
+    __aicore__ inline void ComputeBmm1Tail(SplitExtraInfo& extraInfo);
 
-    __aicore__ inline void SetExtraInfo(SplitExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount,
+    __aicore__ inline void SetExtraInfo(SplitExtraInfo& extraInfo, int64_t taskId, int64_t s2LoopCount,
                                         int64_t s2LoopLimit, int64_t multiCoreInnerIdx);
 
     __aicore__ inline void CalS1OuterSize(int64_t offset);
 
-    __aicore__ inline void GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvlen);
+    __aicore__ inline void GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t& actualSeqQlen, int64_t& actualSeqKvlen);
 
     __aicore__ inline void GetS2LoopRange();
 
-    __aicore__ inline void CalcQCoreOffset(const SplitExtraInfo &extraInfo);
+    __aicore__ inline void CalcQCoreOffset(const SplitExtraInfo& extraInfo);
 
-    __aicore__ inline void CalcKCoreOffset(const SplitExtraInfo &extraInfo);
+    __aicore__ inline void CalcKCoreOffset(const SplitExtraInfo& extraInfo);
 
-    __aicore__ inline void CalcVCoreOffset(const SplitExtraInfo &extraInfo);
+    __aicore__ inline void CalcVCoreOffset(const SplitExtraInfo& extraInfo);
 
-    __aicore__ inline void CalcQRopeCoreOffset(const SplitExtraInfo &extraInfo);
+    __aicore__ inline void CalcQRopeCoreOffset(const SplitExtraInfo& extraInfo);
 
-    __aicore__ inline void CalcKRopeCoreOffset(const SplitExtraInfo &extraInfo);
+    __aicore__ inline void CalcKRopeCoreOffset(const SplitExtraInfo& extraInfo);
 
     template <typename T2>
-    __aicore__ inline void ComputeMm1(const SplitExtraInfo &extraInfo,
-                                      matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, T2, bias1Type, CFG_EXCEED> &bmm1,
+    __aicore__ inline void ComputeMm1(const SplitExtraInfo& extraInfo,
+                                      matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, T2, bias1Type, CFG_EXCEED>& bmm1,
                                       int32_t cubeSubIdx);
 
-    __aicore__ inline void ComputeMm2(const SplitExtraInfo &extraInfo, int32_t cubeSubIdx);
+    __aicore__ inline void ComputeMm2(const SplitExtraInfo& extraInfo, int32_t cubeSubIdx);
 
-    __aicore__ inline void CopyInMm1AToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo);
+    __aicore__ inline void CopyInMm1AToL1(LocalTensor<INPUT_T>& l1Tensor, const SplitExtraInfo& extraInfo);
 
-    __aicore__ inline void CopyInMm1BToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo,
+    __aicore__ inline void CopyInMm1BToL1(LocalTensor<INPUT_T>& l1Tensor, const SplitExtraInfo& extraInfo,
                                           uint32_t subNid, uint32_t subNSize);
 
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo,
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<INPUT_T>& l1Tensor, const SplitExtraInfo& extraInfo,
                                           uint32_t subKid, uint32_t subKSize, int32_t cubeSubIdx);
 
-    __aicore__ inline void CopyInMm2BToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo,
+    __aicore__ inline void CopyInMm2BToL1(LocalTensor<INPUT_T>& l1Tensor, const SplitExtraInfo& extraInfo,
                                           uint32_t subKid, uint32_t subKSize);
 
-    __aicore__ inline void CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor, uint32_t srcN,
+    __aicore__ inline void CopyGmToL1(LocalTensor<INPUT_T>& l1Tensor, GlobalTensor<INPUT_T>& gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride);
 
     __aicore__ inline void PairComputeAxisIdx(int64_t multiCoreInnerIdx);
 
-    __aicore__ inline void PairSetExtraInfo(SplitExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount,
+    __aicore__ inline void PairSetExtraInfo(SplitExtraInfo& extraInfo, int64_t taskId, int64_t s2LoopCount,
                                             int64_t s2LoopLimit, int64_t multiCoreInnerIdx);
 
     __aicore__ inline void PairCalS1OuterSize(int64_t offset);
 
-    __aicore__ inline void PairGetS1LoopRange(int64_t &multiCoreInnerOffset, int64_t &multiCoreInnerLimit);
+    __aicore__ inline void PairGetS1LoopRange(int64_t& multiCoreInnerOffset, int64_t& multiCoreInnerLimit);
 
     __aicore__ inline void PairGetS2LoopRange();
 
@@ -178,16 +178,16 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key,
-                                               __gm__ uint8_t *keyRope, __gm__ uint8_t *value, __gm__ uint8_t *pse,
-                                               __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask,
-                                               __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink,
-                                               __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKv,
-                                               __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-                                               __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
-                                               __gm__ uint8_t *workspace,
-                                               const FlashAttentionScoreGeneralTilingData *__restrict tiling,
-                                               TPipe *tPipe)
+                          hasRope>::UnpackInit(__gm__ uint8_t* query, __gm__ uint8_t* queryRope, __gm__ uint8_t* key,
+                                               __gm__ uint8_t* keyRope, __gm__ uint8_t* value, __gm__ uint8_t* pse,
+                                               __gm__ uint8_t* dropMask, __gm__ uint8_t* paddingMask,
+                                               __gm__ uint8_t* prefix, __gm__ uint8_t* attenMask, __gm__ uint8_t* sink,
+                                               __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKv,
+                                               __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum,
+                                               __gm__ uint8_t* softmaxOut, __gm__ uint8_t* attentionOut,
+                                               __gm__ uint8_t* workspace,
+                                               const FlashAttentionScoreGeneralTilingData* __restrict tiling,
+                                               TPipe* tPipe)
 {
     this->InitInput(query, queryRope, key, keyRope, value, pse, dropMask, paddingMask, prefix, attenMask, sink,
                     softmaxMax, softmaxSum, softmaxOut, attentionOut, workspace, tiling, tPipe); // gm设置
@@ -205,9 +205,9 @@ FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT
         this->pairBlockIdx = this->blockIdx & 1 ? this->blockIdx - 1 : this->blockIdx + 1;
     }
     this->ComputeConstexpr();
-    qListGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths);
-    kvListGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKv);
-    sinkGm.SetGlobalBuffer((__gm__ float *)sink);
+    qListGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths);
+    kvListGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKv);
+    sinkGm.SetGlobalBuffer((__gm__ float*)sink);
     // 初始化unpack
     actualSeqQlenAddr = actualSeqLengths;
     actualSeqKvlenAddr = actualSeqLengthsKv;
@@ -218,7 +218,7 @@ FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT
         for (int64_t i = 0; i < this->tilingData->inputParams.bSize; ++i) {
             GetSeqQlenKvlenByBoidx(i, actualS1Len, actualS2Len);
             if (actualS2Len <= 0 && actualS1Len != 0) {
-                int64_t accumSize = (i == 0) ? 0 : ((__gm__ int64_t *)actualSeqQlenAddr)[i - 1];
+                int64_t accumSize = (i == 0) ? 0 : ((__gm__ int64_t*)actualSeqQlenAddr)[i - 1];
                 if (actualS1Len < 0 && accumSize > 0) {
                     actualS1Len = this->s1Size - accumSize;
                 }
@@ -270,7 +270,7 @@ FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT
         PseInnerAlibiCreate<hasPse>(this->pseAlibiGm, pseHelpBuffer, this->pseInfo);
     }
     prefixNAddr = prefix;
-    this->s2SizeSum = ((__gm__ uint64_t *)actualSeqLengthsKv)[this->tilingData->inputParams.bSize - 1];
+    this->s2SizeSum = ((__gm__ uint64_t*)actualSeqLengthsKv)[this->tilingData->inputParams.bSize - 1];
     return;
 }
 
@@ -341,8 +341,8 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t &actualSeqQlen,
-                                                           int64_t &actualSeqKvlen)
+                          hasRope>::GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t& actualSeqQlen,
+                                                           int64_t& actualSeqKvlen)
 {
     if (boIdx == 0) {
         actualSeqQlen = qListGm.GetValue(0);
@@ -473,7 +473,7 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
     } else if (this->tilingData->inputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::PREFIX)) {
         this->s2StartIdx = 0;
         this->s2EndIdx = Max((this->s1oIdx + 1) * this->s1BaseSize - actualS1Len + actualS2Len,
-                             ((__gm__ int64_t *)prefixNAddr)[this->boIdx]);
+                             ((__gm__ int64_t*)prefixNAddr)[this->boIdx]);
         this->s2EndIdx = Min(this->s2EndIdx, this->s2Size);
         if (this->s2EndIdx - this->s2StartIdx <= 0) {
             this->s2StartIdx = 0;
@@ -778,7 +778,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::SetExtraInfo(SplitExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount,
+                          hasRope>::SetExtraInfo(SplitExtraInfo& extraInfo, int64_t taskId, int64_t s2LoopCount,
                                                  int64_t s2LoopLimit, int64_t multiCoreInnerIdx)
 {
     extraInfo.s2StartIdx = this->s2StartIdx;
@@ -815,7 +815,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::ComputeBmm1Tail(SplitExtraInfo &extraInfo)
+                          hasRope>::ComputeBmm1Tail(SplitExtraInfo& extraInfo)
 {
     extraInfo.s1RealSize = this->s1BaseSize;
     if (extraInfo.s1Size < (extraInfo.s1oIdx + 1) * this->s1BaseSize) {
@@ -849,7 +849,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::CalcQCoreOffset(const SplitExtraInfo &extraInfo)
+                          hasRope>::CalcQCoreOffset(const SplitExtraInfo& extraInfo)
 {
     int64_t bOffset = extraInfo.s1SizeAcc * this->n2GD;
     int64_t s1Offset = extraInfo.s1oIdx * this->s1BaseN2GD;
@@ -863,7 +863,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::CalcKCoreOffset(const SplitExtraInfo &extraInfo)
+                          hasRope>::CalcKCoreOffset(const SplitExtraInfo& extraInfo)
 {
     int64_t bOffset = extraInfo.s2SizeAcc * this->n2D;
     int64_t s2Offset = extraInfo.s2StartIdx * this->n2D + extraInfo.s2LoopCount * this->s2BaseNratioN2D;
@@ -876,7 +876,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::CalcVCoreOffset(const SplitExtraInfo &extraInfo)
+                          hasRope>::CalcVCoreOffset(const SplitExtraInfo& extraInfo)
 {
     int64_t bOffset = extraInfo.s2SizeAcc * this->n2D2;
     int64_t s2Offset = extraInfo.s2StartIdx * this->n2D2 + extraInfo.s2LoopCount * this->s2BaseNratioSize * this->n2D2;
@@ -890,8 +890,8 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
 template <typename T2>
 __aicore__ inline void FlashAttentionVarLenScore<
     implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-    hasRope>::ComputeMm1(const SplitExtraInfo &extraInfo,
-                         matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, T2, bias1Type, CFG_EXCEED> &bmm1,
+    hasRope>::ComputeMm1(const SplitExtraInfo& extraInfo,
+                         matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, T2, bias1Type, CFG_EXCEED>& bmm1,
                          int32_t cubeSubIdx)
 {
     bmm1.SetOrgShape(extraInfo.s1RealSize, this->mm1Kb, this->mm1Ka1, this->mm1Kb1, extraInfo.s2RealSize);
@@ -938,7 +938,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::ComputeMm2(const SplitExtraInfo &extraInfo, int32_t cubeSubIdx)
+                          hasRope>::ComputeMm2(const SplitExtraInfo& extraInfo, int32_t cubeSubIdx)
 {
     this->bmm2L1Carry.SetOrgShape(extraInfo.s1RealSize, this->mm2Kb, extraInfo.s2AlignedSize, this->mm2Kb,
                                   this->d2Size);
@@ -981,7 +981,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::CopyInMm1AToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo)
+                          hasRope>::CopyInMm1AToL1(LocalTensor<INPUT_T>& l1Tensor, const SplitExtraInfo& extraInfo)
 {
     CalcQCoreOffset(extraInfo);
     auto srcGm = this->queryGm[this->qCoreOffset];
@@ -992,7 +992,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::CopyInMm1BToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo,
+                          hasRope>::CopyInMm1BToL1(LocalTensor<INPUT_T>& l1Tensor, const SplitExtraInfo& extraInfo,
                                                    uint32_t subNid, uint32_t subNSize)
 {
     CalcKCoreOffset(extraInfo);
@@ -1004,7 +1004,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::CopyInMm2AToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo,
+                          hasRope>::CopyInMm2AToL1(LocalTensor<INPUT_T>& l1Tensor, const SplitExtraInfo& extraInfo,
                                                    uint32_t subKid, uint32_t subKSize, int32_t cubeSubIdx)
 {
     int64_t s1RealSizeAligned = CeilDiv(extraInfo.s1RealSize, 16) * 16;
@@ -1017,7 +1017,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::CopyInMm2BToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo,
+                          hasRope>::CopyInMm2BToL1(LocalTensor<INPUT_T>& l1Tensor, const SplitExtraInfo& extraInfo,
                                                    uint32_t subKid, uint32_t subKSize)
 {
     CalcVCoreOffset(extraInfo);
@@ -1029,7 +1029,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor,
+                          hasRope>::CopyGmToL1(LocalTensor<INPUT_T>& l1Tensor, GlobalTensor<INPUT_T>& gmSrcTensor,
                                                uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
@@ -1048,7 +1048,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::PairGetS1LoopRange(int64_t &multiCoreInnerOffset, int64_t &multiCoreInnerLimit)
+                          hasRope>::PairGetS1LoopRange(int64_t& multiCoreInnerOffset, int64_t& multiCoreInnerLimit)
 {
     multiCoreInnerOffset = this->tilingData->multiCoreParams.sparseStartIdx[this->pairBlockIdx];
     if (likely((this->tilingData->multiCoreParams.coreNum - 1) > this->pairBlockIdx)) {
@@ -1178,7 +1178,7 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
     } else if (this->tilingData->inputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::PREFIX)) {
         this->pairS2StartIdx = 0;
         this->pairS2EndIdx = Max((this->pairS1oIdx + 1) * this->s1BaseSize - actualS1Len + actualS2Len,
-                                 ((__gm__ int64_t *)prefixNAddr)[this->pairBoIdx]);
+                                 ((__gm__ int64_t*)prefixNAddr)[this->pairBoIdx]);
         this->pairS2EndIdx = Min(this->pairS2EndIdx, this->s2Size);
         if (this->pairS2EndIdx - this->pairS2StartIdx <= 0) {
             this->pairS2StartIdx = 0;
@@ -1197,7 +1197,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
 FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                          hasRope>::PairSetExtraInfo(SplitExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount,
+                          hasRope>::PairSetExtraInfo(SplitExtraInfo& extraInfo, int64_t taskId, int64_t s2LoopCount,
                                                      int64_t s2LoopLimit, int64_t multiCoreInnerIdx)
 {
     extraInfo.s2StartIdx = this->pairS2StartIdx;

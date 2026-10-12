@@ -20,7 +20,7 @@
 
 #include "../../../../op_kernel/arch35/block_attn_res_update_tiling_data.h"
 
-inline void InitBlockAttnResUpdateTilingData(const uint8_t *tiling, BlockAttnResUpdateTilingData *tilingData)
+inline void InitBlockAttnResUpdateTilingData(const uint8_t* tiling, BlockAttnResUpdateTilingData* tilingData)
 {
     std::memcpy(tilingData, tiling, sizeof(BlockAttnResUpdateTilingData));
 }
@@ -31,6 +31,6 @@ inline void InitBlockAttnResUpdateTilingData(const uint8_t *tiling, BlockAttnRes
 
 #define GET_TILING_DATA_WITH_STRUCT(tilingStruct, tilingData, tilingArg) \
     tilingStruct tilingData; \
-    InitBlockAttnResUpdateTilingData(reinterpret_cast<const uint8_t *>(tilingArg), &tilingData)
+    InitBlockAttnResUpdateTilingData(reinterpret_cast<const uint8_t*>(tilingArg), &tilingData)
 
 #endif // TEST_BLOCK_ATTN_RES_UPDATE_TILING_H

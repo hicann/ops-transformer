@@ -27,9 +27,9 @@ constexpr size_t MATRIX_DIM_NUM = 2UL;
 constexpr size_t TOKEN_DIM_INDEX = 0UL;
 constexpr size_t HIDDEN_DIM_INDEX = 1UL;
 
-static bool CheckNotNull(const aclTensor *partialBlockRef, const aclTensor *delta, const aclTensor *pseudoQuery,
-                         const aclTensor *numerator, const aclTensor *logitMax, const aclTensor *expSum,
-                         const aclOpExecutor *executor)
+static bool CheckNotNull(const aclTensor* partialBlockRef, const aclTensor* delta, const aclTensor* pseudoQuery,
+                         const aclTensor* numerator, const aclTensor* logitMax, const aclTensor* expSum,
+                         const aclOpExecutor* executor)
 {
     OP_CHECK(partialBlockRef != nullptr,
              OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "BlockAttnResUpdate partialBlockRef is nullptr."), return false);
@@ -47,17 +47,17 @@ static bool CheckNotNull(const aclTensor *partialBlockRef, const aclTensor *delt
     return true;
 }
 
-static bool IsEmptyWorkload(const aclTensor *partialBlockRef)
+static bool IsEmptyWorkload(const aclTensor* partialBlockRef)
 {
-    const auto &shape = partialBlockRef->GetViewShape();
+    const auto& shape = partialBlockRef->GetViewShape();
     return shape.GetDimNum() == MATRIX_DIM_NUM &&
            (shape.GetDim(TOKEN_DIM_INDEX) == 0 || shape.GetDim(HIDDEN_DIM_INDEX) == 0);
 }
 } // namespace
 
-const aclTensor *BlockAttnResUpdate(aclTensor *partialBlockRef, const aclTensor *delta, const aclTensor *pseudoQuery,
-                                    const aclTensor *numerator, const aclTensor *logitMax, const aclTensor *expSum,
-                                    double eps, aclOpExecutor *executor)
+const aclTensor* BlockAttnResUpdate(aclTensor* partialBlockRef, const aclTensor* delta, const aclTensor* pseudoQuery,
+                                    const aclTensor* numerator, const aclTensor* logitMax, const aclTensor* expSum,
+                                    double eps, aclOpExecutor* executor)
 {
     L0_DFX(BlockAttnResUpdate, partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum, eps);
 

@@ -33,26 +33,26 @@ public:
     __aicore__ inline void Process(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR atten_mask,
                                    GM_ADDR softmax_max, GM_ADDR softmax_sum, GM_ADDR attention_in,
                                    GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq, GM_ADDR dk,
-                                   GM_ADDR dv, GM_ADDR user, const TILING_CLASS *tilingData);
+                                   GM_ADDR dv, GM_ADDR user, const TILING_CLASS* tilingData);
 
 private:
     __aicore__ inline void CubeProcess(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR atten_mask,
                                        GM_ADDR softmax_max, GM_ADDR softmax_sum, GM_ADDR attention_in,
                                        GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq, GM_ADDR dk,
-                                       GM_ADDR dv, GM_ADDR user, const TILING_CLASS *tilingData);
+                                       GM_ADDR dv, GM_ADDR user, const TILING_CLASS* tilingData);
     __aicore__ inline void VectorProcess(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR atten_mask,
                                          GM_ADDR softmax_max, GM_ADDR softmax_sum, GM_ADDR attention_in,
                                          GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq, GM_ADDR dk,
-                                         GM_ADDR dv, GM_ADDR user, const TILING_CLASS *tilingData);
+                                         GM_ADDR dv, GM_ADDR user, const TILING_CLASS* tilingData);
     __aicore__ inline void VecPreProcess(GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR user,
-                                         const TILING_CLASS *tilingData);
+                                         const TILING_CLASS* tilingData);
     __aicore__ inline void VecSftgProcess(GM_ADDR dy, GM_ADDR attention_in, GM_ADDR actual_seq_qlen, GM_ADDR user,
-                                          const TILING_CLASS *tilingData);
+                                          const TILING_CLASS* tilingData);
     __aicore__ inline void VecMainProcess(GM_ADDR atten_mask, GM_ADDR softmax_max, GM_ADDR softmax_sum,
                                           GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR user,
-                                          const TILING_CLASS *tilingData);
+                                          const TILING_CLASS* tilingData);
     __aicore__ inline void VecPostProcess(GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR user,
-                                          const TILING_CLASS *tilingData);
+                                          const TILING_CLASS* tilingData);
     __aicore__ inline void SetFlag();
     __aicore__ inline void WaitFlag();
     int64_t batch;
@@ -74,7 +74,7 @@ template <typename TYPE, class TILING_CLASS>
 __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::Process(
     GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR atten_mask, GM_ADDR softmax_max, GM_ADDR softmax_sum,
     GM_ADDR attention_in, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
-    GM_ADDR user, const TILING_CLASS *tilingData)
+    GM_ADDR user, const TILING_CLASS* tilingData)
 {
     batch = tilingData->mlaTensorTilingData.b;
     n1 = tilingData->mlaTensorTilingData.n2 * tilingData->mlaTensorTilingData.g;
@@ -105,7 +105,7 @@ template <typename TYPE, class TILING_CLASS>
 __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::CubeProcess(
     GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR atten_mask, GM_ADDR softmax_max, GM_ADDR softmax_sum,
     GM_ADDR attention_in, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
-    GM_ADDR user, const TILING_CLASS *tilingData)
+    GM_ADDR user, const TILING_CLASS* tilingData)
 {
     AscendC::TPipe pipeCube;
     CUBE_OP::CubeOp<TYPE> cubeOp;
@@ -126,10 +126,10 @@ __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::CubePro
         cubeAddr.addr_mapping(&cubeAddrInfo[taskId % 2], &cube3AddrInfo[taskId % 2]);
         if (cubeAddrInfo[taskId % 2].blockLength > 0) {
             SetFlag();
-            cubeOp.Cube1Process(cubeAddrInfo[taskId % 2], (__gm__ TYPE *)query, (__gm__ TYPE *)key,
-                                (__gm__ float *)mm2WorkSpaceAddr);
-            cubeOp.Cube1Process(cubeAddrInfo[taskId % 2], (__gm__ TYPE *)dy, (__gm__ TYPE *)value,
-                                (__gm__ float *)mm1WorkSpaceAddr);
+            cubeOp.Cube1Process(cubeAddrInfo[taskId % 2], (__gm__ TYPE*)query, (__gm__ TYPE*)key,
+                                (__gm__ float*)mm2WorkSpaceAddr);
+            cubeOp.Cube1Process(cubeAddrInfo[taskId % 2], (__gm__ TYPE*)dy, (__gm__ TYPE*)value,
+                                (__gm__ float*)mm1WorkSpaceAddr);
             WaitFlag();
             AscendC::CrossCoreSetFlag<2, PIPE_FIX>(CUBE2VEC);
         }
@@ -137,24 +137,24 @@ __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::CubePro
             if (cube23_mix_flag) {
                 AscendC::WaitEvent(VEC2CUBE);
                 SetFlag();
-                cubeOp.Cube23Process(cubeAddrInfo[(taskId - 1) % 2], (__gm__ TYPE *)mm1WorkSpaceAddr,
-                                     (__gm__ TYPE *)key, (__gm__ TYPE *)query, (__gm__ float *)dqWorkSpaceAddr,
-                                     (__gm__ float *)dkWorkSpaceAddr);
+                cubeOp.Cube23Process(cubeAddrInfo[(taskId - 1) % 2], (__gm__ TYPE*)mm1WorkSpaceAddr, (__gm__ TYPE*)key,
+                                     (__gm__ TYPE*)query, (__gm__ float*)dqWorkSpaceAddr,
+                                     (__gm__ float*)dkWorkSpaceAddr);
                 WaitFlag();
                 SetFlag();
-                cubeOp.Cube3Process(cube3AddrInfo[(taskId - 1) % 2], (__gm__ TYPE *)mm2WorkSpaceAddr, (__gm__ TYPE *)dy,
-                                    (__gm__ float *)dvWorkSpaceAddr);
+                cubeOp.Cube3Process(cube3AddrInfo[(taskId - 1) % 2], (__gm__ TYPE*)mm2WorkSpaceAddr, (__gm__ TYPE*)dy,
+                                    (__gm__ float*)dvWorkSpaceAddr);
                 WaitFlag();
             } else {
                 SetFlag();
-                cubeOp.Cube2Process(cubeAddrInfo[(taskId - 1) % 2], (__gm__ TYPE *)mm1WorkSpaceAddr, (__gm__ TYPE *)key,
-                                    (__gm__ float *)dqWorkSpaceAddr);
+                cubeOp.Cube2Process(cubeAddrInfo[(taskId - 1) % 2], (__gm__ TYPE*)mm1WorkSpaceAddr, (__gm__ TYPE*)key,
+                                    (__gm__ float*)dqWorkSpaceAddr);
                 WaitFlag();
                 SetFlag();
-                cubeOp.Cube3Process(cube3AddrInfo[(taskId - 1) % 2], (__gm__ TYPE *)mm1WorkSpaceAddr,
-                                    (__gm__ TYPE *)query, (__gm__ float *)dkWorkSpaceAddr);
-                cubeOp.Cube3Process(cube3AddrInfo[(taskId - 1) % 2], (__gm__ TYPE *)mm2WorkSpaceAddr, (__gm__ TYPE *)dy,
-                                    (__gm__ float *)dvWorkSpaceAddr);
+                cubeOp.Cube3Process(cube3AddrInfo[(taskId - 1) % 2], (__gm__ TYPE*)mm1WorkSpaceAddr,
+                                    (__gm__ TYPE*)query, (__gm__ float*)dkWorkSpaceAddr);
+                cubeOp.Cube3Process(cube3AddrInfo[(taskId - 1) % 2], (__gm__ TYPE*)mm2WorkSpaceAddr, (__gm__ TYPE*)dy,
+                                    (__gm__ float*)dvWorkSpaceAddr);
                 WaitFlag();
             }
         }
@@ -170,7 +170,7 @@ template <typename TYPE, class TILING_CLASS>
 __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::VectorProcess(
     GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR atten_mask, GM_ADDR softmax_max, GM_ADDR softmax_sum,
     GM_ADDR attention_in, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
-    GM_ADDR user, const TILING_CLASS *tilingData)
+    GM_ADDR user, const TILING_CLASS* tilingData)
 {
     VecPreProcess(dq, dk, dv, user, tilingData);
     VecSftgProcess(dy, attention_in, actual_seq_qlen, user, tilingData);
@@ -181,7 +181,7 @@ __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::VectorP
 template <typename TYPE, class TILING_CLASS>
 __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::VecPreProcess(GM_ADDR dq, GM_ADDR dk,
                                                                                        GM_ADDR dv, GM_ADDR user,
-                                                                                       const TILING_CLASS *tilingData)
+                                                                                       const TILING_CLASS* tilingData)
 {
     AscendC::TPipe pipePre;
     VectorInitOuput<TILING_CLASS> opPre;
@@ -192,7 +192,7 @@ __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::VecPreP
 
 template <typename TYPE, class TILING_CLASS>
 __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::VecSftgProcess(
-    GM_ADDR dy, GM_ADDR attention_in, GM_ADDR actual_seq_qlen, GM_ADDR user, const TILING_CLASS *tilingData)
+    GM_ADDR dy, GM_ADDR attention_in, GM_ADDR actual_seq_qlen, GM_ADDR user, const TILING_CLASS* tilingData)
 {
     AscendC::TPipe pipeSoftmaxGrad;
     VectorSoftmaxGrad<TYPE, TILING_CLASS> opSoftmaxGrad;
@@ -205,7 +205,7 @@ __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::VecSftg
 template <typename TYPE, class TILING_CLASS>
 __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::VecMainProcess(
     GM_ADDR atten_mask, GM_ADDR softmax_max, GM_ADDR softmax_sum, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen,
-    GM_ADDR user, const TILING_CLASS *tilingData)
+    GM_ADDR user, const TILING_CLASS* tilingData)
 {
     AscendC::TPipe pipeVec;
     VecOp<TYPE, TILING_CLASS> op;
@@ -237,7 +237,7 @@ __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::VecMain
 template <typename TYPE, class TILING_CLASS>
 __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::VecPostProcess(GM_ADDR dq, GM_ADDR dk,
                                                                                         GM_ADDR dv, GM_ADDR user,
-                                                                                        const TILING_CLASS *tilingData)
+                                                                                        const TILING_CLASS* tilingData)
 {
     AscendC::TPipe pipePost;
     VectorPost<TYPE, TILING_CLASS> vecPost;

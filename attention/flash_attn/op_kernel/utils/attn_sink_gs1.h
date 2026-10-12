@@ -43,7 +43,7 @@ namespace AttentionCommon {
 using namespace Reg;
 
 template <typename INPUT_T>
-__aicore__ inline void SinkCopyInGS1(LocalTensor<INPUT_T> &sinkTmpUb, GlobalTensor<INPUT_T> &sinkGm, uint32_t gs1Start,
+__aicore__ inline void SinkCopyInGS1(LocalTensor<INPUT_T>& sinkTmpUb, GlobalTensor<INPUT_T>& sinkGm, uint32_t gs1Start,
                                      uint32_t actVecMSize, uint32_t actS1Size, uint32_t n2Idx, uint32_t gSize)
 {
     uint32_t gStart = gs1Start / actS1Size;
@@ -63,7 +63,7 @@ __aicore__ inline void SinkCopyInGS1(LocalTensor<INPUT_T> &sinkTmpUb, GlobalTens
 }
 
 template <typename INPUT_T>
-__aicore__ inline void SinkCopyInS1G(LocalTensor<INPUT_T> &sinkTmpUb, GlobalTensor<INPUT_T> &sinkGm, uint32_t gs1Start,
+__aicore__ inline void SinkCopyInS1G(LocalTensor<INPUT_T>& sinkTmpUb, GlobalTensor<INPUT_T>& sinkGm, uint32_t gs1Start,
                                      uint32_t actVecMSize, uint32_t actS1Size, uint32_t n2Idx, uint32_t gSize)
 {
     uint32_t gStart = gs1Start % gSize;
@@ -139,7 +139,7 @@ __aicore__ inline void SinkCopyInS1G(LocalTensor<INPUT_T> &sinkTmpUb, GlobalTens
  * 前置: CopyIn 已将唯一 sink 值(float)放入 inUb[0]。BRC_B32 将其广播到 64 个 lane。
  */
 template <typename T, typename INPUT_T>
-__simd_vf__ inline void SinkBrcVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *inUb, uint32_t m)
+__simd_vf__ inline void SinkBrcVF(__ubuf__ T* maxUb, __ubuf__ INPUT_T* inUb, uint32_t m)
 {
     RegTensor<T> valReg;
     LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(valReg, inUb);
@@ -153,7 +153,7 @@ __simd_vf__ inline void SinkBrcVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *inUb, uin
  * 前置: inUb[0..m) 为本块行值连续段(float, 基址 32B 对齐)。
  */
 template <typename T, typename INPUT_T>
-__simd_vf__ inline void SinkContigDirectVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *inUb, uint32_t m)
+__simd_vf__ inline void SinkContigDirectVF(__ubuf__ T* maxUb, __ubuf__ INPUT_T* inUb, uint32_t m)
 {
     RegTensor<T> fReg;
     LoadAlign<T, Reg::LoadDist::DIST_NORM>(fReg, inUb);
@@ -167,7 +167,7 @@ __simd_vf__ inline void SinkContigDirectVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *
  * 前置: inUb[0..gCount) 为本块 g 值连续区(float, GS1 CopyIn 布局)。
  */
 template <typename T, typename INPUT_T>
-__simd_vf__ inline void SinkGs1DirectVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *inUb, uint32_t s0, uint32_t actS1Size,
+__simd_vf__ inline void SinkGs1DirectVF(__ubuf__ T* maxUb, __ubuf__ INPUT_T* inUb, uint32_t s0, uint32_t actS1Size,
                                         uint32_t m)
 {
     RegTensor<T> fRegA;
@@ -188,8 +188,8 @@ __simd_vf__ inline void SinkGs1DirectVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *inU
     Reg::Div<int32_t>(qReg, aReg, aszReg, pregAll);
     Reg::Adds<int32_t>(qSub, qReg, -64, pregAll); // B 段 lane = idx - 64
     // 宽模式拼合: idx < 64 取 A 段, 否则取 B 段(负值 huge 越界, 被 Select 掩掉)
-    RegTensor<uint32_t> &qU32 = (RegTensor<uint32_t> &)qReg;
-    RegTensor<uint32_t> &qSubU32 = (RegTensor<uint32_t> &)qSub;
+    RegTensor<uint32_t>& qU32 = (RegTensor<uint32_t>&)qReg;
+    RegTensor<uint32_t>& qSubU32 = (RegTensor<uint32_t>&)qSub;
     Reg::Gather<T>(gRegA, fRegA, qU32);
     Reg::Gather<T>(gRegB, fRegB, qSubU32);
     MaskReg pregA = CreateMask<T, Reg::MaskPattern::ALL>();
@@ -206,7 +206,7 @@ __simd_vf__ inline void SinkGs1DirectVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *inU
  * case2.2(gStart <= gEnd)序列不回绕, 索引恒等重排, 同样正确。
  */
 template <typename T, typename INPUT_T>
-__simd_vf__ inline void SinkRotDirectVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *inUb, uint32_t gStart, uint32_t gSize,
+__simd_vf__ inline void SinkRotDirectVF(__ubuf__ T* maxUb, __ubuf__ INPUT_T* inUb, uint32_t gStart, uint32_t gSize,
                                         uint32_t m)
 {
     RegTensor<T> fRegA;
@@ -230,8 +230,8 @@ __simd_vf__ inline void SinkRotDirectVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *inU
     Reg::Sub<int32_t>(kReg, aReg, kReg, pregAll);
     Reg::Adds<int32_t>(kSub, kReg, -64, pregAll); // B 段 lane = k - 64
     // 宽模式拼合: k < 64 取 A 段, 否则取 B 段(负值 huge 越界, 被 Select 掩掉)
-    RegTensor<uint32_t> &kU32 = (RegTensor<uint32_t> &)kReg;
-    RegTensor<uint32_t> &kSubU32 = (RegTensor<uint32_t> &)kSub;
+    RegTensor<uint32_t>& kU32 = (RegTensor<uint32_t>&)kReg;
+    RegTensor<uint32_t>& kSubU32 = (RegTensor<uint32_t>&)kSub;
     Reg::Gather<T>(gRegA, fRegA, kU32);
     Reg::Gather<T>(gRegB, fRegB, kSubU32);
     MaskReg pregA = CreateMask<T, Reg::MaskPattern::ALL>();
@@ -249,7 +249,7 @@ __simd_vf__ inline void SinkRotDirectVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *inU
  * 行序列: r < headLen 取 inUb[headOff + r], 其余行取 inUb[r - headLen]。
  */
 template <typename T, typename INPUT_T>
-__simd_vf__ inline void SinkGapDirectVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *inUb, uint32_t headOff, uint32_t headLen,
+__simd_vf__ inline void SinkGapDirectVF(__ubuf__ T* maxUb, __ubuf__ INPUT_T* inUb, uint32_t headOff, uint32_t headLen,
                                         uint32_t m)
 {
     RegTensor<T> fHeadA;
@@ -272,15 +272,15 @@ __simd_vf__ inline void SinkGapDirectVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *inU
     Reg::Adds<int32_t>(rSub, rReg, -64, pregAll);
     Reg::Adds<int32_t>(idxTail, rReg, -static_cast<int32_t>(headLen), pregAll);
     // 头段宽模式: r < 64 取 A 段, 否则取 B 段
-    RegTensor<uint32_t> &rU32 = (RegTensor<uint32_t> &)rReg;
-    RegTensor<uint32_t> &rSubU32 = (RegTensor<uint32_t> &)rSub;
+    RegTensor<uint32_t>& rU32 = (RegTensor<uint32_t>&)rReg;
+    RegTensor<uint32_t>& rSubU32 = (RegTensor<uint32_t>&)rSub;
     Reg::Gather<T>(gHeadA, fHeadA, rU32);
     Reg::Gather<T>(gHeadB, fHeadB, rSubU32);
     MaskReg pregHA = CreateMask<T, Reg::MaskPattern::ALL>();
     Reg::Compares<int32_t, CMPMODE::LT>(pregHA, rReg, 64, pregAll);
     Reg::Select<T>(gHead, gHeadA, gHeadB, pregHA);
     // 头尾拼合: r < headLen 取头段, 否则取尾段(尾索引负值 huge 越界, 被 Select 掩掉)
-    RegTensor<uint32_t> &idxTailU32 = (RegTensor<uint32_t> &)idxTail;
+    RegTensor<uint32_t>& idxTailU32 = (RegTensor<uint32_t>&)idxTail;
     Reg::Gather<T>(gTail, fTail, idxTailU32);
     MaskReg pregHead = CreateMask<T, Reg::MaskPattern::ALL>();
     Reg::Compares<int32_t, CMPMODE::LT>(pregHead, rReg, static_cast<int32_t>(headLen), pregAll);
@@ -300,14 +300,14 @@ __simd_vf__ inline void SinkGapDirectVF(__ubuf__ T *maxUb, __ubuf__ INPUT_T *inU
  * \param gSize       [in]  GQA 组大小
  */
 template <typename T, typename INPUT_T, bool IS_GS1_LAYOUT>
-__aicore__ inline void SinkExpandMaxVf(const LocalTensor<T> &maxUb, const LocalTensor<INPUT_T> &sinkTmpUb,
+__aicore__ inline void SinkExpandMaxVf(const LocalTensor<T>& maxUb, const LocalTensor<INPUT_T>& sinkTmpUb,
                                        uint32_t gs1Start, uint32_t actVecMSize, uint32_t actS1Size, uint32_t gSize)
 {
     if (actVecMSize == 0) {
         return;
     }
-    __ubuf__ T *maxUbPtr = (__ubuf__ T *)maxUb.GetPhyAddr();
-    __ubuf__ INPUT_T *inUb = (__ubuf__ INPUT_T *)sinkTmpUb.GetPhyAddr();
+    __ubuf__ T* maxUbPtr = (__ubuf__ T*)maxUb.GetPhyAddr();
+    __ubuf__ INPUT_T* inUb = (__ubuf__ INPUT_T*)sinkTmpUb.GetPhyAddr();
 
     if constexpr (IS_GS1_LAYOUT) {
         uint32_t s0 = gs1Start % actS1Size;

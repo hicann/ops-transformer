@@ -55,13 +55,13 @@ TEST_F(BSASelectBlockMaskTilingTest, tiling_bnsd_case0)
          // 1: key [B, N, S_kv, D]
          {{{b, n, s_kv, d}, {b, n, s_kv, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
          // 2: block_shape (OPTIONAL, has value)
-         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)blockShapeData},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)blockShapeData},
          // 3: post_block_shape (OPTIONAL, not provided)
          {{{-1}, {-1}}, ge::DT_UNDEFINED, ge::FORMAT_ND},
          // 4: actual_seq_lengths (OPTIONAL, has value)
-         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)actualSeqData},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqData},
          // 5: actual_seq_lengths_kv (OPTIONAL, has value)
-         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)actualSeqKvData},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqKvData},
          // 6: actual_block_len_query (OPTIONAL, not provided)
          {{{-1}, {-1}}, ge::DT_UNDEFINED, ge::FORMAT_ND},
          // 7: actual_block_len_key (OPTIONAL, not provided)
@@ -105,13 +105,13 @@ TEST_F(BSASelectBlockMaskTilingTest, tiling_bnsd_block64)
          // 1: key
          {{{b, n, s_kv, d}, {b, n, s_kv, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
          // 2: block_shape
-         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)blockShapeData},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)blockShapeData},
          // 3: post_block_shape
          {{{-1}, {-1}}, ge::DT_UNDEFINED, ge::FORMAT_ND},
          // 4: actual_seq_lengths
-         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)actualSeqData},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqData},
          // 5: actual_seq_lengths_kv
-         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)actualSeqKvData},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqKvData},
          // 6: actual_block_len_query
          {{{-1}, {-1}}, ge::DT_UNDEFINED, ge::FORMAT_ND},
          // 7: actual_block_len_key
@@ -153,13 +153,13 @@ TEST_F(BSASelectBlockMaskTilingTest, tiling_bf16_case)
          // 1: key (BF16)
          {{{b, n, s_kv, d}, {b, n, s_kv, d}}, ge::DT_BF16, ge::FORMAT_ND},
          // 2: block_shape
-         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)blockShapeData},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)blockShapeData},
          // 3: post_block_shape
          {{{-1}, {-1}}, ge::DT_UNDEFINED, ge::FORMAT_ND},
          // 4: actual_seq_lengths
-         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)actualSeqData},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqData},
          // 5: actual_seq_lengths_kv
-         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)actualSeqKvData},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqKvData},
          // 6: actual_block_len_query
          {{{-1}, {-1}}, ge::DT_UNDEFINED, ge::FORMAT_ND},
          // 7: actual_block_len_key
@@ -201,13 +201,13 @@ TEST_F(BSASelectBlockMaskTilingTest, tiling_batch2_case)
          // 1: key
          {{{b, n, s_kv, d}, {b, n, s_kv, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
          // 2: block_shape
-         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)blockShapeData},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)blockShapeData},
          // 3: post_block_shape
          {{{-1}, {-1}}, ge::DT_UNDEFINED, ge::FORMAT_ND},
          // 4: actual_seq_lengths
-         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)actualSeqData},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqData},
          // 5: actual_seq_lengths_kv
-         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)actualSeqKvData},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqKvData},
          // 6: actual_block_len_query
          {{{-1}, {-1}}, ge::DT_UNDEFINED, ge::FORMAT_ND},
          // 7: actual_block_len_key
@@ -253,13 +253,13 @@ TEST_F(BSASelectBlockMaskTilingTest, tiling_tnd_case)
          // 1: key [totalKv, N, D]
          {{{totalKv, n, d}, {totalKv, n, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
          // 2: block_shape (OPTIONAL, has value)
-         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)blockShapeData},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)blockShapeData},
          // 3: post_block_shape (OPTIONAL, not provided)
          {{{-1}, {-1}}, ge::DT_UNDEFINED, ge::FORMAT_ND},
          // 4: actual_seq_lengths (OPTIONAL, has value)
-         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)actualSeqData},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqData},
          // 5: actual_seq_lengths_kv (OPTIONAL, has value)
-         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void *)actualSeqKvData},
+         {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqKvData},
          // 6: actual_block_len_query (OPTIONAL, not provided)
          {{{-1}, {-1}}, ge::DT_UNDEFINED, ge::FORMAT_ND},
          // 7: actual_block_len_key (OPTIONAL, not provided)

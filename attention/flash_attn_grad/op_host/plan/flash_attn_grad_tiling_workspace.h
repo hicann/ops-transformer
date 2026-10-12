@@ -23,7 +23,7 @@
 
 namespace optiling {
 
-FagWorkspacePlan BuildWorkspacePlan(const FagParsedInfo &info);
+FagWorkspacePlan BuildWorkspacePlan(const FagParsedInfo& info);
 
 } // namespace optiling
 

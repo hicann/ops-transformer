@@ -70,7 +70,7 @@ public:
     static constexpr uint32_t L0C_HALF_BUF_SIZE = ArchTag::L0C_SIZE / 2;
     static constexpr uint32_t L0C_PINGPONG_BUF_SIZE = L0C_HALF_BUF_SIZE / L0_STAGES;
 
-    __aicore__ inline BlockMmadTla(Arch::Resource<ArchTag> &resource, Mm1L1TileHelper &mm1L1TileHelper)
+    __aicore__ inline BlockMmadTla(Arch::Resource<ArchTag>& resource, Mm1L1TileHelper& mm1L1TileHelper)
     {
         l1QBufNum = mm1L1TileHelper.qL1BufNum;
         l1KBufNum = mm1L1TileHelper.kL1BufNum;
@@ -97,7 +97,7 @@ public:
     __aicore__ inline ~BlockMmadTla() {}
 
     template <class TensorQ>
-    __aicore__ inline void loadQGM(TensorQ &gQTensor, GemmCoord actualOriShape)
+    __aicore__ inline void loadQGM(TensorQ& gQTensor, GemmCoord actualOriShape)
     {
         uint32_t qSTile = actualOriShape[0];
         uint32_t embed = actualOriShape[1];
@@ -115,7 +115,7 @@ public:
     }
 
     template <class TensorK, class TensorL1K>
-    __aicore__ inline void SparseKL1TileMLoad(TensorK &gKTensor, TensorL1K &l1KTensorTla,
+    __aicore__ inline void SparseKL1TileMLoad(TensorK& gKTensor, TensorL1K& l1KTensorTla,
                                               AscendC::GlobalTensor<int32_t> gSparseBlockIdx,
                                               uint32_t gatheredKvSTileIdx, uint32_t kvSeqlen, uint32_t kvSBaseTile,
                                               uint32_t blockShapeY, uint32_t yBlockNumAval, uint32_t yBlockNumRsvd,
@@ -170,7 +170,7 @@ public:
     }
 
     template <class TensorK, class TensorS>
-    __aicore__ inline void operator()(TensorK &gKTensor, TensorS &ubSTensor,
+    __aicore__ inline void operator()(TensorK& gKTensor, TensorS& ubSTensor,
                                       AscendC::GlobalTensor<int32_t> gSparseBlockIdx, GemmCoord actualOriShape,
                                       uint32_t gatheredKvSTileIdx, uint32_t kvSeqlen, uint32_t kvSBaseTile,
                                       uint32_t blockShapeY, uint32_t yBlockNumAval, uint32_t yBlockNumRsvd,

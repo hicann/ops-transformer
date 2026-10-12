@@ -74,14 +74,14 @@ static uint32_t CalculateTschBlockDim(uint32_t sliceNum, uint32_t aicCoreNum, ui
 // tiling func + tiling prepare
 class FlashAttentionScoreGradTiling {
 public:
-    ge::graphStatus RunEmptyTiling(gert::TilingContext *context)
+    ge::graphStatus RunEmptyTiling(gert::TilingContext* context)
     {
-        FlashAttentionScoreGradTilingData *tilingData = context->GetTilingData<FlashAttentionScoreGradTilingData>();
+        FlashAttentionScoreGradTilingData* tilingData = context->GetTilingData<FlashAttentionScoreGradTilingData>();
         uint64_t aicNum = 40; // 40: B3 default aicNum
         uint64_t aivNum = 20; // 20: B3 default aivNum
         auto platformInfoPtr = context->GetPlatformInfo();
         if (platformInfoPtr == nullptr) {
-            auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context->GetCompileInfo());
+            auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context->GetCompileInfo());
             OP_CHECK_IF(
                 compilePtr == nullptr,
                 OP_LOGE(context,
@@ -131,7 +131,7 @@ public:
             tilingData->emptyTensorTilingData.set_singleCoreDvNum(dvNum / aivNum + 1);
             tilingData->emptyTensorTilingData.set_tailCoreDvNum(dvNum / aivNum);
         }
-        const gert::StorageShape *dpseShape = context->GetOutputShape(OUTPUT_IDX_DPSE);
+        const gert::StorageShape* dpseShape = context->GetOutputShape(OUTPUT_IDX_DPSE);
         uint64_t dpseNum =
             (dpseShape == nullptr) ? 0 : static_cast<uint64_t>(dpseShape->GetStorageShape().GetShapeSize());
         if (dpseNum % aivNum == 0ULL) {
@@ -148,20 +148,20 @@ public:
         auto sliceNum =
             (dqNum < aivNum && dkNum < aivNum && dpseNum < aivNum) ? std::max(std::max(dqNum, dkNum), dpseNum) : aivNum;
         context->SetBlockDim(CalculateTschBlockDim(sliceNum, aicNum, aivNum));
-        size_t *workspaces = context->GetWorkspaceSizes(1);
+        size_t* workspaces = context->GetWorkspaceSizes(1);
         workspaces[0] = WORKSPACE_SIZE;
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus RunEmptyTilingRegbase(gert::TilingContext *context)
+    ge::graphStatus RunEmptyTilingRegbase(gert::TilingContext* context)
     {
-        fag::FlashAttentionScoreGradEmptyTensorTilingDataRegbase *emptyTensorTilingDataRegbase =
+        fag::FlashAttentionScoreGradEmptyTensorTilingDataRegbase* emptyTensorTilingDataRegbase =
             context->GetTilingData<fag::FlashAttentionScoreGradEmptyTensorTilingDataRegbase>();
         uint64_t aicNum = 32; // 32: A5 default aicNum
         uint64_t aivNum = 64; // 64: A5 default aivNum
         auto platformInfoPtr = context->GetPlatformInfo();
         if (platformInfoPtr == nullptr) {
-            auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context->GetCompileInfo());
+            auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context->GetCompileInfo());
             OP_CHECK_IF(
                 compilePtr == nullptr,
                 OP_LOGE(context,
@@ -211,7 +211,7 @@ public:
             emptyTensorTilingDataRegbase->set_singleCoreDvNum(dvNum / aivNum + 1);
             emptyTensorTilingDataRegbase->set_tailCoreDvNum(dvNum / aivNum);
         }
-        const gert::StorageShape *dpseShape = context->GetOutputShape(OUTPUT_IDX_DPSE);
+        const gert::StorageShape* dpseShape = context->GetOutputShape(OUTPUT_IDX_DPSE);
         uint64_t dpseNum =
             (dpseShape == nullptr) ? 0 : static_cast<uint64_t>(dpseShape->GetStorageShape().GetShapeSize());
         if (dpseNum % aivNum == 0ULL) {
@@ -225,8 +225,8 @@ public:
         }
 
         // rope场景清零的处理
-        const gert::StorageShape *dqRopeShape = context->GetOutputShape(OUTPUT_IDX_DQ_ROPE);
-        const gert::StorageShape *dkRopeShape = context->GetOutputShape(OUTPUT_IDX_DK_ROPE);
+        const gert::StorageShape* dqRopeShape = context->GetOutputShape(OUTPUT_IDX_DQ_ROPE);
+        const gert::StorageShape* dkRopeShape = context->GetOutputShape(OUTPUT_IDX_DK_ROPE);
         uint64_t dqRopeNum =
             (dqRopeShape == nullptr) ? 0 : static_cast<uint64_t>(dqRopeShape->GetStorageShape().GetShapeSize());
         dqRopeNum = (dqRopeNum < SMLEST_ROPE_SIZE) ? 0 : dqRopeNum;
@@ -259,19 +259,19 @@ public:
         auto sliceNum =
             (dqNum < aivNum && dkNum < aivNum && dpseNum < aivNum) ? std::max(std::max(dqNum, dkNum), dpseNum) : aivNum;
         context->SetBlockDim(CalculateTschBlockDim(sliceNum, aicNum, aivNum));
-        size_t *workspaces = context->GetWorkspaceSizes(1);
+        size_t* workspaces = context->GetWorkspaceSizes(1);
         workspaces[0] = WORKSPACE_SIZE;
         return ge::GRAPH_SUCCESS;
     }
 };
 
-static bool IsEmptyOutput(gert::TilingContext *context)
+static bool IsEmptyOutput(gert::TilingContext* context)
 {
-    const gert::StorageShape *dqShape = context->GetOutputShape(OUTPUT_IDX_DQ);
-    const gert::StorageShape *dqRopeShape = context->GetOutputShape(OUTPUT_IDX_DQ_ROPE);
-    const gert::StorageShape *dkShape = context->GetOutputShape(OUTPUT_IDX_DK);
-    const gert::StorageShape *dkRopeShape = context->GetOutputShape(OUTPUT_IDX_DK_ROPE);
-    const gert::StorageShape *dvShape = context->GetOutputShape(OUTPUT_IDX_DV);
+    const gert::StorageShape* dqShape = context->GetOutputShape(OUTPUT_IDX_DQ);
+    const gert::StorageShape* dqRopeShape = context->GetOutputShape(OUTPUT_IDX_DQ_ROPE);
+    const gert::StorageShape* dkShape = context->GetOutputShape(OUTPUT_IDX_DK);
+    const gert::StorageShape* dkRopeShape = context->GetOutputShape(OUTPUT_IDX_DK_ROPE);
+    const gert::StorageShape* dvShape = context->GetOutputShape(OUTPUT_IDX_DV);
     if (dqShape != nullptr && dkShape != nullptr && dvShape != nullptr) {
         if (dqShape->GetStorageShape().GetShapeSize() == 0 || dkShape->GetStorageShape().GetShapeSize() == 0 ||
             dvShape->GetStorageShape().GetShapeSize() == 0) {
@@ -287,9 +287,9 @@ static bool IsEmptyOutput(gert::TilingContext *context)
 }
 
 // EOD场景: TND输入下actualSeqQlen/actualSeqKvlen累加和全是0，无有效计算时，直接走空tensor模板
-static bool IsTndAllSeqLenZero(gert::TilingContext *context)
+static bool IsTndAllSeqLenZero(gert::TilingContext* context)
 {
-    const char *inputLayout = context->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
+    const char* inputLayout = context->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
     if (inputLayout == nullptr || strlen(inputLayout) != 3 || inputLayout[0] != 'T') { // 3: TND
         return false;
     }
@@ -304,8 +304,8 @@ static bool IsTndAllSeqLenZero(gert::TilingContext *context)
     if (qShapeSize == 0 || kvShapeSize == 0 || qShapeSize != kvShapeSize) {
         return false;
     }
-    const int64_t *qValue = actualSeqQlenTensor->GetData<int64_t>();
-    const int64_t *kvValue = actualSeqKvlenTensor->GetData<int64_t>();
+    const int64_t* qValue = actualSeqQlenTensor->GetData<int64_t>();
+    const int64_t* kvValue = actualSeqKvlenTensor->GetData<int64_t>();
     if (qValue == nullptr || kvValue == nullptr) {
         return false;
     }
@@ -317,7 +317,7 @@ static bool IsTndAllSeqLenZero(gert::TilingContext *context)
     return realBSize == 0;
 }
 
-static ge::graphStatus CheckAttrs(gert::TilingContext *context)
+static ge::graphStatus CheckAttrs(gert::TilingContext* context)
 {
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
@@ -328,7 +328,7 @@ static ge::graphStatus CheckAttrs(gert::TilingContext *context)
     auto nextTokensPtr = attrs->GetAttrPointer<int64_t>(idx++);
     auto n1SizePtr = attrs->GetAttrPointer<uint32_t>(idx++);
     auto inputLayoutPtr = attrs->GetAttrPointer<char>(idx++);
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
 
     OP_CHECK_NULL_WITH_CONTEXT(context, scaleValuePtr);
     OP_CHECK_NULL_WITH_CONTEXT(context, keepProbPtr);
@@ -340,18 +340,18 @@ static ge::graphStatus CheckAttrs(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckBaseInput(gert::TilingContext *context)
+static ge::graphStatus CheckBaseInput(gert::TilingContext* context)
 {
-    auto &queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
-    auto &keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
-    auto &valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
+    auto& queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
+    auto& keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
+    auto& valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
     int64_t headNum = *context->GetAttrs()->GetAttrPointer<int>(HEAD_NUM_IDX);
     OP_CHECK_IF(
         headNum == 0,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "headNum", std::to_string(headNum).c_str(),
                                               "The value of headNum must be greater than 0"),
         return ge::GRAPH_FAILED);
-    const char *inputLayout = context->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
+    const char* inputLayout = context->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
     if (strlen(inputLayout) == 3) { // 3: BSH or SBH or TND
         if (inputLayout[0] == 'B') {
             // layout is BSH
@@ -443,7 +443,7 @@ static ge::graphStatus CheckBaseInput(gert::TilingContext *context)
     return ge::SUCCESS;
 }
 
-static ge::graphStatus CheckParams(gert::TilingContext *context)
+static ge::graphStatus CheckParams(gert::TilingContext* context)
 {
     OP_CHECK_IF(
         context == nullptr,
@@ -453,8 +453,8 @@ static ge::graphStatus CheckParams(gert::TilingContext *context)
         CheckAttrs(context) != ge::GRAPH_SUCCESS,
         OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [invalid attrs]"),
         return ge::GRAPH_FAILED);
-    const auto *queryRopeShape = context->GetOptionalInputShape(QUERY_ROPE_INPUT_INDEX);
-    const auto *keyRopeShape = context->GetOptionalInputShape(KEY_ROPE_INPUT_INDEX);
+    const auto* queryRopeShape = context->GetOptionalInputShape(QUERY_ROPE_INPUT_INDEX);
+    const auto* keyRopeShape = context->GetOptionalInputShape(KEY_ROPE_INPUT_INDEX);
     const bool hasQueryRope = queryRopeShape != nullptr;
     const bool hasKeyRope = keyRopeShape != nullptr;
     if (hasQueryRope != hasKeyRope) {
@@ -486,14 +486,14 @@ static ge::graphStatus CheckParams(gert::TilingContext *context)
     return ge::GRAPH_FAILED;
 }
 
-static void LogConstraintWarnings(gert::TilingContext *context)
+static void LogConstraintWarnings(gert::TilingContext* context)
 {
-    const char *inputLayout = context->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
+    const char* inputLayout = context->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
     if (inputLayout == nullptr || strlen(inputLayout) != 3 || inputLayout[0] != 'T') {
         return;
     }
 
-    auto &queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
+    auto& queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
     int64_t tVal = queryShape.GetDim(0);
     int64_t nVal = queryShape.GetDim(1);
     int64_t dVal = queryShape.GetDim(2);
@@ -539,13 +539,13 @@ static void LogConstraintWarnings(gert::TilingContext *context)
     }
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionGradScore(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionGradScore(gert::TilingContext* context)
 {
     if (CheckParams(context) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     LogConstraintWarnings(context);
-    auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context->GetCompileInfo());
+    auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context->GetCompileInfo());
     OP_CHECK_IF(
         compilePtr == nullptr,
         OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
@@ -567,13 +567,13 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionGradScore(gert::TilingConte
     return TilingRegistryArch::GetInstance().DoTilingImpl(context);
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashAttentionScoreGrad(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashAttentionScoreGrad(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(
         context == nullptr,
         OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
         return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(
         platformInfoPtr == nullptr,
         OP_LOGE(context,

@@ -240,7 +240,7 @@ private:
 };
 
 template <typename TYPE>
-__aicore__ inline void CubeOp<TYPE>::Init(TPipe *pipe, uint64_t qHeadNumIn, uint64_t kvHeadNumIn, uint64_t headDimIn,
+__aicore__ inline void CubeOp<TYPE>::Init(TPipe* pipe, uint64_t qHeadNumIn, uint64_t kvHeadNumIn, uint64_t headDimIn,
                                           uint64_t sparseMode)
 {
     pipe->InitBuffer(L1Buffer, HardwareInfo<ArchType::ASCEND_V220>::l1Size);
@@ -252,8 +252,8 @@ __aicore__ inline void CubeOp<TYPE>::Init(TPipe *pipe, uint64_t qHeadNumIn, uint
     sparseType = sparseMode;
     globalBlockOffset = GetBlockIdx() * 16 * 128 * 128;
 
-    temp_tensor_bf16.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE *>(0));
-    temp_tensor_fp32.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(0));
+    temp_tensor_bf16.SetGlobalBuffer(reinterpret_cast<__gm__ TYPE*>(0));
+    temp_tensor_fp32.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(0));
 
     AscendC::SetLoadDataPaddingValue<uint64_t>(0);
     AscendC::SetNdParaImpl(0x1);
@@ -288,9 +288,9 @@ __aicore__ inline void CubeOp<TYPE>::Init(TPipe *pipe, uint64_t qHeadNumIn, uint
 }
 
 template <typename TYPE>
-__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube1Process(const CubeAddrInfo &addrs,
-                                                                                 __gm__ TYPE *left, __gm__ TYPE *right,
-                                                                                 __gm__ float *out)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube1Process(const CubeAddrInfo& addrs,
+                                                                                 __gm__ TYPE* left, __gm__ TYPE* right,
+                                                                                 __gm__ float* out)
 {
     pingPongIdx = addrs.taskId % 2;
     globalBlockOffset = GetBlockIdx() * BLOCK_WORKSPACE * 2 + pingPongIdx * BLOCK_WORKSPACE;
@@ -301,9 +301,9 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube1Process
 }
 
 template <typename TYPE>
-__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Process(const CubeAddrInfo &addrs,
-                                                                                 __gm__ TYPE *left, __gm__ TYPE *right,
-                                                                                 __gm__ float *out)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Process(const CubeAddrInfo& addrs,
+                                                                                 __gm__ TYPE* left, __gm__ TYPE* right,
+                                                                                 __gm__ float* out)
 {
     pingPongIdx = addrs.taskId % 2;
     globalBlockOffset = GetBlockIdx() * BLOCK_WORKSPACE * 2 + pingPongIdx * BLOCK_WORKSPACE;
@@ -314,9 +314,9 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Process
 }
 
 template <typename TYPE>
-__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube3Process(const CubeAddrInfo &addrs,
-                                                                                 __gm__ TYPE *left, __gm__ TYPE *right,
-                                                                                 __gm__ float *out)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube3Process(const CubeAddrInfo& addrs,
+                                                                                 __gm__ TYPE* left, __gm__ TYPE* right,
+                                                                                 __gm__ float* out)
 {
     pingPongIdx = addrs.taskId % 2;
     globalBlockOffset = GetBlockIdx() * BLOCK_WORKSPACE * 2 + pingPongIdx * BLOCK_WORKSPACE;
@@ -328,8 +328,8 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube3Process
 
 template <typename TYPE>
 __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube23Process(
-    const CubeAddrInfo &addrs, __gm__ TYPE *left, __gm__ TYPE *right1, __gm__ TYPE *right2, __gm__ float *out1,
-    __gm__ float *out2)
+    const CubeAddrInfo& addrs, __gm__ TYPE* left, __gm__ TYPE* right1, __gm__ TYPE* right2, __gm__ float* out1,
+    __gm__ float* out2)
 {
     pingPongIdx = addrs.taskId % 2;
     globalBlockOffset = GetBlockIdx() * BLOCK_WORKSPACE * 2 + pingPongIdx * BLOCK_WORKSPACE;

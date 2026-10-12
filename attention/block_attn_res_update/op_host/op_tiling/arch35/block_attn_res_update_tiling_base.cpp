@@ -22,7 +22,7 @@ namespace optiling {
 namespace block_attn_res_update {
 namespace {
 
-constexpr const char *OP_NAME = "BlockAttnResUpdate";
+constexpr const char* OP_NAME = "BlockAttnResUpdate";
 constexpr uint32_t INPUT_PARTIAL_BLOCK = 0U;
 constexpr uint32_t INPUT_DELTA = 1U;
 constexpr uint32_t INPUT_PSEUDO_QUERY = 2U;
@@ -39,21 +39,21 @@ constexpr uint32_t MATRIX_DIM_NUM = 2U;
 constexpr uint32_t VECTOR_DIM_NUM = 1U;
 constexpr size_t INPUT_COUNT = static_cast<size_t>(INPUT_EXP_SUM) + 1U;
 
-constexpr std::array<const char *, INPUT_COUNT> INPUT_NAMES = {
+constexpr std::array<const char*, INPUT_COUNT> INPUT_NAMES = {
     "partial_block", "delta", "pseudo_query", "numerator", "logit_max", "exp_sum",
 };
 constexpr std::array<ge::DataType, INPUT_COUNT> EXPECTED_DTYPES = {
     ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
 };
-constexpr const char *REFERENCE_OUTPUT_PARTIAL_BLOCK_NAME = "reference output partial_block";
+constexpr const char* REFERENCE_OUTPUT_PARTIAL_BLOCK_NAME = "reference output partial_block";
 
 struct TensorContextInfo {
-    std::array<const gert::StorageShape *, INPUT_COUNT> inputShapes{};
-    const gert::StorageShape *partialBlockOutputStorageShape = nullptr;
-    const gert::StorageShape *hStorageShape = nullptr;
+    std::array<const gert::StorageShape*, INPUT_COUNT> inputShapes{};
+    const gert::StorageShape* partialBlockOutputStorageShape = nullptr;
+    const gert::StorageShape* hStorageShape = nullptr;
 };
 
-bool SameShape(const gert::Shape &lhs, const gert::Shape &rhs)
+bool SameShape(const gert::Shape& lhs, const gert::Shape& rhs)
 {
     if (lhs.GetDimNum() != rhs.GetDimNum()) {
         return false;
@@ -66,7 +66,7 @@ bool SameShape(const gert::Shape &lhs, const gert::Shape &rhs)
     return true;
 }
 
-std::string ShapeToString(const gert::Shape &shape)
+std::string ShapeToString(const gert::Shape& shape)
 {
     std::string shapeStr = "[";
     for (size_t i = 0; i < shape.GetDimNum(); ++i) {
@@ -79,7 +79,7 @@ std::string ShapeToString(const gert::Shape &shape)
     return shapeStr;
 }
 
-bool CheckShapeDimNum(const char *opName, const char *tensorName, const gert::Shape &shape, uint32_t expectedDimNum)
+bool CheckShapeDimNum(const char* opName, const char* tensorName, const gert::Shape& shape, uint32_t expectedDimNum)
 {
     const size_t actualDimNum = shape.GetDimNum();
     if (actualDimNum == expectedDimNum) {
@@ -93,8 +93,8 @@ bool CheckShapeDimNum(const char *opName, const char *tensorName, const gert::Sh
     return false;
 }
 
-bool CheckShapeMatches(const char *opName, const char *tensorName, const gert::Shape &shape, const char *referenceName,
-                       const gert::Shape &referenceShape)
+bool CheckShapeMatches(const char* opName, const char* tensorName, const gert::Shape& shape, const char* referenceName,
+                       const gert::Shape& referenceShape)
 {
     if (SameShape(shape, referenceShape)) {
         return true;
@@ -107,8 +107,8 @@ bool CheckShapeMatches(const char *opName, const char *tensorName, const gert::S
     return false;
 }
 
-bool CheckVectorLength(const char *opName, const char *tensorName, const gert::Shape &shape, int64_t expectedLength,
-                       const char *axisName)
+bool CheckVectorLength(const char* opName, const char* tensorName, const gert::Shape& shape, int64_t expectedLength,
+                       const char* axisName)
 {
     if (shape.GetDim(0) == expectedLength) {
         return true;
@@ -122,7 +122,7 @@ bool CheckVectorLength(const char *opName, const char *tensorName, const gert::S
     return false;
 }
 
-bool CheckTensorDtype(const char *opName, const char *tensorName, ge::DataType actualDtype, ge::DataType expectedDtype)
+bool CheckTensorDtype(const char* opName, const char* tensorName, ge::DataType actualDtype, ge::DataType expectedDtype)
 {
     if (actualDtype == expectedDtype) {
         return true;
@@ -135,7 +135,7 @@ bool CheckTensorDtype(const char *opName, const char *tensorName, ge::DataType a
     return false;
 }
 
-bool CheckTensorNdFormats(const char *opName, const char *tensorName, const gert::CompileTimeTensorDesc &tensorDesc)
+bool CheckTensorNdFormats(const char* opName, const char* tensorName, const gert::CompileTimeTensorDesc& tensorDesc)
 {
     const ge::Format originFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(tensorDesc.GetOriginFormat()));
     const ge::Format storageFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(tensorDesc.GetStorageFormat()));
@@ -150,10 +150,10 @@ bool CheckTensorNdFormats(const char *opName, const char *tensorName, const gert
     return false;
 }
 
-bool CheckStorageShapeMatchesOrigin(const char *opName, const char *tensorName, const gert::StorageShape &storageShape)
+bool CheckStorageShapeMatchesOrigin(const char* opName, const char* tensorName, const gert::StorageShape& storageShape)
 {
-    const gert::Shape &originShape = storageShape.GetOriginShape();
-    const gert::Shape &physicalShape = storageShape.GetStorageShape();
+    const gert::Shape& originShape = storageShape.GetOriginShape();
+    const gert::Shape& physicalShape = storageShape.GetStorageShape();
     if (SameShape(physicalShape, originShape)) {
         return true;
     }
@@ -165,14 +165,14 @@ bool CheckStorageShapeMatchesOrigin(const char *opName, const char *tensorName, 
     return false;
 }
 
-bool CheckInputMetadata(gert::TilingContext *context, const char *opName, TensorContextInfo &tensorInfo)
+bool CheckInputMetadata(gert::TilingContext* context, const char* opName, TensorContextInfo& tensorInfo)
 {
     for (uint32_t i = INPUT_PARTIAL_BLOCK; i <= INPUT_EXP_SUM; ++i) {
         tensorInfo.inputShapes[i] = context->GetInputShape(i);
         OP_CHECK_IF(tensorInfo.inputShapes[i] == nullptr, OP_LOGE(opName, "Input %s shape is nullptr.", INPUT_NAMES[i]),
                     return false);
 
-        const auto *inputDesc = context->GetInputDesc(i);
+        const auto* inputDesc = context->GetInputDesc(i);
         OP_CHECK_IF(inputDesc == nullptr, OP_LOGE(opName, "Input %s desc is nullptr.", INPUT_NAMES[i]), return false);
         if (!CheckTensorDtype(opName, INPUT_NAMES[i], inputDesc->GetDataType(), EXPECTED_DTYPES[i])) {
             return false;
@@ -184,12 +184,12 @@ bool CheckInputMetadata(gert::TilingContext *context, const char *opName, Tensor
     return true;
 }
 
-bool CheckOutputMetadata(gert::TilingContext *context, const char *opName, TensorContextInfo &tensorInfo)
+bool CheckOutputMetadata(gert::TilingContext* context, const char* opName, TensorContextInfo& tensorInfo)
 {
     tensorInfo.partialBlockOutputStorageShape = context->GetOutputShape(OUTPUT_PARTIAL_BLOCK);
     OP_CHECK_IF(tensorInfo.partialBlockOutputStorageShape == nullptr,
                 OP_LOGE(opName, "Reference output partial_block shape is nullptr."), return false);
-    const auto *partialBlockOutputDesc = context->GetOutputDesc(OUTPUT_PARTIAL_BLOCK);
+    const auto* partialBlockOutputDesc = context->GetOutputDesc(OUTPUT_PARTIAL_BLOCK);
     OP_CHECK_IF(partialBlockOutputDesc == nullptr, OP_LOGE(opName, "Reference output partial_block desc is nullptr."),
                 return false);
     if (!CheckTensorDtype(opName, REFERENCE_OUTPUT_PARTIAL_BLOCK_NAME, partialBlockOutputDesc->GetDataType(),
@@ -199,7 +199,7 @@ bool CheckOutputMetadata(gert::TilingContext *context, const char *opName, Tenso
 
     tensorInfo.hStorageShape = context->GetOutputShape(OUTPUT_H);
     OP_CHECK_IF(tensorInfo.hStorageShape == nullptr, OP_LOGE(opName, "Output h shape is nullptr."), return false);
-    const auto *hDesc = context->GetOutputDesc(OUTPUT_H);
+    const auto* hDesc = context->GetOutputDesc(OUTPUT_H);
     OP_CHECK_IF(hDesc == nullptr, OP_LOGE(opName, "Output h desc is nullptr."), return false);
     if (!CheckTensorDtype(opName, "h", hDesc->GetDataType(), ge::DT_BF16)) {
         return false;
@@ -207,7 +207,7 @@ bool CheckOutputMetadata(gert::TilingContext *context, const char *opName, Tenso
     return true;
 }
 
-bool CheckStorageShapes(const char *opName, const TensorContextInfo &tensorInfo)
+bool CheckStorageShapes(const char* opName, const TensorContextInfo& tensorInfo)
 {
     for (size_t i = 0U; i < INPUT_COUNT; ++i) {
         if (!CheckStorageShapeMatchesOrigin(opName, INPUT_NAMES[i], *tensorInfo.inputShapes[i])) {
@@ -219,7 +219,7 @@ bool CheckStorageShapes(const char *opName, const TensorContextInfo &tensorInfo)
            CheckStorageShapeMatchesOrigin(opName, "h", *tensorInfo.hStorageShape);
 }
 
-bool CheckDimNums(const char *opName, const TensorContextInfo &tensorInfo)
+bool CheckDimNums(const char* opName, const TensorContextInfo& tensorInfo)
 {
     return CheckShapeDimNum(opName, "partial_block", tensorInfo.inputShapes[INPUT_PARTIAL_BLOCK]->GetOriginShape(),
                             MATRIX_DIM_NUM) &&
@@ -237,9 +237,9 @@ bool CheckDimNums(const char *opName, const TensorContextInfo &tensorInfo)
            CheckShapeDimNum(opName, "h", tensorInfo.hStorageShape->GetOriginShape(), MATRIX_DIM_NUM);
 }
 
-bool CheckRelatedShapes(const char *opName, const TensorContextInfo &tensorInfo)
+bool CheckRelatedShapes(const char* opName, const TensorContextInfo& tensorInfo)
 {
-    const gert::Shape &partialShape = tensorInfo.inputShapes[INPUT_PARTIAL_BLOCK]->GetOriginShape();
+    const gert::Shape& partialShape = tensorInfo.inputShapes[INPUT_PARTIAL_BLOCK]->GetOriginShape();
     return CheckShapeMatches(opName, "delta", tensorInfo.inputShapes[INPUT_DELTA]->GetOriginShape(), "partial_block",
                              partialShape) &&
            CheckShapeMatches(opName, "numerator", tensorInfo.inputShapes[INPUT_NUMERATOR]->GetOriginShape(),
@@ -250,9 +250,9 @@ bool CheckRelatedShapes(const char *opName, const TensorContextInfo &tensorInfo)
            CheckShapeMatches(opName, "h", tensorInfo.hStorageShape->GetOriginShape(), "partial_block", partialShape);
 }
 
-bool CheckDimSizes(const char *opName, const TensorContextInfo &tensorInfo, uint64_t &tSize, uint32_t &dSize)
+bool CheckDimSizes(const char* opName, const TensorContextInfo& tensorInfo, uint64_t& tSize, uint32_t& dSize)
 {
-    const gert::Shape &partialShape = tensorInfo.inputShapes[INPUT_PARTIAL_BLOCK]->GetOriginShape();
+    const gert::Shape& partialShape = tensorInfo.inputShapes[INPUT_PARTIAL_BLOCK]->GetOriginShape();
     const int64_t tDim = partialShape.GetDim(0);
     const int64_t dDim = partialShape.GetDim(1);
     OP_CHECK_IF(tDim <= 0,
@@ -274,9 +274,9 @@ bool CheckDimSizes(const char *opName, const TensorContextInfo &tensorInfo, uint
                 OP_LOGE(opName, "T * D exceeds the signed 64-bit kernel GM offset range, T=%ld, D=%ld.", tDim, dDim),
                 return false);
 
-    const gert::Shape &logitMaxShape = tensorInfo.inputShapes[INPUT_LOGIT_MAX]->GetOriginShape();
-    const gert::Shape &expSumShape = tensorInfo.inputShapes[INPUT_EXP_SUM]->GetOriginShape();
-    const gert::Shape &pseudoQueryShape = tensorInfo.inputShapes[INPUT_PSEUDO_QUERY]->GetOriginShape();
+    const gert::Shape& logitMaxShape = tensorInfo.inputShapes[INPUT_LOGIT_MAX]->GetOriginShape();
+    const gert::Shape& expSumShape = tensorInfo.inputShapes[INPUT_EXP_SUM]->GetOriginShape();
+    const gert::Shape& pseudoQueryShape = tensorInfo.inputShapes[INPUT_PSEUDO_QUERY]->GetOriginShape();
     if (!CheckVectorLength(opName, "logit_max", logitMaxShape, tDim, "T") ||
         !CheckVectorLength(opName, "exp_sum", expSumShape, tDim, "T") ||
         !CheckVectorLength(opName, "pseudo_query", pseudoQueryShape, dDim, "D")) {
@@ -288,9 +288,9 @@ bool CheckDimSizes(const char *opName, const TensorContextInfo &tensorInfo, uint
     return true;
 }
 
-bool CheckRawTilingData(gert::TilingContext *context, const char *opName)
+bool CheckRawTilingData(gert::TilingContext* context, const char* opName)
 {
-    auto *rawTilingData = context->GetRawTilingData();
+    auto* rawTilingData = context->GetRawTilingData();
     OP_CHECK_IF(rawTilingData == nullptr, OP_LOGE(opName, "Raw tiling data is nullptr."), return false);
     OP_CHECK_IF(rawTilingData->GetData() == nullptr, OP_LOGE(opName, "Raw tiling data buffer is nullptr."),
                 return false);
@@ -321,8 +321,8 @@ ge::graphStatus BlockAttnResUpdateTilingBase::GetShapeAttrsInfo()
         return ret;
     }
 
-    const auto *attrs = context_->GetAttrs();
-    const float *eps = attrs == nullptr ? nullptr : attrs->GetAttrPointer<float>(ATTR_EPS);
+    const auto* attrs = context_->GetAttrs();
+    const float* eps = attrs == nullptr ? nullptr : attrs->GetAttrPointer<float>(ATTR_EPS);
     const float epsValue = eps == nullptr ? DEFAULT_EPS : *eps;
     if (!std::isfinite(epsValue) || epsValue <= 0.0F) {
         const std::string epsValueStr = std::to_string(epsValue);
@@ -366,7 +366,7 @@ ge::graphStatus BlockAttnResUpdateTilingBase::CheckContext()
 ge::graphStatus BlockAttnResUpdateTilingBase::GetPlatformInfo()
 {
     OP_CHECK_IF(context_ == nullptr, OP_LOGE(OP_NAME, "Context is nullptr."), return ge::GRAPH_FAILED);
-    auto *platformInfo = context_->GetPlatformInfo();
+    auto* platformInfo = context_->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(opName_, "PlatformInfo is nullptr."), return ge::GRAPH_FAILED);
     auto platform = platform_ascendc::PlatformAscendC(platformInfo);
     platform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize_);

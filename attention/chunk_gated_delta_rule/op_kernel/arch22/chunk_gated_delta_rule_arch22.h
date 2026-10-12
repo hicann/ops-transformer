@@ -41,8 +41,8 @@ struct CGDRInitParams {
 };
 
 template <typename srcType, typename dstType>
-__aicore__ inline void CopyCast(const GlobalTensor<srcType> &src, const GlobalTensor<dstType> &dst, TPipe *pipe,
-                                const int64_t totalDataCount, const RoundMode &roundMode)
+__aicore__ inline void CopyCast(const GlobalTensor<srcType>& src, const GlobalTensor<dstType>& dst, TPipe* pipe,
+                                const int64_t totalDataCount, const RoundMode& roundMode)
 {
     if ASCEND_IS_AIV {
         int64_t blkNum = GetBlockNum();
@@ -87,7 +87,7 @@ __aicore__ inline void CopyCast(const GlobalTensor<srcType> &src, const GlobalTe
 template <typename lowType, typename highType>
 class CGDR {
 public:
-    __aicore__ inline CGDR(TPipe *pipe, const ChunkGatedDeltaRuleTilingData *tilingData)
+    __aicore__ inline CGDR(TPipe* pipe, const ChunkGatedDeltaRuleTilingData* tilingData)
         : stageOneOp_(stage1MT_)
     {
         pipe_ = pipe;
@@ -138,58 +138,58 @@ public:
         }
     }
 
-    __aicore__ inline void Init(const CGDRInitParams &initParams, GM_ADDR user)
+    __aicore__ inline void Init(const CGDRInitParams& initParams, GM_ADDR user)
     {
         uint64_t dataSize = tiling_->t * tiling_->nk * tiling_->dk;
-        query_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.query), dataSize);
-        key_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.key), dataSize);
+        query_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(initParams.query), dataSize);
+        key_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(initParams.key), dataSize);
 
         dataSize = tiling_->t * tiling_->nv * tiling_->dv;
-        value_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.value), dataSize);
-        out_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.attnOut), dataSize);
+        value_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(initParams.value), dataSize);
+        out_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(initParams.attnOut), dataSize);
 
         dataSize = tiling_->t * tiling_->nv;
-        beta_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.beta), dataSize);
+        beta_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(initParams.beta), dataSize);
         if (initParams.gOptional != nullptr) {
-            g_.SetGlobalBuffer(reinterpret_cast<__gm__ highType *>(initParams.gOptional), dataSize);
+            g_.SetGlobalBuffer(reinterpret_cast<__gm__ highType*>(initParams.gOptional), dataSize);
             gFlag_ = true;
         }
 
         dataSize = tiling_->b * tiling_->nv * tiling_->dv * tiling_->dk;
-        initState_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.initState), dataSize);
-        finalState_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.finalState), dataSize);
+        initState_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(initParams.initState), dataSize);
+        finalState_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(initParams.finalState), dataSize);
 
-        actualSeqLens_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(initParams.seqlens), tiling_->b);
+        actualSeqLens_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(initParams.seqlens), tiling_->b);
 
         uint64_t offset = 0;
-        gCum_.SetGlobalBuffer(reinterpret_cast<__gm__ highType *>(user + offset));
+        gCum_.SetGlobalBuffer(reinterpret_cast<__gm__ highType*>(user + offset));
         offset += sizeof(highType) * tiling_->nv * tiling_->maxGroupLength;
 
-        kCumDecay_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset));
+        kCumDecay_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset));
         offset += sizeof(lowType) * tiling_->nv * tiling_->maxGroupLength * tiling_->dk;
 
-        vInner_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset));
+        vInner_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset));
         offset += sizeof(lowType) * tiling_->nv * tiling_->maxGroupLength * tiling_->dv;
 
-        qPrime_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset));
+        qPrime_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset));
         offset += sizeof(lowType) * tiling_->nv * tiling_->maxGroupLength * tiling_->dk;
 
-        attnInter_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset));
+        attnInter_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset));
         offset += sizeof(lowType) * tiling_->nv * tiling_->maxGroupLength * tiling_->dv;
 
-        kg_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset));
+        kg_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset));
         offset += sizeof(lowType) * tiling_->nv * tiling_->maxGroupLength * tiling_->dk;
 
-        qkt_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(user + offset));
+        qkt_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType*>(user + offset));
         offset += sizeof(lowType) * tiling_->nv * tiling_->maxGroupLength * tiling_->chunkSize;
 
-        highState_.SetGlobalBuffer(reinterpret_cast<__gm__ highType *>(user + offset));
+        highState_.SetGlobalBuffer(reinterpret_cast<__gm__ highType*>(user + offset));
         offset += sizeof(highType) * tiling_->b * tiling_->nv * tiling_->dv * tiling_->dk;
 
-        stageOneMask_.SetGlobalBuffer(reinterpret_cast<__gm__ highType *>(user + offset));
+        stageOneMask_.SetGlobalBuffer(reinterpret_cast<__gm__ highType*>(user + offset));
         offset += sizeof(highType) * tiling_->chunkSize * tiling_->chunkSize * tiling_->aiCoreNum * TASK_RATIO;
 
-        stageThreeMask_.SetGlobalBuffer(reinterpret_cast<__gm__ highType *>(user + offset));
+        stageThreeMask_.SetGlobalBuffer(reinterpret_cast<__gm__ highType*>(user + offset));
         offset += sizeof(highType) * tiling_->chunkSize * tiling_->chunkSize * tiling_->aiCoreNum * TASK_RATIO;
 
         stageWsAddr_ = user + offset;
@@ -233,7 +233,7 @@ public:
     }
 
 private:
-    __aicore__ inline void RunStage1(const ChunkGroup &cg)
+    __aicore__ inline void RunStage1(const ChunkGroup& cg)
     {
         GDRStageOneInitParams initStageOneParams{query_, key_,         value_,        beta_,   g_,
                                                  gCum_,  kCumDecay_,   vInner_,       qPrime_, kg_,
@@ -243,7 +243,7 @@ private:
         pipe_->Reset();
     }
 
-    __aicore__ inline void RunStage2(ChunkGroup &cg, GlobalTensor<lowType> stateIn, GlobalTensor<lowType> stateOut)
+    __aicore__ inline void RunStage2(ChunkGroup& cg, GlobalTensor<lowType> stateIn, GlobalTensor<lowType> stateOut)
     {
         Stage2 stageTwoOp;
         StageTwoParams initStageTwoParams{
@@ -257,7 +257,7 @@ private:
         pipe_->Reset();
     }
 
-    __aicore__ inline void RunStage3(ChunkGroup &cg)
+    __aicore__ inline void RunStage3(ChunkGroup& cg)
     {
         Stage3 stageThreeOp;
         StageThreeParams initStageThreeParams{
@@ -275,8 +275,8 @@ private:
     }
 
 private:
-    TPipe *pipe_;
-    const ChunkGatedDeltaRuleTilingData *tiling_;
+    TPipe* pipe_;
+    const ChunkGatedDeltaRuleTilingData* tiling_;
     GlobalTensor<lowType> query_;
     GlobalTensor<lowType> key_;
     GlobalTensor<lowType> value_;

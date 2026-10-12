@@ -32,7 +32,7 @@ def fa_npu(q, k, v, q_rope, k_rope, atten_mask, pse, **kwargs):
     next_tokens = kwargs.get("next_tokens", 2147483647)
     actual_seq_qlen = kwargs.get("actual_seq_qlen", None)
     actual_seq_kvlen = kwargs.get("actual_seq_kvlen", actual_seq_qlen)
-    scale = kwargs.get("scale", 1 / (d ** 0.5))
+    scale = kwargs.get("scale", 1 / (d**0.5))
     pse_type = kwargs.get("pse_type", 1)
     keep_prob = kwargs.get("keep_prob", 1)
     q_start_idx = kwargs.get("q_start_idx", None)
@@ -62,7 +62,11 @@ def fa_npu(q, k, v, q_rope, k_rope, atten_mask, pse, **kwargs):
     torch.npu.manual_seed(seed)
 
     out_all = torch_npu.npu_fusion_attention_v2(
-        q1, k1, v1, n1, input_layout,
+        q1,
+        k1,
+        v1,
+        n1,
+        input_layout,
         # optional parameters
         pse=pse1,
         atten_mask=atten_mask1,
@@ -78,7 +82,8 @@ def fa_npu(q, k, v, q_rope, k_rope, atten_mask, pse, **kwargs):
         pse_type=pse_type,
         q_start_idx=tuple([q_start_idx]) if q_start_idx is not None else None,
         kv_start_idx=tuple([kv_start_idx]) if kv_start_idx is not None else None,
-        sparse_mode=sparse_mode)
+        sparse_mode=sparse_mode,
+    )
     torch.npu.synchronize()
 
     npu_out = out_all[0].cpu()

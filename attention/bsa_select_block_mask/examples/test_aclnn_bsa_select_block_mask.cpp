@@ -24,18 +24,19 @@
 using namespace std;
 
 #define CHECK_RET(cond, return_expr) \
-    do {                               \
-        if (!(cond)) {                   \
-            return_expr;                   \
-        }                                \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)     \
-    do {                              \
+#define LOG_PRINT(message, ...) \
+    do { \
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t>& shape) {
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
+{
     int64_t shapeSize = 1;
     for (auto i : shape) {
         shapeSize *= i;
@@ -43,8 +44,9 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape) {
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream* stream) {
-     // 固定写法，资源初始化
+int Init(int32_t deviceId, aclrtStream* stream)
+{
+    // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
     ret = aclrtSetDevice(deviceId);
@@ -56,7 +58,8 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 
 template <typename T>
 int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor) {
+                    aclDataType dataType, aclTensor** tensor)
+{
     if (shape.empty()) {
         LOG_PRINT("CreateAclTensor: ERROR - shape is empty\n");
         return -1;
@@ -67,25 +70,25 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
             return -1;
         }
     }
-    
+
     auto size = GetShapeSize(shape) * sizeof(T);
-    
+
     if (hostData.size() != static_cast<size_t>(GetShapeSize(shape))) {
-        LOG_PRINT("CreateAclTensor: ERROR - hostData size mismatch: %zu vs %ld\n", 
-                  hostData.size(), GetShapeSize(shape));
+        LOG_PRINT("CreateAclTensor: ERROR - hostData size mismatch: %zu vs %ld\n", hostData.size(),
+                  GetShapeSize(shape));
         return -1;
     }
-    
+
     // 调用aclrtMalloc申请device侧内存
     *deviceAddr = nullptr;
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
-    
+
     // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
     ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); 
-              aclrtFree(*deviceAddr); *deviceAddr = nullptr; return ret);
-    
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); aclrtFree(*deviceAddr);
+              *deviceAddr = nullptr; return ret);
+
     // 计算连续tensor的strides
     std::vector<int64_t> strides(shape.size(), 1);
     if (shape.size() > 1) {
@@ -97,13 +100,14 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
     // 调用aclCreateTensor接口创建aclTensor
     *tensor = nullptr;
     *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
-                                shape.data(), shape.size(), *deviceAddr);
-    CHECK_RET(*tensor != nullptr, LOG_PRINT("aclCreateTensor failed - returned nullptr\n"); 
-              aclrtFree(*deviceAddr); *deviceAddr = nullptr; return -1);
+                              shape.data(), shape.size(), *deviceAddr);
+    CHECK_RET(*tensor != nullptr, LOG_PRINT("aclCreateTensor failed - returned nullptr\n"); aclrtFree(*deviceAddr);
+              *deviceAddr = nullptr; return -1);
     return 0;
 }
 
-int main() {
+int main()
+{
     // 1.(固定写法)device/stream初始化, 参考acl API手册
     // 根据自己的实际device填写deviceId
     int32_t deviceId = 0;
@@ -111,10 +115,10 @@ int main() {
     auto ret = Init(deviceId, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
-   // 2.构造输入与输出， (以BNSD Layout为例)
+    // 2.构造输入与输出， (以BNSD Layout为例)
     int32_t batch = 1;
     int32_t numHeads = 4;
-    int32_t numKHeads = 4;      // 仅支持MHA: N == KN
+    int32_t numKHeads = 4;        // 仅支持MHA: N == KN
     int32_t qSeqlen = 256 * 1024; // 256K
     int32_t kSeqlen = 256 * 1024; // 256K
     int32_t headDim = 128;
@@ -136,7 +140,7 @@ int main() {
 
     std::vector<op::fp16_t> qData(qSize, 0.1f);
     std::vector<op::fp16_t> kData(kSize, 0.1f);
-    
+
     // mask输出初始化为0
     std::vector<int8_t> maskOutData(GetShapeSize(maskShape), 0);
 
@@ -150,7 +154,7 @@ int main() {
 
     // 创建aclIntArray属性参数
     std::vector<int64_t> blockShapeVec = {blockShapeX, blockShapeY};
-    aclIntArray *blockShapeArr = aclCreateIntArray(blockShapeVec.data(), blockShapeVec.size());
+    aclIntArray* blockShapeArr = aclCreateIntArray(blockShapeVec.data(), blockShapeVec.size());
 
     // 标量与字符串参数配置
     char queryLayoutBuffer[16] = "BNSD";
@@ -158,30 +162,15 @@ int main() {
     double scaleValue = 1.0 / std::sqrt(static_cast<double>(headDim));
     double sparsity = 0.5;
 
-     // 3.调用CANN算子库API
+    // 3.调用CANN算子库API
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
 
     // 调用aclnnBSASelectBlockMask第一段接口
     LOG_PRINT("Calling aclnnBSASelectBlockMaskGetWorkspaceSize...\n");
     ret = aclnnBSASelectBlockMaskGetWorkspaceSize(
-        qTensor, 
-        kTensor, 
-        blockShapeArr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        queryLayoutBuffer,
-        keyLayoutBuffer,
-        static_cast<int64_t>(numKHeads),
-        scaleValue, 
-        sparsity, 
-        maskTensor,
-        &workspaceSize, 
-        &executor
-    );
+        qTensor, kTensor, blockShapeArr, nullptr, nullptr, nullptr, nullptr, nullptr, queryLayoutBuffer,
+        keyLayoutBuffer, static_cast<int64_t>(numKHeads), scaleValue, sparsity, maskTensor, &workspaceSize, &executor);
 
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
     CHECK_RET(executor != nullptr, LOG_PRINT("executor is null after GetWorkspaceSize\n"); return -1);
@@ -201,11 +190,12 @@ int main() {
 
     // 4.(固定写法)同步等待任务执行结束
     ret = aclrtSynchronizeStream(stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret); 
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
     // 5.获取输出的值，将device侧内存上的结果拷贝至host侧
     int64_t maskSize = GetShapeSize(maskShape);
-    ret = aclrtMemcpy(maskOutData.data(), maskSize * sizeof(int8_t), maskAddr, maskSize * sizeof(int8_t), ACL_MEMCPY_DEVICE_TO_HOST);
+    ret = aclrtMemcpy(maskOutData.data(), maskSize * sizeof(int8_t), maskAddr, maskSize * sizeof(int8_t),
+                      ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed.\n"); return ret);
 
     LOG_PRINT("Execution Success! BlockSparseMask output (first 20 elements):\n");
@@ -219,7 +209,7 @@ int main() {
     aclDestroyTensor(qTensor);
     aclDestroyTensor(kTensor);
     aclDestroyTensor(maskTensor);
-    
+
     aclDestroyIntArray(blockShapeArr);
 
     // 7.释放device资源
@@ -227,9 +217,9 @@ int main() {
     aclrtFree(kAddr);
     aclrtFree(maskAddr);
     if (workspaceAddr) {
-      aclrtFree(workspaceAddr);
+        aclrtFree(workspaceAddr);
     }
-    
+
     aclrtDestroyStream(stream);
     aclrtResetDevice(deviceId);
     aclFinalize();

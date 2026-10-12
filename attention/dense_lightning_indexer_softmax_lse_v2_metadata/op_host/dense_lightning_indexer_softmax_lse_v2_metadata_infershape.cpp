@@ -18,15 +18,15 @@
 using namespace ge;
 
 namespace ops {
-static ge::graphStatus InferShapeDenseLightningIndexerSoftmaxLseV2Metadata(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeDenseLightningIndexerSoftmaxLseV2Metadata(gert::InferShapeContext* context)
 {
-    gert::Shape *oShape = context->GetOutputShape(0);
+    gert::Shape* oShape = context->GetOutputShape(0);
     oShape->SetDimNum(1);
     oShape->SetDim(0, optiling::DLI_METADATA_SIZE);
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDtypeDenseLightningIndexerSoftmaxLseV2Metadata(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDtypeDenseLightningIndexerSoftmaxLseV2Metadata(gert::InferDataTypeContext* context)
 {
     context->SetOutputDataType(0, DT_INT32);
     return GRAPH_SUCCESS;

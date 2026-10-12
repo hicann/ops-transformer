@@ -127,13 +127,13 @@ struct BlockSparseAttentionCompileInfo {
 
 // 输入参数信息
 struct RequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct OptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 // Q Input Layout枚举
@@ -163,52 +163,52 @@ public:
     BSATiling() = default;
     ~BSATiling() = default;
 
-    ge::graphStatus GetBsaTiling(gert::TilingContext *bsaContext, BlockSparseAttentionTilingData &tilingData);
-    ge::graphStatus BsaSetTilingData(gert::TilingContext *context, BlockSparseAttentionTilingData &tilingData);
+    ge::graphStatus GetBsaTiling(gert::TilingContext* bsaContext, BlockSparseAttentionTilingData& tilingData);
+    ge::graphStatus BsaSetTilingData(gert::TilingContext* context, BlockSparseAttentionTilingData& tilingData);
 
 private:
-    ge::graphStatus GetNpuInfo(gert::TilingContext *bsaContext);
-    ge::graphStatus ParseAttrs(gert::TilingContext *bsaContext);
-    ge::graphStatus GetInputLayout(gert::TilingContext *bsaContext);
-    ge::graphStatus ParseRequiredTensors(gert::TilingContext *bsaContext);
-    ge::graphStatus ParseOptionalTensors(gert::TilingContext *bsaContext);
-    ge::graphStatus CheckQKVDtype(gert::TilingContext *bsaContext);
-    ge::graphStatus CheckAttentionOutDtype(gert::TilingContext *bsaContext);
-    ge::graphStatus CheckNDFormat(gert::TilingContext *bsaContext);
-    ge::graphStatus CheckQKVDimVal(gert::TilingContext *bsaContext, uint32_t kHeads, uint32_t vHeads, uint32_t kHeadDim,
+    ge::graphStatus GetNpuInfo(gert::TilingContext* bsaContext);
+    ge::graphStatus ParseAttrs(gert::TilingContext* bsaContext);
+    ge::graphStatus GetInputLayout(gert::TilingContext* bsaContext);
+    ge::graphStatus ParseRequiredTensors(gert::TilingContext* bsaContext);
+    ge::graphStatus ParseOptionalTensors(gert::TilingContext* bsaContext);
+    ge::graphStatus CheckQKVDtype(gert::TilingContext* bsaContext);
+    ge::graphStatus CheckAttentionOutDtype(gert::TilingContext* bsaContext);
+    ge::graphStatus CheckNDFormat(gert::TilingContext* bsaContext);
+    ge::graphStatus CheckQKVDimVal(gert::TilingContext* bsaContext, uint32_t kHeads, uint32_t vHeads, uint32_t kHeadDim,
                                    uint32_t vHeadDim);
-    ge::graphStatus ParseQKVInTND(gert::TilingContext *bsaContext);
-    ge::graphStatus ParseQKVInBNSD(gert::TilingContext *bsaContext);
-    ge::graphStatus ParseQKVInBSND(gert::TilingContext *bsaContext);
-    ge::graphStatus ParseSeqlensInTND(gert::TilingContext *bsaContext);
-    ge::graphStatus ParseSeqlensInNonTND(gert::TilingContext *bsaContext);
-    ge::graphStatus ParseSeqlens(gert::TilingContext *bsaContext);
-    ge::graphStatus ParseSparsePattern(gert::TilingContext *bsaContext);
-    ge::graphStatus ParseAttenMask(gert::TilingContext *bsaContext);
-    ge::graphStatus ParseBlockTable(gert::TilingContext *bsaContext);
-    ge::graphStatus CheckSparsePattern(gert::TilingContext *bsaContext, const int64_t defaultShape);
-    ge::graphStatus ValidateGenericDequantScale(gert::TilingContext *bsaContext, const int parameterIndex);
-    ge::graphStatus ValidateMxfp4DequantScale(gert::TilingContext *bsaContext, const int parameterIndex);
-    ge::graphStatus ValidateQDequantScale(gert::TilingContext *bsaContext);
-    ge::graphStatus ValidateKDequantScale(gert::TilingContext *bsaContext);
-    ge::graphStatus ValidateVDequantScale(gert::TilingContext *bsaContext);
-    ge::graphStatus ValidateTNDSeqlenSum(gert::TilingContext *bsaContext);
+    ge::graphStatus ParseQKVInTND(gert::TilingContext* bsaContext);
+    ge::graphStatus ParseQKVInBNSD(gert::TilingContext* bsaContext);
+    ge::graphStatus ParseQKVInBSND(gert::TilingContext* bsaContext);
+    ge::graphStatus ParseSeqlensInTND(gert::TilingContext* bsaContext);
+    ge::graphStatus ParseSeqlensInNonTND(gert::TilingContext* bsaContext);
+    ge::graphStatus ParseSeqlens(gert::TilingContext* bsaContext);
+    ge::graphStatus ParseSparsePattern(gert::TilingContext* bsaContext);
+    ge::graphStatus ParseAttenMask(gert::TilingContext* bsaContext);
+    ge::graphStatus ParseBlockTable(gert::TilingContext* bsaContext);
+    ge::graphStatus CheckSparsePattern(gert::TilingContext* bsaContext, const int64_t defaultShape);
+    ge::graphStatus ValidateGenericDequantScale(gert::TilingContext* bsaContext, const int parameterIndex);
+    ge::graphStatus ValidateMxfp4DequantScale(gert::TilingContext* bsaContext, const int parameterIndex);
+    ge::graphStatus ValidateQDequantScale(gert::TilingContext* bsaContext);
+    ge::graphStatus ValidateKDequantScale(gert::TilingContext* bsaContext);
+    ge::graphStatus ValidateVDequantScale(gert::TilingContext* bsaContext);
+    ge::graphStatus ValidateTNDSeqlenSum(gert::TilingContext* bsaContext);
     // 950 exclusive
     uint32_t GetCurQSTileNum950(int64_t curQSeqlen);
     void CalcBaseTileTilingParams950();
     void CalcSplitCoreTilingParams950();
-    void CalcWorkspaceTilingParams950(gert::TilingContext *bsaContext);
+    void CalcWorkspaceTilingParams950(gert::TilingContext* bsaContext);
     void CalcMatmulPhaseL1TileInfo950();
     void B8FullQuantKVPL1TileInfo950(uint32_t qBaseTileAligned128, uint32_t embeddingSizeAligned128,
                                      uint32_t kvBaseTileAligned128);
     void TransposedMatmulConfig950();
     // 910 exclusive
-    ge::graphStatus CalculateTaskSplit(gert::TilingContext *bsaContext);
-    ge::graphStatus CalculateWorkSpace(gert::TilingContext *bsaContext);
+    ge::graphStatus CalculateTaskSplit(gert::TilingContext* bsaContext);
+    ge::graphStatus CalculateWorkSpace(gert::TilingContext* bsaContext);
     // shared
-    void CalculateBatchTaskSplit(int64_t qSeqlen, uint32_t groupSize, uint32_t &curTaskNum, uint32_t &curQBlockNum);
-    ge::graphStatus FillTilingData(gert::TilingContext *bsaContext);
-    uint64_t GenerateTilingKey(gert::TilingContext *bsaContext);
+    void CalculateBatchTaskSplit(int64_t qSeqlen, uint32_t groupSize, uint32_t& curTaskNum, uint32_t& curQBlockNum);
+    ge::graphStatus FillTilingData(gert::TilingContext* bsaContext);
+    uint64_t GenerateTilingKey(gert::TilingContext* bsaContext);
 
 private:
     uint32_t batch_ = 0;
@@ -240,9 +240,9 @@ private:
     uint32_t totalTaskNum_ = 0;
     uint32_t coreTaskNum_ = 0; // 向下取整: totalTaskNum_ / blockDim_
     uint32_t maxNumBlocksPerBatch_ = 0;
-    const int64_t *qSeqLenList_ = nullptr;
-    const int64_t *kvSeqLenList_ = nullptr;
-    const int64_t *blockShapeList = nullptr;
+    const int64_t* qSeqLenList_ = nullptr;
+    const int64_t* kvSeqLenList_ = nullptr;
+    const int64_t* blockShapeList = nullptr;
     bool useUniformQSeqlen_ = false;  // 是否使用统一的qseqlen值（使用maxQSeqlen_）
     bool useUniformKvSeqlen_ = false; // 是否使用统一的kvseqlen值（使用maxKvSeqlen_）
 
@@ -299,7 +299,7 @@ private:
     ge::DataType dataType_ = ge::DT_FLOAT16;
     ge::DataType attentionOutDataType_ = ge::DT_FLOAT16;
 
-    BlockSparseAttentionTilingData *tilingData_ = nullptr;
+    BlockSparseAttentionTilingData* tilingData_ = nullptr;
 };
 
 } // namespace optiling

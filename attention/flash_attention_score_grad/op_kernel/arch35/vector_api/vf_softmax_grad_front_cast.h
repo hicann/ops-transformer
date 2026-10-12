@@ -35,8 +35,8 @@ param [in] gradTensor input grad LocalTensor
 param [in] srcTensor input src LocalTensor
 */
 template <typename T1, typename T, uint32_t srcN, uint32_t HEAD_DIM_ALIGN>
-__aicore__ inline void MySoftmaxGradFrontCast(const LocalTensor<T> &dstTensor, const LocalTensor<T1> &gradTensor,
-                                              const LocalTensor<T1> &srcTensor, uint32_t srcM, uint32_t realN = srcN)
+__aicore__ inline void MySoftmaxGradFrontCast(const LocalTensor<T>& dstTensor, const LocalTensor<T1>& gradTensor,
+                                              const LocalTensor<T1>& srcTensor, uint32_t srcM, uint32_t realN = srcN)
 {
     if constexpr (IsSameType<T1, float>::value) {
         if constexpr (srcN <= 256) {
@@ -64,8 +64,8 @@ __aicore__ inline void MySoftmaxGradFrontCast(const LocalTensor<T> &dstTensor, c
 }
 #else
 template <typename T1, typename T, uint32_t srcN, uint32_t HEAD_DIM_ALIGN>
-__aicore__ inline void MySoftmaxGradFrontCast(const LocalTensor<T> &dstTensor, const LocalTensor<T1> &gradTensor,
-                                              const LocalTensor<T1> &srcTensor, uint32_t srcM, uint32_t realN = srcN)
+__aicore__ inline void MySoftmaxGradFrontCast(const LocalTensor<T>& dstTensor, const LocalTensor<T1>& gradTensor,
+                                              const LocalTensor<T1>& srcTensor, uint32_t srcM, uint32_t realN = srcN)
 {}
 #endif
 } // namespace AscendC

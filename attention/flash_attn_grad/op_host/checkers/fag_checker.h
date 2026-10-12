@@ -36,7 +36,7 @@ public:
     FagChecker();
     ~FagChecker() = default;
 
-    ge::graphStatus Process(gert::TilingContext *context);
+    ge::graphStatus Process(gert::TilingContext* context);
 
 private:
     std::vector<std::unique_ptr<FagBaseChecker>> checkers_;

@@ -16,13 +16,13 @@ namespace FA {
 constexpr uint32_t BATCH_MODE_SCHEDULE = 1;
 class FlashAttentionScoreTilingDropMaskRegbase : public FlashAttentionScoreTilingRegbase {
 public:
-    explicit FlashAttentionScoreTilingDropMaskRegbase(gert::TilingContext *context) :
-        FlashAttentionScoreTilingRegbase(context)
+    explicit FlashAttentionScoreTilingDropMaskRegbase(gert::TilingContext* context)
+        : FlashAttentionScoreTilingRegbase(context)
     {
         // manually initialize tiling data in hostapi scenario
         OP_CHECK_IF(memset_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(), 0,
-                            context_->GetRawTilingData()->GetCapacity()) != EOK,
-                   OPS_REPORT_VECTOR_INNER_ERR(opName, "Fail to memset tiling data"), return;);
+                             context_->GetRawTilingData()->GetCapacity()) != EOK,
+                    OPS_REPORT_VECTOR_INNER_ERR(opName, "Fail to memset tiling data"), return;);
     }
     ~FlashAttentionScoreTilingDropMaskRegbase() override = default;
 
@@ -51,8 +51,8 @@ protected:
 
         // ub能计算的最大元素数, 向下对齐
         // 单次ub计算量为x个元素,空间占用：x/8 * 1 [1个 uint8]+ 2x * 2[2个fp16,select的src和res] + x * 1 [1个uint8]共6份
-        int64_t baseUbCalSize = AlignDown(CeilDivision(static_cast<int64_t>(aicoreParams_.ubSize),
-                                          DROP_MASK_CAL_SIZE), ubCalFactor);
+        int64_t baseUbCalSize =
+            AlignDown(CeilDivision(static_cast<int64_t>(aicoreParams_.ubSize), DROP_MASK_CAL_SIZE), ubCalFactor);
         baseUbCalSize = std::min(baseUbCalSize, shapeSingleCoreSize * ubCalFactor);
         // ub 的外层循环次数
         int64_t multiCoreFactorSize = CeilDivision(shapeSingleCoreSize * ubCalFactor, baseUbCalSize);
@@ -81,6 +81,7 @@ protected:
     void CalcDBasicBlock() override {}
 };
 
-REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingDropMaskRegbase, static_cast<int32_t>(NpuArch::DAV_3510), 81);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingDropMaskRegbase,
+                                   static_cast<int32_t>(NpuArch::DAV_3510), 81);
 } // namespace FA
 } // namespace optiling

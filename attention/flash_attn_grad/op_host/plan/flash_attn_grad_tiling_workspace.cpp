@@ -27,7 +27,7 @@ constexpr int64_t FAG_WS_ALIGN_ROWS = 128;
 // G 个 Q head 会 atomicAdd 到同一块 dk/dv。kernel 用 fp32 atomicAdd 累加，之后
 // 由 post 阶段乘 scale 并 cast 回 fp16/bf16 输出；dv 不乘 scale。
 // dq/dk 宽 D，dv 宽 Dv（两者可以不等，例如 192 与 128）。
-FagWorkspacePlan BuildWorkspacePlan(const FagParsedInfo &info)
+FagWorkspacePlan BuildWorkspacePlan(const FagParsedInfo& info)
 {
     FagWorkspacePlan plan;
     plan.libapiSize = info.libapiWorkspaceSize;

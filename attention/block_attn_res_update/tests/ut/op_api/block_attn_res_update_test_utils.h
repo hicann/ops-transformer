@@ -34,7 +34,7 @@ namespace block_attn_res_update::test {
 
 constexpr size_t PATH_BUFFER_SIZE = 4096U;
 
-inline void SplitString(const std::string &input, const std::string &delimiter, std::vector<std::string> &output)
+inline void SplitString(const std::string& input, const std::string& delimiter, std::vector<std::string>& output)
 {
     const size_t delimiterLength = delimiter.size();
     size_t currentPosition = 0U;
@@ -65,7 +65,7 @@ inline bool ParseBool(std::string value)
     return value == "true" || value == "1" || value == "yes";
 }
 
-inline std::vector<int64_t> ParseDims(const std::string &value)
+inline std::vector<int64_t> ParseDims(const std::string& value)
 {
     const std::string trimmed = Trim(value);
     if (trimmed.empty() || trimmed == "NONE") {
@@ -76,7 +76,7 @@ inline std::vector<int64_t> ParseDims(const std::string &value)
     SplitString(trimmed, ":", tokens);
     std::vector<int64_t> dims;
     dims.reserve(tokens.size());
-    for (const auto &token : tokens) {
+    for (const auto& token : tokens) {
         dims.emplace_back(std::stoll(Trim(token)));
     }
     return dims;
@@ -88,7 +88,7 @@ struct AclTensorSpec {
     std::vector<int64_t> storageDims;
 };
 
-inline AclTensorSpec ParseAclTensorSpec(const std::string &value)
+inline AclTensorSpec ParseAclTensorSpec(const std::string& value)
 {
     std::vector<std::string> sections;
     SplitString(Trim(value), "#", sections);
@@ -106,7 +106,7 @@ inline AclTensorSpec ParseAclTensorSpec(const std::string &value)
     return spec;
 }
 
-inline aclDataType ParseAclDtype(const std::string &dtype)
+inline aclDataType ParseAclDtype(const std::string& dtype)
 {
     static const std::map<std::string, aclDataType> dtypeMap = {
         {"FLOAT", ACL_FLOAT},
@@ -116,7 +116,7 @@ inline aclDataType ParseAclDtype(const std::string &dtype)
     return iterator == dtypeMap.end() ? ACL_DT_UNDEFINED : iterator->second;
 }
 
-inline aclFormat ParseAclFormat(const std::string &format)
+inline aclFormat ParseAclFormat(const std::string& format)
 {
     static const std::map<std::string, aclFormat> formatMap = {
         {"ND", ACL_FORMAT_ND},
@@ -126,7 +126,7 @@ inline aclFormat ParseAclFormat(const std::string &format)
     return iterator == formatMap.end() ? ACL_FORMAT_UNDEFINED : iterator->second;
 }
 
-inline aclnnStatus ParseAclnnStatus(const std::string &status)
+inline aclnnStatus ParseAclnnStatus(const std::string& status)
 {
     static const std::map<std::string, aclnnStatus> statusMap = {
         {"ACLNN_SUCCESS", ACLNN_SUCCESS},
@@ -141,7 +141,7 @@ inline aclnnStatus ParseAclnnStatus(const std::string &status)
     return iterator == statusMap.end() ? static_cast<aclnnStatus>(std::stoll(trimmed)) : iterator->second;
 }
 
-inline void SetPlatformSocVersion(const std::string &socVersion)
+inline void SetPlatformSocVersion(const std::string& socVersion)
 {
     static const std::map<std::string, op::SocVersion> socVersionMap = {
         {"Ascend910B", op::SocVersion::ASCEND910B},
@@ -154,7 +154,7 @@ inline void SetPlatformSocVersion(const std::string &socVersion)
     op::SetPlatformSocVersion(iterator->second);
 }
 
-inline std::string JoinPath(const std::string &directory, const std::string &fileName)
+inline std::string JoinPath(const std::string& directory, const std::string& fileName)
 {
     if (directory.empty()) {
         return fileName;
@@ -169,14 +169,14 @@ inline std::string GetDirectory(std::string path)
     return position == std::string::npos ? "." : path.substr(0U, position);
 }
 
-inline bool FileExists(const std::string &path)
+inline bool FileExists(const std::string& path)
 {
     std::ifstream file(path);
     return file.good();
 }
 
-inline std::string ResolveCsvPath(const std::string &csvFileName, const std::string &repositoryRelativeDirectory,
-                                  const char *currentFile)
+inline std::string ResolveCsvPath(const std::string& csvFileName, const std::string& repositoryRelativeDirectory,
+                                  const char* currentFile)
 {
     std::vector<std::string> candidates = {
         JoinPath(GetDirectory(currentFile), csvFileName),
@@ -184,7 +184,7 @@ inline std::string ResolveCsvPath(const std::string &csvFileName, const std::str
         csvFileName,
     };
 
-    const char *codePath = std::getenv("CODE_PATH");
+    const char* codePath = std::getenv("CODE_PATH");
     if (codePath != nullptr) {
         candidates.emplace_back(JoinPath(JoinPath(codePath, repositoryRelativeDirectory), csvFileName));
     }
@@ -194,7 +194,7 @@ inline std::string ResolveCsvPath(const std::string &csvFileName, const std::str
         candidates.emplace_back(JoinPath(JoinPath(currentWorkingDirectory, repositoryRelativeDirectory), csvFileName));
     }
 
-    for (const auto &candidate : candidates) {
+    for (const auto& candidate : candidates) {
         if (FileExists(candidate)) {
             return candidate;
         }
@@ -210,8 +210,8 @@ inline std::string MakeSafeParamName(std::string name)
     return name;
 }
 
-inline std::string BuildCsvParseErrorMessage(const std::string &csvPath, size_t lineNumber, const std::string &caseName,
-                                             const std::exception &error)
+inline std::string BuildCsvParseErrorMessage(const std::string& csvPath, size_t lineNumber, const std::string& caseName,
+                                             const std::exception& error)
 {
     std::ostringstream message;
     message << "Failed to parse CSV case. file=" << csvPath << ", line=" << lineNumber;

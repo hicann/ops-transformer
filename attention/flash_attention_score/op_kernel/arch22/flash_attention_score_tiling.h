@@ -465,22 +465,22 @@ public:
         this->singleCoreHeadSize = value;
     }
 
-    const uint32_t *get_seqList() const
+    const uint32_t* get_seqList() const
     {
         return seqList;
     }
-    void set_seqList(const uint32_t *values)
+    void set_seqList(const uint32_t* values)
     {
         for (int i = 0; i < 48; ++i) {
             seqList[i] = values[i];
         }
     }
 
-    const uint32_t *get_eachCoreSeqSize() const
+    const uint32_t* get_eachCoreSeqSize() const
     {
         return eachCoreSeqSize;
     }
-    void set_eachCoreSeqSize(const uint32_t *values)
+    void set_eachCoreSeqSize(const uint32_t* values)
     {
         for (int i = 0; i < 48; ++i) {
             eachCoreSeqSize[i] = values[i];
@@ -625,11 +625,11 @@ public:
         this->eachCoreBatchNum = value;
     }
 
-    const uint32_t *get_sOuterLoopTimesList() const
+    const uint32_t* get_sOuterLoopTimesList() const
     {
         return sOuterLoopTimesList;
     }
-    void set_sOuterLoopTimesList(const uint32_t *values)
+    void set_sOuterLoopTimesList(const uint32_t* values)
     {
         for (int i = 0; i < 48; ++i) {
             sOuterLoopTimesList[i] = values[i];
@@ -1903,11 +1903,11 @@ public:
         this->splitFactorTailSize = value;
     }
 
-    int64_t *get_sparseStartIdx()
+    int64_t* get_sparseStartIdx()
     {
         return sparseStartIdx;
     }
-    void set_sparseStartIdx(const int64_t *values)
+    void set_sparseStartIdx(const int64_t* values)
     {
         for (int i = 0; i < 48; ++i) {
             sparseStartIdx[i] = values[i];

@@ -117,11 +117,11 @@ struct TempParamsUngs1s2Bb {
 
 class FlashAttentionScoreGradUbngs1s2BbTiling : public TilingBaseClass {
 public:
-    FlashAttentionScoreGradUbngs1s2BbTilingData *td_ =
+    FlashAttentionScoreGradUbngs1s2BbTilingData* td_ =
         context_->GetTilingData<FlashAttentionScoreGradUbngs1s2BbTilingData>();
     TempParamsUngs1s2Bb basicParams;
 
-    explicit FlashAttentionScoreGradUbngs1s2BbTiling(gert::TilingContext *context)
+    explicit FlashAttentionScoreGradUbngs1s2BbTiling(gert::TilingContext* context)
         : TilingBaseClass(context)
     {
         td_->reset();
@@ -225,7 +225,7 @@ public:
         if (sinkShape != nullptr && sinkShape->GetStorageShape().GetDimNum() == 1) {
             return false;
         }
-        const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
+        const char* tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
                                        context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) :
                                        "";
         if (strcmp(tndSoftmaxIn, "") != 0) {
@@ -256,8 +256,8 @@ public:
                     OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "value"), return ge::GRAPH_FAILED);
         OP_CHECK_IF(context_->GetInputShape(KEY) == nullptr,
                     OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "keyIn"), return ge::GRAPH_FAILED);
-        const gert::StorageShape *valueShape = context_->GetInputShape(VALUE);
-        const gert::StorageShape *keyShape = context_->GetInputShape(KEY);
+        const gert::StorageShape* valueShape = context_->GetInputShape(VALUE);
+        const gert::StorageShape* keyShape = context_->GetInputShape(KEY);
         if (!IsSameShape(keyShape, valueShape) && IsSameShapeButValueDLeEqD(keyShape, valueShape)) {
             return false;
         }
@@ -279,7 +279,7 @@ public:
         auto platformInfoPtr = context_->GetPlatformInfo();
         if (platformInfoPtr == nullptr) {
             auto compileInfoPtr =
-                reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context_->GetCompileInfo());
+                reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context_->GetCompileInfo());
             OP_CHECK_IF(
                 compileInfoPtr == nullptr,
                 OP_LOGE(context_,
@@ -413,7 +413,7 @@ public:
         td_->opInfo.set_nextTokens(*context_->GetAttrs()->GetAttrPointer<int64_t>(NEXT_TOKENS));
         td_->opInfo.set_headNum(*context_->GetAttrs()->GetAttrPointer<uint32_t>(HEAD_NUM));
         OP_CHECK_IF(td_->opInfo.get_headNum() == 0, OP_LOGW(context_, "headNum is 0."), return ge::GRAPH_PARAM_INVALID);
-        const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
+        const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
         if (strcmp(inputLayout, BSH_STR) == 0) {
             td_->opInfo.set_inputLayout(static_cast<uint32_t>(InputLayout::BSH));
         } else if (strcmp(inputLayout, SBH_STR) == 0) {
@@ -441,8 +441,8 @@ public:
                     OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "query"), return ge::GRAPH_FAILED);
         OP_CHECK_IF(context_->GetInputShape(KEY) == nullptr,
                     OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "keyIn"), return ge::GRAPH_FAILED);
-        const gert::Shape &queryShape = context_->GetInputShape(QUERY)->GetStorageShape();
-        const gert::Shape &keyShape = context_->GetInputShape(KEY)->GetStorageShape();
+        const gert::Shape& queryShape = context_->GetInputShape(QUERY)->GetStorageShape();
+        const gert::Shape& keyShape = context_->GetInputShape(KEY)->GetStorageShape();
         if (td_->opInfo.get_inputLayout() == static_cast<uint32_t>(InputLayout::BNSD) ||
             td_->opInfo.get_inputLayout() == static_cast<uint32_t>(InputLayout::BSND)) {
             OP_CHECK_IF(
@@ -942,8 +942,8 @@ public:
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus SetMm1AndMm2Tiling(matmul_tiling::MatmulApiTiling &mm1AndMm2, int64_t bIn,
-                                       AscendC::tiling::TCubeTiling *mm1AndMm2Tiling)
+    ge::graphStatus SetMm1AndMm2Tiling(matmul_tiling::MatmulApiTiling& mm1AndMm2, int64_t bIn,
+                                       AscendC::tiling::TCubeTiling* mm1AndMm2Tiling)
     {
         mm1AndMm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
                            matmul_tiling::DataType::DT_FLOAT16, false);
@@ -974,8 +974,8 @@ public:
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus SetMm31Tiling(matmul_tiling::MatmulApiTiling &mm31, int64_t bIn,
-                                  AscendC::tiling::TCubeTiling *mm31Tiling)
+    ge::graphStatus SetMm31Tiling(matmul_tiling::MatmulApiTiling& mm31, int64_t bIn,
+                                  AscendC::tiling::TCubeTiling* mm31Tiling)
     {
         mm31.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT16,
                       false);
@@ -1004,8 +1004,8 @@ public:
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus SetMm32AndMm4Tiling(matmul_tiling::MatmulApiTiling &mm32AndMm4, int64_t bIn,
-                                        AscendC::tiling::TCubeTiling *mm32AndMm4Tiling)
+    ge::graphStatus SetMm32AndMm4Tiling(matmul_tiling::MatmulApiTiling& mm32AndMm4, int64_t bIn,
+                                        AscendC::tiling::TCubeTiling* mm32AndMm4Tiling)
     {
         mm32AndMm4.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
                             matmul_tiling::DataType::DT_FLOAT16, true);
@@ -1118,7 +1118,7 @@ public:
         context_->SetBlockDim(blockdim);
         context_->SetScheduleMode(1);
 
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         workspaces[0] = workspaceSize_;
 
         return ge::GRAPH_SUCCESS;

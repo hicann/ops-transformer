@@ -39,9 +39,9 @@ constexpr int64_t MAX_HEAD_DIM = 8192;
 
 } // namespace
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor> block_attn_res_prepare(const at::Tensor &blockRes,
-                                                                      const at::Tensor &validBlocks,
-                                                                      const at::Tensor &pseudoQuery, double eps)
+std::tuple<at::Tensor, at::Tensor, at::Tensor> block_attn_res_prepare(const at::Tensor& blockRes,
+                                                                      const at::Tensor& validBlocks,
+                                                                      const at::Tensor& pseudoQuery, double eps)
 {
     TORCH_CHECK(blockRes.dim() == BLOCK_RES_RANK, "block_res must be a 3D tensor, but got ", blockRes.dim(), "D");
     TORCH_CHECK(validBlocks.dim() == VALID_BLOCKS_RANK && validBlocks.size(VALID_BLOCKS_VALUE_DIM_INDEX) == 1,

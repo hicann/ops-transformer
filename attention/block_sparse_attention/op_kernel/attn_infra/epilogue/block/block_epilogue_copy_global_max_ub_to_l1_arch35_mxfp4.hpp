@@ -33,7 +33,7 @@ public:
     using ElementLocalGlobalMax = ElementLocalGlobalMax_;
     using LayoutLocalGlobalMax = LayoutLocalGlobalMax_;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource)
     {
         for (uint32_t i = 0; i < MXFP4::UB_LOCAL_GLOBAL_MAX_CNT; i++) {
             localGlobalMaxUBTensor[i] = resource.ubBuf.template GetBufferByByte<ElementLocalGlobalMax>(
@@ -43,10 +43,10 @@ public:
     __aicore__ inline ~BlockEpilogue() {}
 
     template <class TensorL1GlobalMax>
-    __aicore__ inline void operator()(TensorL1GlobalMax const &l1GlocalMaxTensorTla, TileInfo const &tileInfo)
+    __aicore__ inline void operator()(TensorL1GlobalMax const& l1GlocalMaxTensorTla, TileInfo const& tileInfo)
     {
         uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
-        AscendC::LocalTensor<ElementLocalGlobalMax> &localGlobalMax = localGlobalMaxUBTensor[tileInfo.tileMaxIdx];
+        AscendC::LocalTensor<ElementLocalGlobalMax>& localGlobalMax = localGlobalMaxUBTensor[tileInfo.tileMaxIdx];
         // 如果当前kvs只有一个softmax，就另外一个核不用做同步操作
         if (tileInfo.kvsFirstTileStartVecCore != subBlockIdx && tileInfo.isTileGoupFirstTile) {
             auto l1TlaTile = tla::GetTile(l1GlocalMaxTensorTla, tla::MakeCoord(1 - subBlockIdx, 0),

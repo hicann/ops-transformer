@@ -31,11 +31,11 @@ public:
     static constexpr BSALayout LAYOUT_KV = BSAT::layoutKV; // BNSD or TND
 
     __aicore__ inline BSAVecSmService(){};
-    __aicore__ inline void InitParams(const BSAConstInfo &constInfo,
-                                      const optiling::BSASelectBlockMaskTilingData *__restrict tilingData);
-    __aicore__ inline void InitBuffers(TBuf<> *uBuf_);
+    __aicore__ inline void InitParams(const BSAConstInfo& constInfo,
+                                      const optiling::BSASelectBlockMaskTilingData* __restrict tilingData);
+    __aicore__ inline void InitBuffers(TBuf<>* uBuf_);
 
-    __aicore__ inline void InitGM(GlobalTensor<T> &ScoreFp32Gm, GlobalTensor<OUT_T> &attnScoreFp16Gm);
+    __aicore__ inline void InitGM(GlobalTensor<T>& ScoreFp32Gm, GlobalTensor<OUT_T>& attnScoreFp16Gm);
 
     __aicore__ inline void OnlineSoftmaxFirstPassChunk(uint32_t qChunkStart, uint32_t qChunkSize, uint32_t kChunkStart,
                                                        uint32_t kChunkSize, uint32_t validYBlocks);
@@ -46,7 +46,7 @@ public:
 
 private:
     BSAConstInfo constInfo;
-    const optiling::BSASelectBlockMaskTilingData *__restrict tilingData;
+    const optiling::BSASelectBlockMaskTilingData* __restrict tilingData;
 
     static constexpr int32_t BUFFER = 1;
     uint32_t vecSubBlockIdx = 0; // vector核在aic的序号： 0 or 1
@@ -74,7 +74,7 @@ private:
 
 template <typename BSAT>
 __aicore__ inline void BSAVecSmService<BSAT>::InitParams(
-    const BSAConstInfo &constInfo, const optiling::BSASelectBlockMaskTilingData *__restrict tilingData)
+    const BSAConstInfo& constInfo, const optiling::BSASelectBlockMaskTilingData* __restrict tilingData)
 {
     this->constInfo = constInfo;
     this->tilingData = tilingData;
@@ -82,7 +82,7 @@ __aicore__ inline void BSAVecSmService<BSAT>::InitParams(
 }
 
 template <typename BSAT>
-__aicore__ inline void BSAVecSmService<BSAT>::InitBuffers(TBuf<> *uBuf_)
+__aicore__ inline void BSAVecSmService<BSAT>::InitBuffers(TBuf<>* uBuf_)
 {
     // ub 划分
     // 根据UB计算，最多可以5次cube，一次vector计算， 即score ub 占用64 * 128 * 5 * 4 = 160k
@@ -143,14 +143,14 @@ __aicore__ inline void BSAVecSmService<BSAT>::InitBuffers(TBuf<> *uBuf_)
 }
 
 template <typename BSAT>
-__aicore__ inline void BSAVecSmService<BSAT>::InitGM(GlobalTensor<T> &ScoreFp32Gm, GlobalTensor<OUT_T> &attnScoreFp16Gm)
+__aicore__ inline void BSAVecSmService<BSAT>::InitGM(GlobalTensor<T>& ScoreFp32Gm, GlobalTensor<OUT_T>& attnScoreFp16Gm)
 {
     this->attnScoreFp16GmTensor = attnScoreFp16Gm;
     this->scoreFp32GmTensor = ScoreFp32Gm;
 }
 
-__aicore__ inline void SubBroadcast(LocalTensor<float> const &ubOut, LocalTensor<float> const &ubIn0,
-                                    LocalTensor<float> const &ubIn1, uint64_t row, uint64_t col)
+__aicore__ inline void SubBroadcast(LocalTensor<float> const& ubOut, LocalTensor<float> const& ubIn0,
+                                    LocalTensor<float> const& ubIn1, uint64_t row, uint64_t col)
 {
     // 默认 col 安装32字节对齐
     // 分核逻辑的关系，矩阵shape不会超过[128, 128 * 5], 若启动俩个vector，shape不会超过[64, 128 * 5]
@@ -178,8 +178,8 @@ __aicore__ inline void SubBroadcast(LocalTensor<float> const &ubOut, LocalTensor
     }
 }
 
-__aicore__ inline void DivBroadcast(LocalTensor<float> const &ubOut, LocalTensor<float> const &ubIn0,
-                                    LocalTensor<float> const &ubIn1, uint64_t row, uint64_t col)
+__aicore__ inline void DivBroadcast(LocalTensor<float> const& ubOut, LocalTensor<float> const& ubIn0,
+                                    LocalTensor<float> const& ubIn1, uint64_t row, uint64_t col)
 {
     // 默认 col 安装32字节对齐
     // 分核逻辑的关系，矩阵shape不会超过[128, 128 * 5], 若启动俩个vector，shape不会超过[64, 128 * 5]
@@ -422,7 +422,7 @@ __aicore__ inline void BSAVecSmService<BSAT>::SoftmaxSecondPassAndCast(uint32_t 
 
     uint64_t attnScoreOffset = static_cast<uint64_t>(sftOutQRowOffset) * validYBlocks + kChunkStart;
     GlobalTensor<OUT_T> attnScoreChunkGm;
-    attnScoreChunkGm.SetGlobalBuffer((__gm__ OUT_T *)(attnScoreFp16GmTensor.GetPhyAddr() + attnScoreOffset));
+    attnScoreChunkGm.SetGlobalBuffer((__gm__ OUT_T*)(attnScoreFp16GmTensor.GetPhyAddr() + attnScoreOffset));
     DataCopyPad(attnScoreChunkGm[0], scoreFp16Ub,
                 {static_cast<uint16_t>(actualQExcuteRow), static_cast<uint32_t>(kChunkSize * sizeof(OUT_T)), 0,
                  static_cast<uint32_t>((validYBlocks - kChunkSize) * sizeof(OUT_T)), 0});

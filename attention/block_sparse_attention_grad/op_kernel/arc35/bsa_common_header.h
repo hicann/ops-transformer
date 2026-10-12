@@ -107,20 +107,20 @@ inline __aicore__ T RoundUp(const T val, const T align)
     return (val + align - 1) / align * align;
 }
 
-__aicore__ inline int64_t GetSeqLen(int32_t i, __gm__ uint8_t *seq_Len)
+__aicore__ inline int64_t GetSeqLen(int32_t i, __gm__ uint8_t* seq_Len)
 {
     int64_t actualSeqlen;
     if (i == 0) {
-        actualSeqlen = ((__gm__ int64_t *)seq_Len)[0];
+        actualSeqlen = ((__gm__ int64_t*)seq_Len)[0];
     } else {
-        actualSeqlen = ((__gm__ int64_t *)seq_Len)[i] - ((__gm__ int64_t *)seq_Len)[i - 1];
+        actualSeqlen = ((__gm__ int64_t*)seq_Len)[i] - ((__gm__ int64_t*)seq_Len)[i - 1];
     }
     return actualSeqlen;
 }
 
-__aicore__ inline int64_t GetSeqTotalLen(int32_t i, __gm__ uint8_t *seq_Len)
+__aicore__ inline int64_t GetSeqTotalLen(int32_t i, __gm__ uint8_t* seq_Len)
 {
-    int64_t actualTotalSeqlen = ((__gm__ int64_t *)seq_Len)[i];
+    int64_t actualTotalSeqlen = ((__gm__ int64_t*)seq_Len)[i];
     return actualTotalSeqlen;
 }
 
@@ -165,9 +165,9 @@ __aicore__ inline int64_t GetSftgGmOffset(int64_t lastBatchSum, int64_t current_
     }
 }
 
-__aicore__ inline bool IsValidBlock(const ConstInfo &const_info, const int64_t batch_idx, const int64_t n1_idx,
+__aicore__ inline bool IsValidBlock(const ConstInfo& const_info, const int64_t batch_idx, const int64_t n1_idx,
                                     const int64_t q_block_idx, const int64_t kv_block_idx,
-                                    __gm__ uint8_t *block_sparse_mask)
+                                    __gm__ uint8_t* block_sparse_mask)
 
 {
     // The public mask layout is [B, N1, Q_BLOCK, KV_BLOCK].  The Arch35 aclnn

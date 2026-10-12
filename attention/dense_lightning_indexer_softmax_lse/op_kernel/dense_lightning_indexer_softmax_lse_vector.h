@@ -27,8 +27,8 @@ constexpr uint64_t VEC_REPEAT_BYTES = 256;
 constexpr int32_t CONST_TWO = 2;
 
 template <typename T>
-__aicore__ inline void CopyIn(LocalTensor<float> &mmOutUb, LocalTensor<T> &weightsUb, GlobalTensor<float> &mMoutGm,
-                              GlobalTensor<T> &weightScaleGm, int64_t mm1ResGmOffset, int64_t weights_gmoffset,
+__aicore__ inline void CopyIn(LocalTensor<float>& mmOutUb, LocalTensor<T>& weightsUb, GlobalTensor<float>& mMoutGm,
+                              GlobalTensor<T>& weightScaleGm, int64_t mm1ResGmOffset, int64_t weights_gmoffset,
                               int64_t groupInner, int64_t s2Inner, int64_t mmUbStride)
 {
     // 将mm1ResGmOffset copy到UB上
@@ -53,7 +53,7 @@ __aicore__ inline void CopyIn(LocalTensor<float> &mmOutUb, LocalTensor<T> &weigh
 }
 
 template <typename T>
-__aicore__ inline void CopyOut(const GlobalTensor<T> &dstGm, const LocalTensor<T> &srcUb, int64_t copyCount)
+__aicore__ inline void CopyOut(const GlobalTensor<T>& dstGm, const LocalTensor<T>& srcUb, int64_t copyCount)
 {
     AscendC::DataCopyParams dataCopyOutyParams;
     dataCopyOutyParams.blockCount = 1;
@@ -64,8 +64,8 @@ __aicore__ inline void CopyOut(const GlobalTensor<T> &dstGm, const LocalTensor<T
 }
 
 template <typename T>
-__aicore__ inline void DoScale(const LocalTensor<float> &reduceCacheBuf, LocalTensor<float> &mmOutUb,
-                               LocalTensor<float> &weightsUb, LocalTensor<T> &weightsTUb, LocalTensor<float> &tmpBuff,
+__aicore__ inline void DoScale(const LocalTensor<float>& reduceCacheBuf, LocalTensor<float>& mmOutUb,
+                               LocalTensor<float>& weightsUb, LocalTensor<T>& weightsTUb, LocalTensor<float>& tmpBuff,
                                int64_t groupInner, int64_t s2Inner, int32_t outerGidx)
 {
     // cast bfloat16_t to float
@@ -111,7 +111,7 @@ __aicore__ inline uint64_t FindNearestPower2(uint64_t value)
     }
 }
 
-__aicore__ inline void DoReduce(const LocalTensor<float> &srcTensor, LocalTensor<float> &dstTensor, int32_t rNum,
+__aicore__ inline void DoReduce(const LocalTensor<float>& srcTensor, LocalTensor<float>& dstTensor, int32_t rNum,
                                 int32_t aNum)
 {
     if (rNum == 1) {

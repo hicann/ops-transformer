@@ -33,16 +33,16 @@ using Params = typename TensorApiKernel::Params;
 constexpr uint32_t MM1_L0_K_MAX = 64U;
 constexpr uint32_t SINGLE_STAGE = 1U;
 
-__aicore__ inline void AssembleProblemShape(Params &params, const optiling::BlockAttnResPrepareMixTilingData &tiling)
+__aicore__ inline void AssembleProblemShape(Params& params, const optiling::BlockAttnResPrepareMixTilingData& tiling)
 {
     params.problemShape = {static_cast<int64_t>(tiling.totalS), static_cast<int64_t>(tiling.totalN),
                            static_cast<int64_t>(tiling.totalD), static_cast<int64_t>(tiling.totalT)};
 }
 
-__aicore__ inline void AssembleMm1Params(Params &params, GM_ADDR blockRes, GM_ADDR pseudoQuery, GM_ADDR workspace,
-                                         const optiling::BlockAttnResPrepareMixTilingData &tiling)
+__aicore__ inline void AssembleMm1Params(Params& params, GM_ADDR blockRes, GM_ADDR pseudoQuery, GM_ADDR workspace,
+                                         const optiling::BlockAttnResPrepareMixTilingData& tiling)
 {
-    auto &mm1 = params.mm1Params;
+    auto& mm1 = params.mm1Params;
     mm1.aGmAddr = pseudoQuery;
     mm1.bGmAddr = blockRes;
     mm1.cGmAddr = workspace;
@@ -57,10 +57,10 @@ __aicore__ inline void AssembleMm1Params(Params &params, GM_ADDR blockRes, GM_AD
     mm1.l0cStages = SINGLE_STAGE;
 }
 
-__aicore__ inline void AssembleMm2Params(Params &params, GM_ADDR blockRes, GM_ADDR numerator, GM_ADDR workspace,
-                                         const optiling::BlockAttnResPrepareMixTilingData &tiling)
+__aicore__ inline void AssembleMm2Params(Params& params, GM_ADDR blockRes, GM_ADDR numerator, GM_ADDR workspace,
+                                         const optiling::BlockAttnResPrepareMixTilingData& tiling)
 {
-    auto &mm2 = params.mm2Params;
+    auto& mm2 = params.mm2Params;
     mm2.aGmAddr = workspace;
     mm2.bGmAddr = blockRes;
     mm2.cGmAddr = numerator;
@@ -75,11 +75,11 @@ __aicore__ inline void AssembleMm2Params(Params &params, GM_ADDR blockRes, GM_AD
     mm2.l0cStages = SINGLE_STAGE;
 }
 
-__aicore__ inline void AssembleEpilogueParams(Params &params, GM_ADDR validBlocks, GM_ADDR numerator, GM_ADDR logitMax,
+__aicore__ inline void AssembleEpilogueParams(Params& params, GM_ADDR validBlocks, GM_ADDR numerator, GM_ADDR logitMax,
                                               GM_ADDR expSum, GM_ADDR workspace,
-                                              const optiling::BlockAttnResPrepareMixTilingData &tiling)
+                                              const optiling::BlockAttnResPrepareMixTilingData& tiling)
 {
-    auto &epilogue = params.epilogueParams;
+    auto& epilogue = params.epilogueParams;
     epilogue.validBlocksGmAddr = validBlocks;
     epilogue.softmaxMaxGmAddr = logitMax;
     epilogue.weightedOutputGmAddr = numerator;
@@ -100,9 +100,9 @@ __aicore__ inline void AssembleEpilogueParams(Params &params, GM_ADDR validBlock
     epilogue.epsilon = tiling.eps;
 }
 
-__aicore__ inline void AssembleSchedulerParams(Params &params, const optiling::BlockAttnResPrepareMixTilingData &tiling)
+__aicore__ inline void AssembleSchedulerParams(Params& params, const optiling::BlockAttnResPrepareMixTilingData& tiling)
 {
-    auto &scheduler = params.schedulerParams;
+    auto& scheduler = params.schedulerParams;
     scheduler.totalWorkUnits = tiling.totalWorkUnits;
     scheduler.usedCoreNum = tiling.usedCoreNum;
     scheduler.baseT = tiling.baseT;
@@ -115,7 +115,7 @@ __aicore__ inline void AssembleSchedulerParams(Params &params, const optiling::B
 __aicore__ inline void BlockAttnResPrepareTensorApiBlazeKernel(GM_ADDR blockRes, GM_ADDR validBlocks,
                                                                GM_ADDR pseudoQuery, GM_ADDR numerator, GM_ADDR logitMax,
                                                                GM_ADDR expSum, GM_ADDR workspace,
-                                                               const optiling::BlockAttnResPrepareMixTilingData &tiling)
+                                                               const optiling::BlockAttnResPrepareMixTilingData& tiling)
 {
     BlockAttnResPrepareMixDetail::Params params{};
     BlockAttnResPrepareMixDetail::AssembleProblemShape(params, tiling);

@@ -34,10 +34,10 @@ public:
 
     __aicore__ inline BSAVecPostPoolService(){};
 
-    __aicore__ inline void InitParams(const BSAConstInfo &constInfo,
-                                      const optiling::BSASelectBlockMaskTilingData *__restrict tilingData);
-    __aicore__ inline void InitBuffers(TBuf<> *uBuf_);
-    __aicore__ inline void InitPostPoolGM(GlobalTensor<IN_T> &attnScoreGm, GlobalTensor<OUT_T> &pooledScoreGm);
+    __aicore__ inline void InitParams(const BSAConstInfo& constInfo,
+                                      const optiling::BSASelectBlockMaskTilingData* __restrict tilingData);
+    __aicore__ inline void InitBuffers(TBuf<>* uBuf_);
+    __aicore__ inline void InitPostPoolGM(GlobalTensor<IN_T>& attnScoreGm, GlobalTensor<OUT_T>& pooledScoreGm);
 
     // 多核入口：按 aivIdx/aivNum 将 postX 方向的 px 行组划分到各 AIV
     __aicore__ inline void PostPoolRange(uint32_t batchIdx, uint32_t headIdx, uint32_t validXBlocks,
@@ -51,15 +51,15 @@ private:
     static constexpr uint32_t REDUCE_TMP_BYTES = BSAConstInfo::BUFFER_SIZE_BYTE_24K;
     static constexpr uint32_t POOLED_ROW_ELEMS = BSA_POST_POOL_COL_CAP / 8; // SC/C ≤ 256（C ≥ 8）
 
-    __aicore__ inline void CalcPostPxRange(uint32_t &pxStart, uint32_t &pxEnd, uint32_t validPostX);
+    __aicore__ inline void CalcPostPxRange(uint32_t& pxStart, uint32_t& pxEnd, uint32_t validPostX);
 
     BSAConstInfo constInfo;
-    const optiling::BSASelectBlockMaskTilingData *__restrict tilingData;
+    const optiling::BSASelectBlockMaskTilingData* __restrict tilingData;
 
     GlobalTensor<IN_T> attnScoreGmTensor;
     GlobalTensor<OUT_T> pooledScoreGmTensor;
 
-    TBuf<> *uBufPtr = nullptr;
+    TBuf<>* uBufPtr = nullptr;
     // post-pool 相位
     LocalTensor<IN_T> readUb;
     LocalTensor<T> colFp32Ub;
@@ -71,14 +71,14 @@ private:
 
 template <typename BSAT>
 __aicore__ inline void BSAVecPostPoolService<BSAT>::InitParams(
-    const BSAConstInfo &constInfo, const optiling::BSASelectBlockMaskTilingData *__restrict tilingData)
+    const BSAConstInfo& constInfo, const optiling::BSASelectBlockMaskTilingData* __restrict tilingData)
 {
     this->constInfo = constInfo;
     this->tilingData = tilingData;
 }
 
 template <typename BSAT>
-__aicore__ inline void BSAVecPostPoolService<BSAT>::InitBuffers(TBuf<> *uBuf_)
+__aicore__ inline void BSAVecPostPoolService<BSAT>::InitBuffers(TBuf<>* uBuf_)
 {
     uBufPtr = uBuf_;
     uint32_t ubOffset = 0;
@@ -106,8 +106,8 @@ __aicore__ inline void BSAVecPostPoolService<BSAT>::InitBuffers(TBuf<> *uBuf_)
 }
 
 template <typename BSAT>
-__aicore__ inline void BSAVecPostPoolService<BSAT>::InitPostPoolGM(GlobalTensor<IN_T> &attnScoreGm,
-                                                                   GlobalTensor<OUT_T> &pooledScoreGm)
+__aicore__ inline void BSAVecPostPoolService<BSAT>::InitPostPoolGM(GlobalTensor<IN_T>& attnScoreGm,
+                                                                   GlobalTensor<OUT_T>& pooledScoreGm)
 {
     this->attnScoreGmTensor = attnScoreGm;
     this->pooledScoreGmTensor = pooledScoreGm;
@@ -121,7 +121,7 @@ BSAVecPostPoolService<BSAT>::GetScalarScratch()
 }
 
 template <typename BSAT>
-__aicore__ inline void BSAVecPostPoolService<BSAT>::CalcPostPxRange(uint32_t &pxStart, uint32_t &pxEnd,
+__aicore__ inline void BSAVecPostPoolService<BSAT>::CalcPostPxRange(uint32_t& pxStart, uint32_t& pxEnd,
                                                                     uint32_t validPostX)
 {
     pxStart = 0;

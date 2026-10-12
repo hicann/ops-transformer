@@ -140,13 +140,13 @@ std::string QuantModeToSerialString(FlashMlaWithKvcacheQuantMode faQuantMode);
 // ============================================================
 
 struct FlashMlaWithKvcacheRequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct FlashMlaWithKvcacheOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 struct FlashMlaWithKvcacheParaInfo {
@@ -166,15 +166,15 @@ struct FlashMlaWithKvcacheParaInfo {
     FlashMlaWithKvcacheOptionalParaInfo cuSeqlensKv = {nullptr, nullptr};
     FlashMlaWithKvcacheOptionalParaInfo sequsedKv = {nullptr, nullptr};
 
-    const int64_t *headDimV = nullptr;
-    const float *softmaxScale = nullptr;
-    const int64_t *maskMode = nullptr;
-    const int64_t *maxSeqlenQ = nullptr;
-    const int64_t *maxSeqlenKV = nullptr;
-    const char *layoutQ = nullptr;
-    const char *layoutKV = nullptr;
-    const char *layoutOut = nullptr;
-    const int64_t *returnSoftMaxLse = nullptr;
+    const int64_t* headDimV = nullptr;
+    const float* softmaxScale = nullptr;
+    const int64_t* maskMode = nullptr;
+    const int64_t* maxSeqlenQ = nullptr;
+    const int64_t* maxSeqlenKV = nullptr;
+    const char* layoutQ = nullptr;
+    const char* layoutKV = nullptr;
+    const char* layoutOut = nullptr;
+    const int64_t* returnSoftMaxLse = nullptr;
 
     FlashMlaWithKvcacheRequiredParaInfo attnOut = {nullptr, nullptr};
     FlashMlaWithKvcacheRequiredParaInfo lseOut = {nullptr, nullptr};
@@ -186,8 +186,8 @@ struct FlashMlaWithKvcacheParaInfo {
 
 class FlashMlaWithKvcacheTilingInfo : public TilingInfo {
 public:
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     FlashMlaWithKvcacheParaInfo opParamInfo;
 
     // Base Param

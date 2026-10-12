@@ -30,8 +30,8 @@
 namespace optiling {
 
 // 选模板 + 定 D/Dv 分档。失败仅有一种情况：D 超出已实现范围。
-ge::graphStatus SelectKernelPlan(gert::TilingContext *context, const FagParsedInfo &info, FagKernelPlan &plan,
-                                 FagRouteTrace &trace);
+ge::graphStatus SelectKernelPlan(gert::TilingContext* context, const FagParsedInfo& info, FagKernelPlan& plan,
+                                 FagRouteTrace& trace);
 
 } // namespace optiling
 

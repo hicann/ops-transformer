@@ -36,7 +36,7 @@ inline T CeilDiv(T num, T rnd)
     return (num + rnd - 1) / rnd;
 }
 
-inline bool IsTensorValid(Tensor *tensor)
+inline bool IsTensorValid(Tensor* tensor)
 {
     return tensor != nullptr && tensor->GetData() != nullptr && tensor->GetTensorShape() != nullptr;
 }

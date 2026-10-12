@@ -57,7 +57,7 @@ class BlockAttnResUpdateKernelTestUtils {
 public:
     static constexpr uint32_t MAX_NUM_BLOCKS = 4U;
 
-    static BlockAttnResUpdateKernelCsvLoadResult GetParams(const std::string &socVersion, const std::string &testSuite)
+    static BlockAttnResUpdateKernelCsvLoadResult GetParams(const std::string& socVersion, const std::string& testSuite)
     {
         BlockAttnResUpdateKernelCsvLoadResult result;
         const std::string csvPath = ops::ut::ResolveCsvPath(
@@ -109,7 +109,7 @@ public:
                 param.tilingData = ParseTilingData(fields[index++]);
                 ValidateParam(param);
                 result.params.emplace_back(std::move(param));
-            } catch (const std::exception &error) {
+            } catch (const std::exception& error) {
                 result.errors.emplace_back(ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error));
             }
         }
@@ -120,7 +120,7 @@ public:
     }
 
 #ifdef __CCE_KT_TEST__
-    static void TestOneParamCase950(const BlockAttnResUpdateKernelTestParam &param)
+    static void TestOneParamCase950(const BlockAttnResUpdateKernelTestParam& param)
     {
         ASSERT_TRUE(param.result) << "op_kernel CSV currently supports successful launch cases only";
 
@@ -180,7 +180,7 @@ public:
 #endif
 
 private:
-    static uint32_t ParseU32(const std::string &value, const char *fieldName)
+    static uint32_t ParseU32(const std::string& value, const char* fieldName)
     {
         const uint64_t parsed = std::stoull(ops::ut::Trim(value));
         if (parsed > std::numeric_limits<uint32_t>::max()) {
@@ -189,7 +189,7 @@ private:
         return static_cast<uint32_t>(parsed);
     }
 
-    static std::vector<int32_t> ParseTilingData(const std::string &value)
+    static std::vector<int32_t> ParseTilingData(const std::string& value)
     {
         std::istringstream input(ops::ut::Trim(value));
         std::vector<int32_t> words;
@@ -206,7 +206,7 @@ private:
         return words;
     }
 
-    static void ValidateParam(const BlockAttnResUpdateKernelTestParam &param)
+    static void ValidateParam(const BlockAttnResUpdateKernelTestParam& param)
     {
         static_assert(sizeof(BlockAttnResUpdateTilingData) == 32UL,
                       "BlockAttnResUpdateTilingData ABI changed; update the CSV serialization");
@@ -257,7 +257,7 @@ private:
     class GmBuffer {
     public:
         explicit GmBuffer(size_t size)
-            : data_(static_cast<uint8_t *>(AscendC::GmAlloc(size)))
+            : data_(static_cast<uint8_t*>(AscendC::GmAlloc(size)))
         {}
         ~GmBuffer()
         {
@@ -266,10 +266,10 @@ private:
             }
         }
 
-        GmBuffer(const GmBuffer &) = delete;
-        GmBuffer &operator=(const GmBuffer &) = delete;
+        GmBuffer(const GmBuffer&) = delete;
+        GmBuffer& operator=(const GmBuffer&) = delete;
 
-        uint8_t *Get() const
+        uint8_t* Get() const
         {
             return data_;
         }
@@ -279,7 +279,7 @@ private:
         }
 
     private:
-        uint8_t *data_ = nullptr;
+        uint8_t* data_ = nullptr;
     };
 
     static uint16_t FloatToBf16(float value)
@@ -290,9 +290,9 @@ private:
         return static_cast<uint16_t>((bits + roundBias) >> 16U);
     }
 
-    static void InitInputData(const BlockAttnResUpdateKernelTestParam &param, std::vector<float> &partial,
-                              std::vector<uint16_t> &delta, std::vector<float> &pseudoQuery,
-                              std::vector<float> &numerator, std::vector<float> &logitMax, std::vector<float> &expSum)
+    static void InitInputData(const BlockAttnResUpdateKernelTestParam& param, std::vector<float>& partial,
+                              std::vector<uint16_t>& delta, std::vector<float>& pseudoQuery,
+                              std::vector<float>& numerator, std::vector<float>& logitMax, std::vector<float>& expSum)
     {
         for (uint32_t dIndex = 0U; dIndex < param.d; ++dIndex) {
             const int32_t queryCode = static_cast<int32_t>((dIndex * 5U + param.seed) % 9U) - 4;

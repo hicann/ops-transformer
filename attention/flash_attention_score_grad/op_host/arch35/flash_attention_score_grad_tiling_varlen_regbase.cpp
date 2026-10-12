@@ -19,7 +19,7 @@ using namespace Ops::Transformer::OpTiling;
 using namespace optiling::fag;
 namespace optiling {
 namespace fag {
-inline void GetTNDOuterMN(const FuzzyBaseInfoParamsRegbase &p, int64_t bIdx, int64_t &m, int64_t &n)
+inline void GetTNDOuterMN(const FuzzyBaseInfoParamsRegbase& p, int64_t bIdx, int64_t& m, int64_t& n)
 {
     const int64_t cubeM = p.s1Inner * p.s1CvRatio;
     const int64_t cubeN = p.s2Inner * p.s2CvRatio;
@@ -74,7 +74,7 @@ inline int64_t GetTNDRightDownRowShift(int64_t m, int64_t n)
     return std::max(static_cast<int64_t>(0), m - n - 1);
 }
 
-inline void GetTNDLeftUpVirt(int64_t m, int64_t n, int64_t &virtM, int64_t &virtN)
+inline void GetTNDLeftUpVirt(int64_t m, int64_t n, int64_t& virtM, int64_t& virtN)
 {
     if (m < n) {
         n = m;
@@ -83,7 +83,7 @@ inline void GetTNDLeftUpVirt(int64_t m, int64_t n, int64_t &virtM, int64_t &virt
     virtN = n;
 }
 
-inline void GetTNDRightDownVirt(int64_t m, int64_t n, int64_t &virtM, int64_t &virtN)
+inline void GetTNDRightDownVirt(int64_t m, int64_t n, int64_t& virtM, int64_t& virtN)
 {
     m -= GetTNDRightDownRowShift(m, n);
     if (m < 1 || n < 1) {
@@ -121,12 +121,12 @@ struct TNDRunShape {
     TNDRunShapeKind kind = TNDRunShapeKind::INVALID;
 };
 
-inline bool SameTNDRunShape(const TNDRunShape &a, const TNDRunShape &b)
+inline bool SameTNDRunShape(const TNDRunShape& a, const TNDRunShape& b)
 {
     return a.m == b.m && a.n == b.n && a.p == b.p && a.q == b.q && a.kind == b.kind;
 }
 
-inline TNDRunShape MakeTNDCausalRunShape(const FuzzyBaseInfoParamsRegbase &p, int64_t bIdx, bool leftUp)
+inline TNDRunShape MakeTNDCausalRunShape(const FuzzyBaseInfoParamsRegbase& p, int64_t bIdx, bool leftUp)
 {
     TNDRunShape s;
     GetTNDOuterMN(p, bIdx, s.m, s.n);
@@ -142,8 +142,8 @@ inline TNDRunShape MakeTNDCausalRunShape(const FuzzyBaseInfoParamsRegbase &p, in
     return s;
 }
 
-inline void GetTNDBandMN(FuzzyBaseInfoParamsRegbase &p, int64_t bIdx, int64_t &m, int64_t &n, int64_t &bandP,
-                         int64_t &bandQ)
+inline void GetTNDBandMN(FuzzyBaseInfoParamsRegbase& p, int64_t bIdx, int64_t& m, int64_t& n, int64_t& bandP,
+                         int64_t& bandQ)
 {
     GetTNDOuterMN(p, bIdx, m, n);
     if (m < 1 || n < 1) {
@@ -185,7 +185,7 @@ inline void GetTNDBandMN(FuzzyBaseInfoParamsRegbase &p, int64_t bIdx, int64_t &m
     n = actualN;
 }
 
-inline TNDRunShape MakeTNDBandRunShape(FuzzyBaseInfoParamsRegbase &p, int64_t bIdx)
+inline TNDRunShape MakeTNDBandRunShape(FuzzyBaseInfoParamsRegbase& p, int64_t bIdx)
 {
     TNDRunShape s;
     GetTNDBandMN(p, bIdx, s.m, s.n, s.p, s.q);
@@ -193,8 +193,8 @@ inline TNDRunShape MakeTNDBandRunShape(FuzzyBaseInfoParamsRegbase &p, int64_t bI
     return s;
 }
 
-inline int64_t CountTNDSameShapeRun(FuzzyBaseInfoParamsRegbase &p, int64_t start, bool leftUp, bool isBand,
-                                    TNDRunShape &shape)
+inline int64_t CountTNDSameShapeRun(FuzzyBaseInfoParamsRegbase& p, int64_t start, bool leftUp, bool isBand,
+                                    TNDRunShape& shape)
 {
     shape = isBand ? MakeTNDBandRunShape(p, start) : MakeTNDCausalRunShape(p, start, leftUp);
     int64_t end = start;
@@ -208,14 +208,14 @@ inline int64_t CountTNDSameShapeRun(FuzzyBaseInfoParamsRegbase &p, int64_t start
     return end - start + 1;
 }
 
-inline void CopyTNDPrefix(const std::vector<int64_t> &src, int64_t *dst, size_t dstLen)
+inline void CopyTNDPrefix(const std::vector<int64_t>& src, int64_t* dst, size_t dstLen)
 {
     std::fill(dst, dst + dstLen, static_cast<int64_t>(0));
     const size_t n = std::min(src.size(), dstLen);
     std::copy(src.begin(), src.begin() + static_cast<long>(n), dst);
 }
 
-inline void StoreTNDPrefix(const std::vector<int64_t> &raw, int64_t step, int64_t tailValue, int64_t *dst)
+inline void StoreTNDPrefix(const std::vector<int64_t>& raw, int64_t step, int64_t tailValue, int64_t* dst)
 {
     std::vector<int64_t> sliced = SliceVector(raw, step);
     sliced.push_back(tailValue);
@@ -246,12 +246,12 @@ inline int64_t CalTNDBandNarrowRounds(int64_t k, int64_t n1, int64_t m, int64_t 
     return seg * CeilDivideBy((nNew - overlap) * n1 + overlap, k);
 }
 
-inline bool TNDRunEmpty(const TNDRunShape &shape, bool isBand)
+inline bool TNDRunEmpty(const TNDRunShape& shape, bool isBand)
 {
     return shape.m < 1 || shape.n < 1 || (isBand && shape.p + shape.q < NUM_TWO);
 }
 
-inline bool PreferTNDLineDeter(FuzzyBaseInfoParamsRegbase &p)
+inline bool PreferTNDLineDeter(FuzzyBaseInfoParamsRegbase& p)
 {
     if (p.g != 1) {
         return false;
@@ -327,7 +327,7 @@ struct TNDLineDeterPack {
     int64_t rLine = 0;
 };
 
-inline TNDLineDeterPack BuildTNDLineDeter(FuzzyBaseInfoParamsRegbase &p)
+inline TNDLineDeterPack BuildTNDLineDeter(FuzzyBaseInfoParamsRegbase& p)
 {
     TNDLineDeterPack pack;
     const int64_t k = static_cast<int64_t>(p.aicNum);
@@ -397,7 +397,7 @@ inline TNDLineDeterPack BuildTNDLineDeter(FuzzyBaseInfoParamsRegbase &p)
     return pack;
 }
 
-inline void ApplyTNDLineDeterParam(FuzzyBaseInfoParamsRegbase &p, const TNDLineDeterPack &pack)
+inline void ApplyTNDLineDeterParam(FuzzyBaseInfoParamsRegbase& p, const TNDLineDeterPack& pack)
 {
     p.splitAxis = SplitAxisEnum::BN2GS1S2;
     p.tndLineDeter = 1;
@@ -421,7 +421,7 @@ inline void ApplyTNDLineDeterParam(FuzzyBaseInfoParamsRegbase &p, const TNDLineD
 
 class FlashAttentionScoreGradTilingVarlenRegbase : public FlashAttentionScoreGradTilingNormalRegbase {
 public:
-    explicit FlashAttentionScoreGradTilingVarlenRegbase(gert::TilingContext *curContext_)
+    explicit FlashAttentionScoreGradTilingVarlenRegbase(gert::TilingContext* curContext_)
         : FlashAttentionScoreGradTilingNormalRegbase(curContext_)
     {}
     ~FlashAttentionScoreGradTilingVarlenRegbase() override = default;
@@ -594,7 +594,7 @@ protected:
         CalcleTNDBandBns2DeterParam(deterPrefixData);
     }
 
-    void CalcleTNDDenseBns2DeterParam(DeterPrefixData &deterPrefixData)
+    void CalcleTNDDenseBns2DeterParam(DeterPrefixData& deterPrefixData)
     {
         if (fBaseParams.splitAxis != SplitAxisEnum::BN2S2) {
             return;
@@ -621,7 +621,7 @@ protected:
         CalcleTNDDeterSyncRounds(syncRounds, syncRoundRanges);
     }
 
-    void CalcleTNDCausalDeterPrefix(DeterPrefixData &deterPrefixData, int64_t &m0Max, int64_t &m1Max, int64_t &m2Max)
+    void CalcleTNDCausalDeterPrefix(DeterPrefixData& deterPrefixData, int64_t& m0Max, int64_t& m1Max, int64_t& m2Max)
     {
         int64_t N12 = fBaseParams.g == 1 ? fBaseParams.n2 % fBaseParams.aicNum % NUM_TWO : fBaseParams.n2 % NUM_TWO;
         for (int64_t i = 0; i < fBaseParams.b; i++) {
@@ -661,7 +661,7 @@ protected:
         }
     }
 
-    void CalcleTNDCausalDeterParamNormal(DeterPrefixData &deterPrefixData, const int64_t m0Max, const int64_t m1Max,
+    void CalcleTNDCausalDeterParamNormal(DeterPrefixData& deterPrefixData, const int64_t m0Max, const int64_t m1Max,
                                          const int64_t m2Max)
     {
         int64_t N11 = fBaseParams.n2 % fBaseParams.aicNum / NUM_TWO;
@@ -699,7 +699,7 @@ protected:
         }
     }
 
-    void CalcleTNDCausalDeterParamGQA(DeterPrefixData &deterPrefixData, const int64_t m0Max, const int64_t m1Max,
+    void CalcleTNDCausalDeterParamGQA(DeterPrefixData& deterPrefixData, const int64_t m0Max, const int64_t m1Max,
                                       const int64_t m2Max)
     {
         int64_t N11 = fBaseParams.n2 / NUM_TWO;
@@ -763,7 +763,7 @@ protected:
         std::copy(deterPrefixData.prefix2.begin(), deterPrefixData.prefix2.end(), fBaseParams.deterPrefix2);
     }
 
-    void CalcleTNDBandDeterPrefix(DeterPrefixData &deterPrefixData, int64_t N11, int64_t &mnMax)
+    void CalcleTNDBandDeterPrefix(DeterPrefixData& deterPrefixData, int64_t N11, int64_t& mnMax)
     {
         for (int64_t i = 0; i < fBaseParams.b; i++) {
             int64_t m, n, p, q, mNew, nNew;
@@ -827,7 +827,7 @@ protected:
         }
     }
 
-    void CalcleTNDBandBns2DeterParam(DeterPrefixData &deterPrefixData)
+    void CalcleTNDBandBns2DeterParam(DeterPrefixData& deterPrefixData)
     {
         if (fBaseParams.splitAxis != SplitAxisEnum::BN2S2) {
             return;
@@ -856,9 +856,9 @@ protected:
         CalcleTNDDeterSyncRounds(syncRounds, syncRoundRanges);
     }
 
-    void CalcleTNDDenseDeterSplitDkOffset(DeterPrefixData &deterPrefixData,
-                                          std::vector<std::pair<uint64_t, uint64_t>> &syncRounds,
-                                          std::vector<std::pair<uint64_t, uint64_t>> &syncRoundRanges)
+    void CalcleTNDDenseDeterSplitDkOffset(DeterPrefixData& deterPrefixData,
+                                          std::vector<std::pair<uint64_t, uint64_t>>& syncRounds,
+                                          std::vector<std::pair<uint64_t, uint64_t>>& syncRoundRanges)
     {
         int64_t precoreLastBatchStartRound = 0;
         for (uint32_t coreId = 0; coreId < CORE_LIST_NUM; coreId++) {
@@ -867,7 +867,7 @@ protected:
             }
             auto actualSeqKvlenTensor =
                 context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::ACTUAL_SEQ_KV_LEN));
-            const int64_t *kvValue = actualSeqKvlenTensor->GetData<int64_t>();
+            const int64_t* kvValue = actualSeqKvlenTensor->GetData<int64_t>();
 
             TndBandDeterRoundInfo tndBandDeterRoundInfo;
             for (int64_t round = fBaseParams.deterMaxRound; round > 0; round--) {
@@ -904,7 +904,7 @@ protected:
         }
     }
 
-    bool SupportTNDBns2(DeterPrefixData &deterPrefixData, int64_t round)
+    bool SupportTNDBns2(DeterPrefixData& deterPrefixData, int64_t round)
     {
         for (int64_t b = 0; b < fBaseParams.b; b++) {
             int64_t m = deterPrefixData.mNewList[b];
@@ -917,9 +917,9 @@ protected:
         return true;
     }
 
-    void CalcleTNDBandDeterSplitDkOffset(DeterPrefixData &deterPrefixData,
-                                         std::vector<std::pair<uint64_t, uint64_t>> &syncRounds,
-                                         std::vector<std::pair<uint64_t, uint64_t>> &syncRoundRanges)
+    void CalcleTNDBandDeterSplitDkOffset(DeterPrefixData& deterPrefixData,
+                                         std::vector<std::pair<uint64_t, uint64_t>>& syncRounds,
+                                         std::vector<std::pair<uint64_t, uint64_t>>& syncRoundRanges)
     {
         int64_t precoreLastBatchStartRound = 0;
         int64_t N11 = fBaseParams.n1 / fBaseParams.aicNum;
@@ -967,7 +967,7 @@ protected:
     }
 
     template <const uint32_t deterSparseType>
-    std::tuple<int64_t, int64_t, int64_t> CalTNDDenseIndex(DeterPrefixData &deterPrefixData, int64_t coreId,
+    std::tuple<int64_t, int64_t, int64_t> CalTNDDenseIndex(DeterPrefixData& deterPrefixData, int64_t coreId,
                                                            int64_t roundId, int64_t N1)
     {
         int64_t unPadRoundMax{deterPrefixData.prefix1[fBaseParams.b + 1]}, ID{(coreId - 1) * unPadRoundMax + roundId},
@@ -1026,12 +1026,12 @@ protected:
     }
 
     void UpdateSeparateDkOffsetLargeM(
-        std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> &coordinateInfo,
-        TndBandDeterRoundInfo &tndBandDeterRoundInfo)
+        std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>& coordinateInfo,
+        TndBandDeterRoundInfo& tndBandDeterRoundInfo)
     {
         auto actualSeqKvlenTensor =
             context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::ACTUAL_SEQ_KV_LEN));
-        const int64_t *kvValue = actualSeqKvlenTensor->GetData<int64_t>();
+        const int64_t* kvValue = actualSeqKvlenTensor->GetData<int64_t>();
         int64_t m, n, p, q, x, y, w, coreId, round;
         std::tie(m, n, p, q, x, y, w, coreId, round) = coordinateInfo;
         if (n >= m) {
@@ -1066,12 +1066,12 @@ protected:
     }
 
     void UpdateSeparateDkOffsetSmallM(
-        std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> &coordinateInfo,
-        TndBandDeterRoundInfo &tndBandDeterRoundInfo)
+        std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>& coordinateInfo,
+        TndBandDeterRoundInfo& tndBandDeterRoundInfo)
     {
         auto actualSeqKvlenTensor =
             context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::ACTUAL_SEQ_KV_LEN));
-        const int64_t *kvValue = actualSeqKvlenTensor->GetData<int64_t>();
+        const int64_t* kvValue = actualSeqKvlenTensor->GetData<int64_t>();
         int64_t m, n, p, q, x, y, w, coreId, round;
         std::tie(m, n, p, q, x, y, w, coreId, round) = coordinateInfo;
         if (p + q <= n) {
@@ -1098,8 +1098,8 @@ protected:
     }
 
     void UpdateSeparateDkOffset(
-        std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> &coordinateInfo,
-        TndBandDeterRoundInfo &tndBandDeterRoundInfo)
+        std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>& coordinateInfo,
+        TndBandDeterRoundInfo& tndBandDeterRoundInfo)
     {
         int64_t m, p, q;
         std::tie(m, std::ignore, p, q, std::ignore, std::ignore, std::ignore, std::ignore, std::ignore) =
@@ -1112,7 +1112,7 @@ protected:
     }
 
     bool IsSeparateS2(
-        std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> &coordinateInfo)
+        std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>& coordinateInfo)
     {
         int64_t m, n, p, q, x, y;
         std::tie(m, n, p, q, x, y, std::ignore, std::ignore, std::ignore) = coordinateInfo;
@@ -1156,7 +1156,7 @@ protected:
         return isSeparate;
     }
 
-    int64_t GetKeyOffset(const int64_t *kvValue, int64_t w, int64_t y)
+    int64_t GetKeyOffset(const int64_t* kvValue, int64_t w, int64_t y)
     {
         int64_t batchId = CeilDivideBy(w, fBaseParams.n2) - 1;
         int64_t n2Idx = w - batchId * fBaseParams.n2 - 1;
@@ -1173,8 +1173,8 @@ protected:
         return bOffset + n2Offset + s2Offset;
     }
 
-    void CalcleTNDDeterSyncRounds(std::vector<std::pair<uint64_t, uint64_t>> &syncRounds,
-                                  std::vector<std::pair<uint64_t, uint64_t>> &syncRoundRanges)
+    void CalcleTNDDeterSyncRounds(std::vector<std::pair<uint64_t, uint64_t>>& syncRounds,
+                                  std::vector<std::pair<uint64_t, uint64_t>>& syncRoundRanges)
     {
         if (syncRounds.size() + syncRoundRanges.size() > CORE_LIST_NUM) {
             fBaseParams.startNeedSyncRound[0] = 1;
@@ -1248,7 +1248,7 @@ protected:
         return needSyncRounds;
     }
 
-    void SetCoreRoundInfo(TndBandDeterRoundInfo &tndBandDeterRoundInfo, uint64_t round, int64_t batchId)
+    void SetCoreRoundInfo(TndBandDeterRoundInfo& tndBandDeterRoundInfo, uint64_t round, int64_t batchId)
     {
         if (batchId != tndBandDeterRoundInfo.lastBatchId && tndBandDeterRoundInfo.lastBatchId != 0 &&
             tndBandDeterRoundInfo.coreLastBatchStartRound == 0) {
@@ -1295,8 +1295,8 @@ protected:
         return ge::GRAPH_SUCCESS;
     }
 
-    void FillBlockInfoLoadBalanceForBn2(std::vector<std::vector<int64_t>> &totalBlockInfo,
-                                        std::vector<std::vector<float>> &acturalBlockInfo)
+    void FillBlockInfoLoadBalanceForBn2(std::vector<std::vector<int64_t>>& totalBlockInfo,
+                                        std::vector<std::vector<float>>& acturalBlockInfo)
     {
         acturalBlockInfo[fBaseParams.b][0] = 0;     // 存全部累积基本块: bn2g * acutalblocks1s2
         acturalBlockInfo[fBaseParams.b + 1][0] = 0; // 存最大的acutalblocks1s2，用于下界
@@ -1386,8 +1386,8 @@ protected:
         }
     }
 
-    bool CaclePerCoreBlockInfoBn2(const std::vector<std::vector<int64_t>> &totalBlockInfo,
-                                  const std::vector<std::vector<float>> &acturalBlockInfo,
+    bool CaclePerCoreBlockInfoBn2(const std::vector<std::vector<int64_t>>& totalBlockInfo,
+                                  const std::vector<std::vector<float>>& acturalBlockInfo,
                                   const float maxBlockNumPerCore, int64_t (&blockStarts)[CORE_LIST_NUM],
                                   int64_t (&blockEnds)[CORE_LIST_NUM])
     {
@@ -1519,8 +1519,8 @@ protected:
         return ge::GRAPH_SUCCESS;
     }
 
-    void FillBlockInfo(std::vector<std::vector<std::vector<int64_t>>> &calculatedBlockInfo,
-                       std::vector<std::vector<int64_t>> &totalBlockInfo)
+    void FillBlockInfo(std::vector<std::vector<std::vector<int64_t>>>& calculatedBlockInfo,
+                       std::vector<std::vector<int64_t>>& totalBlockInfo)
     {
         OP_LOGD("FillBlockInfo", " Starting load balancing calculation in TND scenario");
         OP_LOGD("FillBlockInfo", "SparseMode %u, find band index %u", fBaseParams.sparseMode, fBaseParams.bandIdx);
@@ -1549,7 +1549,7 @@ protected:
         }
     }
 
-    void CalValidUnpadBlockInfo(int64_t batchIdx, std::vector<std::vector<std::vector<int64_t>>> &calculatedBlockInfo)
+    void CalValidUnpadBlockInfo(int64_t batchIdx, std::vector<std::vector<std::vector<int64_t>>>& calculatedBlockInfo)
     {
         int64_t actualS1Len = fBaseParams.actualSeqQlen[batchIdx];
         int64_t actualS2Len = fBaseParams.actualSeqKvlen[batchIdx];
@@ -1599,8 +1599,8 @@ protected:
         }
     }
 
-    void GetUnpadS1S2OuterIndex(int64_t &s1oIdx, int64_t &s2oIdx, int64_t gTail, int64_t bIdx,
-                                std::vector<std::vector<std::vector<int64_t>>> &calculatedBlockInfo)
+    void GetUnpadS1S2OuterIndex(int64_t& s1oIdx, int64_t& s2oIdx, int64_t gTail, int64_t bIdx,
+                                std::vector<std::vector<std::vector<int64_t>>>& calculatedBlockInfo)
     {
         int64_t s1oTail = 0;
         for (int64_t i = 0; i < fBaseParams.s2Outer; i++) {
@@ -1722,7 +1722,7 @@ protected:
         return true;
     }
 
-    float BinarySearchMaxBlockNumPerCore(const std::vector<std::vector<float>> &acturalBlockInfo)
+    float BinarySearchMaxBlockNumPerCore(const std::vector<std::vector<float>>& acturalBlockInfo)
     {
         float left = acturalBlockInfo[fBaseParams.b + 1][0];
         float right = acturalBlockInfo[fBaseParams.b][0];
@@ -1738,7 +1738,7 @@ protected:
         return right;
     }
 
-    void FillColumnValidBlockCount(std::vector<std::vector<uint64_t>> &validBlockCount)
+    void FillColumnValidBlockCount(std::vector<std::vector<uint64_t>>& validBlockCount)
     {
         for (int64_t b = 0; b < fBaseParams.b; b++) {
             int64_t actualS1Outer = (fBaseParams.actualSeqQlen[b] + fBaseParams.s1CvInner - 1) / fBaseParams.s1CvInner;
@@ -1759,9 +1759,9 @@ protected:
         }
     }
 
-    bool CaclePerCoreBlockInfo(const std::vector<std::vector<int64_t>> &totalBlockInfo,
-                               const std::vector<std::vector<float>> &acturalBlockInfo,
-                               const std::vector<std::vector<uint64_t>> &validBlockCount,
+    bool CaclePerCoreBlockInfo(const std::vector<std::vector<int64_t>>& totalBlockInfo,
+                               const std::vector<std::vector<float>>& acturalBlockInfo,
+                               const std::vector<std::vector<uint64_t>>& validBlockCount,
                                const float maxBlockNumPerCore, int64_t (&blockStarts)[CORE_LIST_NUM],
                                int64_t (&blockEnds)[CORE_LIST_NUM])
     {
@@ -1887,7 +1887,7 @@ protected:
                 bIdx + 1, tndBaseInfo.tndS2BlockPrefixSum[bIdx + 1], tndBaseInfo.tndSwizzleS1S2PrefixSum[bIdx + 1]);
     }
 
-    bool IsPossible(const std::vector<std::vector<float>> &acturalBlockInfo, const float possibleMax)
+    bool IsPossible(const std::vector<std::vector<float>>& acturalBlockInfo, const float possibleMax)
     {
         float currentSum = 0;
         uint64_t needCoreNum = 1;

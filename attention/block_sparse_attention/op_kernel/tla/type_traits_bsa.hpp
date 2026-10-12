@@ -19,7 +19,7 @@
 #define inline __inline__ __attribute__((always_inline))
 #endif
 
-#define TLA_REQUIRES(...) typename std::enable_if<(__VA_ARGS__)>::type * = nullptr
+#define TLA_REQUIRES(...) typename std::enable_if<(__VA_ARGS__)>::type* = nullptr
 
 namespace tla {
 

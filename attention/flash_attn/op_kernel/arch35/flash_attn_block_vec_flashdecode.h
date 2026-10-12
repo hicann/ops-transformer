@@ -99,17 +99,17 @@ protected:
     int64_t nextTokensPerBatch_ = 0;
 
     static constexpr T BOOL_ATTEN_MASK_SCALAR_VALUE = -1000000000000.0; // 用于mask为bool类型
-    uint32_t negativeIntScalar_ = *((uint32_t *)&BOOL_ATTEN_MASK_SCALAR_VALUE);
+    uint32_t negativeIntScalar_ = *((uint32_t*)&BOOL_ATTEN_MASK_SCALAR_VALUE);
 
     uint64_t actSeqLensKv_ = 0;
     uint64_t actSeqLensQ_ = 0;
     // ================================类成员变量====================================
-    const ConstInfo_t &constInfo_;
+    const ConstInfo_t& constInfo_;
     TaskInfo taskInfo_{};
 
     using SEQLEN_T = uint32_t;
-    SeqLensTool<LAYOUT_T, SEQLEN_T> &qSeqLensTool_;
-    SeqLensTool<LAYOUT_KV, SEQLEN_T> &kvSeqLensTool_;
+    SeqLensTool<LAYOUT_T, SEQLEN_T>& qSeqLensTool_;
+    SeqLensTool<LAYOUT_KV, SEQLEN_T>& kvSeqLensTool_;
 
     static constexpr GmFormat OUT_FORMAT = GetAttentionOutGmFormat<LAYOUT_OUT>();
     using FaGmTensorOut = FaGmTensor<OUTPUT_T, OUT_FORMAT, SEQLEN_T, IS_TND<LAYOUT_OUT>()>;
@@ -133,8 +133,8 @@ private:
     LocalTensor<T> fdLseUbBuf_;
 
 public:
-    __aicore__ inline FiaBlockVecFlashDecode(ConstInfo_t &constInfo, SeqLensTool<LAYOUT_T, SEQLEN_T> &qSeqLensTool,
-                                             SeqLensTool<LAYOUT_KV, SEQLEN_T> &kvSeqLensTool)
+    __aicore__ inline FiaBlockVecFlashDecode(ConstInfo_t& constInfo, SeqLensTool<LAYOUT_T, SEQLEN_T>& qSeqLensTool,
+                                             SeqLensTool<LAYOUT_KV, SEQLEN_T>& kvSeqLensTool)
         : constInfo_(constInfo),
           qSeqLensTool_(qSeqLensTool),
           kvSeqLensTool_(kvSeqLensTool){};
@@ -145,8 +145,8 @@ public:
         return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
     }
 
-    __aicore__ inline void InitBlock(__gm__ uint8_t *learnableSink, __gm__ uint8_t *softmaxLse,
-                                     __gm__ uint8_t *attentionOut)
+    __aicore__ inline void InitBlock(__gm__ uint8_t* learnableSink, __gm__ uint8_t* softmaxLse,
+                                     __gm__ uint8_t* attentionOut)
     {
         this->dSizeV_Align_ = this->Align(constInfo_.dSizeV, FP32_REPEAT_ELEMENT_NUM);
 
@@ -154,7 +154,7 @@ public:
                            outGmTensor_, attentionOut);
 
         if (constInfo_.isSoftmaxLseEnable) {
-            softmaxLseGm_.SetGlobalBuffer((__gm__ float *)softmaxLse);
+            softmaxLseGm_.SetGlobalBuffer((__gm__ float*)softmaxLse);
         }
     }
 
@@ -227,9 +227,9 @@ public:
 
 protected:
     __aicore__ inline void InitAttenOutBuffer(uint32_t batchSize, uint32_t n2Size, uint32_t gSize, uint32_t qSeqSize,
-                                              uint32_t headDim, FaGmTensorOut &outGmTensor, __gm__ uint8_t *gm)
+                                              uint32_t headDim, FaGmTensorOut& outGmTensor, __gm__ uint8_t* gm)
     {
-        outGmTensor.gmTensor.SetGlobalBuffer((__gm__ OUTPUT_T *)gm);
+        outGmTensor.gmTensor.SetGlobalBuffer((__gm__ OUTPUT_T*)gm);
         if constexpr (GmLayoutParams<OUT_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_BNGSD) {
             outGmTensor.offsetCalculator.Init(batchSize, n2Size, gSize, qSeqSize, headDim, qSeqLensTool_.seqUsedParser);
         } else {
@@ -237,7 +237,7 @@ protected:
         }
     }
 
-    __aicore__ inline void CopyAccumOutIn(LocalTensor<T> &accumOutLocal, uint32_t splitKVIndex, uint32_t startRow,
+    __aicore__ inline void CopyAccumOutIn(LocalTensor<T>& accumOutLocal, uint32_t splitKVIndex, uint32_t startRow,
                                           uint32_t dealRowCount)
     {
         DataCopyExtParams copyInParams;
@@ -273,7 +273,7 @@ protected:
                      dealRowCountAlign);
         }
     }
-    __aicore__ inline void ComputeScaleValue(LocalTensor<T> &lseExp, uint32_t dealRowCount,
+    __aicore__ inline void ComputeScaleValue(LocalTensor<T>& lseExp, uint32_t dealRowCount,
                                              uint32_t actualCombineLoopSize, uint32_t cntM, uint32_t startRow)
     {
         LocalTensor<T> lseSum = (cntM & 1) == 0 ? fdSumBuf1_ : fdSumBuf2_;
@@ -287,7 +287,7 @@ protected:
                                                                        constInfo_.isSoftmaxLseEnable, false);
     }
 
-    __aicore__ inline void Bmm2DataCopyOutTrans(LocalTensor<OUTPUT_T> &attenOutUb, uint32_t startRow,
+    __aicore__ inline void Bmm2DataCopyOutTrans(LocalTensor<OUTPUT_T>& attenOutUb, uint32_t startRow,
                                                 uint32_t dealRowCount, uint32_t columnCount)
     {
         FaUbTensor<OUTPUT_T> ubTensor{
@@ -314,13 +314,13 @@ protected:
             copyAttenOutUbToGm_(outGmTensor_, ubTensor, gmCoord);
         }
     }
-    __aicore__ inline void ReduceFinalRes(LocalTensor<T> &reduceOut, LocalTensor<T> &mm2Res, LocalTensor<T> &lseLocal,
+    __aicore__ inline void ReduceFinalRes(LocalTensor<T>& reduceOut, LocalTensor<T>& mm2Res, LocalTensor<T>& lseLocal,
                                           uint32_t cntKV, uint32_t dealRowCount)
     {
         uint64_t dSizeV_Align_ = (uint64_t)this->dSizeV_Align_;
         ReduceFinalRes_VF<T>(reduceOut, lseLocal, mm2Res, dealRowCount, dSizeV_Align_, cntKV);
     }
-    __aicore__ inline void CopyFinalResOut(LocalTensor<T> &accumOutLocal, uint32_t startRow, uint32_t dealRowCount,
+    __aicore__ inline void CopyFinalResOut(LocalTensor<T>& accumOutLocal, uint32_t startRow, uint32_t dealRowCount,
                                            uint32_t cntM)
     {
         LocalTensor<OUTPUT_T> tmpBmm2ResCastTensor = fdOutputBuf_;
@@ -366,7 +366,7 @@ protected:
     }
 
     template <typename UBOUT_T>
-    __aicore__ inline void DealInvalidRows(LocalTensor<UBOUT_T> &attenOutUb, uint32_t startRow, uint32_t dealRowCount,
+    __aicore__ inline void DealInvalidRows(LocalTensor<UBOUT_T>& attenOutUb, uint32_t startRow, uint32_t dealRowCount,
                                            uint32_t columnCount)
     {
         if constexpr (!HAS_MASK) {
@@ -394,7 +394,7 @@ protected:
     }
 
     template <typename UBOUT_T>
-    __aicore__ inline void DealInvalidMaskRows(LocalTensor<UBOUT_T> &attenOutUb, uint32_t startRow,
+    __aicore__ inline void DealInvalidMaskRows(LocalTensor<UBOUT_T>& attenOutUb, uint32_t startRow,
                                                uint32_t dealRowCount, uint32_t columnCount, uint32_t cntM)
     {
         if constexpr (!HAS_MASK) {
@@ -410,7 +410,7 @@ protected:
     }
 
 public:
-    __aicore__ inline void FlashDecode(FDparams &fd)
+    __aicore__ inline void FlashDecode(FDparams& fd)
     {
         if (!fd.fdCoreEnable) {
             return;

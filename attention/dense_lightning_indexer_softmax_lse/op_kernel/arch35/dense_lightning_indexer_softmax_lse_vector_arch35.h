@@ -29,8 +29,8 @@ constexpr uint64_t VEC_REPEAT_BYTES = 256;
 constexpr int32_t CONST_TWO = 2;
 
 template <typename T>
-__aicore__ inline void CopyIn(LocalTensor<float> &mmOutUb, LocalTensor<T> &weightsUb, GlobalTensor<float> &mMoutGm,
-                              GlobalTensor<T> &weightScaleGm, int64_t mm1ResGmOffset, int64_t weights_gmoffset,
+__aicore__ inline void CopyIn(LocalTensor<float>& mmOutUb, LocalTensor<T>& weightsUb, GlobalTensor<float>& mMoutGm,
+                              GlobalTensor<T>& weightScaleGm, int64_t mm1ResGmOffset, int64_t weights_gmoffset,
                               int64_t groupInner, int64_t s2Inner, int64_t mmUbStride)
 {
     AscendC::DataCopyPadExtParams<float> padParams{false, 0, 0, 0};
@@ -53,7 +53,7 @@ __aicore__ inline void CopyIn(LocalTensor<float> &mmOutUb, LocalTensor<T> &weigh
 }
 
 template <typename T>
-__aicore__ inline void CopyOut(const GlobalTensor<T> &dstGm, const LocalTensor<T> &srcUb, int64_t copyCount)
+__aicore__ inline void CopyOut(const GlobalTensor<T>& dstGm, const LocalTensor<T>& srcUb, int64_t copyCount)
 {
     AscendC::DataCopyParams dataCopyOutyParams;
     dataCopyOutyParams.blockCount = 1;
@@ -64,8 +64,8 @@ __aicore__ inline void CopyOut(const GlobalTensor<T> &dstGm, const LocalTensor<T
 }
 
 template <typename T>
-__aicore__ inline void DoScale(const LocalTensor<float> &reduceCacheBuf, LocalTensor<float> &mmOutUb,
-                               LocalTensor<float> &weightsUb, LocalTensor<T> &weightsTUb, LocalTensor<float> &tmpBuff,
+__aicore__ inline void DoScale(const LocalTensor<float>& reduceCacheBuf, LocalTensor<float>& mmOutUb,
+                               LocalTensor<float>& weightsUb, LocalTensor<T>& weightsTUb, LocalTensor<float>& tmpBuff,
                                int64_t groupInner, int64_t s2Inner, int32_t outerGidx)
 {
     if constexpr (!IsSameType<T, float>::value) {
@@ -106,7 +106,7 @@ __aicore__ inline uint64_t FindNearestPower2(uint64_t value)
     }
 }
 
-__aicore__ inline void DoReduce(const LocalTensor<float> &srcTensor, LocalTensor<float> &dstTensor, int32_t rNum,
+__aicore__ inline void DoReduce(const LocalTensor<float>& srcTensor, LocalTensor<float>& dstTensor, int32_t rNum,
                                 int32_t aNum)
 {
     if (rNum == 1) {
@@ -132,14 +132,14 @@ __aicore__ inline void DoReduce(const LocalTensor<float> &srcTensor, LocalTensor
 }
 
 template <typename T>
-__aicore__ inline void DoScaleVfWrapper(const LocalTensor<float> &reduceCacheBuf, const LocalTensor<float> &mmOutUb,
-                                        const LocalTensor<float> &weightsUb, const LocalTensor<T> &weightsTUb,
+__aicore__ inline void DoScaleVfWrapper(const LocalTensor<float>& reduceCacheBuf, const LocalTensor<float>& mmOutUb,
+                                        const LocalTensor<float>& weightsUb, const LocalTensor<T>& weightsTUb,
                                         int64_t groupInner, int64_t s2Inner, int32_t outerGidx)
 {
-    __ubuf__ float *reduceCacheBufUb = (__ubuf__ float *)reduceCacheBuf.GetPhyAddr();
-    __ubuf__ float *mmOutUbAddr = (__ubuf__ float *)mmOutUb.GetPhyAddr();
-    __ubuf__ float *weightsUbAddr = (__ubuf__ float *)weightsUb.GetPhyAddr();
-    __ubuf__ T *weightsTUbAddr = (__ubuf__ T *)weightsTUb.GetPhyAddr();
+    __ubuf__ float* reduceCacheBufUb = (__ubuf__ float*)reduceCacheBuf.GetPhyAddr();
+    __ubuf__ float* mmOutUbAddr = (__ubuf__ float*)mmOutUb.GetPhyAddr();
+    __ubuf__ float* weightsUbAddr = (__ubuf__ float*)weightsUb.GetPhyAddr();
+    __ubuf__ T* weightsTUbAddr = (__ubuf__ T*)weightsTUb.GetPhyAddr();
 
     uint64_t countPerRepeat = VEC_REPEAT_BYTES / sizeof(float);
     uint64_t repeatTimes = s2Inner / countPerRepeat;
@@ -153,15 +153,15 @@ __aicore__ inline void DoScaleVfWrapper(const LocalTensor<float> &reduceCacheBuf
     }
 }
 
-__aicore__ inline void DoReduceSumBlockVfWrapper(const LocalTensor<float> &dstTensor,
-                                                 const LocalTensor<float> &srcTensor,
-                                                 const LocalTensor<float> &maxValueTensor,
-                                                 const LocalTensor<float> &prevSumTensor, uint32_t count)
+__aicore__ inline void DoReduceSumBlockVfWrapper(const LocalTensor<float>& dstTensor,
+                                                 const LocalTensor<float>& srcTensor,
+                                                 const LocalTensor<float>& maxValueTensor,
+                                                 const LocalTensor<float>& prevSumTensor, uint32_t count)
 {
-    __ubuf__ float *dstTensorUb = (__ubuf__ float *)dstTensor.GetPhyAddr();
-    __ubuf__ float *srcTensorUb = (__ubuf__ float *)srcTensor.GetPhyAddr();
-    __ubuf__ float *maxValueTensorUb = (__ubuf__ float *)maxValueTensor.GetPhyAddr();
-    __ubuf__ float *prevSumTensorUb = (__ubuf__ float *)prevSumTensor.GetPhyAddr();
+    __ubuf__ float* dstTensorUb = (__ubuf__ float*)dstTensor.GetPhyAddr();
+    __ubuf__ float* srcTensorUb = (__ubuf__ float*)srcTensor.GetPhyAddr();
+    __ubuf__ float* maxValueTensorUb = (__ubuf__ float*)maxValueTensor.GetPhyAddr();
+    __ubuf__ float* prevSumTensorUb = (__ubuf__ float*)prevSumTensor.GetPhyAddr();
 
     DoReduceSumBlockVF(dstTensorUb, srcTensorUb, maxValueTensorUb, prevSumTensorUb, count);
 }

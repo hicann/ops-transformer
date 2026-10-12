@@ -27,15 +27,15 @@ static const uint64_t INDEX_OUT_4 = 4;
 static const uint64_t INDEX_OUT_5 = 5;
 static const uint64_t INDEX_OUT_6 = 6;
 static const uint64_t INDEX_OUTDTYPE = 11;
-ge::graphStatus InferShape4FlashAttentionScoreGrad(gert::InferShapeContext *context)
+ge::graphStatus InferShape4FlashAttentionScoreGrad(gert::InferShapeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     OP_LOGI(context, "Enter FlashAttentionScoreGrad runtime infershape impl.");
-    const gert::Shape *queryShape = context->GetInputShape(0);
+    const gert::Shape* queryShape = context->GetInputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(1);
+    const gert::Shape* keyShape = context->GetInputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    const gert::Shape *valueShape = context->GetInputShape(2);
+    const gert::Shape* valueShape = context->GetInputShape(2);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
 
     auto attrs = context->GetAttrs();
@@ -43,16 +43,16 @@ ge::graphStatus InferShape4FlashAttentionScoreGrad(gert::InferShapeContext *cont
 
     auto headNum = attrs->GetInt(4); // N1
     OP_CHECK_NULL_WITH_CONTEXT(context, headNum);
-    const char *inputLayout = attrs->GetAttrPointer<char>(5);
+    const char* inputLayout = attrs->GetAttrPointer<char>(5);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayout);
     std::string inputLayoutStr = std::string(inputLayout) == "" ? "empty" : std::string(inputLayout);
-    for (auto &c : inputLayoutStr) {
+    for (auto& c : inputLayoutStr) {
         c = toupper(c);
     }
     if (inputLayoutStr != "BSH" && inputLayoutStr != "SBH" && inputLayoutStr != "BSND" && inputLayoutStr != "BNSD" &&
         inputLayoutStr != "TND") {
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout,
-            "BSH or SBH or BSND or BNSD or TND");
+                                   "BSH or SBH or BSND or BNSD or TND");
         return GRAPH_FAILED;
     }
 
@@ -77,31 +77,31 @@ ge::graphStatus InferShape4FlashAttentionScoreGrad(gert::InferShapeContext *cont
         sKv = keyShape->GetDim(DIM_NUM_2);
     }
     OP_LOGI(context, "B=%ld, N=%ld, T=%ld, Sq=%ld, Skv=%ld, inputLayout=%s", b, *headNum, t, sQ, sKv,
-              inputLayoutStr.c_str());
+            inputLayoutStr.c_str());
 
-    gert::Shape *dqShape = context->GetOutputShape(0);
+    gert::Shape* dqShape = context->GetOutputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, dqShape);
     *dqShape = *queryShape;
 
-    gert::Shape *dkShape = context->GetOutputShape(1);
+    gert::Shape* dkShape = context->GetOutputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, dkShape);
     *dkShape = *keyShape;
 
-    gert::Shape *dvShape = context->GetOutputShape(2);
+    gert::Shape* dvShape = context->GetOutputShape(2);
     OP_CHECK_NULL_WITH_CONTEXT(context, dvShape);
     *dvShape = *valueShape;
 
     // dpse output
-    gert::Shape *dpseShape = context->GetOutputShape(3);
+    gert::Shape* dpseShape = context->GetOutputShape(3);
     OP_CHECK_NULL_WITH_CONTEXT(context, dpseShape);
 
-    gert::Shape *dqRopeShape = context->GetOutputShape(4);
+    gert::Shape* dqRopeShape = context->GetOutputShape(4);
 
-    gert::Shape *dkRopeShape = context->GetOutputShape(5);
+    gert::Shape* dkRopeShape = context->GetOutputShape(5);
 
-    gert::Shape *dsinkShape = context->GetOutputShape(6);
+    gert::Shape* dsinkShape = context->GetOutputShape(6);
 
-    const gert::Shape *pseShape = context->GetOptionalInputShape(4);
+    const gert::Shape* pseShape = context->GetOptionalInputShape(4);
     if (pseShape != nullptr && pseShape->GetShapeSize() != 0) {
         OP_LOGD(context, "pse_shift is not nullptr");
         *dpseShape = *pseShape;
@@ -110,17 +110,17 @@ ge::graphStatus InferShape4FlashAttentionScoreGrad(gert::InferShapeContext *cont
         dpseShape->SetDimNum(1);
         dpseShape->SetDim(0, 0);
     }
-    const gert::Shape *queryRopeShape = context->GetOptionalInputShape(22);
+    const gert::Shape* queryRopeShape = context->GetOptionalInputShape(22);
     if (queryRopeShape != nullptr) {
         OP_LOGD(context, "queryRope is not nullptr");
         *dqRopeShape = *queryRopeShape;
-    } 
-    const gert::Shape *keyRopeShape = context->GetOptionalInputShape(23);
+    }
+    const gert::Shape* keyRopeShape = context->GetOptionalInputShape(23);
     if (keyRopeShape != nullptr) {
         OP_LOGD(context, "keyRope is not nullptr");
         *dkRopeShape = *keyRopeShape;
     }
-    const gert::Shape *sinkShape = context->GetOptionalInputShape(24);
+    const gert::Shape* sinkShape = context->GetOptionalInputShape(24);
     if (sinkShape != nullptr && sinkShape->GetShapeSize() != 0) {
         OP_LOGD(context, "sink is not nullptr");
         *dsinkShape = *sinkShape;
@@ -128,7 +128,7 @@ ge::graphStatus InferShape4FlashAttentionScoreGrad(gert::InferShapeContext *cont
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataType4FlashAttentionScoreGrad(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataType4FlashAttentionScoreGrad(gert::InferDataTypeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     OP_LOGI(context, "Enter FlashAttentionScoreGrad infer data type impl.");
@@ -174,7 +174,8 @@ ge::graphStatus InferDataType4FlashAttentionScoreGrad(gert::InferDataTypeContext
             context->SetOutputDataType(INDEX_OUT_6, ge::DT_FLOAT);
         } else {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "outDtype",
-                std::to_string(outDtype).c_str(), "The value of outDtype must be 0 or 1");
+                                                  std::to_string(outDtype).c_str(),
+                                                  "The value of outDtype must be 0 or 1");
             return GRAPH_FAILED;
         }
         return GRAPH_SUCCESS;

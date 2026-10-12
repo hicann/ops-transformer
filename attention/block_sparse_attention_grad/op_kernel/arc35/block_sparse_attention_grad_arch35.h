@@ -61,26 +61,26 @@ public:
     __aicore__ inline void Process(GM_ADDR dout, GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR attention_out,
                                    GM_ADDR softmaxLse, GM_ADDR blockSparseMask, GM_ADDR blockShape,
                                    GM_ADDR attentionMask, GM_ADDR actualQseqlen, GM_ADDR actualKvseqlen, GM_ADDR dq,
-                                   GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace, const TILING_CLASS *tilingData,
-                                   TPipe *tPipe)
+                                   GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace, const TILING_CLASS* tilingData,
+                                   TPipe* tPipe)
     {
         uint32_t base_m = tilingData->baseM;
         uint32_t base_n = tilingData->baseN;
         uint32_t vec_base_m = base_m / 2;
         uint32_t vec_base_n = base_n;
 
-        query_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)q);
-        key_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)k);
-        val_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)v);
-        dout_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)dout);
-        attention_out_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)attention_out);
-        dq_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)dq);
-        dk_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)dk);
-        dv_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)dv);
-        dq_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->dqWorkspaceOffset));
-        dk_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->dkWorkspaceOffset));
-        dv_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->dvWorkspaceOffset));
-        sftg_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->sftgWorkspaceOffset));
+        query_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)q);
+        key_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)k);
+        val_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)v);
+        dout_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)dout);
+        attention_out_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)attention_out);
+        dq_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)dq);
+        dk_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)dk);
+        dv_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)dv);
+        dq_workspace_.SetGlobalBuffer((__gm__ float*)(workspace + tilingData->dqWorkspaceOffset));
+        dk_workspace_.SetGlobalBuffer((__gm__ float*)(workspace + tilingData->dkWorkspaceOffset));
+        dv_workspace_.SetGlobalBuffer((__gm__ float*)(workspace + tilingData->dvWorkspaceOffset));
+        sftg_workspace_.SetGlobalBuffer((__gm__ float*)(workspace + tilingData->sftgWorkspaceOffset));
         addr_.Init(tilingData, actualQseqlen, actualKvseqlen, blockSparseMask, workspace);
         tPipe->InitBuffer(ub_buffer_, UB_SIZE);
         tPipe->InitBuffer(l1_buffer_, L1_SIZE);
@@ -113,8 +113,8 @@ public:
         }
     }
 
-    __aicore__ inline void kv_reuse_check(RunTimeInfo &lastRunTimeInfo, RunTimeInfo &runTimeInfo,
-                                          RunTimeInfo &nextRunTimeInfo, bool first)
+    __aicore__ inline void kv_reuse_check(RunTimeInfo& lastRunTimeInfo, RunTimeInfo& runTimeInfo,
+                                          RunTimeInfo& nextRunTimeInfo, bool first)
     {
         if constexpr (DETERMINISTIC_ENABLE) {
             // 确定性路径：dkv group 语义由 latin-square 状态机给出（last valid in group 会跨过组内无效轮次）
@@ -151,8 +151,8 @@ public:
     __aicore__ inline void CubeProcess(GM_ADDR dout, GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR attention_out,
                                        GM_ADDR softmaxLse, GM_ADDR blockSparseMask, GM_ADDR blockShape,
                                        GM_ADDR attentionMask, GM_ADDR actualQseqlen, GM_ADDR actualKvseqlen, GM_ADDR dq,
-                                       GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace, const TILING_CLASS *tilingData,
-                                       TPipe *tPipe)
+                                       GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace, const TILING_CLASS* tilingData,
+                                       TPipe* tPipe)
     {
         CubeOp<BSA_TYPE> cubeOp;
         cubeOp.Init(tilingData, tPipe, l1_buffer_, l1_offset_);
@@ -220,7 +220,7 @@ public:
                                          GM_ADDR softmaxLse, GM_ADDR blockSparseMask, GM_ADDR blockShape,
                                          GM_ADDR attentionMask, GM_ADDR actualQseqlen, GM_ADDR actualKvseqlen,
                                          GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace,
-                                         const TILING_CLASS *tilingData, TPipe *tPipe)
+                                         const TILING_CLASS* tilingData, TPipe* tPipe)
     {
         VecOp<BSA_TYPE> vecOp;
         vecOp.Init(dout, q, k, v, attention_out, softmaxLse, blockSparseMask, blockShape, attentionMask, actualQseqlen,

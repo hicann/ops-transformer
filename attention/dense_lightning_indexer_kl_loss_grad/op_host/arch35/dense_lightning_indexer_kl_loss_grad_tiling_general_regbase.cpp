@@ -123,7 +123,7 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::ValidateReq
     OP_CHECK_IF(metadataDesc == nullptr, OP_LOGE(opName, "metadata desc must be provided."), return ge::GRAPH_FAILED);
 
     // metadata由DenseLightningIndexerKLLossGradMetadata算子生成，长度固定
-    const gert::Shape &metadataShape = metadataTensor->GetStorageShape();
+    const gert::Shape& metadataShape = metadataTensor->GetStorageShape();
     OP_CHECK_IF(metadataShape.GetDimNum() != 1UL,
                 OP_LOGE(opName, "The dim num of metadata must be 1, but got %zu.", metadataShape.GetDimNum()),
                 return ge::GRAPH_FAILED);
@@ -136,9 +136,9 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::ValidateReq
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::CheckOutShape(gert::Shape &inputshape,
-                                                                                   const char *inputName,
-                                                                                   gert::Shape &outputshape)
+ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::CheckOutShape(gert::Shape& inputshape,
+                                                                                   const char* inputName,
+                                                                                   gert::Shape& outputshape)
 {
     if (layoutQuery[DIM_NUM_0] == 'T' && layoutQuery[DIM_NUM_1] == 'N' && layoutQuery[DIM_NUM_2] == 'D') {
         if (inputshape.GetDim(DIM_NUM_0) != outputshape.GetDim(DIM_NUM_0) ||
@@ -259,7 +259,7 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::CheckContex
     auto layoutKeyPtr = attrs->GetAttrPointer<char>(idx++);
     auto sparseModePtr = attrs->GetAttrPointer<int32_t>(idx++);
     auto cmpRatioPtr = attrs->GetAttrPointer<int32_t>(idx++);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
 
     OP_CHECK_NULL_WITH_CONTEXT(context_, layoutQueryPtr);
     OP_CHECK_NULL_WITH_CONTEXT(context_, layoutKeyPtr);
@@ -347,10 +347,10 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeAttrs()
     return true;
 }
 
-bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeDimLayout(const gert::Shape &queryIndexShape,
-                                                                           const gert::Shape &keyIndexShape,
-                                                                           const gert::Shape &weightsShape,
-                                                                           const gert::Shape &attnSoftmaxL1Shape,
+bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeDimLayout(const gert::Shape& queryIndexShape,
+                                                                           const gert::Shape& keyIndexShape,
+                                                                           const gert::Shape& weightsShape,
+                                                                           const gert::Shape& attnSoftmaxL1Shape,
                                                                            size_t layoutLen)
 {
     if (layoutLen == 3UL) {
@@ -358,7 +358,7 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeDimLayout(const
             t1Size = queryIndexShape.GetDim(0); // TND只有三个数值 T:0 N:1 D:2
             t2Size = keyIndexShape.GetDim(0);
             realT1Size = t1Size;
-            const gert::Shape &actSeqQLenShape =
+            const gert::Shape& actSeqQLenShape =
                 context_->GetOptionalInputTensor(CU_SEQLENS_QUERY_INPUT_INDEX)->GetStorageShape();
             bSize = actSeqQLenShape.GetDim(0) - 1;
             s1Size = t1Size;
@@ -422,7 +422,7 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeOptionalDtype()
 {
     struct OptionalInput {
         uint32_t index;
-        const char *name;
+        const char* name;
     };
     static const OptionalInput optionalInputs[] = {
         {CU_SEQLENS_QUERY_INPUT_INDEX, "cu_seqlens_q"},   {CU_SEQLENS_KEY_INPUT_INDEX, "cu_seqlens_k"},
@@ -430,7 +430,7 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeOptionalDtype()
         {CMP_RESIDUAL_KEY_INPUT_INDEX, "cmp_residual_k"}, {METADATA_INPUT_INDEX, "metadata"},
     };
 
-    for (const auto &optionalInput : optionalInputs) {
+    for (const auto& optionalInput : optionalInputs) {
         // 未传入的可选输入tensor为空指针，无需校验
         if (context_->GetOptionalInputTensor(optionalInput.index) == nullptr) {
             continue;
@@ -698,7 +698,7 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::CheckOptionalShape()
 {
     struct OptionalShapeRule {
         uint32_t index;
-        const char *name;
+        const char* name;
         int64_t expectLen;
     };
     // cu_seqlens为累积长度，元素数为B+1；其余按batch给出，元素数为B
@@ -712,12 +712,12 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::CheckOptionalShape()
         {CMP_RESIDUAL_KEY_INPUT_INDEX, "cmp_residual_k", perBatchLen},
     };
 
-    for (const auto &rule : rules) {
+    for (const auto& rule : rules) {
         auto tensor = context_->GetOptionalInputTensor(rule.index);
         if (tensor == nullptr) {
             continue;
         }
-        const gert::Shape &shape = tensor->GetStorageShape();
+        const gert::Shape& shape = tensor->GetStorageShape();
         OP_CHECK_IF(shape.GetDimNum() != 1UL,
                     OP_LOGE(opName, "The dim num of %s must be 1, but got %zu.", rule.name, shape.GetDimNum()),
                     return false);
@@ -731,11 +731,11 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::CheckOptionalShape()
 
 bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeLayout()
 {
-    auto &queryIndexShape = context_->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
-    auto &keyIndexShape = context_->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
-    auto &weightsShape = context_->GetInputShape(WEIGHT_INPUT_INDEX)->GetStorageShape();
-    auto &attnSoftmaxL1Shape = context_->GetInputShape(ATTN_SOFTMAX_L1_NORM_INPUT_INDEX)->GetStorageShape();
-    auto &softmaxLseShape = context_->GetInputShape(SOFTMAX_LSE_INPUT_INDEX)->GetStorageShape();
+    auto& queryIndexShape = context_->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
+    auto& keyIndexShape = context_->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
+    auto& weightsShape = context_->GetInputShape(WEIGHT_INPUT_INDEX)->GetStorageShape();
+    auto& attnSoftmaxL1Shape = context_->GetInputShape(ATTN_SOFTMAX_L1_NORM_INPUT_INDEX)->GetStorageShape();
+    auto& softmaxLseShape = context_->GetInputShape(SOFTMAX_LSE_INPUT_INDEX)->GetStorageShape();
 
     size_t layoutLen = strlen(layoutQuery);
     OP_CHECK_IF(!CrossShapeVerify(), OPS_REPORT_VECTOR_INNER_ERR(opName, "CrossShapeVerify Failed"), return false);
@@ -755,7 +755,7 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::GetPlatform
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
         auto compileInfoPtr =
-            reinterpret_cast<const DenseLightningIndexerKLLossGradCompileInfo *>(context_->GetCompileInfo());
+            reinterpret_cast<const DenseLightningIndexerKLLossGradCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(opName, "compileInfoPtr is null."), return ge::GRAPH_FAILED);
         aivNum = compileInfoPtr->aivNum;
         aicNum = compileInfoPtr->aicNum;
@@ -833,8 +833,8 @@ void DenseLightningIndexerKLLossGradTilingGeneralRegbase::SetMultiCoreParamsRegb
 
 void DenseLightningIndexerKLLossGradTilingGeneralRegbase::InitOutputSplit()
 {
-    DLIKGradInitOutputParamsRegbase *initoutput = &tilingData->initOutputParams;
-    auto &dKeyIndexShape = context_->GetOutputShape(D_KEY_OUTPUT_INDEX)->GetStorageShape();
+    DLIKGradInitOutputParamsRegbase* initoutput = &tilingData->initOutputParams;
+    auto& dKeyIndexShape = context_->GetOutputShape(D_KEY_OUTPUT_INDEX)->GetStorageShape();
     int64_t totalsize = 0;
     uint32_t singlecoresize = 0;
     if (tilingKeyLayout == LayoutTypeRegbase::LAYOUT_TND) {
@@ -1007,7 +1007,7 @@ uint64_t DenseLightningIndexerKLLossGradTilingGeneralRegbase::GetTilingKey() con
 ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::GetWorkspaceSize()
 {
     int64_t coreNum = dlikGradMultiCoreParams_->get_coreNum();
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     int64_t s2BlockSize = 8192;
     int64_t bmm3Size = dlikGradBaseParams_->get_bSize() * dlikGradBaseParams_->get_n2Size() *
                        dlikGradBaseParams_->get_s2Size() * dSizeQueryIndex * sizeof(float);

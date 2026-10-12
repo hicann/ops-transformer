@@ -43,8 +43,8 @@ struct RmsNormParam {
  * @param row 行数
  * @param col 列数
  */
-__aicore__ inline void ColumnSum(const LocalTensor<float> &dstLocal, const LocalTensor<float> &srcLocal,
-                                 const LocalTensor<float> &shareTmpUb, uint32_t row, uint32_t col)
+__aicore__ inline void ColumnSum(const LocalTensor<float>& dstLocal, const LocalTensor<float>& srcLocal,
+                                 const LocalTensor<float>& shareTmpUb, uint32_t row, uint32_t col)
 {
     // 行数为1时，直接将srcLocal复制到dstLocal
     if (unlikely(row == 1)) {
@@ -93,8 +93,8 @@ __aicore__ inline void ColumnSum(const LocalTensor<float> &dstLocal, const Local
  * @param row 行数
  * @param col 列数
  */
-__aicore__ inline void ColumnMax(const LocalTensor<float> &dstLocal, const LocalTensor<float> &srcLocal,
-                                 const LocalTensor<float> &shareTmpUb, uint32_t row, uint32_t col)
+__aicore__ inline void ColumnMax(const LocalTensor<float>& dstLocal, const LocalTensor<float>& srcLocal,
+                                 const LocalTensor<float>& shareTmpUb, uint32_t row, uint32_t col)
 {
     // 行数为1时，直接将srcLocal复制到dstLocal
     if (unlikely(row == 1)) {
@@ -148,8 +148,8 @@ __aicore__ inline void ColumnMax(const LocalTensor<float> &dstLocal, const Local
             colRemain 剩余列数
             repeatStride 循环步长（内存中实际列长度）
  */
-__aicore__ inline void MatSubVec(const LocalTensor<float> &dstLocal, const LocalTensor<float> &src0Local,
-                                 const LocalTensor<float> &src1Local, const MatRpeatParam &repeatParam)
+__aicore__ inline void MatSubVec(const LocalTensor<float>& dstLocal, const LocalTensor<float>& src0Local,
+                                 const LocalTensor<float>& src1Local, const MatRpeatParam& repeatParam)
 {
     for (uint32_t row = 0; row < repeatParam.row; row += REPEAT_MAX_NUM) {
         uint32_t repeatRowTimes = Std::min(repeatParam.row - row, REPEAT_MAX_NUM);
@@ -181,8 +181,8 @@ __aicore__ inline void MatSubVec(const LocalTensor<float> &dstLocal, const Local
             colRemain 剩余列数
             repeatStride 循环步长（内存中实际列长度）
  */
-__aicore__ inline void MatDivVec(const LocalTensor<float> &dstLocal, const LocalTensor<float> &src0Local,
-                                 const LocalTensor<float> &src1Local, const MatRpeatParam &repeatParam)
+__aicore__ inline void MatDivVec(const LocalTensor<float>& dstLocal, const LocalTensor<float>& src0Local,
+                                 const LocalTensor<float>& src1Local, const MatRpeatParam& repeatParam)
 {
     for (uint32_t row = 0; row < repeatParam.row; row += REPEAT_MAX_NUM) {
         uint32_t repeatRowTimes = Std::min(repeatParam.row - row, REPEAT_MAX_NUM);
@@ -214,8 +214,8 @@ __aicore__ inline void MatDivVec(const LocalTensor<float> &dstLocal, const Local
             colRemain 剩余列数
             repeatStride 循环步长（内存中实际列长度）
  */
-__aicore__ inline void MatMulVec(const LocalTensor<float> &dstLocal, const LocalTensor<float> &src0Local,
-                                 const LocalTensor<float> &src1Local, const MatRpeatParam &repeatParam)
+__aicore__ inline void MatMulVec(const LocalTensor<float>& dstLocal, const LocalTensor<float>& src0Local,
+                                 const LocalTensor<float>& src1Local, const MatRpeatParam& repeatParam)
 {
     for (uint32_t row = 0; row < repeatParam.row; row += REPEAT_MAX_NUM) {
         uint32_t repeatRowTimes = Std::min(repeatParam.row - row, REPEAT_MAX_NUM);
@@ -247,8 +247,8 @@ __aicore__ inline void MatMulVec(const LocalTensor<float> &dstLocal, const Local
             colRemain 剩余列数
             repeatStride 循环步长（内存中实际列长度）
  */
-__aicore__ inline void RowSum(const LocalTensor<float> &dstLocal, const LocalTensor<float> &srcLocal,
-                              const LocalTensor<float> &shareTmpUb, const MatRpeatParam &repeatParam)
+__aicore__ inline void RowSum(const LocalTensor<float>& dstLocal, const LocalTensor<float>& srcLocal,
+                              const LocalTensor<float>& shareTmpUb, const MatRpeatParam& repeatParam)
 {
     uint32_t blockCount = repeatParam.loopTimes;
     if (blockCount > 0 && repeatParam.colRemain > 0) {
@@ -285,8 +285,8 @@ __aicore__ inline void RowSum(const LocalTensor<float> &dstLocal, const LocalTen
             colRemain 剩余列数
             repeatStride 循环步长（内存中实际列长度）
  */
-__aicore__ inline void RowDivs(const LocalTensor<float> &dstLocal, const LocalTensor<float> &src0Local,
-                               const LocalTensor<float> &src1Local, const MatRpeatParam &repeatParam)
+__aicore__ inline void RowDivs(const LocalTensor<float>& dstLocal, const LocalTensor<float>& src0Local,
+                               const LocalTensor<float>& src1Local, const MatRpeatParam& repeatParam)
 {
     for (uint32_t row = 0; row < repeatParam.row; row += REPEAT_MAX_NUM) {
         uint32_t repeatRowTimes = Std::min(repeatParam.row - row, REPEAT_MAX_NUM);
@@ -318,8 +318,8 @@ __aicore__ inline void RowDivs(const LocalTensor<float> &dstLocal, const LocalTe
             colRemain 剩余列数
             repeatStride 循环步长（内存中实际列长度）
  */
-__aicore__ inline void RowMuls(const LocalTensor<float> &dstLocal, const LocalTensor<float> &src0Local,
-                               const LocalTensor<float> &src1Local, const MatRpeatParam &repeatParam)
+__aicore__ inline void RowMuls(const LocalTensor<float>& dstLocal, const LocalTensor<float>& src0Local,
+                               const LocalTensor<float>& src1Local, const MatRpeatParam& repeatParam)
 {
     for (uint32_t row = 0; row < repeatParam.row; row += REPEAT_MAX_NUM) {
         uint32_t repeatRowTimes = Std::min(repeatParam.row - row, REPEAT_MAX_NUM);

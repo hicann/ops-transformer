@@ -55,10 +55,10 @@ uint64_t GetTilingKey(uint32_t sp, ge::DataType goType_)
     return tiling_key;
 }
 
-ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context)
+ge::graphStatus DecodeUpdateTiling(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("AttentionUpdate", "context is null"), return ge::GRAPH_FAILED);
-    auto compileInfo = reinterpret_cast<const DecodeUpdateCompileInfo *>(context->GetCompileInfo());
+    auto compileInfo = reinterpret_cast<const DecodeUpdateCompileInfo*>(context->GetCompileInfo());
     if (compileInfo->is_ascendc) {
         return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
     }
@@ -66,8 +66,8 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context)
     OP_LOGD(nodeName, "Tiling initializing");
 
     auto attrs = context->GetAttrs();
-    const int64_t *updateTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_UPDATETYPE_INDEX);
-    const int64_t *spPtr = attrs->GetAttrPointer<int64_t>(ATTR_SP_INDEX);
+    const int64_t* updateTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_UPDATETYPE_INDEX);
+    const int64_t* spPtr = attrs->GetAttrPointer<int64_t>(ATTR_SP_INDEX);
 
     auto updateType = *updateTypePtr;
     auto sp = *spPtr;
@@ -113,7 +113,7 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context)
     OP_LOGD(nodeName, "sp is %u", tilingData.get_sp());
     OP_LOGD(nodeName, "totalLength is %u", tilingData.get_totalLength());
 
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
     workspaces[0] = SYS_WORKSPACE_SIZE;
 
     context->SetBlockDim(blockDims);
@@ -123,7 +123,7 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingPrepare4DecodeUpdate(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepare4DecodeUpdate(gert::TilingParseContext* context)
 {
     auto compileInfo = context->GetCompiledInfo<DecodeUpdateCompileInfo>();
     OP_CHECK_IF(compileInfo == nullptr, OP_LOGE(context, "compileInfoPtr is null"), return ge::GRAPH_FAILED);

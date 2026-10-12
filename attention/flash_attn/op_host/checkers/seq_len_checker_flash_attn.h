@@ -29,18 +29,18 @@ public:
     ActualSeqLenChecker() = default;
     ~ActualSeqLenChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const FaTilingInfo &faInfo) override;
-    ge::graphStatus CheckParaExistence(const FaTilingInfo &faInfo) override;
-    ge::graphStatus CheckFeature(const FaTilingInfo &faInfo) override;
-    ge::graphStatus CheckMultiPara(const FaTilingInfo &faInfo) override;
+    ge::graphStatus CheckSinglePara(const FaTilingInfo& faInfo) override;
+    ge::graphStatus CheckParaExistence(const FaTilingInfo& faInfo) override;
+    ge::graphStatus CheckFeature(const FaTilingInfo& faInfo) override;
+    ge::graphStatus CheckMultiPara(const FaTilingInfo& faInfo) override;
 
 private:
-    ge::graphStatus CheckSingleParaSequsedQ(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckSingleParaSequsedKv(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckSingleParaCuSeqlensQ(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckSingleParaCuSeqlensKv(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckSingleParaMaxSeqlenQ(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckSingleParaMaxSeqlenKv(const FaTilingInfo &faInfo);
+    ge::graphStatus CheckSingleParaSequsedQ(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckSingleParaSequsedKv(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckSingleParaCuSeqlensQ(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckSingleParaCuSeqlensKv(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckSingleParaMaxSeqlenQ(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckSingleParaMaxSeqlenKv(const FaTilingInfo& faInfo);
 };
 
 } // namespace flash_attn

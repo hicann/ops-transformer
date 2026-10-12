@@ -46,11 +46,11 @@ int64_t CalculateMlaMetadataSizeBytes(int64_t batchSize, int64_t aicCoreNum, int
     return CalculateMlaMetadataSizeWords(batchSize, aicCoreNum, aivCoreNum) * static_cast<int64_t>(sizeof(int32_t));
 }
 
-at::Tensor FlashMlaWithKvcacheMetadata(const c10::optional<at::Tensor> &cuSeqlensQ, const at::Tensor &cacheSeqlens,
-                                       const c10::optional<at::Tensor> &sequsedQ, int64_t maxSeqlenQ,
+at::Tensor FlashMlaWithKvcacheMetadata(const c10::optional<at::Tensor>& cuSeqlensQ, const at::Tensor& cacheSeqlens,
+                                       const c10::optional<at::Tensor>& sequsedQ, int64_t maxSeqlenQ,
                                        int64_t maxSeqlenKv, int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDimQk,
                                        int64_t headDimV, int64_t maskMode, std::string layoutQ, int64_t aicCoreNum,
-                                       int64_t aivCoreNum, const at::Tensor &output)
+                                       int64_t aivCoreNum, const at::Tensor& output)
 {
     // Device inference from the seq-lens tensors (sparse_flash_mla precedent): cacheSeqlens 必传, cu/seq 可选.
     at::Device outputDevice = at::Device(std::string("npu"));
@@ -76,7 +76,7 @@ at::Tensor FlashMlaWithKvcacheMetadata(const c10::optional<at::Tensor> &cuSeqlen
 
     // ACLNN_CMD's ConvertTypes binds non-const lvalue refs -> hoist layout strings into char* lvalues
     // (direct .c_str()/.data() rvalues fail to compile; same pattern in kernel entry).
-    char *layoutQPtr = const_cast<char *>(layoutQ.c_str());
+    char* layoutQPtr = const_cast<char*>(layoutQ.c_str());
 
     // Call order must match the schema/def input order (N5): cu_seqlens_q, cache_seqlens, seqused_q first,
     // then int attrs, then layout_q, then the output buffer.
@@ -86,10 +86,10 @@ at::Tensor FlashMlaWithKvcacheMetadata(const c10::optional<at::Tensor> &cuSeqlen
 }
 
 std::tuple<at::Tensor, at::Tensor> FlashMlaWithKvcache(
-    const at::Tensor &q, const at::Tensor &kCache, const c10::optional<at::Tensor> &blockTable,
-    const c10::optional<at::Tensor> &cacheSeqlens, const c10::optional<at::Tensor> &cuSeqlensQ,
-    const c10::optional<at::Tensor> &sequsedQ, const c10::optional<at::Tensor> &attnMask,
-    const c10::optional<at::Tensor> &metadata, int64_t headDimV, double softmaxScale, int64_t maskMode,
+    const at::Tensor& q, const at::Tensor& kCache, const c10::optional<at::Tensor>& blockTable,
+    const c10::optional<at::Tensor>& cacheSeqlens, const c10::optional<at::Tensor>& cuSeqlensQ,
+    const c10::optional<at::Tensor>& sequsedQ, const c10::optional<at::Tensor>& attnMask,
+    const c10::optional<at::Tensor>& metadata, int64_t headDimV, double softmaxScale, int64_t maskMode,
     int64_t maxSeqlenQ, int64_t maxSeqlenKv, std::string layoutQ, std::string layoutKv, std::string layoutOut,
     int64_t returnSoftmaxLse, int64_t aicCoreNum, int64_t aivCoreNum)
 {
@@ -154,9 +154,9 @@ std::tuple<at::Tensor, at::Tensor> FlashMlaWithKvcache(
                     "head num == 1).");
     }
 
-    char *layoutQPtr = const_cast<char *>(layoutQ.c_str());
-    char *layoutKvPtr = const_cast<char *>(layoutKv.c_str());
-    char *layoutOutPtr = const_cast<char *>(layoutOut.c_str());
+    char* layoutQPtr = const_cast<char*>(layoutQ.c_str());
+    char* layoutKvPtr = const_cast<char*>(layoutKv.c_str());
+    char* layoutOutPtr = const_cast<char*>(layoutOut.c_str());
 
     // Python bool -> C++ int64_t: pybind11 auto-converts return_softmax_lse (True->1, False->0) before here.
     ACLNN_CMD(aclnnFlashMlaWithKvcache, q, kCache, blockTable, cacheSeqlens, cuSeqlensQ, sequsedQ, attnMask, metadata,

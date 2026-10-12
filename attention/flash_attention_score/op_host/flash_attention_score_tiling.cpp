@@ -70,14 +70,14 @@ static uint32_t Ceil(uint32_t num1, uint32_t num2)
     return (num1 + num2 - 1U) / num2;
 }
 
-static ge::graphStatus CheckParams(const gert::TilingContext *context)
+static ge::graphStatus CheckParams(const gert::TilingContext* context)
 {
     if (context->GetAttrs() != nullptr && context->GetInputShape(QUERY_INPUT_INDEX) != nullptr &&
         context->GetInputShape(KEY_INPUT_INDEX) != nullptr && context->GetInputShape(VALUE_INPUT_INDEX) != nullptr) {
-        auto &valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
-        auto &keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
-        auto &queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
-        const char *inputLayout = context->GetAttrs()->GetAttrPointer<char>(INPUTLAYOUT_ATTRS_INDEX);
+        auto& valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
+        auto& keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
+        auto& queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
+        const char* inputLayout = context->GetAttrs()->GetAttrPointer<char>(INPUTLAYOUT_ATTRS_INDEX);
         if (strlen(inputLayout) == 3) { // 3: BSH or SBH
             if (inputLayout[0] == 'B') {
                 // layout is BSH
@@ -151,8 +151,8 @@ static ge::graphStatus CheckParams(const gert::TilingContext *context)
     return ge::GRAPH_FAILED;
 }
 
-static bool GetEmptyArgs(EmptyArgs &emptyArgs, gert::TilingContext *context, const uint32_t &coreNum,
-                         const uint64_t &attentionOutShapeSize, const int64_t &softmaxSumShapeSize)
+static bool GetEmptyArgs(EmptyArgs& emptyArgs, gert::TilingContext* context, const uint32_t& coreNum,
+                         const uint64_t& attentionOutShapeSize, const int64_t& softmaxSumShapeSize)
 {
     emptyArgs.coreNum = coreNum;
     OP_CHECK_IF((coreNum <= 0),
@@ -252,7 +252,7 @@ static bool GetEmptyArgs(EmptyArgs &emptyArgs, gert::TilingContext *context, con
     return true;
 }
 
-static bool IsEmptyInputRegbase(gert::TilingContext *context)
+static bool IsEmptyInputRegbase(gert::TilingContext* context)
 {
     auto attentionOutShape = context->GetOutputShape(ATTENTIONOUT_OUTPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
@@ -287,9 +287,9 @@ static bool IsEmptyInputRegbase(gert::TilingContext *context)
         |                                   |                             |       |
         |--------n*(blocks/coreNum+1)-------|-----m*(blocks/coreNum)------|<32Byte|
         */
-        FlashAttentionScoreEmptyInputTilingDataRegbase *regbaseEmptyInputTiling =
+        FlashAttentionScoreEmptyInputTilingDataRegbase* regbaseEmptyInputTiling =
             context->GetTilingData<FlashAttentionScoreEmptyInputTilingDataRegbase>();
-        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreCompileInfo *>(context->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreCompileInfo*>(context->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context, "compileInfoPtr is null"), return false);
 
         EmptyArgs emptyArgs;
@@ -309,7 +309,7 @@ static bool IsEmptyInputRegbase(gert::TilingContext *context)
         regbaseEmptyInputTiling->set_attentionOutLastCoreIndex(emptyArgs.attentionOutLastCoreIndex);
         context->SetTilingKey(GET_TPL_TILING_KEY(TILING_KEY_1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0));
         context->SetBlockDim(compileInfoPtr->aicNum);
-        size_t *workspaces = context->GetWorkspaceSizes(1);
+        size_t* workspaces = context->GetWorkspaceSizes(1);
         // workspace上预留100M
         workspaces[0] = VALUE_100 * VALUE_1024 * VALUE_1024;
         return true;
@@ -317,7 +317,7 @@ static bool IsEmptyInputRegbase(gert::TilingContext *context)
     return false;
 }
 
-static bool IsEmptyInput(gert::TilingContext *context)
+static bool IsEmptyInput(gert::TilingContext* context)
 {
     auto attentionOutShape = context->GetOutputShape(ATTENTIONOUT_OUTPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
@@ -351,9 +351,9 @@ static bool IsEmptyInput(gert::TilingContext *context)
         |                                   |                             |       |
         |--------n*(blocks/coreNum+1)-------|-----m*(blocks/coreNum)------|<32Byte|
         */
-        FlashAttentionScoreTilingData *emptyInputTiling = context->GetTilingData<FlashAttentionScoreTilingData>();
+        FlashAttentionScoreTilingData* emptyInputTiling = context->GetTilingData<FlashAttentionScoreTilingData>();
         emptyInputTiling->reset();
-        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreCompileInfo *>(context->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreCompileInfo*>(context->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context, "compileInfoPtr is null"), return false);
         EmptyArgs emptyArgs;
         if (!GetEmptyArgs(emptyArgs, context, compileInfoPtr->aivNum, attentionOutShapeSize, softmaxSumShapeSize)) {
@@ -376,7 +376,7 @@ static bool IsEmptyInput(gert::TilingContext *context)
         OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context, "platformInfoPtr is null"), return false);
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
         context->SetBlockDim(ascendcPlatform.CalcTschBlockDim(emptyArgs.aivActualNum, 0, compileInfoPtr->aivNum));
-        size_t *workspaces = context->GetWorkspaceSizes(1);
+        size_t* workspaces = context->GetWorkspaceSizes(1);
         // workspace上预留100M
         workspaces[0] = VALUE_100 * VALUE_1024 * VALUE_1024;
         return true;
@@ -384,7 +384,7 @@ static bool IsEmptyInput(gert::TilingContext *context)
     return false;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionScore(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionScore(gert::TilingContext* context)
 {
     OP_LOGW(context, "Start registering tiling.");
     if (CheckParams(context) != ge::GRAPH_SUCCESS) {
@@ -411,7 +411,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionScore(gert::TilingContext *
     return resultCode;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashAttentionScore(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashAttentionScore(gert::TilingParseContext* context)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context, "platformInfoPtr is null"), return ge::GRAPH_FAILED);

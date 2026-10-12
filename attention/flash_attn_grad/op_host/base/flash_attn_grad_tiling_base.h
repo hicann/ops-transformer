@@ -49,19 +49,19 @@ enum class FagScheduleMode : uint32_t {
 
 class FagTilingBase {
 public:
-    explicit FagTilingBase(gert::TilingContext *context)
+    explicit FagTilingBase(gert::TilingContext* context)
         : context_(context)
     {}
     virtual ~FagTilingBase() = default;
 
-    FagTilingBase(const FagTilingBase &) = delete;
-    FagTilingBase &operator=(const FagTilingBase &) = delete;
+    FagTilingBase(const FagTilingBase&) = delete;
+    FagTilingBase& operator=(const FagTilingBase&) = delete;
 
     // 返回值语义与 FiaTilingBase::DoTiling 一致，注册表就靠它表达 fallback：
     //   GRAPH_SUCCESS       成功，不必再往下试
     //   GRAPH_PARAM_INVALID 本类不支持这组输入，应继续试下一个模板类
     //   GRAPH_FAILED        真失败，中止整个 tiling
-    ge::graphStatus DoTiling(const FagParsedInfo &info)
+    ge::graphStatus DoTiling(const FagParsedInfo& info)
     {
         InitTilingInfo(info);
         if (!IsCapable()) {
@@ -71,7 +71,7 @@ public:
     }
 
 protected:
-    virtual void InitTilingInfo(const FagParsedInfo &info) = 0;
+    virtual void InitTilingInfo(const FagParsedInfo& info) = 0;
     virtual bool IsCapable() = 0;
     virtual ge::graphStatus DoOpTiling() = 0;
 
@@ -90,7 +90,7 @@ protected:
 
     ge::graphStatus SetWorkspaceSize(size_t workspaceSize) const
     {
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         OP_CHECK_IF(workspaces == nullptr, OP_LOGE(context_->GetNodeName(), "workspace sizes got from ge is nullptr."),
                     return ge::GRAPH_FAILED);
         workspaces[0] = workspaceSize;
@@ -102,7 +102,7 @@ protected:
         return context_->SetScheduleMode(static_cast<uint32_t>(mode));
     }
 
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
 };
 
 } // namespace optiling

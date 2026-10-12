@@ -33,13 +33,13 @@ namespace {
 using TensorDescription = gert::InfershapeContextPara::TensorDescription;
 
 constexpr size_t CSV_COLUMN_COUNT = 16U;
-constexpr const char *CSV_FILE_NAME = "test_block_attn_res_prepare_infershape.csv";
-constexpr const char *CSV_REPO_DIR = "attention/block_attn_res_prepare/tests/ut/op_host";
+constexpr const char* CSV_FILE_NAME = "test_block_attn_res_prepare_infershape.csv";
+constexpr const char* CSV_REPO_DIR = "attention/block_attn_res_prepare/tests/ut/op_host";
 
 struct BlockAttnResPrepareInfershapeCase {
     void RunShapeCase() const
     {
-        const auto makeTensorDescription = [](const std::string &shape, const std::string &dtype) {
+        const auto makeTensorDescription = [](const std::string& shape, const std::string& dtype) {
             const auto dims = ops::ut::ParseDims(shape);
             return TensorDescription(ops::ut::MakeGertStorageShape(dims, dims), ops::ut::ParseGeDtype(dtype),
                                      ge::FORMAT_ND);
@@ -177,19 +177,19 @@ std::vector<BlockAttnResPrepareInfershapeCase> LoadCases()
             testCase.expectExpSumShape = ops::ut::Trim(items[index++]);
             testCase.expectOutputDtypes = ops::ut::Trim(items[index++]);
             cases.emplace_back(std::move(testCase));
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
     return cases;
 }
 
-std::string MakeParamName(const testing::TestParamInfo<BlockAttnResPrepareInfershapeCase> &info)
+std::string MakeParamName(const testing::TestParamInfo<BlockAttnResPrepareInfershapeCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
 
-const std::vector<BlockAttnResPrepareInfershapeCase> &GetCases()
+const std::vector<BlockAttnResPrepareInfershapeCase>& GetCases()
 {
     static const std::vector<BlockAttnResPrepareInfershapeCase> cases = LoadCases();
     return cases;

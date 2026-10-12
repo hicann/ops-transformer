@@ -26,22 +26,22 @@ TEMPLATES_DEF
 class DlikgBlockVec {
 public:
     __aicore__ inline DlikgBlockVec(){};
-    __aicore__ inline void InitParams(const DLIKGradConstInfo &vecConstInfo,
-                                      const optiling::DenseLightningIndexerGradRegBaseTilingData *tiling);
+    __aicore__ inline void InitParams(const DLIKGradConstInfo& vecConstInfo,
+                                      const optiling::DenseLightningIndexerGradRegBaseTilingData* tiling);
     __aicore__ inline void InitGlobalBuffer(GM_ADDR key, GM_ADDR weight, GM_ADDR softmaxLse, GM_ADDR attnSoftmaxL1,
                                             GM_ADDR dKey, GM_ADDR dWeight, GM_ADDR softmaxOut,
-                                            GlobalTensor<T> &reduceSumRes, GM_ADDR cuSeqlensQ, GM_ADDR cuSeqlensK,
+                                            GlobalTensor<T>& reduceSumRes, GM_ADDR cuSeqlensQ, GM_ADDR cuSeqlensK,
                                             GM_ADDR sequsedQ, GM_ADDR sequsedK, GM_ADDR cmpResidualK,
-                                            GlobalTensor<T> &deterRes, GlobalTensor<T> &bmm3Res);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void CopyInWeight(DLIKGradRunInfo &runInfo);
-    __aicore__ inline void ProcessVector1(Buffer<BufferType::UB, SyncType::NO_SYNC> &bmm1ResBuf,
-                                          DLIKGradRunInfo &runInfo);
-    __aicore__ inline void ProcessSoftmaxReduceSum(DLIKGradRunInfo &runInfo);
-    __aicore__ inline void ProcessVector2(Buffer<BufferType::UB, SyncType::NO_SYNC> &bmm1ResBuf,
-                                          Buffer<BufferType::L1, SyncType::NO_SYNC> &outputBuf,
-                                          DLIKGradRunInfo &runInfo);
-    __aicore__ inline void ProcessVector3Deter(DLIKGradRunInfo &runInfo);
+                                            GlobalTensor<T>& deterRes, GlobalTensor<T>& bmm3Res);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void CopyInWeight(DLIKGradRunInfo& runInfo);
+    __aicore__ inline void ProcessVector1(Buffer<BufferType::UB, SyncType::NO_SYNC>& bmm1ResBuf,
+                                          DLIKGradRunInfo& runInfo);
+    __aicore__ inline void ProcessSoftmaxReduceSum(DLIKGradRunInfo& runInfo);
+    __aicore__ inline void ProcessVector2(Buffer<BufferType::UB, SyncType::NO_SYNC>& bmm1ResBuf,
+                                          Buffer<BufferType::L1, SyncType::NO_SYNC>& outputBuf,
+                                          DLIKGradRunInfo& runInfo);
+    __aicore__ inline void ProcessVector3Deter(DLIKGradRunInfo& runInfo);
     // gm addr
     GlobalTensor<INPUT_T> keyIndexGm;
     GlobalTensor<T> weightGm;
@@ -68,17 +68,17 @@ public:
     GM_ADDR usedSeqKvlenAddr;
     GM_ADDR cmpResidualKAddr;
 
-    const optiling::DenseLightningIndexerGradRegBaseTilingData *tilingData;
-    TPipe *pipe;
+    const optiling::DenseLightningIndexerGradRegBaseTilingData* tilingData;
+    TPipe* pipe;
     MutexID mteBufMutexId;
 
 private:
     static constexpr int64_t UB_ROW_SIZE = 8;
     static constexpr event_t EVENT_ID2 = (event_t)7;
 
-    __aicore__ inline bool GetBS1Index(int64_t usedT1Index, int64_t &bIdx, int64_t &s1Idx, int64_t &bS1Index,
-                                       int64_t &accumS1Len, int64_t &accumS2Len, int32_t &actualSeqLensQ,
-                                       int32_t &actualSeqLensK, int64_t taskId, int64_t &currentS2Size);
+    __aicore__ inline bool GetBS1Index(int64_t usedT1Index, int64_t& bIdx, int64_t& s1Idx, int64_t& bS1Index,
+                                       int64_t& accumS1Len, int64_t& accumS2Len, int32_t& actualSeqLensQ,
+                                       int32_t& actualSeqLensK, int64_t taskId, int64_t& currentS2Size);
 
     DLIKGradConstInfo constInfo;
     TBuf<> gatherTbuf;
@@ -109,7 +109,7 @@ private:
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::InitParams(
-    const DLIKGradConstInfo &vecConstInfo, const optiling::DenseLightningIndexerGradRegBaseTilingData *tiling)
+    const DLIKGradConstInfo& vecConstInfo, const optiling::DenseLightningIndexerGradRegBaseTilingData* tiling)
 {
     this->constInfo = vecConstInfo;
     tilingData = tiling;
@@ -118,17 +118,17 @@ __aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::InitParams(
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::InitGlobalBuffer(
     GM_ADDR key, GM_ADDR weight, GM_ADDR softmaxLse, GM_ADDR attnSoftmaxL1, GM_ADDR dKey, GM_ADDR dWeight,
-    GM_ADDR softmaxOut, GlobalTensor<T> &reduceSumRes, GM_ADDR cuSeqlensQ, GM_ADDR cuSeqlensK, GM_ADDR sequsedQ,
-    GM_ADDR sequsedK, GM_ADDR cmpResidualK, GlobalTensor<T> &deterRes, GlobalTensor<T> &bmm3Res)
+    GM_ADDR softmaxOut, GlobalTensor<T>& reduceSumRes, GM_ADDR cuSeqlensQ, GM_ADDR cuSeqlensK, GM_ADDR sequsedQ,
+    GM_ADDR sequsedK, GM_ADDR cmpResidualK, GlobalTensor<T>& deterRes, GlobalTensor<T>& bmm3Res)
 {
-    keyIndexGm.SetGlobalBuffer((__gm__ INPUT_T *)key);
-    weightGm.SetGlobalBuffer((__gm__ T *)weight);
-    softmaxLseGm.SetGlobalBuffer((__gm__ T *)softmaxLse);
-    attnSoftmaxL1Gm.SetGlobalBuffer((__gm__ T *)attnSoftmaxL1);
+    keyIndexGm.SetGlobalBuffer((__gm__ INPUT_T*)key);
+    weightGm.SetGlobalBuffer((__gm__ T*)weight);
+    softmaxLseGm.SetGlobalBuffer((__gm__ T*)softmaxLse);
+    attnSoftmaxL1Gm.SetGlobalBuffer((__gm__ T*)attnSoftmaxL1);
 
-    dKeyIndexGm.SetGlobalBuffer((__gm__ OUT_T *)dKey);
-    dWeightGm.SetGlobalBuffer((__gm__ T *)dWeight);
-    softmaxOutGm.SetGlobalBuffer((__gm__ T *)softmaxOut);
+    dKeyIndexGm.SetGlobalBuffer((__gm__ OUT_T*)dKey);
+    dWeightGm.SetGlobalBuffer((__gm__ T*)dWeight);
+    softmaxOutGm.SetGlobalBuffer((__gm__ T*)softmaxOut);
     this->reduceSumResGm = reduceSumRes;
     this->deterRes = deterRes;
     this->bmm3Res = bmm3Res;
@@ -141,7 +141,7 @@ __aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::InitGlobalBuffer(
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::InitBuffers(TPipe *pipe)
+__aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(this->attnSoftmaxL1Que, 1, DLIKGradConstInfo::BUFFER_SIZE_BYTE_32K);
     pipe->InitBuffer(this->dkQue, 1, DLIKGradConstInfo::BUFFER_SIZE_BYTE_64K);
@@ -190,11 +190,11 @@ __aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::InitBuffers(TPipe *pipe)
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline bool DlikgBlockVec<TEMPLATE_ARGS>::GetBS1Index(int64_t usedT1Index, int64_t &bIdx, int64_t &s1Idx,
-                                                                 int64_t &bS1Index, int64_t &accumS1Len,
-                                                                 int64_t &accumS2Len, int32_t &actualSeqLensQ,
-                                                                 int32_t &actualSeqLensK, int64_t taskId,
-                                                                 int64_t &currentS2Size)
+__aicore__ inline bool DlikgBlockVec<TEMPLATE_ARGS>::GetBS1Index(int64_t usedT1Index, int64_t& bIdx, int64_t& s1Idx,
+                                                                 int64_t& bS1Index, int64_t& accumS1Len,
+                                                                 int64_t& accumS2Len, int32_t& actualSeqLensQ,
+                                                                 int32_t& actualSeqLensK, int64_t taskId,
+                                                                 int64_t& currentS2Size)
 {
     int64_t t1Offset = 0;
     int64_t t2Offset = 0;
@@ -214,12 +214,12 @@ __aicore__ inline bool DlikgBlockVec<TEMPLATE_ARGS>::GetBS1Index(int64_t usedT1I
     }
     if constexpr (!HasSequsedQ) {
         if constexpr (Layout_Q == DLILayout::TND) {
-            curT1 = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            curT1 = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
             while (usedT1Index >= curT1) {
-                curT1 = ((__gm__ int32_t *)actualSeqQlenAddr)[++bIndex];
+                curT1 = ((__gm__ int32_t*)actualSeqQlenAddr)[++bIndex];
             }
             bIndex = bIndex - 1;
-            t1Offset = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            t1Offset = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
             s1Index = usedT1Index - t1Offset;
         } else {
             bIndex = usedT1Index / constInfo.s1Size;
@@ -230,11 +230,11 @@ __aicore__ inline bool DlikgBlockVec<TEMPLATE_ARGS>::GetBS1Index(int64_t usedT1I
     } else {
         while (usedT1Index >= nextUsedT1Offset) {
             usedT1Offset = nextUsedT1Offset;
-            nextUsedT1Offset = ((__gm__ int32_t *)usedSeqQlenAddr)[++bIndex] + usedT1Offset;
+            nextUsedT1Offset = ((__gm__ int32_t*)usedSeqQlenAddr)[++bIndex] + usedT1Offset;
         }
         s1Index = usedT1Index - usedT1Offset;
         if constexpr (Layout_Q == DLILayout::TND) {
-            t1Offset = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            t1Offset = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
         } else {
             t1Offset = bIndex * constInfo.s1Size;
         }
@@ -243,30 +243,30 @@ __aicore__ inline bool DlikgBlockVec<TEMPLATE_ARGS>::GetBS1Index(int64_t usedT1I
     if constexpr (Layout_Q == DLILayout::TND) {
         if (unlikely(bIndex == 0)) {
             t2Offset = 0;
-            curS1 = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex + 1];
-            curS2 = ((__gm__ int32_t *)actualSeqKvlenAddr)[bIndex + 1];
+            curS1 = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex + 1];
+            curS2 = ((__gm__ int32_t*)actualSeqKvlenAddr)[bIndex + 1];
         } else {
-            curS1 = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex + 1] - ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
-            curS2 = ((__gm__ int32_t *)actualSeqKvlenAddr)[bIndex + 1] - ((__gm__ int32_t *)actualSeqKvlenAddr)[bIndex];
-            t2Offset = ((__gm__ int32_t *)actualSeqKvlenAddr)[bIndex];
+            curS1 = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex + 1] - ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
+            curS2 = ((__gm__ int32_t*)actualSeqKvlenAddr)[bIndex + 1] - ((__gm__ int32_t*)actualSeqKvlenAddr)[bIndex];
+            t2Offset = ((__gm__ int32_t*)actualSeqKvlenAddr)[bIndex];
         }
     } else {
         t2Offset = bIndex * constInfo.s2Size;
     }
 
     if constexpr (HasSequsedQ) {
-        usedS1 = ((__gm__ int32_t *)usedSeqQlenAddr)[bIndex];
+        usedS1 = ((__gm__ int32_t*)usedSeqQlenAddr)[bIndex];
     } else {
         usedS1 = curS1;
     }
     if constexpr (HasSequsedK) {
-        usedS2 = ((__gm__ int32_t *)usedSeqKvlenAddr)[bIndex];
+        usedS2 = ((__gm__ int32_t*)usedSeqKvlenAddr)[bIndex];
     } else {
         usedS2 = curS2;
     }
 
     if constexpr (HasCmpResidualK) {
-        currentCmpResidualK = ((__gm__ uint32_t *)cmpResidualKAddr)[bIndex];
+        currentCmpResidualK = ((__gm__ uint32_t*)cmpResidualKAddr)[bIndex];
     } else {
         currentCmpResidualK = 0;
     }
@@ -286,7 +286,7 @@ __aicore__ inline bool DlikgBlockVec<TEMPLATE_ARGS>::GetBS1Index(int64_t usedT1I
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::CopyInWeight(DLIKGradRunInfo &runInfo)
+__aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::CopyInWeight(DLIKGradRunInfo& runInfo)
 {
     LocalTensor<float> weightInUb = weightInQue[runInfo.sTaskIdMod3].template AllocTensor<float>();
     LocalTensor<float> lseInUb = softmaxLseQue[runInfo.sTaskIdMod3].template AllocTensor<float>();
@@ -306,7 +306,7 @@ __aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::CopyInWeight(DLIKGradRunInf
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::ProcessVector1(
-    Buffer<BufferType::UB, SyncType::NO_SYNC> &bmm1ResBuf, DLIKGradRunInfo &runInfo)
+    Buffer<BufferType::UB, SyncType::NO_SYNC>& bmm1ResBuf, DLIKGradRunInfo& runInfo)
 {
     CrossCoreWaitFlag<2, PIPE_V>(SYNC_MM2_TO_V1_FLAG[runInfo.taskIdMod3]);
     LocalTensor<float> weightInUb = weightInQue[runInfo.sTaskIdMod3].template AllocTensor<float>();
@@ -328,7 +328,7 @@ __aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::ProcessVector1(
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::ProcessSoftmaxReduceSum(DLIKGradRunInfo &runInfo)
+__aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::ProcessSoftmaxReduceSum(DLIKGradRunInfo& runInfo)
 {
     auto softmaxTensor = this->attnSoftmaxL1Que.template AllocTensor<T>();
     auto softmaxReduceSumTensor = softmaxReduceSumOutQue[runInfo.sTaskIdMod3].template AllocTensor<T>();
@@ -361,8 +361,8 @@ __aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::ProcessSoftmaxReduceSum(DLI
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::ProcessVector2(
-    Buffer<BufferType::UB, SyncType::NO_SYNC> &bmm1ResBuf, Buffer<BufferType::L1, SyncType::NO_SYNC> &outputBuf,
-    DLIKGradRunInfo &runInfo)
+    Buffer<BufferType::UB, SyncType::NO_SYNC>& bmm1ResBuf, Buffer<BufferType::L1, SyncType::NO_SYNC>& outputBuf,
+    DLIKGradRunInfo& runInfo)
 {
     CrossCoreWaitFlag<2, PIPE_MTE3>(SYNC_V2_TO_C3_FLAG[runInfo.taskIdMod3]);
     auto reduceSumTensor = this->reduceSumOutQue[runInfo.taskIdMod3].template AllocTensor<T>();
@@ -451,7 +451,7 @@ __aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::ProcessVector2(
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::ProcessVector3Deter(DLIKGradRunInfo &runInfo)
+__aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::ProcessVector3Deter(DLIKGradRunInfo& runInfo)
 {
     CrossCoreSetFlag<0, PIPE_MTE2>(SYNC_C3_TO_V3_DETER_MTE2_FLAG);
     CrossCoreWaitFlag<0, PIPE_MTE2>(SYNC_C3_TO_V3_DETER_MTE2_FLAG);
@@ -545,18 +545,18 @@ class DlikgBlockVecDummy {
 public:
     __aicore__ inline void InitGlobalBuffer(GM_ADDR key, GM_ADDR weight, GM_ADDR softmaxLse, GM_ADDR attnSoftmaxL1,
                                             GM_ADDR dKey, GM_ADDR dWeight, GM_ADDR softmaxOut,
-                                            GlobalTensor<T> &reduceSumRes, GM_ADDR cuSeqlensQ, GM_ADDR cuSeqlensK,
+                                            GlobalTensor<T>& reduceSumRes, GM_ADDR cuSeqlensQ, GM_ADDR cuSeqlensK,
                                             GM_ADDR sequsedQ, GM_ADDR sequsedK, GM_ADDR cmpResidualK,
-                                            GlobalTensor<T> &deterRes, GlobalTensor<T> &bmm3Res) {};
-    __aicore__ inline void InitBuffers(TPipe *pipe) {};
-    __aicore__ inline void CopyInWeight(DLIKGradRunInfo &runInfo) {};
-    __aicore__ inline void ProcessVector1(Buffer<BufferType::UB, SyncType::NO_SYNC> &bmm1ResBuf,
-                                          DLIKGradRunInfo &runInfo) {};
-    __aicore__ inline void ProcessSoftmaxReduceSum(DLIKGradRunInfo &runInfo);
-    __aicore__ inline void ProcessVector2(Buffer<BufferType::UB, SyncType::NO_SYNC> &bmm1ResBuf,
-                                          Buffer<BufferType::L1, SyncType::NO_SYNC> &outputBuf,
-                                          DLIKGradRunInfo &runInfo) {};
-    __aicore__ inline void ProcessVector3Deter(DLIKGradRunInfo &runInfo) {};
+                                            GlobalTensor<T>& deterRes, GlobalTensor<T>& bmm3Res) {};
+    __aicore__ inline void InitBuffers(TPipe* pipe) {};
+    __aicore__ inline void CopyInWeight(DLIKGradRunInfo& runInfo) {};
+    __aicore__ inline void ProcessVector1(Buffer<BufferType::UB, SyncType::NO_SYNC>& bmm1ResBuf,
+                                          DLIKGradRunInfo& runInfo) {};
+    __aicore__ inline void ProcessSoftmaxReduceSum(DLIKGradRunInfo& runInfo);
+    __aicore__ inline void ProcessVector2(Buffer<BufferType::UB, SyncType::NO_SYNC>& bmm1ResBuf,
+                                          Buffer<BufferType::L1, SyncType::NO_SYNC>& outputBuf,
+                                          DLIKGradRunInfo& runInfo) {};
+    __aicore__ inline void ProcessVector3Deter(DLIKGradRunInfo& runInfo) {};
 };
 } // namespace Dlikg
 #endif

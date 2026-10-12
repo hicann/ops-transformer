@@ -79,11 +79,11 @@ struct is_constant : false_type {};
 template <auto n, class T>
 struct is_constant<n, T const> : is_constant<n, T> {};
 template <auto n, class T>
-struct is_constant<n, T const &> : is_constant<n, T> {};
+struct is_constant<n, T const&> : is_constant<n, T> {};
 template <auto n, class T>
-struct is_constant<n, T &> : is_constant<n, T> {};
+struct is_constant<n, T&> : is_constant<n, T> {};
 template <auto n, class T>
-struct is_constant<n, T &&> : is_constant<n, T> {};
+struct is_constant<n, T&&> : is_constant<n, T> {};
 template <auto n, auto v>
 struct is_constant<n, C<v>> : bool_constant<v == n> {};
 template <auto n, class T, T v>

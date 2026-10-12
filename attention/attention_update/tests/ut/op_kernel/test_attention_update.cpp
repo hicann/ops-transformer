@@ -25,15 +25,14 @@ inline T1 CeilA2B(T1 a, T2 b)
 }
 
 template <typename T>
-uint8_t *CreateTensorList(const std::vector<std::vector<uint64_t>> &shapeInfos)
+uint8_t* CreateTensorList(const std::vector<std::vector<uint64_t>>& shapeInfos)
 {
     uint64_t tensorListDescCount = 1 + shapeInfos.size() * 2;
-    for (const auto &shape : shapeInfos) {
+    for (const auto& shape : shapeInfos) {
         tensorListDescCount += shape.size();
     }
     std::vector<uint64_t> shapeSizeList;
-    auto *tensorListDesc =
-        reinterpret_cast<uint64_t *>(AscendC::GmAlloc(tensorListDescCount * sizeof(uint64_t)));
+    auto* tensorListDesc = reinterpret_cast<uint64_t*>(AscendC::GmAlloc(tensorListDescCount * sizeof(uint64_t)));
     *tensorListDesc = (tensorListDescCount - shapeInfos.size()) * sizeof(uint64_t);
     uint64_t addrIndex = 0;
     for (size_t i = 0; i < shapeInfos.size(); ++i) {
@@ -51,18 +50,18 @@ uint8_t *CreateTensorList(const std::vector<std::vector<uint64_t>> &shapeInfos)
     for (size_t i = 0; i < shapeInfos.size(); ++i) {
         ++addrIndex;
         uint64_t dataSize = shapeSizeList[i] * sizeof(T);
-        auto *dataPtr = reinterpret_cast<uint8_t *>(AscendC::GmAlloc(CeilA2B(dataSize, 32) * 32));
+        auto* dataPtr = reinterpret_cast<uint8_t*>(AscendC::GmAlloc(CeilA2B(dataSize, 32) * 32));
         *(tensorListDesc + addrIndex) = reinterpret_cast<uint64_t>(dataPtr);
     }
-    return reinterpret_cast<uint8_t *>(tensorListDesc);
+    return reinterpret_cast<uint8_t*>(tensorListDesc);
 }
 
-void FreeTensorList(uint8_t *addr, const std::vector<std::vector<uint64_t>> &shapeInfos)
+void FreeTensorList(uint8_t* addr, const std::vector<std::vector<uint64_t>>& shapeInfos)
 {
-    uint64_t dataPtrOffset = *reinterpret_cast<uint64_t *>(addr);
-    uint8_t *dataAddr = addr + dataPtrOffset;
+    uint64_t dataPtrOffset = *reinterpret_cast<uint64_t*>(addr);
+    uint8_t* dataAddr = addr + dataPtrOffset;
     for (size_t i = 0; i < shapeInfos.size(); ++i) {
-        auto *tensorAddr = reinterpret_cast<uint8_t *>(*(reinterpret_cast<uint64_t *>(dataAddr) + i));
+        auto* tensorAddr = reinterpret_cast<uint8_t*>(*(reinterpret_cast<uint64_t*>(dataAddr) + i));
         AscendC::GmFree(tensorAddr);
     }
     AscendC::GmFree(addr);
@@ -95,7 +94,7 @@ protected:
 TEST_P(AttentionUpdateTest, KernelSmoke)
 {
     AttentionUpdateTestParam param = GetParam();
-    const DecodeUpdateTilingData &tilingParam = param.tiling;
+    const DecodeUpdateTilingData& tilingParam = param.tiling;
 
     int64_t outputShapeSize = tilingParam.totalLength * tilingParam.hDim;
     int64_t lseoutShapeSize = tilingParam.totalLength;
@@ -108,14 +107,14 @@ TEST_P(AttentionUpdateTest, KernelSmoke)
     constexpr int64_t WORKSPACE_SIZE = 16 * 1024 * 1024;
     int64_t tilingSize = sizeof(DecodeUpdateTilingData);
 
-    uint8_t *lse = CreateTensorList<float>(lseShapeInfos);
-    uint8_t *go = CreateTensorList<float>(goShapeInfos);
-    auto *output = reinterpret_cast<uint8_t *>(AscendC::GmAlloc(outputByteSize));
-    auto *lseout = tilingParam.updateType == 0 ? nullptr : reinterpret_cast<uint8_t *>(AscendC::GmAlloc(lseoutByteSize));
-    auto *workspace = reinterpret_cast<uint8_t *>(AscendC::GmAlloc(WORKSPACE_SIZE));
-    auto *tiling = reinterpret_cast<uint8_t *>(AscendC::GmAlloc(tilingSize));
+    uint8_t* lse = CreateTensorList<float>(lseShapeInfos);
+    uint8_t* go = CreateTensorList<float>(goShapeInfos);
+    auto* output = reinterpret_cast<uint8_t*>(AscendC::GmAlloc(outputByteSize));
+    auto* lseout = tilingParam.updateType == 0 ? nullptr : reinterpret_cast<uint8_t*>(AscendC::GmAlloc(lseoutByteSize));
+    auto* workspace = reinterpret_cast<uint8_t*>(AscendC::GmAlloc(WORKSPACE_SIZE));
+    auto* tiling = reinterpret_cast<uint8_t*>(AscendC::GmAlloc(tilingSize));
 
-    *reinterpret_cast<DecodeUpdateTilingData *>(tiling) = tilingParam;
+    *reinterpret_cast<DecodeUpdateTilingData*>(tiling) = tilingParam;
 
     uint32_t blockDim = tilingParam.formerNum + tilingParam.tailNum;
     ICPU_SET_TILING_KEY(param.tilingKey);

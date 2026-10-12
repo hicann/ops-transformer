@@ -36,9 +36,9 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnFlashMlaWithKvcacheMetadataGetWorkspaceSize(
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cacheSeqlensOptional, const aclTensor *sequsedQOptional,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cacheSeqlensOptional, const aclTensor* sequsedQOptional,
     int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDimQk, int64_t headDimV,
-    int64_t maskMode, const char *layoutQ, const aclTensor *metaData, uint64_t *workspaceSize, aclOpExecutor **executor)
+    int64_t maskMode, const char* layoutQ, const aclTensor* metaData, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnFlashMlaWithKvcacheMetadata,
                    DFX_IN(cuSeqlensQOptional, cacheSeqlensOptional, sequsedQOptional, maxSeqlenQ, maxSeqlenKv,
@@ -50,7 +50,7 @@ aclnnStatus aclnnFlashMlaWithKvcacheMetadataGetWorkspaceSize(
 
     // 与主算子 ACLNN tiling 保持一致：优先获取当前线程的有效核数（含 stream 控核）。
     // 查询失败时，与 opbase InitL2Phase1Context 一样回退到硬件平台核数。
-    const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
+    const op::PlatformInfo& npuInfo = op::GetCurrentPlatformInfo();
     uint32_t aicCoreNum = 0;
     uint32_t aivCoreNum = 0;
     if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicCoreNum) != ACL_SUCCESS) {
@@ -59,7 +59,7 @@ aclnnStatus aclnnFlashMlaWithKvcacheMetadataGetWorkspaceSize(
     if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivCoreNum) != ACL_SUCCESS) {
         aivCoreNum = npuInfo.GetVectorCoreNum();
     }
-    const char *socVersion = npuInfo.GetSocLongVersion().c_str();
+    const char* socVersion = npuInfo.GetSocLongVersion().c_str();
 
     auto ret = FlashMlaWithKvcacheMetadataCheck::ParamsCheck(
         cuSeqlensQOptional, cacheSeqlensOptional, sequsedQOptional, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv,
@@ -67,7 +67,7 @@ aclnnStatus aclnnFlashMlaWithKvcacheMetadataGetWorkspaceSize(
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     // 前置处理：seqlens 输入转连续（AICPU kernel 按连续内存读取原始数据）
-    const aclTensor *cuSeqlensQContiguous = nullptr;
+    const aclTensor* cuSeqlensQContiguous = nullptr;
     if (cuSeqlensQOptional != nullptr) {
         cuSeqlensQContiguous = l0op::Contiguous(cuSeqlensQOptional, uniqueExecutor.get());
         if (cuSeqlensQContiguous == nullptr) {
@@ -75,7 +75,7 @@ aclnnStatus aclnnFlashMlaWithKvcacheMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *cacheSeqlensContiguous = nullptr;
+    const aclTensor* cacheSeqlensContiguous = nullptr;
     if (cacheSeqlensOptional != nullptr) {
         cacheSeqlensContiguous = l0op::Contiguous(cacheSeqlensOptional, uniqueExecutor.get());
         if (cacheSeqlensContiguous == nullptr) {
@@ -83,7 +83,7 @@ aclnnStatus aclnnFlashMlaWithKvcacheMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *sequsedQContiguous = nullptr;
+    const aclTensor* sequsedQContiguous = nullptr;
     if (sequsedQOptional != nullptr) {
         sequsedQContiguous = l0op::Contiguous(sequsedQOptional, uniqueExecutor.get());
         if (sequsedQContiguous == nullptr) {
@@ -106,7 +106,7 @@ aclnnStatus aclnnFlashMlaWithKvcacheMetadataGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnFlashMlaWithKvcacheMetadata(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnFlashMlaWithKvcacheMetadata(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                              aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnFlashMlaWithKvcacheMetadata);

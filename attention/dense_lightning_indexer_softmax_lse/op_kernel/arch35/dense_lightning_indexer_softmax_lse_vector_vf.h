@@ -30,8 +30,8 @@ constexpr static CastTrait castTraitB162B32Even = {
 };
 
 template <typename T, bool outerGidxZero>
-__simd_vf__ inline void DoScaleVF(__ubuf__ float *reduceCacheBuf, __ubuf__ float *mmOutUb, __ubuf__ float *weightsUb,
-                                  __ubuf__ T *weightsTUb, int64_t groupInner, int64_t s2Inner, uint64_t repeatTimes,
+__simd_vf__ inline void DoScaleVF(__ubuf__ float* reduceCacheBuf, __ubuf__ float* mmOutUb, __ubuf__ float* weightsUb,
+                                  __ubuf__ T* weightsTUb, int64_t groupInner, int64_t s2Inner, uint64_t repeatTimes,
                                   uint64_t countPerRepeat)
 {
     RegTensor<float> mmReg;
@@ -73,8 +73,8 @@ __simd_vf__ inline void DoScaleVF(__ubuf__ float *reduceCacheBuf, __ubuf__ float
     }
 }
 
-__simd_vf__ inline void DoReduceSumBlockVF(__ubuf__ float *dstTensor, __ubuf__ float *srcTensor,
-                                           __ubuf__ float *maxValueTensor, __ubuf__ float *prevSumTensor,
+__simd_vf__ inline void DoReduceSumBlockVF(__ubuf__ float* dstTensor, __ubuf__ float* srcTensor,
+                                           __ubuf__ float* maxValueTensor, __ubuf__ float* prevSumTensor,
                                            uint32_t count)
 {
     RegTensor<float> srcReg;

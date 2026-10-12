@@ -40,7 +40,7 @@ public:
     using LayoutPScale = typename PScaleType::Layout;
     using ElementDm = ElementDm_;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource, ElementGroupMax LOG2_CX_CEIL)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource, ElementGroupMax LOG2_CX_CEIL)
     {
         for (uint32_t i = 0; i < MXFP4::UB_P_SCALE_CNT; i++) {
             pscaleUBTensor[i] = resource.ubBuf.template GetBufferByByte<ElementPScale>(MXFP4::UB_P_SCALE_BUF_OFFSET +
@@ -68,7 +68,7 @@ public:
     __aicore__ inline ~BlockEpilogue() {}
 
     template <class TensorL1Pscale>
-    __aicore__ inline void operator()(TensorL1Pscale &l1PScaleTensor, TileInfo const &tileInfo, TaskInfo &taskInfo)
+    __aicore__ inline void operator()(TensorL1Pscale& l1PScaleTensor, TileInfo const& tileInfo, TaskInfo& taskInfo)
     {
         uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
         AscendC::LocalTensor<ElementGroupMax> localGlobalMax = localGlobalMaxUBTensor[tileInfo.tileMaxIdx];
@@ -141,8 +141,8 @@ public:
     }
 
     template <class TensorDst>
-    __aicore__ inline void CopyPScaleUbToL1(TensorDst &l1PScaleTensor, AscendC::LocalTensor<ElementPScale> &pscale1Src,
-                                            AscendC::LocalTensor<ElementPScale> &pscale2Src, uint32_t subBlockIdx,
+    __aicore__ inline void CopyPScaleUbToL1(TensorDst& l1PScaleTensor, AscendC::LocalTensor<ElementPScale>& pscale1Src,
+                                            AscendC::LocalTensor<ElementPScale>& pscale2Src, uint32_t subBlockIdx,
                                             uint16_t firstLoopStart, uint16_t firstLoop, uint16_t secondLoopStart,
                                             uint16_t secondLoop, bool isQsAlign128)
     {
@@ -177,8 +177,8 @@ public:
     }
 
 private:
-    __aicore__ inline void GetPScaleParams(const TileInfo &tileInfo, uint32_t subBlockIdx, uint16_t &firstLoopStart,
-                                           uint16_t &firstLoop, uint16_t &secondLoopStart, uint16_t &secondLoop)
+    __aicore__ inline void GetPScaleParams(const TileInfo& tileInfo, uint32_t subBlockIdx, uint16_t& firstLoopStart,
+                                           uint16_t& firstLoop, uint16_t& secondLoopStart, uint16_t& secondLoop)
     {
         uint16_t isLoopFirstTaskVecCore = (subBlockIdx == tileInfo.kvsFirstTileStartVecCore);
         uint32_t loop = tileInfo.loop;

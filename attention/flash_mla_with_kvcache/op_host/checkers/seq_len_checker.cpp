@@ -38,14 +38,14 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35MLA;
 
-ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedQ(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedQ(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
-    auto &sequsedQTensor = faInfo.opParamInfo.sequsedQ.tensor;
+    auto& sequsedQTensor = faInfo.opParamInfo.sequsedQ.tensor;
     if (sequsedQTensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::CompileTimeTensorDesc *sequsedQDesc = faInfo.opParamInfo.sequsedQ.desc;
+    const gert::CompileTimeTensorDesc* sequsedQDesc = faInfo.opParamInfo.sequsedQ.desc;
     OP_CHECK_IF(sequsedQDesc != nullptr && sequsedQDesc->GetDataType() != ge::DT_INT32,
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(faInfo.opName, "seqused_q",
                                                       DataTypeToSerialString(sequsedQDesc->GetDataType()).c_str(),
@@ -73,14 +73,14 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedQ(const FlashMlaWithK
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckSingleParaCacheSeqlens(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSingleParaCacheSeqlens(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
-    auto &cacheSeqlensTensor = faInfo.opParamInfo.cacheSeqlens.tensor;
+    auto& cacheSeqlensTensor = faInfo.opParamInfo.cacheSeqlens.tensor;
     if (cacheSeqlensTensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::CompileTimeTensorDesc *cacheSeqlensDesc = faInfo.opParamInfo.cacheSeqlens.desc;
+    const gert::CompileTimeTensorDesc* cacheSeqlensDesc = faInfo.opParamInfo.cacheSeqlens.desc;
     OP_CHECK_IF(cacheSeqlensDesc != nullptr && cacheSeqlensDesc->GetDataType() != ge::DT_INT32,
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(faInfo.opName, "cache_seqlens",
                                                       DataTypeToSerialString(cacheSeqlensDesc->GetDataType()).c_str(),
@@ -109,14 +109,14 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaCacheSeqlens(const FlashMlaW
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensQ(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensQ(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
-    auto &cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
+    auto& cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
     if (cuSeqlensQTensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::CompileTimeTensorDesc *cuSeqlensQDesc = faInfo.opParamInfo.cuSeqlensQ.desc;
+    const gert::CompileTimeTensorDesc* cuSeqlensQDesc = faInfo.opParamInfo.cuSeqlensQ.desc;
     OP_CHECK_IF(cuSeqlensQDesc != nullptr && cuSeqlensQDesc->GetDataType() != ge::DT_INT32,
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(faInfo.opName, "cu_seqlens_q",
                                                       DataTypeToSerialString(cuSeqlensQDesc->GetDataType()).c_str(),
@@ -145,7 +145,7 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensQ(const FlashMlaWit
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckSingleParaMaxSeqlenQ(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSingleParaMaxSeqlenQ(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     OP_CHECK_IF(faInfo.maxSeqQ != -1,
                 OP_LOGE_FOR_INVALID_VALUE(faInfo.opName, "max_seqlen_q", std::to_string(faInfo.maxSeqQ).c_str(),
@@ -154,7 +154,7 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaMaxSeqlenQ(const FlashMlaWit
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckSingleParaMaxSeqlenKv(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSingleParaMaxSeqlenKv(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     OP_CHECK_IF(faInfo.maxSeqKv != -1,
                 OP_LOGE_FOR_INVALID_VALUE(faInfo.opName, "max_seqlen_kv", std::to_string(faInfo.maxSeqKv).c_str(),
@@ -163,7 +163,7 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaMaxSeqlenKv(const FlashMlaWi
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckSinglePara(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSinglePara(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     if (CheckSingleParaSequsedQ(faInfo) != ge::GRAPH_SUCCESS ||
         CheckSingleParaCacheSeqlens(faInfo) != ge::GRAPH_SUCCESS ||
@@ -175,11 +175,11 @@ ge::graphStatus ActualSeqLenChecker::CheckSinglePara(const FlashMlaWithKvcacheTi
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckParaExistence(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckParaExistence(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     // KV is paged-only -> cache_seqlens always required
     if (faInfo.pageAttentionFlag) {
-        auto &cacheSeqlensTensor = faInfo.opParamInfo.cacheSeqlens.tensor;
+        auto& cacheSeqlensTensor = faInfo.opParamInfo.cacheSeqlens.tensor;
         OP_CHECK_IF(
             cacheSeqlensTensor == nullptr,
             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "cache_seqlens",
@@ -189,7 +189,7 @@ ge::graphStatus ActualSeqLenChecker::CheckParaExistence(const FlashMlaWithKvcach
 
     // cu_seqlens_q is only meaningful for the TND query layout: required when TND,
     // forbidden otherwise (BNSD/BSND query layouts carry no cumulative seqlens)
-    auto &cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
+    auto& cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
     if (faInfo.qLayout == FlashMlaWithKvcacheLayout::TND) {
         OP_CHECK_IF(cuSeqlensQTensor == nullptr,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "cu_seqlens_q",
@@ -206,13 +206,13 @@ ge::graphStatus ActualSeqLenChecker::CheckParaExistence(const FlashMlaWithKvcach
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckFeature(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckFeature(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     (void)faInfo;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckMultiPara(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckMultiPara(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     // ACLNN 直调路径下 GetData<int32_t>() 返回设备指针，host 侧值校验会段错误
     // （同策略：只做 shape/dtype 校验；值约束由 kernel 的 ACTLEN_T=uint32_t 解析器兜底）。

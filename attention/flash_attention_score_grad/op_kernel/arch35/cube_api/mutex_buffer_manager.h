@@ -23,7 +23,7 @@ class MutexBufferManager {
     using TensorType = LocalTensor<uint8_t>;
 
 public:
-    __aicore__ inline void Init(TPipe *pipe, uint32_t size)
+    __aicore__ inline void Init(TPipe* pipe, uint32_t size)
     {
         TBuf<BufferInfo<bufferType>::Position> tbuf;
         pipe->InitBuffer(tbuf, size);
@@ -39,7 +39,7 @@ public:
     }
 
     template <SyncType syncType = SyncType::INNER_CORE_SYNC>
-    __aicore__ inline void FreeBuffer(MutexBuffer<bufferType, syncType> &buffer)
+    __aicore__ inline void FreeBuffer(MutexBuffer<bufferType, syncType>& buffer)
     {}
 
 private:

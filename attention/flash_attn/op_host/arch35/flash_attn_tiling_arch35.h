@@ -50,13 +50,13 @@ struct FaPlatFormInfo {
 
 class FlashAttnTilingImpl : public FiaTilingBase {
 public:
-    explicit FlashAttnTilingImpl(gert::TilingContext *context)
+    explicit FlashAttnTilingImpl(gert::TilingContext* context)
         : FiaTilingBase(context)
     {}
     ~FlashAttnTilingImpl() override = default;
 
     // protected:
-    void InitTilingInfo(TilingInfo *tilingInfo) override;
+    void InitTilingInfo(TilingInfo* tilingInfo) override;
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
 
@@ -79,7 +79,7 @@ private:
 
     void CalcNumBlocks(uint32_t aicNum);
     void FillTiling();
-    ge::graphStatus SetTilingData(FlashAttnTilingData &tilingData);
+    ge::graphStatus SetTilingData(FlashAttnTilingData& tilingData);
     bool CheckNeedInitOutput() const;
 
     FlashAttnTilingData tilingData_;
@@ -101,7 +101,7 @@ private:
     ScheduleMode scheduleMode_ = ScheduleMode::BATCH_MODE;
     uint32_t numBlocks_ = 0;
 
-    FaTilingInfo *faInfo_ = nullptr;
+    FaTilingInfo* faInfo_ = nullptr;
 };
 
 } // namespace flash_attn

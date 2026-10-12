@@ -16,7 +16,7 @@ namespace op_api {
 const int64_t FLOAT4_E2M1 = static_cast<int64_t>(296);
 const int64_t FLOAT8_E8M0 = static_cast<int64_t>(293);
 
-TensorWrapper make_wrapper(const at::Tensor &tensor, const int64_t real_dtype)
+TensorWrapper make_wrapper(const at::Tensor& tensor, const int64_t real_dtype)
 {
     TensorWrapper wrapper = {tensor, ACL_DT_UNDEFINED};
     if (kATenScalarTypeToAclDataTypeTable[static_cast<int64_t>(tensor.scalar_type())] == ACL_UINT8) {
@@ -39,15 +39,15 @@ enum QuantMode : int64_t {
 };
 
 std::tuple<at::Tensor, at::Tensor> npu_block_sparse_attention(
-    const at::Tensor &query, const at::Tensor &key, const at::Tensor &value, const at::Tensor &block_sparse_mask,
+    const at::Tensor& query, const at::Tensor& key, const at::Tensor& value, const at::Tensor& block_sparse_mask,
     std::vector<int64_t> block_shape, c10::string_view q_input_layout, c10::string_view kv_input_layout,
     int64_t num_key_value_heads, double scale_value, int64_t inner_precise,
-    const c10::optional<std::vector<int64_t>> &actual_seq_lengths,
-    const c10::optional<std::vector<int64_t>> &actual_seq_lengths_kv, int64_t softmax_lse_flag, int64_t mask_type,
+    const c10::optional<std::vector<int64_t>>& actual_seq_lengths,
+    const c10::optional<std::vector<int64_t>>& actual_seq_lengths_kv, int64_t softmax_lse_flag, int64_t mask_type,
     int64_t quant_mode, int64_t block_size, int64_t pre_tokens, int64_t next_tokens, double dst_type_max,
-    const c10::optional<at::Tensor> &atten_mask, const c10::optional<at::Tensor> &block_table,
-    const c10::optional<at::Tensor> &q_dequant_scale, const c10::optional<at::Tensor> &k_dequant_scale,
-    const c10::optional<at::Tensor> &v_dequant_scale, const c10::optional<at::Tensor> &p_quant_scale,
+    const c10::optional<at::Tensor>& atten_mask, const c10::optional<at::Tensor>& block_table,
+    const c10::optional<at::Tensor>& q_dequant_scale, const c10::optional<at::Tensor>& k_dequant_scale,
+    const c10::optional<at::Tensor>& v_dequant_scale, const c10::optional<at::Tensor>& p_quant_scale,
     c10::optional<at::ScalarType> attention_out_dtype)
 {
     // pybind 按值收下 std::vector<int64_t>（真实拷贝），再在本函数作用域内构建
@@ -99,8 +99,8 @@ std::tuple<at::Tensor, at::Tensor> npu_block_sparse_attention(
 
     std::string q_layout(q_input_layout);
     std::string kv_layout(kv_input_layout);
-    char *q_layout_ptr = const_cast<char *>(q_layout.c_str());
-    char *kv_layout_ptr = const_cast<char *>(kv_layout.c_str());
+    char* q_layout_ptr = const_cast<char*>(q_layout.c_str());
+    char* kv_layout_ptr = const_cast<char*>(kv_layout.c_str());
 
     // block_shape_ref / actual_seq_lengths_ref / actual_seq_lengths_kv_ref 为指向
     // 本作用域存活数据的 IntArrayRef，ACLNN_CMD 内部 ConvertType 会转成 aclIntArray。

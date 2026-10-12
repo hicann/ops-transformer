@@ -32,7 +32,7 @@ namespace flash_mla_with_kvcache {
 
 ge::graphStatus FlashMlaWithKvcacheInfoParser::GetEmptyTensorFlag()
 {
-    auto checkEmptyTensor = [this](const gert::StorageShape *shape, const std::string &name) -> bool {
+    auto checkEmptyTensor = [this](const gert::StorageShape* shape, const std::string& name) -> bool {
         if (shape == nullptr) {
             return false;
         }
@@ -92,7 +92,7 @@ ge::graphStatus FlashMlaWithKvcacheInfoParser::CheckRequiredParaExistence() cons
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashMlaWithKvcacheInfoParser::GetCuSeqLenQSize(int64_t &size)
+ge::graphStatus FlashMlaWithKvcacheInfoParser::GetCuSeqLenQSize(int64_t& size)
 {
     if (opParamInfo_.cuSeqlensQ.tensor == nullptr) {
         OP_LOGE(opName_, "when %s's layout is %s, %s must be provided.", QUERY_NAME.c_str(),
@@ -334,14 +334,14 @@ void FlashMlaWithKvcacheInfoParser::GetKvIsContiguous()
     bool keyContig = false;
     bool valContig = false;
     if (keyStrides_ != nullptr) {
-        const gert::Shape &keyShape = opParamInfo_.kCache.shape->GetStorageShape();
+        const gert::Shape& keyShape = opParamInfo_.kCache.shape->GetStorageShape();
         keyContig =
             (CheckTensorContiguous(keyShape.GetDimNum(), keyShape, keyStrides_, keyDimIdx) == ge::GRAPH_SUCCESS);
         keyNonContigDim_ = keyContig ? -1 : keyDimIdx;
     }
 
     if (valueStrides_ != nullptr) {
-        const gert::Shape &valueShape = opParamInfo_.kCache.shape->GetStorageShape();
+        const gert::Shape& valueShape = opParamInfo_.kCache.shape->GetStorageShape();
         valContig =
             (CheckTensorContiguous(valueShape.GetDimNum(), valueShape, valueStrides_, valDimIdx) == ge::GRAPH_SUCCESS);
         valueNonContigDim_ = valContig ? -1 : valDimIdx;
@@ -578,7 +578,7 @@ ge::graphStatus FlashMlaWithKvcacheInfoParser::GetActualSeqInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-void FlashMlaWithKvcacheInfoParser::GenerateFeatureInfo(FlashMlaWithKvcacheTilingInfo &faInfo)
+void FlashMlaWithKvcacheInfoParser::GenerateFeatureInfo(FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     // PagedAttention 参数组
     faInfo.pageAttentionFlag = (kvStorageMode_ == KvStorageMode::PAGE_ATTENTION);
@@ -613,7 +613,7 @@ void FlashMlaWithKvcacheInfoParser::GenerateFeatureInfo(FlashMlaWithKvcacheTilin
     faInfo.maxSeqKv = maxSeqKv_;
 }
 
-void FlashMlaWithKvcacheInfoParser::GenerateLayoutInfo(FlashMlaWithKvcacheTilingInfo &faInfo)
+void FlashMlaWithKvcacheInfoParser::GenerateLayoutInfo(FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     faInfo.qLayout = layoutQ_;
     faInfo.kvLayout = layoutKV_;
@@ -643,7 +643,7 @@ void FlashMlaWithKvcacheInfoParser::GenerateLayoutInfo(FlashMlaWithKvcacheTiling
     }
 }
 
-void FlashMlaWithKvcacheInfoParser::GenerateInfo(FlashMlaWithKvcacheTilingInfo &faInfo)
+void FlashMlaWithKvcacheInfoParser::GenerateInfo(FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     faInfo.opName = opName_;
     faInfo.platformInfo = platformInfo_;
@@ -672,7 +672,7 @@ void FlashMlaWithKvcacheInfoParser::GenerateInfo(FlashMlaWithKvcacheTilingInfo &
     GenerateLayoutInfo(faInfo);
 }
 
-void FlashMlaWithKvcacheInfoParser::GenerateAxisInfo(FlashMlaWithKvcacheTilingInfo &faInfo)
+void FlashMlaWithKvcacheInfoParser::GenerateAxisInfo(FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     faInfo.bSize = bSize_;
     faInfo.n1Size = n1Size_;
@@ -687,14 +687,14 @@ void FlashMlaWithKvcacheInfoParser::GenerateAxisInfo(FlashMlaWithKvcacheTilingIn
     faInfo.kTSize = keyTSize_;
 }
 
-void FlashMlaWithKvcacheInfoParser::GenerateDtypeInfo(FlashMlaWithKvcacheTilingInfo &faInfo)
+void FlashMlaWithKvcacheInfoParser::GenerateDtypeInfo(FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     faInfo.inputQType = inputQType_;
     faInfo.inputKvType = inputKvType_;
     faInfo.outputType = outputType_;
 }
 
-ge::graphStatus FlashMlaWithKvcacheInfoParser::Parse(FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus FlashMlaWithKvcacheInfoParser::Parse(FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     OP_LOGI(faInfo.opName, "enter FlashMlaWithKvcacheInfoParser::Parse!");
     if (context_ == nullptr) {

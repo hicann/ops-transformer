@@ -36,7 +36,7 @@ constexpr static AscendC::Reg::CastTrait castTraitB162B32Even = {
 };
 
 template <typename T, typename INPUT_T>
-__simd_vf__ inline void ProcessVec1BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb, __ubuf__ INPUT_T *weightUb,
+__simd_vf__ inline void ProcessVec1BasicVF(__ubuf__ T* dstUb, __ubuf__ T* srcUb, __ubuf__ INPUT_T* weightUb,
                                            uint32_t loopNum, uint32_t tailSize, uint32_t repeatTime,
                                            const uint32_t nBaseSize)
 {
@@ -75,56 +75,56 @@ __simd_vf__ inline void ProcessVec1BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
             LoadAlign<INPUT_T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight1, weightUb + i * UNROLL_SIZE);
             LoadAlign(vreg_input_x1, srcUb + (i * UNROLL_SIZE + 0) * nBaseSize + idx * floatRepSize);
             Relu(vreg_input_x1, vreg_input_x1, preg_all_b32);
-            StoreAlign(((__ubuf__ T *&)srcUb + (i * UNROLL_SIZE + 0) * nBaseSize + idx * floatRepSize), vreg_input_x1,
+            StoreAlign(((__ubuf__ T*&)srcUb + (i * UNROLL_SIZE + 0) * nBaseSize + idx * floatRepSize), vreg_input_x1,
                        preg_all_b32);
             Mul(vreg_input_x1, vreg_input_x1, vreg_weight1, preg_all_b32);
 
             LoadAlign<INPUT_T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight2, weightUb + i * UNROLL_SIZE + 1);
             LoadAlign(vreg_input_x2, srcUb + (i * UNROLL_SIZE + 1) * nBaseSize + idx * floatRepSize);
             Relu(vreg_input_x2, vreg_input_x2, preg_all_b32);
-            StoreAlign(((__ubuf__ T *&)srcUb + (i * UNROLL_SIZE + 1) * nBaseSize + idx * floatRepSize), vreg_input_x2,
+            StoreAlign(((__ubuf__ T*&)srcUb + (i * UNROLL_SIZE + 1) * nBaseSize + idx * floatRepSize), vreg_input_x2,
                        preg_all_b32);
             Mul(vreg_input_x2, vreg_input_x2, vreg_weight2, preg_all_b32);
 
             LoadAlign<INPUT_T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight3, weightUb + i * UNROLL_SIZE + 2);
             LoadAlign(vreg_input_x3, srcUb + (i * UNROLL_SIZE + 2) * nBaseSize + idx * floatRepSize);
             Relu(vreg_input_x3, vreg_input_x3, preg_all_b32);
-            StoreAlign(((__ubuf__ T *&)srcUb + (i * UNROLL_SIZE + 2) * nBaseSize + idx * floatRepSize), vreg_input_x3,
+            StoreAlign(((__ubuf__ T*&)srcUb + (i * UNROLL_SIZE + 2) * nBaseSize + idx * floatRepSize), vreg_input_x3,
                        preg_all_b32);
             Mul(vreg_input_x3, vreg_input_x3, vreg_weight3, preg_all_b32);
 
             LoadAlign<INPUT_T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight4, weightUb + i * UNROLL_SIZE + 3);
             LoadAlign(vreg_input_x4, srcUb + (i * UNROLL_SIZE + 3) * nBaseSize + idx * floatRepSize);
             Relu(vreg_input_x4, vreg_input_x4, preg_all_b32);
-            StoreAlign(((__ubuf__ T *&)srcUb + (i * UNROLL_SIZE + 3) * nBaseSize + idx * floatRepSize), vreg_input_x4,
+            StoreAlign(((__ubuf__ T*&)srcUb + (i * UNROLL_SIZE + 3) * nBaseSize + idx * floatRepSize), vreg_input_x4,
                        preg_all_b32);
             Mul(vreg_input_x4, vreg_input_x4, vreg_weight4, preg_all_b32);
 
             LoadAlign<INPUT_T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight5, weightUb + i * UNROLL_SIZE + 4);
             LoadAlign(vreg_input_x5, srcUb + (i * UNROLL_SIZE + 4) * nBaseSize + idx * floatRepSize);
             Relu(vreg_input_x5, vreg_input_x5, preg_all_b32);
-            StoreAlign(((__ubuf__ T *&)srcUb + (i * UNROLL_SIZE + 4) * nBaseSize + idx * floatRepSize), vreg_input_x5,
+            StoreAlign(((__ubuf__ T*&)srcUb + (i * UNROLL_SIZE + 4) * nBaseSize + idx * floatRepSize), vreg_input_x5,
                        preg_all_b32);
             Mul(vreg_input_x5, vreg_input_x5, vreg_weight5, preg_all_b32);
 
             LoadAlign<INPUT_T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight6, weightUb + i * UNROLL_SIZE + 5);
             LoadAlign(vreg_input_x6, srcUb + (i * UNROLL_SIZE + 5) * nBaseSize + idx * floatRepSize);
             Relu(vreg_input_x6, vreg_input_x6, preg_all_b32);
-            StoreAlign(((__ubuf__ T *&)srcUb + (i * UNROLL_SIZE + 5) * nBaseSize + idx * floatRepSize), vreg_input_x6,
+            StoreAlign(((__ubuf__ T*&)srcUb + (i * UNROLL_SIZE + 5) * nBaseSize + idx * floatRepSize), vreg_input_x6,
                        preg_all_b32);
             Mul(vreg_input_x6, vreg_input_x6, vreg_weight6, preg_all_b32);
 
             LoadAlign<INPUT_T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight7, weightUb + i * UNROLL_SIZE + 6);
             LoadAlign(vreg_input_x7, srcUb + (i * UNROLL_SIZE + 6) * nBaseSize + idx * floatRepSize);
             Relu(vreg_input_x7, vreg_input_x7, preg_all_b32);
-            StoreAlign(((__ubuf__ T *&)srcUb + (i * UNROLL_SIZE + 6) * nBaseSize + idx * floatRepSize), vreg_input_x7,
+            StoreAlign(((__ubuf__ T*&)srcUb + (i * UNROLL_SIZE + 6) * nBaseSize + idx * floatRepSize), vreg_input_x7,
                        preg_all_b32);
             Mul(vreg_input_x7, vreg_input_x7, vreg_weight7, preg_all_b32);
 
             LoadAlign<INPUT_T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight8, weightUb + i * UNROLL_SIZE + 7);
             LoadAlign(vreg_input_x8, srcUb + (i * UNROLL_SIZE + 7) * nBaseSize + idx * floatRepSize);
             Relu(vreg_input_x8, vreg_input_x8, preg_all_b32);
-            StoreAlign(((__ubuf__ T *&)srcUb + (i * UNROLL_SIZE + 7) * nBaseSize + idx * floatRepSize), vreg_input_x8,
+            StoreAlign(((__ubuf__ T*&)srcUb + (i * UNROLL_SIZE + 7) * nBaseSize + idx * floatRepSize), vreg_input_x8,
                        preg_all_b32);
             Mul(vreg_input_x8, vreg_input_x8, vreg_weight8, preg_all_b32);
 
@@ -141,24 +141,24 @@ __simd_vf__ inline void ProcessVec1BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
             LoadAlign<INPUT_T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight1, weightUb + loopNum * UNROLL_SIZE + j);
             LoadAlign(vreg_input_x1, srcUb + (loopNum * UNROLL_SIZE + j) * nBaseSize + idx * floatRepSize);
             Relu(vreg_input_x1, vreg_input_x1, preg_all_b32);
-            StoreAlign(((__ubuf__ T *&)srcUb + (loopNum * UNROLL_SIZE + j) * nBaseSize + idx * floatRepSize),
+            StoreAlign(((__ubuf__ T*&)srcUb + (loopNum * UNROLL_SIZE + j) * nBaseSize + idx * floatRepSize),
                        vreg_input_x1, preg_all_b32);
             Mul(vreg_input_x1, vreg_input_x1, vreg_weight1, preg_all_b32);
             Add(vreg_output_tail, vreg_output_tail, vreg_input_x1, preg_all_b32);
         }
         Add(vreg_output, vreg_output, vreg_output_tail, preg_all_b32);
-        StoreAlign(((__ubuf__ T *&)dstUb + idx * floatRepSize), vreg_output, preg_all_b32);
+        StoreAlign(((__ubuf__ T*&)dstUb + idx * floatRepSize), vreg_output, preg_all_b32);
     }
 }
 
 template <typename T, typename INPUT_T>
-__aicore__ inline void ProcessVec1Vf(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
-                                     const LocalTensor<INPUT_T> &weightTensor, const uint32_t nSize,
+__aicore__ inline void ProcessVec1Vf(const LocalTensor<T>& dstTensor, const LocalTensor<T>& srcTensor,
+                                     const LocalTensor<INPUT_T>& weightTensor, const uint32_t nSize,
                                      const uint32_t nBaseSize)
 {
-    __ubuf__ T *dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
-    __ubuf__ INPUT_T *weightUb = (__ubuf__ INPUT_T *)weightTensor.GetPhyAddr();
+    __ubuf__ T* dstUb = (__ubuf__ T*)dstTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
+    __ubuf__ INPUT_T* weightUb = (__ubuf__ INPUT_T*)weightTensor.GetPhyAddr();
     uint32_t loopNum = nSize / UNROLL_SIZE;
     uint32_t tailSize = nSize % UNROLL_SIZE;
     uint32_t repeatTime = nBaseSize / floatRepSize;

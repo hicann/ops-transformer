@@ -38,8 +38,8 @@ namespace optiling {
 // checker 之间传递的共享状态。属性字段由 FagAttrRangeChecker 填写，在它之后
 // 注册的 checker 才可以读；默认值与 flash_attn_grad_def.cpp 的属性默认值一致。
 struct FagCheckCtx {
-    gert::TilingContext *context = nullptr;
-    const char *opName = nullptr;
+    gert::TilingContext* context = nullptr;
+    const char* opName = nullptr;
 
     int64_t maskMode = MASK_MODE_NO_MASK;
     int64_t winLeft = -1;
@@ -57,15 +57,15 @@ public:
 
     // 校验失败必须返回非 SUCCESS 并自己打过 OP_LOGE；组合器只负责补一条
     // "哪个 checker 失败了"，不重复打原因。
-    virtual ge::graphStatus Check(FagCheckCtx &ctx) = 0;
+    virtual ge::graphStatus Check(FagCheckCtx& ctx) = 0;
 
     // 用于失败时定位是哪一环，不参与判定。
-    virtual const char *Name() const = 0;
+    virtual const char* Name() const = 0;
 };
 
 // 可选输入是否真的传进来了：shape 非空且维度数大于 0。图模式下未接的可选输入
 // 可能拿到非空但 0 维的 shape，所以两个条件都要看。
-bool IsOptionalTensorExist(gert::TilingContext *context, size_t index);
+bool IsOptionalTensorExist(gert::TilingContext* context, size_t index);
 
 } // namespace optiling
 

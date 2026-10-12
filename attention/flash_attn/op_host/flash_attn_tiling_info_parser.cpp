@@ -32,7 +32,7 @@ namespace flash_attn {
 
 ge::graphStatus FaInfoParser::GetEmptyTensorFlag()
 {
-    auto checkEmptyTensor = [this](const gert::StorageShape *shape, const std::string &name) -> bool {
+    auto checkEmptyTensor = [this](const gert::StorageShape* shape, const std::string& name) -> bool {
         if (shape == nullptr) {
             return false;
         }
@@ -96,7 +96,7 @@ ge::graphStatus FaInfoParser::CheckRequiredParaExistence() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FaInfoParser::GetCuSeqLenQSize(int64_t &size)
+ge::graphStatus FaInfoParser::GetCuSeqLenQSize(int64_t& size)
 {
     if (opParamInfo_.cuSeqlensQ.tensor == nullptr) {
         OP_LOGE(opName_, "when %s's layout is %s, %s must be provided.", QUERY_NAME.c_str(),
@@ -340,14 +340,14 @@ void FaInfoParser::GetKvIsContiguous()
     bool keyContig = false;
     bool valContig = false;
     if (keyStrides_ != nullptr) {
-        const gert::Shape &keyShape = opParamInfo_.key.shape->GetStorageShape();
+        const gert::Shape& keyShape = opParamInfo_.key.shape->GetStorageShape();
         keyContig =
             (CheckTensorContiguous(keyShape.GetDimNum(), keyShape, keyStrides_, keyDimIdx) == ge::GRAPH_SUCCESS);
         keyNonContigDim_ = keyContig ? -1 : keyDimIdx;
     }
 
     if (valueStrides_ != nullptr) {
-        const gert::Shape &valueShape = opParamInfo_.value.shape->GetStorageShape();
+        const gert::Shape& valueShape = opParamInfo_.value.shape->GetStorageShape();
         valContig =
             (CheckTensorContiguous(valueShape.GetDimNum(), valueShape, valueStrides_, valDimIdx) == ge::GRAPH_SUCCESS);
         valueNonContigDim_ = valContig ? -1 : valDimIdx;
@@ -546,7 +546,7 @@ ge::graphStatus FaInfoParser::GetActualSeqInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-void FaInfoParser::GenerateFeatureInfo(FaTilingInfo &faInfo)
+void FaInfoParser::GenerateFeatureInfo(FaTilingInfo& faInfo)
 {
     // PagedAttention 参数组
     faInfo.pageAttentionFlag = (kvStorageMode_ == KvStorageMode::PAGE_ATTENTION);
@@ -571,14 +571,14 @@ void FaInfoParser::GenerateFeatureInfo(FaTilingInfo &faInfo)
     faInfo.maxSeqKv = maxSeqKv_;
 }
 
-void FaInfoParser::GenerateLayoutInfo(FaTilingInfo &faInfo)
+void FaInfoParser::GenerateLayoutInfo(FaTilingInfo& faInfo)
 {
     faInfo.qLayout = layoutQ_;
     faInfo.kvLayout = layoutKV_;
     faInfo.outLayout = layoutOut_;
 }
 
-void FaInfoParser::GenerateInfo(FaTilingInfo &faInfo)
+void FaInfoParser::GenerateInfo(FaTilingInfo& faInfo)
 {
     faInfo.opName = opName_;
     faInfo.platformInfo = platformInfo_;
@@ -607,7 +607,7 @@ void FaInfoParser::GenerateInfo(FaTilingInfo &faInfo)
     GenerateLayoutInfo(faInfo);
 }
 
-void FaInfoParser::GenerateAxisInfo(FaTilingInfo &faInfo)
+void FaInfoParser::GenerateAxisInfo(FaTilingInfo& faInfo)
 {
     faInfo.bSize = bSize_;
     faInfo.n1Size = n1Size_;
@@ -621,14 +621,14 @@ void FaInfoParser::GenerateAxisInfo(FaTilingInfo &faInfo)
     faInfo.kTSize = keyTSize_;
 }
 
-void FaInfoParser::GenerateDtypeInfo(FaTilingInfo &faInfo)
+void FaInfoParser::GenerateDtypeInfo(FaTilingInfo& faInfo)
 {
     faInfo.inputQType = inputQType_;
     faInfo.inputKvType = inputKvType_;
     faInfo.outputType = outputType_;
 }
 
-ge::graphStatus FaInfoParser::Parse(FaTilingInfo &faInfo)
+ge::graphStatus FaInfoParser::Parse(FaTilingInfo& faInfo)
 {
     OP_LOGI(faInfo.opName, "enter FaInfoParser::Parse!");
     if (context_ == nullptr) {

@@ -179,10 +179,10 @@ public:
     // output global mmemory
     GlobalTensor<float> dqWorkSpaceGm, dkWorkSpaceGm, dvWorkSpaceGm;
 
-    TPipe *pipe;
+    TPipe* pipe;
     FagTilingType tilingData;
     // l1 buffer manage
-    MutexBufferManager<BufferType::L1> *l1BufferManagerPtr;
+    MutexBufferManager<BufferType::L1>* l1BufferManagerPtr;
     typename std::conditional<IS_L1_REUSE,
                               typename DyL1BuffSelector<IS_L1_REUSE, IS_L1_PRELOAD, IS_SMALL_D_PRELOAD>::TYPE,
                               std::nullptr_t>::type dYL1Buf;
@@ -237,53 +237,53 @@ public:
     __aicore__ inline MutexBuffer<BufferType::L0C> GetMmL0CBuffer();
     __aicore__ inline MutexBuffer<BufferType::L0C> GetDkL0CBuffer();
     __aicore__ inline MutexBuffer<BufferType::L0C> GetDvL0CBuffer();
-    __aicore__ inline void SetCubeBlockParams(TPipe *pipe, FagTilingType tilingData,
-                                              MutexBufferManager<BufferType::L1> *l1BuffMgr);
+    __aicore__ inline void SetCubeBlockParams(TPipe* pipe, FagTilingType tilingData,
+                                              MutexBufferManager<BufferType::L1>* l1BuffMgr);
     __aicore__ inline void InitGlobalBuffer(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR queryRope,
                                             GM_ADDR keyRope, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace);
-    __aicore__ inline void InitCubeBuffer(FagConstInfo &constInfo);
+    __aicore__ inline void InitCubeBuffer(FagConstInfo& constInfo);
     __aicore__ inline void UnInitCubeBuffer();
-    __aicore__ inline void IterateMmDyV(LocalTensor<CALC_TYPE> &mm1ResTensor, FagConstInfo &constInfo,
-                                        FagRunInfo &runInfo, PreloadArgs<IS_ROPE> &preloadArgs); // mm1
-    __aicore__ inline void IterateMmQK(LocalTensor<CALC_TYPE> &mm2ResTensor, FagConstInfo &constInfo,
-                                       FagRunInfo &runInfo, PreloadArgs<IS_ROPE> &preloadArgs); // mm2
+    __aicore__ inline void IterateMmDyV(LocalTensor<CALC_TYPE>& mm1ResTensor, FagConstInfo& constInfo,
+                                        FagRunInfo& runInfo, PreloadArgs<IS_ROPE>& preloadArgs); // mm1
+    __aicore__ inline void IterateMmQK(LocalTensor<CALC_TYPE>& mm2ResTensor, FagConstInfo& constInfo,
+                                       FagRunInfo& runInfo, PreloadArgs<IS_ROPE>& preloadArgs); // mm2
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmDsK(typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor,
-                                        MutexBuffer<BufferType::L1, SyncType::NO_SYNC> &dSL1Buffer,
-                                        FagConstInfo &constInfo, FagRunInfo &runInfo); // mm3 dq
+                                        MutexBuffer<BufferType::L1, SyncType::NO_SYNC>& dSL1Buffer,
+                                        FagConstInfo& constInfo, FagRunInfo& runInfo); // mm3 dq
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmDsKOlderDeter(
-        GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC> &dSL1Buf,
-        FagConstInfo &constInfo, FagRunInfo &runInfo); // mm3 older dq
+        GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC>& dSL1Buf,
+        FagConstInfo& constInfo, FagRunInfo& runInfo); // mm3 older dq
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmDsKFixpout(typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor,
-                                               MutexBuffer<BufferType::L0C> mm3L0CBuffer, FagConstInfo &constInfo,
-                                               FagRunInfo &runInfo, uint32_t realN, uint64_t gmNOffset);
+                                               MutexBuffer<BufferType::L0C> mm3L0CBuffer, FagConstInfo& constInfo,
+                                               FagRunInfo& runInfo, uint32_t realN, uint64_t gmNOffset);
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmDsQ(typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor,
-                                        MutexBuffer<BufferType::L1, SyncType::NO_SYNC> &dSL1Buffer,
-                                        FagConstInfo &constInfo, FagRunInfo &runInfo,
+                                        MutexBuffer<BufferType::L1, SyncType::NO_SYNC>& dSL1Buffer,
+                                        FagConstInfo& constInfo, FagRunInfo& runInfo,
                                         bool isDqNeedDeter = false); // mm4 dk
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmDsQOlderDeter(
-        GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC> &dSL1Buf,
-        FagConstInfo &constInfo, FagRunInfo &runInfo, bool isDqNeedDeter = false); // mm4 older dk
+        GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC>& dSL1Buf,
+        FagConstInfo& constInfo, FagRunInfo& runInfo, bool isDqNeedDeter = false); // mm4 older dk
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmDsQFixpout(typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor,
-                                               MutexBuffer<BufferType::L0C> dkL0CBuffer, FagConstInfo &constInfo,
-                                               FagRunInfo &runInfo, uint32_t realN, uint64_t gmNOffset, bool isFixpOut);
+                                               MutexBuffer<BufferType::L0C> dkL0CBuffer, FagConstInfo& constInfo,
+                                               FagRunInfo& runInfo, uint32_t realN, uint64_t gmNOffset, bool isFixpOut);
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmPDy(typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor,
-                                        MutexBuffer<BufferType::L1, SyncType::NO_SYNC> &pL1Buffer,
-                                        FagConstInfo &constInfo, FagRunInfo &runInfo); // mm5 dv
+                                        MutexBuffer<BufferType::L1, SyncType::NO_SYNC>& pL1Buffer,
+                                        FagConstInfo& constInfo, FagRunInfo& runInfo); // mm5 dv
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmPDyOlderDeter(
-        GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC> &pL1Buf,
-        FagConstInfo &constInfo, FagRunInfo &runInfo); // mm5 dv
+        GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC>& pL1Buf,
+        FagConstInfo& constInfo, FagRunInfo& runInfo); // mm5 dv
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmPDyFixpout(typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor,
-                                               MutexBuffer<BufferType::L0C> &dvL0CBuffer, FagConstInfo &constInfo,
-                                               FagRunInfo &runInfo, uint32_t realN, uint64_t gmNOffset, bool isFixpOut);
+                                               MutexBuffer<BufferType::L0C>& dvL0CBuffer, FagConstInfo& constInfo,
+                                               FagRunInfo& runInfo, uint32_t realN, uint64_t gmNOffset, bool isFixpOut);
 };
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -373,8 +373,8 @@ __aicore__ inline MutexBuffer<BufferType::L0C> FAGBlockCube<TEMPLATE_ARGS>::GetD
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::SetCubeBlockParams(TPipe *pipe, FagTilingType tilingData,
-                                                                       MutexBufferManager<BufferType::L1> *l1BuffMgr)
+__aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::SetCubeBlockParams(TPipe* pipe, FagTilingType tilingData,
+                                                                       MutexBufferManager<BufferType::L1>* l1BuffMgr)
 {
     this->pipe = pipe;
     this->tilingData = tilingData;
@@ -387,16 +387,16 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::InitGlobalBuffer(GM_ADDR que
                                                                      GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
                                                                      GM_ADDR workspace)
 {
-    queryGm.SetGlobalBuffer((__gm__ INPUT_TYPE *)query);
-    keyGm.SetGlobalBuffer((__gm__ INPUT_TYPE *)key);
-    valueGm.SetGlobalBuffer((__gm__ INPUT_TYPE *)value);
-    dyGm.SetGlobalBuffer((__gm__ OUTDTYPE *)dy);
-    queryRopeGm.SetGlobalBuffer((__gm__ INPUT_TYPE *)queryRope);
-    keyRopeGm.SetGlobalBuffer((__gm__ INPUT_TYPE *)keyRope);
+    queryGm.SetGlobalBuffer((__gm__ INPUT_TYPE*)query);
+    keyGm.SetGlobalBuffer((__gm__ INPUT_TYPE*)key);
+    valueGm.SetGlobalBuffer((__gm__ INPUT_TYPE*)value);
+    dyGm.SetGlobalBuffer((__gm__ OUTDTYPE*)dy);
+    queryRopeGm.SetGlobalBuffer((__gm__ INPUT_TYPE*)queryRope);
+    keyRopeGm.SetGlobalBuffer((__gm__ INPUT_TYPE*)keyRope);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::InitCubeBuffer(FagConstInfo &constInfo)
+__aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::InitCubeBuffer(FagConstInfo& constInfo)
 {
     isDkvL0CResidentForD192Dv128 =
         !IS_FP32_INPUT && ((SPLIT_AXIS == BN2GS1S2 || SPLIT_AXIS == BN2S2) &&
@@ -506,9 +506,9 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::UnInitCubeBuffer()
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDyV(LocalTensor<CALC_TYPE> &mm1ResTensor,
-                                                                 FagConstInfo &constInfo, FagRunInfo &runInfo,
-                                                                 PreloadArgs<IS_ROPE> &preloadArgs)
+__aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDyV(LocalTensor<CALC_TYPE>& mm1ResTensor,
+                                                                 FagConstInfo& constInfo, FagRunInfo& runInfo,
+                                                                 PreloadArgs<IS_ROPE>& preloadArgs)
 {
     MutexBuffer<BufferType::L1> dyL1Buffer;
     MutexBuffer<BufferType::L1> dyL1NextBuffer;
@@ -670,9 +670,9 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDyV(LocalTensor<CAL
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmQK(LocalTensor<CALC_TYPE> &mm2ResTensor,
-                                                                FagConstInfo &constInfo, FagRunInfo &runInfo,
-                                                                PreloadArgs<IS_ROPE> &preloadArgs)
+__aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmQK(LocalTensor<CALC_TYPE>& mm2ResTensor,
+                                                                FagConstInfo& constInfo, FagRunInfo& runInfo,
+                                                                PreloadArgs<IS_ROPE>& preloadArgs)
 {
     MutexBuffer<BufferType::L1> qL1Buffer;
     MutexBuffer<BufferType::L1> qL1NextBuffer;
@@ -890,7 +890,7 @@ TEMPLATES_DEF_NO_DEFAULT
 template <typename T, bool IS_WRITE_UB>
 __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsKFixpout(
     typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor, MutexBuffer<BufferType::L0C> mm3L0CBuffer,
-    FagConstInfo &constInfo, FagRunInfo &runInfo, uint32_t realN, uint64_t gmNOffset)
+    FagConstInfo& constInfo, FagRunInfo& runInfo, uint32_t realN, uint64_t gmNOffset)
 {
     if constexpr (IS_WRITE_UB) {
         // fixp2ub
@@ -967,7 +967,7 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsKFixpout(
                              runInfo.commonRunInfo.goIdx * runInfo.commonRunInfo.actualS1Size * constInfo.dAlign16 +
                              runInfo.commonRunInfo.s1oIdx * CUBE_BASEM * constInfo.dAlign16;
                 } else {
-                    offset = ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1] *
+                    offset = ((__gm__ int64_t*)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1] *
                                  constInfo.n2Size * constInfo.commonConstInfo.gSize * constInfo.dAlign16 +
                              runInfo.commonRunInfo.n2oIdx * constInfo.commonConstInfo.gSize *
                                  runInfo.commonRunInfo.actualS1Size * constInfo.dAlign16 +
@@ -991,8 +991,8 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsKFixpout(
 TEMPLATES_DEF_NO_DEFAULT
 template <typename T, bool IS_WRITE_UB>
 __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsK(
-    typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor, MutexBuffer<BufferType::L1, SyncType::NO_SYNC> &dSL1Buffer,
-    FagConstInfo &constInfo, FagRunInfo &runInfo)
+    typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor, MutexBuffer<BufferType::L1, SyncType::NO_SYNC>& dSL1Buffer,
+    FagConstInfo& constInfo, FagRunInfo& runInfo)
 {
     uint32_t dimSize = static_cast<uint32_t>(constInfo.commonConstInfo.dSize);
     bool isSplitN = IsDqkvSplitNEnabled(constInfo.commonConstInfo.s1Size, constInfo.commonConstInfo.s2Size);
@@ -1092,8 +1092,8 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsK(
 TEMPLATES_DEF_NO_DEFAULT
 template <typename T, bool IS_WRITE_UB>
 __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsKOlderDeter(
-    GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC> &dSL1Buf,
-    FagConstInfo &constInfo, FagRunInfo &runInfo)
+    GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC>& dSL1Buf,
+    FagConstInfo& constInfo, FagRunInfo& runInfo)
 {
     MutexBuffer<BufferType::L1, SyncType::NO_SYNC> dSL1Buffer = dSL1Buf.Get();
     constexpr uint32_t baseD = SPLIT_BASE_D;
@@ -1189,7 +1189,7 @@ TEMPLATES_DEF_NO_DEFAULT
 template <typename T, bool IS_WRITE_UB>
 __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQFixpout(
     typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor, MutexBuffer<BufferType::L0C> dkL0CBuffer,
-    FagConstInfo &constInfo, FagRunInfo &runInfo, uint32_t realN, uint64_t gmNOffset, bool isFixpOut)
+    FagConstInfo& constInfo, FagRunInfo& runInfo, uint32_t realN, uint64_t gmNOffset, bool isFixpOut)
 {
     if constexpr (IS_WRITE_UB) {
         // fixp2ub
@@ -1277,7 +1277,7 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQFixpout(
                             runInfo.s2oIdx * CUBE_BASEN * constInfo.dAlign16;
                     } else {
                         offset =
-                            ((__gm__ int64_t *)constInfo.seqS2_addr)[runInfo.commonRunInfo.boIdx - 1] *
+                            ((__gm__ int64_t*)constInfo.seqS2_addr)[runInfo.commonRunInfo.boIdx - 1] *
                                 constInfo.n2Size * constInfo.dAlign16 +
                             runInfo.commonRunInfo.n2oIdx * runInfo.commonRunInfo.actualS2Size * constInfo.dAlign16 +
                             runInfo.s2oIdx * CUBE_BASEN * constInfo.dAlign16;
@@ -1300,8 +1300,8 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQFixpout(
 TEMPLATES_DEF_NO_DEFAULT
 template <typename T, bool IS_WRITE_UB>
 __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQ(
-    typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor, MutexBuffer<BufferType::L1, SyncType::NO_SYNC> &dSL1Buffer,
-    FagConstInfo &constInfo, FagRunInfo &runInfo, bool isDqNeedDeter)
+    typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor, MutexBuffer<BufferType::L1, SyncType::NO_SYNC>& dSL1Buffer,
+    FagConstInfo& constInfo, FagRunInfo& runInfo, bool isDqNeedDeter)
 {
     LocalTensor<INPUT_TYPE> dsL1Tensor = dSL1Buffer.GetTensor<INPUT_TYPE>();
     if constexpr (IS_DETER_OLD(DETER_SPARSE_TYPE)) {
@@ -1422,8 +1422,8 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQ(
 TEMPLATES_DEF_NO_DEFAULT
 template <typename T, bool IS_WRITE_UB>
 __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQOlderDeter(
-    GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC> &dSL1Buf,
-    FagConstInfo &constInfo, FagRunInfo &runInfo, bool isDqNeedDeter)
+    GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC>& dSL1Buf,
+    FagConstInfo& constInfo, FagRunInfo& runInfo, bool isDqNeedDeter)
 {
     MutexBuffer<BufferType::L1, SyncType::NO_SYNC> dSL1Buffer = dSL1Buf.Get();
     LocalTensor<INPUT_TYPE> dsL1Tensor = dSL1Buffer.GetTensor<INPUT_TYPE>();
@@ -1515,8 +1515,8 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQOlderDeter(
 TEMPLATES_DEF_NO_DEFAULT
 template <typename T, bool IS_WRITE_UB>
 __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDyFixpout(
-    typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor, MutexBuffer<BufferType::L0C> &dvL0CBuffer,
-    FagConstInfo &constInfo, FagRunInfo &runInfo, uint32_t realN, uint64_t gmNOffset, bool isFixpOut)
+    typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor, MutexBuffer<BufferType::L0C>& dvL0CBuffer,
+    FagConstInfo& constInfo, FagRunInfo& runInfo, uint32_t realN, uint64_t gmNOffset, bool isFixpOut)
 {
     if constexpr (!IS_NZ_OUT) {
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
@@ -1609,7 +1609,7 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDyFixpout(
                     offset = runInfo.commonRunInfo.n2oIdx * runInfo.commonRunInfo.actualS2Size * constInfo.dvAlign16 +
                              runInfo.s2oIdx * CUBE_BASEN * constInfo.dvAlign16;
                 } else {
-                    offset = ((__gm__ int64_t *)constInfo.seqS2_addr)[runInfo.commonRunInfo.boIdx - 1] *
+                    offset = ((__gm__ int64_t*)constInfo.seqS2_addr)[runInfo.commonRunInfo.boIdx - 1] *
                                  constInfo.n2Size * constInfo.dvAlign16 +
                              runInfo.commonRunInfo.n2oIdx * runInfo.commonRunInfo.actualS2Size * constInfo.dvAlign16 +
                              runInfo.s2oIdx * CUBE_BASEN * constInfo.dvAlign16;
@@ -1630,8 +1630,8 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDyFixpout(
 TEMPLATES_DEF_NO_DEFAULT
 template <typename T, bool IS_WRITE_UB>
 __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDy(
-    typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor, MutexBuffer<BufferType::L1, SyncType::NO_SYNC> &pL1Buffer,
-    FagConstInfo &constInfo, FagRunInfo &runInfo)
+    typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor, MutexBuffer<BufferType::L1, SyncType::NO_SYNC>& pL1Buffer,
+    FagConstInfo& constInfo, FagRunInfo& runInfo)
 {
     uint32_t dimSize = static_cast<uint32_t>(constInfo.commonConstInfo.dSizeV);
     bool isSplitN = IsDvSplitNEnabled(constInfo.commonConstInfo.s1Size, constInfo.commonConstInfo.s2Size);
@@ -1745,8 +1745,8 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDy(
 TEMPLATES_DEF_NO_DEFAULT
 template <typename T, bool IS_WRITE_UB>
 __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDyOlderDeter(
-    GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC> &pL1Buf,
-    FagConstInfo &constInfo, FagRunInfo &runInfo)
+    GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC>& pL1Buf,
+    FagConstInfo& constInfo, FagRunInfo& runInfo)
 {
     MutexBuffer<BufferType::L1, SyncType::NO_SYNC> pL1Buffer = pL1Buf.Get();
     constexpr uint32_t baseD = SPLIT_BASE_D;
@@ -1835,41 +1835,41 @@ TEMPLATES_DEF
 class FAGBlockCubeDummy {
 public:
     __aicore__ inline FAGBlockCubeDummy(){};
-    __aicore__ inline void SetCubeBlockParams(TPipe *pipe, FagTilingType tilingData,
-                                              MutexBufferManager<BufferType::L1> *l1BuffMgr) {};
+    __aicore__ inline void SetCubeBlockParams(TPipe* pipe, FagTilingType tilingData,
+                                              MutexBufferManager<BufferType::L1>* l1BuffMgr) {};
     __aicore__ inline void InitGlobalBuffer(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR queryRope,
                                             GM_ADDR keyRope, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace) {};
-    __aicore__ inline void InitCubeBuffer(FagConstInfo &constInfo) {};
+    __aicore__ inline void InitCubeBuffer(FagConstInfo& constInfo) {};
     __aicore__ inline void UnInitCubeBuffer() {};
-    __aicore__ inline void IterateMmDyV(LocalTensor<CALC_TYPE> &mm1ResTensor, FagConstInfo &constInfo,
-                                        FagRunInfo &runInfo, PreloadArgs<IS_ROPE> &preloadArgs) {};
-    __aicore__ inline void IterateMmQK(LocalTensor<CALC_TYPE> &mm2ResTensor, FagConstInfo &constInfo,
-                                       FagRunInfo &runInfo, PreloadArgs<IS_ROPE> &preloadArgs) {};
+    __aicore__ inline void IterateMmDyV(LocalTensor<CALC_TYPE>& mm1ResTensor, FagConstInfo& constInfo,
+                                        FagRunInfo& runInfo, PreloadArgs<IS_ROPE>& preloadArgs) {};
+    __aicore__ inline void IterateMmQK(LocalTensor<CALC_TYPE>& mm2ResTensor, FagConstInfo& constInfo,
+                                       FagRunInfo& runInfo, PreloadArgs<IS_ROPE>& preloadArgs) {};
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmDsK(typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor,
-                                        MutexBuffer<BufferType::L1, SyncType::NO_SYNC> &dSL1Buffer,
-                                        FagConstInfo &constInfo, FagRunInfo &runInfo) {}; // dq
+                                        MutexBuffer<BufferType::L1, SyncType::NO_SYNC>& dSL1Buffer,
+                                        FagConstInfo& constInfo, FagRunInfo& runInfo) {}; // dq
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmDsKOlderDeter(
-        GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC> &dSL1Buf,
-        FagConstInfo &constInfo, FagRunInfo &runInfo) {}; // mm3 older dq
+        GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC>& dSL1Buf,
+        FagConstInfo& constInfo, FagRunInfo& runInfo) {}; // mm3 older dq
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmDsQ(typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor,
-                                        MutexBuffer<BufferType::L1, SyncType::NO_SYNC> &dSL1Buffer,
-                                        FagConstInfo &constInfo, FagRunInfo &runInfo,
+                                        MutexBuffer<BufferType::L1, SyncType::NO_SYNC>& dSL1Buffer,
+                                        FagConstInfo& constInfo, FagRunInfo& runInfo,
                                         bool isDqNeedDeter = false) {}; // dk
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmDsQOlderDeter(
-        GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC> &dSL1Buf,
-        FagConstInfo &constInfo, FagRunInfo &runInfo, bool isDqNeedDeter = false) {}; // mm4 older dk
+        GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC>& dSL1Buf,
+        FagConstInfo& constInfo, FagRunInfo& runInfo, bool isDqNeedDeter = false) {}; // mm4 older dk
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmPDy(typename DqkvResPos<T, IS_WRITE_UB>::PosType outTensor,
-                                        MutexBuffer<BufferType::L1, SyncType::NO_SYNC> &pL1Buffer,
-                                        FagConstInfo &constInfo, FagRunInfo &runInfo) {}; // dv
+                                        MutexBuffer<BufferType::L1, SyncType::NO_SYNC>& pL1Buffer,
+                                        FagConstInfo& constInfo, FagRunInfo& runInfo) {}; // dv
     template <typename T, bool IS_WRITE_UB>
     __aicore__ inline void IterateMmPDyOlderDeter(
-        GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC> &pL1Buf,
-        FagConstInfo &constInfo, FagRunInfo &runInfo) {}; // mm5 older dv
+        GlobalTensor<CALC_TYPE> outTensor, MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC>& pL1Buf,
+        FagConstInfo& constInfo, FagRunInfo& runInfo) {}; // mm5 older dv
 };
 
 template <typename T>

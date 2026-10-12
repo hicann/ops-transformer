@@ -21,7 +21,7 @@ namespace optiling {
 namespace flash_mla_with_kvcache {
 class FlashMlaWithKvcacheInfoParser {
 public:
-    explicit FlashMlaWithKvcacheInfoParser(const gert::TilingContext *context)
+    explicit FlashMlaWithKvcacheInfoParser(const gert::TilingContext* context)
         : context_(context)
     {}
     ~FlashMlaWithKvcacheInfoParser() = default;
@@ -30,7 +30,7 @@ public:
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckRequiredParaExistence() const;
     ge::graphStatus GetEmptyTensorFlag();
-    ge::graphStatus GetCuSeqLenQSize(int64_t &size);
+    ge::graphStatus GetCuSeqLenQSize(int64_t& size);
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     void GetOptionalInputParaMaskInfo();
@@ -55,8 +55,8 @@ public:
     ge::graphStatus GetStrides();
 
     void SetFaShape();
-    ge::graphStatus GetMaxActualSeq(const gert::Tensor *actualSeqLensTensor, FlashMlaWithKvcacheLayout layout,
-                                    int64_t &maxActualSeqLen);
+    ge::graphStatus GetMaxActualSeq(const gert::Tensor* actualSeqLensTensor, FlashMlaWithKvcacheLayout layout,
+                                    int64_t& maxActualSeqLen);
     ge::graphStatus GetS2SizeFromCuSeqLens();
     ge::graphStatus GetS2SizeForBatchContinuous();
     ge::graphStatus GetMaxBlockNumPerBatch();
@@ -74,20 +74,20 @@ public:
 
     ge::graphStatus GetActualSeqInfo();
 
-    void GenerateAxisInfo(FlashMlaWithKvcacheTilingInfo &faInfo);
-    void GenerateDtypeInfo(FlashMlaWithKvcacheTilingInfo &faInfo);
-    void GenerateFeatureInfo(FlashMlaWithKvcacheTilingInfo &faInfo);
-    void GenerateLayoutInfo(FlashMlaWithKvcacheTilingInfo &faInfo);
-    void GenerateInfo(FlashMlaWithKvcacheTilingInfo &faInfo);
+    void GenerateAxisInfo(FlashMlaWithKvcacheTilingInfo& faInfo);
+    void GenerateDtypeInfo(FlashMlaWithKvcacheTilingInfo& faInfo);
+    void GenerateFeatureInfo(FlashMlaWithKvcacheTilingInfo& faInfo);
+    void GenerateLayoutInfo(FlashMlaWithKvcacheTilingInfo& faInfo);
+    void GenerateInfo(FlashMlaWithKvcacheTilingInfo& faInfo);
     ge::graphStatus ParseAxisInfo();
     ge::graphStatus ParseFeatureInfo();
-    ge::graphStatus Parse(FlashMlaWithKvcacheTilingInfo &faInfo);
+    ge::graphStatus Parse(FlashMlaWithKvcacheTilingInfo& faInfo);
 
 public:
-    const gert::TilingContext *context_ = nullptr;
+    const gert::TilingContext* context_ = nullptr;
 
-    const char *opName_ = nullptr;
-    fe::PlatFormInfos *platformInfo_ = nullptr;
+    const char* opName_ = nullptr;
+    fe::PlatFormInfos* platformInfo_ = nullptr;
     FlashMlaWithKvcacheParaInfo opParamInfo_;
 
     // BaseParams
@@ -108,8 +108,8 @@ public:
     KvStorageMode kvStorageMode_ = KvStorageMode::BATCH_CONTINUOUS;
 
     // kvcache strides (tensor v2 view inputs)
-    const gert::Stride *keyStrides_ = nullptr;
-    const gert::Stride *valueStrides_ = nullptr;
+    const gert::Stride* keyStrides_ = nullptr;
+    const gert::Stride* valueStrides_ = nullptr;
     uint64_t keyBnStride_ = 0;
     uint64_t keyN2Stride_ = 0;
     uint64_t valueBnStride_ = 0;

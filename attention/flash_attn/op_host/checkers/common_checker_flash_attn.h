@@ -30,31 +30,31 @@ public:
     CommonChecker() = default;
     ~CommonChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const FaTilingInfo &faInfo) override;
+    ge::graphStatus CheckSinglePara(const FaTilingInfo& faInfo) override;
 
-    ge::graphStatus CheckParaExistence(const FaTilingInfo &faInfo) override;
+    ge::graphStatus CheckParaExistence(const FaTilingInfo& faInfo) override;
 
-    ge::graphStatus CheckMultiPara(const FaTilingInfo &faInfo) override;
+    ge::graphStatus CheckMultiPara(const FaTilingInfo& faInfo) override;
 
-    void SetFaShapeCompare(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckQueryShape(const FaTilingInfo &faInfo) const;
-    ge::graphStatus CheckKVShape(const FaTilingInfo &faInfo) const;
-    ge::graphStatus CheckAttnOutShape(const FaTilingInfo &faInfo) const;
+    void SetFaShapeCompare(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckQueryShape(const FaTilingInfo& faInfo) const;
+    ge::graphStatus CheckKVShape(const FaTilingInfo& faInfo) const;
+    ge::graphStatus CheckAttnOutShape(const FaTilingInfo& faInfo) const;
 
 private:
     // --- Layout checks ---
-    ge::graphStatus CheckSingleParaLayout(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckMultiParaLayout(const FaTilingInfo &faInfo);
+    ge::graphStatus CheckSingleParaLayout(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckMultiParaLayout(const FaTilingInfo& faInfo);
 
     // --- Shape/dt checks ---
-    ge::graphStatus CheckNonQuantDataType(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckNonQuantHeadNum(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckDtypeConsistency(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckAxis(const FaTilingInfo &faInfo);
-    ge::graphStatus CheckShapeConsistency(const FaTilingInfo &faInfo);
+    ge::graphStatus CheckNonQuantDataType(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckNonQuantHeadNum(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckDtypeConsistency(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckAxis(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckShapeConsistency(const FaTilingInfo& faInfo);
 
-    ge::graphStatus CheckKVShapeForContinuous(const FaTilingInfo &faInfo) const;
-    ge::graphStatus CheckKVShapeForPageAttention(const FaTilingInfo &faInfo) const;
+    ge::graphStatus CheckKVShapeForContinuous(const FaTilingInfo& faInfo) const;
+    ge::graphStatus CheckKVShapeForPageAttention(const FaTilingInfo& faInfo) const;
 
     // --- Attr checks ---
 

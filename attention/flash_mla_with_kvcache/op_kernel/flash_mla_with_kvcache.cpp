@@ -84,15 +84,15 @@ __aicore__ inline constexpr GmFormat GetKvLayoutMla()
 template <uint8_t inOutLayoutType, uint8_t KvLayoutType, bool hasAttenMask, uint8_t config>
 // 形参序必须吃齐 def 输入序 cache_seqlens(3)/cu_seqlens_q(4)/seqused_q(5)（运行时按 def 序绑槽位；
 // 曾用 FIA 内部序致 cacheSeqlens 收到 seqused_q=NULL 槽 → kv 长度解析解引用 GM 0 越界）。
-__global__ __aicore__ void flash_mla_with_kvcache(__gm__ uint8_t *query, __gm__ uint8_t *kCache,
-                                                  __gm__ uint8_t *blockTable, __gm__ uint8_t *cacheSeqlens,
-                                                  __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ,
-                                                  __gm__ uint8_t *attnMask, __gm__ uint8_t *metadata,
-                                                  __gm__ uint8_t *attnOut, __gm__ uint8_t *softmaxLse,
-                                                  __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+__global__ __aicore__ void flash_mla_with_kvcache(__gm__ uint8_t* query, __gm__ uint8_t* kCache,
+                                                  __gm__ uint8_t* blockTable, __gm__ uint8_t* cacheSeqlens,
+                                                  __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* sequsedQ,
+                                                  __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
+                                                  __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse,
+                                                  __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     REGISTER_TILING_DEFAULT(optiling::FlashMlaWithKvcacheTilingData);
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 
     // DT_BF16/DT_FLOAT16 为 device 头树 basic_api/kernel_type.h 定义的预处理宏
@@ -120,7 +120,7 @@ __global__ __aicore__ void flash_mla_with_kvcache(__gm__ uint8_t *query, __gm__ 
     // 根因（静态图）：固定 shape 下 tiling 是编译期常量字节数组而非 __gm__ buffer，
     // 不能直接 reinterpret_cast 成结构体指针访问，必须先拷贝到栈局部结构体对象再取指针。
     GET_TILING_DATA_MEMBER(optiling::FlashMlaWithKvcacheTilingData, baseTiling, baseTilingIn, tiling);
-    const optiling::FlashMlaWithKvcacheNoQuantTilingArch35 *__restrict tilingData = &baseTilingIn;
+    const optiling::FlashMlaWithKvcacheNoQuantTilingArch35* __restrict tilingData = &baseTilingIn;
 
     // —— 模板参数聚合（cube/vec/fd 参数集不一致 → 各建聚合类型，见 utils/flash_mla_with_kvcache_type.h）——
     using FA_T_Cube = FlashAttnKernel::FATypeCube<INPUT_T, float, qLayout, s1TemplateType, s2TemplateType,

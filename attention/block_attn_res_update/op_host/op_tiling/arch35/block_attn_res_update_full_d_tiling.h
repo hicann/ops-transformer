@@ -33,7 +33,7 @@ struct BlockAttnResUpdateFullDTilingInfo {
 
 class BlockAttnResUpdateFullDTiling : public BlockAttnResUpdateTilingBase {
 public:
-    explicit BlockAttnResUpdateFullDTiling(gert::TilingContext *context)
+    explicit BlockAttnResUpdateFullDTiling(gert::TilingContext* context)
         : BlockAttnResUpdateTilingBase(context)
     {}
     ~BlockAttnResUpdateFullDTiling() override = default;
@@ -48,7 +48,7 @@ private:
     void SetTilingData();
     ge::graphStatus SelectUbTiling(uint64_t maxTPerCore);
     bool TryUbTiling(uint64_t maxTPerCore);
-    uint64_t CalcUbBytes(uint32_t tileT, uint32_t &statsTStride) const;
+    uint64_t CalcUbBytes(uint32_t tileT, uint32_t& statsTStride) const;
 
     BlockAttnResUpdateFullDTilingInfo tilingInfo_{};
     BlockAttnResUpdateTilingData tilingData_{};

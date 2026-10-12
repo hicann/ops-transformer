@@ -41,7 +41,7 @@ public:
     static constexpr uint32_t SUB_VEC_NUM = 2;
     static constexpr uint32_t BLOCK_SIZE = 32;
 
-    __aicore__ inline BlockMmadTla(Arch::Resource<ArchTag> &resource)
+    __aicore__ inline BlockMmadTla(Arch::Resource<ArchTag>& resource)
     {
         // L1 区域顺序（与 QFA 一致）：P 数据 | P-scale | Q 数据 | Q-scale | KV(=V) 数据 | KV(=V)-scale
         // localGlobalMaxL1 = 256*4
@@ -53,7 +53,7 @@ public:
     __aicore__ inline ~BlockMmadTla() {}
 
     template <class TensorGMaxUb, class TileInfoT>
-    __aicore__ inline void operator()(TensorGMaxUb &gMaxUbTensor, TileInfoT &delay3TileInfo)
+    __aicore__ inline void operator()(TensorGMaxUb& gMaxUbTensor, TileInfoT& delay3TileInfo)
     {
         // AscendC::PRINTF("CopyGMaxL1ToUb \n");
         uint32_t blockCount = static_cast<uint32_t>(tla::get<0>(gMaxUbTensor.shape()));

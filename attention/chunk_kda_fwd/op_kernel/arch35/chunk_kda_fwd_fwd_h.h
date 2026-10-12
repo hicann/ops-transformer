@@ -101,22 +101,22 @@ public:
 
     __aicore__ inline void Init(GM_ADDR gk, GM_ADDR initialState, GM_ADDR attnOut, GM_ADDR finalState, GM_ADDR aqk,
                                 GM_ADDR akk, GM_ADDR w, GM_ADDR u, GM_ADDR qg, GM_ADDR kg, GM_ADDR vNew, GM_ADDR h,
-                                const TilingData &tiling)
+                                const TilingData& tiling)
     {
-        gk_.SetGlobalBuffer(reinterpret_cast<__gm__ GK_T *>(gk));
+        gk_.SetGlobalBuffer(reinterpret_cast<__gm__ GK_T*>(gk));
         if (initialState != nullptr) {
-            initialState_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(initialState));
+            initialState_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(initialState));
         }
-        attnOut_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(attnOut));
-        finalState_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(finalState));
-        aqk_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(aqk));
-        akk_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(akk));
-        w_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(w));
-        u_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(u));
-        qg_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(qg));
-        kg_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(kg));
-        vNew_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(vNew));
-        h_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(h));
+        attnOut_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(attnOut));
+        finalState_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(finalState));
+        aqk_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(aqk));
+        akk_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(akk));
+        w_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(w));
+        u_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(u));
+        qg_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(qg));
+        kg_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(kg));
+        vNew_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(vNew));
+        h_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(h));
         batch_ = tiling.batch;
         heads_ = tiling.vHeadNum;
         seqlen_ = tiling.seqlen;
@@ -753,10 +753,9 @@ private:
         Exp(gate, gate, KDA_FWD_H_SUB_DIM);
         PipeBarrier<PIPE_V>();
         AscendC::VF_CALL<Catlass::Epilogue::Block::detail::ApplyKGateUpdateRegbaseDualIssue<float>>(
-            reinterpret_cast<__ubuf__ float *>(direct.GetPhyAddr()),
-            reinterpret_cast<__ubuf__ float *>(state.GetPhyAddr()),
-            reinterpret_cast<__ubuf__ float *>(gate.GetPhyAddr()), static_cast<uint16_t>(KDA_FWD_H_SUB_DIM),
-            static_cast<uint16_t>(KDA_FWD_H_DIM));
+            reinterpret_cast<__ubuf__ float*>(direct.GetPhyAddr()),
+            reinterpret_cast<__ubuf__ float*>(state.GetPhyAddr()), reinterpret_cast<__ubuf__ float*>(gate.GetPhyAddr()),
+            static_cast<uint16_t>(KDA_FWD_H_SUB_DIM), static_cast<uint16_t>(KDA_FWD_H_DIM));
         PipeBarrier<PIPE_V>();
         Adds(state, direct, 0.0f, KDA_FWD_H_STATE_SUB_ELEMS);
         PipeBarrier<PIPE_V>();

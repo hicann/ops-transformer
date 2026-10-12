@@ -35,9 +35,9 @@ struct StageThreeParams {
     GlobalTensor<float> maskTensor;
     GM_ADDR ws;
     GlobalTensor<bfloat16_t> attnOut;
-    StageThreeMT *mm3;
-    TPipe *pipe;
-    ChunkGroup *cg;
+    StageThreeMT* mm3;
+    TPipe* pipe;
+    ChunkGroup* cg;
     float scale;
     int64_t Nv;
     int64_t Nk;
@@ -48,7 +48,7 @@ struct StageThreeParams {
 
 class Stage3 {
 public:
-    __aicore__ inline void Init(StageThreeParams *initParams, int32_t coreNum)
+    __aicore__ inline void Init(StageThreeParams* initParams, int32_t coreNum)
     {
         coreId_ = GetBlockIdx();
         sTP_ = initParams;
@@ -65,7 +65,7 @@ public:
         paddedDv_ = Ceil(Dv_, BLOCK_SIZE / sizeof(bfloat16_t)) * (BLOCK_SIZE / sizeof(bfloat16_t));
         gOptional_ = sTP_->gOptional;
         uint64_t workSpaceOffset = 0;
-        tmpGM_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(
+        tmpGM_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(
             initParams->ws + workSpaceOffset + coreNum_ * chunkSize_ * chunkSize_ * sizeof(float)));
         if ASCEND_IS_AIC {
             return;
@@ -208,8 +208,8 @@ public:
     }
 
 private:
-    StageThreeParams *sTP_;
-    TPipe *pipe_;
+    StageThreeParams* sTP_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, BUFFER_NUM_ONE> inQueue_;
     TQue<QuePosition::VECOUT, BUFFER_NUM_ONE> outQueue_;
     TBuf<TPosition::VECCALC> tmpBuff_;

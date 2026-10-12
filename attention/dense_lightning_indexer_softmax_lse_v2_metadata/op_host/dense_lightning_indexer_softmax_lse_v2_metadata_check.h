@@ -25,7 +25,7 @@ extern "C" {
 
 namespace {
 
-static constexpr const char *DLI_ACLNN_OP_NAME = "aclnnDenseLightningIndexerSoftmaxLseV2Metadata";
+static constexpr const char* DLI_ACLNN_OP_NAME = "aclnnDenseLightningIndexerSoftmaxLseV2Metadata";
 
 inline constexpr int64_t DLI_NO_MASK_MODE = 0;
 inline constexpr int64_t DLI_CAUSAL_MASK_MODE = 3;
@@ -36,12 +36,12 @@ inline constexpr int64_t DLI_NUM_HEADS_Q_UPPER_BOUND = 128;
 inline constexpr int64_t DLI_HEAD_DIM_LIMIT = 128;
 inline constexpr int64_t DLI_METADATA_SIZE = 64;
 
-inline bool IsTensorExistDliSLse(const aclTensor *tensor)
+inline bool IsTensorExistDliSLse(const aclTensor* tensor)
 {
     return (tensor != nullptr) && (tensor->GetViewShape().GetDimNum() > 0) && (tensor->GetViewShape().GetDim(0) > 0);
 }
 
-int64_t GetDimNumDliSLse(const aclTensor *tensor)
+int64_t GetDimNumDliSLse(const aclTensor* tensor)
 {
     if (tensor == nullptr) {
         return -1;
@@ -49,7 +49,7 @@ int64_t GetDimNumDliSLse(const aclTensor *tensor)
     return tensor->GetViewShape().GetDimNum();
 }
 
-aclDataType GetDataTypeDliSLse(const aclTensor *tensor)
+aclDataType GetDataTypeDliSLse(const aclTensor* tensor)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     if (tensor == nullptr) {
@@ -59,12 +59,12 @@ aclDataType GetDataTypeDliSLse(const aclTensor *tensor)
     return dataType;
 }
 
-inline bool IsTensorSourceDliSLse(const std::string &source)
+inline bool IsTensorSourceDliSLse(const std::string& source)
 {
     return source != "batch_size";
 }
 
-inline int64_t GetRawShapeSizeDliSLse(const std::string &source, int64_t batchValue)
+inline int64_t GetRawShapeSizeDliSLse(const std::string& source, int64_t batchValue)
 {
     if (source.find("cu_seqlens") != std::string::npos) {
         return batchValue + 1;
@@ -72,7 +72,7 @@ inline int64_t GetRawShapeSizeDliSLse(const std::string &source, int64_t batchVa
     return batchValue;
 }
 
-inline std::string GetSourceDescDliSLse(const std::string &source)
+inline std::string GetSourceDescDliSLse(const std::string& source)
 {
     if (source == "batch_size") {
         return "batch_size";
@@ -83,8 +83,8 @@ inline std::string GetSourceDescDliSLse(const std::string &source)
     return "the shape size of " + source;
 }
 
-int64_t GetQueryBatchSizeDliSLse(int64_t batchSize, const aclTensor *cuSeqlensQOptional,
-                                 const aclTensor *sequsedQOptional, const char *layoutQOptional, std::string *source)
+int64_t GetQueryBatchSizeDliSLse(int64_t batchSize, const aclTensor* cuSeqlensQOptional,
+                                 const aclTensor* sequsedQOptional, const char* layoutQOptional, std::string* source)
 {
     if (IsTensorExistDliSLse(sequsedQOptional)) {
         *source = "seqused_q";
@@ -100,8 +100,8 @@ int64_t GetQueryBatchSizeDliSLse(int64_t batchSize, const aclTensor *cuSeqlensQO
     return batchSize;
 }
 
-int64_t GetKeyBatchSizeDliSLse(int64_t batchSize, const aclTensor *cuSeqlensKOptional,
-                               const aclTensor *sequsedKOptional, const char *layoutKOptional, std::string *source)
+int64_t GetKeyBatchSizeDliSLse(int64_t batchSize, const aclTensor* cuSeqlensKOptional,
+                               const aclTensor* sequsedKOptional, const char* layoutKOptional, std::string* source)
 {
     if (IsTensorExistDliSLse(sequsedKOptional)) {
         *source = "seqused_k";
@@ -118,8 +118,8 @@ int64_t GetKeyBatchSizeDliSLse(int64_t batchSize, const aclTensor *cuSeqlensKOpt
 }
 
 aclnnStatus CheckSingleParamDliSLse(int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK, int64_t numHeadsQ,
-                                    int64_t numHeadsK, int64_t headDim, const char *layoutQOptional,
-                                    const char *layoutKOptional, int64_t maskMode, int64_t cmpRatio,
+                                    int64_t numHeadsK, int64_t headDim, const char* layoutQOptional,
+                                    const char* layoutKOptional, int64_t maskMode, int64_t cmpRatio,
                                     uint32_t aicCoreNum)
 {
     if (aicCoreNum == 0) {
@@ -201,9 +201,9 @@ aclnnStatus CheckSingleParamDliSLse(int64_t batchSize, int64_t maxSeqlenQ, int64
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckExistenceDliSLse(int64_t maskMode, int64_t cmpRatio, const aclTensor *cuSeqlensQOptional,
-                                  const aclTensor *cuSeqlensKOptional, const aclTensor *cmpResidualKOptional,
-                                  const char *layoutQOptional, const char *layoutKOptional, const aclTensor *metadata)
+aclnnStatus CheckExistenceDliSLse(int64_t maskMode, int64_t cmpRatio, const aclTensor* cuSeqlensQOptional,
+                                  const aclTensor* cuSeqlensKOptional, const aclTensor* cmpResidualKOptional,
+                                  const char* layoutQOptional, const char* layoutKOptional, const aclTensor* metadata)
 {
     if (strcmp(layoutQOptional, "TND") == 0) {
         if (!IsTensorExistDliSLse(cuSeqlensQOptional)) {
@@ -234,10 +234,10 @@ aclnnStatus CheckExistenceDliSLse(int64_t maskMode, int64_t cmpRatio, const aclT
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckConsistencyDliSLse(int64_t batchSize, const aclTensor *cuSeqlensQOptional,
-                                    const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedQOptional,
-                                    const aclTensor *sequsedKOptional, const aclTensor *cmpResidualKOptional,
-                                    const char *layoutQOptional, const char *layoutKOptional, const aclTensor *metadata)
+aclnnStatus CheckConsistencyDliSLse(int64_t batchSize, const aclTensor* cuSeqlensQOptional,
+                                    const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
+                                    const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional,
+                                    const char* layoutQOptional, const char* layoutKOptional, const aclTensor* metadata)
 {
     int64_t dimNum = -1;
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
@@ -404,12 +404,12 @@ aclnnStatus CheckConsistencyDliSLse(int64_t batchSize, const aclTensor *cuSeqlen
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus ParamsCheckDliSLseA5(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKOptional,
-                                 const aclTensor *sequsedQOptional, const aclTensor *sequsedKOptional,
-                                 const aclTensor *cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
+aclnnStatus ParamsCheckDliSLseA5(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional,
+                                 const aclTensor* sequsedQOptional, const aclTensor* sequsedKOptional,
+                                 const aclTensor* cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
                                  int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim,
-                                 char *layoutQOptional, char *layoutKOptional, int64_t maskMode, int64_t cmpRatio,
-                                 const aclTensor *metadata, uint32_t aicCoreNum)
+                                 char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio,
+                                 const aclTensor* metadata, uint32_t aicCoreNum)
 {
     auto ret = CheckSingleParamDliSLse(batchSize, maxSeqlenQ, maxSeqlenK, numHeadsQ, numHeadsK, headDim,
                                        layoutQOptional, layoutKOptional, maskMode, cmpRatio, aicCoreNum);
@@ -426,12 +426,12 @@ aclnnStatus ParamsCheckDliSLseA5(const aclTensor *cuSeqlensQOptional, const aclT
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus ParamsCheckDliSLse(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKOptional,
-                               const aclTensor *sequsedQOptional, const aclTensor *sequsedKOptional,
-                               const aclTensor *cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
+aclnnStatus ParamsCheckDliSLse(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional,
+                               const aclTensor* sequsedQOptional, const aclTensor* sequsedKOptional,
+                               const aclTensor* cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
                                int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim,
-                               char *layoutQOptional, char *layoutKOptional, int64_t maskMode, int64_t cmpRatio,
-                               const aclTensor *metadata, uint32_t aicCoreNum, const std::string &socVersion)
+                               char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio,
+                               const aclTensor* metadata, uint32_t aicCoreNum, const std::string& socVersion)
 {
     const std::string ascend950 = "Ascend950";
     if (socVersion.find(ascend950) == std::string::npos) {

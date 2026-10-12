@@ -28,14 +28,14 @@ public:
     __aicore__ inline FlashAttentionScoreGradNzPost(){};
     __aicore__ inline void Init(GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dqRope, GM_ADDR dkRope, GM_ADDR dsink,
                                 GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR workspace,
-                                FagTilingType ordTilingData, TPipe *pipeIn);
+                                FagTilingType ordTilingData, TPipe* pipeIn);
     __aicore__ inline void Process();
     template <uint8_t MM_IDX = 0>
     __aicore__ inline void DoWork();
     template <uint8_t MM_IDX = 0>
     __aicore__ inline void GetPosition(uint64_t index);
     template <uint8_t MM_IDX = 0>
-    __aicore__ inline void CopyIn(TQue<QuePosition::VECIN, 1> &inQue, uint64_t srcM, uint64_t srcN, uint64_t srcOffset);
+    __aicore__ inline void CopyIn(TQue<QuePosition::VECIN, 1>& inQue, uint64_t srcM, uint64_t srcN, uint64_t srcOffset);
     __aicore__ inline void ProcessSink();
 
     constexpr static uint64_t MAX_PROCESS_D = 160;
@@ -43,7 +43,7 @@ public:
     constexpr static uint32_t CUBE_BASEN = (uint32_t)s2TemplateType;
     constexpr static uint32_t ROPE_D = 64;
 
-    TPipe *pipe;
+    TPipe* pipe;
     FagTilingType tilingData;
 
     // GlobalBuffer
@@ -102,34 +102,34 @@ public:
 
 TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void FlashAttentionScoreGradNzPost<TEMPLATE_ARGS>::Init(
     GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dqRope, GM_ADDR dkRope, GM_ADDR dsink, GM_ADDR actual_seq_qlen,
-    GM_ADDR actual_seq_kvlen, GM_ADDR workspace, FagTilingType ordTilingData, TPipe *pipeIn)
+    GM_ADDR actual_seq_kvlen, GM_ADDR workspace, FagTilingType ordTilingData, TPipe* pipeIn)
 {
     pipe = pipeIn;
     tilingData = ordTilingData;
     // Init WorkSpace
-    dqWorkSpace.SetGlobalBuffer((__gm__ float *)workspace +
+    dqWorkSpace.SetGlobalBuffer((__gm__ float*)workspace +
                                 tilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
-    dkWorkSpace.SetGlobalBuffer((__gm__ float *)workspace +
+    dkWorkSpace.SetGlobalBuffer((__gm__ float*)workspace +
                                 tilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
-    dvWorkSpace.SetGlobalBuffer((__gm__ float *)workspace +
+    dvWorkSpace.SetGlobalBuffer((__gm__ float*)workspace +
                                 tilingData->postTilingData.dvWorkSpaceOffset / sizeof(float));
 
     isSink = tilingData->s1s2BNGS1S2BaseParams.sinkOptional;
     if (unlikely(isSink)) {
-        dsinkWorkSpace.SetGlobalBuffer((__gm__ float *)workspace +
+        dsinkWorkSpace.SetGlobalBuffer((__gm__ float*)workspace +
                                        tilingData->postTilingData.dsinkWorkSpaceOffset / sizeof(float));
-        dsinkGm.SetGlobalBuffer((__gm__ float *)dsink);
+        dsinkGm.SetGlobalBuffer((__gm__ float*)dsink);
         s1SinkOuter = tilingData->s1s2BNGS1S2BaseParams.s1SinkOuter;
         s2SinkOuter = tilingData->s1s2BNGS1S2BaseParams.s2SinkOuter;
         pipe->InitBuffer(dsinkResBuf, sizeof(float));
     }
 
-    dqGm.SetGlobalBuffer((__gm__ OUTDTYPE *)dq);
-    dkGm.SetGlobalBuffer((__gm__ OUTDTYPE *)dk);
-    dvGm.SetGlobalBuffer((__gm__ OUTDTYPE *)dv);
+    dqGm.SetGlobalBuffer((__gm__ OUTDTYPE*)dq);
+    dkGm.SetGlobalBuffer((__gm__ OUTDTYPE*)dk);
+    dvGm.SetGlobalBuffer((__gm__ OUTDTYPE*)dv);
     if constexpr (IS_ROPE) {
-        dqRopeGm.SetGlobalBuffer((__gm__ OUTDTYPE *)dqRope);
-        dkRopeGm.SetGlobalBuffer((__gm__ OUTDTYPE *)dkRope);
+        dqRopeGm.SetGlobalBuffer((__gm__ OUTDTYPE*)dqRope);
+        dkRopeGm.SetGlobalBuffer((__gm__ OUTDTYPE*)dkRope);
     }
     if constexpr (IS_TND) {
         actualSeqQlenAddr = actual_seq_qlen;
@@ -176,9 +176,9 @@ __aicore__ inline void FlashAttentionScoreGradNzPost<TEMPLATE_ARGS>::GetPosition
         int64_t totalLen = 0;
         for (uint64_t bDimIdx = 0; bDimIdx < b; bDimIdx++) {
             if constexpr (MM_IDX == DQ_IDX) {
-                uint64_t sq = (bDimIdx == 0) ? ((__gm__ int64_t *)actualSeqQlenAddr)[bDimIdx] :
-                                               (((__gm__ int64_t *)actualSeqQlenAddr)[bDimIdx] -
-                                                ((__gm__ int64_t *)actualSeqQlenAddr)[bDimIdx - 1]);
+                uint64_t sq = (bDimIdx == 0) ? ((__gm__ int64_t*)actualSeqQlenAddr)[bDimIdx] :
+                                               (((__gm__ int64_t*)actualSeqQlenAddr)[bDimIdx] -
+                                                ((__gm__ int64_t*)actualSeqQlenAddr)[bDimIdx - 1]);
                 s1Outer = Ceil<uint64_t>(sq, CUBE_BASEM);
                 totalLen += n1 * s1Outer;
                 if (totalLen > index) {
@@ -190,9 +190,9 @@ __aicore__ inline void FlashAttentionScoreGradNzPost<TEMPLATE_ARGS>::GetPosition
                     break;
                 }
             } else {
-                uint64_t skv = (bDimIdx == 0) ? ((__gm__ int64_t *)actualSeqKVlenAddr)[bDimIdx] :
-                                                (((__gm__ int64_t *)actualSeqKVlenAddr)[bDimIdx] -
-                                                 ((__gm__ int64_t *)actualSeqKVlenAddr)[bDimIdx - 1]);
+                uint64_t skv = (bDimIdx == 0) ? ((__gm__ int64_t*)actualSeqKVlenAddr)[bDimIdx] :
+                                                (((__gm__ int64_t*)actualSeqKVlenAddr)[bDimIdx] -
+                                                 ((__gm__ int64_t*)actualSeqKVlenAddr)[bDimIdx - 1]);
                 s2Outer = Ceil<uint64_t>(skv, CUBE_BASEN);
                 totalLen += n2 * s2Outer;
                 if (totalLen > index) {
@@ -222,7 +222,7 @@ __aicore__ inline void FlashAttentionScoreGradNzPost<TEMPLATE_ARGS>::GetPosition
 
 TEMPLATES_DEF_NO_DEFAULT
 template <uint8_t MM_IDX>
-__aicore__ inline void FlashAttentionScoreGradNzPost<TEMPLATE_ARGS>::CopyIn(TQue<QuePosition::VECIN, 1> &inQue,
+__aicore__ inline void FlashAttentionScoreGradNzPost<TEMPLATE_ARGS>::CopyIn(TQue<QuePosition::VECIN, 1>& inQue,
                                                                             uint64_t srcM, uint64_t srcN,
                                                                             uint64_t srcOffset)
 {
@@ -348,9 +348,9 @@ __aicore__ inline void FlashAttentionScoreGradNzPost<TEMPLATE_ARGS>::DoWork()
     if constexpr (IS_TND) {
         if constexpr (MM_IDX == DQ_IDX) {
             for (uint64_t bDimIdx = 0; bDimIdx < b; bDimIdx++) {
-                uint64_t sq = (bDimIdx == 0) ? ((__gm__ int64_t *)actualSeqQlenAddr)[bDimIdx] :
-                                               (((__gm__ int64_t *)actualSeqQlenAddr)[bDimIdx] -
-                                                ((__gm__ int64_t *)actualSeqQlenAddr)[bDimIdx - 1]);
+                uint64_t sq = (bDimIdx == 0) ? ((__gm__ int64_t*)actualSeqQlenAddr)[bDimIdx] :
+                                               (((__gm__ int64_t*)actualSeqQlenAddr)[bDimIdx] -
+                                                ((__gm__ int64_t*)actualSeqQlenAddr)[bDimIdx - 1]);
                 totalBlockNum += n1 * Ceil<int64_t>(sq, CUBE_BASEM);
             }
             blockNum = Ceil<uint64_t>(totalBlockNum, usedCoreNum);
@@ -359,9 +359,9 @@ __aicore__ inline void FlashAttentionScoreGradNzPost<TEMPLATE_ARGS>::DoWork()
             outD = d;
         } else {
             for (uint64_t bDimIdx = 0; bDimIdx < b; bDimIdx++) {
-                uint64_t skv = (bDimIdx == 0) ? ((__gm__ int64_t *)actualSeqKVlenAddr)[bDimIdx] :
-                                                (((__gm__ int64_t *)actualSeqKVlenAddr)[bDimIdx] -
-                                                 ((__gm__ int64_t *)actualSeqKVlenAddr)[bDimIdx - 1]);
+                uint64_t skv = (bDimIdx == 0) ? ((__gm__ int64_t*)actualSeqKVlenAddr)[bDimIdx] :
+                                                (((__gm__ int64_t*)actualSeqKVlenAddr)[bDimIdx] -
+                                                 ((__gm__ int64_t*)actualSeqKVlenAddr)[bDimIdx - 1]);
                 totalBlockNum += n2 * Ceil<int64_t>(skv, CUBE_BASEN);
             }
             blockNum = Ceil<uint64_t>(totalBlockNum, usedCoreNum);
@@ -415,8 +415,8 @@ __aicore__ inline void FlashAttentionScoreGradNzPost<TEMPLATE_ARGS>::DoWork()
             if (unlikely(bIdx == 0)) {
                 srcOffset = nIdx * curS * curD + sIdx * CUBE_BASEM * curD;
             } else {
-                prefixS = MM_IDX == DQ_IDX ? ((__gm__ int64_t *)actualSeqQlenAddr)[bIdx - 1] :
-                                             ((__gm__ int64_t *)actualSeqKVlenAddr)[bIdx - 1];
+                prefixS = MM_IDX == DQ_IDX ? ((__gm__ int64_t*)actualSeqQlenAddr)[bIdx - 1] :
+                                             ((__gm__ int64_t*)actualSeqKVlenAddr)[bIdx - 1];
                 srcOffset = prefixS * curN * curD + nIdx * curS * curD + sIdx * CUBE_BASEM * curD;
             }
         } else {

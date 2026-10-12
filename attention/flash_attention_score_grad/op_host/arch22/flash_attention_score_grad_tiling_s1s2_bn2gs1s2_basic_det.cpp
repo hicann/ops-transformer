@@ -94,9 +94,9 @@ ge::graphStatus FlashAttentionScoreGraTilingBasicDet::SetAttrsInfo()
 ge::graphStatus FlashAttentionScoreGraTilingBasicDet::SetBaseInfo()
 {
     int64_t headNum = *context_->GetAttrs()->GetAttrPointer<int>(HEAD_NUM);
-    const gert::StorageShape *queryShape = context_->GetInputShape(0);
-    const gert::StorageShape *keyShape = context_->GetInputShape(1);
-    const gert::StorageShape *valueShape = context_->GetInputShape(2);
+    const gert::StorageShape* queryShape = context_->GetInputShape(0);
+    const gert::StorageShape* keyShape = context_->GetInputShape(1);
+    const gert::StorageShape* valueShape = context_->GetInputShape(2);
     if (strcmp(fBaseParams.inputLayout, BSH_STR) == 0) {
         fBaseParams.queryType = static_cast<uint32_t>(context_->GetInputDesc(QUERY)->GetDataType());
         fBaseParams.b = queryShape->GetStorageShape().GetDim(DIM_0);
@@ -199,8 +199,8 @@ ge::graphStatus FlashAttentionScoreGraTilingBasicDet::SetBaseInfo()
                         "The shape sizes of actualSeqQLenOptional and actualSeqKvLenOptional must be the same"),
                     return ge::GRAPH_FAILED);
         if (!isMaxWorkspace_) {
-            const int64_t *qValue = actualSeqQLenTensor->GetData<int64_t>();
-            const int64_t *kvValue = actualSeqKvLenTensor->GetData<int64_t>();
+            const int64_t* qValue = actualSeqQLenTensor->GetData<int64_t>();
+            const int64_t* kvValue = actualSeqKvLenTensor->GetData<int64_t>();
 
             OP_CHECK_IF((qValue == nullptr || kvValue == nullptr),
                         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
@@ -443,7 +443,7 @@ ge::graphStatus FlashAttentionScoreGraTilingBasicDet::DoOpTiling()
     tilingData->basicDetTensorTilingData.set_nextTockens(fBaseParams.nextTockens);
     tilingData->basicDetTensorTilingData.set_dqPostAbsorb(fBaseParams.dqPostAbsorb);
     tilingData->basicDetTensorTilingData.set_sparseMode(fBaseParams.sparseMode);
-    const char *inputLayout = fBaseParams.inputLayout;
+    const char* inputLayout = fBaseParams.inputLayout;
     if (strcmp(inputLayout, BSH_STR) == 0) {
         tilingData->basicDetTensorTilingData.set_layout(static_cast<uint32_t>(KernelInputLayout::BSNGD));
     } else if (strcmp(inputLayout, TND_STR) == 0) {
@@ -517,7 +517,7 @@ ge::graphStatus FlashAttentionScoreGraTilingBasicDet::GetWorkspaceSize()
     constexpr size_t DB_NUM = 2;
     constexpr size_t matmulSize = 16 * 128 * 128;
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     size_t workspaceOffset = 0;
 
     // matmal3 q
@@ -584,7 +584,7 @@ ge::graphStatus FlashAttentionScoreGraTilingBasicDet::GetPlatformInfo()
 {
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo *>(
+        auto compileInfoPtr = reinterpret_cast<const Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo*>(
             context_->GetCompileInfo());
         OP_CHECK_IF(
             compileInfoPtr == nullptr,

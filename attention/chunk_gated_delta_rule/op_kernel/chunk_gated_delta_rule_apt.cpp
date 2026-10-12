@@ -30,7 +30,7 @@ extern "C" __global__ __aicore__ void chunk_gated_delta_rule(GM_ADDR query, GM_A
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     TPipe pipe;
 
-    __gm__ uint8_t *user = GetUserWorkspace(workspaceGM);
+    __gm__ uint8_t* user = GetUserWorkspace(workspaceGM);
     CGDRInitParams initParams{query, key, value, beta, initialState, seqlens, gOptional, out, finalState};
     if (TILING_KEY_IS(TILING_KEY_CGDR_FP32_STATE_WITH_GAMMA)) {
         CGDR<bfloat16_t, float, float, true> op(&pipe, &tilingData);

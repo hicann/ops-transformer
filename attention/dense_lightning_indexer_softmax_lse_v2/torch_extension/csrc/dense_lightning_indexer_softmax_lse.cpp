@@ -15,11 +15,11 @@
 namespace op_api {
 constexpr int64_t DLI_METADATA_SIZE = 64;
 
-at::Device get_dense_lightning_indexer_softmax_lse_v2_metadata_device(const c10::optional<at::Tensor> &cu_seqlens_q,
-                                                                      const c10::optional<at::Tensor> &cu_seqlens_k,
-                                                                      const c10::optional<at::Tensor> &seqused_q,
-                                                                      const c10::optional<at::Tensor> &seqused_k,
-                                                                      const c10::optional<at::Tensor> &cmp_residual_k)
+at::Device get_dense_lightning_indexer_softmax_lse_v2_metadata_device(const c10::optional<at::Tensor>& cu_seqlens_q,
+                                                                      const c10::optional<at::Tensor>& cu_seqlens_k,
+                                                                      const c10::optional<at::Tensor>& seqused_q,
+                                                                      const c10::optional<at::Tensor>& seqused_k,
+                                                                      const c10::optional<at::Tensor>& cmp_residual_k)
 {
     if (cu_seqlens_q.has_value() && cu_seqlens_q.value().defined()) {
         return cu_seqlens_q.value().device();
@@ -40,9 +40,9 @@ at::Device get_dense_lightning_indexer_softmax_lse_v2_metadata_device(const c10:
 }
 
 at::Tensor dense_lightning_indexer_softmax_lse_v2_metadata(
-    int64_t num_heads_q, int64_t num_heads_k, int64_t head_dim, const c10::optional<at::Tensor> &cu_seqlens_q,
-    const c10::optional<at::Tensor> &cu_seqlens_k, const c10::optional<at::Tensor> &seqused_q,
-    const c10::optional<at::Tensor> &seqused_k, const c10::optional<at::Tensor> &cmp_residual_k, int64_t batch_size,
+    int64_t num_heads_q, int64_t num_heads_k, int64_t head_dim, const c10::optional<at::Tensor>& cu_seqlens_q,
+    const c10::optional<at::Tensor>& cu_seqlens_k, const c10::optional<at::Tensor>& seqused_q,
+    const c10::optional<at::Tensor>& seqused_k, const c10::optional<at::Tensor>& cmp_residual_k, int64_t batch_size,
     int64_t max_seqlen_q, int64_t max_seqlen_k, std::string layout_q, std::string layout_k, int64_t mask_mode,
     int64_t cmp_ratio)
 {
@@ -54,8 +54,8 @@ at::Tensor dense_lightning_indexer_softmax_lse_v2_metadata(
         output = at::empty({DLI_METADATA_SIZE}, at::TensorOptions().dtype(at::kInt).device(local_device));
     }
 
-    char *layout_q_ptr = const_cast<char *>(layout_q.c_str());
-    char *layout_k_ptr = const_cast<char *>(layout_k.c_str());
+    char* layout_q_ptr = const_cast<char*>(layout_q.c_str());
+    char* layout_k_ptr = const_cast<char*>(layout_k.c_str());
 
     ACLNN_CMD(aclnnDenseLightningIndexerSoftmaxLseV2Metadata, cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k,
               cmp_residual_k, batch_size, max_seqlen_q, max_seqlen_k, num_heads_q, num_heads_k, head_dim, layout_q_ptr,
@@ -65,10 +65,10 @@ at::Tensor dense_lightning_indexer_softmax_lse_v2_metadata(
 }
 
 at::Tensor dense_lightning_indexer_softmax_lse_v2(
-    const at::Tensor &query_index, const at::Tensor &key_index, const at::Tensor &weight,
-    const c10::optional<at::Tensor> &cu_seqlens_q, const c10::optional<at::Tensor> &cu_seqlens_k,
-    const c10::optional<at::Tensor> &seqused_q, const c10::optional<at::Tensor> &seqused_k,
-    const c10::optional<at::Tensor> &cmp_residual_k, const c10::optional<at::Tensor> &metadata, std::string layout_q,
+    const at::Tensor& query_index, const at::Tensor& key_index, const at::Tensor& weight,
+    const c10::optional<at::Tensor>& cu_seqlens_q, const c10::optional<at::Tensor>& cu_seqlens_k,
+    const c10::optional<at::Tensor>& seqused_q, const c10::optional<at::Tensor>& seqused_k,
+    const c10::optional<at::Tensor>& cmp_residual_k, const c10::optional<at::Tensor>& metadata, std::string layout_q,
     std::string layout_k, int64_t mask_mode, int64_t cmp_ratio)
 {
     at::Tensor softmax_lse_out{nullptr};
@@ -86,8 +86,8 @@ at::Tensor dense_lightning_indexer_softmax_lse_v2(
         }
     }
 
-    char *layout_q_ptr = const_cast<char *>(layout_q.c_str());
-    char *layout_k_ptr = const_cast<char *>(layout_k.c_str());
+    char* layout_q_ptr = const_cast<char*>(layout_q.c_str());
+    char* layout_k_ptr = const_cast<char*>(layout_k.c_str());
 
     ACLNN_CMD(aclnnDenseLightningIndexerSoftmaxLseV2, query_index, key_index, weight, cu_seqlens_q, cu_seqlens_k,
               seqused_q, seqused_k, cmp_residual_k, metadata, layout_q_ptr, layout_k_ptr, mask_mode, cmp_ratio,

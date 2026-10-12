@@ -81,7 +81,7 @@ struct FlashAttnGradCompileInfo {
     uint64_t l2CacheSize = 0;
     uint64_t libapiWorkspaceSize = 0;
 
-    static ge::graphStatus ParamCheck(gert::TilingContext *context)
+    static ge::graphStatus ParamCheck(gert::TilingContext* context)
     {
         return ge::GRAPH_SUCCESS;
     }

@@ -32,18 +32,14 @@ protected:
     }
 };
 
-TEST_F(flash_attention_score_grad_v3_opapi_ut, flash_attention_score_grad_aclnn_1) {
-    auto tensorQ = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND)
-        .ValueRange(-1, 1);
-    auto tensorK = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND)
-        .ValueRange(-1, 1);
-    auto tensorV = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND)
-        .ValueRange(-1, 1);
-    auto tensorDx = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND)
-        .ValueRange(-1, 1);
-    auto tensorAttenMask = TensorDesc({256, 256}, ACL_UINT8, ACL_FORMAT_ND)
-        .Value(vector<uint8_t>{0});
-        
+TEST_F(flash_attention_score_grad_v3_opapi_ut, flash_attention_score_grad_aclnn_1)
+{
+    auto tensorQ = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto tensorK = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto tensorV = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto tensorDx = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto tensorAttenMask = TensorDesc({256, 256}, ACL_UINT8, ACL_FORMAT_ND).Value(vector<uint8_t>{0});
+
     auto tensorSoftmaxMax =
         TensorDesc({1, 1, 256, 8}, ACL_FLOAT, ACL_FORMAT_ND).Value(vector<float>(1 * 1 * 256 * 8, 3.0f));
     auto tensorSoftmaxSum =
@@ -70,43 +66,21 @@ TEST_F(flash_attention_score_grad_v3_opapi_ut, flash_attention_score_grad_aclnn_
     auto tensorDQROPEDesc = TensorDesc({}, ACL_FLOAT, ACL_FORMAT_ND);
     auto tensorDKROPEDesc = TensorDesc({}, ACL_FLOAT, ACL_FORMAT_ND);
 
-    auto ut = OP_API_UT(
-        aclnnFlashAttentionScoreGradV3,
-        INPUT(
-            tensorQ,
-            tensorK,
-            tensorV,
-            tensorDx,
-            nullptr,  // pse
-            nullptr,  // dropmask
-            nullptr,  // psepaddingmask
-            tensorAttenMask,
-            tensorSoftmaxMax,
-            tensorSoftmaxSum,
-            nullptr,  // softmaxin
-            tensorAttentionIn,
-            nullptr,  // sink
-            nullptr,  // Prefix
-            nullptr,  // QStartIdx
-            nullptr,  // KVStartIdx
-            scaleValue,
-            keepProb,
-            preTokens,
-            nextTokens,
-            headNum,
-            layout,
-            innerPrecise,
-            sparseMod,
-            pseType
-        ),
-        OUTPUT(
-            tensorDQDesc,
-            tensorDKDesc,
-            tensorDVDesc,
-            tensorDPseDesc,
-            nullptr
-        )
-    );
+    auto ut =
+        OP_API_UT(aclnnFlashAttentionScoreGradV3,
+                  INPUT(tensorQ, tensorK, tensorV, tensorDx,
+                        nullptr, // pse
+                        nullptr, // dropmask
+                        nullptr, // psepaddingmask
+                        tensorAttenMask, tensorSoftmaxMax, tensorSoftmaxSum,
+                        nullptr, // softmaxin
+                        tensorAttentionIn,
+                        nullptr, // sink
+                        nullptr, // Prefix
+                        nullptr, // QStartIdx
+                        nullptr, // KVStartIdx
+                        scaleValue, keepProb, preTokens, nextTokens, headNum, layout, innerPrecise, sparseMod, pseType),
+                  OUTPUT(tensorDQDesc, tensorDKDesc, tensorDVDesc, tensorDPseDesc, nullptr));
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);

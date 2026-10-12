@@ -33,30 +33,30 @@ constexpr size_t VECTOR_DIM_NUM = 1UL;
 constexpr size_t TOKEN_DIM_INDEX = 0UL;
 constexpr size_t HIDDEN_DIM_INDEX = 1UL;
 constexpr int64_t MAX_D_SIZE = 8192L;
-constexpr const char *ACLNN_API_NAME = "aclnnBlockAttnResUpdateGetWorkspaceSize";
-constexpr const char *PARTIAL_BLOCK_REF_NAME = "partialBlockRef";
-constexpr const char *DELTA_NAME = "delta";
-constexpr const char *PSEUDO_QUERY_NAME = "pseudoQuery";
-constexpr const char *NUMERATOR_NAME = "numerator";
-constexpr const char *LOGIT_MAX_NAME = "logitMax";
-constexpr const char *EXP_SUM_NAME = "expSum";
-constexpr const char *H_NAME = "h";
+constexpr const char* ACLNN_API_NAME = "aclnnBlockAttnResUpdateGetWorkspaceSize";
+constexpr const char* PARTIAL_BLOCK_REF_NAME = "partialBlockRef";
+constexpr const char* DELTA_NAME = "delta";
+constexpr const char* PSEUDO_QUERY_NAME = "pseudoQuery";
+constexpr const char* NUMERATOR_NAME = "numerator";
+constexpr const char* LOGIT_MAX_NAME = "logitMax";
+constexpr const char* EXP_SUM_NAME = "expSum";
+constexpr const char* H_NAME = "h";
 
 struct BlockAttnResUpdateParams {
-    aclTensor *partialBlockRef{nullptr};
-    const aclTensor *delta{nullptr};
-    const aclTensor *pseudoQuery{nullptr};
-    const aclTensor *numerator{nullptr};
-    const aclTensor *logitMax{nullptr};
-    const aclTensor *expSum{nullptr};
+    aclTensor* partialBlockRef{nullptr};
+    const aclTensor* delta{nullptr};
+    const aclTensor* pseudoQuery{nullptr};
+    const aclTensor* numerator{nullptr};
+    const aclTensor* logitMax{nullptr};
+    const aclTensor* expSum{nullptr};
     double eps{1e-6};
-    aclTensor *h{nullptr};
+    aclTensor* h{nullptr};
 };
 
 static const std::initializer_list<op::DataType> FLOAT_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
 static const std::initializer_list<op::DataType> BF16_DTYPE_SUPPORT_LIST = {DataType::DT_BF16};
 
-static bool CheckNotNull(const BlockAttnResUpdateParams &params)
+static bool CheckNotNull(const BlockAttnResUpdateParams& params)
 {
     OP_CHECK(params.partialBlockRef != nullptr,
              OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(ACLNN_API_NAME, PARTIAL_BLOCK_REF_NAME, "tensor can not be null"),
@@ -90,7 +90,7 @@ static aclnnStatus CheckAiCoreSupport()
     return ACLNN_SUCCESS;
 }
 
-static bool CheckDtypeValid(const BlockAttnResUpdateParams &params)
+static bool CheckDtypeValid(const BlockAttnResUpdateParams& params)
 {
     OP_CHECK(CheckType(params.partialBlockRef->GetDataType(), FLOAT_DTYPE_SUPPORT_LIST),
              OP_LOGE_FOR_INVALID_DTYPE(ACLNN_API_NAME, PARTIAL_BLOCK_REF_NAME,
@@ -129,7 +129,7 @@ static bool CheckDtypeValid(const BlockAttnResUpdateParams &params)
     return true;
 }
 
-static bool CheckTensorFormat(const aclTensor *tensor, const char *tensorName)
+static bool CheckTensorFormat(const aclTensor* tensor, const char* tensorName)
 {
     const auto originalFormat = tensor->GetOriginalFormat();
     const auto storageFormat = tensor->GetStorageFormat();
@@ -142,7 +142,7 @@ static bool CheckTensorFormat(const aclTensor *tensor, const char *tensorName)
     return true;
 }
 
-static bool CheckFormat(const BlockAttnResUpdateParams &params)
+static bool CheckFormat(const BlockAttnResUpdateParams& params)
 {
     if (!CheckTensorFormat(params.partialBlockRef, PARTIAL_BLOCK_REF_NAME)) {
         return false;
@@ -165,7 +165,7 @@ static bool CheckFormat(const BlockAttnResUpdateParams &params)
     return CheckTensorFormat(params.h, H_NAME);
 }
 
-static bool CheckTensorDimNum(const aclTensor *tensor, const char *tensorName, size_t expectedDimNum)
+static bool CheckTensorDimNum(const aclTensor* tensor, const char* tensorName, size_t expectedDimNum)
 {
     const size_t actualDimNum = tensor->GetViewShape().GetDimNum();
     const std::string actualDimNumString = std::to_string(actualDimNum) + "D";
@@ -177,11 +177,11 @@ static bool CheckTensorDimNum(const aclTensor *tensor, const char *tensorName, s
     return true;
 }
 
-static bool CheckTensorShape(const aclTensor *tensor, const char *tensorName, const aclTensor *reference,
-                             const char *referenceName)
+static bool CheckTensorShape(const aclTensor* tensor, const char* tensorName, const aclTensor* reference,
+                             const char* referenceName)
 {
-    const auto &shape = tensor->GetViewShape();
-    const auto &referenceShape = reference->GetViewShape();
+    const auto& shape = tensor->GetViewShape();
+    const auto& referenceShape = reference->GetViewShape();
     const std::string actualShape = op::ToString(shape).GetString();
     const std::string reason =
         std::string("shape must match ") + referenceName + " " + op::ToString(referenceShape).GetString();
@@ -191,7 +191,7 @@ static bool CheckTensorShape(const aclTensor *tensor, const char *tensorName, co
     return true;
 }
 
-static bool CheckTensorDimNums(const BlockAttnResUpdateParams &params)
+static bool CheckTensorDimNums(const BlockAttnResUpdateParams& params)
 {
     if (!CheckTensorDimNum(params.partialBlockRef, PARTIAL_BLOCK_REF_NAME, MATRIX_DIM_NUM)) {
         return false;
@@ -217,7 +217,7 @@ static bool CheckTensorDimNums(const BlockAttnResUpdateParams &params)
     return true;
 }
 
-static bool CheckMatrixShapes(const BlockAttnResUpdateParams &params)
+static bool CheckMatrixShapes(const BlockAttnResUpdateParams& params)
 {
     if (!CheckTensorShape(params.delta, DELTA_NAME, params.partialBlockRef, PARTIAL_BLOCK_REF_NAME)) {
         return false;
@@ -231,23 +231,23 @@ static bool CheckMatrixShapes(const BlockAttnResUpdateParams &params)
     return true;
 }
 
-static bool CheckVectorShapes(const BlockAttnResUpdateParams &params, int64_t tSize, int64_t dSize)
+static bool CheckVectorShapes(const BlockAttnResUpdateParams& params, int64_t tSize, int64_t dSize)
 {
-    const auto &logitMaxShape = params.logitMax->GetViewShape();
+    const auto& logitMaxShape = params.logitMax->GetViewShape();
     const std::string logitMaxShapeString = op::ToString(logitMaxShape).GetString();
     OP_CHECK(
         logitMaxShape.GetDim(TOKEN_DIM_INDEX) == tSize,
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(ACLNN_API_NAME, LOGIT_MAX_NAME, logitMaxShapeString.c_str(),
                                                "shape must be [T], where T is the first dimension of partialBlockRef"),
         return false);
-    const auto &expSumShape = params.expSum->GetViewShape();
+    const auto& expSumShape = params.expSum->GetViewShape();
     const std::string expSumShapeString = op::ToString(expSumShape).GetString();
     OP_CHECK(
         expSumShape.GetDim(TOKEN_DIM_INDEX) == tSize,
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(ACLNN_API_NAME, EXP_SUM_NAME, expSumShapeString.c_str(),
                                                "shape must be [T], where T is the first dimension of partialBlockRef"),
         return false);
-    const auto &pseudoQueryShape = params.pseudoQuery->GetViewShape();
+    const auto& pseudoQueryShape = params.pseudoQuery->GetViewShape();
     const std::string pseudoQueryShapeString = op::ToString(pseudoQueryShape).GetString();
     OP_CHECK(
         pseudoQueryShape.GetDim(TOKEN_DIM_INDEX) == dSize,
@@ -287,13 +287,13 @@ static bool CheckDimensionRangesAndSize(int64_t tSize, int64_t dSize)
     return true;
 }
 
-static bool CheckShape(const BlockAttnResUpdateParams &params)
+static bool CheckShape(const BlockAttnResUpdateParams& params)
 {
     if (!CheckTensorDimNums(params) || !CheckMatrixShapes(params)) {
         return false;
     }
 
-    const auto &partialBlockRefShape = params.partialBlockRef->GetViewShape();
+    const auto& partialBlockRefShape = params.partialBlockRef->GetViewShape();
     const int64_t tSize = partialBlockRefShape.GetDim(TOKEN_DIM_INDEX);
     const int64_t dSize = partialBlockRefShape.GetDim(HIDDEN_DIM_INDEX);
     if (!CheckVectorShapes(params, tSize, dSize)) {
@@ -302,7 +302,7 @@ static bool CheckShape(const BlockAttnResUpdateParams &params)
     return CheckDimensionRangesAndSize(tSize, dSize);
 }
 
-static bool CheckTensorContiguous(const aclTensor *tensor, const char *tensorName)
+static bool CheckTensorContiguous(const aclTensor* tensor, const char* tensorName)
 {
     const std::string reason = std::string("tensor must be contiguous, but got shape ") +
                                op::ToString(tensor->GetViewShape()).GetString() + " and strides " +
@@ -312,7 +312,7 @@ static bool CheckTensorContiguous(const aclTensor *tensor, const char *tensorNam
     return true;
 }
 
-static bool CheckContiguous(const BlockAttnResUpdateParams &params)
+static bool CheckContiguous(const BlockAttnResUpdateParams& params)
 {
     if (!CheckTensorContiguous(params.partialBlockRef, PARTIAL_BLOCK_REF_NAME)) {
         return false;
@@ -344,7 +344,7 @@ static bool CheckEps(double eps)
     return true;
 }
 
-static aclnnStatus CheckParams(const BlockAttnResUpdateParams &params)
+static aclnnStatus CheckParams(const BlockAttnResUpdateParams& params)
 {
     if (!CheckNotNull(params)) {
         return ACLNN_ERR_PARAM_NULLPTR;
@@ -371,14 +371,14 @@ static aclnnStatus CheckParams(const BlockAttnResUpdateParams &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus PreProcess(BlockAttnResUpdateParams &params)
+static aclnnStatus PreProcess(BlockAttnResUpdateParams& params)
 {
     // Torch tensors may use a flattened storage shape. The operator requires storage and original shapes to match
     // the logical view shape, so normalize all input and output descriptors before invoking the L0 operator.
-    const aclTensor *tensors[] = {
+    const aclTensor* tensors[] = {
         params.partialBlockRef, params.delta, params.pseudoQuery, params.numerator, params.logitMax,
         params.expSum,          params.h};
-    for (const aclTensor *tensor : tensors) {
+    for (const aclTensor* tensor : tensors) {
         tensor->SetStorageShape(tensor->GetViewShape());
         tensor->SetOriginalShape(tensor->GetViewShape());
     }
@@ -386,11 +386,11 @@ static aclnnStatus PreProcess(BlockAttnResUpdateParams &params)
 }
 } // namespace
 
-extern "C" aclnnStatus aclnnBlockAttnResUpdateGetWorkspaceSize(aclTensor *partialBlockRef, const aclTensor *delta,
-                                                               const aclTensor *pseudoQuery, const aclTensor *numerator,
-                                                               const aclTensor *logitMax, const aclTensor *expSum,
-                                                               double eps, aclTensor *h, uint64_t *workspaceSize,
-                                                               aclOpExecutor **executor)
+extern "C" aclnnStatus aclnnBlockAttnResUpdateGetWorkspaceSize(aclTensor* partialBlockRef, const aclTensor* delta,
+                                                               const aclTensor* pseudoQuery, const aclTensor* numerator,
+                                                               const aclTensor* logitMax, const aclTensor* expSum,
+                                                               double eps, aclTensor* h, uint64_t* workspaceSize,
+                                                               aclOpExecutor** executor)
 {
     OP_CHECK(workspaceSize != nullptr,
              OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(ACLNN_API_NAME, "workspaceSize", "pointer can not be null"),
@@ -428,7 +428,7 @@ extern "C" aclnnStatus aclnnBlockAttnResUpdateGetWorkspaceSize(aclTensor *partia
     return ACLNN_SUCCESS;
 }
 
-extern "C" aclnnStatus aclnnBlockAttnResUpdate(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern "C" aclnnStatus aclnnBlockAttnResUpdate(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnBlockAttnResUpdate);

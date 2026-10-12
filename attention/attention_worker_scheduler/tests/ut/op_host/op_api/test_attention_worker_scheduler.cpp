@@ -26,7 +26,7 @@ public:
         : exe(nullptr)
     {}
 
-    aclTensor *CreateAclTensor(std::vector<int64_t> shape, aclDataType dtype)
+    aclTensor* CreateAclTensor(std::vector<int64_t> shape, aclDataType dtype)
     {
         return aclCreateTensor(shape.data(), shape.size(), dtype, nullptr, 0, ACL_FORMAT_ND, shape.data(), shape.size(),
                                data);
@@ -50,7 +50,7 @@ public:
     }
 
 public:
-    aclOpExecutor *exe;
+    aclOpExecutor* exe;
     int64_t data[DATA_SIZE] = {0};
 };
 

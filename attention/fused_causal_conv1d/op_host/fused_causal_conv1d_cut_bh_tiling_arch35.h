@@ -90,7 +90,7 @@ constexpr int64_t X_INPUT_2D = 1; // 2D 输入 [cu_seq_len, dim]，需配合 que
 
 class FusedCausalConv1dCutBHTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit FusedCausalConv1dCutBHTiling(gert::TilingContext *context, bool isInplace = false)
+    explicit FusedCausalConv1dCutBHTiling(gert::TilingContext* context, bool isInplace = false)
         : TilingBaseClass(context),
           isInplace_(isInplace)
     {}
@@ -146,18 +146,18 @@ private:
     // ---- 核内 UB 切分（细粒度）----
     ge::graphStatus ComputeIntraCoreUbTiling();
     // ---- UB 切分核心计算（细粒度，被 ComputeIntraCoreUbTiling 调用）----
-    void ComputeUbFor(int64_t coreDimElems, int64_t coreBS, int64_t availableUbSize, int64_t &outUbDim,
-                      int64_t &outUbBS, int64_t &outLoopDim, int64_t &outLoopBS, int64_t &outUbTailDim,
-                      int64_t &outUbTailBS);
+    void ComputeUbFor(int64_t coreDimElems, int64_t coreBS, int64_t availableUbSize, int64_t& outUbDim,
+                      int64_t& outUbBS, int64_t& outLoopDim, int64_t& outLoopBS, int64_t& outUbTailDim,
+                      int64_t& outUbTailBS);
 
     // ---- 核间切分（粗粒度：dim >= 1024）----
     ge::graphStatus ComputeInterCoreSplitCoarse();
     // ---- 核内 UB 切分（粗粒度）----
     ge::graphStatus ComputeIntraCoreUbTilingCoarse();
     // ---- UB 切分核心计算（粗粒度，被 ComputeIntraCoreUbTilingCoarse 调用）----
-    void ComputeUbForCoarse(int64_t coreDimElems, int64_t coreBS, int64_t availableUbSize, int64_t &outUbDim,
-                            int64_t &outUbBS, int64_t &outLoopDim, int64_t &outLoopBS, int64_t &outUbTailDim,
-                            int64_t &outUbTailBS);
+    void ComputeUbForCoarse(int64_t coreDimElems, int64_t coreBS, int64_t availableUbSize, int64_t& outUbDim,
+                            int64_t& outUbBS, int64_t& outLoopDim, int64_t& outLoopBS, int64_t& outUbTailDim,
+                            int64_t& outUbTailBS);
 
     uint64_t ubSize_ = 0;       // 单核 UB 总大小（字节）
     uint64_t totalCoreNum_ = 0; // 总 AIV 核数

@@ -25,7 +25,7 @@ public:
     MetadataChecker() = default;
     ~MetadataChecker() = default;
 
-    ge::graphStatus CheckSinglePara(const FaTilingInfo &faInfo) override;
+    ge::graphStatus CheckSinglePara(const FaTilingInfo& faInfo) override;
 };
 } // namespace flash_attn
 } // namespace optiling

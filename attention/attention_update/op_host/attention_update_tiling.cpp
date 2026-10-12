@@ -57,7 +57,7 @@ ge::graphStatus AttentionUpdateTiling::GetPlatformInfo()
     ubBlockSize_ = Ops::Base::GetUbBlockSize(context_);
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const DecodeUpdateCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const DecodeUpdateCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         totalCoreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
@@ -85,8 +85,7 @@ ge::graphStatus AttentionUpdateTiling::CheckInputDtype()
 {
     if (goType_ != ge::DataType::DT_FLOAT && goType_ != ge::DataType::DT_FLOAT16 && goType_ != ge::DataType::DT_BF16) {
         std::string dtypeStr = ToString(goType_);
-        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "go", dtypeStr.c_str(),
-            "FLOAT, FLOAT16 or BF16");
+        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "go", dtypeStr.c_str(), "FLOAT, FLOAT16 or BF16");
         return ge::GRAPH_FAILED;
     }
 
@@ -103,13 +102,14 @@ ge::graphStatus AttentionUpdateTiling::CheckInputDtype()
         auto currentDtype = context_->GetInputDesc(i)->GetDataType();
         if (i >= sp_) {
             if (goType_ != currentDtype) {
-                std::string paramMsg = "go[" + std::to_string(i-sp_) + "] tensor";
+                std::string paramMsg = "go[" + std::to_string(i - sp_) + "] tensor";
                 std::string currentDtypeStr = ToString(currentDtype);
                 std::string reasonMsg = "All tensors in input go must have the same dtype, "
-                    "but the dtype of go[" + std::to_string(i-sp_) + "] tensor is different from other dtypes " +
-                    ToString(goType_);
+                                        "but the dtype of go[" +
+                                        std::to_string(i - sp_) + "] tensor is different from other dtypes " +
+                                        ToString(goType_);
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), paramMsg.c_str(),
-                    currentDtypeStr.c_str(), reasonMsg.c_str());
+                                                      currentDtypeStr.c_str(), reasonMsg.c_str());
                 return ge::GRAPH_FAILED;
             }
         } else {
@@ -117,10 +117,11 @@ ge::graphStatus AttentionUpdateTiling::CheckInputDtype()
                 std::string paramMsg = "lse[" + std::to_string(i) + "] tensor";
                 std::string currentDtypeStr = ToString(currentDtype);
                 std::string reasonMsg = "All tensors in the lse must have the same dtype, "
-                    "but the dtype of lse[" + std::to_string(i) + "] tensor is different from other dtypes " +
-                    ToString(lseType_);
+                                        "but the dtype of lse[" +
+                                        std::to_string(i) + "] tensor is different from other dtypes " +
+                                        ToString(lseType_);
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), paramMsg.c_str(),
-                    currentDtypeStr.c_str(), reasonMsg.c_str());
+                                                      currentDtypeStr.c_str(), reasonMsg.c_str());
                 return ge::GRAPH_FAILED;
             }
         }
@@ -134,8 +135,8 @@ ge::graphStatus AttentionUpdateTiling::CheckInputDim()
     uint64_t dimNum = 0;
     if (!(d_ >= D_MIN && d_ <= D_MAX && d_ % D_DIVIDE_8 == 0)) {
         std::string shapeStr = ToString(goShape_);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "go",
-            shapeStr.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "go", shapeStr.c_str(),
             "The H dim of input go should be in the range of [8, 512] and divisible by 8, "
             "where H refers to the 1st dim");
         return ge::GRAPH_FAILED;
@@ -147,38 +148,38 @@ ge::graphStatus AttentionUpdateTiling::CheckInputDim()
         std::string paramMsg;
         if (i >= sp_) {
             uint64_t currentD = context_->GetInputShape(i)->GetOriginShape().GetDim(DIM_1);
-            paramMsg = "go[" + std::to_string(i-sp_) + "] tensor";
+            paramMsg = "go[" + std::to_string(i - sp_) + "] tensor";
             if (!(dimNum == GO_DIM_NUM)) {
                 std::string dimNumStr = std::to_string(dimNum);
-                OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), paramMsg.c_str(),
-                    dimNumStr.c_str(), "2D");
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), paramMsg.c_str(), dimNumStr.c_str(), "2D");
                 return ge::GRAPH_FAILED;
             }
             if (!(currentD == d_)) {
                 std::string currentShapeStr = ToString(currentShape);
                 std::string reasonMsg = "The H dims of all go tensors must be the same, "
-                    "but the H dim of " + paramMsg + " is different from other H dims " +
-                    ToString(goShape_) +", where H refers to the 1st dim";
+                                        "but the H dim of " +
+                                        paramMsg + " is different from other H dims " + ToString(goShape_) +
+                                        ", where H refers to the 1st dim";
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), paramMsg.c_str(),
-                    currentShapeStr.c_str(), reasonMsg.c_str());
+                                                      currentShapeStr.c_str(), reasonMsg.c_str());
                 return ge::GRAPH_FAILED;
             }
         } else {
             paramMsg = "lse[" + std::to_string(i) + "] tensor";
             if (!(dimNum == LSE_DIM_NUM)) {
                 std::string dimNumStr = std::to_string(dimNum);
-                OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), paramMsg.c_str(),
-                    dimNumStr.c_str(), "1D");
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), paramMsg.c_str(), dimNumStr.c_str(), "1D");
                 return ge::GRAPH_FAILED;
             }
         }
         if (!(bshSize_ == currentBshSize)) {
             std::string currentShapeStr = ToString(currentShape);
             std::string reasonMsg = "The batch axis of all go and lse tensors should be the same, "
-                "but the batch axis of " + paramMsg + " is different from other batch axes " +
-                ToString(goShape_) + ", where batch refers to the 0th dim";
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), paramMsg.c_str(),
-                currentShapeStr.c_str(), reasonMsg.c_str());
+                                    "but the batch axis of " +
+                                    paramMsg + " is different from other batch axes " + ToString(goShape_) +
+                                    ", where batch refers to the 0th dim";
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), paramMsg.c_str(), currentShapeStr.c_str(),
+                                                  reasonMsg.c_str());
             return ge::GRAPH_FAILED;
         }
     }
@@ -197,16 +198,14 @@ ge::graphStatus AttentionUpdateTiling::CheckInputParams()
     // 检查参数update_type
     if (!(updateType_ == 0 || updateType_ == 1)) {
         std::string updateTypeStr = std::to_string(updateType_);
-        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "update_type",
-            updateTypeStr.c_str(), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "update_type", updateTypeStr.c_str(), "0 or 1");
         return ge::GRAPH_FAILED;
     }
 
     // 检查参数sp
     if (!(sp_ >= 1 && sp_ <= ATTR_SP_MAX)) {
         std::string spStr = std::to_string(sp_);
-        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "sp",
-            spStr.c_str(), "in the range of [1, 16]");
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "sp", spStr.c_str(), "in the range of [1, 16]");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -219,8 +218,8 @@ ge::graphStatus AttentionUpdateTiling::CheckOutputParams()
     auto outputType = outputDesc->GetDataType();
     if (goType_ != outputType) {
         std::string dtypeMsg = ToString(goType_) + " and " + ToString(outputType);
-        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context_->GetNodeName(), "go and output",
-            dtypeMsg.c_str(), "The dtypes of parameter go and parameter output should be the same");
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context_->GetNodeName(), "go and output", dtypeMsg.c_str(),
+                                               "The dtypes of parameter go and parameter output should be the same");
         return ge::GRAPH_FAILED;
     }
 
@@ -230,8 +229,8 @@ ge::graphStatus AttentionUpdateTiling::CheckOutputParams()
         auto outputLseMType = outputLseMDesc->GetDataType();
         if (outputLseMType != ge::DataType::DT_FLOAT) {
             std::string dtypeStr = ToString(outputLseMType);
-            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "lse_m",
-                dtypeStr.c_str(),
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                context_->GetNodeName(), "lse_m", dtypeStr.c_str(),
                 "The dtype of output lse_m should be FLOAT when the attr update_type is 1");
             return ge::GRAPH_FAILED;
         }
@@ -245,18 +244,17 @@ ge::graphStatus AttentionUpdateTiling::GetShapeAttrsInfo()
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
-    const int64_t *spPtr = attrs->GetAttrPointer<int64_t>(ATTR_SP_INDEX);
+    const int64_t* spPtr = attrs->GetAttrPointer<int64_t>(ATTR_SP_INDEX);
     OP_CHECK_IF(spPtr == nullptr, OP_LOGE("AttentionUpdate", "spPtr is null"), return ge::GRAPH_FAILED);
     sp_ = static_cast<uint64_t>(*spPtr);
 
     uint32_t allTensorCount = context_->GetComputeNodeInputNum();
-    if (allTensorCount != sp_ * NUM_2){
+    if (allTensorCount != sp_ * NUM_2) {
         std::string tensorCountStr = std::to_string(static_cast<int64_t>(allTensorCount));
-        std::string reasonMsg = 
-            "The number of tensors in input lse and go should be twice the attr sp, where sp is "
-            + std::to_string(sp_);
-        OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(context_->GetNodeName(), "lse and go",
-                    tensorCountStr.c_str(), reasonMsg.c_str());
+        std::string reasonMsg =
+            "The number of tensors in input lse and go should be twice the attr sp, where sp is " + std::to_string(sp_);
+        OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(context_->GetNodeName(), "lse and go", tensorCountStr.c_str(),
+                                                   reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -275,14 +273,14 @@ ge::graphStatus AttentionUpdateTiling::GetShapeAttrsInfo()
     d_ = goShape_.GetDim(DIM_1);
     bshSize_ = goShape_.GetDim(DIM_0);
 
-    const int64_t *updateTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_UPDATE_TYPE_INDEX);
+    const int64_t* updateTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_UPDATE_TYPE_INDEX);
     OP_CHECK_IF(updateTypePtr == nullptr, OP_LOGE("AttentionUpdate", "updateTypePtr is null"), return ge::GRAPH_FAILED);
     updateType_ = static_cast<int64_t>(*updateTypePtr);
     goDtypeSize_ = GetSizeByDataType(goType_);
     if (goDtypeSize_ == 0) {
         std::string dtypeStr = Ops::Base::ToString(goType_);
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "go",
-            dtypeStr.c_str(), "The dtype size of input go cannot be 0");
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "go", dtypeStr.c_str(),
+                                              "The dtype size of input go cannot be 0");
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(CheckInputParams() != ge::GRAPH_SUCCESS,

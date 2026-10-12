@@ -17,7 +17,6 @@
 #include "log/log.h"
 #include "util/shape_util.h"
 
-
 using namespace ge;
 namespace ops {
 constexpr int32_t NUM_ZERO = 0;
@@ -31,7 +30,7 @@ static ge::graphStatus InferShape4DecodeUpdate(gert::InferShapeContext* context)
     OP_LOGI(context, "Begin to do InferShape4DecodeUpdate.");
 
     uint32_t inputNumInferShape = context->GetComputeNodeInputNum();
-    uint32_t sp = inputNumInferShape / NUM_TWO;    
+    uint32_t sp = inputNumInferShape / NUM_TWO;
 
     auto lseShape = context->GetInputShape(LSE_INDEX);
     auto localOutShape = context->GetInputShape(sp);
@@ -49,7 +48,7 @@ static ge::graphStatus InferDataType4DecodeUpdate(gert::InferDataTypeContext* co
     OP_LOGI(context, "Begin to do InferDataType4DecodeUpdate.");
 
     uint32_t inputNumInferShape = context->GetComputeNodeInputNum();
-    uint32_t sp = inputNumInferShape / NUM_TWO;    
+    uint32_t sp = inputNumInferShape / NUM_TWO;
 
     auto lseDtype = context->GetInputDataType(NUM_ZERO);
     auto localOutDtype = context->GetInputDataType(sp);
@@ -63,6 +62,5 @@ static ge::graphStatus InferDataType4DecodeUpdate(gert::InferDataTypeContext* co
 IMPL_OP_INFERSHAPE(AttentionUpdate)
     .InferShape(ops::InferShape4DecodeUpdate)
     .InferDataType(ops::InferDataType4DecodeUpdate);
-
 
 } // namespace ops

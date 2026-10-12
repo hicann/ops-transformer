@@ -32,7 +32,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -42,8 +42,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -61,7 +61,7 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<float> resultData(size, 0);
@@ -73,7 +73,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -133,31 +133,31 @@ int main()
     std::vector<float> dwHostData(GetShapeSize(wShape), 0.0f);
     std::vector<float> softmaxOutHostData(GetShapeSize(softmaxShape), 0.0f);
 
-    void *qDeviceAddr = nullptr;
-    void *kDeviceAddr = nullptr;
-    void *wDeviceAddr = nullptr;
-    void *attnSoftmaxL1NormDeviceAddr = nullptr;
-    void *softmaxLseDeviceAddr = nullptr;
-    void *cuSeqLensQDeviceAddr = nullptr;
-    void *cuSeqLensKDeviceAddr = nullptr;
-    void *metadataDeviceAddr = nullptr;
-    void *dqDeviceAddr = nullptr;
-    void *dkDeviceAddr = nullptr;
-    void *dwDeviceAddr = nullptr;
-    void *softmaxOutDeviceAddr = nullptr;
+    void* qDeviceAddr = nullptr;
+    void* kDeviceAddr = nullptr;
+    void* wDeviceAddr = nullptr;
+    void* attnSoftmaxL1NormDeviceAddr = nullptr;
+    void* softmaxLseDeviceAddr = nullptr;
+    void* cuSeqLensQDeviceAddr = nullptr;
+    void* cuSeqLensKDeviceAddr = nullptr;
+    void* metadataDeviceAddr = nullptr;
+    void* dqDeviceAddr = nullptr;
+    void* dkDeviceAddr = nullptr;
+    void* dwDeviceAddr = nullptr;
+    void* softmaxOutDeviceAddr = nullptr;
 
-    aclTensor *q = nullptr;
-    aclTensor *k = nullptr;
-    aclTensor *w = nullptr;
-    aclTensor *attnSoftmaxL1Norm = nullptr;
-    aclTensor *softmaxLse = nullptr;
-    aclTensor *cuSeqLensQ = nullptr;
-    aclTensor *cuSeqLensK = nullptr;
-    aclTensor *metadata = nullptr;
-    aclTensor *dq = nullptr;
-    aclTensor *dk = nullptr;
-    aclTensor *dw = nullptr;
-    aclTensor *softmaxOut = nullptr;
+    aclTensor* q = nullptr;
+    aclTensor* k = nullptr;
+    aclTensor* w = nullptr;
+    aclTensor* attnSoftmaxL1Norm = nullptr;
+    aclTensor* softmaxLse = nullptr;
+    aclTensor* cuSeqLensQ = nullptr;
+    aclTensor* cuSeqLensK = nullptr;
+    aclTensor* metadata = nullptr;
+    aclTensor* dq = nullptr;
+    aclTensor* dk = nullptr;
+    aclTensor* dw = nullptr;
+    aclTensor* softmaxOut = nullptr;
 
     ret = CreateAclTensor(qHostData, qShape, &qDeviceAddr, aclDataType::ACL_FLOAT16, &q);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -192,7 +192,7 @@ int main()
     char layoutK[4] = {'T', 'N', 'D', 0};
 
     uint64_t metadataWorkspaceSize = 0;
-    aclOpExecutor *metadataExecutor = nullptr;
+    aclOpExecutor* metadataExecutor = nullptr;
     ret = aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
         cuSeqLensQ, cuSeqLensK, nullptr, nullptr, nullptr, batchSize, t1, t2, numHeadsQ, numHeadsK, headDim, layoutQ,
         layoutK, maskMode, cmpRatio, metadata, &metadataWorkspaceSize, &metadataExecutor);
@@ -200,7 +200,7 @@ int main()
               LOG_PRINT("aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *metadataWorkspaceAddr = nullptr;
+    void* metadataWorkspaceAddr = nullptr;
     if (metadataWorkspaceSize > 0) {
         ret = aclrtMalloc(&metadataWorkspaceAddr, metadataWorkspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate metadata workspace failed. ERROR: %d\n", ret); return ret);
@@ -211,7 +211,7 @@ int main()
               return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     ret = aclnnDenseLightningIndexerKLLossGradGetWorkspaceSize(
         q, k, w, attnSoftmaxL1Norm, softmaxLse, cuSeqLensQ, cuSeqLensK, nullptr, nullptr, nullptr, metadata, layoutQ,
         layoutK, maskMode, cmpRatio, dq, dk, dw, softmaxOut, &workspaceSize, &executor);
@@ -219,7 +219,7 @@ int main()
               LOG_PRINT("aclnnDenseLightningIndexerKLLossGradGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

@@ -31,14 +31,14 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35FA;
 
-ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedQ(const FaTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedQ(const FaTilingInfo& faInfo)
 {
-    auto &sequsedQTensor = faInfo.opParamInfo.sequsedQ.tensor;
+    auto& sequsedQTensor = faInfo.opParamInfo.sequsedQ.tensor;
     if (sequsedQTensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::CompileTimeTensorDesc *sequsedQDesc = faInfo.opParamInfo.sequsedQ.desc;
+    const gert::CompileTimeTensorDesc* sequsedQDesc = faInfo.opParamInfo.sequsedQ.desc;
     OP_CHECK_IF(sequsedQDesc != nullptr && sequsedQDesc->GetDataType() != ge::DT_INT32,
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(faInfo.opName, "seqused_q",
                                                       DataTypeToSerialString(sequsedQDesc->GetDataType()).c_str(),
@@ -66,14 +66,14 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedQ(const FaTilingInfo 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedKv(const FaTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedKv(const FaTilingInfo& faInfo)
 {
-    auto &sequsedKvTensor = faInfo.opParamInfo.sequsedKv.tensor;
+    auto& sequsedKvTensor = faInfo.opParamInfo.sequsedKv.tensor;
     if (sequsedKvTensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::CompileTimeTensorDesc *sequsedKvDesc = faInfo.opParamInfo.sequsedKv.desc;
+    const gert::CompileTimeTensorDesc* sequsedKvDesc = faInfo.opParamInfo.sequsedKv.desc;
     OP_CHECK_IF(sequsedKvDesc != nullptr && sequsedKvDesc->GetDataType() != ge::DT_INT32,
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(faInfo.opName, "seqused_kv",
                                                       DataTypeToSerialString(sequsedKvDesc->GetDataType()).c_str(),
@@ -102,14 +102,14 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedKv(const FaTilingInfo
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensQ(const FaTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensQ(const FaTilingInfo& faInfo)
 {
-    auto &cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
+    auto& cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
     if (cuSeqlensQTensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::CompileTimeTensorDesc *cuSeqlensQDesc = faInfo.opParamInfo.cuSeqlensQ.desc;
+    const gert::CompileTimeTensorDesc* cuSeqlensQDesc = faInfo.opParamInfo.cuSeqlensQ.desc;
     OP_CHECK_IF(cuSeqlensQDesc != nullptr && cuSeqlensQDesc->GetDataType() != ge::DT_INT32,
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(faInfo.opName, "cu_seqlens_q",
                                                       DataTypeToSerialString(cuSeqlensQDesc->GetDataType()).c_str(),
@@ -138,14 +138,14 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensQ(const FaTilingInf
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensKv(const FaTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensKv(const FaTilingInfo& faInfo)
 {
-    auto &cuSeqlensKvTensor = faInfo.opParamInfo.cuSeqlensKv.tensor;
+    auto& cuSeqlensKvTensor = faInfo.opParamInfo.cuSeqlensKv.tensor;
     if (cuSeqlensKvTensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::CompileTimeTensorDesc *cuSeqlensKvDesc = faInfo.opParamInfo.cuSeqlensKv.desc;
+    const gert::CompileTimeTensorDesc* cuSeqlensKvDesc = faInfo.opParamInfo.cuSeqlensKv.desc;
     OP_CHECK_IF(cuSeqlensKvDesc != nullptr && cuSeqlensKvDesc->GetDataType() != ge::DT_INT32,
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(faInfo.opName, "cu_seqlens_kv",
                                                       DataTypeToSerialString(cuSeqlensKvDesc->GetDataType()).c_str(),
@@ -174,7 +174,7 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensKv(const FaTilingIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckSingleParaMaxSeqlenQ(const FaTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSingleParaMaxSeqlenQ(const FaTilingInfo& faInfo)
 {
     OP_CHECK_IF(faInfo.maxSeqQ < -1,
                 OP_LOGE_FOR_INVALID_VALUE(faInfo.opName, "max_seqlen_q", std::to_string(faInfo.maxSeqQ).c_str(),
@@ -183,7 +183,7 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaMaxSeqlenQ(const FaTilingInf
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckSingleParaMaxSeqlenKv(const FaTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSingleParaMaxSeqlenKv(const FaTilingInfo& faInfo)
 {
     OP_CHECK_IF(faInfo.maxSeqKv < -1,
                 OP_LOGE_FOR_INVALID_VALUE(faInfo.opName, "max_seqlen_kv", std::to_string(faInfo.maxSeqKv).c_str(),
@@ -192,7 +192,7 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaMaxSeqlenKv(const FaTilingIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckSinglePara(const FaTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckSinglePara(const FaTilingInfo& faInfo)
 {
     if (CheckSingleParaSequsedQ(faInfo) != ge::GRAPH_SUCCESS || CheckSingleParaSequsedKv(faInfo) != ge::GRAPH_SUCCESS ||
         CheckSingleParaCuSeqlensQ(faInfo) != ge::GRAPH_SUCCESS ||
@@ -204,17 +204,17 @@ ge::graphStatus ActualSeqLenChecker::CheckSinglePara(const FaTilingInfo &faInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckParaExistence(const FaTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckParaExistence(const FaTilingInfo& faInfo)
 {
     if (faInfo.pageAttentionFlag) {
-        auto &sequsedKvTensor = faInfo.opParamInfo.sequsedKv.tensor;
+        auto& sequsedKvTensor = faInfo.opParamInfo.sequsedKv.tensor;
         OP_CHECK_IF(sequsedKvTensor == nullptr,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                         faInfo.opName, "seqused_kv", "seqused_kv cannot be empty when paged attention is enabled"),
                     return ge::GRAPH_FAILED);
     }
 
-    auto &cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
+    auto& cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
     if (faInfo.qLayout == FaLayout::TND) {
         OP_CHECK_IF(cuSeqlensQTensor == nullptr,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "cu_seqlens_q",
@@ -228,7 +228,7 @@ ge::graphStatus ActualSeqLenChecker::CheckParaExistence(const FaTilingInfo &faIn
                     return ge::GRAPH_FAILED);
     }
 
-    auto &cuSeqlensKvTensor = faInfo.opParamInfo.cuSeqlensKv.tensor;
+    auto& cuSeqlensKvTensor = faInfo.opParamInfo.cuSeqlensKv.tensor;
     if (faInfo.kvLayout == FaLayout::TND) {
         OP_CHECK_IF(cuSeqlensKvTensor == nullptr,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "cu_seqlens_kv",
@@ -245,19 +245,19 @@ ge::graphStatus ActualSeqLenChecker::CheckParaExistence(const FaTilingInfo &faIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckFeature(const FaTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckFeature(const FaTilingInfo& faInfo)
 {
     (void)faInfo;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ActualSeqLenChecker::CheckMultiPara(const FaTilingInfo &faInfo)
+ge::graphStatus ActualSeqLenChecker::CheckMultiPara(const FaTilingInfo& faInfo)
 {
-    auto &cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
+    auto& cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
     if (cuSeqlensQTensor != nullptr && faInfo.qLayout == FaLayout::TND) {
     }
 
-    auto &cuSeqlensKvTensor = faInfo.opParamInfo.cuSeqlensKv.tensor;
+    auto& cuSeqlensKvTensor = faInfo.opParamInfo.cuSeqlensKv.tensor;
     if (cuSeqlensKvTensor != nullptr && faInfo.kvLayout == FaLayout::TND) {
     }
     return ge::GRAPH_SUCCESS;

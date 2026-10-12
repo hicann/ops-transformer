@@ -27,10 +27,11 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(ChunkGatedDeltaRule);
 
-const std::array<const aclTensor *, 2>
-ChunkGatedDeltaRule(const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *beta,
-                    const aclTensor *initialState, const aclTensor *actualSeqLengths, const aclTensor *gOptional,
-                    float scaleValue, aclOpExecutor *executor)
+const std::array<const aclTensor*, 2> ChunkGatedDeltaRule(const aclTensor* query, const aclTensor* key,
+                                                          const aclTensor* value, const aclTensor* beta,
+                                                          const aclTensor* initialState,
+                                                          const aclTensor* actualSeqLengths, const aclTensor* gOptional,
+                                                          float scaleValue, aclOpExecutor* executor)
 {
     L0_DFX(ChunkGatedDeltaRule, query, key, value, beta, initialState, actualSeqLengths, gOptional, scaleValue);
 

@@ -25,20 +25,20 @@ using namespace AscendC;
 using namespace Reg;
 
 template <typename T>
-__simd_vf__ void inline init_indexs_and_duplicate_vf(__ubuf__ uint8_t *index_nd2xz, __ubuf__ T *dup_dest)
+__simd_vf__ void inline init_indexs_and_duplicate_vf(__ubuf__ uint8_t* index_nd2xz, __ubuf__ T* dup_dest)
 {
     // Index
     RegTensor<uint8_t> index_reg, index_reg_1, index_reg_2;
     MaskReg mask_32 = CreateMask<int8_t, MaskPattern::VL32>();
 
-    Arange((RegTensor<int8_t> &)index_reg, 0);
+    Arange((RegTensor<int8_t>&)index_reg, 0);
 
     ShiftLefts(index_reg, index_reg, NUM_2, mask_32);
     for (uint16_t i = 0; i < 4; ++i) {
         Adds(index_reg_1, index_reg, i, mask_32);
         Adds(index_reg_2, index_reg_1, NUM_128, mask_32);
-        StoreAlign(index_nd2xz + indexSubLength * i, (RegTensor<uint8_t> &)index_reg_1, mask_32);
-        StoreAlign(index_nd2xz + indexSubLength * i + NUM_128, (RegTensor<uint8_t> &)index_reg_2, mask_32);
+        StoreAlign(index_nd2xz + indexSubLength * i, (RegTensor<uint8_t>&)index_reg_1, mask_32);
+        StoreAlign(index_nd2xz + indexSubLength * i + NUM_128, (RegTensor<uint8_t>&)index_reg_2, mask_32);
     }
 
     // Duplicate
@@ -51,12 +51,12 @@ __simd_vf__ void inline init_indexs_and_duplicate_vf(__ubuf__ uint8_t *index_nd2
 }
 
 template <typename T>
-__aicore__ inline void InitIndexesAndDuplicateCallVF(LocalTensor<uint8_t> &nd2nzIndexes,
-                                                     const LocalTensor<T> &localGlobalMaxUB)
+__aicore__ inline void InitIndexesAndDuplicateCallVF(LocalTensor<uint8_t>& nd2nzIndexes,
+                                                     const LocalTensor<T>& localGlobalMaxUB)
 {
-    __ubuf__ uint8_t *index_nd2xz = (__ubuf__ uint8_t *)nd2nzIndexes.GetPhyAddr();
+    __ubuf__ uint8_t* index_nd2xz = (__ubuf__ uint8_t*)nd2nzIndexes.GetPhyAddr();
 
-    __ubuf__ T *local_global_max_buf = (__ubuf__ T *)localGlobalMaxUB.GetPhyAddr();
+    __ubuf__ T* local_global_max_buf = (__ubuf__ T*)localGlobalMaxUB.GetPhyAddr();
 
     init_indexs_and_duplicate_vf<T>(index_nd2xz, local_global_max_buf);
 }

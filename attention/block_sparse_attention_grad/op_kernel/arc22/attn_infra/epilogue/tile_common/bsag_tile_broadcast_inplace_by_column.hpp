@@ -29,7 +29,7 @@ struct TileBroadcastInplaceByColumn {
 
     __aicore__ inline TileBroadcastInplaceByColumn() {}
 
-    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const &ubInOut)
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const& ubInOut)
     {
         constexpr uint32_t eleNumPerBlk =
             static_cast<uint32_t>(BYTE_PER_BLK) / static_cast<uint32_t>(sizeof(ElementCompute));

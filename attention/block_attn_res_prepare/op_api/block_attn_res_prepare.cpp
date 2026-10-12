@@ -25,7 +25,7 @@ using namespace op;
 namespace l0op {
 namespace {
 
-bool CheckNotNull(const void *pointer, const char *parameterName)
+bool CheckNotNull(const void* pointer, const char* parameterName)
 {
     if (pointer == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "%s must not be nullptr.", parameterName);
@@ -38,11 +38,11 @@ bool CheckNotNull(const void *pointer, const char *parameterName)
 
 OP_TYPE_REGISTER(BlockAttnResPrepare);
 
-const std::array<const aclTensor *, BLOCK_ATTN_RES_PREPARE_OUTPUT_NUM> BlockAttnResPrepare(const aclTensor *blockRes,
-                                                                                           const aclTensor *validBlocks,
-                                                                                           const aclTensor *pseudoQuery,
-                                                                                           double eps,
-                                                                                           aclOpExecutor *executor)
+const std::array<const aclTensor*, BLOCK_ATTN_RES_PREPARE_OUTPUT_NUM> BlockAttnResPrepare(const aclTensor* blockRes,
+                                                                                          const aclTensor* validBlocks,
+                                                                                          const aclTensor* pseudoQuery,
+                                                                                          double eps,
+                                                                                          aclOpExecutor* executor)
 {
     L0_DFX(BlockAttnResPrepare, blockRes, validBlocks, pseudoQuery, eps);
     if (!CheckNotNull(blockRes, "blockRes") || !CheckNotNull(validBlocks, "validBlocks") ||

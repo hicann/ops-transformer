@@ -32,7 +32,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -41,7 +41,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<float> resultData(size, 0);
@@ -53,7 +53,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -70,8 +70,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -124,25 +124,25 @@ int main()
     std::vector<int64_t> softmaxMaxShape = {T1, N1, 8};
     std::vector<int64_t> softmaxSumShape = {T1, N1, 8};
 
-    void *qDeviceAddr = nullptr;
-    void *kDeviceAddr = nullptr;
-    void *vDeviceAddr = nullptr;
-    void *attenmaskDeviceAddr = nullptr;
-    void *attentionOutDeviceAddr = nullptr;
-    void *softmaxMaxDeviceAddr = nullptr;
-    void *softmaxSumDeviceAddr = nullptr;
+    void* qDeviceAddr = nullptr;
+    void* kDeviceAddr = nullptr;
+    void* vDeviceAddr = nullptr;
+    void* attenmaskDeviceAddr = nullptr;
+    void* attentionOutDeviceAddr = nullptr;
+    void* softmaxMaxDeviceAddr = nullptr;
+    void* softmaxSumDeviceAddr = nullptr;
 
-    aclTensor *q = nullptr;
-    aclTensor *k = nullptr;
-    aclTensor *v = nullptr;
-    aclTensor *pse = nullptr;
-    aclTensor *dropMask = nullptr;
-    aclTensor *padding = nullptr;
-    aclTensor *attenmask = nullptr;
-    aclTensor *attentionOut = nullptr;
-    aclTensor *softmaxMax = nullptr;
-    aclTensor *softmaxSum = nullptr;
-    aclTensor *softmaxOut = nullptr;
+    aclTensor* q = nullptr;
+    aclTensor* k = nullptr;
+    aclTensor* v = nullptr;
+    aclTensor* pse = nullptr;
+    aclTensor* dropMask = nullptr;
+    aclTensor* padding = nullptr;
+    aclTensor* attenmask = nullptr;
+    aclTensor* attentionOut = nullptr;
+    aclTensor* softmaxMax = nullptr;
+    aclTensor* softmaxSum = nullptr;
+    aclTensor* softmaxOut = nullptr;
 
     std::vector<float> qHostData(q_size, 1.0);
     std::vector<float> kHostData(kv_size, 1.0);
@@ -171,11 +171,11 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<int64_t> prefixOp = {0};
-    aclIntArray *prefix = aclCreateIntArray(prefixOp.data(), 1);
+    aclIntArray* prefix = aclCreateIntArray(prefixOp.data(), 1);
     std::vector<int64_t> acSeqQLenOp = {256};
     std::vector<int64_t> acSeqKvLenOp = {256};
-    aclIntArray *acSeqQLen = aclCreateIntArray(acSeqQLenOp.data(), acSeqQLenOp.size());
-    aclIntArray *acSeqKvLen = aclCreateIntArray(acSeqKvLenOp.data(), acSeqKvLenOp.size());
+    aclIntArray* acSeqQLen = aclCreateIntArray(acSeqQLenOp.data(), acSeqQLenOp.size());
+    aclIntArray* acSeqKvLen = aclCreateIntArray(acSeqKvLenOp.data(), acSeqKvLenOp.size());
     double scaleValue = 1.0 / sqrt(128);
     double keepProb = 1.0;
     int64_t preTokens = INT32_MAX;
@@ -189,7 +189,7 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 调用aclnnFlashAttentionVarLenScoreV4第一段接口
     ret = aclnnFlashAttentionVarLenScoreV4GetWorkspaceSize(
@@ -201,7 +201,7 @@ int main()
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

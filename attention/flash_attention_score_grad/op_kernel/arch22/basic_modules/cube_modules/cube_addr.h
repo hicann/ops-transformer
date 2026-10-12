@@ -19,8 +19,8 @@
 namespace CUBE_ADDR {
 class CubeAddr {
 public:
-    struct CubeAddrInfo *globalCubeAddr;
-    struct CubeAddrInfo *globalCube3Addr;
+    struct CubeAddrInfo* globalCubeAddr;
+    struct CubeAddrInfo* globalCube3Addr;
     int32_t s1BlockNum;
     int32_t s2BlockNum;
     int32_t s2TailLength;
@@ -40,20 +40,20 @@ public:
         }
     }
 
-    __aicore__ int64_t getSeqLen(int32_t i, __gm__ uint8_t *seq_Len)
+    __aicore__ int64_t getSeqLen(int32_t i, __gm__ uint8_t* seq_Len)
     {
         int64_t actualSeqlen;
         if (i == 0) {
-            actualSeqlen = ((__gm__ int64_t *)seq_Len)[0];
+            actualSeqlen = ((__gm__ int64_t*)seq_Len)[0];
         } else {
-            actualSeqlen = ((__gm__ int64_t *)seq_Len)[i] - ((__gm__ int64_t *)seq_Len)[i - 1];
+            actualSeqlen = ((__gm__ int64_t*)seq_Len)[i] - ((__gm__ int64_t*)seq_Len)[i - 1];
         }
         return actualSeqlen;
     }
 
-    __aicore__ int64_t getTotalLen(int32_t i, __gm__ uint8_t *seq_Len)
+    __aicore__ int64_t getTotalLen(int32_t i, __gm__ uint8_t* seq_Len)
     {
-        int64_t actualTotalSeqlen = ((__gm__ int64_t *)seq_Len)[i];
+        int64_t actualTotalSeqlen = ((__gm__ int64_t*)seq_Len)[i];
         return actualTotalSeqlen;
     }
 
@@ -209,7 +209,7 @@ public:
     }
 
     // 分块主逻辑，与cube侧相同
-    __aicore__ int32_t addr_mapping(struct CubeAddrInfo *cubeAddrInfo, struct CubeAddrInfo *cube3AddrInfo)
+    __aicore__ int32_t addr_mapping(struct CubeAddrInfo* cubeAddrInfo, struct CubeAddrInfo* cube3AddrInfo)
     {
         globalCubeAddr = cubeAddrInfo;
         globalCube3Addr = cube3AddrInfo;
@@ -357,7 +357,7 @@ public:
     }
 
     __aicore__ void init(int32_t batchSize, int32_t heads, int32_t gin, int32_t headDims, int32_t core_index,
-                         __gm__ uint8_t *actual_seq_qlen, __gm__ uint8_t *actual_seq_kvlen, int32_t cubeNum,
+                         __gm__ uint8_t* actual_seq_qlen, __gm__ uint8_t* actual_seq_kvlen, int32_t cubeNum,
                          int32_t sparseMode)
     {
         sparseType = sparseMode;
@@ -425,8 +425,8 @@ private:
     constexpr static int32_t ROW_2 = 2;
     constexpr static int32_t ROW_4 = 4;
 
-    __gm__ uint8_t *seqLenQ;
-    __gm__ uint8_t *seqLenK;
+    __gm__ uint8_t* seqLenQ;
+    __gm__ uint8_t* seqLenK;
 
     int32_t cubeIdx;
     int32_t lengths[3] = {4, 2, 1};

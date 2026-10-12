@@ -24,20 +24,20 @@ constexpr uint32_t KEY_INDEX = 1;
 constexpr uint32_t ATTR_LAYOUT_INDEX = 0;
 constexpr uint32_t SOFTMAX_LSE_INDEX = 0;
 
-static ge::graphStatus InferShapeDenseLightningIndexerSoftmaxLseV2(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeDenseLightningIndexerSoftmaxLseV2(gert::InferShapeContext* context)
 {
-    const gert::Shape *queryShape = context->GetInputShape(QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(KEY_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
 
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const char *inputLayoutPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_INDEX);
+    const char* inputLayoutPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutPtr);
     std::string inputLayoutStr = std::string(inputLayoutPtr);
 
-    gert::Shape *softmaxLseShape = context->GetOutputShape(SOFTMAX_LSE_INDEX);
+    gert::Shape* softmaxLseShape = context->GetOutputShape(SOFTMAX_LSE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxLseShape);
 
     if (inputLayoutStr == "BSND") {
@@ -54,7 +54,7 @@ static ge::graphStatus InferShapeDenseLightningIndexerSoftmaxLseV2(gert::InferSh
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeDenseLightningIndexerSoftmaxLseV2(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeDenseLightningIndexerSoftmaxLseV2(gert::InferDataTypeContext* context)
 {
     context->SetOutputDataType(SOFTMAX_LSE_INDEX, ge::DT_FLOAT);
     return GRAPH_SUCCESS;

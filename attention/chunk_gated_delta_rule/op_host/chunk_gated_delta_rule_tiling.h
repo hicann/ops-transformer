@@ -32,12 +32,12 @@ struct ChunkGatedDeltaRuleCompileInfo {
 struct ChunkGatedDeltaRuleInfo {
 public:
     int64_t usedCoreNum = 0;
-    const char *opName = "ChunkGatedDeltaRule";
+    const char* opName = "ChunkGatedDeltaRule";
 };
 
 class ChunkGatedDeltaRuleTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit ChunkGatedDeltaRuleTiling(gert::TilingContext *context)
+    explicit ChunkGatedDeltaRuleTiling(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {
         InitCompileInfo();
@@ -85,13 +85,13 @@ protected:
     ge::graphStatus AnalyzeFormat();
     ge::graphStatus DoMatmulTiling();
     ge::graphStatus SetScheduleConfig();
-    ge::graphStatus CheckExpectedShapes(const gert::Shape &queryShape, const gert::Shape &keyShape,
-                                        const gert::Shape &valueShape, const gert::Shape &betaShape,
-                                        const gert::Shape &stateShape, const gert::Shape &actualSeqLengthsShape,
-                                        const gert::Shape &outShape, const gert::Shape &finalStateShape,
-                                        const gert::Shape *gShape);
-    bool CheckDim(const gert::Shape &shape, const size_t dim, const std::string &dimDesc);
-    bool CheckFormat(const gert::CompileTimeTensorDesc *desc, const std::string &name);
+    ge::graphStatus CheckExpectedShapes(const gert::Shape& queryShape, const gert::Shape& keyShape,
+                                        const gert::Shape& valueShape, const gert::Shape& betaShape,
+                                        const gert::Shape& stateShape, const gert::Shape& actualSeqLengthsShape,
+                                        const gert::Shape& outShape, const gert::Shape& finalStateShape,
+                                        const gert::Shape* gShape);
+    bool CheckDim(const gert::Shape& shape, const size_t dim, const std::string& dimDesc);
+    bool CheckFormat(const gert::CompileTimeTensorDesc* desc, const std::string& name);
 
     ChunkGatedDeltaRuleCompileInfo compileInfo_;
     ChunkGatedDeltaRule::ChunkGatedDeltaRuleTilingData tilingData_;

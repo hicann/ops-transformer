@@ -13,7 +13,7 @@
 using namespace ge;
 
 namespace ops {
-static ge::graphStatus InferShapeFlashAttnGrad(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeFlashAttnGrad(gert::InferShapeContext* context)
 {
     auto qShape = context->GetInputShape(0);
     auto kShape = context->GetInputShape(1);
@@ -29,7 +29,7 @@ static ge::graphStatus InferShapeFlashAttnGrad(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDtypeFlashAttnGrad(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDtypeFlashAttnGrad(gert::InferDataTypeContext* context)
 {
     auto qDtype = context->GetInputDataType(0);
     context->SetOutputDataType(0, qDtype);

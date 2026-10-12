@@ -26,7 +26,7 @@ template <typename BSA_TYPE_T>
 __aicore__ inline void RunBsagByNonZeroIndex(
     GM_ADDR dout, GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR out, GM_ADDR softmaxLse, GM_ADDR blockSparseMask,
     GM_ADDR blockShape, GM_ADDR attentionMask, GM_ADDR actualSeqLengths, GM_ADDR actualSeqLengthsKv, GM_ADDR dq,
-    GM_ADDR dk, GM_ADDR dv, GM_ADDR user, const BlockSparseAttentionGradTilingDataArch35 *tilingDataPtr, TPipe *tPipe)
+    GM_ADDR dk, GM_ADDR dv, GM_ADDR user, const BlockSparseAttentionGradTilingDataArch35* tilingDataPtr, TPipe* tPipe)
 {
     if ASCEND_IS_AIV {
         NonZero::NonZeroBigMaskDim1<int8_t, int32_t> indexOp;
@@ -52,17 +52,17 @@ __aicore__ inline void RunBsagByNonZeroIndex(
  * 使用__global__和__aicore__修饰符标识为全局kernel函数
  */
 extern "C" __global__ __aicore__ void block_sparse_attention_grad(
-    __gm__ uint8_t *dout, __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *out,
-    __gm__ uint8_t *softmaxLse, __gm__ uint8_t *blockSparseMask, __gm__ uint8_t *attentionMask,
-    __gm__ uint8_t *blockShape, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKv,
-    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+    __gm__ uint8_t* dout, __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* out,
+    __gm__ uint8_t* softmaxLse, __gm__ uint8_t* blockSparseMask, __gm__ uint8_t* attentionMask,
+    __gm__ uint8_t* blockShape, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKv,
+    __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
-    __gm__ uint8_t *user = AscendC::GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = AscendC::GetUserWorkspace(workspace);
 
 #if __CCE_AICORE__ == 310
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     GET_TILING_DATA_WITH_STRUCT(BlockSparseAttentionGradTilingDataArch35, tiling_data_in, tiling);
-    const BlockSparseAttentionGradTilingDataArch35 *__restrict tilingDataPtrArch35 = &tiling_data_in;
+    const BlockSparseAttentionGradTilingDataArch35* __restrict tilingDataPtrArch35 = &tiling_data_in;
     using ARC35_TILING_CLASS = BlockSparseAttentionGradTilingDataArch35;
     TPipe tPipe;
     if (TILING_KEY_IS(1000)) {
@@ -128,8 +128,8 @@ extern "C" __global__ __aicore__ void block_sparse_attention_grad(
     }
 
 #else
-    __gm__ BlockSparseAttentionGradTilingData *tilingDataPtr =
-        reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData *>(tiling);
+    __gm__ BlockSparseAttentionGradTilingData* tilingDataPtr =
+        reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData*>(tiling);
     if (TILING_KEY_IS(0)) {
         BSA::BlockSparseAttentionGradInfer<half, 0>(dout, query, key, value, out, softmaxLse, blockSparseMask,
                                                     blockShape, attentionMask, actualSeqLengths, actualSeqLengthsKv, dq,

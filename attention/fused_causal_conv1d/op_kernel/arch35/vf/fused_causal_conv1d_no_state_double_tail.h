@@ -23,7 +23,7 @@ using namespace AscendC;
 
 ////残差连接模式，不含尾行
 template <typename T>
-__simd_vf__ void Conv1dNoStateDoubleTailConNoResVF(__ubuf__ T *xAddr, __ubuf__ T *weightAddr, __ubuf__ T *yAddr,
+__simd_vf__ void Conv1dNoStateDoubleTailConNoResVF(__ubuf__ T* xAddr, __ubuf__ T* weightAddr, __ubuf__ T* yAddr,
                                                    uint32_t xLoopNum, uint32_t dimLen)
 {
     Reg::RegTensor<float> weight11B32, weight12B32, weight13B32, x11B32, x12B32, x13B32, mul11B32, mul12B32, mul13B32,
@@ -226,7 +226,7 @@ __simd_vf__ void Conv1dNoStateDoubleTailConNoResVF(__ubuf__ T *xAddr, __ubuf__ T
 
 // 残差连接模式，含尾行
 template <typename T>
-__simd_vf__ void Conv1dNoStateDoubleTailConResVF(__ubuf__ T *xAddr, __ubuf__ T *weightAddr, __ubuf__ T *yAddr,
+__simd_vf__ void Conv1dNoStateDoubleTailConResVF(__ubuf__ T* xAddr, __ubuf__ T* weightAddr, __ubuf__ T* yAddr,
                                                  uint32_t xLoopNum, uint32_t dimLen)
 {
     Reg::RegTensor<float> weight11B32, weight12B32, weight13B32, x11B32, x12B32, x13B32, mul11B32, mul12B32, mul13B32,
@@ -502,7 +502,7 @@ __simd_vf__ void Conv1dNoStateDoubleTailConResVF(__ubuf__ T *xAddr, __ubuf__ T *
 
 // 非残差连接模式，不含尾行
 template <typename T>
-__simd_vf__ void Conv1dNoStateDoubleTailNoConNoResVF(__ubuf__ T *xAddr, __ubuf__ T *weightAddr, __ubuf__ T *yAddr,
+__simd_vf__ void Conv1dNoStateDoubleTailNoConNoResVF(__ubuf__ T* xAddr, __ubuf__ T* weightAddr, __ubuf__ T* yAddr,
                                                      uint32_t xLoopNum, uint32_t dimLen)
 {
     Reg::RegTensor<float> weight11B32, weight12B32, weight13B32, x11B32, x12B32, x13B32, mul11B32, mul12B32, mul13B32,
@@ -697,7 +697,7 @@ __simd_vf__ void Conv1dNoStateDoubleTailNoConNoResVF(__ubuf__ T *xAddr, __ubuf__
 
 // 非残差连接模式，含尾行
 template <typename T>
-__simd_vf__ void Conv1dNoStateDoubleTailNoConResVF(__ubuf__ T *xAddr, __ubuf__ T *weightAddr, __ubuf__ T *yAddr,
+__simd_vf__ void Conv1dNoStateDoubleTailNoConResVF(__ubuf__ T* xAddr, __ubuf__ T* weightAddr, __ubuf__ T* yAddr,
                                                    uint32_t xLoopNum, uint32_t dimLen)
 {
     Reg::RegTensor<float> weight11B32, weight12B32, weight13B32, x11B32, x12B32, x13B32, mul11B32, mul12B32, mul13B32,
@@ -960,12 +960,12 @@ __simd_vf__ void Conv1dNoStateDoubleTailNoConResVF(__ubuf__ T *xAddr, __ubuf__ T
 }
 
 template <typename T>
-__aicore__ inline void Conv1dNoStateDoubleTail(LocalTensor<T> &xUb, LocalTensor<T> &weightUb, LocalTensor<T> &yUb,
+__aicore__ inline void Conv1dNoStateDoubleTail(LocalTensor<T>& xUb, LocalTensor<T>& weightUb, LocalTensor<T>& yUb,
                                                uint32_t xSLen, uint32_t dimLen, int32_t isResidualConnection)
 {
-    __ubuf__ T *xAddr = (__ubuf__ T *)xUb.GetPhyAddr();
-    __ubuf__ T *weightAddr = (__ubuf__ T *)weightUb.GetPhyAddr();
-    __ubuf__ T *yAddr = (__ubuf__ T *)yUb.GetPhyAddr();
+    __ubuf__ T* xAddr = (__ubuf__ T*)xUb.GetPhyAddr();
+    __ubuf__ T* weightAddr = (__ubuf__ T*)weightUb.GetPhyAddr();
+    __ubuf__ T* yAddr = (__ubuf__ T*)yUb.GetPhyAddr();
     uint32_t xLoopNum = xSLen / 2;
     uint8_t xLoopRem = xSLen % 2;
     if (isResidualConnection == 1) {

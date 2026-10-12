@@ -48,8 +48,8 @@ using namespace AttentionCommon;
 
 namespace FlashAttnKernel {
 template <bool first, bool last>
-__simd_vf__ inline void MlaStreamUpdate(__ubuf__ float *dst, __ubuf__ float *cur, __ubuf__ float *exp,
-                                        __ubuf__ float *sum, uint16_t rows)
+__simd_vf__ inline void MlaStreamUpdate(__ubuf__ float* dst, __ubuf__ float* cur, __ubuf__ float* exp,
+                                        __ubuf__ float* sum, uint16_t rows)
 {
     using namespace AscendC;
     using namespace AscendC::Reg;
@@ -156,7 +156,7 @@ public:
     using pseShiftType = INPUT_T;
 
     static constexpr T BOOL_ATTEN_MASK_SCALAR_VALUE = -1000000000000.0; // 用于mask为bool类型
-    uint32_t negativeIntScalar = *((uint32_t *)&BOOL_ATTEN_MASK_SCALAR_VALUE);
+    uint32_t negativeIntScalar = *((uint32_t*)&BOOL_ATTEN_MASK_SCALAR_VALUE);
 
     using attenMaskGmType = typename std::conditional<hasAtten, GlobalTensor<uint8_t>, int8_t>::type;
     using flashdecodeGmType = typename std::conditional<FLASH_DECODE, GlobalTensor<float>, int8_t>::type;
@@ -214,7 +214,7 @@ public:
     GlobalTensor<float> softmaxLseGm;
     // seq-lens INT32；q 侧 ACCUM 带首零头（cu_seqlens_q [b+1]），ACTLEN_T=uint32_t；
     // parser 所有权在 kernel 侧 FlashMlaSeqLensTool，本 block 只读引用
-    SeqLensToolType &seqLensTool_;
+    SeqLensToolType& seqLensTool_;
 
     attenMaskGmType attenMaskGmInt;
 
@@ -245,40 +245,39 @@ public:
     LocalTensor<uint8_t> vec1ApiTmpBuf_;
     LocalTensor<uint8_t> l1PBuffers_;
 
-    const ConstInfoNoQuant &constInfo;
-    T negativeFloatScalar = *((const T *)&NEGATIVE_MIN_VALUE_FP32);
+    const ConstInfoNoQuant& constInfo;
+    T negativeFloatScalar = *((const T*)&NEGATIVE_MIN_VALUE_FP32);
     int64_t bmm2SubBlockOffset = 0;
     int64_t vec2SubBlockOffset = 0;
 
     // ==================== Functions ======================
-    __aicore__ inline FlashMlaWithKvcacheNoQuantMlaBlockVec(ConstInfoNoQuant &constInfo, SeqLensToolType &seqLensTool)
+    __aicore__ inline FlashMlaWithKvcacheNoQuantMlaBlockVec(ConstInfoNoQuant& constInfo, SeqLensToolType& seqLensTool)
         : constInfo(constInfo),
           seqLensTool_(seqLensTool){};
 
-    __aicore__ inline void InitVecBlock(__gm__ uint8_t *attenMask, __gm__ uint8_t *softmaxLse,
-                                        __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace)
+    __aicore__ inline void InitVecBlock(__gm__ uint8_t* attenMask, __gm__ uint8_t* softmaxLse,
+                                        __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace)
     {
         InitVecInput(attenMask, softmaxLse, attentionOut, workspace);
     }
 
-    __aicore__ inline void InitVecInput(__gm__ uint8_t *attenMask, __gm__ uint8_t *softmaxLse,
-                                        __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace)
+    __aicore__ inline void InitVecInput(__gm__ uint8_t* attenMask, __gm__ uint8_t* softmaxLse,
+                                        __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace)
     {
-        this->attentionOutGm.SetGlobalBuffer((__gm__ OUTPUT_T *)attentionOut);
+        this->attentionOutGm.SetGlobalBuffer((__gm__ OUTPUT_T*)attentionOut);
 
         if (unlikely(constInfo.isSoftmaxLseEnable)) {
-            softmaxLseGm.SetGlobalBuffer((__gm__ float *)softmaxLse);
+            softmaxLseGm.SetGlobalBuffer((__gm__ float*)softmaxLse);
         }
 
         if constexpr (hasAtten) {
-            attenMaskGmInt.SetGlobalBuffer((__gm__ uint8_t *)attenMask);
+            attenMaskGmInt.SetGlobalBuffer((__gm__ uint8_t*)attenMask);
         }
 
         if constexpr (FLASH_DECODE) {
-            accumOutGm.SetGlobalBuffer((__gm__ float *)workspace);
-            softmaxFDSumGm.SetGlobalBuffer((__gm__ float *)workspace + constInfo.accumOutSize);
-            softmaxFDMaxGm.SetGlobalBuffer((__gm__ float *)workspace + constInfo.accumOutSize +
-                                           constInfo.logSumExpSize);
+            accumOutGm.SetGlobalBuffer((__gm__ float*)workspace);
+            softmaxFDSumGm.SetGlobalBuffer((__gm__ float*)workspace + constInfo.accumOutSize);
+            softmaxFDMaxGm.SetGlobalBuffer((__gm__ float*)workspace + constInfo.accumOutSize + constInfo.logSumExpSize);
         }
         InitAttenOutBuffer();
     }
@@ -367,8 +366,8 @@ public:
         }
     }
 
-    __aicore__ inline void SoftmaxDataCopyOut(FlashMlaWithKvcacheRunInfoX runInfo, LocalTensor<float> &sumUb,
-                                              LocalTensor<float> &maxUb)
+    __aicore__ inline void SoftmaxDataCopyOut(FlashMlaWithKvcacheRunInfoX runInfo, LocalTensor<float>& sumUb,
+                                              LocalTensor<float>& maxUb)
     {
         if constexpr (FLASH_DECODE) {
             if (runInfo.isS2SplitCore) {
@@ -387,8 +386,8 @@ public:
         }
     }
 
-    __aicore__ inline void SoftmaxLseCopyOut(LocalTensor<float> &softmaxSumTmp, LocalTensor<float> &softmaxMaxTmp,
-                                             FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void SoftmaxLseCopyOut(LocalTensor<float>& softmaxSumTmp, LocalTensor<float>& softmaxMaxTmp,
+                                             FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         if (unlikely(runInfo.actVecMSize == 0)) {
             return;
@@ -432,8 +431,8 @@ public:
     }
 
     template <bool APPLY_MASK>
-    __aicore__ inline void ProcessSoftmax(LocalTensor<INPUT_T> &stage1CastTensor, LocalTensor<T> &mmRes,
-                                          LocalTensor<uint8_t> &attenMaskUb, const FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void ProcessSoftmax(LocalTensor<INPUT_T>& stage1CastTensor, LocalTensor<T>& mmRes,
+                                          LocalTensor<uint8_t>& attenMaskUb, const FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         LocalTensor<pseShiftType> pseUb;
         LocalTensor<uint8_t> dropMaskUb;
@@ -486,7 +485,7 @@ public:
         }
     }
 
-    __aicore__ inline void ProcessVec1Nd(LocalTensor<INPUT_T> &pL1Tensor, LocalTensor<T> &mm1ResUbTensor,
+    __aicore__ inline void ProcessVec1Nd(LocalTensor<INPUT_T>& pL1Tensor, LocalTensor<T>& mm1ResUbTensor,
                                          FlashMlaWithKvcacheRunInfoX runInfo, bool useMask)
     {
         LocalTensor<uint8_t> attenMaskUb;
@@ -562,27 +561,23 @@ public:
             if (runInfo.actVecMSize != 0) {
                 if (runInfo.isFirstS2Loop) {
                     if (runInfo.isLastS2Loop) {
-                        MlaStreamUpdate<true, true>((__ubuf__ float *)dst.GetPhyAddr() + n * 256U,
-                                                    (__ubuf__ float *)cur.GetPhyAddr(),
-                                                    (__ubuf__ float *)exp.GetPhyAddr(),
-                                                    (__ubuf__ float *)sum.GetPhyAddr(), runInfo.actVecMSize);
+                        MlaStreamUpdate<true, true>(
+                            (__ubuf__ float*)dst.GetPhyAddr() + n * 256U, (__ubuf__ float*)cur.GetPhyAddr(),
+                            (__ubuf__ float*)exp.GetPhyAddr(), (__ubuf__ float*)sum.GetPhyAddr(), runInfo.actVecMSize);
                     } else {
-                        MlaStreamUpdate<true, false>((__ubuf__ float *)dst.GetPhyAddr() + n * 256U,
-                                                     (__ubuf__ float *)cur.GetPhyAddr(),
-                                                     (__ubuf__ float *)exp.GetPhyAddr(),
-                                                     (__ubuf__ float *)sum.GetPhyAddr(), runInfo.actVecMSize);
+                        MlaStreamUpdate<true, false>(
+                            (__ubuf__ float*)dst.GetPhyAddr() + n * 256U, (__ubuf__ float*)cur.GetPhyAddr(),
+                            (__ubuf__ float*)exp.GetPhyAddr(), (__ubuf__ float*)sum.GetPhyAddr(), runInfo.actVecMSize);
                     }
                 } else {
                     if (runInfo.isLastS2Loop) {
-                        MlaStreamUpdate<false, true>((__ubuf__ float *)dst.GetPhyAddr() + n * 256U,
-                                                     (__ubuf__ float *)cur.GetPhyAddr(),
-                                                     (__ubuf__ float *)exp.GetPhyAddr(),
-                                                     (__ubuf__ float *)sum.GetPhyAddr(), runInfo.actVecMSize);
+                        MlaStreamUpdate<false, true>(
+                            (__ubuf__ float*)dst.GetPhyAddr() + n * 256U, (__ubuf__ float*)cur.GetPhyAddr(),
+                            (__ubuf__ float*)exp.GetPhyAddr(), (__ubuf__ float*)sum.GetPhyAddr(), runInfo.actVecMSize);
                     } else {
-                        MlaStreamUpdate<false, false>((__ubuf__ float *)dst.GetPhyAddr() + n * 256U,
-                                                      (__ubuf__ float *)cur.GetPhyAddr(),
-                                                      (__ubuf__ float *)exp.GetPhyAddr(),
-                                                      (__ubuf__ float *)sum.GetPhyAddr(), runInfo.actVecMSize);
+                        MlaStreamUpdate<false, false>(
+                            (__ubuf__ float*)dst.GetPhyAddr() + n * 256U, (__ubuf__ float*)cur.GetPhyAddr(),
+                            (__ubuf__ float*)exp.GetPhyAddr(), (__ubuf__ float*)sum.GetPhyAddr(), runInfo.actVecMSize);
                     }
                 }
             }
@@ -594,7 +589,7 @@ public:
         }
     }
 
-    __aicore__ inline void CopyOutAttentionOut(FlashMlaWithKvcacheRunInfoX runInfo, LocalTensor<T> &vec2ResUb,
+    __aicore__ inline void CopyOutAttentionOut(FlashMlaWithKvcacheRunInfoX runInfo, LocalTensor<T>& vec2ResUb,
                                                uint32_t mStartVec, uint32_t mDealSize)
     {
         if constexpr (FLASH_DECODE) {
@@ -610,7 +605,7 @@ public:
         }
     }
 
-    __aicore__ inline void Bmm2ResCastAndCopyOut(FlashMlaWithKvcacheRunInfoX &runInfo, LocalTensor<T> &vec2ResUb,
+    __aicore__ inline void Bmm2ResCastAndCopyOut(FlashMlaWithKvcacheRunInfoX& runInfo, LocalTensor<T>& vec2ResUb,
                                                  uint32_t mStartVec, uint32_t mDealSize)
     {
         LocalTensor<OUTPUT_T> attenOut;
@@ -627,7 +622,7 @@ public:
         Mutex::Unlock<PIPE_MTE3>(UB_OUT_VEC2_RES_EVENT0);
     }
 
-    __aicore__ inline bool CalcBlockNeedRowInvalid(FlashMlaWithKvcacheRunInfoX &runInfo, int64_t s1FirstValidToken,
+    __aicore__ inline bool CalcBlockNeedRowInvalid(FlashMlaWithKvcacheRunInfoX& runInfo, int64_t s1FirstValidToken,
                                                    int64_t s1LastValidToken)
     {
         int32_t vecMStartIdx = runInfo.gS1Idx + runInfo.vecMbaseIdx;
@@ -657,8 +652,8 @@ public:
     }
 
     template <typename VEC2_RES_T>
-    __aicore__ inline void RowInvalid(LocalTensor<VEC2_RES_T> &vec2ResUb, int64_t mStartVec, int64_t mDealSize,
-                                      FlashMlaWithKvcacheRunInfoX &runInfo, int64_t dSizeAligned64)
+    __aicore__ inline void RowInvalid(LocalTensor<VEC2_RES_T>& vec2ResUb, int64_t mStartVec, int64_t mDealSize,
+                                      FlashMlaWithKvcacheRunInfoX& runInfo, int64_t dSizeAligned64)
     {
         if constexpr (hasAtten) {
             int64_t s1FirstValidToken =
@@ -685,8 +680,8 @@ public:
         }
     }
 
-    __aicore__ inline void Bmm2DataCopyOutTrans(const FlashMlaWithKvcacheRunInfoX &info,
-                                                LocalTensor<OUTPUT_T> &attenOutUb, uint32_t vecMIdx,
+    __aicore__ inline void Bmm2DataCopyOutTrans(const FlashMlaWithKvcacheRunInfoX& info,
+                                                LocalTensor<OUTPUT_T>& attenOutUb, uint32_t vecMIdx,
                                                 uint32_t dealRowCount)
     {
         GmCoordGs1Merge gmCoord{.bIdx = info.bIdx,
@@ -700,13 +695,13 @@ public:
         CopyAttentionOut(ubTensor, gmCoord);
     }
 
-    __aicore__ inline void CopyAttentionOut(FaUbTensor<OUTPUT_T, false> &ubTensor, GmCoordGs1Merge &gmCoord)
+    __aicore__ inline void CopyAttentionOut(FaUbTensor<OUTPUT_T, false>& ubTensor, GmCoordGs1Merge& gmCoord)
     {
         copyAttenOutUbToGm_(outGmTensor_, ubTensor, gmCoord);
     }
 
-    __aicore__ inline void BroadCastAndCopyOut(const FlashMlaWithKvcacheRunInfoX &runInfo, LocalTensor<float> &sumUb,
-                                               LocalTensor<float> &maxUb, int64_t gmOffset, int64_t calculateSize)
+    __aicore__ inline void BroadCastAndCopyOut(const FlashMlaWithKvcacheRunInfoX& runInfo, LocalTensor<float>& sumUb,
+                                               LocalTensor<float>& maxUb, int64_t gmOffset, int64_t calculateSize)
     {
         // Copy sum to gm
         Mutex::Lock<PIPE_V>(UB_BRDCST_SUM_EVENT);
@@ -727,8 +722,8 @@ public:
         Mutex::Unlock<PIPE_MTE3>(UB_BRDCST_MAX_EVENT);
     }
 
-    __aicore__ inline void ComputeLogSumExpAndCopyToGm(const FlashMlaWithKvcacheRunInfoX &runInfo,
-                                                       LocalTensor<float> &sumUb, LocalTensor<float> &maxUb)
+    __aicore__ inline void ComputeLogSumExpAndCopyToGm(const FlashMlaWithKvcacheRunInfoX& runInfo,
+                                                       LocalTensor<float>& sumUb, LocalTensor<float>& maxUb)
     {
         if (unlikely(runInfo.actVecMSize == 0)) {
             return;
@@ -739,7 +734,7 @@ public:
         BroadCastAndCopyOut(runInfo, sumUb, maxUb, gmOffset, calculateSize);
     }
 
-    __aicore__ inline void Bmm2ResForFDCopyOut(const FlashMlaWithKvcacheRunInfoX &runInfo, LocalTensor<T> &vec2ResUb,
+    __aicore__ inline void Bmm2ResForFDCopyOut(const FlashMlaWithKvcacheRunInfoX& runInfo, LocalTensor<T>& vec2ResUb,
                                                uint32_t mStartVec, uint32_t mDealSize)
     {
         int64_t dSizeAligned64 = (int64_t)FA_T::dVBaseSize;
@@ -833,7 +828,7 @@ public:
 
     // Return false for a fully visible tile without touching mask buffers or their synchronization.
     __aicore__ inline bool AttenMaskCopyIn(LocalTensor<uint8_t> attenMaskUb, uint32_t vecMIdx, uint32_t mDealSize,
-                                           FlashMlaWithKvcacheRunInfoX &runInfo)
+                                           FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         MaskInfo maskInfo;
         maskInfo.gs1StartIdx = runInfo.gS1Idx + runInfo.vecMbaseIdx + vecMIdx;
@@ -898,8 +893,8 @@ public:
     using OUT_T = OUTPUT_T;
     using ConstInfoNoQuant = ConstInfo_t<FlashMlaWithKvcacheKernelType::NO_QUANT>;
     template <typename FlashMlaSeqLensToolT>
-    __aicore__ inline FlashMlaWithKvcacheNoQuantMlaBlockVecDummy(ConstInfoNoQuant &constInfo,
-                                                                 FlashMlaSeqLensToolT &seqLensTool){};
+    __aicore__ inline FlashMlaWithKvcacheNoQuantMlaBlockVecDummy(ConstInfoNoQuant& constInfo,
+                                                                 FlashMlaSeqLensToolT& seqLensTool){};
 };
 
 } // namespace FlashAttnKernel

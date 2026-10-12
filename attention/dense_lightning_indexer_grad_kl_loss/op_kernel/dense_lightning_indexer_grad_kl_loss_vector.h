@@ -51,52 +51,52 @@ public:
     static constexpr bool deterministic = DLIT::deterministic;
 
     __aicore__ inline DLIKLLossVectorService(){};
-    __aicore__ inline void InitParams(const DLIGradKLLossConstInfo &vecConstInfo,
-                                      const optiling::DenseLightningIndexerGradKLLossTilingData *__restrict tilingData);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
+    __aicore__ inline void InitParams(const DLIGradKLLossConstInfo& vecConstInfo,
+                                      const optiling::DenseLightningIndexerGradKLLossTilingData* __restrict tilingData);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
     __aicore__ inline void InitVector1GM(
-        const GlobalTensor<T> &softmaxMax, const GlobalTensor<T> &softmaxSum, const GlobalTensor<T> &softmaxMaxIndex,
-        const GlobalTensor<T> &softmaxSumIndex, const GlobalTensor<MM12_OUT_T> &bmm1Res,
-        const GlobalTensor<MM12_OUT_T> &bmm2Res, const GlobalTensor<W_T> &weight, const GlobalTensor<T> pSync,
-        const GlobalTensor<T> sySync, const GlobalTensor<T> &loss, const GlobalTensor<T> &dWeightFloat,
-        const GlobalTensor<T> &reluGm, const GlobalTensor<KV_T> &reluGradRes, const GlobalTensor<W_T> &dWeight,
-        const GlobalTensor<MM4_OUT_T> &dQueryIndexFloat, const GlobalTensor<OUT_T> &dQueryIndex);
-    __aicore__ inline void InitVector1DeterGM(const GlobalTensor<INFO_INT_64_T> &deterCoreInfoGm,
-                                              const GlobalTensor<T> &dKeyIndexDeterGmFloat,
-                                              const GlobalTensor<T> &dKeyIndexGmFloat,
-                                              const GlobalTensor<T> &lossGmDeterFloat);
+        const GlobalTensor<T>& softmaxMax, const GlobalTensor<T>& softmaxSum, const GlobalTensor<T>& softmaxMaxIndex,
+        const GlobalTensor<T>& softmaxSumIndex, const GlobalTensor<MM12_OUT_T>& bmm1Res,
+        const GlobalTensor<MM12_OUT_T>& bmm2Res, const GlobalTensor<W_T>& weight, const GlobalTensor<T> pSync,
+        const GlobalTensor<T> sySync, const GlobalTensor<T>& loss, const GlobalTensor<T>& dWeightFloat,
+        const GlobalTensor<T>& reluGm, const GlobalTensor<KV_T>& reluGradRes, const GlobalTensor<W_T>& dWeight,
+        const GlobalTensor<MM4_OUT_T>& dQueryIndexFloat, const GlobalTensor<OUT_T>& dQueryIndex);
+    __aicore__ inline void InitVector1DeterGM(const GlobalTensor<INFO_INT_64_T>& deterCoreInfoGm,
+                                              const GlobalTensor<T>& dKeyIndexDeterGmFloat,
+                                              const GlobalTensor<T>& dKeyIndexGmFloat,
+                                              const GlobalTensor<T>& lossGmDeterFloat);
     __aicore__ inline void AllocEventID();
-    __aicore__ inline void ProcessVector1(DLIGradKLLossRunInfo &runInfo);
-    __aicore__ inline void CastOutWeightGrad(DLIGradKLLossRunInfo &runInfo);
-    __aicore__ inline void CastOutQIndexGrad(DLIGradKLLossRunInfo &runInfo);
-    __aicore__ inline void DeterAddKIndexGrad(DLIGradKLLossRunInfo &runInfo);
+    __aicore__ inline void ProcessVector1(DLIGradKLLossRunInfo& runInfo);
+    __aicore__ inline void CastOutWeightGrad(DLIGradKLLossRunInfo& runInfo);
+    __aicore__ inline void CastOutQIndexGrad(DLIGradKLLossRunInfo& runInfo);
+    __aicore__ inline void DeterAddKIndexGrad(DLIGradKLLossRunInfo& runInfo);
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void SaveDeterRunInfo(const DLIGradKLLossRunInfo &info);
+    __aicore__ inline void SaveDeterRunInfo(const DLIGradKLLossRunInfo& info);
     __aicore__ inline void SaveDeterRunInfoInvalid();
     __aicore__ inline void GetDeterRunInfo(int64_t aicIdx);
 
 private:
-    __aicore__ inline void PreloadWeight(DLIGradKLLossRunInfo &runInfo, uint32_t s1InnerIdx, uint32_t curS1InnerSize,
+    __aicore__ inline void PreloadWeight(DLIGradKLLossRunInfo& runInfo, uint32_t s1InnerIdx, uint32_t curS1InnerSize,
                                          uint32_t pingpongFlag);
-    __aicore__ inline void VectorP(DLIGradKLLossRunInfo &runInfo, uint32_t s1InnerIdx, uint32_t curS1InnerSize,
+    __aicore__ inline void VectorP(DLIGradKLLossRunInfo& runInfo, uint32_t s1InnerIdx, uint32_t curS1InnerSize,
                                    uint32_t pingpongFlag);
-    __aicore__ inline void VectorSy(DLIGradKLLossRunInfo &runInfo, uint32_t s1InnerIdx, uint32_t curS1InnerSize,
+    __aicore__ inline void VectorSy(DLIGradKLLossRunInfo& runInfo, uint32_t s1InnerIdx, uint32_t curS1InnerSize,
                                     uint32_t pingpongFlag);
-    __aicore__ inline void VectorLoss(DLIGradKLLossRunInfo &runInfo);
-    __aicore__ inline void VectorDwDqDk(DLIGradKLLossRunInfo &runInfo);
-    __aicore__ inline void VectorCopyInDwDqDk(DLIGradKLLossRunInfo &runInfo);
-    __aicore__ inline void CopyInWithSparseMask(DLIGradKLLossRunInfo &runInfo, LocalTensor<T> dstUbTensor,
+    __aicore__ inline void VectorLoss(DLIGradKLLossRunInfo& runInfo);
+    __aicore__ inline void VectorDwDqDk(DLIGradKLLossRunInfo& runInfo);
+    __aicore__ inline void VectorCopyInDwDqDk(DLIGradKLLossRunInfo& runInfo);
+    __aicore__ inline void CopyInWithSparseMask(DLIGradKLLossRunInfo& runInfo, LocalTensor<T> dstUbTensor,
                                                 GlobalTensor<T> srcGmTensor, uint32_t rowSize,
                                                 int32_t actualLenFirstRow);
 
     DLIGradKLLossConstInfo constInfo;
-    const optiling::DenseLightningIndexerGradKLLossTilingData *__restrict tilingData;
+    const optiling::DenseLightningIndexerGradKLLossTilingData* __restrict tilingData;
 
-    __aicore__ inline void DataCopyReluRes(LocalTensor<T> &reluResTensor, GlobalTensor<T> &reluGm,
-                                           DLIGradKLLossRunInfo &runInfo, int64_t reluResOffset, int64_t count);
+    __aicore__ inline void DataCopyReluRes(LocalTensor<T>& reluResTensor, GlobalTensor<T>& reluGm,
+                                           DLIGradKLLossRunInfo& runInfo, int64_t reluResOffset, int64_t count);
 
-    __aicore__ inline void ReLUGrad(LocalTensor<KV_T> &reluGradOutTensor, LocalTensor<T> &ReLuTensor,
-                                    LocalTensor<T> &subResTensor, DLIGradKLLossRunInfo &runInfo);
+    __aicore__ inline void ReLUGrad(LocalTensor<KV_T>& reluGradOutTensor, LocalTensor<T>& ReLuTensor,
+                                    LocalTensor<T>& subResTensor, DLIGradKLLossRunInfo& runInfo);
 
     // global tensor
     GlobalTensor<KV_T> keyGm;
@@ -203,8 +203,8 @@ private:
 
 template <typename DLIT>
 __aicore__ inline void DLIKLLossVectorService<DLIT>::InitParams(
-    const DLIGradKLLossConstInfo &vecConstInfo,
-    const optiling::DenseLightningIndexerGradKLLossTilingData *__restrict tilingData)
+    const DLIGradKLLossConstInfo& vecConstInfo,
+    const optiling::DenseLightningIndexerGradKLLossTilingData* __restrict tilingData)
 {
     this->constInfo = vecConstInfo;
     this->tilingData = tilingData;
@@ -212,12 +212,12 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::InitParams(
 
 template <typename DLIT>
 __aicore__ inline void DLIKLLossVectorService<DLIT>::InitVector1GM(
-    const GlobalTensor<T> &softmaxMax, const GlobalTensor<T> &softmaxSum, const GlobalTensor<T> &softmaxMaxIndex,
-    const GlobalTensor<T> &softmaxSumIndex, const GlobalTensor<MM12_OUT_T> &bmm1Res,
-    const GlobalTensor<MM12_OUT_T> &bmm2Res, const GlobalTensor<W_T> &weight, const GlobalTensor<T> pSync,
-    const GlobalTensor<T> sySync, const GlobalTensor<T> &loss, const GlobalTensor<T> &dWeightFloat,
-    const GlobalTensor<T> &reluGm, const GlobalTensor<KV_T> &reluGradRes, const GlobalTensor<W_T> &dWeight,
-    const GlobalTensor<MM4_OUT_T> &dQueryIndexFloat, const GlobalTensor<OUT_T> &dQueryIndex)
+    const GlobalTensor<T>& softmaxMax, const GlobalTensor<T>& softmaxSum, const GlobalTensor<T>& softmaxMaxIndex,
+    const GlobalTensor<T>& softmaxSumIndex, const GlobalTensor<MM12_OUT_T>& bmm1Res,
+    const GlobalTensor<MM12_OUT_T>& bmm2Res, const GlobalTensor<W_T>& weight, const GlobalTensor<T> pSync,
+    const GlobalTensor<T> sySync, const GlobalTensor<T>& loss, const GlobalTensor<T>& dWeightFloat,
+    const GlobalTensor<T>& reluGm, const GlobalTensor<KV_T>& reluGradRes, const GlobalTensor<W_T>& dWeight,
+    const GlobalTensor<MM4_OUT_T>& dQueryIndexFloat, const GlobalTensor<OUT_T>& dQueryIndex)
 {
     this->bmm1ResGm[0] = bmm1Res;
     this->bmm1ResGm[1] = bmm1Res[constInfo.n1Size * S1_BASE_STEP * S2_BASE_STEP];
@@ -246,8 +246,8 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::InitVector1GM(
 
 template <typename DLIT>
 __aicore__ inline void DLIKLLossVectorService<DLIT>::InitVector1DeterGM(
-    const GlobalTensor<INFO_INT_64_T> &deterCoreInfoGm, const GlobalTensor<T> &dKeyIndexDeterGmFloat,
-    const GlobalTensor<T> &dKeyIndexGmFloat, const GlobalTensor<T> &lossGmDeterFloat)
+    const GlobalTensor<INFO_INT_64_T>& deterCoreInfoGm, const GlobalTensor<T>& dKeyIndexDeterGmFloat,
+    const GlobalTensor<T>& dKeyIndexGmFloat, const GlobalTensor<T>& lossGmDeterFloat)
 {
     this->deterCoreInfoGm = deterCoreInfoGm;
     this->dKeyIndexDeterGmFloat = dKeyIndexDeterGmFloat;
@@ -256,7 +256,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::InitVector1DeterGM(
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void DLIKLLossVectorService<DLIT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(this->uBuf_, DLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_192K);
 
@@ -420,7 +420,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::FreeEventID()
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::CopyInWithSparseMask(DLIGradKLLossRunInfo &runInfo,
+__aicore__ inline void DLIKLLossVectorService<DLIT>::CopyInWithSparseMask(DLIGradKLLossRunInfo& runInfo,
                                                                           LocalTensor<T> dstUbTensor,
                                                                           GlobalTensor<T> srcGmTensor, uint32_t rowSize,
                                                                           int32_t actualLenFirstRow)
@@ -462,7 +462,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::CopyInWithSparseMask(DLIGra
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::PreloadWeight(DLIGradKLLossRunInfo &runInfo, uint32_t s1InnerIdx,
+__aicore__ inline void DLIKLLossVectorService<DLIT>::PreloadWeight(DLIGradKLLossRunInfo& runInfo, uint32_t s1InnerIdx,
                                                                    uint32_t curS1InnerSize, uint32_t pingpongFlag)
 {
     uint32_t weightSize = curS1InnerSize * constInfo.n1IndexSize;
@@ -499,7 +499,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::PreloadWeight(DLIGradKLLoss
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::VectorP(DLIGradKLLossRunInfo &runInfo, uint32_t s1InnerIdx,
+__aicore__ inline void DLIKLLossVectorService<DLIT>::VectorP(DLIGradKLLossRunInfo& runInfo, uint32_t s1InnerIdx,
                                                              uint32_t curS1InnerSize, uint32_t pingpongFlag)
 {
     uint32_t mm1ResGmOffsetS1 = constInfo.subBlockIdx * runInfo.curS1Size / AIC_AIV_RATIO * runInfo.curS2StepSize +
@@ -568,7 +568,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::VectorP(DLIGradKLLossRunInf
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::VectorSy(DLIGradKLLossRunInfo &runInfo, uint32_t s1InnerIdx,
+__aicore__ inline void DLIKLLossVectorService<DLIT>::VectorSy(DLIGradKLLossRunInfo& runInfo, uint32_t s1InnerIdx,
                                                               uint32_t curS1InnerSize, uint32_t pingpongFlag)
 {
     // weight UB cast To weight.GetValue and release eventID
@@ -655,7 +655,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::VectorSy(DLIGradKLLossRunIn
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::VectorCopyInDwDqDk(DLIGradKLLossRunInfo &runInfo)
+__aicore__ inline void DLIKLLossVectorService<DLIT>::VectorCopyInDwDqDk(DLIGradKLLossRunInfo& runInfo)
 {
     // 拷入P和SY
     int64_t copyPSYOffset = constInfo.subBlockIdx * S1_VEC_SIZE_8 * S2_BASE_STEP;
@@ -671,9 +671,9 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::VectorCopyInDwDqDk(DLIGradK
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::DataCopyReluRes(LocalTensor<T> &reluResTensor,
-                                                                     GlobalTensor<T> &reluGm,
-                                                                     DLIGradKLLossRunInfo &runInfo,
+__aicore__ inline void DLIKLLossVectorService<DLIT>::DataCopyReluRes(LocalTensor<T>& reluResTensor,
+                                                                     GlobalTensor<T>& reluGm,
+                                                                     DLIGradKLLossRunInfo& runInfo,
                                                                      int64_t reluResOffset, int64_t count)
 {
     int64_t countAlign = BlockAlign<T>(count);
@@ -693,9 +693,9 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::DataCopyReluRes(LocalTensor
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::ReLUGrad(LocalTensor<KV_T> &reluGradOutTensor,
-                                                              LocalTensor<T> &reLuTensor, LocalTensor<T> &subResTensor,
-                                                              DLIGradKLLossRunInfo &runInfo)
+__aicore__ inline void DLIKLLossVectorService<DLIT>::ReLUGrad(LocalTensor<KV_T>& reluGradOutTensor,
+                                                              LocalTensor<T>& reLuTensor, LocalTensor<T>& subResTensor,
+                                                              DLIGradKLLossRunInfo& runInfo)
 {
     uint32_t curS2StepSizeAlign64 =
         (runInfo.curS2StepSize + FLOAT_REPEAT_NUM - 1) / FLOAT_REPEAT_NUM * FLOAT_REPEAT_NUM;
@@ -709,7 +709,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::ReLUGrad(LocalTensor<KV_T> 
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::VectorLoss(DLIGradKLLossRunInfo &runInfo)
+__aicore__ inline void DLIKLLossVectorService<DLIT>::VectorLoss(DLIGradKLLossRunInfo& runInfo)
 {
     event_t vToMte2 = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
     event_t mte2ToV = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>());
@@ -776,7 +776,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::VectorLoss(DLIGradKLLossRun
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::VectorDwDqDk(DLIGradKLLossRunInfo &runInfo)
+__aicore__ inline void DLIKLLossVectorService<DLIT>::VectorDwDqDk(DLIGradKLLossRunInfo& runInfo)
 {
     event_t vToMte2 = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
     event_t mte2ToV = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>());
@@ -890,7 +890,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::VectorDwDqDk(DLIGradKLLossR
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::ProcessVector1(DLIGradKLLossRunInfo &runInfo)
+__aicore__ inline void DLIKLLossVectorService<DLIT>::ProcessVector1(DLIGradKLLossRunInfo& runInfo)
 {
     if (runInfo.curS1SizeVec == 0) {
         return;
@@ -934,7 +934,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::ProcessVector1(DLIGradKLLos
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::CastOutWeightGrad(DLIGradKLLossRunInfo &runInfo)
+__aicore__ inline void DLIKLLossVectorService<DLIT>::CastOutWeightGrad(DLIGradKLLossRunInfo& runInfo)
 {
     if (runInfo.curS1SizeVec == 0) {
         return;
@@ -967,7 +967,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::CastOutWeightGrad(DLIGradKL
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::CastOutQIndexGrad(DLIGradKLLossRunInfo &runInfo)
+__aicore__ inline void DLIKLLossVectorService<DLIT>::CastOutQIndexGrad(DLIGradKLLossRunInfo& runInfo)
 {
     if (runInfo.curS1SizeVec == 0) {
         return;
@@ -1014,7 +1014,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::CastOutQIndexGrad(DLIGradKL
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::DeterAddKIndexGrad(DLIGradKLLossRunInfo &runInfo)
+__aicore__ inline void DLIKLLossVectorService<DLIT>::DeterAddKIndexGrad(DLIGradKLLossRunInfo& runInfo)
 {
     for (int aicIdx = 0; aicIdx < constInfo.aicNum; aicIdx++) {
         GetDeterRunInfo(aicIdx);
@@ -1082,7 +1082,7 @@ __aicore__ inline void DLIKLLossVectorService<DLIT>::DeterAddKIndexGrad(DLIGradK
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVectorService<DLIT>::SaveDeterRunInfo(const DLIGradKLLossRunInfo &info)
+__aicore__ inline void DLIKLLossVectorService<DLIT>::SaveDeterRunInfo(const DLIGradKLLossRunInfo& info)
 {
     deterCoreInfoUb_.SetValue(0, info.bIdx);
     deterCoreInfoUb_.SetValue(1, info.accumS2Idx);

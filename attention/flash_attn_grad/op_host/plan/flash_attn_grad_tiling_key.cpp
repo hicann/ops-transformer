@@ -31,7 +31,7 @@ uint64_t DAlignBits(int64_t dAlign)
 
 } // namespace
 
-uint64_t EncodeTilingKey(const FagParsedInfo &info, const FagKernelPlan &kernel, const FagSchedulePlan &schedule)
+uint64_t EncodeTilingKey(const FagParsedInfo& info, const FagKernelPlan& kernel, const FagSchedulePlan& schedule)
 {
     uint64_t maskModeBits = 0ULL;
     if (info.hasAttenMask && info.maskMode == MASK_MODE_CAUSAL) {

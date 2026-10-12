@@ -24,7 +24,7 @@ using T = float;
 TEMPLATES_DEF
 class DlikgBlockCube {
 public:
-    TPipe *pipe;
+    TPipe* pipe;
     constexpr static uint32_t QUERY_INDEX_BUFFER_SIZE = 128 * 128 * 2;
     constexpr static uint32_t MM4_GATHER_BUFFER_SIZE = 128 * 128 * 2;
     constexpr static uint32_t L0C_SINGLE_BUFFER_SIZE = 64 * 1024;
@@ -51,7 +51,7 @@ public:
     GlobalTensor<T> bmm3Res;
     /* =====================LocalBuffer变量==================== */
 
-    BufferManager<BufferType::L1> *l1BufferManagerPtr;
+    BufferManager<BufferType::L1>* l1BufferManagerPtr;
     BuffersPolicy3buff<BufferType::L1> sYKeyL1Buf;
     BuffersPolicy3buff<BufferType::L1> sYQueryL1Buf;
 
@@ -67,29 +67,29 @@ public:
     DLIKGradConstInfo constInfo{};
 
     __aicore__ inline DlikgBlockCube(){};
-    __aicore__ inline void SetCubeBlockParams(TPipe *tPipe, BufferManager<BufferType::L1> *l1BuffMgr);
+    __aicore__ inline void SetCubeBlockParams(TPipe* tPipe, BufferManager<BufferType::L1>* l1BuffMgr);
     __aicore__ inline void InitCubeBuffers();
     __aicore__ inline void InitGlobalBuffer(GM_ADDR query, GM_ADDR dQuery, GM_ADDR key, GM_ADDR dKey,
                                             GlobalTensor<T> bmm3Res, GlobalTensor<T> deterRes);
-    __aicore__ inline void ComputeMmSy(Buffer<BufferType::UB, SyncType::NO_SYNC> &bmm2ResBuf, DLIKGradRunInfo &runInfo,
-                                       DLIKGradConstInfo &constInfo);
-    __aicore__ inline void ComputeMmDk(Buffer<BufferType::L1, SyncType::NO_SYNC> &reluGradResL1Buf,
-                                       DLIKGradRunInfo &runInfo, DLIKGradConstInfo &constInfo);
-    __aicore__ inline void ComputeMmDq(Buffer<BufferType::L1, SyncType::NO_SYNC> &reluGradResL1Buf,
-                                       DLIKGradRunInfo &runInfo, DLIKGradConstInfo &constInfo, bool isFixOut);
+    __aicore__ inline void ComputeMmSy(Buffer<BufferType::UB, SyncType::NO_SYNC>& bmm2ResBuf, DLIKGradRunInfo& runInfo,
+                                       DLIKGradConstInfo& constInfo);
+    __aicore__ inline void ComputeMmDk(Buffer<BufferType::L1, SyncType::NO_SYNC>& reluGradResL1Buf,
+                                       DLIKGradRunInfo& runInfo, DLIKGradConstInfo& constInfo);
+    __aicore__ inline void ComputeMmDq(Buffer<BufferType::L1, SyncType::NO_SYNC>& reluGradResL1Buf,
+                                       DLIKGradRunInfo& runInfo, DLIKGradConstInfo& constInfo, bool isFixOut);
 
 private:
-    __aicore__ inline void CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor, uint32_t srcN,
+    __aicore__ inline void CopyGmToL1(LocalTensor<INPUT_T>& l1Tensor, GlobalTensor<INPUT_T>& gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride);
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<INPUT_T> &l1Tensor, const DLIKGradRunInfo &info,
-                                          DLIKGradConstInfo &constInfo);
-    __aicore__ inline void CopyInMm2BToL1(LocalTensor<INPUT_T> &l1Tensor, const DLIKGradRunInfo &info,
-                                          DLIKGradConstInfo &constInfo);
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<INPUT_T>& l1Tensor, const DLIKGradRunInfo& info,
+                                          DLIKGradConstInfo& constInfo);
+    __aicore__ inline void CopyInMm2BToL1(LocalTensor<INPUT_T>& l1Tensor, const DLIKGradRunInfo& info,
+                                          DLIKGradConstInfo& constInfo);
 };
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::SetCubeBlockParams(TPipe *tPipe,
-                                                                         BufferManager<BufferType::L1> *l1BuffMgr)
+__aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::SetCubeBlockParams(TPipe* tPipe,
+                                                                         BufferManager<BufferType::L1>* l1BuffMgr)
 {
     this->pipe = tPipe;
     this->l1BufferManagerPtr = l1BuffMgr;
@@ -120,17 +120,17 @@ __aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::InitGlobalBuffer(GM_ADDR q
                                                                        GM_ADDR dKey, GlobalTensor<T> bmm3Res,
                                                                        GlobalTensor<T> deterRes)
 {
-    queryIndexGm.SetGlobalBuffer((__gm__ INPUT_T *)query);
-    keyIndexGm.SetGlobalBuffer((__gm__ INPUT_T *)key);
-    mm4ResGm.SetGlobalBuffer((__gm__ OUT_T *)dQuery);
-    mm3ResGm.SetGlobalBuffer((__gm__ OUT_T *)dKey);
+    queryIndexGm.SetGlobalBuffer((__gm__ INPUT_T*)query);
+    keyIndexGm.SetGlobalBuffer((__gm__ INPUT_T*)key);
+    mm4ResGm.SetGlobalBuffer((__gm__ OUT_T*)dQuery);
+    mm3ResGm.SetGlobalBuffer((__gm__ OUT_T*)dKey);
     this->bmm3Res = bmm3Res;
     this->deterRes = deterRes;
 };
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor,
-                                                                 GlobalTensor<INPUT_T> &gmSrcTensor, uint32_t srcN,
+__aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::CopyGmToL1(LocalTensor<INPUT_T>& l1Tensor,
+                                                                 GlobalTensor<INPUT_T>& gmSrcTensor, uint32_t srcN,
                                                                  uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
@@ -146,27 +146,27 @@ __aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::CopyGmToL1(LocalTensor<INP
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::CopyInMm2AToL1(LocalTensor<INPUT_T> &l1Tensor,
-                                                                     const DLIKGradRunInfo &info,
-                                                                     DLIKGradConstInfo &constInfo)
+__aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::CopyInMm2AToL1(LocalTensor<INPUT_T>& l1Tensor,
+                                                                     const DLIKGradRunInfo& info,
+                                                                     DLIKGradConstInfo& constInfo)
 {
     auto srcGm = queryIndexGm[info.queryIndexTensorOffset];
     CopyGmToL1(l1Tensor, srcGm, constInfo.gSizeQueryIndex, constInfo.dSizeQueryIndex, constInfo.dSizeQueryIndex);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::CopyInMm2BToL1(LocalTensor<INPUT_T> &l1Tensor,
-                                                                     const DLIKGradRunInfo &info,
-                                                                     DLIKGradConstInfo &constInfo)
+__aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::CopyInMm2BToL1(LocalTensor<INPUT_T>& l1Tensor,
+                                                                     const DLIKGradRunInfo& info,
+                                                                     DLIKGradConstInfo& constInfo)
 {
     auto srcGm = keyIndexGm[info.keyIndexTensorOffset];
     CopyGmToL1(l1Tensor, srcGm, info.kProcessSize, constInfo.dSizeQueryIndex, constInfo.dSizeQueryIndex);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::ComputeMmSy(Buffer<BufferType::UB, SyncType::NO_SYNC> &bmm2ResBuf,
-                                                                  DLIKGradRunInfo &runInfo,
-                                                                  DLIKGradConstInfo &constInfo)
+__aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::ComputeMmSy(Buffer<BufferType::UB, SyncType::NO_SYNC>& bmm2ResBuf,
+                                                                  DLIKGradRunInfo& runInfo,
+                                                                  DLIKGradConstInfo& constInfo)
 {
     uint32_t dSize = constInfo.dSizeQueryIndex;
     uint32_t kSize = runInfo.kProcessSize;
@@ -221,7 +221,7 @@ __aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::ComputeMmSy(Buffer<BufferT
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::ComputeMmDk(
-    Buffer<BufferType::L1, SyncType::NO_SYNC> &reluGradResL1Buf, DLIKGradRunInfo &runInfo, DLIKGradConstInfo &constInfo)
+    Buffer<BufferType::L1, SyncType::NO_SYNC>& reluGradResL1Buf, DLIKGradRunInfo& runInfo, DLIKGradConstInfo& constInfo)
 {
     uint32_t kSize = runInfo.kProcessSize;
     uint32_t kLoopTimes = CeilDiv(kSize, VEC_P_BASESIZE);
@@ -283,7 +283,7 @@ __aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::ComputeMmDk(
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void DlikgBlockCube<TEMPLATE_ARGS>::ComputeMmDq(
-    Buffer<BufferType::L1, SyncType::NO_SYNC> &reluGradResL1Buf, DLIKGradRunInfo &runInfo, DLIKGradConstInfo &constInfo,
+    Buffer<BufferType::L1, SyncType::NO_SYNC>& reluGradResL1Buf, DLIKGradRunInfo& runInfo, DLIKGradConstInfo& constInfo,
     bool isFixOut)
 {
     uint32_t kSize = runInfo.kProcessSize;
@@ -342,16 +342,16 @@ TEMPLATES_DEF
 class DlikgBlockCubeDummy {
 public:
     __aicore__ inline DlikgBlockCubeDummy(){};
-    __aicore__ inline void SetCubeBlockParams(TPipe *tPipe, BufferManager<BufferType::L1> *l1BuffMgr) {};
+    __aicore__ inline void SetCubeBlockParams(TPipe* tPipe, BufferManager<BufferType::L1>* l1BuffMgr) {};
     __aicore__ inline void InitCubeBuffers() {};
     __aicore__ inline void InitGlobalBuffer(GM_ADDR query, GM_ADDR dQuery, GM_ADDR key, GM_ADDR dKey,
                                             GlobalTensor<T> bmm3Res, GlobalTensor<T> deterRes) {};
-    __aicore__ inline void ComputeMmSy(Buffer<BufferType::UB, SyncType::NO_SYNC> &bmm2ResBuf, DLIKGradRunInfo &runInfo,
-                                       DLIKGradConstInfo &constInfo) {};
-    __aicore__ inline void ComputeMmDk(Buffer<BufferType::L1, SyncType::NO_SYNC> &reluGradResL1Buf,
-                                       DLIKGradRunInfo &runInfo, DLIKGradConstInfo &constInfo) {};
-    __aicore__ inline void ComputeMmDq(Buffer<BufferType::L1, SyncType::NO_SYNC> &reluGradResL1Buf,
-                                       DLIKGradRunInfo &runInfo, DLIKGradConstInfo &constInfo, bool isFixOut) {};
+    __aicore__ inline void ComputeMmSy(Buffer<BufferType::UB, SyncType::NO_SYNC>& bmm2ResBuf, DLIKGradRunInfo& runInfo,
+                                       DLIKGradConstInfo& constInfo) {};
+    __aicore__ inline void ComputeMmDk(Buffer<BufferType::L1, SyncType::NO_SYNC>& reluGradResL1Buf,
+                                       DLIKGradRunInfo& runInfo, DLIKGradConstInfo& constInfo) {};
+    __aicore__ inline void ComputeMmDq(Buffer<BufferType::L1, SyncType::NO_SYNC>& reluGradResL1Buf,
+                                       DLIKGradRunInfo& runInfo, DLIKGradConstInfo& constInfo, bool isFixOut) {};
 };
 
 template <typename T>

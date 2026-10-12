@@ -32,27 +32,27 @@ public:
     __aicore__ inline VecOpDet(){};
     __aicore__ void Init(GM_ADDR drop_mask, GM_ADDR softmax_max, GM_ADDR softmax_sum, GM_ADDR atten_mask,
                          GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
-                         GM_ADDR workspace, const TILING_CLASS *__restrict ordTilingData, TPipe *pipe_in);
-    __aicore__ inline void DetVector1(const VecAddrInfoDet &addrs);
-    __aicore__ inline void DetVector2(const VecAddrInfoDet &addrs);
+                         GM_ADDR workspace, const TILING_CLASS* __restrict ordTilingData, TPipe* pipe_in);
+    __aicore__ inline void DetVector1(const VecAddrInfoDet& addrs);
+    __aicore__ inline void DetVector2(const VecAddrInfoDet& addrs);
 
 private:
-    __aicore__ inline void GetSeqQlenKvlenByBidx(int64_t bIdx, SEQLEN_TYPE &actualSeqQlen, SEQLEN_TYPE &actualSeqKvlen);
+    __aicore__ inline void GetSeqQlenKvlenByBidx(int64_t bIdx, SEQLEN_TYPE& actualSeqQlen, SEQLEN_TYPE& actualSeqKvlen);
     __aicore__ inline void CalFullMask(int64_t curIdx, event_t mte2WaitMte3A, event_t mte2WaitMte3B);
-    __aicore__ inline void CopyInAttenMaskBool(LocalTensor<uint8_t> &dstTensor, int64_t attenMaskOffset,
+    __aicore__ inline void CopyInAttenMaskBool(LocalTensor<uint8_t>& dstTensor, int64_t attenMaskOffset,
                                                uint32_t s1Extend, uint32_t s2Extend);
-    __aicore__ inline void CalcAttenMaskBool(LocalTensor<float> &dstTensor, LocalTensor<uint8_t> srcTensor,
+    __aicore__ inline void CalcAttenMaskBool(LocalTensor<float>& dstTensor, LocalTensor<uint8_t> srcTensor,
                                              uint32_t s1Extend, uint32_t s2SrcExtend, uint32_t s2MaskExtend = 128,
                                              uint8_t maskType = 0);
-    __aicore__ inline void CopyInSoftMax(LocalTensor<float> &dstTensor, uint32_t s1Extend, uint32_t softMaxOffset);
-    __aicore__ inline void CalcSoftMax(LocalTensor<float> &dstTensor, LocalTensor<float> &src0Tensor,
-                                       LocalTensor<float> &src1Tensor, uint32_t s1Extend, uint32_t s2Extend,
-                                       uint32_t s2ExtendAlign, const SoftMaxTiling &tiling);
-    __aicore__ inline void SubGrapA(int64_t curIdx, const VecBlockInfoDet &blockInfo, event_t mte2WaitMte3A,
+    __aicore__ inline void CopyInSoftMax(LocalTensor<float>& dstTensor, uint32_t s1Extend, uint32_t softMaxOffset);
+    __aicore__ inline void CalcSoftMax(LocalTensor<float>& dstTensor, LocalTensor<float>& src0Tensor,
+                                       LocalTensor<float>& src1Tensor, uint32_t s1Extend, uint32_t s2Extend,
+                                       uint32_t s2ExtendAlign, const SoftMaxTiling& tiling);
+    __aicore__ inline void SubGrapA(int64_t curIdx, const VecBlockInfoDet& blockInfo, event_t mte2WaitMte3A,
                                     const bool skipSftMaxSumCopy);
-    __aicore__ inline void SubGrapB(int64_t curIdx, const VecBlockInfoDet &blockInfo, event_t mte2WaitMte3B,
+    __aicore__ inline void SubGrapB(int64_t curIdx, const VecBlockInfoDet& blockInfo, event_t mte2WaitMte3B,
                                     const bool skipSftMaxSumCopy);
-    __aicore__ inline void DropOutCopy(LocalTensor<uint8_t> &dropMaskTensor, int64_t s2VBegin);
+    __aicore__ inline void DropOutCopy(LocalTensor<uint8_t>& dropMaskTensor, int64_t s2VBegin);
     __aicore__ inline void OrderAccum(GlobalTensor<float> dstTensor, GlobalTensor<float> srcTensor, DetGroup detGrop,
                                       uint32_t pingpongFlag, int32_t headNum, int32_t startBlkIdx, int32_t usedVecCore);
     __aicore__ inline void OrderAccumDq(GlobalTensor<INPUT_TYPE> dstTensor, GlobalTensor<float> srcTensor,
@@ -61,7 +61,7 @@ private:
 
 protected:
     TBuf<> unifiedBuffer;
-    const TILING_CLASS *__restrict tilingData;
+    const TILING_CLASS* __restrict tilingData;
     GlobalTensor<uint8_t> maskWorkSpaceGm, attenMaskU8Gm, dropMaskGm;
     GlobalTensor<float> mm1WorkspaceGm;
     GlobalTensor<float> mm2WorkspaceGm;
@@ -151,8 +151,8 @@ protected:
 template <typename FAGT>
 __aicore__ void VecOpDet<FAGT>::Init(GM_ADDR drop_mask, GM_ADDR softmax_max, GM_ADDR softmax_sum, GM_ADDR atten_mask,
                                      GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR dq, GM_ADDR dk,
-                                     GM_ADDR dv, GM_ADDR workspace, const TILING_CLASS *__restrict ordTilingData,
-                                     TPipe *pipe)
+                                     GM_ADDR dv, GM_ADDR workspace, const TILING_CLASS* __restrict ordTilingData,
+                                     TPipe* pipe)
 {
     // ub分配
     tilingData = ordTilingData;
@@ -181,39 +181,39 @@ __aicore__ void VecOpDet<FAGT>::Init(GM_ADDR drop_mask, GM_ADDR softmax_max, GM_
     pipe->InitBuffer(unifiedBuffer, TOTAL_SIZE);
 
     // global tensor
-    softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmax_max);
-    softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmax_sum);
-    attenMaskU8Gm.SetGlobalBuffer((__gm__ uint8_t *)atten_mask);
+    softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmax_max);
+    softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmax_sum);
+    attenMaskU8Gm.SetGlobalBuffer((__gm__ uint8_t*)atten_mask);
     mm1WorkspaceGm.SetGlobalBuffer(
-        (__gm__ float *)(workspace + tilingData->basicDetTensorTilingData.mm1WorkspaceOffset));
+        (__gm__ float*)(workspace + tilingData->basicDetTensorTilingData.mm1WorkspaceOffset));
     mm2WorkspaceGm.SetGlobalBuffer(
-        (__gm__ float *)(workspace + tilingData->basicDetTensorTilingData.mm2WorkspaceOffset));
+        (__gm__ float*)(workspace + tilingData->basicDetTensorTilingData.mm2WorkspaceOffset));
     dsWorkSpaceGm.SetGlobalBuffer(
-        (__gm__ INPUT_TYPE *)(workspace + tilingData->basicDetTensorTilingData.mm1WorkspaceOffset));
+        (__gm__ INPUT_TYPE*)(workspace + tilingData->basicDetTensorTilingData.mm1WorkspaceOffset));
     dropWorkSpaceGm.SetGlobalBuffer(
-        (__gm__ INPUT_TYPE *)(workspace + tilingData->basicDetTensorTilingData.mm2WorkspaceOffset));
+        (__gm__ INPUT_TYPE*)(workspace + tilingData->basicDetTensorTilingData.mm2WorkspaceOffset));
     sfmgWorkspaceGm.SetGlobalBuffer(
-        (__gm__ float *)(workspace + tilingData->basicDetTensorTilingData.sfmgWorkspaceOffset));
+        (__gm__ float*)(workspace + tilingData->basicDetTensorTilingData.sfmgWorkspaceOffset));
 
     // 确定性
     if constexpr (DETERMINISTIC_ENABLE) {
         dqDetWorkSpaceGm.SetGlobalBuffer(
-            (__gm__ float *)(workspace + tilingData->basicDetTensorTilingData.dqDetWorkspaceOffset));
+            (__gm__ float*)(workspace + tilingData->basicDetTensorTilingData.dqDetWorkspaceOffset));
         dkDetWorkSpaceGm.SetGlobalBuffer(
-            (__gm__ float *)(workspace + tilingData->basicDetTensorTilingData.dkDetWorkspaceOffset));
+            (__gm__ float*)(workspace + tilingData->basicDetTensorTilingData.dkDetWorkspaceOffset));
         dvDetWorkSpaceGm.SetGlobalBuffer(
-            (__gm__ float *)(workspace + tilingData->basicDetTensorTilingData.dvDetWorkspaceOffset));
+            (__gm__ float*)(workspace + tilingData->basicDetTensorTilingData.dvDetWorkspaceOffset));
         dqWorkSpaceGm.SetGlobalBuffer(
-            (__gm__ float *)(workspace + tilingData->basicDetTensorTilingData.dqWorkSpaceOffset));
+            (__gm__ float*)(workspace + tilingData->basicDetTensorTilingData.dqWorkSpaceOffset));
         dkWorkSpaceGm.SetGlobalBuffer(
-            (__gm__ float *)(workspace + tilingData->basicDetTensorTilingData.dkWorkSpaceOffset));
+            (__gm__ float*)(workspace + tilingData->basicDetTensorTilingData.dkWorkSpaceOffset));
         dvWorkSpaceGm.SetGlobalBuffer(
-            (__gm__ float *)(workspace + tilingData->basicDetTensorTilingData.dvWorkSpaceOffset));
-        dqGm.SetGlobalBuffer((__gm__ INPUT_TYPE *)dq);
+            (__gm__ float*)(workspace + tilingData->basicDetTensorTilingData.dvWorkSpaceOffset));
+        dqGm.SetGlobalBuffer((__gm__ INPUT_TYPE*)dq);
     }
 
     if constexpr (DROP_ENABLE == true) {
-        dropMaskGm.SetGlobalBuffer((__gm__ uint8_t *)drop_mask);
+        dropMaskGm.SetGlobalBuffer((__gm__ uint8_t*)drop_mask);
         // init dropMaskInfo
         dropMaskInfo.n2G = n2 * g;
         dropMaskInfo.gSize = g;
@@ -262,18 +262,18 @@ __aicore__ void VecOpDet<FAGT>::Init(GM_ADDR drop_mask, GM_ADDR softmax_max, GM_
 }
 
 template <typename FAGT>
-__aicore__ inline void VecOpDet<FAGT>::GetSeqQlenKvlenByBidx(int64_t bIdx, SEQLEN_TYPE &actualSeqQlen,
-                                                             SEQLEN_TYPE &actualSeqKvlen)
+__aicore__ inline void VecOpDet<FAGT>::GetSeqQlenKvlenByBidx(int64_t bIdx, SEQLEN_TYPE& actualSeqQlen,
+                                                             SEQLEN_TYPE& actualSeqKvlen)
 {
     if (layout == TND) {
         if (unlikely(bIdx == 0)) {
-            actualSeqQlen = ((__gm__ SEQLEN_TYPE *)actual_seq_qlen_addr)[0];
-            actualSeqKvlen = ((__gm__ SEQLEN_TYPE *)actual_seq_kvlen_addr)[0];
+            actualSeqQlen = ((__gm__ SEQLEN_TYPE*)actual_seq_qlen_addr)[0];
+            actualSeqKvlen = ((__gm__ SEQLEN_TYPE*)actual_seq_kvlen_addr)[0];
         } else {
-            actualSeqQlen = ((__gm__ SEQLEN_TYPE *)actual_seq_qlen_addr)[bIdx] -
-                            ((__gm__ SEQLEN_TYPE *)actual_seq_qlen_addr)[bIdx - 1];
-            actualSeqKvlen = ((__gm__ SEQLEN_TYPE *)actual_seq_kvlen_addr)[bIdx] -
-                             ((__gm__ SEQLEN_TYPE *)actual_seq_kvlen_addr)[bIdx - 1];
+            actualSeqQlen = ((__gm__ SEQLEN_TYPE*)actual_seq_qlen_addr)[bIdx] -
+                            ((__gm__ SEQLEN_TYPE*)actual_seq_qlen_addr)[bIdx - 1];
+            actualSeqKvlen = ((__gm__ SEQLEN_TYPE*)actual_seq_kvlen_addr)[bIdx] -
+                             ((__gm__ SEQLEN_TYPE*)actual_seq_kvlen_addr)[bIdx - 1];
         }
     } else {
         actualSeqQlen = dimS1;
@@ -283,7 +283,7 @@ __aicore__ inline void VecOpDet<FAGT>::GetSeqQlenKvlenByBidx(int64_t bIdx, SEQLE
 }
 
 template <typename FAGT>
-__aicore__ inline void VecOpDet<FAGT>::CopyInAttenMaskBool(LocalTensor<uint8_t> &dstTensor, int64_t attenMaskOffset,
+__aicore__ inline void VecOpDet<FAGT>::CopyInAttenMaskBool(LocalTensor<uint8_t>& dstTensor, int64_t attenMaskOffset,
                                                            uint32_t s1Extend, uint32_t s2Extend)
 {
     AscendC::DataCopyExtParams intriParams;
@@ -297,14 +297,14 @@ __aicore__ inline void VecOpDet<FAGT>::CopyInAttenMaskBool(LocalTensor<uint8_t> 
 }
 
 template <typename FAGT>
-__aicore__ inline void VecOpDet<FAGT>::CalcAttenMaskBool(LocalTensor<float> &dstTensor, LocalTensor<uint8_t> srcTensor,
+__aicore__ inline void VecOpDet<FAGT>::CalcAttenMaskBool(LocalTensor<float>& dstTensor, LocalTensor<uint8_t> srcTensor,
                                                          uint32_t s1Extend, uint32_t s2SrcExtend, uint32_t s2MaskExtend,
                                                          uint8_t maskType)
 {
     LocalTensor<uint8_t> tmpUbBuffer =
         unifiedBuffer.GetWithOffset<uint8_t>(TMP_UB_SIZE / sizeof(uint8_t), TMP_UB_OFFSET);
     uint32_t tmp = 0xFF7FFFFF;
-    float scalar = *((float *)&tmp);
+    float scalar = *((float*)&tmp);
     SelectWithBytesMaskShapeInfo info;
     info.firstAxis = s1Extend;
     info.srcLastAxis = s2SrcExtend;
@@ -320,7 +320,7 @@ __aicore__ inline void VecOpDet<FAGT>::CalcAttenMaskBool(LocalTensor<float> &dst
 }
 
 template <typename FAGT>
-__aicore__ inline void VecOpDet<FAGT>::CopyInSoftMax(LocalTensor<float> &dstTensor, uint32_t s1Extend,
+__aicore__ inline void VecOpDet<FAGT>::CopyInSoftMax(LocalTensor<float>& dstTensor, uint32_t s1Extend,
                                                      uint32_t softMaxOffset)
 {
     DataCopyPad(dstTensor, softmaxSumGm[softMaxOffset], {1, static_cast<uint16_t>(s1Extend * BLOCK_SIZE), 0, 0},
@@ -330,9 +330,9 @@ __aicore__ inline void VecOpDet<FAGT>::CopyInSoftMax(LocalTensor<float> &dstTens
 }
 
 template <typename FAGT>
-__aicore__ inline void VecOpDet<FAGT>::CalcSoftMax(LocalTensor<float> &dstTensor, LocalTensor<float> &src0Tensor,
-                                                   LocalTensor<float> &src1Tensor, uint32_t s1Extend, uint32_t s2Extend,
-                                                   uint32_t s2ExtendAlign, const SoftMaxTiling &tiling)
+__aicore__ inline void VecOpDet<FAGT>::CalcSoftMax(LocalTensor<float>& dstTensor, LocalTensor<float>& src0Tensor,
+                                                   LocalTensor<float>& src1Tensor, uint32_t s1Extend, uint32_t s2Extend,
+                                                   uint32_t s2ExtendAlign, const SoftMaxTiling& tiling)
 {
     bool isBasicBlock = (s1Extend % 8 == 0) && (s2Extend % 64 == 0);
     if (isBasicBlock) {
@@ -385,7 +385,7 @@ __aicore__ inline void VecOpDet<FAGT>::CalFullMask(int64_t curIdx, event_t mte2W
 }
 
 template <typename FAGT>
-__aicore__ inline void VecOpDet<FAGT>::DropOutCopy(LocalTensor<uint8_t> &dropMaskTensor, int64_t s2VBegin)
+__aicore__ inline void VecOpDet<FAGT>::DropOutCopy(LocalTensor<uint8_t>& dropMaskTensor, int64_t s2VBegin)
 {
     // for compute dropout mask offset
     dropMaskInfo.s2StartIdx = s2VBegin;
@@ -395,7 +395,7 @@ __aicore__ inline void VecOpDet<FAGT>::DropOutCopy(LocalTensor<uint8_t> &dropMas
 }
 
 template <typename FAGT>
-__aicore__ inline void VecOpDet<FAGT>::SubGrapA(int64_t curIdx, const VecBlockInfoDet &blockInfo, event_t mte2WaitMte3A,
+__aicore__ inline void VecOpDet<FAGT>::SubGrapA(int64_t curIdx, const VecBlockInfoDet& blockInfo, event_t mte2WaitMte3A,
                                                 const bool skipSftMaxSumCopy)
 {
     if (curIdx > 0) {
@@ -481,7 +481,7 @@ __aicore__ inline void VecOpDet<FAGT>::SubGrapA(int64_t curIdx, const VecBlockIn
 }
 
 template <typename FAGT>
-__aicore__ inline void VecOpDet<FAGT>::SubGrapB(int64_t curIdx, const VecBlockInfoDet &blockInfo, event_t mte2WaitMte3B,
+__aicore__ inline void VecOpDet<FAGT>::SubGrapB(int64_t curIdx, const VecBlockInfoDet& blockInfo, event_t mte2WaitMte3B,
                                                 const bool skipSftMaxSumCopy)
 {
     if (curIdx > 0) {
@@ -527,7 +527,7 @@ __aicore__ inline void VecOpDet<FAGT>::SubGrapB(int64_t curIdx, const VecBlockIn
 }
 
 template <typename FAGT>
-__aicore__ inline void VecOpDet<FAGT>::DetVector1(const VecAddrInfoDet &addrs)
+__aicore__ inline void VecOpDet<FAGT>::DetVector1(const VecAddrInfoDet& addrs)
 {
     SET_FLAG(MTE3, MTE2, EVENT_ID0);
     WAIT_FLAG(MTE3, MTE2, EVENT_ID0);
@@ -562,7 +562,7 @@ __aicore__ inline void VecOpDet<FAGT>::DetVector1(const VecAddrInfoDet &addrs)
     }
 
     for (uint32_t i = 0; i < blockLen; ++i) {
-        auto &blockInfo = addrs.VecBlkInfo[i];
+        auto& blockInfo = addrs.VecBlkInfo[i];
         bool skipSftMaxSumCopy = false;
         s1VecSize = (blockInfo.s1Len + 1) / 2;
         s1Extend = subIdx ? blockInfo.s1Len - s1VecSize : s1VecSize;
@@ -585,13 +585,13 @@ __aicore__ inline void VecOpDet<FAGT>::DetVector1(const VecAddrInfoDet &addrs)
                 int64_t innerRowOffsetLeft =
                     unlikely(batchIdx == 0) ?
                         0 :
-                        ((__gm__ int64_t *)actual_seq_qlen_addr)[batchIdx - 1] * 32 / sizeof(float);
-                softMaxOffset = ((((__gm__ int64_t *)actual_seq_qlen_addr)[batch - 1] * 32 / sizeof(float)) *
+                        ((__gm__ int64_t*)actual_seq_qlen_addr)[batchIdx - 1] * 32 / sizeof(float);
+                softMaxOffset = ((((__gm__ int64_t*)actual_seq_qlen_addr)[batch - 1] * 32 / sizeof(float)) *
                                      (blockInfo.n2Idx * g + blockInfo.gIdx) +
                                  innerRowOffsetLeft + originInnerBatchOffset % (actualS1Len * 32 / sizeof(float)));
             } else {
                 if (batchIdx > 0) {
-                    softMaxOffset = ((__gm__ SEQLEN_TYPE *)actual_seq_qlen_addr)[batchIdx - 1] * n2 * g * 8;
+                    softMaxOffset = ((__gm__ SEQLEN_TYPE*)actual_seq_qlen_addr)[batchIdx - 1] * n2 * g * 8;
                 }
                 softMaxOffset +=
                     ((blockInfo.n2Idx * g + blockInfo.gIdx) * actualS1Len + blockInfo.s1Idx + subIdx * s1VecSize) * 8;
@@ -626,7 +626,7 @@ __aicore__ inline void VecOpDet<FAGT>::DetVector1(const VecAddrInfoDet &addrs)
 }
 
 template <typename FAGT>
-__aicore__ inline void VecOpDet<FAGT>::DetVector2(const VecAddrInfoDet &addrs)
+__aicore__ inline void VecOpDet<FAGT>::DetVector2(const VecAddrInfoDet& addrs)
 {
     SET_FLAG(V, MTE2, EVENT_ID0);
     WAIT_FLAG(V, MTE2, EVENT_ID0);

@@ -16,9 +16,9 @@
 #ifndef OP_KERNEL_ATTENTION_WORKER_COMBINE_COMMON_UTILS_H
 #define OP_KERNEL_ATTENTION_WORKER_COMBINE_COMMON_UTILS_H
 
-#define GET_OFFSET_BYTE(_type, member) ((unsigned long)(&((_type *)0)->member))
-#define GET_OFFSET_B32(_type, member) ((unsigned long)(&((_type *)0)->member) / 4)
-#define GET_OFFSET_B64(_type, member) ((unsigned long)(&((_type *)0)->member) / 8)
+#define GET_OFFSET_BYTE(_type, member) ((unsigned long)(&((_type*)0)->member))
+#define GET_OFFSET_B32(_type, member) ((unsigned long)(&((_type*)0)->member) / 4)
+#define GET_OFFSET_B64(_type, member) ((unsigned long)(&((_type*)0)->member) / 8)
 
 struct ScheduleContext {
     struct CommonArea {

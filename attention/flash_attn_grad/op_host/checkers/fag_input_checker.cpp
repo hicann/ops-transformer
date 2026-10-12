@@ -14,15 +14,15 @@
 
 namespace optiling {
 
-bool IsOptionalTensorExist(gert::TilingContext *context, size_t index)
+bool IsOptionalTensorExist(gert::TilingContext* context, size_t index)
 {
     auto shape = context->GetOptionalInputShape(index);
     return (shape != nullptr) && (shape->GetStorageShape().GetDimNum() > 0);
 }
 
-ge::graphStatus FagInputExistenceChecker::Check(FagCheckCtx &ctx)
+ge::graphStatus FagInputExistenceChecker::Check(FagCheckCtx& ctx)
 {
-    gert::TilingContext *context = ctx.context;
+    gert::TilingContext* context = ctx.context;
     OP_CHECK_IF(context->GetInputShape(Q_INDEX) == nullptr || context->GetInputShape(K_INDEX) == nullptr ||
                     context->GetInputShape(V_INDEX) == nullptr || context->GetInputShape(DOUT_INDEX) == nullptr ||
                     context->GetInputShape(ATTN_OUT_INDEX) == nullptr ||
@@ -32,14 +32,14 @@ ge::graphStatus FagInputExistenceChecker::Check(FagCheckCtx &ctx)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FagDtypeChecker::Check(FagCheckCtx &ctx)
+ge::graphStatus FagDtypeChecker::Check(FagCheckCtx& ctx)
 {
-    gert::TilingContext *context = ctx.context;
-    const char *opName = ctx.opName;
+    gert::TilingContext* context = ctx.context;
+    const char* opName = ctx.opName;
 
     struct DescRef {
-        const char *name;
-        const gert::CompileTimeTensorDesc *desc;
+        const char* name;
+        const gert::CompileTimeTensorDesc* desc;
     };
 
     auto qDesc = context->GetInputDesc(Q_INDEX);
@@ -52,13 +52,13 @@ ge::graphStatus FagDtypeChecker::Check(FagCheckCtx &ctx)
 
     OP_CHECK_IF(qDesc == nullptr, OP_LOGE(opName, "failed to get input/output desc for dtype check."),
                 return ge::GRAPH_PARAM_INVALID);
-    for (const auto &item : others) {
+    for (const auto& item : others) {
         OP_CHECK_IF(item.desc == nullptr, OP_LOGE(opName, "failed to get input/output desc for dtype check."),
                     return ge::GRAPH_PARAM_INVALID);
     }
 
     const ge::DataType qDtype = qDesc->GetDataType();
-    for (const auto &item : others) {
+    for (const auto& item : others) {
         OP_CHECK_IF(item.desc->GetDataType() != qDtype,
                     OP_LOGE(opName, "dtype of %s must be the same as q(%d), but got %d.", item.name,
                             static_cast<int32_t>(qDtype), static_cast<int32_t>(item.desc->GetDataType())),

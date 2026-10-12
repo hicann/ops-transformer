@@ -48,8 +48,8 @@ struct ScopeGuard {
         : m_exitFunc(std::move(onExitScope)),
           m_isDismissed(false)
     {}
-    ScopeGuard(const ScopeGuard &) = delete;
-    ScopeGuard &operator=(const ScopeGuard &) = delete;
+    ScopeGuard(const ScopeGuard&) = delete;
+    ScopeGuard& operator=(const ScopeGuard&) = delete;
 
     ~ScopeGuard()
     {
@@ -68,9 +68,9 @@ struct ScopeGuard {
 };
 
 struct Tensor {
-    void *hostAddr{nullptr};
-    void *deviceAddr{nullptr};
-    aclTensor *data{nullptr};
+    void* hostAddr{nullptr};
+    void* deviceAddr{nullptr};
+    aclTensor* data{nullptr};
 };
 
 struct ArgScenario {
@@ -90,13 +90,13 @@ struct ArgContext {
     int64_t numHeadsQ{8};
     int64_t numHeadsK{1};
     int64_t headDim{128};
-    char *layoutQ{nullptr};
-    char *layoutK{nullptr};
+    char* layoutQ{nullptr};
+    char* layoutK{nullptr};
     int64_t maskMode{3};
     int64_t cmpRatio{4};
 };
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -105,7 +105,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-aclnnStatus Init(int32_t deviceId, aclrtStream *stream)
+aclnnStatus Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclInit failed. ERROR: %d", ret);
@@ -123,7 +123,7 @@ void Finalize(int32_t deviceId, aclrtStream stream)
     aclFinalize();
 }
 
-aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape, Tensor &tensor)
+aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t>& shape, Tensor& tensor)
 {
     auto size = GetShapeSize(shape) * aclDataTypeSize(dataType);
     auto ret = aclrtMallocHost(&(tensor.hostAddr), size);
@@ -140,14 +140,14 @@ aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape
     return ACL_SUCCESS;
 }
 
-void SetInt32TensorData(Tensor &tensor, const std::vector<int32_t> &hostData)
+void SetInt32TensorData(Tensor& tensor, const std::vector<int32_t>& hostData)
 {
     auto size = hostData.size() * sizeof(int32_t);
     memcpy(tensor.hostAddr, hostData.data(), size);
     aclrtMemcpy(tensor.deviceAddr, size, tensor.hostAddr, size, ACL_MEMCPY_HOST_TO_DEVICE);
 }
 
-void DestroyTensor(Tensor &tensor)
+void DestroyTensor(Tensor& tensor)
 {
     if (tensor.data != nullptr) {
         aclDestroyTensor(tensor.data);
@@ -163,7 +163,7 @@ void DestroyTensor(Tensor &tensor)
     }
 }
 
-void DestroyArgs(ArgContext &context)
+void DestroyArgs(ArgContext& context)
 {
     DestroyTensor(context.metadata);
     DestroyTensor(context.cuSeqLensQOptional);
@@ -182,7 +182,7 @@ void DestroyArgs(ArgContext &context)
     }
 }
 
-aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
+aclnnStatus CreateArgs(const ArgScenario& scenario, ArgContext& context)
 {
     ScopeGuard argsGuard([&] { DestroyArgs(context); });
     aclnnStatus ret;
@@ -190,8 +190,8 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     int64_t batchSize = 1;
     context.maxSeqLenQ = 16;
     context.maxSeqLenK = 4;
-    context.layoutQ = (char *)malloc(sizeof(char) * 16);
-    context.layoutK = (char *)malloc(sizeof(char) * 16);
+    context.layoutQ = (char*)malloc(sizeof(char) * 16);
+    context.layoutK = (char*)malloc(sizeof(char) * 16);
     strcpy(context.layoutQ, scenario.hasCuSeq ? "TND" : "BSND");
     strcpy(context.layoutK, scenario.hasCuSeq ? "TND" : "BSND");
 
@@ -221,7 +221,7 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     return ACL_SUCCESS;
 }
 
-void PrintMetadata(const DenseLISoftmaxLseV2MetaData &metadata)
+void PrintMetadata(const DenseLISoftmaxLseV2MetaData& metadata)
 {
     LOG_PRINT("forecore_num      : %d\n", metadata.forecore_num);
     LOG_PRINT("tail_core_num     : %d\n", metadata.tail_core_num);
@@ -245,8 +245,8 @@ int main()
     ScopeGuard argsGuard([&] { DestroyArgs(context); });
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
     ret = aclnnDenseLightningIndexerSoftmaxLseV2MetadataGetWorkspaceSize(
         context.cuSeqLensQOptional.data, context.cuSeqLensKOptional.data, context.seqUsedQOptional.data,
         context.seqUsedKOptional.data, context.cmpResidualKOptional.data, context.batchSize, context.maxSeqLenQ,

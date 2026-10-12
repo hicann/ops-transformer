@@ -110,9 +110,9 @@ ge::graphStatus FlashAttentionScoreGraTilingMla::SetBaseInfo()
                 fBaseParams.inputLayout);
         return ge ::GRAPH_PARAM_INVALID;
     }
-    const gert::StorageShape *queryShape = context_->GetInputShape(0);
-    const gert::StorageShape *keyShape = context_->GetInputShape(1);
-    const gert::StorageShape *valueShape = context_->GetInputShape(2);
+    const gert::StorageShape* queryShape = context_->GetInputShape(0);
+    const gert::StorageShape* keyShape = context_->GetInputShape(1);
+    const gert::StorageShape* valueShape = context_->GetInputShape(2);
     auto actualSeqQLenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_Q_LEN);
     auto actualSeqKvLenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_KV_LEN);
     auto qStartTensor = context_->GetOptionalInputTensor(Q_START_IDX);
@@ -139,8 +139,8 @@ ge::graphStatus FlashAttentionScoreGraTilingMla::SetBaseInfo()
                     "The shape sizes of actualSeqQLenOptional and actualSeqKvLenOptional must be the same"),
                 return ge::GRAPH_FAILED);
     if (!isMaxWorkspace_) {
-        const int64_t *qValue = actualSeqQLenTensor->GetData<int64_t>();
-        const int64_t *kvValue = actualSeqKvLenTensor->GetData<int64_t>();
+        const int64_t* qValue = actualSeqQLenTensor->GetData<int64_t>();
+        const int64_t* kvValue = actualSeqKvLenTensor->GetData<int64_t>();
         OP_CHECK_IF((qValue == nullptr || kvValue == nullptr),
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                         "FlashAttentionScoreGrad", "actualSeqQLenOptional or actualSeqKvLenOptional",
@@ -349,7 +349,7 @@ ge::graphStatus FlashAttentionScoreGraTilingMla::GetWorkspaceSize()
     constexpr size_t DB_NUM = 2;
     constexpr size_t matmulSize = 16 * 128 * 128;
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     size_t workspaceOffset = WORKSPACE_RSV_BYTE;
 
     // matmal3 q
@@ -401,7 +401,7 @@ ge::graphStatus FlashAttentionScoreGraTilingMla::GetPlatformInfo()
 {
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo *>(
+        auto compileInfoPtr = reinterpret_cast<const Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo*>(
             context_->GetCompileInfo());
         OP_CHECK_IF(
             compileInfoPtr == nullptr,
@@ -437,14 +437,14 @@ ge::graphStatus FlashAttentionScoreGraTilingMla::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForMultiHeadLatentAttentionGrad(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForMultiHeadLatentAttentionGrad(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr,
                 OP_LOGE("TilingPrepare",
                         "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
                 return ge::GRAPH_FAILED);
 
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(
         platformInfoPtr == nullptr,
         OP_LOGE(context,

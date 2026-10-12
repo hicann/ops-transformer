@@ -48,7 +48,7 @@ static constexpr uint32_t LSE_DIM_D = 1;
 
 static constexpr int32_t UNKNOWN_DIMS = -2;
 
-static ge::graphStatus InferShapeBlockSparseAttention(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeBlockSparseAttention(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("BlockSparseAttention", "context is nullptr!");
@@ -58,35 +58,35 @@ static ge::graphStatus InferShapeBlockSparseAttention(gert::InferShapeContext *c
     OP_LOGD(context->GetNodeName(), "Enter BlockSparseAttention InferShape impl.");
 
     // 获取Query shape
-    const gert::Shape *queryShape = context->GetInputShape(QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
 
     // 获取Key shape
-    const gert::Shape *keyShape = context->GetInputShape(KEY_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
 
     // 获取Value shape
-    const gert::Shape *valueShape = context->GetInputShape(VALUE_INDEX);
+    const gert::Shape* valueShape = context->GetInputShape(VALUE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
 
     // 获取输出shape
-    gert::Shape *attentionOutShape = context->GetOutputShape(ATTENTION_OUT_INDEX);
+    gert::Shape* attentionOutShape = context->GetOutputShape(ATTENTION_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
 
-    gert::Shape *softmaxLseShape = context->GetOutputShape(SOFTMAX_LSE_INDEX);
+    gert::Shape* softmaxLseShape = context->GetOutputShape(SOFTMAX_LSE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxLseShape);
 
     // 获取属性
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const char *qInputLayoutPtr = attrs->GetAttrPointer<char>(ATTR_Q_INPUT_LAYOUT_INDEX);
+    const char* qInputLayoutPtr = attrs->GetAttrPointer<char>(ATTR_Q_INPUT_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, qInputLayoutPtr);
 
-    const char *kvInputLayoutPtr = attrs->GetAttrPointer<char>(ATTR_KV_INPUT_LAYOUT_INDEX);
+    const char* kvInputLayoutPtr = attrs->GetAttrPointer<char>(ATTR_KV_INPUT_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, kvInputLayoutPtr);
 
-    const int64_t *numKvHeadsPtr = attrs->GetInt(ATTR_NUM_KV_HEADS_INDEX);
+    const int64_t* numKvHeadsPtr = attrs->GetInt(ATTR_NUM_KV_HEADS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numKvHeadsPtr);
 
     // UNKNOWN DIM处理
@@ -244,7 +244,7 @@ static ge::graphStatus InferShapeBlockSparseAttention(gert::InferShapeContext *c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeBlockSparseAttention(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeBlockSparseAttention(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         return ge::GRAPH_FAILED;

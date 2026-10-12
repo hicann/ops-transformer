@@ -165,8 +165,8 @@ public:
                                 GM_ADDR cu_seqlens, GM_ADDR chunk_indices, GM_ADDR h, GM_ADDR v_new,
                                 GM_ADDR final_state, GM_ADDR tiling, GM_ADDR user)
     {
-        __gm__ ChunkKdaFwdHRuntimeTiling *__restrict kdaFwdHTilingData =
-            reinterpret_cast<__gm__ ChunkKdaFwdHRuntimeTiling *__restrict>(tiling);
+        __gm__ ChunkKdaFwdHRuntimeTiling* __restrict kdaFwdHTilingData =
+            reinterpret_cast<__gm__ ChunkKdaFwdHRuntimeTiling* __restrict>(tiling);
 
         batch = kdaFwdHTilingData->batch;
         seqlen = kdaFwdHTilingData->seqlen;
@@ -187,23 +187,23 @@ public:
         numChunksWorkspaceOffset = kdaFwdHTilingData->numChunksWorkspaceOffset;
         kDecayWorkspaceOffset = kdaFwdHTilingData->kDecayWorkspaceOffset;
 
-        gmK.SetGlobalBuffer((__gm__ ElementK *)k);
-        gmW.SetGlobalBuffer((__gm__ ElementW *)w);
-        gmU.SetGlobalBuffer((__gm__ ElementU *)u);
-        gmG.SetGlobalBuffer((__gm__ ElementG *)(scalarGated ? g : gk));
-        gmInitialState.SetGlobalBuffer((__gm__ ElementInitialState *)inital_state);
-        gmH.SetGlobalBuffer((__gm__ ElementH *)h);
-        gmV.SetGlobalBuffer((__gm__ ElementV *)v_new);
-        gmFinalState.SetGlobalBuffer((__gm__ ElementFinalState *)final_state);
-        gmVWorkspace.SetGlobalBuffer((__gm__ ElementVWork *)(user + vWorkspaceOffset));
-        gmVUpdateWorkspace.SetGlobalBuffer((__gm__ ElementV *)(user + vUpdateWorkspaceOffset));
-        gmHWorkspace.SetGlobalBuffer((__gm__ ElementHWork *)(user + hWorkspaceOffset));
-        gmGk.SetGlobalBuffer((__gm__ ElementG *)(kGated ? gk : g));
-        gmKDecayWorkspace.SetGlobalBuffer((__gm__ ElementK *)(user + kDecayWorkspaceOffset));
+        gmK.SetGlobalBuffer((__gm__ ElementK*)k);
+        gmW.SetGlobalBuffer((__gm__ ElementW*)w);
+        gmU.SetGlobalBuffer((__gm__ ElementU*)u);
+        gmG.SetGlobalBuffer((__gm__ ElementG*)(scalarGated ? g : gk));
+        gmInitialState.SetGlobalBuffer((__gm__ ElementInitialState*)inital_state);
+        gmH.SetGlobalBuffer((__gm__ ElementH*)h);
+        gmV.SetGlobalBuffer((__gm__ ElementV*)v_new);
+        gmFinalState.SetGlobalBuffer((__gm__ ElementFinalState*)final_state);
+        gmVWorkspace.SetGlobalBuffer((__gm__ ElementVWork*)(user + vWorkspaceOffset));
+        gmVUpdateWorkspace.SetGlobalBuffer((__gm__ ElementV*)(user + vUpdateWorkspaceOffset));
+        gmHWorkspace.SetGlobalBuffer((__gm__ ElementHWork*)(user + hWorkspaceOffset));
+        gmGk.SetGlobalBuffer((__gm__ ElementG*)(kGated ? gk : g));
+        gmKDecayWorkspace.SetGlobalBuffer((__gm__ ElementK*)(user + kDecayWorkspaceOffset));
 
-        gmSeqlen.SetGlobalBuffer((__gm__ int64_t *)cu_seqlens);
-        gmNumSeq.SetGlobalBuffer((__gm__ int64_t *)(user + numSeqWorkspaceOffset));
-        gmNumChunks.SetGlobalBuffer((__gm__ int64_t *)(user + numChunksWorkspaceOffset));
+        gmSeqlen.SetGlobalBuffer((__gm__ int64_t*)cu_seqlens);
+        gmNumSeq.SetGlobalBuffer((__gm__ int64_t*)(user + numSeqWorkspaceOffset));
+        gmNumChunks.SetGlobalBuffer((__gm__ int64_t*)(user + numChunksWorkspaceOffset));
 
         if ASCEND_IS_AIC {
             cubeBlockScheduler.Init(cu_seqlens, chunk_indices, tiling, user);
@@ -217,7 +217,7 @@ public:
     template <typename TilingData>
     __aicore__ inline void InitFromData(GM_ADDR k, GM_ADDR w, GM_ADDR u, GM_ADDR g, GM_ADDR gk, GM_ADDR inital_state,
                                         GM_ADDR cu_seqlens, GM_ADDR chunk_indices, GM_ADDR h, GM_ADDR v_new,
-                                        GM_ADDR final_state, const TilingData &tilingData, GM_ADDR user)
+                                        GM_ADDR final_state, const TilingData& tilingData, GM_ADDR user)
     {
         batch = tilingData.batch;
         seqlen = tilingData.seqlen;
@@ -238,22 +238,22 @@ public:
         numChunksWorkspaceOffset = tilingData.numChunksWorkspaceOffset;
         kDecayWorkspaceOffset = tilingData.kDecayWorkspaceOffset;
 
-        gmK.SetGlobalBuffer((__gm__ ElementK *)k);
-        gmW.SetGlobalBuffer((__gm__ ElementW *)w);
-        gmU.SetGlobalBuffer((__gm__ ElementU *)u);
-        gmG.SetGlobalBuffer((__gm__ ElementG *)(scalarGated ? g : gk));
-        gmInitialState.SetGlobalBuffer((__gm__ ElementInitialState *)inital_state);
-        gmH.SetGlobalBuffer((__gm__ ElementH *)h);
-        gmV.SetGlobalBuffer((__gm__ ElementV *)v_new);
-        gmFinalState.SetGlobalBuffer((__gm__ ElementFinalState *)final_state);
-        gmVWorkspace.SetGlobalBuffer((__gm__ ElementVWork *)(user + vWorkspaceOffset));
-        gmVUpdateWorkspace.SetGlobalBuffer((__gm__ ElementV *)(user + vUpdateWorkspaceOffset));
-        gmHWorkspace.SetGlobalBuffer((__gm__ ElementHWork *)(user + hWorkspaceOffset));
-        gmGk.SetGlobalBuffer((__gm__ ElementG *)(kGated ? gk : g));
-        gmKDecayWorkspace.SetGlobalBuffer((__gm__ ElementK *)(user + kDecayWorkspaceOffset));
-        gmSeqlen.SetGlobalBuffer((__gm__ int64_t *)cu_seqlens);
-        gmNumSeq.SetGlobalBuffer((__gm__ int64_t *)(user + numSeqWorkspaceOffset));
-        gmNumChunks.SetGlobalBuffer((__gm__ int64_t *)(user + numChunksWorkspaceOffset));
+        gmK.SetGlobalBuffer((__gm__ ElementK*)k);
+        gmW.SetGlobalBuffer((__gm__ ElementW*)w);
+        gmU.SetGlobalBuffer((__gm__ ElementU*)u);
+        gmG.SetGlobalBuffer((__gm__ ElementG*)(scalarGated ? g : gk));
+        gmInitialState.SetGlobalBuffer((__gm__ ElementInitialState*)inital_state);
+        gmH.SetGlobalBuffer((__gm__ ElementH*)h);
+        gmV.SetGlobalBuffer((__gm__ ElementV*)v_new);
+        gmFinalState.SetGlobalBuffer((__gm__ ElementFinalState*)final_state);
+        gmVWorkspace.SetGlobalBuffer((__gm__ ElementVWork*)(user + vWorkspaceOffset));
+        gmVUpdateWorkspace.SetGlobalBuffer((__gm__ ElementV*)(user + vUpdateWorkspaceOffset));
+        gmHWorkspace.SetGlobalBuffer((__gm__ ElementHWork*)(user + hWorkspaceOffset));
+        gmGk.SetGlobalBuffer((__gm__ ElementG*)(kGated ? gk : g));
+        gmKDecayWorkspace.SetGlobalBuffer((__gm__ ElementK*)(user + kDecayWorkspaceOffset));
+        gmSeqlen.SetGlobalBuffer((__gm__ int64_t*)cu_seqlens);
+        gmNumSeq.SetGlobalBuffer((__gm__ int64_t*)(user + numSeqWorkspaceOffset));
+        gmNumChunks.SetGlobalBuffer((__gm__ int64_t*)(user + numChunksWorkspaceOffset));
 
         if ASCEND_IS_AIC {
             cubeBlockScheduler.InitFromData(cu_seqlens, chunk_indices, tilingData, user);
@@ -273,7 +273,7 @@ public:
         return static_cast<float>(value);
     }
 
-    __aicore__ inline void ComputeTailVWorkspace(const KdaFwdHOffsets &offsets)
+    __aicore__ inline void ComputeTailVWorkspace(const KdaFwdHOffsets& offsets)
     {
         uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
         uint32_t subBlockNum = AscendC::GetSubBlockNum();
@@ -315,7 +315,7 @@ public:
         }
     }
 
-    __aicore__ inline void ComputeHWorkspaceVector(const KdaFwdHOffsets &offsets, uint32_t eventId)
+    __aicore__ inline void ComputeHWorkspaceVector(const KdaFwdHOffsets& offsets, uint32_t eventId)
     {
         uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
         uint32_t subBlockNum = AscendC::GetSubBlockNum();
@@ -484,12 +484,12 @@ public:
                         cubeBlockScheduler.InitTasks();
                         for (uint32_t i = 0; i < PING_PONG_STAGES; ++i) {
                             uint32_t streamId = cubeBlockScheduler.GetStreamId(i);
-                            const auto &stream = cubeBlockScheduler.GetStream(i);
+                            const auto& stream = cubeBlockScheduler.GetStream(i);
                             if (cubeBlockScheduler.StreamIsDone(stream)) {
                                 continue;
                             }
 
-                            const KdaFwdHOffsets &cube1Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
+                            const KdaFwdHOffsets& cube1Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
                             Arch::CrossCoreWaitFlag(cubeBlockScheduler.vec2Done[streamId]);
                             if (cube1Offsets.blockTokens < 16) {
                                 Arch::CrossCoreSetFlag<0x2, PIPE_MTE2>(cubeBlockScheduler.cube1Done[streamId]);
@@ -526,11 +526,11 @@ public:
                         /* C2: h[i+1] = k.T @ v_work */
                         for (uint32_t i = 0; i < PING_PONG_STAGES; ++i) {
                             uint32_t streamId = cubeBlockScheduler.GetStreamId(i);
-                            const auto &stream = cubeBlockScheduler.GetStream(i);
+                            const auto& stream = cubeBlockScheduler.GetStream(i);
                             if (cubeBlockScheduler.StreamIsDone(stream)) {
                                 continue;
                             }
-                            const KdaFwdHOffsets &cube2Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
+                            const KdaFwdHOffsets& cube2Offsets = cubeBlockScheduler.GetCurTaskOffsets(stream);
                             Arch::CrossCoreWaitFlag(cubeBlockScheduler.vec1Done[streamId]);
 
                             if (cubeBlockScheduler.NeedProcessStage2(stream)) {
@@ -675,11 +675,11 @@ public:
                         vecBlockScheduler.InitTasks();
                         for (uint32_t i = 0; i < PING_PONG_STAGES; ++i) {
                             uint32_t streamId = vecBlockScheduler.GetStreamId(i);
-                            const auto &stream = vecBlockScheduler.GetStream(i);
+                            const auto& stream = vecBlockScheduler.GetStream(i);
                             if (vecBlockScheduler.StreamIsDone(stream)) {
                                 continue;
                             }
-                            const KdaFwdHOffsets &vec1Offsets = vecBlockScheduler.GetCurTaskOffsets(stream);
+                            const KdaFwdHOffsets& vec1Offsets = vecBlockScheduler.GetCurTaskOffsets(stream);
                             if (vec1Offsets.blockTokens < 16) {
                                 ComputeTailVWorkspace(vec1Offsets);
                             }
@@ -702,11 +702,11 @@ public:
                         /* V2: h[i+1] += h_work if i < num_chunks - 1 else None */
                         for (uint32_t i = 0; i < PING_PONG_STAGES; ++i) {
                             uint32_t streamId = vecBlockScheduler.GetStreamId(i);
-                            const auto &stream = vecBlockScheduler.GetStream(i);
+                            const auto& stream = vecBlockScheduler.GetStream(i);
                             if (vecBlockScheduler.StreamIsDone(stream)) {
                                 continue;
                             }
-                            const KdaFwdHOffsets &vec2Offsets = vecBlockScheduler.GetCurTaskOffsets(stream);
+                            const KdaFwdHOffsets& vec2Offsets = vecBlockScheduler.GetCurTaskOffsets(stream);
                             if (vecBlockScheduler.NeedProcessStage2(stream)) {
                                 bool vectorC2Path = vec2Offsets.blockTokens < 16;
                                 if (vectorC2Path) {

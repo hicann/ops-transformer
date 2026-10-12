@@ -33,13 +33,13 @@ FagChecker::FagChecker()
     checkers_.emplace_back(std::make_unique<FagShapeChecker>());
 }
 
-ge::graphStatus FagChecker::Process(gert::TilingContext *context)
+ge::graphStatus FagChecker::Process(gert::TilingContext* context)
 {
     FagCheckCtx ctx;
     ctx.context = context;
     ctx.opName = context->GetNodeName();
 
-    for (const auto &checker : checkers_) {
+    for (const auto& checker : checkers_) {
         const ge::graphStatus ret = checker->Check(ctx);
         // 具体原因由 checker 自己打过，这里只补一条定位信息。
         OP_CHECK_IF(ret != ge::GRAPH_SUCCESS, OP_LOGE(ctx.opName, "%s check failed.", checker->Name()), return ret);

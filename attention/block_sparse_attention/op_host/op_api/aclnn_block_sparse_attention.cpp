@@ -32,7 +32,7 @@ namespace {
 
 static constexpr uint64_t LSE_OUT = 1;
 
-static bool CheckDataType(const aclTensor *query, const aclTensor *key, const aclTensor *value)
+static bool CheckDataType(const aclTensor* query, const aclTensor* key, const aclTensor* value)
 {
     const DataType qDtype = query->GetDataType();
     const DataType kDtype = key->GetDataType();
@@ -58,7 +58,7 @@ static bool CheckDataType(const aclTensor *query, const aclTensor *key, const ac
     return true;
 }
 
-static aclnnStatus CheckMandatoryTensors(const aclTensor *query, const aclTensor *key, const aclTensor *value)
+static aclnnStatus CheckMandatoryTensors(const aclTensor* query, const aclTensor* key, const aclTensor* value)
 {
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(key != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -66,7 +66,7 @@ static aclnnStatus CheckMandatoryTensors(const aclTensor *query, const aclTensor
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ParseblockShapeOptional(const aclIntArray *blockShapeOptional)
+static aclnnStatus ParseblockShapeOptional(const aclIntArray* blockShapeOptional)
 {
     if (blockShapeOptional != nullptr) {
         uint64_t size = blockShapeOptional->Size();
@@ -75,7 +75,7 @@ static aclnnStatus ParseblockShapeOptional(const aclIntArray *blockShapeOptional
             return ACLNN_ERR_PARAM_INVALID;
         }
 
-        const int64_t *data = blockShapeOptional->GetData();
+        const int64_t* data = blockShapeOptional->GetData();
         if (data == nullptr) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "blockShapeOptional data is null.");
             return ACLNN_ERR_PARAM_INVALID;
@@ -91,8 +91,8 @@ static aclnnStatus ParseblockShapeOptional(const aclIntArray *blockShapeOptional
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ValidateParams(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                                  char *qInputLayout, char *kvInputLayout, const aclIntArray *blockShapeOptional)
+static aclnnStatus ValidateParams(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                  char* qInputLayout, char* kvInputLayout, const aclIntArray* blockShapeOptional)
 {
     CHECK_RET(CheckMandatoryTensors(query, key, value) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR);
 
@@ -131,9 +131,9 @@ static aclnnStatus ValidateParams(const aclTensor *query, const aclTensor *key, 
     return ParseblockShapeOptional(blockShapeOptional);
 }
 
-static aclnnStatus MakeContiguous(const aclTensor *&query, const aclTensor *&key, const aclTensor *&value,
-                                  const aclTensor *&blockSparseMaskOptional, const aclTensor *&attenMaskOptional,
-                                  const aclTensor *&blockTableOptional, aclOpExecutor *executor)
+static aclnnStatus MakeContiguous(const aclTensor*& query, const aclTensor*& key, const aclTensor*& value,
+                                  const aclTensor*& blockSparseMaskOptional, const aclTensor*& attenMaskOptional,
+                                  const aclTensor*& blockTableOptional, aclOpExecutor* executor)
 {
     query = l0op::Contiguous(query, executor);
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -166,8 +166,8 @@ static aclnnStatus MakeContiguous(const aclTensor *&query, const aclTensor *&key
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ValidateAdditionalParams(int64_t innerPrecise, const aclTensor *attentionOut,
-                                            uint64_t *workspaceSize, aclOpExecutor **executor)
+static aclnnStatus ValidateAdditionalParams(int64_t innerPrecise, const aclTensor* attentionOut,
+                                            uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (innerPrecise != 0 && innerPrecise != 1 && innerPrecise != 4) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "innerPrecise must be 0 or 1 or 4, got %ld.", innerPrecise);
@@ -181,7 +181,7 @@ static aclnnStatus ValidateAdditionalParams(int64_t innerPrecise, const aclTenso
     return ACLNN_SUCCESS;
 }
 
-static string ConvertLayoutString(char *layoutStr)
+static string ConvertLayoutString(char* layoutStr)
 {
     return op::ToString(layoutStr).GetString();
 }
@@ -189,12 +189,12 @@ static string ConvertLayoutString(char *layoutStr)
 } // namespace
 
 __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *blockSparseMask,
-    const aclTensor *attenMaskOptional, const aclIntArray *blockShape, const aclIntArray *actualSeqLengthsOptional,
-    const aclIntArray *actualSeqLengthsKvOptional, const aclTensor *blockTableOptional, char *qInputLayout,
-    char *kvInputLayout, int64_t numKeyValueHeads, int64_t maskType, double scaleValue, int64_t innerPrecise,
-    int64_t blockSize, int64_t preTokens, int64_t nextTokens, int64_t softmaxLseFlag, aclTensor *attentionOut,
-    aclTensor *softmaxLseOptional, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* blockSparseMask,
+    const aclTensor* attenMaskOptional, const aclIntArray* blockShape, const aclIntArray* actualSeqLengthsOptional,
+    const aclIntArray* actualSeqLengthsKvOptional, const aclTensor* blockTableOptional, char* qInputLayout,
+    char* kvInputLayout, int64_t numKeyValueHeads, int64_t maskType, double scaleValue, int64_t innerPrecise,
+    int64_t blockSize, int64_t preTokens, int64_t nextTokens, int64_t softmaxLseFlag, aclTensor* attentionOut,
+    aclTensor* softmaxLseOptional, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     aclnnStatus ret = ValidateParams(query, key, value, qInputLayout, kvInputLayout, blockShape);
     if (ret != ACLNN_SUCCESS) {
@@ -214,7 +214,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGetW
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    auto *executorImpl = uniqueExecutor.get();
+    auto* executorImpl = uniqueExecutor.get();
     // 新增blockSparseMaskOptional参数
     ret = MakeContiguous(query, key, value, blockSparseMask, attenMaskOptional, blockTableOptional, executorImpl);
     if (ret != ACLNN_SUCCESS) {
@@ -246,8 +246,8 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGetW
     return ACLNN_SUCCESS;
 }
 
-__attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttention(void *workspace, uint64_t workspaceSize,
-                                                                             aclOpExecutor *executor,
+__attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttention(void* workspace, uint64_t workspaceSize,
+                                                                             aclOpExecutor* executor,
                                                                              aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnBlockSparseAttention);

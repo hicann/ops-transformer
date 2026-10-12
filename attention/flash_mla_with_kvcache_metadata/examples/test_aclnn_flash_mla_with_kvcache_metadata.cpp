@@ -56,7 +56,7 @@ constexpr uint32_t METADATA_BUFFER_AIV_CORE_UPPER_BOUND = 72;
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -65,7 +65,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
@@ -86,8 +86,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -122,8 +122,8 @@ int64_t CapacityAlignedWords(int64_t batch)
 
 template <typename FnRun>
 int RunMetadataOnce(aclrtStream stream, int64_t batch, int64_t maxSeqQ, int64_t maxSeqKv, int64_t nHeadQ,
-                    int64_t nHeadKv, int64_t headDimQk, int64_t headDimV, int64_t maskMode, const char *layoutQ,
-                    const char *layoutKv, const char *layoutOut, int64_t bufferWords, std::vector<int32_t> *outWords,
+                    int64_t nHeadKv, int64_t headDimQk, int64_t headDimV, int64_t maskMode, const char* layoutQ,
+                    const char* layoutKv, const char* layoutOut, int64_t bufferWords, std::vector<int32_t>* outWords,
                     bool isMla, FnRun run)
 {
     // flash_attn_metadata host checker: TND layoutQ requires cu_seqlens_q;
@@ -134,19 +134,19 @@ int RunMetadataOnce(aclrtStream stream, int64_t batch, int64_t maxSeqQ, int64_t 
     }
     std::vector<int32_t> kvLens(batch, static_cast<int32_t>(maxSeqKv));
 
-    void *metaDev = nullptr;
+    void* metaDev = nullptr;
     std::vector<int32_t> hostData(bufferWords, 0);
-    aclTensor *metaT = nullptr;
+    aclTensor* metaT = nullptr;
     std::vector<int64_t> metaShape = {bufferWords};
     int64_t r = CreateAclTensor(hostData, metaShape, &metaDev, aclDataType::ACL_INT32, &metaT);
     if (r != ACL_SUCCESS) {
         LOG_PRINT("CreateAclTensor(metadata) failed: %ld\n", r);
         return -1;
     }
-    void *cuDev = nullptr;
-    void *seqKvDev = nullptr;
-    aclTensor *cuT = nullptr;
-    aclTensor *seqKvT = nullptr;
+    void* cuDev = nullptr;
+    void* seqKvDev = nullptr;
+    aclTensor* cuT = nullptr;
+    aclTensor* seqKvT = nullptr;
     std::vector<int64_t> cuShape = {batch + 1};
     std::vector<int64_t> seqKvShape = {batch};
     r = CreateAclTensor(cuSeqlensQ, cuShape, &cuDev, aclDataType::ACL_INT32, &cuT);
@@ -156,9 +156,9 @@ int RunMetadataOnce(aclrtStream stream, int64_t batch, int64_t maxSeqQ, int64_t 
         return -1;
     }
 
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     uint64_t workspaceSize = 0;
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (isMla) {
         r = aclnnFlashMlaWithKvcacheMetadataGetWorkspaceSize(cuT, seqKvT, nullptr, maxSeqQ, maxSeqKv, nHeadQ, nHeadKv,
                                                              headDimQk, headDimV, maskMode, layoutQ, metaT,
@@ -228,9 +228,9 @@ static int RunByteGolden(aclrtStream stream)
     int64_t headDimQk = 576;
     int64_t headDimV = 512;
     int64_t maskMode = 3;
-    const char *layoutQ = "TND";
-    const char *layoutKv = "PA_NZ";
-    const char *layoutOut = "TND";
+    const char* layoutQ = "TND";
+    const char* layoutKv = "PA_NZ";
+    const char* layoutOut = "TND";
 
     int64_t words = CapacityAlignedWords(batch);
     std::vector<int32_t> mlaOut(words, 0);
@@ -354,7 +354,7 @@ static int RunNegativeCapacity(aclrtStream stream)
     pid_t pid = fork();
     if (pid == 0) {
         setenv("FLASH_MLA_WITH_KVCACHE_METADATA_NEGATIVE_ONLY", "1", 1);
-        execl("/proc/self/exe", "test_aclnn_flash_mla_with_kvcache_metadata", (char *)nullptr);
+        execl("/proc/self/exe", "test_aclnn_flash_mla_with_kvcache_metadata", (char*)nullptr);
         _exit(127);
     }
     int status = 0;
@@ -374,26 +374,26 @@ static int RunNegativeCapacity(aclrtStream stream)
     return 0;
 }
 
-static void DumpMetaCompact(void *data)
+static void DumpMetaCompact(void* data)
 {
-    int32_t sectionNum = static_cast<int32_t>(((int32_t *)data)[0]);
-    uint32_t aicCoreNum = static_cast<uint32_t>(((int32_t *)data)[HEAD_AIC_NUM_INDEX]);
-    uint32_t aivCoreNum = static_cast<uint32_t>(((int32_t *)data)[HEAD_AIV_NUM_INDEX]);
+    int32_t sectionNum = static_cast<int32_t>(((int32_t*)data)[0]);
+    uint32_t aicCoreNum = static_cast<uint32_t>(((int32_t*)data)[HEAD_AIC_NUM_INDEX]);
+    uint32_t aivCoreNum = static_cast<uint32_t>(((int32_t*)data)[HEAD_AIV_NUM_INDEX]);
     detail::FaMetadata meta(data, sectionNum, aicCoreNum, aivCoreNum);
     LOG_PRINT("  isFd:%d mBaseSize:%d s2BaseSize:%d\n", meta.GetHeadMetadata(HEAD_IS_FD_INDEX),
               meta.GetHeadMetadata(HEAD_M_BASE_SIZE_INDEX), meta.GetHeadMetadata(HEAD_S2_BASE_SIZE_INDEX));
 }
 
-static void DumpMeta(void *data)
+static void DumpMeta(void* data)
 {
-    const char *fullDump = getenv("FLASH_MLA_WITH_KVCACHE_METADATA_FULL_DUMP");
+    const char* fullDump = getenv("FLASH_MLA_WITH_KVCACHE_METADATA_FULL_DUMP");
     if (fullDump == nullptr) {
         DumpMetaCompact(data);
         return;
     }
-    int32_t sectionNum = static_cast<int32_t>(((int32_t *)data)[0]);
-    uint32_t aicCoreNum = static_cast<uint32_t>(((int32_t *)data)[HEAD_AIC_NUM_INDEX]);
-    uint32_t aivCoreNum = static_cast<uint32_t>(((int32_t *)data)[HEAD_AIV_NUM_INDEX]);
+    int32_t sectionNum = static_cast<int32_t>(((int32_t*)data)[0]);
+    uint32_t aicCoreNum = static_cast<uint32_t>(((int32_t*)data)[HEAD_AIC_NUM_INDEX]);
+    uint32_t aivCoreNum = static_cast<uint32_t>(((int32_t*)data)[HEAD_AIV_NUM_INDEX]);
     optiling::detail::FaMetadata faMetadata(data, sectionNum, aicCoreNum, aivCoreNum);
     printf("sectionNum:%d\n", faMetadata.GetHeadMetadata(optiling::HEAD_SECTION_NUM_INDEX));
     printf("isFd:%d\n", faMetadata.GetHeadMetadata(optiling::HEAD_IS_FD_INDEX));
@@ -434,8 +434,8 @@ static int RunNegativeRuntimeOnly()
     aclrtStream stream;
     int64_t ret = Init(deviceId, &stream);
     if (ret == 0) {
-        void *metaDev = nullptr;
-        aclTensor *metaT = nullptr;
+        void* metaDev = nullptr;
+        aclTensor* metaT = nullptr;
         std::vector<int64_t> tinyShape = {static_cast<int64_t>(tiny.size())};
         ret = CreateAclTensor(tiny, tinyShape, &metaDev, aclDataType::ACL_INT32, &metaT);
         std::vector<int32_t> cuQ(batch + 1, 0);
@@ -443,22 +443,22 @@ static int RunNegativeRuntimeOnly()
             cuQ[b] = b * 8;
         }
         std::vector<int32_t> seqKv(batch, 32768);
-        void *cuDev = nullptr;
-        void *seqKvDev = nullptr;
-        aclTensor *cuT = nullptr;
-        aclTensor *seqKvT = nullptr;
+        void* cuDev = nullptr;
+        void* seqKvDev = nullptr;
+        aclTensor* cuT = nullptr;
+        aclTensor* seqKvT = nullptr;
         std::vector<int64_t> cuShape = {batch + 1};
         std::vector<int64_t> seqKvShape = {batch};
         ret = CreateAclTensor(cuQ, cuShape, &cuDev, aclDataType::ACL_INT32, &cuT);
         ret = ret == ACL_SUCCESS ? CreateAclTensor(seqKv, seqKvShape, &seqKvDev, aclDataType::ACL_INT32, &seqKvT) : ret;
-        aclOpExecutor *executor = nullptr;
+        aclOpExecutor* executor = nullptr;
         uint64_t ws = 0;
         if (ret == 0) {
             ret = aclnnFlashMlaWithKvcacheMetadataGetWorkspaceSize(cuT, seqKvT, nullptr, 8, 32768, 17, 1, 576, 512, 3,
                                                                    "TND", metaT, &ws, &executor);
             printf("[negative-child] GetWorkspaceSize with undersized buffer: aclnnStatus=%ld\n", ret);
             if (ret == 0) {
-                void *wsAddr = nullptr;
+                void* wsAddr = nullptr;
                 if (ws > 0U) {
                     aclrtMalloc(&wsAddr, ws, ACL_MEM_MALLOC_HUGE_FIRST);
                 }
@@ -508,8 +508,8 @@ int main()
         int64_t metadataSize = ((36 + 72) * batchSize * numKeyValueHeads + 1) * 16;
         int64_t alignedSize = ((metadataSize + 4095) / 4096) * 4096;
         std::vector<int32_t> metadataHostData(alignedSize, 0);
-        void *metadataDeviceAddr = nullptr;
-        aclTensor *metadataTensor = nullptr;
+        void* metadataDeviceAddr = nullptr;
+        aclTensor* metadataTensor = nullptr;
         std::vector<int64_t> metadataShape = {alignedSize};
         ret = CreateAclTensor(metadataHostData, metadataShape, &metadataDeviceAddr, aclDataType::ACL_INT32,
                               &metadataTensor);
@@ -518,10 +518,10 @@ int main()
             cuQ[b] = cuQ[b - 1] + qS;
         }
         std::vector<int32_t> cacheSl(batchSize, kvS);
-        void *cuDevSmk = nullptr;
-        void *clDevSmk = nullptr;
-        aclTensor *cuTmk = nullptr;
-        aclTensor *clTmk = nullptr;
+        void* cuDevSmk = nullptr;
+        void* clDevSmk = nullptr;
+        aclTensor* cuTmk = nullptr;
+        aclTensor* clTmk = nullptr;
         std::vector<int64_t> cuShapeMk = {batchSize + 1};
         std::vector<int64_t> clShapeMk = {batchSize};
         ret = CreateAclTensor(cuQ, cuShapeMk, &cuDevSmk, aclDataType::ACL_INT32, &cuTmk);
@@ -529,9 +529,9 @@ int main()
         if (!CHECK_RET(ret == ACL_SUCCESS)) {
             return ret;
         }
-        aclOpExecutor *executor = nullptr;
+        aclOpExecutor* executor = nullptr;
         uint64_t workspaceSize = 0;
-        void *workspaceAddr = nullptr;
+        void* workspaceAddr = nullptr;
         ret = aclnnFlashMlaWithKvcacheMetadataGetWorkspaceSize(cuTmk, clTmk, nullptr, qS, kvS, numHeads,
                                                                numKeyValueHeads, 576, headDim, 3, "TND", metadataTensor,
                                                                &workspaceSize, &executor);

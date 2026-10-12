@@ -70,16 +70,16 @@ constexpr int64_t TILING_KEY_BIG_MASK_1_DIM = 20001;
 
 class NonZeroAscendCTilingImpl {
 public:
-    explicit NonZeroAscendCTilingImpl(gert::TilingContext *context)
+    explicit NonZeroAscendCTilingImpl(gert::TilingContext* context)
         : context_(context) {};
-    ge::graphStatus DoTiling(int64_t coreNum, int64_t ubSize, int64_t vRegSize, mNonZeroTiling &tiling_data);
+    ge::graphStatus DoTiling(int64_t coreNum, int64_t ubSize, int64_t vRegSize, mNonZeroTiling& tiling_data);
 
 private:
     ge::graphStatus CheckInputOutputSize();
     void MatchTilingStrategyAndCalcUbSizeInfo(int64_t inputDataSize);
     void CalcMaskUbSize(int64_t inputDtypeSize);
     void CalcMaskLoopNum(int64_t numInput);
-    void FillTilingData(mNonZeroTiling &tiling_data);
+    void FillTilingData(mNonZeroTiling& tiling_data);
     void PrintTilingData();
     void CalcUbSizeInfoSmallMask();
     void CalcUbSizeInfoBigMask();
@@ -134,7 +134,7 @@ private:
     ge::DataType outputDtype_ = ge::DataType::DT_MAX;
     gert::Shape xShape_;
     gert::Shape yShape_;
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
 };
 
 void NonZeroAscendCTilingImpl::CalcMaskUbSize(int64_t inputDtypeSize)
@@ -153,7 +153,7 @@ void NonZeroAscendCTilingImpl::MatchTilingStrategyAndCalcUbSizeInfo(int64_t inpu
     CalcUbSizeInfoBigMask();
 }
 
-void NonZeroAscendCTilingImpl::FillTilingData(mNonZeroTiling &tilingData)
+void NonZeroAscendCTilingImpl::FillTilingData(mNonZeroTiling& tilingData)
 {
     tilingData.set_inputDims(inputDims_);
     tilingData.set_realCoreNum(realCoreNum_);
@@ -220,7 +220,7 @@ ge::graphStatus NonZeroAscendCTilingImpl::CalcQuickDivParams()
     return ge::GRAPH_SUCCESS;
 }
 
-static std::vector<int64_t> GetXShape(const gert::Shape &shape)
+static std::vector<int64_t> GetXShape(const gert::Shape& shape)
 {
     int32_t dim_num = static_cast<int32_t>(shape.GetDimNum());
     int64_t sum = 1;
@@ -307,7 +307,7 @@ void NonZeroAscendCTilingImpl::CalcUbSizeInfoBigMask()
 }
 
 ge::graphStatus NonZeroAscendCTilingImpl::DoTiling(int64_t coreNum, int64_t ubSize, int64_t vRegSize,
-                                                   mNonZeroTiling &tiling_data)
+                                                   mNonZeroTiling& tiling_data)
 {
     OP_LOGD(context_->GetNodeName(), "Enter NonZeroAscendCTilingImpl init.");
     coreNum_ = coreNum;

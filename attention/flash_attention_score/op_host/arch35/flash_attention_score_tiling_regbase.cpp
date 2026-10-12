@@ -25,7 +25,7 @@ ge::graphStatus FlashAttentionScoreTilingRegbase::CheckContext()
     auto nextTokensPtr = attrs->GetAttrPointer<int64_t>(idx++);
     auto n1SizePtr = attrs->GetAttrPointer<int64_t>(idx++);
     auto inputLayoutPtr = attrs->GetAttrPointer<char>(idx++);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
 
     OP_CHECK_NULL_WITH_CONTEXT(context_, scaleValuePtr);
     OP_CHECK_NULL_WITH_CONTEXT(context_, keepProbPtr);
@@ -53,7 +53,7 @@ ge::graphStatus FlashAttentionScoreTilingRegbase::GetPlatformInfo()
 {
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName, "compileInfoPtr is null."),
                     return ge::GRAPH_FAILED);
         aivNum = compileInfoPtr->aivNum;
@@ -244,9 +244,9 @@ bool FlashAttentionScoreTilingRegbase::AnalyzeAttrs()
 
 bool FlashAttentionScoreTilingRegbase::AnalyzeLayout()
 {
-    auto &queryShape = context_->GetInputShape(0)->GetStorageShape();
-    auto &keyShape = context_->GetInputShape(1)->GetStorageShape();
-    auto &valueShape = context_->GetInputShape(2)->GetStorageShape();
+    auto& queryShape = context_->GetInputShape(0)->GetStorageShape();
+    auto& keyShape = context_->GetInputShape(1)->GetStorageShape();
+    auto& valueShape = context_->GetInputShape(2)->GetStorageShape();
 
     auto queryRope = context_->GetOptionalInputShape(QUERY_ROPE_INDEX);
     bool hasQueryRope = queryRope != nullptr && queryRope->GetStorageShape().GetDimNum() != 0;
@@ -260,7 +260,7 @@ bool FlashAttentionScoreTilingRegbase::AnalyzeLayout()
     }
     dSizeRope = 0; // init dSizeRope
     hasRope = hasQueryRope && hasKeyRope;
-    const gert::Shape *queryRopeShape = hasQueryRope ? &queryRope->GetStorageShape() : nullptr;
+    const gert::Shape* queryRopeShape = hasQueryRope ? &queryRope->GetStorageShape() : nullptr;
 
     size_t layoutLen = strlen(inputLayout);
     OP_LOGD(context_, "get input_layout [%s].", inputLayout);
@@ -316,22 +316,22 @@ bool FlashAttentionScoreTilingRegbase::AnalyzeLayout()
     return true;
 }
 
-bool FlashAttentionScoreTilingRegbase::GetActualSeqLenData(int64_t inputIdx, std::vector<int64_t> &res,
-                                                           int64_t &actualLen) const
+bool FlashAttentionScoreTilingRegbase::GetActualSeqLenData(int64_t inputIdx, std::vector<int64_t>& res,
+                                                           int64_t& actualLen) const
 {
     auto actualSeqLenTensor = context_->GetOptionalInputTensor(inputIdx);
     if (actualSeqLenTensor == nullptr) {
         OP_LOGW(context_, "[%s]actualSeqLenTensor is null pointer", templateName);
         return true;
     }
-    auto &actualSeqLenShape = actualSeqLenTensor->GetShape().GetStorageShape();
+    auto& actualSeqLenShape = actualSeqLenTensor->GetShape().GetStorageShape();
     if (actualSeqLenShape.GetDimNum() != 1) {
         OP_LOGW(context_, "[%s]actualSeqLenShape is invalid %lu %ld", templateName, actualSeqLenShape.GetDimNum(),
                 actualSeqLenShape.GetDim(0));
         return true;
     }
     /* Get Data from tensor. */
-    const int64_t *value = actualSeqLenTensor->GetData<int64_t>();
+    const int64_t* value = actualSeqLenTensor->GetData<int64_t>();
     if (value == nullptr) {
         OP_LOGW(context_, "[%s]actualSeqLenTensor data is null pointer", templateName);
         return true;
@@ -353,8 +353,8 @@ bool FlashAttentionScoreTilingRegbase::GetActualSeqLenData(int64_t inputIdx, std
     return true;
 }
 
-bool FlashAttentionScoreTilingRegbase::AnalyzeTndLayout(const gert::Shape &queryShape, const gert::Shape &keyShape,
-                                                        const gert::Shape &valueShape)
+bool FlashAttentionScoreTilingRegbase::AnalyzeTndLayout(const gert::Shape& queryShape, const gert::Shape& keyShape,
+                                                        const gert::Shape& valueShape)
 {
     int64_t actualSeqQLen = 0;
     int64_t actualSeqKVLen = 0;
@@ -433,9 +433,9 @@ bool FlashAttentionScoreTilingRegbase::AnalyzeTndLayout(const gert::Shape &query
     return true;
 }
 
-bool FlashAttentionScoreTilingRegbase::Analyze3DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape,
-                                                         const gert::Shape &valueShape, size_t layoutLen,
-                                                         const gert::Shape *queryRopeShape)
+bool FlashAttentionScoreTilingRegbase::Analyze3DimLayout(const gert::Shape& queryShape, const gert::Shape& keyShape,
+                                                         const gert::Shape& valueShape, size_t layoutLen,
+                                                         const gert::Shape* queryRopeShape)
 {
     int64_t h1 = 0;
     int64_t h2 = 0;
@@ -520,9 +520,9 @@ bool FlashAttentionScoreTilingRegbase::Analyze3DimLayout(const gert::Shape &quer
     return true;
 }
 
-bool FlashAttentionScoreTilingRegbase::Analyze4DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape,
-                                                         const gert::Shape &valueShape, size_t layoutLen,
-                                                         const gert::Shape *queryRopeShape)
+bool FlashAttentionScoreTilingRegbase::Analyze4DimLayout(const gert::Shape& queryShape, const gert::Shape& keyShape,
+                                                         const gert::Shape& valueShape, size_t layoutLen,
+                                                         const gert::Shape* queryRopeShape)
 {
     if (layoutLen == 4UL) {
         // 2: N idx, 3: D idx
@@ -679,8 +679,8 @@ ge::graphStatus FlashAttentionScoreTilingRegbase::GetShapeAttrsInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-bool FlashAttentionScoreTilingRegbase::AnalyzeTndPseOptionalInput(PseShapeType &pseShapeType,
-                                                                  const gert::Shape &pseShapeDims, size_t pseDimNum,
+bool FlashAttentionScoreTilingRegbase::AnalyzeTndPseOptionalInput(PseShapeType& pseShapeType,
+                                                                  const gert::Shape& pseShapeDims, size_t pseDimNum,
                                                                   int64_t pseBSize)
 {
     int64_t accumS1S2 = 0;
@@ -705,8 +705,8 @@ bool FlashAttentionScoreTilingRegbase::AnalyzeTndPseOptionalInput(PseShapeType &
     return true;
 }
 
-bool FlashAttentionScoreTilingRegbase::AnalyzeGeneralPseOptionalInput(PseShapeType &pseShapeType,
-                                                                      const gert::Shape &pseShapeDims, size_t pseDimNum,
+bool FlashAttentionScoreTilingRegbase::AnalyzeGeneralPseOptionalInput(PseShapeType& pseShapeType,
+                                                                      const gert::Shape& pseShapeDims, size_t pseDimNum,
                                                                       int64_t pseBSize)
 {
     if (pseDimNum != PSE_DIM_NUM) {
@@ -761,7 +761,7 @@ bool FlashAttentionScoreTilingRegbase::AnalyzePseOptionalInput()
     auto pseShape = context_->GetOptionalInputShape(PSE_INPUT_INDEX);
     if (pseShape != nullptr && pseShape->GetStorageShape().GetDimNum() != 0) {
         hasPse = true;
-        auto &pseShapeDims = pseShape->GetStorageShape();
+        auto& pseShapeDims = pseShape->GetStorageShape();
         size_t pseDimNum = pseShapeDims.GetDimNum();
         int64_t pseBSize = pseShapeDims.GetDim(0);
         if (pseType == static_cast<int64_t>(PseType::PSE_INNER_MUL_ADD_TYPE) ||
@@ -792,8 +792,8 @@ bool FlashAttentionScoreTilingRegbase::AnalyzePseOptionalInput()
     return true;
 }
 
-bool FlashAttentionScoreTilingRegbase::Analyze4DimAttenOptionalInput(AttenMaskShapeType &attenMaskShapeType,
-                                                                     const gert::Shape &attenMaskStorageShape)
+bool FlashAttentionScoreTilingRegbase::Analyze4DimAttenOptionalInput(AttenMaskShapeType& attenMaskShapeType,
+                                                                     const gert::Shape& attenMaskStorageShape)
 {
     int64_t attenMaskDim0Size = attenMaskStorageShape.GetDim(0);
     int64_t attenMaskDim1Size = attenMaskStorageShape.GetDim(1);
@@ -823,8 +823,8 @@ bool FlashAttentionScoreTilingRegbase::Analyze4DimAttenOptionalInput(AttenMaskSh
     return true;
 }
 
-bool FlashAttentionScoreTilingRegbase::Analyze2DimAttenOptionalInput(AttenMaskShapeType &attenMaskShapeType,
-                                                                     const gert::Shape &attenMaskStorageShape)
+bool FlashAttentionScoreTilingRegbase::Analyze2DimAttenOptionalInput(AttenMaskShapeType& attenMaskShapeType,
+                                                                     const gert::Shape& attenMaskStorageShape)
 {
     int64_t attenMaskDim0Size = attenMaskStorageShape.GetDim(0);
     int64_t attenMaskDim1Size = attenMaskStorageShape.GetDim(1);
@@ -848,7 +848,7 @@ bool FlashAttentionScoreTilingRegbase::Analyze2DimAttenOptionalInput(AttenMaskSh
     return true;
 }
 
-bool FlashAttentionScoreTilingRegbase::AnalyzeAttenOptionalInputDimNumLimit(const gert::Shape &attenMaskStorageShape,
+bool FlashAttentionScoreTilingRegbase::AnalyzeAttenOptionalInputDimNumLimit(const gert::Shape& attenMaskStorageShape,
                                                                             size_t attenMaskDimNum)
 {
     if ((attenMaskCompressMode != static_cast<uint8_t>(AttenMaskCompressMode::NO_COMPRESS_MODE) &&
@@ -889,7 +889,7 @@ bool FlashAttentionScoreTilingRegbase::AnalyzeAttenOptionalInput()
         inputParamsRegbase_->set_attenMaskDataType(1);
         // 0: (B,N2,G,S1,S2), 1: (B,1,1,S1,S2), 2: (1,1,1,S1,S2)
         AttenMaskShapeType attenMaskShapeType = AttenMaskShapeType::ATTEN_B_N2_G_S1_S2;
-        auto &attenMaskStorageShape = attenMaskShape->GetStorageShape();
+        auto& attenMaskStorageShape = attenMaskShape->GetStorageShape();
         size_t attenMaskDimNum = attenMaskStorageShape.GetDimNum();
         if (attenMaskDimNum == ATTENTION_MASK_DIM_NUM_4) {
             OP_CHECK_IF(!Analyze4DimAttenOptionalInput(attenMaskShapeType, attenMaskStorageShape),
@@ -1371,7 +1371,7 @@ void FlashAttentionScoreTilingRegbase::SetSplitCoreModeParam()
             sparseMode, firstFullLoadS1OuterIdx, splitCoreMode, thresholdS2Size);
 }
 
-void FlashAttentionScoreTilingRegbase::SetSparseTilingInfo(SparseEnum &sparseType)
+void FlashAttentionScoreTilingRegbase::SetSparseTilingInfo(SparseEnum& sparseType)
 {
     inputParamsRegbase_->set_attenMaskCompressMode(attenMaskCompressMode);
     inputParamsRegbase_->set_sparseType(static_cast<uint8_t>(sparseType));
@@ -1398,7 +1398,7 @@ int64_t FlashAttentionScoreTilingRegbase::CalcTotalSize()
     return totalSize;
 }
 
-bool FlashAttentionScoreTilingRegbase::PretokenAndNexttokenAdjustment(SparseEnum &sparseType)
+bool FlashAttentionScoreTilingRegbase::PretokenAndNexttokenAdjustment(SparseEnum& sparseType)
 {
     if (sparseMode == static_cast<int64_t>(SparseMode::ALL_MASK) ||
         sparseMode == static_cast<int64_t>(SparseMode::PREFIX) ||
@@ -1464,7 +1464,7 @@ bool FlashAttentionScoreTilingRegbase::PretokenAndNexttokenAdjustment(SparseEnum
 }
 
 bool FlashAttentionScoreTilingRegbase::SparseBandModeCheck(int64_t maxS1Val, int64_t maxS2Val, int64_t minS1Val,
-                                                           int64_t minS2Val, SparseEnum &sparseType)
+                                                           int64_t minS2Val, SparseEnum& sparseType)
 {
     int64_t oriPreTokens =
         (sparseMode == static_cast<int64_t>(SparseMode::BAND)) ? (preTokens + s2Size - s1Size) : preTokens;
@@ -1532,7 +1532,7 @@ bool FlashAttentionScoreTilingRegbase::SparseBandModeCheck(int64_t maxS1Val, int
     return true;
 }
 
-bool FlashAttentionScoreTilingRegbase::SparseModeProcess(SparseEnum &sparseType)
+bool FlashAttentionScoreTilingRegbase::SparseModeProcess(SparseEnum& sparseType)
 {
     if (!PretokenAndNexttokenAdjustment(sparseType)) {
         return false;
@@ -1560,7 +1560,7 @@ bool FlashAttentionScoreTilingRegbase::SparseModeProcess(SparseEnum &sparseType)
     return true;
 }
 
-bool FlashAttentionScoreTilingRegbase::GetSparseInfo(SparseEnum &sparseType)
+bool FlashAttentionScoreTilingRegbase::GetSparseInfo(SparseEnum& sparseType)
 {
     OP_LOGD(context_, "check sparse info: preTokens[%ld], nextTokens[%ld], s1[%ld], s2[%ld], hasAttenMask[%d].",
             preTokens, nextTokens, s1Size, s2Size, hasAttenMask);
@@ -1601,7 +1601,7 @@ bool FlashAttentionScoreTilingRegbase::GetSparseInfo(SparseEnum &sparseType)
     return true;
 }
 
-bool FlashAttentionScoreTilingRegbase::InitSparseValidArray(std::vector<int64_t> &sparseValidArray, int64_t bIdx)
+bool FlashAttentionScoreTilingRegbase::InitSparseValidArray(std::vector<int64_t>& sparseValidArray, int64_t bIdx)
 {
     OP_CHECK_IF(sparseValidArray.empty(),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "sparseValidArray", "0",
@@ -1642,10 +1642,10 @@ bool FlashAttentionScoreTilingRegbase::InitSparseValidArray(std::vector<int64_t>
     return true;
 }
 
-bool FlashAttentionScoreTilingRegbase::PartitionSparseData(const std::vector<int64_t> &sparseRollingArray,
+bool FlashAttentionScoreTilingRegbase::PartitionSparseData(const std::vector<int64_t>& sparseRollingArray,
                                                            int64_t sparseRollingArraySum, int64_t sparseArraySize,
                                                            int64_t loadMaxEachCore,
-                                                           std::vector<int64_t> &partitionResult)
+                                                           std::vector<int64_t>& partitionResult)
 {
     OP_CHECK_IF(partitionResult.empty(),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "partitionResult", "0",
@@ -1691,12 +1691,12 @@ bool FlashAttentionScoreTilingRegbase::PartitionSparseData(const std::vector<int
 }
 
 void FlashAttentionScoreTilingRegbase::SetPrefixSparseStartIdx(
-    const std::vector<std::vector<int64_t>> &sparseValidArray, MultiCoreParamsRegbase &multiCoreParamsRegbase,
+    const std::vector<std::vector<int64_t>>& sparseValidArray, MultiCoreParamsRegbase& multiCoreParamsRegbase,
     int64_t maxCoreNum)
 {
     int64_t validAivNum = std::min(static_cast<int64_t>(multiCoreParamsRegbase.get_coreNum()), maxCoreNum);
     int64_t totalSize = multiCoreParamsRegbase.get_totalSize(); // BN2GS1.o
-    int64_t *sparseStartIdx = multiCoreParamsRegbase.get_sparseStartIdxPtr();
+    int64_t* sparseStartIdx = multiCoreParamsRegbase.get_sparseStartIdxPtr();
     for (int64_t idx = 0; idx < maxCoreNum; ++idx) {
         sparseStartIdx[idx] = totalSize;
     }
@@ -1759,14 +1759,14 @@ void FlashAttentionScoreTilingRegbase::SetPrefixSparseStartIdx(
     }
 }
 
-bool FlashAttentionScoreTilingRegbase::SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray,
-                                                         MultiCoreParamsRegbase &multiCoreParamsRegbase,
+bool FlashAttentionScoreTilingRegbase::SetSparseStartIdx(const std::vector<int64_t>& sparseValidArray,
+                                                         MultiCoreParamsRegbase& multiCoreParamsRegbase,
                                                          int64_t maxCoreNum)
 {
     // to avoid buffer overflow, or maybe sometimes we want to only verify single core
     int64_t validAivNum = std::min(static_cast<int64_t>(multiCoreParamsRegbase.get_coreNum()), maxCoreNum);
     int64_t totalSize = multiCoreParamsRegbase.get_totalSize(); // BN2GS1.o
-    int64_t *sparseStartIdx = multiCoreParamsRegbase.get_sparseStartIdxPtr();
+    int64_t* sparseStartIdx = multiCoreParamsRegbase.get_sparseStartIdxPtr();
     for (int64_t idx = 0; idx < maxCoreNum; ++idx) {
         sparseStartIdx[idx] = totalSize;
     }
@@ -1812,8 +1812,8 @@ bool FlashAttentionScoreTilingRegbase::SetSparseStartIdx(const std::vector<int64
     return true;
 }
 
-int64_t FlashAttentionScoreTilingRegbase::PrintSparseMaxMinLoadPerCore(const std::vector<int64_t> &sparseValidArray,
-                                                                       int64_t *sparseStartIdx, int32_t validAivNum,
+int64_t FlashAttentionScoreTilingRegbase::PrintSparseMaxMinLoadPerCore(const std::vector<int64_t>& sparseValidArray,
+                                                                       int64_t* sparseStartIdx, int32_t validAivNum,
                                                                        int64_t avgLoadSize)
 {
     int64_t maxLoadSize = 0;
@@ -1864,7 +1864,7 @@ int64_t FlashAttentionScoreTilingRegbase::PrintSparseMaxMinLoadPerCore(const std
     return 0;
 }
 
-SparseEnum FlashAttentionScoreTilingRegbase::GetPrefixNList(std::ostringstream &failReason)
+SparseEnum FlashAttentionScoreTilingRegbase::GetPrefixNList(std::ostringstream& failReason)
 {
     auto prefixN = context_->GetOptionalInputTensor(PREFIX_INPUT_INDEX);
     bool isPrefixNullptr = true;
@@ -1883,7 +1883,7 @@ SparseEnum FlashAttentionScoreTilingRegbase::GetPrefixNList(std::ostringstream &
         return SparseEnum::ALL;
     }
 
-    auto &prefixShape = prefixN->GetShape().GetStorageShape();
+    auto& prefixShape = prefixN->GetShape().GetStorageShape();
     if (prefixShape.GetDimNum() != 1) {
         OP_LOGW(context_, "[%s] prefixN shape is invalid, DimNum should be 1, but it is %lu.", templateName,
                 prefixShape.GetDimNum());
@@ -1936,9 +1936,9 @@ ge::graphStatus FlashAttentionScoreTilingRegbase::SetQKVStartIdx()
     inputParamsRegbase_->set_kvStartIdx(0);
     auto qStartIdxTensor = context_->GetOptionalInputTensor(Q_START_IDX_INPUT_INDEX);
     if (qStartIdxTensor != nullptr) {
-        auto &qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
+        auto& qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
         if (qStartIdxShape.GetDimNum() >= 1 && qStartIdxShape.GetDim(0) != 0) {
-            const int64_t *value = qStartIdxTensor->GetData<int64_t>();
+            const int64_t* value = qStartIdxTensor->GetData<int64_t>();
             if (value != nullptr) {
                 qStartIdx = value[0];
                 inputParamsRegbase_->set_qStartIdx(qStartIdx);
@@ -1949,9 +1949,9 @@ ge::graphStatus FlashAttentionScoreTilingRegbase::SetQKVStartIdx()
 
     auto kvStartIdxTensor = context_->GetOptionalInputTensor(KV_START_IDX_INPUT_INDEX);
     if (kvStartIdxTensor != nullptr) {
-        auto &kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
+        auto& kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
         if (kvStartIdxShape.GetDimNum() >= 1 && kvStartIdxShape.GetDim(0) != 0) {
-            const int64_t *kvValue = kvStartIdxTensor->GetData<int64_t>();
+            const int64_t* kvValue = kvStartIdxTensor->GetData<int64_t>();
             if (kvValue != nullptr) {
                 kvStartIdx = kvValue[0];
                 inputParamsRegbase_->set_kvStartIdx(kvStartIdx);
@@ -2009,7 +2009,7 @@ ge::graphStatus FlashAttentionScoreTilingRegbase::PostTiling()
 {
     auto numBlocks = CalcTschBlockDim(multiCoreParamsRegbase_->get_coreNum() * 2, aicNum, aivNum);
     context_->SetBlockDim(numBlocks);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     if (inputParamsRegbase_->get_needDropMaskOp() == 1) {
         numBlocks = CalcTschBlockDim(aivNum, aicNum, aivNum);
         context_->SetBlockDim(numBlocks);

@@ -35,12 +35,12 @@ TEST_P(FlashAttentionScoreInferDTypeTest, param)
     std::vector<uint32_t> inputInstance(22, 1);
     std::vector<uint32_t> outputInstance(4, 1);
     ge::DataType inputDtype = param.input_dtype;
-    std::vector<void *> inputDataTypes = {&inputDtype, &inputDtype, &inputDtype, &inputDtype, &inputDtype, &inputDtype,
-                                          &inputDtype, &inputDtype, &inputDtype, &inputDtype, &inputDtype, &inputDtype,
-                                          &inputDtype, &inputDtype, &inputDtype, &inputDtype, &inputDtype, &inputDtype,
-                                          &inputDtype, &inputDtype, &inputDtype, &inputDtype};
-    std::vector<void *> outputDataTypes = {&param.softmaxMax_dtype, &param.softmaxSum_dtype, &param.softmaxOut_dtype,
-                                           &param.attentionOut_dtype};
+    std::vector<void*> inputDataTypes = {&inputDtype, &inputDtype, &inputDtype, &inputDtype, &inputDtype, &inputDtype,
+                                         &inputDtype, &inputDtype, &inputDtype, &inputDtype, &inputDtype, &inputDtype,
+                                         &inputDtype, &inputDtype, &inputDtype, &inputDtype, &inputDtype, &inputDtype,
+                                         &inputDtype, &inputDtype, &inputDtype, &inputDtype};
+    std::vector<void*> outputDataTypes = {&param.softmaxMax_dtype, &param.softmaxSum_dtype, &param.softmaxOut_dtype,
+                                          &param.attentionOut_dtype};
 
     auto contextHolder =
         gert::InferDataTypeContextFaker()

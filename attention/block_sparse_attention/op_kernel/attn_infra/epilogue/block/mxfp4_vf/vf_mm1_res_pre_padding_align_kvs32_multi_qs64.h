@@ -25,7 +25,7 @@ using namespace AscendC;
 using namespace Reg;
 
 template <typename T, uint16_t QsBase = 128>
-__simd_vf__ inline void mm1_res_pre_padding_align_kvs32_multi_qs64_vf(__ubuf__ T *s, uint16_t actKvsTile,
+__simd_vf__ inline void mm1_res_pre_padding_align_kvs32_multi_qs64_vf(__ubuf__ T* s, uint16_t actKvsTile,
                                                                       uint16_t kvsActBaseTileAlign32)
 {
     // ====================== 寄存器定义 ======================
@@ -45,10 +45,10 @@ __simd_vf__ inline void mm1_res_pre_padding_align_kvs32_multi_qs64_vf(__ubuf__ T
 }
 
 template <typename T>
-__aicore__ inline void Mm1ResPrePaddingAlignKvs32MultiQs64CallVF(const LocalTensor<T> &srcTensor, uint16_t actKvsTile,
+__aicore__ inline void Mm1ResPrePaddingAlignKvs32MultiQs64CallVF(const LocalTensor<T>& srcTensor, uint16_t actKvsTile,
                                                                  uint16_t kvsActBaseTileAlign32)
 {
-    __ubuf__ T *s_ub = (__ubuf__ T *)srcTensor.GetPhyAddr();
+    __ubuf__ T* s_ub = (__ubuf__ T*)srcTensor.GetPhyAddr();
 
     mm1_res_pre_padding_align_kvs32_multi_qs64_vf<T>(s_ub, actKvsTile, kvsActBaseTileAlign32);
 }

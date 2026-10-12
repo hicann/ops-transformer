@@ -159,7 +159,7 @@ struct CopyL0CToUBTla<
     static constexpr auto reluEn = ReluEnable_;
 
     template <class TensorDst, class TensorSrc>
-    CATLASS_DEVICE void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint8_t unitFlag = 0)
+    CATLASS_DEVICE void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint8_t unitFlag = 0)
     {
         static_assert(
             tla::detail::isRowMajor<typename TensorDst::Layout>::value &&
@@ -188,7 +188,7 @@ struct CopyL0CToUBTla<
     }
 
     template <class TensorDst, class TensorSrc>
-    CATLASS_DEVICE void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint32_t ubRowNum,
+    CATLASS_DEVICE void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint32_t ubRowNum,
                                    uint8_t beginSubBlockIdx, uint8_t sendVecNum, uint8_t unitFlag = 0)
     {
         static_assert(
@@ -230,7 +230,7 @@ struct CopyL0CToUBTla<
     }
 
     template <class TensorDst, class TensorSrc>
-    CATLASS_DEVICE void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint8_t subBlockIdx,
+    CATLASS_DEVICE void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint8_t subBlockIdx,
                                    uint8_t unitFlag = 0)
     {
         static_assert(
@@ -277,7 +277,7 @@ struct CopyL0CToUBTla<
     static constexpr auto reluEn = ReluEnable_;
 
     template <class TensorDst, class TensorSrc>
-    CATLASS_DEVICE void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint8_t unitFlag = 0)
+    CATLASS_DEVICE void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint8_t unitFlag = 0)
     {
         static_assert(
             tla::detail::isRowMajor<typename TensorDst::Layout>::value &&
@@ -322,7 +322,7 @@ struct CopyL0CToUBTla<
     static constexpr auto reluEn = ReluEnable_;
 
     template <class TensorDst, class TensorSrc>
-    CATLASS_DEVICE void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint8_t unitFlag = 0)
+    CATLASS_DEVICE void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint8_t unitFlag = 0)
     {
         static_assert(
             tla::detail::isRowMajor<typename TensorDst::Layout>::value &&

@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
-# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
@@ -27,16 +27,33 @@ for _, params in enumerate(ENABLED_PARAMS):
 
     # 生成所有参数组合
     param_names = [
-        "batch_size", "hidden_size", "Seq_len", "head_dim", "block_size", "cmp_ratio",
-        "coff", "start_p", "cache_mode", "layout_x", "data_type", "cu_seqlens", "seqused", "start_pos",
-        "x_datarange","wkv_datarange","wgate_datarange","ape_datarange","kv_state_datarange","score_state_datarange"
+        "batch_size",
+        "hidden_size",
+        "Seq_len",
+        "head_dim",
+        "block_size",
+        "cmp_ratio",
+        "coff",
+        "start_p",
+        "cache_mode",
+        "layout_x",
+        "data_type",
+        "cu_seqlens",
+        "seqused",
+        "start_pos",
+        "x_datarange",
+        "wkv_datarange",
+        "wgate_datarange",
+        "ape_datarange",
+        "kv_state_datarange",
+        "score_state_datarange",
     ]
 
     param_values = [
         locals()["param_batch_size"],
         locals()["param_hidden_size"],
         locals()["param_Seq_len"],
-        locals()["param_head_dim"], 
+        locals()["param_head_dim"],
         locals()["param_block_size"],
         locals()["param_cmp_ratio"],
         locals()["param_coff"],
@@ -62,31 +79,50 @@ for _, params in enumerate(ENABLED_PARAMS):
 
     @pytest.mark.ci
     @pytest.mark.parametrize("param_combinations", locals()["param_combinations"])
-    def test_compressor(param_combinations):   # 初始化参数和tensor
-        batch_size = param_combinations['batch_size']
-        hidden_size = param_combinations['hidden_size']
-        Seq_len = param_combinations['Seq_len']
-        head_dim = param_combinations['head_dim']
-        block_size = param_combinations['block_size']
-        cmp_ratio = param_combinations['cmp_ratio']
-        coff = param_combinations['coff']
-        start_p = param_combinations['start_p']
-        cache_mode = param_combinations['cache_mode']
-        layout_x = param_combinations['layout_x']
-        data_type = param_combinations['data_type']
-        cu_seqlens = param_combinations['cu_seqlens']
-        seqused = param_combinations['seqused']
-        start_pos = param_combinations['start_pos']
-        x_datarange = param_combinations['x_datarange']
-        wkv_datarange = param_combinations['wkv_datarange']
-        wgate_datarange = param_combinations['wgate_datarange']
-        ape_datarange = param_combinations['ape_datarange']
-        kv_state_datarange = param_combinations['kv_state_datarange']
-        score_state_datarange = param_combinations['score_state_datarange']
+    def test_compressor(param_combinations):  # 初始化参数和tensor
+        batch_size = param_combinations["batch_size"]
+        hidden_size = param_combinations["hidden_size"]
+        Seq_len = param_combinations["Seq_len"]
+        head_dim = param_combinations["head_dim"]
+        block_size = param_combinations["block_size"]
+        cmp_ratio = param_combinations["cmp_ratio"]
+        coff = param_combinations["coff"]
+        start_p = param_combinations["start_p"]
+        cache_mode = param_combinations["cache_mode"]
+        layout_x = param_combinations["layout_x"]
+        data_type = param_combinations["data_type"]
+        cu_seqlens = param_combinations["cu_seqlens"]
+        seqused = param_combinations["seqused"]
+        start_pos = param_combinations["start_pos"]
+        x_datarange = param_combinations["x_datarange"]
+        wkv_datarange = param_combinations["wkv_datarange"]
+        wgate_datarange = param_combinations["wgate_datarange"]
+        ape_datarange = param_combinations["ape_datarange"]
+        kv_state_datarange = param_combinations["kv_state_datarange"]
+        score_state_datarange = param_combinations["score_state_datarange"]
 
-        test_data = batch_size, hidden_size, Seq_len, head_dim, block_size, cmp_ratio, coff, \
-                    start_p, cache_mode, layout_x, data_type, cu_seqlens, seqused, start_pos, \
-                    x_datarange, wkv_datarange,  wgate_datarange, ape_datarange, kv_state_datarange, score_state_datarange
+        test_data = (
+            batch_size,
+            hidden_size,
+            Seq_len,
+            head_dim,
+            block_size,
+            cmp_ratio,
+            coff,
+            start_p,
+            cache_mode,
+            layout_x,
+            data_type,
+            cu_seqlens,
+            seqused,
+            start_pos,
+            x_datarange,
+            wkv_datarange,
+            wgate_datarange,
+            ape_datarange,
+            kv_state_datarange,
+            score_state_datarange,
+        )
 
         torch_npu.npu.set_device(0)
 

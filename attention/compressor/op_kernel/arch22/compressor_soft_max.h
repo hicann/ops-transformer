@@ -28,8 +28,8 @@ namespace Compressor {
  * @param row 行数
  * @param col 列数
  */
-__aicore__ inline void ColumnSoftMax(const LocalTensor<float> &dstLocal, const LocalTensor<float> &srcLocal,
-                                     const LocalTensor<float> &shareTmpUb, uint32_t row, uint32_t col)
+__aicore__ inline void ColumnSoftMax(const LocalTensor<float>& dstLocal, const LocalTensor<float>& srcLocal,
+                                     const LocalTensor<float>& shareTmpUb, uint32_t row, uint32_t col)
 {
     uint32_t dtypeMask = FP32_REPEAT_ELEMENT_NUM;
     uint32_t dLoop = col / dtypeMask;

@@ -34,13 +34,13 @@ FAG_PRE_CLASS_TEMPLATE
 class FlashAttentionScoreGradS1S2BNGS1S2PreRegbase {
 public:
     __aicore__ inline FlashAttentionScoreGradS1S2BNGS1S2PreRegbase(){};
-    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv,
-                                __gm__ uint8_t *actual_seq_kvlen, __gm__ uint8_t *drop_mask, __gm__ uint8_t *workspace,
-                                FagTilingType ordTilingData, TPipe *pipeIn);
+    __aicore__ inline void Init(__gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv,
+                                __gm__ uint8_t* actual_seq_kvlen, __gm__ uint8_t* drop_mask, __gm__ uint8_t* workspace,
+                                FagTilingType ordTilingData, TPipe* pipeIn);
     __aicore__ inline void Process();
     __aicore__ inline void SyncALLCores();
 
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> helpQue;
     TQue<QuePosition::VECIN, 1> inputQue;
     TQue<QuePosition::VECIN, 1> castQue;
@@ -102,8 +102,8 @@ public:
 
 FAG_PRE_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PreRegbase<FAG_PRE_FUNCTION_PARAMS_TEMPLATE>::Init(
-    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *actual_seq_kvlen,
-    __gm__ uint8_t *drop_mask, __gm__ uint8_t *workspace, FagTilingType orgTilingData, TPipe *pipeIn)
+    __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* actual_seq_kvlen,
+    __gm__ uint8_t* drop_mask, __gm__ uint8_t* workspace, FagTilingType orgTilingData, TPipe* pipeIn)
 {
     cBlockIdx = GetBlockIdx();
 
@@ -128,7 +128,7 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PreRegbase<FAG_PRE_FUNC
         sinkPreBlockFactor = tilingData->preTilingData.sinkPreBlockFactor;
         sinkPreBlockTotal = tilingData->preTilingData.sinkPreBlockTotal;
         sinkPreBlockTail = tilingData->preTilingData.sinkPreBlockTail;
-        dsinkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dsinkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                          tilingData->postTilingData.dsinkWorkSpaceOffset / sizeof(float));
         initdsinkSize = cBlockIdx == sinkPreBlockTotal - 1 ? sinkPreBlockTail : sinkPreBlockFactor;
         dsinkOffset = ((uint64_t)cBlockIdx) * sinkPreBlockFactor;
@@ -136,17 +136,14 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PreRegbase<FAG_PRE_FUNC
 
     maskUsedCoreNum = tilingData->preTilingData.maskCoreNum;
 
-    drop_maskGm.SetGlobalBuffer((__gm__ uint8_t *)drop_mask);
-    dqGm.SetGlobalBuffer((__gm__ T1 *)dq);
-    dkGm.SetGlobalBuffer((__gm__ T1 *)dk);
-    dvGm.SetGlobalBuffer((__gm__ T1 *)dv);
+    drop_maskGm.SetGlobalBuffer((__gm__ uint8_t*)drop_mask);
+    dqGm.SetGlobalBuffer((__gm__ T1*)dq);
+    dkGm.SetGlobalBuffer((__gm__ T1*)dk);
+    dvGm.SetGlobalBuffer((__gm__ T1*)dv);
 
-    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                  tilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
-    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                  tilingData->postTilingData.dkWorkSpaceOffset / sizeof(T2));
-    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                  tilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
+    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + tilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
+    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + tilingData->postTilingData.dkWorkSpaceOffset / sizeof(T2));
+    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + tilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
 
     initdqSize = cBlockIdx == qPreBlockTotal - 1 ? qPreBlockTail : qPreBlockFactor;
     dqOffset = ((uint64_t)cBlockIdx) * qPreBlockFactor;
@@ -159,16 +156,16 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PreRegbase<FAG_PRE_FUNC
     isDropBoolMode = tilingData->preTilingData.dropoutIsDivisibleBy8 == 0;
     if constexpr (IS_TND) {
         if (!isDropBoolMode && tilingData->s1s2BNGS1S2BaseParams.keepProb < 1) {
-            isDropBoolMode = (((__gm__ int64_t *)actual_seq_kvlen)[0] % 8 != 0);
+            isDropBoolMode = (((__gm__ int64_t*)actual_seq_kvlen)[0] % 8 != 0);
             for (uint32_t i = 0; i + 1 < tilingData->s1s2BNGS1S2BaseParams.b; i++) {
                 const int64_t seqS2iplus1 =
-                    ((__gm__ int64_t *)actual_seq_kvlen)[i + 1] - ((__gm__ int64_t *)actual_seq_kvlen)[i];
+                    ((__gm__ int64_t*)actual_seq_kvlen)[i + 1] - ((__gm__ int64_t*)actual_seq_kvlen)[i];
                 isDropBoolMode = (isDropBoolMode || (seqS2iplus1 % 8 != 0));
             }
         }
     }
     if (tilingData->s1s2BNGS1S2BaseParams.dropMaskOuter && isDropBoolMode) {
-        maskWorkSpaceGm.SetGlobalBuffer((__gm__ uint8_t *)workspace + tilingData->postTilingData.dropMaskGmOffset);
+        maskWorkSpaceGm.SetGlobalBuffer((__gm__ uint8_t*)workspace + tilingData->postTilingData.dropMaskGmOffset);
 
         pipe->InitBuffer(helpQue, 1, HELP_LEN);
         pipe->InitBuffer(inputQue, 1, tilingData->preTilingData.inputBufferLen);

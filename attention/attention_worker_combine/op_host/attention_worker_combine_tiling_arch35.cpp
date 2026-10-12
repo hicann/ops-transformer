@@ -58,7 +58,7 @@ static_assert(MXFP_H_TILE_ALIGN % MXFP_SCALE_GROUP_SIZE == 0);
 
 class AttentionWorkerCombineTilingArch35 : public AttentionWorkerCombineTilingBase {
 public:
-    explicit AttentionWorkerCombineTilingArch35(gert::TilingContext *context)
+    explicit AttentionWorkerCombineTilingArch35(gert::TilingContext* context)
         : AttentionWorkerCombineTilingBase(context)
     {}
     ~AttentionWorkerCombineTilingArch35() override = default;
@@ -82,13 +82,13 @@ private:
     ge::graphStatus ValidateInputs();
     ge::graphStatus ValidateOutput() const;
     void SetBsTiling(int64_t bsCoreNum);
-    void SetHTiling(int64_t hAlign, int64_t hCapacity, int64_t &bsCoreNum);
-    void DoOpTilingSplitH(int64_t hAlign, int64_t hCapacity, int64_t &bsCoreNum);
+    void SetHTiling(int64_t hAlign, int64_t hCapacity, int64_t& bsCoreNum);
+    void DoOpTilingSplitH(int64_t hAlign, int64_t hCapacity, int64_t& bsCoreNum);
     void DoOpTilingFullK(int64_t bsCoreNum, int64_t hAlign, int64_t kIn);
-    void SelectBestHCore(int64_t hAlign, int64_t hInSplitK, int64_t &bsCoreNum, int64_t &lastCoreNum,
-                         int64_t &lastBestHCore);
+    void SelectBestHCore(int64_t hAlign, int64_t hInSplitK, int64_t& bsCoreNum, int64_t& lastCoreNum,
+                         int64_t& lastBestHCore);
 
-    AttentionWorkerCombineRegbaseTilingData *tilingData{nullptr};
+    AttentionWorkerCombineRegbaseTilingData* tilingData{nullptr};
     int64_t batchSize_{0};
     int64_t k_{0};
     int64_t hiddenSize_{0};
@@ -132,9 +132,9 @@ ge::graphStatus AttentionWorkerCombineTilingArch35::ParseAttrs()
 
 ge::graphStatus AttentionWorkerCombineTilingArch35::ValidateInputs()
 {
-    const auto *shapePtr = context_->GetInputShape(EXPERT_SCALES_INDEX);
+    const auto* shapePtr = context_->GetInputShape(EXPERT_SCALES_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, shapePtr);
-    const auto &shape = shapePtr->GetStorageShape();
+    const auto& shape = shapePtr->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != (isMxfpCase_ ? 3U : 2U),
                 OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "expert_scales",
                                                          std::to_string(shape.GetDimNum()).c_str(),
@@ -151,7 +151,7 @@ ge::graphStatus AttentionWorkerCombineTilingArch35::ValidateInputs()
             (std::to_string(batchSize) + "," + std::to_string(routedK) + "," + std::to_string(hiddenSize_)).c_str(),
             "R/H must be positive and K must be in [1,64]."),
         return ge::GRAPH_FAILED);
-    const auto *scaleDesc = context_->GetInputDesc(EXPERT_SCALES_INDEX);
+    const auto* scaleDesc = context_->GetInputDesc(EXPERT_SCALES_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, scaleDesc);
     OP_CHECK_IF(scaleDesc->GetDataType() != (isMxfpCase_ ? ge::DT_FLOAT8_E8M0 : ge::DT_FLOAT),
                 OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "expert_scales",
@@ -177,7 +177,7 @@ ge::graphStatus AttentionWorkerCombineTilingArch35::ValidateInputs()
 
 ge::graphStatus AttentionWorkerCombineTilingArch35::ValidateOutput() const
 {
-    const auto *outDesc = context_->GetOutputDesc(0);
+    const auto* outDesc = context_->GetOutputDesc(0);
     OP_CHECK_NULL_WITH_CONTEXT(context_, outDesc);
     const ge::DataType expectedOutputType = tokenDtype_ == TOKEN_DTYPE_FP16 ? ge::DT_FLOAT16 : ge::DT_BF16;
     OP_CHECK_IF(
@@ -230,8 +230,8 @@ void AttentionWorkerCombineTilingArch35::DoOpTilingFullK(int64_t bsCoreNum, int6
     context_->SetBlockDim(bsCoreNum);
 }
 
-void AttentionWorkerCombineTilingArch35::SelectBestHCore(int64_t hAlign, int64_t hInSplitK, int64_t &bsCoreNum,
-                                                         int64_t &lastCoreNum, int64_t &lastBestHCore)
+void AttentionWorkerCombineTilingArch35::SelectBestHCore(int64_t hAlign, int64_t hInSplitK, int64_t& bsCoreNum,
+                                                         int64_t& lastCoreNum, int64_t& lastBestHCore)
 {
     int64_t bsMaxCore = 0;
     int64_t batchSize = tilingData->BS;
@@ -317,7 +317,7 @@ ge::graphStatus AttentionWorkerCombineTilingArch35::CalcOpTiling()
     return DoOpTilingNonquant();
 }
 
-void AttentionWorkerCombineTilingArch35::SetHTiling(int64_t hAlign, int64_t hCapacity, int64_t &bsCoreNum)
+void AttentionWorkerCombineTilingArch35::SetHTiling(int64_t hAlign, int64_t hCapacity, int64_t& bsCoreNum)
 {
     int64_t hCores = 1;
     int64_t mainLoops = CeilDiv(hAlign, hCapacity);
@@ -347,7 +347,7 @@ void AttentionWorkerCombineTilingArch35::SetHTiling(int64_t hAlign, int64_t hCap
     tilingData->tailCoreHLoopNum = tailLoops;
 }
 
-void AttentionWorkerCombineTilingArch35::DoOpTilingSplitH(int64_t hAlign, int64_t hCapacity, int64_t &bsCoreNum)
+void AttentionWorkerCombineTilingArch35::DoOpTilingSplitH(int64_t hAlign, int64_t hCapacity, int64_t& bsCoreNum)
 {
     SetHTiling(hAlign, hCapacity, bsCoreNum);
     tilingData->KSplitFactor = 1;

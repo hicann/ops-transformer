@@ -134,8 +134,8 @@ constexpr uint16_t KDA_ARCH35_SOLVE_FIX_EVENT = 7;
 
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
 template <bool HAS_BIAS>
-static __simd_vf__ inline void AccumulateRawSafeGateChunk128Regbase(__ubuf__ float *input, __ubuf__ float *bias,
-                                                                    __ubuf__ float *acc, uint16_t rows, float expA,
+static __simd_vf__ inline void AccumulateRawSafeGateChunk128Regbase(__ubuf__ float* input, __ubuf__ float* bias,
+                                                                    __ubuf__ float* acc, uint16_t rows, float expA,
                                                                     float lowerBound)
 {
     using namespace AscendC::Reg;
@@ -191,9 +191,9 @@ static __simd_vf__ inline void AccumulateRawSafeGateChunk128Regbase(__ubuf__ flo
 }
 
 template <typename InputT>
-__simd_callee__ inline void LoadKdaGateRegbasePair(AscendC::Reg::RegTensor<float> &zeroReg,
-                                                   AscendC::Reg::RegTensor<float> &oneReg, __ubuf__ InputT *src,
-                                                   AscendC::Reg::MaskReg &inputMask)
+__simd_callee__ inline void LoadKdaGateRegbasePair(AscendC::Reg::RegTensor<float>& zeroReg,
+                                                   AscendC::Reg::RegTensor<float>& oneReg, __ubuf__ InputT* src,
+                                                   AscendC::Reg::MaskReg& inputMask)
 {
     using namespace AscendC::Reg;
     if constexpr (std::is_same<InputT, float>()) {
@@ -206,9 +206,9 @@ __simd_callee__ inline void LoadKdaGateRegbasePair(AscendC::Reg::RegTensor<float
 }
 
 template <typename OutputT>
-__simd_callee__ inline void ClampKdaGateRegbaseOutput(AscendC::Reg::RegTensor<float> &zeroReg,
-                                                      AscendC::Reg::RegTensor<float> &oneReg,
-                                                      AscendC::Reg::MaskReg &floatMask)
+__simd_callee__ inline void ClampKdaGateRegbaseOutput(AscendC::Reg::RegTensor<float>& zeroReg,
+                                                      AscendC::Reg::RegTensor<float>& oneReg,
+                                                      AscendC::Reg::MaskReg& floatMask)
 {
     using namespace AscendC::Reg;
     if constexpr (std::is_same<OutputT, half>()) {
@@ -220,11 +220,11 @@ __simd_callee__ inline void ClampKdaGateRegbaseOutput(AscendC::Reg::RegTensor<fl
 }
 
 template <typename OutputT, bool USE_REF, bool NEGATIVE>
-__simd_callee__ inline void BuildKdaGateRegbaseExp(AscendC::Reg::RegTensor<float> &expZeroReg,
-                                                   AscendC::Reg::RegTensor<float> &expOneReg,
-                                                   AscendC::Reg::RegTensor<float> &gateZeroReg,
-                                                   AscendC::Reg::RegTensor<float> &gateOneReg, __ubuf__ float *ref,
-                                                   AscendC::Reg::MaskReg &floatMask)
+__simd_callee__ inline void BuildKdaGateRegbaseExp(AscendC::Reg::RegTensor<float>& expZeroReg,
+                                                   AscendC::Reg::RegTensor<float>& expOneReg,
+                                                   AscendC::Reg::RegTensor<float>& gateZeroReg,
+                                                   AscendC::Reg::RegTensor<float>& gateOneReg, __ubuf__ float* ref,
+                                                   AscendC::Reg::MaskReg& floatMask)
 {
     using namespace AscendC::Reg;
     constexpr float expInputMax = std::is_same<OutputT, bfloat16_t>() ? KDA_SCORE_EXP_INPUT_MAX : KDA_EXP_INPUT_MAX;
@@ -254,9 +254,9 @@ __simd_callee__ inline void BuildKdaGateRegbaseExp(AscendC::Reg::RegTensor<float
 }
 
 template <typename OutputT>
-__simd_callee__ inline void StoreKdaGateRegbasePair(__ubuf__ OutputT *dst, AscendC::Reg::RegTensor<float> &zeroReg,
-                                                    AscendC::Reg::RegTensor<float> &oneReg,
-                                                    AscendC::Reg::MaskReg &inputMask, AscendC::Reg::MaskReg &floatMask)
+__simd_callee__ inline void StoreKdaGateRegbasePair(__ubuf__ OutputT* dst, AscendC::Reg::RegTensor<float>& zeroReg,
+                                                    AscendC::Reg::RegTensor<float>& oneReg,
+                                                    AscendC::Reg::MaskReg& inputMask, AscendC::Reg::MaskReg& floatMask)
 {
     using namespace AscendC::Reg;
     RegTensor<OutputT> outputReg;
@@ -266,10 +266,10 @@ __simd_callee__ inline void StoreKdaGateRegbasePair(__ubuf__ OutputT *dst, Ascen
 }
 
 template <typename InputT, typename OutputT, typename GK_T, bool USE_REF>
-static __simd_vf__ inline void PrepareKdaGateQwRegbase(__ubuf__ InputT *q, __ubuf__ InputT *k, __ubuf__ OutputT *qOut,
-                                                       __ubuf__ OutputT *kOut, __ubuf__ InputT *qDirect,
-                                                       __ubuf__ InputT *kDirect, __ubuf__ GK_T *gate,
-                                                       __ubuf__ float *ref, uint16_t rows, uint16_t cols)
+static __simd_vf__ inline void PrepareKdaGateQwRegbase(__ubuf__ InputT* q, __ubuf__ InputT* k, __ubuf__ OutputT* qOut,
+                                                       __ubuf__ OutputT* kOut, __ubuf__ InputT* qDirect,
+                                                       __ubuf__ InputT* kDirect, __ubuf__ GK_T* gate,
+                                                       __ubuf__ float* ref, uint16_t rows, uint16_t cols)
 {
     using namespace AscendC::Reg;
     constexpr uint16_t ELEMENTS_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(InputT);
@@ -317,8 +317,8 @@ static __simd_vf__ inline void PrepareKdaGateQwRegbase(__ubuf__ InputT *q, __ubu
 }
 
 template <typename InputT, typename OutputT, typename GK_T, bool USE_REF>
-static __simd_vf__ inline void PrepareKdaGateKgRegbase(__ubuf__ OutputT *kg, __ubuf__ InputT *k, __ubuf__ GK_T *gate,
-                                                       __ubuf__ float *ref, uint16_t rows, uint16_t cols,
+static __simd_vf__ inline void PrepareKdaGateKgRegbase(__ubuf__ OutputT* kg, __ubuf__ InputT* k, __ubuf__ GK_T* gate,
+                                                       __ubuf__ float* ref, uint16_t rows, uint16_t cols,
                                                        uint16_t validRows)
 {
     using namespace AscendC::Reg;
@@ -360,10 +360,10 @@ static __simd_vf__ inline void PrepareKdaGateKgRegbase(__ubuf__ OutputT *kg, __u
 template <typename InputT, typename OutputT, typename GK_T, bool USE_REF, bool STORE_DIRECT, bool EXPORT_FINAL_KG,
           bool SCALE_SCORE_W = false>
 static __simd_vf__ inline void PrepareKdaGateQwKgRegbase(
-    __ubuf__ InputT *q, __ubuf__ InputT *k, __ubuf__ OutputT *qOut, __ubuf__ OutputT *wOut, __ubuf__ OutputT *kgOut,
-    __ubuf__ InputT *qDirect, __ubuf__ InputT *wDirect, __ubuf__ InputT *v, __ubuf__ InputT *vDirect,
-    __ubuf__ InputT *finalKgOut, __ubuf__ float *beta, __ubuf__ GK_T *gate, __ubuf__ float *ref,
-    __ubuf__ float *finalRef, uint16_t rows, uint16_t cols, uint16_t validRows)
+    __ubuf__ InputT* q, __ubuf__ InputT* k, __ubuf__ OutputT* qOut, __ubuf__ OutputT* wOut, __ubuf__ OutputT* kgOut,
+    __ubuf__ InputT* qDirect, __ubuf__ InputT* wDirect, __ubuf__ InputT* v, __ubuf__ InputT* vDirect,
+    __ubuf__ InputT* finalKgOut, __ubuf__ float* beta, __ubuf__ GK_T* gate, __ubuf__ float* ref,
+    __ubuf__ float* finalRef, uint16_t rows, uint16_t cols, uint16_t validRows)
 {
     using namespace AscendC::Reg;
     constexpr uint16_t ELEMENTS_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(InputT);
@@ -499,7 +499,7 @@ static __simd_vf__ inline void PrepareKdaGateQwKgRegbase(
     }
 }
 
-static __simd_vf__ inline void ForwardSubDiag16Regbase(__ubuf__ float *diag, uint16_t valid)
+static __simd_vf__ inline void ForwardSubDiag16Regbase(__ubuf__ float* diag, uint16_t valid)
 {
     using namespace AscendC::Reg;
     constexpr uint16_t DIAG_SIZE = KDA_SOLVE_DIAG_BT;
@@ -528,7 +528,7 @@ static __simd_vf__ inline void ForwardSubDiag16Regbase(__ubuf__ float *diag, uin
     }
 }
 
-static __simd_vf__ inline void SelectCausalRows64Regbase(__ubuf__ float *aqk, __ubuf__ float *akk, uint16_t rowBegin,
+static __simd_vf__ inline void SelectCausalRows64Regbase(__ubuf__ float* aqk, __ubuf__ float* akk, uint16_t rowBegin,
                                                          uint16_t rowCount)
 {
     using namespace AscendC::Reg;
@@ -557,7 +557,7 @@ static __simd_vf__ inline void SelectCausalRows64Regbase(__ubuf__ float *aqk, __
     }
 }
 
-static __simd_vf__ inline void ForwardSubDiag16StridedRegbase(__ubuf__ float *matrix, uint16_t rowStride,
+static __simd_vf__ inline void ForwardSubDiag16StridedRegbase(__ubuf__ float* matrix, uint16_t rowStride,
                                                               uint16_t rowBegin, uint16_t colBegin, uint16_t valid)
 {
     using namespace AscendC::Reg;
@@ -588,7 +588,7 @@ static __simd_vf__ inline void ForwardSubDiag16StridedRegbase(__ubuf__ float *ma
     }
 }
 
-static __simd_vf__ inline void ForwardSubDiag16PairStridedRegbase(__ubuf__ float *matrix, uint16_t rowStride,
+static __simd_vf__ inline void ForwardSubDiag16PairStridedRegbase(__ubuf__ float* matrix, uint16_t rowStride,
                                                                   uint16_t colBegin, uint16_t firstValid,
                                                                   uint16_t secondValid)
 {
@@ -660,7 +660,7 @@ static __simd_vf__ inline void ForwardSubDiag16PairStridedRegbase(__ubuf__ float
     }
 }
 
-static __simd_vf__ inline void ApplyKdaRowScaleRegbase(__ubuf__ float *matrix, __ubuf__ float *rowScale, uint16_t rows,
+static __simd_vf__ inline void ApplyKdaRowScaleRegbase(__ubuf__ float* matrix, __ubuf__ float* rowScale, uint16_t rows,
                                                        uint16_t cols)
 {
     using namespace AscendC::Reg;
@@ -789,46 +789,46 @@ public:
                                 GM_ADDR preparedQG, GM_ADDR preparedAqk, GM_ADDR propagatedVNew, GM_ADDR propagatedH,
                                 GM_ADDR o, GM_ADDR finalState, GM_ADDR aqk, GM_ADDR akk, GM_ADDR w, GM_ADDR u,
                                 GM_ADDR qg, GM_ADDR kg, GM_ADDR vNew, GM_ADDR h, GM_ADDR finalKg, GM_ADDR workspace,
-                                const TilingData &tiling, TPipe *pipe, bool initVecBuffers = true, bool storeQG = true)
+                                const TilingData& tiling, TPipe* pipe, bool initVecBuffers = true, bool storeQG = true)
     {
         pipe_ = pipe;
-        q_.SetGlobalBuffer((__gm__ T *)q);
-        k_.SetGlobalBuffer((__gm__ T *)k);
-        v_.SetGlobalBuffer((__gm__ T *)v);
-        gk_.SetGlobalBuffer((__gm__ GK_T *)gk);
-        rawG_.SetGlobalBuffer((__gm__ float *)rawG);
-        aLog_.SetGlobalBuffer((__gm__ float *)aLog);
-        dtBias_.SetGlobalBuffer((__gm__ float *)dtBias);
-        beta_.SetGlobalBuffer((__gm__ BETA_T *)beta);
+        q_.SetGlobalBuffer((__gm__ T*)q);
+        k_.SetGlobalBuffer((__gm__ T*)k);
+        v_.SetGlobalBuffer((__gm__ T*)v);
+        gk_.SetGlobalBuffer((__gm__ GK_T*)gk);
+        rawG_.SetGlobalBuffer((__gm__ float*)rawG);
+        aLog_.SetGlobalBuffer((__gm__ float*)aLog);
+        dtBias_.SetGlobalBuffer((__gm__ float*)dtBias);
+        beta_.SetGlobalBuffer((__gm__ BETA_T*)beta);
         if (initialState != nullptr) {
-            initialState_.SetGlobalBuffer((__gm__ float *)initialState);
+            initialState_.SetGlobalBuffer((__gm__ float*)initialState);
         }
-        cuSeqlensAddr_ = reinterpret_cast<__gm__ int64_t *>(cuSeqlens);
+        cuSeqlensAddr_ = reinterpret_cast<__gm__ int64_t*>(cuSeqlens);
         if (preparedQG != nullptr) {
-            preparedQG_.SetGlobalBuffer((__gm__ T *)preparedQG);
+            preparedQG_.SetGlobalBuffer((__gm__ T*)preparedQG);
         }
         if (preparedAqk != nullptr) {
-            preparedAqk_.SetGlobalBuffer((__gm__ T *)preparedAqk);
+            preparedAqk_.SetGlobalBuffer((__gm__ T*)preparedAqk);
         }
         if (propagatedVNew != nullptr) {
-            propagatedVNew_.SetGlobalBuffer((__gm__ T *)propagatedVNew);
+            propagatedVNew_.SetGlobalBuffer((__gm__ T*)propagatedVNew);
         }
         if (propagatedH != nullptr) {
-            propagatedH_.SetGlobalBuffer((__gm__ T *)propagatedH);
+            propagatedH_.SetGlobalBuffer((__gm__ T*)propagatedH);
         }
-        chunkIndicesAddr_ = reinterpret_cast<__gm__ int64_t *>(chunkIndices);
-        o_.SetGlobalBuffer((__gm__ OUT_T *)o);
-        finalState_.SetGlobalBuffer((__gm__ float *)finalState);
-        aqk_.SetGlobalBuffer((__gm__ float *)aqk);
-        akk_.SetGlobalBuffer((__gm__ AKK_T *)akk);
-        w_.SetGlobalBuffer((__gm__ T *)w);
-        u_.SetGlobalBuffer((__gm__ OUT_T *)u);
-        qg_.SetGlobalBuffer((__gm__ T *)qg);
-        kg_.SetGlobalBuffer((__gm__ T *)kg);
-        vNew_.SetGlobalBuffer((__gm__ T *)vNew);
-        h_.SetGlobalBuffer((__gm__ float *)h);
-        finalKg_.SetGlobalBuffer((__gm__ T *)finalKg);
-        solveWorkspace_.SetGlobalBuffer((__gm__ float *)workspace);
+        chunkIndicesAddr_ = reinterpret_cast<__gm__ int64_t*>(chunkIndices);
+        o_.SetGlobalBuffer((__gm__ OUT_T*)o);
+        finalState_.SetGlobalBuffer((__gm__ float*)finalState);
+        aqk_.SetGlobalBuffer((__gm__ float*)aqk);
+        akk_.SetGlobalBuffer((__gm__ AKK_T*)akk);
+        w_.SetGlobalBuffer((__gm__ T*)w);
+        u_.SetGlobalBuffer((__gm__ OUT_T*)u);
+        qg_.SetGlobalBuffer((__gm__ T*)qg);
+        kg_.SetGlobalBuffer((__gm__ T*)kg);
+        vNew_.SetGlobalBuffer((__gm__ T*)vNew);
+        h_.SetGlobalBuffer((__gm__ float*)h);
+        finalKg_.SetGlobalBuffer((__gm__ T*)finalKg);
+        solveWorkspace_.SetGlobalBuffer((__gm__ float*)workspace);
 
         B_ = tiling.batch;
         N_ = tiling.seqNum;
@@ -860,7 +860,7 @@ public:
             usedCoreNum_ * solvePipelineDepth * KDA_SOLVE_SCRATCH_SLOTS * BT_ * BT_ * sizeof(float);
         const uint64_t alignedSolveBytes =
             (solveBytes + KDA_WORKSPACE_ALIGN - 1) / KDA_WORKSPACE_ALIGN * KDA_WORKSPACE_ALIGN;
-        scoreWorkspace_.SetGlobalBuffer((__gm__ SCORE_T *)(workspace + alignedSolveBytes));
+        scoreWorkspace_.SetGlobalBuffer((__gm__ SCORE_T*)(workspace + alignedSolveBytes));
         if ASCEND_IS_AIV {
             uint64_t subBlockNum = static_cast<uint64_t>(GetSubBlockNum());
             solveCoreIdx_ = subBlockNum == 0 ? 0 : static_cast<uint64_t>(GetBlockIdx()) / subBlockNum;
@@ -896,7 +896,7 @@ public:
     }
 
     template <typename PostWuOp>
-    __aicore__ inline void ProcessAicFused(PostWuOp &postWu)
+    __aicore__ inline void ProcessAicFused(PostWuOp& postWu)
     {
         ProcessPreAicHeadPairFused(postWu);
     }
@@ -1031,7 +1031,7 @@ private:
         return start + ref;
     }
 
-    __aicore__ inline void RunExp2(LocalTensor<float> &tensor, uint32_t count)
+    __aicore__ inline void RunExp2(LocalTensor<float>& tensor, uint32_t count)
     {
         SetFlag<HardEvent::S_V>(EXP2_EVENT_ID);
         WaitFlag<HardEvent::S_V>(EXP2_EVENT_ID);
@@ -1042,7 +1042,7 @@ private:
         WaitFlag<HardEvent::V_S>(EXP2_EVENT_ID);
     }
 
-    __aicore__ inline void ClampExpInput(LocalTensor<float> &tensor, uint32_t count)
+    __aicore__ inline void ClampExpInput(LocalTensor<float>& tensor, uint32_t count)
     {
         Mins(tensor, tensor, KDA_EXP_INPUT_MAX, count);
         PipeBarrier<PIPE_V>();
@@ -1050,7 +1050,7 @@ private:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void ClampScoreExpInput(LocalTensor<float> &tensor, uint32_t count)
+    __aicore__ inline void ClampScoreExpInput(LocalTensor<float>& tensor, uint32_t count)
     {
         constexpr float expInputMax =
             IsSameType<SCORE_T, bfloat16_t>::value ? KDA_SCORE_EXP_INPUT_MAX : KDA_EXP_INPUT_MAX;
@@ -1063,7 +1063,7 @@ private:
     }
 
     template <typename OutputT>
-    __aicore__ inline void ClampFp32ForCast(LocalTensor<float> &tensor, uint32_t count)
+    __aicore__ inline void ClampFp32ForCast(LocalTensor<float>& tensor, uint32_t count)
     {
         if constexpr (IsSameType<OutputT, half>::value) {
             Mins(tensor, tensor, KDA_FP16_MAX, count);
@@ -1073,13 +1073,13 @@ private:
         }
     }
 
-    __aicore__ inline void ClampFp32ToOutputType(LocalTensor<float> &tensor, uint32_t count)
+    __aicore__ inline void ClampFp32ToOutputType(LocalTensor<float>& tensor, uint32_t count)
     {
         ClampFp32ForCast<T>(tensor, count);
     }
 
     template <typename CopyT>
-    __aicore__ inline void CopyVectorIn(LocalTensor<CopyT> &dst, GlobalTensor<CopyT> &src, uint64_t offset,
+    __aicore__ inline void CopyVectorIn(LocalTensor<CopyT>& dst, GlobalTensor<CopyT>& src, uint64_t offset,
                                         uint64_t count)
     {
         uint64_t rowBytes = count * static_cast<uint64_t>(sizeof(CopyT));
@@ -1093,7 +1093,7 @@ private:
     }
 
     template <typename CopyT>
-    __aicore__ inline void CopyRowsIn(LocalTensor<CopyT> &dst, GlobalTensor<CopyT> &src, uint64_t offset, uint64_t rows,
+    __aicore__ inline void CopyRowsIn(LocalTensor<CopyT>& dst, GlobalTensor<CopyT>& src, uint64_t offset, uint64_t rows,
                                       uint64_t cols, uint64_t rowStride)
     {
         if (rows == 0 || cols == 0) {
@@ -1110,7 +1110,7 @@ private:
     }
 
     template <typename CopyT>
-    __aicore__ inline void CopyVectorOut(GlobalTensor<CopyT> &dst, uint64_t offset, LocalTensor<CopyT> &src,
+    __aicore__ inline void CopyVectorOut(GlobalTensor<CopyT>& dst, uint64_t offset, LocalTensor<CopyT>& src,
                                          uint64_t count)
     {
         uint64_t rowBytes = count * static_cast<uint64_t>(sizeof(CopyT));
@@ -1123,13 +1123,13 @@ private:
     }
 
     template <typename CopyT>
-    __aicore__ inline void CopyRowIn(LocalTensor<CopyT> &dst, GlobalTensor<CopyT> &src, uint64_t offset)
+    __aicore__ inline void CopyRowIn(LocalTensor<CopyT>& dst, GlobalTensor<CopyT>& src, uint64_t offset)
     {
         CopyVectorIn(dst, src, offset, K_);
     }
 
     template <typename CopyT>
-    __aicore__ inline void CopyRowOut(GlobalTensor<CopyT> &dst, uint64_t offset, LocalTensor<CopyT> &src)
+    __aicore__ inline void CopyRowOut(GlobalTensor<CopyT>& dst, uint64_t offset, LocalTensor<CopyT>& src)
     {
         CopyVectorOut(dst, offset, src, K_);
     }
@@ -1279,7 +1279,7 @@ private:
         PipeBarrier<PIPE_V>();
         SetFlag<HardEvent::V_S>(vToSEvent_);
         WaitFlag<HardEvent::V_S>(vToSEvent_);
-        __ubuf__ float *ptr = (__ubuf__ float *)scalar.GetPhyAddr();
+        __ubuf__ float* ptr = (__ubuf__ float*)scalar.GetPhyAddr();
         return ptr[0];
     }
 
@@ -1339,12 +1339,12 @@ private:
                 LocalTensor<float> gate = LocalGateChunk().template ReinterpretCast<float>()[tileRow * K_];
                 if (hasDtBias_) {
                     AccumulateRawSafeGateChunk128Regbase<true>(
-                        (__ubuf__ float *)gate.GetPhyAddr(), (__ubuf__ float *)bias.GetPhyAddr(),
-                        (__ubuf__ float *)acc.GetPhyAddr(), static_cast<uint16_t>(currentRows), expA, lowerBound_);
+                        (__ubuf__ float*)gate.GetPhyAddr(), (__ubuf__ float*)bias.GetPhyAddr(),
+                        (__ubuf__ float*)acc.GetPhyAddr(), static_cast<uint16_t>(currentRows), expA, lowerBound_);
                 } else {
                     AccumulateRawSafeGateChunk128Regbase<false>(
-                        (__ubuf__ float *)gate.GetPhyAddr(), (__ubuf__ float *)bias.GetPhyAddr(),
-                        (__ubuf__ float *)acc.GetPhyAddr(), static_cast<uint16_t>(currentRows), expA, lowerBound_);
+                        (__ubuf__ float*)gate.GetPhyAddr(), (__ubuf__ float*)bias.GetPhyAddr(),
+                        (__ubuf__ float*)acc.GetPhyAddr(), static_cast<uint16_t>(currentRows), expA, lowerBound_);
                 }
                 PipeBarrier<PIPE_V>();
                 SetFlag<HardEvent::V_MTE3>(vToMte3Event_);
@@ -1437,7 +1437,7 @@ private:
     }
 
     template <typename CopyT>
-    __aicore__ inline void LoadAsFloatRow(GlobalTensor<CopyT> &src, uint64_t srcOffset, LocalTensor<float> &dst,
+    __aicore__ inline void LoadAsFloatRow(GlobalTensor<CopyT>& src, uint64_t srcOffset, LocalTensor<float>& dst,
                                           uint64_t count)
     {
         if constexpr (IsSameType<CopyT, float>::value) {
@@ -1463,8 +1463,8 @@ private:
     }
 
     template <typename CopyT>
-    __aicore__ inline void LoadAsFloatVector(GlobalTensor<CopyT> &src, uint64_t srcOffset, LocalTensor<float> &dst,
-                                             LocalTensor<CopyT> &typedScratch, uint64_t count)
+    __aicore__ inline void LoadAsFloatVector(GlobalTensor<CopyT>& src, uint64_t srcOffset, LocalTensor<float>& dst,
+                                             LocalTensor<CopyT>& typedScratch, uint64_t count)
     {
         if constexpr (IsSameType<CopyT, float>::value) {
             CopyVectorIn(dst, src, srcOffset, count);
@@ -1480,7 +1480,7 @@ private:
     }
 
     template <typename CopyT>
-    __aicore__ inline void StoreFloatRow(GlobalTensor<CopyT> &dst, uint64_t dstOffset, LocalTensor<float> &src,
+    __aicore__ inline void StoreFloatRow(GlobalTensor<CopyT>& dst, uint64_t dstOffset, LocalTensor<float>& src,
                                          uint64_t count)
     {
         if constexpr (IsSameType<CopyT, float>::value) {
@@ -1609,31 +1609,31 @@ private:
             bool fuseQwKg = SAFE_GATE && BT_ == 64 && K_ == 128 && V_ == 128 && subBlockNum == 1;
             if (fuseQwKg) {
                 PrepareKdaGateQwKgRegbase<T, SCORE_T, GK_T, true, true, exportFinalKg, true>(
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
-                    (__ubuf__ SCORE_T *)reinterpret_cast<uint64_t>(qScore.GetPhyAddr()),
-                    (__ubuf__ SCORE_T *)reinterpret_cast<uint64_t>(kScore.GetPhyAddr()),
-                    (__ubuf__ SCORE_T *)reinterpret_cast<uint64_t>(kgScore.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(directQ.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(directW.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(vTyped.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(directV.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(vTyped.GetPhyAddr()),
-                    (__ubuf__ float *)reinterpret_cast<uint64_t>(betaFp32.GetPhyAddr()),
-                    (__ubuf__ GK_T *)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
-                    (__ubuf__ float *)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()),
-                    (__ubuf__ float *)reinterpret_cast<uint64_t>(finalRefFp32.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
+                    (__ubuf__ SCORE_T*)reinterpret_cast<uint64_t>(qScore.GetPhyAddr()),
+                    (__ubuf__ SCORE_T*)reinterpret_cast<uint64_t>(kScore.GetPhyAddr()),
+                    (__ubuf__ SCORE_T*)reinterpret_cast<uint64_t>(kgScore.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(directQ.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(directW.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(vTyped.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(directV.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(vTyped.GetPhyAddr()),
+                    (__ubuf__ float*)reinterpret_cast<uint64_t>(betaFp32.GetPhyAddr()),
+                    (__ubuf__ GK_T*)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
+                    (__ubuf__ float*)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()),
+                    (__ubuf__ float*)reinterpret_cast<uint64_t>(finalRefFp32.GetPhyAddr()),
                     static_cast<uint16_t>(tileRows), static_cast<uint16_t>(K_), static_cast<uint16_t>(tileRows));
             } else {
                 PrepareKdaGateQwRegbase<T, SCORE_T, GK_T, true>(
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
-                    (__ubuf__ SCORE_T *)reinterpret_cast<uint64_t>(qScore.GetPhyAddr()),
-                    (__ubuf__ SCORE_T *)reinterpret_cast<uint64_t>(kScore.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(directQ.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(directW.GetPhyAddr()),
-                    (__ubuf__ GK_T *)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
-                    (__ubuf__ float *)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()), static_cast<uint16_t>(tileRows),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
+                    (__ubuf__ SCORE_T*)reinterpret_cast<uint64_t>(qScore.GetPhyAddr()),
+                    (__ubuf__ SCORE_T*)reinterpret_cast<uint64_t>(kScore.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(directQ.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(directW.GetPhyAddr()),
+                    (__ubuf__ GK_T*)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
+                    (__ubuf__ float*)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()), static_cast<uint16_t>(tileRows),
                     static_cast<uint16_t>(K_));
             }
 #else
@@ -1780,10 +1780,10 @@ private:
             }
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
             PrepareKdaGateKgRegbase<T, SCORE_T, GK_T, true>(
-                (__ubuf__ SCORE_T *)reinterpret_cast<uint64_t>(kgScore.GetPhyAddr()),
-                (__ubuf__ T *)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
-                (__ubuf__ GK_T *)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
-                (__ubuf__ float *)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()), static_cast<uint16_t>(tileRows),
+                (__ubuf__ SCORE_T*)reinterpret_cast<uint64_t>(kgScore.GetPhyAddr()),
+                (__ubuf__ T*)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
+                (__ubuf__ GK_T*)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
+                (__ubuf__ float*)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()), static_cast<uint16_t>(tileRows),
                 static_cast<uint16_t>(K_), static_cast<uint16_t>(tileRows));
 #else
             PipeBarrier<PIPE_V>();
@@ -1940,49 +1940,49 @@ private:
             if (writeScoreScratch) {
                 if (fuseScoreWriteback) {
                     PrepareKdaGateQwKgRegbase<T, SCORE_T, GK_T, true, true, false, true>(
-                        (__ubuf__ T *)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
-                        (__ubuf__ T *)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
-                        (__ubuf__ SCORE_T *)reinterpret_cast<uint64_t>(qScore.GetPhyAddr()),
-                        (__ubuf__ SCORE_T *)reinterpret_cast<uint64_t>(wScore.GetPhyAddr()),
-                        (__ubuf__ SCORE_T *)reinterpret_cast<uint64_t>(kgScore.GetPhyAddr()),
-                        (__ubuf__ T *)reinterpret_cast<uint64_t>(directQ.GetPhyAddr()),
-                        (__ubuf__ T *)reinterpret_cast<uint64_t>(directW.GetPhyAddr()),
-                        (__ubuf__ T *)reinterpret_cast<uint64_t>(vTyped.GetPhyAddr()),
-                        (__ubuf__ T *)reinterpret_cast<uint64_t>(directV.GetPhyAddr()), nullptr,
-                        (__ubuf__ float *)reinterpret_cast<uint64_t>(betaFp32.GetPhyAddr()),
-                        (__ubuf__ GK_T *)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
-                        (__ubuf__ float *)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()), nullptr,
+                        (__ubuf__ T*)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
+                        (__ubuf__ T*)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
+                        (__ubuf__ SCORE_T*)reinterpret_cast<uint64_t>(qScore.GetPhyAddr()),
+                        (__ubuf__ SCORE_T*)reinterpret_cast<uint64_t>(wScore.GetPhyAddr()),
+                        (__ubuf__ SCORE_T*)reinterpret_cast<uint64_t>(kgScore.GetPhyAddr()),
+                        (__ubuf__ T*)reinterpret_cast<uint64_t>(directQ.GetPhyAddr()),
+                        (__ubuf__ T*)reinterpret_cast<uint64_t>(directW.GetPhyAddr()),
+                        (__ubuf__ T*)reinterpret_cast<uint64_t>(vTyped.GetPhyAddr()),
+                        (__ubuf__ T*)reinterpret_cast<uint64_t>(directV.GetPhyAddr()), nullptr,
+                        (__ubuf__ float*)reinterpret_cast<uint64_t>(betaFp32.GetPhyAddr()),
+                        (__ubuf__ GK_T*)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
+                        (__ubuf__ float*)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()), nullptr,
                         static_cast<uint16_t>(tileRows), static_cast<uint16_t>(K_), validRows);
                 } else {
                     PrepareKdaGateQwKgRegbase<T, SCORE_T, GK_T, true, false, false>(
-                        (__ubuf__ T *)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
-                        (__ubuf__ T *)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
-                        (__ubuf__ SCORE_T *)reinterpret_cast<uint64_t>(qScore.GetPhyAddr()),
-                        (__ubuf__ SCORE_T *)reinterpret_cast<uint64_t>(wScore.GetPhyAddr()),
-                        (__ubuf__ SCORE_T *)reinterpret_cast<uint64_t>(kgScore.GetPhyAddr()), nullptr, nullptr, nullptr,
-                        nullptr, nullptr, nullptr, (__ubuf__ GK_T *)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
-                        (__ubuf__ float *)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()), nullptr,
+                        (__ubuf__ T*)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
+                        (__ubuf__ T*)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
+                        (__ubuf__ SCORE_T*)reinterpret_cast<uint64_t>(qScore.GetPhyAddr()),
+                        (__ubuf__ SCORE_T*)reinterpret_cast<uint64_t>(wScore.GetPhyAddr()),
+                        (__ubuf__ SCORE_T*)reinterpret_cast<uint64_t>(kgScore.GetPhyAddr()), nullptr, nullptr, nullptr,
+                        nullptr, nullptr, nullptr, (__ubuf__ GK_T*)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
+                        (__ubuf__ float*)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()), nullptr,
                         static_cast<uint16_t>(tileRows), static_cast<uint16_t>(K_), validRows);
                 }
             } else if (useRef) {
                 PrepareKdaGateQwKgRegbase<T, T, GK_T, true, false, false>(
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(kgTyped.GetPhyAddr()), nullptr, nullptr, nullptr, nullptr,
-                    nullptr, nullptr, (__ubuf__ GK_T *)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
-                    (__ubuf__ float *)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()), nullptr,
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(kgTyped.GetPhyAddr()), nullptr, nullptr, nullptr, nullptr,
+                    nullptr, nullptr, (__ubuf__ GK_T*)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
+                    (__ubuf__ float*)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()), nullptr,
                     static_cast<uint16_t>(tileRows), static_cast<uint16_t>(K_), validRows);
             } else {
                 PrepareKdaGateQwKgRegbase<T, T, GK_T, false, false, false>(
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
-                    (__ubuf__ T *)reinterpret_cast<uint64_t>(kgTyped.GetPhyAddr()), nullptr, nullptr, nullptr, nullptr,
-                    nullptr, nullptr, (__ubuf__ GK_T *)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
-                    (__ubuf__ float *)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()), nullptr,
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(qTyped.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(kTyped.GetPhyAddr()),
+                    (__ubuf__ T*)reinterpret_cast<uint64_t>(kgTyped.GetPhyAddr()), nullptr, nullptr, nullptr, nullptr,
+                    nullptr, nullptr, (__ubuf__ GK_T*)reinterpret_cast<uint64_t>(gateTyped.GetPhyAddr()),
+                    (__ubuf__ float*)reinterpret_cast<uint64_t>(refFp32.GetPhyAddr()), nullptr,
                     static_cast<uint16_t>(tileRows), static_cast<uint16_t>(K_), validRows);
             }
 #else
@@ -2708,7 +2708,7 @@ private:
         constexpr uint8_t rowBlk = diagSize * sizeof(float) / 32;
 
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
-        ForwardSubDiag16Regbase((__ubuf__ float *)reinterpret_cast<uint64_t>(diag.GetPhyAddr()),
+        ForwardSubDiag16Regbase((__ubuf__ float*)reinterpret_cast<uint64_t>(diag.GetPhyAddr()),
                                 static_cast<uint16_t>(valid));
 #else
         for (uint64_t i = 2; i < valid; ++i) {
@@ -2776,7 +2776,7 @@ private:
             if (valid > diagSize) {
                 valid = diagSize;
             }
-            ForwardSubDiag16StridedRegbase((__ubuf__ float *)reinterpret_cast<uint64_t>(xMat.GetPhyAddr()),
+            ForwardSubDiag16StridedRegbase((__ubuf__ float*)reinterpret_cast<uint64_t>(xMat.GetPhyAddr()),
                                            static_cast<uint16_t>(BT_), static_cast<uint16_t>(localBlockRow),
                                            static_cast<uint16_t>(blockBegin), static_cast<uint16_t>(valid));
             SetFlag<HardEvent::V_S>(EXP2_EVENT_ID);
@@ -2854,8 +2854,8 @@ private:
     __aicore__ inline void BuildCausalSelectMasks(LocalTensor<uint8_t> aqkMask, LocalTensor<uint8_t> akkMask,
                                                   uint64_t rowBegin, uint64_t rowCount, uint64_t colBegin)
     {
-        __ubuf__ uint64_t *aqkMaskPtr = reinterpret_cast<__ubuf__ uint64_t *>(aqkMask.GetPhyAddr());
-        __ubuf__ uint64_t *akkMaskPtr = reinterpret_cast<__ubuf__ uint64_t *>(akkMask.GetPhyAddr());
+        __ubuf__ uint64_t* aqkMaskPtr = reinterpret_cast<__ubuf__ uint64_t*>(aqkMask.GetPhyAddr());
+        __ubuf__ uint64_t* akkMaskPtr = reinterpret_cast<__ubuf__ uint64_t*>(akkMask.GetPhyAddr());
         for (uint32_t localRow = 0; localRow < rowCount; ++localRow) {
             uint32_t row = static_cast<uint32_t>(rowBegin + localRow);
             aqkMaskPtr[localRow] = BuildCausalMask(static_cast<uint64_t>(row) + 1, colBegin);
@@ -2868,8 +2868,8 @@ private:
     {
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
         if constexpr (COMPILE_BT == 64 && COMPILE_K == 128 && COMPILE_V == 128) {
-            SelectCausalRows64Regbase((__ubuf__ float *)reinterpret_cast<uint64_t>(aqkMat.GetPhyAddr()),
-                                      (__ubuf__ float *)reinterpret_cast<uint64_t>(akkMat.GetPhyAddr()),
+            SelectCausalRows64Regbase((__ubuf__ float*)reinterpret_cast<uint64_t>(aqkMat.GetPhyAddr()),
+                                      (__ubuf__ float*)reinterpret_cast<uint64_t>(akkMat.GetPhyAddr()),
                                       static_cast<uint16_t>(rowBegin), static_cast<uint16_t>(rowCount));
             PipeBarrier<PIPE_V>();
             return;
@@ -3015,7 +3015,7 @@ private:
     }
 
     __aicore__ inline void GetSolveRowRange(uint64_t curT, uint64_t subBlockIdx, uint64_t subBlockNum,
-                                            uint64_t &rowBegin, uint64_t &rowEnd) const
+                                            uint64_t& rowBegin, uint64_t& rowEnd) const
     {
         if (subBlockNum == 0 || subBlockIdx >= subBlockNum) {
             rowBegin = 0;
@@ -3047,8 +3047,8 @@ private:
         LocalTensor<float> akkMat = directBase[KDA_DIRECT_SCORE_MATRIX_ELEMENTS];
         LocalTensor<float> xMat = directBase[2 * KDA_DIRECT_SCORE_MATRIX_ELEMENTS];
 
-        SelectCausalRows64Regbase((__ubuf__ float *)reinterpret_cast<uint64_t>(aqkMat.GetPhyAddr()),
-                                  (__ubuf__ float *)reinterpret_cast<uint64_t>(akkMat.GetPhyAddr()),
+        SelectCausalRows64Regbase((__ubuf__ float*)reinterpret_cast<uint64_t>(aqkMat.GetPhyAddr()),
+                                  (__ubuf__ float*)reinterpret_cast<uint64_t>(akkMat.GetPhyAddr()),
                                   static_cast<uint16_t>(rowBegin), KDA_DIRECT_SCORE_ROWS);
         PipeBarrier<PIPE_V>();
         Muls(xMat, akkMat, -1.0f, KDA_DIRECT_SCORE_MATRIX_ELEMENTS);
@@ -3139,8 +3139,8 @@ private:
         }
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
         if (!scoreIncludesBeta) {
-            ApplyKdaRowScaleRegbase((__ubuf__ float *)reinterpret_cast<uint64_t>(akkMat.GetPhyAddr()),
-                                    (__ubuf__ float *)reinterpret_cast<uint64_t>(betaLocal.GetPhyAddr()),
+            ApplyKdaRowScaleRegbase((__ubuf__ float*)reinterpret_cast<uint64_t>(akkMat.GetPhyAddr()),
+                                    (__ubuf__ float*)reinterpret_cast<uint64_t>(betaLocal.GetPhyAddr()),
                                     static_cast<uint16_t>(rowCount), static_cast<uint16_t>(BT_));
             PipeBarrier<PIPE_V>();
         }
@@ -3224,9 +3224,9 @@ private:
         WaitFlag<HardEvent::MTE3_V>(mte3ToVEvent_);
     }
 
-    __aicore__ inline void CubeGemmSolveSub(GlobalTensor<float> &tensorA, uint64_t baseA, uint64_t rowA, uint64_t colA,
-                                            GlobalTensor<float> &tensorB, uint64_t baseB, uint64_t rowB, uint64_t colB,
-                                            GlobalTensor<float> &tensorC, uint64_t baseC, uint64_t rowC, uint64_t colC,
+    __aicore__ inline void CubeGemmSolveSub(GlobalTensor<float>& tensorA, uint64_t baseA, uint64_t rowA, uint64_t colA,
+                                            GlobalTensor<float>& tensorB, uint64_t baseB, uint64_t rowB, uint64_t colB,
+                                            GlobalTensor<float>& tensorC, uint64_t baseC, uint64_t rowC, uint64_t colC,
                                             uint32_t m, uint32_t n, uint32_t k)
     {
         using ElementA = float;
@@ -3771,10 +3771,10 @@ private:
         Catlass::Arch::CrossCoreSetFlagWithReverse<0x2, PIPE_FIX>(mchSyncDoneFlag_);
     }
 
-    __aicore__ inline void ScaleRowsByBeta(GlobalTensor<T> &src, GlobalTensor<T> &dst, uint64_t b, uint64_t hv,
+    __aicore__ inline void ScaleRowsByBeta(GlobalTensor<T>& src, GlobalTensor<T>& dst, uint64_t b, uint64_t hv,
                                            uint64_t start, uint64_t rowBegin, uint64_t rowCount, uint64_t dim,
-                                           LocalTensor<float> &betaLocal, LocalTensor<float> &betaBrcb,
-                                           LocalTensor<float> &matrixLocal, bool sourceSequenceMajor = false)
+                                           LocalTensor<float>& betaLocal, LocalTensor<float>& betaBrcb,
+                                           LocalTensor<float>& matrixLocal, bool sourceSequenceMajor = false)
     {
         constexpr uint64_t vecElemsPerRepeat = 64;
         constexpr uint64_t typedOffsetFloats = 20480;
@@ -3798,8 +3798,8 @@ private:
         }
 
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
-        ApplyKdaRowScaleRegbase((__ubuf__ float *)reinterpret_cast<uint64_t>(matrixLocal.GetPhyAddr()),
-                                (__ubuf__ float *)reinterpret_cast<uint64_t>(betaLocal.GetPhyAddr()),
+        ApplyKdaRowScaleRegbase((__ubuf__ float*)reinterpret_cast<uint64_t>(matrixLocal.GetPhyAddr()),
+                                (__ubuf__ float*)reinterpret_cast<uint64_t>(betaLocal.GetPhyAddr()),
                                 static_cast<uint16_t>(rowCount), static_cast<uint16_t>(dim));
 #else
         uint8_t repeatStride = static_cast<uint8_t>(dim * sizeof(float) / 32);
@@ -3972,8 +3972,8 @@ private:
         }
     }
 
-    __aicore__ inline bool ResolveFlatChunk(uint64_t task, uint64_t &seq, uint64_t &b, uint64_t &h, uint64_t &hv,
-                                            uint64_t &chunkIdx, uint64_t &start, uint64_t &end)
+    __aicore__ inline bool ResolveFlatChunk(uint64_t task, uint64_t& seq, uint64_t& b, uint64_t& h, uint64_t& hv,
+                                            uint64_t& chunkIdx, uint64_t& start, uint64_t& end)
     {
         hv = task % HV_;
         uint64_t flatChunk = task / HV_;
@@ -4367,8 +4367,8 @@ private:
         }
     }
 
-    __aicore__ inline bool ResolveFlatChunkForHv(uint64_t flatChunk, uint64_t hv, uint64_t &seq, uint64_t &b,
-                                                 uint64_t &h, uint64_t &chunkIdx, uint64_t &start, uint64_t &end)
+    __aicore__ inline bool ResolveFlatChunkForHv(uint64_t flatChunk, uint64_t hv, uint64_t& seq, uint64_t& b,
+                                                 uint64_t& h, uint64_t& chunkIdx, uint64_t& start, uint64_t& end)
     {
         if (!isVarLen_) {
             seq = flatChunk / NT_;
@@ -4487,7 +4487,7 @@ private:
     }
 
     template <typename PostWuOp>
-    __aicore__ inline void ProcessPreAicHeadPairFused(PostWuOp &postWu)
+    __aicore__ inline void ProcessPreAicHeadPairFused(PostWuOp& postWu)
     {
         const uint64_t chunkCount = isVarLen_ ? NT_ : B_ * NT_;
         const uint64_t headWindows = HV_ / KDA_SCORE_LANES;
@@ -4699,7 +4699,7 @@ private:
     GlobalTensor<T> propagatedH_;
     GlobalTensor<float> solveWorkspace_;
     GlobalTensor<SCORE_T> scoreWorkspace_;
-    TPipe *pipe_ = nullptr;
+    TPipe* pipe_ = nullptr;
     TBuf<TPosition::VECCALC> exp2Buf_;
     TBuf<TPosition::VECCALC> vecBuf_;
     TBuf<TPosition::VECCALC> gateWritebackBuf_;
@@ -4750,8 +4750,8 @@ private:
     uint64_t solveCoreIdx_ = 0;
     uint64_t activeSolveSlot_ = 0;
     uint64_t activeGateChunkStart_ = 0;
-    __gm__ int64_t *chunkIndicesAddr_ = nullptr;
-    __gm__ int64_t *cuSeqlensAddr_ = nullptr;
+    __gm__ int64_t* chunkIndicesAddr_ = nullptr;
+    __gm__ int64_t* cuSeqlensAddr_ = nullptr;
 };
 } // namespace
 
@@ -4761,7 +4761,7 @@ __aicore__ inline void RunChunkKdaPrepare(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_AD
                                           GM_ADDR dtBias, GM_ADDR beta, GM_ADDR initialState, GM_ADDR cuSeqlens,
                                           GM_ADDR chunkIndices, GM_ADDR aqk, GM_ADDR akk, GM_ADDR qg, GM_ADDR qgScaled,
                                           GM_ADDR wSeed, GM_ADDR uSeed, GM_ADDR finalKg, GM_ADDR userWorkspace,
-                                          const TilingData &tiling, TPipe &pipe, bool storeQG = true)
+                                          const TilingData& tiling, TPipe& pipe, bool storeQG = true)
 {
     GM_ADDR aqkFp32 = userWorkspace + tiling.prepareAqkFp32Offset;
     GM_ADDR akkFp32 = userWorkspace + tiling.prepareAkkFp32Offset;

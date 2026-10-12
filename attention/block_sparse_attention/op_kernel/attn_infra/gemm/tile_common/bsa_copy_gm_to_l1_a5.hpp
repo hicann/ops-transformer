@@ -31,7 +31,7 @@ struct TileCopyTla<
     __aicore__ inline TileCopyTla(){};
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint32_t ndNum = 1,
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint32_t ndNum = 1,
                                       uint32_t srcNdMatrixStride = 0, uint32_t dstNzMatrixStride = 0)
     {
         static_assert(
@@ -88,7 +88,7 @@ struct TileCopyTla<Arch::AtlasA5,
     __aicore__ inline TileCopyTla(){};
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor)
     {
         static_assert(
             tla::detail::iszN<typename TensorSrc::Element, typename TensorSrc::Layout>::value &&
@@ -126,7 +126,7 @@ struct TileCopyTla<
     __aicore__ inline TileCopyTla(){};
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint32_t ndNum = 1,
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint32_t ndNum = 1,
                                       uint32_t srcNdMatrixStride = 0, uint32_t dstNzMatrixStride = 0)
     {
         static_assert(tla::detail::isColumnMajor<typename TensorSrc::Layout>::value &&
@@ -183,7 +183,7 @@ struct TileCopyTla<Arch::AtlasA5,
     __aicore__ inline TileCopyTla(){};
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor)
     {
         static_assert(tla::detail::isnZ<typename TensorSrc::Element, typename TensorSrc::Layout>::value &&
                           tla::detail::isnZ<typename TensorDst::Element, typename TensorDst::Layout>::value &&
@@ -229,7 +229,7 @@ struct TileCopyTla<Arch::AtlasA5,
     __aicore__ inline TileCopyTla(){};
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint32_t ndNum = 1,
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint32_t ndNum = 1,
                                       uint32_t srcNdMatrixStride = 0, uint32_t dstNzMatrixStride = 0)
     {
         static_assert(tla::detail::isMxScaleATrans<typename TensorSrc::Element, typename TensorSrc::Layout>::value &&

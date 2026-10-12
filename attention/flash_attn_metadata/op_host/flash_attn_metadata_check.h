@@ -29,44 +29,44 @@ extern "C" {
 
 class FlashAttnMetadataCheck {
 public:
-    static inline aclnnStatus ParamsCheck(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional,
-                                          const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
+    static inline aclnnStatus ParamsCheck(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional,
+                                          const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
                                           int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
                                           int64_t numHeadsKv, int64_t headDim, int64_t headDimV, int64_t maskMode,
-                                          int64_t winLeft, int64_t winRight, const char *layoutQ, const char *layoutKv,
-                                          const char *layoutOut, const aclTensor *metadata, bool isGradEnabled);
+                                          int64_t winLeft, int64_t winRight, const char* layoutQ, const char* layoutKv,
+                                          const char* layoutOut, const aclTensor* metadata, bool isGradEnabled);
 
 private:
     static constexpr int64_t NONE_VALUE = -1;
 
-    static inline bool IsTensorExist(const aclTensor *tensor);
-    static inline bool IsPA(const char *layout);
-    static inline aclnnStatus CheckSeqLens(bool isCu, int64_t batchSize, const aclTensor *seqLens);
+    static inline bool IsTensorExist(const aclTensor* tensor);
+    static inline bool IsPA(const char* layout);
+    static inline aclnnStatus CheckSeqLens(bool isCu, int64_t batchSize, const aclTensor* seqLens);
 
     static inline aclnnStatus CheckBaseAttr(int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv,
                                             int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, int64_t headDimV,
-                                            const char *layoutQ, const char *layoutKv, const char *layoutOut,
+                                            const char* layoutQ, const char* layoutKv, const char* layoutOut,
                                             bool isGradEnabled);
 
     static inline aclnnStatus CheckMask(int64_t maskMode, int64_t winLeft, int64_t winRight);
 
     static inline aclnnStatus CheckExistency(int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv,
-                                             const char *layoutQ, const char *layoutKv,
-                                             const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional,
-                                             const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
-                                             const aclTensor *metadata);
+                                             const char* layoutQ, const char* layoutKv,
+                                             const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional,
+                                             const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
+                                             const aclTensor* metadata);
 
     static inline aclnnStatus CheckConsistency(int64_t batchSize, int64_t numHeadsQ, int64_t numHeadsKv,
-                                               const aclTensor *cuSeqlensQOptional,
-                                               const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-                                               const aclTensor *sequsedKvOptional);
+                                               const aclTensor* cuSeqlensQOptional,
+                                               const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+                                               const aclTensor* sequsedKvOptional);
 };
 
 inline aclnnStatus FlashAttnMetadataCheck::ParamsCheck(
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
     int64_t numHeadsKv, int64_t headDim, int64_t headDimV, int64_t maskMode, int64_t winLeft, int64_t winRight,
-    const char *layoutQ, const char *layoutKv, const char *layoutOut, const aclTensor *metadata, bool isGradEnabled)
+    const char* layoutQ, const char* layoutKv, const char* layoutOut, const aclTensor* metadata, bool isGradEnabled)
 {
     auto ret = CheckBaseAttr(batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV, layoutQ,
                              layoutKv, layoutOut, isGradEnabled);
@@ -91,21 +91,21 @@ inline aclnnStatus FlashAttnMetadataCheck::ParamsCheck(
     return ACLNN_SUCCESS;
 }
 
-inline bool FlashAttnMetadataCheck::IsTensorExist(const aclTensor *tensor)
+inline bool FlashAttnMetadataCheck::IsTensorExist(const aclTensor* tensor)
 {
     return (tensor != nullptr) && (tensor->GetViewShape().GetDimNum() > 0) && (tensor->GetViewShape().GetDim(0) > 0) &&
            (tensor->GetData() != nullptr);
 }
 
-inline bool FlashAttnMetadataCheck::IsPA(const char *layout)
+inline bool FlashAttnMetadataCheck::IsPA(const char* layout)
 {
     return (strcmp(layout, "PA_BNBD") == 0 || strcmp(layout, "PA_BBND") == 0 || strcmp(layout, "PA_NZ") == 0);
 }
 
 inline aclnnStatus FlashAttnMetadataCheck::CheckBaseAttr(int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv,
                                                          int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim,
-                                                         int64_t headDimV, const char *layoutQ, const char *layoutKv,
-                                                         const char *layoutOut, bool isGradEnabled)
+                                                         int64_t headDimV, const char* layoutQ, const char* layoutKv,
+                                                         const char* layoutOut, bool isGradEnabled)
 {
     int64_t MIN_BATCH = 0;
     int64_t MAX_BATCH = 65536;
@@ -188,11 +188,11 @@ inline aclnnStatus FlashAttnMetadataCheck::CheckMask(int64_t maskMode, int64_t w
 }
 
 inline aclnnStatus FlashAttnMetadataCheck::CheckExistency(int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv,
-                                                          const char *layoutQ, const char *layoutKv,
-                                                          const aclTensor *cuSeqlensQOptional,
-                                                          const aclTensor *cuSeqlensKvOptional,
-                                                          const aclTensor *sequsedQOptional,
-                                                          const aclTensor *sequsedKvOptional, const aclTensor *metadata)
+                                                          const char* layoutQ, const char* layoutKv,
+                                                          const aclTensor* cuSeqlensQOptional,
+                                                          const aclTensor* cuSeqlensKvOptional,
+                                                          const aclTensor* sequsedQOptional,
+                                                          const aclTensor* sequsedKvOptional, const aclTensor* metadata)
 {
     CHECK_COND(metadata != nullptr, ACLNN_ERR_RUNTIME_ERROR, "metadata should be provided, but got null");
     CHECK_COND(metadata->GetDataType() == aclDataType::ACL_INT32, ACLNN_ERR_RUNTIME_ERROR,
@@ -236,10 +236,10 @@ inline aclnnStatus FlashAttnMetadataCheck::CheckExistency(int64_t batchSize, int
 }
 
 inline aclnnStatus FlashAttnMetadataCheck::CheckConsistency(int64_t batchSize, int64_t numHeadsQ, int64_t numHeadsKv,
-                                                            const aclTensor *cuSeqlensQOptional,
-                                                            const aclTensor *cuSeqlensKvOptional,
-                                                            const aclTensor *sequsedQOptional,
-                                                            const aclTensor *sequsedKvOptional)
+                                                            const aclTensor* cuSeqlensQOptional,
+                                                            const aclTensor* cuSeqlensKvOptional,
+                                                            const aclTensor* sequsedQOptional,
+                                                            const aclTensor* sequsedKvOptional)
 {
     if (batchSize <= 0) {
         return ACLNN_SUCCESS;
@@ -262,7 +262,7 @@ inline aclnnStatus FlashAttnMetadataCheck::CheckConsistency(int64_t batchSize, i
     return ACLNN_SUCCESS;
 }
 
-inline aclnnStatus FlashAttnMetadataCheck::CheckSeqLens(bool isCu, int64_t batchSize, const aclTensor *seqLens)
+inline aclnnStatus FlashAttnMetadataCheck::CheckSeqLens(bool isCu, int64_t batchSize, const aclTensor* seqLens)
 {
     if (seqLens == nullptr) {
         return ACLNN_SUCCESS;

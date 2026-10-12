@@ -66,7 +66,7 @@ public:
 
     __aicore__ inline BSAMatmulService(){};
 
-    __aicore__ inline void InitParams(const BSAConstInfo &constInfo);
+    __aicore__ inline void InitParams(const BSAConstInfo& constInfo);
 
     /**
      * @brief 在 L1 和 L0 上分配所需的缓冲区
@@ -80,7 +80,7 @@ public:
      *
      * @param pipe Pipeline 指针，用于 InitBuffer 调用
      */
-    __aicore__ inline void InitBuffers(TPipe *pipe);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
 
     /**
      * @brief 绑定 GM 全局张量引用
@@ -88,8 +88,8 @@ public:
      * @param kCmpGm      Key 压缩矩阵 GM 张量 [yBlocks, dSize] (float)
      * @param attnScoreGm 输出注意力分数 GM 张量 [xBlocks, yBlocks] (float)
      */
-    __aicore__ inline void InitGM(GlobalTensor<IN_T> &qCmpGm, GlobalTensor<IN_T> &kCmpGm,
-                                  GlobalTensor<MM_OUT_T> &attnScoreGm);
+    __aicore__ inline void InitGM(GlobalTensor<IN_T>& qCmpGm, GlobalTensor<IN_T>& kCmpGm,
+                                  GlobalTensor<MM_OUT_T>& attnScoreGm);
 
     /// @brief 分配硬件同步事件（MTE1↔MTE2, M↔MTE1, FIX↔M）
     __aicore__ inline void AllocEventID();
@@ -129,7 +129,7 @@ private:
      * @param srcD        源列数
      * @param srcDstride  源行 stride（跨 head/batch 的实际步长）
      */
-    __aicore__ inline void CopyGmToL1(LocalTensor<IN_T> &l1Tensor, GlobalTensor<IN_T> &gmSrcTensor, uint32_t srcN,
+    __aicore__ inline void CopyGmToL1(LocalTensor<IN_T>& l1Tensor, GlobalTensor<IN_T>& gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride);
 
     /**
@@ -165,7 +165,7 @@ private:
      * @param mSize     M 维度（对齐后）
      * @param kSize     K 维度（对齐后）
      */
-    __aicore__ inline void LoadDataMmA(LocalTensor<IN_T> &aL0Tensor, LocalTensor<IN_T> &aL1Tensor, uint32_t mSize,
+    __aicore__ inline void LoadDataMmA(LocalTensor<IN_T>& aL0Tensor, LocalTensor<IN_T>& aL1Tensor, uint32_t mSize,
                                        uint32_t kSize);
 
     /**
@@ -179,7 +179,7 @@ private:
      * @param kSize     K 维度（对齐后）
      * @param nSize     N 维度（对齐后）
      */
-    __aicore__ inline void LoadDataMmB(LocalTensor<IN_T> &bL0Tensor, LocalTensor<IN_T> &bL1Tensor, uint32_t kSize,
+    __aicore__ inline void LoadDataMmB(LocalTensor<IN_T>& bL0Tensor, LocalTensor<IN_T>& bL1Tensor, uint32_t kSize,
                                        uint32_t nSize);
 
     /**
@@ -214,7 +214,7 @@ private:
      * @param dstStride   GM 中行 stride（= yBlocks，即全量 K 维度）
      * @param l0PingPongFlag L0C 乒乓旗标
      */
-    __aicore__ inline void FixCopyOut(GlobalTensor<MM_OUT_T> &resGm, uint32_t mSize, uint32_t nSize, uint32_t dstStride,
+    __aicore__ inline void FixCopyOut(GlobalTensor<MM_OUT_T>& resGm, uint32_t mSize, uint32_t nSize, uint32_t dstStride,
                                       uint8_t l0PingPongFlag);
 
     /// L0A Ping-Pong 缓冲区大小: 32KB
@@ -257,13 +257,13 @@ private:
 };
 
 template <typename BSAT>
-__aicore__ inline void BSAMatmulService<BSAT>::InitParams(const BSAConstInfo &constInfo)
+__aicore__ inline void BSAMatmulService<BSAT>::InitParams(const BSAConstInfo& constInfo)
 {
     this->constInfo = constInfo;
 }
 
 template <typename BSAT>
-__aicore__ inline void BSAMatmulService<BSAT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void BSAMatmulService<BSAT>::InitBuffers(TPipe* pipe)
 {
     // ---- L1 缓冲区: Q 单缓冲 + K 双缓冲 ----
     // Q 单缓冲: 尺寸 = CUBE_BASE_BLOCK(128) × dSize(128) × sizeof(float)= 64KB
@@ -295,8 +295,8 @@ __aicore__ inline void BSAMatmulService<BSAT>::InitBuffers(TPipe *pipe)
 }
 
 template <typename BSAT>
-__aicore__ inline void BSAMatmulService<BSAT>::InitGM(GlobalTensor<IN_T> &qCmpGm, GlobalTensor<IN_T> &kCmpGm,
-                                                      GlobalTensor<MM_OUT_T> &attnScoreGm)
+__aicore__ inline void BSAMatmulService<BSAT>::InitGM(GlobalTensor<IN_T>& qCmpGm, GlobalTensor<IN_T>& kCmpGm,
+                                                      GlobalTensor<MM_OUT_T>& attnScoreGm)
 {
     this->qCmpGmLocal = qCmpGm;
     this->kCmpGmLocal = kCmpGm;
@@ -337,7 +337,7 @@ __aicore__ inline void BSAMatmulService<BSAT>::FreeEventID()
 }
 
 template <typename BSAT>
-__aicore__ inline void BSAMatmulService<BSAT>::CopyGmToL1(LocalTensor<IN_T> &l1Tensor, GlobalTensor<IN_T> &gmSrcTensor,
+__aicore__ inline void BSAMatmulService<BSAT>::CopyGmToL1(LocalTensor<IN_T>& l1Tensor, GlobalTensor<IN_T>& gmSrcTensor,
                                                           uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
@@ -376,7 +376,7 @@ __aicore__ inline void BSAMatmulService<BSAT>::CopyInKToL1(uint32_t kBlockStart,
 // ==================== L1→L0 加载 ====================
 
 template <typename BSAT>
-__aicore__ inline void BSAMatmulService<BSAT>::LoadDataMmA(LocalTensor<IN_T> &aL0Tensor, LocalTensor<IN_T> &aL1Tensor,
+__aicore__ inline void BSAMatmulService<BSAT>::LoadDataMmA(LocalTensor<IN_T>& aL0Tensor, LocalTensor<IN_T>& aL1Tensor,
                                                            uint32_t mSize, uint32_t kSize)
 {
     // M, K 对齐到 C0_SIZE=16
@@ -397,7 +397,7 @@ __aicore__ inline void BSAMatmulService<BSAT>::LoadDataMmA(LocalTensor<IN_T> &aL
 }
 
 template <typename BSAT>
-__aicore__ inline void BSAMatmulService<BSAT>::LoadDataMmB(LocalTensor<IN_T> &bL0Tensor, LocalTensor<IN_T> &bL1Tensor,
+__aicore__ inline void BSAMatmulService<BSAT>::LoadDataMmB(LocalTensor<IN_T>& bL0Tensor, LocalTensor<IN_T>& bL1Tensor,
                                                            uint32_t kSize, uint32_t nSize)
 {
     uint32_t alignK = BSAAlignTo(kSize, static_cast<uint32_t>(C0_SIZE));
@@ -454,7 +454,7 @@ __aicore__ inline void BSAMatmulService<BSAT>::MmadInner(uint32_t mSize, uint32_
 // ==================== FixCopyOut 结果写回 ====================
 
 template <typename BSAT>
-__aicore__ inline void BSAMatmulService<BSAT>::FixCopyOut(GlobalTensor<MM_OUT_T> &resGm, uint32_t mSize, uint32_t nSize,
+__aicore__ inline void BSAMatmulService<BSAT>::FixCopyOut(GlobalTensor<MM_OUT_T>& resGm, uint32_t mSize, uint32_t nSize,
                                                           uint32_t dstStride, uint8_t l0PingPongFlag)
 {
     uint8_t flagVal = l0PingPongFlag & 1;

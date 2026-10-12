@@ -27,7 +27,7 @@ const int64_t VALUE_2 = 2;
 const int64_t CMP_RATIO_MIN = 2;
 const int64_t CMP_RATIO_MAX = 128;
 
-std::vector<bool> IsContiguousAxes(const at::Tensor &tensor)
+std::vector<bool> IsContiguousAxes(const at::Tensor& tensor)
 {
     auto sizes = tensor.sizes();
     auto strides = tensor.strides();
@@ -49,7 +49,7 @@ std::vector<bool> IsContiguousAxes(const at::Tensor &tensor)
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> ConstructCompressorOutputTensor(
-    const at::Tensor &x, const at::Tensor &wkv, const at::Tensor &ape, const c10::optional<at::Tensor> &cuSeqlens,
+    const at::Tensor& x, const at::Tensor& wkv, const at::Tensor& ape, const c10::optional<at::Tensor>& cuSeqlens,
     int64_t cmpRatio, int64_t coff)
 {
     auto xDim = x.dim();
@@ -90,9 +90,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ConstructCompressorOutputTensor(
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> Compressor(
-    const at::Tensor &x, const at::Tensor &wkv, const at::Tensor &wgate, at::Tensor &stateCache, const at::Tensor &ape,
-    int64_t cmpRatio, const c10::optional<at::Tensor> &stateBlockTable, const c10::optional<at::Tensor> &cuSeqlens,
-    const c10::optional<at::Tensor> &seqused, const c10::optional<at::Tensor> &startPos, int64_t coff,
+    const at::Tensor& x, const at::Tensor& wkv, const at::Tensor& wgate, at::Tensor& stateCache, const at::Tensor& ape,
+    int64_t cmpRatio, const c10::optional<at::Tensor>& stateBlockTable, const c10::optional<at::Tensor>& cuSeqlens,
+    const c10::optional<at::Tensor>& seqused, const c10::optional<at::Tensor>& startPos, int64_t coff,
     int64_t cacheMode, bool gradEnabled)
 {
     TORCH_CHECK(x.defined(), "Check x != nullptr failed");
@@ -117,9 +117,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> Compressor(
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> CompressorBackward(
-    at::Tensor &dCmpKv, const at::Tensor &x, const at::Tensor &wkv, const at::Tensor &wgate,
-    const at::Tensor &softmaxScore, const at::Tensor &kv, const c10::optional<at::Tensor> &cuSeqlens,
-    const c10::optional<at::Tensor> &seqused, const c10::optional<at::Tensor> &startPos, int64_t cmpRatio, int64_t coff)
+    at::Tensor& dCmpKv, const at::Tensor& x, const at::Tensor& wkv, const at::Tensor& wgate,
+    const at::Tensor& softmaxScore, const at::Tensor& kv, const c10::optional<at::Tensor>& cuSeqlens,
+    const c10::optional<at::Tensor>& seqused, const c10::optional<at::Tensor>& startPos, int64_t cmpRatio, int64_t coff)
 {
     auto xDim = x.dim();
     at::SmallVector<int64_t, MAX_DIM_SIZE> dxSize;
@@ -153,9 +153,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> CompressorBackward(
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> CompressorMeta(
-    const at::Tensor &x, const at::Tensor &wkv, const at::Tensor &wgate, at::Tensor &stateCache, const at::Tensor &ape,
-    int64_t cmpRatio, const c10::optional<at::Tensor> &stateBlockTable, const c10::optional<at::Tensor> &cuSeqlens,
-    const c10::optional<at::Tensor> &seqused, const c10::optional<at::Tensor> &startPos, int64_t coff,
+    const at::Tensor& x, const at::Tensor& wkv, const at::Tensor& wgate, at::Tensor& stateCache, const at::Tensor& ape,
+    int64_t cmpRatio, const c10::optional<at::Tensor>& stateBlockTable, const c10::optional<at::Tensor>& cuSeqlens,
+    const c10::optional<at::Tensor>& seqused, const c10::optional<at::Tensor>& startPos, int64_t coff,
     int64_t cacheMode)
 {
     TORCH_CHECK(x.defined(), "Check x != nullptr failed");

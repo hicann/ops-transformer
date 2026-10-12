@@ -35,9 +35,9 @@ FAG_POST_CLASS_TEMPLATE
 class FlashAttentionScoreGradS1S2BNGS1S2PostRegbase {
 public:
     __aicore__ inline FlashAttentionScoreGradS1S2BNGS1S2PostRegbase(){};
-    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dqRope,
-                                __gm__ uint8_t *dkRope, __gm__ uint8_t *dsink, __gm__ uint8_t *workspace,
-                                FagTilingType ordTilingData, TPipe *pipe_in);
+    __aicore__ inline void Init(__gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dqRope,
+                                __gm__ uint8_t* dkRope, __gm__ uint8_t* dsink, __gm__ uint8_t* workspace,
+                                FagTilingType ordTilingData, TPipe* pipe_in);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessSink();
     __aicore__ inline void ProcessDqkv();
@@ -48,7 +48,7 @@ public:
     uint32_t ROPE_DIM = 64;
     uint32_t VALUE_DIM = 128;
     uint32_t POST_S_BASE = 96;
-    TPipe *pipe;
+    TPipe* pipe;
     FagTilingType tilingData;
     TQue<QuePosition::VECIN, 1> inQueuePing;
     TQue<QuePosition::VECOUT, 1> outQueuePing;
@@ -74,29 +74,29 @@ public:
 
 FAG_POST_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PostRegbase<FAG_POST_FUNCTION_PARAMS_TEMPLATE>::Init(
-    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dqRope, __gm__ uint8_t *dkRope,
-    __gm__ uint8_t *dsink, __gm__ uint8_t *workspace, FagTilingType ordTilingData, TPipe *pipe_in)
+    __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dqRope, __gm__ uint8_t* dkRope,
+    __gm__ uint8_t* dsink, __gm__ uint8_t* workspace, FagTilingType ordTilingData, TPipe* pipe_in)
 {
     vBlockIdx = GetBlockIdx();
     tilingData = ordTilingData;
     pipe = pipe_in;
 
-    dqkv[0].SetGlobalBuffer((__gm__ OUTDTYPE *)dq);
-    dqkv[1].SetGlobalBuffer((__gm__ OUTDTYPE *)dk);
-    dqkv[2].SetGlobalBuffer((__gm__ OUTDTYPE *)dv);
+    dqkv[0].SetGlobalBuffer((__gm__ OUTDTYPE*)dq);
+    dqkv[1].SetGlobalBuffer((__gm__ OUTDTYPE*)dk);
+    dqkv[2].SetGlobalBuffer((__gm__ OUTDTYPE*)dv);
 
-    dqkRope[0].SetGlobalBuffer((__gm__ OUTDTYPE *)dqRope);
-    dqkRope[1].SetGlobalBuffer((__gm__ OUTDTYPE *)dkRope);
+    dqkRope[0].SetGlobalBuffer((__gm__ OUTDTYPE*)dqRope);
+    dqkRope[1].SetGlobalBuffer((__gm__ OUTDTYPE*)dkRope);
 
     loop = tilingData->postTilingData.qPostBlockFactor;
     inputTotalSize = tilingData->postTilingData.qPostBlockTotal;
     qPostTailNum = tilingData->postTilingData.qPostTailNum;
 
-    dqkvWorkspace[0].SetGlobalBuffer((__gm__ float *)workspace +
+    dqkvWorkspace[0].SetGlobalBuffer((__gm__ float*)workspace +
                                      tilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
-    dqkvWorkspace[1].SetGlobalBuffer((__gm__ float *)workspace +
+    dqkvWorkspace[1].SetGlobalBuffer((__gm__ float*)workspace +
                                      tilingData->postTilingData.dkWorkSpaceOffset / sizeof(T2));
-    dqkvWorkspace[2].SetGlobalBuffer((__gm__ float *)workspace +
+    dqkvWorkspace[2].SetGlobalBuffer((__gm__ float*)workspace +
                                      tilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
 
     if constexpr (IS_ROPE) {
@@ -105,9 +105,9 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PostRegbase<FAG_POST_FU
 
     isSink = tilingData->s1s2BNGS1S2BaseParams.sinkOptional;
     if (unlikely(isSink)) {
-        dsinkWorkspace.SetGlobalBuffer((__gm__ float *)workspace +
+        dsinkWorkspace.SetGlobalBuffer((__gm__ float*)workspace +
                                        tilingData->postTilingData.dsinkWorkSpaceOffset / sizeof(float));
-        dsinkGm.SetGlobalBuffer((__gm__ float *)dsink);
+        dsinkGm.SetGlobalBuffer((__gm__ float*)dsink);
         s1SinkOuter = tilingData->s1s2BNGS1S2BaseParams.s1SinkOuter;
         s2SinkOuter = tilingData->s1s2BNGS1S2BaseParams.s2SinkOuter;
         bSinkSize = tilingData->s1s2BNGS1S2BaseParams.b;
@@ -136,7 +136,7 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PostRegbase<FAG_POST_FU
     if (end > inputTotalSize) {
         end = inputTotalSize;
     }
-    GM_ADDR baseAddr = (__gm__ uint8_t *)dsinkWorkspace.GetPhyAddr();
+    GM_ADDR baseAddr = (__gm__ uint8_t*)dsinkWorkspace.GetPhyAddr();
     for (uint64_t nIdx = begin; nIdx < end; nIdx++) {
         SetFlag<HardEvent::MTE3_S>(eventIDMte3ToS);
         WaitFlag<HardEvent::MTE3_S>(eventIDMte3ToS);

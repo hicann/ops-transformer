@@ -39,8 +39,8 @@ constexpr uint32_t B32_REP_SIZE = REGSIZE / sizeof(float);
 
 // 对stateAddr的数据进行原地读写出操作， stateAddr=yAddr
 template <typename T>
-__simd_vf__ void Conv1dNeedStateSingleTailConVF(__ubuf__ T *xAddr, __ubuf__ T *weightAddr, __ubuf__ T *stateAddr,
-                                                __ubuf__ T *yAddr, uint8_t stateSLen, uint8_t xSLen, uint32_t dimLen)
+__simd_vf__ void Conv1dNeedStateSingleTailConVF(__ubuf__ T* xAddr, __ubuf__ T* weightAddr, __ubuf__ T* stateAddr,
+                                                __ubuf__ T* yAddr, uint8_t stateSLen, uint8_t xSLen, uint32_t dimLen)
 {
     Reg::RegTensor<float> xB32, mulB32, weightB32, yB32;
     Reg::RegTensor<T> xB16, weightB16, yB16;
@@ -102,8 +102,8 @@ __simd_vf__ void Conv1dNeedStateSingleTailConVF(__ubuf__ T *xAddr, __ubuf__ T *w
 }
 
 template <typename T>
-__simd_vf__ void Conv1dNeedStateSingleTailNoConVF(__ubuf__ T *xAddr, __ubuf__ T *weightAddr, __ubuf__ T *stateAddr,
-                                                  __ubuf__ T *yAddr, uint8_t stateSLen, uint8_t xSLen, uint32_t dimLen)
+__simd_vf__ void Conv1dNeedStateSingleTailNoConVF(__ubuf__ T* xAddr, __ubuf__ T* weightAddr, __ubuf__ T* stateAddr,
+                                                  __ubuf__ T* yAddr, uint8_t stateSLen, uint8_t xSLen, uint32_t dimLen)
 {
     Reg::RegTensor<float> xB32, mulB32, weightB32, yB32;
     Reg::RegTensor<T> xB16, weightB16, yB16;
@@ -163,8 +163,8 @@ __simd_vf__ void Conv1dNeedStateSingleTailNoConVF(__ubuf__ T *xAddr, __ubuf__ T 
 }
 
 template <typename T>
-__simd_vf__ void Conv1dNeedStateSingleTailConBHVF(__ubuf__ T *xAddr, __ubuf__ T *weightAddr, __ubuf__ T *stateAddr,
-                                                  __ubuf__ T *yAddr, uint32_t dimLen)
+__simd_vf__ void Conv1dNeedStateSingleTailConBHVF(__ubuf__ T* xAddr, __ubuf__ T* weightAddr, __ubuf__ T* stateAddr,
+                                                  __ubuf__ T* yAddr, uint32_t dimLen)
 {
     Reg::RegTensor<float> weight11B32, weight12B32, weight13B32, x11B32, x12B32, x13B32, mul11B32, mul12B32, mul13B32,
         y1B32;
@@ -273,8 +273,8 @@ __simd_vf__ void Conv1dNeedStateSingleTailConBHVF(__ubuf__ T *xAddr, __ubuf__ T 
 }
 
 template <typename T>
-__simd_vf__ void Conv1dNeedStateSingleTailNoConBHVF(__ubuf__ T *xAddr, __ubuf__ T *weightAddr, __ubuf__ T *stateAddr,
-                                                    __ubuf__ T *yAddr, uint32_t dimLen)
+__simd_vf__ void Conv1dNeedStateSingleTailNoConBHVF(__ubuf__ T* xAddr, __ubuf__ T* weightAddr, __ubuf__ T* stateAddr,
+                                                    __ubuf__ T* yAddr, uint32_t dimLen)
 {
     Reg::RegTensor<float> weight11B32, weight12B32, weight13B32, x11B32, x12B32, x13B32, mul11B32, mul12B32, mul13B32,
         y1B32;
@@ -379,14 +379,14 @@ __simd_vf__ void Conv1dNeedStateSingleTailNoConBHVF(__ubuf__ T *xAddr, __ubuf__ 
 }
 
 template <typename T>
-__aicore__ inline void Conv1dNeedStateSingleTail(LocalTensor<T> &xUb, LocalTensor<T> &weightUb, LocalTensor<T> &stateUb,
-                                                 LocalTensor<T> &yUb, uint8_t stateSLen, uint32_t xSLen,
+__aicore__ inline void Conv1dNeedStateSingleTail(LocalTensor<T>& xUb, LocalTensor<T>& weightUb, LocalTensor<T>& stateUb,
+                                                 LocalTensor<T>& yUb, uint8_t stateSLen, uint32_t xSLen,
                                                  uint32_t dimLen, int32_t isResidualConnection)
 {
-    __ubuf__ T *xAddr = (__ubuf__ T *)xUb.GetPhyAddr();
-    __ubuf__ T *weightAddr = (__ubuf__ T *)weightUb.GetPhyAddr();
-    __ubuf__ T *stateAddr = (__ubuf__ T *)stateUb.GetPhyAddr();
-    __ubuf__ T *yAddr = (__ubuf__ T *)yUb.GetPhyAddr();
+    __ubuf__ T* xAddr = (__ubuf__ T*)xUb.GetPhyAddr();
+    __ubuf__ T* weightAddr = (__ubuf__ T*)weightUb.GetPhyAddr();
+    __ubuf__ T* stateAddr = (__ubuf__ T*)stateUb.GetPhyAddr();
+    __ubuf__ T* yAddr = (__ubuf__ T*)yUb.GetPhyAddr();
     if (isResidualConnection == 1) {
         Conv1dNeedStateSingleTailConVF(xAddr, weightAddr, stateAddr, yAddr, stateSLen, xSLen, dimLen);
     } else {
@@ -395,14 +395,14 @@ __aicore__ inline void Conv1dNeedStateSingleTail(LocalTensor<T> &xUb, LocalTenso
 }
 
 template <typename T>
-__aicore__ inline void Conv1dNeedStateSingleTailBH(LocalTensor<T> &xUb, LocalTensor<T> &weightUb,
-                                                   LocalTensor<T> &stateUb, LocalTensor<T> &yUb, uint32_t convStateLen,
+__aicore__ inline void Conv1dNeedStateSingleTailBH(LocalTensor<T>& xUb, LocalTensor<T>& weightUb,
+                                                   LocalTensor<T>& stateUb, LocalTensor<T>& yUb, uint32_t convStateLen,
                                                    uint32_t dimLen, int32_t isResidualConnection)
 {
-    __ubuf__ T *xAddr = (__ubuf__ T *)xUb.GetPhyAddr();
-    __ubuf__ T *weightAddr = (__ubuf__ T *)weightUb.GetPhyAddr();
-    __ubuf__ T *stateAddr = (__ubuf__ T *)stateUb.GetPhyAddr();
-    __ubuf__ T *yAddr = (__ubuf__ T *)yUb.GetPhyAddr();
+    __ubuf__ T* xAddr = (__ubuf__ T*)xUb.GetPhyAddr();
+    __ubuf__ T* weightAddr = (__ubuf__ T*)weightUb.GetPhyAddr();
+    __ubuf__ T* stateAddr = (__ubuf__ T*)stateUb.GetPhyAddr();
+    __ubuf__ T* yAddr = (__ubuf__ T*)yUb.GetPhyAddr();
 
     if (isResidualConnection == 1) {
         if (convStateLen == 2) {

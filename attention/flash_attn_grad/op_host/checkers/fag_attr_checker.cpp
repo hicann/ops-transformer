@@ -17,7 +17,7 @@ namespace {
 
 // 属性缺省时保留 ctx 里的默认值，不报错：这些属性在 flash_attn_grad_def.cpp
 // 里都带默认值，图模式下可能整个 attrs 都拿不到。
-void ReadInt64Attr(const gert::RuntimeAttrs *attrs, size_t index, int64_t &out)
+void ReadInt64Attr(const gert::RuntimeAttrs* attrs, size_t index, int64_t& out)
 {
     auto ptr = attrs->GetAttrPointer<int64_t>(index);
     if (ptr != nullptr) {
@@ -25,7 +25,7 @@ void ReadInt64Attr(const gert::RuntimeAttrs *attrs, size_t index, int64_t &out)
     }
 }
 
-void ReadStrAttr(const gert::RuntimeAttrs *attrs, size_t index, std::string &out)
+void ReadStrAttr(const gert::RuntimeAttrs* attrs, size_t index, std::string& out)
 {
     auto ptr = attrs->GetAttrPointer<char>(index);
     if (ptr != nullptr) {
@@ -34,23 +34,23 @@ void ReadStrAttr(const gert::RuntimeAttrs *attrs, size_t index, std::string &out
 }
 
 // "必须是 -1 或非负" 的属性反复出现，收成一条。-1 表示"未设置"。
-ge::graphStatus CheckMinusOneOrNonNegative(const char *opName, const char *attrName, int64_t value)
+ge::graphStatus CheckMinusOneOrNonNegative(const char* opName, const char* attrName, int64_t value)
 {
     OP_CHECK_IF(value < -1, OP_LOGE(opName, "%s must be -1 or >= 0, but got %ld.", attrName, value),
                 return ge::GRAPH_PARAM_INVALID);
     return ge::GRAPH_SUCCESS;
 }
 
-bool IsSupportedLayout(const std::string &layout)
+bool IsSupportedLayout(const std::string& layout)
 {
     return layout == "BSND" || layout == "TND" || layout == "BNSD";
 }
 
 } // namespace
 
-ge::graphStatus FagAttrRangeChecker::Check(FagCheckCtx &ctx)
+ge::graphStatus FagAttrRangeChecker::Check(FagCheckCtx& ctx)
 {
-    const char *opName = ctx.opName;
+    const char* opName = ctx.opName;
 
     auto attrs = ctx.context->GetAttrs();
     if (attrs != nullptr) {
@@ -77,9 +77,9 @@ ge::graphStatus FagAttrRangeChecker::Check(FagCheckCtx &ctx)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FagMaskChecker::Check(FagCheckCtx &ctx)
+ge::graphStatus FagMaskChecker::Check(FagCheckCtx& ctx)
 {
-    const char *opName = ctx.opName;
+    const char* opName = ctx.opName;
     const bool hasMask = IsOptionalTensorExist(ctx.context, ATTN_MASK_INDEX);
 
     // mask_mode 决定 attn_mask 该不该来、window 参数该不该给：
@@ -116,7 +116,7 @@ ge::graphStatus FagMaskChecker::Check(FagCheckCtx &ctx)
     }
 
     if (hasMask) {
-        auto &maskShape = ctx.context->GetOptionalInputShape(ATTN_MASK_INDEX)->GetStorageShape();
+        auto& maskShape = ctx.context->GetOptionalInputShape(ATTN_MASK_INDEX)->GetStorageShape();
         OP_CHECK_IF(maskShape.GetDimNum() != 2U,
                     OP_LOGE(opName, "attn_mask must be 2D, but got %zu dims.", maskShape.GetDimNum()),
                     return ge::GRAPH_PARAM_INVALID);
@@ -128,20 +128,20 @@ ge::graphStatus FagMaskChecker::Check(FagCheckCtx &ctx)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FagLayoutChecker::Check(FagCheckCtx &ctx)
+ge::graphStatus FagLayoutChecker::Check(FagCheckCtx& ctx)
 {
-    const char *opName = ctx.opName;
+    const char* opName = ctx.opName;
 
     const struct {
-        const char *attrName;
-        const std::string &value;
+        const char* attrName;
+        const std::string& value;
     } layouts[] = {
         {"layout_q", ctx.layoutQ},
         {"layout_kv", ctx.layoutKv},
         {"layout_out", ctx.layoutOut},
     };
 
-    for (const auto &item : layouts) {
+    for (const auto& item : layouts) {
         OP_CHECK_IF(!IsSupportedLayout(item.value),
                     OP_LOGE(opName, "%s only supports BSND, TND, BNSD, but got %s.", item.attrName, item.value.c_str()),
                     return ge::GRAPH_PARAM_INVALID);

@@ -53,34 +53,34 @@ public:
     // Methods
     __aicore__ inline BsaRegularKernelArch35() {}
 
-    __aicore__ inline void operator()(BsaKernelParamsArch35 const &params)
+    __aicore__ inline void operator()(BsaKernelParamsArch35 const& params)
     {
-        __gm__ BlockSparseAttentionTilingData *bsaTilingData =
-            reinterpret_cast<__gm__ BlockSparseAttentionTilingData *>(params.tiling);
+        __gm__ BlockSparseAttentionTilingData* bsaTilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionTilingData*>(params.tiling);
         FetchBaseShapeInfo(bsaTilingData);
         CalcOnChipBufTileInfo(bsaTilingData);
         CalcUBufTileInfo();
         // global buffers
         AscendC::GlobalTensor<ElementQ> gQ;
-        gQ.SetGlobalBuffer((__gm__ ElementQ *)params.q);
+        gQ.SetGlobalBuffer((__gm__ ElementQ*)params.q);
         AscendC::GlobalTensor<ElementK> gK;
-        gK.SetGlobalBuffer((__gm__ ElementK *)params.k);
+        gK.SetGlobalBuffer((__gm__ ElementK*)params.k);
         AscendC::GlobalTensor<ElementK> gV;
-        gV.SetGlobalBuffer((__gm__ ElementK *)params.v);
+        gV.SetGlobalBuffer((__gm__ ElementK*)params.v);
         AscendC::GlobalTensor<int64_t> gActualQseqlen;
-        gActualQseqlen.SetGlobalBuffer((__gm__ int64_t *)params.actualQseqlen);
+        gActualQseqlen.SetGlobalBuffer((__gm__ int64_t*)params.actualQseqlen);
         AscendC::GlobalTensor<int64_t> gActualKvseqlen;
-        gActualKvseqlen.SetGlobalBuffer((__gm__ int64_t *)params.actualKvseqlen);
+        gActualKvseqlen.SetGlobalBuffer((__gm__ int64_t*)params.actualKvseqlen);
         AscendC::GlobalTensor<uint8_t> gBlockSparseMask;
-        gBlockSparseMask.SetGlobalBuffer((__gm__ uint8_t *)params.blockSparseMask);
+        gBlockSparseMask.SetGlobalBuffer((__gm__ uint8_t*)params.blockSparseMask);
         AscendC::GlobalTensor<ElementO> gO;
-        gO.SetGlobalBuffer((__gm__ ElementO *)params.o);
+        gO.SetGlobalBuffer((__gm__ ElementO*)params.o);
         AscendC::GlobalTensor<ElementLse> gLse;
-        gLse.SetGlobalBuffer((__gm__ ElementLse *)params.lse);
+        gLse.SetGlobalBuffer((__gm__ ElementLse*)params.lse);
         AscendC::GlobalTensor<ElementSparseIdx> gSparseIdx;
-        gSparseIdx.SetGlobalBuffer((__gm__ ElementSparseIdx *)params.workSpace);
+        gSparseIdx.SetGlobalBuffer((__gm__ ElementSparseIdx*)params.workSpace);
         AscendC::GlobalTensor<ElementSparseCount> gSparseCount;
-        gSparseCount.SetGlobalBuffer((__gm__ ElementSparseCount *)(params.workSpace + sparseIdxSize_));
+        gSparseCount.SetGlobalBuffer((__gm__ ElementSparseCount*)(params.workSpace + sparseIdxSize_));
         // cross core data move dst buffers
         AscendC::LocalTensor<ElementP> l1PTensor[MAX_CROSS_CORE_BUF_STAGES];
         AscendC::LocalTensor<ElementS> ubSTensor[UB_S_OTMP_BUF_STAGES];
@@ -431,7 +431,7 @@ public:
         ReleaseSyncFlags<4, 4, 4>();
     }
 
-    __aicore__ inline void FetchBaseShapeInfo(__gm__ BlockSparseAttentionTilingData *bsaTilingData)
+    __aicore__ inline void FetchBaseShapeInfo(__gm__ BlockSparseAttentionTilingData* bsaTilingData)
     {
         batch_ = bsaTilingData->batch;
         qHeads_ = bsaTilingData->numHeads;
@@ -458,7 +458,7 @@ public:
         kvSeqlenAligned_ = bsaTilingData->maxKvSeqlen;
     }
 
-    __aicore__ inline void CalcOnChipBufTileInfo(__gm__ BlockSparseAttentionTilingData *bsaTilingData)
+    __aicore__ inline void CalcOnChipBufTileInfo(__gm__ BlockSparseAttentionTilingData* bsaTilingData)
     {
         mm1L1TileM_ = bsaTilingData->BsaMmPhaseL1TileInfo.mm1L1TileM;
         mm1L1TileN_ = bsaTilingData->BsaMmPhaseL1TileInfo.mm1L1TileN;

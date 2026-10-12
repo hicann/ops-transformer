@@ -64,8 +64,8 @@ constexpr AscendC::Reg::DivSpecificMode BARU_DIV_0ULP_FTZ_TRUE_MODE = {
 // Phase 1 computes p = partial + delta and
 // score = dot(p, pseudoQuery) / sqrt(mean(p * p) + eps), then stores p and one score per T row.
 // One-VREG specialization: the query is invariant across T, so load and tail-clear it once.
-__simd_vf__ inline void BlockAttnResUpdatePhase1OneVLVF(__ubuf__ float *partial, __ubuf__ bfloat16_t *delta,
-                                                        __ubuf__ float *pseudoQuery, __ubuf__ float *stats,
+__simd_vf__ inline void BlockAttnResUpdatePhase1OneVLVF(__ubuf__ float* partial, __ubuf__ bfloat16_t* delta,
+                                                        __ubuf__ float* pseudoQuery, __ubuf__ float* stats,
                                                         uint16_t tSize, uint32_t dSize, uint32_t dAlignFp32,
                                                         uint32_t dAlignBf16, uint32_t statsTStride, float eps,
                                                         float invD, uint16_t hasTail)
@@ -88,7 +88,7 @@ __simd_vf__ inline void BlockAttnResUpdatePhase1OneVLVF(__ubuf__ float *partial,
     Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(queryReg, pseudoQuery);
     // Add below zeroes inactive partial lanes. Clear query padding once so the reductions can use allMask.
     for (uint16_t loop = 0; loop < hasTail; ++loop) {
-        Reg::ShiftLefts((Reg::RegTensor<uint32_t> &)queryReg, (Reg::RegTensor<uint32_t> &)queryReg,
+        Reg::ShiftLefts((Reg::RegTensor<uint32_t>&)queryReg, (Reg::RegTensor<uint32_t>&)queryReg,
                         static_cast<int16_t>(0), dMask);
     }
 
@@ -118,8 +118,8 @@ __simd_vf__ inline void BlockAttnResUpdatePhase1OneVLVF(__ubuf__ float *partial,
 
 // Two-VREG Phase 1 specialization: both query vectors stay resident across the T loop, and the second is tail-cleared
 // once.
-__simd_vf__ inline void BlockAttnResUpdatePhase1TwoVLVF(__ubuf__ float *partial, __ubuf__ bfloat16_t *delta,
-                                                        __ubuf__ float *pseudoQuery, __ubuf__ float *stats,
+__simd_vf__ inline void BlockAttnResUpdatePhase1TwoVLVF(__ubuf__ float* partial, __ubuf__ bfloat16_t* delta,
+                                                        __ubuf__ float* pseudoQuery, __ubuf__ float* stats,
                                                         uint16_t tSize, uint32_t dSize, uint32_t dAlignFp32,
                                                         uint32_t dAlignBf16, uint32_t statsTStride, float eps,
                                                         float invD, uint16_t hasTail)
@@ -146,7 +146,7 @@ __simd_vf__ inline void BlockAttnResUpdatePhase1TwoVLVF(__ubuf__ float *partial,
     Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(queryReg0, pseudoQuery);
     Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(queryReg1, pseudoQuery + BARU_VREG_FP32_ELEMENTS);
     for (uint16_t loop = 0; loop < hasTail; ++loop) {
-        Reg::ShiftLefts((Reg::RegTensor<uint32_t> &)queryReg1, (Reg::RegTensor<uint32_t> &)queryReg1,
+        Reg::ShiftLefts((Reg::RegTensor<uint32_t>&)queryReg1, (Reg::RegTensor<uint32_t>&)queryReg1,
                         static_cast<int16_t>(0), tailMask);
     }
 
@@ -186,8 +186,8 @@ __simd_vf__ inline void BlockAttnResUpdatePhase1TwoVLVF(__ubuf__ float *partial,
 }
 
 // Generic Phase 1 path. D is the effective reduction length; aligned strides are used only for UB addressing.
-__simd_vf__ inline void BlockAttnResUpdatePhase1VF(__ubuf__ float *partial, __ubuf__ bfloat16_t *delta,
-                                                   __ubuf__ float *pseudoQuery, __ubuf__ float *stats, uint16_t tSize,
+__simd_vf__ inline void BlockAttnResUpdatePhase1VF(__ubuf__ float* partial, __ubuf__ bfloat16_t* delta,
+                                                   __ubuf__ float* pseudoQuery, __ubuf__ float* stats, uint16_t tSize,
                                                    uint32_t dSize, uint32_t dAlignFp32, uint32_t dAlignBf16,
                                                    uint32_t statsTStride, float eps, float invD, uint16_t hasMixedPair,
                                                    uint16_t hasSingleRemainder, uint16_t hasRemainder,
@@ -270,7 +270,7 @@ __simd_vf__ inline void BlockAttnResUpdatePhase1VF(__ubuf__ float *partial, __ub
             Reg::LoadAlign<bfloat16_t, Reg::LoadDist::DIST_UNPACK_B16>(deltaReg1, delta + deltaTOffset + vectorOffset1);
             Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(loopQueryReg0, pseudoQuery + vectorOffset0);
             Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(loopQueryReg1, pseudoQuery + vectorOffset1);
-            Reg::ShiftLefts((Reg::RegTensor<uint32_t> &)loopQueryReg1, (Reg::RegTensor<uint32_t> &)loopQueryReg1,
+            Reg::ShiftLefts((Reg::RegTensor<uint32_t>&)loopQueryReg1, (Reg::RegTensor<uint32_t>&)loopQueryReg1,
                             static_cast<int16_t>(0), tailMask);
             Reg::Cast<float, bfloat16_t, BARU_CAST_BF16_TO_FP32>(deltaFp32Reg0, deltaReg0, allMask);
             Reg::Cast<float, bfloat16_t, BARU_CAST_BF16_TO_FP32>(deltaFp32Reg1, deltaReg1, tailMask);
@@ -293,7 +293,7 @@ __simd_vf__ inline void BlockAttnResUpdatePhase1VF(__ubuf__ float *partial, __ub
             Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(partialReg0, partial + partialTOffset + vectorOffset);
             Reg::LoadAlign<bfloat16_t, Reg::LoadDist::DIST_UNPACK_B16>(deltaReg0, delta + deltaTOffset + vectorOffset);
             Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(loopQueryReg0, pseudoQuery + vectorOffset);
-            Reg::ShiftLefts((Reg::RegTensor<uint32_t> &)loopQueryReg0, (Reg::RegTensor<uint32_t> &)loopQueryReg0,
+            Reg::ShiftLefts((Reg::RegTensor<uint32_t>&)loopQueryReg0, (Reg::RegTensor<uint32_t>&)loopQueryReg0,
                             static_cast<int16_t>(0), tailMask);
             Reg::Cast<float, bfloat16_t, BARU_CAST_BF16_TO_FP32>(deltaFp32Reg0, deltaReg0, tailMask);
             Reg::Add<float>(partialReg0, partialReg0, deltaFp32Reg0, tailMask);
@@ -321,8 +321,8 @@ __simd_vf__ inline void BlockAttnResUpdatePhase1VF(__ubuf__ float *partial, __ub
 // newMax = max(logitMax, score), alpha = exp(logitMax - newMax), beta = exp(score - newMax),
 // h = (numerator * alpha + partial * beta) / (expSum * alpha + beta).
 // One-VREG specialization: the fixed D body removes the inner loop and builds its mask once per VF call.
-__simd_vf__ inline void BlockAttnResUpdatePhase2OneVLVF(__ubuf__ float *partial, __ubuf__ bfloat16_t *deltaH,
-                                                        __ubuf__ float *numerator, __ubuf__ float *stats,
+__simd_vf__ inline void BlockAttnResUpdatePhase2OneVLVF(__ubuf__ float* partial, __ubuf__ bfloat16_t* deltaH,
+                                                        __ubuf__ float* numerator, __ubuf__ float* stats,
                                                         uint16_t tSize, uint32_t dSize, uint32_t dAlignFp32,
                                                         uint32_t dAlignBf16, uint32_t statsTStride)
 {
@@ -371,8 +371,8 @@ __simd_vf__ inline void BlockAttnResUpdatePhase2OneVLVF(__ubuf__ float *partial,
 }
 
 // Two-VREG Phase 2 specialization: two independent register chains expose the fixed pair to RVEC dual issue.
-__simd_vf__ inline void BlockAttnResUpdatePhase2TwoVLVF(__ubuf__ float *partial, __ubuf__ bfloat16_t *deltaH,
-                                                        __ubuf__ float *numerator, __ubuf__ float *stats,
+__simd_vf__ inline void BlockAttnResUpdatePhase2TwoVLVF(__ubuf__ float* partial, __ubuf__ bfloat16_t* deltaH,
+                                                        __ubuf__ float* numerator, __ubuf__ float* stats,
                                                         uint16_t tSize, uint32_t dSize, uint32_t dAlignFp32,
                                                         uint32_t dAlignBf16, uint32_t statsTStride)
 {
@@ -434,8 +434,8 @@ __simd_vf__ inline void BlockAttnResUpdatePhase2TwoVLVF(__ubuf__ float *partial,
 // Generic Phase 2 path computes the online-softmax merge coefficients and forms BF16 h.
 // Alpha and beta are normalized once per T row so that each D loop needs only Mul + MulDstAdd.
 // Phase 1 and Phase 2 run in program order on V, so delta is fully consumed before its UB region is reused for h.
-__simd_vf__ inline void BlockAttnResUpdatePhase2VF(__ubuf__ float *partial, __ubuf__ bfloat16_t *deltaH,
-                                                   __ubuf__ float *numerator, __ubuf__ float *stats, uint16_t tSize,
+__simd_vf__ inline void BlockAttnResUpdatePhase2VF(__ubuf__ float* partial, __ubuf__ bfloat16_t* deltaH,
+                                                   __ubuf__ float* numerator, __ubuf__ float* stats, uint16_t tSize,
                                                    uint32_t dSize, uint32_t dAlignFp32, uint32_t dAlignBf16,
                                                    uint32_t statsTStride, uint16_t fullLoops, uint16_t hasTail,
                                                    uint16_t hasMixedPair, uint16_t hasOddFullOnly, uint16_t hasTailOnly)
@@ -574,7 +574,7 @@ public:
     __aicore__ inline __attribute__((always_inline)) void operator()(GM_ADDR partialBlock, GM_ADDR delta,
                                                                      GM_ADDR pseudoQuery, GM_ADDR numerator,
                                                                      GM_ADDR logitMax, GM_ADDR expSum, GM_ADDR h,
-                                                                     const BlockAttnResUpdateTilingData *tilingData)
+                                                                     const BlockAttnResUpdateTilingData* tilingData)
     {
         Init(partialBlock, delta, pseudoQuery, numerator, logitMax, expSum, h, tilingData);
         Process();
@@ -584,17 +584,17 @@ private:
     __aicore__ inline __attribute__((always_inline)) void Init(GM_ADDR partialBlock, GM_ADDR delta, GM_ADDR pseudoQuery,
                                                                GM_ADDR numerator, GM_ADDR logitMax, GM_ADDR expSum,
                                                                GM_ADDR h,
-                                                               const BlockAttnResUpdateTilingData *tilingData)
+                                                               const BlockAttnResUpdateTilingData* tilingData)
     {
         tilingData_ = tilingData;
 
-        partialBlockGm_ = reinterpret_cast<__gm__ float *>(partialBlock);
-        deltaGm_ = reinterpret_cast<__gm__ bfloat16_t *>(delta);
-        pseudoQueryGm_ = reinterpret_cast<__gm__ float *>(pseudoQuery);
-        numeratorGm_ = reinterpret_cast<__gm__ float *>(numerator);
-        logitMaxGm_ = reinterpret_cast<__gm__ float *>(logitMax);
-        expSumGm_ = reinterpret_cast<__gm__ float *>(expSum);
-        hGm_ = reinterpret_cast<__gm__ bfloat16_t *>(h);
+        partialBlockGm_ = reinterpret_cast<__gm__ float*>(partialBlock);
+        deltaGm_ = reinterpret_cast<__gm__ bfloat16_t*>(delta);
+        pseudoQueryGm_ = reinterpret_cast<__gm__ float*>(pseudoQuery);
+        numeratorGm_ = reinterpret_cast<__gm__ float*>(numerator);
+        logitMaxGm_ = reinterpret_cast<__gm__ float*>(logitMax);
+        expSumGm_ = reinterpret_cast<__gm__ float*>(expSum);
+        hGm_ = reinterpret_cast<__gm__ bfloat16_t*>(h);
         InitUbLayout();
     }
 
@@ -803,14 +803,14 @@ private:
     uint64_t deltaHUbBytes_ = 0;
     uint64_t bufferUbBytes_ = 0;
 
-    const BlockAttnResUpdateTilingData *tilingData_ = nullptr;
-    __gm__ float *partialBlockGm_ = nullptr;
-    __gm__ bfloat16_t *deltaGm_ = nullptr;
-    __gm__ float *pseudoQueryGm_ = nullptr;
-    __gm__ float *numeratorGm_ = nullptr;
-    __gm__ float *logitMaxGm_ = nullptr;
-    __gm__ float *expSumGm_ = nullptr;
-    __gm__ bfloat16_t *hGm_ = nullptr;
+    const BlockAttnResUpdateTilingData* tilingData_ = nullptr;
+    __gm__ float* partialBlockGm_ = nullptr;
+    __gm__ bfloat16_t* deltaGm_ = nullptr;
+    __gm__ float* pseudoQueryGm_ = nullptr;
+    __gm__ float* numeratorGm_ = nullptr;
+    __gm__ float* logitMaxGm_ = nullptr;
+    __gm__ float* expSumGm_ = nullptr;
+    __gm__ bfloat16_t* hGm_ = nullptr;
 };
 
 } // namespace BlockAttnResUpdateOps

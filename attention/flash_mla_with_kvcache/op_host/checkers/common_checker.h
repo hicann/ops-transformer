@@ -30,31 +30,31 @@ public:
     CommonChecker() = default;
     ~CommonChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const FlashMlaWithKvcacheTilingInfo &faInfo) override;
+    ge::graphStatus CheckSinglePara(const FlashMlaWithKvcacheTilingInfo& faInfo) override;
 
-    ge::graphStatus CheckParaExistence(const FlashMlaWithKvcacheTilingInfo &faInfo) override;
+    ge::graphStatus CheckParaExistence(const FlashMlaWithKvcacheTilingInfo& faInfo) override;
 
-    ge::graphStatus CheckMultiPara(const FlashMlaWithKvcacheTilingInfo &faInfo) override;
+    ge::graphStatus CheckMultiPara(const FlashMlaWithKvcacheTilingInfo& faInfo) override;
 
-    void SetFaShapeCompare(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckQueryShape(const FlashMlaWithKvcacheTilingInfo &faInfo) const;
-    ge::graphStatus CheckKVShape(const FlashMlaWithKvcacheTilingInfo &faInfo) const;
-    ge::graphStatus CheckAttnOutShape(const FlashMlaWithKvcacheTilingInfo &faInfo) const;
+    void SetFaShapeCompare(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckQueryShape(const FlashMlaWithKvcacheTilingInfo& faInfo) const;
+    ge::graphStatus CheckKVShape(const FlashMlaWithKvcacheTilingInfo& faInfo) const;
+    ge::graphStatus CheckAttnOutShape(const FlashMlaWithKvcacheTilingInfo& faInfo) const;
 
 private:
     // --- Layout checks ---
-    ge::graphStatus CheckSingleParaLayout(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckMultiParaLayout(const FlashMlaWithKvcacheTilingInfo &faInfo);
+    ge::graphStatus CheckSingleParaLayout(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckMultiParaLayout(const FlashMlaWithKvcacheTilingInfo& faInfo);
 
     // --- Shape/dt checks ---
-    ge::graphStatus CheckNonQuantDataType(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckNonQuantHeadNum(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckDtypeConsistency(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckAxis(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckMlaGeometry(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckShapeConsistency(const FlashMlaWithKvcacheTilingInfo &faInfo);
+    ge::graphStatus CheckNonQuantDataType(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckNonQuantHeadNum(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckDtypeConsistency(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckAxis(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckMlaGeometry(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckShapeConsistency(const FlashMlaWithKvcacheTilingInfo& faInfo);
 
-    ge::graphStatus CheckKVShapeForPageAttention(const FlashMlaWithKvcacheTilingInfo &faInfo) const;
+    ge::graphStatus CheckKVShapeForPageAttention(const FlashMlaWithKvcacheTilingInfo& faInfo) const;
 
     // --- Attr checks ---
 

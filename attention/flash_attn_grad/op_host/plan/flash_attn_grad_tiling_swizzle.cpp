@@ -25,8 +25,8 @@ constexpr int64_t FP32_BYTES = 4;
 
 } // namespace
 
-void DecideSwizzle(const FagParsedInfo &info, const FagKernelPlan &kernel, FagSchedulePlan &schedule,
-                   FagRouteTrace &trace)
+void DecideSwizzle(const FagParsedInfo& info, const FagKernelPlan& kernel, FagSchedulePlan& schedule,
+                   FagRouteTrace& trace)
 {
     // 决定块到核的映射方式。线性切分会让同时在跑的核散落在很多 head 上：
     // S=8192 D=128、36 核时，核 0 在 head 0 而核 35 已经在 head 31，于是 36 个核

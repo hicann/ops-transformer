@@ -32,14 +32,14 @@ TEST_P(FlashAttnInferDTypeTest, param)
 {
     auto param = GetParam();
 
-    std::vector<void *> inputDataTypes;
+    std::vector<void*> inputDataTypes;
     inputDataTypes.emplace_back(&param.q_dtype);
     inputDataTypes.emplace_back(&param.k_dtype);
     inputDataTypes.emplace_back(&param.v_dtype);
 
     ge::DataType attn_out_dtype_init = ge::DT_UNDEFINED;
     ge::DataType softmax_lse_dtype_init = ge::DT_UNDEFINED;
-    std::vector<void *> outputDataTypes;
+    std::vector<void*> outputDataTypes;
     outputDataTypes.emplace_back(&attn_out_dtype_init);
     outputDataTypes.emplace_back(&softmax_lse_dtype_init);
 

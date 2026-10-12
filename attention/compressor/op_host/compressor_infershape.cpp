@@ -67,11 +67,11 @@ struct CompressorProtoShapeParam {
     int64_t compressDim{0}; // 压缩量 = coff * cmp_ratio
 };
 
-static ge::graphStatus GetCompressorAttrs(const gert::InferShapeContext *context, int64_t &cmpRatio, int64_t &coff)
+static ge::graphStatus GetCompressorAttrs(const gert::InferShapeContext* context, int64_t& cmpRatio, int64_t& coff)
 {
     auto attr = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attr);
-    const int64_t *cmpRatioPtr = attr->GetAttrPointer<int64_t>(CMP_RATIO_ATTR_INDEX);
+    const int64_t* cmpRatioPtr = attr->GetAttrPointer<int64_t>(CMP_RATIO_ATTR_INDEX);
     OP_CHECK_IF((cmpRatioPtr == nullptr),
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "cmp_ratio", "attr is required"),
                 return ge::GRAPH_FAILED);
@@ -81,7 +81,7 @@ static ge::graphStatus GetCompressorAttrs(const gert::InferShapeContext *context
                                                       "cmp_ratio should be within [" + std::to_string(CMP_RATIO_MIN) +
                                                           ", " + std::to_string(CMP_RATIO_MAX) + "]"),
                 return ge::GRAPH_FAILED);
-    const int64_t *coffPtr = attr->GetAttrPointer<int64_t>(COFF_ATTR_INDEX);
+    const int64_t* coffPtr = attr->GetAttrPointer<int64_t>(COFF_ATTR_INDEX);
     coff = (coffPtr != nullptr) ? *coffPtr : COFF_DEFAULT;
     OP_CHECK_IF((coff != COFF_VALUE_1 && coff != COFF_VALUE_2),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "coff", std::to_string(coff),
@@ -90,7 +90,7 @@ static ge::graphStatus GetCompressorAttrs(const gert::InferShapeContext *context
     return GRAPH_SUCCESS;
 }
 
-static void GetCompressorBshShape(const gert::Shape *xShape, int64_t cmpRatio, CompressorProtoShapeParam &shapeParam)
+static void GetCompressorBshShape(const gert::Shape* xShape, int64_t cmpRatio, CompressorProtoShapeParam& shapeParam)
 {
     shapeParam.isBsMerge = false;
     shapeParam.B = xShape->GetDim(DIM_INDEX_0);
@@ -101,8 +101,8 @@ static void GetCompressorBshShape(const gert::Shape *xShape, int64_t cmpRatio, C
     shapeParam.H = xShape->GetDim(DIM_INDEX_2);
 }
 
-static ge::graphStatus GetCompressorThShape(const gert::InferShapeContext *context, const gert::Shape *xShape,
-                                            int64_t cmpRatio, CompressorProtoShapeParam &shapeParam)
+static ge::graphStatus GetCompressorThShape(const gert::InferShapeContext* context, const gert::Shape* xShape,
+                                            int64_t cmpRatio, CompressorProtoShapeParam& shapeParam)
 {
     shapeParam.isBsMerge = true;
     shapeParam.T = xShape->GetDim(DIM_INDEX_0);
@@ -128,7 +128,7 @@ static ge::graphStatus GetCompressorThShape(const gert::InferShapeContext *conte
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus GetCompressorShapeDim(const gert::InferShapeContext *context, CompressorProtoShapeParam &shapeParam)
+ge::graphStatus GetCompressorShapeDim(const gert::InferShapeContext* context, CompressorProtoShapeParam& shapeParam)
 {
     auto xShape = context->GetRequiredInputShape(TOKEN_X_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
@@ -160,7 +160,7 @@ ge::graphStatus GetCompressorShapeDim(const gert::InferShapeContext *context, Co
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus SetCompressorShapeDim(const CompressorProtoShapeParam &shapeParam, gert::InferShapeContext *context)
+ge::graphStatus SetCompressorShapeDim(const CompressorProtoShapeParam& shapeParam, gert::InferShapeContext* context)
 {
     auto cmpKvShape = context->GetOutputShape(CMP_KV_OUTPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, cmpKvShape);
@@ -208,7 +208,7 @@ ge::graphStatus SetCompressorShapeDim(const CompressorProtoShapeParam &shapePara
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeCompressor(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeCompressor(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("Compressor", "context", "is nullptr"),
                 return ge::GRAPH_FAILED);
@@ -219,7 +219,7 @@ ge::graphStatus InferDataTypeCompressor(gert::InferDataTypeContext *context)
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferShapeCompressor(gert::InferShapeContext *context)
+ge::graphStatus InferShapeCompressor(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("Compressor", "context", "is nullptr"),
                 return ge::GRAPH_FAILED);

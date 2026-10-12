@@ -200,29 +200,29 @@ template <uint8_t splitAxis, uint8_t inputDType, bool isTnd, bool isDrop, bool i
           uint16_t s1TemplateType, uint16_t s2TemplateType, uint16_t dTemplateType, uint8_t deterType, bool isNEqual,
           bool isBn2MultiBlk, bool isDNoEqual, bool isRope, uint8_t outDType, bool isNzOut, bool isTndSwizzle,
           bool isRegbase>
-inline __aicore__ void RegbaseFAG(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *dy,
-                                  __gm__ uint8_t *pse_shift, __gm__ uint8_t *drop_mask, __gm__ uint8_t *padding_mask,
-                                  __gm__ uint8_t *atten_mask, __gm__ uint8_t *softmax_max, __gm__ uint8_t *softmax_sum,
-                                  __gm__ uint8_t *softmax_in, __gm__ uint8_t *attention_in, __gm__ uint8_t *prefix,
-                                  __gm__ uint8_t *actual_seq_qlen, __gm__ uint8_t *actual_seq_kvlen,
-                                  __gm__ uint8_t *deqScaleQ, __gm__ uint8_t *deqScaleK, __gm__ uint8_t *deqScaleV,
-                                  __gm__ uint8_t *deqScaleDy, __gm__ uint8_t *dsScale, __gm__ uint8_t *pScale,
-                                  __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope, __gm__ uint8_t *sink,
-                                  __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dpse,
-                                  __gm__ uint8_t *dqRope, __gm__ uint8_t *dkRope, __gm__ uint8_t *dsink,
-                                  __gm__ uint8_t *workspace, __gm__ uint8_t *tiling_data)
+inline __aicore__ void RegbaseFAG(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* dy,
+                                  __gm__ uint8_t* pse_shift, __gm__ uint8_t* drop_mask, __gm__ uint8_t* padding_mask,
+                                  __gm__ uint8_t* atten_mask, __gm__ uint8_t* softmax_max, __gm__ uint8_t* softmax_sum,
+                                  __gm__ uint8_t* softmax_in, __gm__ uint8_t* attention_in, __gm__ uint8_t* prefix,
+                                  __gm__ uint8_t* actual_seq_qlen, __gm__ uint8_t* actual_seq_kvlen,
+                                  __gm__ uint8_t* deqScaleQ, __gm__ uint8_t* deqScaleK, __gm__ uint8_t* deqScaleV,
+                                  __gm__ uint8_t* deqScaleDy, __gm__ uint8_t* dsScale, __gm__ uint8_t* pScale,
+                                  __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope, __gm__ uint8_t* sink,
+                                  __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dpse,
+                                  __gm__ uint8_t* dqRope, __gm__ uint8_t* dkRope, __gm__ uint8_t* dsink,
+                                  __gm__ uint8_t* workspace, __gm__ uint8_t* tiling_data)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     TPipe pipeIn;
     SetMaskNorm();
     SetSysWorkspace(workspace);
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
     constexpr static bool needDeterPrefix = NEED_DETER_PREFIX(deterType, isTnd);
     using fagTiling = FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<NEED_DETER(deterType), needDeterPrefix,
                                                                              isTnd, isTndSwizzle>;
-    size_t offset = (size_t)(&((fagTiling *)0)->s1s2BNGS1S2BaseParams);
+    size_t offset = (size_t)(&((fagTiling*)0)->s1s2BNGS1S2BaseParams);
 
-    const __gm__ fagTiling *__restrict tilingData = (const __gm__ fagTiling *__restrict)(tiling_data + offset);
+    const __gm__ fagTiling* __restrict tilingData = (const __gm__ fagTiling* __restrict)(tiling_data + offset);
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16)
     if constexpr (splitAxis == BN2GS1S2) {
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_REGBASE_IMPL_FP16(

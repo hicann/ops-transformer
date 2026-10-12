@@ -35,7 +35,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -44,7 +44,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<float> resultData(size, 0);
@@ -56,7 +56,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 固定写法，AscendCL初始化
     auto ret = aclInit(nullptr);
@@ -73,8 +73,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -121,17 +121,17 @@ int main()
     std::vector<int64_t> softmaxLseShape = {B, N2, S1};
     std::vector<int64_t> metadataShape = {64};
 
-    void *qIndexDeviceAddr = nullptr;
-    void *kIndexDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *softmaxLseDeviceAddr = nullptr;
-    void *metadataDeviceAddr = nullptr;
+    void* qIndexDeviceAddr = nullptr;
+    void* kIndexDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* softmaxLseDeviceAddr = nullptr;
+    void* metadataDeviceAddr = nullptr;
 
-    aclTensor *qIndex = nullptr;
-    aclTensor *kIndex = nullptr;
-    aclTensor *weight = nullptr;
-    aclTensor *softmaxLse = nullptr;
-    aclTensor *metadata = nullptr;
+    aclTensor* qIndex = nullptr;
+    aclTensor* kIndex = nullptr;
+    aclTensor* weight = nullptr;
+    aclTensor* softmaxLse = nullptr;
+    aclTensor* metadata = nullptr;
 
     // 使用 float16 作为输入数据类型，weight 和输出 lse 固定为 float32
     std::vector<aclFloat16> qIndexHostData(B * S1 * N1 * D, aclFloatToFloat16(0.2));
@@ -176,7 +176,7 @@ int main()
 
     // 3. 调用 metadata 前置算子，生成分核负载均衡信息
     uint64_t metadataWorkspaceSize = 0;
-    aclOpExecutor *metadataExecutor = nullptr;
+    aclOpExecutor* metadataExecutor = nullptr;
     ret = aclnnDenseLightningIndexerSoftmaxLseV2MetadataGetWorkspaceSize(
         nullptr, nullptr, nullptr, nullptr, nullptr, B, S1, S2, N1, N2, D, layoutQ, layoutK, maskMode, cmpRatio,
         metadata, &metadataWorkspaceSize, &metadataExecutor);
@@ -184,7 +184,7 @@ int main()
               LOG_PRINT("aclnnDenseLightningIndexerSoftmaxLseV2MetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *metadataWorkspaceAddr = nullptr;
+    void* metadataWorkspaceAddr = nullptr;
     if (metadataWorkspaceSize > 0) {
         ret = aclrtMalloc(&metadataWorkspaceAddr, metadataWorkspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate metadata workspace failed. ERROR: %d\n", ret); return ret);
@@ -199,7 +199,7 @@ int main()
 
     // 4. 调用主算子
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     // 调用aclnnDenseLightningIndexerSoftmaxLseV2GetWorkspaceSize第一段接口
     ret = aclnnDenseLightningIndexerSoftmaxLseV2GetWorkspaceSize(qIndex, kIndex, weight, nullptr, nullptr, nullptr,
@@ -210,7 +210,7 @@ int main()
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

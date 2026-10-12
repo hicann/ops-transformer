@@ -37,19 +37,19 @@ public:
     FlashMlaWithKvcacheChecker() = default;
     ~FlashMlaWithKvcacheChecker() = default;
 
-    ge::graphStatus Init(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus Process(const FlashMlaWithKvcacheTilingInfo &faInfo);
+    ge::graphStatus Init(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus Process(const FlashMlaWithKvcacheTilingInfo& faInfo);
 
-    ge::graphStatus CheckSinglePara(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckParaExistence(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckFeature(const FlashMlaWithKvcacheTilingInfo &faInfo);
-    ge::graphStatus CheckMultiPara(const FlashMlaWithKvcacheTilingInfo &faInfo);
+    ge::graphStatus CheckSinglePara(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckParaExistence(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckFeature(const FlashMlaWithKvcacheTilingInfo& faInfo);
+    ge::graphStatus CheckMultiPara(const FlashMlaWithKvcacheTilingInfo& faInfo);
 
 private:
     using CheckMethod =
-        std::function<ge::graphStatus(FlashMlaWithKvcacheBaseChecker *, const FlashMlaWithKvcacheTilingInfo &)>;
+        std::function<ge::graphStatus(FlashMlaWithKvcacheBaseChecker*, const FlashMlaWithKvcacheTilingInfo&)>;
 
-    ge::graphStatus RunCheck(const CheckMethod &method, const FlashMlaWithKvcacheTilingInfo &faInfo);
+    ge::graphStatus RunCheck(const CheckMethod& method, const FlashMlaWithKvcacheTilingInfo& faInfo);
 
     void RegisterCheckers();
 

@@ -23,25 +23,25 @@ public:
     __aicore__ inline VecOp(){};
     __aicore__ inline void Init(GM_ADDR softmax_max, GM_ADDR softmax_sum, GM_ADDR atten_mask, GM_ADDR actual_seq_qlen,
                                 GM_ADDR actual_seq_kvlen, GM_ADDR workspace,
-                                const TILING_TYPE *__restrict ordTilingData, TPipe *pipe_in);
-    __aicore__ inline void Process(const VecAddrInfo &addrs);
+                                const TILING_TYPE* __restrict ordTilingData, TPipe* pipe_in);
+    __aicore__ inline void Process(const VecAddrInfo& addrs);
 
 private:
-    __aicore__ inline void GetSeqQlenKvlenByBidx(int64_t bIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvlen);
-    __aicore__ inline void CopyInAttenMaskBool(LocalTensor<uint8_t> &dstTensor, int64_t attenMaskOffset,
+    __aicore__ inline void GetSeqQlenKvlenByBidx(int64_t bIdx, int64_t& actualSeqQlen, int64_t& actualSeqKvlen);
+    __aicore__ inline void CopyInAttenMaskBool(LocalTensor<uint8_t>& dstTensor, int64_t attenMaskOffset,
                                                uint32_t s1Extend, uint32_t s2Extend);
-    __aicore__ inline void CalcAttenMaskBool(LocalTensor<float> &dstTensor, LocalTensor<uint8_t> srcTensor,
+    __aicore__ inline void CalcAttenMaskBool(LocalTensor<float>& dstTensor, LocalTensor<uint8_t> srcTensor,
                                              uint32_t s1Extend, uint32_t s2SrcExtend,
                                              uint32_t s2MaskExtend = BASE_BLOCK_LENGTH, uint8_t maskType = 0);
-    __aicore__ inline void CopyInSoftMax(LocalTensor<float> &dstTensor, uint32_t s1Extend, uint32_t softMaxOffset);
-    __aicore__ inline void CalcSoftMax(LocalTensor<float> &dstTensor, LocalTensor<float> &src0Tensor,
-                                       LocalTensor<float> &src1Tensor, uint32_t s1Extend, uint32_t s2Extend,
-                                       uint32_t s2ExtendAlign, const SoftMaxTiling &tiling);
-    __aicore__ inline void SubGrapA(int64_t curIdx, const VecBlockInfo &blockInfo, event_t mte2WaitMte3A);
-    __aicore__ inline void SubGrapB(int64_t curIdx, const VecBlockInfo &blockInfo, event_t mte2WaitMte3B);
+    __aicore__ inline void CopyInSoftMax(LocalTensor<float>& dstTensor, uint32_t s1Extend, uint32_t softMaxOffset);
+    __aicore__ inline void CalcSoftMax(LocalTensor<float>& dstTensor, LocalTensor<float>& src0Tensor,
+                                       LocalTensor<float>& src1Tensor, uint32_t s1Extend, uint32_t s2Extend,
+                                       uint32_t s2ExtendAlign, const SoftMaxTiling& tiling);
+    __aicore__ inline void SubGrapA(int64_t curIdx, const VecBlockInfo& blockInfo, event_t mte2WaitMte3A);
+    __aicore__ inline void SubGrapB(int64_t curIdx, const VecBlockInfo& blockInfo, event_t mte2WaitMte3B);
 
 protected:
-    TPipe *pipe;
+    TPipe* pipe;
     TBuf<> unifiedBuffer;
 
     GlobalTensor<uint8_t> attenMaskU8Gm;
@@ -130,14 +130,14 @@ protected:
     struct VecAddrInfo vecAddrInfo;
     GM_ADDR actual_seq_qlen_addr;
     GM_ADDR actual_seq_kvlen_addr;
-    const TILING_TYPE *__restrict tilingData;
+    const TILING_TYPE* __restrict tilingData;
 };
 
 template <typename IN_TYPE, class TILING_TYPE>
 __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::Init(GM_ADDR softmax_max, GM_ADDR softmax_sum, GM_ADDR atten_mask,
                                                          GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen,
-                                                         GM_ADDR workspace, const TILING_TYPE *__restrict ordTilingData,
-                                                         TPipe *pipe_in)
+                                                         GM_ADDR workspace, const TILING_TYPE* __restrict ordTilingData,
+                                                         TPipe* pipe_in)
 {
     // ub分配
     tilingData = ordTilingData;
@@ -164,18 +164,18 @@ __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::Init(GM_ADDR softmax_max, GM
     pipe->InitBuffer(unifiedBuffer, TOTAL_SIZE);
 
     // global tensor
-    softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmax_max);
-    softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmax_sum);
-    attenMaskU8Gm.SetGlobalBuffer((__gm__ uint8_t *)atten_mask);
-    mm1WorkspaceGm.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->mlaTensorTilingData.mm1WorkspaceOffset));
-    mm2WorkspaceGm.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->mlaTensorTilingData.mm2WorkspaceOffset));
-    mulWorkSpaceGm.SetGlobalBuffer((__gm__ IN_TYPE *)(workspace + tilingData->mlaTensorTilingData.mm1WorkspaceOffset));
-    dropWorkSpaceGm.SetGlobalBuffer((__gm__ IN_TYPE *)(workspace + tilingData->mlaTensorTilingData.mm2WorkspaceOffset));
-    sfmgWorkspaceGm.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->mlaTensorTilingData.sfmgWorkspaceOffset));
+    softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmax_max);
+    softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmax_sum);
+    attenMaskU8Gm.SetGlobalBuffer((__gm__ uint8_t*)atten_mask);
+    mm1WorkspaceGm.SetGlobalBuffer((__gm__ float*)(workspace + tilingData->mlaTensorTilingData.mm1WorkspaceOffset));
+    mm2WorkspaceGm.SetGlobalBuffer((__gm__ float*)(workspace + tilingData->mlaTensorTilingData.mm2WorkspaceOffset));
+    mulWorkSpaceGm.SetGlobalBuffer((__gm__ IN_TYPE*)(workspace + tilingData->mlaTensorTilingData.mm1WorkspaceOffset));
+    dropWorkSpaceGm.SetGlobalBuffer((__gm__ IN_TYPE*)(workspace + tilingData->mlaTensorTilingData.mm2WorkspaceOffset));
+    sfmgWorkspaceGm.SetGlobalBuffer((__gm__ float*)(workspace + tilingData->mlaTensorTilingData.sfmgWorkspaceOffset));
 }
 
 template <typename IN_TYPE, class TILING_TYPE>
-__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::Process(const VecAddrInfo &addrs)
+__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::Process(const VecAddrInfo& addrs)
 {
     taskId = addrs.taskId;
     pingpongIdx = taskId % 2;
@@ -191,7 +191,7 @@ __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::Process(const VecAddrInfo &a
     }
     AscendC::PipeBarrier<PIPE_V>();
     for (uint32_t i = 0; i < blockLen; ++i) {
-        auto &blockInfo = addrs.VecBlkInfo[i];
+        auto& blockInfo = addrs.VecBlkInfo[i];
         ///////////////////////////////////////////////////////////////
         // do scalar calculate
         ///////////////////////////////////////////////////////////////
@@ -207,7 +207,7 @@ __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::Process(const VecAddrInfo &a
         // offset
         sfmgOffset = 0;
         if (blockInfo.batchIdx > 0) {
-            sfmgOffset = ((__gm__ int64_t *)actual_seq_qlen_addr)[blockInfo.batchIdx - 1] * n2 * g * 8;
+            sfmgOffset = ((__gm__ int64_t*)actual_seq_qlen_addr)[blockInfo.batchIdx - 1] * n2 * g * 8;
         }
         sfmgOffset += ((blockInfo.n2Idx * g + blockInfo.gIdx) * actualS1Len + blockInfo.S1Idx * S1_CUBESIZE +
                        curS1Idx * s1VecSize) *
@@ -217,11 +217,11 @@ __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::Process(const VecAddrInfo &a
             int64_t innerRowOffsetLeft =
                 unlikely(blockInfo.batchIdx == 0) ?
                     0 :
-                    ((__gm__ int64_t *)actual_seq_qlen_addr)[blockInfo.batchIdx - 1] * 32 / sizeof(float);
+                    ((__gm__ int64_t*)actual_seq_qlen_addr)[blockInfo.batchIdx - 1] * 32 / sizeof(float);
             int64_t originInnerBatchOffset = ((blockInfo.n2Idx * g + blockInfo.gIdx) * actualS1Len +
                                               blockInfo.S1Idx * S1_CUBESIZE + curS1Idx * s1VecSize) *
                                              32 / sizeof(float);
-            softMaxOffset = ((((__gm__ int64_t *)actual_seq_qlen_addr)[batch - 1] * 32 / sizeof(float)) *
+            softMaxOffset = ((((__gm__ int64_t*)actual_seq_qlen_addr)[batch - 1] * 32 / sizeof(float)) *
                                  (blockInfo.n2Idx * g + blockInfo.gIdx) +
                              innerRowOffsetLeft + originInnerBatchOffset % (actualS1Len * 32 / sizeof(float)));
         } else {
@@ -251,23 +251,23 @@ __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::Process(const VecAddrInfo &a
 }
 
 template <typename IN_TYPE, class TILING_TYPE>
-__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::GetSeqQlenKvlenByBidx(int64_t bIdx, int64_t &actualSeqQlen,
-                                                                          int64_t &actualSeqKvlen)
+__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::GetSeqQlenKvlenByBidx(int64_t bIdx, int64_t& actualSeqQlen,
+                                                                          int64_t& actualSeqKvlen)
 {
     if (unlikely(bIdx == 0)) {
-        actualSeqQlen = ((__gm__ int64_t *)actual_seq_qlen_addr)[0];
-        actualSeqKvlen = ((__gm__ int64_t *)actual_seq_kvlen_addr)[0];
+        actualSeqQlen = ((__gm__ int64_t*)actual_seq_qlen_addr)[0];
+        actualSeqKvlen = ((__gm__ int64_t*)actual_seq_kvlen_addr)[0];
     } else {
         actualSeqQlen =
-            ((__gm__ int64_t *)actual_seq_qlen_addr)[bIdx] - ((__gm__ int64_t *)actual_seq_qlen_addr)[bIdx - 1];
+            ((__gm__ int64_t*)actual_seq_qlen_addr)[bIdx] - ((__gm__ int64_t*)actual_seq_qlen_addr)[bIdx - 1];
         actualSeqKvlen =
-            ((__gm__ int64_t *)actual_seq_kvlen_addr)[bIdx] - ((__gm__ int64_t *)actual_seq_kvlen_addr)[bIdx - 1];
+            ((__gm__ int64_t*)actual_seq_kvlen_addr)[bIdx] - ((__gm__ int64_t*)actual_seq_kvlen_addr)[bIdx - 1];
     }
     return;
 }
 
 template <typename IN_TYPE, class TILING_TYPE>
-__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CopyInAttenMaskBool(LocalTensor<uint8_t> &dstTensor,
+__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CopyInAttenMaskBool(LocalTensor<uint8_t>& dstTensor,
                                                                         int64_t attenMaskOffset, uint32_t s1Extend,
                                                                         uint32_t s2Extend)
 {
@@ -282,7 +282,7 @@ __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CopyInAttenMaskBool(LocalTen
 }
 
 template <typename IN_TYPE, class TILING_TYPE>
-__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CalcAttenMaskBool(LocalTensor<float> &dstTensor,
+__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CalcAttenMaskBool(LocalTensor<float>& dstTensor,
                                                                       LocalTensor<uint8_t> srcTensor, uint32_t s1Extend,
                                                                       uint32_t s2SrcExtend, uint32_t s2MaskExtend,
                                                                       uint8_t maskType)
@@ -292,10 +292,10 @@ __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CalcAttenMaskBool(LocalTenso
     float scalar;
     if constexpr (IsSameType<float, float>::value) {
         uint32_t tmp = 0xFF7FFFFF;
-        scalar = *((float *)&tmp);
+        scalar = *((float*)&tmp);
     } else {
         uint16_t tmp = 0xFBFF;
-        scalar = *((IN_TYPE *)&tmp);
+        scalar = *((IN_TYPE*)&tmp);
     }
     SelectWithBytesMaskShapeInfo info;
     info.firstAxis = s1Extend;
@@ -307,7 +307,7 @@ __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CalcAttenMaskBool(LocalTenso
 }
 
 template <typename IN_TYPE, class TILING_TYPE>
-__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CopyInSoftMax(LocalTensor<float> &dstTensor, uint32_t s1Extend,
+__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CopyInSoftMax(LocalTensor<float>& dstTensor, uint32_t s1Extend,
                                                                   uint32_t softMaxOffset)
 {
     DataCopyPad(dstTensor, softmaxSumGm[softMaxOffset], {1, static_cast<uint16_t>(s1Extend * BLOCK_SIZE), 0, 0},
@@ -317,11 +317,11 @@ __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CopyInSoftMax(LocalTensor<fl
 }
 
 template <typename IN_TYPE, class TILING_TYPE>
-__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CalcSoftMax(LocalTensor<float> &dstTensor,
-                                                                LocalTensor<float> &src0Tensor,
-                                                                LocalTensor<float> &src1Tensor, uint32_t s1Extend,
+__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CalcSoftMax(LocalTensor<float>& dstTensor,
+                                                                LocalTensor<float>& src0Tensor,
+                                                                LocalTensor<float>& src1Tensor, uint32_t s1Extend,
                                                                 uint32_t s2Extend, uint32_t s2ExtendAlign,
-                                                                const SoftMaxTiling &tiling)
+                                                                const SoftMaxTiling& tiling)
 {
     bool isBasicBlock = (s1Extend % 8 == 0) && (s2Extend % 64 == 0);
     if (isBasicBlock) {
@@ -359,7 +359,7 @@ __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CalcSoftMax(LocalTensor<floa
 }
 
 template <typename IN_TYPE, class TILING_TYPE>
-__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::SubGrapA(int64_t curIdx, const VecBlockInfo &blockInfo,
+__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::SubGrapA(int64_t curIdx, const VecBlockInfo& blockInfo,
                                                              event_t mte2WaitMte3A)
 {
     uint32_t ubBufferOffset = 0;
@@ -413,7 +413,7 @@ __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::SubGrapA(int64_t curIdx, con
 }
 
 template <typename IN_TYPE, class TILING_TYPE>
-__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::SubGrapB(int64_t curIdx, const VecBlockInfo &blockInfo,
+__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::SubGrapB(int64_t curIdx, const VecBlockInfo& blockInfo,
                                                              event_t mte2WaitMte3B)
 {
     uint32_t ubBufferOffset = DbBegin;

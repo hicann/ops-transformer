@@ -71,7 +71,7 @@ constexpr int64_t B_6 = 6;
 constexpr int64_t G_4 = 4;
 constexpr int64_t SPARSE_MODE_3 = 3;
 
-const char *templateNameBn2 = "FlashAttentionScoreGradTilingS1s2Bn2";
+const char* templateNameBn2 = "FlashAttentionScoreGradTilingS1s2Bn2";
 const std::vector<gert::Shape> MODULE1_TEMPLATE_SUPPORTED_SHAPE = {
     // 5d shape [B, N,S1,S2,D]
     {24, 5, 9216, 9216, 64},
@@ -105,7 +105,7 @@ bool FlashAttentionScoreGradTilingS1s2Bn2::IsCapable()
     if (sinkShape != nullptr && sinkShape->GetStorageShape().GetDimNum() == 1) {
         return false;
     }
-    const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
+    const char* tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
                                    context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) :
                                    "";
     const bool isTndSoftmaxIn = td_->opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND) &&
@@ -136,8 +136,8 @@ bool FlashAttentionScoreGradTilingS1s2Bn2::IsCapable()
                 OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "value"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->GetInputShape(KEY) == nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "keyIn"),
                 return ge::GRAPH_FAILED);
-    const gert::StorageShape *valueShape = context_->GetInputShape(VALUE);
-    const gert::StorageShape *keyShape = context_->GetInputShape(KEY);
+    const gert::StorageShape* valueShape = context_->GetInputShape(VALUE);
+    const gert::StorageShape* keyShape = context_->GetInputShape(KEY);
     if (!IsSameShape(keyShape, valueShape) && IsSameShapeButValueDLeEqD(keyShape, valueShape)) {
         return false;
     }
@@ -175,7 +175,7 @@ bool FlashAttentionScoreGradTilingDeterministic::IsCapable()
     if (sinkShape != nullptr && sinkShape->GetStorageShape().GetDimNum() == 1) {
         return false;
     }
-    const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
+    const char* tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
                                    context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) :
                                    "";
     const bool isTndSoftmaxIn = td_->opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND) &&
@@ -196,8 +196,8 @@ bool FlashAttentionScoreGradTilingDeterministic::IsCapable()
                 OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "value"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->GetInputShape(KEY) == nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "keyIn"),
                 return ge::GRAPH_FAILED);
-    const gert::StorageShape *valueShape = context_->GetInputShape(VALUE);
-    const gert::StorageShape *keyShape = context_->GetInputShape(KEY);
+    const gert::StorageShape* valueShape = context_->GetInputShape(VALUE);
+    const gert::StorageShape* keyShape = context_->GetInputShape(KEY);
     if (!IsSameShape(keyShape, valueShape) && IsSameShapeButValueDLeEqD(keyShape, valueShape)) {
         return false;
     }
@@ -272,7 +272,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetPlatformInfo()
 {
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo *>(
+        auto compileInfoPtr = reinterpret_cast<const Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo*>(
             context_->GetCompileInfo());
         OP_CHECK_IF(
             compileInfoPtr == nullptr,
@@ -343,7 +343,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2::DecideBranch()
     }
 }
 
-ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetMaskShapeType(const gert::Shape &storageShape,
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetMaskShapeType(const gert::Shape& storageShape,
                                                                        const uint32_t maskShapeDims)
 {
     if (maskShapeDims == DIM_2) {
@@ -440,14 +440,14 @@ void FlashAttentionScoreGradTilingS1s2Bn2::SetQKVStartIdx()
         OP_LOGW(context_, "[%s]qStartIdxTensor is null pointer", templateNameBn2);
         return;
     }
-    auto &qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
+    auto& qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
     if (qStartIdxShape.GetDimNum() != 1 || qStartIdxShape.GetDim(0) <= 0) {
         OP_LOGW(context_, "[%s]qStartIdxShape is invalid %lu %ld", templateNameBn2, qStartIdxShape.GetDimNum(),
                 qStartIdxShape.GetDim(0));
         return;
     }
     /* Get Data from tensor. */
-    const int64_t *value = qStartIdxTensor->GetData<int64_t>();
+    const int64_t* value = qStartIdxTensor->GetData<int64_t>();
     if (value == nullptr) {
         OP_LOGW(context_, "[%s]qStartIdxShape data is null pointer", templateNameBn2);
         return;
@@ -459,14 +459,14 @@ void FlashAttentionScoreGradTilingS1s2Bn2::SetQKVStartIdx()
         OP_LOGW(context_, "[%s]kvStartIdxTensor is null pointer", templateNameBn2);
         return;
     }
-    auto &kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
+    auto& kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
     if (kvStartIdxShape.GetDimNum() != 1 || kvStartIdxShape.GetDim(0) <= 0) {
         OP_LOGW(context_, "[%s]kvStartIdxShape is invalid %lu %ld", templateNameBn2, kvStartIdxShape.GetDimNum(),
                 kvStartIdxShape.GetDim(0));
         return;
     }
     /* Get Data from tensor. */
-    const int64_t *kvValue = kvStartIdxTensor->GetData<int64_t>();
+    const int64_t* kvValue = kvStartIdxTensor->GetData<int64_t>();
     if (kvValue == nullptr) {
         OP_LOGW(context_, "[%s]qStartIdxShape data is null pointer", templateNameBn2);
         return;
@@ -610,7 +610,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetPseInfo()
             auto dim0 = storageShape.GetDim(DIM_0);
             int64_t shapeN1 = td_->opInfo.get_N2() * td_->opInfo.get_G();
             int64_t effectiveT2 = 0;
-            for (const auto &kvlen : tmpData_.actualSeqKvlen) {
+            for (const auto& kvlen : tmpData_.actualSeqKvlen) {
                 effectiveT2 += kvlen;
             }
             bool isUnpadBN1S = isUnpad && (dim0 == effectiveT2 * shapeN1);
@@ -686,14 +686,14 @@ bool FlashAttentionScoreGradTilingS1s2Bn2::ProcessPrefix()
         return false;
     }
 
-    auto &prefixShape = prefixNTensor->GetShape().GetStorageShape();
+    auto& prefixShape = prefixNTensor->GetShape().GetStorageShape();
     if (prefixShape.GetDimNum() != 1 || prefixShape.GetDim(0) != td_->opInfo.get_B()) {
         OP_LOGW(context_, "FAG S1s2Bn2 sparseMode is prefix, but prefixshape size[%zu] or value is invalid!",
                 prefixShape.GetDimNum());
         return false;
     }
 
-    const int64_t *value = prefixNTensor->GetData<int64_t>();
+    const int64_t* value = prefixNTensor->GetData<int64_t>();
     if (value == nullptr) {
         OP_LOGW(context_, "FAG S1s2Bn2 sparseMode is prefix, but prefixN data is null pointer!");
         return false;
@@ -853,7 +853,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
         return status;
     }
 
-    const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
+    const char* tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
                                    context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) :
                                    "";
     td_->opInfo.set_tndSoftmaxIn(td_->opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND) &&
@@ -898,7 +898,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
 
     if ((td_->opInfo.get_layout() != static_cast<uint32_t>(InputLayout::TND)) &&
         (sparseMode == RIGHT_DOWN_CASUAL_BAND || sparseMode == BAND_LEFT_UP_CASUAL)) {
-        const char *inputLayout = attrs->GetAttrPointer<char>(INPUT_LAYOUT);
+        const char* inputLayout = attrs->GetAttrPointer<char>(INPUT_LAYOUT);
         std::string valuesMsg = "{" + std::string(inputLayout) + ", " + std::to_string(sparseMode) + "}";
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad", "inputLayout, sparseMode", valuesMsg.c_str(),
                                                "RIGHT_DOWN_CASUAL_BAND and BAND_LEFT_UP_CASUAL require TND layout");
@@ -1222,7 +1222,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::CheckAttenMaskShape()
     return ge::GRAPH_SUCCESS;
 }
 
-bool FlashAttentionScoreGradTilingS1s2Bn2::CheckForDichotomy(std::vector<int64_t> &nums, uint32_t x, uint32_t m)
+bool FlashAttentionScoreGradTilingS1s2Bn2::CheckForDichotomy(std::vector<int64_t>& nums, uint32_t x, uint32_t m)
 {
     int64_t sum = 0;
     uint32_t cnt = 1;
@@ -1237,7 +1237,7 @@ bool FlashAttentionScoreGradTilingS1s2Bn2::CheckForDichotomy(std::vector<int64_t
     return (cnt <= m);
 }
 
-int64_t FlashAttentionScoreGradTilingS1s2Bn2::GetSplitArrayMinMaxSum(std::vector<int64_t> &s1s2WeightNums,
+int64_t FlashAttentionScoreGradTilingS1s2Bn2::GetSplitArrayMinMaxSum(std::vector<int64_t>& s1s2WeightNums,
                                                                      uint32_t coreNum)
 {
     int64_t left = 0;
@@ -1706,7 +1706,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetWorkspaceSize()
 
     // set global workspace
     // 内存顺序排布
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = sysLen;
     workspaces[0] += dropoutWorkspaceLen;
     workspaces[0] += (mm1WorkspaceLen + mm2WorkspaceLen) * currentUseCoreNum;
@@ -1761,7 +1761,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::PostTiling()
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetLayoutInfo()
 {
-    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
+    const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
     if (strcmp(inputLayout, BSH_STR) == 0) {
         td_->opInfo.set_layout(static_cast<uint32_t>(InputLayout::BSH));
     } else if (strcmp(inputLayout, SBH_STR) == 0) {
@@ -1780,13 +1780,13 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetLayoutInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Shape &queryShape,
-                                                                  const gert::Shape &keyShape, int64_t dimN1)
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Shape& queryShape,
+                                                                  const gert::Shape& keyShape, int64_t dimN1)
 {
     OP_CHECK_IF(dimN1 == 0, OP_LOGW(context_, "headNum is 0."), return ge::GRAPH_PARAM_INVALID);
 
     uint32_t dimSize = queryShape.GetDimNum();
-    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
+    const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
     OP_CHECK_IF(static_cast<size_t>(dimSize) != strlen(inputLayout),
                 OP_LOGW(context_, "layout dims is not inputLayout's length."), return ge::GRAPH_PARAM_INVALID);
     if (td_->opInfo.get_layout() == static_cast<uint32_t>(InputLayout::BNSD)) {
@@ -1851,8 +1851,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Sh
         if (!isMaxWorkspace_) {
             std::vector<int64_t> actualSeqQlen;
             std::vector<int64_t> actualSeqKvlen;
-            const int64_t *qValue = actualSeqQlenTensor->GetData<int64_t>();
-            const int64_t *kvValue = actualSeqKvlenTensor->GetData<int64_t>();
+            const int64_t* qValue = actualSeqQlenTensor->GetData<int64_t>();
+            const int64_t* kvValue = actualSeqKvlenTensor->GetData<int64_t>();
             OP_CHECK_IF((qValue == nullptr || kvValue == nullptr),
                         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                             "FlashAttentionScoreGrad", "actualSeqQLenOptional or actualSeqKvLenOptional",
@@ -1930,18 +1930,18 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetBaseShapeInfo()
                 OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "query"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->GetInputShape(KEY) == nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "keyIn"),
                 return ge::GRAPH_FAILED);
-    const gert::Shape &queryShape = context_->GetInputShape(QUERY)->GetStorageShape();
-    const gert::Shape &keyShape = context_->GetInputShape(KEY)->GetStorageShape();
+    const gert::Shape& queryShape = context_->GetInputShape(QUERY)->GetStorageShape();
+    const gert::Shape& keyShape = context_->GetInputShape(KEY)->GetStorageShape();
     int64_t dimN1 = *context_->GetAttrs()->GetAttrPointer<int>(HEAD_NUM); // headNum is as same as N1
     auto shapeStatus = SetBaseInfo(queryShape, keyShape, dimN1);
     if (shapeStatus != ge::GRAPH_SUCCESS) {
         return shapeStatus;
     }
 
-    const gert::StorageShape *qShape = context_->GetInputShape(QUERY);
-    const gert::StorageShape *kShape = context_->GetInputShape(KEY);
-    const gert::StorageShape *vShape = context_->GetInputShape(VALUE);
-    const gert::StorageShape *dyShape = context_->GetInputShape(DY);
+    const gert::StorageShape* qShape = context_->GetInputShape(QUERY);
+    const gert::StorageShape* kShape = context_->GetInputShape(KEY);
+    const gert::StorageShape* vShape = context_->GetInputShape(VALUE);
+    const gert::StorageShape* dyShape = context_->GetInputShape(DY);
 
     auto ret = IsSameShapeButValueDLeEqD(qShape, dyShape);
     OP_CHECK_IF(!ret,

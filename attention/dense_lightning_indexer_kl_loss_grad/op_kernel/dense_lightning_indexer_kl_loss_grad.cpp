@@ -33,7 +33,7 @@ using namespace Dlikg;
                                                        Dlikg::DlikgBlockVecDummy<__VA_ARGS__>>::type; \
         templateClass<CubeBlockType, VecBlockType> op; \
         GET_TILING_DATA_WITH_STRUCT(tilingdataClass, tiling_data_in, tiling); \
-        const tilingdataClass *__restrict tiling_data = &tiling_data_in; \
+        const tilingdataClass* __restrict tiling_data = &tiling_data_in; \
         op.Init(q, k, w, attnSoftmaxL1, softmaxLse, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, \
                 metadata, dq, dk, dw, softmaxOut, user, tiling_data, &tPipe); \
         op.Process(); \
@@ -47,15 +47,15 @@ using namespace Dlikg;
 template <int TopKRange, int LayoutT_Q, int LayoutT_KT, int SparseMode, bool HasCuSeqlensQ, bool HasCuSeqlensK,
           bool HasSequsedQ, bool HasSequsedK, bool HasCmpResidualK, bool Deterministic>
 __global__ __aicore__ void dense_lightning_indexer_kl_loss_grad(
-    __gm__ uint8_t *q, __gm__ uint8_t *k, __gm__ uint8_t *w, __gm__ uint8_t *attnSoftmaxL1, __gm__ uint8_t *softmaxLse,
-    __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensK, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedK,
-    __gm__ uint8_t *cmpResidualK, __gm__ uint8_t *metadata, __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dw,
-    __gm__ uint8_t *softmaxOut, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+    __gm__ uint8_t* q, __gm__ uint8_t* k, __gm__ uint8_t* w, __gm__ uint8_t* attnSoftmaxL1, __gm__ uint8_t* softmaxLse,
+    __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensK, __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sequsedK,
+    __gm__ uint8_t* cmpResidualK, __gm__ uint8_t* metadata, __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dw,
+    __gm__ uint8_t* softmaxOut, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     REGISTER_TILING_DEFAULT(optiling::DenseLightningIndexerGradRegBaseTilingData);
     TPipe tPipe;
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
 
     if constexpr (ORIG_DTYPE_Q == DT_FLOAT16 && ORIG_DTYPE_K == DT_FLOAT16) {
         DLI_OP_IMPL(DenseLightningIndexerKLLossGradKernelBase, optiling::DenseLightningIndexerGradRegBaseTilingData,

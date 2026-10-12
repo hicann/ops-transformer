@@ -99,9 +99,9 @@ bool BSASelectBlockMaskTilingBase::AnalyzeAttrs()
 
     auto blockShapeTensor = context_->GetOptionalInputTensor(BLOCK_SHAPE_INPUT_INDEX);
     if (blockShapeTensor != nullptr) {
-        auto &blockShapeShape = blockShapeTensor->GetShape().GetStorageShape();
+        auto& blockShapeShape = blockShapeTensor->GetShape().GetStorageShape();
         if (blockShapeShape.GetDimNum() != 0) {
-            const int64_t *blockShapeData = blockShapeTensor->GetData<int64_t>();
+            const int64_t* blockShapeData = blockShapeTensor->GetData<int64_t>();
             if (blockShapeData != nullptr) {
                 blockShapeX = static_cast<uint64_t>(blockShapeData[0]);
                 blockShapeY = static_cast<uint64_t>(blockShapeData[1]);
@@ -128,7 +128,7 @@ bool BSASelectBlockMaskTilingBase::AnalyzeAttrs()
     auto postBlockShapeTensor = context_->GetOptionalInputTensor(POST_BLOCK_SHAPE_INPUT_INDEX);
     OP_LOGD(opName, "postBlockShapeTensor ptr=%p", postBlockShapeTensor);
     if (postBlockShapeTensor != nullptr && postBlockShapeTensor->GetShape().GetStorageShape().GetDimNum() != 0) {
-        const int64_t *postBlockShapeData = postBlockShapeTensor->GetData<int64_t>();
+        const int64_t* postBlockShapeData = postBlockShapeTensor->GetData<int64_t>();
         OP_LOGD(opName, "postBlockShapeData ptr=%p", postBlockShapeData);
         if (postBlockShapeData != nullptr) {
             postBlockShapeX = static_cast<uint16_t>(postBlockShapeData[0]);
@@ -175,8 +175,8 @@ bool BSASelectBlockMaskTilingBase::AnalyzeDtype()
 
 bool BSASelectBlockMaskTilingBase::AnalyzeLayout()
 {
-    auto &queryShape = context_->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
-    auto &keyShape = context_->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
+    auto& queryShape = context_->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
+    auto& keyShape = context_->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
 
     size_t qDimNum = queryShape.GetDimNum();
     size_t kvDimNum = keyShape.GetDimNum();
@@ -282,8 +282,8 @@ bool BSASelectBlockMaskTilingBase::AnalyzeLayout()
 
 bool BSASelectBlockMaskTilingBase::CrossShapeVerify()
 {
-    auto &queryShape = context_->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
-    auto &keyShape = context_->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
+    auto& queryShape = context_->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
+    auto& keyShape = context_->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
 
     if (tilingKeyLayoutQ == LayoutType::LAYOUT_BNSD) {
         OP_CHECK_IF(keyShape.GetDim(0) != static_cast<int64_t>(batchSize),
@@ -419,7 +419,7 @@ ge::graphStatus BSASelectBlockMaskTilingBase::GetPlatformInfo()
 {
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const BSASelectBlockMaskCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const BSASelectBlockMaskCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(opName, "compileInfoPtr is null."), return ge::GRAPH_FAILED);
         aivNum = compileInfoPtr->aivNum;
         aicNum = compileInfoPtr->aicNum;
@@ -471,7 +471,7 @@ ge::graphStatus BSASelectBlockMaskTilingBase::DoOpTiling()
 
 ge::graphStatus BSASelectBlockMaskTilingBase::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
 
     workspaces[0] = static_cast<size_t>(outputParams_->get_totalWorkspaceSize()) + WORK_SPACE_RESERVE_SIZE;

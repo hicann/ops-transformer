@@ -19,24 +19,24 @@ constexpr size_t OUTPUT_PARTIAL_BLOCK = 0;
 constexpr size_t OUTPUT_H = 1;
 } // namespace
 
-static ge::graphStatus InferShapeForBlockAttnResUpdate(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeForBlockAttnResUpdate(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("BlockAttnResUpdate", "InferShapeContext is nullptr.");
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape *partialBlockShape = context->GetInputShape(INPUT_PARTIAL_BLOCK);
+    const gert::Shape* partialBlockShape = context->GetInputShape(INPUT_PARTIAL_BLOCK);
     OP_CHECK_NULL_WITH_CONTEXT(context, partialBlockShape);
-    gert::Shape *partialBlockRefShape = context->GetOutputShape(OUTPUT_PARTIAL_BLOCK);
+    gert::Shape* partialBlockRefShape = context->GetOutputShape(OUTPUT_PARTIAL_BLOCK);
     OP_CHECK_NULL_WITH_CONTEXT(context, partialBlockRefShape);
-    gert::Shape *hShape = context->GetOutputShape(OUTPUT_H);
+    gert::Shape* hShape = context->GetOutputShape(OUTPUT_H);
     OP_CHECK_NULL_WITH_CONTEXT(context, hShape);
     *partialBlockRefShape = *partialBlockShape;
     *hShape = *partialBlockShape;
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeForBlockAttnResUpdate(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeForBlockAttnResUpdate(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("BlockAttnResUpdate", "InferDataTypeContext is nullptr.");

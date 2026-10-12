@@ -15,14 +15,14 @@
 
 namespace {
 
-const BlockAttnResUpdateKernelCsvLoadResult &GetKernelCases()
+const BlockAttnResUpdateKernelCsvLoadResult& GetKernelCases()
 {
     static const BlockAttnResUpdateKernelCsvLoadResult result =
         BlockAttnResUpdateKernelTestUtils::GetParams("Ascend950", "BLOCK_ATTN_RES_UPDATE_FLOW");
     return result;
 }
 
-std::string MakeParamName(const testing::TestParamInfo<BlockAttnResUpdateKernelTestParam> &info)
+std::string MakeParamName(const testing::TestParamInfo<BlockAttnResUpdateKernelTestParam>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.caseName);
 }
@@ -39,8 +39,8 @@ protected:
 
 TEST(BlockAttnResUpdateKernelCsv, LoadsAscend950Cases)
 {
-    const auto &result = GetKernelCases();
-    for (const auto &error : result.errors) {
+    const auto& result = GetKernelCases();
+    for (const auto& error : result.errors) {
         ADD_FAILURE() << error;
     }
     EXPECT_FALSE(result.params.empty());

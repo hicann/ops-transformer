@@ -38,14 +38,14 @@ struct BSASelectBlockMaskCompileInfo {
 
 class BSASelectBlockMaskTilingBase : public TilingBaseClass {
 public:
-    explicit BSASelectBlockMaskTilingBase(gert::TilingContext *context)
+    explicit BSASelectBlockMaskTilingBase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {
         Reset();
     }
     ~BSASelectBlockMaskTilingBase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
@@ -82,7 +82,7 @@ protected:
         socVersion = platform_ascendc::SocVersion::ASCEND910B;
     }
 
-    [[nodiscard]] gert::TilingContext *GetContext()
+    [[nodiscard]] gert::TilingContext* GetContext()
     {
         return context_;
     }
@@ -132,9 +132,9 @@ protected:
     uint32_t postXBlocks;
     uint32_t postYBlocks;
 
-    const char *opName;
-    const char *queryLayout;
-    const char *kvLayout;
+    const char* opName;
+    const char* queryLayout;
+    const char* kvLayout;
 
     uint32_t aivNum;
     uint32_t aicNum;
@@ -147,10 +147,10 @@ protected:
     LayoutType tilingKeyLayoutQ;
     LayoutType tilingKeyLayoutKV;
 
-    BSASelectBlockMaskTilingData *tilingData = nullptr;
-    BSABaseParams *baseParams_ = nullptr;
-    BSAMultiCoreParams *multiCoreParams_ = nullptr;
-    BSAOutputParams *outputParams_ = nullptr;
+    BSASelectBlockMaskTilingData* tilingData = nullptr;
+    BSABaseParams* baseParams_ = nullptr;
+    BSAMultiCoreParams* multiCoreParams_ = nullptr;
+    BSAOutputParams* outputParams_ = nullptr;
 };
 
 } // namespace optiling

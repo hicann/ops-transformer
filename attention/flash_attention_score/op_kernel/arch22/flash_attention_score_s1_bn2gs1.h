@@ -100,12 +100,12 @@ class FlashAttentionScoreS1Bn2gs1 {
 public:
     __aicore__ inline FlashAttentionScoreS1Bn2gs1(){};
 
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse,
-                                __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix,
-                                __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax,
-                                __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
-                                __gm__ uint8_t *workspace,
-                                const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pse,
+                                __gm__ uint8_t* dropMask, __gm__ uint8_t* paddingMask, __gm__ uint8_t* prefix,
+                                __gm__ uint8_t* attenMask, __gm__ uint8_t* sink, __gm__ uint8_t* softmaxMax,
+                                __gm__ uint8_t* softmaxSum, __gm__ uint8_t* softmaxOut, __gm__ uint8_t* attentionOut,
+                                __gm__ uint8_t* workspace,
+                                const FlashAttentionScoreGeneralTilingData* __restrict tiling, TPipe* tPipe);
     __aicore__ inline void Process();
 
     // define matmul
@@ -148,47 +148,47 @@ public:
     modeTypeMm2Nz bmm2Nz;
 
 protected:
-    __aicore__ inline void InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                     __gm__ uint8_t *pse, __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask,
-                                     __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink,
-                                     __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut,
-                                     __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-                                     const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void InitInput(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                     __gm__ uint8_t* pse, __gm__ uint8_t* dropMask, __gm__ uint8_t* paddingMask,
+                                     __gm__ uint8_t* prefix, __gm__ uint8_t* attenMask, __gm__ uint8_t* sink,
+                                     __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum, __gm__ uint8_t* softmaxOut,
+                                     __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
+                                     const FlashAttentionScoreGeneralTilingData* __restrict tiling, TPipe* tPipe);
     __aicore__ inline void WaitBmm1Result();
-    template <typename T2, typename T3, const auto &TILING>
-    __aicore__ inline void WaitBmm2Result(matmul::Matmul<T2, b2Type, T3, bias2Type, TILING> &bmm2);
-    template <typename T2, typename T3, const auto &TILING>
-    __aicore__ inline void IterateBmm2(SplitS1dExtraInfo &extraInfo,
-                                       matmul::Matmul<T2, b2Type, T3, bias2Type, TILING> &bmm2);
-    __aicore__ inline void SetExtraInfo(SplitS1dExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount,
+    template <typename T2, typename T3, const auto& TILING>
+    __aicore__ inline void WaitBmm2Result(matmul::Matmul<T2, b2Type, T3, bias2Type, TILING>& bmm2);
+    template <typename T2, typename T3, const auto& TILING>
+    __aicore__ inline void IterateBmm2(SplitS1dExtraInfo& extraInfo,
+                                       matmul::Matmul<T2, b2Type, T3, bias2Type, TILING>& bmm2);
+    __aicore__ inline void SetExtraInfo(SplitS1dExtraInfo& extraInfo, int64_t taskId, int64_t s2LoopCount,
                                         int64_t s2LoopLimit, int64_t multiCoreInnerIdx, bool lastNotPair);
-    __aicore__ inline void SetTiling(const FlashAttentionScoreGeneralTilingData *__restrict tilingData);
+    __aicore__ inline void SetTiling(const FlashAttentionScoreGeneralTilingData* __restrict tilingData);
     __aicore__ inline void InitBuffer();
     __aicore__ inline void ComputeConstexpr();
     __aicore__ inline void ComputeAxisIdx(int64_t multiCoreInnerIdx);
-    __aicore__ inline void IterateBmm1(SplitS1dExtraInfo &extraInfo);
-    __aicore__ inline void Bmm1SetTensorA(SplitS1dExtraInfo &extraInfo);
-    __aicore__ inline void ComputeBmm1Tail(SplitS1dExtraInfo &extraInfo);
-    __aicore__ inline void SetBmm1TensorB(SplitS1dExtraInfo &extraInfo);
-    __aicore__ inline void Bmm2ResultDiv(SplitS1dExtraInfo &extraInfo, int64_t vec2S1Idx, LocalTensor<T> &bmm2Res,
-                                         LocalTensor<T> &sumTensor, int32_t vec2S1RealSize);
-    __aicore__ inline void LoopDivVec2(LocalTensor<T> &bmm2Res, LocalTensor<T> &sumTensor, int32_t s1OuterLoop,
+    __aicore__ inline void IterateBmm1(SplitS1dExtraInfo& extraInfo);
+    __aicore__ inline void Bmm1SetTensorA(SplitS1dExtraInfo& extraInfo);
+    __aicore__ inline void ComputeBmm1Tail(SplitS1dExtraInfo& extraInfo);
+    __aicore__ inline void SetBmm1TensorB(SplitS1dExtraInfo& extraInfo);
+    __aicore__ inline void Bmm2ResultDiv(SplitS1dExtraInfo& extraInfo, int64_t vec2S1Idx, LocalTensor<T>& bmm2Res,
+                                         LocalTensor<T>& sumTensor, int32_t vec2S1RealSize);
+    __aicore__ inline void LoopDivVec2(LocalTensor<T>& bmm2Res, LocalTensor<T>& sumTensor, int32_t s1OuterLoop,
                                        int32_t s1OuterRemain, BinaryRepeatParams repeatParams);
-    __aicore__ inline void Bmm2DataCopyOut(SplitS1dExtraInfo &extraInfo, int64_t vec2S1Idx, int64_t divCastCalcSize,
-                                           LocalTensor<T> &bmm2Res, LocalTensor<INPUT_T> &attentionOut);
-    __aicore__ inline void ProcessVec2(SplitS1dExtraInfo &extraInfo);
-    __aicore__ inline void ProcessVec1(SplitS1dExtraInfo &extraInfo);
-    __aicore__ inline void CopyInAttenMask(SplitS1dExtraInfo &extraInfo, int64_t loopIdx, int64_t maskOffset);
-    __aicore__ inline int64_t ComputeAttenMaskOffset(SplitS1dExtraInfo &extraInfo, int64_t loopIdx);
-    __aicore__ inline int64_t ComputeOffsetForNoCompress(SplitS1dExtraInfo &extraInfo, int64_t loopIdx);
-    __aicore__ inline void NdToNz(SplitS1dExtraInfo &extraInfo, LocalTensor<INPUT_T> &nzResUb,
-                                  LocalTensor<INPUT_T> &vec1ResUb, int64_t loopIdx);
-    __aicore__ inline void GetBmm1Result(SplitS1dExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb, int64_t loopIdx);
-    __aicore__ inline void ComputeAttenMask(SplitS1dExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb,
+    __aicore__ inline void Bmm2DataCopyOut(SplitS1dExtraInfo& extraInfo, int64_t vec2S1Idx, int64_t divCastCalcSize,
+                                           LocalTensor<T>& bmm2Res, LocalTensor<INPUT_T>& attentionOut);
+    __aicore__ inline void ProcessVec2(SplitS1dExtraInfo& extraInfo);
+    __aicore__ inline void ProcessVec1(SplitS1dExtraInfo& extraInfo);
+    __aicore__ inline void CopyInAttenMask(SplitS1dExtraInfo& extraInfo, int64_t loopIdx, int64_t maskOffset);
+    __aicore__ inline int64_t ComputeAttenMaskOffset(SplitS1dExtraInfo& extraInfo, int64_t loopIdx);
+    __aicore__ inline int64_t ComputeOffsetForNoCompress(SplitS1dExtraInfo& extraInfo, int64_t loopIdx);
+    __aicore__ inline void NdToNz(SplitS1dExtraInfo& extraInfo, LocalTensor<INPUT_T>& nzResUb,
+                                  LocalTensor<INPUT_T>& vec1ResUb, int64_t loopIdx);
+    __aicore__ inline void GetBmm1Result(SplitS1dExtraInfo& extraInfo, LocalTensor<T>& bmm1ResUb, int64_t loopIdx);
+    __aicore__ inline void ComputeAttenMask(SplitS1dExtraInfo& extraInfo, LocalTensor<T>& bmm1ResUb,
                                             const uint8_t maskType);
-    __aicore__ inline void SoftMaxCompute(SplitS1dExtraInfo &extraInfo, LocalTensor<T> &srcTensor, int64_t loopIdx);
+    __aicore__ inline void SoftMaxCompute(SplitS1dExtraInfo& extraInfo, LocalTensor<T>& srcTensor, int64_t loopIdx);
     __aicore__ inline void Bmm2SetTensor();
-    __aicore__ inline void CopyToL1(const GlobalTensor<INPUT_T> &gmTensor, LocalTensor<INPUT_T> &localTensor,
+    __aicore__ inline void CopyToL1(const GlobalTensor<INPUT_T>& gmTensor, LocalTensor<INPUT_T>& localTensor,
                                     int64_t row, int64_t column, uint16_t srcDValue);
 
     uint32_t s1BaseSize;
@@ -196,13 +196,13 @@ protected:
     uint32_t dSize;
     int64_t dSizeAlign16;
     // sparse 用函数
-    __aicore__ inline void GetS1LoopRange(int64_t &multiCoreInnerOffset, int64_t &multiCoreInnerLimit);
+    __aicore__ inline void GetS1LoopRange(int64_t& multiCoreInnerOffset, int64_t& multiCoreInnerLimit);
     __aicore__ inline void GetS2LoopRange();
 
-    __aicore__ inline int64_t ComputeOffsetForCausal(const int64_t &delta, const uint32_t &s1BaseSize,
-                                                     const uint32_t &s2BaseSize, const uint32_t &attenMaskS2Size);
-    __aicore__ inline int64_t ComputeOffsetForPrefixRectangle(const int64_t &delta, const uint32_t &s2BaseSize,
-                                                              const uint32_t &attenMaskS2Size);
+    __aicore__ inline int64_t ComputeOffsetForCausal(const int64_t& delta, const uint32_t& s1BaseSize,
+                                                     const uint32_t& s2BaseSize, const uint32_t& attenMaskS2Size);
+    __aicore__ inline int64_t ComputeOffsetForPrefixRectangle(const int64_t& delta, const uint32_t& s2BaseSize,
+                                                              const uint32_t& attenMaskS2Size);
     __aicore__ inline int32_t Align(int32_t shape);
 
     // sparse 用参数
@@ -281,19 +281,19 @@ protected:
 
     int32_t blockIdx;
 
-    const FlashAttentionScoreGeneralTilingData *__restrict tilingData;
+    const FlashAttentionScoreGeneralTilingData* __restrict tilingData;
 
     int64_t boIdx;
     int64_t n2oIdx;
     int64_t goIdx;
     int64_t s1oIdx;
 
-    TPipe *pipe;
+    TPipe* pipe;
 
     GlobalTensor<INPUT_T> queryGm;
     GlobalTensor<INPUT_T> keyGm;
     GlobalTensor<INPUT_T> pseGm;
-    __gm__ uint8_t *pseSlope;
+    __gm__ uint8_t* pseSlope;
     GM_ADDR prefixNAddr;
     GlobalTensor<INPUT_T> valueGm;
     GlobalTensor<INPUT_T> attentionOutGm;
@@ -330,10 +330,10 @@ protected:
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::Init(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *dropMask,
-    __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink,
-    __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
-    __gm__ uint8_t *workspace, const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pse, __gm__ uint8_t* dropMask,
+    __gm__ uint8_t* paddingMask, __gm__ uint8_t* prefix, __gm__ uint8_t* attenMask, __gm__ uint8_t* sink,
+    __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum, __gm__ uint8_t* softmaxOut, __gm__ uint8_t* attentionOut,
+    __gm__ uint8_t* workspace, const FlashAttentionScoreGeneralTilingData* __restrict tiling, TPipe* tPipe)
 {
     this->InitInput(query, key, value, pse, dropMask, paddingMask, prefix, attenMask, sink, softmaxMax, softmaxSum,
                     softmaxOut, attentionOut, workspace, tiling, tPipe); // gm设置
@@ -353,10 +353,10 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::InitInput(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *dropMask,
-    __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink,
-    __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
-    __gm__ uint8_t *workspace, const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pse, __gm__ uint8_t* dropMask,
+    __gm__ uint8_t* paddingMask, __gm__ uint8_t* prefix, __gm__ uint8_t* attenMask, __gm__ uint8_t* sink,
+    __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum, __gm__ uint8_t* softmaxOut, __gm__ uint8_t* attentionOut,
+    __gm__ uint8_t* workspace, const FlashAttentionScoreGeneralTilingData* __restrict tiling, TPipe* tPipe)
 {
     this->blockIdx = GetBlockIdx();
     this->pipe = tPipe;
@@ -364,10 +364,10 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
     this->SetTiling(tiling);
 
     // init global buffer
-    this->queryGm.SetGlobalBuffer((__gm__ INPUT_T *)query);
-    this->keyGm.SetGlobalBuffer((__gm__ INPUT_T *)key);
-    this->valueGm.SetGlobalBuffer((__gm__ INPUT_T *)value);
-    this->pseGm.SetGlobalBuffer((__gm__ INPUT_T *)pse);
+    this->queryGm.SetGlobalBuffer((__gm__ INPUT_T*)query);
+    this->keyGm.SetGlobalBuffer((__gm__ INPUT_T*)key);
+    this->valueGm.SetGlobalBuffer((__gm__ INPUT_T*)value);
+    this->pseGm.SetGlobalBuffer((__gm__ INPUT_T*)pse);
     this->pseSlope = pse;
     this->prefixNAddr = prefix;
 
@@ -378,13 +378,13 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
             workspace += CeilDiv(this->tilingData->dropmaskParams.shapeTotalSize, 512) * 512;
         }
     } else {
-        this->dropMaskGm.SetGlobalBuffer((__gm__ uint8_t *)dropMask);
+        this->dropMaskGm.SetGlobalBuffer((__gm__ uint8_t*)dropMask);
     }
-    this->attenMaskGmInt.SetGlobalBuffer((__gm__ uint8_t *)attenMask);
-    this->softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmaxMax);
-    this->softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmaxSum);
-    this->sinkGm.SetGlobalBuffer((__gm__ float *)sink);
-    this->attentionOutGm.SetGlobalBuffer((__gm__ INPUT_T *)attentionOut);
+    this->attenMaskGmInt.SetGlobalBuffer((__gm__ uint8_t*)attenMask);
+    this->softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmaxMax);
+    this->softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmaxSum);
+    this->sinkGm.SetGlobalBuffer((__gm__ float*)sink);
+    this->attentionOutGm.SetGlobalBuffer((__gm__ INPUT_T*)attentionOut);
 
     // 补齐到512， 统一按T处理
     // S1BaseSize是配比之后的S1BaseSize值
@@ -408,20 +408,20 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
         this->blockIdx * (mmNRatioOffset * 2 + stage1WorkspaceOffset + 2 * bmm2ResultOffset + pseAlibiOffset);
 
     // bmm1Result， 占用mmNRatioOffset空间
-    this->mm1Res[0].SetGlobalBuffer((__gm__ T *)(workspace + totalOffset));
-    this->mm1Res[1].SetGlobalBuffer((__gm__ T *)(workspace + totalOffset + mmNRatioOffset));
+    this->mm1Res[0].SetGlobalBuffer((__gm__ T*)(workspace + totalOffset));
+    this->mm1Res[1].SetGlobalBuffer((__gm__ T*)(workspace + totalOffset + mmNRatioOffset));
     // stage1Result， 占用mmNRatioOffset空间
-    this->stage1Res[0].SetGlobalBuffer((__gm__ INPUT_T *)(workspace + totalOffset + 2 * mmNRatioOffset));
+    this->stage1Res[0].SetGlobalBuffer((__gm__ INPUT_T*)(workspace + totalOffset + 2 * mmNRatioOffset));
     this->stage1Res[1].SetGlobalBuffer(
-        (__gm__ INPUT_T *)(workspace + totalOffset + 2 * mmNRatioOffset + stage1WorkspaceOffset / 2));
+        (__gm__ INPUT_T*)(workspace + totalOffset + 2 * mmNRatioOffset + stage1WorkspaceOffset / 2));
 
     // bmm2Result, 占用s1BaseSize * D的空间
-    this->mm2Res[0].SetGlobalBuffer((__gm__ T *)(workspace + totalOffset + mmNRatioOffset * 2 + stage1WorkspaceOffset));
+    this->mm2Res[0].SetGlobalBuffer((__gm__ T*)(workspace + totalOffset + mmNRatioOffset * 2 + stage1WorkspaceOffset));
     this->mm2Res[1].SetGlobalBuffer(
-        (__gm__ T *)(workspace + totalOffset + mmNRatioOffset * 2 + stage1WorkspaceOffset + bmm2ResultOffset));
+        (__gm__ T*)(workspace + totalOffset + mmNRatioOffset * 2 + stage1WorkspaceOffset + bmm2ResultOffset));
 
     uint64_t pseAlibiAddr = totalOffset + mmNRatioOffset * 2 + stage1WorkspaceOffset + 2 * bmm2ResultOffset;
-    this->pseAlibiGm.SetGlobalBuffer((__gm__ half *)(workspace + pseAlibiAddr));
+    this->pseAlibiGm.SetGlobalBuffer((__gm__ half*)(workspace + pseAlibiAddr));
 
     if constexpr (IsSameType<T, half>::value) {
         this->negativeIntScalar = NEGATIVE_MIN_VAULE_FP16;
@@ -432,7 +432,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline int64_t FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::ComputeOffsetForCausal(
-    const int64_t &delta, const uint32_t &s1BaseSize, const uint32_t &s2BaseSize, const uint32_t &attenMaskS2Size)
+    const int64_t& delta, const uint32_t& s1BaseSize, const uint32_t& s2BaseSize, const uint32_t& attenMaskS2Size)
 {
     if (delta <= 0) {
         return Min(-1 * delta, s1BaseSize);
@@ -444,7 +444,7 @@ __aicore__ inline int64_t FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAM
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline int64_t
 FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::ComputeOffsetForPrefixRectangle(
-    const int64_t &delta, const uint32_t &s2BaseSize, const uint32_t &attenMaskS2Size)
+    const int64_t& delta, const uint32_t& s2BaseSize, const uint32_t& attenMaskS2Size)
 {
     // attenMask S1 is same to S2
     if (delta <= 0) {
@@ -466,7 +466,7 @@ __aicore__ inline int32_t FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAM
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::SetTiling(
-    const FlashAttentionScoreGeneralTilingData *__restrict tilingData)
+    const FlashAttentionScoreGeneralTilingData* __restrict tilingData)
 {
     // copy base params
     this->tilingData = tilingData;
@@ -585,7 +585,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 // sparse functions
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::GetS1LoopRange(
-    int64_t &multiCoreInnerOffset, int64_t &multiCoreInnerLimit)
+    int64_t& multiCoreInnerOffset, int64_t& multiCoreInnerLimit)
 {
     // 计算sparse场景下s1的循环范围
     if (this->tilingData->inputParams.sparseType > 0) {
@@ -649,7 +649,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
         this->s2StartIdx = 0;
         this->s2EndIdx = Max(s1BaseSize * (this->s1oIdx + 1) - this->tilingData->inputParams.s1Size +
                                  this->tilingData->inputParams.s2Size,
-                             ((__gm__ int64_t *)this->prefixNAddr)[this->boIdx]);
+                             ((__gm__ int64_t*)this->prefixNAddr)[this->boIdx]);
         this->s2EndIdx = CeilDiv(this->s2EndIdx, s2BaseSize) * s2BaseSize;
         this->s2EndIdx = Min(this->s2EndIdx, this->tilingData->inputParams.s2Size);
         // s1baseSize行都无效时, 将startIdx设置为0, endIdx设置为S2Size
@@ -666,7 +666,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::Bmm2ResultDiv(
-    SplitS1dExtraInfo &extraInfo, int64_t vec2S1Idx, LocalTensor<T> &bmm2Res, LocalTensor<T> &sumTensor,
+    SplitS1dExtraInfo& extraInfo, int64_t vec2S1Idx, LocalTensor<T>& bmm2Res, LocalTensor<T>& sumTensor,
     int32_t vec2S1RealSize)
 {
     BinaryRepeatParams repeatParams;
@@ -699,7 +699,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::LoopDivVec2(
-    LocalTensor<T> &bmm2Res, LocalTensor<T> &sumTensor, int32_t s1OuterLoop, int32_t s1OuterRemain,
+    LocalTensor<T>& bmm2Res, LocalTensor<T>& sumTensor, int32_t s1OuterLoop, int32_t s1OuterRemain,
     BinaryRepeatParams repeatParams)
 {
     int64_t bmm2LoopMaxSize = this->repeatMaxTimes * this->dSizeAlign16;
@@ -735,8 +735,8 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::Bmm2DataCopyOut(
-    SplitS1dExtraInfo &extraInfo, int64_t vec2S1Idx, int64_t divCastCalcSize, LocalTensor<T> &bmm2Res,
-    LocalTensor<INPUT_T> &attentionOut)
+    SplitS1dExtraInfo& extraInfo, int64_t vec2S1Idx, int64_t divCastCalcSize, LocalTensor<T>& bmm2Res,
+    LocalTensor<INPUT_T>& attentionOut)
 {
     int32_t calcSize = bmm2Res.GetSize();
     AscendC::PipeBarrier<PIPE_V>();
@@ -794,7 +794,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::ProcessVec2(
-    SplitS1dExtraInfo &extraInfo)
+    SplitS1dExtraInfo& extraInfo)
 {
     if constexpr (enableL1Reuse) {
         if (extraInfo.lastNotPair) {
@@ -1004,7 +1004,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::SetExtraInfo(
-    SplitS1dExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit, int64_t multiCoreInnerIdx,
+    SplitS1dExtraInfo& extraInfo, int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit, int64_t multiCoreInnerIdx,
     bool lastNotPair)
 {
     extraInfo.s2StartIdx = this->s2StartIdx;
@@ -1035,7 +1035,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::ComputeBmm1Tail(
-    SplitS1dExtraInfo &extraInfo)
+    SplitS1dExtraInfo& extraInfo)
 {
     extraInfo.s2RealSize = extraInfo.s2EndIdx - extraInfo.s2StartIdx;
     extraInfo.s2RealSizeAlign8 = CeilDiv(extraInfo.s2RealSize, 8) * 8;
@@ -1068,7 +1068,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::IterateBmm1(
-    SplitS1dExtraInfo &extraInfo)
+    SplitS1dExtraInfo& extraInfo)
 {
     if (extraInfo.s1RealSize != lastVec1S1RealSize || this->tilingData->inputParams.sparseType > 0) {
         this->bmm1.SetOrgShape(extraInfo.s1RealSize, mm1Kb, mm1Ka, mm1Kb, extraInfo.s2RealSize);
@@ -1086,7 +1086,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::Bmm1SetTensorA(
-    SplitS1dExtraInfo &extraInfo)
+    SplitS1dExtraInfo& extraInfo)
 {
     // 计算gm上的offset
     int64_t bOffset = 0;
@@ -1122,7 +1122,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::CopyToL1(
-    const GlobalTensor<INPUT_T> &gmTensor, LocalTensor<INPUT_T> &localTensor, int64_t row, int64_t column,
+    const GlobalTensor<INPUT_T>& gmTensor, LocalTensor<INPUT_T>& localTensor, int64_t row, int64_t column,
     uint16_t srcDValue)
 {
     Nd2NzParams nd2nzParams;
@@ -1142,7 +1142,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::SetBmm1TensorB(
-    SplitS1dExtraInfo &extraInfo)
+    SplitS1dExtraInfo& extraInfo)
 {
     // 计算gm上的offset
     int64_t bOffset = 0;
@@ -1171,7 +1171,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::ProcessVec1(
-    SplitS1dExtraInfo &extraInfo)
+    SplitS1dExtraInfo& extraInfo)
 {
     if constexpr (enableL1Reuse) {
         if (extraInfo.lastNotPair) {
@@ -1181,7 +1181,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
     LocalTensor<T> stage1PingTensor = this->stage1PingBuf.template Get<T>(); // t.a 32k
     LocalTensor<T> stage1PongTensor = this->stage1PongBuf.template Get<T>(); // i.a 32k
-    LocalTensor<T> &actualUseTensor = bmm1Format == CubeFormat::ND ? stage1PongTensor : stage1PingTensor;
+    LocalTensor<T>& actualUseTensor = bmm1Format == CubeFormat::ND ? stage1PongTensor : stage1PingTensor;
     LocalTensor<T> commonTBuf = this->commonTBuf.template Get<T>(); // t.b 32k
     event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>());
     event_t eventIdVToMte2A = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
@@ -1394,7 +1394,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::CopyInAttenMask(
-    SplitS1dExtraInfo &extraInfo, int64_t loopIdx, int64_t maskOffset)
+    SplitS1dExtraInfo& extraInfo, int64_t loopIdx, int64_t maskOffset)
 {
     if constexpr (hasAtten == true) {
         LocalTensor<uint8_t> attenMaskUb;
@@ -1421,7 +1421,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline int64_t FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::ComputeAttenMaskOffset(
-    SplitS1dExtraInfo &extraInfo, int64_t loopIdx)
+    SplitS1dExtraInfo& extraInfo, int64_t loopIdx)
 {
     if constexpr (hasAtten == true) {
         int64_t delta = 0;
@@ -1448,7 +1448,7 @@ __aicore__ inline int64_t FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAM
                    static_cast<uint8_t>(AttenMaskCompressMode::PREFIX_MODE)) {
             int64_t s1VOffset = extraInfo.s1oIdx * s1BaseSize + loopIdx * extraInfo.vecS1BaseSize;
             int64_t s1s2Sub = this->tilingData->inputParams.s1Size - this->tilingData->inputParams.s2Size;
-            int64_t prefixNTmp = ((__gm__ int64_t *)this->prefixNAddr)[extraInfo.boIdx];
+            int64_t prefixNTmp = ((__gm__ int64_t*)this->prefixNAddr)[extraInfo.boIdx];
             delta = s1VOffset - s1s2Sub;
 
             this->attenMaskOffsetPre = this->ComputeOffsetForPrefixRectangle(
@@ -1474,7 +1474,7 @@ __aicore__ inline int64_t FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAM
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline int64_t FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::ComputeOffsetForNoCompress(
-    SplitS1dExtraInfo &extraInfo, int64_t loopIdx)
+    SplitS1dExtraInfo& extraInfo, int64_t loopIdx)
 {
     if constexpr (hasAtten == true) {
         int64_t bOffset = 0;
@@ -1496,7 +1496,7 @@ __aicore__ inline int64_t FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAM
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::NdToNz(
-    SplitS1dExtraInfo &extraInfo, LocalTensor<INPUT_T> &nzResUb, LocalTensor<INPUT_T> &vec1ResUb, int64_t loopIdx)
+    SplitS1dExtraInfo& extraInfo, LocalTensor<INPUT_T>& nzResUb, LocalTensor<INPUT_T>& vec1ResUb, int64_t loopIdx)
 {
     auto nzResUbTmp = nzResUb.template ReinterpretCast<half>();
     auto vec1ResUbTmp = vec1ResUb.template ReinterpretCast<half>();
@@ -1554,7 +1554,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::GetBmm1Result(
-    SplitS1dExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb, int64_t loopIdx)
+    SplitS1dExtraInfo& extraInfo, LocalTensor<T>& bmm1ResUb, int64_t loopIdx)
 {
     if constexpr (bmm1Format == CubeFormat::NZ) {
         Nz2NdInfo nz2NdInfo;
@@ -1593,7 +1593,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::ComputeAttenMask(
-    SplitS1dExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb, const uint8_t maskType)
+    SplitS1dExtraInfo& extraInfo, LocalTensor<T>& bmm1ResUb, const uint8_t maskType)
 {
     if constexpr (hasAtten == true) {
         LocalTensor<uint8_t> attenMaskUb = this->maskTBufPing.template Get<uint8_t>();
@@ -1619,7 +1619,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::SoftMaxCompute(
-    SplitS1dExtraInfo &extraInfo, LocalTensor<T> &srcTensor, int64_t loopIdx)
+    SplitS1dExtraInfo& extraInfo, LocalTensor<T>& srcTensor, int64_t loopIdx)
 {
     int64_t vecS1TailSize = CeilDiv(extraInfo.vecS1TailSize, 8) * 8;
     uint32_t bmm1ResUbShape[] = {static_cast<uint32_t>(vecS1TailSize),
@@ -1739,18 +1739,18 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 }
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
-template <typename T2, typename T3, const auto &TILING>
+template <typename T2, typename T3, const auto& TILING>
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::WaitBmm2Result(
-    matmul::Matmul<T2, b2Type, T3, bias2Type, TILING> &bmm2)
+    matmul::Matmul<T2, b2Type, T3, bias2Type, TILING>& bmm2)
 {
     bmm2.WaitIterateAll();
     bmm2.End();
 }
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
-template <typename T2, typename T3, const auto &TILING>
+template <typename T2, typename T3, const auto& TILING>
 __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_TEMPLATE>::IterateBmm2(
-    SplitS1dExtraInfo &extraInfo, matmul::Matmul<T2, b2Type, T3, bias2Type, TILING> &bmm2)
+    SplitS1dExtraInfo& extraInfo, matmul::Matmul<T2, b2Type, T3, bias2Type, TILING>& bmm2)
 {
     int64_t bOffset = 0;
     int64_t n2Offset = 0;

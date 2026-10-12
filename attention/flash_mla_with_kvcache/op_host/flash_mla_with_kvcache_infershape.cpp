@@ -45,24 +45,24 @@ static constexpr size_t OUTPUT_IDX_SOFTMAX_LSE = 1;
 // MLA rope 合并语义常量：q/k_cache 最后维 = head_dim_v + ROPE_HEAD_DIM
 static constexpr int64_t FLASH_MLA_WITH_KVCACHE_ROPE_HEAD_DIM = 64;
 
-ge::graphStatus InferShapeFlashMlaWithKvcache(gert::InferShapeContext *context)
+ge::graphStatus InferShapeFlashMlaWithKvcache(gert::InferShapeContext* context)
 {
     OP_LOGI(context, "FlashMlaWithKvcache InferShape start.");
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
 
-    const gert::Shape *qShape = context->GetInputShape(INPUT_IDX_Q);
+    const gert::Shape* qShape = context->GetInputShape(INPUT_IDX_Q);
     OP_CHECK_NULL_WITH_CONTEXT(context, qShape);
-    const gert::Shape *kCacheShape = context->GetInputShape(INPUT_IDX_K_CACHE);
+    const gert::Shape* kCacheShape = context->GetInputShape(INPUT_IDX_K_CACHE);
     OP_CHECK_NULL_WITH_CONTEXT(context, kCacheShape);
 
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const char *layoutQ = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_Q);
-    const char *layoutKv = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_KV);
-    const char *layoutOut = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_OUT);
+    const char* layoutQ = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_Q);
+    const char* layoutKv = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_KV);
+    const char* layoutOut = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_OUT);
     OP_CHECK_NULL_WITH_CONTEXT(context, layoutQ);
     OP_CHECK_NULL_WITH_CONTEXT(context, layoutKv);
     OP_CHECK_NULL_WITH_CONTEXT(context, layoutOut);
@@ -88,13 +88,13 @@ ge::graphStatus InferShapeFlashMlaWithKvcache(gert::InferShapeContext *context)
     std::string layoutOutStr = std::string(layoutOut);
 
     // 转为大写以便统一比较
-    for (auto &c : layoutQStr) {
+    for (auto& c : layoutQStr) {
         c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
     }
-    for (auto &c : layoutKvStr) {
+    for (auto& c : layoutKvStr) {
         c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
     }
-    for (auto &c : layoutOutStr) {
+    for (auto& c : layoutOutStr) {
         c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
     }
 
@@ -180,7 +180,7 @@ ge::graphStatus InferShapeFlashMlaWithKvcache(gert::InferShapeContext *context)
         return ge::GRAPH_FAILED;
     }
 
-    gert::Shape *attnOutShape = context->GetOutputShape(OUTPUT_IDX_ATTN_OUT);
+    gert::Shape* attnOutShape = context->GetOutputShape(OUTPUT_IDX_ATTN_OUT);
     OP_CHECK_NULL_WITH_CONTEXT(context, attnOutShape);
 
     // 输出最后维 = head_dim_v（q 的 576 含 rope，不能直接作为输出宽度）
@@ -213,7 +213,7 @@ ge::graphStatus InferShapeFlashMlaWithKvcache(gert::InferShapeContext *context)
         return ge::GRAPH_FAILED;
     }
 
-    gert::Shape *lseShape = context->GetOutputShape(OUTPUT_IDX_SOFTMAX_LSE);
+    gert::Shape* lseShape = context->GetOutputShape(OUTPUT_IDX_SOFTMAX_LSE);
     if (lseShape != nullptr) {
         if (returnSoftmaxLse != 0) {
             if (isTND) {
@@ -237,7 +237,7 @@ ge::graphStatus InferShapeFlashMlaWithKvcache(gert::InferShapeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeFlashMlaWithKvcache(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeFlashMlaWithKvcache(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         return ge::GRAPH_FAILED;

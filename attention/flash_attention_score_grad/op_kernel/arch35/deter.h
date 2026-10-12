@@ -75,7 +75,7 @@ struct CoordinateInfo {
 };
 
 template <uint8_t mode = 0>
-__aicore__ inline void TransDeterRound(int64_t &r, bool &useEvenCol, int64_t rMax)
+__aicore__ inline void TransDeterRound(int64_t& r, bool& useEvenCol, int64_t rMax)
 {
     if constexpr (mode == 0) {
         return;
@@ -93,7 +93,7 @@ __aicore__ inline void TransDeterRound(int64_t &r, bool &useEvenCol, int64_t rMa
 }
 
 template <uint8_t mode = 0>
-__aicore__ inline void TransTilingSplitMode(int64_t &m, int64_t &n, int64_t &r, bool &useEvenCol, int64_t rMax)
+__aicore__ inline void TransTilingSplitMode(int64_t& m, int64_t& n, int64_t& r, bool& useEvenCol, int64_t rMax)
 {
     if constexpr (mode == 0) {
         return;
@@ -109,7 +109,7 @@ __aicore__ inline void TransTilingSplitMode(int64_t &m, int64_t &n, int64_t &r, 
 }
 
 template <uint8_t mode = 0, const bool IS_TND = false>
-__aicore__ inline void TransTilingSplitModeBack(CoordinateInfo &coordinateInfo, bool useEvenCol)
+__aicore__ inline void TransTilingSplitModeBack(CoordinateInfo& coordinateInfo, bool useEvenCol)
 {
     if constexpr (mode == 0) {
         return;
@@ -129,7 +129,7 @@ __aicore__ inline void TransTilingSplitModeBack(CoordinateInfo &coordinateInfo, 
 }
 
 __aicore__ inline void InitCoordinateInfo(int64_t s1Outer, int64_t s2Outer, int64_t mOffset, int64_t nOffset,
-                                          CoordinateInfo &coordinateInfo)
+                                          CoordinateInfo& coordinateInfo)
 {
     coordinateInfo.s1Outer = s1Outer;
     coordinateInfo.s2Outer = s2Outer;
@@ -138,7 +138,7 @@ __aicore__ inline void InitCoordinateInfo(int64_t s1Outer, int64_t s2Outer, int6
 }
 
 __aicore__ inline void CalDenseIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t j, int64_t r,
-                                     CoordinateInfo &coordinate)
+                                     CoordinateInfo& coordinate)
 {
     k = Min(k, b * m);
     if (j > k) {
@@ -175,7 +175,7 @@ __aicore__ inline void CalDenseIndex(int64_t k, int64_t m, int64_t n, int64_t b,
 }
 
 __aicore__ inline void CalDenseIndexForSingleN(int64_t k, int64_t m, int64_t b, int64_t j, int64_t r, int64_t R,
-                                               CoordinateInfo &coordinate)
+                                               CoordinateInfo& coordinate)
 {
     int64_t n = 1;
     int64_t ID = (j - 1) * R + r;
@@ -211,7 +211,7 @@ __aicore__ inline void CalDenseIndexForSingleN(int64_t k, int64_t m, int64_t b, 
 }
 
 __aicore__ inline void CalDenseSwizzleIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t j, int64_t r,
-                                            CoordinateInfo &coordinate)
+                                            CoordinateInfo& coordinate)
 {
     j = j - 1;
     r = r - 1;
@@ -242,7 +242,7 @@ __aicore__ inline void CalDenseSwizzleIndex(int64_t k, int64_t m, int64_t n, int
 }
 
 __aicore__ inline void CalGQADenseIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t core_id, int64_t round_id,
-                                        int64_t g, CoordinateInfo &coordinate, int64_t denseRound = 0)
+                                        int64_t g, CoordinateInfo& coordinate, int64_t denseRound = 0)
 {
     coordinate.batchId = -1;
     k = Min(Min(k, b * g * m), b * n);
@@ -305,7 +305,7 @@ __aicore__ inline void CalGQADenseIndex(int64_t k, int64_t m, int64_t n, int64_t
     coordinate.s2Idx = y;
 }
 __aicore__ inline void CalCausalG2kSingleBatchDeterIndex(int64_t k, int64_t j, int64_t a, int64_t L1, int64_t offset,
-                                                         CoordinateInfo &coordinate)
+                                                         CoordinateInfo& coordinate)
 {
     int64_t x, y = 0;
     if (j % NUM_TWO == 1) { // 奇核分支
@@ -332,7 +332,7 @@ __aicore__ inline void CalCausalG2kSingleBatchDeterIndex(int64_t k, int64_t j, i
 }
 
 __aicore__ inline void CalCausalNoRecSingleBatchDeterIndex(int64_t k, int64_t m, int64_t n, int64_t j, int64_t r,
-                                                           CoordinateInfo &coordinate)
+                                                           CoordinateInfo& coordinate)
 {
     coordinate.batchId = -1;
 
@@ -371,7 +371,7 @@ __aicore__ inline void CalCausalNoRecSingleBatchDeterIndex(int64_t k, int64_t m,
 
 // 矩形
 __aicore__ inline void CalCausalRecSingleBatchDeterIndex(int64_t k, int64_t m, int64_t n, int64_t j, int64_t r,
-                                                         CoordinateInfo &coordinate)
+                                                         CoordinateInfo& coordinate)
 {
     int64_t x, y = 0;
     // Choose method based on core count
@@ -403,7 +403,7 @@ __aicore__ inline void CalCausalRecSingleBatchDeterIndex(int64_t k, int64_t m, i
 
 // 计算单batch切分
 __aicore__ inline void CalCausalSingleBatchDeterIndex(int64_t k, int64_t m, int64_t n, int64_t j, int64_t r,
-                                                      CoordinateInfo &coordinate)
+                                                      CoordinateInfo& coordinate)
 {
     // 0. special case
     if (k >= (n / NUM_TWO) + 1) {
@@ -464,7 +464,7 @@ __aicore__ inline void CalCausalSingleBatchDeterIndex(int64_t k, int64_t m, int6
 }
 
 __aicore__ inline void CalCausalIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t j, int64_t r,
-                                      CoordinateInfo &coordinate)
+                                      CoordinateInfo& coordinate)
 {
     // 1. b1, b2, rm1
     int64_t b1 = b / k;
@@ -661,7 +661,7 @@ __aicore__ inline void CalCausalIndex(int64_t k, int64_t m, int64_t n, int64_t b
 }
 
 __aicore__ inline void CalCausalSwizzleIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t j, int64_t r,
-                                             CoordinateInfo &coordinate)
+                                             CoordinateInfo& coordinate)
 {
     // 按照相邻B或者N拼接成一个完整S1S2
     int64_t nNew = n + 1;
@@ -724,7 +724,7 @@ __aicore__ inline int64_t CalLeftUpCausalSwizzleMaxRound(int64_t k, int64_t m, i
 }
 
 __aicore__ inline void CalLeftUpCausalSwizzleIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t j, int64_t r,
-                                                   CoordinateInfo &coordinate)
+                                                   CoordinateInfo& coordinate)
 {
     coordinate.batchId = -1;
     int64_t pairCount = b >> 1;
@@ -769,7 +769,7 @@ __aicore__ inline void CalLeftUpCausalSwizzleIndex(int64_t k, int64_t m, int64_t
 }
 
 __aicore__ inline void CalGQACausalIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t j, int64_t r, int64_t g,
-                                         CoordinateInfo &coordinate)
+                                         CoordinateInfo& coordinate)
 {
     // 1. b1, b2, rm1
     int64_t b1 = b / k;
@@ -1013,7 +1013,7 @@ struct BandInfo {
 };
 
 __aicore__ inline void GenBandHybridInfo(int64_t k, int64_t m, int64_t n, int64_t p, int64_t q, int64_t b,
-                                         BandInfo &bandInfo)
+                                         BandInfo& bandInfo)
 {
     p = Min(p, m);
     q = Min(q, n);
@@ -1039,8 +1039,8 @@ __aicore__ inline void GenBandHybridInfo(int64_t k, int64_t m, int64_t n, int64_
     bandInfo.hybridPairCount = Max(0, Min(bandInfo.L1, bandInfo.L3 - p + 1));
 }
 
-__aicore__ inline bool SetBandHybridCoordinate(const BandInfo &bandInfo, int64_t w, int64_t y, int64_t localRound,
-                                               CoordinateInfo &coordinate)
+__aicore__ inline bool SetBandHybridCoordinate(const BandInfo& bandInfo, int64_t w, int64_t y, int64_t localRound,
+                                               CoordinateInfo& coordinate)
 {
     int64_t x = y + localRound - bandInfo.q;
     int64_t xMin = Max(1, y - bandInfo.q + 1);
@@ -1054,7 +1054,7 @@ __aicore__ inline bool SetBandHybridCoordinate(const BandInfo &bandInfo, int64_t
     return true;
 }
 
-__aicore__ inline void CalBandHybridIndex(const BandInfo &bandInfo, int64_t j, int64_t r, CoordinateInfo &coordinate)
+__aicore__ inline void CalBandHybridIndex(const BandInfo& bandInfo, int64_t j, int64_t r, CoordinateInfo& coordinate)
 {
     coordinate.batchId = -1;
     int64_t slot = bandInfo.p + bandInfo.q - 1;
@@ -1105,7 +1105,7 @@ __aicore__ inline void CalBandHybridIndex(const BandInfo &bandInfo, int64_t j, i
     SetBandHybridCoordinate(bandInfo, w, y, localRound, coordinate);
 }
 
-__aicore__ inline void GenBandInfo(int64_t k, int64_t m, int64_t n, int64_t p, int64_t q, int64_t b, BandInfo &bandInfo)
+__aicore__ inline void GenBandInfo(int64_t k, int64_t m, int64_t n, int64_t p, int64_t q, int64_t b, BandInfo& bandInfo)
 {
     bandInfo.k = k;
     bandInfo.m = m;
@@ -1153,7 +1153,7 @@ __aicore__ inline void GenBandInfo(int64_t k, int64_t m, int64_t n, int64_t p, i
 }
 
 __aicore__ inline void CalGQADenseIndexNoTune(int64_t k, int64_t m, int64_t n, int64_t b, int64_t core_id,
-                                              int64_t round_id, int64_t g, CoordinateInfo &coordinate)
+                                              int64_t round_id, int64_t g, CoordinateInfo& coordinate)
 {
     coordinate.batchId = -1;
     k = Min(Min(k, b * g * m), b * n);
@@ -1181,7 +1181,7 @@ __aicore__ inline void CalGQADenseIndexNoTune(int64_t k, int64_t m, int64_t n, i
 }
 
 __aicore__ inline void GenGQABandInfo(int64_t k, int64_t m, int64_t n, int64_t p, int64_t q, int64_t b, int64_t g,
-                                      BandInfo &bandInfo)
+                                      BandInfo& bandInfo)
 {
     bandInfo.k = k;
     bandInfo.m = m;
@@ -1238,7 +1238,7 @@ __aicore__ inline void GenGQABandInfo(int64_t k, int64_t m, int64_t n, int64_t p
     }
 }
 
-__aicore__ inline void CalBandIndex(const BandInfo &bandInfo, int64_t j, int64_t r, CoordinateInfo &coordinate)
+__aicore__ inline void CalBandIndex(const BandInfo& bandInfo, int64_t j, int64_t r, CoordinateInfo& coordinate)
 {
     int64_t w, x, y = 0;
     coordinate.batchId = -1;
@@ -1476,8 +1476,8 @@ __aicore__ inline void CalBandIndex(const BandInfo &bandInfo, int64_t j, int64_t
 }
 
 template <bool isAlign = false>
-__aicore__ inline int64_t GetPrefixByBidx(const __gm__ uint8_t *actualSeqQlenAddr,
-                                          const __gm__ uint8_t *actualSeqKvlenAddr, const __gm__ int64_t *prefix,
+__aicore__ inline int64_t GetPrefixByBidx(const __gm__ uint8_t* actualSeqQlenAddr,
+                                          const __gm__ uint8_t* actualSeqKvlenAddr, const __gm__ int64_t* prefix,
                                           int64_t bIdx, int64_t step)
 {
     int64_t w = bIdx / step;
@@ -1485,12 +1485,12 @@ __aicore__ inline int64_t GetPrefixByBidx(const __gm__ uint8_t *actualSeqQlenAdd
     int64_t prefixNum = prefix[w];
     if (bIdx % step > 0) {
         w = w * step;
-        int64_t lastSeqQLen = w == 0 ? 0 : ((__gm__ int64_t *)actualSeqQlenAddr)[w - 1];
-        int64_t lastSeqKvLen = w == 0 ? 0 : ((__gm__ int64_t *)actualSeqKvlenAddr)[w - 1];
+        int64_t lastSeqQLen = w == 0 ? 0 : ((__gm__ int64_t*)actualSeqQlenAddr)[w - 1];
+        int64_t lastSeqKvLen = w == 0 ? 0 : ((__gm__ int64_t*)actualSeqKvlenAddr)[w - 1];
         int64_t currentSeqQLen, currentSeqKvLen;
         while (w < bIdx) {
-            currentSeqQLen = ((__gm__ int64_t *)actualSeqQlenAddr)[w];
-            currentSeqKvLen = ((__gm__ int64_t *)actualSeqKvlenAddr)[w];
+            currentSeqQLen = ((__gm__ int64_t*)actualSeqQlenAddr)[w];
+            currentSeqKvLen = ((__gm__ int64_t*)actualSeqKvlenAddr)[w];
             prefixNum += (currentSeqQLen - lastSeqQLen) *
                          (isAlign ? AlignTo16(currentSeqKvLen - lastSeqKvLen) : (currentSeqKvLen - lastSeqKvLen));
             w += 1;
@@ -1501,21 +1501,20 @@ __aicore__ inline int64_t GetPrefixByBidx(const __gm__ uint8_t *actualSeqQlenAdd
     return prefixNum;
 }
 
-__aicore__ inline void GetSeqQlenKvlenByBidx(const __gm__ uint8_t *actualSeqQlenAddr,
-                                             const __gm__ uint8_t *actualSeqKvlenAddr, int64_t bIdx,
-                                             int64_t &actualSeqQlen, int64_t &actualSeqKvlen)
+__aicore__ inline void GetSeqQlenKvlenByBidx(const __gm__ uint8_t* actualSeqQlenAddr,
+                                             const __gm__ uint8_t* actualSeqKvlenAddr, int64_t bIdx,
+                                             int64_t& actualSeqQlen, int64_t& actualSeqKvlen)
 {
     if (unlikely(bIdx == 0)) {
-        actualSeqQlen = ((__gm__ int64_t *)actualSeqQlenAddr)[0];
-        actualSeqKvlen = ((__gm__ int64_t *)actualSeqKvlenAddr)[0];
+        actualSeqQlen = ((__gm__ int64_t*)actualSeqQlenAddr)[0];
+        actualSeqKvlen = ((__gm__ int64_t*)actualSeqKvlenAddr)[0];
     } else {
-        actualSeqQlen = ((__gm__ int64_t *)actualSeqQlenAddr)[bIdx] - ((__gm__ int64_t *)actualSeqQlenAddr)[bIdx - 1];
-        actualSeqKvlen =
-            ((__gm__ int64_t *)actualSeqKvlenAddr)[bIdx] - ((__gm__ int64_t *)actualSeqKvlenAddr)[bIdx - 1];
+        actualSeqQlen = ((__gm__ int64_t*)actualSeqQlenAddr)[bIdx] - ((__gm__ int64_t*)actualSeqQlenAddr)[bIdx - 1];
+        actualSeqKvlen = ((__gm__ int64_t*)actualSeqKvlenAddr)[bIdx] - ((__gm__ int64_t*)actualSeqKvlenAddr)[bIdx - 1];
     }
 }
 
-__aicore__ inline void CalVirtualIndex(int64_t flag, int64_t &m, int64_t &n)
+__aicore__ inline void CalVirtualIndex(int64_t flag, int64_t& m, int64_t& n)
 {
     if (m < n) {
         n = m;
@@ -1532,8 +1531,8 @@ __aicore__ inline void CalVirtualIndex(int64_t flag, int64_t &m, int64_t &n)
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN, const bool isDense, const bool IS_N_EQUAL>
-__aicore__ inline void UpdateMNPQ(int64_t actualCalcS1Token, int64_t actualCalcS2Token, CoordinateInfo &coordinateInfo,
-                                  int64_t &actualM, int64_t &actualN)
+__aicore__ inline void UpdateMNPQ(int64_t actualCalcS1Token, int64_t actualCalcS2Token, CoordinateInfo& coordinateInfo,
+                                  int64_t& actualM, int64_t& actualN)
 {
     // sparse_mode == band 或者 RIGHT_DOWN_CASUAL时，token以右下角为基本，需要校正
     int64_t actualS1Len = coordinateInfo.actualS1Len;
@@ -1607,11 +1606,11 @@ __aicore__ inline void UpdateMNPQ(int64_t actualCalcS1Token, int64_t actualCalcS
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN>
-__aicore__ inline void CalTNDDenseSwizzleIndex(const __gm__ uint8_t *actualSeqQlenAddr,
-                                               const __gm__ uint8_t *actualSeqKvlenAddr,
-                                               const __gm__ uint64_t *tndS2BlockPrefixSum, int64_t b, int64_t n2,
+__aicore__ inline void CalTNDDenseSwizzleIndex(const __gm__ uint8_t* actualSeqQlenAddr,
+                                               const __gm__ uint8_t* actualSeqKvlenAddr,
+                                               const __gm__ uint64_t* tndS2BlockPrefixSum, int64_t b, int64_t n2,
                                                int64_t g, int64_t j, int64_t k, int64_t r,
-                                               CoordinateInfo &coordinateInfo)
+                                               CoordinateInfo& coordinateInfo)
 {
     j -= 1;
     r -= 1;
@@ -1650,10 +1649,10 @@ __aicore__ inline void CalTNDDenseSwizzleIndex(const __gm__ uint8_t *actualSeqQl
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN, const uint8_t DETER_SPARSE_TYPE = DETER_DENSE,
           const bool IS_N_EQUAL = true>
-__aicore__ inline void CalTNDDenseIndex(const __gm__ uint8_t *actualSeqQlenAddr,
-                                        const __gm__ uint8_t *actualSeqKvlenAddr, const __gm__ int64_t *prefix,
+__aicore__ inline void CalTNDDenseIndex(const __gm__ uint8_t* actualSeqQlenAddr,
+                                        const __gm__ uint8_t* actualSeqKvlenAddr, const __gm__ int64_t* prefix,
                                         int64_t deterMaxRound, int64_t b, int64_t n2, int64_t g, int64_t j, int64_t r,
-                                        uint8_t flag, int64_t step, CoordinateInfo &coordinateInfo)
+                                        uint8_t flag, int64_t step, CoordinateInfo& coordinateInfo)
 {
     coordinateInfo.batchId = -1;
     if (r > deterMaxRound) {
@@ -1809,7 +1808,7 @@ __aicore__ inline void CalTNDDenseIndex(const __gm__ uint8_t *actualSeqQlenAddr,
     return;
 }
 
-__aicore__ inline void CalCausalPosWholeBatch(int64_t m, int64_t n, int64_t a, CoordinateInfo &coordinateInfo)
+__aicore__ inline void CalCausalPosWholeBatch(int64_t m, int64_t n, int64_t a, CoordinateInfo& coordinateInfo)
 {
     int64_t n1 = n / NUM_TWO * NUM_TWO;
     int64_t L = NUM_TWO * m - n1 + 1;
@@ -1834,7 +1833,7 @@ __aicore__ inline void CalCausalPosWholeBatch(int64_t m, int64_t n, int64_t a, C
     return;
 }
 
-__aicore__ inline void UpdataCausalMN(CoordinateInfo &coordinateInfo, int64_t &m, int64_t &n)
+__aicore__ inline void UpdataCausalMN(CoordinateInfo& coordinateInfo, int64_t& m, int64_t& n)
 {
     coordinateInfo.s1Outer = m;
     coordinateInfo.s2Outer = n;
@@ -1842,11 +1841,11 @@ __aicore__ inline void UpdataCausalMN(CoordinateInfo &coordinateInfo, int64_t &m
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN>
-__aicore__ inline void CalTNDCausalIndex(const __gm__ uint8_t *actualSeqQlenAddr,
-                                         const __gm__ uint8_t *actualSeqKvlenAddr, const __gm__ int64_t *prefix0,
-                                         const __gm__ int64_t *prefix1, const __gm__ int64_t *prefix2, int64_t b,
+__aicore__ inline void CalTNDCausalIndex(const __gm__ uint8_t* actualSeqQlenAddr,
+                                         const __gm__ uint8_t* actualSeqKvlenAddr, const __gm__ int64_t* prefix0,
+                                         const __gm__ int64_t* prefix1, const __gm__ int64_t* prefix2, int64_t b,
                                          int64_t N1, int64_t k, int64_t j, int64_t r, int64_t step,
-                                         CoordinateInfo &coordinateInfo)
+                                         CoordinateInfo& coordinateInfo)
 {
     int64_t maxRoundIndex = b > DETER_PREFIX_THRESHOLD ? Ceil<int64_t>(b + 1, step) : b + 1;
     int64_t N10 = N1 / k;
@@ -1969,11 +1968,11 @@ __aicore__ inline void CalTNDCausalIndex(const __gm__ uint8_t *actualSeqQlenAddr
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN>
-__aicore__ inline void CalTNDGQACausalIndex(const __gm__ uint8_t *actualSeqQlenAddr,
-                                            const __gm__ uint8_t *actualSeqKvlenAddr, const __gm__ int64_t *prefix0,
-                                            const __gm__ int64_t *prefix1, const __gm__ int64_t *prefix2, int64_t b,
+__aicore__ inline void CalTNDGQACausalIndex(const __gm__ uint8_t* actualSeqQlenAddr,
+                                            const __gm__ uint8_t* actualSeqKvlenAddr, const __gm__ int64_t* prefix0,
+                                            const __gm__ int64_t* prefix1, const __gm__ int64_t* prefix2, int64_t b,
                                             int64_t g, int64_t N2, int64_t k, int64_t j, int64_t r, int64_t step,
-                                            bool coreDivide, CoordinateInfo &coordinateInfo)
+                                            bool coreDivide, CoordinateInfo& coordinateInfo)
 {
     int64_t maxRoundIndex = b > DETER_PREFIX_THRESHOLD ? Ceil<int64_t>(b + 1, step) : b + 1;
     int64_t N2_1 = N2 / NUM_TWO;
@@ -2059,7 +2058,7 @@ __aicore__ inline void CalTNDGQACausalIndex(const __gm__ uint8_t *actualSeqQlenA
     }
 }
 
-__aicore__ inline int64_t BinarySearch(const __gm__ int64_t *prefix, int64_t b, int64_t rThreshold, int64_t step)
+__aicore__ inline int64_t BinarySearch(const __gm__ int64_t* prefix, int64_t b, int64_t rThreshold, int64_t step)
 {
     int64_t w = 0;
     while ((w + 1) * step < b && rThreshold > prefix[w + 1]) {
@@ -2069,7 +2068,7 @@ __aicore__ inline int64_t BinarySearch(const __gm__ int64_t *prefix, int64_t b, 
 }
 
 __aicore__ inline void CalPosWholeBatch(int64_t m, int64_t n, int64_t p, int64_t q, int64_t a,
-                                        CoordinateInfo &coordinateInfo)
+                                        CoordinateInfo& coordinateInfo)
 {
     int64_t L1, L2, L3, R1, R2, R3, Rm;
     int64_t x, y;
@@ -2194,10 +2193,10 @@ __aicore__ inline void CalPosWholeBatch(int64_t m, int64_t n, int64_t p, int64_t
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN>
-__aicore__ inline void CalTNDBandIndex(const __gm__ uint8_t *actualSeqQlenAddr,
-                                       const __gm__ uint8_t *actualSeqKvlenAddr, const __gm__ int64_t *prefix0,
-                                       const __gm__ int64_t *prefix1, int64_t b, int64_t N1, int64_t k, int64_t j,
-                                       int64_t r, int64_t step, CoordinateInfo &coordinateInfo)
+__aicore__ inline void CalTNDBandIndex(const __gm__ uint8_t* actualSeqQlenAddr,
+                                       const __gm__ uint8_t* actualSeqKvlenAddr, const __gm__ int64_t* prefix0,
+                                       const __gm__ int64_t* prefix1, int64_t b, int64_t N1, int64_t k, int64_t j,
+                                       int64_t r, int64_t step, CoordinateInfo& coordinateInfo)
 {
     int64_t maxRoundIndex = b > DETER_PREFIX_THRESHOLD ? Ceil<int64_t>(b + 1, step) : b + 1;
     int64_t R0 = prefix0[maxRoundIndex];
@@ -2304,10 +2303,10 @@ __aicore__ inline void CalTNDBandIndex(const __gm__ uint8_t *actualSeqQlenAddr,
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN>
-__aicore__ inline void CalTNDGQABandIndex(const __gm__ uint8_t *actualSeqQlenAddr,
-                                          const __gm__ uint8_t *actualSeqKvlenAddr, const __gm__ int64_t *prefix0,
-                                          const __gm__ int64_t *prefix1, int64_t b, int64_t g, int64_t N2, int64_t k,
-                                          int64_t j, int64_t r, int64_t step, CoordinateInfo &coordinateInfo)
+__aicore__ inline void CalTNDGQABandIndex(const __gm__ uint8_t* actualSeqQlenAddr,
+                                          const __gm__ uint8_t* actualSeqKvlenAddr, const __gm__ int64_t* prefix0,
+                                          const __gm__ int64_t* prefix1, int64_t b, int64_t g, int64_t N2, int64_t k,
+                                          int64_t j, int64_t r, int64_t step, CoordinateInfo& coordinateInfo)
 {
     int64_t maxRoundIndex = b > DETER_PREFIX_THRESHOLD ? Ceil<int64_t>(b + 1, step) : b + 1;
     int64_t R1 = prefix1[maxRoundIndex];
@@ -2376,8 +2375,8 @@ __aicore__ inline void CalTNDGQABandIndex(const __gm__ uint8_t *actualSeqQlenAdd
     return;
 }
 
-__aicore__ inline void CalGQABandIndex(const BandInfo &bandInfo, int64_t j, int64_t r, int64_t N1,
-                                       CoordinateInfo &coordinate)
+__aicore__ inline void CalGQABandIndex(const BandInfo& bandInfo, int64_t j, int64_t r, int64_t N1,
+                                       CoordinateInfo& coordinate)
 {
     int64_t w, x, y = 0;
     coordinate.batchId = -1;
@@ -2662,7 +2661,7 @@ __aicore__ inline void CalGQABandIndex(const BandInfo &bandInfo, int64_t j, int6
     return;
 }
 __aicore__ inline bool CalTNDDenseLine(int64_t k, int64_t m, int64_t n, int64_t copies, int64_t j, int64_t r,
-                                       int64_t &w, int64_t &x, int64_t &y)
+                                       int64_t& w, int64_t& x, int64_t& y)
 {
     if (j < 1 || j > k || r < 1 || copies <= 0 || m <= 0 || n <= 0) {
         return false;
@@ -2678,7 +2677,7 @@ __aicore__ inline bool CalTNDDenseLine(int64_t k, int64_t m, int64_t n, int64_t 
     return true;
 }
 
-__aicore__ inline void CalTNDG2k(int64_t k, int64_t j, int64_t a, int64_t l1, int64_t offset, int64_t &x, int64_t &y)
+__aicore__ inline void CalTNDG2k(int64_t k, int64_t j, int64_t a, int64_t l1, int64_t offset, int64_t& x, int64_t& y)
 {
     if (j % NUM_TWO == 1) {
         if (a <= l1 - j + 1) {
@@ -2699,7 +2698,7 @@ __aicore__ inline void CalTNDG2k(int64_t k, int64_t j, int64_t a, int64_t l1, in
     }
 }
 
-__aicore__ inline bool CalTNDCase0(int64_t m, int64_t n, int64_t j, int64_t r, int64_t &x, int64_t &y)
+__aicore__ inline bool CalTNDCase0(int64_t m, int64_t n, int64_t j, int64_t r, int64_t& x, int64_t& y)
 {
     if (j > (n / NUM_TWO) + 1 || j < 1 || r < 1) {
         return false;
@@ -2724,7 +2723,7 @@ __aicore__ inline bool CalTNDCase0(int64_t m, int64_t n, int64_t j, int64_t r, i
     return y >= 1 && y <= m && y <= x && x <= m;
 }
 
-__aicore__ inline bool CalTNDCase0Rec(int64_t k, int64_t m, int64_t n, int64_t j, int64_t r, int64_t &x, int64_t &y)
+__aicore__ inline bool CalTNDCase0Rec(int64_t k, int64_t m, int64_t n, int64_t j, int64_t r, int64_t& x, int64_t& y)
 {
     if (NUM_TWO * k < m + 1 && k < n) {
         CalTNDG2k(k, j, r, m, 0, x, y);
@@ -2767,8 +2766,8 @@ __aicore__ inline int64_t CalTNDSingleCausalRounds(int64_t k, int64_t m, int64_t
     return rounds2k + roundsTail;
 }
 
-__aicore__ inline bool CalTNDSingleCausalPos(int64_t k, int64_t m, int64_t n, int64_t j, int64_t r, int64_t &x,
-                                             int64_t &y)
+__aicore__ inline bool CalTNDSingleCausalPos(int64_t k, int64_t m, int64_t n, int64_t j, int64_t r, int64_t& x,
+                                             int64_t& y)
 {
     if (j < 1 || j > k || r < 1) {
         return false;
@@ -2824,8 +2823,8 @@ __aicore__ inline bool IsTNDRightDownValid(int64_t m, int64_t n, int64_t x, int6
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN>
-__aicore__ inline void LoadTNDOuterMN(const __gm__ uint8_t *actualSeqQlenAddr, const __gm__ uint8_t *actualSeqKvlenAddr,
-                                      int64_t batchType, int64_t &m, int64_t &n, CoordinateInfo &coordinateInfo)
+__aicore__ inline void LoadTNDOuterMN(const __gm__ uint8_t* actualSeqQlenAddr, const __gm__ uint8_t* actualSeqKvlenAddr,
+                                      int64_t batchType, int64_t& m, int64_t& n, CoordinateInfo& coordinateInfo)
 {
     int64_t actualS1Len = 0;
     int64_t actualS2Len = 0;
@@ -2854,7 +2853,7 @@ __aicore__ inline int64_t GetTNDRightDownRowShift(int64_t m, int64_t n)
     return Max(static_cast<int64_t>(0), m - n - 1);
 }
 
-__aicore__ inline void TrimTNDCausalMN(int64_t &m, int64_t &n, bool leftUp)
+__aicore__ inline void TrimTNDCausalMN(int64_t& m, int64_t& n, bool leftUp)
 {
     if (leftUp) {
         if (m < n) {
@@ -2866,10 +2865,10 @@ __aicore__ inline void TrimTNDCausalMN(int64_t &m, int64_t &n, bool leftUp)
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN>
-__aicore__ inline void ExpandTNDCausalRun(const __gm__ uint8_t *actualSeqQlenAddr,
-                                          const __gm__ uint8_t *actualSeqKvlenAddr, int64_t b, int64_t bIdx,
-                                          bool leftUp, int64_t &runHead, int64_t &runEnd, int64_t &m, int64_t &n,
-                                          CoordinateInfo &coordinateInfo)
+__aicore__ inline void ExpandTNDCausalRun(const __gm__ uint8_t* actualSeqQlenAddr,
+                                          const __gm__ uint8_t* actualSeqKvlenAddr, int64_t b, int64_t bIdx,
+                                          bool leftUp, int64_t& runHead, int64_t& runEnd, int64_t& m, int64_t& n,
+                                          CoordinateInfo& coordinateInfo)
 {
     LoadTNDOuterMN<CUBE_BASEM, CUBE_BASEN>(actualSeqQlenAddr, actualSeqKvlenAddr, bIdx, m, n, coordinateInfo);
     TrimTNDCausalMN(m, n, leftUp);
@@ -2902,9 +2901,9 @@ __aicore__ inline void ExpandTNDCausalRun(const __gm__ uint8_t *actualSeqQlenAdd
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN>
-__aicore__ inline void LoadTNDBandMN(const __gm__ uint8_t *actualSeqQlenAddr, const __gm__ uint8_t *actualSeqKvlenAddr,
-                                     int64_t bIdx, int64_t &m, int64_t &n, int64_t &p, int64_t &q,
-                                     CoordinateInfo &coordinateInfo)
+__aicore__ inline void LoadTNDBandMN(const __gm__ uint8_t* actualSeqQlenAddr, const __gm__ uint8_t* actualSeqKvlenAddr,
+                                     int64_t bIdx, int64_t& m, int64_t& n, int64_t& p, int64_t& q,
+                                     CoordinateInfo& coordinateInfo)
 {
     LoadTNDOuterMN<CUBE_BASEM, CUBE_BASEN>(actualSeqQlenAddr, actualSeqKvlenAddr, bIdx, m, n, coordinateInfo);
     if (m < 1 || n < 1) {
@@ -2924,10 +2923,10 @@ __aicore__ inline void LoadTNDBandMN(const __gm__ uint8_t *actualSeqQlenAddr, co
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN>
-__aicore__ inline void ExpandTNDBandRun(const __gm__ uint8_t *actualSeqQlenAddr,
-                                        const __gm__ uint8_t *actualSeqKvlenAddr, int64_t b, int64_t bIdx,
-                                        int64_t &runHead, int64_t &runEnd, int64_t &m, int64_t &n, int64_t &p,
-                                        int64_t &q, CoordinateInfo &coordinateInfo)
+__aicore__ inline void ExpandTNDBandRun(const __gm__ uint8_t* actualSeqQlenAddr,
+                                        const __gm__ uint8_t* actualSeqKvlenAddr, int64_t b, int64_t bIdx,
+                                        int64_t& runHead, int64_t& runEnd, int64_t& m, int64_t& n, int64_t& p,
+                                        int64_t& q, CoordinateInfo& coordinateInfo)
 {
     const int64_t rawP = coordinateInfo.p;
     const int64_t rawQ = coordinateInfo.q;
@@ -2974,7 +2973,7 @@ __aicore__ inline int64_t GetTNDPrefixTailIndex(int64_t b, int64_t step)
     return b > DETER_PREFIX_THRESHOLD ? Ceil<int64_t>(b + 1, step) : b + 1;
 }
 
-__aicore__ inline void GetTNDLeftUpVirt(int64_t m, int64_t n, int64_t &virtM, int64_t &virtN)
+__aicore__ inline void GetTNDLeftUpVirt(int64_t m, int64_t n, int64_t& virtM, int64_t& virtN)
 {
     if (m < n) {
         n = m;
@@ -2983,7 +2982,7 @@ __aicore__ inline void GetTNDLeftUpVirt(int64_t m, int64_t n, int64_t &virtM, in
     virtN = n;
 }
 
-__aicore__ inline void GetTNDRightDownVirt(int64_t m, int64_t n, int64_t &virtM, int64_t &virtN)
+__aicore__ inline void GetTNDRightDownVirt(int64_t m, int64_t n, int64_t& virtM, int64_t& virtN)
 {
     m -= GetTNDRightDownRowShift(m, n);
     if (m < 1 || n < 1) {
@@ -3043,20 +3042,20 @@ __aicore__ inline int64_t CalTNDBandLineRounds(int64_t k, int64_t n1, int64_t m,
     return Ceil<int64_t>(CalTNDBandWideCols(m, n, p, q) * n1, k) * m;
 }
 
-__aicore__ inline void MapTNDTriToBatch(int64_t tri, int64_t n1, int64_t runHead, int64_t &batchId)
+__aicore__ inline void MapTNDTriToBatch(int64_t tri, int64_t n1, int64_t runHead, int64_t& batchId)
 {
     batchId = (runHead + tri / n1) * n1 + (tri % n1) + 1;
 }
 
-__aicore__ inline void MapTNDCopyToBatch(int64_t copyId, int64_t n1, int64_t runHead, int64_t &batchId)
+__aicore__ inline void MapTNDCopyToBatch(int64_t copyId, int64_t n1, int64_t runHead, int64_t& batchId)
 {
     MapTNDTriToBatch(copyId - 1, n1, runHead, batchId);
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN, const bool LEFT_UP>
-__aicore__ inline void BindTNDCausalMappedBatch(const __gm__ uint8_t *actualSeqQlenAddr,
-                                                const __gm__ uint8_t *actualSeqKvlenAddr, int64_t runHead, int64_t n1,
-                                                int64_t n1Id, int64_t x, int64_t y, CoordinateInfo &coordinateInfo)
+__aicore__ inline void BindTNDCausalMappedBatch(const __gm__ uint8_t* actualSeqQlenAddr,
+                                                const __gm__ uint8_t* actualSeqKvlenAddr, int64_t runHead, int64_t n1,
+                                                int64_t n1Id, int64_t x, int64_t y, CoordinateInfo& coordinateInfo)
 {
     MapTNDTriToBatch(n1Id - 1, n1, runHead, coordinateInfo.batchId);
     int64_t realM = 0;
@@ -3068,10 +3067,10 @@ __aicore__ inline void BindTNDCausalMappedBatch(const __gm__ uint8_t *actualSeqQ
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN>
-__aicore__ inline void BindTNDBandMappedBatch(const __gm__ uint8_t *actualSeqQlenAddr,
-                                              const __gm__ uint8_t *actualSeqKvlenAddr, int64_t runHead, int64_t n1,
+__aicore__ inline void BindTNDBandMappedBatch(const __gm__ uint8_t* actualSeqQlenAddr,
+                                              const __gm__ uint8_t* actualSeqKvlenAddr, int64_t runHead, int64_t n1,
                                               int64_t copyId, int64_t x, int64_t y, int64_t rawP, int64_t rawQ,
-                                              CoordinateInfo &coordinateInfo)
+                                              CoordinateInfo& coordinateInfo)
 {
     MapTNDCopyToBatch(copyId, n1, runHead, coordinateInfo.batchId);
     coordinateInfo.p = rawP;
@@ -3086,8 +3085,8 @@ __aicore__ inline void BindTNDBandMappedBatch(const __gm__ uint8_t *actualSeqQle
     coordinateInfo.s2Idx = y;
 }
 
-__aicore__ inline bool MapTNDLeftUp(int64_t m, int64_t n, int64_t pairId, int64_t pairBatchCount, int64_t &x,
-                                    int64_t &y, int64_t &n1Id)
+__aicore__ inline bool MapTNDLeftUp(int64_t m, int64_t n, int64_t pairId, int64_t pairBatchCount, int64_t& x,
+                                    int64_t& y, int64_t& n1Id)
 {
     if (x > m) {
         y = n + 1 - y;
@@ -3103,8 +3102,8 @@ __aicore__ inline bool MapTNDLeftUp(int64_t m, int64_t n, int64_t pairId, int64_
     return n1Id >= 1 && n1Id <= pairBatchCount && y >= 1 && y <= n && y <= x && x <= m;
 }
 
-__aicore__ inline bool MapTNDRightDown(int64_t m, int64_t n, int64_t pairId, int64_t pairBatchCount, int64_t &x,
-                                       int64_t &y, int64_t &n1Id)
+__aicore__ inline bool MapTNDRightDown(int64_t m, int64_t n, int64_t pairId, int64_t pairBatchCount, int64_t& x,
+                                       int64_t& y, int64_t& n1Id)
 {
     const int64_t nExt = n + 1;
     if (y >= x + nExt - m + 1) {
@@ -3117,7 +3116,7 @@ __aicore__ inline bool MapTNDRightDown(int64_t m, int64_t n, int64_t pairId, int
     return n1Id >= 1 && n1Id <= pairBatchCount && IsTNDRightDownValid(m, n, x, y);
 }
 
-__aicore__ inline bool MapTNDBandWide(int64_t m, int64_t n, int64_t p, int64_t q, int64_t &x, int64_t &y)
+__aicore__ inline bool MapTNDBandWide(int64_t m, int64_t n, int64_t p, int64_t q, int64_t& x, int64_t& y)
 {
     const int64_t l1 = m - p;
     const int64_t l2 = p + q - m;
@@ -3135,10 +3134,10 @@ __aicore__ inline bool MapTNDBandWide(int64_t m, int64_t n, int64_t p, int64_t q
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN, const bool LEFT_UP>
-__aicore__ inline void CalTNDCausalLineRunIndex(const __gm__ uint8_t *actualSeqQlenAddr,
-                                                const __gm__ uint8_t *actualSeqKvlenAddr, const __gm__ int64_t *prefix,
+__aicore__ inline void CalTNDCausalLineRunIndex(const __gm__ uint8_t* actualSeqQlenAddr,
+                                                const __gm__ uint8_t* actualSeqKvlenAddr, const __gm__ int64_t* prefix,
                                                 int64_t b, int64_t n1, int64_t k, int64_t j, int64_t r, int64_t step,
-                                                CoordinateInfo &coordinateInfo)
+                                                CoordinateInfo& coordinateInfo)
 {
     coordinateInfo.batchId = -1;
     const int64_t batchTypeBase = BinarySearch(prefix, b, r, step);
@@ -3214,11 +3213,11 @@ __aicore__ inline void CalTNDCausalLineRunIndex(const __gm__ uint8_t *actualSeqQ
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN>
-__aicore__ inline void CalTNDCausalLineIndex(const __gm__ uint8_t *actualSeqQlenAddr,
-                                             const __gm__ uint8_t *actualSeqKvlenAddr, const __gm__ int64_t *prefix0,
-                                             const __gm__ int64_t *prefixSingle, int64_t b, int64_t N1, int64_t k,
+__aicore__ inline void CalTNDCausalLineIndex(const __gm__ uint8_t* actualSeqQlenAddr,
+                                             const __gm__ uint8_t* actualSeqKvlenAddr, const __gm__ int64_t* prefix0,
+                                             const __gm__ int64_t* prefixSingle, int64_t b, int64_t N1, int64_t k,
                                              int64_t j, int64_t r, int64_t step, int64_t sparseMode,
-                                             CoordinateInfo &coordinateInfo)
+                                             CoordinateInfo& coordinateInfo)
 {
     if (r <= prefix0[0]) {
         coordinateInfo.batchId = -1;
@@ -3252,10 +3251,10 @@ __aicore__ inline void CalTNDCausalLineIndex(const __gm__ uint8_t *actualSeqQlen
 }
 
 template <const int64_t CUBE_BASEM, const int64_t CUBE_BASEN>
-__aicore__ inline void CalTNDBandLineIndex(const __gm__ uint8_t *actualSeqQlenAddr,
-                                           const __gm__ uint8_t *actualSeqKvlenAddr, const __gm__ int64_t *prefix,
+__aicore__ inline void CalTNDBandLineIndex(const __gm__ uint8_t* actualSeqQlenAddr,
+                                           const __gm__ uint8_t* actualSeqKvlenAddr, const __gm__ int64_t* prefix,
                                            int64_t b, int64_t n1, int64_t k, int64_t j, int64_t r, int64_t step,
-                                           CoordinateInfo &coordinateInfo)
+                                           CoordinateInfo& coordinateInfo)
 {
     coordinateInfo.batchId = -1;
     const int64_t rawP = coordinateInfo.p;

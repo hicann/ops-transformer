@@ -36,7 +36,7 @@ struct CopyGm2UbTla<
     __aicore__ inline CopyGm2UbTla() = default;
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor)
     {
         static_assert(tla::detail::isRowMajor<typename TensorSrc::Layout>::value &&
                           tla::detail::isRowMajor<typename TensorDst::Layout>::value &&
@@ -69,7 +69,7 @@ struct CopyGm2UbTla<
     __aicore__ inline CopyGm2UbTla() = default;
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor)
     {
         static_assert(tla::detail::isRowMajor<typename TensorSrc::Layout>::value &&
                           tla::detail::isRowMajor<typename TensorDst::Layout>::value &&

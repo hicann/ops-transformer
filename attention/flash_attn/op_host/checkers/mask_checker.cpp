@@ -31,7 +31,7 @@ using std::string;
 using namespace ge;
 using namespace AscendC;
 using namespace arch35FA;
-ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const FaTilingInfo &faInfo)
+ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const FaTilingInfo& faInfo)
 {
     const std::vector<int64_t> maskModeList = {static_cast<int64_t>(MaskMode::NO_MASK),
                                                static_cast<int64_t>(MaskMode::CAUSAL),
@@ -43,14 +43,14 @@ ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const FaTilingInfo &faInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const FaTilingInfo &faInfo)
+ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const FaTilingInfo& faInfo)
 {
-    auto &attnMaskTensor = faInfo.opParamInfo.attnMask.tensor;
+    auto& attnMaskTensor = faInfo.opParamInfo.attnMask.tensor;
     if (attnMaskTensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::CompileTimeTensorDesc *attnMaskDesc = faInfo.opParamInfo.attnMask.desc;
+    const gert::CompileTimeTensorDesc* attnMaskDesc = faInfo.opParamInfo.attnMask.desc;
     OP_CHECK_IF(attnMaskDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(faInfo.opName, "TensorDesc of attn_mask"),
                 return ge::GRAPH_FAILED);
 
@@ -79,7 +79,7 @@ ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const FaTilingInfo &faInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckSingleParaWindowParams(const FaTilingInfo &faInfo)
+ge::graphStatus MaskChecker::CheckSingleParaWindowParams(const FaTilingInfo& faInfo)
 {
     OP_CHECK_IF(faInfo.winLeft < -1,
                 OP_LOGE_FOR_INVALID_VALUE(faInfo.opName, "win_left", std::to_string(faInfo.winLeft).c_str(), ">= -1"),
@@ -92,7 +92,7 @@ ge::graphStatus MaskChecker::CheckSingleParaWindowParams(const FaTilingInfo &faI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckSinglePara(const FaTilingInfo &faInfo)
+ge::graphStatus MaskChecker::CheckSinglePara(const FaTilingInfo& faInfo)
 {
     if (CheckSingleParaMaskMode(faInfo) != ge::GRAPH_SUCCESS || CheckSingleParaAttnMask(faInfo) != ge::GRAPH_SUCCESS ||
         CheckSingleParaWindowParams(faInfo) != ge::GRAPH_SUCCESS) {
@@ -101,9 +101,9 @@ ge::graphStatus MaskChecker::CheckSinglePara(const FaTilingInfo &faInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckParaExistence(const FaTilingInfo &faInfo)
+ge::graphStatus MaskChecker::CheckParaExistence(const FaTilingInfo& faInfo)
 {
-    auto &attnMaskTensor = faInfo.opParamInfo.attnMask.tensor;
+    auto& attnMaskTensor = faInfo.opParamInfo.attnMask.tensor;
 
     if (faInfo.maskMode == static_cast<int64_t>(MaskMode::NO_MASK)) {
         OP_CHECK_IF(attnMaskTensor != nullptr,

@@ -316,7 +316,7 @@ public:
 
     uint32_t GetRawTilingKey() const
     {
-        return *(reinterpret_cast<const uint32_t *>(this));
+        return *(reinterpret_cast<const uint32_t*>(this));
     }
 
     std::string ToString() const
@@ -335,7 +335,7 @@ public:
     uint32_t reserved : 23; // to fullfil 32 bit, if add new template bit then decrease this number
 };
 
-inline bool operator==(const TilingKey &left, const TilingKey &right)
+inline bool operator==(const TilingKey& left, const TilingKey& right)
 {
     return left.GetRawTilingKey() == right.GetRawTilingKey();
 }
@@ -352,21 +352,21 @@ public:
 
 class FlashAttentionScoreTilingBase : public TilingBaseClass {
 public:
-    explicit FlashAttentionScoreTilingBase(gert::TilingContext *context)
+    explicit FlashAttentionScoreTilingBase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {
         Reset();
     }
     ~FlashAttentionScoreTilingBase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
     }
 
 protected:
-    [[nodiscard]] gert::TilingContext *GetContext()
+    [[nodiscard]] gert::TilingContext* GetContext()
     {
         return context_;
     }
@@ -378,13 +378,13 @@ protected:
     ge::graphStatus GetPlatformInfo() override;
     // 2、获取INPUT/OUTPUT/ATTR信息
     ge::graphStatus GetShapeAttrsInfo() override;
-    virtual bool GetSparseInfo(SparseEnum &sparseType);
+    virtual bool GetSparseInfo(SparseEnum& sparseType);
     void EnableBandInvalidLineImplMode();
-    bool SparseModeProcess(SparseEnum &sparseType);
-    void SetSparseTilingInfo(SparseEnum &sparseType);
+    bool SparseModeProcess(SparseEnum& sparseType);
+    void SetSparseTilingInfo(SparseEnum& sparseType);
     bool SparseBandModeCheck(int64_t maxS1Value, int64_t maxS2Value, int64_t minS1Value, int64_t minS2Value,
-                             SparseEnum &sparseType);
-    bool PretokenAndNexttokenAdjustment(SparseEnum &sparseType);
+                             SparseEnum& sparseType);
+    bool PretokenAndNexttokenAdjustment(SparseEnum& sparseType);
 
     // 3、计算数据切分TilingData
     ge::graphStatus DoOpTiling() override;
@@ -397,12 +397,12 @@ protected:
     // 7、保存Tiling数据
     ge::graphStatus PostTiling() override;
 
-    virtual void GetBufferNum(BufferNum &bufferNum) const = 0;
+    virtual void GetBufferNum(BufferNum& bufferNum) const = 0;
 
     void Reset();
 
-    void GetActualSeqLenData(int64_t inputIdx, std::vector<int64_t> &res, int64_t &actualLen, int64_t &actualBatch,
-                             int64_t &endLen) const;
+    void GetActualSeqLenData(int64_t inputIdx, std::vector<int64_t>& res, int64_t& actualLen, int64_t& actualBatch,
+                             int64_t& endLen) const;
 
     int64_t GetActualSeqLenBufferSize() const;
 
@@ -444,30 +444,30 @@ protected:
     virtual bool AnalyzeDtype();
     bool AnalyzeAttrs();
     bool AnalyzeLayout();
-    bool CouldConvertTND2BSH(const std::vector<int64_t> &resQ, const std::vector<int64_t> &resKV,
-                             const uint32_t &firstValidIndex, const uint32_t &lastValidIndex,
-                             const int64_t &actualQBatch, const int64_t &actualKVBatch, int64_t &s1Max, int64_t &s2Max,
-                             int64_t &t1Size, int64_t &t2Size) const;
+    bool CouldConvertTND2BSH(const std::vector<int64_t>& resQ, const std::vector<int64_t>& resKV,
+                             const uint32_t& firstValidIndex, const uint32_t& lastValidIndex,
+                             const int64_t& actualQBatch, const int64_t& actualKVBatch, int64_t& s1Max, int64_t& s2Max,
+                             int64_t& t1Size, int64_t& t2Size) const;
 
-    bool Analyze3DimLayout(const gert::Shape &queryShape, const gert::Shape *queryRopeShape,
-                           const gert::Shape &keyShape, const gert::Shape &valueShape, size_t layoutLen);
-    bool Analyze4DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &valueShape,
+    bool Analyze3DimLayout(const gert::Shape& queryShape, const gert::Shape* queryRopeShape,
+                           const gert::Shape& keyShape, const gert::Shape& valueShape, size_t layoutLen);
+    bool Analyze4DimLayout(const gert::Shape& queryShape, const gert::Shape& keyShape, const gert::Shape& valueShape,
                            size_t layoutLen);
     bool AnalyzeOptionalInput();
     bool MatchTemplate();
-    virtual void CalcS1S2BasicBlock(const BufferNum &bufferNum);
+    virtual void CalcS1S2BasicBlock(const BufferNum& bufferNum);
     virtual void CalcNRatio();
     virtual void CalcDBasicBlock();
-    int64_t CalcMaxS1BasicBlockSize(int64_t actualD, const BufferNum &bufferNum) const;
-    int64_t CalcMaxS2BasicBlockSize(const BufferNum &bufferNum, int64_t tmpS1BasicBlock) const;
+    int64_t CalcMaxS1BasicBlockSize(int64_t actualD, const BufferNum& bufferNum) const;
+    int64_t CalcMaxS2BasicBlockSize(const BufferNum& bufferNum, int64_t tmpS1BasicBlock) const;
     virtual bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock) = 0;
-    bool IsBasicBlockInSoftMax(const ge::Shape &shape) const;
+    bool IsBasicBlockInSoftMax(const ge::Shape& shape) const;
     virtual bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t batch,
-                                    matmul_tiling::MatmulApiTiling &bmm1);
+                                    matmul_tiling::MatmulApiTiling& bmm1);
     virtual bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t tmpDBasicBlock,
-                                    int64_t batch, matmul_tiling::MatmulApiTiling &bmm2) = 0;
+                                    int64_t batch, matmul_tiling::MatmulApiTiling& bmm2) = 0;
     bool SetMatMulTiling(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t tmpDBasicBlock, int64_t batch,
-                         matmul_tiling::MatmulApiTiling &bmm1, matmul_tiling::MatmulApiTiling &bmm2);
+                         matmul_tiling::MatmulApiTiling& bmm1, matmul_tiling::MatmulApiTiling& bmm2);
     bool SetMatMulTiling(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t tmpDBasicBlock, int64_t batch = 1);
     virtual void SetCoreParams();
     virtual void SetQKVStartIdx();
@@ -481,16 +481,16 @@ protected:
     void SetScalarConst();
     virtual void SetMatmulConstArr();
     virtual bool CheckScalarConstCondation();
-    virtual bool MatchMatmulConst(MatmulConstParams &matmulConst);
-    virtual bool InitSparseValidArray(std::vector<int64_t> &sparseValidArray, int64_t bIdx);
-    virtual bool SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray, MultiCoreParams &multiCoreParams);
-    void SetPrefixSparseStartIdx(const std::vector<std::vector<int64_t>> &sparseValidArray,
-                                 MultiCoreParams &multiCoreParams);
-    int64_t PrintSparseMaxMinLoadPerCore(const std::vector<int64_t> &sparseValidArray, int64_t *sparseStartIdx,
+    virtual bool MatchMatmulConst(MatmulConstParams& matmulConst);
+    virtual bool InitSparseValidArray(std::vector<int64_t>& sparseValidArray, int64_t bIdx);
+    virtual bool SetSparseStartIdx(const std::vector<int64_t>& sparseValidArray, MultiCoreParams& multiCoreParams);
+    void SetPrefixSparseStartIdx(const std::vector<std::vector<int64_t>>& sparseValidArray,
+                                 MultiCoreParams& multiCoreParams);
+    int64_t PrintSparseMaxMinLoadPerCore(const std::vector<int64_t>& sparseValidArray, int64_t* sparseStartIdx,
                                          int32_t validAivNum, int64_t avgLoadSize);
-    bool PartitionSparseData(const std::vector<int64_t> &sparseRollingArray, int64_t sparseRollingArraySum,
-                             int64_t sparseArraySize, int64_t loadMaxEachCore, std::vector<int64_t> &partitionResult);
-    SparseEnum GetPrefixNList(std::ostringstream &failReason);
+    bool PartitionSparseData(const std::vector<int64_t>& sparseRollingArray, int64_t sparseRollingArraySum,
+                             int64_t sparseArraySize, int64_t loadMaxEachCore, std::vector<int64_t>& partitionResult);
+    SparseEnum GetPrefixNList(std::ostringstream& failReason);
     void GetMaxWorkspaceFlag();
     bool IsB41L2CacheOptimizable() const;
 
@@ -576,10 +576,10 @@ protected:
     int64_t minUsedUBSize;
     int64_t maxValidS2Len;
 
-    const char *templateName = "base";
-    const char *opName;
-    const char *inputLayout;
-    const int64_t *prefixNData;
+    const char* templateName = "base";
+    const char* opName;
+    const char* inputLayout;
+    const int64_t* prefixNData;
     TemplateType expectTemplate;
     TemplateType actualTemplate;
 
@@ -604,7 +604,7 @@ protected:
     bool needL1Carry = false;
     bool enableL1Reuse = false;
     bool isMaxWorkspace = false;
-    FlashAttentionScoreGeneralTilingData *tilingData = context_->GetTilingData<FlashAttentionScoreGeneralTilingData>();
+    FlashAttentionScoreGeneralTilingData* tilingData = context_->GetTilingData<FlashAttentionScoreGeneralTilingData>();
 };
 
 int64_t FlashAttentionScoreTilingBase::GetNRatio()
@@ -637,7 +637,7 @@ ge::graphStatus FlashAttentionScoreTilingBase::GetPlatformInfo()
 {
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(opName, "compileInfoPtr is null."), return ge::GRAPH_FAILED);
         aivNum = compileInfoPtr->aivNum;
         aicNum = compileInfoPtr->aicNum;
@@ -671,7 +671,7 @@ ge::graphStatus FlashAttentionScoreTilingBase::CheckContext()
     auto nextTokensPtr = attrs->GetAttrPointer<int64_t>(idx++);
     auto n1SizePtr = attrs->GetAttrPointer<int64_t>(idx++);
     auto inputLayoutPtr = attrs->GetAttrPointer<char>(idx++);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
 
     OP_CHECK_NULL_WITH_CONTEXT(context_, scaleValuePtr);
     OP_CHECK_NULL_WITH_CONTEXT(context_, keepProbPtr);
@@ -695,9 +695,9 @@ ge::graphStatus FlashAttentionScoreTilingBase::CheckContext()
     return ge::GRAPH_SUCCESS;
 }
 
-void FlashAttentionScoreTilingBase::SetSparseTilingInfo(SparseEnum &sparseType)
+void FlashAttentionScoreTilingBase::SetSparseTilingInfo(SparseEnum& sparseType)
 {
-    auto &inputParams = tilingData->inputParams;
+    auto& inputParams = tilingData->inputParams;
     inputParams.set_attenMaskCompressMode(attenMaskCompressMode);
     inputParams.set_sparseType(static_cast<uint8_t>(sparseType));
     inputParams.set_preTokens(preTokens);
@@ -717,7 +717,7 @@ void FlashAttentionScoreTilingBase::EnableBandInvalidLineImplMode()
     }
 }
 
-bool FlashAttentionScoreTilingBase::PretokenAndNexttokenAdjustment(SparseEnum &sparseType)
+bool FlashAttentionScoreTilingBase::PretokenAndNexttokenAdjustment(SparseEnum& sparseType)
 {
     if (sparseMode == static_cast<int64_t>(ALL_MASK) || sparseMode == static_cast<int64_t>(PREFIX) ||
         sparseMode == static_cast<int64_t>(PREFIX_COMPRESS)) {
@@ -781,7 +781,7 @@ bool FlashAttentionScoreTilingBase::PretokenAndNexttokenAdjustment(SparseEnum &s
 }
 
 bool FlashAttentionScoreTilingBase::SparseBandModeCheck(int64_t maxS1Value, int64_t maxS2Value, int64_t minS1Value,
-                                                        int64_t minS2Value, SparseEnum &sparseType)
+                                                        int64_t minS2Value, SparseEnum& sparseType)
 {
     int64_t oriPreTokens = (sparseMode == static_cast<int64_t>(BAND)) ? (preTokens + s2Size - s1Size) : preTokens;
     int64_t oriNextTokens = (sparseMode == static_cast<int64_t>(BAND)) ? (nextTokens + s1Size - s2Size) : nextTokens;
@@ -847,7 +847,7 @@ bool FlashAttentionScoreTilingBase::SparseBandModeCheck(int64_t maxS1Value, int6
     return true;
 }
 
-bool FlashAttentionScoreTilingBase::SparseModeProcess(SparseEnum &sparseType)
+bool FlashAttentionScoreTilingBase::SparseModeProcess(SparseEnum& sparseType)
 {
     if (sparseMode > static_cast<int64_t>(PREFIX_COMPRESS)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "sparseMode", std::to_string(sparseMode),
@@ -879,7 +879,7 @@ bool FlashAttentionScoreTilingBase::SparseModeProcess(SparseEnum &sparseType)
     return true;
 }
 
-bool FlashAttentionScoreTilingBase::GetSparseInfo(SparseEnum &sparseType)
+bool FlashAttentionScoreTilingBase::GetSparseInfo(SparseEnum& sparseType)
 {
     OP_LOGD(context_, "check sparse info: preTokens[%ld], nextTokens[%ld], s1[%ld], s2[%ld], attenMaskExistFlag[%d].",
             preTokens, nextTokens, s1Size, s2Size, attenMaskExistFlag);
@@ -913,7 +913,7 @@ bool FlashAttentionScoreTilingBase::GetSparseInfo(SparseEnum &sparseType)
 
 bool FlashAttentionScoreTilingBase::SetPseAlibiParams()
 {
-    auto &inputParams = tilingData->inputParams;
+    auto& inputParams = tilingData->inputParams;
     inputParams.set_pseEncodeType(PSE_ENCODE_NONE);
     auto pseShape = context_->GetOptionalInputShape(PSE_INPUT_INDEX);
     if (pseShape == nullptr || pseShape->GetStorageShape().GetDimNum() == 0) {
@@ -1000,7 +1000,7 @@ ge::graphStatus FlashAttentionScoreTilingBase::GetShapeAttrsInfo()
                     return ge::GRAPH_FAILED);
     }
 
-    auto &inputParams = tilingData->inputParams;
+    auto& inputParams = tilingData->inputParams;
     inputParams.set_bSize(bSize);
     inputParams.set_n2Size(n2Size);
     inputParams.set_gSize(gSize);
@@ -1202,7 +1202,7 @@ bool FlashAttentionScoreTilingBase::AnalyzeAttrs()
     }
     if (attrs->GetAttrNum() > static_cast<size_t>(SOFTMAX_OUT_LAYOUT_INDEX)) {
         // read 13th attr softmax_out_layout
-        const char *softmaxOutLayout = attrs->GetAttrPointer<char>(SOFTMAX_OUT_LAYOUT_INDEX);
+        const char* softmaxOutLayout = attrs->GetAttrPointer<char>(SOFTMAX_OUT_LAYOUT_INDEX);
         if (strcmp(inputLayout, "TND") == 0 && strcmp(softmaxOutLayout, "same_as_input") == 0) {
             // check whether softmax_out_layout is TND
             tndSoftmaxOut = static_cast<uint8_t>(1);
@@ -1217,11 +1217,11 @@ bool FlashAttentionScoreTilingBase::AnalyzeAttrs()
 
 bool FlashAttentionScoreTilingBase::AnalyzeLayout()
 {
-    auto &queryShape = context_->GetInputShape(0)->GetStorageShape();
-    auto *queryRopeShape =
+    auto& queryShape = context_->GetInputShape(0)->GetStorageShape();
+    auto* queryRopeShape =
         context_->GetOptionalInputShape(15) ? &context_->GetOptionalInputShape(15)->GetStorageShape() : nullptr;
-    auto &keyShape = context_->GetInputShape(1)->GetStorageShape();
-    auto &valueShape = context_->GetInputShape(2)->GetStorageShape();
+    auto& keyShape = context_->GetInputShape(1)->GetStorageShape();
+    auto& valueShape = context_->GetInputShape(2)->GetStorageShape();
 
     size_t layoutLen = strlen(inputLayout);
     OP_LOGD(context_, "Get input_layout [%s].", inputLayout);
@@ -1251,12 +1251,12 @@ bool FlashAttentionScoreTilingBase::AnalyzeLayout()
     return true;
 }
 
-bool FlashAttentionScoreTilingBase::CouldConvertTND2BSH(const std::vector<int64_t> &resQ,
-                                                        const std::vector<int64_t> &resKV,
-                                                        const uint32_t &firstValidIndex, const uint32_t &lastValidIndex,
-                                                        const int64_t &actualQBatch, const int64_t &actualKVBatch,
-                                                        int64_t &s1Max, int64_t &s2Max, int64_t &t1Size,
-                                                        int64_t &t2Size) const
+bool FlashAttentionScoreTilingBase::CouldConvertTND2BSH(const std::vector<int64_t>& resQ,
+                                                        const std::vector<int64_t>& resKV,
+                                                        const uint32_t& firstValidIndex, const uint32_t& lastValidIndex,
+                                                        const int64_t& actualQBatch, const int64_t& actualKVBatch,
+                                                        int64_t& s1Max, int64_t& s2Max, int64_t& t1Size,
+                                                        int64_t& t2Size) const
 {
     auto pseShape = context_->GetOptionalInputShape(PSE_INPUT_INDEX);
     auto queryRopeShape = context_->GetOptionalInputShape(QUERY_ROPE_INPUT_INDEX);
@@ -1304,7 +1304,7 @@ int64_t FlashAttentionScoreTilingBase::GetActualSeqLenBufferSize() const
         if (seqLenTensor == nullptr) {
             continue;
         }
-        auto &seqLenShape = seqLenTensor->GetShape().GetStorageShape();
+        auto& seqLenShape = seqLenTensor->GetShape().GetStorageShape();
         if (seqLenShape.GetDimNum() != 1) {
             continue;
         }
@@ -1314,22 +1314,22 @@ int64_t FlashAttentionScoreTilingBase::GetActualSeqLenBufferSize() const
     return std::max(bufferSize, 1L);
 }
 
-void FlashAttentionScoreTilingBase::GetActualSeqLenData(int64_t inputIdx, std::vector<int64_t> &res, int64_t &actualLen,
-                                                        int64_t &actualBatch, int64_t &endLen) const
+void FlashAttentionScoreTilingBase::GetActualSeqLenData(int64_t inputIdx, std::vector<int64_t>& res, int64_t& actualLen,
+                                                        int64_t& actualBatch, int64_t& endLen) const
 {
     auto actualSeqLenTensor = context_->GetOptionalInputTensor(inputIdx);
     if (actualSeqLenTensor == nullptr) {
         OP_LOGW(context_, "[%s]actualSeqLenTensor is null pointer", templateName);
         return;
     }
-    auto &actualSeqLenShape = actualSeqLenTensor->GetShape().GetStorageShape();
+    auto& actualSeqLenShape = actualSeqLenTensor->GetShape().GetStorageShape();
     if (actualSeqLenShape.GetDimNum() != 1) {
         OP_LOGW(context_, "[%s]actualSeqLenShape is invalid %lu %ld", templateName, actualSeqLenShape.GetDimNum(),
                 actualSeqLenShape.GetDim(0));
         return;
     }
     /* Get Data from tensor. */
-    const int64_t *value = actualSeqLenTensor->GetData<int64_t>();
+    const int64_t* value = actualSeqLenTensor->GetData<int64_t>();
     if (value == nullptr) {
         OP_LOGW(context_, "[%s]actualSeqLenTensor data is null pointer", templateName);
         return;
@@ -1356,8 +1356,8 @@ void FlashAttentionScoreTilingBase::GetActualSeqLenData(int64_t inputIdx, std::v
     endLen = value[actualSeqLenShape.GetDim(0) - 1];
 }
 
-bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &queryShape, const gert::Shape *queryRopeShape,
-                                                      const gert::Shape &keyShape, const gert::Shape &valueShape,
+bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape& queryShape, const gert::Shape* queryRopeShape,
+                                                      const gert::Shape& keyShape, const gert::Shape& valueShape,
                                                       size_t layoutLen)
 {
     int64_t h1 = 0;
@@ -1541,8 +1541,8 @@ bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &querySh
     return true;
 }
 
-bool FlashAttentionScoreTilingBase::Analyze4DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape,
-                                                      const gert::Shape &valueShape, size_t layoutLen)
+bool FlashAttentionScoreTilingBase::Analyze4DimLayout(const gert::Shape& queryShape, const gert::Shape& keyShape,
+                                                      const gert::Shape& valueShape, size_t layoutLen)
 {
     if (layoutLen == 4UL) {
         // 2: N idx, 3: D idx
@@ -1600,7 +1600,7 @@ bool FlashAttentionScoreTilingBase::Analyze4DimLayout(const gert::Shape &querySh
     return true;
 }
 
-SparseEnum FlashAttentionScoreTilingBase::GetPrefixNList(std::ostringstream &failReason)
+SparseEnum FlashAttentionScoreTilingBase::GetPrefixNList(std::ostringstream& failReason)
 {
     auto prefixN = context_->GetOptionalInputTensor(PREFIX_INPUT_INDEX);
     if (prefixN == nullptr) {
@@ -1609,7 +1609,7 @@ SparseEnum FlashAttentionScoreTilingBase::GetPrefixNList(std::ostringstream &fai
         return SparseEnum::ALL;
     }
 
-    auto &prefixShape = prefixN->GetShape().GetStorageShape();
+    auto& prefixShape = prefixN->GetShape().GetStorageShape();
     if (prefixShape.GetDimNum() != 1) {
         OP_LOGW(context_, "[%s] prefixN shape is invalid, DimNum should be 1, but it is %lu.", templateName,
                 prefixShape.GetDimNum());
@@ -1659,7 +1659,7 @@ void FlashAttentionScoreTilingBase::SetQKVStartIdx()
         OP_LOGW(context_, "[%s]qStartIdxTensor is null pointer", templateName);
         return;
     }
-    auto &qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
+    auto& qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
     if (qStartIdxShape.GetDimNum() != 1) {
         return;
     }
@@ -1667,7 +1667,7 @@ void FlashAttentionScoreTilingBase::SetQKVStartIdx()
         return;
     }
     /* Get Data from tensor. */
-    const int64_t *value = qStartIdxTensor->GetData<int64_t>();
+    const int64_t* value = qStartIdxTensor->GetData<int64_t>();
     if (value == nullptr) {
         return;
     }
@@ -1678,7 +1678,7 @@ void FlashAttentionScoreTilingBase::SetQKVStartIdx()
         OP_LOGW(context_, "[%s]kvStartIdxTensor is null pointer", templateName);
         return;
     }
-    auto &kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
+    auto& kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
     if (kvStartIdxShape.GetDimNum() != 1) {
         return;
     }
@@ -1686,7 +1686,7 @@ void FlashAttentionScoreTilingBase::SetQKVStartIdx()
         return;
     }
     /* Get Data from tensor. */
-    const int64_t *kvValue = kvStartIdxTensor->GetData<int64_t>();
+    const int64_t* kvValue = kvStartIdxTensor->GetData<int64_t>();
     if (kvValue == nullptr) {
         return;
     }
@@ -1718,7 +1718,7 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
     }
     if (pseShape != nullptr && pseShape->GetStorageShape().GetDimNum() != 0) {
         pseExistFlag = static_cast<uint8_t>(1);
-        auto &pseShapeDims = pseShape->GetStorageShape();
+        auto& pseShapeDims = pseShape->GetStorageShape();
         size_t pseDimNum = pseShapeDims.GetDimNum();
         int64_t pseBSize = pseShapeDims.GetDim(0);
         if (pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_TYPE) ||
@@ -1809,7 +1809,7 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
         tilingData->inputParams.set_attenMaskDataType(1);
         // 0: (B,N2,G,S1,S2), 1: (B,1,1,S1,S2), 2: (1,1,1,S1,S2)
         AttenMaskShapeType attenMaskShapeType = ATTEN_B_N2_G_S1_S2;
-        auto &attenMaskStorageShape = attenMaskShape->GetStorageShape();
+        auto& attenMaskStorageShape = attenMaskShape->GetStorageShape();
         size_t attenMaskDimNum = attenMaskStorageShape.GetDimNum();
         if (attenMaskDimNum == ATTENTION_MASK_DIM_NUM_4) {
             int64_t attenMaskDim0Size = attenMaskStorageShape.GetDim(0);
@@ -1972,7 +1972,7 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
 
 ge::graphStatus FlashAttentionScoreTilingBase::DoOpTiling()
 {
-    auto &inputParams = tilingData->inputParams;
+    auto& inputParams = tilingData->inputParams;
     OP_LOGD(context_, "[%s]try template[%s]", templateName, expectTemplate.ToString().c_str());
     if (!MatchTemplate()) {
         OP_LOGI(context_,
@@ -2037,7 +2037,7 @@ bool FlashAttentionScoreTilingBase::MatchTemplate()
     return false;
 }
 
-void FlashAttentionScoreTilingBase::CalcS1S2BasicBlock(const BufferNum &bufferNum)
+void FlashAttentionScoreTilingBase::CalcS1S2BasicBlock(const BufferNum& bufferNum)
 {
     // calc s1 s2 first, we set d basic block as s2 now
     const int64_t actualD = expectTemplate.splitD == 0 ? alignedD : FRACTAL_NUM; // if split d we use min s2 16
@@ -2094,7 +2094,7 @@ void FlashAttentionScoreTilingBase::CalcDBasicBlock()
     return;
 }
 
-int64_t FlashAttentionScoreTilingBase::CalcMaxS1BasicBlockSize(int64_t actualD, const BufferNum &bufferNum) const
+int64_t FlashAttentionScoreTilingBase::CalcMaxS1BasicBlockSize(int64_t actualD, const BufferNum& bufferNum) const
 {
     // if S2 basic block is min value 16, s1 basic block can reach max value, then we get:
     // s1 * 16 * X * sizeof(T) + s1d * Y * sizeof(T) + s1 * expNum * 32 + s1 * 64 + apiTmp =>
@@ -2108,7 +2108,7 @@ int64_t FlashAttentionScoreTilingBase::CalcMaxS1BasicBlockSize(int64_t actualD, 
     return AlignDown(maxS1BasicBlock, FRACTAL_NUM);
 }
 
-int64_t FlashAttentionScoreTilingBase::CalcMaxS2BasicBlockSize(const BufferNum &bufferNum,
+int64_t FlashAttentionScoreTilingBase::CalcMaxS2BasicBlockSize(const BufferNum& bufferNum,
                                                                int64_t tmpS1BasicBlock) const
 {
     // used UB: s1s2 * X * sizeof(T) + s1d * Y * sizeof(T) + s1 * expNum * 32 + s1 * 64 + apiTmp
@@ -2129,7 +2129,7 @@ int64_t FlashAttentionScoreTilingBase::CalcMaxS2BasicBlockSize(const BufferNum &
     return std::min(AlignDown(tmpS2BasicBlock, FRACTAL_NUM), alignedS2);
 }
 
-bool FlashAttentionScoreTilingBase::IsBasicBlockInSoftMax(const ge::Shape &shape) const
+bool FlashAttentionScoreTilingBase::IsBasicBlockInSoftMax(const ge::Shape& shape) const
 {
     // 2 axes at least
     if (shape.GetDimNum() < 2) {
@@ -2155,7 +2155,7 @@ bool FlashAttentionScoreTilingBase::IsBasicBlockInSoftMax(const ge::Shape &shape
 
 void FlashAttentionScoreTilingBase::SetCoreParams()
 {
-    auto &coreParams = tilingData->coreParams;
+    auto& coreParams = tilingData->coreParams;
     coreParams.set_s1BaseSize(s1BasicBlock);
     coreParams.set_s1BaseTailSize(CalcTailSize(s1Size, s1BasicBlock));
     coreParams.set_s1OuterSize(CeilDivision(s1Size, s1BasicBlock));
@@ -2186,7 +2186,7 @@ void FlashAttentionScoreTilingBase::SetCoreParams()
 
 void FlashAttentionScoreTilingBase::SetMultiBatchCoreParams()
 {
-    auto &coreParams = tilingData->coreParams;
+    auto& coreParams = tilingData->coreParams;
     coreParams.set_bBaseSize(1);
     coreParams.set_bBaseTailSize(1);
     coreParams.set_bOuterSize(bSize);
@@ -2202,8 +2202,8 @@ void FlashAttentionScoreTilingBase::SetMultiBatchCoreParams()
 
 void FlashAttentionScoreTilingBase::SetMultiCoreParams()
 {
-    auto &multiCoreParams = tilingData->multiCoreParams;
-    auto &coreParams = tilingData->coreParams;
+    auto& multiCoreParams = tilingData->multiCoreParams;
+    auto& coreParams = tilingData->coreParams;
     int64_t totalSize = coreParams.get_bOuterSize() * coreParams.get_n2OuterSize() * coreParams.get_gOuterSize() *
                         coreParams.get_s1OuterSize();
     int64_t actualUsedAivNum = std::min(totalSize, static_cast<int64_t>(aivNum));
@@ -2228,8 +2228,8 @@ ge::graphStatus FlashAttentionScoreTilingBase::PostTiling()
 {
     auto blockDim = CalcTschBlockDim(tilingData->multiCoreParams.get_coreNum(), aicNum, aivNum);
     context_->SetBlockDim(blockDim);
-    auto &inputParams = tilingData->inputParams;
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    auto& inputParams = tilingData->inputParams;
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     if (inputParams.get_needDropMaskOp() == 1) {
         blockDim = CalcTschBlockDim(aivNum, aicNum, aivNum);
         context_->SetBlockDim(blockDim);
@@ -2271,7 +2271,7 @@ ge::graphStatus FlashAttentionScoreTilingBase::PostTiling()
 
 bool FlashAttentionScoreTilingBase::SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
                                                        [[maybe_unused]] int64_t batch,
-                                                       matmul_tiling::MatmulApiTiling &bmm1)
+                                                       matmul_tiling::MatmulApiTiling& bmm1)
 {
     bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
     bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -2291,8 +2291,8 @@ bool FlashAttentionScoreTilingBase::SetBmm1TilingInput(int64_t tmpS1BasicBlock, 
 
 bool FlashAttentionScoreTilingBase::SetMatMulTiling(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
                                                     int64_t tmpDBasicBlock, int64_t batch,
-                                                    matmul_tiling::MatmulApiTiling &bmm1,
-                                                    matmul_tiling::MatmulApiTiling &bmm2)
+                                                    matmul_tiling::MatmulApiTiling& bmm1,
+                                                    matmul_tiling::MatmulApiTiling& bmm2)
 {
     if (!SetBmm1TilingInput(tmpS1BasicBlock, tmpS2BasicBlock, batch, bmm1) ||
         !SetBmm2TilingInput(tmpS1BasicBlock, tmpS2BasicBlock, tmpDBasicBlock, batch, bmm2)) {
@@ -2366,7 +2366,7 @@ void FlashAttentionScoreTilingBase::SetSoftMaxTiling()
 
 void FlashAttentionScoreTilingBase::SetDataCopyTransposeTiling()
 {
-    auto &coreParams = tilingData->coreParams;
+    auto& coreParams = tilingData->coreParams;
     auto transposeSrcShape = ge::Shape({coreParams.get_bBaseSize(), 1, std::min(s1BasicBlock, alignedS1),
                                         coreParams.get_gBaseSize() * std::min(dBasicBlock, alignedD)});
     auto transposeDstShape = ge::Shape({bSize, n1Size, s1Size, n1Size * dSize});
@@ -2378,8 +2378,8 @@ void FlashAttentionScoreTilingBase::SetDataCopyTransposeTiling()
 
 void FlashAttentionScoreTilingBase::SetTensorSizeParams()
 {
-    auto &tensorSizeParams = tilingData->tensorSizeParams;
-    auto &coreParams = tilingData->coreParams;
+    auto& tensorSizeParams = tilingData->tensorSizeParams;
+    auto& coreParams = tilingData->coreParams;
     int64_t batchInnerSize = coreParams.get_bBaseSize() * coreParams.get_n2BaseSize() * coreParams.get_gBaseSize();
     tensorSizeParams.set_bmm1ResUbSize(batchInnerSize * s1BasicBlock * s2BasicBlock);
     tensorSizeParams.set_attenMaskUbSize(attenMaskExistFlag * batchInnerSize * s1BasicBlock * s2BasicBlock);
@@ -2419,7 +2419,7 @@ void FlashAttentionScoreTilingBase::SetTensorSizeParams()
     tensorSizeParams.set_bmm2ResUbSize(batchInnerSize * s1BasicBlock * dBasicBlock);
 }
 
-bool FlashAttentionScoreTilingBase::InitSparseValidArray(std::vector<int64_t> &sparseValidArray, int64_t bIdx)
+bool FlashAttentionScoreTilingBase::InitSparseValidArray(std::vector<int64_t>& sparseValidArray, int64_t bIdx)
 {
     OP_CHECK_IF(sparseValidArray.size() == 0,
                 OP_LOGE_FOR_INVALID_VALUE(opName, "sparseValidArray size", std::to_string(sparseValidArray.size()),
@@ -2465,9 +2465,9 @@ bool FlashAttentionScoreTilingBase::InitSparseValidArray(std::vector<int64_t> &s
     return true;
 }
 
-bool FlashAttentionScoreTilingBase::PartitionSparseData(const std::vector<int64_t> &sparseRollingArray,
+bool FlashAttentionScoreTilingBase::PartitionSparseData(const std::vector<int64_t>& sparseRollingArray,
                                                         int64_t sparseRollingArraySum, int64_t sparseArraySize,
-                                                        int64_t loadMaxEachCore, std::vector<int64_t> &partitionResult)
+                                                        int64_t loadMaxEachCore, std::vector<int64_t>& partitionResult)
 {
     OP_CHECK_IF(partitionResult.size() == 0,
                 OP_LOGE_FOR_INVALID_VALUE(opName, "partitionResult size", std::to_string(partitionResult.size()),
@@ -2511,8 +2511,8 @@ bool FlashAttentionScoreTilingBase::PartitionSparseData(const std::vector<int64_
     return true;
 }
 
-void FlashAttentionScoreTilingBase::SetPrefixSparseStartIdx(const std::vector<std::vector<int64_t>> &sparseValidArray,
-                                                            MultiCoreParams &multiCoreParams)
+void FlashAttentionScoreTilingBase::SetPrefixSparseStartIdx(const std::vector<std::vector<int64_t>>& sparseValidArray,
+                                                            MultiCoreParams& multiCoreParams)
 {
     int64_t validCoreNum;
     if (isSameAB) {
@@ -2521,7 +2521,7 @@ void FlashAttentionScoreTilingBase::SetPrefixSparseStartIdx(const std::vector<st
         validCoreNum = std::min(static_cast<int64_t>(multiCoreParams.get_coreNum()), MAX_AIV_NUM);
     }
     int64_t totalSize = multiCoreParams.get_totalSize(); // BN2GS1.o
-    int64_t *sparseStartIdx = multiCoreParams.get_sparseStartIdx();
+    int64_t* sparseStartIdx = multiCoreParams.get_sparseStartIdx();
     for (int64_t idx = 0; idx < MAX_AIV_NUM; ++idx) {
         sparseStartIdx[idx] = totalSize;
     }
@@ -2584,8 +2584,8 @@ void FlashAttentionScoreTilingBase::SetPrefixSparseStartIdx(const std::vector<st
     }
 }
 
-bool FlashAttentionScoreTilingBase::SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray,
-                                                      MultiCoreParams &multiCoreParams)
+bool FlashAttentionScoreTilingBase::SetSparseStartIdx(const std::vector<int64_t>& sparseValidArray,
+                                                      MultiCoreParams& multiCoreParams)
 {
     // to avoid buffer overflow, or maybe sometimes we want to only verify single core
     int64_t validCoreNum;
@@ -2595,7 +2595,7 @@ bool FlashAttentionScoreTilingBase::SetSparseStartIdx(const std::vector<int64_t>
         validCoreNum = std::min(static_cast<int64_t>(multiCoreParams.get_coreNum()), MAX_AIV_NUM);
     }
     int64_t totalSize = multiCoreParams.get_totalSize(); // BN2GS1.o
-    int64_t *sparseStartIdx = multiCoreParams.get_sparseStartIdx();
+    int64_t* sparseStartIdx = multiCoreParams.get_sparseStartIdx();
     for (int64_t idx = 0; idx < MAX_AIV_NUM; ++idx) {
         sparseStartIdx[idx] = totalSize;
     }
@@ -2641,8 +2641,8 @@ bool FlashAttentionScoreTilingBase::SetSparseStartIdx(const std::vector<int64_t>
     return true;
 }
 
-int64_t FlashAttentionScoreTilingBase::PrintSparseMaxMinLoadPerCore(const std::vector<int64_t> &sparseValidArray,
-                                                                    int64_t *sparseStartIdx, int32_t validAivNum,
+int64_t FlashAttentionScoreTilingBase::PrintSparseMaxMinLoadPerCore(const std::vector<int64_t>& sparseValidArray,
+                                                                    int64_t* sparseStartIdx, int32_t validAivNum,
                                                                     int64_t avgLoadSize)
 {
     int64_t maxLoadSize = 0;
@@ -2705,11 +2705,11 @@ void FlashAttentionScoreTilingBase::SetSparseParams()
         return;
     }
 
-    auto &coreParams = tilingData->coreParams;
+    auto& coreParams = tilingData->coreParams;
     coreParams.set_s1SparseValidSize(s1SparseValidSize);
     coreParams.set_s2SparseValidSize(s2SparseValidSize);
 
-    auto &multiCoreParams = tilingData->multiCoreParams;
+    auto& multiCoreParams = tilingData->multiCoreParams;
     if (tilingData->inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::PREFIX)) {
         std::vector<std::vector<int64_t>> sparseValidArray;
         for (int64_t bIdx = 0; bIdx < bSize; bIdx++) {
@@ -2737,7 +2737,7 @@ bool FlashAttentionScoreTilingBase::CheckScalarConstCondation()
 }
 
 /* 检查当前tiling中的baseMNK是否与子类枚举的常量化参数匹配 */
-bool FlashAttentionScoreTilingBase::MatchMatmulConst(MatmulConstParams &matmulConst)
+bool FlashAttentionScoreTilingBase::MatchMatmulConst(MatmulConstParams& matmulConst)
 {
     return mm1BaseM == matmulConst.baseM && mm1BaseN == matmulConst.baseN && mm1BaseK == matmulConst.baseK;
 }
@@ -2749,7 +2749,7 @@ void FlashAttentionScoreTilingBase::SetScalarConst()
     if (!(CheckScalarConstCondation())) {
         return;
     }
-    for (auto &matmulConst : matmulConstArr) {
+    for (auto& matmulConst : matmulConstArr) {
         if (MatchMatmulConst(matmulConst)) {
             s1TemplateType = matmulConst.s1Type;
             s2TemplateType = matmulConst.s2Type;
@@ -2763,10 +2763,10 @@ void FlashAttentionScoreTilingBase::SetScalarConst()
 
 ge::graphStatus FlashAttentionScoreTilingBase::GetWorkspaceSize()
 {
-    auto &tensorSizeParams = tilingData->tensorSizeParams;
-    auto &coreParams = tilingData->coreParams;
+    auto& tensorSizeParams = tilingData->tensorSizeParams;
+    auto& coreParams = tilingData->coreParams;
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     int64_t bmm1Byetes = coreParams.get_nRatio() * tensorSizeParams.get_bmm1ResUbSize() * calcTypeSize;
     int64_t bmm2Byetes = tensorSizeParams.get_bmm2ResUbSize() * calcTypeSize;
     workspaces[0] = static_cast<size_t>((bmm1Byetes + bmm2Byetes) * aivNum) + WORK_SPACE_RESERVE_SIZE;
@@ -2775,7 +2775,7 @@ ge::graphStatus FlashAttentionScoreTilingBase::GetWorkspaceSize()
 
 class FlashAttentionScoreTilingS1Bn2gs1 : public FlashAttentionScoreTilingBase {
 public:
-    explicit FlashAttentionScoreTilingS1Bn2gs1(gert::TilingContext *context)
+    explicit FlashAttentionScoreTilingS1Bn2gs1(gert::TilingContext* context)
         : FlashAttentionScoreTilingBase(context)
     {
         expectTemplate.splitS1 = 1;
@@ -2847,8 +2847,8 @@ protected:
 
     void SetMultiCoreParams() override
     {
-        auto &multiCoreParams = tilingData->multiCoreParams;
-        auto &coreParams = tilingData->coreParams;
+        auto& multiCoreParams = tilingData->multiCoreParams;
+        auto& coreParams = tilingData->coreParams;
         int64_t totalSize = coreParams.get_bOuterSize() * coreParams.get_n2OuterSize() * coreParams.get_gOuterSize() *
                             coreParams.get_s1OuterSize();
         int64_t actualUsedAivNum = std::min(totalSize, static_cast<int64_t>(aivNum));
@@ -2867,8 +2867,8 @@ protected:
             return;
         }
         SetMultiCoreParams();
-        auto &coreParams = tilingData->coreParams;
-        auto &multiCoreParams = tilingData->multiCoreParams;
+        auto& coreParams = tilingData->coreParams;
+        auto& multiCoreParams = tilingData->multiCoreParams;
         // 对于S2 < 128且S1 16对齐的场景，bmm1输出改成NZ格式，配比设为4，提升fix pipe效率
         if (alignedS2 < s2SizeLimitMin) {
             nRatioMax = 1;
@@ -2913,10 +2913,10 @@ protected:
         if (tilingData->inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::ALL)) {
             return;
         }
-        auto &coreParams = tilingData->coreParams;
+        auto& coreParams = tilingData->coreParams;
         coreParams.set_s1SparseValidSize(s1SparseValidSize);
         coreParams.set_s2SparseValidSize(s2SparseValidSize);
-        auto &multiCoreParams = tilingData->multiCoreParams;
+        auto& multiCoreParams = tilingData->multiCoreParams;
         if (tilingData->inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::PREFIX)) {
             std::vector<std::vector<int64_t>> sparseValidArray;
             for (int64_t bIdx = 0; bIdx < bSize; bIdx++) {
@@ -2942,12 +2942,12 @@ protected:
         return true;
     }
 
-    void GetBufferNum(BufferNum &bufferNum) const override
+    void GetBufferNum(BufferNum& bufferNum) const override
     {
         bufferNum.bufferS1S2Num = s1dHighPerfBufferNum;
     }
 
-    void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum &bufferNum) override
+    void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum& bufferNum) override
     {
         if (IsB41L2CacheOptimizable()) {
             OP_LOGI(opName, "L2 cache optimization: s1BasicBlock set to 64 for B4_1.");
@@ -2964,7 +2964,7 @@ protected:
     }
 
     bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, [[maybe_unused]] int64_t batch,
-                            matmul_tiling::MatmulApiTiling &bmm1) override
+                            matmul_tiling::MatmulApiTiling& bmm1) override
     {
         bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -2990,7 +2990,7 @@ protected:
     }
 
     bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, [[maybe_unused]] int64_t tmpS2BasicBlock, int64_t tmpDBasicBlock,
-                            [[maybe_unused]] int64_t batch, matmul_tiling::MatmulApiTiling &bmm2) override
+                            [[maybe_unused]] int64_t batch, matmul_tiling::MatmulApiTiling& bmm2) override
     {
         bmm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
@@ -3056,7 +3056,7 @@ protected:
         return false;
     }
 
-    bool MatchMatmulConst(MatmulConstParams &matmulConst) override
+    bool MatchMatmulConst(MatmulConstParams& matmulConst) override
     {
         if (enableL1Reuse == true) {
             return false;
@@ -3090,8 +3090,8 @@ protected:
         }
         tilingData->bmm1TilingData.shareL1Size = l1SizeRemain;
         tilingData->bmm2TilingData.shareL1Size = l1SizeRemain;
-        auto &coreParams = tilingData->coreParams;
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        auto& coreParams = tilingData->coreParams;
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         int64_t bmm1Size = 0;
         int64_t bmm1AlignBytes = 0;
         int64_t s2SizeAlign16 = CeilDivision(s2Size, 16L) * 16L;
@@ -3119,7 +3119,7 @@ protected:
 
 class FlashAttentionScoreTilingB : public FlashAttentionScoreTilingBase {
 public:
-    explicit FlashAttentionScoreTilingB(gert::TilingContext *context)
+    explicit FlashAttentionScoreTilingB(gert::TilingContext* context)
         : FlashAttentionScoreTilingBase(context)
     {
         templateName = "FlashAttentionScoreB";
@@ -3134,12 +3134,12 @@ protected:
     int64_t dVec2BasicBlock_ = 1;
     int64_t s1Vec2BasicBlock_ = 1;
 
-    void GetBufferNum(BufferNum &bufferNum) const override
+    void GetBufferNum(BufferNum& bufferNum) const override
     {
         bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM;
     }
 
-    void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum &bufferNum) override
+    void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum& bufferNum) override
     {
         s2BasicBlock = alignedS2;
         s1BasicBlock = blockBUBSizeLimit_ / s2BasicBlock / FRACTAL_NUM * FRACTAL_NUM;
@@ -3157,8 +3157,8 @@ protected:
 
     void SetCoreParams() override
     {
-        auto &coreParams = tilingData->coreParams;
-        auto &inputParams = tilingData->inputParams;
+        auto& coreParams = tilingData->coreParams;
+        auto& inputParams = tilingData->inputParams;
         int64_t n2 = inputParams.get_n2Size();
         int64_t g = inputParams.get_gSize();
         int64_t b = inputParams.get_bSize();
@@ -3196,8 +3196,8 @@ protected:
 
     void SetMultiCoreParams() override
     {
-        auto &multiCoreParams = tilingData->multiCoreParams;
-        auto &coreParams = tilingData->coreParams;
+        auto& multiCoreParams = tilingData->multiCoreParams;
+        auto& coreParams = tilingData->coreParams;
         int64_t totalSize = coreParams.get_bOuterSize(); // 核间一共处理的Bo大小
         int64_t tempUsedAivNum = std::min(totalSize, static_cast<int64_t>(aivNum));
         multiCoreParams.set_totalSize(totalSize);
@@ -3214,8 +3214,8 @@ protected:
 
     void SetTensorSizeParams() override
     {
-        auto &tensorSizeParams = tilingData->tensorSizeParams;
-        auto &coreParams = tilingData->coreParams;
+        auto& tensorSizeParams = tilingData->tensorSizeParams;
+        auto& coreParams = tilingData->coreParams;
         tensorSizeParams.set_bmm1ResUbSize(s1BasicBlock * s2BasicBlock);
         tensorSizeParams.set_attenMaskUbSize(attenMaskExistFlag * s1BasicBlock * s2BasicBlock);
         tensorSizeParams.set_pseUbSize(pseExistFlag * s1BasicBlock * s2BasicBlock);
@@ -3251,7 +3251,7 @@ protected:
     }
 
     bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t batch,
-                            matmul_tiling::MatmulApiTiling &bmm1) override
+                            matmul_tiling::MatmulApiTiling& bmm1) override
     {
         bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -3273,7 +3273,7 @@ protected:
     }
 
     bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, [[maybe_unused]] int64_t tmpS2BasicBlock, int64_t tmpDBasicBlock,
-                            int64_t batch, matmul_tiling::MatmulApiTiling &bmm2) override
+                            int64_t batch, matmul_tiling::MatmulApiTiling& bmm2) override
     {
         bmm2.SetAType(matmul_tiling::TPosition::VECCALC, matmul_tiling::CubeFormat::NZ, bmmDtype, false);
         bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
@@ -3331,7 +3331,7 @@ protected:
 
     bool IsCapable() override
     {
-        auto &inputParams = tilingData->inputParams;
+        auto& inputParams = tilingData->inputParams;
         int64_t n2 = inputParams.get_n2Size();
         int64_t g = inputParams.get_gSize();
         bool notMatched = false;
@@ -3366,10 +3366,10 @@ protected:
 
     ge::graphStatus GetWorkspaceSize() override
     {
-        auto &inputParams = tilingData->inputParams;
-        auto &coreParams = tilingData->coreParams;
-        auto &multiCoreParams = tilingData->multiCoreParams;
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        auto& inputParams = tilingData->inputParams;
+        auto& coreParams = tilingData->coreParams;
+        auto& multiCoreParams = tilingData->multiCoreParams;
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         int64_t bmm1Byetes = coreParams.get_bBaseSize() * inputParams.get_n2Size() * inputParams.get_gSize() *
                              inputParams.get_s1Size() * alignedS2 * calcTypeSize * inputDtypeBytes / DATA_TYPE_FP16;
         int64_t bmm2Byetes = coreParams.get_bBaseSize() * inputParams.get_n2Size() * inputParams.get_gSize() *
@@ -3400,7 +3400,7 @@ protected:
 
 class FlashAttentionScoreTilingS1s2Bn2gs1 : public FlashAttentionScoreTilingBase {
 public:
-    explicit FlashAttentionScoreTilingS1s2Bn2gs1(gert::TilingContext *context)
+    explicit FlashAttentionScoreTilingS1s2Bn2gs1(gert::TilingContext* context)
         : FlashAttentionScoreTilingBase(context)
     {
         expectTemplate.splitS1 = 1U;
@@ -3419,7 +3419,7 @@ protected:
         return nRatio;
     }
 
-    void GetBufferNum(BufferNum &bufferNum) const override
+    void GetBufferNum(BufferNum& bufferNum) const override
     {
         bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM;
     }
@@ -3462,7 +3462,7 @@ protected:
         return (isSupportBSND || isSupportBNSD) && isSupportAttrs;
     }
 
-    void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum &bufferNum) override
+    void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum& bufferNum) override
     {
         s1BasicBlock = std::min(64L, alignedS1);
         // d轴为64
@@ -3572,7 +3572,7 @@ protected:
     }
 
     bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, [[maybe_unused]] int64_t batch,
-                            matmul_tiling::MatmulApiTiling &bmm1) override
+                            matmul_tiling::MatmulApiTiling& bmm1) override
     {
         bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -3599,7 +3599,7 @@ protected:
     }
 
     bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, [[maybe_unused]] int64_t tmpDBasicBlock,
-                            [[maybe_unused]] int64_t batch, matmul_tiling::MatmulApiTiling &bmm2) override
+                            [[maybe_unused]] int64_t batch, matmul_tiling::MatmulApiTiling& bmm2) override
     {
         int64_t singleM = std::min(tmpS1BasicBlock, s1Size);
         bmm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
@@ -3665,7 +3665,7 @@ protected:
             tilingData->bmm2TilingData.singleCoreK = L1REUSE_BMM2_SINGLE_CORE_K;
         }
         if (enableL1Reuse) {
-            auto &multiCoreParams = tilingData->multiCoreParams;
+            auto& multiCoreParams = tilingData->multiCoreParams;
             int64_t totalSize = multiCoreParams.get_totalSize();
             multiCoreParams.set_splitFactorSize(
                 CeilDivision(totalSize, static_cast<int64_t>(multiCoreParams.get_coreNum())) * AICAIV_RATIO_2);
@@ -3677,10 +3677,10 @@ protected:
     {
         RefreshSplitFactor();
 
-        auto &tensorSizeParams = tilingData->tensorSizeParams;
-        auto &coreParams = tilingData->coreParams;
+        auto& tensorSizeParams = tilingData->tensorSizeParams;
+        auto& coreParams = tilingData->coreParams;
 
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         int64_t bmm1Bytes = coreParams.get_nRatio() * tensorSizeParams.get_bmm1ResUbSize() * calcTypeSize;
 
         // 切D场景，stage1占用2倍的空间，stage2占用4倍空间
@@ -3784,7 +3784,7 @@ protected:
 
 class FlashAttentionScoreTilingS1s2Bn2gs1SameAB : public FlashAttentionScoreTilingBase {
 public:
-    explicit FlashAttentionScoreTilingS1s2Bn2gs1SameAB(gert::TilingContext *context)
+    explicit FlashAttentionScoreTilingS1s2Bn2gs1SameAB(gert::TilingContext* context)
         : FlashAttentionScoreTilingBase(context)
     {
         expectTemplate.splitS1 = 1U;
@@ -3820,12 +3820,12 @@ protected:
         }
     }
 
-    void GetBufferNum(BufferNum &bufferNum) const override
+    void GetBufferNum(BufferNum& bufferNum) const override
     {
         bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM;
     }
 
-    void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum &bufferNum) override
+    void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum& bufferNum) override
     {
         s1BasicBlockBest = 256L;
         if (enableBestBlock) {
@@ -3846,8 +3846,8 @@ protected:
 
     void SetMultiCoreParams() override
     {
-        auto &multiCoreParams = tilingData->multiCoreParams;
-        auto &coreParams = tilingData->coreParams;
+        auto& multiCoreParams = tilingData->multiCoreParams;
+        auto& coreParams = tilingData->coreParams;
         int64_t totalSize = coreParams.get_bOuterSize() * coreParams.get_n2OuterSize() * coreParams.get_gOuterSize() *
                             coreParams.get_s1OuterSize();
         int64_t actualUsedAicNum = std::min(totalSize, static_cast<int64_t>(aicNum));
@@ -3871,7 +3871,7 @@ protected:
     }
 
     bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, [[maybe_unused]] int64_t batch,
-                            matmul_tiling::MatmulApiTiling &bmm1) override
+                            matmul_tiling::MatmulApiTiling& bmm1) override
     {
         bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -3900,7 +3900,7 @@ protected:
     }
 
     bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, [[maybe_unused]] int64_t tmpDBasicBlock,
-                            [[maybe_unused]] int64_t batch, matmul_tiling::MatmulApiTiling &bmm2) override
+                            [[maybe_unused]] int64_t batch, matmul_tiling::MatmulApiTiling& bmm2) override
     {
         int64_t singleM = std::min(tmpS1BasicBlock, s1Size);
         bmm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
@@ -3991,10 +3991,10 @@ protected:
 
     ge::graphStatus GetWorkspaceSize() override
     {
-        auto &tensorSizeParams = tilingData->tensorSizeParams;
-        auto &coreParams = tilingData->coreParams;
+        auto& tensorSizeParams = tilingData->tensorSizeParams;
+        auto& coreParams = tilingData->coreParams;
 
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         int64_t bmm1Bytes = coreParams.get_nRatio() * tensorSizeParams.get_bmm1ResUbSize() * calcTypeSize;
 
         // UB不常驻，stage1占用3倍的空间，stage2占用4倍空间
@@ -4084,7 +4084,7 @@ protected:
 
 class FlashAttentionVarLenScoreTiling : public FlashAttentionScoreTilingBase {
 public:
-    explicit FlashAttentionVarLenScoreTiling(gert::TilingContext *context)
+    explicit FlashAttentionVarLenScoreTiling(gert::TilingContext* context)
         : FlashAttentionScoreTilingBase(context)
     {
         expectTemplate.splitS1 = 1U;
@@ -4107,12 +4107,12 @@ protected:
         }
     }
 
-    void GetBufferNum(BufferNum &bufferNum) const override
+    void GetBufferNum(BufferNum& bufferNum) const override
     {
         bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM;
     }
 
-    void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum &bufferNum) override
+    void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum& bufferNum) override
     {
         if (isSameAB) {
             s1BasicBlock = std::min(TND_S1_BASICBLOCK_256, alignedS1);
@@ -4133,7 +4133,7 @@ protected:
     }
 
     bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, [[maybe_unused]] int64_t batch,
-                            matmul_tiling::MatmulApiTiling &bmm1) override
+                            matmul_tiling::MatmulApiTiling& bmm1) override
     {
         bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -4156,7 +4156,7 @@ protected:
     }
 
     bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, [[maybe_unused]] int64_t tmpDBasicBlock,
-                            [[maybe_unused]] int64_t batch, matmul_tiling::MatmulApiTiling &bmm2) override
+                            [[maybe_unused]] int64_t batch, matmul_tiling::MatmulApiTiling& bmm2) override
     {
         bmm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
@@ -4315,8 +4315,8 @@ protected:
     }
     void SetMultiCoreParams() override
     {
-        auto &multiCoreParams = tilingData->multiCoreParams;
-        auto &coreParams = tilingData->coreParams;
+        auto& multiCoreParams = tilingData->multiCoreParams;
+        auto& coreParams = tilingData->coreParams;
         accumS1BlockNum = 0;
         for (int64_t i = 0; i < bSize; i++) {
             OP_LOGD(context_, "[%s]actualSeqLenData data %ld is %ld.", templateName, i, actualSeqLenData[i]);
@@ -4346,15 +4346,15 @@ protected:
 
     ge::graphStatus GetWorkspaceSize() override
     {
-        auto &tensorSizeParams = tilingData->tensorSizeParams;
-        auto &coreParams = tilingData->coreParams;
+        auto& tensorSizeParams = tilingData->tensorSizeParams;
+        auto& coreParams = tilingData->coreParams;
         // 走SameAB模板并满足条件S1BaseSize <= 256 && dSize == 192时使能L1自主管理，shareL1Size需设为0
         if (isSameAB && coreParams.get_s1BaseSize() <= 256 &&
             (dSize == 192 || dSize == 128 || dSize == 88 || dSize == 80)) {
             tilingData->bmm1TilingData.shareL1Size = 0;
             tilingData->bmm2TilingData.shareL1Size = 0;
         }
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         int64_t bmm1Byetes;
         if (isMaxWorkspace) {
             bmm1Byetes = 8 * (512 * 128) * calcTypeSize;
@@ -4411,7 +4411,7 @@ protected:
                                           IsBasicBlockInSoftMax(softmaxShape));
     }
 
-    bool CheckPretokenAndNexttoken(SparseEnum &sparseType)
+    bool CheckPretokenAndNexttoken(SparseEnum& sparseType)
     {
         if (sparseMode == static_cast<int64_t>(ALL_MASK)) {
             if (preTokens < s1Size - 1 || nextTokens < s2Size - 1) {
@@ -4523,7 +4523,7 @@ protected:
         return true;
     }
 
-    bool SparseNoMaskModeCheck(int64_t maxS1Value, int64_t maxS2Value, int64_t minS2Value, SparseEnum &sparseType)
+    bool SparseNoMaskModeCheck(int64_t maxS1Value, int64_t maxS2Value, int64_t minS2Value, SparseEnum& sparseType)
     {
         if (nextTokens < 0) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "nextTokens", std::to_string(nextTokens),
@@ -4572,7 +4572,7 @@ protected:
         return true;
     }
 
-    bool VarLenGetPrefixNList(SparseEnum &sparseType)
+    bool VarLenGetPrefixNList(SparseEnum& sparseType)
     {
         auto prefixN = context_->GetOptionalInputTensor(PREFIX_INPUT_INDEX);
         if (prefixN == nullptr) {
@@ -4580,7 +4580,7 @@ protected:
             return false;
         }
 
-        auto &prefixShape = prefixN->GetShape().GetStorageShape();
+        auto& prefixShape = prefixN->GetShape().GetStorageShape();
         if (prefixShape.GetDimNum() != 1) {
             OP_LOGE_FOR_INVALID_SHAPEDIM(opName, "prefixN shape", std::to_string(prefixShape.GetDimNum()), "1");
             return false;
@@ -4628,7 +4628,7 @@ protected:
         return true;
     }
 
-    bool VarLenSparseModeProcess(SparseEnum &sparseType)
+    bool VarLenSparseModeProcess(SparseEnum& sparseType)
     {
         if (sparseMode == static_cast<int64_t>(PREFIX) || sparseMode > static_cast<int64_t>(BAND_LEFT_UP_CAUSAL)) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "sparseMode", std::to_string(sparseMode),
@@ -4651,7 +4651,7 @@ protected:
         return true;
     }
 
-    bool GetSparseInfo(SparseEnum &sparseType) override
+    bool GetSparseInfo(SparseEnum& sparseType) override
     {
         OP_LOGD(context_,
                 "check sparse feature: preTokens[%ld], nextTokens[%ld], s1[%ld], s2[%ld], attenMaskExist[%d].",
@@ -4709,10 +4709,10 @@ protected:
         return std::min(s2RealSize, actualSeqLenKvData[bOutIdx]);
     }
 
-    bool InitSparseValidArray(std::vector<int64_t> &sparseValidArray)
+    bool InitSparseValidArray(std::vector<int64_t>& sparseValidArray)
     {
         uint8_t sparseType = tilingData->inputParams.get_sparseType();
-        auto &coreParams = tilingData->coreParams;
+        auto& coreParams = tilingData->coreParams;
         for (int32_t i = 0; i < bSize; i++) {
             int64_t n2G = coreParams.get_n2OuterSize() * coreParams.get_gOuterSize();
             int64_t s1BlockNum = CeilDivision(actualSeqLenData[i], s1BasicBlock);
@@ -4735,8 +4735,8 @@ protected:
         return true;
     }
 
-    bool BalanceLoad(const std::vector<int64_t> &sparseValidArray, MultiCoreParams &multiCoreParams,
-                     std::vector<int64_t> &localValue, std::vector<int64_t> &sparseStartIdx)
+    bool BalanceLoad(const std::vector<int64_t>& sparseValidArray, MultiCoreParams& multiCoreParams,
+                     std::vector<int64_t>& localValue, std::vector<int64_t>& sparseStartIdx)
     {
         // to avoid buffer overflow, or maybe sometimes we want to only verify single core
         int64_t validAiCoreNum = isSameAB ?
@@ -4785,8 +4785,8 @@ protected:
         return (tmpMaxVal >= maxVal) ? false : true;
     }
 
-    inline bool InitLoadValue(const std::vector<int64_t> &sparseValidArray, int64_t validAivNum, int64_t totalSize,
-                              const std::vector<int64_t> &sparseStartIdx, std::vector<int64_t> &localValue)
+    inline bool InitLoadValue(const std::vector<int64_t>& sparseValidArray, int64_t validAivNum, int64_t totalSize,
+                              const std::vector<int64_t>& sparseStartIdx, std::vector<int64_t>& localValue)
     {
         for (int64_t idx = 0; idx < validAivNum; ++idx) {
             int64_t start = sparseStartIdx[idx];
@@ -4801,14 +4801,14 @@ protected:
         return true;
     }
 
-    bool SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray, MultiCoreParams &multiCoreParams) override
+    bool SetSparseStartIdx(const std::vector<int64_t>& sparseValidArray, MultiCoreParams& multiCoreParams) override
     {
         // to avoid buffer overflow, or maybe sometimes we want to only verify single core
         int64_t validAiCoreNum = isSameAB ?
                                      std::min(static_cast<int64_t>(multiCoreParams.get_coreNum() / 2), MAX_AIC_NUM) :
                                      std::min(static_cast<int64_t>(multiCoreParams.get_coreNum()), MAX_AIV_NUM);
         int64_t totalSize = multiCoreParams.get_totalSize(); // BN2GS1.o
-        int64_t *sparseStartIdx = multiCoreParams.get_sparseStartIdx();
+        int64_t* sparseStartIdx = multiCoreParams.get_sparseStartIdx();
         int64_t maxAiCoreNum = isSameAB ? MAX_AIC_NUM : MAX_AIV_NUM;
         OP_CHECK_IF(totalSize <= 0 && !isMaxWorkspace,
                     OP_LOGE_FOR_INVALID_VALUE(opName, "totalSize", std::to_string(totalSize), "larger than 0"),
@@ -4874,8 +4874,8 @@ protected:
         if (isMaxWorkspace) {
             return;
         }
-        auto &coreParams = tilingData->coreParams;
-        auto &multiCoreParams = tilingData->multiCoreParams;
+        auto& coreParams = tilingData->coreParams;
+        auto& multiCoreParams = tilingData->multiCoreParams;
         std::vector<int64_t> sparseValidArray;
         sparseValidArray.reserve(multiCoreParams.get_totalSize());
         InitSparseValidArray(sparseValidArray);
@@ -4889,7 +4889,7 @@ protected:
     {
         auto ret = FlashAttentionScoreTilingBase::PostTiling();
 
-        auto &inputParams = tilingData->inputParams;
+        auto& inputParams = tilingData->inputParams;
         // TND EOD+Padding 场景下 kernel侧使用t1Size复用s1Size
         inputParams.set_s1Size(realT1Size);
         if (!isSameAB && inputDtypeBytes != DATA_TYPE_FP32 && !hasRope && s1BasicBlock <= S1_BASIC_BLOCK_L1CARRY_MAX &&
@@ -4905,7 +4905,7 @@ protected:
 
 class FlashAttentionScoreTilingDropMask : public FlashAttentionScoreTilingBase {
 public:
-    explicit FlashAttentionScoreTilingDropMask(gert::TilingContext *context)
+    explicit FlashAttentionScoreTilingDropMask(gert::TilingContext* context)
         : FlashAttentionScoreTilingBase(context)
     {}
     ~FlashAttentionScoreTilingDropMask() override = default;
@@ -4913,8 +4913,8 @@ public:
 protected:
     ge::graphStatus DoOpTiling() override
     {
-        auto &inputParams = tilingData->inputParams;
-        auto &dropmaskParams = tilingData->dropmaskParams;
+        auto& inputParams = tilingData->inputParams;
+        auto& dropmaskParams = tilingData->dropmaskParams;
         if (inputParams.get_needDropMaskOp() == 0) {
             dropmaskParams.reset();
             return ge::GRAPH_PARAM_INVALID;
@@ -4954,11 +4954,11 @@ protected:
         return true;
     }
 
-    void GetBufferNum([[maybe_unused]] BufferNum &bufferNum) const override {}
+    void GetBufferNum([[maybe_unused]] BufferNum& bufferNum) const override {}
 
     bool SetBmm2TilingInput([[maybe_unused]] int64_t tmpS1BasicBlock, [[maybe_unused]] int64_t tmpS2BasicBlock,
                             [[maybe_unused]] int64_t tmpDBasicBlock, [[maybe_unused]] int64_t batch,
-                            [[maybe_unused]] matmul_tiling::MatmulApiTiling &bmm2) override
+                            [[maybe_unused]] matmul_tiling::MatmulApiTiling& bmm2) override
     {
         return true;
     }

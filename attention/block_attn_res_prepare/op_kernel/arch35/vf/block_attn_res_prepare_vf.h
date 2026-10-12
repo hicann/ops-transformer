@@ -59,7 +59,7 @@ constexpr AscendC::Reg::DivSpecificMode BARP_DIV_0ULP_FTZ_TRUE_MODE = {
     AscendC::DivAlgo::PRECISION_0ULP_FTZ_TRUE,
 };
 
-__simd_vf__ inline void InitializeEmptyOnlineSoftmax(__ubuf__ float *statAddr)
+__simd_vf__ inline void InitializeEmptyOnlineSoftmax(__ubuf__ float* statAddr)
 {
     RegTensor<float> maxReg;
     RegTensor<float> sumReg;
@@ -72,7 +72,7 @@ __simd_vf__ inline void InitializeEmptyOnlineSoftmax(__ubuf__ float *statAddr)
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 }
 
-__simd_vf__ inline void FillZero(__ubuf__ float *outputAddr, uint32_t validD)
+__simd_vf__ inline void FillZero(__ubuf__ float* outputAddr, uint32_t validD)
 {
     RegTensor<float> zeroReg;
     MaskReg allMask = CreateMask<float, MaskPattern::ALL>();
@@ -90,7 +90,7 @@ __simd_vf__ inline void FillZero(__ubuf__ float *outputAddr, uint32_t validD)
 
 // These raw UB arguments are internal static byte offsets. UB offset zero is valid and must not be treated as nullptr.
 template <bool FIRST_D_TILE>
-__simd_vf__ inline void AccumulateSquareDot(__ubuf__ float *qAddr, __ubuf__ float *vAddr, __ubuf__ float *statAddr,
+__simd_vf__ inline void AccumulateSquareDot(__ubuf__ float* qAddr, __ubuf__ float* vAddr, __ubuf__ float* statAddr,
                                             uint32_t validD, uint32_t nIndex)
 {
     RegTensor<float> qReg;
@@ -137,7 +137,7 @@ __simd_vf__ inline void AccumulateSquareDot(__ubuf__ float *qAddr, __ubuf__ floa
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 }
 
-__simd_vf__ inline void FinalizeSingleBlock(__ubuf__ float *statAddr, float reciprocalD, float eps)
+__simd_vf__ inline void FinalizeSingleBlock(__ubuf__ float* statAddr, float reciprocalD, float eps)
 {
     RegTensor<float> sumSquareReg;
     RegTensor<float> dotReg;
@@ -159,7 +159,7 @@ __simd_vf__ inline void FinalizeSingleBlock(__ubuf__ float *statAddr, float reci
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 }
 
-__simd_vf__ inline void FinalizeSoftmax(__ubuf__ float *statAddr, uint32_t validN, float reciprocalD, float eps)
+__simd_vf__ inline void FinalizeSoftmax(__ubuf__ float* statAddr, uint32_t validN, float reciprocalD, float eps)
 {
     RegTensor<float> sumSquareReg;
     RegTensor<float> dotReg;
@@ -196,8 +196,8 @@ __simd_vf__ inline void FinalizeSoftmax(__ubuf__ float *statAddr, uint32_t valid
 }
 
 template <bool FIRST_BLOCK>
-__simd_vf__ inline void WeightedAccumulate(__ubuf__ float *vAddr, __ubuf__ float *weightAddr,
-                                           __ubuf__ float *outputAddr, uint32_t validD)
+__simd_vf__ inline void WeightedAccumulate(__ubuf__ float* vAddr, __ubuf__ float* weightAddr,
+                                           __ubuf__ float* outputAddr, uint32_t validD)
 {
     RegTensor<float> vReg;
     RegTensor<float> weightReg;
@@ -221,7 +221,7 @@ __simd_vf__ inline void WeightedAccumulate(__ubuf__ float *vAddr, __ubuf__ float
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 }
 
-__simd_vf__ inline void CopySingleBlock(__ubuf__ float *vAddr, __ubuf__ float *outputAddr, uint32_t validD)
+__simd_vf__ inline void CopySingleBlock(__ubuf__ float* vAddr, __ubuf__ float* outputAddr, uint32_t validD)
 {
     RegTensor<float> vReg;
     uint32_t remaining = validD;

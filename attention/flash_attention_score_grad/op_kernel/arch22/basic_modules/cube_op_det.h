@@ -73,30 +73,30 @@ private:
     uint32_t sparseMode;
     int64_t sparseLeftBound{0};  // preToken直线计算公式: s1Idx = s2Idx + sparseLeftBound
     int64_t sparseRightBound{0}; // nextToken直线计算公式: s1Idx = s2Idx + sparseRightBound
-    __gm__ INPUT_TYPE *queryAddr;
-    __gm__ INPUT_TYPE *keyAddr;
-    __gm__ INPUT_TYPE *dyAddr;
-    __gm__ INPUT_TYPE *valueAddr;
-    __gm__ INPUT_TYPE *pWorkSpaceAddr;
-    __gm__ INPUT_TYPE *dsWorkSpaceAddr;
-    __gm__ float *mm1WorkSpaceAddr;
-    __gm__ float *mm2WorkSpaceAddr;
-    __gm__ float *dqDetWorkSpaceAddr;
-    __gm__ float *dkDetWorkSpaceAddr;
-    __gm__ float *dvDetWorkSpaceAddr;
-    __gm__ float *dqWorkSpaceAddr;
-    __gm__ float *dkWorkSpaceAddr;
-    __gm__ float *dvWorkSpaceAddr;
+    __gm__ INPUT_TYPE* queryAddr;
+    __gm__ INPUT_TYPE* keyAddr;
+    __gm__ INPUT_TYPE* dyAddr;
+    __gm__ INPUT_TYPE* valueAddr;
+    __gm__ INPUT_TYPE* pWorkSpaceAddr;
+    __gm__ INPUT_TYPE* dsWorkSpaceAddr;
+    __gm__ float* mm1WorkSpaceAddr;
+    __gm__ float* mm2WorkSpaceAddr;
+    __gm__ float* dqDetWorkSpaceAddr;
+    __gm__ float* dkDetWorkSpaceAddr;
+    __gm__ float* dvDetWorkSpaceAddr;
+    __gm__ float* dqWorkSpaceAddr;
+    __gm__ float* dkWorkSpaceAddr;
+    __gm__ float* dvWorkSpaceAddr;
 
 public:
     __aicore__ inline CubeOpDet(){};
 
-    __aicore__ inline void Init(TPipe *pipe, const TILING_CLASS *tilingData, __gm__ INPUT_TYPE *queryAddr,
-                                __gm__ INPUT_TYPE *keyAddr, __gm__ INPUT_TYPE *dyAddr, __gm__ INPUT_TYPE *valueAddr,
-                                __gm__ float *mm1WorkSpaceAddr, __gm__ float *mm2WorkSpaceAddr,
-                                __gm__ float *dqDetWorkSpaceAddr, __gm__ float *dkDetWorkSpaceAddr,
-                                __gm__ float *dvDetWorkSpaceAddr, __gm__ float *dqWorkSpaceAddr,
-                                __gm__ float *dkWorkSpaceAddr, __gm__ float *dvWorkSpaceAddr)
+    __aicore__ inline void Init(TPipe* pipe, const TILING_CLASS* tilingData, __gm__ INPUT_TYPE* queryAddr,
+                                __gm__ INPUT_TYPE* keyAddr, __gm__ INPUT_TYPE* dyAddr, __gm__ INPUT_TYPE* valueAddr,
+                                __gm__ float* mm1WorkSpaceAddr, __gm__ float* mm2WorkSpaceAddr,
+                                __gm__ float* dqDetWorkSpaceAddr, __gm__ float* dkDetWorkSpaceAddr,
+                                __gm__ float* dvDetWorkSpaceAddr, __gm__ float* dqWorkSpaceAddr,
+                                __gm__ float* dkWorkSpaceAddr, __gm__ float* dvWorkSpaceAddr)
     {
         dimN2 = tilingData->basicDetTensorTilingData.n2;
         dimN1 = dimN2 * tilingData->basicDetTensorTilingData.g;
@@ -123,8 +123,8 @@ public:
         this->valueAddr = valueAddr;
         this->mm1WorkSpaceAddr = mm1WorkSpaceAddr;
         this->mm2WorkSpaceAddr = mm2WorkSpaceAddr;
-        this->dsWorkSpaceAddr = (__gm__ INPUT_TYPE *)mm1WorkSpaceAddr;
-        this->pWorkSpaceAddr = (__gm__ INPUT_TYPE *)mm2WorkSpaceAddr;
+        this->dsWorkSpaceAddr = (__gm__ INPUT_TYPE*)mm1WorkSpaceAddr;
+        this->pWorkSpaceAddr = (__gm__ INPUT_TYPE*)mm2WorkSpaceAddr;
         this->dqDetWorkSpaceAddr = dqDetWorkSpaceAddr;
         this->dkDetWorkSpaceAddr = dkDetWorkSpaceAddr;
         this->dvDetWorkSpaceAddr = dvDetWorkSpaceAddr;
@@ -138,8 +138,8 @@ public:
 
         pipe->InitBuffer(L1Buffer, HardwareInfo<ArchType::ASCEND_V220>::l1Size);
         pipe->InitBuffer(L0CBuffer, HardwareInfo<ArchType::ASCEND_V220>::l0CSize);
-        tmp_type_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ INPUT_TYPE *>(0));
-        tmp_fp32_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(0));
+        tmp_type_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ INPUT_TYPE*>(0));
+        tmp_fp32_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(0));
         AscendC::SetNdParaImpl(config);
         AscendC::SetLoadDataPaddingValue<uint64_t>(0);
         commonFixpipeParamsV220.quantPre = QuantMode_t::NoQuant;
@@ -171,7 +171,7 @@ public:
         WAIT_FLAG(MTE1, MTE2, EVENT_ID0);
     }
 
-    __aicore__ inline __attribute__((always_inline)) void Cube12Process(const CubeAddrInfoDet &shapeInfo)
+    __aicore__ inline __attribute__((always_inline)) void Cube12Process(const CubeAddrInfoDet& shapeInfo)
     {
         SET_FLAG(M, MTE1, aEventIDPing);
         SET_FLAG(M, MTE1, aEventIDPong);
@@ -198,7 +198,7 @@ public:
         WAIT_FLAG(FIX, M, aEventIDPong);
     };
 
-    __aicore__ inline __attribute__((always_inline)) void Cube345Process(const CubeAddrInfoDet &shapeInfo)
+    __aicore__ inline __attribute__((always_inline)) void Cube345Process(const CubeAddrInfoDet& shapeInfo)
     {
         SET_FLAG(MTE1, MTE2, aEventIDPing);
         SET_FLAG(MTE1, MTE2, aEventIDPong);
@@ -206,9 +206,9 @@ public:
         SET_FLAG(M, MTE1, aEventIDPong);
         SET_FLAG(FIX, M, bEventIDPing);
         SET_FLAG(FIX, M, bEventIDPong);
-        __gm__ float *dq_out;
-        __gm__ float *dk_out;
-        __gm__ float *dv_out;
+        __gm__ float* dq_out;
+        __gm__ float* dk_out;
+        __gm__ float* dv_out;
         sparseLeftBound = shapeInfo.sparseLeftBound;
         sparseRightBound = shapeInfo.sparseRightBound;
 
@@ -240,9 +240,9 @@ public:
 
 private:
     template <uint32_t CUBE_TYPE>
-    __aicore__ inline __attribute__((always_inline)) void ComputeMM12(const CubeAddrInfoDet &shapeInfo,
-                                                                      __gm__ INPUT_TYPE *left, __gm__ INPUT_TYPE *right,
-                                                                      __gm__ float *out)
+    __aicore__ inline __attribute__((always_inline)) void ComputeMM12(const CubeAddrInfoDet& shapeInfo,
+                                                                      __gm__ INPUT_TYPE* left, __gm__ INPUT_TYPE* right,
+                                                                      __gm__ float* out)
     {
         /*
         对于Dq，ReDuce轴为headDim方向（对应K轴），具体遍历顺序示意图如下：
@@ -269,9 +269,9 @@ private:
         auto gm_a = left + shapeInfo.s1GmAddr;
         auto gm_b = right + shapeInfo.s2GmAddr;
         auto gm_c = out + globalBlockOffset;
-        const uint64_t left_offset = gm_a - (__gm__ INPUT_TYPE *)0;
-        const uint64_t right_offset = gm_b - (__gm__ INPUT_TYPE *)0;
-        const uint64_t out_offset = gm_c - (__gm__ float *)0;
+        const uint64_t left_offset = gm_a - (__gm__ INPUT_TYPE*)0;
+        const uint64_t right_offset = gm_b - (__gm__ INPUT_TYPE*)0;
+        const uint64_t out_offset = gm_c - (__gm__ float*)0;
 
         for (int32_t nIdx = 0; nIdx < nLoop; nIdx++) {
             int32_t s2Idx = shapeInfo.s2Idx + nIdx * SIZE_128;
@@ -384,9 +384,9 @@ private:
     };
 
     template <uint32_t CUBE_TYPE>
-    __aicore__ inline __attribute__((always_inline)) void ComputeMMDQ(const CubeAddrInfoDet &shapeInfo,
-                                                                      __gm__ INPUT_TYPE *left, __gm__ INPUT_TYPE *right,
-                                                                      __gm__ float *out)
+    __aicore__ inline __attribute__((always_inline)) void ComputeMMDQ(const CubeAddrInfoDet& shapeInfo,
+                                                                      __gm__ INPUT_TYPE* left, __gm__ INPUT_TYPE* right,
+                                                                      __gm__ float* out)
     {
         /*
         对于Dq，ReDuce轴为S2方向（对应N轴），具体遍历顺序示意图如下：
@@ -409,9 +409,9 @@ private:
         int32_t nTail = (nSize % SIZE_128) == 0 ? SIZE_128 : (nSize % SIZE_128);
         int32_t mLoop = CeilDiv(mSize, SIZE_128);
         int32_t nLoop = CeilDiv(nSize, SIZE_128);
-        uint64_t left_offset = (__gm__ INPUT_TYPE *)(left + globalBlockOffset * 2) - (__gm__ INPUT_TYPE *)0;
-        uint64_t right_offset = (__gm__ INPUT_TYPE *)(right + shapeInfo.s2GmAddr) - (__gm__ INPUT_TYPE *)0;
-        uint64_t out_offset = (__gm__ float *)(out) - (__gm__ float *)0;
+        uint64_t left_offset = (__gm__ INPUT_TYPE*)(left + globalBlockOffset * 2) - (__gm__ INPUT_TYPE*)0;
+        uint64_t right_offset = (__gm__ INPUT_TYPE*)(right + shapeInfo.s2GmAddr) - (__gm__ INPUT_TYPE*)0;
+        uint64_t out_offset = (__gm__ float*)(out) - (__gm__ float*)0;
         bool isCausalBlock = shapeInfo.s1Idx == shapeInfo.s2Idx;
         bool visitBMatrix[4] = {false, false, false, false};
 
@@ -504,9 +504,9 @@ private:
     };
 
     template <uint32_t CUBE_TYPE>
-    __aicore__ inline __attribute__((always_inline)) void ComputeMMDKV(const CubeAddrInfoDet &shapeInfo,
-                                                                       __gm__ INPUT_TYPE *left,
-                                                                       __gm__ INPUT_TYPE *right, __gm__ float *out)
+    __aicore__ inline __attribute__((always_inline)) void ComputeMMDKV(const CubeAddrInfoDet& shapeInfo,
+                                                                       __gm__ INPUT_TYPE* left,
+                                                                       __gm__ INPUT_TYPE* right, __gm__ float* out)
     {
         /*
         对于Dk，Dv，ReDuce轴为S1方向（对应M轴），具体遍历顺序示意图如下：
@@ -530,9 +530,9 @@ private:
         int32_t nTail = (nSize % SIZE_128) == 0 ? SIZE_128 : (nSize % SIZE_128);
         int32_t mLoop = CeilDiv(mSize, SIZE_128);
         int32_t nLoop = CeilDiv(nSize, SIZE_128);
-        uint64_t left_offset = (__gm__ INPUT_TYPE *)(left + globalBlockOffset * 2) - (__gm__ INPUT_TYPE *)0;
-        uint64_t right_offset = (__gm__ INPUT_TYPE *)(right + shapeInfo.s1GmAddr) - (__gm__ INPUT_TYPE *)0;
-        uint64_t out_offset = (__gm__ float *)(out) - (__gm__ float *)0;
+        uint64_t left_offset = (__gm__ INPUT_TYPE*)(left + globalBlockOffset * 2) - (__gm__ INPUT_TYPE*)0;
+        uint64_t right_offset = (__gm__ INPUT_TYPE*)(right + shapeInfo.s1GmAddr) - (__gm__ INPUT_TYPE*)0;
+        uint64_t out_offset = (__gm__ float*)(out) - (__gm__ float*)0;
         for (int32_t nIdx = 0; nIdx < nLoop; nIdx++) {
             int32_t nProcess = (nIdx == nLoop - 1) ? nTail : SIZE_128;
             int32_t nProcessAlign = RoundUp(nProcess, SIZE_16);

@@ -83,7 +83,7 @@ constexpr uint32_t MM12_ND2NZ_SIZE = 5000;
 constexpr int64_t TOTAL_SIZE = 189 * 1024;
 constexpr int64_t VEC_SPLIT_NUM = 3;
 constexpr float HALF = 0.5f;
-const char *TEMPLATE_NAME_SAME_AB = "FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb";
+const char* TEMPLATE_NAME_SAME_AB = "FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb";
 constexpr int64_t S_MAX = 8192;
 constexpr int64_t SPECIAL_HEADDIM_128 = 128;
 constexpr int64_t SPECIAL_HEADDIM_256 = 256;
@@ -133,10 +133,10 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::IsCapable()
                 (fBaseParams.sparseMode == SPARSE_MODE_3 || fBaseParams.sparseMode == 0) &&
                 (1.0f - keep_prob < epsilon) && (fBaseParams.pseOptional == EMPTY_TENSOR) && (dropMask == nullptr)) {
                 auto actualSeqQlenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_Q_LEN);
-                auto &actualSeqQLenShape = actualSeqQlenTensor->GetShape().GetStorageShape();
-                const int64_t *actQValue = actualSeqQlenTensor->GetData<int64_t>();
+                auto& actualSeqQLenShape = actualSeqQlenTensor->GetShape().GetStorageShape();
+                const int64_t* actQValue = actualSeqQlenTensor->GetData<int64_t>();
                 auto actualSeqKvlenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_KV_LEN);
-                const int64_t *actKvValue = actualSeqKvlenTensor->GetData<int64_t>();
+                const int64_t* actKvValue = actualSeqKvlenTensor->GetData<int64_t>();
                 for (int64_t i = 0; i < actualSeqQLenShape.GetDim(0); ++i) {
                     if (i > 0 && actQValue[i] == actQValue[i - 1]) {
                         return true;
@@ -271,7 +271,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetPlatformInfo
 
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo *>(
+        auto compileInfoPtr = reinterpret_cast<const Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo*>(
             context_->GetCompileInfo());
         OP_CHECK_IF(
             compileInfoPtr == nullptr,
@@ -324,14 +324,14 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetQKVStartIdx()
         OP_LOGW(context_, "[%s]qStartIdxTensor is null pointer", TEMPLATE_NAME_SAME_AB);
         return;
     }
-    auto &qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
+    auto& qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
     if (qStartIdxShape.GetDimNum() != 1 || qStartIdxShape.GetDim(0) <= 0) {
         OP_LOGW(context_, "[%s]qStartIdxShape is invalid %lu %ld", TEMPLATE_NAME_SAME_AB, qStartIdxShape.GetDimNum(),
                 qStartIdxShape.GetDim(0));
         return;
     }
     /* Get Data from tensor. */
-    const int64_t *value = qStartIdxTensor->GetData<int64_t>();
+    const int64_t* value = qStartIdxTensor->GetData<int64_t>();
     if (value == nullptr) {
         OP_LOGW(context_, "[%s]qStartIdxShape data is null pointer", TEMPLATE_NAME_SAME_AB);
         return;
@@ -343,14 +343,14 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetQKVStartIdx()
         OP_LOGW(context_, "[%s]kvStartIdxTensor is null pointer", TEMPLATE_NAME_SAME_AB);
         return;
     }
-    auto &kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
+    auto& kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
     if (kvStartIdxShape.GetDimNum() != 1 || kvStartIdxShape.GetDim(0) <= 0) {
         OP_LOGW(context_, "[%s]kvStartIdxShape is invalid %lu %ld", TEMPLATE_NAME_SAME_AB, kvStartIdxShape.GetDimNum(),
                 kvStartIdxShape.GetDim(0));
         return;
     }
     /* Get Data from tensor. */
-    const int64_t *kvValue = kvStartIdxTensor->GetData<int64_t>();
+    const int64_t* kvValue = kvStartIdxTensor->GetData<int64_t>();
     if (kvValue == nullptr) {
         OP_LOGW(context_, "[%s]qStartIdxShape data is null pointer", TEMPLATE_NAME_SAME_AB);
         return;
@@ -373,14 +373,14 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetSparseParams()
             return false;
         }
 
-        auto &prefixShape = prefixNTensor->GetShape().GetStorageShape();
+        auto& prefixShape = prefixNTensor->GetShape().GetStorageShape();
         if (prefixShape.GetDimNum() != 1 || prefixShape.GetDim(0) != fBaseParams.b) {
             OP_LOGW(context_, "FAG sameAB sparseMode is prefix, but prefixshape size[%zu] or value is invalid!",
                     prefixShape.GetDimNum());
             return false;
         }
 
-        const int64_t *value = prefixNTensor->GetData<int64_t>();
+        const int64_t* value = prefixNTensor->GetData<int64_t>();
         if (value == nullptr) {
             OP_LOGW(context_, "FAG sameAB sparseMode is prefix, but prefixN data is null pointer!");
             return false;
@@ -436,7 +436,7 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetSparseParams()
     return false;
 }
 
-ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseNormal(const char *inputLayout)
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseNormal(const char* inputLayout)
 {
     auto pseShape = context_->GetOptionalInputShape(PSE_SHIFT);
     OP_CHECK_IF(pseShape == nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "pseShiftOptional"),
@@ -491,7 +491,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseNorma
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseInfo(const char *inputLayout)
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseInfo(const char* inputLayout)
 {
     if (context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(PSETYPE)) {
         fBaseParams.pseType = *(context_->GetAttrs()->GetAttrPointer<int64_t>(PSETYPE)); // 8
@@ -574,7 +574,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseInfo(
     } else if (pseShapeDim == PSE_DIM_NUM_1 && isTnd) {
         auto dim0 = pseShape->GetStorageShape().GetDim(DIM_0);
         int64_t effectiveT2 = 0;
-        for (const auto &kvlen : fBaseParams.actualSeqKvlen) {
+        for (const auto& kvlen : fBaseParams.actualSeqKvlen) {
             effectiveT2 += kvlen;
         }
         bool isTndPseBN1S = isTnd && (dim0 == effectiveT2 * fBaseParams.n1);
@@ -690,7 +690,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessSparseMo
 
     if ((fBaseParams.layoutType != INPUT_FORMAT_TND) &&
         (fBaseParams.sparseMode == RIGHT_DOWN_CASUAL_BAND || fBaseParams.sparseMode == BAND_LEFT_UP_CASUAL)) {
-        const char *inputLayout = attrs->GetAttrPointer<char>(INPUT_LAYOUT);
+        const char* inputLayout = attrs->GetAttrPointer<char>(INPUT_LAYOUT);
         std::string valuesMsg = "{" + std::string(inputLayout) + ", " + std::to_string(fBaseParams.sparseMode) + "}";
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad", "inputLayout, sparseMode", valuesMsg.c_str(),
                                                "RIGHT_DOWN_CASUAL_BAND and BAND_LEFT_UP_CASUAL require TND layout");
@@ -751,15 +751,15 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::PrintShapeInfo()
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetBaseShapeInfo()
 {
     // 待公共模板实现后，会删除该函数  直接继承基类
-    const gert::StorageShape *queryShape = context_->GetInputShape(QUERY);                  // [B, N2, G, S1, D]
-    const gert::StorageShape *queryRopeShape = context_->GetOptionalInputShape(QUERY_ROPE); // [B, N2, G, S1, D]
-    const gert::StorageShape *keyShape = context_->GetInputShape(KEY);                      // [B, N2, 1, S2, D]
-    const gert::StorageShape *keyRopeShape = context_->GetOptionalInputShape(KEY_ROPE);     // [B, N2, 1, S2, D]
-    const gert::StorageShape *valueShape = context_->GetInputShape(VALUE);
-    const gert::StorageShape *dyShape = context_->GetInputShape(DY);
+    const gert::StorageShape* queryShape = context_->GetInputShape(QUERY);                  // [B, N2, G, S1, D]
+    const gert::StorageShape* queryRopeShape = context_->GetOptionalInputShape(QUERY_ROPE); // [B, N2, G, S1, D]
+    const gert::StorageShape* keyShape = context_->GetInputShape(KEY);                      // [B, N2, 1, S2, D]
+    const gert::StorageShape* keyRopeShape = context_->GetOptionalInputShape(KEY_ROPE);     // [B, N2, 1, S2, D]
+    const gert::StorageShape* valueShape = context_->GetInputShape(VALUE);
+    const gert::StorageShape* dyShape = context_->GetInputShape(DY);
 
     int64_t headNum = *context_->GetAttrs()->GetAttrPointer<int>(HEAD_NUM);
-    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
+    const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
 
     OP_CHECK_IF(headNum == 0,
                 OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "headNum", std::to_string(headNum).c_str(),
@@ -889,8 +889,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetBaseShapeInf
                         "The shape sizes of actualSeqQLenOptional and actualSeqKvLenOptional must be the same"),
                     return ge::GRAPH_FAILED);
         if (!isMaxWorkspace_) {
-            const int64_t *qValue = actualSeqQlenTensor->GetData<int64_t>();
-            const int64_t *kvValue = actualSeqKvlenTensor->GetData<int64_t>();
+            const int64_t* qValue = actualSeqQlenTensor->GetData<int64_t>();
+            const int64_t* kvValue = actualSeqKvlenTensor->GetData<int64_t>();
             OP_CHECK_IF((qValue == nullptr || kvValue == nullptr),
                         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                             "FlashAttentionScoreGrad", "actualSeqQLenOptional or actualSeqKvLenOptional",
@@ -1003,7 +1003,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetBaseShapeInf
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessDropInfo(const char *inputLayout)
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessDropInfo(const char* inputLayout)
 {
     auto dropMask = context_->GetOptionalInputDesc(DROP_MASK);
     OP_CHECK_IF(
@@ -1081,7 +1081,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetShapeAttrsIn
         return ret;
     }
 
-    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
+    const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
 
     fBaseParams.n1 = fBaseParams.n2 * fBaseParams.g;
     fBaseParams.s1Align = (fBaseParams.s1 + INPUT_ALIGN - 1) / INPUT_ALIGN * INPUT_ALIGN;
@@ -1202,7 +1202,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetShapeAttrsIn
         return ret;
     }
 
-    const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
+    const char* tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
                                    context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) :
                                    "";
     if (strcmp(tndSoftmaxIn, "same_as_input") == 0) {
@@ -1620,7 +1620,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoLibApiTiling(
     return ge::GRAPH_SUCCESS;
 }
 
-void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetMatmulTilingBufferInfo(AscendC::tiling::TCubeTiling *mmTiling)
+void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetMatmulTilingBufferInfo(AscendC::tiling::TCubeTiling* mmTiling)
 {
     mmTiling->shareMode = 0;
     mmTiling->shareL1Size = fBaseParams.l1Size;
@@ -1629,7 +1629,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetMatmulTilingBufferInfo(
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(
         workspaces == nullptr,
         OP_LOGE(context_,

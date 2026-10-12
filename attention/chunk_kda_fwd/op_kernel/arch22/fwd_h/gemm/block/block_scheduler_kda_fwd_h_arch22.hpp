@@ -138,8 +138,8 @@ struct BlockSchedulerKdaFwdH {
     void Init(GM_ADDR cu_seqlens, GM_ADDR chunk_indices, GM_ADDR tiling, GM_ADDR user, uint32_t coreIdx,
               uint32_t coreNum)
     {
-        __gm__ ChunkKdaFwdHRuntimeTiling *__restrict kdaFwdHTilingData =
-            reinterpret_cast<__gm__ ChunkKdaFwdHRuntimeTiling *__restrict>(tiling);
+        __gm__ ChunkKdaFwdHRuntimeTiling* __restrict kdaFwdHTilingData =
+            reinterpret_cast<__gm__ ChunkKdaFwdHRuntimeTiling* __restrict>(tiling);
 
         batch = kdaFwdHTilingData->batch;
         seqlen = kdaFwdHTilingData->seqlen;
@@ -160,7 +160,7 @@ struct BlockSchedulerKdaFwdH {
     }
 
     template <typename TilingData>
-    CATLASS_DEVICE void InitFromData(GM_ADDR cu_seqlens, GM_ADDR chunk_indices, const TilingData &tilingData,
+    CATLASS_DEVICE void InitFromData(GM_ADDR cu_seqlens, GM_ADDR chunk_indices, const TilingData& tilingData,
                                      GM_ADDR user, uint32_t coreIdx, uint32_t coreNum)
     {
         batch = tilingData.batch;
@@ -184,9 +184,9 @@ struct BlockSchedulerKdaFwdH {
     CATLASS_DEVICE
     void InitRuntime(GM_ADDR cu_seqlens, GM_ADDR chunk_indices, GM_ADDR user, uint32_t coreIdx, uint32_t coreNum)
     {
-        gmSeqlen.SetGlobalBuffer((__gm__ int64_t *)cu_seqlens);
-        gmNumSeq.SetGlobalBuffer((__gm__ int64_t *)(user + numSeqWorkspaceOffset));
-        gmNumChunks.SetGlobalBuffer((__gm__ int64_t *)(user + numChunksWorkspaceOffset));
+        gmSeqlen.SetGlobalBuffer((__gm__ int64_t*)cu_seqlens);
+        gmNumSeq.SetGlobalBuffer((__gm__ int64_t*)(user + numSeqWorkspaceOffset));
+        gmNumChunks.SetGlobalBuffer((__gm__ int64_t*)(user + numChunksWorkspaceOffset));
 
         if (isVariedLen) {
             inputTokenBatch = tokenBatch;
@@ -226,7 +226,7 @@ struct BlockSchedulerKdaFwdH {
         uint32_t firstTaskIdx = waveIdx * cubeCoreNum + cubeCoreIdx;
         taskStride = taskNum;
         for (uint32_t streamId = 0; streamId < PING_PONG_STAGES; ++streamId) {
-            auto &stream = runningQ.streams[streamId];
+            auto& stream = runningQ.streams[streamId];
             stream.nextTaskIdx = streamId == 0 ? firstTaskIdx : taskNum;
             stream.chunkIdx = 0;
             stream.batchChunks = 0;
@@ -242,7 +242,7 @@ struct BlockSchedulerKdaFwdH {
     }
 
     CATLASS_DEVICE
-    void ResolveVarlenSequence(uint32_t compactBatchIdx, KdaFwdHStream &stream)
+    void ResolveVarlenSequence(uint32_t compactBatchIdx, KdaFwdHStream& stream)
     {
         uint32_t actualBatch = 0;
         int64_t chunkPrefix = 0;
@@ -279,7 +279,7 @@ struct BlockSchedulerKdaFwdH {
     }
 
     CATLASS_DEVICE
-    void InitNewStream(KdaFwdHStream &newStream)
+    void InitNewStream(KdaFwdHStream& newStream)
     {
         newStream.batchIdx = taskIdx / vNumHead;
         newStream.vHeadIdx = taskIdx % vNumHead;
@@ -300,7 +300,7 @@ struct BlockSchedulerKdaFwdH {
     CATLASS_DEVICE
     void AssignNextStream(uint32_t streamId)
     {
-        auto &stream = runningQ.streams[streamId];
+        auto& stream = runningQ.streams[streamId];
         taskIdx = stream.nextTaskIdx;
         if (taskIdx >= taskNum) {
             stream.active = false;
@@ -319,8 +319,8 @@ struct BlockSchedulerKdaFwdH {
     CATLASS_DEVICE
     void UpdateTask(uint32_t streamId)
     {
-        auto &stream = runningQ.streams[streamId];
-        auto &offset = stream.offset;
+        auto& stream = runningQ.streams[streamId];
+        auto& offset = stream.offset;
 
         offset.isInitialState = stream.chunkIdx == 0;
         offset.isFinalState = stream.chunkIdx == (stream.batchChunks - 1);
@@ -368,7 +368,7 @@ struct BlockSchedulerKdaFwdH {
     {
         isRunning = false;
         for (uint32_t streamId = 0; streamId < PING_PONG_STAGES; ++streamId) {
-            auto &stream = runningQ.streams[streamId];
+            auto& stream = runningQ.streams[streamId];
             if (stream.active) {
                 stream.chunkIdx += 1;
                 if (stream.chunkIdx >= stream.batchChunks) {
@@ -388,7 +388,7 @@ struct BlockSchedulerKdaFwdH {
     }
 
     CATLASS_DEVICE
-    const KdaFwdHStream &GetStream(uint32_t i) const
+    const KdaFwdHStream& GetStream(uint32_t i) const
     {
         return runningQ.streams[i];
     }
@@ -400,19 +400,19 @@ struct BlockSchedulerKdaFwdH {
     }
 
     CATLASS_DEVICE
-    const KdaFwdHOffsets &GetCurTaskOffsets(const KdaFwdHStream &stream) const
+    const KdaFwdHOffsets& GetCurTaskOffsets(const KdaFwdHStream& stream) const
     {
         return stream.offset;
     }
 
     CATLASS_DEVICE
-    bool StreamIsDone(const KdaFwdHStream &stream) const
+    bool StreamIsDone(const KdaFwdHStream& stream) const
     {
         return !stream.active;
     }
 
     CATLASS_DEVICE
-    bool NeedProcessStage2(const KdaFwdHStream &stream)
+    bool NeedProcessStage2(const KdaFwdHStream& stream)
     {
         return storeFinalState || !stream.offset.isFinalState;
     }
@@ -430,7 +430,7 @@ struct BlockSchedulerKdaFwdHCube : public BlockSchedulerKdaFwdH {
     }
 
     template <typename TilingData>
-    CATLASS_DEVICE void InitFromData(GM_ADDR cu_seqlens, GM_ADDR chunk_indices, const TilingData &tilingData,
+    CATLASS_DEVICE void InitFromData(GM_ADDR cu_seqlens, GM_ADDR chunk_indices, const TilingData& tilingData,
                                      GM_ADDR user)
     {
         BlockSchedulerKdaFwdH::InitFromData(cu_seqlens, chunk_indices, tilingData, user, AscendC::GetBlockIdx(),
@@ -450,7 +450,7 @@ struct BlockSchedulerKdaFwdHVec : public BlockSchedulerKdaFwdH {
     }
 
     template <typename TilingData>
-    CATLASS_DEVICE void InitFromData(GM_ADDR cu_seqlens, GM_ADDR chunk_indices, const TilingData &tilingData,
+    CATLASS_DEVICE void InitFromData(GM_ADDR cu_seqlens, GM_ADDR chunk_indices, const TilingData& tilingData,
                                      GM_ADDR user)
     {
         BlockSchedulerKdaFwdH::InitFromData(cu_seqlens, chunk_indices, tilingData, user,

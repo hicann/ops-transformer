@@ -31,7 +31,7 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35FA;
 
-ge::graphStatus PagedAttentionChecker::CheckSinglePara(const FaTilingInfo &faInfo)
+ge::graphStatus PagedAttentionChecker::CheckSinglePara(const FaTilingInfo& faInfo)
 {
     if (!faInfo.pageAttentionFlag) {
         return ge::GRAPH_SUCCESS;
@@ -49,12 +49,12 @@ ge::graphStatus PagedAttentionChecker::CheckSinglePara(const FaTilingInfo &faInf
                                               "The value of block_size must be 16-aligned"),
         return ge::GRAPH_FAILED);
 
-    auto &blockTableTensor = faInfo.opParamInfo.blockTable.tensor;
+    auto& blockTableTensor = faInfo.opParamInfo.blockTable.tensor;
     // 这里和存在性校验冲突了，但是为了在单参数校验校验dtype需要先判空
     OP_CHECK_IF(blockTableTensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(faInfo.opName, "block_table"),
                 return ge::GRAPH_FAILED);
 
-    const gert::CompileTimeTensorDesc *blockTableDesc = faInfo.opParamInfo.blockTable.desc;
+    const gert::CompileTimeTensorDesc* blockTableDesc = faInfo.opParamInfo.blockTable.desc;
     OP_CHECK_IF(blockTableDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(faInfo.opName, "TensorDesc of block_table"),
                 return ge::GRAPH_FAILED);
 
@@ -76,11 +76,11 @@ ge::graphStatus PagedAttentionChecker::CheckSinglePara(const FaTilingInfo &faInf
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckParaExistence(const FaTilingInfo &faInfo)
+ge::graphStatus PagedAttentionChecker::CheckParaExistence(const FaTilingInfo& faInfo)
 {
     if (!faInfo.pageAttentionFlag) {
         // 非 PA 模式下，block_table 不应传入
-        auto &blockTableTensor = faInfo.opParamInfo.blockTable.tensor;
+        auto& blockTableTensor = faInfo.opParamInfo.blockTable.tensor;
         OP_CHECK_IF(blockTableTensor != nullptr,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                         faInfo.opName, "block_table", "provided",
@@ -89,7 +89,7 @@ ge::graphStatus PagedAttentionChecker::CheckParaExistence(const FaTilingInfo &fa
         return ge::GRAPH_SUCCESS;
     }
 
-    auto &blockTableTensor = faInfo.opParamInfo.blockTable.tensor;
+    auto& blockTableTensor = faInfo.opParamInfo.blockTable.tensor;
     OP_CHECK_IF(blockTableTensor == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "block_table", "provided",
                                                       "When PagedAttention is enabled, block_table must not be empty"),
@@ -98,7 +98,7 @@ ge::graphStatus PagedAttentionChecker::CheckParaExistence(const FaTilingInfo &fa
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckFeature(const FaTilingInfo &faInfo)
+ge::graphStatus PagedAttentionChecker::CheckFeature(const FaTilingInfo& faInfo)
 {
     if (!faInfo.pageAttentionFlag) {
         return ge::GRAPH_SUCCESS;
@@ -115,7 +115,7 @@ ge::graphStatus PagedAttentionChecker::CheckFeature(const FaTilingInfo &faInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckMultiPara(const FaTilingInfo &faInfo)
+ge::graphStatus PagedAttentionChecker::CheckMultiPara(const FaTilingInfo& faInfo)
 {
     if (!faInfo.pageAttentionFlag) {
         OP_CHECK_IF(faInfo.keyNonContigDim != -1,
@@ -129,7 +129,7 @@ ge::graphStatus PagedAttentionChecker::CheckMultiPara(const FaTilingInfo &faInfo
         return ge::GRAPH_SUCCESS;
     }
 
-    auto &blockTableTensor = faInfo.opParamInfo.blockTable.tensor;
+    auto& blockTableTensor = faInfo.opParamInfo.blockTable.tensor;
     int64_t dim0 = blockTableTensor->GetStorageShape().GetDim(0);
     if (dim0 != faInfo.bSize) {
         std::string shapeStr = Ops::Base::ToString(blockTableTensor->GetStorageShape());

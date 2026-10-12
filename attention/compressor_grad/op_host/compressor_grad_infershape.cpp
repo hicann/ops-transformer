@@ -60,8 +60,8 @@ struct CompressorGradProtoShapeParam {
     int64_t cmpRatio{0};
 };
 
-ge::graphStatus GetCompressorGradShapeDim(const gert::InferShapeContext *context,
-                                          CompressorGradProtoShapeParam &shapeParam)
+ge::graphStatus GetCompressorGradShapeDim(const gert::InferShapeContext* context,
+                                          CompressorGradProtoShapeParam& shapeParam)
 {
     auto xShape = context->GetRequiredInputShape(TOKEN_X_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
@@ -75,7 +75,7 @@ ge::graphStatus GetCompressorGradShapeDim(const gert::InferShapeContext *context
 
     auto attr = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attr);
-    const int64_t *cmpRatioPtr = attr->GetAttrPointer<int64_t>(CMP_RATIO_ATTR_INDEX);
+    const int64_t* cmpRatioPtr = attr->GetAttrPointer<int64_t>(CMP_RATIO_ATTR_INDEX);
     OP_CHECK_IF((cmpRatioPtr == nullptr),
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "cmp_ratio", "attr is required"),
                 return ge::GRAPH_FAILED);
@@ -102,8 +102,8 @@ ge::graphStatus GetCompressorGradShapeDim(const gert::InferShapeContext *context
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus SetCompressorGradShapeDim(const CompressorGradProtoShapeParam &shapeParam,
-                                          gert::InferShapeContext *context)
+ge::graphStatus SetCompressorGradShapeDim(const CompressorGradProtoShapeParam& shapeParam,
+                                          gert::InferShapeContext* context)
 {
     auto dxShape = context->GetOutputShape(D_X_OUTPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, dxShape);
@@ -140,7 +140,7 @@ ge::graphStatus SetCompressorGradShapeDim(const CompressorGradProtoShapeParam &s
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeCompressorGrad(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeCompressorGrad(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("CompressorGrad", "context", "is nullptr"),
                 return ge::GRAPH_FAILED);
@@ -152,7 +152,7 @@ ge::graphStatus InferDataTypeCompressorGrad(gert::InferDataTypeContext *context)
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferShapeCompressorGrad(gert::InferShapeContext *context)
+ge::graphStatus InferShapeCompressorGrad(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("CompressorGrad", "context", "is nullptr"),
                 return ge::GRAPH_FAILED);

@@ -81,39 +81,39 @@ public:
     // Methods
     __aicore__ inline BsaMXFP4FullQuantKernelArch35() {}
 
-    __aicore__ inline void operator()(BsaFullQuantKernelParamsArch35 const &params)
+    __aicore__ inline void operator()(BsaFullQuantKernelParamsArch35 const& params)
     {
-        __gm__ BlockSparseAttentionTilingData *bsaTilingData =
-            reinterpret_cast<__gm__ BlockSparseAttentionTilingData *>(params.tiling);
+        __gm__ BlockSparseAttentionTilingData* bsaTilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionTilingData*>(params.tiling);
         FetchBaseShapeInfo(bsaTilingData);
         InitLayoutStride();
         // global buffers
         AscendC::GlobalTensor<ElementQ> gQ;
-        gQ.SetGlobalBuffer((__gm__ ElementQ *)params.query);
+        gQ.SetGlobalBuffer((__gm__ ElementQ*)params.query);
         AscendC::GlobalTensor<ElementK> gK;
-        gK.SetGlobalBuffer((__gm__ ElementK *)params.key);
+        gK.SetGlobalBuffer((__gm__ ElementK*)params.key);
         AscendC::GlobalTensor<ElementK> gV;
-        gV.SetGlobalBuffer((__gm__ ElementK *)params.value);
+        gV.SetGlobalBuffer((__gm__ ElementK*)params.value);
         AscendC::GlobalTensor<int64_t> gActualQseqlen;
-        gActualQseqlen.SetGlobalBuffer((__gm__ int64_t *)params.actualSeqLengths);
+        gActualQseqlen.SetGlobalBuffer((__gm__ int64_t*)params.actualSeqLengths);
         AscendC::GlobalTensor<int64_t> gActualKvseqlen;
-        gActualKvseqlen.SetGlobalBuffer((__gm__ int64_t *)params.actualSeqLengthsKv);
+        gActualKvseqlen.SetGlobalBuffer((__gm__ int64_t*)params.actualSeqLengthsKv);
         AscendC::GlobalTensor<uint8_t> gBlockSparseMask;
-        gBlockSparseMask.SetGlobalBuffer((__gm__ uint8_t *)params.blockSparseMask);
+        gBlockSparseMask.SetGlobalBuffer((__gm__ uint8_t*)params.blockSparseMask);
         AscendC::GlobalTensor<uint8_t> gQDequantScale;
-        gQDequantScale.SetGlobalBuffer((__gm__ uint8_t *)params.qDequantScale);
+        gQDequantScale.SetGlobalBuffer((__gm__ uint8_t*)params.qDequantScale);
         AscendC::GlobalTensor<uint8_t> gKDequantScale;
-        gKDequantScale.SetGlobalBuffer((__gm__ uint8_t *)params.kDequantScale);
+        gKDequantScale.SetGlobalBuffer((__gm__ uint8_t*)params.kDequantScale);
         AscendC::GlobalTensor<uint8_t> gVDequantScale;
-        gVDequantScale.SetGlobalBuffer((__gm__ uint8_t *)params.vDequantScale);
+        gVDequantScale.SetGlobalBuffer((__gm__ uint8_t*)params.vDequantScale);
         AscendC::GlobalTensor<ElementO> gO;
-        gO.SetGlobalBuffer((__gm__ ElementO *)params.attentionOut);
+        gO.SetGlobalBuffer((__gm__ ElementO*)params.attentionOut);
         AscendC::GlobalTensor<ElementLse> gLse;
-        gLse.SetGlobalBuffer((__gm__ ElementLse *)params.lse);
+        gLse.SetGlobalBuffer((__gm__ ElementLse*)params.lse);
         AscendC::GlobalTensor<ElementSparseIdx> gSparseIdx;
-        gSparseIdx.SetGlobalBuffer((__gm__ ElementSparseIdx *)params.workSpace);
+        gSparseIdx.SetGlobalBuffer((__gm__ ElementSparseIdx*)params.workSpace);
         AscendC::GlobalTensor<ElementSparseCount> gSparseCount;
-        gSparseCount.SetGlobalBuffer((__gm__ ElementSparseCount *)(params.workSpace + sparseIdxSize_));
+        gSparseCount.SetGlobalBuffer((__gm__ ElementSparseCount*)(params.workSpace + sparseIdxSize_));
 
         // cross core data move dst buffers
         AscendC::LocalTensor<ElementS> ubSTensor[EpMXFP4::UB_S_BUF_CNT];
@@ -151,7 +151,7 @@ public:
         coreIdx = AscendC::GetBlockIdx();
 
         uint32_t kvBufId = 0;
-        uint64_t softmaxScale = static_cast<uint64_t>(*reinterpret_cast<int32_t *>(&scaleValue_));
+        uint64_t softmaxScale = static_cast<uint64_t>(*reinterpret_cast<int32_t*>(&scaleValue_));
         BlockMmadQK blockMmadQK(resource, kvBufId, softmaxScale);
         BlockMmadPV blockMmadPV(resource, kvBufId);
         BlockMmadCopyGlobalMaxL1ToUB blockGMaxL1ToUb(resource);
@@ -202,13 +202,13 @@ public:
             delay20TaskTileIdx = coreTileLoop - PV_RE_DELAY_N - delay20preTaskTileSum;
             delay3TaskTileIdx = coreTileLoop - DELAY_PSCALE_N - delay3preTaskTileSum;
 
-            TaskInfo &curTaskInfo = taskInfos[coreTaskId % PRELOAD_TASK_CACHE_SIZE];
-            TaskInfo &delay20TaskInfo = taskInfos[delay20CoreTaskId % PRELOAD_TASK_CACHE_SIZE];
-            TaskInfo &delay3TaskInfo = taskInfos[delay3CoreTaskId % PRELOAD_TASK_CACHE_SIZE];
+            TaskInfo& curTaskInfo = taskInfos[coreTaskId % PRELOAD_TASK_CACHE_SIZE];
+            TaskInfo& delay20TaskInfo = taskInfos[delay20CoreTaskId % PRELOAD_TASK_CACHE_SIZE];
+            TaskInfo& delay3TaskInfo = taskInfos[delay3CoreTaskId % PRELOAD_TASK_CACHE_SIZE];
 
-            TileInfo &curTileInfo = tileInfos[coreTileLoop % PRELOAD_TASK_CACHE_SIZE];
-            TileInfo &delay20TileInfo = tileInfos[(coreTileLoop - PV_RE_DELAY_N) % PRELOAD_TASK_CACHE_SIZE];
-            TileInfo &delay3TileInfo = tileInfos[(coreTileLoop - DELAY_PSCALE_N) % PRELOAD_TASK_CACHE_SIZE];
+            TileInfo& curTileInfo = tileInfos[coreTileLoop % PRELOAD_TASK_CACHE_SIZE];
+            TileInfo& delay20TileInfo = tileInfos[(coreTileLoop - PV_RE_DELAY_N) % PRELOAD_TASK_CACHE_SIZE];
+            TileInfo& delay3TileInfo = tileInfos[(coreTileLoop - DELAY_PSCALE_N) % PRELOAD_TASK_CACHE_SIZE];
 
             // 创建qs任务
             if (curTaskTileIdx == 0 && coreTaskId < coreTaskNum) {
@@ -372,7 +372,7 @@ public:
         ReleaseSyncFlags();
     }
 
-    __aicore__ inline void FetchBaseShapeInfo(__gm__ BlockSparseAttentionTilingData *bsaTilingData)
+    __aicore__ inline void FetchBaseShapeInfo(__gm__ BlockSparseAttentionTilingData* bsaTilingData)
     {
         batch_ = bsaTilingData->batch;
         qHeads_ = bsaTilingData->numHeads;
@@ -463,7 +463,7 @@ public:
         AscendC::LocalTensor<ElementS> (&l1LocalGlobalMax)[GmMXFP4::L1_LOCAL_GLOBAL_MAX_BUF_CNT],
         AscendC::LocalTensor<ElementS> (&ubSTensor)[EpMXFP4::UB_S_BUF_CNT],
         AscendC::LocalTensor<ElementS> (&ubPeerGlobalMax)[EpMXFP4::UB_PEER_GLOBAL_MAX_CNT],
-        AscendC::LocalTensor<ElementOTmp> &ubOTmpTensor)
+        AscendC::LocalTensor<ElementOTmp>& ubOTmpTensor)
 
     {
         // L1 侧 buffer 初始化：OFFSET + i * SIZE 递增
@@ -493,12 +493,12 @@ public:
     }
 
     // Qs维度任务
-    __aicore__ inline void CreateTaskInfo(TaskInfo &info, uint32_t coreTaskId, uint32_t coreIdx, uint32_t coreNum,
-                                          AscendC::GlobalTensor<int64_t> &gActualQseqlen,
-                                          AscendC::GlobalTensor<int64_t> &gActualKvseqlen,
-                                          AscendC::GlobalTensor<ElementSparseCount> &gSparseCount,
-                                          AscendC::GlobalTensor<ElementSparseIdx> &gSparseIdx,
-                                          BatchOffsetInfo &batchInfo)
+    __aicore__ inline void CreateTaskInfo(TaskInfo& info, uint32_t coreTaskId, uint32_t coreIdx, uint32_t coreNum,
+                                          AscendC::GlobalTensor<int64_t>& gActualQseqlen,
+                                          AscendC::GlobalTensor<int64_t>& gActualKvseqlen,
+                                          AscendC::GlobalTensor<ElementSparseCount>& gSparseCount,
+                                          AscendC::GlobalTensor<ElementSparseIdx>& gSparseIdx,
+                                          BatchOffsetInfo& batchInfo)
     {
         uint32_t taskIdx = coreTaskId * coreNum + coreIdx; // 反推全局 task 序号
 
@@ -648,8 +648,8 @@ public:
     }
 
     // 256*128基本块维度
-    __aicore__ inline void CreateTileInfo(TileInfo &info, uint64_t coreTileLoop, uint32_t curTaskTileIdx,
-                                          const TaskInfo &taskInfo)
+    __aicore__ inline void CreateTileInfo(TileInfo& info, uint64_t coreTileLoop, uint32_t curTaskTileIdx,
+                                          const TaskInfo& taskInfo)
     {
         info.loop = static_cast<uint32_t>(coreTileLoop);
         info.curKvsTileLoopIdx = curTaskTileIdx;

@@ -26,8 +26,8 @@ namespace optiling {
 // FlashMlaWithKvcache 使用common中的公共结构
 // using FlashMlaWithKvcacheTilingData = FlashMlaWithKvcacheSimplifiedTilingData;
 
-ASCENDC_EXTERN_C ge::graphStatus TilingFlashMlaWithKvcache(gert::TilingContext *context);
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashMlaWithKvcache(gert::TilingParseContext *context);
+ASCENDC_EXTERN_C ge::graphStatus TilingFlashMlaWithKvcache(gert::TilingContext* context);
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashMlaWithKvcache(gert::TilingParseContext* context);
 
 } // namespace optiling
 

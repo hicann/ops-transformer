@@ -116,19 +116,19 @@ public:
     FaGmTensor<KV_T, KV_FORMAT> kCacheGm;
     GlobalTensor<int32_t> blockTableGm;
     // seq-lens GM 张量与解析器所有权在 kernel 侧 FlashMlaSeqLensTool，本 block 只读引用
-    SeqLensToolType &seqLensTool_;
+    SeqLensToolType& seqLensTool_;
 
     CopyQueryGmToL1<Q_T, Q_FORMAT> copyQueryGmToL1;
     CopyKvGmToL1<KV_T, KV_FORMAT> copyKvGmToL1;
 
-    const ConstInfoX &constInfo;
+    const ConstInfoX& constInfo;
 
     /*============================================================================== */
-    __aicore__ inline FlashMlaWithKvcacheNoQuantMlaBlockCube(ConstInfoX &constInfo, SeqLensToolType &seqLensTool)
+    __aicore__ inline FlashMlaWithKvcacheNoQuantMlaBlockCube(ConstInfoX& constInfo, SeqLensToolType& seqLensTool)
         : constInfo(constInfo),
           seqLensTool_(seqLensTool){};
 
-    __aicore__ inline void InitCubeBlock(__gm__ uint8_t *query, __gm__ uint8_t *kCache, __gm__ uint8_t *blockTable)
+    __aicore__ inline void InitCubeBlock(__gm__ uint8_t* query, __gm__ uint8_t* kCache, __gm__ uint8_t* blockTable)
     {
         InitCubeInput(query, kCache, blockTable);
     }
@@ -167,10 +167,10 @@ public:
         l0CBuffers_ = LocalTensor<uint8_t>(TPosition::CO1, 0U, L0C_BUFCNT * L0C_BUF_BYTES);
     }
 
-    __aicore__ inline void InitCubeInput(__gm__ uint8_t *query, __gm__ uint8_t *kCache, __gm__ uint8_t *blockTable)
+    __aicore__ inline void InitCubeInput(__gm__ uint8_t* query, __gm__ uint8_t* kCache, __gm__ uint8_t* blockTable)
     {
         if constexpr (PAGE_ATTENTION) {
-            blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
+            blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blockTable);
         }
 
         // query 576 宽单张量（nope 512 + rope 64 合并）——GM stride 按 576 初始化，
@@ -198,10 +198,10 @@ public:
 
     __aicore__ inline void InitQBuffer(
         uint32_t batchSize, uint32_t n2Size, uint32_t gSize, uint32_t qSeqSize, uint32_t headDim,
-        FaGmTensor<Q_T, Q_FORMAT, uint32_t, LAYOUT == FLASH_MLA_WITH_KVCACHE_LAYOUT::TND> &qGmTensor,
-        __gm__ uint8_t *gm)
+        FaGmTensor<Q_T, Q_FORMAT, uint32_t, LAYOUT == FLASH_MLA_WITH_KVCACHE_LAYOUT::TND>& qGmTensor,
+        __gm__ uint8_t* gm)
     {
-        qGmTensor.gmTensor.SetGlobalBuffer((__gm__ Q_T *)gm);
+        qGmTensor.gmTensor.SetGlobalBuffer((__gm__ Q_T*)gm);
         if constexpr (GmLayoutParams<Q_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_BNGSD) {
             qGmTensor.offsetCalculator.Init(batchSize, n2Size, gSize, qSeqSize, headDim,
                                             seqLensTool_.qActSeqLensParser);
@@ -211,10 +211,10 @@ public:
     }
 
     __aicore__ inline void InitKVBuffer(uint32_t n2Size, uint32_t kvCacheBlockSize, uint32_t headDim,
-                                        FaGmTensor<KV_T, KV_FORMAT> &kvGmTensor, __gm__ uint8_t *gm, uint32_t bnStride,
+                                        FaGmTensor<KV_T, KV_FORMAT>& kvGmTensor, __gm__ uint8_t* gm, uint32_t bnStride,
                                         uint32_t n2Stride)
     {
-        kvGmTensor.gmTensor.SetGlobalBuffer((__gm__ KV_T *)gm);
+        kvGmTensor.gmTensor.SetGlobalBuffer((__gm__ KV_T*)gm);
 
         if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_BNBD) {
             kvGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, headDim, blockTableGm,
@@ -247,7 +247,7 @@ public:
     // copy query（q 为 576 宽单张量，GM 上 nope+rope 合并存储，
     // 一次拷满 576 宽连续块，避免两次 strided 拷贝（nope 512 + rope 64）在 GM 行内留 gap 降低 MTE2 效率；
     // L1 NZ 布局中 rope 段自然落在 [dSize*dstStride) 偏移处，与双段拷贝一致）
-    __aicore__ inline void CopyQueryAndRopeTile(const LocalTensor<Q_T> &dstTensor, FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void CopyQueryAndRopeTile(const LocalTensor<Q_T>& dstTensor, FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         uint32_t dstStride = (runInfo.actMSize + 15) >> 4 << 4;
         FaL1Tensor<Q_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
@@ -265,7 +265,7 @@ public:
     // 一次拷满 576 宽连续块，避免两次 strided 拷贝在 GM 行内留 gap；L1 NZ 布局 rope 段自然落在
     // [dSize*dstStride) 偏移处；key and value 是同一份数据（k==v），bmm2 的 V 段 = L1 nope 区（512 宽），
     // 无独立 value GM 读取）
-    __aicore__ inline void CopyKeyAndRopeTile(const LocalTensor<KV_T> &dstTensor, FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void CopyKeyAndRopeTile(const LocalTensor<KV_T>& dstTensor, FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         uint32_t dstStride = (runInfo.actSingleLoopS2Size + 15) >> 4 << 4;
         FaL1Tensor<KV_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
@@ -280,7 +280,7 @@ public:
     }
 
     // 提前一轮发起 KV 搬运（只发 MTE2、不等落地），让 MTE2 与 MAC 流水重叠
-    __aicore__ inline void IterateBmm1Load(FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void IterateBmm1Load(FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         uint32_t kvpL1BufId = runInfo.loop % L1_KVP_BUFCNT;
         LocalTensor<KV_T> kvpL1Tensor = l1KvpBuffers_[kvpL1BufId * L1_KVP_BUF_BYTES].template ReinterpretCast<KV_T>();
@@ -291,7 +291,7 @@ public:
 
     // 仅用于 kernel 启动首任务（loop==0）：Q 的 MTE2 拷贝提前与 KV 同拍发出，压缩启动期。
     // 中途换 Q 块时不可提前（Q 单槽 L1，前块 MTE1 锁未释时会写冲突），仍走 IterateBmm1 原路径。
-    __aicore__ inline void IterateQPreload(FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void IterateQPreload(FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         LocalTensor<Q_T> qL1Tensor = l1QBuffers_.template ReinterpretCast<Q_T>();
         Mutex::Lock<PIPE_MTE2>(Q_L1_BUFFER_ID0);
@@ -299,8 +299,8 @@ public:
         Mutex::Unlock<PIPE_MTE2>(Q_L1_BUFFER_ID0);
     }
 
-    __aicore__ inline void FixpipeMm1(const LocalTensor<T> &dstTensor, const LocalTensor<T> &l0C,
-                                      FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void FixpipeMm1(const LocalTensor<T>& dstTensor, const LocalTensor<T>& l0C,
+                                      FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
         // L0C上的bmm1结果矩阵N方向的size大小, 使能NZ2ND, nSize*sizeof(T) 必须是32B的倍数
@@ -321,7 +321,7 @@ public:
 
     // ================== 特化 LoadData (310 分支 LoadData2DParamsV2, 常量折叠) ==================
     // mm1 L0A: MK, isLeftTranspose=false, realM=0; kSplit=tileK, mSplit=actM
-    __aicore__ inline void Mm1LoadL0A(LocalTensor<Q_T> &l0a, const LocalTensor<Q_T> &l1, uint64_t offset,
+    __aicore__ inline void Mm1LoadL0A(LocalTensor<Q_T>& l0a, const LocalTensor<Q_T>& l1, uint64_t offset,
                                       uint32_t tileK, uint32_t actM)
     {
         LoadData2DParamsV2 p;
@@ -335,7 +335,7 @@ public:
         LoadData(l0a, l1[offset], p);
     }
     // mm1 L0B: KN, isRightTranspose=true → ifTranspose=false; kSplit=tileK, nSplit=actS2
-    __aicore__ inline void Mm1LoadL0B(LocalTensor<KV_T> &l0b, const LocalTensor<KV_T> &l1, uint64_t offset,
+    __aicore__ inline void Mm1LoadL0B(LocalTensor<KV_T>& l0b, const LocalTensor<KV_T>& l1, uint64_t offset,
                                       uint32_t tileK, uint32_t actS2)
     {
         LoadData2DParamsV2 p;
@@ -349,7 +349,7 @@ public:
         LoadData(l0b, l1[offset], p);
     }
     // mm2 L0A: MK, isLeftTranspose=false, realM≠0 → mStep 用 realM; kSplit=actS2, mSplit=64
-    __aicore__ inline void Mm2LoadL0A(LocalTensor<KV_T> &l0a, const LocalTensor<KV_T> &l1, uint32_t actS2,
+    __aicore__ inline void Mm2LoadL0A(LocalTensor<KV_T>& l0a, const LocalTensor<KV_T>& l1, uint32_t actS2,
                                       uint32_t realM)
     {
         LoadData2DParamsV2 p;
@@ -364,7 +364,7 @@ public:
         LoadData(l0a, l1[0], p);
     }
     // mm2 L0B: KN, isRightTranspose=false → ifTranspose=true; kSplit=actS2, nSplit=128(常量)
-    __aicore__ inline void Mm2LoadL0B(LocalTensor<KV_T> &l0b, const LocalTensor<KV_T> &l1, uint64_t offset,
+    __aicore__ inline void Mm2LoadL0B(LocalTensor<KV_T>& l0b, const LocalTensor<KV_T>& l1, uint64_t offset,
                                       uint32_t actS2)
     {
         constexpr uint32_t nSplit = 128;
@@ -382,8 +382,8 @@ public:
     // ================== 特化 MatmulK（mm1: Q·K^T, K=576 固定, 96+112+128+112+128, M=actM, N=actS2）==================
     // 首个 Q96 分块常驻，其余分块交替使用 Q112/P 与 Q128 临时槽。
     // A/B 共用 B 槽 Mutex；Q112/P 最后一次 QK 读取位于倒数第二条 Mmad。
-    __aicore__ inline void Mm1MatmulK(const LocalTensor<Q_T> &qL1, const LocalTensor<KV_T> &kvL1,
-                                      const LocalTensor<MM_T> &c, uint32_t actM, uint32_t actS2, bool loadQueryCache)
+    __aicore__ inline void Mm1MatmulK(const LocalTensor<Q_T>& qL1, const LocalTensor<KV_T>& kvL1,
+                                      const LocalTensor<MM_T>& c, uint32_t actM, uint32_t actS2, bool loadQueryCache)
     {
         const uint32_t am = (actM + 15U) / 16U * 16U;
         const uint32_t an = (actS2 + 15U) / 16U * 16U;
@@ -424,7 +424,7 @@ public:
     }
 
     // qPreloaded：本任务 Q 已由启动路径（loop==0 IterateQPreload）提前发起 MTE2，跳过重复拷贝
-    __aicore__ inline void IterateBmm1(FlashMlaWithKvcacheRunInfoX &runInfo, bool qPreloaded = false)
+    __aicore__ inline void IterateBmm1(FlashMlaWithKvcacheRunInfoX& runInfo, bool qPreloaded = false)
     {
         uint32_t mm1ResUbBufId = runInfo.loop % UB_MM1_RES_BUFCNT;
         uint32_t kvpL1BufId = runInfo.loop % L1_KVP_BUFCNT;
@@ -470,8 +470,8 @@ public:
     }
 
     template <typename DST_TENSOR_T>
-    __aicore__ inline void FixpipeMm2PartialN(const DST_TENSOR_T &dstTensor, const LocalTensor<T> &l0C, uint32_t realN,
-                                              FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void FixpipeMm2PartialN(const DST_TENSOR_T& dstTensor, const LocalTensor<T>& l0C, uint32_t realN,
+                                              FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams; // L0C→UB;FixpipeParamsM300:L0C→UB
         fixpipeParams.nSize = (realN + 7) >> 3 << 3;
@@ -485,7 +485,7 @@ public:
         Fixpipe<T, T, FIXPIPE_ROW_MAJOR_UB>(dstTensor, l0C, fixpipeParams);
     }
 
-    __aicore__ inline void IterateBmm2(FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void IterateBmm2(FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         uint32_t kvslot = runInfo.loop % L1_KVP_BUFCNT;
         auto kv = l1KvpBuffers_[kvslot * L1_KVP_BUF_BYTES].template ReinterpretCast<KV_T>();
@@ -574,8 +574,8 @@ public:
 
     using ConstInfoX = ConstInfo_t<FlashMlaWithKvcacheKernelType::NO_QUANT>;
     template <typename FlashMlaSeqLensToolT>
-    __aicore__ inline FlashMlaWithKvcacheNoQuantMlaBlockCubeDummy(ConstInfoX &constInfo,
-                                                                  FlashMlaSeqLensToolT &seqLensTool){};
+    __aicore__ inline FlashMlaWithKvcacheNoQuantMlaBlockCubeDummy(ConstInfoX& constInfo,
+                                                                  FlashMlaSeqLensToolT& seqLensTool){};
 };
 
 } // namespace FlashAttnKernel

@@ -28,13 +28,13 @@
 namespace optiling {
 // ------------------公共定义--------------------------
 struct TilingRequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct TilingOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 enum class DataLayout : uint32_t {
@@ -109,17 +109,17 @@ struct DenseLISoftmaxLseParaInfo {
     TilingRequiredParaInfo softmaxMaxOut = {nullptr, nullptr};
     TilingRequiredParaInfo softmaxSumOut = {nullptr, nullptr};
 
-    const char *layOut = nullptr;
-    const int32_t *sparseMode = nullptr;
-    const int64_t *preTokens = nullptr;
-    const int64_t *nextTokens = nullptr;
+    const char* layOut = nullptr;
+    const int32_t* sparseMode = nullptr;
+    const int64_t* preTokens = nullptr;
+    const int64_t* nextTokens = nullptr;
 };
 
 // -----------算子Tiling入参信息类---------------
 class DenseLISoftmaxLseTilingInfo {
 public:
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     DenseLISoftmaxLseParaInfo opParamInfo;
     // Base Param
     platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND910B;
@@ -150,7 +150,7 @@ public:
 // -----------算子Tiling入参信息解析及Check类---------------
 class DenseLISoftmaxLseInfoParser {
 public:
-    explicit DenseLISoftmaxLseInfoParser(gert::TilingContext *context)
+    explicit DenseLISoftmaxLseInfoParser(gert::TilingContext* context)
         : context_(context)
     {}
     ~DenseLISoftmaxLseInfoParser() = default;
@@ -158,8 +158,8 @@ public:
     ge::graphStatus CheckRequiredInOutExistence() const;
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckRequiredParaExistence() const;
-    ge::graphStatus GetActualSeqLenSize(uint32_t &size, const gert::Tensor *tensor,
-                                        const std::string &actualSeqLenName);
+    ge::graphStatus GetActualSeqLenSize(uint32_t& size, const gert::Tensor* tensor,
+                                        const std::string& actualSeqLenName);
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     void GetOptionalInputParaInfo();
@@ -178,7 +178,7 @@ public:
     ge::graphStatus CheckShapeDim();
     ge::graphStatus GetS2Size();
     ge::graphStatus CheckSeqLenLimit();
-    ge::graphStatus GetMaxSeqLenFromTensor(const gert::Tensor *tensor, uint64_t &maxSeqLen, bool isAccumSeq);
+    ge::graphStatus GetMaxSeqLenFromTensor(const gert::Tensor* tensor, uint64_t& maxSeqLen, bool isAccumSeq);
     ge::graphStatus GetStorageSeqSize();
     ge::graphStatus GetQueryKeyAndOutLayout();
     ge::graphStatus GetN1Size();
@@ -186,13 +186,13 @@ public:
     ge::graphStatus GetGSize();
     ge::graphStatus GetAttenMaskInfo();
     ge::graphStatus GetActualSeqInfo();
-    void GenerateInfo(DenseLISoftmaxLseTilingInfo &denseLISoftmaxTilingInfo);
-    ge::graphStatus ParseAndCheck(DenseLISoftmaxLseTilingInfo &denseLISoftmaxTilingInfo);
+    void GenerateInfo(DenseLISoftmaxLseTilingInfo& denseLISoftmaxTilingInfo);
+    ge::graphStatus ParseAndCheck(DenseLISoftmaxLseTilingInfo& denseLISoftmaxTilingInfo);
 
 public:
-    gert::TilingContext *context_ = nullptr;
-    const char *opName_;
-    fe::PlatFormInfos *platformInfo_;
+    gert::TilingContext* context_ = nullptr;
+    const char* opName_;
+    fe::PlatFormInfos* platformInfo_;
     DenseLISoftmaxLseParaInfo opParamInfo_;
 
     // BaseParams
@@ -218,12 +218,12 @@ public:
 // ---------------算子Tiling类---------------
 class DenseLightningIndexerSoftmaxLseTiling {
 public:
-    explicit DenseLightningIndexerSoftmaxLseTiling(gert::TilingContext *context)
+    explicit DenseLightningIndexerSoftmaxLseTiling(gert::TilingContext* context)
         : context_(context) {};
-    ge::graphStatus DoTiling(DenseLISoftmaxLseTilingInfo *tilingInfo);
+    ge::graphStatus DoTiling(DenseLISoftmaxLseTilingInfo* tilingInfo);
 
 private:
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     DenseLISoftmaxLseTilingData tilingData_;
 };
 } // namespace optiling

@@ -15,7 +15,7 @@ namespace optiling {
 namespace FA {
 class FlashAttentionScoreTilingBasic : public FlashAttentionScoreTilingRegbase {
 public:
-    explicit FlashAttentionScoreTilingBasic(gert::TilingContext *context)
+    explicit FlashAttentionScoreTilingBasic(gert::TilingContext* context)
         : FlashAttentionScoreTilingRegbase(context)
     {
         this->templateName = "S1S2Const";
@@ -214,7 +214,7 @@ protected:
 
     ge::graphStatus GetWorkspaceSize() override
     {
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         // 当前只有当D较大时需要开启workspace存放Bmm2的数据
         int64_t bmm2Bytes = 0;
         int64_t vec2Bytes = 0;

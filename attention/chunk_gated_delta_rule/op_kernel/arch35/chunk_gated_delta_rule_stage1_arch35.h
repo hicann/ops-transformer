@@ -57,7 +57,7 @@ class Stage1 {
 public:
     using vInnerType = std::conditional_t<kStateIsFp32, float, bfloat16_t>;
     __aicore__ inline Stage1() {}
-    __aicore__ inline void SetGlobalTensors(const GDRStageOneInitParams<vInnerType> &initParams)
+    __aicore__ inline void SetGlobalTensors(const GDRStageOneInitParams<vInnerType>& initParams)
     {
         queryGm_ = initParams.query;
         keyGm_ = initParams.key;
@@ -78,26 +78,26 @@ public:
         // ckOffset_
         uint64_t workSpaceOffset = 0;
         uint64_t curWS = coreIdx_ * paraNum_ * ckOffset_ * sizeof(bfloat16_t);
-        gBKWsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(initParams.ws + workSpaceOffset + curWS));
+        gBKWsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(initParams.ws + workSpaceOffset + curWS));
         workSpaceOffset += coreNum_ * paraNum_ * ckOffset_ * sizeof(bfloat16_t);
 
-        queryConGm_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(initParams.ws + workSpaceOffset + curWS));
+        queryConGm_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(initParams.ws + workSpaceOffset + curWS));
         workSpaceOffset += coreNum_ * paraNum_ * ckOffset_ * sizeof(bfloat16_t);
 
-        keyConGm_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(initParams.ws + workSpaceOffset + curWS));
+        keyConGm_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(initParams.ws + workSpaceOffset + curWS));
         workSpaceOffset += coreNum_ * paraNum_ * ckOffset_ * sizeof(bfloat16_t);
 
         // ccOffset_
         curWS = coreIdx_ * paraNum_ * ccOffset_ * sizeof(bfloat16_t);
-        kkWsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(initParams.ws + workSpaceOffset + curWS));
+        kkWsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(initParams.ws + workSpaceOffset + curWS));
         workSpaceOffset += coreNum_ * paraNum_ * ccOffset_ * sizeof(bfloat16_t);
 
-        attnWsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(initParams.ws + workSpaceOffset + curWS));
+        attnWsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(initParams.ws + workSpaceOffset + curWS));
         workSpaceOffset += coreNum_ * paraNum_ * ccOffset_ * sizeof(bfloat16_t);
 
         // cvOffset_
         curWS = coreIdx_ * paraNum_ * cvOffset_ * sizeof(bfloat16_t);
-        vBetaWsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(initParams.ws + workSpaceOffset + curWS));
+        vBetaWsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(initParams.ws + workSpaceOffset + curWS));
     }
 
     __aicore__ inline void InitLocalBuffers()
@@ -175,8 +175,8 @@ public:
         WaitFlag<HardEvent::S_V>(eventID);
     }
 
-    __aicore__ inline void Init(const GDRStageOneInitParams<vInnerType> &initParams, TPipe *pipe,
-                                const ChunkGatedDeltaRuleTilingData *tilingData)
+    __aicore__ inline void Init(const GDRStageOneInitParams<vInnerType>& initParams, TPipe* pipe,
+                                const ChunkGatedDeltaRuleTilingData* tilingData)
     {
         pipe_ = pipe;
         tiling_ = tilingData;
@@ -386,8 +386,8 @@ private:
         }
         AscendC::CrossCoreWaitFlag(0xA); // 同步5
     }
-    __aicore__ inline void QKPreProcess(const GlobalTensor<bfloat16_t> &srcGm, const GlobalTensor<bfloat16_t> &dstGm,
-                                        const GlobalTensor<bfloat16_t> &outKgGm, uint32_t subValidRows,
+    __aicore__ inline void QKPreProcess(const GlobalTensor<bfloat16_t>& srcGm, const GlobalTensor<bfloat16_t>& dstGm,
+                                        const GlobalTensor<bfloat16_t>& outKgGm, uint32_t subValidRows,
                                         bool kgFlag = false)
     {
         // copyOut
@@ -427,10 +427,10 @@ private:
         // Copy g
         GCopyInWithStride(src, validLen);
         // CumSum、Exp 和 Gamma 在同一次 VF 中计算，chunkSize_ 按参数传入。
-        auto gAddr = reinterpret_cast<__ubuf__ float *>(gCumUbFloat_.GetPhyAddr());
-        auto gCumAddr = reinterpret_cast<__ubuf__ float *>(gCumSumUbFloat.GetPhyAddr());
-        auto gCumExpAddr = reinterpret_cast<__ubuf__ float *>(gCumExpUbFloat.GetPhyAddr());
-        auto gammaAddr = reinterpret_cast<__ubuf__ float *>(gammaUbFloat.GetPhyAddr());
+        auto gAddr = reinterpret_cast<__ubuf__ float*>(gCumUbFloat_.GetPhyAddr());
+        auto gCumAddr = reinterpret_cast<__ubuf__ float*>(gCumSumUbFloat.GetPhyAddr());
+        auto gCumExpAddr = reinterpret_cast<__ubuf__ float*>(gCumExpUbFloat.GetPhyAddr());
+        auto gammaAddr = reinterpret_cast<__ubuf__ float*>(gammaUbFloat.GetPhyAddr());
         AscendC::VF_CALL<CumSumExpVF>(gAddr, gCumAddr, gCumExpAddr, gammaAddr, static_cast<uint32_t>(chunkSize_));
         PipeBarrier<PIPE_V>();
 
@@ -727,9 +727,9 @@ private:
         WaitFlag<HardEvent::FIX_MTE2>(eventID);
     }
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     CGDRMatmulBasic mmBasic_;
-    const ChunkGatedDeltaRuleTilingData *tiling_;
+    const ChunkGatedDeltaRuleTilingData* tiling_;
     ChunkGroup cg_;
     uint32_t nk_;
     uint32_t nv_;

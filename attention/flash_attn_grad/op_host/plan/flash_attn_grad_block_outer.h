@@ -35,7 +35,7 @@ inline int64_t FagCvInner(int64_t seq, int64_t inner, int64_t ratio)
     return (inner * ratio > seq) ? seq : inner * ratio;
 }
 
-inline void FagS1S2Outer(int64_t s1, int64_t s2, int64_t &s1Outer, int64_t &s2Outer)
+inline void FagS1S2Outer(int64_t s1, int64_t s2, int64_t& s1Outer, int64_t& s2Outer)
 {
     int64_t s1CvInner = FagCvInner(s1, FAG_S1_INNER, FAG_S1CV_RATIO_DEFAULT);
     int64_t s2CvInner = FagCvInner(s2, FAG_S2_INNER, FAG_S2CV_RATIO_DEFAULT);

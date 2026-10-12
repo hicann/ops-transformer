@@ -20,7 +20,7 @@
 namespace optiling {
 namespace fag {
 
-ge::graphStatus CheckSoftmaxMaxShape(const gert::TilingContext *context, int64_t b, int64_t n1, int64_t s1,
+ge::graphStatus CheckSoftmaxMaxShape(const gert::TilingContext* context, int64_t b, int64_t n1, int64_t s1,
                                      bool isQuant)
 {
     auto softmaxMaxShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::SOFTMAX_MAX));
@@ -49,7 +49,7 @@ ge::graphStatus CheckSoftmaxMaxShape(const gert::TilingContext *context, int64_t
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckSoftmaxSumShape(const gert::TilingContext *context, int64_t b, int64_t n1, int64_t s1,
+ge::graphStatus CheckSoftmaxSumShape(const gert::TilingContext* context, int64_t b, int64_t n1, int64_t s1,
                                      bool isQuant)
 {
     auto softmaxSumShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::SOFTMAX_SUM));
@@ -78,11 +78,11 @@ ge::graphStatus CheckSoftmaxSumShape(const gert::TilingContext *context, int64_t
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckSoftmaxMaxSumTndShape(const gert::TilingContext *context, int64_t t1, int64_t n1)
+ge::graphStatus CheckSoftmaxMaxSumTndShape(const gert::TilingContext* context, int64_t t1, int64_t n1)
 {
     if (context->GetAttrs()->GetAttrNum() > static_cast<size_t>(AttrIndex::TND_SOFTMAX_IN)) {
         // read 13th attr softmax_out_layout
-        const char *softmaxInLayout =
+        const char* softmaxInLayout =
             context->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::TND_SOFTMAX_IN));
         if (strcmp(softmaxInLayout, "same_as_input") != 0) {
             // check whether softmax_out_layout is TND
@@ -134,7 +134,7 @@ ge::graphStatus CheckSoftmaxMaxSumTndShape(const gert::TilingContext *context, i
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckAttentionInShape(const gert::TilingContext *context)
+ge::graphStatus CheckAttentionInShape(const gert::TilingContext* context)
 {
     auto attentionInShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::ATTENTION_IN));
     if (attentionInShape == nullptr) {
@@ -153,7 +153,7 @@ ge::graphStatus CheckAttentionInShape(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckSoftmaxDtype(const gert::TilingContext *context)
+ge::graphStatus CheckSoftmaxDtype(const gert::TilingContext* context)
 {
     auto softmaxMax = context->GetOptionalInputDesc(static_cast<size_t>(InputIndex::SOFTMAX_MAX));
     auto softmaxSum = context->GetOptionalInputDesc(static_cast<size_t>(InputIndex::SOFTMAX_SUM));
@@ -175,7 +175,7 @@ ge::graphStatus CheckSoftmaxDtype(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckAttentionInDtype(const gert::TilingContext *context)
+ge::graphStatus CheckAttentionInDtype(const gert::TilingContext* context)
 {
     auto query = context->GetInputDesc(static_cast<size_t>(InputIndex::QUERY));
     auto attentionIn = context->GetOptionalInputDesc(static_cast<size_t>(InputIndex::ATTENTION_IN));
@@ -200,7 +200,7 @@ ge::graphStatus CheckAttentionInDtype(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckShapeValid(const gert::TilingContext *context, int64_t b, int64_t n1, int64_t s1, int64_t d)
+ge::graphStatus CheckShapeValid(const gert::TilingContext* context, int64_t b, int64_t n1, int64_t s1, int64_t d)
 {
     auto isShapeInValid = (b == 0 || n1 == 0 || s1 == 0 || d == 0);
     std::string shapeMsg =
@@ -228,7 +228,7 @@ ge::graphStatus CheckShapeValid(const gert::TilingContext *context, int64_t b, i
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckTndShapeValid(const gert::TilingContext *context, int64_t t1, int64_t n1, int64_t d)
+ge::graphStatus CheckTndShapeValid(const gert::TilingContext* context, int64_t t1, int64_t n1, int64_t d)
 {
     if (context == nullptr) {
         OP_LOGE(context, "context is nullptr");
@@ -255,7 +255,7 @@ ge::graphStatus CheckTndShapeValid(const gert::TilingContext *context, int64_t t
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckDtypeValid(const gert::TilingContext *context)
+ge::graphStatus CheckDtypeValid(const gert::TilingContext* context)
 {
     if (context == nullptr) {
         OP_LOGE(context, "context is nullptr");
@@ -274,7 +274,7 @@ ge::graphStatus CheckDtypeValid(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase &fBaseParams)
+ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     // check atten_mask shape when enable atten_mask_compress
     if (fBaseParams.attenMaskCompressMode == 0) {
@@ -365,7 +365,7 @@ ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase &fBaseParams)
     return ge::GRAPH_SUCCESS;
 }
 
-bool CheckIsLargeInvalidBlk(const FuzzyBaseInfoParamsRegbase &fBaseParams)
+bool CheckIsLargeInvalidBlk(const FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     if ((fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::LEFT_UP_CAUSAL)) &&
         (fBaseParams.s1Outer >= 0 && fBaseParams.s2Outer >= 0) && (fBaseParams.s1Outer < fBaseParams.s2Outer) &&
@@ -375,10 +375,10 @@ bool CheckIsLargeInvalidBlk(const FuzzyBaseInfoParamsRegbase &fBaseParams)
     return false;
 }
 
-void JudgeIsNeedDeter(FuzzyBaseInfoParamsRegbase &fBaseParams, std::array<int64_t, CORE_LIST_NUM> &dqOffset,
-                      std::array<int64_t, CORE_LIST_NUM> &dkDvOffset, std::array<int64_t, CORE_LIST_NUM> &dqOffsetpre,
-                      std::array<int64_t, CORE_LIST_NUM> &dkDvOffsetpre, int64_t calcNum, bool &noNeedDeter,
-                      bool &dqNeedDeterpre, bool &dkDvNeedDeterpre)
+void JudgeIsNeedDeter(FuzzyBaseInfoParamsRegbase& fBaseParams, std::array<int64_t, CORE_LIST_NUM>& dqOffset,
+                      std::array<int64_t, CORE_LIST_NUM>& dkDvOffset, std::array<int64_t, CORE_LIST_NUM>& dqOffsetpre,
+                      std::array<int64_t, CORE_LIST_NUM>& dkDvOffsetpre, int64_t calcNum, bool& noNeedDeter,
+                      bool& dqNeedDeterpre, bool& dkDvNeedDeterpre)
 {
     bool dqNeedDeter = false;
     bool dkDvNeedDeter = false;
@@ -468,7 +468,7 @@ void JudgeIsNeedDeter(FuzzyBaseInfoParamsRegbase &fBaseParams, std::array<int64_
     }
 }
 
-void GetOffset(FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t &currentDqOffset, int64_t &currentDkDvOffset,
+void GetOffset(FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t& currentDqOffset, int64_t& currentDkDvOffset,
                int64_t blockIdx)
 {
     int64_t boIdx = 0;
@@ -571,7 +571,7 @@ void GetOffset(FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t &currentDqOffset
     }
 }
 
-int64_t GetTotalPerBatchNum(FuzzyBaseInfoParamsRegbase &fBaseParams, uint8_t sparseType)
+int64_t GetTotalPerBatchNum(FuzzyBaseInfoParamsRegbase& fBaseParams, uint8_t sparseType)
 {
     int64_t totalPerBatchNum = 0;
     if (sparseType == static_cast<uint8_t>(SparseType::DENSE)) {
@@ -603,7 +603,7 @@ int64_t GetTotalPerBatchNum(FuzzyBaseInfoParamsRegbase &fBaseParams, uint8_t spa
     return totalPerBatchNum;
 }
 
-void PrintShapeInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
+void PrintShapeInfo(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     OP_LOGI(context_,
             "FAG s1s2_bn2gs1s2 with shape b[%ld] n2[%ld] g[%ld] s1[%ld] s2[%ld] d[%ld] preToken[%ld] nextToken[%ld]!",
@@ -611,7 +611,7 @@ void PrintShapeInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegb
             fBaseParams.s1Token, fBaseParams.s2Token);
 }
 
-bool CheckSparseModeValue(FuzzyBaseInfoParamsRegbase &fBaseParams)
+bool CheckSparseModeValue(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     if (fBaseParams.sparseMode > static_cast<uint32_t>(SparseMode::PREFIX_COMPRESS)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "sparseMode",
@@ -622,7 +622,7 @@ bool CheckSparseModeValue(FuzzyBaseInfoParamsRegbase &fBaseParams)
     return true;
 }
 
-bool CheckVarLenSparseModeValue(FuzzyBaseInfoParamsRegbase &fBaseParams)
+bool CheckVarLenSparseModeValue(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::PREFIX) ||
         fBaseParams.sparseMode > static_cast<uint32_t>(SparseMode::BAND_LEFT_UP_CASUAL)) {
@@ -634,7 +634,7 @@ bool CheckVarLenSparseModeValue(FuzzyBaseInfoParamsRegbase &fBaseParams)
     return true;
 }
 
-ge::graphStatus CheckUnpadTokensInfo(FuzzyBaseInfoParamsRegbase &fBaseParams)
+ge::graphStatus CheckUnpadTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     // 7  8
     if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::RIGHT_DOWN_CASUAL_BAND) ||
@@ -701,7 +701,7 @@ ge::graphStatus CheckUnpadTokensInfo(FuzzyBaseInfoParamsRegbase &fBaseParams)
     return ge::GRAPH_SUCCESS;
 }
 
-int64_t FindBandIdx(FuzzyBaseInfoParamsRegbase &fBaseParams)
+int64_t FindBandIdx(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::RIGHT_DOWN_CASUAL_BAND)) {
         for (int64_t i = fBaseParams.b - 1; i >= 0; i--) {
@@ -719,15 +719,15 @@ int64_t FindBandIdx(FuzzyBaseInfoParamsRegbase &fBaseParams)
     return 0;
 }
 
-bool IsNewDeter(const FuzzyBaseInfoParamsRegbase &fBaseParams)
+bool IsNewDeter(const FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     return fBaseParams.deterSparseType >= static_cast<uint32_t>(DeterSparseType::DETER_DENSE) &&
            fBaseParams.deterSparseType <= static_cast<uint32_t>(DeterSparseType::DETER_BAND) &&
            (fBaseParams.layoutType == INPUT_FORMAT_TND);
 }
 
-bool CheckPrefixNExist(FuzzyBaseInfoParamsRegbase &fBaseParams, const int64_t bIdx, const int64_t prefixN,
-                       std::vector<std::vector<std::pair<int64_t, int64_t>>> &s1ValidIdx)
+bool CheckPrefixNExist(FuzzyBaseInfoParamsRegbase& fBaseParams, const int64_t bIdx, const int64_t prefixN,
+                       std::vector<std::vector<std::pair<int64_t, int64_t>>>& s1ValidIdx)
 {
     for (int64_t i = 0; i < bIdx; ++i) {
         if (fBaseParams.prefixN[i] == prefixN) {
@@ -739,7 +739,7 @@ bool CheckPrefixNExist(FuzzyBaseInfoParamsRegbase &fBaseParams, const int64_t bI
     return false;
 }
 
-void CalcleBandDeterParam(FuzzyBaseInfoParamsRegbase &fBaseParams)
+void CalcleBandDeterParam(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     int64_t m{fBaseParams.s1Outer}, n{fBaseParams.s2Outer}, k{static_cast<int64_t>(fBaseParams.aicNum)},
         b{fBaseParams.b * fBaseParams.n2};
@@ -790,7 +790,7 @@ void CalcleBandDeterParam(FuzzyBaseInfoParamsRegbase &fBaseParams)
     fBaseParams.deterMaxRound = r1 + r2;
 }
 
-void CalcleCausalDeterParam(FuzzyBaseInfoParamsRegbase &fBaseParams)
+void CalcleCausalDeterParam(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     int64_t m{fBaseParams.s1Outer}, n{fBaseParams.s2Outer}, k{static_cast<int64_t>(fBaseParams.aicNum)},
         b{fBaseParams.b * fBaseParams.n2};
@@ -847,10 +847,10 @@ void CalcleCausalDeterParam(FuzzyBaseInfoParamsRegbase &fBaseParams)
     fBaseParams.deterMaxRound = rUpper;
 }
 
-void SetSparsePrefixBlockInterval(const FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t bIdx, int64_t nIdx,
-                                  std::vector<std::vector<std::pair<int64_t, int64_t>>> &s1ValidIdx,
+void SetSparsePrefixBlockInterval(const FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t bIdx, int64_t nIdx,
+                                  std::vector<std::vector<std::pair<int64_t, int64_t>>>& s1ValidIdx,
                                   int64_t (&blockStarts)[CORE_LIST_NUM], int64_t (&blockEnds)[CORE_LIST_NUM],
-                                  uint32_t &coreNum, int64_t &tmepBlock)
+                                  uint32_t& coreNum, int64_t& tmepBlock)
 {
     for (int64_t gIdx = 0; gIdx < fBaseParams.g; ++gIdx) {
         for (int64_t s2Idx = 0; s2Idx < fBaseParams.s2Outer; ++s2Idx) {
@@ -868,7 +868,7 @@ void SetSparsePrefixBlockInterval(const FuzzyBaseInfoParamsRegbase &fBaseParams,
     return;
 }
 
-std::pair<uint32_t, uint32_t> GetS1S2TemplateType(FuzzyBaseInfoParamsRegbase &fBaseParams)
+std::pair<uint32_t, uint32_t> GetS1S2TemplateType(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     if (fBaseParams.queryType == ge::DT_FLOAT && fBaseParams.d > static_cast<uint32_t>(ConstAxisTemplateNum::NUM256)) {
         fBaseParams.s1TemplateType = ConstAxisTemplateNum::NUM64;
@@ -903,7 +903,7 @@ std::pair<uint32_t, uint32_t> GetS1S2TemplateType(FuzzyBaseInfoParamsRegbase &fB
                           static_cast<uint32_t>(ConstAxisTemplateNum::NUM128));
 }
 
-uint32_t GetDTemplateType(FuzzyBaseInfoParamsRegbase &fBaseParams)
+uint32_t GetDTemplateType(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     if (fBaseParams.hasRope) {
         fBaseParams.dTemplateType = ConstAxisTemplateNum::NUM192;
@@ -928,8 +928,8 @@ uint32_t GetDTemplateType(FuzzyBaseInfoParamsRegbase &fBaseParams)
     return static_cast<uint32_t>(ConstAxisTemplateNum::NUM768);
 }
 
-void GetCommS1S2OuterInfo(FuzzyBaseInfoParamsRegbase &fBaseParams, const int64_t prefixN,
-                          std::vector<std::pair<int64_t, int64_t>> &s1ValidIdx)
+void GetCommS1S2OuterInfo(FuzzyBaseInfoParamsRegbase& fBaseParams, const int64_t prefixN,
+                          std::vector<std::pair<int64_t, int64_t>>& s1ValidIdx)
 {
     for (int64_t i = 0; i < fBaseParams.s2Outer; i++) {
         int64_t s1Start = 0;
@@ -950,8 +950,8 @@ void GetCommS1S2OuterInfo(FuzzyBaseInfoParamsRegbase &fBaseParams, const int64_t
     }
 }
 
-void GetCommonS1S2OuterIndex(const FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t (*parseInfo)[ARRAY_LENGTH],
-                             int64_t gTail, int64_t &s1oIdx, int64_t &s2oIdx)
+void GetCommonS1S2OuterIndex(const FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t (*parseInfo)[ARRAY_LENGTH],
+                             int64_t gTail, int64_t& s1oIdx, int64_t& s2oIdx)
 {
     int64_t preSize = 0;
     int64_t nextSize = 0;
@@ -970,8 +970,8 @@ void GetCommonS1S2OuterIndex(const FuzzyBaseInfoParamsRegbase &fBaseParams, int6
     }
 }
 
-void CalcleActualToken(FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t batchIdx, int64_t &actualCalcS1Token,
-                       int64_t &actualCalcS2Token)
+void CalcleActualToken(FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t batchIdx, int64_t& actualCalcS1Token,
+                       int64_t& actualCalcS2Token)
 {
     int64_t actualS1Len = fBaseParams.actualSeqQlen[batchIdx];
     int64_t actualS2Len = fBaseParams.actualSeqKvlen[batchIdx];
@@ -996,7 +996,7 @@ void CalcleActualToken(FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t batchIdx
     }
 }
 
-ge::graphStatus ProcessSinkInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
+ge::graphStatus ProcessSinkInfo(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     auto sinkShape = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SINK_IDX));
     auto dsinkShape = context_->GetOutputShape(DSINKOUT_IDX);
@@ -1038,9 +1038,9 @@ ge::graphStatus ProcessSinkInfo(const gert::TilingContext *context_, FuzzyBaseIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ProcessOptionalInput(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
+ge::graphStatus ProcessOptionalInput(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
-    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
+    const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
     if (strcmp(inputLayout, "TND") == 0) {
         fBaseParams.qSize = static_cast<uint64_t>(fBaseParams.t1) * fBaseParams.n2 * fBaseParams.g * fBaseParams.d;
         fBaseParams.kSize = static_cast<uint64_t>(fBaseParams.t2) * fBaseParams.n2 * 1 * fBaseParams.d;
@@ -1057,7 +1057,7 @@ ge::graphStatus ProcessOptionalInput(const gert::TilingContext *context_, FuzzyB
 
     // process tnd softmax layout
     if (context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(AttrIndex::TND_SOFTMAX_IN)) {
-        const char *tndMaxSumLayout =
+        const char* tndMaxSumLayout =
             context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::TND_SOFTMAX_IN));
         if (strcmp(inputLayout, "TND") == 0 && strcmp(tndMaxSumLayout, "same_as_input") == 0) {
             fBaseParams.tndMaxSumLayout = 1;
@@ -1141,9 +1141,9 @@ ge::graphStatus ProcessOptionalInput(const gert::TilingContext *context_, FuzzyB
                CheckShapeValid(context_, fBaseParams.b, fBaseParams.n1, fBaseParams.s1, fBaseParams.d);
 }
 
-void ProcessDropoutIsDivisibleBy8(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
+void ProcessDropoutIsDivisibleBy8(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
-    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
+    const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
     if (strcmp(inputLayout, "TND") == 0) {
         for (int64_t i = 0; i < fBaseParams.b; i++)
             if (fBaseParams.actualSeqKvlen[i] % BIT_NUMS != 0) {
@@ -1158,7 +1158,7 @@ void ProcessDropoutIsDivisibleBy8(const gert::TilingContext *context_, FuzzyBase
     return;
 }
 
-ge::graphStatus ProcessDropoutInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
+ge::graphStatus ProcessDropoutInfo(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     bool hasDrop = fBaseParams.keepProb < 1;
     // dropout mask
@@ -1205,7 +1205,7 @@ ge::graphStatus ProcessDropoutInfo(const gert::TilingContext *context_, FuzzyBas
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ProcessQuantInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
+ge::graphStatus ProcessQuantInfo(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     DetermineMode(fBaseParams);
     if (fBaseParams.queryType == ge::DT_FLOAT8_E5M2 || fBaseParams.queryType == ge::DT_FLOAT8_E4M3FN ||
@@ -1248,7 +1248,7 @@ ge::graphStatus ProcessQuantInfo(const gert::TilingContext *context_, FuzzyBaseI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ProcessSparseModeInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
+ge::graphStatus ProcessSparseModeInfo(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     // 新增SPARSE_MODE属性，上库兼容处理
     auto attrs = context_->GetAttrs();
@@ -1318,7 +1318,7 @@ ge::graphStatus ProcessSparseModeInfo(const gert::TilingContext *context_, Fuzzy
 }
 
 // 以下场景对外部输入token屏蔽，重新设置token值并做校验
-ge::graphStatus ProcessTokensInfo(FuzzyBaseInfoParamsRegbase &fBaseParams)
+ge::graphStatus ProcessTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     OP_LOGD("ProcessTokensInfo", " Before correction ,the value of s1Token = %ld and the value of s2Token %ld.",
             fBaseParams.s1Token, fBaseParams.s2Token);
@@ -1382,17 +1382,17 @@ ge::graphStatus ProcessTokensInfo(FuzzyBaseInfoParamsRegbase &fBaseParams)
     return ge::GRAPH_SUCCESS;
 }
 
-void SetQKVStartIdx(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
+void SetQKVStartIdx(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     fBaseParams.qStartIdx = 0;
     fBaseParams.kvStartIdx = 0;
 
     auto qStartIdxTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::Q_START_IDX));
     if (qStartIdxTensor != nullptr) {
-        auto &qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
+        auto& qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
         if (qStartIdxShape.GetDimNum() >= 1 && qStartIdxShape.GetDim(0) != 0) {
             /* Get Data from tensor. */
-            const int64_t *value = qStartIdxTensor->GetData<int64_t>();
+            const int64_t* value = qStartIdxTensor->GetData<int64_t>();
             if (value != nullptr) {
                 fBaseParams.qStartIdx = value[0];
                 OP_LOGD(context_, "[%s]SetQKVStartIdx qStartIdx: %ld", "FlashAttentionScoreGradTilingS1s2Bn2gs1s2",
@@ -1403,10 +1403,10 @@ void SetQKVStartIdx(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegb
 
     auto kvStartIdxTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::KV_START_IDX));
     if (kvStartIdxTensor != nullptr) {
-        auto &kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
+        auto& kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
         if (kvStartIdxShape.GetDimNum() >= 1 && kvStartIdxShape.GetDim(0) != 0) {
             /* Get Data from tensor. */
-            const int64_t *kvValue = kvStartIdxTensor->GetData<int64_t>();
+            const int64_t* kvValue = kvStartIdxTensor->GetData<int64_t>();
             if (kvValue != nullptr) {
                 fBaseParams.kvStartIdx = kvValue[0];
                 OP_LOGD(context_, "[%s]SetQKVStartIdx kvStartIdx: %ld", "FlashAttentionScoreGradTilingS1s2Bn2gs1s2",
@@ -1416,8 +1416,8 @@ void SetQKVStartIdx(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegb
     }
 }
 
-ge::graphStatus ProcessPseNormal(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams,
-                                 const char *inputLayout)
+ge::graphStatus ProcessPseNormal(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams,
+                                 const char* inputLayout)
 {
     auto pseShape = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::PSE_SHIFT));
     auto pseShapeDim = pseShape->GetStorageShape().GetDimNum();
@@ -1508,8 +1508,8 @@ ge::graphStatus ProcessPseNormal(const gert::TilingContext *context_, FuzzyBaseI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ProcessPseInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams,
-                               const char *inputLayout)
+ge::graphStatus ProcessPseInfo(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams,
+                               const char* inputLayout)
 {
     if (context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(AttrIndex::PSETYPE)) {
         fBaseParams.pseType =
@@ -1595,7 +1595,7 @@ ge::graphStatus ProcessPseInfo(const gert::TilingContext *context_, FuzzyBaseInf
     return ge::GRAPH_SUCCESS;
 }
 
-void SetPseLayout(FuzzyBaseInfoParamsRegbase &fBaseParams)
+void SetPseLayout(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     if (fBaseParams.pseShapeType == static_cast<uint32_t>(PseShapeType::PSE_SHAPE_TYPE_1NSS) ||
         fBaseParams.pseShapeType == static_cast<uint32_t>(PseShapeType::PSE_SHAPE_TYPE_BNHS) ||
@@ -1611,7 +1611,7 @@ void SetPseLayout(FuzzyBaseInfoParamsRegbase &fBaseParams)
     }
 }
 
-bool SetSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
+bool SetSparseParams(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::PREFIX) ||
         fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::PREFIX_COMPRESS)) {
@@ -1654,8 +1654,8 @@ bool SetSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoParamsReg
     return false;
 }
 
-void SetSplitAxis(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams,
-                  const TndBaseInfo &tndBaseInfo)
+void SetSplitAxis(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams,
+                  const TndBaseInfo& tndBaseInfo)
 {
     fBaseParams.isBn2 = (fBaseParams.s1 <= BN2_MAX_S && fBaseParams.s2 <= BN2_MAX_S) &&
                         (fBaseParams.n1 == fBaseParams.n2) && (fBaseParams.d <= BN2_MAX_D) &&
@@ -1718,7 +1718,7 @@ void SetSplitAxis(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbas
     }
 }
 
-void DetermineMode(FuzzyBaseInfoParamsRegbase &fBaseParams)
+void DetermineMode(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     // 当前fp16都走高精度
     if (fBaseParams.queryType == ge::DT_FLOAT) {
@@ -1736,13 +1736,13 @@ void DetermineMode(FuzzyBaseInfoParamsRegbase &fBaseParams)
     }
 }
 
-bool SupportTrans2BS2N2GD(const FuzzyBaseInfoParamsRegbase &fBaseParams)
+bool SupportTrans2BS2N2GD(const FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     return (fBaseParams.sparseMode <= static_cast<uint32_t>(SparseMode::PREFIX_COMPRESS)) && fBaseParams.isAllSame &&
            (fBaseParams.layoutType == INPUT_FORMAT_TND);
 }
 
-ge::graphStatus SetAttenMaskShapeType(FuzzyBaseInfoParamsRegbase &fBaseParams, const gert::StorageShape *attenMaskShape,
+ge::graphStatus SetAttenMaskShapeType(FuzzyBaseInfoParamsRegbase& fBaseParams, const gert::StorageShape* attenMaskShape,
                                       size_t dimNum)
 {
     if (dimNum == ATTEN_MASK_DIM_LENGTH_2) {
@@ -1777,7 +1777,7 @@ ge::graphStatus SetAttenMaskShapeType(FuzzyBaseInfoParamsRegbase &fBaseParams, c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ProcessInnerPseInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams,
+ge::graphStatus ProcessInnerPseInfo(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams,
                                     size_t pseShapeDim)
 {
     auto pseShape = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::PSE_SHIFT));
@@ -1824,7 +1824,7 @@ ge::graphStatus ProcessInnerPseInfo(const gert::TilingContext *context_, FuzzyBa
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ProcessPseSparseMode8(FuzzyBaseInfoParamsRegbase &fBaseParams)
+ge::graphStatus ProcessPseSparseMode8(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     for (int64_t boIdx = 0; boIdx < fBaseParams.b; boIdx++) {
         int64_t actualS1Len = fBaseParams.actualSeqQlen[boIdx];
@@ -1857,7 +1857,7 @@ ge::graphStatus ProcessPseSparseMode8(FuzzyBaseInfoParamsRegbase &fBaseParams)
     return ge::GRAPH_SUCCESS;
 }
 
-bool SetPrefixSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
+bool SetPrefixSparseParams(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     auto prefixNTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::PREFIX_N));
     if (prefixNTensor == nullptr) {
@@ -1865,7 +1865,7 @@ bool SetPrefixSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoPar
         return false;
     }
 
-    auto &prefixShape = prefixNTensor->GetShape().GetStorageShape();
+    auto& prefixShape = prefixNTensor->GetShape().GetStorageShape();
     if (prefixShape.GetDimNum() != 1 || prefixShape.GetDim(0) != fBaseParams.b) {
         std::string reasonMsg =
             "When sparseMode is 5, the shape of prefixOptional must be [" + std::to_string(fBaseParams.b) + "]";
@@ -1875,7 +1875,7 @@ bool SetPrefixSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoPar
     }
 
     std::vector<int64_t> prefixN;
-    const int64_t *value = prefixNTensor->GetData<int64_t>();
+    const int64_t* value = prefixNTensor->GetData<int64_t>();
     if (value == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "prefixOptional");
         return false;

@@ -83,7 +83,7 @@ bool FusedCausalConv1dCutBSHTiling::IsCapable()
     int64_t maxQueryLen = -1;
     auto attrs = context_->GetAttrs();
     if (attrs != nullptr) {
-        const int64_t *p = attrs->GetAttrPointer<int64_t>(ATTR_MAX_QUERY_LEN_INDEX);
+        const int64_t* p = attrs->GetAttrPointer<int64_t>(ATTR_MAX_QUERY_LEN_INDEX);
         if (p != nullptr) {
             maxQueryLen = *p;
         }
@@ -333,7 +333,7 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::CheckAttrs()
 
     // activation_mode ∈ {0, 1, 2}
     int64_t activationMode = 0;
-    const int64_t *p = attrs->GetAttrPointer<int64_t>(ATTR_ACTIVATION_MODE_INDEX);
+    const int64_t* p = attrs->GetAttrPointer<int64_t>(ATTR_ACTIVATION_MODE_INDEX);
     if (p != nullptr) {
         activationMode = *p;
     }
@@ -526,7 +526,7 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::GetInputDtypes()
 ge::graphStatus FusedCausalConv1dCutBSHTiling::GetInputStrides()
 {
     if (context_->InputIsView(INPUT_X_INDEX)) {
-        auto *xStride = context_->GetInputStride(INPUT_X_INDEX);
+        auto* xStride = context_->GetInputStride(INPUT_X_INDEX);
         OP_CHECK_IF(xStride == nullptr || xStride->GetDimNum() == 0,
                     OP_LOGE(context_->GetNodeName(), "x stride is invalid."), return ge::GRAPH_FAILED);
         if (xStride->GetDimNum() != xShape_.GetDimNum()) {
@@ -550,7 +550,7 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::GetInputStrides()
     }
 
     if (context_->InputIsView(INPUT_CACHE_STATES_INDEX)) {
-        auto *cacheStride = context_->GetInputStride(INPUT_CACHE_STATES_INDEX);
+        auto* cacheStride = context_->GetInputStride(INPUT_CACHE_STATES_INDEX);
         OP_CHECK_IF(cacheStride == nullptr || cacheStride->GetDimNum() == 0,
                     OP_LOGE(context_->GetNodeName(), "cache_states stride is invalid."), return ge::GRAPH_FAILED);
         if (cacheStride->GetDimNum() != cacheStatesShape_.GetDimNum()) {
@@ -604,7 +604,7 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::GetShapeAttrsInfo()
 
     auto attrs = context_->GetAttrs();
     if (attrs != nullptr) {
-        const int64_t *p;
+        const int64_t* p;
         if ((p = attrs->GetAttrPointer<int64_t>(ATTR_BLOCK_SIZE_INDEX)) != nullptr) {
             blockSize_ = static_cast<uint64_t>(*p);
         }
@@ -720,9 +720,9 @@ FusedCausalConv1dCutBSHTiling::CuSeqLenSplitInfo FusedCausalConv1dCutBSHTiling::
 ge::graphStatus FusedCausalConv1dCutBSHTiling::CalcCoreUbTiling(uint64_t coreDim, uint64_t coreBS,
                                                                 uint64_t bsBlockFactor, int64_t availableUbSize,
                                                                 uint64_t weightCacheCoeffPerDim, uint64_t bsOverlap,
-                                                                uint64_t &ubFactorBS, uint64_t &ubFactorDim,
-                                                                uint64_t &loopNumBS, uint64_t &ubTailFactorBS,
-                                                                uint64_t &loopNumDim, uint64_t &ubTailFactorDim)
+                                                                uint64_t& ubFactorBS, uint64_t& ubFactorDim,
+                                                                uint64_t& loopNumBS, uint64_t& ubTailFactorBS,
+                                                                uint64_t& loopNumDim, uint64_t& ubTailFactorDim)
 {
     constexpr uint64_t XY_BUFFER_FACTOR = 2 * DOUBLE_BUFFER_NUM; // 2(x双) + 2(y双) = 4
     int64_t maxUbDim = availableUbSize / (weightCacheCoeffPerDim + coreBS * xDtypeSize_ * XY_BUFFER_FACTOR);
@@ -853,8 +853,8 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::Calculate2DTiling()
 }
 
 ge::graphStatus FusedCausalConv1dCutBSHTiling::SearchBestCoreSplit(uint64_t N, uint64_t bsOverlap,
-                                                                   uint64_t &bestDimCores,
-                                                                   CuSeqLenSplitInfo &bestBSSplitInfo)
+                                                                   uint64_t& bestDimCores,
+                                                                   CuSeqLenSplitInfo& bestBSSplitInfo)
 {
     uint64_t bestUsed = 0;
     bool bestIsBalanced = false; // 当前最佳是否 BS 均分
@@ -1056,7 +1056,7 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::PostTiling()
     // Save tiling data to buffer
     auto tilingDataSize = sizeof(FusedCausalConv1dCutBSHTilingData);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;

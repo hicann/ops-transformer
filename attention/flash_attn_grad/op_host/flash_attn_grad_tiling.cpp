@@ -24,7 +24,7 @@
 
 namespace optiling {
 
-ge::graphStatus FlashAttnGradTilingFunc(gert::TilingContext *context)
+ge::graphStatus FlashAttnGradTilingFunc(gert::TilingContext* context)
 {
     FagParsedInfo info;
     ge::graphStatus ret = ParsePlatform(context, info);
@@ -50,7 +50,7 @@ ge::graphStatus FlashAttnGradTilingFunc(gert::TilingContext *context)
 // 把平台信息在编译期取一次缓存进 CompileInfo，供图模式下 Tiling 阶段拿不到
 // PlatformInfo 时回退使用。取不到 platform 不在这里报错：AOE / 单算子等场景本就
 // 可能没有，真正需要时由 ParsePlatform 判断两路都空才失败。
-ge::graphStatus TilingParseForFlashAttnGrad(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForFlashAttnGrad(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("FlashAttnGrad", "TilingParseContext is nullptr."),
                 return ge::GRAPH_FAILED);

@@ -20,8 +20,8 @@ namespace BSASelectBlockMaskVF {
 using namespace AscendC;
 using namespace Reg;
 
-__simd_vf__ inline void DoSoftmaxSecondPassFp32VF(__ubuf__ float *scoreUb, __ubuf__ float *rowMaxUb,
-                                                  __ubuf__ float *rowSumUb, float scaleValue, uint32_t row,
+__simd_vf__ inline void DoSoftmaxSecondPassFp32VF(__ubuf__ float* scoreUb, __ubuf__ float* rowMaxUb,
+                                                  __ubuf__ float* rowSumUb, float scaleValue, uint32_t row,
                                                   uint32_t col)
 {
     RegTensor<float> scoreReg;
@@ -36,7 +36,7 @@ __simd_vf__ inline void DoSoftmaxSecondPassFp32VF(__ubuf__ float *scoreUb, __ubu
         for (uint32_t colIdx = 0; colIdx < col; colIdx += countPerRepeat) {
             uint32_t curCount = (col - colIdx) >= countPerRepeat ? countPerRepeat : (col - colIdx);
             MaskReg preg = UpdateMask<float>(curCount);
-            __ubuf__ float *scoreAddr = scoreUb + rowIdx * col + colIdx;
+            __ubuf__ float* scoreAddr = scoreUb + rowIdx * col + colIdx;
             LoadAlign(scoreReg, scoreAddr);
             Muls(scoreReg, scoreReg, scaleValue, preg);
             Sub(tmpReg, scoreReg, maxReg, preg);
@@ -48,7 +48,7 @@ __simd_vf__ inline void DoSoftmaxSecondPassFp32VF(__ubuf__ float *scoreUb, __ubu
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 }
 
-__simd_vf__ inline void DoSoftmaxFirstPassExpFp32VF(__ubuf__ float *scoreUb, __ubuf__ float *rowMaxUb, uint32_t row,
+__simd_vf__ inline void DoSoftmaxFirstPassExpFp32VF(__ubuf__ float* scoreUb, __ubuf__ float* rowMaxUb, uint32_t row,
                                                     uint32_t col)
 {
     RegTensor<float> scoreReg;
@@ -61,7 +61,7 @@ __simd_vf__ inline void DoSoftmaxFirstPassExpFp32VF(__ubuf__ float *scoreUb, __u
         for (uint32_t colIdx = 0; colIdx < col; colIdx += countPerRepeat) {
             uint32_t curCount = (col - colIdx) >= countPerRepeat ? countPerRepeat : (col - colIdx);
             MaskReg preg = UpdateMask<float>(curCount);
-            __ubuf__ float *scoreAddr = scoreUb + rowIdx * col + colIdx;
+            __ubuf__ float* scoreAddr = scoreUb + rowIdx * col + colIdx;
             LoadAlign(scoreReg, scoreAddr);
             Sub(tmpReg, scoreReg, maxReg, preg);
             Exp(scoreReg, tmpReg, preg);
@@ -71,23 +71,23 @@ __simd_vf__ inline void DoSoftmaxFirstPassExpFp32VF(__ubuf__ float *scoreUb, __u
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 }
 
-__aicore__ inline void DoSoftmaxSecondPassFp32VfWrapper(const LocalTensor<float> &scoreUb,
-                                                        const LocalTensor<float> &rowMaxUb,
-                                                        const LocalTensor<float> &rowSumUb, float scaleValue,
+__aicore__ inline void DoSoftmaxSecondPassFp32VfWrapper(const LocalTensor<float>& scoreUb,
+                                                        const LocalTensor<float>& rowMaxUb,
+                                                        const LocalTensor<float>& rowSumUb, float scaleValue,
                                                         uint32_t row, uint32_t col)
 {
-    __ubuf__ float *scoreAddr = (__ubuf__ float *)scoreUb.GetPhyAddr();
-    __ubuf__ float *rowMaxAddr = (__ubuf__ float *)rowMaxUb.GetPhyAddr();
-    __ubuf__ float *rowSumAddr = (__ubuf__ float *)rowSumUb.GetPhyAddr();
+    __ubuf__ float* scoreAddr = (__ubuf__ float*)scoreUb.GetPhyAddr();
+    __ubuf__ float* rowMaxAddr = (__ubuf__ float*)rowMaxUb.GetPhyAddr();
+    __ubuf__ float* rowSumAddr = (__ubuf__ float*)rowSumUb.GetPhyAddr();
     DoSoftmaxSecondPassFp32VF(scoreAddr, rowMaxAddr, rowSumAddr, scaleValue, row, col);
 }
 
-__aicore__ inline void DoSoftmaxFirstPassExpFp32VfWrapper(const LocalTensor<float> &scoreUb,
-                                                          const LocalTensor<float> &rowMaxUb, uint32_t row,
+__aicore__ inline void DoSoftmaxFirstPassExpFp32VfWrapper(const LocalTensor<float>& scoreUb,
+                                                          const LocalTensor<float>& rowMaxUb, uint32_t row,
                                                           uint32_t col)
 {
-    __ubuf__ float *scoreAddr = (__ubuf__ float *)scoreUb.GetPhyAddr();
-    __ubuf__ float *rowMaxAddr = (__ubuf__ float *)rowMaxUb.GetPhyAddr();
+    __ubuf__ float* scoreAddr = (__ubuf__ float*)scoreUb.GetPhyAddr();
+    __ubuf__ float* rowMaxAddr = (__ubuf__ float*)rowMaxUb.GetPhyAddr();
     DoSoftmaxFirstPassExpFp32VF(scoreAddr, rowMaxAddr, row, col);
 }
 

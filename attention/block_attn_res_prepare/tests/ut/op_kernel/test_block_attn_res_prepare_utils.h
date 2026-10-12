@@ -60,7 +60,7 @@ class BlockAttnResPrepareKernelTestUtils {
 public:
     static constexpr uint32_t MAX_NUM_BLOCKS = 4U;
 
-    static BlockAttnResPrepareKernelCsvLoadResult GetParams(const std::string &socVersion, const std::string &testSuite)
+    static BlockAttnResPrepareKernelCsvLoadResult GetParams(const std::string& socVersion, const std::string& testSuite)
     {
         BlockAttnResPrepareKernelCsvLoadResult result;
         const std::string csvPath = ops::ut::ResolveCsvPath(
@@ -115,7 +115,7 @@ public:
                 param.tilingData = ParseTilingData(fields[index++]);
                 ValidateParam(param);
                 result.params.emplace_back(std::move(param));
-            } catch (const std::exception &error) {
+            } catch (const std::exception& error) {
                 result.errors.emplace_back(ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error));
             }
         }
@@ -126,7 +126,7 @@ public:
     }
 
 #ifdef __CCE_KT_TEST__
-    static void TestOneParamCase950(const BlockAttnResPrepareKernelTestParam &param)
+    static void TestOneParamCase950(const BlockAttnResPrepareKernelTestParam& param)
     {
         ASSERT_TRUE(param.result) << "op_kernel CSV currently supports successful launch cases only";
 
@@ -172,7 +172,7 @@ public:
 #endif
 
 private:
-    static uint32_t ParseU32(const std::string &value, const char *fieldName)
+    static uint32_t ParseU32(const std::string& value, const char* fieldName)
     {
         const uint64_t parsed = std::stoull(ops::ut::Trim(value));
         if (parsed > std::numeric_limits<uint32_t>::max()) {
@@ -181,7 +181,7 @@ private:
         return static_cast<uint32_t>(parsed);
     }
 
-    static uint64_t ParseU64(const std::string &value, const char *fieldName)
+    static uint64_t ParseU64(const std::string& value, const char* fieldName)
     {
         try {
             const std::string trimmed = ops::ut::Trim(value);
@@ -194,12 +194,12 @@ private:
                 throw std::invalid_argument("invalid trailing characters");
             }
             return result;
-        } catch (const std::exception &) {
+        } catch (const std::exception&) {
             throw std::invalid_argument(std::string(fieldName) + " is not a valid uint64 value");
         }
     }
 
-    static std::vector<int32_t> ParseTilingData(const std::string &value)
+    static std::vector<int32_t> ParseTilingData(const std::string& value)
     {
         std::istringstream input(ops::ut::Trim(value));
         std::vector<int32_t> words;
@@ -216,7 +216,7 @@ private:
         return words;
     }
 
-    static void ValidateParam(const BlockAttnResPrepareKernelTestParam &param)
+    static void ValidateParam(const BlockAttnResPrepareKernelTestParam& param)
     {
         static_assert(sizeof(optiling::BlockAttnResPrepareTilingData) == 48UL,
                       "BlockAttnResPrepareTilingData ABI changed; update the CSV serialization");
@@ -263,7 +263,7 @@ private:
     class GmBuffer {
     public:
         explicit GmBuffer(size_t size)
-            : data_(static_cast<uint8_t *>(AscendC::GmAlloc(size)))
+            : data_(static_cast<uint8_t*>(AscendC::GmAlloc(size)))
         {}
         ~GmBuffer()
         {
@@ -272,10 +272,10 @@ private:
             }
         }
 
-        GmBuffer(const GmBuffer &) = delete;
-        GmBuffer &operator=(const GmBuffer &) = delete;
+        GmBuffer(const GmBuffer&) = delete;
+        GmBuffer& operator=(const GmBuffer&) = delete;
 
-        uint8_t *Get() const
+        uint8_t* Get() const
         {
             return data_;
         }
@@ -285,11 +285,11 @@ private:
         }
 
     private:
-        uint8_t *data_ = nullptr;
+        uint8_t* data_ = nullptr;
     };
 
-    static void InitInputData(const BlockAttnResPrepareKernelTestParam &param, std::vector<float> &blockRes,
-                              std::vector<float> &pseudoQuery)
+    static void InitInputData(const BlockAttnResPrepareKernelTestParam& param, std::vector<float>& blockRes,
+                              std::vector<float>& pseudoQuery)
     {
         for (size_t index = 0UL; index < blockRes.size(); ++index) {
             const int32_t value = static_cast<int32_t>((index * 3UL + param.seed) % 11UL) - 5;

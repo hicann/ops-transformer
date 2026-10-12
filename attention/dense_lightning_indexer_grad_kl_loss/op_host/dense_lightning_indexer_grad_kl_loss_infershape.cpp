@@ -43,35 +43,35 @@ enum OutputIdx {
     lossEnum
 };
 
-ge::graphStatus InferShapeDenseLightningIndexerGradKLLoss(gert::InferShapeContext *context)
+ge::graphStatus InferShapeDenseLightningIndexerGradKLLoss(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("DenseLightningIndexerGradKLLoss", "context is nullptr!");
         return ge::GRAPH_FAILED;
     }
-    
+
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeDenseLightningIndexerGradKLLoss");
-    
+
     // get input shapes
-    const gert::Shape *queryShape = context->GetInputShape(queryEnum);
+    const gert::Shape* queryShape = context->GetInputShape(queryEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(keyEnum);
+    const gert::Shape* keyShape = context->GetInputShape(keyEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    const gert::Shape *weightShape = context->GetInputShape(weightEnum);
+    const gert::Shape* weightShape = context->GetInputShape(weightEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightShape);
-    const gert::Shape *queryIndexShape = context->GetInputShape(queryIndexEnum);
+    const gert::Shape* queryIndexShape = context->GetInputShape(queryIndexEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryIndexShape);
-    const gert::Shape *keyIndexShape = context->GetInputShape(keyIndexEnum);
+    const gert::Shape* keyIndexShape = context->GetInputShape(keyIndexEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyIndexShape);
 
     // get output shapes
-    gert::Shape *dQIndexShape = context->GetOutputShape(dQueryIndexEnum);
+    gert::Shape* dQIndexShape = context->GetOutputShape(dQueryIndexEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, dQIndexShape);
-    gert::Shape *dKIndexShape = context->GetOutputShape(dKeyIndexEnum);
+    gert::Shape* dKIndexShape = context->GetOutputShape(dKeyIndexEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, dKIndexShape);
-    gert::Shape *dWeightShape = context->GetOutputShape(dWeightEnum);
+    gert::Shape* dWeightShape = context->GetOutputShape(dWeightEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, dWeightShape);
-    gert::Shape *lossShape = context->GetOutputShape(lossEnum);
+    gert::Shape* lossShape = context->GetOutputShape(lossEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, lossShape);
 
     // 填充输出shape大小
@@ -85,7 +85,7 @@ ge::graphStatus InferShapeDenseLightningIndexerGradKLLoss(gert::InferShapeContex
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeDenseLightningIndexerGradKLLoss(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeDenseLightningIndexerGradKLLoss(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("DenseLightningIndexerGradKLLoss", "context is nullptr!");
@@ -104,5 +104,7 @@ ge::graphStatus InferDataTypeDenseLightningIndexerGradKLLoss(gert::InferDataType
     return ge::GRAPH_SUCCESS;
 }
 
-IMPL_OP(DenseLightningIndexerGradKLLoss).InferShape(InferShapeDenseLightningIndexerGradKLLoss).InferDataType(InferDataTypeDenseLightningIndexerGradKLLoss);
+IMPL_OP(DenseLightningIndexerGradKLLoss)
+    .InferShape(InferShapeDenseLightningIndexerGradKLLoss)
+    .InferDataType(InferDataTypeDenseLightningIndexerGradKLLoss);
 } // namespace ops

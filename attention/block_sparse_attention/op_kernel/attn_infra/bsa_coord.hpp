@@ -81,7 +81,7 @@ public:
 
     // Element-wise addition
     HOST_DEVICE
-    Coord operator+(Coord const &b) const
+    Coord operator+(Coord const& b) const
     {
         Coord c;
         AddCoordImpl<0>(c, b);
@@ -99,7 +99,7 @@ public:
 
     // Element-wise subtraction
     HOST_DEVICE
-    Coord operator-(Coord const &b) const
+    Coord operator-(Coord const& b) const
     {
         Coord c;
         SubCoordImpl<0>(c, b);
@@ -117,7 +117,7 @@ public:
 
     // Element-wise multiply
     HOST_DEVICE
-    Coord operator*(Coord const &b) const
+    Coord operator*(Coord const& b) const
     {
         Coord c;
         MulCoordImpl<0>(c, b);
@@ -126,7 +126,7 @@ public:
 
     // Element-wise division
     HOST_DEVICE
-    Coord operator/(Coord const &b) const
+    Coord operator/(Coord const& b) const
     {
         Coord c;
         DivCoordImpl<0>(c, b);
@@ -135,7 +135,7 @@ public:
 
     // Element-wise mod
     HOST_DEVICE
-    Coord operator%(Coord const &b) const
+    Coord operator%(Coord const& b) const
     {
         Coord c;
         ModCoordImpl<0>(c, b);
@@ -144,7 +144,7 @@ public:
 
     // In-place addition
     HOST_DEVICE
-    Coord &operator+=(Coord const &b)
+    Coord& operator+=(Coord const& b)
     {
         PlusEqualImpl<0>(b);
         return *this;
@@ -152,7 +152,7 @@ public:
 
     // In-place equal
     HOST_DEVICE
-    bool operator==(Coord const &b) const
+    bool operator==(Coord const& b) const
     {
         return EqualCoordImpl<0>(b);
     }
@@ -166,42 +166,42 @@ public:
 
     // Member acces operator
     HOST_DEVICE
-    Index &operator[](int dim)
+    Index& operator[](int dim)
     {
         return idx[dim];
     }
 
     // Member access operator
     HOST_DEVICE
-    Index const &operator[](int dim) const
+    Index const& operator[](int dim) const
     {
         return idx[dim];
     }
 
     // Gets the index of a given Coord element
     template <int DIM>
-    HOST_DEVICE Index &At()
+    HOST_DEVICE Index& At()
     {
         return idx[DIM];
     }
 
     // Access via index; may limit unrolling potential
     HOST_DEVICE
-    Index &At(int dim)
+    Index& At(int dim)
     {
         return idx[dim];
     }
 
     // Gets the index of a given Coord element
     template <int DIM>
-    HOST_DEVICE Index const &At() const
+    HOST_DEVICE Index const& At() const
     {
         return idx[DIM];
     }
 
     // Access via index; may limit unrolling potential
     HOST_DEVICE
-    Index const &At(int dim) const
+    Index const& At(int dim) const
     {
         return idx[dim];
     }
@@ -214,7 +214,7 @@ public:
     }
 
     HOST_DEVICE
-    static Coord Min(Coord const &a, Coord const &b)
+    static Coord Min(Coord const& a, Coord const& b)
     {
         Coord res;
         for (int i = 0; i < RANK; ++i) {
@@ -255,7 +255,7 @@ private:
     }
 
     template <int N>
-    HOST_DEVICE void AddCoordImpl(Coord &c, Coord const &b) const
+    HOST_DEVICE void AddCoordImpl(Coord& c, Coord const& b) const
     {
         if constexpr (N < RANK) {
             c.idx[N] = idx[N] + b.idx[N];
@@ -264,7 +264,7 @@ private:
     }
 
     template <int N>
-    HOST_DEVICE void AddScalarImpl(Coord &c, Index const val) const
+    HOST_DEVICE void AddScalarImpl(Coord& c, Index const val) const
     {
         if constexpr (N < RANK) {
             c.idx[N] = idx[N] + val;
@@ -273,7 +273,7 @@ private:
     }
 
     template <int N>
-    HOST_DEVICE void SubCoordImpl(Coord &c, Coord const &b) const
+    HOST_DEVICE void SubCoordImpl(Coord& c, Coord const& b) const
     {
         if constexpr (N < RANK) {
             c.idx[N] = idx[N] - b.idx[N];
@@ -282,7 +282,7 @@ private:
     }
 
     template <int N>
-    HOST_DEVICE void SubScalarImpl(Coord &c, Index const val) const
+    HOST_DEVICE void SubScalarImpl(Coord& c, Index const val) const
     {
         if constexpr (N < RANK) {
             c.idx[N] = idx[N] - val;
@@ -291,7 +291,7 @@ private:
     }
 
     template <int N>
-    HOST_DEVICE void MulCoordImpl(Coord &c, Coord const &b) const
+    HOST_DEVICE void MulCoordImpl(Coord& c, Coord const& b) const
     {
         if constexpr (N < RANK) {
             c.idx[N] = idx[N] * b.idx[N];
@@ -300,7 +300,7 @@ private:
     }
 
     template <int N>
-    HOST_DEVICE void DivCoordImpl(Coord &c, Coord const &b) const
+    HOST_DEVICE void DivCoordImpl(Coord& c, Coord const& b) const
     {
         if constexpr (N < RANK) {
             c.idx[N] = idx[N] / b.idx[N];
@@ -309,7 +309,7 @@ private:
     }
 
     template <int N>
-    HOST_DEVICE void ModCoordImpl(Coord &c, Coord const &b) const
+    HOST_DEVICE void ModCoordImpl(Coord& c, Coord const& b) const
     {
         if constexpr (N < RANK) {
             c.idx[N] = idx[N] % b.idx[N];
@@ -318,7 +318,7 @@ private:
     }
 
     template <int N>
-    HOST_DEVICE void PlusEqualImpl(Coord const &b)
+    HOST_DEVICE void PlusEqualImpl(Coord const& b)
     {
         if constexpr (N < RANK) {
             idx[N] += b.idx[N];
@@ -327,7 +327,7 @@ private:
     }
 
     template <int N>
-    HOST_DEVICE bool EqualCoordImpl(Coord const &b) const
+    HOST_DEVICE bool EqualCoordImpl(Coord const& b) const
     {
         if constexpr (N == RANK) {
             return true;

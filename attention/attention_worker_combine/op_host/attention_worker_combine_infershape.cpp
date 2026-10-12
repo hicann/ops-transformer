@@ -32,14 +32,14 @@ constexpr int64_t DIM_NUM = 2;
 constexpr int64_t TOKEN_DTYPE_FP16 = 0;
 constexpr int64_t TOKEN_DTYPE_BF16 = 1;
 
-graphStatus InferShape4AttentionWorkerCombine(gert::InferShapeContext *context)
+graphStatus InferShape4AttentionWorkerCombine(gert::InferShapeContext* context)
 {
     OP_LOGI(context->GetNodeName(), "Begin to do InferShape4AttentionWorkerCombine");
 
     // input
-    const gert::Shape *scheduleContextInputShape = context->GetInputShape(INPUT_IDX_SCHEDULE_CONTEXT);
-    const gert::Shape *expertScalesInputShape = context->GetInputShape(INPUT_IDX_EXPERT_SCALES); // [BS, K]
-    const gert::Shape *layerIdInputShape = context->GetInputShape(INPUT_IDX_LAYER_ID);           // [1, ]
+    const gert::Shape* scheduleContextInputShape = context->GetInputShape(INPUT_IDX_SCHEDULE_CONTEXT);
+    const gert::Shape* expertScalesInputShape = context->GetInputShape(INPUT_IDX_EXPERT_SCALES); // [BS, K]
+    const gert::Shape* layerIdInputShape = context->GetInputShape(INPUT_IDX_LAYER_ID);           // [1, ]
     OP_CHECK_NULL_WITH_CONTEXT(context, scheduleContextInputShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, expertScalesInputShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, layerIdInputShape);
@@ -50,13 +50,13 @@ graphStatus InferShape4AttentionWorkerCombine(gert::InferShapeContext *context)
     OP_CHECK_NULL_WITH_CONTEXT(context, hiddenSize);
 
     // output
-    gert::Shape *yShape = context->GetOutputShape(OUTPUT_IDX_Y); // [BS, H]
+    gert::Shape* yShape = context->GetOutputShape(OUTPUT_IDX_Y); // [BS, H]
     OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
     yShape->SetDimNum(DIM_NUM);
     yShape->SetDim(IDX_ZERO, expertScalesInputShape->GetDim(IDX_ZERO));
     yShape->SetDim(IDX_ONE, *hiddenSize);
 
-    gert::Shape *nextLayerIdShape = context->GetOutputShape(OUTPUT_IDX_NEXT_LAYER_ID); // [1, ]
+    gert::Shape* nextLayerIdShape = context->GetOutputShape(OUTPUT_IDX_NEXT_LAYER_ID); // [1, ]
     OP_CHECK_NULL_WITH_CONTEXT(context, nextLayerIdShape);
 
     *nextLayerIdShape = *layerIdInputShape; // [1, ]
@@ -64,7 +64,7 @@ graphStatus InferShape4AttentionWorkerCombine(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-graphStatus InferDtype4AttentionWorkerCombine(gert::InferDataTypeContext *context)
+graphStatus InferDtype4AttentionWorkerCombine(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "InferDtype4AttentionWorkerCombine enter");
 

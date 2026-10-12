@@ -43,7 +43,7 @@ const size_t DIM_1 = 1;
 const size_t DIM_2 = 2;
 const size_t DIM_3 = 3;
 
-static ge::graphStatus InferShapeChunkGatedDeltaRule(InferShapeContext *context)
+static ge::graphStatus InferShapeChunkGatedDeltaRule(InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("ChunkGatedDeltaRule", "inference context is null");
@@ -92,7 +92,7 @@ static ge::graphStatus InferShapeChunkGatedDeltaRule(InferShapeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeChunkGatedDeltaRule(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeChunkGatedDeltaRule(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("ChunkGatedDeltaRule", "inference context is null");

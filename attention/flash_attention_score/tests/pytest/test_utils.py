@@ -18,8 +18,19 @@ from einops import rearrange
 PHILOX_M4_32 = [0xD2511F53, 0xCD9E8D57]
 PHIL0X_W_32 = [0x9E3779B9, 0xBB67AE85]
 
+
 def philox4_32(counter, key, rounds):
-    return philox(counter, key, philox4_round, PHILOX_M4_32, philox4_bumpkey, PHIL0X_W_32, 32, 0xffffffff, rounds)
+    return philox(
+        counter,
+        key,
+        philox4_round,
+        PHILOX_M4_32,
+        philox4_bumpkey,
+        PHIL0X_W_32,
+        32,
+        0xFFFFFFFF,
+        rounds,
+    )
 
 
 def philox4_round(counter, key, philox_m, len_w, mask_w):
@@ -40,8 +51,18 @@ def philox4_bumpkey(key, philox_w, mask_w):
     key[1] = (key[1] + philox_w[1]) & mask_w
 
 
-def philox(counter, key, philox_round, philox_m, philox_bumpkey, philox_w, len_w, mask_w, rounds):
-    for i in range(rounds -1):
+def philox(
+    counter,
+    key,
+    philox_round,
+    philox_m,
+    philox_bumpkey,
+    philox_w,
+    len_w,
+    mask_w,
+    rounds,
+):
+    for i in range(rounds - 1):
         philox_round(counter, key, philox_m, len_w, mask_w)
         philox_bumpkey(key, philox_w, mask_w)
     philox_round(counter, key, philox_m, len_w, mask_w)
@@ -50,7 +71,7 @@ def philox(counter, key, philox_round, philox_m, philox_bumpkey, philox_w, len_w
 
 def inc_counter(counter):
     for i in range(4):
-        counter[i] = (counter[i] + 1) & 0xffffffff
+        counter[i] = (counter[i] + 1) & 0xFFFFFFFF
         if counter[i] != 0:
             return counter
     return counter
@@ -68,12 +89,12 @@ def uint32_to_uint8_array(data):
     little_endian = np.array([1], dtype=np.uint32).view(np.uint8)[0] == 1
     uint8_array = np.zeros((4), dtype=np.uint8)
     if little_endian:
-        uint8_array[0] = data & 0xff
-        uint8_array[1] = (data >> 8) & 0xff
-        uint8_array[2] = (data >> 16) & 0xff
-        uint8_array[3] = (data >> 24) & 0xff
+        uint8_array[0] = data & 0xFF
+        uint8_array[1] = (data >> 8) & 0xFF
+        uint8_array[2] = (data >> 16) & 0xFF
+        uint8_array[3] = (data >> 24) & 0xFF
     else:
-        uint32_data = np.array(data, dtype=np.dtype('>u4'))
+        uint32_data = np.array(data, dtype=np.dtype(">u4"))
         uint8_array[0] = uint32_data.view(np.uint8)[3]
         uint8_array[1] = uint32_data.view(np.uint8)[2]
         uint8_array[2] = uint32_data.view(np.uint8)[1]
@@ -108,8 +129,13 @@ def gen_dropmask(b, n1, s1, s2, keep_prob=0.8, seed=2, offset=0):
     s2_aligned = math.ceil(s2 / 16) * 16
     count = b * n1 * s1 * s2_aligned
     golden_uint8 = gen_dropmask_uint8(rounds, counter, key, count, keep_prob)
-    drop_mask_np = np.array(golden_uint8).reshape(b, n1, s1, s2_aligned)[:, :, :, :s2-s2_aligned].astype(
-        np.uint8) if s2_aligned != s2 else np.array(golden_uint8).reshape(b, n1, s1, s2).astype(np.uint8)
+    drop_mask_np = (
+        np.array(golden_uint8)
+        .reshape(b, n1, s1, s2_aligned)[:, :, :, : s2 - s2_aligned]
+        .astype(np.uint8)
+        if s2_aligned != s2
+        else np.array(golden_uint8).reshape(b, n1, s1, s2).astype(np.uint8)
+    )
     drop_mask = torch.from_numpy(drop_mask_np)
     return drop_mask
 
@@ -135,13 +161,13 @@ def trans_bnsd_to_layout(tensor, input_layout):
         return None
     else:
         if input_layout == "BSH":
-            return rearrange(tensor.clone(), 'b n s d -> b s (n d)')
+            return rearrange(tensor.clone(), "b n s d -> b s (n d)")
         elif input_layout == "SBH":
-            return rearrange(tensor.clone(), 'b n s d -> s b (n d)')
+            return rearrange(tensor.clone(), "b n s d -> s b (n d)")
         elif input_layout == "BSND":
-            return rearrange(tensor.clone(), 'b n s d -> b s n d')
+            return rearrange(tensor.clone(), "b n s d -> b s n d")
         elif input_layout == "TND":
-            return rearrange(tensor.clone(), '1 n s d -> s n d')
+            return rearrange(tensor.clone(), "1 n s d -> s n d")
         else:
             return tensor.clone()
 
@@ -170,15 +196,25 @@ def generate_pse(b, n1, s1, s2, pse_type, pse_layout, dtype, q_start_idx, kv_sta
             pse = torch.randn(1, n1, s1, s2).to(dtype)
             pse_npu = pse
         elif pse_layout == "bnhs":
-            pse_bias = 1 / (torch.arange(b) + 1).unsqueeze(1) * 1 / (torch.arange(n1) + 1)
+            pse_bias = (
+                1 / (torch.arange(b) + 1).unsqueeze(1) * 1 / (torch.arange(n1) + 1)
+            )
             bn11 = pse_bias.reshape(b, n1, 1, 1)
-            alibi_base = -torch.abs(torch.arange(s1).unsqueeze(1) - torch.arange(s2).unsqueeze(0) - (s1 - s2))
+            alibi_base = -torch.abs(
+                torch.arange(s1).unsqueeze(1)
+                - torch.arange(s2).unsqueeze(0)
+                - (s1 - s2)
+            )
             pse = bn11 * alibi_base
             pse_npu = pse[:, :, -1024:, :]
         elif pse_layout == "1nhs":
             pse_bias = 1 / (torch.arange(n1) + 1)
             bn11 = pse_bias.reshape(1, n1, 1, 1)
-            alibi_base = -torch.abs(torch.arange(s1).unsqueeze(1) - torch.arange(s2).unsqueeze(0) - (s1 - s2))
+            alibi_base = -torch.abs(
+                torch.arange(s1).unsqueeze(1)
+                - torch.arange(s2).unsqueeze(0)
+                - (s1 - s2)
+            )
             pse = bn11 * alibi_base
             pse_npu = pse[:, :, -1024:, :]
         return pse, pse_npu
@@ -193,9 +229,21 @@ def generate_pse(b, n1, s1, s2, pse_type, pse_layout, dtype, q_start_idx, kv_sta
             alibi_slopes = torch.randn(b, n1).float()
             alibi_bias = alibi_slopes.reshape(b, n1, 1, 1)
         if pse_type == 2:
-            alibi_base = -torch.abs(torch.arange(s2).unsqueeze(0) - torch.arange(s1).unsqueeze(1) - q_start_idx + kv_start_idx)
+            alibi_base = -torch.abs(
+                torch.arange(s2).unsqueeze(0)
+                - torch.arange(s1).unsqueeze(1)
+                - q_start_idx
+                + kv_start_idx
+            )
         else:
-            alibi_base = -(torch.abs(torch.arange(s2).unsqueeze(0) - torch.arange(s1).unsqueeze(1) - q_start_idx + kv_start_idx).sqrt())
+            alibi_base = -(
+                torch.abs(
+                    torch.arange(s2).unsqueeze(0)
+                    - torch.arange(s1).unsqueeze(1)
+                    - q_start_idx
+                    + kv_start_idx
+                ).sqrt()
+            )
         return alibi_bias * alibi_base, alibi_slopes
 
 
@@ -214,7 +262,7 @@ def generate_npu_mask(b, s1, s2, sparse_mode, pre_tokens, next_tokens, prefix=No
         assert prefix is not None
         mask = torch.triu(torch.ones(b, 1, s1, s2), diagonal=s2 - s1 + 1)
         for i in range(0, b):
-            mask[i, :, :, :prefix[i]] = 0
+            mask[i, :, :, : prefix[i]] = 0
         mask = mask.bool()
     elif sparse_mode == 6:
         upper = torch.triu(torch.ones(2048, 2048), diagonal=1)
@@ -223,7 +271,17 @@ def generate_npu_mask(b, s1, s2, sparse_mode, pre_tokens, next_tokens, prefix=No
     return mask
 
 
-def generate_cpu_mask(b, s1, s2, sparse_mode, pre_tokens, next_tokens, prefix=None, index=None, band_index=None):
+def generate_cpu_mask(
+    b,
+    s1,
+    s2,
+    sparse_mode,
+    pre_tokens,
+    next_tokens,
+    prefix=None,
+    index=None,
+    band_index=None,
+):
     if sparse_mode is None:
         return None
     if sparse_mode == 0:
@@ -237,14 +295,18 @@ def generate_cpu_mask(b, s1, s2, sparse_mode, pre_tokens, next_tokens, prefix=No
     elif sparse_mode == 3:
         mask = torch.triu(torch.ones(s1, s2), diagonal=s2 - s1 + 1).bool()
     elif sparse_mode == 4:
-        atten_mask_u = torch.triu(torch.ones(s1, s2), diagonal=next_tokens + 1 + s2 - s1)
-        atten_mask_l = torch.tril(torch.ones(s1, s2), diagonal=-pre_tokens - 1 + s2 - s1)
+        atten_mask_u = torch.triu(
+            torch.ones(s1, s2), diagonal=next_tokens + 1 + s2 - s1
+        )
+        atten_mask_l = torch.tril(
+            torch.ones(s1, s2), diagonal=-pre_tokens - 1 + s2 - s1
+        )
         mask = (atten_mask_u + atten_mask_l).bool()
     elif sparse_mode == 5 or sparse_mode == 6:
         assert prefix is not None
         mask = torch.triu(torch.ones(b, 1, s1, s2), diagonal=s2 - s1 + 1)
         for i in range(0, b):
-            mask[i, :, :, :prefix[i]] = 0
+            mask[i, :, :, : prefix[i]] = 0
         mask = mask.bool()
     elif sparse_mode == 6:
         upper = torch.triu(torch.ones(2048, 2048), diagonal=1)
@@ -252,22 +314,38 @@ def generate_cpu_mask(b, s1, s2, sparse_mode, pre_tokens, next_tokens, prefix=No
         mask = torch.cat((upper, lower), dim=0).bool()
     elif sparse_mode in [7, 8]:
         if index == band_index:
-            atten_mask_u = torch.triu(torch.ones(s1, s2), diagonal=next_tokens + 1 + s2 - s1)
-            atten_mask_l = torch.tril(torch.ones(s1, s2), diagonal=-pre_tokens - 1 + s2 - s1)
+            atten_mask_u = torch.triu(
+                torch.ones(s1, s2), diagonal=next_tokens + 1 + s2 - s1
+            )
+            atten_mask_l = torch.tril(
+                torch.ones(s1, s2), diagonal=-pre_tokens - 1 + s2 - s1
+            )
             mask = (atten_mask_u + atten_mask_l).bool()
         else:
-            mask = torch.triu(torch.ones(s1, s2), diagonal=s2 - s1 + 1 if sparse_mode == 7 else 1).bool()
+            mask = torch.triu(
+                torch.ones(s1, s2), diagonal=s2 - s1 + 1 if sparse_mode == 7 else 1
+            ).bool()
     return mask
 
 
 def generate_qkv(b, n1, n2, s1, s2, d, d_v, d_rope, input_layout, dtype):
-    q = torch.randn(b, n1, s1, d, generator=torch.Generator().manual_seed(42), dtype=dtype)
-    k = torch.randn(b, n2, s2, d, generator=torch.Generator().manual_seed(43), dtype=dtype)
-    v = torch.randn(b, n2, s2, d_v, generator=torch.Generator().manual_seed(44), dtype=dtype)
+    q = torch.randn(
+        b, n1, s1, d, generator=torch.Generator().manual_seed(42), dtype=dtype
+    )
+    k = torch.randn(
+        b, n2, s2, d, generator=torch.Generator().manual_seed(43), dtype=dtype
+    )
+    v = torch.randn(
+        b, n2, s2, d_v, generator=torch.Generator().manual_seed(44), dtype=dtype
+    )
 
     # MLA:d=128, d_rope=64
-    q_rope = torch.randn(b, n1, s1, d_rope, generator=torch.Generator().manual_seed(45), dtype=dtype)
-    k_rope = torch.randn(b, n2, s2, d_rope, generator=torch.Generator().manual_seed(46), dtype=dtype)
+    q_rope = torch.randn(
+        b, n1, s1, d_rope, generator=torch.Generator().manual_seed(45), dtype=dtype
+    )
+    k_rope = torch.randn(
+        b, n2, s2, d_rope, generator=torch.Generator().manual_seed(46), dtype=dtype
+    )
 
     qf = torch.cat((q, q_rope), -1)
     kf = torch.cat((k, k_rope), -1)

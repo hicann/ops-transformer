@@ -2116,7 +2116,7 @@ public:
     int64_t blockStarts[50] = {};
     int64_t blockEnds[50] = {};
 
-    const int64_t *get_blockStarts() const
+    const int64_t* get_blockStarts() const
     {
         return blockStarts;
     }
@@ -2127,7 +2127,7 @@ public:
         }
     }
 
-    const int64_t *get_blockEnds() const
+    const int64_t* get_blockEnds() const
     {
         return blockEnds;
     }
@@ -2738,7 +2738,7 @@ public:
     int64_t bN2idxStarts[50] = {};
     int64_t bN2idxEnds[50] = {};
 
-    const int64_t *get_bN2idxStarts() const
+    const int64_t* get_bN2idxStarts() const
     {
         return bN2idxStarts;
     }
@@ -2749,7 +2749,7 @@ public:
         }
     }
 
-    const int64_t *get_bN2idxEnds() const
+    const int64_t* get_bN2idxEnds() const
     {
         return bN2idxEnds;
     }

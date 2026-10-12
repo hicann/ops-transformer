@@ -107,7 +107,7 @@ public:
         EXPECT_EQ(aclRet, expected);
     }
 
-    aclnnStatus RunNullCase(int idx, uint64_t &ws)
+    aclnnStatus RunNullCase(int idx, uint64_t& ws)
     {
         constexpr float scale = 1.0f;
         switch (idx) {

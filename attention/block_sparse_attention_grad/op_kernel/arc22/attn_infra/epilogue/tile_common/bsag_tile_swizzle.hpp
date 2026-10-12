@@ -24,7 +24,7 @@ struct EpilogueIdentityTileSwizzle {
 
     __aicore__ inline EpilogueIdentityTileSwizzle() = default;
 
-    __aicore__ inline EpilogueIdentityTileSwizzle(MatrixCoord const &blockShape, MatrixCoord const &tileShape)
+    __aicore__ inline EpilogueIdentityTileSwizzle(MatrixCoord const& blockShape, MatrixCoord const& tileShape)
         : blockShape(blockShape),
           tileShape(tileShape)
     {
@@ -41,7 +41,7 @@ struct EpilogueIdentityTileSwizzle {
         return MatrixCoord{loopIdx / loopsMN.column(), loopIdx % loopsMN.column()};
     }
 
-    __aicore__ inline MatrixCoord GetActualTileShape(MatrixCoord const &tileCoord) const
+    __aicore__ inline MatrixCoord GetActualTileShape(MatrixCoord const& tileCoord) const
     {
         return MatrixCoord::Min(tileShape, blockShape - tileCoord * tileShape);
     }
@@ -54,7 +54,7 @@ struct EpilogueHorizontalTileSwizzle {
 
     __aicore__ inline EpilogueHorizontalTileSwizzle() = default;
 
-    __aicore__ inline EpilogueHorizontalTileSwizzle(MatrixCoord const &blockShape, MatrixCoord const &tileShape)
+    __aicore__ inline EpilogueHorizontalTileSwizzle(MatrixCoord const& blockShape, MatrixCoord const& tileShape)
         : blockShape(blockShape),
           tileShape(tileShape)
     {
@@ -71,7 +71,7 @@ struct EpilogueHorizontalTileSwizzle {
         return MatrixCoord{loopIdx % loopsMN.row(), loopIdx / loopsMN.row()};
     }
 
-    __aicore__ inline MatrixCoord GetActualTileShape(MatrixCoord const &tileCoord) const
+    __aicore__ inline MatrixCoord GetActualTileShape(MatrixCoord const& tileCoord) const
     {
         return MatrixCoord::Min(tileShape, blockShape - tileCoord * tileShape);
     }

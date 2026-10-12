@@ -75,7 +75,7 @@ private:
 public:
     __aicore__ inline CubeOp(){};
 
-    __aicore__ inline void Init(TPipe *pipe, const FlashAttentionScoreGradTilingDataS1s2Bn2 *__restrict tiling_data)
+    __aicore__ inline void Init(TPipe* pipe, const FlashAttentionScoreGradTilingDataS1s2Bn2* __restrict tiling_data)
     {
         AsdopsBuffer<ArchType::ASCEND_V220> asdopsBuf;
         uint64_t config = 0x1;

@@ -82,7 +82,7 @@ public:
     ConstInfoX constInfo_;
     FlashMlaSeqLensTool<Q_MODE, KV_MODE> seqLensTool_;
 
-    const optiling::FlashMlaWithKvcacheNoQuantTilingArch35 *__restrict tilingData_;
+    const optiling::FlashMlaWithKvcacheNoQuantTilingArch35* __restrict tilingData_;
     // 静态 tensor 模型：block 内自持静态 buffer + Mutex/cross-core 显式同步
     CubeBlockType cubeBlock_;
     VecFaBlockType vecFaBlock_;
@@ -108,27 +108,27 @@ public:
         : cubeBlock_(constInfo_, seqLensTool_),
           vecFaBlock_(constInfo_, seqLensTool_),
           vecFdBlock_(constInfo_, seqLensTool_){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *kCache, __gm__ uint8_t *attenMask,
-                                __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *cacheSeqlens,
-                                __gm__ uint8_t *blockTable, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *attentionOut,
-                                __gm__ uint8_t *workspace, __gm__ uint8_t *metadata,
-                                const optiling::FlashMlaWithKvcacheNoQuantTilingArch35 *__restrict tiling)
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* kCache, __gm__ uint8_t* attenMask,
+                                __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* sequsedQ, __gm__ uint8_t* cacheSeqlens,
+                                __gm__ uint8_t* blockTable, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* attentionOut,
+                                __gm__ uint8_t* workspace, __gm__ uint8_t* metadata,
+                                const optiling::FlashMlaWithKvcacheNoQuantTilingArch35* __restrict tiling)
     {
         this->tilingData_ = tiling;
 
         // metadata（GM 输入）：section 数在 16-word header 第 0 个 uint32；header 第 1 个 uint32
         // 为 producer 写入的全局 FD 启用标志（与 flash_attn HEAD_IS_FD_INDEX=1 一致）；第 4/5 个
         // uint32 为 producer 自描述写入的 FA/FD 区每 section 核数（硬件实际值）
-        sectionNum_ = ((__gm__ uint32_t *)metadata)[0];
-        enableFlashDecode_ = static_cast<bool>(((__gm__ uint32_t *)metadata)[1U]);
-        metaAicCoreNum_ = ((__gm__ uint32_t *)metadata)[FLASH_MLA_METADATA_AIC_NUM_INDEX];
-        metaAivCoreNum_ = ((__gm__ uint32_t *)metadata)[FLASH_MLA_METADATA_AIV_NUM_INDEX];
+        sectionNum_ = ((__gm__ uint32_t*)metadata)[0];
+        enableFlashDecode_ = static_cast<bool>(((__gm__ uint32_t*)metadata)[1U]);
+        metaAicCoreNum_ = ((__gm__ uint32_t*)metadata)[FLASH_MLA_METADATA_AIC_NUM_INDEX];
+        metaAivCoreNum_ = ((__gm__ uint32_t*)metadata)[FLASH_MLA_METADATA_AIV_NUM_INDEX];
         // FA 区从 header 后开始（参见 metadata 消费段）
-        faMetaDataGm_.SetGlobalBuffer((__gm__ uint32_t *)(metadata + FA_METADATA_HEADER_OFFSET),
+        faMetaDataGm_.SetGlobalBuffer((__gm__ uint32_t*)(metadata + FA_METADATA_HEADER_OFFSET),
                                       metaAicCoreNum_ * FLASH_ATTN_METADATA_SIZE * sectionNum_);
         fdMetaDataGm_.SetGlobalBuffer(
-            (__gm__ uint32_t *)(metadata + FA_METADATA_HEADER_OFFSET +
-                                FLASH_ATTN_METADATA_SIZE * metaAicCoreNum_ * sectionNum_ * sizeof(uint32_t)),
+            (__gm__ uint32_t*)(metadata + FA_METADATA_HEADER_OFFSET +
+                               FLASH_ATTN_METADATA_SIZE * metaAicCoreNum_ * sectionNum_ * sizeof(uint32_t)),
             metaAivCoreNum_ * FA_FD_METADATA_SIZE * sectionNum_);
 
         InitConstInfo();
@@ -168,11 +168,11 @@ public:
             constInfo_.subBlockIdx = AscendC::GetSubBlockIdx();
         }
 
-        const auto &flashMlaWithKvcacheBaseParams = this->tilingData_->flashMlaWithKvcacheBaseParams;
-        const auto &flashMlaWithKvcacheAttenMaskParams = this->tilingData_->flashMlaWithKvcacheAttenMaskParams;
-        const auto &flashMlaWithKvcachePageAttentionParams = this->tilingData_->flashMlaWithKvcachePageAttentionParams;
-        const auto &flashMlaWithKvcacheWorkspaceParams = this->tilingData_->flashMlaWithKvcacheWorkspaceParams;
-        const auto &flashMlaWithKvcacheEmptyTensorParams = this->tilingData_->flashMlaWithKvcacheEmptyTensorParams;
+        const auto& flashMlaWithKvcacheBaseParams = this->tilingData_->flashMlaWithKvcacheBaseParams;
+        const auto& flashMlaWithKvcacheAttenMaskParams = this->tilingData_->flashMlaWithKvcacheAttenMaskParams;
+        const auto& flashMlaWithKvcachePageAttentionParams = this->tilingData_->flashMlaWithKvcachePageAttentionParams;
+        const auto& flashMlaWithKvcacheWorkspaceParams = this->tilingData_->flashMlaWithKvcacheWorkspaceParams;
+        const auto& flashMlaWithKvcacheEmptyTensorParams = this->tilingData_->flashMlaWithKvcacheEmptyTensorParams;
 
         constInfo_.bSize = flashMlaWithKvcacheBaseParams.bSize;
         constInfo_.t1Size = flashMlaWithKvcacheBaseParams.t1Size;
@@ -397,8 +397,8 @@ public:
         return TASK_DEAL_MODE::CREATE_TASK;
     }
 
-    __aicore__ inline void GetPreNextTokenLeftUp(int64_t actSeqLensQ_, int64_t actSeqLensKv_, int64_t &preTokenLeftUp,
-                                                 int64_t &nextTokenLeftUp)
+    __aicore__ inline void GetPreNextTokenLeftUp(int64_t actSeqLensQ_, int64_t actSeqLensKv_, int64_t& preTokenLeftUp,
+                                                 int64_t& nextTokenLeftUp)
     {
         preTokenLeftUp = constInfo_.preTokens;
         nextTokenLeftUp = constInfo_.nextTokens;
@@ -492,11 +492,11 @@ public:
 
     __aicore__ inline void ExecuteTask(uint64_t loop, FlashMlaWithKvcacheRunInfoX taskRunInfo[PRELOAD_TASK_CACHE_SIZE])
     {
-        FlashMlaWithKvcacheRunInfoX &runInfo0 = taskRunInfo[loop & (PRELOAD_TASK_CACHE_SIZE - 1)]; // 本轮任务
-        FlashMlaWithKvcacheRunInfoX &runInfoNegN =
+        FlashMlaWithKvcacheRunInfoX& runInfo0 = taskRunInfo[loop & (PRELOAD_TASK_CACHE_SIZE - 1)]; // 本轮任务
+        FlashMlaWithKvcacheRunInfoX& runInfoNegN =
             taskRunInfo[(loop - (PRELOAD_N - 1)) &
                         (PRELOAD_TASK_CACHE_SIZE - 1)]; // 上 PRELOAD_N-1 轮任务（对齐 fia，bmm2 落后 1 轮）
-        FlashMlaWithKvcacheRunInfoX &runInfoNext =
+        FlashMlaWithKvcacheRunInfoX& runInfoNext =
             taskRunInfo[(loop + 1) & (PRELOAD_TASK_CACHE_SIZE - 1)]; // 下一轮任务（仅用于提前搬运 KV）
 
         // 提前一轮发起下一任务的 KV 搬运（只发 MTE2、不等落地），让 MTE2 与 MAC 流水重叠：
@@ -549,44 +549,44 @@ public:
         }
     }
 
-    __aicore__ inline void ComputeMm1(FlashMlaWithKvcacheRunInfoX &runInfo, bool qPreloaded = false)
+    __aicore__ inline void ComputeMm1(FlashMlaWithKvcacheRunInfoX& runInfo, bool qPreloaded = false)
     {
         cubeBlock_.IterateBmm1(runInfo, qPreloaded);
     }
 
-    __aicore__ inline void ComputeQPreload(FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void ComputeQPreload(FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         cubeBlock_.IterateQPreload(runInfo);
     }
 
-    __aicore__ inline void ComputeBmm1Load(FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void ComputeBmm1Load(FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         cubeBlock_.IterateBmm1Load(runInfo);
     }
 
-    __aicore__ inline void ComputeMm2(FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void ComputeMm2(FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         cubeBlock_.IterateBmm2(runInfo);
     }
 
-    __aicore__ inline void ComputeVec1(FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void ComputeVec1(FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         vecFaBlock_.ProcessVec1(runInfo);
     }
 
-    __aicore__ inline void ComputeVec2(FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void ComputeVec2(FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         this->vecFaBlock_.ProcessVec2(runInfo);
     }
 
-    __aicore__ inline void EnableTask(FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void EnableTask(FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         runInfo.isValid = true;
         runInfo.qPreloaded = false; // 槽位跨轮复用，必须重置
         validTaskNum_++;
     }
 
-    __aicore__ inline void DisableTask(FlashMlaWithKvcacheRunInfoX &runInfo)
+    __aicore__ inline void DisableTask(FlashMlaWithKvcacheRunInfoX& runInfo)
     {
         runInfo.isValid = false;
         validTaskNum_--;
@@ -595,13 +595,13 @@ public:
     __aicore__ inline void CreateTask(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur,
                                       FlashMlaWithKvcacheRunInfoX taskRunInfo[PRELOAD_TASK_CACHE_SIZE])
     {
-        FlashMlaWithKvcacheRunInfoX &runInfo = taskRunInfo[loop & (PRELOAD_TASK_CACHE_SIZE - 1)]; // 本轮任务
+        FlashMlaWithKvcacheRunInfoX& runInfo = taskRunInfo[loop & (PRELOAD_TASK_CACHE_SIZE - 1)]; // 本轮任务
         CalcParams(loop, bN2Cur, gS1Cur, s2Cur, runInfo);
         EnableTask(runInfo);
     }
 
     __aicore__ inline void CalcParams(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur,
-                                      FlashMlaWithKvcacheRunInfoX &info)
+                                      FlashMlaWithKvcacheRunInfoX& info)
     {
         info.loop = loop;
         info.mloop = mloop_;
@@ -665,8 +665,8 @@ public:
         }
     }
 
-    __aicore__ inline void UpdateAxisInfo(TASK_DEAL_MODE taskDealMode, uint32_t &bN2Cur, uint32_t &gS1Cur,
-                                          uint32_t &s2Cur)
+    __aicore__ inline void UpdateAxisInfo(TASK_DEAL_MODE taskDealMode, uint32_t& bN2Cur, uint32_t& gS1Cur,
+                                          uint32_t& s2Cur)
     {
         if (taskDealMode == TASK_DEAL_MODE::NOT_START) {
             s2Cur = curS2Start_;

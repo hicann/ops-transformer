@@ -18,12 +18,12 @@ namespace {
 // 八个参与 shape 校验的张量在这里统一带上名字，好让下面的循环把错误信息里的
 // 张量名打出来 —— 原先是每个张量各写一遍 OP_CHECK_IF，加一个张量要改八处。
 struct TensorRef {
-    const char *name;
-    const gert::Shape *shape;
+    const char* name;
+    const gert::Shape* shape;
 };
 
 // 每个张量按 layout 应有的维度数：TND 是 3 维，BSND/BNSD 是 4 维。
-ge::graphStatus CheckDimNum(const char *opName, const char *layout, size_t expectDims, const TensorRef *tensors,
+ge::graphStatus CheckDimNum(const char* opName, const char* layout, size_t expectDims, const TensorRef* tensors,
                             size_t num)
 {
     for (size_t i = 0; i < num; ++i) {
@@ -36,8 +36,8 @@ ge::graphStatus CheckDimNum(const char *opName, const char *layout, size_t expec
 }
 
 // 一组张量在某个轴上必须与参考张量取值相同。dimTag 只用于错误信息。
-ge::graphStatus CheckDimEqual(const char *opName, const char *dimTag, const char *refName, int64_t refVal,
-                              size_t dimIdx, const TensorRef *tensors, size_t num)
+ge::graphStatus CheckDimEqual(const char* opName, const char* dimTag, const char* refName, int64_t refVal,
+                              size_t dimIdx, const TensorRef* tensors, size_t num)
 {
     for (size_t i = 0; i < num; ++i) {
         const int64_t got = tensors[i].shape->GetDim(dimIdx);
@@ -68,8 +68,8 @@ AxisIndex GetAxisIndex(bool isTnd, bool isBnsd)
     return {3U, 2U, 1U}; // [B, S, N, D]
 }
 
-ge::graphStatus CheckHeadDim(const char *opName, const AxisIndex &axis, const TensorRef &q, const TensorRef &v,
-                             const TensorRef *qSide, size_t qSideNum, const TensorRef *vSide, size_t vSideNum)
+ge::graphStatus CheckHeadDim(const char* opName, const AxisIndex& axis, const TensorRef& q, const TensorRef& v,
+                             const TensorRef* qSide, size_t qSideNum, const TensorRef* vSide, size_t vSideNum)
 {
     // Q 侧（q/dq/dk/k）共用 D，V 侧（v/dout/attn_out/dv）共用 Dv，两者可以不等。
     const int64_t qD = q.shape->GetDim(axis.d);
@@ -92,17 +92,17 @@ ge::graphStatus CheckHeadDim(const char *opName, const AxisIndex &axis, const Te
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckCuSeqlens(const char *opName, gert::TilingContext *context, bool isTnd)
+ge::graphStatus CheckCuSeqlens(const char* opName, gert::TilingContext* context, bool isTnd)
 {
     const struct {
-        const char *name;
+        const char* name;
         size_t index;
     } cuSeqlens[] = {
         {"cu_seqlens_q", CU_SEQLENS_Q_INDEX},
         {"cu_seqlens_kv", CU_SEQLENS_KV_INDEX},
     };
 
-    for (const auto &item : cuSeqlens) {
+    for (const auto& item : cuSeqlens) {
         const bool exists = IsOptionalTensorExist(context, item.index);
         if (!isTnd) {
             OP_CHECK_IF(exists, OP_LOGE(opName, "%s must not be provided when layout is not TND.", item.name),
@@ -111,7 +111,7 @@ ge::graphStatus CheckCuSeqlens(const char *opName, gert::TilingContext *context,
         }
         OP_CHECK_IF(!exists, OP_LOGE(opName, "%s must be provided when layout is TND.", item.name),
                     return ge::GRAPH_PARAM_INVALID);
-        auto &shape = context->GetOptionalInputShape(item.index)->GetStorageShape();
+        auto& shape = context->GetOptionalInputShape(item.index)->GetStorageShape();
         OP_CHECK_IF(shape.GetDimNum() != 1U,
                     OP_LOGE(opName, "%s must be 1D, but got %zu dims.", item.name, shape.GetDimNum()),
                     return ge::GRAPH_PARAM_INVALID);
@@ -121,11 +121,11 @@ ge::graphStatus CheckCuSeqlens(const char *opName, gert::TilingContext *context,
 
 } // namespace
 
-ge::graphStatus FagShapeChecker::Check(FagCheckCtx &ctx)
+ge::graphStatus FagShapeChecker::Check(FagCheckCtx& ctx)
 {
-    gert::TilingContext *context = ctx.context;
-    const char *opName = ctx.opName;
-    const char *layout = ctx.layoutQ.c_str();
+    gert::TilingContext* context = ctx.context;
+    const char* opName = ctx.opName;
+    const char* layout = ctx.layoutQ.c_str();
     const bool isTnd = (ctx.layoutQ == "TND");
     const bool isBnsd = (ctx.layoutQ == "BNSD");
 
@@ -137,7 +137,7 @@ ge::graphStatus FagShapeChecker::Check(FagCheckCtx &ctx)
     const TensorRef dq = {"dq", &context->GetOutputShape(DQ_OUT_INDEX)->GetStorageShape()};
     const TensorRef dk = {"dk", &context->GetOutputShape(DK_OUT_INDEX)->GetStorageShape()};
     const TensorRef dv = {"dv", &context->GetOutputShape(DV_OUT_INDEX)->GetStorageShape()};
-    auto &softmaxLseSS = context->GetInputShape(SOFTMAX_LSE_INDEX)->GetStorageShape();
+    auto& softmaxLseSS = context->GetInputShape(SOFTMAX_LSE_INDEX)->GetStorageShape();
 
     // softmax_lse 的维度数与其他张量不同（TND 下是 2D 的 (N, T)），单独校验。
     const TensorRef mainTensors[] = {q, k, v, dout, attnOut, dq, dk, dv};

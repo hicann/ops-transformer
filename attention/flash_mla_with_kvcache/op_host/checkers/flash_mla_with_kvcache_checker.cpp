@@ -44,17 +44,17 @@ void FlashMlaWithKvcacheChecker::RegisterCheckers()
     checkers_.push_back(std::make_unique<SoftmaxLSEChecker>());
 }
 
-ge::graphStatus FlashMlaWithKvcacheChecker::Init(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus FlashMlaWithKvcacheChecker::Init(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     (void)faInfo;
     RegisterCheckers();
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashMlaWithKvcacheChecker::RunCheck(const CheckMethod &method,
-                                                     const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus FlashMlaWithKvcacheChecker::RunCheck(const CheckMethod& method,
+                                                     const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
-    for (const auto &checker : checkers_) {
+    for (const auto& checker : checkers_) {
         if (ge::GRAPH_SUCCESS != method(checker.get(), faInfo)) {
             return ge::GRAPH_FAILED;
         }
@@ -62,35 +62,35 @@ ge::graphStatus FlashMlaWithKvcacheChecker::RunCheck(const CheckMethod &method,
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashMlaWithKvcacheChecker::CheckSinglePara(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus FlashMlaWithKvcacheChecker::CheckSinglePara(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
-    return RunCheck([](FlashMlaWithKvcacheBaseChecker *c,
-                       const FlashMlaWithKvcacheTilingInfo &info) { return c->CheckSinglePara(info); },
+    return RunCheck([](FlashMlaWithKvcacheBaseChecker* c,
+                       const FlashMlaWithKvcacheTilingInfo& info) { return c->CheckSinglePara(info); },
                     faInfo);
 }
 
-ge::graphStatus FlashMlaWithKvcacheChecker::CheckParaExistence(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus FlashMlaWithKvcacheChecker::CheckParaExistence(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
-    return RunCheck([](FlashMlaWithKvcacheBaseChecker *c,
-                       const FlashMlaWithKvcacheTilingInfo &info) { return c->CheckParaExistence(info); },
+    return RunCheck([](FlashMlaWithKvcacheBaseChecker* c,
+                       const FlashMlaWithKvcacheTilingInfo& info) { return c->CheckParaExistence(info); },
                     faInfo);
 }
 
-ge::graphStatus FlashMlaWithKvcacheChecker::CheckFeature(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus FlashMlaWithKvcacheChecker::CheckFeature(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
-    return RunCheck([](FlashMlaWithKvcacheBaseChecker *c,
-                       const FlashMlaWithKvcacheTilingInfo &info) { return c->CheckFeature(info); },
+    return RunCheck([](FlashMlaWithKvcacheBaseChecker* c,
+                       const FlashMlaWithKvcacheTilingInfo& info) { return c->CheckFeature(info); },
                     faInfo);
 }
 
-ge::graphStatus FlashMlaWithKvcacheChecker::CheckMultiPara(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus FlashMlaWithKvcacheChecker::CheckMultiPara(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
-    return RunCheck([](FlashMlaWithKvcacheBaseChecker *c,
-                       const FlashMlaWithKvcacheTilingInfo &info) { return c->CheckMultiPara(info); },
+    return RunCheck([](FlashMlaWithKvcacheBaseChecker* c,
+                       const FlashMlaWithKvcacheTilingInfo& info) { return c->CheckMultiPara(info); },
                     faInfo);
 }
 
-ge::graphStatus FlashMlaWithKvcacheChecker::Process(const FlashMlaWithKvcacheTilingInfo &faInfo)
+ge::graphStatus FlashMlaWithKvcacheChecker::Process(const FlashMlaWithKvcacheTilingInfo& faInfo)
 {
     if (faInfo.emptyTensorFlag) {
         OP_LOGE(faInfo.opName, "Empty tensor detected: q, k_cache or attn_out has dimension with size 0");

@@ -51,7 +51,7 @@ static inline int64_t FagAlignTo(int64_t value, int64_t alignment)
 // Helper: calcle actual token for TND/unpad sparse modes
 // Source: common_regbase.cpp:914-936 CalcleActualToken
 static inline void FagCalcleActualToken(uint32_t sparseMode, int64_t s1Token, int64_t s2Token, int64_t actualS1Len,
-                                        int64_t actualS2Len, int64_t &actualCalcS1Token, int64_t &actualCalcS2Token)
+                                        int64_t actualS2Len, int64_t& actualCalcS1Token, int64_t& actualCalcS2Token)
 {
     actualCalcS1Token = s1Token;
     actualCalcS2Token = s2Token;
@@ -415,7 +415,7 @@ void FlashAttnMetadataCpuKernel::DoFagSparseBlockInfo()
 
 // ===== GetFagParseS1S2OuterInfo: build sparse valid S1xS2 mapping table =====
 // Source: normal_regbase.cpp:1509-1551
-void FlashAttnMetadataCpuKernel::GetFagParseS1S2OuterInfo(std::vector<std::vector<int64_t>> &parseInfo)
+void FlashAttnMetadataCpuKernel::GetFagParseS1S2OuterInfo(std::vector<std::vector<int64_t>>& parseInfo)
 {
     int64_t s1 = static_cast<int64_t>(maxSeqlenQ_);
     int64_t s2 = static_cast<int64_t>(maxSeqlenKv_);
@@ -704,8 +704,8 @@ bool FlashAttnMetadataCpuKernel::FagCheckUnpadSparseLeftAndRight(int64_t s1oDimI
 
 // ===== FagFillBlockInfoLoadBalance: build load balance table for TND =====
 // Source: normal_regbase.cpp:1685-1750
-void FlashAttnMetadataCpuKernel::FagFillBlockInfoLoadBalance(std::vector<std::vector<int64_t>> &totalBlockInfo,
-                                                             std::vector<std::vector<float>> &acturalBlockInfo)
+void FlashAttnMetadataCpuKernel::FagFillBlockInfoLoadBalance(std::vector<std::vector<int64_t>>& totalBlockInfo,
+                                                             std::vector<std::vector<float>>& acturalBlockInfo)
 {
     int64_t b = static_cast<int64_t>(batchSize_);
     int64_t n2 = static_cast<int64_t>(numHeadsKv_);
@@ -834,8 +834,8 @@ void FlashAttnMetadataCpuKernel::DoFagBn2s2SparseTndSplit()
 
 // Source: varlen_regbase.cpp:1247-1262 BinarySearchMaxBlockNumPerCore
 float FlashAttnMetadataCpuKernel::Bn2s2BinarySearchMaxBlockNumPerCore(int64_t b, int64_t n2, int64_t g, int64_t aicNum,
-                                                                      std::vector<std::vector<int64_t>> &totalBlockInfo,
-                                                                      std::vector<std::vector<float>> &acturalBlockInfo)
+                                                                      std::vector<std::vector<int64_t>>& totalBlockInfo,
+                                                                      std::vector<std::vector<float>>& acturalBlockInfo)
 {
     float left = acturalBlockInfo[b + 1][0];
     float right = acturalBlockInfo[b][0];
@@ -853,7 +853,7 @@ float FlashAttnMetadataCpuKernel::Bn2s2BinarySearchMaxBlockNumPerCore(int64_t b,
 
 // Source: varlen_regbase.cpp:1373-1412 IsPossible
 bool FlashAttnMetadataCpuKernel::Bn2s2IsPossible(int64_t b, int64_t n2, int64_t g, int64_t aicNum, float possibleMax,
-                                                 std::vector<std::vector<float>> &acturalBlockInfo)
+                                                 std::vector<std::vector<float>>& acturalBlockInfo)
 {
     float currentSum = 0;
     uint64_t needCoreNum = 1;
@@ -879,8 +879,8 @@ bool FlashAttnMetadataCpuKernel::Bn2s2IsPossible(int64_t b, int64_t n2, int64_t 
 
 // Source: varlen_regbase.cpp:1264-1314 CaclePerCoreBlockInfo
 bool FlashAttnMetadataCpuKernel::Bn2s2CaclePerCoreBlockInfo(int64_t b, int64_t n2, int64_t g, int64_t aicNum,
-                                                            std::vector<std::vector<int64_t>> &totalBlockInfo,
-                                                            std::vector<std::vector<float>> &acturalBlockInfo,
+                                                            std::vector<std::vector<int64_t>>& totalBlockInfo,
+                                                            std::vector<std::vector<float>>& acturalBlockInfo,
                                                             float maxBlockNumPerCore)
 {
     float currentSum = 0;
@@ -1042,7 +1042,7 @@ bool FlashAttnMetadataCpuKernel::DoFagBn2SparseBlockInfo()
 
 // Consecutive row split across live AIV cores. Remainder goes to the first rem cores
 // so max(rows)-min(rows) <= 1 among participants. Idle slots stay [0,0).
-static inline void FagSplitRows(int64_t totalRows, uint32_t nAiv, FA_METADATA_T *starts, FA_METADATA_T *ends)
+static inline void FagSplitRows(int64_t totalRows, uint32_t nAiv, FA_METADATA_T* starts, FA_METADATA_T* ends)
 {
     for (uint32_t i = 0; i < FAG_AIV_SLOT_NUM; i++) {
         starts[i] = 0;
@@ -1067,7 +1067,7 @@ static inline void FagSplitRows(int64_t totalRows, uint32_t nAiv, FA_METADATA_T 
 // FAG data is appended after FA/FD data, core counts are dynamic (read from attrs)
 void FlashAttnMetadataCpuKernel::GenFagMetadata(uint32_t sectionNum)
 {
-    auto *basePtr = static_cast<FA_METADATA_T *>(metadata_->GetData());
+    auto* basePtr = static_cast<FA_METADATA_T*>(metadata_->GetData());
     // FAG start offset = Head(16) + FA(sectionNum*aicNum*16) + FD(sectionNum*aivNum*16)
     uint32_t fagOffset = METADATA_STRIDE + sectionNum * (static_cast<uint32_t>(aicCoreNum_) * METADATA_STRIDE +
                                                          static_cast<uint32_t>(aivCoreNum_) * METADATA_STRIDE);
@@ -1075,7 +1075,7 @@ void FlashAttnMetadataCpuKernel::GenFagMetadata(uint32_t sectionNum)
     // Record FAG start offset in head[7]
     basePtr[HEAD_FAG_START_OFFSET_INDEX] = fagOffset;
 
-    auto *fag = basePtr + fagOffset;
+    auto* fag = basePtr + fagOffset;
     // Zero FAG region
     std::fill_n(fag, FAG_METADATA_SIZE, static_cast<FA_METADATA_T>(0));
 

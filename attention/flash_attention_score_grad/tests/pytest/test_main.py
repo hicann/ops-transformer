@@ -18,6 +18,7 @@ from test_case import TestCases
 from cpu_impl import attentionScoreWithGrad, run_unpad
 from npu_impl import PTAtest
 
+
 def checkResult(a, b, name):
     log(f"info: 开始计算 {name} 精度。")
     ratio_threshold = 0.005
@@ -43,10 +44,12 @@ def checkResult(a, b, name):
             ratio_diff = num_diff / torch.numel(a)
             if torch.max(diff) > 0.1:
                 log(
-                    f"error: {name} 计算结果有{num_diff}个元素的偏差超过{ratio_threshold:.2%}，占比为{ratio_diff:.2%}，超过阈值，用例执行失败！！！")
+                    f"error: {name} 计算结果有{num_diff}个元素的偏差超过{ratio_threshold:.2%}，占比为{ratio_diff:.2%}，超过阈值，用例执行失败！！！"
+                )
             else:
                 log(
-                    f"info: {name} 计算结果有{num_diff}个元素的偏差超过{ratio_threshold:.2%}，占比为{ratio_diff:.2%} 。")
+                    f"info: {name} 计算结果有{num_diff}个元素的偏差超过{ratio_threshold:.2%}，占比为{ratio_diff:.2%} 。"
+                )
             ratio = (1 - ratio_diff).cpu().detach().numpy()
             # log(a.max(), b.max())
             max = torch.max(diff).cpu().detach().numpy()
@@ -62,11 +65,14 @@ def checkResult(a, b, name):
         sum = 999999
     return ratio, max, sum
 
+
 def test_npu_flash_atten_grad():
     for test_name, test_data in TestCases.items():
         print(f"=============Run test case: {test_name} begin ============")
-        ctx = CalculationContext(input_case = test_data)
-        func = run_unpad if test_data["input_layout"] == "TND" else attentionScoreWithGrad
+        ctx = CalculationContext(input_case=test_data)
+        func = (
+            run_unpad if test_data["input_layout"] == "TND" else attentionScoreWithGrad
+        )
         golden_tuple = func(ctx)
         npu_tuple = PTAtest(ctx)
         if test_data["rope"] == 0:
@@ -78,8 +84,6 @@ def test_npu_flash_atten_grad():
             checkResult(
                 n_val.float().flatten(),
                 g_val.float().to(device).flatten(),
-                f"{test_name} {name}"
+                f"{test_name} {name}",
             )
         print(f"=============Run test case: {test_name} end ============")
-        
-

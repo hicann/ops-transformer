@@ -26,13 +26,13 @@
 class FlashAttentionScoreDropMaskAdapterRegbase {
 public:
     __aicore__ inline FlashAttentionScoreDropMaskAdapterRegbase() {}
-    __aicore__ inline void Init(__gm__ uint8_t *dropMask, __gm__ uint8_t *workspace,
-                                const FlashAttentionScoreSimplifiedTilingData *__restrict tiling,
-                                AscendC::TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t* dropMask, __gm__ uint8_t* workspace,
+                                const FlashAttentionScoreSimplifiedTilingData* __restrict tiling,
+                                AscendC::TPipe* tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void CopyIn(int64_t offset, int32_t calSize);
-    __aicore__ inline void Compute(int32_t calSize, AscendC::LocalTensor<half> &dropMaskSelSrc,
-                                   const AscendC::BinaryRepeatParams &binaryRepeatParams);
+    __aicore__ inline void Compute(int32_t calSize, AscendC::LocalTensor<half>& dropMaskSelSrc,
+                                   const AscendC::BinaryRepeatParams& binaryRepeatParams);
     __aicore__ inline void CopyOut(int64_t offset, int32_t calSize);
     __aicore__ inline void SyncAllCores();
 
@@ -52,8 +52,8 @@ public:
     };
 
     int32_t blockIdx;
-    AscendC::TPipe *pipe;
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData;
+    AscendC::TPipe* pipe;
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tilingData;
 
     AscendC::GlobalTensor<uint8_t> dropMaskGm;
     AscendC::GlobalTensor<uint8_t> outputGm;
@@ -70,8 +70,8 @@ public:
 };
 
 __aicore__ inline void FlashAttentionScoreDropMaskAdapterRegbase::Init(
-    __gm__ uint8_t *dropMask, __gm__ uint8_t *workspace,
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, AscendC::TPipe *tPipe)
+    __gm__ uint8_t* dropMask, __gm__ uint8_t* workspace,
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tiling, AscendC::TPipe* tPipe)
 {
     pipe = tPipe;
     tilingData = tiling;
@@ -143,7 +143,7 @@ __aicore__ inline void FlashAttentionScoreDropMaskAdapterRegbase::CopyIn(int64_t
 }
 
 __aicore__ inline void FlashAttentionScoreDropMaskAdapterRegbase::Compute(
-    int32_t calSize, AscendC::LocalTensor<half> &dropMaskSelSrc, const AscendC::BinaryRepeatParams &binaryRepeatParams)
+    int32_t calSize, AscendC::LocalTensor<half>& dropMaskSelSrc, const AscendC::BinaryRepeatParams& binaryRepeatParams)
 {
     AscendC::LocalTensor<half> dropMaskSelRes = dropMaskSelResTBuf.template Get<half>();
     AscendC::LocalTensor<uint8_t> dropMaskUb = dropMaskInputQueue.template DeQue<uint8_t>();

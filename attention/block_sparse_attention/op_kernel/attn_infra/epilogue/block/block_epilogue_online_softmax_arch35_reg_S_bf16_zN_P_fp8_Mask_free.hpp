@@ -38,7 +38,7 @@ public:
     static constexpr uint32_t UB_S_P_BUF_STAGES = 2;
     static constexpr uint32_t UB_DM_BUF_MAX_STAGES = 3;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource, float scaleValue, UBufTileHelper &uBufTileHelper)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource, float scaleValue, UBufTileHelper& uBufTileHelper)
     {
         subBlockIdx_ = AscendC::GetSubBlockIdx();
         subBlockNum_ = AscendC::GetSubBlockNum();
@@ -85,7 +85,7 @@ public:
     __aicore__ inline ~BlockEpilogue() {}
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void CopyPUbToPL1(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint32_t rowNum)
+    __aicore__ inline void CopyPUbToPL1(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint32_t rowNum)
     {
         AscendC::DataCopyParams repeatParams;
         uint32_t elementNumPerC0 = 32;
@@ -101,21 +101,21 @@ public:
     }
 
     template <class TensorP>
-    __aicore__ inline void SubCoreCompute(TensorP &l1PTensorTlaTile, uint32_t rowNumCurSubCore,
+    __aicore__ inline void SubCoreCompute(TensorP& l1PTensorTlaTile, uint32_t rowNumCurSubCore,
                                           uint32_t colNumCurSubCore, uint32_t zNRowNumSplit, uint32_t isFirstKvSTile,
                                           uint32_t isLastKvSTile, uint32_t ubSBufId, uint32_t ubDmBufId,
                                           Arch::CrossCoreFlag mm1ToSmFlag, Arch::CrossCoreFlag smToMm2Flag)
     {
-        __ubuf__ ElementInput *sUbAddr = (__ubuf__ ElementInput *)lsUbTensor[ubSBufId].GetPhyAddr();
-        __ubuf__ ElementOutput *pUbAddr = (__ubuf__ ElementOutput *)pUbTensor[ubSBufId].GetPhyAddr();
-        __ubuf__ float *gmUbAddr = (__ubuf__ float *)gmUbTensor.GetPhyAddr();
-        __ubuf__ float *glUbAddr = (__ubuf__ float *)glUbTensor.GetPhyAddr();
-        __ubuf__ float *lmUbAddr = (__ubuf__ float *)lmUbTensor.GetPhyAddr();
-        __ubuf__ float *llUbAddr = (__ubuf__ float *)llUbTensor.GetPhyAddr();
-        __ubuf__ float *dmUbAddr = (__ubuf__ float *)dmUbTensor[ubDmBufId].GetPhyAddr();
-        __ubuf__ uint8_t *gatherPIdxUbAddr = (__ubuf__ uint8_t *)gatherPIdxUbTensor.GetPhyAddr();
-        __ubuf__ int32_t *tailMaskUbAddr = (__ubuf__ int32_t *)tailMaskUbTensor.GetPhyAddr();
-        __ubuf__ int16_t *tailMaskUbAddr16 = (__ubuf__ int16_t *)tailMaskUbTensor16.GetPhyAddr();
+        __ubuf__ ElementInput* sUbAddr = (__ubuf__ ElementInput*)lsUbTensor[ubSBufId].GetPhyAddr();
+        __ubuf__ ElementOutput* pUbAddr = (__ubuf__ ElementOutput*)pUbTensor[ubSBufId].GetPhyAddr();
+        __ubuf__ float* gmUbAddr = (__ubuf__ float*)gmUbTensor.GetPhyAddr();
+        __ubuf__ float* glUbAddr = (__ubuf__ float*)glUbTensor.GetPhyAddr();
+        __ubuf__ float* lmUbAddr = (__ubuf__ float*)lmUbTensor.GetPhyAddr();
+        __ubuf__ float* llUbAddr = (__ubuf__ float*)llUbTensor.GetPhyAddr();
+        __ubuf__ float* dmUbAddr = (__ubuf__ float*)dmUbTensor[ubDmBufId].GetPhyAddr();
+        __ubuf__ uint8_t* gatherPIdxUbAddr = (__ubuf__ uint8_t*)gatherPIdxUbTensor.GetPhyAddr();
+        __ubuf__ int32_t* tailMaskUbAddr = (__ubuf__ int32_t*)tailMaskUbTensor.GetPhyAddr();
+        __ubuf__ int16_t* tailMaskUbAddr16 = (__ubuf__ int16_t*)tailMaskUbTensor16.GetPhyAddr();
 
         uint32_t rowAligned16 = RoundUp(zNRowNumSplit, 16);
         uint32_t colAligned16 = RoundUp(colNumCurSubCore, 16);
@@ -220,7 +220,7 @@ public:
     }
 
     template <class TensorP>
-    __aicore__ inline void operator()(TensorP &l1PTensorTla, GemmCoord actualBlockShape, uint32_t isFirstKvSTile,
+    __aicore__ inline void operator()(TensorP& l1PTensorTla, GemmCoord actualBlockShape, uint32_t isFirstKvSTile,
                                       uint32_t isLastKvSTile, uint32_t ubSBufId, uint32_t ubDmBufId,
                                       Arch::CrossCoreFlag mm1ToSmFlag, Arch::CrossCoreFlag smToMm2Flag)
     {
@@ -272,7 +272,7 @@ private:
         GT_16_LT_32,
     };
 
-    __simd_vf__ inline void GenB16zNTailMask(__ubuf__ int32_t *tailMaskUb, uint32_t tailSizePerB16Fractal)
+    __simd_vf__ inline void GenB16zNTailMask(__ubuf__ int32_t* tailMaskUb, uint32_t tailSizePerB16Fractal)
     {
         using namespace AscendC::Reg;
         RegTensor<int32_t> tailMaskElemVreg;
@@ -285,8 +285,8 @@ private:
     }
 
     template <bool NeedUpdate>
-    __simd_vf__ inline void RowmaxImplzNAligned(__ubuf__ ElementInput *sUbAddr, __ubuf__ float *gmUbAddr,
-                                                __ubuf__ float *lmUbAddr, __ubuf__ float *dmUbAddr, uint32_t row,
+    __simd_vf__ inline void RowmaxImplzNAligned(__ubuf__ ElementInput* sUbAddr, __ubuf__ float* gmUbAddr,
+                                                __ubuf__ float* lmUbAddr, __ubuf__ float* dmUbAddr, uint32_t row,
                                                 uint32_t rowAligned16, uint32_t colAligned16, ElementInput minValue,
                                                 float pScale)
     {
@@ -337,29 +337,29 @@ private:
             Sub(vreg_max_tmp_odd, vreg_max_tmp_odd, vreg_ln_p_scale, preg_all_b32);
             Sub(vreg_max_tmp_unroll_odd, vreg_max_tmp_unroll_odd, vreg_ln_p_scale, preg_all_b32);
             if constexpr (NeedUpdate) {
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)lmUbAddr), vreg_max_tmp_odd,
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)lmUbAddr), vreg_max_tmp_odd,
                                                                    ureg_max, 8); // 写回8行max到lmUb
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)lmUbAddr),
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)lmUbAddr),
                                                                    vreg_max_tmp_unroll_odd, ureg_max, 8);
             } else {
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)gmUbAddr), vreg_max_tmp_odd,
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)gmUbAddr), vreg_max_tmp_odd,
                                                                    ureg_max, 8); // 写回8行max到gmUb
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)gmUbAddr),
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)gmUbAddr),
                                                                    vreg_max_tmp_unroll_odd, ureg_max, 8);
             }
         }
         if constexpr (NeedUpdate) {
-            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)lmUbAddr), ureg_max, 0);
+            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)lmUbAddr), ureg_max, 0);
         } else {
-            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)gmUbAddr), ureg_max, 0);
+            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)gmUbAddr), ureg_max, 0);
         }
     }
 
     template <bool NeedUpdate>
-    __simd_vf__ inline void PAndRowSumImplzNAligned(__ubuf__ ElementOutput *pUbAddr, __ubuf__ ElementInput *sUbAddr,
-                                                    __ubuf__ float *gmUbAddr, __ubuf__ float *lmUbAddr,
-                                                    __ubuf__ float *glUbAddr, __ubuf__ float *llUbAddr,
-                                                    __ubuf__ uint8_t *gatherPIdxUbAddr, uint32_t row,
+    __simd_vf__ inline void PAndRowSumImplzNAligned(__ubuf__ ElementOutput* pUbAddr, __ubuf__ ElementInput* sUbAddr,
+                                                    __ubuf__ float* gmUbAddr, __ubuf__ float* lmUbAddr,
+                                                    __ubuf__ float* glUbAddr, __ubuf__ float* llUbAddr,
+                                                    __ubuf__ uint8_t* gatherPIdxUbAddr, uint32_t row,
                                                     uint32_t rowAligned16, uint32_t colAligned32)
     {
         using namespace AscendC::Reg;
@@ -464,12 +464,12 @@ private:
                 Cast<ElementOutput, float, castTraitRintOne>(vreg_exp_1_f8_1, vreg_exp_1_1, preg_all_b32);
                 Cast<ElementOutput, float, castTraitRintThree>(vreg_exp_3_f8_1, vreg_exp_3_1, preg_all_b32);
 
-                Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_1, (RegTensor<uint8_t> &)vreg_exp_0_f8_1,
-                   (RegTensor<uint8_t> &)vreg_exp_2_f8_1, preg_all_b8);
-                Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_2, (RegTensor<uint8_t> &)vreg_exp_1_f8_1,
-                   (RegTensor<uint8_t> &)vreg_exp_3_f8_1, preg_all_b8);
-                Or((RegTensor<uint8_t> &)vreg_exp_merge_f8_1, (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_1,
-                   (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_2, preg_all_b8);
+                Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_1, (RegTensor<uint8_t>&)vreg_exp_0_f8_1,
+                   (RegTensor<uint8_t>&)vreg_exp_2_f8_1, preg_all_b8);
+                Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_2, (RegTensor<uint8_t>&)vreg_exp_1_f8_1,
+                   (RegTensor<uint8_t>&)vreg_exp_3_f8_1, preg_all_b8);
+                Or((RegTensor<uint8_t>&)vreg_exp_merge_f8_1, (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_1,
+                   (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_2, preg_all_b8);
 
                 LoadAlign(vreg_exp_merge_f8_indexes, gatherPIdxUbAddr);
                 Gather(vreg_exp_merge_f8_1, vreg_exp_merge_f8_1, vreg_exp_merge_f8_indexes);
@@ -481,12 +481,12 @@ private:
                 Cast<ElementOutput, float, castTraitRintOne>(vreg_exp_1_f8_2, vreg_exp_1_2, preg_all_b32);
                 Cast<ElementOutput, float, castTraitRintThree>(vreg_exp_3_f8_2, vreg_exp_3_2, preg_all_b32);
 
-                Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_1, (RegTensor<uint8_t> &)vreg_exp_0_f8_2,
-                   (RegTensor<uint8_t> &)vreg_exp_2_f8_2, preg_all_b8);
-                Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_2, (RegTensor<uint8_t> &)vreg_exp_1_f8_2,
-                   (RegTensor<uint8_t> &)vreg_exp_3_f8_2, preg_all_b8);
-                Or((RegTensor<uint8_t> &)vreg_exp_merge_f8_2, (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_1,
-                   (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_2, preg_all_b8);
+                Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_1, (RegTensor<uint8_t>&)vreg_exp_0_f8_2,
+                   (RegTensor<uint8_t>&)vreg_exp_2_f8_2, preg_all_b8);
+                Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_2, (RegTensor<uint8_t>&)vreg_exp_1_f8_2,
+                   (RegTensor<uint8_t>&)vreg_exp_3_f8_2, preg_all_b8);
+                Or((RegTensor<uint8_t>&)vreg_exp_merge_f8_2, (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_1,
+                   (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_2, preg_all_b8);
 
                 Gather(vreg_exp_merge_f8_2, vreg_exp_merge_f8_2, vreg_exp_merge_f8_indexes);
                 StoreAlign(pUbAddr + i * 16 * 32 + j * rowAligned16 * 32 + 8 * 32, vreg_exp_merge_f8_2, preg_all_b8);
@@ -494,28 +494,28 @@ private:
             ReduceDataBlock<ReduceType::SUM>(vreg_exp_sum_1, vreg_exp_sum_1, preg_all_b32);
             ReduceDataBlock<ReduceType::SUM>(vreg_exp_sum_2, vreg_exp_sum_2, preg_all_b32);
             if constexpr (NeedUpdate) {
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)llUbAddr), vreg_exp_sum_1,
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)llUbAddr), vreg_exp_sum_1,
                                                                    ureg_exp_sum, 8);
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)llUbAddr), vreg_exp_sum_2,
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)llUbAddr), vreg_exp_sum_2,
                                                                    ureg_exp_sum, 8);
             } else {
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)glUbAddr), vreg_exp_sum_1,
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)glUbAddr), vreg_exp_sum_1,
                                                                    ureg_exp_sum, 8);
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)glUbAddr), vreg_exp_sum_2,
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)glUbAddr), vreg_exp_sum_2,
                                                                    ureg_exp_sum, 8);
             }
         }
         if constexpr (NeedUpdate) {
-            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)llUbAddr), ureg_exp_sum, 0);
+            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)llUbAddr), ureg_exp_sum, 0);
         } else {
-            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)glUbAddr), ureg_exp_sum, 0);
+            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)glUbAddr), ureg_exp_sum, 0);
         }
     }
 
     template <bool NeedUpdate, ColzNFractalTailSizeStatus TailSizeStatus>
-    __simd_vf__ inline void RowmaxImplzNUnAligned(__ubuf__ ElementInput *sUbAddr, __ubuf__ float *gmUbAddr,
-                                                  __ubuf__ float *lmUbAddr, __ubuf__ float *dmUbAddr,
-                                                  __ubuf__ int16_t *tailMaskUbAddr, uint32_t row, uint32_t rowAligned16,
+    __simd_vf__ inline void RowmaxImplzNUnAligned(__ubuf__ ElementInput* sUbAddr, __ubuf__ float* gmUbAddr,
+                                                  __ubuf__ float* lmUbAddr, __ubuf__ float* dmUbAddr,
+                                                  __ubuf__ int16_t* tailMaskUbAddr, uint32_t row, uint32_t rowAligned16,
                                                   uint32_t colMainLoopNum16, ElementInput minValue, float pScale)
     {
         using namespace AscendC::Reg;
@@ -586,30 +586,30 @@ private:
             Sub(vreg_max_tmp_odd, vreg_max_tmp_odd, vreg_ln_p_scale, preg_all_b32);
             Sub(vreg_max_tmp_unroll_odd, vreg_max_tmp_unroll_odd, vreg_ln_p_scale, preg_all_b32);
             if constexpr (NeedUpdate) {
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)lmUbAddr), vreg_max_tmp_odd,
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)lmUbAddr), vreg_max_tmp_odd,
                                                                    ureg_max, 8); // 写回8行max到lmUb
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)lmUbAddr),
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)lmUbAddr),
                                                                    vreg_max_tmp_unroll_odd, ureg_max, 8);
             } else {
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)gmUbAddr), vreg_max_tmp_odd,
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)gmUbAddr), vreg_max_tmp_odd,
                                                                    ureg_max, 8); // 写回8行max到gmUb
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)gmUbAddr),
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)gmUbAddr),
                                                                    vreg_max_tmp_unroll_odd, ureg_max, 8);
             }
         }
         if constexpr (NeedUpdate) {
-            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)lmUbAddr), ureg_max, 0);
+            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)lmUbAddr), ureg_max, 0);
         } else {
-            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)gmUbAddr), ureg_max, 0);
+            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)gmUbAddr), ureg_max, 0);
         }
     }
 
     template <bool NeedUpdate, ColzNFractalTailSizeStatus TailSizeStatus>
-    __simd_vf__ inline void PAndRowSumImplzNUnAligned(__ubuf__ ElementOutput *pUbAddr, __ubuf__ ElementInput *sUbAddr,
-                                                      __ubuf__ float *gmUbAddr, __ubuf__ float *lmUbAddr,
-                                                      __ubuf__ float *glUbAddr, __ubuf__ float *llUbAddr,
-                                                      __ubuf__ uint8_t *gatherPIdxUbAddr,
-                                                      __ubuf__ int16_t *tailMaskUbAddr, uint32_t row,
+    __simd_vf__ inline void PAndRowSumImplzNUnAligned(__ubuf__ ElementOutput* pUbAddr, __ubuf__ ElementInput* sUbAddr,
+                                                      __ubuf__ float* gmUbAddr, __ubuf__ float* lmUbAddr,
+                                                      __ubuf__ float* glUbAddr, __ubuf__ float* llUbAddr,
+                                                      __ubuf__ uint8_t* gatherPIdxUbAddr,
+                                                      __ubuf__ int16_t* tailMaskUbAddr, uint32_t row,
                                                       uint32_t rowAligned16, uint32_t colMainLoopNum32,
                                                       ElementInput minValue)
     {
@@ -724,12 +724,12 @@ private:
                 Cast<ElementOutput, float, castTraitRintOne>(vreg_exp_1_f8_1, vreg_exp_1_1, preg_all_b32);
                 Cast<ElementOutput, float, castTraitRintThree>(vreg_exp_3_f8_1, vreg_exp_3_1, preg_all_b32);
 
-                Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_1, (RegTensor<uint8_t> &)vreg_exp_0_f8_1,
-                   (RegTensor<uint8_t> &)vreg_exp_2_f8_1, preg_all_b8);
-                Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_2, (RegTensor<uint8_t> &)vreg_exp_1_f8_1,
-                   (RegTensor<uint8_t> &)vreg_exp_3_f8_1, preg_all_b8);
-                Or((RegTensor<uint8_t> &)vreg_exp_merge_f8_1, (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_1,
-                   (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_2, preg_all_b8);
+                Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_1, (RegTensor<uint8_t>&)vreg_exp_0_f8_1,
+                   (RegTensor<uint8_t>&)vreg_exp_2_f8_1, preg_all_b8);
+                Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_2, (RegTensor<uint8_t>&)vreg_exp_1_f8_1,
+                   (RegTensor<uint8_t>&)vreg_exp_3_f8_1, preg_all_b8);
+                Or((RegTensor<uint8_t>&)vreg_exp_merge_f8_1, (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_1,
+                   (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_2, preg_all_b8);
 
                 LoadAlign(vreg_exp_merge_f8_indexes, gatherPIdxUbAddr);
                 Gather(vreg_exp_merge_f8_1, vreg_exp_merge_f8_1, vreg_exp_merge_f8_indexes);
@@ -741,12 +741,12 @@ private:
                 Cast<ElementOutput, float, castTraitRintOne>(vreg_exp_1_f8_2, vreg_exp_1_2, preg_all_b32);
                 Cast<ElementOutput, float, castTraitRintThree>(vreg_exp_3_f8_2, vreg_exp_3_2, preg_all_b32);
 
-                Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_1, (RegTensor<uint8_t> &)vreg_exp_0_f8_2,
-                   (RegTensor<uint8_t> &)vreg_exp_2_f8_2, preg_all_b8);
-                Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_2, (RegTensor<uint8_t> &)vreg_exp_1_f8_2,
-                   (RegTensor<uint8_t> &)vreg_exp_3_f8_2, preg_all_b8);
-                Or((RegTensor<uint8_t> &)vreg_exp_merge_f8_2, (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_1,
-                   (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_2, preg_all_b8);
+                Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_1, (RegTensor<uint8_t>&)vreg_exp_0_f8_2,
+                   (RegTensor<uint8_t>&)vreg_exp_2_f8_2, preg_all_b8);
+                Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_2, (RegTensor<uint8_t>&)vreg_exp_1_f8_2,
+                   (RegTensor<uint8_t>&)vreg_exp_3_f8_2, preg_all_b8);
+                Or((RegTensor<uint8_t>&)vreg_exp_merge_f8_2, (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_1,
+                   (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_2, preg_all_b8);
 
                 Gather(vreg_exp_merge_f8_2, vreg_exp_merge_f8_2, vreg_exp_merge_f8_indexes);
                 StoreAlign(pUbAddr + i * 16 * 32 + j * rowAligned16 * 32 + 8 * 32, vreg_exp_merge_f8_2, preg_all_b8);
@@ -814,12 +814,12 @@ private:
             Cast<ElementOutput, float, castTraitRintOne>(vreg_exp_1_f8_1, vreg_exp_1_1, preg_all_b32);
             Cast<ElementOutput, float, castTraitRintThree>(vreg_exp_3_f8_1, vreg_exp_3_1, preg_all_b32);
 
-            Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_1, (RegTensor<uint8_t> &)vreg_exp_0_f8_1,
-               (RegTensor<uint8_t> &)vreg_exp_2_f8_1, preg_all_b8);
-            Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_2, (RegTensor<uint8_t> &)vreg_exp_1_f8_1,
-               (RegTensor<uint8_t> &)vreg_exp_3_f8_1, preg_all_b8);
-            Or((RegTensor<uint8_t> &)vreg_exp_merge_f8_1, (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_1,
-               (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_1_2, preg_all_b8);
+            Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_1, (RegTensor<uint8_t>&)vreg_exp_0_f8_1,
+               (RegTensor<uint8_t>&)vreg_exp_2_f8_1, preg_all_b8);
+            Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_2, (RegTensor<uint8_t>&)vreg_exp_1_f8_1,
+               (RegTensor<uint8_t>&)vreg_exp_3_f8_1, preg_all_b8);
+            Or((RegTensor<uint8_t>&)vreg_exp_merge_f8_1, (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_1,
+               (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_1_2, preg_all_b8);
 
             LoadAlign(vreg_exp_merge_f8_indexes, gatherPIdxUbAddr);
             Gather(vreg_exp_merge_f8_1, vreg_exp_merge_f8_1, vreg_exp_merge_f8_indexes);
@@ -831,12 +831,12 @@ private:
             Cast<ElementOutput, float, castTraitRintOne>(vreg_exp_1_f8_2, vreg_exp_1_2, preg_all_b32);
             Cast<ElementOutput, float, castTraitRintThree>(vreg_exp_3_f8_2, vreg_exp_3_2, preg_all_b32);
 
-            Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_1, (RegTensor<uint8_t> &)vreg_exp_0_f8_2,
-               (RegTensor<uint8_t> &)vreg_exp_2_f8_2, preg_all_b8);
-            Or((RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_2, (RegTensor<uint8_t> &)vreg_exp_1_f8_2,
-               (RegTensor<uint8_t> &)vreg_exp_3_f8_2, preg_all_b8);
-            Or((RegTensor<uint8_t> &)vreg_exp_merge_f8_2, (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_1,
-               (RegTensor<uint8_t> &)vreg_exp_merge_tmp_f8_2_2, preg_all_b8);
+            Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_1, (RegTensor<uint8_t>&)vreg_exp_0_f8_2,
+               (RegTensor<uint8_t>&)vreg_exp_2_f8_2, preg_all_b8);
+            Or((RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_2, (RegTensor<uint8_t>&)vreg_exp_1_f8_2,
+               (RegTensor<uint8_t>&)vreg_exp_3_f8_2, preg_all_b8);
+            Or((RegTensor<uint8_t>&)vreg_exp_merge_f8_2, (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_1,
+               (RegTensor<uint8_t>&)vreg_exp_merge_tmp_f8_2_2, preg_all_b8);
 
             Gather(vreg_exp_merge_f8_2, vreg_exp_merge_f8_2, vreg_exp_merge_f8_indexes);
             StoreAlign(pUbAddr + i * 16 * 32 + colMainLoopNum32 * rowAligned16 * 32 + 8 * 32, vreg_exp_merge_f8_2,
@@ -845,26 +845,26 @@ private:
             ReduceDataBlock<ReduceType::SUM>(vreg_exp_sum_1, vreg_exp_sum_1, preg_all_b32);
             ReduceDataBlock<ReduceType::SUM>(vreg_exp_sum_2, vreg_exp_sum_2, preg_all_b32);
             if constexpr (NeedUpdate) {
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)llUbAddr), vreg_exp_sum_1,
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)llUbAddr), vreg_exp_sum_1,
                                                                    ureg_exp_sum, 8);
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)llUbAddr), vreg_exp_sum_2,
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)llUbAddr), vreg_exp_sum_2,
                                                                    ureg_exp_sum, 8);
             } else {
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)glUbAddr), vreg_exp_sum_1,
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)glUbAddr), vreg_exp_sum_1,
                                                                    ureg_exp_sum, 8);
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)glUbAddr), vreg_exp_sum_2,
+                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)glUbAddr), vreg_exp_sum_2,
                                                                    ureg_exp_sum, 8);
             }
         }
         if constexpr (NeedUpdate) {
-            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)llUbAddr), ureg_exp_sum, 0);
+            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)llUbAddr), ureg_exp_sum, 0);
         } else {
-            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)glUbAddr), ureg_exp_sum, 0);
+            StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float*&)glUbAddr), ureg_exp_sum, 0);
         }
     }
 
-    __simd_vf__ inline void UpdateRowMaxImpl(__ubuf__ float *dmUbAddr, __ubuf__ float *gmUbAddr,
-                                             __ubuf__ float *lmUbAddr, uint32_t row)
+    __simd_vf__ inline void UpdateRowMaxImpl(__ubuf__ float* dmUbAddr, __ubuf__ float* gmUbAddr,
+                                             __ubuf__ float* lmUbAddr, uint32_t row)
     {
         using namespace AscendC::Reg;
         RegTensor<float> vreg_in_max;
@@ -878,9 +878,9 @@ private:
         StoreAlign<float, StoreDist::DIST_NORM_B32>(lmUbAddr, vreg_max_new, preg_all_b32); // hm
     }
 
-    __simd_vf__ inline void UpdateExpSumImpl(__ubuf__ float *dmUbAddr, __ubuf__ float *gmUbAddr,
-                                             __ubuf__ float *lmUbAddr, __ubuf__ float *glUbAddr,
-                                             __ubuf__ float *llUbAddr)
+    __simd_vf__ inline void UpdateExpSumImpl(__ubuf__ float* dmUbAddr, __ubuf__ float* gmUbAddr,
+                                             __ubuf__ float* lmUbAddr, __ubuf__ float* glUbAddr,
+                                             __ubuf__ float* llUbAddr)
     {
         using namespace AscendC::Reg;
         RegTensor<float> vreg_in_exp_sum;
@@ -904,11 +904,11 @@ private:
         StoreAlign<float, StoreDist::DIST_NORM_B32>(gmUbAddr, vreg_input_max, preg_all_b32); // gm = hm
 
         // gl = dm * gl + ll
-        LoadAlign(vreg_in_exp_sum, (__ubuf__ float *&)llUbAddr);
-        LoadAlign(vreg_exp_sum_brc, (__ubuf__ float *&)glUbAddr);
+        LoadAlign(vreg_in_exp_sum, (__ubuf__ float*&)llUbAddr);
+        LoadAlign(vreg_exp_sum_brc, (__ubuf__ float*&)glUbAddr);
         Mul(vreg_exp_sum_update, vreg_exp_max, vreg_exp_sum_brc, preg_all_b32);
         Add(vreg_exp_sum_update, vreg_exp_sum_update, vreg_in_exp_sum, preg_all_b32);
-        StoreAlign<float, StoreDist::DIST_NORM_B32>((__ubuf__ float *&)glUbAddr, vreg_exp_sum_update, preg_all_b32);
+        StoreAlign<float, StoreDist::DIST_NORM_B32>((__ubuf__ float*&)glUbAddr, vreg_exp_sum_update, preg_all_b32);
     }
 };
 

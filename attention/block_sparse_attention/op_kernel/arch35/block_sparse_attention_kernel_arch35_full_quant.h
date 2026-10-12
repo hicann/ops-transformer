@@ -53,40 +53,40 @@ public:
     // Methods
     __aicore__ inline BsaFullQuantKernelArch35() {}
 
-    __aicore__ inline void operator()(BsaFullQuantKernelParamsArch35 const &params)
+    __aicore__ inline void operator()(BsaFullQuantKernelParamsArch35 const& params)
     {
-        __gm__ BlockSparseAttentionTilingData *bsaTilingData =
-            reinterpret_cast<__gm__ BlockSparseAttentionTilingData *>(params.tiling);
+        __gm__ BlockSparseAttentionTilingData* bsaTilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionTilingData*>(params.tiling);
         FetchBaseShapeInfo(bsaTilingData);
         CalcL1L0BufTileInfo(bsaTilingData);
         CalcUBufTileInfo();
         // global buffers
         AscendC::GlobalTensor<ElementQ> gQ;
-        gQ.SetGlobalBuffer((__gm__ ElementQ *)params.query);
+        gQ.SetGlobalBuffer((__gm__ ElementQ*)params.query);
         AscendC::GlobalTensor<ElementK> gK;
-        gK.SetGlobalBuffer((__gm__ ElementK *)params.key);
+        gK.SetGlobalBuffer((__gm__ ElementK*)params.key);
         AscendC::GlobalTensor<ElementK> gV;
-        gV.SetGlobalBuffer((__gm__ ElementK *)params.value);
+        gV.SetGlobalBuffer((__gm__ ElementK*)params.value);
         AscendC::GlobalTensor<int64_t> gActualQseqlen;
-        gActualQseqlen.SetGlobalBuffer((__gm__ int64_t *)params.actualSeqLengths);
+        gActualQseqlen.SetGlobalBuffer((__gm__ int64_t*)params.actualSeqLengths);
         AscendC::GlobalTensor<int64_t> gActualKvseqlen;
-        gActualKvseqlen.SetGlobalBuffer((__gm__ int64_t *)params.actualSeqLengthsKv);
+        gActualKvseqlen.SetGlobalBuffer((__gm__ int64_t*)params.actualSeqLengthsKv);
         AscendC::GlobalTensor<uint8_t> gBlockSparseMask;
-        gBlockSparseMask.SetGlobalBuffer((__gm__ uint8_t *)params.blockSparseMask);
+        gBlockSparseMask.SetGlobalBuffer((__gm__ uint8_t*)params.blockSparseMask);
         AscendC::GlobalTensor<float> gQDequantScale;
-        gQDequantScale.SetGlobalBuffer((__gm__ float *)params.qDequantScale);
+        gQDequantScale.SetGlobalBuffer((__gm__ float*)params.qDequantScale);
         AscendC::GlobalTensor<float> gKDequantScale;
-        gKDequantScale.SetGlobalBuffer((__gm__ float *)params.kDequantScale);
+        gKDequantScale.SetGlobalBuffer((__gm__ float*)params.kDequantScale);
         AscendC::GlobalTensor<float> gVDequantScale;
-        gVDequantScale.SetGlobalBuffer((__gm__ float *)params.vDequantScale);
+        gVDequantScale.SetGlobalBuffer((__gm__ float*)params.vDequantScale);
         AscendC::GlobalTensor<ElementO> gO;
-        gO.SetGlobalBuffer((__gm__ ElementO *)params.attentionOut);
+        gO.SetGlobalBuffer((__gm__ ElementO*)params.attentionOut);
         AscendC::GlobalTensor<ElementLse> gLse;
-        gLse.SetGlobalBuffer((__gm__ ElementLse *)params.lse);
+        gLse.SetGlobalBuffer((__gm__ ElementLse*)params.lse);
         AscendC::GlobalTensor<ElementSparseIdx> gSparseIdx;
-        gSparseIdx.SetGlobalBuffer((__gm__ ElementSparseIdx *)params.workSpace);
+        gSparseIdx.SetGlobalBuffer((__gm__ ElementSparseIdx*)params.workSpace);
         AscendC::GlobalTensor<ElementSparseCount> gSparseCount;
-        gSparseCount.SetGlobalBuffer((__gm__ ElementSparseCount *)(params.workSpace + sparseIdxSize_));
+        gSparseCount.SetGlobalBuffer((__gm__ ElementSparseCount*)(params.workSpace + sparseIdxSize_));
         // cross core data move dst buffers
         AscendC::LocalTensor<ElementP> l1PTensor[MAX_CROSS_CORE_BUF_STAGES];
         AscendC::LocalTensor<ElementS> ubSTensor[UB_S_OTMP_BUF_STAGES];
@@ -378,7 +378,7 @@ public:
                     if constexpr (zNOnlineSoftmax) {
                         combinedDeqScalar *= scaleValue_;
                     }
-                    uint64_t deqScalar = static_cast<uint64_t>(*reinterpret_cast<int32_t *>(&combinedDeqScalar));
+                    uint64_t deqScalar = static_cast<uint64_t>(*reinterpret_cast<int32_t*>(&combinedDeqScalar));
                     blockMmadQK(gmKTensorTla, ubSTensorTla, gSparseIdx[gmOffsetSparseIdx], actualBlockShapeQK,
                                 gatheredKvSTileIdx, kvSeqlen, kvBaseTile_, blockShapeY_, yBlockNumAval, yBlockNumRsvd,
                                 prefixSumL0AStages, prefixSumL0BStages, mm1ToSmFlag, deqScalar);
@@ -434,7 +434,7 @@ public:
                     uint32_t kvDequantScaleOffsetDe =
                         curBatch * kvHeads_ * yBlockNumAligned_ + kvHeadIdx * yBlockNumAligned_ + yBlockIndexDe;
                     float vDequantScaleValue = gVDequantScale.GetValue(kvDequantScaleOffsetDe);
-                    uint64_t deqScalar = static_cast<uint64_t>(*reinterpret_cast<int32_t *>(&vDequantScaleValue));
+                    uint64_t deqScalar = static_cast<uint64_t>(*reinterpret_cast<int32_t*>(&vDequantScaleValue));
                     blockMmadPV(gmVTensorTla, ubOTmpTensorTla, gSparseIdx[gmOffsetSparseIdx], actualBlockShapePV,
                                 gatheredKvSTileIdxDe, kvSeqlen, kvBaseTile_, blockShapeY_, yBlockNumAval, yBlockNumRsvd,
                                 prefixSumL0AStages, prefixSumL0BStages, smToMm2Flag, mm2ToReFlag, deqScalar);
@@ -454,7 +454,7 @@ public:
         ReleaseSyncFlags<4, 4, 4>();
     }
 
-    __aicore__ inline void FetchBaseShapeInfo(__gm__ BlockSparseAttentionTilingData *bsaTilingData)
+    __aicore__ inline void FetchBaseShapeInfo(__gm__ BlockSparseAttentionTilingData* bsaTilingData)
     {
         batch_ = bsaTilingData->batch;
         qHeads_ = bsaTilingData->numHeads;
@@ -481,7 +481,7 @@ public:
         kvSeqlenAligned_ = bsaTilingData->maxKvSeqlen;
     }
 
-    __aicore__ inline void CalcL1L0BufTileInfo(__gm__ BlockSparseAttentionTilingData *bsaTilingData)
+    __aicore__ inline void CalcL1L0BufTileInfo(__gm__ BlockSparseAttentionTilingData* bsaTilingData)
     {
         mm1L1TileM_ = bsaTilingData->BsaMmPhaseL1TileInfo.mm1L1TileM;
         mm1L1TileN_ = bsaTilingData->BsaMmPhaseL1TileInfo.mm1L1TileN;

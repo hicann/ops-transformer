@@ -30,7 +30,7 @@ using namespace Reg;
  */
 
 template <typename T>
-__aicore__ inline void Transdata(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor, uint32_t srcM,
+__aicore__ inline void Transdata(const LocalTensor<T>& dstTensor, const LocalTensor<T>& srcTensor, uint32_t srcM,
                                  uint32_t srcN)
 {
     const uint32_t blockSize = 32;
@@ -48,8 +48,8 @@ __aicore__ inline void Transdata(const LocalTensor<T> &dstTensor, const LocalTen
             MaskReg pregFullExe = CreateMask<T, MaskPattern::ALL>();
             for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
                 LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY, PostLiteral::POST_MODE_UPDATE>(
-                    vregSrc1, (__ubuf__ T *&)srcLocalInt, blockStride, repeatStride, pregFullExe);
-                StoreAlign<T, PostLiteral::POST_MODE_UPDATE>((__ubuf__ T *&)dstLocalInt, vregSrc1, srcN, pregFullExe);
+                    vregSrc1, (__ubuf__ T*&)srcLocalInt, blockStride, repeatStride, pregFullExe);
+                StoreAlign<T, PostLiteral::POST_MODE_UPDATE>((__ubuf__ T*&)dstLocalInt, vregSrc1, srcN, pregFullExe);
             }
         }
     } else if (srcN <= 192) {
@@ -64,21 +64,21 @@ __aicore__ inline void Transdata(const LocalTensor<T> &dstTensor, const LocalTen
             MaskReg pregFullExe = CreateMask<T, MaskPattern::ALL>();
             for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
                 LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY, PostLiteral::POST_MODE_UPDATE>(
-                    vregSrc1, (__ubuf__ T *&)srcLocalInt, blockStride, repeatStride, pregFullExe);
+                    vregSrc1, (__ubuf__ T*&)srcLocalInt, blockStride, repeatStride, pregFullExe);
                 LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY, PostLiteral::POST_MODE_UPDATE>(
-                    vregSrc2, (__ubuf__ T *&)srcLocalInt2, blockStride, repeatStride, pregFullExe);
-                StoreUnAlign<T, PostLiteral::POST_MODE_UPDATE>((__ubuf__ T *&)dstLocalInt, vregSrc1, ureg1,
+                    vregSrc2, (__ubuf__ T*&)srcLocalInt2, blockStride, repeatStride, pregFullExe);
+                StoreUnAlign<T, PostLiteral::POST_MODE_UPDATE>((__ubuf__ T*&)dstLocalInt, vregSrc1, ureg1,
                                                                VREG_SIZE >> 1);
-                StoreUnAlign<T, PostLiteral::POST_MODE_UPDATE>((__ubuf__ T *&)dstLocalInt, vregSrc2, ureg2, tailSize);
+                StoreUnAlign<T, PostLiteral::POST_MODE_UPDATE>((__ubuf__ T*&)dstLocalInt, vregSrc2, ureg2, tailSize);
             }
-            StoreUnAlignPost<T>((__ubuf__ T *&)dstLocalInt, ureg1, 0);
-            StoreUnAlignPost<T>((__ubuf__ T *&)dstLocalInt, ureg2, 0);
+            StoreUnAlignPost<T>((__ubuf__ T*&)dstLocalInt, ureg1, 0);
+            StoreUnAlignPost<T>((__ubuf__ T*&)dstLocalInt, ureg2, 0);
         }
     }
 }
 #else
 template <typename T>
-__aicore__ inline void Transdata(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor, uint32_t srcM,
+__aicore__ inline void Transdata(const LocalTensor<T>& dstTensor, const LocalTensor<T>& srcTensor, uint32_t srcM,
                                  uint32_t srcN)
 {}
 #endif

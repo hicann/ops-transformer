@@ -69,7 +69,7 @@ void ChunkGatedDeltaRuleTiling::InitCompileInfo()
         OP_LOGE(context_->GetNodeName(), "platformInfoPtr is null");
         return;
     }
-    const auto &ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
+    const auto& ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfo_.ubSize);
     compileInfo_.aivNum = ascendcPlatform.GetCoreNumAiv();
     compileInfo_.aicNum = ascendcPlatform.GetCoreNumAic();
@@ -287,14 +287,14 @@ ge::graphStatus ChunkGatedDeltaRuleTiling::PostTiling()
                 return ge::GRAPH_FAILED);
 
     errno_t ret = memcpy_s(rawTilingData->GetData(), rawTilingData->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
     }
     rawTilingData->SetDataSize(tilingDataSize);
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     OP_CHECK_IF(workspaces == nullptr, OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(), "workspaces is null"),
                 return ge::GRAPH_FAILED);
     workspaces[0] = workspaceSize_;
@@ -396,7 +396,7 @@ ge::graphStatus ChunkGatedDeltaRuleTiling::AnalyzeDtype()
 }
 
 // 校验 shape 的维度数是否符合预期
-bool ChunkGatedDeltaRuleTiling::CheckDim(const gert::Shape &shape, const size_t dim, const std::string &dimDesc)
+bool ChunkGatedDeltaRuleTiling::CheckDim(const gert::Shape& shape, const size_t dim, const std::string& dimDesc)
 {
     if (shape.GetDimNum() != dim) {
         OP_LOGE(context_->GetNodeName(), "The number of dimensions of %s should be %zu, but it is %zu", dimDesc.c_str(),
@@ -408,9 +408,9 @@ bool ChunkGatedDeltaRuleTiling::CheckDim(const gert::Shape &shape, const size_t 
 
 // 统一校验所有输入输出 shape 是否与理想 shape 一致
 ge::graphStatus ChunkGatedDeltaRuleTiling::CheckExpectedShapes(
-    const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &valueShape,
-    const gert::Shape &betaShape, const gert::Shape &stateShape, const gert::Shape &actualSeqLengthsShape,
-    const gert::Shape &outShape, const gert::Shape &finalStateShape, const gert::Shape *gShape)
+    const gert::Shape& queryShape, const gert::Shape& keyShape, const gert::Shape& valueShape,
+    const gert::Shape& betaShape, const gert::Shape& stateShape, const gert::Shape& actualSeqLengthsShape,
+    const gert::Shape& outShape, const gert::Shape& finalStateShape, const gert::Shape* gShape)
 {
     const gert::Shape expectQueryShape = gert::Shape({tilingData_.t, tilingData_.nk, tilingData_.dk});
     const gert::Shape expectKeyShape = gert::Shape({tilingData_.t, tilingData_.nk, tilingData_.dk});
@@ -520,15 +520,15 @@ ge::graphStatus ChunkGatedDeltaRuleTiling::CheckDerivedDimConstraints()
 // 统一校验输入输出 shape/rank 约束，并从锚点 shape 中解析 tilingData 维度
 ge::graphStatus ChunkGatedDeltaRuleTiling::AnalyzeShapes()
 {
-    const auto &queryShape = context_->GetInputShape(QUERY_INDEX)->GetOriginShape();
-    const auto &keyShape = context_->GetInputShape(KEY_INDEX)->GetOriginShape();
-    const auto &valueShape = context_->GetInputShape(VALUE_INDEX)->GetOriginShape();
-    const auto &betaShape = context_->GetInputShape(BETA_INDEX)->GetOriginShape();
-    const auto &stateShape = context_->GetInputShape(STATE_INDEX)->GetOriginShape();
-    const auto &actualSeqLengthsShape = context_->GetInputShape(ACTUAL_SEQ_LENGTHS_INDEX)->GetOriginShape();
-    const auto &outShape = context_->GetOutputShape(OUTPUT_OUT_IDX)->GetOriginShape();
-    const auto &finalStateShape = context_->GetOutputShape(OUTPUT_FINAL_STATE_IDX)->GetOriginShape();
-    const gert::Shape *gShape = nullptr;
+    const auto& queryShape = context_->GetInputShape(QUERY_INDEX)->GetOriginShape();
+    const auto& keyShape = context_->GetInputShape(KEY_INDEX)->GetOriginShape();
+    const auto& valueShape = context_->GetInputShape(VALUE_INDEX)->GetOriginShape();
+    const auto& betaShape = context_->GetInputShape(BETA_INDEX)->GetOriginShape();
+    const auto& stateShape = context_->GetInputShape(STATE_INDEX)->GetOriginShape();
+    const auto& actualSeqLengthsShape = context_->GetInputShape(ACTUAL_SEQ_LENGTHS_INDEX)->GetOriginShape();
+    const auto& outShape = context_->GetOutputShape(OUTPUT_OUT_IDX)->GetOriginShape();
+    const auto& finalStateShape = context_->GetOutputShape(OUTPUT_FINAL_STATE_IDX)->GetOriginShape();
+    const gert::Shape* gShape = nullptr;
 
     // 先校验 rank，保证后续 GetDim 安全
     if (!CheckDim(queryShape, QKV_DIM_NUM, "query") || !CheckDim(keyShape, QKV_DIM_NUM, "key") ||
@@ -596,7 +596,7 @@ ge::graphStatus ChunkGatedDeltaRuleTiling::AnalyzeEmptyTensor()
 // tiling 阶段基于 primary format 做格式校验。
 // GetPrimaryFormat() 可以吸收一部分派生格式，但 NCL/NCHW 等布局不会统一折回 ND。
 // 因此这里只拦截当前明确不支持的 FRACTAL_NZ，以避免误拦其他合法的 ND 派生布局。
-bool ChunkGatedDeltaRuleTiling::CheckFormat(const gert::CompileTimeTensorDesc *desc, const std::string &name)
+bool ChunkGatedDeltaRuleTiling::CheckFormat(const gert::CompileTimeTensorDesc* desc, const std::string& name)
 {
     auto primaryFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(desc->GetStorageFormat()));
     OP_CHECK_IF(primaryFormat == ge::FORMAT_FRACTAL_NZ,
@@ -685,7 +685,7 @@ void ChunkGatedDeltaRuleTiling::PrintTilingData()
 }
 
 // tiling 调度入口
-static ge::graphStatus ChunkGatedDeltaRuleTilingFunc(gert::TilingContext *context)
+static ge::graphStatus ChunkGatedDeltaRuleTilingFunc(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("ChunkGatedDeltaRule", "context is null"),
                 return ge::GRAPH_FAILED);
@@ -693,12 +693,12 @@ static ge::graphStatus ChunkGatedDeltaRuleTilingFunc(gert::TilingContext *contex
 }
 
 // tiling parse 阶段准备，校验编译信息是否存在
-static ge::graphStatus TilingPrepareForChunkGatedDeltaRule(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForChunkGatedDeltaRule(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("ChunkGatedDeltaRule", "context is null"),
                 return ge::GRAPH_FAILED);
 
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null"),
                 return ge::GRAPH_FAILED);
 
