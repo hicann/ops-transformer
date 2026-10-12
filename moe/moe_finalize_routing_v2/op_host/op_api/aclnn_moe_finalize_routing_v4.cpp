@@ -112,16 +112,16 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV4GetWorkspaceSize(
         CHECK_RET(xContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor* a1Contiguous = nullptr;
+    const aclTensor* alpha1Contiguous = nullptr;
     if (alpha1Optional != nullptr) {
-        a1Contiguous = l0op::Contiguous(alpha1Optional, uniqueExecutor.get());
-        CHECK_RET(a1Contiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        alpha1Contiguous = l0op::Contiguous(alpha1Optional, uniqueExecutor.get());
+        CHECK_RET(alpha1Contiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor* a2Contiguous = nullptr;
+    const aclTensor* alpha2Contiguous = nullptr;
     if (alpha2Optional != nullptr) {
-        a2Contiguous = l0op::Contiguous(alpha2Optional, uniqueExecutor.get());
-        CHECK_RET(a2Contiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        alpha2Contiguous = l0op::Contiguous(alpha2Optional, uniqueExecutor.get());
+        CHECK_RET(alpha2Contiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
     const aclTensor* vContiguous = nullptr;
@@ -130,10 +130,10 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV4GetWorkspaceSize(
         CHECK_RET(vContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    auto out_ = l0op::MoeFinalizeRoutingV2(expandedXContiguous, expandedRowIdxContiguous, x1Contiguous, x2Contiguous,
-                                           biasContiguous, scalesContiguous, expertIdxContiguous, xContiguous,
-                                           a1Contiguous, a2Contiguous, vContiguous, dropPadMode, zeroExpertRange,
-                                           copyExpertRange, constantExpertRange, k, out, uniqueExecutor.get());
+    auto out_ = l0op::MoeFinalizeRoutingV2(
+        expandedXContiguous, expandedRowIdxContiguous, x1Contiguous, x2Contiguous, biasContiguous, scalesContiguous,
+        expertIdxContiguous, xContiguous, alpha1Contiguous, alpha2Contiguous, vContiguous, dropPadMode, zeroExpertRange,
+        copyExpertRange, constantExpertRange, k, out, uniqueExecutor.get());
     CHECK_RET(out_ != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     auto viewCopyOutResult = l0op::ViewCopy(out_, out, uniqueExecutor.get());

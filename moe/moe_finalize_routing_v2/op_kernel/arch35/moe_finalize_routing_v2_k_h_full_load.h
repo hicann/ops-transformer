@@ -397,7 +397,7 @@ private:
                 CopyIn(xGm[xGmOffset], expandedXLocal[offset + validK * tilingData->hAligned], 1, tilingData->h);
             } else if (hasConstExpert && expertIdx >= tilingData->constantExpertStart &&
                        expertIdx < tilingData->constantExpertEnd) {
-                // x = a1 * x[i] +  a2 * v
+                // x = alpha1 * x[i] +  alpha2 * v
                 int64_t xGmOffset = GetBlockIdx() * tilingData->rowOfFormerBlock * h +
                                     rowOuterIdx * tilingData->rowFactor * h + rowInnerIdx * h;
                 CopyIn(xGm[xGmOffset], xLocal, 1, tilingData->h);
@@ -526,7 +526,7 @@ private:
                                     rowOuterIdx * tilingData->rowFactor * tilingData->h + rowInnerIdx * tilingData->h;
                 CopyIn(xGm[xGmOffset], expandedXLocal[khAlignedOffset], 1, tilingData->h);
             } else if (expertIdx >= tilingData->constantExpertStart && expertIdx < tilingData->constantExpertEnd) {
-                // x = a1 * x[i] +  a2 * v
+                // x = alpha1 * x[i] +  alpha2 * v
                 // 不需要有偏移，用完就下一个循环覆盖掉就行
                 int64_t xGmOffset = GetBlockIdx() * tilingData->rowOfFormerBlock * tilingData->h +
                                     rowOuterIdx * tilingData->rowFactor * tilingData->h + rowInnerIdx * tilingData->h;

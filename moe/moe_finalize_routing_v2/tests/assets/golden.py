@@ -29,8 +29,8 @@ class MoeFinalizeRoutingV2TestSpec:
         scales,
         expert_idx,
         x=None,
-        a1=None,
-        a2=None,
+        alpha1=None,
+        alpha2=None,
         v=None,
         *,
         drop_pad_mode=0,
@@ -94,13 +94,14 @@ class MoeFinalizeRoutingV2TestSpec:
                     elif (
                         x is not None
                         and v is not None
-                        and a1 is not None
-                        and a2 is not None
+                        and alpha1 is not None
+                        and alpha2 is not None
                         and const_start <= expert_id < const_end
                     ):
                         row_idx = expert_id - const_start
                         dst_row = (
-                            a1[row_idx, :] * x[i, :] + a2[row_idx, :] * v[row_idx, :]
+                            alpha1[row_idx, :] * x[i, :]
+                            + alpha2[row_idx, :] * v[row_idx, :]
                         ).astype(out_type)
                     else:
                         dst_row = expanded_x[
@@ -133,8 +134,8 @@ class MoeFinalizeRoutingV2TestSpec:
         scales,
         expert_idx,
         x=None,
-        a1=None,
-        a2=None,
+        alpha1=None,
+        alpha2=None,
         v=None,
         **kwargs,
     ):
@@ -163,8 +164,8 @@ class MoeFinalizeRoutingV2TestSpec:
             scales,
             expert_idx,
             x,
-            a1,
-            a2,
+            alpha1,
+            alpha2,
             v,
         )
 

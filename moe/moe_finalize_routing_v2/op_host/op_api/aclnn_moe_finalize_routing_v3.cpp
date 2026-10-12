@@ -112,16 +112,16 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV3GetWorkspaceSize(
         CHECK_RET(xContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor* a1Contiguous = nullptr;
+    const aclTensor* alpha1Contiguous = nullptr;
     if (alpha1Optional != nullptr) {
-        a1Contiguous = l0op::Contiguous(alpha1Optional, uniqueExecutor.get());
-        CHECK_RET(a1Contiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        alpha1Contiguous = l0op::Contiguous(alpha1Optional, uniqueExecutor.get());
+        CHECK_RET(alpha1Contiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor* a2Contiguous = nullptr;
+    const aclTensor* alpha2Contiguous = nullptr;
     if (alpha2Optional != nullptr) {
-        a2Contiguous = l0op::Contiguous(alpha2Optional, uniqueExecutor.get());
-        CHECK_RET(a2Contiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        alpha2Contiguous = l0op::Contiguous(alpha2Optional, uniqueExecutor.get());
+        CHECK_RET(alpha2Contiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
     const aclTensor* vContiguous = nullptr;
@@ -131,10 +131,10 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV3GetWorkspaceSize(
     }
 
     // 调用l0接口进行计算，传入out参数
-    auto out_ = l0op::MoeFinalizeRoutingV2(expandedXContiguous, expandedRowIdxContiguous, x1Contiguous, x2Contiguous,
-                                           biasContiguous, scalesContiguous, expertIdxContiguous, xContiguous,
-                                           a1Contiguous, a2Contiguous, vContiguous, dropPadMode, zeroExpertRange,
-                                           copyExpertRange, constantExpertRange, 1, out, uniqueExecutor.get());
+    auto out_ = l0op::MoeFinalizeRoutingV2(
+        expandedXContiguous, expandedRowIdxContiguous, x1Contiguous, x2Contiguous, biasContiguous, scalesContiguous,
+        expertIdxContiguous, xContiguous, alpha1Contiguous, alpha2Contiguous, vContiguous, dropPadMode, zeroExpertRange,
+        copyExpertRange, constantExpertRange, 1, out, uniqueExecutor.get());
     CHECK_RET(out_ != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     // copyout结果，如果出参out是非连续Tensor，需要把计算完的连续Tensor转非连续

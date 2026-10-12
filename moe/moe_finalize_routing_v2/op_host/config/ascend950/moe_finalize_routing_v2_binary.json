@@ -85,7 +85,7 @@
             ]
           },
           {
-            "name": "a1",
+            "name": "alpha1",
             "index": 8,
             "dtype": "float32",
             "format": "ND",
@@ -95,7 +95,7 @@
             ]
           },
           {
-            "name": "a2",
+            "name": "alpha2",
             "index": 9,
             "dtype": "float32",
             "format": "ND",
@@ -248,7 +248,7 @@
             ]
           },
           {
-            "name": "a1",
+            "name": "alpha1",
             "index": 8,
             "dtype": "float16",
             "format": "ND",
@@ -258,7 +258,7 @@
             ]
           },
           {
-            "name": "a2",
+            "name": "alpha2",
             "index": 9,
             "dtype": "float16",
             "format": "ND",
@@ -411,7 +411,7 @@
             ]
           },
           {
-            "name": "a1",
+            "name": "alpha1",
             "index": 8,
             "dtype": "bfloat16",
             "format": "ND",
@@ -421,7 +421,7 @@
             ]
           },
           {
-            "name": "a2",
+            "name": "alpha2",
             "index": 9,
             "dtype": "bfloat16",
             "format": "ND",
