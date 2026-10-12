@@ -92,6 +92,12 @@ public:
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT16, ge::DT_BF16})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND});
+        // dsink: sink 的梯度，[N1] fp32。各 AIV 把部分和原子加到自己的槽位行，
+        // post 由 AIV0 按固定行序归约后写出。没有 sinks 时不写，内容未定义。
+        this->Output("dsink")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND});
         this->Attr("softmax_scale").AttrType(OPTIONAL).Float(0.0);
         this->Attr("mask_mode").AttrType(OPTIONAL).Int(0);
         this->Attr("win_left").AttrType(OPTIONAL).Int(-1);

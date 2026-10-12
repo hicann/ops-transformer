@@ -45,6 +45,14 @@ void DecideSwizzle(const FagParsedInfo& info, const FagKernelPlan& kernel, FagSc
     // 核 0 拿 2 列而核 35 拿 1 列，2 倍倾斜，实测反慢 14%）。
     schedule.swizzle = 0;
 
+    // Deterministic scheduling uses the AscendC-compatible non-swizzle mapping.
+    // Its cross-round conflicts are serialized by the kernel's FIX token chain
+    // while accumulating directly into the public fp32 workspace.
+    if (info.isDeterministic) {
+        trace.swizzleReject = "deterministic-linear";
+        return;
+    }
+
     if (kernel.tmpl != TMPL_BN2GS1S2) {
         trace.swizzleReject = "not-bn2gs1s2";
         return;

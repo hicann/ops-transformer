@@ -54,6 +54,12 @@ FagWorkspacePlan BuildWorkspacePlan(const FagParsedInfo& info)
         static_cast<size_t>(FAG_WS_ALIGN_ROWS) * static_cast<size_t>(std::max(info.d, info.dv));
     cursor += alignRowElems * FP32_SIZE;
 
+    // dsink 槽位区：[aivNum x N1] fp32。与 kernel 在 128 行垫之后的切分对齐。
+    // 按平台 AIV 数开，不小于实际启动的 AIV 行数。
+    plan.dsink.offset = cursor;
+    plan.dsink.size = static_cast<size_t>(info.aivNum) * static_cast<size_t>(info.n1) * FP32_SIZE;
+    cursor += plan.dsink.size;
+
     plan.totalSize = cursor;
     return plan;
 }

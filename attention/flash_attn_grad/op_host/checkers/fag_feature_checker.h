@@ -23,7 +23,7 @@
 
 namespace optiling {
 
-// D2：确定性计算明确拒绝。
+// D2：TND 确定性仍拒绝；其余放行（GS1S2 核上闭式，BN2 单块走现网）。
 class FagDeterministicChecker : public FagBaseChecker {
 public:
     ge::graphStatus Check(FagCheckCtx& ctx) override;

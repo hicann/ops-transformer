@@ -19,7 +19,7 @@
 
 namespace op_api {
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor> FlashAttnGrad(
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> FlashAttnGrad(
     const at::Tensor& q, const at::Tensor& k, const at::Tensor& v, const at::Tensor& doTensor,
     const at::Tensor& attnOut, const at::Tensor& softmaxLse, const c10::optional<at::Tensor>& cuSeqlensQ,
     const c10::optional<at::Tensor>& cuSeqlensKv, const c10::optional<at::Tensor>& sequsedQ,
@@ -41,10 +41,21 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> FlashAttnGrad(
     at::Tensor dq;
     at::Tensor dk;
     at::Tensor dv;
+    at::Tensor dsink;
     {
         dq = at::empty(q.sizes(), q.options());
         dk = at::empty(k.sizes(), k.options());
         dv = at::empty(v.sizes(), v.options());
+        // dsink 按 Q head 数 N1 存放。
+        int64_t n1 = 0;
+        if (layoutQ == "TND" || layoutQ == "BNSD") {
+            n1 = q.size(1);
+        } else {
+            n1 = q.size(2);
+        }
+        // dsink 仅在传入 sinks 时有定义（kernel 归约后全量写出）；
+        // sinks=None 时 kernel 不写，内容未定义。故用 empty 分配、不清零。
+        dsink = at::empty({n1}, q.options().dtype(at::kFloat));
     }
 
     char* layoutQPtr = const_cast<char*>(layoutQ.c_str());
@@ -53,9 +64,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> FlashAttnGrad(
 
     ACLNN_CMD(aclnnInnerFlashAttnGrad, q, k, v, doTensor, attnOut, softmaxLse, cuSeqlensQ, cuSeqlensKv, sequsedQ,
               sequsedKv, sinks, attnMask, metadata, softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ, maxSeqlenKv,
-              layoutQPtr, layoutKvPtr, layoutOutPtr, dq, dk, dv);
+              layoutQPtr, layoutKvPtr, layoutOutPtr, dq, dk, dv, dsink);
 
-    return std::make_tuple(dq, dk, dv);
+    return std::make_tuple(dq, dk, dv, dsink);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)

@@ -68,6 +68,9 @@ TILING_DATA_FIELD_DEF(int64_t, sparseType)
 TILING_DATA_FIELD_DEF(int64_t, s1Token)
 TILING_DATA_FIELD_DEF(int64_t, s2Token)
 TILING_DATA_FIELD_DEF(int64_t, totalPerBatchNum)
+TILING_DATA_FIELD_DEF(int64_t, deterMaxRound)
+// 1 = 本次带 sinks，kernel 额外算 dsink。运行期标量，不占 tilingkey。必须放最后。
+TILING_DATA_FIELD_DEF(int64_t, sinkOptional)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(FlashAttnGrad, FlashAttnGradTilingDataTmp)
 

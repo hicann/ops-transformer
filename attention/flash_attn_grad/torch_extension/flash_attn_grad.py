@@ -33,13 +33,14 @@ class FlashAttnGradOpBuilder(OpBuilder):
             "float softmax_scale=0.0, int mask_mode=0, int win_left=-1, int win_right=-1, "
             "int max_seqlen_q=-1, int max_seqlen_kv=-1, "
             'str layout_q="BSND", str layout_kv="BSND", str layout_out="BSND") '
-            "-> (Tensor, Tensor, Tensor)",
+            "-> (Tensor, Tensor, Tensor, Tensor)",
         ]
 
     def register_meta(self):
         """
         Registers the Meta implementation (Shape/Dtype inference).
         dq shape = q shape, dk shape = k shape, dv shape = v shape.
+        dsink shape = (N1,) fp32; only meaningful when sinks is provided.
         """
 
         @impl(get_as_library(), self.name, "Meta")
@@ -70,7 +71,12 @@ class FlashAttnGradOpBuilder(OpBuilder):
             dq = torch.empty(q.size(), dtype=q.dtype, device="meta")
             dk = torch.empty(k.size(), dtype=k.dtype, device="meta")
             dv = torch.empty(v.size(), dtype=v.dtype, device="meta")
-            return (dq, dk, dv)
+            if layout_q == "TND" or layout_q == "BNSD":
+                n_q = q.size(1)
+            else:
+                n_q = q.size(2)
+            dsink = torch.empty((n_q,), dtype=torch.float32, device="meta")
+            return (dq, dk, dv, dsink)
 
 
 flash_attn_grad_op_builder = FlashAttnGradOpBuilder()
@@ -105,7 +111,8 @@ def flash_attn_grad(
     """
     Flash Attention backward gradient computation.
 
-    Computes gradients dq, dk, dv for the flash attention forward pass.
+    Computes gradients dq, dk, dv for the flash attention forward pass, and the
+    gradient dsink of the optional per-head sink parameter.
 
     Args:
         q: Query tensor of shape (B, S1, N1, D) for BSND or (T1, N1, D) for TND.
@@ -118,7 +125,7 @@ def flash_attn_grad(
         cu_seqlens_kv: Cumulative sequence lengths for KV (TND layout).
         seqused_q: Actual sequence lengths used for Q.
         seqused_kv: Actual sequence lengths used for KV.
-        sinks: Sink tensor.
+        sinks: Sink tensor of shape (N1,), fp32.
         attn_mask: Attention mask tensor (for mask_mode 3 or 4).
         metadata: Precomputed metadata tensor from flash_attn_metadata.
         softmax_scale: Softmax scale factor. 0.0 means 1/sqrt(head_dim).
@@ -132,7 +139,8 @@ def flash_attn_grad(
         layout_out: Layout of output tensors ("BSND", "TND", or "BNSD").
 
     Returns:
-        A tuple of (dq, dk, dv) gradient tensors.
+        A tuple of (dq, dk, dv, dsink) gradient tensors. dsink is fp32 of shape
+        (N1,); it is meaningful only when sinks is provided.
     """
     op_module = flash_attn_grad_op_builder.load()
     return op_module.flash_attn_grad(

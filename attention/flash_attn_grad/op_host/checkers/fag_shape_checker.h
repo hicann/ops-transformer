@@ -17,7 +17,7 @@
  *
  * 易漂移口径：
  *   - TND 下 cu_seqlens_q / cu_seqlens_kv 必传且为 1D，非 TND 下必须不传；
- *   - D 与 Dv 可以不等，但要求 Dv <= D，且两者都落在 (0, MAX_HEAD_DIM]。
+ *   - D 必须等于 Dv，唯一例外是 D=192 且 Dv=128；两者都落在 (0, MAX_HEAD_DIM]。
  */
 
 #ifndef FLASH_ATTN_GRAD_CHECKERS_FAG_SHAPE_CHECKER_H_

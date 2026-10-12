@@ -121,8 +121,16 @@ void FlashAttnMetadataCpuKernel::InitFagLayoutAndSparse()
     int64_t s1 = static_cast<int64_t>(maxSeqlenQ_);
     int64_t s2 = static_cast<int64_t>(maxSeqlenKv_);
 
+    // mask_mode=4 双侧窗 -1 = 正无穷：与 host parser 归一化 maskMode 对齐，改写 dense。
+    if (maskMode_ == 4 && winLeft_ == -1 && winRight_ == -1) {
+        maskMode_ = 0;
+    }
+
     if (maskMode_ == 0) {
         fagIsSparse_ = false;
+        fagSparseMode_ = FAG_SPARSE_NO_MASK;
+        fagS1Token_ = INT32_MAX;
+        fagS2Token_ = INT32_MAX;
     } else if (maskMode_ == 3) {
         fagSparseMode_ = FAG_SPARSE_RIGHT_DOWN_CAUSAL;
         fagIsSparse_ = true;

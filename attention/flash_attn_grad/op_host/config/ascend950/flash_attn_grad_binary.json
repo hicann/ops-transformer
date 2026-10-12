@@ -149,6 +149,15 @@
           "paramType": "required",
           "shape": [-2],
           "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "dsink",
+          "index": 3,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
         }
       ],
       "attrs": [
@@ -343,6 +352,15 @@
           "name": "dv",
           "index": 2,
           "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "dsink",
+          "index": 3,
+          "dtype": "float32",
           "format": "ND",
           "paramType": "required",
           "shape": [-2],

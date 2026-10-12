@@ -30,10 +30,12 @@ namespace optiling {
 //   bit2     layout     0=非TND, 1=TND（BNSD 不占位，运行期靠视图参数区分）
 //   bit[4:3] mask_mode  host 存 0/1/2，kernel values=[0,3,4]
 //   bit5     swizzle          仅 template=0 有效
-//   bit[7:6] d_align    0=64, 1=128, 2=192
-//   bit8     dv_align   0=128, 1=192
-//   bit9     is_bn2_multiblk  仅 template=1 有效
-//   bit10    bn2_need_zero    仅 MultiBlk + mask 3/4 的无效行/列
+//   bit[8:6] d_align    0=64, 1=128, 2=192, 3=256, 4=768
+//   bit[11:9] dv_align  同 d_align。一般 d_align==dv_align；仅 D=192 且 Dv=128
+//                       时为 128
+//   bit12    is_bn2_multiblk  仅 template=1 有效
+//   bit13    bn2_need_zero    仅 MultiBlk + mask 3/4 的无效行/列
+//   bit14    deter            仅 template=0；BN2 单块保持 0
 uint64_t EncodeTilingKey(const FagParsedInfo& info, const FagKernelPlan& kernel, const FagSchedulePlan& schedule);
 
 } // namespace optiling

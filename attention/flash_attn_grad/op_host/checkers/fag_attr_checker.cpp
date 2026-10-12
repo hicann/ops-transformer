@@ -85,7 +85,7 @@ ge::graphStatus FagMaskChecker::Check(FagCheckCtx& ctx)
     // mask_mode 决定 attn_mask 该不该来、window 参数该不该给：
     //   0 无 mask，attn_mask 与 window 都不能出现；
     //   3 causal，需要 attn_mask，但不吃 window；
-    //   4 window，需要 attn_mask，且 window 两侧都必须显式给。
+    //   4 window：单侧/双侧有限窗要 attn_mask；两侧 -1（正无穷）改写 dense，mask 可选。
     if (ctx.maskMode == MASK_MODE_NO_MASK) {
         OP_CHECK_IF(hasMask, OP_LOGE(opName, "attn_mask must not be provided when mask_mode is 0."),
                     return ge::GRAPH_PARAM_INVALID);
@@ -105,17 +105,22 @@ ge::graphStatus FagMaskChecker::Check(FagCheckCtx& ctx)
                     OP_LOGE(opName, "win_right must be -1 when mask_mode is 3, but got %ld.", ctx.winRight),
                     return ge::GRAPH_PARAM_INVALID);
     } else if (ctx.maskMode == MASK_MODE_WINDOW) {
-        OP_CHECK_IF(!hasMask, OP_LOGE(opName, "attn_mask must be provided when mask_mode is 4."),
+        OP_CHECK_IF(ctx.winLeft < -1,
+                    OP_LOGE(opName, "win_left must be -1 or >= 0 when mask_mode is 4, but got %ld.", ctx.winLeft),
                     return ge::GRAPH_PARAM_INVALID);
-        OP_CHECK_IF(ctx.winLeft < 0,
-                    OP_LOGE(opName, "win_left must be >= 0 when mask_mode is 4, but got %ld.", ctx.winLeft),
+        OP_CHECK_IF(ctx.winRight < -1,
+                    OP_LOGE(opName, "win_right must be -1 or >= 0 when mask_mode is 4, but got %ld.", ctx.winRight),
                     return ge::GRAPH_PARAM_INVALID);
-        OP_CHECK_IF(ctx.winRight < 0,
-                    OP_LOGE(opName, "win_right must be >= 0 when mask_mode is 4, but got %ld.", ctx.winRight),
+        const bool bothInf = (ctx.winLeft == -1 && ctx.winRight == -1);
+        // 双侧 -1 = 正无穷，改写 dense，attn_mask 可选（有也忽略）。
+        // 单侧无穷或有限窗仍要 [2048,2048] 压缩 mask。
+        OP_CHECK_IF(!bothInf && !hasMask, OP_LOGE(opName, "attn_mask must be provided when mask_mode is 4."),
                     return ge::GRAPH_PARAM_INVALID);
     }
 
-    if (hasMask) {
+    // 双侧无穷改写 dense：图上即使挂着 attn_mask 也忽略，不按 [2048,2048] 卡。
+    const bool ignoreMaskTensor = (ctx.maskMode == MASK_MODE_WINDOW && ctx.winLeft == -1 && ctx.winRight == -1);
+    if (hasMask && !ignoreMaskTensor) {
         auto& maskShape = ctx.context->GetOptionalInputShape(ATTN_MASK_INDEX)->GetStorageShape();
         OP_CHECK_IF(maskShape.GetDimNum() != 2U,
                     OP_LOGE(opName, "attn_mask must be 2D, but got %zu dims.", maskShape.GetDimNum()),

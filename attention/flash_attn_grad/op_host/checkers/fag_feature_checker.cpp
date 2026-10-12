@@ -10,21 +10,26 @@
 
 #include "fag_feature_checker.h"
 
+#include <string>
+
 #include "log/log.h"
 
 namespace optiling {
 
-// dq/dk/dv 目前用 fp32 atomicAdd 累加，跨核累加顺序不固定，因此开启确定性
-// 计算时结果并不确定。这不是参数非法，而是特性未支持 —— 明确拒绝，不静默放行，
-// 避免用户以为拿到了确定性结果。待确定性模板落地后（独立 tilingkey 分支、
-// 前缀表放 AICPU），把这里改成正例即可。
+// GS1S2 走核上闭式分核；BN2 单块一头一核已确定，放行现网。TND 第一期仍拒。
 ge::graphStatus FagDeterministicChecker::Check(FagCheckCtx& ctx)
 {
-    OP_CHECK_IF(ctx.context->GetDeterministic() == 1,
-                OP_LOGE(ctx.opName, "FlashAttnGrad does not support deterministic computation yet "
-                                    "(dq/dk/dv are accumulated with fp32 atomicAdd). Please disable the deterministic "
-                                    "switch, or use FlashAttentionScoreGrad instead."),
-                return ge::GRAPH_PARAM_INVALID);
+    if (ctx.context->GetDeterministic() != 1) {
+        return ge::GRAPH_SUCCESS;
+    }
+    const auto attrs = ctx.context->GetAttrs();
+    if (attrs != nullptr) {
+        const auto layoutQPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_Q_INDEX);
+        if (layoutQPtr != nullptr && std::string(layoutQPtr) == "TND") {
+            OP_LOGE(ctx.opName, "FlashAttnGrad deterministic computation does not support TND yet.");
+            return ge::GRAPH_PARAM_INVALID;
+        }
+    }
     return ge::GRAPH_SUCCESS;
 }
 

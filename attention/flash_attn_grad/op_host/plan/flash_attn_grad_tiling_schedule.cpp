@@ -30,7 +30,12 @@ ge::graphStatus BuildSchedulePlan(gert::TilingContext* context, const FagParsedI
     FagS1S2Outer(info.s1, info.s2, schedule.s1Outer, schedule.s2Outer);
     schedule.useActualCores = !info.isTnd && (info.maskMode == MASK_MODE_NO_MASK) && !info.hasSeqused;
     schedule.usedCube = info.aicNum;
-    if (schedule.useActualCores) {
+    if (info.isDeterministic && kernel.tmpl == TMPL_BN2GS1S2) {
+        // 确定性按满片 aicNum 启动，核上闭式用 get_block_num() 当 k。
+        schedule.useActualCores = false;
+        schedule.usedCube = info.aicNum;
+        schedule.deterMaxRound = 0;
+    } else if (schedule.useActualCores) {
         schedule.usedCube =
             static_cast<uint32_t>(FagUsedCubeCores(kernel.tmpl == TMPL_BN2, info.b, info.n2, info.g, schedule.s1Outer,
                                                    schedule.s2Outer, static_cast<int64_t>(info.aicNum)));

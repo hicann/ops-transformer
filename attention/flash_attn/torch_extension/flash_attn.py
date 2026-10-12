@@ -72,7 +72,20 @@ def _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q):
     return batch_size
 
 
-def _calculate_metadata_size(batch_size, num_heads_kv):
+def _fag_deter_elems(
+    batch_size, num_heads_q, num_heads_kv, max_seqlen_q, max_seqlen_kv
+):
+    """确定性分核在核上闭式计算，metadata 不再为轮次表预留。"""
+    return 0
+
+
+def _calculate_metadata_size(
+    batch_size,
+    num_heads_kv,
+    num_heads_q=None,
+    max_seqlen_q=None,
+    max_seqlen_kv=None,
+):
     """计算 metadata tensor 的对齐后大小"""
     align_size = 4096
     head_size = 1 * METADATA_STRIDE
@@ -82,6 +95,9 @@ def _calculate_metadata_size(batch_size, num_heads_kv):
 
     metadata_size = head_size + fa_size + fd_size
     metadata_size += FAG_METADATA_SIZE  # FAG (Flash Attn Grad) metadata size
+    metadata_size += _fag_deter_elems(
+        batch_size, num_heads_q, num_heads_kv, max_seqlen_q, max_seqlen_kv
+    )
     return ((metadata_size + align_size - 1) // align_size) * align_size
 
 
@@ -141,7 +157,9 @@ class FlashAttenOpBuilder(OpBuilder):
             is_grad_enabled: Optional[bool] = False,
         ):
             b_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
-            metadata_size = _calculate_metadata_size(b_size, num_heads_kv)
+            metadata_size = _calculate_metadata_size(
+                b_size, num_heads_kv, num_heads_q, max_seqlen_q, max_seqlen_kv
+            )
             return torch.empty((metadata_size,), dtype=torch.int32, device="meta")
 
         @torch.library.register_fake("cann_ops_transformer::flash_attn")
@@ -192,19 +210,25 @@ class FlashAttenOpBuilder(OpBuilder):
             if layout_out == "TND":
                 torch._check(
                     layout_q == "TND",
-                    lambda: f"When the layout of output is TND, the layout of query must be TND, but got {layout_q}",
+                    lambda: (
+                        f"When the layout of output is TND, the layout of query must be TND, but got {layout_q}"
+                    ),
                 )
                 attention_out_size = (t_size, n_size, d_size)
             elif layout_out == "BNSD":
                 torch._check(
                     layout_q == "BNSD",
-                    lambda: f"When the layout of output is BNSD, the layout of query must be BNSD, but got {layout_q}",
+                    lambda: (
+                        f"When the layout of output is BNSD, the layout of query must be BNSD, but got {layout_q}"
+                    ),
                 )
                 attention_out_size = (b_size, n_size, s_size, d_size)
             else:
                 torch._check(
                     layout_q != "TND",
-                    lambda: f"When the layout of output is BSND, the layout of query must be BNSD or BSND, but got {layout_q}",
+                    lambda: (
+                        f"When the layout of output is BSND, the layout of query must be BNSD or BSND, but got {layout_q}"
+                    ),
                 )
                 attention_out_size = (b_size, s_size, n_size, d_size)
 
@@ -257,7 +281,9 @@ def flash_attn_metadata(
     layout_out = "BSND" if layout_out is None else layout_out
 
     op_module = flash_attn_op_builder.load()
-    metadata_size = _calculate_metadata_size(b_size, num_heads_kv)
+    metadata_size = _calculate_metadata_size(
+        b_size, num_heads_kv, num_heads_q, max_seqlen_q, max_seqlen_kv
+    )
     output = torch.empty((metadata_size,), dtype=torch.int32, device="npu")
 
     return op_module.flash_attn_metadata(

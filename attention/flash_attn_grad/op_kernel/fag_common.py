@@ -18,7 +18,9 @@
 
 import pypto_pro.language as pl
 
-# ---- 基本块尺寸 (对应 s1/s2/dTemplateType) ----
+from fag_colsplit import ceil_div_signed, col_prefix_body
+
+# ---- 基本块尺寸 ----
 CUBE_BASEM = 128  # s1 对齐 128
 CUBE_BASEN = 128  # s2 对齐 128
 # D 的分配宽度。这不是普通常量，而是 tilingkey 字段 d_align 的取值之一 ——
@@ -37,32 +39,39 @@ BLOCK_ELEMS_F16 = 16
 #     128+64 (DB)         0.549 (+15.2%)   0.818 (+9.8%)
 #     192 单发(无 DB)      0.781            1.123
 # 两段等宽时 mac 与 MTE1 的节拍整齐；128+64 的第二段只有一半宽，盖不住前段。
-# 分块的首要目的是保住 L0A/L0B 双缓冲：[128,96]fp16=24KB，x2=48KB<=64KB。
+# 分块的首要目的是保住 L0A/L0B 双缓冲：[128,96]16-bit=24KB，x2=48KB<=64KB。
 # 若直接按 192 单发，L0 tile 变 48KB，双缓冲放不下 —— 那是之前 319->184us
-# 的最大一项优化。96=6*16 满足 fp16 的 C0=16 分形对齐。
+# 的最大一项优化。96=6*16 满足 16-bit 的 C0=16 分形对齐。
 #
 # 表拆成几个**平铺的标量表**而不是一个嵌套元组表：把 tuple-of-tuples 赋给
 # 局部变量(哪怕只是 `chunks = TABLE[d_align]` 之后再下标取)会让 codegen 报
 # "Array tuple assignment ... has elements without a C++ name"。
-D_NCHUNKS = {64: 1, 128: 1, 192: 2}  # 块数(当前最多 2)
-D_CHUNK_OFF0 = {64: 0, 128: 0, 192: 0}  # 第 0 块的列偏移
-D_CHUNK_W0 = {64: 128, 128: 128, 192: 96}  # D<=128 一块 128；尾列靠 valid_shape
-D_CHUNK_OFF1 = {64: 0, 128: 0, 192: 96}  # 第 1 块(仅 192 档)
-D_CHUNK_W1 = {64: 0, 128: 0, 192: 96}
+D_NCHUNKS = {64: 1, 128: 1, 192: 2, 256: 2, 768: 6}  # 768=6×128，空块 dW=0
+D_CHUNK_OFF0 = {64: 0, 128: 0, 192: 0, 256: 0, 768: 0}  # 第 0 块的列偏移
+D_CHUNK_W0 = {
+    64: 128,
+    128: 128,
+    192: 96,
+    256: 128,
+    768: 128,
+}  # D<=128 一块 128；192=96+96；256=128+128；768 走 6 块循环
+D_CHUNK_OFF1 = {64: 0, 128: 0, 192: 96, 256: 128, 768: 128}  # 第 1 块
+D_CHUNK_W1 = {64: 0, 128: 0, 192: 96, 256: 128, 768: 128}
 # L0A/L0B/L0C 按最宽的一块声明，足以装下任一块
-D_CHUNK_MAXW = {64: 128, 128: 128, 192: 96}
+D_CHUNK_MAXW = {64: 128, 128: 128, 192: 96, 256: 128, 768: 128}
 
 # Cube L1/L0 物理宽钉在 128（d_align=64 只是 tilingkey 分档，Acc/L1 仍按
 # 128 开）。pre/post 已改成 1D 元素切，不再用列宽表。V1 列宽见 v1w。
-D_PHYS_W = {64: 128, 128: 128, 192: 192}
+# 768 档物理宽仍 256：整头 768 进 L1 会超 512KB，按窗重载（docs/D256设计.md）。
+D_PHYS_W = {64: 128, 128: 128, 192: 192, 256: 256, 768: 256}
 
 CV_CORE_RATIO = 2
 VECTOR_BASEM = CUBE_BASEM // CV_CORE_RATIO  # 64，每个 vector 子核处理半个 S1
 VECTOR_BASEN = CUBE_BASEN
 
-# 单个 VF 寄存器的 fp32 / fp16 lane 数
+# 单个 VF 寄存器的 fp32 / 16-bit(fp16/bf16) lane 数
 VF_LANES = 64
-VF_LANES_FP16 = 128
+VF_LANES_F16 = 128  # fp16/bf16 同宽，256B 寄存器各 128 lane
 # 压缩 mask 边长 2048，minValue = 0xFF7FFFFF
 ATTEN_MASK_COMPRESS = 2048
 ATTEN_MASK_MIN = -3.4028234663852886e38
@@ -76,10 +85,10 @@ TILE_D = HEAD_DIM_ALIGN
 # ---- NZ 分形排布常量 ----
 # v3/v4 的融合 VF 直接以 NZ 写出，随后 insert 进 CV 共享 L1；
 # 搬运在 fag_block_vec.copy_ub2l1，这里只放几何。
-# NZ 分形：fp16 的 C0 = 16 元素 = 32B(一个 DataBlock)
+# NZ 分形：16-bit(fp16/bf16) 的 C0 = 16 元素 = 32B(一个 DataBlock)
 FRACTAL_C0 = 16
 UB_BLOCK_BYTES = 32
-# 一个分形列占 VECTOR_BASEM*C0 个 fp16 = (64*16)*2/32 = 64 个 32B block，
+# 一个分形列占 VECTOR_BASEM*C0 个 16-bit = (64*16)*2/32 = 64 个 32B block，
 # 末尾 +1 垫一个 block 错开 bank：
 #   blockStride = (srcM * blockN) * sizeof(T1) / blockSize + 1
 NZP_BLOCK_STRIDE = (VECTOR_BASEM * FRACTAL_C0) * 2 // UB_BLOCK_BYTES + 1  # 65
@@ -104,6 +113,11 @@ SYNC_C3_TO_V5_FLAG = 6  # mm3 fp32 已进 mm1 UB，v5 可 Muls+Cast dQ
 SYNC_C4_TO_V6_FLAG = 7  # mm4 fp32 已进 mm2 UB，v6 可 Muls+Cast dK
 # cube 在下一轮 mm1/mm2 前等 v6 写完，避免覆写仍在用的 mm1/mm2 槽
 SYNC_DETER_FIX_FLAG = 14
+# newDeter template0 的三段 FIX token。事件 6/7 在 BN2 分支使用，
+# 事件 14 也只在与 template0 编译期互斥的路径使用，因此可以安全复用。
+SYNC_DQ_DETER_FIX_FLAG = 6
+SYNC_DK_DETER_FIX_FLAG = 7
+SYNC_DV_DETER_FIX_FLAG = 14
 
 # cube 领先 vector 的 task 数。PRELOAD_TIMES=3：首轮连发两组
 # mm2+mm1(共四次 matmul)填满两个 UB 槽位，之后第 N 组的 cube 计算与
@@ -114,17 +128,41 @@ PRELOAD_TIMES = 3
 # ==================================================================
 #  SetConstInfo
 # ==================================================================
-def set_const_info(tiling, coreNum, enableSwizzle):
+def set_const_info(tiling, coreNum):
     """由 tiling + 运行期核数推导常量。
 
     coreNum 不在 tiling 里(TilingData 没有该字段)，改由调用方从
     pl.get_block_num() 取：这是 host SetBlockDim 启动的 cube 数，dense 下
     等于 metadata blockOuter。cube/vector 两侧同一口径，set/wait 才能配对。
 
-    enableSwizzle 同理由 host 判据算好后经 tilingkey/常量传入。
+    分核开关用 tilingkey 裸名 ``swizzle``，不要再写进本结构体：字段会
+    被当成运行期值，``if constInfo.enableSwizzle`` 两路都编进同一份二进制。
     """
     s1Outer = (tiling.s1 + CUBE_BASEM - 1) // CUBE_BASEM
     s2Outer = (tiling.s2 + CUBE_BASEN - 1) // CUBE_BASEN
+    # mask3 的 s1Token 可能是 INT32_MAX + s1 - s2，这里不读它。
+    # mask0 不走 packed 反查，列几何折叠成整矩形。
+    if mask_mode == 0:
+        colP = 0
+        colQ = 0
+        packedPerHead = s1Outer * s2Outer
+    else:
+        colQ = ceil_div_signed(tiling.s2Token, CUBE_BASEM)
+        colQ = pl.min(colQ, s2Outer - 1)
+        if mask_mode == 3:
+            colP = s1Outer - 1
+            colLastHi = s1Outer - 1
+        else:
+            colP = ceil_div_signed(tiling.s1Token, CUBE_BASEM)
+            colP = pl.min(colP, s1Outer - 1)
+            lc = ((tiling.s2 + 63) // 64) * 64
+            colLastHi = pl.min(
+                ceil_div_signed(lc + tiling.s1Token, CUBE_BASEM) - 1, s1Outer - 1
+            )
+        lastLo = pl.max(s2Outer - 1 - colQ, 0)
+        packedPerHead = col_prefix_body(s1Outer, colP, colQ, s2Outer - 1) + pl.max(
+            colLastHi - lastLo + 1, 0
+        )
     return pl.struct(
         "FagConstInfo",
         bSize=tiling.b,
@@ -158,7 +196,6 @@ def set_const_info(tiling, coreNum, enableSwizzle):
         totalBlockNum=tiling.b * tiling.n2 * tiling.gSize * s1Outer * s2Outer,
         gSize=tiling.gSize,
         coreNum=coreNum,
-        enableSwizzle=enableSwizzle,
         # 布局视图参数(BSND/BNSD 统一四维视图)，见 FlashAttnGradTilingData 注释。
         # Q 侧 n1=n2*G 个 head，KV 侧 n2 个，故两套。
         viewD0Q=tiling.viewD0Q,
@@ -176,8 +213,14 @@ def set_const_info(tiling, coreNum, enableSwizzle):
         s1Token=tiling.s1Token,
         s2Token=tiling.s2Token,
         totalPerBatchNum=tiling.totalPerBatchNum,
+        colP=colP,
+        colQ=colQ,
+        packedPerHead=packedPerHead,
         bandP=(pl.max(tiling.s1Token, 0) + CUBE_BASEM - 1) // CUBE_BASEM,
         bandQ=(pl.max(tiling.s2Token, 0) + CUBE_BASEN - 1) // CUBE_BASEN,
+        n1Size=tiling.n2 * tiling.gSize,
+        sinkOptional=tiling.sinkOptional,
+        aivCount=coreNum * 2,
     )
 
 
@@ -202,11 +245,7 @@ def make_run_infos():
         halfS1RealSize=0,
         queryOffset=0,
         keyOffset=0,
-        # GQA 的组内索引 g，取值 [0, gSize)
         goIdx=0,
-        # 统一四维视图上的第 0 / 第 2 轴索引，见 set_run_info()。
-        # Q 侧(q/dout/attn_out/dq)用 head = n2oIdx*gSize + goIdx；
-        # KV 侧(k/v/dk/dv)用 head = n2oIdx。
         idx0Q=0,
         idx2Q=0,
         idx0KV=0,
@@ -216,6 +255,38 @@ def make_run_infos():
         loadKV=0,
         dkvAcc=0,
         flushDkv=0,
+        readyRound=0,
+        gIdx=0,
+        dqFirst=1,
+        dqLast=1,
+    )
+
+
+def make_run_infos_2():
+    """1-ahead：runInfos[2]（BN2 与 D=256 共用）。"""
+    return pl.struct_array(
+        2,
+        "FagRunInfo",
+        boIdx=0,
+        n2oIdx=0,
+        s1oIdx=0,
+        s2oIdx=0,
+        s1RealSize=0,
+        s2RealSize=0,
+        halfS1RealSize=0,
+        queryOffset=0,
+        keyOffset=0,
+        goIdx=0,
+        idx0Q=0,
+        idx2Q=0,
+        idx0KV=0,
+        idx2KV=0,
+        loadBase=0,
+        rowShift=0,
+        loadKV=0,
+        dkvAcc=0,
+        flushDkv=0,
+        readyRound=0,
         gIdx=0,
         dqFirst=1,
         dqLast=1,

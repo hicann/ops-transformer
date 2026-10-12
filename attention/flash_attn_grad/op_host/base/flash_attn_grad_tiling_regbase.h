@@ -43,7 +43,7 @@ protected:
 private:
     // 写 pypto codegen 出来的 TilingData。基类不封装这一步（见 flash_attn_grad_tiling_base.h
     // 的说明）：那个结构体只在带 force-include 的 *_tiling*.cpp 里可见。
-    ge::graphStatus WriteTilingData(const FagParsedInfo& info);
+    ge::graphStatus WriteTilingData(const FagParsedInfo& info, const FagTilingPlan& plan);
 
     // 指向入口栈上的解析结果。本类不拥有它，也不回写（策略层对 info 只读）。
     const FagParsedInfo* info_ = nullptr;

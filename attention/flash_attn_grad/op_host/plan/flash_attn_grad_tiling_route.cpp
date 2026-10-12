@@ -101,10 +101,11 @@ static_assert(kRouteNum <= FAG_TRACE_SLOT_NUM, "trace slots must cover all route
 
 // ===== D / Dv 分档 ==========================================================
 // D 决定每块片上 tile 的宽度，而 tile shape 在 pypto 是 trace 期常量，所以必须
-// 做成编译期分档。一律按最大 192 分配不只是
-// 慢：L0C 会要 288KB，超出 256KB 预算，物理上放不下。
-// Dv 只决定已分配 tile 里填多少列，是纯运行期数值，不占 tilingkey；但 y/dy/prod/tmp
-// 四块 UB 的宽度由 Dv 派生，故仍需一个分配档次。
+// 做成编译期分档。一律按最大档分配不只是
+// 慢：L0C 会超出 256KB 预算，物理上放不下。
+// Dv 只决定已分配 tile 里填多少列，是纯运行期数值；但 y/dy 的 UB 宽度由 Dv
+// 派生，故仍需一个分配档次。dAlign 与 dvAlign 取值相同；唯一分叉是
+// D=192 且 Dv=128 → dvAlign=128。其余 D!=Dv 已在 CheckHeadDim 拦截。
 ge::graphStatus SelectDBucket(gert::TilingContext* context, const FagParsedInfo& p, FagKernelPlan& plan)
 {
     OP_CHECK_IF(p.d > MAX_HEAD_DIM,
@@ -112,13 +113,18 @@ ge::graphStatus SelectDBucket(gert::TilingContext* context, const FagParsedInfo&
                         p.d, MAX_HEAD_DIM),
                 return ge::GRAPH_PARAM_INVALID);
 
-    plan.dAlign = (p.d <= 64) ? 64 : ((p.d <= 128) ? 128 : 192);
-    plan.dvAlign = (p.dv <= 128) ? 128 : 192;
-    // dAlign=64 仍是独立的 tilingkey 档，但 kernel 的 L1/L0 物理上保持 128 宽、
-    // 靠 compact + set_validshape 裁剪；dvAlign 没有 64 档。
-    if (plan.dAlign == 64) {
-        plan.dvAlign = 128;
+    if (p.d <= 64) {
+        plan.dAlign = 64;
+    } else if (p.d <= 128) {
+        plan.dAlign = 128;
+    } else if (p.d <= 192) {
+        plan.dAlign = 192;
+    } else if (p.d <= 256) {
+        plan.dAlign = 256;
+    } else {
+        plan.dAlign = 768;
     }
+    plan.dvAlign = (p.d == 192 && p.dv == 128) ? 128 : plan.dAlign;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -136,6 +142,11 @@ ge::graphStatus SelectKernelPlan(gert::TilingContext* context, const FagParsedIn
         }
         if (!route.prefer(info)) {
             trace.Reject(route.name, "preference");
+            continue;
+        }
+        // MultiBlk 多核写同一 dq 行。确定性改走 GS1S2 核上闭式，不另编 MultiBlk deter。
+        if (info.isDeterministic && route.isBn2MultiBlk == 1) {
+            trace.Reject(route.name, "deterministic-gs1s2");
             continue;
         }
         plan.tmpl = route.tmpl;

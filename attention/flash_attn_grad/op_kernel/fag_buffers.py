@@ -12,7 +12,7 @@
 pypto 的 tile 必须在 ``with pl.section_*()`` 里就地声明，而且 tracer
 不接受自定义 Python 类（``CubeBlock(...)`` 会直接报 Unsupported function
 call），所以这里是**一个 buffer 一个工厂函数**：调用点写
-``q_l1 = buf.make_q_l1()``，声明本身连同它的全部理由留在本文件。
+``q_l1 = make_q_l1()``，声明本身连同它的全部理由留在本文件。
 
 这样拆的收益：
 
@@ -45,6 +45,7 @@ from fag_common import (
     CUBE_BASEN,
     D_CHUNK_MAXW,
     D_PHYS_W,
+    HEAD_DIM_ALIGN,
     NZP_ROWS,
     VECTOR_BASEM,
     VECTOR_BASEN,
@@ -57,8 +58,7 @@ from fag_common import (
 def make_mm1_res():
     """mm1(dP = dO@V^T) 的结果 UB，双槽按 taskId % 2 ping-pong。
 
-    cube 侧 fixpipe 写、vector 侧读，
-    故声明在两个 section 之外。
+    cube 侧 fixpipe 写、vector 侧读，故声明在两个 section 之外。
     """
     return pl.make_tile_group(
         type=pl.TileType(
@@ -89,7 +89,7 @@ def make_ds_l1():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[CUBE_BASEM, CUBE_BASEN],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Mat,
             layout=pl.NZ,
             compact=1,
@@ -104,7 +104,7 @@ def make_p_l1():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[CUBE_BASEM, CUBE_BASEN],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Mat,
             layout=pl.NZ,
             compact=1,
@@ -130,7 +130,7 @@ def make_ds_t_l1():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[CUBE_BASEN, CUBE_BASEM],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Mat,
             layout=pl.ZN,
             compact=1,
@@ -145,7 +145,7 @@ def make_p_t_l1():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[CUBE_BASEN, CUBE_BASEM],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Mat,
             layout=pl.ZN,
             compact=1,
@@ -163,7 +163,7 @@ def make_q_l1():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[CUBE_BASEM, D_PHYS_W[d_align]],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Mat,
             compact=1,
         ),
@@ -177,7 +177,7 @@ def make_k_l1():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[D_PHYS_W[d_align], CUBE_BASEN],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Mat,
             layout=pl.ZN,
             compact=1,
@@ -197,7 +197,7 @@ def make_k_nd_l1():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[CUBE_BASEN, D_PHYS_W[d_align]],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Mat,
             compact=1,
         ),
@@ -216,7 +216,7 @@ def make_v_l1():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[D_PHYS_W[d_align], CUBE_BASEN],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Mat,
             layout=pl.ZN,
             compact=1,
@@ -231,7 +231,7 @@ def make_do_l1():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[CUBE_BASEM, D_PHYS_W[d_align]],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Mat,
             compact=1,
         ),
@@ -256,7 +256,7 @@ def make_q_lag_view():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[CUBE_BASEM, D_PHYS_W[d_align]],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Mat,
             compact=1,
         ),
@@ -270,7 +270,7 @@ def make_do_lag_view():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[CUBE_BASEM, D_PHYS_W[d_align]],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Mat,
             compact=1,
         ),
@@ -291,7 +291,7 @@ def make_l0a():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[CUBE_BASEM, mem.ACC_COLS[d_align]],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Left,
             compact=1,
         ),
@@ -305,7 +305,7 @@ def make_l0b():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[mem.ACC_COLS[d_align], CUBE_BASEN],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Right,
             compact=1,
         ),
@@ -334,7 +334,7 @@ def make_l0c_acc():
 
 
 # ==================================================================
-#  dK / dV 的常驻 L0C
+#  dK / dV 的常驻 L0C（IS_DKV_RESIDENT_L0C）
 # ==================================================================
 # 这些累加器要在同一 s2 块内跨 s1 轮次持续存在，访问方式是 current() 而非
 # next()，故每个 D 分块**各建一个独立的 tile_group**，不做成多槽位 group。
@@ -406,13 +406,13 @@ def make_dv_l0c_chunk1():
 # ==================================================================
 #  Vector 侧 UB（BN2GS1S2）
 # ==================================================================
-# `v1w` 是 V1 的列宽（d_align=64 档取 64，否则取 dv_align），y/dy 按它分配。
+# `v1w` 是 V1 的列宽：一般等于 `dv_align`，768 档为 256。
 def make_y_ub(v1w):
     """前向输出 y 的 UB（V1 的输入之一）。"""
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[VECTOR_BASEM, v1w],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Vec,
         ),
         addrs=[mem.UB_Y_A[v1w]],
@@ -425,7 +425,7 @@ def make_dy_ub(v1w):
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[VECTOR_BASEM, v1w],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Vec,
         ),
         addrs=[mem.UB_DY_A[v1w]],
@@ -442,7 +442,7 @@ def make_nzp_ub(v1w):
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[NZP_ROWS, VECTOR_BASEN],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Vec,
             layout=pl.NZ,
             valid_shape=[-1, -1],
@@ -522,7 +522,7 @@ def make_y_ub_bn2():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[mem.BN2_V1_ROWS, d_align],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Vec,
             valid_shape=[-1, -1],
         ),
@@ -536,7 +536,7 @@ def make_dy_ub_bn2():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[mem.BN2_V1_ROWS, d_align],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Vec,
             valid_shape=[-1, -1],
         ),
@@ -550,7 +550,7 @@ def make_nzp_ub_bn2():
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[NZP_ROWS, VECTOR_BASEN],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Vec,
             layout=pl.NZ,
             valid_shape=[-1, -1],
@@ -618,16 +618,60 @@ def make_mask_pre_view_bn2():
 
 
 def make_cast_ub_bn2():
-    """BN2 的 v5/v6 Muls+Cast 输出缓冲（fp16，直出 GM）。"""
+    """BN2 的 v5/v6 Muls+Cast 输出缓冲（16-bit，直出 GM）。"""
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[VECTOR_BASEM, mem.BN2_CAST_W],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Vec,
             valid_shape=[-1, -1],
         ),
         addrs=[mem.BN2_UB_CAST],
         mutex_ids=mem.MTX_UB_CAST,
+    )
+
+
+def make_sink_part_ub(v1w):
+    """dsink 单任务部分和：[1, VECTOR_BASEN] fp32，只写 lane 0。"""
+    return pl.make_tile_group(
+        type=pl.TileType(
+            shape=[1, VECTOR_BASEN],
+            dtype=pl.DT_FP32,
+            target_memory=pl.MemorySpace.Vec,
+            valid_shape=[-1, -1],
+        ),
+        addrs=[mem.UB_SINK_PART_A[v1w]],
+        mutex_ids=mem.MTX_UB_SINK_PART,
+    )
+
+
+def make_sink_part_ub_bn2():
+    return make_sink_part_ub(HEAD_DIM_ALIGN)
+
+
+def make_sink_row_post_ub(v1w):
+    return pl.make_tile_group(
+        type=pl.TileType(
+            shape=[1, VECTOR_BASEN],
+            dtype=pl.DT_FP32,
+            target_memory=pl.MemorySpace.Vec,
+            valid_shape=[-1, -1],
+        ),
+        addrs=[mem.UB_SINK_ROW_POST_A[v1w]],
+        mutex_ids=mem.MTX_UB_SINK_ROW_POST,
+    )
+
+
+def make_sink_red_post_ub(v1w):
+    return pl.make_tile_group(
+        type=pl.TileType(
+            shape=[1, VECTOR_BASEN],
+            dtype=pl.DT_FP32,
+            target_memory=pl.MemorySpace.Vec,
+            valid_shape=[-1, -1],
+        ),
+        addrs=[mem.UB_SINK_RED_POST_A[v1w]],
+        mutex_ids=mem.MTX_UB_SINK_RED_POST,
     )
 
 
@@ -653,11 +697,11 @@ def make_pre_zero_buffer_f32():
 
 
 def make_pre_zero_buffer_f16():
-    """BN2 ``bn2_need_zero`` 支的清零缓冲（直接清 fp16 out，无 workspace）。"""
+    """BN2 ``bn2_need_zero`` 支的清零缓冲（直接清 16-bit out，无 workspace）。"""
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[1, mem.PRE_ELEMS[d_align]],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Vec,
             valid_shape=[-1, -1],
         ),
@@ -686,11 +730,11 @@ def make_post_f32_buffer():
 
 
 def make_post_f16_buffer():
-    """post 的 fp16 输出缓冲，depth 2。见 :func:`make_post_f32_buffer`。"""
+    """post 的 16-bit 输出缓冲，depth 2。见 :func:`make_post_f32_buffer`。"""
     return pl.make_tile_group(
         type=pl.TileType(
             shape=[1, mem.POST_ELEMS[d_align]],
-            dtype=pl.DT_FP16,
+            dtype=input_dtype,
             target_memory=pl.MemorySpace.Vec,
             valid_shape=[-1, -1],
         ),

@@ -1,8 +1,20 @@
 # FlashAttnGrad
 
+## 产品支持情况
+
+| 产品 | 是否支持 |
+| :----------------------------------------- | ------ |
+| <term>Ascend 950PR&950DT系列产品</term> | √ |
+| <term>Atlas A3系列产品</term> | × |
+| <term>Atlas A2系列产品</term> | × |
+| <term>Atlas 200I/500 A2推理产品</term> | × |
+| <term>Atlas推理系列产品</term> | × |
+| <term>Atlas训练系列产品</term> | × |
+
 ## 功能说明
 
-Flash Attention 反向梯度计算算子。根据前向注意力计算的中间结果（softmax_lse、attn_out）和上游梯度（do），计算 Q/K/V 的梯度（dq/dk/dv）。
+- 算子功能：根据前向注意力计算的中间结果（softmax_lse、attn_out）和上游梯度（do），计算 Q/K/V 的梯度（dq/dk/dv）；提供 `sinks` 时同时计算 sink 的梯度 `dsink`。
+- 计算公式：
 
 其中 $P = Softmax(scale \cdot QK^T - softmax\_lse)$，反向计算公式为：
 
@@ -18,47 +30,55 @@ $$
 dK=scale \cdot (dS^T \cdot Q)
 $$
 
-## 输入输出
+当提供 `sinks` 时，前向 softmax 分母额外含 sink 项（`lse` 已包含该贡献），
+其梯度按 batch / S1 / S2 归约：
 
-### 输入
+$$
+dSink=-\sum_{b,s1,s2} P \cdot dP \cdot \exp(sink-softmax\_lse)
+$$
 
-| 名称 | 类型 | 必选 | 说明 |
-|------|------|------|------|
-| q | BF16/FP16 | 是 | Query tensor |
-| k | BF16/FP16 | 是 | Key tensor |
-| v | BF16/FP16 | 是 | Value tensor |
-| do | BF16/FP16 | 是 | 上游梯度 |
-| attn_out | BF16/FP16 | 是 | 前向注意力输出 |
-| softmax_lse | FP32 | 是 | 前向 softmax LSE |
-| cu_seqlens_q | INT32 | 否 | TND layout 累积序列长度 |
-| cu_seqlens_kv | INT32 | 否 | TND layout 累积序列长度 |
-| seqused_q | INT32 | 否 | 实际使用的 Q 序列长度 |
-| seqused_kv | INT32 | 否 | 实际使用的 KV 序列长度 |
-| sinks | FP32 | 否 | Sink tensor |
-| attn_mask | INT8 | 否 | Attention mask (mask_mode=3/4) |
-| metadata | INT32 | 否 | FAG metadata tensor |
+其中 `dP=dO \cdot V^T`。kernel 按 task（s2 块）在块内把 `P \cdot dP` 逐行乘
+`\exp(sink-softmax\_lse)` 后归约，再归约成 `dsink`：每个 AIV 子核把本 task
+的部分和以 fp32 `atomicAdd` 累加到 workspace 中自己独占的槽位行（一行一个
+AIV，只由本 AIV 写，无跨核竞争；进主循环前该行已由 pre 阶段清零）；`sync_all`
+之后由 AIV0 按固定行序（aiv 0..aivCount-1）归约成 `dsink`。
 
-### 输出
+## 参数说明
 
-| 名称 | 类型 | 说明 |
-|------|------|------|
-| dq | BF16/FP16 | Query 梯度 |
-| dk | BF16/FP16 | Key 梯度 |
-| dv | BF16/FP16 | Value 梯度 |
+| 参数名 | 输入/输出/属性 | 描述 | 数据类型 | 数据格式 |
+|-----|-----------|----|---------|------|
+| q | 输入 | Query，公式中的 Q | BF16、FP16 | ND |
+| k | 输入 | Key，公式中的 K | BF16、FP16 | ND |
+| v | 输入 | Value，公式中的 V | BF16、FP16 | ND |
+| do | 输入 | 上游梯度，公式中的 dO | BF16、FP16 | ND |
+| attn_out | 输入 | 前向注意力输出 | BF16、FP16 | ND |
+| softmax_lse | 输入 | 前向 softmax LSE | FP32 | ND |
+| cu_seqlens_q | 可选输入 | TND layout 累积序列长度 | INT32 | ND |
+| cu_seqlens_kv | 可选输入 | TND layout 累积序列长度 | INT32 | ND |
+| seqused_q | 可选输入 | 实际使用的 Q 序列长度 | INT32 | ND |
+| seqused_kv | 可选输入 | 实际使用的 KV 序列长度 | INT32 | ND |
+| sinks | 可选输入 | Sink tensor | FP32 | ND |
+| attn_mask | 可选输入 | Attention mask，mask_mode=3/4 时使用 | INT8 | ND |
+| metadata | 可选输入 | FAG metadata tensor | INT32 | ND |
+| dq | 输出 | Query 梯度 | BF16、FP16 | ND |
+| dk | 输出 | Key 梯度 | BF16、FP16 | ND |
+| dv | 输出 | Value 梯度 | BF16、FP16 | ND |
+| dsink | 输出 | Sink 梯度，shape 为 (N1,)。torch 接口与 dq、dk、dv 一起返回 | FP32 | ND |
+| softmax_scale | 属性 | softmax 缩放因子，默认 0.0，表示 1/sqrt(d) | FLOAT | - |
+| mask_mode | 属性 | 默认 0。0 全计算，3 causal，4 window | INT | - |
+| win_left | 属性 | window mask 左窗口，默认 -1 | INT | - |
+| win_right | 属性 | window mask 右窗口，默认 -1 | INT | - |
+| max_seqlen_q | 属性 | Q 最大序列长度，默认 -1 | INT | - |
+| max_seqlen_kv | 属性 | KV 最大序列长度，默认 -1 | INT | - |
+| layout_q | 属性 | Q 布局，默认 BSND | STRING | - |
+| layout_kv | 属性 | KV 布局，默认 BSND | STRING | - |
+| layout_out | 属性 | 输出布局，默认 BSND | STRING | - |
 
-### 属性
+## 调用说明
 
-| 名称 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| softmax_scale | Float | 0.0 | softmax 缩放因子，0.0 表示 1/sqrt(d) |
-| mask_mode | Int | 0 | 0:全计算, 3:causal, 4:window |
-| win_left | Int | -1 | window mask 左窗口 |
-| win_right | Int | -1 | window mask 右窗口 |
-| max_seqlen_q | Int | -1 | Q 最大序列长度 |
-| max_seqlen_kv | Int | -1 | KV 最大序列长度 |
-| layout_q | String | "BSND" | Q 布局 |
-| layout_kv | String | "BSND" | KV 布局 |
-| layout_out | String | "BSND" | 输出布局 |
+| 调用方式 | 调用样例 | 说明 |
+|---------|---------|------|
+| PyTorch API | [调用示例](docs/torchapi_flash_attn_grad.md#调用示例) | 通过 [flash_attn_grad](docs/torchapi_flash_attn_grad.md) 调用。先用 flash_attn_metadata 生成 metadata（is_grad_enabled=True），再调用本算子。编译安装见下文 Quick Start。 |
 
 ## Quick Start
 
@@ -135,8 +155,4 @@ from cann_ops_transformer.ops import flash_attn_grad
 | `op_host/flash_attn_grad_infershape.cpp` | shape/dtype 推导 |
 | `op_host/config/ascend950/flash_attn_grad_binary.json` | 二进制算子配置 |
 | `torch_extension/flash_attn_grad.py` | PyTorch 算子 schema 与 python 绑定 |
-| `torch_extension/csrc/flash_attn_grad.cpp` | PyTorch C++ 扩展（aclnn 调用层） |
-
-## aclnn 接口说明
-
-本算子 aclnn 接口**不对外开放**：`aclnnInnerFlashAttnGradGetWorkspaceSize` / `aclnnInnerFlashAttnGrad` 以 inner 符号编入自定义包 `libcust_opapi.so`，仅供 `cann_ops_transformer` torch 扩展内部调用，不在 `op_api/include/aclnnop` 安装头文件中导出，也不提供 aclnn 调用示例。对外统一使用 torch 接口 `cann_ops_transformer.flash_attn_grad`。
+| `torch_extension/csrc/flash_attn_grad.cpp` | PyTorch C++ 扩展 |

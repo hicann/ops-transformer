@@ -71,7 +71,8 @@ AxisIndex GetAxisIndex(bool isTnd, bool isBnsd)
 ge::graphStatus CheckHeadDim(const char* opName, const AxisIndex& axis, const TensorRef& q, const TensorRef& v,
                              const TensorRef* qSide, size_t qSideNum, const TensorRef* vSide, size_t vSideNum)
 {
-    // Q 侧（q/dq/dk/k）共用 D，V 侧（v/dout/attn_out/dv）共用 Dv，两者可以不等。
+    // Q 侧（q/dq/dk/k）共用 D，V 侧（v/dout/attn_out/dv）共用 Dv。
+    // 只允许 D==Dv，唯一例外是 D=192 且 Dv=128。
     const int64_t qD = q.shape->GetDim(axis.d);
     const int64_t vD = v.shape->GetDim(axis.d);
     if (CheckDimEqual(opName, "D", "q", qD, axis.d, qSide, qSideNum) != ge::GRAPH_SUCCESS ||
@@ -79,15 +80,14 @@ ge::graphStatus CheckHeadDim(const char* opName, const AxisIndex& axis, const Te
         return ge::GRAPH_PARAM_INVALID;
     }
 
-    // Dv <= D 不只是惯例：kernel 把每块片上 tile 都按 D 派生的宽度分配，V/dO 侧
-    // 只填前 Dv 列（见 d_align tilingkey 字段）。Dv > D 会写越界。
-    // 必须查：kernel 按 D 分配 tile，Dv > D 会写越界。
-    OP_CHECK_IF(vD > qD, OP_LOGE(opName, "D dim of v (%ld) must not exceed D dim of q (%ld).", vD, qD),
-                return ge::GRAPH_PARAM_INVALID);
     OP_CHECK_IF(vD <= 0 || qD <= 0, OP_LOGE(opName, "D dims must be positive, but got q D=%ld, v D=%ld.", qD, vD),
                 return ge::GRAPH_PARAM_INVALID);
     OP_CHECK_IF(qD > MAX_HEAD_DIM || vD > MAX_HEAD_DIM,
                 OP_LOGE(opName, "D dims must be in (0, %ld], but got q D=%ld, v D=%ld.", MAX_HEAD_DIM, qD, vD),
+                return ge::GRAPH_PARAM_INVALID);
+    const bool allowMismatch = (qD == 192 && vD == 128);
+    OP_CHECK_IF(qD != vD && !allowMismatch,
+                OP_LOGE(opName, "D dim of q (%ld) must equal D dim of v (%ld); only D=192,Dv=128 is allowed.", qD, vD),
                 return ge::GRAPH_PARAM_INVALID);
     return ge::GRAPH_SUCCESS;
 }
@@ -116,6 +116,22 @@ ge::graphStatus CheckCuSeqlens(const char* opName, gert::TilingContext* context,
                     OP_LOGE(opName, "%s must be 1D, but got %zu dims.", item.name, shape.GetDimNum()),
                     return ge::GRAPH_PARAM_INVALID);
     }
+    return ge::GRAPH_SUCCESS;
+}
+
+// sinks 是每个 Q head 一个值的一维向量 [N1]。
+ge::graphStatus CheckSinks(const char* opName, gert::TilingContext* context, int64_t qN)
+{
+    if (!IsOptionalTensorExist(context, SINKS_INDEX)) {
+        return ge::GRAPH_SUCCESS;
+    }
+    const auto& shape = context->GetOptionalInputShape(SINKS_INDEX)->GetStorageShape();
+    OP_CHECK_IF(shape.GetDimNum() != 1U,
+                OP_LOGE(opName, "sinks must be 1D (N1,), but got %zu dims.", shape.GetDimNum()),
+                return ge::GRAPH_PARAM_INVALID);
+    OP_CHECK_IF(shape.GetDim(0) != qN,
+                OP_LOGE(opName, "sinks shape[0] must equal Q head num N1 (%ld), but got %ld.", qN, shape.GetDim(0)),
+                return ge::GRAPH_PARAM_INVALID);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -193,6 +209,9 @@ ge::graphStatus FagShapeChecker::Check(FagCheckCtx& ctx)
         }
     }
 
+    if (CheckSinks(opName, context, qN) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_PARAM_INVALID;
+    }
     return CheckCuSeqlens(opName, context, isTnd);
 }
 

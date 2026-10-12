@@ -1,4 +1,4 @@
-# flash\_attn\_grad
+# flash_attn_grad
 
 ## 产品支持情况
 
@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  `flash_attn_grad`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于计算Flash Attention的反向结果。接口根据前向计算的`softmax_lse`、`attn_out`和上游梯度`dout`，计算Query、Key、Value对应的梯度`dq`、`dk`、`dv`。
+  `flash_attn_grad`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于计算Flash Attention的反向结果。接口根据前向计算的`softmax_lse`、`attn_out`和上游梯度`dout`，计算Query、Key、Value对应的梯度`dq`、`dk`、`dv`；当传入`sinks`时，同时计算sink参数的梯度`dsink`。
 
   调用本接口前，需要调用`flash_attn_metadata`生成反向计算所需的`metadata`。生成时必须设置`is_grad_enabled=True`，并保证两个接口的shape、layout、mask和序列长度相关参数一致。
 
@@ -71,6 +71,12 @@
   dK=scale\cdot(dS^T\cdot Q)
   $$
 
+  当传入`sinks`时，前向softmax的分母额外包含sink项（`softmax_lse`已包含该贡献），sink的梯度为：
+
+  $$
+  dSink=-\sum_{b,s1,s2}P\cdot dP\cdot\exp(sink-softmax\_lse)
+  $$
+
   其中，$Q$、$K$、$V$分别对应输入`q`、`k`、`v`，$Y$对应`attn_out`，$dY$对应`dout`。`softmax_scale`非0时，$scale$取`softmax_scale`；为0时，$scale=1/\sqrt{D}$。
 
 > [!NOTE]
@@ -103,7 +109,7 @@ cann_ops_transformer.flash_attn_grad(
     layout_q="BSND",
     layout_kv="BSND",
     layout_out="BSND"
-) -> (Tensor, Tensor, Tensor)
+) -> (Tensor, Tensor, Tensor, Tensor)
 ```
 
 当前注册的PyTorch schema未使用`*`分隔符，因此`cu_seqlens_q`及之后的参数既可以按位置传入，也可以按关键字传入。建议使用关键字传入可选参数。
@@ -126,7 +132,7 @@ cann_ops_transformer.flash_attn_grad(
 
 ## 参数说明
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度(shape) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | q | Tensor | 必选 | 公式中的Q | bfloat16/float16 | ND | <ul><li>BSND：(B, S1, N1, D)</li><li>BNSD：(B, N1, S1, D)</li><li>TND：(T1, N1, D)</li></ul> |
 | k | Tensor | 必选 | 公式中的K | bfloat16/float16 | ND | <ul><li>BSND：(B, S2, N2, D)</li><li>BNSD：(B, N2, S2, D)</li><li>TND：(T2, N2, D)</li></ul> |
@@ -138,7 +144,7 @@ cann_ops_transformer.flash_attn_grad(
 | cu_seqlens_kv | Tensor | 可选 | TND布局下KV的累积序列长度，第一个元素必须为0，最后一个元素等于T2。`layout_kv`为TND时必须传入，非TND时不支持传入。默认值为None | int32 | ND | (B+1,) |
 | seqused_q | Tensor | 可选 | 每个batch实际使用的Q序列长度。默认值为None | int32 | ND | (B,) |
 | seqused_kv | Tensor | 可选 | 每个batch实际使用的KV序列长度。默认值为None | int32 | ND | (B,) |
-| sinks | Tensor | 可选 | Sink参数，用于改善自注意力计算的数值稳定性。默认值为None | float32 | ND | (N1,) |
+| sinks | Tensor | 可选 | Sink参数，用于改善自注意力计算的数值稳定性，shape为(N1,)。默认值为None，此时`dsink`内容未定义（不应读取） | float32 | ND | (N1,) |
 | attn_mask | Tensor | 可选 | 掩码矩阵。默认值为None | int8 | ND | (2048, 2048) |
 | metadata | Tensor | 可选 | `flash_attn_metadata`生成的FAG任务切分数据。schema中为可选参数，但实际调用时必须传入 | int32 | ND | shape根据batch大小和N2动态计算 |
 | softmax_scale | float | 可选 | Softmax缩放系数。默认值为0.0，表示使用$1/\sqrt{D}$ | float32 | - | - |
@@ -157,29 +163,33 @@ cann_ops_transformer.flash_attn_grad(
 
 ## 返回值说明
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度(shape) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | dq | Tensor | 必选 | 公式中的dQ，Query的梯度 | bfloat16/float16 | ND | shape与`q`相同 |
 | dk | Tensor | 必选 | 公式中的dK，Key的梯度 | bfloat16/float16 | ND | shape与`k`相同 |
 | dv | Tensor | 必选 | 公式中的dV，Value的梯度 | bfloat16/float16 | ND | shape与`v`相同 |
+| dsink | Tensor | 必选 | 公式中的dSink，sink参数的梯度；仅在传入`sinks`时有定义 | float32 | ND | (N1,)；`sinks`为None时内容未定义 |
 
 ## 约束说明
 
-- 接口支持以下组合：
-  - 数据类型为float16或bfloat16。
-  - `layout_q`、`layout_kv`、`layout_out`支持BSND、BNSD、TND，且必须相同。
-  - Dense Attention，`mask_mode=0`、`attn_mask=None`、`win_left=-1`、`win_right=-1`。
-  - TND布局下`cu_seqlens_q`、`cu_seqlens_kv`必须传入；非TND布局下不支持传入。
+- 公共约束：
+  - 接口支持以下组合：
+    - 数据类型为float16或bfloat16。
+    - `layout_q`、`layout_kv`、`layout_out`支持BSND、BNSD、TND，且必须相同。
+    - Dense Attention，`mask_mode=0`、`attn_mask=None`、`win_left=-1`、`win_right=-1`。
+    - TND布局下`cu_seqlens_q`、`cu_seqlens_kv`必须传入；非TND布局下不支持传入。
 - `q`、`k`、`v`、`dout`、`attn_out`的数据类型必须一致。
 - B、S1、S2、N1、N2、D和Dv必须为正数，其中B的取值范围为(0, 65536)。
 - N1必须能被N2整除，支持MHA（N1=N2）和GQA（N1>N2）。
-- Query和Key的head dim均为D；Value、`dout`和`attn_out`的head dim均为Dv，并满足`0 < Dv <= D <= 192`。
-- 与当前仓库中的`flash_attn`联合调用时，前向接口还要求D=Dv且D取64、128或256；结合本接口D不超过192的约束，联合调用当前支持D=Dv=64或128。
+- Query和Key的head dim均为D；Value、`dout`和`attn_out`的head dim均为Dv，并满足`0 < Dv <= D <= 256`。TND布局当前仅支持D<=128；D=192/256仅BSND/BNSD。
+- 与当前仓库中的`flash_attn`联合调用时，前向接口支持的(D, Dv)为(64,64)、(72,72)、(128,128)、(256,256)、(192,128)；本接口覆盖上述组合。
 - `softmax_lse`必须为float32，shape为(B, N1, S1)（BSND/BNSD场景）或(N1, T1)（TND场景）。
 - 所有输入的数据格式均为ND。算子注册了`AutoContiguous`，传入非连续Tensor时由框架转换为连续Tensor。
 - `metadata`必须由`flash_attn_metadata`生成，并设置`is_grad_enabled=True`。生成metadata和调用本接口时，N1、N2、D、B、S1、S2、layout及mask相关参数必须一致，否则行为未定义。
 - `is_grad_enabled=True`生成的metadata同时包含正向和反向任务切分数据，前向`flash_attn`和反向`flash_attn_grad`均可使用同一份metadata，无需分别生成。
 - `softmax_lse`、`attn_out`必须来自与本次反向计算配置一致的前向调用，尤其是`softmax_scale`和layout必须一致。
+- `sinks`为float32、shape为(N1,)，N1为Query head数；提供时必须与前向`flash_attn`所用sinks一致。
+- `dsink`为float32、shape为(N1,)，逐次运行逐位可复现：kernel 里每个 AIV 子核在 UB 内按 head 精确累加部分和，写成 workspace 中自己独占的槽位行（每 AIV 一行，无原子加）；`sync_all` 后由 AIV0 按固定行序归约成 dsink，读前带一遍读侧预热以避开「紧随栅栏的首次读可能尚未全局可见」的窗口。
 - 当前仅支持单算子模式。
 
 ## 配套接口说明
@@ -209,9 +219,8 @@ cann_ops_transformer.flash_attn_metadata(
 ) -> Tensor
 ```
 
-与反向接口直接相关的参数如下：
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度(shape) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | num_heads_q | int | 必选 | Query head数，即N1 | int32 | - | - |
 | num_heads_kv | int | 必选 | Key/Value head数，即N2 | int32 | - | - |
@@ -232,6 +241,10 @@ cann_ops_transformer.flash_attn_metadata(
 | is_grad_enabled | bool | 可选 | 是否生成反向算子所需的metadata。调用`flash_attn_grad`前必须设置为True。默认值为False | bool | - | - |
 
 返回的`metadata`为int32、ND格式的一维Tensor，长度根据batch大小和N2动态计算。
+
+## 确定性计算
+
+- 确定性说明：默认不支持确定性计算。
 
 ## 调用示例
 
@@ -295,7 +308,7 @@ cann_ops_transformer.flash_attn_metadata(
     )
     dout = torch.randn_like(attn_out)
 
-    dq, dk, dv = cann_ops_transformer.flash_attn_grad(
+    dq, dk, dv, dsink = cann_ops_transformer.flash_attn_grad(
         q,
         k,
         v,
@@ -318,4 +331,7 @@ cann_ops_transformer.flash_attn_metadata(
     assert dq.shape == q.shape
     assert dk.shape == k.shape
     assert dv.shape == v.shape
+    # 未传 sinks 时 dsink 内容未定义，仅在传入 sinks 时才有意义
+    assert dsink.shape == (N1,)
+    assert dsink.dtype == torch.float32
     ```

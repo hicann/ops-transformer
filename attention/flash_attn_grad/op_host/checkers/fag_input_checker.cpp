@@ -64,6 +64,20 @@ ge::graphStatus FagDtypeChecker::Check(FagCheckCtx& ctx)
                             static_cast<int32_t>(qDtype), static_cast<int32_t>(item.desc->GetDataType())),
                     return ge::GRAPH_PARAM_INVALID);
     }
+    const auto sinksDesc = context->GetOptionalInputDesc(SINKS_INDEX);
+    if (sinksDesc != nullptr) {
+        OP_CHECK_IF(sinksDesc->GetDataType() != ge::DT_FLOAT,
+                    OP_LOGE(opName, "dtype of sinks must be float32, but got %d.",
+                            static_cast<int32_t>(sinksDesc->GetDataType())),
+                    return ge::GRAPH_PARAM_INVALID);
+    }
+    const auto dsinkDesc = context->GetOutputDesc(DSINK_OUT_INDEX);
+    if (dsinkDesc != nullptr) {
+        OP_CHECK_IF(dsinkDesc->GetDataType() != ge::DT_FLOAT,
+                    OP_LOGE(opName, "dtype of dsink must be float32, but got %d.",
+                            static_cast<int32_t>(dsinkDesc->GetDataType())),
+                    return ge::GRAPH_PARAM_INVALID);
+    }
     return ge::GRAPH_SUCCESS;
 }
 

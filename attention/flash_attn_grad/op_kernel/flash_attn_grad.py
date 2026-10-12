@@ -9,7 +9,9 @@
 
 """FlashAttnGrad kernel 入口 (PyPTO Pro)。
 
-只做**编译期分发**：把 tilingkey 的 ``template`` 位翻成一个模板主循环。
+只做**编译期分发**：``Tmpl.BN2GS1S2`` 且 ``d_align<=192`` 走
+``flash_attn_grad_preload3``（``runInfos[3]``），其余走
+``flash_attn_grad_preload2``（``runInfos[2]``）。
 实现按职责拆在同目录的 ``fag_*`` 模块：
 
 ===================  ============================================
@@ -19,12 +21,15 @@
 ``fag_mem``          L1/L0/UB 地址与 mutex id
 ``fag_tiling``       host 契约（TilingData / TilingKey）
 ``fag_schedule``     块有效性、swizzle、RunInfo
+``fag_deter_ondevice`` 确定性非 swizzle 闭式分核
 ``fag_buffers``      片上 tile 声明
 ``fag_block_cube``   C1..C5 五个 matmul
 ``fag_block_vec``    V1..V6 与 pre/post 编排
 ``fag_vector_api``   寄存器级 VF 微内核
 ``attenmask``        mask 搬入与 softmax VF
-``fag_kernel``       两个模板的主循环
+``fag_kernel``       两个模板入口 + 编译期分发
+``fag_kernel_norm``  非确定性 / BN2 主循环
+``fag_kernel_deter`` 确定性主循环
 ===================  ============================================
 
 本文件必须保持「有且仅有一个 ``@pl.jit``」：codegen
@@ -43,8 +48,8 @@ _KERNEL_DIR = os.path.dirname(os.path.abspath(__file__))
 if _KERNEL_DIR not in sys.path:
     sys.path.insert(0, _KERNEL_DIR)
 
-from fag_kernel import flash_attn_grad_bn2, flash_attn_grad_bn2gs1s2
-from fag_tiling import FlashAttnGradTilingData, FlashAttnGradTilingKey
+from fag_kernel import flash_attn_grad_preload2, flash_attn_grad_preload3
+from fag_tiling import FlashAttnGradTilingData, FlashAttnGradTilingKey, Tmpl
 
 # 这四个 flag 是**按 taskId 奇偶下标取**的，故必须在运行期真的存在一个数组。
 # codegen 只把「入口函数闭包里」的 list 提升成一个具名全局数组；若只在
@@ -87,33 +92,17 @@ def flash_attn_grad(
     dq: pl.Ptr[pl.DT_UINT8],
     dk: pl.Ptr[pl.DT_UINT8],
     dv: pl.Ptr[pl.DT_UINT8],
+    dsink: pl.Ptr[pl.DT_UINT8],
     workspace: pl.Ptr[pl.DT_UINT8],
     tiling: FlashAttnGradTilingData,
 ):
-    """入口只做编译期分发：template 来自 tilingkey。
+    """入口只做编译期分发：template / d_align 来自 tilingkey。
 
-    0=BN2GS1S2，1=BN2（含 MultiBlk）。3 预留给 BN2S2，本轮 is_valid 裁掉。
-    BN2 不接 GQA / D=192。
+    preload3：仅 ``Tmpl.BN2GS1S2`` 且 D<=192，``runInfos[3]``。
+    preload2：其余（``Tmpl.BN2`` 与 D=256/768 GS1S2），1-ahead，``runInfos[2]``。
     """
-    if template == 1:
-        flash_attn_grad_bn2(
-            q,
-            k,
-            v,
-            dout,
-            attn_out,
-            softmax_lse,
-            attn_mask,
-            metadata,
-            dq,
-            dk,
-            dv,
-            workspace,
-            tiling,
-            d_align,
-        )
-    else:
-        flash_attn_grad_bn2gs1s2(
+    if template == Tmpl.BN2GS1S2 and d_align <= 192:
+        flash_attn_grad_preload3(
             q,
             k,
             v,
@@ -130,9 +119,33 @@ def flash_attn_grad(
             dq,
             dk,
             dv,
+            dsink,
             workspace,
             tiling,
             d_align,
             dv_align,
             swizzle,
+            deter,
+        )
+    else:
+        flash_attn_grad_preload2(
+            q,
+            k,
+            v,
+            dout,
+            attn_out,
+            softmax_lse,
+            attn_mask,
+            metadata,
+            sinks,
+            dq,
+            dk,
+            dv,
+            dsink,
+            workspace,
+            tiling,
+            d_align,
+            dv_align,
+            swizzle,
+            deter,
         )

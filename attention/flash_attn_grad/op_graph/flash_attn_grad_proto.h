@@ -42,10 +42,16 @@ namespace ge {
 * FlashAttnMetadata with is_grad_enabled=true, required in actual invocation.
 
 * @par Outputs:
-* Three outputs, including:
+* Four outputs, including:
 * @li dq: A tensor. Type is float16, bfloat16. The gradient of query.
 * @li dk: A tensor. Type is float16, bfloat16. The gradient of key.
 * @li dv: A tensor. Type is float16, bfloat16. The gradient of value.
+ * @li dsink: A 1D tensor of shape (N1,). Type is float32. The gradient of sinks,
+ * only meaningful when `sinks` is provided (otherwise the content is undefined),
+ * produced deterministically: each AIV accumulates its partials in UB, writes one
+* row of an exclusive workspace slot, and after sync_all AIV0 reduces the slots in
+* fixed order (a small reader-side warm-up pass precedes the loads because the
+* first read right after the barrier may not observe other cores' stores yet).
 
 * @par Attributes:
 * Nine attributes, including:
@@ -76,6 +82,7 @@ REG_OP(FlashAttnGrad)
     .OUTPUT(dq, TensorType({DT_FLOAT16, DT_BF16}))
     .OUTPUT(dk, TensorType({DT_FLOAT16, DT_BF16}))
     .OUTPUT(dv, TensorType({DT_FLOAT16, DT_BF16}))
+    .OUTPUT(dsink, TensorType({DT_FLOAT}))
     .ATTR(softmax_scale, Float, 0.0)
     .ATTR(mask_mode, Int, 0)
     .ATTR(win_left, Int, -1)

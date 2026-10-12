@@ -24,17 +24,19 @@ constexpr int64_t FAG_SPARSE_DENSE = 0;
 constexpr int64_t FAG_SPARSE_CASUAL = 1;
 constexpr int64_t FAG_SPARSE_BAND = 2;
 constexpr int64_t FAG_CUBE_BASE = 128;
+constexpr int64_t FAG_WIN_INF = static_cast<int64_t>(std::numeric_limits<int32_t>::max());
 
 inline void FagCorrectSparseTokens(int64_t maskMode, int64_t winLeft, int64_t winRight, int64_t s1, int64_t s2,
                                    int64_t& s1Token, int64_t& s2Token)
 {
     // ProcessTokensInfo (non-TND): causal tokens then right-down pad correction.
+    // mask_mode=4 的 -1 是正无穷（与正向 flash_attn 同口径）。
     if (maskMode == MASK_MODE_CAUSAL) {
-        s1Token = static_cast<int64_t>(std::numeric_limits<int32_t>::max());
+        s1Token = FAG_WIN_INF;
         s2Token = 0;
     } else if (maskMode == MASK_MODE_WINDOW) {
-        s1Token = winLeft;
-        s2Token = winRight;
+        s1Token = (winLeft == -1) ? FAG_WIN_INF : winLeft;
+        s2Token = (winRight == -1) ? FAG_WIN_INF : winRight;
     } else {
         s1Token = static_cast<int64_t>(std::numeric_limits<int32_t>::max());
         s2Token = static_cast<int64_t>(std::numeric_limits<int32_t>::max());
@@ -125,6 +127,13 @@ inline int64_t FagGetTotalPerBatchNum(int64_t s1, int64_t s2, int64_t s1Outer, i
     }
     int64_t p = FagCeilDiv(s1Token, FAG_CUBE_BASE);
     int64_t q = FagCeilDiv(s2Token, FAG_CUBE_BASE);
+    // 将窗口的有效块跨度限制在实际 outer 范围内。
+    if (s1Outer > 0 && p > s1Outer - 1) {
+        p = s1Outer - 1;
+    }
+    if (s2Outer > 0 && q > s2Outer - 1) {
+        q = s2Outer - 1;
+    }
     int64_t total = 0;
     for (int64_t s2oIdx = 0; s2oIdx < s2Outer; ++s2oIdx) {
         int64_t xMin = (s2oIdx - q) > 0 ? (s2oIdx - q) : 0;

@@ -30,7 +30,7 @@ namespace {
 // 布局钉死：改了 py 侧字段就会在这里断编译，逼着同步改 Tmp 和这些数字。
 // 注意 scaleValue 是唯一的 4 字节字段，它后面有 4 字节填充 —— 框架的
 // CheckAlignAndGenPlaceHolder 也会插同样的填充，两边才对得上。
-static_assert(sizeof(FlashAttnGradTilingData) == 192,
+static_assert(sizeof(FlashAttnGradTilingData) == 208,
               "TilingData layout changed; update FlashAttnGradTilingDataTmp in flash_attn_grad_tiling.h too.");
 static_assert(offsetof(FlashAttnGradTilingData, scaleValue) == 56, "scaleValue moved; re-check the 4-byte padding.");
 static_assert(offsetof(FlashAttnGradTilingData, gSize) == 64, "gSize moved; re-check the padding after scaleValue.");
@@ -38,6 +38,9 @@ static_assert(offsetof(FlashAttnGradTilingData, coefN2) == 128,
               "layout-view tail moved; a field was added or removed.");
 static_assert(offsetof(FlashAttnGradTilingData, totalPerBatchNum) == 184,
               "trailing mask field moved; a field was added or removed.");
+static_assert(offsetof(FlashAttnGradTilingData, deterMaxRound) == 192, "deter fields must follow totalPerBatchNum.");
+static_assert(offsetof(FlashAttnGradTilingData, sinkOptional) == 200,
+              "sinkOptional must stay the last field so earlier offsets keep their values.");
 
 void LogPlan(gert::TilingContext* context, const FagParsedInfo& info, const FagTilingPlan& plan,
              const FagRouteTrace& trace)
@@ -46,7 +49,7 @@ void LogPlan(gert::TilingContext* context, const FagParsedInfo& info, const FagT
             "FlashAttnGrad tiling: usedCube=%u, usedBlockDim=%u, useActualCores=%d, s1Outer=%ld, s2Outer=%ld, "
             "layoutStr=%s, layout=%ld, maskMode=%ld, win=(%ld,%ld), sparseType=%ld, totalPerBatch=%ld, "
             "hasAttenMask=%d, hasSeqused=%d, hasSinks=%d, isEmptyShape=%d, "
-            "template=%ld, isBn2MultiBlk=%ld, bn2NeedZero=%ld, swizzle=%ld, dAlign=%ld, dvAlign=%ld, "
+            "template=%ld, isBn2MultiBlk=%ld, bn2NeedZero=%ld, swizzle=%ld, deter=%d, dAlign=%ld, dvAlign=%ld, "
             "B=%ld, S1=%ld, S2=%ld, N1=%ld, N2=%ld, G=%ld, D=%ld, Dv=%ld, "
             "viewQ=[%ld,S,%ld,D] b0=%ld, viewKV=[%ld,S,%ld,D] b0=%ld, coefN=(%ld,%ld), "
             "tilingKey=%llu, workspaceSize=%zu.",
@@ -55,9 +58,10 @@ void LogPlan(gert::TilingContext* context, const FagParsedInfo& info, const FagT
             info.winLeft, info.winRight, info.sparseType, info.totalPerBatchNum, static_cast<int>(info.hasAttenMask),
             static_cast<int>(info.hasSeqused), static_cast<int>(info.hasSinks), static_cast<int>(IsEmptyShape(info)),
             plan.kernel.tmpl, plan.kernel.isBn2MultiBlk, plan.kernel.bn2NeedZero, plan.schedule.swizzle,
-            plan.kernel.dAlign, plan.kernel.dvAlign, info.b, info.s1, info.s2, info.n1, info.n2, info.g, info.d,
-            info.dv, info.viewD0Q, info.viewD2Q, info.coefB0Q, info.viewD0KV, info.viewD2KV, info.coefB0KV, info.coefN0,
-            info.coefN2, plan.tilingKey, plan.workspace.totalSize);
+            static_cast<int>(info.isDeterministic && plan.kernel.tmpl == TMPL_BN2GS1S2), plan.kernel.dAlign,
+            plan.kernel.dvAlign, info.b, info.s1, info.s2, info.n1, info.n2, info.g, info.d, info.dv, info.viewD0Q,
+            info.viewD2Q, info.coefB0Q, info.viewD0KV, info.viewD2KV, info.coefB0KV, info.coefN0, info.coefN2,
+            plan.tilingKey, plan.workspace.totalSize);
 
     // 决策追溯：上板发现别的模板更快时，先看这行就知道今天为什么选了它。
     // l2CacheSize 一起打出来：swizzle 的阈值以它为分母，各 ascend950 变体
@@ -112,7 +116,7 @@ ge::graphStatus FlashAttnGradTilingRegbase::DoOpTiling()
         }
     }
 
-    ret = WriteTilingData(info);
+    ret = WriteTilingData(info, plan);
     if (ret != ge::GRAPH_SUCCESS) {
         return ret;
     }
@@ -130,7 +134,7 @@ ge::graphStatus FlashAttnGradTilingRegbase::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashAttnGradTilingRegbase::WriteTilingData(const FagParsedInfo& info)
+ge::graphStatus FlashAttnGradTilingRegbase::WriteTilingData(const FagParsedInfo& info, const FagTilingPlan& plan)
 {
     FlashAttnGradTilingData* tilingData = context_->GetTilingData<FlashAttnGradTilingData>();
     // GetTilingData 在 capacity < sizeof(T) 时返回 nullptr，而 capacity 来自上面
@@ -166,6 +170,8 @@ ge::graphStatus FlashAttnGradTilingRegbase::WriteTilingData(const FagParsedInfo&
     tilingData->s1Token = info.s1Token;
     tilingData->s2Token = info.s2Token;
     tilingData->totalPerBatchNum = info.totalPerBatchNum;
+    tilingData->deterMaxRound = plan.schedule.deterMaxRound;
+    tilingData->sinkOptional = info.hasSinks ? 1 : 0;
     return ge::GRAPH_SUCCESS;
 }
 

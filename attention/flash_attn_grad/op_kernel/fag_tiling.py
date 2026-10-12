@@ -22,6 +22,19 @@ from dataclasses import dataclass
 from pypto_pro.runtime.tilingkey import TilingKeyField
 
 
+class Tmpl:
+    """tilingkey bit[1:0]，对齐 op_host ``TMPL_*``。
+
+    必须是普通 int 常量：PyPTO 解析 ``template == Tmpl.BN2`` 时
+    IntEnum 过不了 ``eq(Expr, Expr)``。
+    """
+
+    BN2GS1S2 = 0
+    BN2 = 1
+    RESERVED_UNUSED = 2
+    RESERVED_BN2S2 = 3
+
+
 @dataclass
 class FlashAttnGradTilingData:
     """对齐 op_host/flash_attn_grad_tiling.h 的 TILING_DATA_FIELD_DEF 顺序。
@@ -68,13 +81,19 @@ class FlashAttnGradTilingData:
     s1Token: int
     s2Token: int
     totalPerBatchNum: int
+    # 保留字段；核上闭式算轮次，当前不读该字段。
+    deterMaxRound: int
+    # 1 = 带 sinks 输入，主循环额外算 dsink。运行期标量，不占 tilingkey。必须放最后。
+    sinkOptional: int
 
 
 # 与 op_kernel/flash_attn_grad.py 的 FlashAttnGradTilingKey 一致
 class FlashAttnGradTilingKey:
-    # bit[1:0]：0=BN2GS1S2，1=BN2（含 MultiBlk，bit9 区分），
-    # 2=未用，3=BN2S2 预留（本轮不编、不进入口）。
-    template = TilingKeyField(bits=2, values=[0, 1, 2, 3])
+    # bit[1:0]：见 :class:`Tmpl`。2/3 保留，本轮不编、不进入口。
+    template = TilingKeyField(
+        bits=2,
+        values=[Tmpl.BN2GS1S2, Tmpl.BN2, Tmpl.RESERVED_UNUSED, Tmpl.RESERVED_BN2S2],
+    )
     layout = TilingKeyField(bits=1, values=[0, 1])
     # 0=无 attenmask，3=causal，4=band。host 存 0/1/2 索引。
     mask_mode = TilingKeyField(bits=2, values=[0, 3, 4])
@@ -89,22 +108,20 @@ class FlashAttnGradTilingKey:
     #
     # 为什么 D 必须占 tilingkey 位，而 layout/GQA 不用：后两者只改索引算术
     # (运行期数值)，而 D 改的是**每块片上 tile 的宽度**，即分配尺寸，
-    # 而 pypto 的 tile shape 是 trace 期常量，所以 D 必须做成编译期分档，
-    # 不能当运行期值。
-    # 且「一律按最大 192 分配 + 运行期裁列」并非只是慢：L0C 会要 288KB，
-    # 超出 256KB 预算(即便 acc 降到单缓冲)，物理上放不下。
-    #
-    # Dv 不占 tilingkey：它只决定已分配 tile 里填多少列，是纯运行期数值。
-    d_align = TilingKeyField(bits=2, values=[64, 128, 192])
-    # Dv 的**分配**宽度分档。Dv 本身是运行期值(填多少列)，但 y/dy/prod/tmp
-    # 这四块 UB 的宽度是 Dv 派生的，而 tile shape 必须是 trace 期常量，
-    # 故同样要分档。(64, 128) 是例外：d_align=64 时 dv_align 强制 128。
-    dv_align = TilingKeyField(bits=1, values=[128, 192])
-    # BN2 MultiBlk：S 在 (128, 640] 仍走 BN2 函数。bit9，不打乱已有 key。
+    # 而 pypto 的 tile shape 是 trace 期常量，不是运行期值。
+    # 且「一律按最大档分配 + 运行期裁列」并非只是慢：L0C 会超出 256KB
+    # 预算，物理上放不下。bit 取值 3=256、4=768（见 docs/D256设计.md）。
+    d_align = TilingKeyField(bits=3, values=[64, 128, 192, 256, 768])
+    # Dv 的**分配**宽度，取值与 d_align 相同。一般 d_align==dv_align；
+    # 唯一分叉是 D=192 且 Dv=128 → 128。其余 D!=Dv 由 host 拦截。
+    dv_align = TilingKeyField(bits=3, values=[64, 128, 192, 256, 768])
+    # BN2 MultiBlk：S 在 (128, 640] 仍走 BN2 函数。bit10。
     is_bn2_multiblk = TilingKeyField(bits=1, values=[0, 1])
     # BN2 MultiBlk 且存在整行或整列无效 tile：pre 把 dq/dk/dv out 清零。
     # 一行/一列共用这一位，kernel 不区分。
     bn2_need_zero = TilingKeyField(bits=1, values=[0, 1])
+    # bit14：确定性分核（核上闭式）。非 swizzle 走跨轮流水+L0C；swizzle 仍轮间 barrier。
+    deter = TilingKeyField(bits=1, values=[0, 1])
 
     def is_valid(self, key):
         """剪掉本实现未走到的组合，控制二进制数量。"""
@@ -117,27 +134,41 @@ class FlashAttnGradTilingKey:
             dv_align,
             is_bn2_multiblk,
             bn2_need_zero,
+            deter,
         ) = key
-        # 2 未用；3 预留给 BN2S2。不剪会当 GS1S2 多编死二进制。
-        if template != 0 and template != 1:
+        # 2/3 保留。不剪会当 GS1S2 多编死二进制。
+        if template != Tmpl.BN2GS1S2 and template != Tmpl.BN2:
             return False
-        if template == 1:
-            if d_align == 192 or swizzle != 0 or layout != 0:
+        if deter == 1:
+            if template != Tmpl.BN2GS1S2:
                 return False
-            if d_align == 64 and dv_align != 128:
+            if swizzle != 0:
+                return False
+            if is_bn2_multiblk == 1 or bn2_need_zero == 1:
+                return False
+            if layout != 0:
+                return False
+        if template == Tmpl.BN2:
+            if (
+                d_align == 192
+                or d_align == 256
+                or d_align == 768
+                or swizzle != 0
+                or layout != 0
+            ):
+                return False
+            if d_align != dv_align:
                 return False
             if bn2_need_zero == 1:
                 return is_bn2_multiblk == 1 and mask_mode != 0
             return True
         if is_bn2_multiblk == 1 or bn2_need_zero == 1:
             return False
-        # GS1S2 + d_align=64：tilingkey 的 dv_align 没有 64 档，host 仍发 128。
-        if d_align == 64:
-            return dv_align == 128
-        if dv_align > d_align:
+        # 一般 d_align==dv_align；仅 D=192 且 Dv=128 允许 dv_align=128。
+        if d_align != dv_align and not (d_align == 192 and dv_align == 128):
             return False
-        # D=192 只编非 TND。mask 3/4 与 dense 共用 GS1S2 D-split；
-        # swizzle+mask 的 Group B 未迁，不编那几份。
-        if d_align == 192:
-            return layout == 0 and (mask_mode == 0 or swizzle == 0)
+        # D=192 / 256 / 768 只编非 TND。mask 3/4 与 dense 共用 GS1S2 D-split。
+        # 非 TND 的 swizzle=1 必须编出来：长序列 mask 过门走 HeadSliceSplit。
+        if d_align == 192 or d_align == 256 or d_align == 768:
+            return layout == 0
         return True
