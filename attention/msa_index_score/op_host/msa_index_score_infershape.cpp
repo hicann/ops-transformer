@@ -42,17 +42,17 @@ inline int64_t RoundUpTo(int64_t value, int64_t align)
 }
 } // namespace
 
-static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("MsaIndexScore", "InferShapeContext is nullptr!"), return ge::GRAPH_FAILED);
     OP_LOGI(context->GetNodeName(), "Enter MsaIndexScore InferShape impl.");
 
-    const gert::Shape *queryShape = context->GetInputShape(MSA_QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(MSA_QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(MSA_KEY_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(MSA_KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    const gert::Shape *blockTableShape = context->GetOptionalInputShape(MSA_BLOCK_TABLE_INDEX);
-    gert::Shape *scoreShape = context->GetOutputShape(0);
+    const gert::Shape* blockTableShape = context->GetOptionalInputShape(MSA_BLOCK_TABLE_INDEX);
+    gert::Shape* scoreShape = context->GetOutputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, scoreShape);
 
     OP_CHECK_IF(queryShape->GetDimNum() != MSA_QUERY_DIM_NUM,
@@ -60,8 +60,8 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext *context)
                 return ge::GRAPH_FAILED);
 
     auto attrs = context->GetAttrs();
-    const char *layoutKeyPtr = (attrs != nullptr) ? attrs->GetStr(MSA_ATTR_LAYOUT_KEY) : nullptr;
-    const char *layoutKey = (layoutKeyPtr == nullptr || layoutKeyPtr[0] == '\0') ? "BBND" : layoutKeyPtr;
+    const char* layoutKeyPtr = (attrs != nullptr) ? attrs->GetStr(MSA_ATTR_LAYOUT_KEY) : nullptr;
+    const char* layoutKey = (layoutKeyPtr == nullptr || layoutKeyPtr[0] == '\0') ? "BBND" : layoutKeyPtr;
     OP_CHECK_IF(std::strcmp(layoutKey, "TND") != 0 && std::strcmp(layoutKey, "BBND") != 0 &&
                     std::strcmp(layoutKey, "BNBD") != 0,
                 OP_LOGE(context, "layout_key must be TND, BBND or BNBD, got %s.", layoutKey), return ge::GRAPH_FAILED);
@@ -80,9 +80,9 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext *context)
     } else {
         OP_CHECK_IF(keyShape->GetDimNum() != MSA_KEY_TND_DIM_NUM,
                     OP_LOGE(context, "layout_key=TND requires key rank 3."), return ge::GRAPH_FAILED);
-        const gert::Shape *klenShape = context->GetOptionalInputShape(MSA_ACTUAL_SEQ_KLEN_INDEX);
-        const gert::Tensor *klenTensor = context->GetOptionalInputTensor(MSA_ACTUAL_SEQ_KLEN_INDEX);
-        const int32_t *klenData = (klenTensor != nullptr) ? klenTensor->GetData<int32_t>() : nullptr;
+        const gert::Shape* klenShape = context->GetOptionalInputShape(MSA_ACTUAL_SEQ_KLEN_INDEX);
+        const gert::Tensor* klenTensor = context->GetOptionalInputTensor(MSA_ACTUAL_SEQ_KLEN_INDEX);
+        const int32_t* klenData = (klenTensor != nullptr) ? klenTensor->GetData<int32_t>() : nullptr;
         if (klenData != nullptr && klenShape != nullptr && klenShape->GetDimNum() == 1 &&
             klenShape->GetDim(0) >= MSA_KLEN_PREFIX_MIN) {
             const int64_t prefixN = klenShape->GetDim(0);
@@ -115,7 +115,7 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeMsaIndexScore(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeMsaIndexScore(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("MsaIndexScore", "InferDataTypeContext is nullptr!"),
                 return ge::GRAPH_FAILED);

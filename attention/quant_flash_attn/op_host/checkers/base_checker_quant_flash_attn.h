@@ -32,31 +32,31 @@ public:
     QfaBaseChecker() = default;
     virtual ~QfaBaseChecker() = default;
 
-    virtual ge::graphStatus CheckSinglePara(const QfaTilingInfo &qfaInfo)
+    virtual ge::graphStatus CheckSinglePara(const QfaTilingInfo& qfaInfo)
     {
         (void)qfaInfo;
         return ge::GRAPH_SUCCESS;
     }
-    virtual ge::graphStatus CheckParaExistence(const QfaTilingInfo &qfaInfo)
+    virtual ge::graphStatus CheckParaExistence(const QfaTilingInfo& qfaInfo)
     {
         (void)qfaInfo;
         return ge::GRAPH_SUCCESS;
     }
-    virtual ge::graphStatus CheckFeature(const QfaTilingInfo &qfaInfo)
+    virtual ge::graphStatus CheckFeature(const QfaTilingInfo& qfaInfo)
     {
         (void)qfaInfo;
         return ge::GRAPH_SUCCESS;
     }
-    virtual ge::graphStatus CheckMultiPara(const QfaTilingInfo &qfaInfo)
+    virtual ge::graphStatus CheckMultiPara(const QfaTilingInfo& qfaInfo)
     {
         (void)qfaInfo;
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
-    ge::graphStatus CheckFormatSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
+    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const;
+    ge::graphStatus CheckFormatSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const;
     template <typename T>
-    ge::graphStatus CheckValueSupport(const T value, const std::vector<T> &expectValList) const
+    ge::graphStatus CheckValueSupport(const T value, const std::vector<T>& expectValList) const
     {
         if (std::find(expectValList.begin(), expectValList.end(), value) == expectValList.end()) {
             return ge::GRAPH_FAILED;
@@ -66,8 +66,8 @@ public:
 
     // 校验 tensor 是否连续：根据 shape 从最后一维向前累乘推算期望 stride，与实际 stride 比对。
     // 返回 GRAPH_SUCCESS 表示连续；GRAPH_FAILED 表示不连续，index 输出第一个不连续维度的下标。
-    ge::graphStatus CheckTensorContiguous(const uint32_t &tensorDimNum, const gert::Shape &inputShape,
-                                          const gert::Stride *strides, int32_t &index) const;
+    ge::graphStatus CheckTensorContiguous(const uint32_t& tensorDimNum, const gert::Shape& inputShape,
+                                          const gert::Stride* strides, int32_t& index) const;
 
     std::string DataTypeToSerialString(ge::DataType type) const;
     static uint32_t GetTypeSize(ge::DataType dtype);

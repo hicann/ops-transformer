@@ -19,12 +19,10 @@
 using namespace ge;
 using namespace AscendC;
 namespace optiling {
-ge::graphStatus TilingPrepareForMlaProlog(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForMlaProlog(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
-IMPL_OP_OPTILING(MlaProlog)
-    .Tiling(TilingMlaProlog)
-    .TilingParse<MlaPrologCompileInfo>(TilingPrepareForMlaProlog);
+IMPL_OP_OPTILING(MlaProlog).Tiling(TilingMlaProlog).TilingParse<MlaPrologCompileInfo>(TilingPrepareForMlaProlog);
 } // namespace optiling

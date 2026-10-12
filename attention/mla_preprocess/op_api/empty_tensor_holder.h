@@ -20,12 +20,12 @@ namespace MlaPreprocessApi {
 
 class EmptyTensorHolder {
 public:
-    EmptyTensorHolder(const aclTensor *&tensor, aclDataType dataType)
+    EmptyTensorHolder(const aclTensor*& tensor, aclDataType dataType)
     {
         if (tensor == nullptr) {
             const std::vector<int64_t> shape = {0};
             tensor_ = aclCreateTensor(shape.data(), shape.size(), dataType, shape.data(), 0, ACL_FORMAT_ND,
-                                      shape.data(), shape.size(), static_cast<void *>(&placeholderAddr_));
+                                      shape.data(), shape.size(), static_cast<void*>(&placeholderAddr_));
             tensor = tensor_;
         }
     }
@@ -43,7 +43,7 @@ public:
     }
 
 private:
-    const aclTensor *tensor_ = nullptr;
+    const aclTensor* tensor_ = nullptr;
     int64_t placeholderAddr_ = 0xff;
 };
 

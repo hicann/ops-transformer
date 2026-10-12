@@ -35,7 +35,7 @@ __aicore__ inline uint32_t Max(uint32_t x, uint32_t y)
 }
 
 template <typename T, typename Q>
-__aicore__ inline void CopyIn(const AscendC::GlobalTensor<T> &gm, Q &queue, uint64_t offset, uint32_t count)
+__aicore__ inline void CopyIn(const AscendC::GlobalTensor<T>& gm, Q& queue, uint64_t offset, uint32_t count)
 {
     AscendC::LocalTensor<T> local = queue.template AllocTensor<T>();
     DataCopy(local, gm[offset], count);
@@ -43,7 +43,7 @@ __aicore__ inline void CopyIn(const AscendC::GlobalTensor<T> &gm, Q &queue, uint
 }
 
 template <typename T, typename Q>
-__aicore__ inline void CopyOut(const AscendC::GlobalTensor<T> &gm, Q &queue, uint64_t offset, uint32_t count)
+__aicore__ inline void CopyOut(const AscendC::GlobalTensor<T>& gm, Q& queue, uint64_t offset, uint32_t count)
 {
     AscendC::LocalTensor<T> local = queue.template DeQue<T>();
     DataCopy(gm[offset], local, count);
@@ -51,7 +51,7 @@ __aicore__ inline void CopyOut(const AscendC::GlobalTensor<T> &gm, Q &queue, uin
 }
 
 template <typename T>
-__aicore__ inline void CastFrom16To32(const AscendC::LocalTensor<float> &out, const AscendC::LocalTensor<T> &in,
+__aicore__ inline void CastFrom16To32(const AscendC::LocalTensor<float>& out, const AscendC::LocalTensor<T>& in,
                                       uint32_t count)
 {
     Cast(out, in, AscendC::RoundMode::CAST_NONE, count);
@@ -59,7 +59,7 @@ __aicore__ inline void CastFrom16To32(const AscendC::LocalTensor<float> &out, co
 }
 
 template <typename T>
-__aicore__ inline void CastFrom32To16(const AscendC::LocalTensor<T> &out, const AscendC::LocalTensor<float> &in,
+__aicore__ inline void CastFrom32To16(const AscendC::LocalTensor<T>& out, const AscendC::LocalTensor<float>& in,
                                       uint32_t count)
 {
     if constexpr (AscendC::IsSameType<T, half>::value) {
@@ -70,7 +70,7 @@ __aicore__ inline void CastFrom32To16(const AscendC::LocalTensor<T> &out, const 
     AscendC::PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline void CastFromF16ToI8(const AscendC::LocalTensor<int8_t> &out, const AscendC::LocalTensor<half> &in,
+__aicore__ inline void CastFromF16ToI8(const AscendC::LocalTensor<int8_t>& out, const AscendC::LocalTensor<half>& in,
                                        half quantMin, uint32_t count)
 {
     Maxs(in, in, quantMin, count);
@@ -86,8 +86,8 @@ __aicore__ inline void CastFromF16ToI8(const AscendC::LocalTensor<int8_t> &out, 
 }
 
 template <typename T, typename Q>
-__aicore__ inline void CopyInAndCastF32(const AscendC::LocalTensor<float> &out, const AscendC::GlobalTensor<T> &gm,
-                                        Q &queue, uint64_t offset, uint32_t count)
+__aicore__ inline void CopyInAndCastF32(const AscendC::LocalTensor<float>& out, const AscendC::GlobalTensor<T>& gm,
+                                        Q& queue, uint64_t offset, uint32_t count)
 {
     CopyIn(gm, queue, offset, count);
     AscendC::LocalTensor<T> local = queue.template DeQue<T>();
@@ -97,8 +97,8 @@ __aicore__ inline void CopyInAndCastF32(const AscendC::LocalTensor<float> &out, 
 }
 
 template <typename T, typename Q>
-__aicore__ inline void Cast16AndCopyOut(const AscendC::LocalTensor<float> &in, const AscendC::GlobalTensor<T> &gm,
-                                        Q &queue, uint64_t offset, uint32_t count)
+__aicore__ inline void Cast16AndCopyOut(const AscendC::LocalTensor<float>& in, const AscendC::GlobalTensor<T>& gm,
+                                        Q& queue, uint64_t offset, uint32_t count)
 {
     AscendC::LocalTensor<T> local = queue.template AllocTensor<T>();
     CastFrom32To16(local, in, count);
@@ -108,8 +108,8 @@ __aicore__ inline void Cast16AndCopyOut(const AscendC::LocalTensor<float> &in, c
 }
 
 template <typename T>
-__aicore__ inline T ComputeSum(const AscendC::LocalTensor<T> &in, const AscendC::LocalTensor<T> &tmp,
-                               const AscendC::LocalTensor<T> &workLocal, uint32_t count)
+__aicore__ inline T ComputeSum(const AscendC::LocalTensor<T>& in, const AscendC::LocalTensor<T>& tmp,
+                               const AscendC::LocalTensor<T>& workLocal, uint32_t count)
 {
 #if __CCE_AICORE__ == 100
     float sum = 0;
@@ -121,7 +121,7 @@ __aicore__ inline T ComputeSum(const AscendC::LocalTensor<T> &in, const AscendC:
         int64_t bodyCount = repeatTimes * elementNumPerRep;
         if (repeatTimes > 0) {
             AscendC::AscendCUtils::SetMask<T>(elementNumPerRep);
-            cadd_v<ArchType::ASCEND_V200, float>((__ubuf__ T *)tmp.GetPhyAddr(), (__ubuf__ T *)src.GetPhyAddr(),
+            cadd_v<ArchType::ASCEND_V200, float>((__ubuf__ T*)tmp.GetPhyAddr(), (__ubuf__ T*)src.GetPhyAddr(),
                                                  repeatTimes, 1, 1, 8);
             AscendC::SetFlag<HardEvent::V_S>(EVENT_ID0); // PipeBarrier(PIPE_V)?
             AscendC::WaitFlag<HardEvent::V_S>(EVENT_ID0);
@@ -129,8 +129,8 @@ __aicore__ inline T ComputeSum(const AscendC::LocalTensor<T> &in, const AscendC:
 
         if (tailCount != 0) {
             AscendC::AscendCUtils::SetMask<T>(tailCount);
-            cadd_v<ArchType::ASCEND_V200, float>((__ubuf__ T *)tmp[bodyCount].GetPhyAddr(),
-                                                 (__ubuf__ T *)src[bodyCount].GetPhyAddr(), 1, 1, 1, 8);
+            cadd_v<ArchType::ASCEND_V200, float>((__ubuf__ T*)tmp[bodyCount].GetPhyAddr(),
+                                                 (__ubuf__ T*)src[bodyCount].GetPhyAddr(), 1, 1, 1, 8);
             AscendC::SetFlag<HardEvent::V_S>(EVENT_ID0);
             AscendC::WaitFlag<HardEvent::V_S>(EVENT_ID0);
             sum += tmp.GetValue(bodyCount);
@@ -142,8 +142,7 @@ __aicore__ inline T ComputeSum(const AscendC::LocalTensor<T> &in, const AscendC:
 
     if (count > 1) {
         AscendC::AscendCUtils::SetMask<T>(count);
-        cadd_v<ArchType::ASCEND_V200, float>((__ubuf__ T *)tmp.GetPhyAddr(), (__ubuf__ T *)tmp.GetPhyAddr(), 1, 1, 1,
-                                             8);
+        cadd_v<ArchType::ASCEND_V200, float>((__ubuf__ T*)tmp.GetPhyAddr(), (__ubuf__ T*)tmp.GetPhyAddr(), 1, 1, 1, 8);
         AscendC::SetFlag<HardEvent::V_S>(EVENT_ID0);
         AscendC::WaitFlag<HardEvent::V_S>(EVENT_ID0);
     }
@@ -158,19 +157,19 @@ __aicore__ inline T ComputeSum(const AscendC::LocalTensor<T> &in, const AscendC:
 #endif
 }
 
-__aicore__ inline float ComputeSliceSquareSum(const AscendC::LocalTensor<float> &in,
-                                              const AscendC::LocalTensor<float> &tmp,
-                                              const AscendC::LocalTensor<float> &workLocal, uint32_t count)
+__aicore__ inline float ComputeSliceSquareSum(const AscendC::LocalTensor<float>& in,
+                                              const AscendC::LocalTensor<float>& tmp,
+                                              const AscendC::LocalTensor<float>& workLocal, uint32_t count)
 {
     Mul(tmp, in, in, count);
     AscendC::PipeBarrier<PIPE_V>();
     return ComputeSum(tmp, tmp, workLocal, count);
 }
 template <typename T>
-__aicore__ inline void ComputeRmsNorm(const AscendC::LocalTensor<T> &out, const AscendC::LocalTensor<float> &in,
-                                      float rms, const AscendC::LocalTensor<T> &gamma, uint32_t count,
+__aicore__ inline void ComputeRmsNorm(const AscendC::LocalTensor<T>& out, const AscendC::LocalTensor<float>& in,
+                                      float rms, const AscendC::LocalTensor<T>& gamma, uint32_t count,
                                       uint32_t precisionMode, uint32_t gemmaMode,
-                                      const AscendC::LocalTensor<float> &tmp)
+                                      const AscendC::LocalTensor<float>& tmp)
 {
     float value = 1.0;
     Duplicate(tmp, rms, count);
@@ -198,7 +197,7 @@ __aicore__ inline void ComputeRmsNorm(const AscendC::LocalTensor<T> &out, const 
 }
 
 template <typename T, uint32_t gemmaMode>
-__aicore__ inline void CastGAndIsGemmaMode(const AscendC::LocalTensor<float> &out, const AscendC::LocalTensor<T> &gamma,
+__aicore__ inline void CastGAndIsGemmaMode(const AscendC::LocalTensor<float>& out, const AscendC::LocalTensor<T>& gamma,
                                            uint32_t count)
 {
     Cast(out, gamma, AscendC::RoundMode::CAST_NONE, count);
@@ -211,10 +210,10 @@ __aicore__ inline void CastGAndIsGemmaMode(const AscendC::LocalTensor<float> &ou
 }
 
 template <typename T, uint32_t precisionMode>
-__aicore__ inline void ComputeRmsNormFast(const AscendC::LocalTensor<T> &out, const AscendC::LocalTensor<float> &in,
-                                          float rms, const AscendC::LocalTensor<T> &gamma, uint32_t count,
-                                          const AscendC::LocalTensor<float> &tmp,
-                                          const AscendC::LocalTensor<float> &fp32_g)
+__aicore__ inline void ComputeRmsNormFast(const AscendC::LocalTensor<T>& out, const AscendC::LocalTensor<float>& in,
+                                          float rms, const AscendC::LocalTensor<T>& gamma, uint32_t count,
+                                          const AscendC::LocalTensor<float>& tmp,
+                                          const AscendC::LocalTensor<float>& fp32_g)
 {
     float value = 1.0;
     Duplicate(tmp, rms, count);
@@ -235,9 +234,9 @@ __aicore__ inline void ComputeRmsNormFast(const AscendC::LocalTensor<T> &out, co
 }
 
 template <bool WITH_BETA = true>
-__aicore__ inline void ComputeRmsNorm(const AscendC::LocalTensor<float> &out, const AscendC::LocalTensor<float> &in,
-                                      float rms, const AscendC::LocalTensor<half> &gamma,
-                                      const AscendC::LocalTensor<half> &beta, const AscendC::LocalTensor<float> &tmp,
+__aicore__ inline void ComputeRmsNorm(const AscendC::LocalTensor<float>& out, const AscendC::LocalTensor<float>& in,
+                                      float rms, const AscendC::LocalTensor<half>& gamma,
+                                      const AscendC::LocalTensor<half>& beta, const AscendC::LocalTensor<float>& tmp,
                                       uint32_t count)
 {
     Duplicate(tmp, rms, count);
@@ -255,9 +254,9 @@ __aicore__ inline void ComputeRmsNorm(const AscendC::LocalTensor<float> &out, co
 }
 
 template <typename T>
-__aicore__ inline void ComputeRmsNorm(const AscendC::LocalTensor<float> &out, const AscendC::LocalTensor<float> &in,
-                                      float reciprocal_of_rms, const AscendC::LocalTensor<T> &gamma,
-                                      const AscendC::LocalTensor<float> &tmp, const AscendC::LocalTensor<T> &res_out,
+__aicore__ inline void ComputeRmsNorm(const AscendC::LocalTensor<float>& out, const AscendC::LocalTensor<float>& in,
+                                      float reciprocal_of_rms, const AscendC::LocalTensor<T>& gamma,
+                                      const AscendC::LocalTensor<float>& tmp, const AscendC::LocalTensor<T>& res_out,
                                       uint32_t count)
 {
     Duplicate(tmp, reciprocal_of_rms, count);
@@ -271,15 +270,15 @@ __aicore__ inline void ComputeRmsNorm(const AscendC::LocalTensor<float> &out, co
 }
 
 template <typename T>
-__aicore__ inline void ComputeResidualAdd(const AscendC::LocalTensor<T> &out, const AscendC::LocalTensor<T> &in,
-                                          const AscendC::LocalTensor<T> &resIn, uint32_t count)
+__aicore__ inline void ComputeResidualAdd(const AscendC::LocalTensor<T>& out, const AscendC::LocalTensor<T>& in,
+                                          const AscendC::LocalTensor<T>& resIn, uint32_t count)
 {
     Add(out, in, resIn, count);
     AscendC::PipeBarrier<PIPE_V>();
 }
 
 template <typename T>
-__aicore__ inline void ComputeMean(const AscendC::LocalTensor<T> &out, const AscendC::LocalTensor<T> &in, T aveNum,
+__aicore__ inline void ComputeMean(const AscendC::LocalTensor<T>& out, const AscendC::LocalTensor<T>& in, T aveNum,
                                    uint32_t count)
 {
     Duplicate(out, aveNum, count);
@@ -294,9 +293,9 @@ __aicore__ inline void ComputeMean(const AscendC::LocalTensor<T> &out, const Asc
 }
 
 template <typename T>
-__aicore__ inline void ComputeLayerNorm(const AscendC::LocalTensor<float> &out, const AscendC::LocalTensor<float> &in,
-                                        const AscendC::LocalTensor<float> &mean, float eps, float aveNum,
-                                        const AscendC::LocalTensor<T> &gamma, const AscendC::LocalTensor<T> &beta,
+__aicore__ inline void ComputeLayerNorm(const AscendC::LocalTensor<float>& out, const AscendC::LocalTensor<float>& in,
+                                        const AscendC::LocalTensor<float>& mean, float eps, float aveNum,
+                                        const AscendC::LocalTensor<T>& gamma, const AscendC::LocalTensor<T>& beta,
                                         uint32_t count)
 {
     Sub(in, in, mean, count);
@@ -331,8 +330,8 @@ __aicore__ inline void ComputeLayerNorm(const AscendC::LocalTensor<float> &out, 
     AscendC::PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline void ComputeFp16ToI8Quant(const AscendC::LocalTensor<int8_t> &out,
-                                            const AscendC::LocalTensor<half> &in, const AscendC::LocalTensor<half> &tmp,
+__aicore__ inline void ComputeFp16ToI8Quant(const AscendC::LocalTensor<int8_t>& out,
+                                            const AscendC::LocalTensor<half>& in, const AscendC::LocalTensor<half>& tmp,
                                             half scale, half offset, half quantMin, uint32_t count)
 {
     Muls(tmp, in, scale, count);
@@ -342,9 +341,9 @@ __aicore__ inline void ComputeFp16ToI8Quant(const AscendC::LocalTensor<int8_t> &
     CastFromF16ToI8(out, tmp, quantMin, count);
 }
 
-__aicore__ inline void ComputeFp32ToI8Quant(const AscendC::LocalTensor<int8_t> &out,
-                                            const AscendC::LocalTensor<float> &in,
-                                            const AscendC::LocalTensor<half> &tmp, half scale, half offset,
+__aicore__ inline void ComputeFp32ToI8Quant(const AscendC::LocalTensor<int8_t>& out,
+                                            const AscendC::LocalTensor<float>& in,
+                                            const AscendC::LocalTensor<half>& tmp, half scale, half offset,
                                             half quantMin, uint32_t count)
 {
     CastFrom32To16(tmp, in, count);
@@ -352,9 +351,9 @@ __aicore__ inline void ComputeFp32ToI8Quant(const AscendC::LocalTensor<int8_t> &
     ComputeFp16ToI8Quant(out, tmp, tmp, scale, offset, quantMin, count);
 }
 
-__aicore__ inline void ComputeHighPrecisionFp32ToI8Quant(const AscendC::LocalTensor<int8_t> &out,
-                                                         const AscendC::LocalTensor<float> &in,
-                                                         const AscendC::LocalTensor<half> &tmp, float scale,
+__aicore__ inline void ComputeHighPrecisionFp32ToI8Quant(const AscendC::LocalTensor<int8_t>& out,
+                                                         const AscendC::LocalTensor<float>& in,
+                                                         const AscendC::LocalTensor<half>& tmp, float scale,
                                                          float offset, half quantMin, uint32_t count)
 {
     Muls(in, in, scale, count);
@@ -365,20 +364,20 @@ __aicore__ inline void ComputeHighPrecisionFp32ToI8Quant(const AscendC::LocalTen
     CastFromF16ToI8(out, tmp, quantMin, count);
 }
 
-__aicore__ inline void CopyGmTilingToUb(__ubuf__ uint8_t *&tilingInUb, const __gm__ uint8_t *tilingInGm,
-                                        size_t tilingSize, AscendC::TPipe *pipe)
+__aicore__ inline void CopyGmTilingToUb(__ubuf__ uint8_t*& tilingInUb, const __gm__ uint8_t* tilingInGm,
+                                        size_t tilingSize, AscendC::TPipe* pipe)
 {
     uint32_t roundTilingSize = RoundUp(tilingSize, 32);
     AscendC::TBuf<AscendC::TPosition::VECCALC> tilingBuf;
     AscendC::GlobalTensor<uint8_t> tilingGm;
 
-    tilingGm.SetGlobalBuffer((__gm__ uint8_t *)tilingInGm);
+    tilingGm.SetGlobalBuffer((__gm__ uint8_t*)tilingInGm);
     pipe->InitBuffer(tilingBuf, roundTilingSize);
 
     AscendC::LocalTensor<uint8_t> tilingUb = tilingBuf.Get<uint8_t>();
     AscendC::DataCopy(tilingUb, tilingGm, roundTilingSize);
 
-    tilingInUb = (__ubuf__ uint8_t *)tilingUb.GetPhyAddr();
+    tilingInUb = (__ubuf__ uint8_t*)tilingUb.GetPhyAddr();
 }
 
 template <typename T>

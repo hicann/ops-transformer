@@ -20,11 +20,11 @@
 #include "infer_shape_case_executor.h"
 
 namespace {
-constexpr int64_t kT = 128;          // total token count
-constexpr int64_t kN2 = 2;           // kv head_num
-constexpr int64_t kG = 2;            // group size (N1 = kN2 * kG)
-constexpr int64_t kQueryD = 192;     // query / key head dim (D1)
-constexpr int64_t kValueD = 128;     // value head dim (D2, intentionally != kQueryD)
+constexpr int64_t kT = 128;      // total token count
+constexpr int64_t kN2 = 2;       // kv head_num
+constexpr int64_t kG = 2;        // group size (N1 = kN2 * kG)
+constexpr int64_t kQueryD = 192; // query / key head dim (D1)
+constexpr int64_t kValueD = 128; // value head dim (D2, intentionally != kQueryD)
 constexpr int64_t kCompressBlockSize = 32;
 constexpr int64_t kCompressStride = 16;
 constexpr int64_t kSelectedBlockSize = 64;
@@ -33,7 +33,7 @@ constexpr int64_t kSelectedBlockCount = 16;
 using TensorDesc = gert::InfershapeContextPara::TensorDescription;
 using OpAttr = gert::InfershapeContextPara::OpAttr;
 
-std::vector<OpAttr> MakeAttrs(const std::string &layout)
+std::vector<OpAttr> MakeAttrs(const std::string& layout)
 {
     return {
         {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
@@ -86,12 +86,12 @@ std::vector<TensorDesc> MakeOutputs(ge::DataType outDtype)
 // Expected output shapes for the standard query (kN2, kT, kG, kQueryD) /
 // value (kT, kN2, kValueD) layout.
 const std::vector<std::vector<int64_t>> kExpectShapes = {
-    {kT, kN2 * kG, 8},                     // softmax_max
-    {kT, kN2 * kG, 8},                     // softmax_sum
-    {kN2, kT, kG, kValueD},                // attention_out: query with dim(3) replaced by value.dim(2)
-    {kN2, kT, kSelectedBlockCount},        // topk_indices_out
+    {kT, kN2* kG, 8},               // softmax_max
+    {kT, kN2* kG, 8},               // softmax_sum
+    {kN2, kT, kG, kValueD},         // attention_out: query with dim(3) replaced by value.dim(2)
+    {kN2, kT, kSelectedBlockCount}, // topk_indices_out
 };
-}  // namespace
+} // namespace
 
 class NsaCompressAttentionProto : public testing::Test {
 protected:
@@ -108,36 +108,28 @@ protected:
 
 TEST_F(NsaCompressAttentionProto, nsa_compress_attention_infershape_tnd_basic_fp16)
 {
-    gert::InfershapeContextPara para("NsaCompressAttention",
-                                     MakeInputs(ge::DT_FLOAT16),
-                                     MakeOutputs(ge::DT_FLOAT16),
+    gert::InfershapeContextPara para("NsaCompressAttention", MakeInputs(ge::DT_FLOAT16), MakeOutputs(ge::DT_FLOAT16),
                                      MakeAttrs("TND"));
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kExpectShapes);
 }
 
 TEST_F(NsaCompressAttentionProto, nsa_compress_attention_infershape_tnd_basic_bf16)
 {
-    gert::InfershapeContextPara para("NsaCompressAttention",
-                                     MakeInputs(ge::DT_BF16),
-                                     MakeOutputs(ge::DT_BF16),
+    gert::InfershapeContextPara para("NsaCompressAttention", MakeInputs(ge::DT_BF16), MakeOutputs(ge::DT_BF16),
                                      MakeAttrs("TND"));
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kExpectShapes);
 }
 
 TEST_F(NsaCompressAttentionProto, nsa_compress_attention_infershape_layout_lowercase)
 {
-    gert::InfershapeContextPara para("NsaCompressAttention",
-                                     MakeInputs(ge::DT_FLOAT16),
-                                     MakeOutputs(ge::DT_FLOAT16),
+    gert::InfershapeContextPara para("NsaCompressAttention", MakeInputs(ge::DT_FLOAT16), MakeOutputs(ge::DT_FLOAT16),
                                      MakeAttrs("tnd"));
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kExpectShapes);
 }
 
 TEST_F(NsaCompressAttentionProto, nsa_compress_attention_infershape_layout_mixed_case)
 {
-    gert::InfershapeContextPara para("NsaCompressAttention",
-                                     MakeInputs(ge::DT_FLOAT16),
-                                     MakeOutputs(ge::DT_FLOAT16),
+    gert::InfershapeContextPara para("NsaCompressAttention", MakeInputs(ge::DT_FLOAT16), MakeOutputs(ge::DT_FLOAT16),
                                      MakeAttrs("Tnd"));
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kExpectShapes);
 }
@@ -145,18 +137,14 @@ TEST_F(NsaCompressAttentionProto, nsa_compress_attention_infershape_layout_mixed
 TEST_F(NsaCompressAttentionProto, nsa_compress_attention_infershape_invalid_layout_bsh)
 {
     // Anything but "TND" (case-insensitive) must fail.
-    gert::InfershapeContextPara para("NsaCompressAttention",
-                                     MakeInputs(ge::DT_FLOAT16),
-                                     MakeOutputs(ge::DT_FLOAT16),
+    gert::InfershapeContextPara para("NsaCompressAttention", MakeInputs(ge::DT_FLOAT16), MakeOutputs(ge::DT_FLOAT16),
                                      MakeAttrs("BSH"));
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
 
 TEST_F(NsaCompressAttentionProto, nsa_compress_attention_infershape_invalid_layout_empty)
 {
-    gert::InfershapeContextPara para("NsaCompressAttention",
-                                     MakeInputs(ge::DT_FLOAT16),
-                                     MakeOutputs(ge::DT_FLOAT16),
+    gert::InfershapeContextPara para("NsaCompressAttention", MakeInputs(ge::DT_FLOAT16), MakeOutputs(ge::DT_FLOAT16),
                                      MakeAttrs(""));
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }

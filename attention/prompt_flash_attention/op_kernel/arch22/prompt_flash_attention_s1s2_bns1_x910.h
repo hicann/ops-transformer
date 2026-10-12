@@ -68,133 +68,133 @@ protected:
 
     __aicore__ inline void ProcessLastSouterLoopFinalRes();
 
-    __aicore__ inline void CheckRowInvalid(int64_t preTokens, int64_t nextTokens, PFAComputeParam *params);
+    __aicore__ inline void CheckRowInvalid(int64_t preTokens, int64_t nextTokens, PFAComputeParam* params);
 
     __aicore__ inline int64_t ClipSInnerToken(int64_t sInnerToken, int64_t minValue, int64_t maxValue);
 
-    __aicore__ inline void MsdRowSum(LocalTensor<FT> &dstUb, LocalTensor<FT> srcUb, uint32_t dealRowCount,
+    __aicore__ inline void MsdRowSum(LocalTensor<FT>& dstUb, LocalTensor<FT> srcUb, uint32_t dealRowCount,
                                      uint32_t columnCount, uint32_t actualColumnCount);
 
-    __aicore__ inline void MsdRowMax(LocalTensor<FT> &aMaxDstUb, LocalTensor<FT> &srcUb, uint32_t dealRowCount,
+    __aicore__ inline void MsdRowMax(LocalTensor<FT>& aMaxDstUb, LocalTensor<FT>& srcUb, uint32_t dealRowCount,
                                      uint32_t columnCount, uint32_t actualColumnCount);
 
-    __aicore__ inline void MsdAbsRowMax(LocalTensor<FT> &tmpAMaxRes, LocalTensor<FT> &srcUb, LocalTensor<FT> tmpAUb,
+    __aicore__ inline void MsdAbsRowMax(LocalTensor<FT>& tmpAMaxRes, LocalTensor<FT>& srcUb, LocalTensor<FT> tmpAUb,
                                         uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount);
 
-    __aicore__ inline void MsdRowMuls(LocalTensor<FT> &dstUb, LocalTensor<FT> &src0Ub, LocalTensor<FT> &src1Ub,
+    __aicore__ inline void MsdRowMuls(LocalTensor<FT>& dstUb, LocalTensor<FT>& src0Ub, LocalTensor<FT>& src1Ub,
                                       uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount);
 
-    __aicore__ inline void MsdAntiParamsMulByRow(LocalTensor<FT> &dstUb, LocalTensor<FT> &antiParams,
-                                                 LocalTensor<FT> &src1Ub, uint32_t dealRowCount, uint32_t columnCount,
+    __aicore__ inline void MsdAntiParamsMulByRow(LocalTensor<FT>& dstUb, LocalTensor<FT>& antiParams,
+                                                 LocalTensor<FT>& src1Ub, uint32_t dealRowCount, uint32_t columnCount,
                                                  uint32_t actualColumnCount);
 
-    __aicore__ inline void MsdFusedMulAddByRow(LocalTensor<FT> &dstLocal, LocalTensor<FT> &src0Local,
-                                               LocalTensor<FT> &src1Local, uint32_t dealRowCount, uint32_t columnCount,
+    __aicore__ inline void MsdFusedMulAddByRow(LocalTensor<FT>& dstLocal, LocalTensor<FT>& src0Local,
+                                               LocalTensor<FT>& src1Local, uint32_t dealRowCount, uint32_t columnCount,
                                                uint32_t actualColumnCount);
 
-    __aicore__ inline void MsdMulMaxAddSumByRow(LocalTensor<FT> &dstLocal, LocalTensor<FT> &src0RowMax,
-                                                LocalTensor<FT> &src1RowSum, uint32_t dealRowCount,
+    __aicore__ inline void MsdMulMaxAddSumByRow(LocalTensor<FT>& dstLocal, LocalTensor<FT>& src0RowMax,
+                                                LocalTensor<FT>& src1RowSum, uint32_t dealRowCount,
                                                 uint32_t columnCount, uint32_t actualColumnCount);
 
-    __aicore__ inline void MsdVecMulMat(LocalTensor<FT> &dstUb, LocalTensor<FT> &src0Ub, LocalTensor<FT> &src1Ub,
+    __aicore__ inline void MsdVecMulMat(LocalTensor<FT>& dstUb, LocalTensor<FT>& src0Ub, LocalTensor<FT>& src1Ub,
                                         uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount);
 
-    __aicore__ inline void Bmm1MsdCopyQueryGm2Ub(LocalTensor<FT> &queryUb, int64_t queryOffset, uint32_t dealRowCount,
+    __aicore__ inline void Bmm1MsdCopyQueryGm2Ub(LocalTensor<FT>& queryUb, int64_t queryOffset, uint32_t dealRowCount,
                                                  uint32_t columnCount, uint32_t actualColumnCount);
 
-    __aicore__ inline void MsdAIterExpand(GlobalTensor<int8_t> dstGm, LocalTensor<FT> &tmpA1, LocalTensor<FT> &tmpA2,
+    __aicore__ inline void MsdAIterExpand(GlobalTensor<int8_t> dstGm, LocalTensor<FT>& tmpA1, LocalTensor<FT>& tmpA2,
                                           uint32_t calcSize, bool isFirst, int64_t outOffset, int gmPingpong);
 
-    __aicore__ inline void MsdMatmulPreProcess(PFAComputeParam *params, GlobalTensor<KV_T> dstGm,
-                                               LocalTensor<FT> &msdMaxResUb, LocalTensor<FT> &srcUb,
-                                               LocalTensor<FT> &tmpAFloorUb, uint32_t startRow, uint32_t dealRowCount,
+    __aicore__ inline void MsdMatmulPreProcess(PFAComputeParam* params, GlobalTensor<KV_T> dstGm,
+                                               LocalTensor<FT>& msdMaxResUb, LocalTensor<FT>& srcUb,
+                                               LocalTensor<FT>& tmpAFloorUb, uint32_t startRow, uint32_t dealRowCount,
                                                uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong);
 
-    __aicore__ inline void Bmm1MsdCalcQueryRowSum(LocalTensor<FT> &queryUb, uint32_t startRow, uint32_t dealRowCount,
+    __aicore__ inline void Bmm1MsdCalcQueryRowSum(LocalTensor<FT>& queryUb, uint32_t startRow, uint32_t dealRowCount,
                                                   uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong);
 
-    __aicore__ inline void Bmm1MsdExpandPertoken(PFAComputeParam *params);
+    __aicore__ inline void Bmm1MsdExpandPertoken(PFAComputeParam* params);
 
-    __aicore__ inline void Bmm1MsdExpand(PFAComputeParam *params);
+    __aicore__ inline void Bmm1MsdExpand(PFAComputeParam* params);
 
-    __aicore__ inline void MsdMatmulResCombine(LocalTensor<FT> &bmmResUb, GlobalTensor<mmOutputType> srcGm,
+    __aicore__ inline void MsdMatmulResCombine(LocalTensor<FT>& bmmResUb, GlobalTensor<mmOutputType> srcGm,
                                                uint32_t expandLineCnt, uint32_t startRow, uint32_t dealRowCount,
                                                uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong);
 
     __aicore__ inline void MsdCopyAntiquantParamsPerToken(GlobalTensor<FT> srcGm, int64_t offset, uint32_t columnCount,
                                                           uint32_t actualColumnCount);
 
-    __aicore__ inline void Bmm1MsdSqueezeResMulOffsetKPerToken(PFAComputeParam *params, LocalTensor<FT> &mmResUb,
+    __aicore__ inline void Bmm1MsdSqueezeResMulOffsetKPerToken(PFAComputeParam* params, LocalTensor<FT>& mmResUb,
                                                                uint32_t startRow, uint32_t dealRowCount,
                                                                uint32_t columnCount, uint32_t actualColumnCount,
                                                                int gmPingpong);
 
-    __aicore__ inline void Bmm1MsdSqueezeResMulScaleKPerToken(PFAComputeParam *params, LocalTensor<FT> &mmResUb,
+    __aicore__ inline void Bmm1MsdSqueezeResMulScaleKPerToken(PFAComputeParam* params, LocalTensor<FT>& mmResUb,
                                                               uint32_t dealRowCount, uint32_t columnCount,
                                                               uint32_t actualColumnCount, int gmPingpong);
 
-    __aicore__ inline void Bmm1MsdSqueezePerToken(PFAComputeParam *params, LocalTensor<FT> &bmm1ResUb,
+    __aicore__ inline void Bmm1MsdSqueezePerToken(PFAComputeParam* params, LocalTensor<FT>& bmm1ResUb,
                                                   uint32_t startRow, uint32_t dealRowCount, int gmPingpong);
 
-    __aicore__ inline void Bmm1MsdSqueeze(PFAComputeParam *params, LocalTensor<FT> &bmm1ResUb, uint32_t startRow,
+    __aicore__ inline void Bmm1MsdSqueeze(PFAComputeParam* params, LocalTensor<FT>& bmm1ResUb, uint32_t startRow,
                                           uint32_t dealRowCount, int ubPingpong, int gmPingpong);
 
-    __aicore__ inline void Bmm2MsdExpandMm1ResMulScaleVPerToken(PFAComputeParam *params, LocalTensor<FT> &mmResUb,
+    __aicore__ inline void Bmm2MsdExpandMm1ResMulScaleVPerToken(PFAComputeParam* params, LocalTensor<FT>& mmResUb,
                                                                 uint32_t dealRowCount, uint32_t columnCount,
                                                                 uint32_t actualColumnCount, int gmPingpong);
 
-    __aicore__ inline void Bmm2MsdExpandResPerToken(PFAComputeParam *params, LocalTensor<FT> &mmResUb,
+    __aicore__ inline void Bmm2MsdExpandResPerToken(PFAComputeParam* params, LocalTensor<FT>& mmResUb,
                                                     GlobalTensor<KV_T> bmm1ExpandGm, uint32_t startRow,
                                                     uint32_t dealRowCount, uint32_t columnCount,
                                                     uint32_t actualColumnCount, int gmPingpong);
 
-    __aicore__ inline void Bmm2MsdExpandResMulOffsetVPerToken(PFAComputeParam *params, LocalTensor<FT> &mmResUb,
+    __aicore__ inline void Bmm2MsdExpandResMulOffsetVPerToken(PFAComputeParam* params, LocalTensor<FT>& mmResUb,
                                                               uint32_t startRow, uint32_t dealRowCount,
                                                               uint32_t columnCount, uint32_t actualColumnCount,
                                                               int gmPingpong);
 
-    __aicore__ inline void Bmm2MsdExpandPertoken(PFAComputeParam *params, LocalTensor<FT> &mmResUb,
+    __aicore__ inline void Bmm2MsdExpandPertoken(PFAComputeParam* params, LocalTensor<FT>& mmResUb,
                                                  GlobalTensor<KV_T> bmm1ExpandGm, uint32_t startRow,
                                                  uint32_t dealRowCount, int gmPingpong);
 
-    __aicore__ inline void Bmm2MsdExpand(PFAComputeParam *params, LocalTensor<FT> &mmResUb,
+    __aicore__ inline void Bmm2MsdExpand(PFAComputeParam* params, LocalTensor<FT>& mmResUb,
                                          GlobalTensor<KV_T> bmm1ExpandGm, uint32_t startRow, uint32_t dealRowCount,
                                          int gmPingpong);
 
-    __aicore__ inline void Bmm2MsdSqueezeResMulMax(LocalTensor<FT> &bmm2ResUb, uint32_t startRow, uint32_t dealRowCount,
+    __aicore__ inline void Bmm2MsdSqueezeResMulMax(LocalTensor<FT>& bmm2ResUb, uint32_t startRow, uint32_t dealRowCount,
                                                    uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong);
 
-    __aicore__ inline void Bmm2MsdSqueezePertoken(PFAComputeParam *params, LocalTensor<FT> &bmm2ResUb,
+    __aicore__ inline void Bmm2MsdSqueezePertoken(PFAComputeParam* params, LocalTensor<FT>& bmm2ResUb,
                                                   GlobalTensor<mmOutputType> bmm2ResGmDb, int gmPingpong);
 
-    __aicore__ inline void Bmm2MsdSqueeze(PFAComputeParam *params, LocalTensor<computeType> &bmm2ResUb,
+    __aicore__ inline void Bmm2MsdSqueeze(PFAComputeParam* params, LocalTensor<computeType>& bmm2ResUb,
                                           GlobalTensor<mmOutputType> bmm2ResGmDb, int gmPingpong);
 
-    __aicore__ inline void CopyAntiquantScale(LocalTensor<FT> &castUb, GlobalTensor<T> srcGm, int64_t offset);
+    __aicore__ inline void CopyAntiquantScale(LocalTensor<FT>& castUb, GlobalTensor<T> srcGm, int64_t offset);
 
     __aicore__ inline void VecAddMat(LocalTensor<FT> dstUb, LocalTensor<FT> src0Ub, LocalTensor<FT> src1Ub,
                                      uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount);
 
-    __aicore__ inline void MsdSoftmaxResPreProcess(PFAComputeParam *params, GlobalTensor<KV_T> dstGm,
+    __aicore__ inline void MsdSoftmaxResPreProcess(PFAComputeParam* params, GlobalTensor<KV_T> dstGm,
                                                    LocalTensor<FT> srcUb, LocalTensor<FT> tmpAFloorUb,
                                                    uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
                                                    uint32_t actualColumnCount, int gmPingpong);
 
-    __aicore__ inline void Bmm1MsdExpandPerchannel(PFAComputeParam *params);
+    __aicore__ inline void Bmm1MsdExpandPerchannel(PFAComputeParam* params);
 
-    __aicore__ inline void Bmm1MsdSqueezePerchannel(PFAComputeParam *params, LocalTensor<FT> &bmm1ResUb,
+    __aicore__ inline void Bmm1MsdSqueezePerchannel(PFAComputeParam* params, LocalTensor<FT>& bmm1ResUb,
                                                     uint32_t startRow, uint32_t dealRowCount, int gmPingpong);
 
-    __aicore__ inline void Bmm2MsdExpandPerchannel(PFAComputeParam *params, LocalTensor<FT> &bmm1ResUb,
-                                                   GlobalTensor<KV_T> &bmm1ExpandGm, uint32_t startRow,
+    __aicore__ inline void Bmm2MsdExpandPerchannel(PFAComputeParam* params, LocalTensor<FT>& bmm1ResUb,
+                                                   GlobalTensor<KV_T>& bmm1ExpandGm, uint32_t startRow,
                                                    uint32_t dealRowCount, int gmPingpong);
 
-    __aicore__ inline void Bmm2MsdSqueezePerchannel(PFAComputeParam *params, LocalTensor<FT> &bmm2ResUb,
-                                                    GlobalTensor<mmOutputType> &srcGM, int gmPingpong);
+    __aicore__ inline void Bmm2MsdSqueezePerchannel(PFAComputeParam* params, LocalTensor<FT>& bmm2ResUb,
+                                                    GlobalTensor<mmOutputType>& srcGM, int gmPingpong);
 
-    __aicore__ inline void Bmm2UpdateDivPerchannel(LocalTensor<FT> &bmm2ResLastUb);
+    __aicore__ inline void Bmm2UpdateDivPerchannel(LocalTensor<FT>& bmm2ResLastUb);
 
-    __aicore__ inline void Bmm2Antiquant(PFAComputeParam *params)
+    __aicore__ inline void Bmm2Antiquant(PFAComputeParam* params)
     {
         int step = this->tilingData->promptAttentionSingleCoreParams.kvAntiquantSInnerSize;
         int kvAntiquantLoopTimes = (params->singleProcessSInnerBmmTail + step - 1) / step;
@@ -269,10 +269,10 @@ protected:
                     }
                 } else {
                     if (this->isKvContinuous == 0) {
-                        ListTensorDesc valueListDesc((__gm__ void *)this->value_ptr);
-                        __gm__ uint8_t *tempValueGm =
-                            (__gm__ uint8_t *)valueListDesc.GetDataPtr<__gm__ uint8_t>(params->taskBatch);
-                        this->valueGm.SetGlobalBuffer((__gm__ KV_T *)tempValueGm);
+                        ListTensorDesc valueListDesc((__gm__ void*)this->value_ptr);
+                        __gm__ uint8_t* tempValueGm =
+                            (__gm__ uint8_t*)valueListDesc.GetDataPtr<__gm__ uint8_t>(params->taskBatch);
+                        this->valueGm.SetGlobalBuffer((__gm__ KV_T*)tempValueGm);
                     }
                     DataCopy(srcLocal, this->valueGm[vOffset], kvCopyParam);
                 }
@@ -290,7 +290,7 @@ protected:
                     kvCopyParam.blockCount =
                         remainBlockNum > kvComputeSInnerSize - i ? kvComputeSInnerSize - i : remainBlockNum;
                     uint64_t curOffset = 0;
-                    uint32_t blockId = *(reinterpret_cast<__gm__ int32_t *>(this->blocktable_ptr) +
+                    uint32_t blockId = *(reinterpret_cast<__gm__ int32_t*>(this->blocktable_ptr) +
                                          params->taskBatch * blockTableDim2 + blockTableIdx);
                     if (this->tilingData->promptAttentionBaseParams.PAlayoutType == 1) {
                         curOffset = blockId * blockSize * kvHeadNum * headSize + offsetInBlock * kvHeadNum * headSize +
@@ -334,7 +334,7 @@ protected:
         WaitFlag<HardEvent::MTE3_MTE2>(bmmWaitAntiEvt);
     }
 
-    __aicore__ inline void Bmm1Antiquant(PFAComputeParam *params)
+    __aicore__ inline void Bmm1Antiquant(PFAComputeParam* params)
     {
         int step = this->tilingData->promptAttentionSingleCoreParams.kvAntiquantSInnerSize;
         int kvAntiquantLoopTimes = (params->singleProcessSInnerBmmTail + step - 1) / step;
@@ -388,7 +388,7 @@ protected:
         WaitFlag<HardEvent::MTE3_MTE2>(bmmWaitAntiEvt);
     }
 
-    __aicore__ inline void Bmm1AntiquantEachLoop(PFAComputeParam *params, LocalTensor<T> scaleLocal,
+    __aicore__ inline void Bmm1AntiquantEachLoop(PFAComputeParam* params, LocalTensor<T> scaleLocal,
                                                  LocalTensor<T> offsetLocal, DataCopyParams kvCopyParam, int step,
                                                  int kvAntiquantLoopTimes, int headSize, int loopIdx)
     {
@@ -415,10 +415,10 @@ protected:
                 }
             } else {
                 if (this->isKvContinuous == 0) {
-                    ListTensorDesc keyListDesc((__gm__ void *)this->key_ptr);
-                    __gm__ uint8_t *tempKeyGm =
-                        (__gm__ uint8_t *)keyListDesc.GetDataPtr<__gm__ uint8_t>(params->taskBatch);
-                    this->keyGm.SetGlobalBuffer((__gm__ KV_T *)tempKeyGm);
+                    ListTensorDesc keyListDesc((__gm__ void*)this->key_ptr);
+                    __gm__ uint8_t* tempKeyGm =
+                        (__gm__ uint8_t*)keyListDesc.GetDataPtr<__gm__ uint8_t>(params->taskBatch);
+                    this->keyGm.SetGlobalBuffer((__gm__ KV_T*)tempKeyGm);
                 }
                 DataCopy(srcLocal, this->keyGm[kOffset], kvCopyParam);
             }
@@ -435,7 +435,7 @@ protected:
                 uint32_t remainBlockNum = blockSize - offsetInBlock;
                 kvCopyParam.blockCount =
                     remainBlockNum > kvComputeSInnerSize - i ? kvComputeSInnerSize - i : remainBlockNum;
-                uint32_t blockId = *(reinterpret_cast<__gm__ int32_t *>(this->blocktable_ptr) +
+                uint32_t blockId = *(reinterpret_cast<__gm__ int32_t*>(this->blocktable_ptr) +
                                      params->taskBatch * blockTableDim2 + blockTableIdx);
                 uint64_t curOffset = 0;
                 if (this->tilingData->promptAttentionBaseParams.PAlayoutType == 1) {
@@ -453,7 +453,7 @@ protected:
                               loopIdx);
     }
 
-    __aicore__ inline void Bmm1AntiquantEachFlow(PFAComputeParam *params, LocalTensor<int8_t> srcLocal,
+    __aicore__ inline void Bmm1AntiquantEachFlow(PFAComputeParam* params, LocalTensor<int8_t> srcLocal,
                                                  LocalTensor<T> dstLocal, LocalTensor<T> scaleLocal,
                                                  LocalTensor<T> offsetLocal, int step, int64_t kvComputeSInnerSize,
                                                  int headSize, int loopIdx)
@@ -484,7 +484,7 @@ protected:
         this->kvAntiquantDstQueue.FreeTensor(dstLocal);
     }
 
-    __aicore__ inline void Bmm1ComputeIterate(PFAComputeParam *params)
+    __aicore__ inline void Bmm1ComputeIterate(PFAComputeParam* params)
     {
         if (this->mm1SingleCoreNPrev != params->mm1SingleCoreN) {
             // Reduce the number of SetOrgShape calls to reduce the frequency of CV communications.
@@ -531,9 +531,9 @@ protected:
         }
 
         if (this->isKvContinuous == 0) {
-            ListTensorDesc keyListDesc((__gm__ void *)this->key_ptr);
-            __gm__ uint8_t *tempKeyGm = (__gm__ uint8_t *)keyListDesc.GetDataPtr<__gm__ uint8_t>(params->taskBatch);
-            this->keyGm.SetGlobalBuffer((__gm__ KV_T *)tempKeyGm);
+            ListTensorDesc keyListDesc((__gm__ void*)this->key_ptr);
+            __gm__ uint8_t* tempKeyGm = (__gm__ uint8_t*)keyListDesc.GetDataPtr<__gm__ uint8_t>(params->taskBatch);
+            this->keyGm.SetGlobalBuffer((__gm__ KV_T*)tempKeyGm);
         }
 
         if constexpr (PFAT::msdMode != MsdMode::MSD_ON and
@@ -559,7 +559,7 @@ protected:
         this->mm.template IterateAll<false>(this->bmm1ResGmDb[params->gmPingpong], false, false, true, params->fakeMsg);
     }
 
-    __aicore__ inline void Bmm1GmResCopyInUb(LocalTensor<computeType> &mmResUb, int64_t gmOffset, int32_t blockCount,
+    __aicore__ inline void Bmm1GmResCopyInUb(LocalTensor<computeType>& mmResUb, int64_t gmOffset, int32_t blockCount,
                                              int32_t blockLen, int32_t srcStride, int pingpong, int ubPingpong,
                                              uint32_t souterSize, bool unalign, uint32_t alignSInner,
                                              uint32_t unalignSInner, bool setCopyIn)
@@ -580,7 +580,7 @@ protected:
         SetFlag<HardEvent::MTE2_V>(this->bmm1ResCopyInEvent[ubPingpong]);
     }
 
-    __aicore__ inline void SoftmaxResCopyOut(LocalTensor<computeType> &mmResUb, int64_t gmOffset, int pingpong,
+    __aicore__ inline void SoftmaxResCopyOut(LocalTensor<computeType>& mmResUb, int64_t gmOffset, int pingpong,
                                              int ubPingpong, uint32_t singleProcessSInnerSizeNow)
     {
         if constexpr (PFAT::calcMode == OptimizationMode::HighPrecision || IsSameType<T, bfloat16_t>::value) {
@@ -601,19 +601,19 @@ protected:
 
         mmResUb = this->Bmm1Queue.template DeQue<computeType>();
 
-        PFAComputeParam *params = this->headParams;
+        PFAComputeParam* params = this->headParams;
 
         if constexpr (PFAT::calcMode == OptimizationMode::HighPrecision || IsSameType<T, bfloat16_t>::value) {
             // Under compact arrangement, the offset needs to be modified when copying fp16 data to fp32 global memory.
             GlobalTensor<T> tmpBmm1ResGmDb;
             tmpBmm1ResGmDb.SetGlobalBuffer(
-                reinterpret_cast<__gm__ T *>(this->bmm1ResGmDb[pingpong][gmOffset / 2].address_), mmResUb.GetSize());
+                reinterpret_cast<__gm__ T*>(this->bmm1ResGmDb[pingpong][gmOffset / 2].address_), mmResUb.GetSize());
             LocalTensor<T> tmpSoftmaxResUb = mmResUb.template ReinterpretCast<T>();
             DataCopy(tmpBmm1ResGmDb, tmpSoftmaxResUb, this->mm1GmUbCopyParam[ubPingpong]);
         } else {
             if constexpr (PFAT::MM_TYPE == MatMulType::MM_IBSHARE_NORM &&
                           PFAT::calcMode == OptimizationMode::HighPerformance) {
-                PFAComputeParam *params = this->headParams;
+                PFAComputeParam* params = this->headParams;
                 if (params->isLastInnerIter &&
                     params->singleProcessSInnerBmmTail <= SINGLE_PROCESS_SINNER_BMMTAIL_LIMIT) {
                     this->mm1GmUbCopyParam[ubPingpong].dstStride =
@@ -626,7 +626,7 @@ protected:
         SetFlag<HardEvent::MTE3_MTE2>(this->bmm1ResCopyOutEvent[ubPingpong]);
     }
 
-    __aicore__ inline void Res1VecCompute(PFAComputeParam *params)
+    __aicore__ inline void Res1VecCompute(PFAComputeParam* params)
     {
         if (params->fakeMsg) {
             return;
@@ -821,7 +821,7 @@ protected:
     __aicore__ inline void Bmm2ComputeIterate(const uint32_t BIdx, const uint32_t NIdx,
                                               const uint32_t sInnerOffsetDataSize)
     {
-        PFAComputeParam *params = this->headParams;
+        PFAComputeParam* params = this->headParams;
 
         uint32_t mm2KaStride = params->mm1SingleCoreN;
         if constexpr (PFAT::MM_TYPE == MatMulType::MM_IBSHARE_NORM &&
@@ -879,7 +879,7 @@ protected:
             uint64_t gmSize = this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize *
                               this->tilingData->promptAttentionSingleCoreParams.singleProcessSInnerSize;
             GlobalTensor<T> tmpBmm1ResGmDb;
-            tmpBmm1ResGmDb.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(this->bmm1ResGmDb[params->gmPingpong].address_),
+            tmpBmm1ResGmDb.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(this->bmm1ResGmDb[params->gmPingpong].address_),
                                            gmSize);
             this->bmm2.SetTensorA(tmpBmm1ResGmDb);
         } else if constexpr (PFAT::msdMode == MsdMode::MSD_ON) {
@@ -889,9 +889,9 @@ protected:
         }
 
         if (this->isKvContinuous == 0) {
-            ListTensorDesc valueListDesc((__gm__ void *)this->value_ptr);
-            __gm__ uint8_t *tempValueGm = (__gm__ uint8_t *)valueListDesc.GetDataPtr<__gm__ uint8_t>(params->taskBatch);
-            this->valueGm.SetGlobalBuffer((__gm__ KV_T *)tempValueGm);
+            ListTensorDesc valueListDesc((__gm__ void*)this->value_ptr);
+            __gm__ uint8_t* tempValueGm = (__gm__ uint8_t*)valueListDesc.GetDataPtr<__gm__ uint8_t>(params->taskBatch);
+            this->valueGm.SetGlobalBuffer((__gm__ KV_T*)tempValueGm);
         }
 
         if constexpr (PFAT::msdMode != MsdMode::MSD_ON and
@@ -917,8 +917,8 @@ protected:
                                               params->fakeMsg);
     }
 
-    __aicore__ inline LocalTensor<computeType> AllocBmm2UbRes(PFAComputeParam *params, bool useTbuf,
-                                                              uint32_t &resShapeSize)
+    __aicore__ inline LocalTensor<computeType> AllocBmm2UbRes(PFAComputeParam* params, bool useTbuf,
+                                                              uint32_t& resShapeSize)
     {
         LocalTensor<computeType> bmm2ResUb;
         // Optimize for small Q_S using the actual required Q_S.
@@ -937,7 +937,7 @@ protected:
         return bmm2ResUb;
     }
 
-    __aicore__ inline void CopyParamsAttrOutOfInnerLoop(PFAComputeParam *dst, PFAComputeParam *src)
+    __aicore__ inline void CopyParamsAttrOutOfInnerLoop(PFAComputeParam* dst, PFAComputeParam* src)
     {
         dst->isFirstInnerIter = src->isFirstInnerIter;
         dst->isSecondInnerIter = src->isSecondInnerIter;
@@ -1129,7 +1129,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::PseOrMaskCopyIn(i
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1VecInputCopyIn()
 {
-    PFAComputeParam *params = this->headParams;
+    PFAComputeParam* params = this->headParams;
     if (params->fakeMsg) {
         return;
     }
@@ -1205,7 +1205,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SparseBandElewise
                                                                                         uint32_t souterSize,
                                                                                         int64_t attenMaskOffsetPre)
 {
-    PFAComputeParam *params = this->headParams;
+    PFAComputeParam* params = this->headParams;
     if (params->sparseBandSelect0) { // Select 0 part
         this->template ElewiseCompute<U>(this->mmResUb[ubPingpong], souterSize, params->singleProcessSInnerSizeNow,
                                          params->maskCopyInCol, params->useMask, this->bmm1ResCopyInEvent[ubPingpong],
@@ -1227,7 +1227,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SparseBandElewise
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdRowSum(LocalTensor<FT> &dstUb, LocalTensor<FT> srcUb,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdRowSum(LocalTensor<FT>& dstUb, LocalTensor<FT> srcUb,
                                                                          uint32_t dealRowCount, uint32_t columnCount,
                                                                          uint32_t actualColumnCount)
 {
@@ -1261,8 +1261,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdRowSum(LocalTe
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdRowMax(LocalTensor<FT> &aMaxDstUb,
-                                                                         LocalTensor<FT> &srcUb, uint32_t dealRowCount,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdRowMax(LocalTensor<FT>& aMaxDstUb,
+                                                                         LocalTensor<FT>& srcUb, uint32_t dealRowCount,
                                                                          uint32_t columnCount,
                                                                          uint32_t actualColumnCount)
 {
@@ -1296,8 +1296,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdRowMax(LocalTe
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdAbsRowMax(LocalTensor<FT> &tmpAMaxRes,
-                                                                            LocalTensor<FT> &srcUb,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdAbsRowMax(LocalTensor<FT>& tmpAMaxRes,
+                                                                            LocalTensor<FT>& srcUb,
                                                                             LocalTensor<FT> tmpAUb,
                                                                             uint32_t dealRowCount, uint32_t columnCount,
                                                                             uint32_t actualColumnCount)
@@ -1311,9 +1311,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdAbsRowMax(Loca
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdRowMuls(LocalTensor<FT> &dstUb,
-                                                                          LocalTensor<FT> &src0Ub,
-                                                                          LocalTensor<FT> &src1Ub,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdRowMuls(LocalTensor<FT>& dstUb,
+                                                                          LocalTensor<FT>& src0Ub,
+                                                                          LocalTensor<FT>& src1Ub,
                                                                           uint32_t dealRowCount, uint32_t columnCount,
                                                                           uint32_t actualColumnCount)
 {
@@ -1376,7 +1376,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdRowMuls(LocalT
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdAntiParamsMulByRow(
-    LocalTensor<FT> &dstUb, LocalTensor<FT> &antiParams, LocalTensor<FT> &src1Ub, uint32_t dealRowCount,
+    LocalTensor<FT>& dstUb, LocalTensor<FT>& antiParams, LocalTensor<FT>& src1Ub, uint32_t dealRowCount,
     uint32_t columnCount, uint32_t actualColumnCount)
 {
     uint32_t dtype_mask = this->MSD_REPEAT_ELEMENT_NUM;
@@ -1418,7 +1418,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdAntiParamsMulB
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdFusedMulAddByRow(
-    LocalTensor<FT> &dstLocal, LocalTensor<FT> &src0Local, LocalTensor<FT> &src1Local, uint32_t dealRowCount,
+    LocalTensor<FT>& dstLocal, LocalTensor<FT>& src0Local, LocalTensor<FT>& src1Local, uint32_t dealRowCount,
     uint32_t columnCount, uint32_t actualColumnCount)
 {
     uint32_t dtype_mask = this->MSD_REPEAT_ELEMENT_NUM;
@@ -1462,7 +1462,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdFusedMulAddByR
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdMulMaxAddSumByRow(
-    LocalTensor<FT> &dstLocal, LocalTensor<FT> &src0RowMax, LocalTensor<FT> &src1RowSum, uint32_t dealRowCount,
+    LocalTensor<FT>& dstLocal, LocalTensor<FT>& src0RowMax, LocalTensor<FT>& src1RowSum, uint32_t dealRowCount,
     uint32_t columnCount, uint32_t actualColumnCount)
 {
     uint32_t dtype_mask = this->MSD_REPEAT_ELEMENT_NUM;
@@ -1503,9 +1503,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdMulMaxAddSumBy
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdVecMulMat(LocalTensor<FT> &dstUb,
-                                                                            LocalTensor<FT> &src0Ub,
-                                                                            LocalTensor<FT> &src1Ub,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdVecMulMat(LocalTensor<FT>& dstUb,
+                                                                            LocalTensor<FT>& src0Ub,
+                                                                            LocalTensor<FT>& src1Ub,
                                                                             uint32_t dealRowCount, uint32_t columnCount,
                                                                             uint32_t actualColumnCount)
 {
@@ -1549,7 +1549,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdVecMulMat(Loca
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdCopyQueryGm2Ub(LocalTensor<FT> &queryUb,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdCopyQueryGm2Ub(LocalTensor<FT>& queryUb,
                                                                                      int64_t queryOffset,
                                                                                      uint32_t dealRowCount,
                                                                                      uint32_t columnCount,
@@ -1584,8 +1584,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdCopyQueryG
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdAIterExpand(GlobalTensor<int8_t> dstGm,
-                                                                              LocalTensor<FT> &tmpA1,
-                                                                              LocalTensor<FT> &tmpA2, uint32_t calcSize,
+                                                                              LocalTensor<FT>& tmpA1,
+                                                                              LocalTensor<FT>& tmpA2, uint32_t calcSize,
                                                                               bool isFirst, int64_t outOffset,
                                                                               int gmPingpong)
 {
@@ -1623,8 +1623,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdAIterExpand(Gl
 // 𝑄2=𝑟𝑜𝑢𝑛𝑑((127/𝑄𝑚𝑎𝑥×𝑄 −𝑄1)×254)
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdMatmulPreProcess(
-    PFAComputeParam *params, GlobalTensor<KV_T> dstGm, LocalTensor<FT> &msdMaxResUb, LocalTensor<FT> &srcUb,
-    LocalTensor<FT> &tmpAFloorUb, uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
+    PFAComputeParam* params, GlobalTensor<KV_T> dstGm, LocalTensor<FT>& msdMaxResUb, LocalTensor<FT>& srcUb,
+    LocalTensor<FT>& tmpAFloorUb, uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
     uint32_t actualColumnCount, int gmPingpong)
 {
     int64_t actualSeqLength = params->actualSeqLengthPerBatch;
@@ -1652,7 +1652,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdMatmulPreProce
 // Calc ∑𝐴[𝑗]
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdCalcQueryRowSum(
-    LocalTensor<FT> &queryUb, uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
+    LocalTensor<FT>& queryUb, uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
     uint32_t actualColumnCount, int gmPingpong)
 {
     int64_t baseOffset = startRow * this->MSD_BLOCK_ELEMENT_NUM;
@@ -1667,7 +1667,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdCalcQueryR
 
 // Copy Query 2 Ub, Calc ∑𝐴[𝑗], expend to queryMsdExpandGm
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpandPertoken(PFAComputeParam *params)
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpandPertoken(PFAComputeParam* params)
 {
     uint32_t startRow = 0;
     uint32_t dealRowCount = params->actualSeqLengthPerBatch;
@@ -1694,7 +1694,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpandPert
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpand(PFAComputeParam *params)
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpand(PFAComputeParam* params)
 {
     if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 0) {
         Bmm1MsdExpandPerchannel(params);
@@ -1706,7 +1706,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpand(PFA
 // 𝑆′=(𝑆1+𝑆2×1/254 +S3×1/254^2)×1/127
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdMatmulResCombine(
-    LocalTensor<FT> &bmmResUb, GlobalTensor<mmOutputType> srcGm, uint32_t expandLineCnt, uint32_t startRow,
+    LocalTensor<FT>& bmmResUb, GlobalTensor<mmOutputType> srcGm, uint32_t expandLineCnt, uint32_t startRow,
     uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong)
 {
     uint32_t expandOffset = expandLineCnt * columnCount;
@@ -1777,7 +1777,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdCopyAntiquantP
 // 𝑺=𝑺'×𝑄𝑚𝑎𝑥 + 𝑂𝑓𝑓𝑠𝑒𝑡𝐾×∑Q[𝑗]
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueezeResMulOffsetKPerToken(
-    PFAComputeParam *params, LocalTensor<FT> &mmResUb, uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
+    PFAComputeParam* params, LocalTensor<FT>& mmResUb, uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
     uint32_t actualColumnCount, int gmPingpong)
 {
     LocalTensor<FT> aMax = this->msdMaxBmm1Ub[gmPingpong][startRow * this->MSD_BLOCK_ELEMENT_NUM];
@@ -1808,7 +1808,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueezeRes
 // 𝑚𝑚1𝑅𝑒𝑠=𝑆𝑐𝑎𝑙𝑒𝐾×𝑺
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueezeResMulScaleKPerToken(
-    PFAComputeParam *params, LocalTensor<FT> &mmResUb, uint32_t dealRowCount, uint32_t columnCount,
+    PFAComputeParam* params, LocalTensor<FT>& mmResUb, uint32_t dealRowCount, uint32_t columnCount,
     uint32_t actualColumnCount, int gmPingpong)
 {
     MsdCopyAntiquantParamsPerToken(this->keyAntiquantScaleGmPerToken, params->antiqParamOffsetPerToken, columnCount,
@@ -1823,7 +1823,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueezeRes
 // 𝑚𝑚1𝑅𝑒𝑠 = 𝑆𝑐𝑎𝑙𝑒𝐾×(𝑺 + 𝑂𝑓𝑓𝑠𝑒𝑡𝐾×∑𝐴[𝑗])
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueezePerToken(
-    PFAComputeParam *params, LocalTensor<FT> &bmm1ResUb, uint32_t startRow, uint32_t dealRowCount, int gmPingpong)
+    PFAComputeParam* params, LocalTensor<FT>& bmm1ResUb, uint32_t startRow, uint32_t dealRowCount, int gmPingpong)
 {
     uint32_t expandLineCnt = params->singleProcessSOuterSize;
     uint32_t columnCount = params->singleProcessSInnerSizeNow;
@@ -1845,8 +1845,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueezePer
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueeze(PFAComputeParam *params,
-                                                                              LocalTensor<FT> &bmm1ResUb,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueeze(PFAComputeParam* params,
+                                                                              LocalTensor<FT>& bmm1ResUb,
                                                                               uint32_t startRow, uint32_t dealRowCount,
                                                                               int ubPingpong, int gmPingpong)
 {
@@ -1861,7 +1861,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueeze(PF
 // 𝐴′=𝐴×𝑆𝑐𝑎𝑙𝑒𝑉
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandMm1ResMulScaleVPerToken(
-    PFAComputeParam *params, LocalTensor<FT> &mmResUb, uint32_t dealRowCount, uint32_t columnCount,
+    PFAComputeParam* params, LocalTensor<FT>& mmResUb, uint32_t dealRowCount, uint32_t columnCount,
     uint32_t actualColumnCount, int gmPingpong)
 {
     MsdCopyAntiquantParamsPerToken(this->valueAntiquantScaleGmPerToken, params->antiqParamOffsetPerToken, columnCount,
@@ -1876,7 +1876,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandMm1R
 // Expend 𝐴′ to vec1ResGm
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandResPerToken(
-    PFAComputeParam *params, LocalTensor<FT> &mmResUb, GlobalTensor<KV_T> bmm1ExpandGm, uint32_t startRow,
+    PFAComputeParam* params, LocalTensor<FT>& mmResUb, GlobalTensor<KV_T> bmm1ExpandGm, uint32_t startRow,
     uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong)
 {
     LocalTensor<FT> tmpAFloorUb = this->msdTmpMm2Buff.template Get<FT>();
@@ -1890,7 +1890,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandResP
 // 𝑃=𝐴′×𝑂𝑓𝑓𝑠𝑒𝑡𝑉; ∑P[𝑗]
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandResMulOffsetVPerToken(
-    PFAComputeParam *params, LocalTensor<FT> &mmResUb, uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
+    PFAComputeParam* params, LocalTensor<FT>& mmResUb, uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
     uint32_t actualColumnCount, int gmPingpong)
 {
     if (!this->msdIsVOffsetExist) {
@@ -1925,7 +1925,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandResM
 // 𝐴′=𝐴×𝑆𝑐𝑎𝑙𝑒𝑉; Expand 𝐴′; Calc 𝑃=𝐴′×𝑂𝑓𝑓𝑠𝑒𝑡𝑉
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandPertoken(
-    PFAComputeParam *params, LocalTensor<FT> &mmResUb, GlobalTensor<KV_T> bmm1ExpandGm, uint32_t startRow,
+    PFAComputeParam* params, LocalTensor<FT>& mmResUb, GlobalTensor<KV_T> bmm1ExpandGm, uint32_t startRow,
     uint32_t dealRowCount, int gmPingpong)
 {
     uint32_t columnCount = params->singleProcessSInnerSizeNow;
@@ -1944,8 +1944,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandPert
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpand(PFAComputeParam *params,
-                                                                             LocalTensor<FT> &mmResUb,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpand(PFAComputeParam* params,
+                                                                             LocalTensor<FT>& mmResUb,
                                                                              GlobalTensor<KV_T> bmm1ExpandGm,
                                                                              uint32_t startRow, uint32_t dealRowCount,
                                                                              int gmPingpong)
@@ -1960,7 +1960,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpand(PFA
 // 𝑏𝑚𝑚2𝑅𝑒𝑠𝑈𝑏 = 𝑏𝑚𝑚2𝑅𝑒𝑠𝑈𝑏∗𝐴′𝑚𝑎𝑥 + 𝑃
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueezeResMulMax(
-    LocalTensor<FT> &bmm2ResUb, uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
+    LocalTensor<FT>& bmm2ResUb, uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
     uint32_t actualColumnCount, int gmPingpong)
 {
     int64_t baseOffset = startRow * this->MSD_BLOCK_ELEMENT_NUM;
@@ -1977,7 +1977,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueezeRes
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueezePertoken(
-    PFAComputeParam *params, LocalTensor<FT> &bmm2ResUb, GlobalTensor<mmOutputType> bmm2ResGmDb, int gmPingpong)
+    PFAComputeParam* params, LocalTensor<FT>& bmm2ResUb, GlobalTensor<mmOutputType> bmm2ResGmDb, int gmPingpong)
 {
     uint32_t startRow = 0;
     uint32_t dealRowCount = params->actualSeqLengthPerBatch;
@@ -1994,8 +1994,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueezePer
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueeze(PFAComputeParam *params,
-                                                                              LocalTensor<computeType> &bmm2ResUb,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueeze(PFAComputeParam* params,
+                                                                              LocalTensor<computeType>& bmm2ResUb,
                                                                               GlobalTensor<mmOutputType> bmm2ResGmDb,
                                                                               int gmPingpong)
 {
@@ -2007,7 +2007,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueeze(PF
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::CopyAntiquantScale(LocalTensor<FT> &castUb,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::CopyAntiquantScale(LocalTensor<FT>& castUb,
                                                                                   GlobalTensor<T> srcGm, int64_t offset)
 {
     int headDimAlign = this->tilingData->promptAttentionBaseParams.alignedHeadSize;
@@ -2067,7 +2067,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::VecAddMat(LocalTe
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdSoftmaxResPreProcess(
-    PFAComputeParam *params, GlobalTensor<KV_T> dstGm, LocalTensor<FT> srcUb, LocalTensor<FT> tmpAFloorUb,
+    PFAComputeParam* params, GlobalTensor<KV_T> dstGm, LocalTensor<FT> srcUb, LocalTensor<FT> tmpAFloorUb,
     uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong)
 {
     int64_t actualSeqLength = params->actualSeqLengthPerBatch;
@@ -2089,7 +2089,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdSoftmaxResPreP
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpandPerchannel(PFAComputeParam *params)
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpandPerchannel(PFAComputeParam* params)
 {
     // copy scale
     int headSize = this->tilingData->promptAttentionBaseParams.alignedHeadSize;
@@ -2140,7 +2140,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpandPerc
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueezePerchannel(
-    PFAComputeParam *params, LocalTensor<FT> &bmm1ResUb, uint32_t startRow, uint32_t dealRowCount, int gmPingpong)
+    PFAComputeParam* params, LocalTensor<FT>& bmm1ResUb, uint32_t startRow, uint32_t dealRowCount, int gmPingpong)
 {
     uint32_t expandLineCnt = params->singleProcessSOuterSize;
     uint32_t columnCount = params->singleProcessSInnerSizeNow;
@@ -2159,7 +2159,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueezePer
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandPerchannel(
-    PFAComputeParam *params, LocalTensor<FT> &bmm1ResUb, GlobalTensor<KV_T> &bmm1ExpandGm, uint32_t startRow,
+    PFAComputeParam* params, LocalTensor<FT>& bmm1ResUb, GlobalTensor<KV_T>& bmm1ExpandGm, uint32_t startRow,
     uint32_t dealRowCount, int gmPingpong)
 {
     LocalTensor<FT> aFloorUb = this->msdTmpMm2Buff.template Get<FT>();
@@ -2174,7 +2174,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandPerc
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueezePerchannel(
-    PFAComputeParam *params, LocalTensor<FT> &bmm2ResUb, GlobalTensor<mmOutputType> &srcGM, int gmPingpong)
+    PFAComputeParam* params, LocalTensor<FT>& bmm2ResUb, GlobalTensor<mmOutputType>& srcGM, int gmPingpong)
 {
     // S1 * D
     uint32_t startRow = 0;
@@ -2187,9 +2187,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueezePer
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2UpdateDivPerchannel(LocalTensor<FT> &bmm2ResLastUb)
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2UpdateDivPerchannel(LocalTensor<FT>& bmm2ResLastUb)
 {
-    PFAComputeParam *params = this->preHeadParams;
+    PFAComputeParam* params = this->preHeadParams;
     uint32_t dealRowCount = params->singleProcessSOuterSize;
     uint32_t columnCount = this->tilingData->promptAttentionBaseParams.headSize;
     uint32_t actualColumnCount = columnCount;
@@ -2221,7 +2221,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2UpdateDivPerc
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1ResDoVecBmm2Compute()
 {
-    PFAComputeParam *params = this->headParams;
+    PFAComputeParam* params = this->headParams;
     LocalTensor<computeType> bmm2ResUb;
     uint32_t resShapeSize;
 
@@ -2312,7 +2312,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1ResDoVecBmm2C
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::CheckRowInvalid(int64_t preTokens, int64_t nextTokens,
-                                                                               PFAComputeParam *params)
+                                                                               PFAComputeParam* params)
 {
     // 1. nextToken cross souter   2. preToken cross souter   3. preToken cross souter 2
     //  |____            |          |____  \        |           |___\_   \      |
@@ -2344,7 +2344,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SInnerLoopFunc(in
                                                                               int64_t preTokens, int64_t nextTokens)
 {
     // params passing on references. When tailParams, params also update accordingly.
-    PFAComputeParam *&params =
+    PFAComputeParam*& params =
         this->tailParams; // Configure new tasks, which will be placed at the end of the queue. Use tailParams.
     int32_t basicSInnerSize = (int32_t)(params->singleProcessSInnerSize);
     int32_t startIndex = sInnerFirstToken / basicSInnerSize;
@@ -2488,7 +2488,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SInnerLoopFunc(in
 
             // tail join the queue
             this->tailId = (this->tailId + 1) % PFA_PARAMS_QUEUE_CAPBABILITY;
-            PFAComputeParam *nextTailParams = &this->pfaParamsQueue[this->tailId];
+            PFAComputeParam* nextTailParams = &this->pfaParamsQueue[this->tailId];
             if ((sInnerLoopIdx - startIndex) < PFA_PARAMS_QUEUE_CAPBABILITY - 1) {
                 // Overwrite the old head parameter. The next tail is not assigned a value outside the Inner loop and
                 // has no parameters. We need to copy the parameters that will be recorded outside the loop.
@@ -2498,7 +2498,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SInnerLoopFunc(in
             this->tailParams = nextTailParams;
         } else { // tail join the queue
             this->tailId = (this->tailId + 1) % PFA_PARAMS_QUEUE_CAPBABILITY;
-            PFAComputeParam *nextTailParams = &this->pfaParamsQueue[this->tailId];
+            PFAComputeParam* nextTailParams = &this->pfaParamsQueue[this->tailId];
             // Overwrite the old head parameter. The next tail is not assigned a value outside the Inner loop and has no
             // parameters. We need to copy the parameters that will be recorded outside the loop.
             this->CopyParamsAttrOutOfInnerLoop(nextTailParams, this->tailParams);
@@ -2521,8 +2521,8 @@ __aicore__ inline int64_t PromptFlashAttentionS1s2Bns1X910<PFAT>::ClipSInnerToke
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCoreSInnerLoop()
 {
-    PFAComputeParam *params = this->headParams;
-    PFAComputeParam *nextParams = &(this->pfaParamsQueue[(this->headId + 1) % PFA_PARAMS_QUEUE_CAPBABILITY]);
+    PFAComputeParam* params = this->headParams;
+    PFAComputeParam* nextParams = &(this->pfaParamsQueue[(this->headId + 1) % PFA_PARAMS_QUEUE_CAPBABILITY]);
 
     // mm1 compute
     if (this->isGlobalFirstCompute) {
@@ -2592,7 +2592,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCore(u
     bool isLast = false;
     int64_t actualSeqLengthsIdx = 0;
     // You must pass the reference assignment params because the head address is updated internally.
-    PFAComputeParam *&params = this->tailParams;
+    PFAComputeParam*& params = this->tailParams;
     if constexpr (PFAT::enablePrefix) {
         this->actualKVPrefixLen = this->tilingData->promptAttentionBaseParams.isActualSharedPrefixLenNull ?
                                       this->tilingData->promptAttentionBaseParams.prefixSeqInnerSize :
@@ -2611,7 +2611,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCore(u
         }
         for (int sIdx = sIdStart; sIdx < tmpSLoopEnd; sIdx++) {
             if (this->isKvContinuous == 0) {
-                ListTensorDesc keyListTensorDesc((__gm__ void *)this->key_ptr);
+                ListTensorDesc keyListTensorDesc((__gm__ void*)this->key_ptr);
 
                 uint64_t dimInfo[4];
                 this->kvTensorDesc.SetShapeAddr(&dimInfo[0]);
@@ -2733,7 +2733,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCoreBa
     int64_t actualSeqLengthsIdx = this->isActualLenDimsNull ? this->tilingData->promptAttentionBaseParams.seqSize :
                                                               this->actualSeqLengthsGm.GetValue(sIdx);
 
-    PFAComputeParam *&params = this->tailParams;
+    PFAComputeParam*& params = this->tailParams;
     if constexpr (PFAT::enablePrefix) {
         this->actualKVPrefixLen = this->tilingData->promptAttentionBaseParams.isActualSharedPrefixLenNull ?
                                       this->tilingData->promptAttentionBaseParams.prefixSeqInnerSize :
@@ -2829,39 +2829,38 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::InitEachCoreWorks
     int64_t mm2ResSize = this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize *
                          this->tilingData->promptAttentionBaseParams.headSize * msdExpandsize;
     this->bmm1ResGmDb[0].SetGlobalBuffer(
-        (__gm__ mmOutputType *)this
+        (__gm__ mmOutputType*)this
             ->workspaceGm[blockNum * this->spmTmpSize + coreIdx * mm1ResSize * reuseWorkspaceRatio]
             .GetPhyAddr());
     this->bmm1ResGmDb[1].SetGlobalBuffer(
-        (__gm__ mmOutputType *)this
+        (__gm__ mmOutputType*)this
             ->workspaceGm[blockNum * this->spmTmpSize + coreIdx * mm1ResSize * reuseWorkspaceRatio + mm1ResSize]
             .GetPhyAddr());
     if constexpr (IsSameType<T, int8_t>::value) {
         this->quant1ResGmDb[0].SetGlobalBuffer(
-            (__gm__ int8_t *)this->workspaceGm[blockNum * this->spmTmpSize + coreIdx * mm1ResSize * reuseWorkspaceRatio]
+            (__gm__ int8_t*)this->workspaceGm[blockNum * this->spmTmpSize + coreIdx * mm1ResSize * reuseWorkspaceRatio]
                 .GetPhyAddr());
         this->quant1ResGmDb[1].SetGlobalBuffer(
-            (__gm__ int8_t *)this
+            (__gm__ int8_t*)this
                 ->workspaceGm[blockNum * this->spmTmpSize + coreIdx * mm1ResSize * reuseWorkspaceRatio + mm1ResSize]
                 .GetPhyAddr());
     }
 
     if constexpr (PFAT::msdMode == MsdMode::MSD_ON) {
         this->bmm1ExpandGm[0].SetGlobalBuffer(
-            (__gm__ KV_T *)this->workspaceGm[blockNum * this->spmTmpSize + coreIdx * mm1ResSize * reuseWorkspaceRatio]
+            (__gm__ KV_T*)this->workspaceGm[blockNum * this->spmTmpSize + coreIdx * mm1ResSize * reuseWorkspaceRatio]
                 .GetPhyAddr());
         this->bmm1ExpandGm[1].SetGlobalBuffer(
-            (__gm__ KV_T *)this
+            (__gm__ KV_T*)this
                 ->workspaceGm[blockNum * this->spmTmpSize + coreIdx * mm1ResSize * reuseWorkspaceRatio + mm1ResSize]
                 .GetPhyAddr());
     }
 
     int64_t buff_offset = blockNum * (this->spmTmpSize + mm1ResSize * reuseWorkspaceRatio);
     this->bmm2ResGmDb[0].SetGlobalBuffer(
-        (__gm__ mmOutputType *)this->workspaceGm[buff_offset + coreIdx * mm2ResSize * reuseWorkspaceRatio]
-            .GetPhyAddr());
+        (__gm__ mmOutputType*)this->workspaceGm[buff_offset + coreIdx * mm2ResSize * reuseWorkspaceRatio].GetPhyAddr());
     this->bmm2ResGmDb[1].SetGlobalBuffer(
-        (__gm__ mmOutputType *)this->workspaceGm[buff_offset + coreIdx * mm2ResSize * reuseWorkspaceRatio + mm2ResSize]
+        (__gm__ mmOutputType*)this->workspaceGm[buff_offset + coreIdx * mm2ResSize * reuseWorkspaceRatio + mm2ResSize]
             .GetPhyAddr());
 
     buff_offset += blockNum * mm2ResSize * reuseWorkspaceRatio;
@@ -2871,13 +2870,13 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::InitEachCoreWorks
                                                       // details, see the IFA.
         GlobalTensor<T> workspaceGmAntiquant;
         // High precision OptimizationMode, workspace is fp32，but antiquant result is fp16.
-        workspaceGmAntiquant.SetGlobalBuffer((__gm__ T *)this->workspaceGm[buff_offset].GetPhyAddr());
+        workspaceGmAntiquant.SetGlobalBuffer((__gm__ T*)this->workspaceGm[buff_offset].GetPhyAddr());
         int64_t kvAntiquantSize = this->tilingData->promptAttentionSingleCoreParams.singleProcessSInnerSize *
                                   this->tilingData->promptAttentionBaseParams.headSize;
         this->keyGmAntiquant.SetGlobalBuffer(
-            (__gm__ T *)workspaceGmAntiquant[coreIdx * kvAntiquantSize * reuseWorkspaceRatio].GetPhyAddr());
+            (__gm__ T*)workspaceGmAntiquant[coreIdx * kvAntiquantSize * reuseWorkspaceRatio].GetPhyAddr());
         this->valueGmAntiquant.SetGlobalBuffer(
-            (__gm__ T *)workspaceGmAntiquant[coreIdx * kvAntiquantSize * reuseWorkspaceRatio + kvAntiquantSize]
+            (__gm__ T*)workspaceGmAntiquant[coreIdx * kvAntiquantSize * reuseWorkspaceRatio + kvAntiquantSize]
                 .GetPhyAddr());
         buff_offset += blockNum * kvAntiquantSize * reuseWorkspaceRatio;
     }
@@ -2887,25 +2886,25 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::InitEachCoreWorks
     if constexpr (PFAT::MM_TYPE ==
                   MatMulType::MM_PA) {        // If compute type is different，the offset size here is different.
         GlobalTensor<uint32_t> workspaceGmPA; //  storage PA callback structure data
-        workspaceGmPA.SetGlobalBuffer((__gm__ uint32_t *)this->workspaceGm[buff_offset].GetPhyAddr());
+        workspaceGmPA.SetGlobalBuffer((__gm__ uint32_t*)this->workspaceGm[buff_offset].GetPhyAddr());
         int32_t paStructSize = 64 / sizeof(uint32_t); //  dcci cacheline 64B alignment  16 * 4B = 64B
         int32_t NumOfBmm = 2;
         int64_t baseCBDataOffset = coreIdx * paStructSize * NumOfBmm * reuseWorkspaceRatio;
-        this->bmm1CBDataGm[0].SetGlobalBuffer((__gm__ uint32_t *)workspaceGmPA[baseCBDataOffset].GetPhyAddr());
-        this->bmm1CBDataPtr[0] = (__gm__ uint32_t *)workspaceGmPA[baseCBDataOffset].GetPhyAddr();
+        this->bmm1CBDataGm[0].SetGlobalBuffer((__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset].GetPhyAddr());
+        this->bmm1CBDataPtr[0] = (__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset].GetPhyAddr();
         this->bmm1CBDataGm[1].SetGlobalBuffer(
-            (__gm__ uint32_t *)workspaceGmPA[baseCBDataOffset + paStructSize].GetPhyAddr());
-        this->bmm1CBDataPtr[1] = (__gm__ uint32_t *)workspaceGmPA[baseCBDataOffset + paStructSize].GetPhyAddr();
+            (__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset + paStructSize].GetPhyAddr());
+        this->bmm1CBDataPtr[1] = (__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset + paStructSize].GetPhyAddr();
 
         this->bmm2CBDataGm[0].SetGlobalBuffer(
-            (__gm__ uint32_t *)workspaceGmPA[baseCBDataOffset + paStructSize * reuseWorkspaceRatio].GetPhyAddr());
+            (__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset + paStructSize * reuseWorkspaceRatio].GetPhyAddr());
         this->bmm2CBDataPtr[0] =
-            (__gm__ uint32_t *)workspaceGmPA[baseCBDataOffset + paStructSize * reuseWorkspaceRatio].GetPhyAddr();
+            (__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset + paStructSize * reuseWorkspaceRatio].GetPhyAddr();
         this->bmm2CBDataGm[1].SetGlobalBuffer(
-            (__gm__ uint32_t *)workspaceGmPA[baseCBDataOffset + paStructSize * reuseWorkspaceRatio + paStructSize]
+            (__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset + paStructSize * reuseWorkspaceRatio + paStructSize]
                 .GetPhyAddr());
         this->bmm2CBDataPtr[1] =
-            (__gm__ uint32_t *)workspaceGmPA[baseCBDataOffset + paStructSize * reuseWorkspaceRatio + paStructSize]
+            (__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset + paStructSize * reuseWorkspaceRatio + paStructSize]
                 .GetPhyAddr();
         buff_offset +=
             blockNum * baseCBDataOffset + paStructSize * reuseWorkspaceRatio + paStructSize * reuseWorkspaceRatio;
@@ -2913,12 +2912,12 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::InitEachCoreWorks
 
     if constexpr (PFAT::msdMode == MsdMode::MSD_ON) {
         GlobalTensor<KV_T> workspaceGmMsd;
-        workspaceGmMsd.SetGlobalBuffer((__gm__ KV_T *)this->workspaceGm[buff_offset].GetPhyAddr());
+        workspaceGmMsd.SetGlobalBuffer((__gm__ KV_T*)this->workspaceGm[buff_offset].GetPhyAddr());
         int32_t MsdtructSize =
             msdExpandsize * this->tilingData->promptAttentionBaseParams.seqSize *
             this->tilingData->promptAttentionBaseParams.headSize; //  dcci cacheline 64B 对齐  16 * 4B = 64B
         int64_t baseCBDataOffset = coreIdx * MsdtructSize;
-        this->queryMsdExpandGm.SetGlobalBuffer((__gm__ KV_T *)workspaceGmMsd[baseCBDataOffset].GetPhyAddr());
+        this->queryMsdExpandGm.SetGlobalBuffer((__gm__ KV_T*)workspaceGmMsd[baseCBDataOffset].GetPhyAddr());
     }
 }
 
@@ -2941,7 +2940,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCoreSp
     uint32_t actualSeqLengths = this->tilingData->promptAttentionBaseParams.seqSize;
 
     // You must pass the reference assignment params，because the head address is updated internally.
-    PFAComputeParam *&params = this->tailParams;
+    PFAComputeParam*& params = this->tailParams;
 
     int64_t bnIdx = 0;
     for (int sIdx = 0; sIdx < sNum; sIdx++) {
@@ -3024,7 +3023,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ProcessLastSouter
         }
         LocalTensor<float> softmaxSumTmp = this->softmaxExpBuff_.template Get<float>(this->softmaxSumSize);
         LocalTensor<computeType> bmm2ResPreUb = this->tempBmm2Buff_.template Get<computeType>(this->bmm2ResUbSize);
-        LocalTensor<computeType> &FinalResUb = bmm2ResPreUb;
+        LocalTensor<computeType>& FinalResUb = bmm2ResPreUb;
         uint32_t resShapeSize;
 
         LocalTensor<computeType> bmm2ResUb =

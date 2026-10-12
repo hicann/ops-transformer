@@ -38,17 +38,17 @@ protected:
                                           uint32_t sInnerLoopIdx); // copy pse shift
 
     __aicore__ inline void PseShiftProcess(int64_t sInnerLoopIdx, uint32_t computeSize,
-                                           LocalTensor<mmOutputType> &mmResUb);
+                                           LocalTensor<mmOutputType>& mmResUb);
 
-    __aicore__ inline void Bmm1ResDoVecBmm2Compute(LocalTensor<mmOutputType> &mmResUb, LocalTensor<float> &softmaxMaxUb,
-                                                   LocalTensor<float> &softmaxSumUb,
-                                                   LocalTensor<softmaxType> &softmaxExpUb, bool isLast, bool isSecond,
+    __aicore__ inline void Bmm1ResDoVecBmm2Compute(LocalTensor<mmOutputType>& mmResUb, LocalTensor<float>& softmaxMaxUb,
+                                                   LocalTensor<float>& softmaxSumUb,
+                                                   LocalTensor<softmaxType>& softmaxExpUb, bool isLast, bool isSecond,
                                                    event_t eventID, int64_t sInnerLoopIdx);
 
-    __aicore__ inline void Bmm1ResDoVecBmm2ComputeFirst(LocalTensor<mmOutputType> &mmResUb,
-                                                        LocalTensor<float> &softmaxMaxUb,
-                                                        LocalTensor<float> &softmaxSumUb,
-                                                        LocalTensor<softmaxType> &softmaxExpUb, bool isLast,
+    __aicore__ inline void Bmm1ResDoVecBmm2ComputeFirst(LocalTensor<mmOutputType>& mmResUb,
+                                                        LocalTensor<float>& softmaxMaxUb,
+                                                        LocalTensor<float>& softmaxSumUb,
+                                                        LocalTensor<softmaxType>& softmaxExpUb, bool isLast,
                                                         event_t eventID, int64_t sInnerLoopIdx);
 
     __aicore__ inline void ComputeEachCoreSInnerLoop(uint32_t startIndex, uint32_t endIndex);
@@ -113,7 +113,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTail<T, U, FORM
 
 template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
 __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTail<T, U, FORMAT, O, M>::PseShiftProcess(
-    int64_t sInnerLoopIdx, uint32_t computeSize, LocalTensor<mmOutputType> &mmResUb)
+    int64_t sInnerLoopIdx, uint32_t computeSize, LocalTensor<mmOutputType>& mmResUb)
 {
     if (this->usePseShift) {
         this->PseShiftCopyIn(this->pseShiftOffset, this->pseShiftCopyInCol, sInnerLoopIdx);
@@ -134,8 +134,8 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTail<T, U, FORM
 
 template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
 __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTail<T, U, FORMAT, O, M>::Bmm1ResDoVecBmm2ComputeFirst(
-    LocalTensor<mmOutputType> &mmResUb, LocalTensor<float> &softmaxMaxUb, LocalTensor<float> &softmaxSumUb,
-    LocalTensor<softmaxType> &softmaxExpUb, bool isLast, event_t eventID, int64_t sInnerLoopIdx)
+    LocalTensor<mmOutputType>& mmResUb, LocalTensor<float>& softmaxMaxUb, LocalTensor<float>& softmaxSumUb,
+    LocalTensor<softmaxType>& softmaxExpUb, bool isLast, event_t eventID, int64_t sInnerLoopIdx)
 {
     WaitFlag<HardEvent::MTE3_MTE2>(eventID);
     this->mm.template GetTensorC<false>(mmResUb, false, false);
@@ -190,8 +190,8 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTail<T, U, FORM
 
 template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
 __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTail<T, U, FORMAT, O, M>::Bmm1ResDoVecBmm2Compute(
-    LocalTensor<mmOutputType> &mmResUb, LocalTensor<float> &softmaxMaxUb, LocalTensor<float> &softmaxSumUb,
-    LocalTensor<softmaxType> &softmaxExpUb, bool isLast, bool isSecond, event_t eventID, int64_t sInnerLoopIdx)
+    LocalTensor<mmOutputType>& mmResUb, LocalTensor<float>& softmaxMaxUb, LocalTensor<float>& softmaxSumUb,
+    LocalTensor<softmaxType>& softmaxExpUb, bool isLast, bool isSecond, event_t eventID, int64_t sInnerLoopIdx)
 {
     WaitFlag<HardEvent::MTE3_MTE2>(eventID);
     this->mm.template GetTensorC<false>(mmResUb, false, false);
@@ -338,7 +338,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTail<T, U, FORM
     this->mmResUbSize = this->tilingData->promptAttentionTensorSizeRect.mmResUbSize;
     this->bmm2ResUbSize = this->tilingData->promptAttentionTensorSizeRect.bmm2ResUbSize;
     int reuseWorkspaceRatio = this->tilingData->promptAttentionSingleCoreParams.multiSmaxsInnerLoopTimes;
-    this->mm.SetWorkspace((__gm__ uint8_t *)this
+    this->mm.SetWorkspace((__gm__ uint8_t*)this
                               ->workspaceGm[GetBlockNum() * GetTaskRation() * this->spmTmpSize +
                                             coreIdx * this->mmResUbSize * reuseWorkspaceRatio]
                               .GetPhyAddr(),
@@ -347,7 +347,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTail<T, U, FORM
     uint32_t buff_offset =
         GetBlockNum() * GetTaskRation() * (this->spmTmpSize + this->mmResUbSize * reuseWorkspaceRatio);
     this->bmm2.SetWorkspace(
-        (__gm__ uint8_t *)this->workspaceGm[buff_offset + coreIdx * this->bmm2ResUbSize].GetPhyAddr(),
+        (__gm__ uint8_t*)this->workspaceGm[buff_offset + coreIdx * this->bmm2ResUbSize].GetPhyAddr(),
         this->bmm2ResUbSize);
 
     int actualCoreNums = this->tilingData->promptAttentionSingleCoreParams.actualCoreNums;
@@ -442,14 +442,14 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTail<T, U, FORM
     this->bmm2ResUbSize = this->tilingData->promptAttentionTensorSizeRect.bmm2ResUbSize;
     int reuseWorkspaceRatio = this->tilingData->promptAttentionSingleCoreParams.multiSmaxsInnerLoopTimes;
     this->mm.SetWorkspace(
-        (__gm__ uint8_t *)this
+        (__gm__ uint8_t*)this
             ->workspaceGm[blockNum * this->spmTmpSize + coreIdx * this->mmResUbSize * reuseWorkspaceRatio]
             .GetPhyAddr(),
         this->mmResUbSize * reuseWorkspaceRatio);
 
     uint32_t buff_offset = blockNum * (this->spmTmpSize + this->mmResUbSize * reuseWorkspaceRatio);
     this->bmm2.SetWorkspace(
-        (__gm__ uint8_t *)this->workspaceGm[buff_offset + coreIdx * this->bmm2ResUbSize].GetPhyAddr(),
+        (__gm__ uint8_t*)this->workspaceGm[buff_offset + coreIdx * this->bmm2ResUbSize].GetPhyAddr(),
         this->bmm2ResUbSize);
 
     int32_t preTokens = (int32_t)(this->tilingData->promptAttentionBaseParams.preTokens);

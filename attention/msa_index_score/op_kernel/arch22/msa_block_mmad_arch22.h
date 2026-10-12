@@ -94,7 +94,7 @@ public:
     static_assert(L0C_TILE_SIZE * L0C_STAGES <= ArchTag::L0C_SIZE, "L0C pingpong exceeds L0C");
     static_assert(L1A_SIZE + L1B_SIZE * STAGES <= ArchTag::L1_SIZE, "L1 A+B exceeds L1");
 
-    __aicore__ inline MsaBlockMmad(Catlass::Arch::Resource<ArchTag> &resource)
+    __aicore__ inline MsaBlockMmad(Catlass::Arch::Resource<ArchTag>& resource)
     {
         l1ATensor_ = resource.l1Buf.template GetBufferByByte<ElementA>(0);
         const uint32_t l1BOffset = L1A_SIZE;
@@ -137,10 +137,10 @@ public:
         }
     }
 
-    __aicore__ inline void operator()(const AscendC::GlobalTensor<ElementA> &gmA, const LayoutA &layoutA,
-                                      const AscendC::GlobalTensor<ElementB> &gmB, const LayoutB &layoutB,
-                                      const AscendC::GlobalTensor<ElementC> &gmC, const LayoutC &layoutC,
-                                      const Catlass::GemmCoord &actualShape, bool needLoadL1)
+    __aicore__ inline void operator()(const AscendC::GlobalTensor<ElementA>& gmA, const LayoutA& layoutA,
+                                      const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutB,
+                                      const AscendC::GlobalTensor<ElementC>& gmC, const LayoutC& layoutC,
+                                      const Catlass::GemmCoord& actualShape, bool needLoadL1)
     {
         const uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(actualShape.m());
         const uint32_t nRound = RoundUp<L1BAlignHelper::N_ALIGNED>(actualShape.n());

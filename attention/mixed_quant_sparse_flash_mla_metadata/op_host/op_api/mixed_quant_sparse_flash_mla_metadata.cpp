@@ -26,16 +26,16 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(MixedQuantSparseFlashMlaMetadata);
 
-const aclTensor *MixedQuantSparseFlashMlaMetadata(
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensOriKvOptional,
-    const aclTensor *cuSeqlensCmpKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedOriKvOptional,
-    const aclTensor *sequsedCmpKvOptional, const aclTensor *cmpResidualKvOptional,
-    const aclTensor *oriTopkLengthOptional, const aclTensor *cmpTopkLengthOptional, int64_t numHeadsQ,
+const aclTensor* MixedQuantSparseFlashMlaMetadata(
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensOriKvOptional,
+    const aclTensor* cuSeqlensCmpKvOptional, const aclTensor* sequsedQOptional, const aclTensor* sequsedOriKvOptional,
+    const aclTensor* sequsedCmpKvOptional, const aclTensor* cmpResidualKvOptional,
+    const aclTensor* oriTopkLengthOptional, const aclTensor* cmpTopkLengthOptional, int64_t numHeadsQ,
     int64_t numHeadsKv, int64_t headDim, int64_t quantMode, int64_t batchSize, int64_t maxSeqlenQ,
     int64_t maxSeqlenOriKv, int64_t maxSeqlenCmpKv, int64_t oriTopk, int64_t cmpTopk, int64_t ropeHeadDim,
     int64_t cmpRatio, int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight,
-    const char *layoutQOptional, const char *layoutKvOptional, bool hasOriKv, bool hasCmpKv, const char *socVersion,
-    int64_t aicCoreNum, int64_t aivCoreNum, bool isBatchConsistency, const aclTensor *metaData, aclOpExecutor *executor)
+    const char* layoutQOptional, const char* layoutKvOptional, bool hasOriKv, bool hasCmpKv, const char* socVersion,
+    int64_t aicCoreNum, int64_t aivCoreNum, bool isBatchConsistency, const aclTensor* metaData, aclOpExecutor* executor)
 {
     L0_DFX(MixedQuantSparseFlashMlaMetadata, cuSeqlensQOptional, cuSeqlensOriKvOptional, cuSeqlensCmpKvOptional,
            sequsedQOptional, sequsedOriKvOptional, sequsedCmpKvOptional, cmpResidualKvOptional, oriTopkLengthOptional,

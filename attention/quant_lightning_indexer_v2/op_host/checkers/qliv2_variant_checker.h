@@ -23,13 +23,13 @@ namespace lightning_indexer_v2_checker {
 
 class QLIV2VariantChecker : public LightningIndexerV2BaseChecker {
 public:
-    ge::graphStatus CheckParaExistence(const LightningIndexerV2CheckerInfo &info) const override;
-    ge::graphStatus CheckSinglePara(const LightningIndexerV2CheckerInfo &info) const override;
-    ge::graphStatus CheckMultiPara(const LightningIndexerV2CheckerInfo &info) const override;
+    ge::graphStatus CheckParaExistence(const LightningIndexerV2CheckerInfo& info) const override;
+    ge::graphStatus CheckSinglePara(const LightningIndexerV2CheckerInfo& info) const override;
+    ge::graphStatus CheckMultiPara(const LightningIndexerV2CheckerInfo& info) const override;
 
 private:
-    ge::graphStatus CheckScaleShape(const LightningIndexerV2CheckerInfo &info, const CheckerTensor &input,
-                                    const CheckerTensor &scale, const char *inputName, const char *scaleName) const;
+    ge::graphStatus CheckScaleShape(const LightningIndexerV2CheckerInfo& info, const CheckerTensor& input,
+                                    const CheckerTensor& scale, const char* inputName, const char* scaleName) const;
 };
 
 } // namespace lightning_indexer_v2_checker

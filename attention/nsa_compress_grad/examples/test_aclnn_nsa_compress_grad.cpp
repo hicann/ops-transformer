@@ -44,7 +44,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-bool ReadFile(const std::string &filePath, size_t &fileSize, void *buffer, size_t bufferSize)
+bool ReadFile(const std::string& filePath, size_t& fileSize, void* buffer, size_t bufferSize)
 {
     struct stat sBuf;
     int fileStatus = stat(filePath.data(), &sBuf);
@@ -64,7 +64,7 @@ bool ReadFile(const std::string &filePath, size_t &fileSize, void *buffer, size_
         return false;
     }
 
-    std::filebuf *buf = file.rdbuf();
+    std::filebuf* buf = file.rdbuf();
     size_t size = buf->pubseekoff(0, std::ios::end, std::ios::in);
     if (size == 0) {
         ERROR_LOG("file size is 0");
@@ -77,13 +77,13 @@ bool ReadFile(const std::string &filePath, size_t &fileSize, void *buffer, size_
         return false;
     }
     buf->pubseekpos(0, std::ios::in);
-    buf->sgetn(static_cast<char *>(buffer), size);
+    buf->sgetn(static_cast<char*>(buffer), size);
     fileSize = size;
     file.close();
     return true;
 }
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -92,7 +92,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 固定写法，acl初始化
     auto ret = aclInit(nullptr);
@@ -109,8 +109,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **xOrResult)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** xOrResult)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -132,10 +132,10 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-void FreeResource(aclTensor *outputGrad, aclTensor *inputKV, aclTensor *weight, aclTensor *inputGradOut,
-                  aclTensor *weightGradOut, aclIntArray *actSeqLen, void *outputGradDeviceAddr, void *inputKVDeviceAddr,
-                  void *weightDeviceAddr, void *inputGradOutDeviceAddr, void *weightGradOutDeviceAddr,
-                  uint64_t workspaceSize, void *workspaceAddr, int32_t deviceId, aclrtContext context,
+void FreeResource(aclTensor* outputGrad, aclTensor* inputKV, aclTensor* weight, aclTensor* inputGradOut,
+                  aclTensor* weightGradOut, aclIntArray* actSeqLen, void* outputGradDeviceAddr, void* inputKVDeviceAddr,
+                  void* weightDeviceAddr, void* inputGradOutDeviceAddr, void* weightGradOutDeviceAddr,
+                  uint64_t workspaceSize, void* workspaceAddr, int32_t deviceId, aclrtContext context,
                   aclrtStream stream)
 {
     if (outputGrad != nullptr) {
@@ -211,17 +211,17 @@ int main()
     int64_t SeqLenType = 0;
     char layOut[] = "TND";
 
-    void *outputGradDeviceAddr = nullptr;
-    void *inputKVDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *inputGradOutDeviceAddr = nullptr;
-    void *weightGradOutDeviceAddr = nullptr;
+    void* outputGradDeviceAddr = nullptr;
+    void* inputKVDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* inputGradOutDeviceAddr = nullptr;
+    void* weightGradOutDeviceAddr = nullptr;
 
-    aclTensor *outputGrad = nullptr;
-    aclTensor *inputKV = nullptr;
-    aclTensor *weight = nullptr;
-    aclTensor *inputGradOut = nullptr;
-    aclTensor *weightGradOut = nullptr;
+    aclTensor* outputGrad = nullptr;
+    aclTensor* inputKV = nullptr;
+    aclTensor* weight = nullptr;
+    aclTensor* inputGradOut = nullptr;
+    aclTensor* weightGradOut = nullptr;
 
     std::vector<float> inputGradOutHostData(seqLensSum * headNum * headDim, 0.0);
     std::vector<float> weightGradOutHostData(blockSize * headNum, 0.0);
@@ -231,10 +231,10 @@ int main()
     std::vector<float> weightHostData(blockSize * headNum, 1.0);
     std::vector<int64_t> actSeqLenOptionalHostData = {0, 128, 272};
 
-    aclIntArray *actSeqLenOptional =
+    aclIntArray* actSeqLenOptional =
         aclCreateIntArray(actSeqLenOptionalHostData.data(), actSeqLenOptionalHostData.size());
     uint64_t workspaceSize = 0;
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
 
     auto freeResource = [&]() {
         FreeResource(outputGrad, inputKV, weight, inputGradOut, weightGradOut, actSeqLenOptional, outputGradDeviceAddr,
@@ -262,7 +262,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, freeResource(); return ret);
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     // 调用aclnnNsaCompressGrad第一段接口
     ret = aclnnNsaCompressGradGetWorkspaceSize(outputGrad, inputKV, weight, actSeqLenOptional, blockSize, blockStride,
                                                SeqLenType, layOut, inputGradOut, weightGradOut, &workspaceSize,

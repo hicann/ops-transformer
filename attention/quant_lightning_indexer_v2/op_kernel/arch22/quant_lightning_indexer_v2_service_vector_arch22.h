@@ -43,12 +43,12 @@ public:
     using MM1_OUT_T = float;
 
     __aicore__ inline QLIV2Vector(){};
-    __aicore__ inline void ProcessVec0(const QLIV2Common::RunInfo &info);
-    __aicore__ inline void ProcessVec1(const QLIV2Common::RunInfo &info);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitParams(const struct QLIV2Common::ConstInfo &constInfo,
-                                      const struct QLIV2Common::LdSplitCoreInfo &ldInfo,
-                                      const QLIV2TilingData *__restrict tilingData);
+    __aicore__ inline void ProcessVec0(const QLIV2Common::RunInfo& info);
+    __aicore__ inline void ProcessVec1(const QLIV2Common::RunInfo& info);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitParams(const struct QLIV2Common::ConstInfo& constInfo,
+                                      const struct QLIV2Common::LdSplitCoreInfo& ldInfo,
+                                      const QLIV2TilingData* __restrict tilingData);
     __aicore__ inline void ProcessLD();
     __aicore__ inline void InitVecWorkspaceTensor(GlobalTensor<half> vec0OutGm, GlobalTensor<MM1_OUT_T> mm1ResGm,
                                                   GlobalTensor<float> vec1ResGm);
@@ -59,7 +59,7 @@ public:
     __aicore__ inline int32_t AlignS2(int32_t cuS2Len);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void InitLDBuffers(TPipe *pipe);
+    __aicore__ inline void InitLDBuffers(TPipe* pipe);
 
 protected:
     GlobalTensor<MM1_OUT_T> mm1ResGm;
@@ -73,7 +73,7 @@ protected:
     // =================================常量区=================================
 
 private:
-    __aicore__ inline void GetKeyScale(const QLIV2Common::RunInfo &runInfo, const LocalTensor<half> &resUb,
+    __aicore__ inline void GetKeyScale(const QLIV2Common::RunInfo& runInfo, const LocalTensor<half>& resUb,
                                        int64_t batchId, int64_t startS2, int64_t getLen);
     // ================================Local Buffer区====================================
     // queue
@@ -116,8 +116,8 @@ private:
 };
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Vector<QLIV2T>::GetKeyScale(const QLIV2Common::RunInfo &runInfo,
-                                                        const LocalTensor<half> &resUb, int64_t batchId,
+__aicore__ inline void QLIV2Vector<QLIV2T>::GetKeyScale(const QLIV2Common::RunInfo& runInfo,
+                                                        const LocalTensor<half>& resUb, int64_t batchId,
                                                         int64_t startS2, int64_t getLen)
 {
     // startS2一定能整除kCacheBlockSize_
@@ -169,7 +169,7 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::GetKeyScale(const QLIV2Common::RunIn
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Vector<QLIV2T>::InitBuffers(TPipe *pipe)
+__aicore__ inline void QLIV2Vector<QLIV2T>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(inQueue_, 2, s2BaseSize_ * sizeof(float) * 2);                                    // 32KB
     pipe->InitBuffer(outQueue_, 1, BASE_TOPK * sizeof(float));                                         // 8 KB
@@ -189,7 +189,7 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::InitBuffers(TPipe *pipe)
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Vector<QLIV2T>::InitLDBuffers(TPipe *pipe)
+__aicore__ inline void QLIV2Vector<QLIV2T>::InitLDBuffers(TPipe* pipe)
 {
     pipe->Reset();
     pipe->InitBuffer(ldToBeMrgBuf_, BASE_TOPK_VALUE_IDX_SIZE * mrgListNum_ * sizeof(float));
@@ -199,9 +199,9 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::InitLDBuffers(TPipe *pipe)
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Vector<QLIV2T>::InitParams(const struct QLIV2Common::ConstInfo &constInfo,
-                                                       const struct QLIV2Common::LdSplitCoreInfo &ldInfo,
-                                                       const QLIV2TilingData *__restrict tilingData)
+__aicore__ inline void QLIV2Vector<QLIV2T>::InitParams(const struct QLIV2Common::ConstInfo& constInfo,
+                                                       const struct QLIV2Common::LdSplitCoreInfo& ldInfo,
+                                                       const QLIV2TilingData* __restrict tilingData)
 {
     this->constInfo_ = constInfo;
     this->ldInfo_ = ldInfo;
@@ -264,7 +264,7 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::CleanInvalidOutput(int64_t invalidS1
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Vector<QLIV2T>::ProcessVec0(const QLIV2Common::RunInfo &info)
+__aicore__ inline void QLIV2Vector<QLIV2T>::ProcessVec0(const QLIV2Common::RunInfo& info)
 {
     // 只需要一个v核做
     if (blockId_ % 2 != 0) {
@@ -325,7 +325,7 @@ __aicore__ inline int32_t QLIV2Vector<QLIV2T>::AlignS2(int32_t cuS2Len)
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Vector<QLIV2T>::ProcessVec1(const QLIV2Common::RunInfo &info)
+__aicore__ inline void QLIV2Vector<QLIV2T>::ProcessVec1(const QLIV2Common::RunInfo& info)
 {
     int32_t cuBaseS1Idx = info.gS1Idx * s1BaseSize_;
     int32_t cuBaseS2Idx = info.s2Idx * s2BaseSize_;

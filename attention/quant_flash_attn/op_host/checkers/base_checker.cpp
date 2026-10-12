@@ -29,17 +29,17 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35QFA;
 
-ge::graphStatus QfaBaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc,
-                                                  const std::string &name) const
+ge::graphStatus QfaBaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorDesc* desc,
+                                                  const std::string& name) const
 {
     if (desc != nullptr) {
-        const auto &it = DTYPE_SUPPORT_MAP.find(name);
+        const auto& it = DTYPE_SUPPORT_MAP.find(name);
         OP_CHECK_IF(it == DTYPE_SUPPORT_MAP.end(),
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
                         "QuantFlashAttn", name.c_str(), DataTypeToSerialString(desc->GetDataType()).c_str(),
                         "The datatype support list of this parameter should be specified in DTYPE_SUPPORT_MAP"),
                     return ge::GRAPH_FAILED);
-        auto &expectDtypeList = it->second;
+        auto& expectDtypeList = it->second;
         if (std::find(expectDtypeList.begin(), expectDtypeList.end(), desc->GetDataType()) == expectDtypeList.end()) {
             std::string dtypeStr = DataTypeToSerialString(desc->GetDataType());
             std::string expectedDtypes;
@@ -56,8 +56,8 @@ ge::graphStatus QfaBaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorD
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QfaBaseChecker::CheckFormatSupport(const gert::CompileTimeTensorDesc *desc,
-                                                   const std::string &name) const
+ge::graphStatus QfaBaseChecker::CheckFormatSupport(const gert::CompileTimeTensorDesc* desc,
+                                                   const std::string& name) const
 {
     if (desc != nullptr) {
         auto format = desc->GetOriginFormat();
@@ -81,8 +81,8 @@ std::string QfaBaseChecker::DataTypeToSerialString(ge::DataType type) const
     }
 }
 
-ge::graphStatus QfaBaseChecker::CheckTensorContiguous(const uint32_t &tensorDimNum, const gert::Shape &inputShape,
-                                                      const gert::Stride *strides, int32_t &index) const
+ge::graphStatus QfaBaseChecker::CheckTensorContiguous(const uint32_t& tensorDimNum, const gert::Shape& inputShape,
+                                                      const gert::Stride* strides, int32_t& index) const
 {
     // 根据 shape 从最后一维向前累乘推算连续场景的期望 stride，若某一维实际 stride 不等于期望值则不连续
     if (strides == nullptr || strides->GetDimNum() == 0) {

@@ -104,7 +104,7 @@ public:
                                 AscendC::GlobalTensor<int8_t> quantOffsetGmTensor,
                                 AscendC::GlobalTensor<T> inputGmTensor, AscendC::GlobalTensor<int8_t> outputGmTensor,
                                 uint32_t stride, uint32_t num_col, float avg_factor, uint64_t gm_offset,
-                                uint64_t gm_out_offset, uint32_t row_work_, const MlaTilingData &mlaParams_)
+                                uint64_t gm_out_offset, uint32_t row_work_, const MlaTilingData& mlaParams_)
     {
         this->quantScaleGmTensor = quantScaleGmTensor;
         this->quantOffsetGmTensor = quantOffsetGmTensor;
@@ -130,13 +130,13 @@ public:
             (num_col_ - input_stride_ + REPEAT_TIME_64 - 1) / REPEAT_TIME_64 * REPEAT_TIME_64;
     }
 
-    __aicore__ inline void Launch(const AscendC::LocalTensor<int8_t> &dstTensor,
-                                  const AscendC::LocalTensor<T> &srcTensor, const AscendC::LocalTensor<T> &gammaTensor,
-                                  const AscendC::LocalTensor<T> &betaTensor,
-                                  const AscendC::LocalTensor<T> &quantScaleTensor,
-                                  const AscendC::LocalTensor<int8_t> &quantOffsetTensor,
-                                  const AscendC::LocalTensor<float> &res1Tensor,
-                                  const AscendC::LocalTensor<float> &res3Tensor)
+    __aicore__ inline void Launch(const AscendC::LocalTensor<int8_t>& dstTensor,
+                                  const AscendC::LocalTensor<T>& srcTensor, const AscendC::LocalTensor<T>& gammaTensor,
+                                  const AscendC::LocalTensor<T>& betaTensor,
+                                  const AscendC::LocalTensor<T>& quantScaleTensor,
+                                  const AscendC::LocalTensor<int8_t>& quantOffsetTensor,
+                                  const AscendC::LocalTensor<float>& res1Tensor,
+                                  const AscendC::LocalTensor<float>& res3Tensor)
     {
         this->dstTensor = dstTensor;
         this->srcTensor = srcTensor;
@@ -250,11 +250,11 @@ public:
         : blockIdx_(AscendC::GetBlockIdx())
     {}
 
-    __aicore__ inline void RopeInit(AscendC::GlobalTensor<QkDtype> &qGm, AscendC::GlobalTensor<CosDtype> &cosGm,
-                                    AscendC::GlobalTensor<CosDtype> &sinGm,
-                                    AscendC::GlobalTensor<QOutDtype> &outRopeConcatGm,
-                                    AscendC::GlobalTensor<QkDtype> &outRopeConcatGm2,
-                                    const MlaTilingData &ropeConcatParams)
+    __aicore__ inline void RopeInit(AscendC::GlobalTensor<QkDtype>& qGm, AscendC::GlobalTensor<CosDtype>& cosGm,
+                                    AscendC::GlobalTensor<CosDtype>& sinGm,
+                                    AscendC::GlobalTensor<QOutDtype>& outRopeConcatGm,
+                                    AscendC::GlobalTensor<QkDtype>& outRopeConcatGm2,
+                                    const MlaTilingData& ropeConcatParams)
     {
         this->qGm_ = qGm;
         this->cosGm_ = cosGm;
@@ -411,7 +411,7 @@ public:
     }
     // 构建tensor -1 -1 -1 1 1 1
     template <typename BUF_TYPE>
-    __aicore__ inline void ExpandNeg(const AscendC::LocalTensor<BUF_TYPE> &tempBuf, uint32_t headNumTemp)
+    __aicore__ inline void ExpandNeg(const AscendC::LocalTensor<BUF_TYPE>& tempBuf, uint32_t headNumTemp)
     {
         for (uint32_t i = 0; i < this->rotateStride_; ++i) {
             tempBuf.SetValue(i, (BUF_TYPE)-1);
@@ -423,9 +423,9 @@ public:
     }
 
     template <typename BUF_TYPE>
-    __aicore__ inline void CopyQGenReverseQ(const AscendC::LocalTensor<BUF_TYPE> &tempBufQ,
-                                            const AscendC::LocalTensor<float> &tempBufQCast,
-                                            const AscendC::LocalTensor<float> &tempBufRverseQ, uint64_t qOffset,
+    __aicore__ inline void CopyQGenReverseQ(const AscendC::LocalTensor<BUF_TYPE>& tempBufQ,
+                                            const AscendC::LocalTensor<float>& tempBufQCast,
+                                            const AscendC::LocalTensor<float>& tempBufRverseQ, uint64_t qOffset,
                                             uint16_t loopN)
     {
         SET_FLAG(S, MTE2, EVENT_ID1);
@@ -446,8 +446,8 @@ public:
     }
 
     template <typename BUF_TYPE>
-    __aicore__ inline void CopyCosSin(const AscendC::LocalTensor<BUF_TYPE> &tempBufCos,
-                                      const AscendC::LocalTensor<BUF_TYPE> &tempBufSin, uint64_t localStartAddr,
+    __aicore__ inline void CopyCosSin(const AscendC::LocalTensor<BUF_TYPE>& tempBufCos,
+                                      const AscendC::LocalTensor<BUF_TYPE>& tempBufSin, uint64_t localStartAddr,
                                       uint64_t gmStartAddr, uint64_t repeatNum)
     {
         SET_FLAG(S, MTE2, EVENT_ID1);
@@ -512,9 +512,9 @@ private:
     AscendC::LocalTensor<float> negLocal;
 };
 
-__aicore__ inline void ReduceSumCustom(const AscendC::LocalTensor<float> &dst_local,
-                                       const AscendC::LocalTensor<float> &src_local,
-                                       const AscendC::LocalTensor<float> &work_local, int32_t count)
+__aicore__ inline void ReduceSumCustom(const AscendC::LocalTensor<float>& dst_local,
+                                       const AscendC::LocalTensor<float>& src_local,
+                                       const AscendC::LocalTensor<float>& work_local, int32_t count)
 {
 #ifdef __DAV_C220_VEC__
     uint64_t mask = NUM_PER_REP_FP32;
@@ -559,8 +559,8 @@ public:
                                 AscendC::GlobalTensor<int8_t> quantOffsetGmTensor,
                                 AscendC::GlobalTensor<T> inputGmTensor, AscendC::GlobalTensor<int8_t> outputGmTensor,
                                 uint32_t stride, uint32_t num_col, float avg_factor, uint64_t gm_offset,
-                                uint64_t gm_out_offset, uint32_t row_work_, const MlaTilingData &mlaParams_,
-                                AscendC::GlobalTensor<T> &qDownGmTensor)
+                                uint64_t gm_out_offset, uint32_t row_work_, const MlaTilingData& mlaParams_,
+                                AscendC::GlobalTensor<T>& qDownGmTensor)
     {
         this->gammaGmTensor = gammaGmTensor;
         this->betaGmTensor = betaGmTensor;
@@ -596,7 +596,7 @@ public:
                                 AscendC::GlobalTensor<int8_t> quantOffsetGmTensor,
                                 AscendC::GlobalTensor<T> inputGmTensor, AscendC::GlobalTensor<int8_t> outputGmTensor,
                                 uint32_t stride, uint32_t num_col, float avg_factor, uint64_t gm_offset,
-                                uint64_t gm_out_offset, uint32_t row_work_, const MlaTilingData &mlaParams_)
+                                uint64_t gm_out_offset, uint32_t row_work_, const MlaTilingData& mlaParams_)
     {
         this->gammaGmTensor = gammaGmTensor;
         this->betaGmTensor = betaGmTensor;
@@ -626,13 +626,13 @@ public:
             (num_col_ - input_stride_ + REPEAT_TIME_64 - 1) / REPEAT_TIME_64 * REPEAT_TIME_64;
     }
 
-    __aicore__ inline void Launch(const AscendC::LocalTensor<int8_t> &dstTensor,
-                                  const AscendC::LocalTensor<T> &srcTensor, const AscendC::LocalTensor<T> &gammaTensor,
-                                  const AscendC::LocalTensor<T> &betaTensor,
-                                  const AscendC::LocalTensor<T> &quantScaleTensor,
-                                  const AscendC::LocalTensor<int8_t> &quantOffsetTensor,
-                                  const AscendC::LocalTensor<float> &res1Tensor,
-                                  const AscendC::LocalTensor<float> &res3Tensor)
+    __aicore__ inline void Launch(const AscendC::LocalTensor<int8_t>& dstTensor,
+                                  const AscendC::LocalTensor<T>& srcTensor, const AscendC::LocalTensor<T>& gammaTensor,
+                                  const AscendC::LocalTensor<T>& betaTensor,
+                                  const AscendC::LocalTensor<T>& quantScaleTensor,
+                                  const AscendC::LocalTensor<int8_t>& quantOffsetTensor,
+                                  const AscendC::LocalTensor<float>& res1Tensor,
+                                  const AscendC::LocalTensor<float>& res3Tensor)
     {
         this->dstTensor = dstTensor;
         this->srcTensor = srcTensor;
@@ -838,11 +838,11 @@ public:
     __aicore__ explicit EinSumQuant() {}
 
     __aicore__ inline void Init(GM_ADDR einSumOutGm, GM_ADDR scaleGm, GM_ADDR quantOutGm,
-                                const MlaTilingData &tilingData)
+                                const MlaTilingData& tilingData)
     {
-        einSumOutGm_.SetGlobalBuffer(reinterpret_cast<__gm__ InDtype *>(einSumOutGm));
-        scaleGm_.SetGlobalBuffer(reinterpret_cast<__gm__ ScaleDtype *>(scaleGm));
-        quantOutGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(quantOutGm));
+        einSumOutGm_.SetGlobalBuffer(reinterpret_cast<__gm__ InDtype*>(einSumOutGm));
+        scaleGm_.SetGlobalBuffer(reinterpret_cast<__gm__ ScaleDtype*>(scaleGm));
+        quantOutGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(quantOutGm));
 
         headNum = tilingData.esqHeadNum;
         colNum = tilingData.esqColNum;
@@ -1068,19 +1068,19 @@ class PpMatmulEinSum {
 public:
     __aicore__ explicit PpMatmulEinSum(){};
 
-    __aicore__ inline void Init(GM_ADDR gmA, GM_ADDR gmB, GM_ADDR gmC, const MlaTilingData &mlaParams);
+    __aicore__ inline void Init(GM_ADDR gmA, GM_ADDR gmB, GM_ADDR gmC, const MlaTilingData& mlaParams);
 
     __aicore__ inline void Process();
     __aicore__ inline void PreloadB();
 
 private:
-    __aicore__ inline void GetBaseBlockIdx(uint64_t index, MatCoord &tidx);
+    __aicore__ inline void GetBaseBlockIdx(uint64_t index, MatCoord& tidx);
     __aicore__ inline uint64_t GetOffsetB(const uint64_t bIdx, const uint64_t kIdx, const uint64_t nIdx);
-    __aicore__ inline void CopyTileA(AscendC::LocalTensor<InDtype> &dstTensor,
-                                     const AscendC::GlobalTensor<InDtype> &srcTensor, const uint64_t m_actual,
+    __aicore__ inline void CopyTileA(AscendC::LocalTensor<InDtype>& dstTensor,
+                                     const AscendC::GlobalTensor<InDtype>& srcTensor, const uint64_t m_actual,
                                      const uint64_t m_round, const uint64_t k_actual, const uint64_t k_round);
-    __aicore__ inline void CopyTileB(AscendC::LocalTensor<InDtype> &dstTensor,
-                                     const AscendC::GlobalTensor<InDtype> &srcTensor, const uint64_t k_actual,
+    __aicore__ inline void CopyTileB(AscendC::LocalTensor<InDtype>& dstTensor,
+                                     const AscendC::GlobalTensor<InDtype>& srcTensor, const uint64_t k_actual,
                                      const uint64_t k_round, const uint64_t n_actual, const uint64_t n_round);
 
 private:
@@ -1112,7 +1112,7 @@ private:
 
 template <DataFormat formatB, bool transB, uint32_t swizzleDirect, uint64_t splitGapA, uint64_t splitGapC>
 __aicore__ inline void PpMatmulEinSum<formatB, transB, swizzleDirect, splitGapA, splitGapC>::Init(
-    GM_ADDR gmA, GM_ADDR gmB, GM_ADDR gmC, const MlaTilingData &mlaParams)
+    GM_ADDR gmA, GM_ADDR gmB, GM_ADDR gmC, const MlaTilingData& mlaParams)
 {
 #ifdef __DAV_C220_CUBE__
     batch_size = mlaParams.mm3.numBatch;
@@ -1131,9 +1131,9 @@ __aicore__ inline void PpMatmulEinSum<formatB, transB, swizzleDirect, splitGapA,
     core_idx = AscendC::GetBlockIdx();
     ping_flag = 1;
 
-    gm_a.SetGlobalBuffer(reinterpret_cast<__gm__ InDtype *>(gmA));
-    gm_b.SetGlobalBuffer(reinterpret_cast<__gm__ InDtype *>(gmB));
-    gm_c.SetGlobalBuffer(reinterpret_cast<__gm__ OutDtype *>(gmC));
+    gm_a.SetGlobalBuffer(reinterpret_cast<__gm__ InDtype*>(gmA));
+    gm_b.SetGlobalBuffer(reinterpret_cast<__gm__ InDtype*>(gmB));
+    gm_c.SetGlobalBuffer(reinterpret_cast<__gm__ OutDtype*>(gmC));
 
     AsdopsBuffer<ArchType::ASCEND_V220> buf;
     l1_base_a = buf.template GetBuffer<BufferType::ASCEND_CB>(0);
@@ -1146,7 +1146,7 @@ __aicore__ inline void PpMatmulEinSum<formatB, transB, swizzleDirect, splitGapA,
 
 template <DataFormat formatB, bool transB, uint32_t swizzleDirect, uint64_t splitGapA, uint64_t splitGapC>
 __aicore__ inline void PpMatmulEinSum<formatB, transB, swizzleDirect, splitGapA, splitGapC>::GetBaseBlockIdx(
-    uint64_t index, MatCoord &tidx)
+    uint64_t index, MatCoord& tidx)
 {
     uint64_t in_batch_idx = index % (tdim.m * tdim.n);
     if constexpr (swizzleDirect == 0) { // Zn
@@ -1225,7 +1225,7 @@ __aicore__ inline uint64_t PpMatmulEinSum<formatB, transB, swizzleDirect, splitG
 
 template <DataFormat formatB, bool transB, uint32_t swizzleDirect, uint64_t splitGapA, uint64_t splitGapC>
 __aicore__ inline void PpMatmulEinSum<formatB, transB, swizzleDirect, splitGapA, splitGapC>::CopyTileA(
-    AscendC::LocalTensor<InDtype> &dstTensor, const AscendC::GlobalTensor<InDtype> &srcTensor, const uint64_t m_actual,
+    AscendC::LocalTensor<InDtype>& dstTensor, const AscendC::GlobalTensor<InDtype>& srcTensor, const uint64_t m_actual,
     const uint64_t m_round, const uint64_t k_actual, const uint64_t k_round)
 {
     if ((m == 1) || (m_actual == 1)) {
@@ -1251,7 +1251,7 @@ __aicore__ inline void PpMatmulEinSum<formatB, transB, swizzleDirect, splitGapA,
 
 template <DataFormat formatB, bool transB, uint32_t swizzleDirect, uint64_t splitGapA, uint64_t splitGapC>
 __aicore__ inline void PpMatmulEinSum<formatB, transB, swizzleDirect, splitGapA, splitGapC>::CopyTileB(
-    AscendC::LocalTensor<InDtype> &dstTensor, const AscendC::GlobalTensor<InDtype> &srcTensor, const uint64_t k_actual,
+    AscendC::LocalTensor<InDtype>& dstTensor, const AscendC::GlobalTensor<InDtype>& srcTensor, const uint64_t k_actual,
     const uint64_t k_round, const uint64_t n_actual, const uint64_t n_round)
 {
     if constexpr (formatB == DataFormat::ND) {
@@ -1558,24 +1558,24 @@ class PpMatmulW8a8 {
 public:
     __aicore__ PpMatmulW8a8() {};
 
-    __aicore__ inline void Init(AscendC::GlobalTensor<InDtype> &gm_a, AscendC::GlobalTensor<InDtype> &gm_b,
-                                AscendC::GlobalTensor<BiasDtype> &gm_bias,
-                                AscendC::GlobalTensor<ScaleDtype> &gm_descale, AscendC::GlobalTensor<OutDtype> &gm_c,
-                                MlaTilingData &mlaParams, uint32_t mode);
+    __aicore__ inline void Init(AscendC::GlobalTensor<InDtype>& gm_a, AscendC::GlobalTensor<InDtype>& gm_b,
+                                AscendC::GlobalTensor<BiasDtype>& gm_bias,
+                                AscendC::GlobalTensor<ScaleDtype>& gm_descale, AscendC::GlobalTensor<OutDtype>& gm_c,
+                                MlaTilingData& mlaParams, uint32_t mode);
     __aicore__ inline uint64_t GetOffsetA(const uint64_t batchIdx, const uint64_t mIdx, uint64_t kIdx);
     __aicore__ inline uint64_t GetOffsetB(const uint64_t batchIdx, const uint64_t kIdx, uint64_t nIdx);
-    __aicore__ inline void CopyTileA(const AscendC::LocalTensor<InDtype> &dstTensor,
-                                     const AscendC::GlobalTensor<InDtype> &srcTensor, const uint64_t m_actual,
+    __aicore__ inline void CopyTileA(const AscendC::LocalTensor<InDtype>& dstTensor,
+                                     const AscendC::GlobalTensor<InDtype>& srcTensor, const uint64_t m_actual,
                                      const uint64_t m_round, const uint64_t k_actual, const uint64_t k_round);
-    __aicore__ inline void CopyTileB(const AscendC::LocalTensor<InDtype> &dstTensor,
-                                     const AscendC::GlobalTensor<InDtype> &srcTensor, const uint64_t k_actual,
+    __aicore__ inline void CopyTileB(const AscendC::LocalTensor<InDtype>& dstTensor,
+                                     const AscendC::GlobalTensor<InDtype>& srcTensor, const uint64_t k_actual,
                                      const uint64_t k_round, const uint64_t n_actual, const uint64_t n_round);
     __aicore__ inline void Process();
     __aicore__ inline void PreloadDoubleWeight();
 
 private:
     __aicore__ inline void InitBuffer();
-    __aicore__ inline void GetBaseBlockIdx(uint64_t index, uint64_t &m_idx, uint64_t &n_idx);
+    __aicore__ inline void GetBaseBlockIdx(uint64_t index, uint64_t& m_idx, uint64_t& n_idx);
 
 private:
     AscendC::GlobalTensor<InDtype> gm_a;
@@ -1617,9 +1617,9 @@ private:
 
 template <bool transA, bool transB, bool withBias, uint32_t swizzleDir, DataFormat formatA, DataFormat formatB>
 __aicore__ inline void PpMatmulW8a8<transA, transB, withBias, swizzleDir, formatA, formatB>::Init(
-    AscendC::GlobalTensor<InDtype> &gm_a, AscendC::GlobalTensor<InDtype> &gm_b,
-    AscendC::GlobalTensor<BiasDtype> &gm_bias, AscendC::GlobalTensor<ScaleDtype> &gm_descale,
-    AscendC::GlobalTensor<OutDtype> &gm_c, MlaTilingData &mlaParams, uint32_t mode)
+    AscendC::GlobalTensor<InDtype>& gm_a, AscendC::GlobalTensor<InDtype>& gm_b,
+    AscendC::GlobalTensor<BiasDtype>& gm_bias, AscendC::GlobalTensor<ScaleDtype>& gm_descale,
+    AscendC::GlobalTensor<OutDtype>& gm_c, MlaTilingData& mlaParams, uint32_t mode)
 {
     this->gm_a = gm_a;
     this->gm_b = gm_b;
@@ -1704,7 +1704,7 @@ __aicore__ inline uint64_t PpMatmulW8a8<transA, transB, withBias, swizzleDir, fo
 
 template <bool transA, bool transB, bool withBias, uint32_t swizzleDir, DataFormat formatA, DataFormat formatB>
 __aicore__ inline void PpMatmulW8a8<transA, transB, withBias, swizzleDir, formatA, formatB>::CopyTileA(
-    const AscendC::LocalTensor<InDtype> &dstTensor, const AscendC::GlobalTensor<InDtype> &srcTensor,
+    const AscendC::LocalTensor<InDtype>& dstTensor, const AscendC::GlobalTensor<InDtype>& srcTensor,
     const uint64_t m_actual, const uint64_t m_round, const uint64_t k_actual, const uint64_t k_round)
 {
     if ((m == 1) || (m_actual == 1 && !transA)) {
@@ -1736,7 +1736,7 @@ __aicore__ inline void PpMatmulW8a8<transA, transB, withBias, swizzleDir, format
 
 template <bool transA, bool transB, bool withBias, uint32_t swizzleDir, DataFormat formatA, DataFormat formatB>
 __aicore__ inline void PpMatmulW8a8<transA, transB, withBias, swizzleDir, formatA, formatB>::CopyTileB(
-    const AscendC::LocalTensor<InDtype> &dstTensor, const AscendC::GlobalTensor<InDtype> &srcTensor,
+    const AscendC::LocalTensor<InDtype>& dstTensor, const AscendC::GlobalTensor<InDtype>& srcTensor,
     const uint64_t k_actual, const uint64_t k_round, const uint64_t n_actual, const uint64_t n_round)
 {
     if constexpr (formatB == DataFormat::ND) {
@@ -1810,7 +1810,7 @@ __aicore__ inline void PpMatmulW8a8<transA, transB, withBias, swizzleDir, format
 
 template <bool transA, bool transB, bool withBias, uint32_t swizzleDir, DataFormat formatA, DataFormat formatB>
 __aicore__ inline void PpMatmulW8a8<transA, transB, withBias, swizzleDir, formatA, formatB>::GetBaseBlockIdx(
-    uint64_t index, uint64_t &m_idx, uint64_t &n_idx)
+    uint64_t index, uint64_t& m_idx, uint64_t& n_idx)
 {
     uint64_t in_batch_idx = index % (m_loop * n_loop);
     if constexpr (swizzleDir == 0) { // Zn
@@ -2183,7 +2183,7 @@ class MLAOperation {
     using kNopeDtype = typename std::conditional_t<cacheMode == CACHE_MODE_INT8_NZCACHE, int8_t, half>;
 
 public:
-    __aicore__ inline MLAOperation(const MlaTilingData &mlaParams_)
+    __aicore__ inline MLAOperation(const MlaTilingData& mlaParams_)
     {
         blockIdx = AscendC::GetBlockIdx();
 #ifdef __DAV_C220_VEC__
@@ -2220,48 +2220,48 @@ public:
                                 GM_ADDR qGm, GM_ADDR keycacheOutGm, GM_ADDR qGm2, GM_ADDR keycacheOutGm2, GM_ADDR s1Gm,
                                 GM_ADDR s2Gm, GM_ADDR s3Gm, GM_ADDR qDownGm)
     {
-        s1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(s1Gm));
-        wdqkvGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(wdqkvGm));
-        bias1gmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(bias1Gm));
-        descale1gmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t *>(descale1Gm));
+        s1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(s1Gm));
+        wdqkvGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(wdqkvGm));
+        bias1gmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(bias1Gm));
+        descale1gmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t*>(descale1Gm));
         s3GmTensor.SetGlobalBuffer(
-            reinterpret_cast<__gm__ half *>(s3Gm)); // 元素个数的偏移，而非大小偏移，s1GM、s3GM偏移的数据类型不一样
+            reinterpret_cast<__gm__ half*>(s3Gm)); // 元素个数的偏移，而非大小偏移，s1GM、s3GM偏移的数据类型不一样
         this->q_down_out_flag &= (qDownGm != nullptr);
 
 #ifdef __DAV_C220_CUBE__
         mm_w8a8_1.Init(s1GmTensor, wdqkvGmTensor, bias1gmTensor, descale1gmTensor, s3GmTensor, mlaParams, 0);
         mm_w8a8_1.PreloadDoubleWeight();
 #endif
-        hiddenStateGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(hiddenStateGm));
-        gamma1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(gamma1Gm));
-        quantScale1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(quantScale1Gm));
-        quantOffset1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(quantOffset1Gm));
+        hiddenStateGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(hiddenStateGm));
+        gamma1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(gamma1Gm));
+        quantScale1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(quantScale1Gm));
+        quantOffset1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(quantOffset1Gm));
 
-        gamma2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(gamma2Gm));
-        quantScale2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(quantScale2Gm));
-        quantScale3GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(gmCtkvScale));
-        quantOffset2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(quantOffset2Gm));
-        gamma3GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(gamma3Gm));
-        sin1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(sin1Gm));
-        cos1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(cos1Gm));
-        sin2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(sin2Gm));
-        cos2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(cos2Gm));
-        keycacheGmTensor1.SetGlobalBuffer(reinterpret_cast<__gm__ kNopeDtype *>(keycacheOutGm));
-        keycacheGmTensor2.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(keycacheOutGm2));
-        slotMappingGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(slotMappingGm));
-        wuqGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(wuqGm));
-        wukGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(wukGm));
-        descale2gmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t *>(descale2Gm));
-        s2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(s2Gm));
-        qGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ qOutDtype *>(qGm));
-        qGmTensor2.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(qGm2));
-        bias2gmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(bias2Gm));
+        gamma2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(gamma2Gm));
+        quantScale2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(quantScale2Gm));
+        quantScale3GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(gmCtkvScale));
+        quantOffset2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(quantOffset2Gm));
+        gamma3GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(gamma3Gm));
+        sin1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(sin1Gm));
+        cos1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(cos1Gm));
+        sin2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(sin2Gm));
+        cos2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(cos2Gm));
+        keycacheGmTensor1.SetGlobalBuffer(reinterpret_cast<__gm__ kNopeDtype*>(keycacheOutGm));
+        keycacheGmTensor2.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(keycacheOutGm2));
+        slotMappingGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(slotMappingGm));
+        wuqGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(wuqGm));
+        wukGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(wukGm));
+        descale2gmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t*>(descale2Gm));
+        s2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(s2Gm));
+        qGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ qOutDtype*>(qGm));
+        qGmTensor2.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(qGm2));
+        bias2gmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(bias2Gm));
         if (q_down_out_flag) {
-            qDownGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(qDownGm));
+            qDownGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(qDownGm));
         }
 
-        beta1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(beta1Gm));
-        beta2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(beta2Gm));
+        beta1GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(beta1Gm));
+        beta2GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(beta2Gm));
 #ifdef __DAV_C220_CUBE__
         mm_w8a8_2.Init(s1GmTensor, wuqGmTensor, bias2gmTensor, descale2gmTensor, s2GmTensor, mlaParams, 1);
         if constexpr (cacheMode == CACHE_MODE_INT8_NZCACHE) {
@@ -2339,13 +2339,13 @@ private:
 
     template <class T1>
     __aicore__ inline void RmsNormAndRopeConvergence1(
-        const AscendC::LocalTensor<T1> &srcTensor, const AscendC::LocalTensor<T1> &gammaTensor,
-        const AscendC::LocalTensor<T1> &sinTensor, const AscendC::LocalTensor<T1> &cosTensor,
-        const AscendC::LocalTensor<int32_t> &slotMappingTensor, const uint32_t sN,
-        const AscendC::LocalTensor<float> &rmsNormTensor, const AscendC::LocalTensor<float> &gammaFp32,
-        const AscendC::LocalTensor<float> &ropeKTensor, const AscendC::LocalTensor<float> &ropeKRevertTensor,
-        const AscendC::LocalTensor<float> &calTensor, const AscendC::LocalTensor<T1> &outTmpTensor,
-        AscendC::LocalTensor<half> &tmpfp16, AscendC::LocalTensor<int8_t> &int8OutTensor, float quantScale3)
+        const AscendC::LocalTensor<T1>& srcTensor, const AscendC::LocalTensor<T1>& gammaTensor,
+        const AscendC::LocalTensor<T1>& sinTensor, const AscendC::LocalTensor<T1>& cosTensor,
+        const AscendC::LocalTensor<int32_t>& slotMappingTensor, const uint32_t sN,
+        const AscendC::LocalTensor<float>& rmsNormTensor, const AscendC::LocalTensor<float>& gammaFp32,
+        const AscendC::LocalTensor<float>& ropeKTensor, const AscendC::LocalTensor<float>& ropeKRevertTensor,
+        const AscendC::LocalTensor<float>& calTensor, const AscendC::LocalTensor<T1>& outTmpTensor,
+        AscendC::LocalTensor<half>& tmpfp16, AscendC::LocalTensor<int8_t>& int8OutTensor, float quantScale3)
     {
         int64_t slotMapGmOffset = vectorBlockIdx * row_work;
         AscendC::DataCopy(gammaTensor, gamma3GmTensor, SPLIT_RMSNRORM_SIZE_ONE);

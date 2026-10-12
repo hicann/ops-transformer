@@ -41,7 +41,7 @@ constexpr float NEG_INFINITY = -INFINITY;
 constexpr uint16_t REDUCE_SIZE = 8;
 
 template <typename T, typename C, typename O, uint8_t M = 0> // M=0为fp8全量化pertoken量化；M=1为fp8全量化pertile量化
-__simd_vf__ void ComputeVFImpl(__ubuf__ T *xAddr, __ubuf__ O *yAddr, __ubuf__ float *scaleAddr, uint32_t rowIndex,
+__simd_vf__ void ComputeVFImpl(__ubuf__ T* xAddr, __ubuf__ O* yAddr, __ubuf__ float* scaleAddr, uint32_t rowIndex,
                                uint32_t rowCount, uint32_t dtypeSize, uint16_t VL, uint16_t vfLoop,
                                const float alphaValue)
 {
@@ -137,12 +137,12 @@ __simd_vf__ void ComputeVFImpl(__ubuf__ T *xAddr, __ubuf__ O *yAddr, __ubuf__ fl
  * @param col 待处理的列数
  */
 template <typename T, typename C, typename O>
-__aicore__ inline void DynamicQuantPerTokenVf(const LocalTensor<O> &outputLocal, const LocalTensor<C> &scale,
-                                              const LocalTensor<T> &inputLocal, uint64_t row, uint64_t col)
+__aicore__ inline void DynamicQuantPerTokenVf(const LocalTensor<O>& outputLocal, const LocalTensor<C>& scale,
+                                              const LocalTensor<T>& inputLocal, uint64_t row, uint64_t col)
 {
-    auto xAddr = (__local_mem__ T *)inputLocal.GetPhyAddr();
-    auto yAddr = (__local_mem__ O *)outputLocal.GetPhyAddr();
-    auto scaleAddr = (__local_mem__ C *)scale.GetPhyAddr();
+    auto xAddr = (__local_mem__ T*)inputLocal.GetPhyAddr();
+    auto yAddr = (__local_mem__ O*)outputLocal.GetPhyAddr();
+    auto scaleAddr = (__local_mem__ C*)scale.GetPhyAddr();
     uint32_t dtypeSize = sizeof(float);
     uint16_t VL = AscendC::VECTOR_REG_WIDTH / dtypeSize;
     uint32_t rowCount = col;
@@ -158,7 +158,7 @@ __aicore__ inline void DynamicQuantPerTokenVf(const LocalTensor<O> &outputLocal,
 }
 
 template <typename T, typename U>
-__simd_vf__ void ComputeMaxExpVF(__ubuf__ T *srcAddr, __ubuf__ uint16_t *maxExpAddr, uint32_t totalCountInUB,
+__simd_vf__ void ComputeMaxExpVF(__ubuf__ T* srcAddr, __ubuf__ uint16_t* maxExpAddr, uint32_t totalCountInUB,
                                  uint16_t loopNum, uint16_t vecLen)
 {
     AscendC::Reg::RegTensor<T> vdExp0;
@@ -180,9 +180,9 @@ __simd_vf__ void ComputeMaxExpVF(__ubuf__ T *srcAddr, __ubuf__ uint16_t *maxExpA
         AscendC::Reg::LoadAlign<T, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
                                 AscendC::Reg::LoadDist::DIST_DINTLV_B16>(vdExp0, vdExp1, srcAddr, vecLen * DIGIT_TWO);
         // 通过位与运算得到bf16的指数位保留，尾数位置0所对应的值, 0x7f80是bf16 8个指数位为1，7个尾数位为0对应的值
-        AscendC::Reg::And(vdExpExtract0, (AscendC::Reg::RegTensor<uint16_t> &)vdExp0, expMaskBF16, scaleMask1);
+        AscendC::Reg::And(vdExpExtract0, (AscendC::Reg::RegTensor<uint16_t>&)vdExp0, expMaskBF16, scaleMask1);
 
-        AscendC::Reg::And(vdExpExtract1, (AscendC::Reg::RegTensor<uint16_t> &)vdExp1, expMaskBF16, scaleMask1);
+        AscendC::Reg::And(vdExpExtract1, (AscendC::Reg::RegTensor<uint16_t>&)vdExp1, expMaskBF16, scaleMask1);
         // 得到指数位最大的值
         AscendC::Reg::Max(vdMaxExp, vdExpExtract0, vdExpExtract1, scaleMask1);
         // 得到每个block(32个元素)中的指数位最大的值
@@ -195,8 +195,8 @@ __simd_vf__ void ComputeMaxExpVF(__ubuf__ T *srcAddr, __ubuf__ uint16_t *maxExpA
 }
 
 template <typename T, typename U>
-__simd_vf__ void ComputeScaleVF(__ubuf__ uint16_t *maxExpAddr, __ubuf__ uint16_t *mxScaleLocalAddr,
-                                __ubuf__ uint16_t *halfScaleLocalAddr, uint32_t totalScaleInUB, uint16_t loopNumScale,
+__simd_vf__ void ComputeScaleVF(__ubuf__ uint16_t* maxExpAddr, __ubuf__ uint16_t* mxScaleLocalAddr,
+                                __ubuf__ uint16_t* halfScaleLocalAddr, uint32_t totalScaleInUB, uint16_t loopNumScale,
                                 uint16_t vecLen)
 {
     AscendC::Reg::RegTensor<uint16_t> expMask;
@@ -257,8 +257,8 @@ __simd_vf__ void ComputeScaleVF(__ubuf__ uint16_t *maxExpAddr, __ubuf__ uint16_t
 }
 
 template <typename T, typename U>
-__simd_vf__ void ComputeDataVF(__ubuf__ T *srcAddr, __ubuf__ uint16_t *halfScaleLocalAddr,
-                               __ubuf__ int8_t *outLocalAddr, uint32_t totalCountInUB, uint32_t totalCountInUB2,
+__simd_vf__ void ComputeDataVF(__ubuf__ T* srcAddr, __ubuf__ uint16_t* halfScaleLocalAddr,
+                               __ubuf__ int8_t* outLocalAddr, uint32_t totalCountInUB, uint32_t totalCountInUB2,
                                uint16_t loopNum, uint16_t vecLen)
 {
     AscendC::Reg::MaskReg dataMask1;
@@ -306,8 +306,8 @@ __simd_vf__ void ComputeDataVF(__ubuf__ T *srcAddr, __ubuf__ uint16_t *halfScale
                                 AscendC::Reg::LoadDist::DIST_E2B_B16>(halfScaleForMul, halfScaleLocalAddr, REDUCE_SIZE);
 
         // X / mxscale
-        AscendC::Reg::Mul(vdExp0, vdExp0, (AscendC::Reg::RegTensor<T> &)halfScaleForMul, dataMask1);
-        AscendC::Reg::Mul(vdExp1, vdExp1, (AscendC::Reg::RegTensor<T> &)halfScaleForMul, dataMask1);
+        AscendC::Reg::Mul(vdExp0, vdExp0, (AscendC::Reg::RegTensor<T>&)halfScaleForMul, dataMask1);
+        AscendC::Reg::Mul(vdExp1, vdExp1, (AscendC::Reg::RegTensor<T>&)halfScaleForMul, dataMask1);
         AscendC::Reg::Interleave(vdExp0, vdExp1, vdExp0, vdExp1);
         AscendC::Reg::Cast<float, T, castTraitZero>(vdExp0FP32Zero, vdExp0, dataMask1);
         AscendC::Reg::Cast<float, T, castTraitOne>(vdExp0FP32One, vdExp0, dataMask1);
@@ -344,16 +344,16 @@ __simd_vf__ void ComputeDataVF(__ubuf__ T *srcAddr, __ubuf__ uint16_t *halfScale
         AscendC::Reg::Cast<U, float, castTrait32to8>(vdExp1FP8One, vdExp1FP32One, dataMask4);
         AscendC::Reg::StoreAlign<int8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
                                  AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-            outLocalAddr, (AscendC::Reg::RegTensor<int8_t> &)vdExp0FP8Zero, OUT_ELE_NUM_ONE_BLK, dataMask3);
+            outLocalAddr, (AscendC::Reg::RegTensor<int8_t>&)vdExp0FP8Zero, OUT_ELE_NUM_ONE_BLK, dataMask3);
         AscendC::Reg::StoreAlign<int8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
                                  AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-            outLocalAddr, (AscendC::Reg::RegTensor<int8_t> &)vdExp0FP8One, OUT_ELE_NUM_ONE_BLK, dataMask3);
+            outLocalAddr, (AscendC::Reg::RegTensor<int8_t>&)vdExp0FP8One, OUT_ELE_NUM_ONE_BLK, dataMask3);
         AscendC::Reg::StoreAlign<int8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
                                  AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-            outLocalAddr, (AscendC::Reg::RegTensor<int8_t> &)vdExp1FP8Zero, OUT_ELE_NUM_ONE_BLK, dataMask4);
+            outLocalAddr, (AscendC::Reg::RegTensor<int8_t>&)vdExp1FP8Zero, OUT_ELE_NUM_ONE_BLK, dataMask4);
         AscendC::Reg::StoreAlign<int8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
                                  AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-            outLocalAddr, (AscendC::Reg::RegTensor<int8_t> &)vdExp1FP8One, OUT_ELE_NUM_ONE_BLK, dataMask4);
+            outLocalAddr, (AscendC::Reg::RegTensor<int8_t>&)vdExp1FP8One, OUT_ELE_NUM_ONE_BLK, dataMask4);
     }
 }
 
@@ -372,10 +372,10 @@ __simd_vf__ void ComputeDataVF(__ubuf__ T *srcAddr, __ubuf__ uint16_t *halfScale
  Pi = cast_to_dst_type(Vi/mxscale, round_mode)
 **/
 template <typename T, typename U>
-__aicore__ inline void DynamicQuantPerBlockMxfp8Vf(const LocalTensor<int8_t> &outputLocal,
-                                                   const LocalTensor<uint16_t> &outputScale,
-                                                   const LocalTensor<T> &inputLocal,
-                                                   const LocalTensor<uint8_t> &tmpLocal, uint32_t row, uint32_t col)
+__aicore__ inline void DynamicQuantPerBlockMxfp8Vf(const LocalTensor<int8_t>& outputLocal,
+                                                   const LocalTensor<uint16_t>& outputScale,
+                                                   const LocalTensor<T>& inputLocal,
+                                                   const LocalTensor<uint8_t>& tmpLocal, uint32_t row, uint32_t col)
 {
     LocalTensor<uint16_t> maxExpLocal = tmpLocal.ReinterpretCast<uint16_t>();
     uint32_t totalScaleInUB = row * col / FP8_E4M3FN_BLOCK_SIZE;
@@ -384,17 +384,17 @@ __aicore__ inline void DynamicQuantPerBlockMxfp8Vf(const LocalTensor<int8_t> &ou
     uint16_t loopNum = (totalCountInUB + vecLen * DIGIT_TWO - 1) / (vecLen * DIGIT_TWO);
     uint16_t loopNumScale = (totalScaleInUB + vecLen - 1) / vecLen;
 
-    auto srcAddr = reinterpret_cast<__ubuf__ T *>(inputLocal.GetPhyAddr());
-    auto maxExpAddr = reinterpret_cast<__ubuf__ uint16_t *>(maxExpLocal.GetPhyAddr());
-    auto mxScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t *>(outputScale.GetPhyAddr());
+    auto srcAddr = reinterpret_cast<__ubuf__ T*>(inputLocal.GetPhyAddr());
+    auto maxExpAddr = reinterpret_cast<__ubuf__ uint16_t*>(maxExpLocal.GetPhyAddr());
+    auto mxScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t*>(outputScale.GetPhyAddr());
     LocalTensor<uint16_t> halfScaleLocal = maxExpLocal[totalCountInUB].template ReinterpretCast<uint16_t>();
-    auto halfScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t *>(halfScaleLocal.GetPhyAddr());
-    auto outLocalAddr = reinterpret_cast<__ubuf__ int8_t *>(outputLocal.GetPhyAddr());
+    auto halfScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t*>(halfScaleLocal.GetPhyAddr());
+    auto outLocalAddr = reinterpret_cast<__ubuf__ int8_t*>(outputLocal.GetPhyAddr());
     ComputeMaxExpVF<T, U>(srcAddr, maxExpAddr, totalCountInUB, loopNum, vecLen);
     ComputeScaleVF<T, U>(maxExpAddr, mxScaleLocalAddr, halfScaleLocalAddr, totalScaleInUB, loopNumScale, vecLen);
 
-    srcAddr = reinterpret_cast<__ubuf__ T *>(inputLocal.GetPhyAddr());
-    halfScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t *>(halfScaleLocal.GetPhyAddr());
+    srcAddr = reinterpret_cast<__ubuf__ T*>(inputLocal.GetPhyAddr());
+    halfScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t*>(halfScaleLocal.GetPhyAddr());
 
     uint32_t totalCountInUB2 = totalCountInUB * DIGIT_TWO;
     ComputeDataVF<T, U>(srcAddr, halfScaleLocalAddr, outLocalAddr, totalCountInUB, totalCountInUB2, loopNum, vecLen);
@@ -410,14 +410,14 @@ __aicore__ inline void DynamicQuantPerBlockMxfp8Vf(const LocalTensor<int8_t> &ou
  * @param tileSize tile的大小 当前只支持128，且col可被tileSize整除
  */
 template <typename T, typename C, typename O>
-__aicore__ inline void QuantPerTileVF(const LocalTensor<O> &outputLocal, const LocalTensor<T> &inputLocal,
-                                      const LocalTensor<T> &quantScaleLocal, const uint32_t row, const uint32_t col,
+__aicore__ inline void QuantPerTileVF(const LocalTensor<O>& outputLocal, const LocalTensor<T>& inputLocal,
+                                      const LocalTensor<T>& quantScaleLocal, const uint32_t row, const uint32_t col,
                                       const uint32_t tileSize)
 {
     uint32_t cnt = row * col;
-    __ubuf__ T *inputBuf = (__ubuf__ T *)inputLocal.GetPhyAddr();
-    __ubuf__ T *quantScaleBuf = (__ubuf__ T *)quantScaleLocal.GetPhyAddr();
-    __ubuf__ O *outputBuf = (__ubuf__ O *)outputLocal.GetPhyAddr();
+    __ubuf__ T* inputBuf = (__ubuf__ T*)inputLocal.GetPhyAddr();
+    __ubuf__ T* quantScaleBuf = (__ubuf__ T*)quantScaleLocal.GetPhyAddr();
+    __ubuf__ O* outputBuf = (__ubuf__ O*)outputLocal.GetPhyAddr();
     uint32_t dtypeSize = sizeof(float);
     uint16_t VL = AscendC::VECTOR_REG_WIDTH / dtypeSize;
     uint16_t vfLoop = (tileSize + VL - 1) / VL;

@@ -25,7 +25,7 @@ constexpr uint64_t ATTR_Q_DOWN_OUT_FLAG_IDX = 13;
 
 namespace optiling {
 
-ASCENDC_EXTERN_C ge::graphStatus TilingMLAPreprocessV2(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingMLAPreprocessV2(gert::TilingContext* context)
 {
     MlaPreprocessTiling mlaTiling;
     auto status = mlaTiling.Init(context);
@@ -34,12 +34,13 @@ ASCENDC_EXTERN_C ge::graphStatus TilingMLAPreprocessV2(gert::TilingContext *cont
     }
     bool qDownOutFlag = *(context->GetAttrs()->GetAttrPointer<bool>(ATTR_Q_DOWN_OUT_FLAG_IDX));
     mlaTiling.mlaTilingData.set_qDownOutFlag(qDownOutFlag);
-    mlaTiling.mlaTilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
+    mlaTiling.mlaTilingData.SaveToBuffer(context->GetRawTilingData()->GetData(),
+                                         context->GetRawTilingData()->GetCapacity());
     context->GetRawTilingData()->SetDataSize(mlaTiling.mlaTilingData.GetDataSize());
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingPrepareForMlaPreprocessV2(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForMlaPreprocessV2(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

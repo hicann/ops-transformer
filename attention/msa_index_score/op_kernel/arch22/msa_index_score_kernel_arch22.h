@@ -79,28 +79,28 @@ public:
 
     __aicore__ inline void Init(GM_ADDR query, GM_ADDR key, GM_ADDR blockTable, GM_ADDR scale, GM_ADDR actualSeqQlen,
                                 GM_ADDR actualSeqKlen, GM_ADDR startLoc, GM_ADDR score, GM_ADDR workspace,
-                                const MsaIndexScoreTilingData *__restrict tiling)
+                                const MsaIndexScoreTilingData* __restrict tiling)
     {
         tiling_ = tiling;
-        gQuery_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ *>(query));
+        gQuery_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ*>(query));
         if constexpr (IS_QUANT_V) {
-            gKeyInt8_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(key));
+            gKeyInt8_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(key));
         } else {
-            gKeyFp_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ *>(key));
+            gKeyFp_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ*>(key));
         }
         if (IS_QUANT_V || tiling_->keyLayout == MSA_KEY_LAYOUT_TND) {
-            gKeyScratch_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ *>(
-                reinterpret_cast<__gm__ float *>(workspace) + tiling_->kScratchOffsetElems));
+            gKeyScratch_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ*>(reinterpret_cast<__gm__ float*>(workspace) +
+                                                                            tiling_->kScratchOffsetElems));
         }
         if (tiling_->keyLayout != MSA_KEY_LAYOUT_TND) {
-            gBlockTable_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(blockTable));
+            gBlockTable_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(blockTable));
         }
-        gScale_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(scale));
-        gActualSeqQlen_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(actualSeqQlen));
-        gActualSeqKlen_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(actualSeqKlen));
-        gStartLoc_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(startLoc));
-        gScore_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(score));
-        gWorkspace_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementS *>(workspace));
+        gScale_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(scale));
+        gActualSeqQlen_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(actualSeqQlen));
+        gActualSeqKlen_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(actualSeqKlen));
+        gStartLoc_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(startLoc));
+        gScore_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(score));
+        gWorkspace_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementS*>(workspace));
 
         scheduler_.Init(tiling_->batch, tiling_->numQHeads, tiling_->maxBlocksPerBatch, tiling_->scoreBlockStride,
                         tiling_->sparseMode, tiling_->initBlocks, tiling_->localBlocks, tiling_->keyLayout,
@@ -168,8 +168,8 @@ private:
         return coreKScratch;
     }
 
-    __aicore__ inline void WaitKScratchReady(Catlass::Arch::CrossCoreFlag &flagK0, Catlass::Arch::CrossCoreFlag &flagK1,
-                                             Catlass::Arch::CrossCoreFlag &flagK2, Catlass::Arch::CrossCoreFlag &flagK3,
+    __aicore__ inline void WaitKScratchReady(Catlass::Arch::CrossCoreFlag& flagK0, Catlass::Arch::CrossCoreFlag& flagK1,
+                                             Catlass::Arch::CrossCoreFlag& flagK2, Catlass::Arch::CrossCoreFlag& flagK3,
                                              uint32_t st)
     {
         if constexpr (IS_QUANT_V) {
@@ -191,7 +191,7 @@ private:
         }
     }
 
-    __aicore__ inline bool KeyBlockNeedsScratch(const MsaTask &task, uint32_t blk) const
+    __aicore__ inline bool KeyBlockNeedsScratch(const MsaTask& task, uint32_t blk) const
     {
         if constexpr (IS_QUANT_V) {
             return true;
@@ -205,7 +205,7 @@ private:
         return (nValidTok > 0) && (nValidTok < MSA_BLOCK_SIZE) && (task.batchIdx + 1U == tiling_->batch);
     }
 
-    __aicore__ inline bool StileNeedsKScratch(const MsaTask &task, uint32_t blkBase) const
+    __aicore__ inline bool StileNeedsKScratch(const MsaTask& task, uint32_t blkBase) const
     {
         for (uint32_t j = 0; j < MSA_BLOCKS_PER_STILE; ++j) {
             const uint32_t blk = blkBase + j;
@@ -219,7 +219,7 @@ private:
         return false;
     }
 
-    __aicore__ inline uint32_t KeyBlockValidTokens(const MsaTask &task, uint32_t blk) const
+    __aicore__ inline uint32_t KeyBlockValidTokens(const MsaTask& task, uint32_t blk) const
     {
         if (tiling_->keyLayout != MSA_KEY_LAYOUT_TND) {
             return MSA_BLOCK_SIZE;
@@ -232,7 +232,7 @@ private:
         return seqRemain < MSA_BLOCK_SIZE ? seqRemain : MSA_BLOCK_SIZE;
     }
 
-    __aicore__ inline uint64_t KeyBlockGmOffset(const MsaTask &task, uint32_t blk) const
+    __aicore__ inline uint64_t KeyBlockGmOffset(const MsaTask& task, uint32_t blk) const
     {
         if (tiling_->keyLayout == MSA_KEY_LAYOUT_TND) {
             const uint32_t tokenStart = task.cuKStart + blk * tiling_->blockSize;
@@ -244,7 +244,7 @@ private:
     }
 
     template <typename T>
-    __aicore__ inline void CopyGmToUbPartial(const AscendC::LocalTensor<T> &ub, const AscendC::GlobalTensor<T> &gm,
+    __aicore__ inline void CopyGmToUbPartial(const AscendC::LocalTensor<T>& ub, const AscendC::GlobalTensor<T>& gm,
                                              uint32_t nElem)
     {
         if (nElem == 0) {
@@ -269,7 +269,7 @@ private:
     }
 
     /// int8 gather：单 i8 + 单 fp16，每页 MTE2→V→MTE3 串行。subIdx/subBlockNum 对分 page。
-    __aicore__ inline void GatherKeySTileQuantPiped(Catlass::Arch::Resource<ArchTag> &resource, const MsaTask &task,
+    __aicore__ inline void GatherKeySTileQuantPiped(Catlass::Arch::Resource<ArchTag>& resource, const MsaTask& task,
                                                     uint32_t blkBase, uint64_t kScratchBase, uint32_t subIdx,
                                                     uint32_t subBlockNum)
     {
@@ -330,7 +330,7 @@ private:
 
     /// AIV：把本 S-tile 可见 block 的 K 收进 per-core scratch（int8 cast 或 TND fp copy+尾填充）。
     /// int8：两 AIV 按 j%subBlockNum 对分 page；非量化仍由调用方只让 AIV0 进来。
-    __aicore__ inline void GatherKeySTileToScratch(Catlass::Arch::Resource<ArchTag> &resource, const MsaTask &task,
+    __aicore__ inline void GatherKeySTileToScratch(Catlass::Arch::Resource<ArchTag>& resource, const MsaTask& task,
                                                    uint32_t blkBase, uint64_t kScratchBase, uint32_t subIdx,
                                                    uint32_t subBlockNum)
     {
@@ -381,10 +381,10 @@ private:
         AscendC::PipeBarrier<PIPE_ALL>();
     }
 
-    __aicore__ inline void NotifyKScratchReady(Catlass::Arch::CrossCoreFlag &flagK0,
-                                               Catlass::Arch::CrossCoreFlag &flagK1,
-                                               Catlass::Arch::CrossCoreFlag &flagK2,
-                                               Catlass::Arch::CrossCoreFlag &flagK3, uint32_t st)
+    __aicore__ inline void NotifyKScratchReady(Catlass::Arch::CrossCoreFlag& flagK0,
+                                               Catlass::Arch::CrossCoreFlag& flagK1,
+                                               Catlass::Arch::CrossCoreFlag& flagK2,
+                                               Catlass::Arch::CrossCoreFlag& flagK3, uint32_t st)
     {
         if constexpr (IS_QUANT_V) {
             const uint32_t slot = st % MSA_K_SCRATCH_STAGES_A2;
@@ -405,12 +405,12 @@ private:
         }
     }
 
-    __aicore__ inline void IssueKGatherAndNotify(Catlass::Arch::Resource<ArchTag> &resource, const MsaTask &task,
+    __aicore__ inline void IssueKGatherAndNotify(Catlass::Arch::Resource<ArchTag>& resource, const MsaTask& task,
                                                  uint32_t st, uint64_t coreKScratch, uint32_t subIdx,
-                                                 uint32_t subBlockNum, Catlass::Arch::CrossCoreFlag &flagK0,
-                                                 Catlass::Arch::CrossCoreFlag &flagK1,
-                                                 Catlass::Arch::CrossCoreFlag &flagK2,
-                                                 Catlass::Arch::CrossCoreFlag &flagK3)
+                                                 uint32_t subBlockNum, Catlass::Arch::CrossCoreFlag& flagK0,
+                                                 Catlass::Arch::CrossCoreFlag& flagK1,
+                                                 Catlass::Arch::CrossCoreFlag& flagK2,
+                                                 Catlass::Arch::CrossCoreFlag& flagK3)
     {
         if constexpr (IS_QUANT_V) {
             GatherKeySTileToScratch(resource, task, st * MSA_BLOCKS_PER_STILE, KScratchSlot(coreKScratch, st), subIdx,
@@ -421,7 +421,7 @@ private:
         NotifyKScratchReady(flagK0, flagK1, flagK2, flagK3, st);
     }
 
-    __aicore__ inline void ComputeSTile(BlockMmad &blockMmad, const MsaTask &task, uint32_t blkBase, uint64_t sBase,
+    __aicore__ inline void ComputeSTile(BlockMmad& blockMmad, const MsaTask& task, uint32_t blkBase, uint64_t sBase,
                                         uint64_t kScratchBase, bool needLoadL1)
     {
         const uint32_t mActual = task.mActual;
@@ -526,7 +526,7 @@ private:
         AscendC::PipeBarrier<PIPE_ALL>();
     }
 
-    const MsaIndexScoreTilingData *__restrict tiling_ = nullptr;
+    const MsaIndexScoreTilingData* __restrict tiling_ = nullptr;
     MsaTaskScheduler scheduler_;
 
     AscendC::GlobalTensor<ElementQ> gQuery_;

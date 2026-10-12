@@ -14,82 +14,79 @@
 
 #include "ts_nsa_selected_attention_infer.h"
 namespace {
-    TEST_P(Ts_NsaSelectAttentionInfer_WithParam_Ascend910B1, Tc_Tiling_NsaSelectAttentionInfer)
-    {
-        ASSERT_TRUE(case_->Init());
-        ASSERT_EQ(case_->Run(), case_->mOpInfo.mExp.mSuccess);
-    }
-    const auto Tc_NsaSelectAttentionInfer_Tiling_Case = ::testing::Values(
-        NsaSelectAttentionInferCase(
-            "NsaSelectAttentionInfer_Case_q3_tnd", true, "", /* CaseName, Enable, DebugInfo */
-            OpInfo(ControlInfo(true, false),          /* RunTiling, RunKernel */
-                ExpectInfo(false,                  /* ExpectSuccess */
-                            1,                      /* ExpectTilingKey */
-                            48)),                   /* ExpectTilingBlockDim */
-            NsaSelectAttentionInferParam(
-                30, 3, 1, 192, 2, /* batchSize, qSeqSize, headSize, headDim, maxBlockNumPerBatch*/
-                128, 256, 128, 1, /* blockSize kvSeqSize, headDimV, headSizeV*/
-                128, 2, 0, 1.0f, /* selectedBlockSize selectedBlockCount, sparseMode, scaleValue*/      
-                "TND",              /* inputLayout */
-                ge::DT_FLOAT16,     /* optionalDataType */
-                {3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-                3,3,3,3,3,3,3,3,3,3,3,3,3,3,3},     /* actualSeqQLenList */
-                {256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,
-                256,256,256,256,256,256,256,256,256,256,256,256,256,256,256},      /* actualSeqKVLenList */
-                90    /* numtokens */
-        )),
-        NsaSelectAttentionInferCase(
-            "NsaSelectAttentionInfer_Case_q1_bsnd_fp16", true, "", /* CaseName, Enable, DebugInfo */
-            OpInfo(ControlInfo(true, false),          /* RunTiling, RunKernel */
-                ExpectInfo(false,                  /* ExpectSuccess */
-                            0,                      /* ExpectTilingKey */
-                            48)),                   /* ExpectTilingBlockDim */
-            NsaSelectAttentionInferParam(
-                30, 1, 1, 192, 2, /* batchSize, qSeqSize, headSize, headDim, maxBlockNumPerBatch*/
-                128, 256, 128, 1, /* blockSize kvSeqSize, headDimV, headSizeV*/
-                128, 2, 0, 1.0f, /* selectedBlockSize selectedBlockCount, sparseMode, scaleValue*/      
-                "BSND",              /* inputLayout */
-                ge::DT_FLOAT16,     /* optionalDataType */
-                {3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-                3,3,3,3,3,3,3,3,3,3,3,3,3,3,3},     /* actualSeqQLenList */
-                {256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,
-                256,256,256,256,256,256,256,256,256,256,256,256,256,256,256},      /* actualSeqKVLenList */
-                30    /* numtokens */
-        )),
-        NsaSelectAttentionInferCase(
-            "NsaSelectAttentionInfer_Case_q1_bsh_fp16", true, "", /* CaseName, Enable, DebugInfo */
-            OpInfo(ControlInfo(true, false),          /* RunTiling, RunKernel */
-                ExpectInfo(false,                  /* ExpectSuccess */
-                            0,                      /* ExpectTilingKey */
-                            48)),                   /* ExpectTilingBlockDim */
-            NsaSelectAttentionInferParam(
-                1, 1, 1, 192, 2, /* batchSize, qSeqSize, headSize, headDim, maxBlockNumPerBatch*/
-                128, 256, 128, 1, /* blockSize kvSeqSize, headDimV, headSizeV*/
-                128, 2, 0, 1.0f, /* selectedBlockSize selectedBlockCount, sparseMode, scaleValue*/      
-                "BSND",              /* inputLayout */
-                ge::DT_FLOAT16,     /* optionalDataType */
-                {1},     /* actualSeqQLenList */
-                {256},      /* actualSeqKVLenList */
-                1    /* numtokens */
-        )),
-        NsaSelectAttentionInferCase(
-            "NsaSelectAttentionInfer_Case_q1_tnd_fp16", true, "", /* CaseName, Enable, DebugInfo */
-            OpInfo(ControlInfo(true, false),          /* RunTiling, RunKernel */
-                ExpectInfo(false,                  /* ExpectSuccess */
-                            1,                      /* ExpectTilingKey */
-                            48)),                   /* ExpectTilingBlockDim */
-            NsaSelectAttentionInferParam(
-                1, 1, 1, 192, 2, /* batchSize, qSeqSize, headSize, headDim, maxBlockNumPerBatch*/
-                128, 256, 128, 1, /* blockSize kvSeqSize, headDimV, headSizeV*/
-                128, 2, 0, 1.0f, /* selectedBlockSize selectedBlockCount, sparseMode, scaleValue*/      
-                "BSND",              /* inputLayout */
-                ge::DT_FLOAT16,     /* optionalDataType */
-                {1},     /* actualSeqQLenList */
-                {256},      /* actualSeqKVLenList */
-                1    /* numtokens */
-        ))
-    );
-
-INSTANTIATE_TEST_SUITE_P(NsaSelectedAttentionInfer, 
-Ts_NsaSelectAttentionInfer_WithParam_Ascend910B1,Tc_NsaSelectAttentionInfer_Tiling_Case);    
+TEST_P(Ts_NsaSelectAttentionInfer_WithParam_Ascend910B1, Tc_Tiling_NsaSelectAttentionInfer)
+{
+    ASSERT_TRUE(case_->Init());
+    ASSERT_EQ(case_->Run(), case_->mOpInfo.mExp.mSuccess);
 }
+const auto Tc_NsaSelectAttentionInfer_Tiling_Case = ::testing::Values(
+    NsaSelectAttentionInferCase(
+        "NsaSelectAttentionInfer_Case_q3_tnd", true, "", /* CaseName, Enable, DebugInfo */
+        OpInfo(ControlInfo(true, false),                 /* RunTiling, RunKernel */
+               ExpectInfo(false,                         /* ExpectSuccess */
+                          1,                             /* ExpectTilingKey */
+                          48)),                          /* ExpectTilingBlockDim */
+        NsaSelectAttentionInferParam(
+            30, 3, 1, 192, 2, /* batchSize, qSeqSize, headSize, headDim, maxBlockNumPerBatch*/
+            128, 256, 128, 1, /* blockSize kvSeqSize, headDimV, headSizeV*/
+            128, 2, 0, 1.0f,  /* selectedBlockSize selectedBlockCount, sparseMode, scaleValue*/
+            "TND",            /* inputLayout */
+            ge::DT_FLOAT16,   /* optionalDataType */
+            {3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3}, /* actualSeqQLenList */
+            {256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256,
+             256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256}, /* actualSeqKVLenList */
+            90                                                                           /* numtokens */
+            )),
+    NsaSelectAttentionInferCase(
+        "NsaSelectAttentionInfer_Case_q1_bsnd_fp16", true, "", /* CaseName, Enable, DebugInfo */
+        OpInfo(ControlInfo(true, false),                       /* RunTiling, RunKernel */
+               ExpectInfo(false,                               /* ExpectSuccess */
+                          0,                                   /* ExpectTilingKey */
+                          48)),                                /* ExpectTilingBlockDim */
+        NsaSelectAttentionInferParam(
+            30, 1, 1, 192, 2, /* batchSize, qSeqSize, headSize, headDim, maxBlockNumPerBatch*/
+            128, 256, 128, 1, /* blockSize kvSeqSize, headDimV, headSizeV*/
+            128, 2, 0, 1.0f,  /* selectedBlockSize selectedBlockCount, sparseMode, scaleValue*/
+            "BSND",           /* inputLayout */
+            ge::DT_FLOAT16,   /* optionalDataType */
+            {3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3}, /* actualSeqQLenList */
+            {256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256,
+             256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256}, /* actualSeqKVLenList */
+            30                                                                           /* numtokens */
+            )),
+    NsaSelectAttentionInferCase(
+        "NsaSelectAttentionInfer_Case_q1_bsh_fp16", true, "", /* CaseName, Enable, DebugInfo */
+        OpInfo(ControlInfo(true, false),                      /* RunTiling, RunKernel */
+               ExpectInfo(false,                              /* ExpectSuccess */
+                          0,                                  /* ExpectTilingKey */
+                          48)),                               /* ExpectTilingBlockDim */
+        NsaSelectAttentionInferParam(1, 1, 1, 192, 2,  /* batchSize, qSeqSize, headSize, headDim, maxBlockNumPerBatch*/
+                                     128, 256, 128, 1, /* blockSize kvSeqSize, headDimV, headSizeV*/
+                                     128, 2, 0, 1.0f,  /* selectedBlockSize selectedBlockCount, sparseMode, scaleValue*/
+                                     "BSND",           /* inputLayout */
+                                     ge::DT_FLOAT16,   /* optionalDataType */
+                                     {1},              /* actualSeqQLenList */
+                                     {256},            /* actualSeqKVLenList */
+                                     1                 /* numtokens */
+                                     )),
+    NsaSelectAttentionInferCase(
+        "NsaSelectAttentionInfer_Case_q1_tnd_fp16", true, "", /* CaseName, Enable, DebugInfo */
+        OpInfo(ControlInfo(true, false),                      /* RunTiling, RunKernel */
+               ExpectInfo(false,                              /* ExpectSuccess */
+                          1,                                  /* ExpectTilingKey */
+                          48)),                               /* ExpectTilingBlockDim */
+        NsaSelectAttentionInferParam(1, 1, 1, 192, 2,  /* batchSize, qSeqSize, headSize, headDim, maxBlockNumPerBatch*/
+                                     128, 256, 128, 1, /* blockSize kvSeqSize, headDimV, headSizeV*/
+                                     128, 2, 0, 1.0f,  /* selectedBlockSize selectedBlockCount, sparseMode, scaleValue*/
+                                     "BSND",           /* inputLayout */
+                                     ge::DT_FLOAT16,   /* optionalDataType */
+                                     {1},              /* actualSeqQLenList */
+                                     {256},            /* actualSeqKVLenList */
+                                     1                 /* numtokens */
+                                     )));
+
+INSTANTIATE_TEST_SUITE_P(NsaSelectedAttentionInfer, Ts_NsaSelectAttentionInfer_WithParam_Ascend910B1,
+                         Tc_NsaSelectAttentionInfer_Tiling_Case);
+} // namespace

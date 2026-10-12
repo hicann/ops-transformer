@@ -19,7 +19,7 @@
 namespace optiling {
 namespace nsa {
 
-ge::graphStatus CheckTndSoftmaxMaxShape(gert::TilingContext *context, int64_t t1, int64_t n1)
+ge::graphStatus CheckTndSoftmaxMaxShape(gert::TilingContext* context, int64_t t1, int64_t n1)
 {
     auto softmaxMaxShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::SOFTMAX_MAX));
     if (softmaxMaxShape == nullptr) {
@@ -36,13 +36,13 @@ ge::graphStatus CheckTndSoftmaxMaxShape(gert::TilingContext *context, int64_t t1
 
     // softmaxMax pad to 8
     OP_CHECK_IF((dim0 != t1 || dim1 != n1 || dim2 != 8),
-               OP_LOGE(context, "The shape of softmaxMax is invalid, got (%ld,%ld,%ld), should be (%ld,%ld,8)", dim0,
-                         dim1, dim2, t1, n1),
-               return ge::GRAPH_FAILED);
+                OP_LOGE(context, "The shape of softmaxMax is invalid, got (%ld,%ld,%ld), should be (%ld,%ld,8)", dim0,
+                        dim1, dim2, t1, n1),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext *context, int64_t t1, int64_t n1)
+ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext* context, int64_t t1, int64_t n1)
 {
     auto softmaxSumShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::SOFTMAX_SUM));
     if (softmaxSumShape == nullptr) {
@@ -59,13 +59,13 @@ ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext *context, int64_t t1
 
     // softmaxSum pad to 8
     OP_CHECK_IF((dim0 != t1 || dim1 != n1 || dim2 != 8),
-               OP_LOGE(context, "The shape of softmaxSum is invalid, got (%ld,%ld,%ld), should be (%ld,%ld,8)", dim0,
-                         dim1, dim2, t1, n1),
-               return ge::GRAPH_FAILED);
+                OP_LOGE(context, "The shape of softmaxSum is invalid, got (%ld,%ld,%ld), should be (%ld,%ld,8)", dim0,
+                        dim1, dim2, t1, n1),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckAttentionInShape(gert::TilingContext *context)
+ge::graphStatus CheckAttentionInShape(gert::TilingContext* context)
 {
     auto attentionInShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::ATTENTION_OUT));
     if (attentionInShape == nullptr) {
@@ -78,19 +78,19 @@ ge::graphStatus CheckAttentionInShape(gert::TilingContext *context)
     auto valueShapeDim = valueShape->GetStorageShape().GetDimNum();
     if (attentionInShapeDim != queryShapeDim) {
         OP_LOGE(context, "The dimnum of attentionIn %zu should be equal to query %zu", attentionInShapeDim,
-                  queryShapeDim);
+                queryShapeDim);
         return ge::GRAPH_FAILED;
     }
     if (attentionInShapeDim != valueShapeDim) {
         OP_LOGE(context, "The dimnum of attentionIn %zu should be equal to value %zu", attentionInShapeDim,
-                  valueShapeDim);
+                valueShapeDim);
         return ge::GRAPH_FAILED;
     }
 
     for (size_t i = 0; i < queryShapeDim - 1; i++) {
         if (attentionInShape->GetStorageShape().GetDim(i) != queryShape->GetStorageShape().GetDim(i)) {
             OP_LOGE(context, "The dim %zu of attentionIn shape is invalid, got %ld, should be %ld", i,
-                      attentionInShape->GetStorageShape().GetDim(i), queryShape->GetStorageShape().GetDim(i));
+                    attentionInShape->GetStorageShape().GetDim(i), queryShape->GetStorageShape().GetDim(i));
             return ge::GRAPH_FAILED;
         }
     }
@@ -98,49 +98,53 @@ ge::graphStatus CheckAttentionInShape(gert::TilingContext *context)
     if (attentionInShape->GetStorageShape().GetDim(queryShapeDim - 1) !=
         valueShape->GetStorageShape().GetDim(queryShapeDim - 1)) {
         OP_LOGE(context, "The head_dim of attentionIn shape is invalid, got %ld, should be %ld",
-                  attentionInShape->GetStorageShape().GetDim(queryShapeDim - 1),
-                  valueShape->GetStorageShape().GetDim(queryShapeDim - 1));
+                attentionInShape->GetStorageShape().GetDim(queryShapeDim - 1),
+                valueShape->GetStorageShape().GetDim(queryShapeDim - 1));
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckSoftmaxDtype(const gert::TilingContext *context)
+ge::graphStatus CheckSoftmaxDtype(const gert::TilingContext* context)
 {
     auto softmaxMax = context->GetOptionalInputDesc(static_cast<size_t>(InputIndex::SOFTMAX_MAX));
     auto softmaxSum = context->GetOptionalInputDesc(static_cast<size_t>(InputIndex::SOFTMAX_SUM));
     OP_CHECK_IF(softmaxMax == nullptr || softmaxSum == nullptr,
-               OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "softmax_max or softmax_sum is nullptr."), return ge::GRAPH_FAILED);
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "softmax_max or softmax_sum is nullptr."),
+                return ge::GRAPH_FAILED);
 
     auto softmaxMaxType = static_cast<uint32_t>(softmaxMax->GetDataType());
     auto softmaxSumType = static_cast<uint32_t>(softmaxSum->GetDataType());
 
     bool softmaxTypeCheck = (softmaxMaxType == softmaxSumType) && (softmaxMaxType == ge::DT_FLOAT);
     OP_CHECK_IF(softmaxTypeCheck != true,
-               OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "softmaxMaxType should be DT_FLOAT and same with softmaxSumType"),
-               return ge::GRAPH_FAILED);
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
+                                            "softmaxMaxType should be DT_FLOAT and same with softmaxSumType"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckAttentionInDtype(const gert::TilingContext *context)
+ge::graphStatus CheckAttentionInDtype(const gert::TilingContext* context)
 {
     auto query = context->GetInputDesc(static_cast<size_t>(InputIndex::QUERY));
     auto attentionIn = context->GetOptionalInputDesc(static_cast<size_t>(InputIndex::ATTENTION_OUT));
     OP_CHECK_IF(query == nullptr || attentionIn == nullptr,
-               OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "query or attentionIn is nullptr."), return ge::GRAPH_FAILED);
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "query or attentionIn is nullptr."),
+                return ge::GRAPH_FAILED);
 
     auto queryType = static_cast<uint32_t>(query->GetDataType());
     auto attentionInType = static_cast<uint32_t>(attentionIn->GetDataType());
 
     OP_CHECK_IF(queryType != attentionInType,
-               OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "invalid attentionIn dtype should be same with query's dtype"),
-               return ge::GRAPH_FAILED);
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
+                                            "invalid attentionIn dtype should be same with query's dtype"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, int64_t t1, int64_t n1, int64_t d, int64_t d2)
+ge::graphStatus CheckTndShapeValid(gert::TilingContext* context, int64_t t1, int64_t n1, int64_t d, int64_t d2)
 {
     if (context == nullptr) {
         OP_LOGE(context, "context is nullptr");
@@ -169,7 +173,7 @@ ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, int64_t t1, int
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckDtypeValid(gert::TilingContext *context)
+ge::graphStatus CheckDtypeValid(gert::TilingContext* context)
 {
     if (context == nullptr) {
         OP_LOGE(context, "context is nullptr");
@@ -188,7 +192,7 @@ ge::graphStatus CheckDtypeValid(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-bool IsSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape)
+bool IsSameShape(const gert::StorageShape* aShape, const gert::StorageShape* bShape)
 {
     OP_CHECK_IF((aShape == nullptr) || (bShape == nullptr), OP_LOGW("aShape or bShape is nullptr."), return false);
     uint32_t dimSizeA = aShape->GetStorageShape().GetDimNum();

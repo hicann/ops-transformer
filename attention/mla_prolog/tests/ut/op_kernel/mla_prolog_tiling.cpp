@@ -9,10 +9,9 @@
  */
 
 /*!
-* \file mla_prolog_tiling.cpp
-* \brief
-*/
-
+ * \file mla_prolog_tiling.cpp
+ * \brief
+ */
 
 namespace optiling {
 
@@ -25,15 +24,15 @@ inline auto CeilDiv(T a, T b) -> T
     return (a + b - 1) / b;
 }
 
-template <typename T> 
+template <typename T>
 inline auto Align(T num, T rnd) -> T
 {
-    return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd) * (rnd)));
+    return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
 }
 
-uint32_t CalcSingleCoreN(uint32_t n, uint32_t coreNum, uint32_t alignNum) 
+uint32_t CalcSingleCoreN(uint32_t n, uint32_t coreNum, uint32_t alignNum)
 {
     return CeilDiv(n, alignNum * coreNum) * alignNum;
 }
 
-}
+} // namespace optiling

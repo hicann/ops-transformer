@@ -154,12 +154,12 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
     CopyL0CToGm() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGm(Params const &params_)
+    CopyL0CToGm(Params const& params_)
         : params(params_) {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
-                    LayoutDst const &dstLayout, LayoutSrc const &srcLayout, uint8_t unitFlag = 0)
+    void operator()(AscendC::GlobalTensor<ElementDst> const& dst, AscendC::LocalTensor<ElementSrc> const& src,
+                    LayoutDst const& dstLayout, LayoutSrc const& srcLayout, uint8_t unitFlag = 0)
     {
         AscendC::FixpipeParamsV220 intriParams;
 
@@ -199,12 +199,12 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA5, ElementAccumulator_, Gemm::GemmType<E
     CopyL0CToGm() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGm(Params const &params_)
+    CopyL0CToGm(Params const& params_)
         : params(params_) {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
-                    LayoutDst const &dstLayout, LayoutSrc const &srcLayout, uint8_t unitFlag = 0)
+    void operator()(AscendC::GlobalTensor<ElementDst> const& dst, AscendC::LocalTensor<ElementSrc> const& src,
+                    LayoutDst const& dstLayout, LayoutSrc const& srcLayout, uint8_t unitFlag = 0)
     {
         // 950 L0C→GM：与仓内 KDA 相同的 DataCopyCO12Dst + SetFixpipeNz2ndFlag。
         // mSize 用实际 M（dstLayout），srcStride 用 L0C 16 对齐步长。
@@ -253,12 +253,12 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
     CopyL0CToGm() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGm(Params const &params_)
+    CopyL0CToGm(Params const& params_)
         : params(params_) {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
-                    LayoutDst const &dstLayout, LayoutSrc const &srcLayout, uint8_t unitFlag = 0)
+    void operator()(AscendC::GlobalTensor<ElementDst> const& dst, AscendC::LocalTensor<ElementSrc> const& src,
+                    LayoutDst const& dstLayout, LayoutSrc const& srcLayout, uint8_t unitFlag = 0)
     {
         AscendC::FixpipeParamsV220 intriParams;
 
@@ -270,7 +270,7 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
 
         // Fixpipe auxiliary arguments
         intriParams.quantPre = quantPre;
-        intriParams.deqScalar = static_cast<uint64_t>(*reinterpret_cast<int32_t *>(&params.scale));
+        intriParams.deqScalar = static_cast<uint64_t>(*reinterpret_cast<int32_t*>(&params.scale));
         intriParams.reluEn = reluEn;
         intriParams.unitFlag = unitFlag;
 
@@ -298,12 +298,12 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
     CopyL0CToGm() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGm(Params const &params_)
+    CopyL0CToGm(Params const& params_)
         : params(params_) {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
-                    AscendC::LocalTensor<uint64_t> const &scale, LayoutDst const &dstLayout, LayoutSrc const &srcLayout,
+    void operator()(AscendC::GlobalTensor<ElementDst> const& dst, AscendC::LocalTensor<ElementSrc> const& src,
+                    AscendC::LocalTensor<uint64_t> const& scale, LayoutDst const& dstLayout, LayoutSrc const& srcLayout,
                     uint8_t unitFlag = 0)
     {
         AscendC::FixpipeParamsV220 intriParams;
@@ -345,12 +345,12 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
     CopyL0CToGm() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGm(Params const &params_)
+    CopyL0CToGm(Params const& params_)
         : params(params_) {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
-                    LayoutDst const &dstLayout, LayoutSrc const &srcLayout, uint8_t unitFlag = 0)
+    void operator()(AscendC::GlobalTensor<ElementDst> const& dst, AscendC::LocalTensor<ElementSrc> const& src,
+                    LayoutDst const& dstLayout, LayoutSrc const& srcLayout, uint8_t unitFlag = 0)
     {
         AscendC::FixpipeParamsV220 intriParams;
 
@@ -393,12 +393,12 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
     CopyL0CToGm() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGm(Params const &params_)
+    CopyL0CToGm(Params const& params_)
         : params(params_) {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
-                    LayoutDst const &dstLayout, LayoutSrc const &srcLayout, uint8_t unitFlag = 0)
+    void operator()(AscendC::GlobalTensor<ElementDst> const& dst, AscendC::LocalTensor<ElementSrc> const& src,
+                    LayoutDst const& dstLayout, LayoutSrc const& srcLayout, uint8_t unitFlag = 0)
     {
         AscendC::FixpipeParamsV220 intriParams;
 

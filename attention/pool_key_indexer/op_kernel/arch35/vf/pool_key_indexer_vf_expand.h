@@ -31,14 +31,14 @@ using namespace AscendC;
 
 // pow2 pool_size ∈ [2,64] 的向量化展开: out[m] = ps*idx[m/ps] + m%ps, 消除逐
 // pool 标量循环; 尾块(lane >= effExpand)为垃圾值, 由调用方用 -1 Duplicate 覆盖
-__aicore__ inline void ExpandPow2PoolIndices(const LocalTensor<int32_t> &tokenIndices,
-                                             const LocalTensor<uint32_t> &poolIdxTable, const LocalTensor<int32_t> &tpl,
+__aicore__ inline void ExpandPow2PoolIndices(const LocalTensor<int32_t>& tokenIndices,
+                                             const LocalTensor<uint32_t>& poolIdxTable, const LocalTensor<int32_t>& tpl,
                                              uint32_t effExpand, uint32_t ps)
 {
-    __ubuf__ uint32_t *out = (__ubuf__ uint32_t *)tokenIndices.GetPhyAddr();
-    __ubuf__ uint32_t *table = (__ubuf__ uint32_t *)poolIdxTable.GetPhyAddr();
-    __ubuf__ uint32_t *rIdxTpl = (__ubuf__ uint32_t *)tpl.GetPhyAddr();      // r / ps
-    __ubuf__ uint32_t *rOffTpl = (__ubuf__ uint32_t *)tpl.GetPhyAddr() + 64; // r % ps
+    __ubuf__ uint32_t* out = (__ubuf__ uint32_t*)tokenIndices.GetPhyAddr();
+    __ubuf__ uint32_t* table = (__ubuf__ uint32_t*)poolIdxTable.GetPhyAddr();
+    __ubuf__ uint32_t* rIdxTpl = (__ubuf__ uint32_t*)tpl.GetPhyAddr();      // r / ps
+    __ubuf__ uint32_t* rOffTpl = (__ubuf__ uint32_t*)tpl.GetPhyAddr() + 64; // r % ps
 
     if (effExpand == 0) {
         return;

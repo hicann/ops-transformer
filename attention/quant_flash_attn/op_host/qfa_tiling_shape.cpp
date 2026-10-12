@@ -38,13 +38,31 @@ static const std::map<QfaLayout, std::vector<QfaAxis>> QFA_LAYOUT_AXIS_MAP = {
 namespace {
 
 struct CompareFuncs {
-    static bool Equal(const int64_t &a, const int64_t &b) { return a == b; }
-    static bool Greater(const int64_t &a, const int64_t &b) { return a > b; }
-    static bool GreaterEqual(const int64_t &a, const int64_t &b) { return a >= b; }
-    static bool Less(const int64_t &a, const int64_t &b) { return a < b; }
-    static bool LessEqual(const int64_t &a, const int64_t &b) { return a <= b; }
-    static bool NotEqual(const int64_t &a, const int64_t &b) { return a != b; }
-    static bool IgnoreInput(const int64_t &a, const int64_t &b)
+    static bool Equal(const int64_t& a, const int64_t& b)
+    {
+        return a == b;
+    }
+    static bool Greater(const int64_t& a, const int64_t& b)
+    {
+        return a > b;
+    }
+    static bool GreaterEqual(const int64_t& a, const int64_t& b)
+    {
+        return a >= b;
+    }
+    static bool Less(const int64_t& a, const int64_t& b)
+    {
+        return a < b;
+    }
+    static bool LessEqual(const int64_t& a, const int64_t& b)
+    {
+        return a <= b;
+    }
+    static bool NotEqual(const int64_t& a, const int64_t& b)
+    {
+        return a != b;
+    }
+    static bool IgnoreInput(const int64_t& a, const int64_t& b)
     {
         (void)a;
         (void)b;
@@ -63,8 +81,8 @@ const std::map<QfaCompareType, QfaCompareFunc<int64_t>> QfaTilingShapeCompare::c
     {QfaCompareType::NOT_EQUAL, CompareFuncs::NotEqual},
     {QfaCompareType::IGNORE_INPUT, CompareFuncs::IgnoreInput}};
 
-static ge::graphStatus GetLayoutAxes(std::vector<QfaAxis> &layoutAxes, const QfaLayout &layout,
-                                     const std::string &opName, const std::string &funcName)
+static ge::graphStatus GetLayoutAxes(std::vector<QfaAxis>& layoutAxes, const QfaLayout& layout,
+                                     const std::string& opName, const std::string& funcName)
 {
     auto it = QFA_LAYOUT_AXIS_MAP.find(layout);
     if (it == QFA_LAYOUT_AXIS_MAP.end()) {
@@ -76,32 +94,32 @@ static ge::graphStatus GetLayoutAxes(std::vector<QfaAxis> &layoutAxes, const Qfa
     return ge::GRAPH_SUCCESS;
 }
 
-bool QfaTilingShape::HasAxis(const QfaAxis &axis) const
+bool QfaTilingShape::HasAxis(const QfaAxis& axis) const
 {
     auto layoutIt = QFA_LAYOUT_AXIS_MAP.find(layout_);
     if (layoutIt == QFA_LAYOUT_AXIS_MAP.end()) {
         return false;
     }
-    const auto &axes = layoutIt->second;
+    const auto& axes = layoutIt->second;
     return std::find(axes.begin(), axes.end(), axis) != axes.end();
 }
 
-size_t QfaTilingShape::GetAxisIdx(const QfaAxis &axis) const
+size_t QfaTilingShape::GetAxisIdx(const QfaAxis& axis) const
 {
     if (!HasAxis(axis)) {
         return 0;
     }
-    const auto &axes = QFA_LAYOUT_AXIS_MAP.find(layout_)->second;
+    const auto& axes = QFA_LAYOUT_AXIS_MAP.find(layout_)->second;
     auto axisIt = std::find(axes.begin(), axes.end(), axis);
     return std::distance(axes.begin(), axisIt);
 }
 
-int64_t QfaTilingShape::GetAxisNum(const QfaAxis &axis) const
+int64_t QfaTilingShape::GetAxisNum(const QfaAxis& axis) const
 {
     return HasAxis(axis) ? shape_.GetDim(GetAxisIdx(axis)) : invalidDimValue_;
 }
 
-ge::graphStatus QfaTilingShape::CheckHasAxis(const QfaAxis &axis, const std::string &funcName) const
+ge::graphStatus QfaTilingShape::CheckHasAxis(const QfaAxis& axis, const std::string& funcName) const
 {
     if (shape_.GetDimNum() == 0) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, name_.c_str(), "0D",
@@ -155,7 +173,7 @@ std::string QfaTilingShapeCompare::CompareTypeToSerialString(const QfaCompareTyp
     return (it != typeStrMap.end()) ? it->second : "UNKNOWN";
 }
 
-std::string QfaTilingShapeCompare::CompareTypeToSerialSymbolString(const QfaCompareType &compareType) const
+std::string QfaTilingShapeCompare::CompareTypeToSerialSymbolString(const QfaCompareType& compareType) const
 {
     static const std::map<QfaCompareType, std::string> symbolMap = {
         {QfaCompareType::EQUAL, "=="}, {QfaCompareType::GREATER, ">"},     {QfaCompareType::GREATER_EQUAL, ">="},
@@ -164,9 +182,9 @@ std::string QfaTilingShapeCompare::CompareTypeToSerialSymbolString(const QfaComp
     return (it != symbolMap.end()) ? it->second : "UNKNOWN";
 }
 
-ge::graphStatus QfaTilingShapeCompare::GetExpectedShape(gert::Shape &shapeExpected,
-                                                        const QfaTilingShapeCompareParam &param,
-                                                        const std::string &funcName) const
+ge::graphStatus QfaTilingShapeCompare::GetExpectedShape(gert::Shape& shapeExpected,
+                                                        const QfaTilingShapeCompareParam& param,
+                                                        const std::string& funcName) const
 {
     switch (layout_) {
         case QfaLayout::BSND:
@@ -204,16 +222,16 @@ ge::graphStatus QfaTilingShapeCompare::GetExpectedShape(gert::Shape &shapeExpect
     return ge::GRAPH_SUCCESS;
 }
 
-QfaCompareType QfaTilingShapeCompare::GetCompareType(const std::map<QfaAxis, QfaCompareType> &compareTypeMap,
-                                                     const QfaAxis &axis) const
+QfaCompareType QfaTilingShapeCompare::GetCompareType(const std::map<QfaAxis, QfaCompareType>& compareTypeMap,
+                                                     const QfaAxis& axis) const
 {
     auto it = compareTypeMap.find(axis);
     return (it != compareTypeMap.end()) ? it->second : QfaCompareType::EQUAL;
 }
 
-ge::graphStatus QfaTilingShapeCompare::GetCompareFunc(const QfaCompareType &compareType,
-                                                      QfaCompareFunc<int64_t> &compareFunc,
-                                                      const std::string &funcName) const
+ge::graphStatus QfaTilingShapeCompare::GetCompareFunc(const QfaCompareType& compareType,
+                                                      QfaCompareFunc<int64_t>& compareFunc,
+                                                      const std::string& funcName) const
 {
     auto it = compareFuncMap_.find(compareType);
     if (it == compareFuncMap_.end()) {
@@ -225,8 +243,8 @@ ge::graphStatus QfaTilingShapeCompare::GetCompareFunc(const QfaCompareType &comp
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QfaTilingShapeCompare::CompareShape(QfaTilingShapeCompareParam &param,
-                                                    const std::string &funcName) const
+ge::graphStatus QfaTilingShapeCompare::CompareShape(QfaTilingShapeCompareParam& param,
+                                                    const std::string& funcName) const
 {
     gert::Shape shapeExpected;
     if (GetExpectedShape(shapeExpected, param, funcName) != ge::GRAPH_SUCCESS) {

@@ -17,14 +17,9 @@ using namespace AscendC;
 
 using namespace NsaCompressGrad;
 
-extern "C" __global__ __aicore__ void nsa_compress_grad(GM_ADDR outputGrad,
-                                                        GM_ADDR input,
-                                                        GM_ADDR weight,
-                                                        GM_ADDR actSeqLenOptional,
-                                                        GM_ADDR inputGrad,
-                                                        GM_ADDR weightGrad,
-                                                        GM_ADDR workspace,
-                                                        GM_ADDR tiling)
+extern "C" __global__ __aicore__ void nsa_compress_grad(GM_ADDR outputGrad, GM_ADDR input, GM_ADDR weight,
+                                                        GM_ADDR actSeqLenOptional, GM_ADDR inputGrad,
+                                                        GM_ADDR weightGrad, GM_ADDR workspace, GM_ADDR tiling)
 {
     GET_TILING_DATA(tilingData, tiling);
     if (workspace == nullptr) {
@@ -44,7 +39,7 @@ extern "C" __global__ __aicore__ void nsa_compress_grad(GM_ADDR outputGrad,
         op.Process();
         op.MoveResult();
         tPipe.Destroy();
-    } 
+    }
 #endif
 #if (ORIG_DTYPE_OUTPUTGRAD == DT_BF16)
     if (TILING_KEY_IS(0)) {

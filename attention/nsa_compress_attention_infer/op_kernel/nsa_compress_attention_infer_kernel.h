@@ -44,7 +44,7 @@ public:
 
     __aicore__ inline void Init(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR blockTable, GM_ADDR actualQSeqLen,
                                 GM_ADDR actualKvSeqLen, GM_ADDR output, GM_ADDR topkIndicesOut, GM_ADDR workspace,
-                                const NsaCompressAttentionInferTilingData *__restrict tilingData);
+                                const NsaCompressAttentionInferTilingData* __restrict tilingData);
 
     __aicore__ inline void Process();
 
@@ -75,7 +75,7 @@ protected:
     LocalTensor<KV_T> l0bBufTensor;
     LocalTensor<float> l0cBufTensor;
 
-    __gm__ uint8_t *blocktablePtr = nullptr;
+    __gm__ uint8_t* blocktablePtr = nullptr;
 
     uint32_t l1qBufAddrOffset;
     uint32_t l1kBufAddrOffset;
@@ -123,7 +123,7 @@ protected:
     uint32_t bnPerHeadCore;
     uint32_t bnPerTailCore;
 
-    __aicore__ inline void InitTilingData(const NsaCompressAttentionInferTilingData *__restrict tilingData);
+    __aicore__ inline void InitTilingData(const NsaCompressAttentionInferTilingData* __restrict tilingData);
     __aicore__ inline void CopyQToL1(const uint32_t qRowNum, const uint32_t qRowNumRound,
                                      const uint32_t headSizeQkRound, const uint32_t actualKvHeadIdx,
                                      const uint32_t l1qPingPongFlag);
@@ -160,7 +160,7 @@ template <typename NCAIType>
 __aicore__ inline void NsaCompressAttentionInferAic<NCAIType>::Init(
     GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR blockTable, GM_ADDR actualQSeqLen, GM_ADDR actualKvSeqLen,
     GM_ADDR output, GM_ADDR topkIndicesOut, GM_ADDR workspace,
-    const NsaCompressAttentionInferTilingData *__restrict tilingData)
+    const NsaCompressAttentionInferTilingData* __restrict tilingData)
 {
     this->aicNum = GetBlockNum();
     this->splitBNTilingData = tilingData->splitBNParams;
@@ -170,16 +170,16 @@ __aicore__ inline void NsaCompressAttentionInferAic<NCAIType>::Init(
     this->cubeBlockIdx = GetBlockIdx();
 
     // gm数据
-    this->queryGm.SetGlobalBuffer((__gm__ Q_T *)query);
-    this->keyGm.SetGlobalBuffer((__gm__ KV_T *)key);
-    this->valueGm.SetGlobalBuffer((__gm__ KV_T *)value);
-    this->blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
-    this->actualQSeqLenGm.SetGlobalBuffer((__gm__ int64_t *)actualQSeqLen);
-    this->actualKvSeqLenGm.SetGlobalBuffer((__gm__ int64_t *)actualKvSeqLen);
-    this->outGm.SetGlobalBuffer((__gm__ OUT_T *)output);
-    this->mm1ResGm.SetGlobalBuffer((__gm__ float *)workspace);
-    this->scoreInGm.SetGlobalBuffer((__gm__ float *)(workspace + mm1ResWorkSpaceSize));
-    this->mm2InGm.SetGlobalBuffer((__gm__ Q_T *)(workspace + mm1ResWorkSpaceSize + scoreInWorkSpaceSize));
+    this->queryGm.SetGlobalBuffer((__gm__ Q_T*)query);
+    this->keyGm.SetGlobalBuffer((__gm__ KV_T*)key);
+    this->valueGm.SetGlobalBuffer((__gm__ KV_T*)value);
+    this->blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blockTable);
+    this->actualQSeqLenGm.SetGlobalBuffer((__gm__ int64_t*)actualQSeqLen);
+    this->actualKvSeqLenGm.SetGlobalBuffer((__gm__ int64_t*)actualKvSeqLen);
+    this->outGm.SetGlobalBuffer((__gm__ OUT_T*)output);
+    this->mm1ResGm.SetGlobalBuffer((__gm__ float*)workspace);
+    this->scoreInGm.SetGlobalBuffer((__gm__ float*)(workspace + mm1ResWorkSpaceSize));
+    this->mm2InGm.SetGlobalBuffer((__gm__ Q_T*)(workspace + mm1ResWorkSpaceSize + scoreInWorkSpaceSize));
 
     l1qBufAddrOffset = 0;
     l1kBufAddrOffset = BASE_L1_BUF_ADDR_OFFSET;
@@ -198,7 +198,7 @@ __aicore__ inline void NsaCompressAttentionInferAic<NCAIType>::Init(
 
 template <typename NCAIType>
 __aicore__ inline void NsaCompressAttentionInferAic<NCAIType>::InitTilingData(
-    const NsaCompressAttentionInferTilingData *__restrict tilingData)
+    const NsaCompressAttentionInferTilingData* __restrict tilingData)
 {
     batchSize = tilingData->baseParams.batchSize;
     qSeqSize = tilingData->baseParams.qSeqSize;
@@ -652,7 +652,7 @@ public:
     __aicore__ inline void Init(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR blockTable, GM_ADDR actualQSeqLen,
                                 GM_ADDR actualKvSeqLen, GM_ADDR actualSelKvSeqLen, GM_ADDR output,
                                 GM_ADDR topkIndicesOut, GM_ADDR workspace,
-                                const NsaCompressAttentionInferTilingData *__restrict tilingData);
+                                const NsaCompressAttentionInferTilingData* __restrict tilingData);
 
     __aicore__ inline void Process();
 
@@ -673,7 +673,7 @@ protected:
     GlobalTensor<Q_T> mm2InGm;
 
     AsdopsBuffer<ArchType::ASCEND_V220> buf;
-    __gm__ uint8_t *blocktablePtr = nullptr;
+    __gm__ uint8_t* blocktablePtr = nullptr;
 
     SoftMaxTiling softmaxTilingData;
     TopkTiling topkTilingData;
@@ -784,14 +784,14 @@ protected:
     AscendC::LocalTensor<uint8_t> topksharedTmpBuffer;
     AscendC::LocalTensor<int32_t> arithbuffer;
 
-    __aicore__ inline void InitTilingData(const NsaCompressAttentionInferTilingData *__restrict tilingData);
+    __aicore__ inline void InitTilingData(const NsaCompressAttentionInferTilingData* __restrict tilingData);
     __aicore__ inline void PreProcessOffset(const uint32_t processIdx);
     __aicore__ inline void PreProcess(const uint32_t processIdx);
     __aicore__ inline void ProcessSoftmax(uint32_t processIdx);
     __aicore__ inline void SoftmaxComputeVecInGmOffset(uint32_t bn2Idx, uint32_t ridx);
-    __aicore__ inline void SoftmaxCopyIn(DataCopyParams &splitCopyinParams, uint32_t ridx);
+    __aicore__ inline void SoftmaxCopyIn(DataCopyParams& splitCopyinParams, uint32_t ridx);
     __aicore__ inline void SoftmaxCompute(uint32_t ridx);
-    __aicore__ inline void SoftmaxCopyOut(DataCopyParams &splitCopyoutParams, DataCopyParams &splitCopyout32Params,
+    __aicore__ inline void SoftmaxCopyOut(DataCopyParams& splitCopyoutParams, DataCopyParams& splitCopyout32Params,
                                           uint32_t ridx);
     __aicore__ inline void ComputeCurrentTokenOffset(uint32_t startIdx);
     __aicore__ inline void AddMask(uint32_t ridx, uint32_t startIdx, uint32_t endIdx);
@@ -816,16 +816,16 @@ protected:
     // topk
     __aicore__ inline void ProcessTopK();
     __aicore__ inline void TopkComputeVecInGmOffset();
-    __aicore__ inline void TopkCopyIn(DataCopyParams &splitCopyintopkParams);
+    __aicore__ inline void TopkCopyIn(DataCopyParams& splitCopyintopkParams);
     __aicore__ inline void TopkCompute();
-    __aicore__ inline void TopkCopyOut(DataCopyParams &splitCopyouttopkParams);
+    __aicore__ inline void TopkCopyOut(DataCopyParams& splitCopyouttopkParams);
 };
 
 template <typename NCAIType>
 __aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::Init(
     GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR blockTable, GM_ADDR actualQSeqLen, GM_ADDR actualKvSeqLen,
     GM_ADDR actualSelKvSeqLen, GM_ADDR output, GM_ADDR topkIndicesOut, GM_ADDR workspace,
-    const NsaCompressAttentionInferTilingData *__restrict tilingData)
+    const NsaCompressAttentionInferTilingData* __restrict tilingData)
 {
     this->aicNum = GetBlockNum();
 
@@ -835,21 +835,21 @@ __aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::Init(
     vecBlockIdx = GetBlockIdx();
     this->cubeBlockIdx = vecBlockIdx / GetSubBlockNum();
 
-    this->actualQSeqLenGm.SetGlobalBuffer((__gm__ int64_t *)actualQSeqLen);
-    this->actualSelKvSeqLenGm.SetGlobalBuffer((__gm__ int64_t *)actualSelKvSeqLen);
-    this->actualKvSeqLenGm.SetGlobalBuffer((__gm__ int64_t *)actualKvSeqLen);
-    this->topkOutGm.SetGlobalBuffer((__gm__ int32_t *)topkIndicesOut);
+    this->actualQSeqLenGm.SetGlobalBuffer((__gm__ int64_t*)actualQSeqLen);
+    this->actualSelKvSeqLenGm.SetGlobalBuffer((__gm__ int64_t*)actualSelKvSeqLen);
+    this->actualKvSeqLenGm.SetGlobalBuffer((__gm__ int64_t*)actualKvSeqLen);
+    this->topkOutGm.SetGlobalBuffer((__gm__ int32_t*)topkIndicesOut);
 
-    mm1ResGm.SetGlobalBuffer((__gm__ float *)workspace);
-    scoreInGm.SetGlobalBuffer((__gm__ float *)(workspace + mm1ResWorkSpaceSize));
-    mm2InGm.SetGlobalBuffer((__gm__ Q_T *)(workspace + mm1ResWorkSpaceSize + scoreInWorkSpaceSize));
+    mm1ResGm.SetGlobalBuffer((__gm__ float*)workspace);
+    scoreInGm.SetGlobalBuffer((__gm__ float*)(workspace + mm1ResWorkSpaceSize));
+    mm2InGm.SetGlobalBuffer((__gm__ Q_T*)(workspace + mm1ResWorkSpaceSize + scoreInWorkSpaceSize));
     topKInGm.SetGlobalBuffer(
-        (__gm__ float *)(workspace + mm1ResWorkSpaceSize + scoreInWorkSpaceSize + mm2InWorkSpaceSize));
+        (__gm__ float*)(workspace + mm1ResWorkSpaceSize + scoreInWorkSpaceSize + mm2InWorkSpaceSize));
 }
 
 template <typename NCAIType>
 __aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::InitTilingData(
-    const NsaCompressAttentionInferTilingData *__restrict tilingData)
+    const NsaCompressAttentionInferTilingData* __restrict tilingData)
 {
     batchSize = tilingData->baseParams.batchSize;
     qSeqSize = tilingData->baseParams.qSeqSize;
@@ -1099,7 +1099,7 @@ __aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::SoftmaxComputeVec
 }
 
 template <typename NCAIType>
-__aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::SoftmaxCopyIn(DataCopyParams &splitCopyinParams,
+__aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::SoftmaxCopyIn(DataCopyParams& splitCopyinParams,
                                                                              uint32_t ridx)
 {
     // 非对齐拷贝，不填充
@@ -1108,8 +1108,8 @@ __aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::SoftmaxCopyIn(Dat
 }
 
 template <typename NCAIType>
-__aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::SoftmaxCopyOut(DataCopyParams &splitCopyoutParams,
-                                                                              DataCopyParams &splitCopyout32Params,
+__aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::SoftmaxCopyOut(DataCopyParams& splitCopyoutParams,
+                                                                              DataCopyParams& splitCopyout32Params,
                                                                               uint32_t ridx)
 {
     DataCopyPad(mm2InGm[mm2InWorkSpaceOffset], softmaxOut16bufTensor, splitCopyoutParams);
@@ -1512,7 +1512,7 @@ __aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::ProcessTopK()
 }
 
 template <typename NCAIType>
-__aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::TopkCopyIn(DataCopyParams &splitCopyintopkParams)
+__aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::TopkCopyIn(DataCopyParams& splitCopyintopkParams)
 {
     PipeBarrier<PIPE_V>();
     AscendC::Duplicate<float>(topkInputbufTensor, static_cast<float>(0), BASE_TOPK_ELEM_NUM_OFFSET);
@@ -1522,7 +1522,7 @@ __aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::TopkCopyIn(DataCo
 }
 
 template <typename NCAIType>
-__aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::TopkCopyOut(DataCopyParams &splitCopyouttopkParams)
+__aicore__ inline void NsaCompressAttentionInferAiv<NCAIType>::TopkCopyOut(DataCopyParams& splitCopyouttopkParams)
 {
     DataCopyPad(topkOutGm[topkOutputGmOffset], topkoutindexLocal[0], splitCopyouttopkParams);
 }
@@ -1558,7 +1558,7 @@ public:
     __aicore__ inline void Run(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR blockTable, GM_ADDR actualQSeqLen,
                                GM_ADDR actualKvSeqLen, GM_ADDR actualSelKvSeqLen, GM_ADDR output,
                                GM_ADDR topkIndicesOut, GM_ADDR workspace,
-                               const NsaCompressAttentionInferTilingData *__restrict tilingData)
+                               const NsaCompressAttentionInferTilingData* __restrict tilingData)
     {
 #ifdef __DAV_C220_CUBE__
         NsaCompressAttentionInferAic<NCAIType> opAic;

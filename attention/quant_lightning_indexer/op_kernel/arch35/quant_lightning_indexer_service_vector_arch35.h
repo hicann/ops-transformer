@@ -41,11 +41,11 @@ public:
     using SCORE_T = typename QLIT::scoreType;
 
     __aicore__ inline QLIVector(){};
-    __aicore__ inline void ProcessVec1(const QLICommon::RunInfo &info);
-    __aicore__ inline void ProcessTopK(const QLICommon::RunInfo &info);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitParams(const struct QLICommon::ConstInfo &constInfo,
-                                      const QLITilingData *__restrict tilingData);
+    __aicore__ inline void ProcessVec1(const QLICommon::RunInfo& info);
+    __aicore__ inline void ProcessTopK(const QLICommon::RunInfo& info);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitParams(const struct QLICommon::ConstInfo& constInfo,
+                                      const QLITilingData* __restrict tilingData);
     __aicore__ inline void InitVecWorkspaceTensor(GlobalTensor<SCORE_T> scoreGm);
     __aicore__ inline void InitVecInputTensor(GlobalTensor<W_T> weightsGm, GlobalTensor<SCALE_T> qScaleGm,
                                               GlobalTensor<SCALE_T> kScaleGm, GlobalTensor<int32_t> indiceOutGm,
@@ -80,7 +80,7 @@ protected:
     static constexpr uint32_t V_MTE2_EVENT3 = EVENT_ID5;
 
 private:
-    __aicore__ inline void GetKeyScale(const QLICommon::RunInfo &runInfo, LocalTensor<SCALE_T> &kScaleUB,
+    __aicore__ inline void GetKeyScale(const QLICommon::RunInfo& runInfo, LocalTensor<SCALE_T>& kScaleUB,
                                        int64_t batchId, int64_t startS2, int64_t getLen);
     // ================================Local Buffer区====================================
 
@@ -141,7 +141,7 @@ private:
 };
 
 template <typename QLIT>
-__aicore__ inline void QLIVector<QLIT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void QLIVector<QLIT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(resMm1Buf_, 2 * CeilDiv(constInfo_.mBaseSize, 2) * s2BaseSize_ * sizeof(QK_T));
     resMm1UB_ = resMm1Buf_.Get<QK_T>();
@@ -180,8 +180,8 @@ __aicore__ inline void QLIVector<QLIT>::InitBuffers(TPipe *pipe)
 }
 
 template <typename QLIT>
-__aicore__ inline void QLIVector<QLIT>::InitParams(const struct QLICommon::ConstInfo &constInfo,
-                                                   const QLITilingData *__restrict tilingData)
+__aicore__ inline void QLIVector<QLIT>::InitParams(const struct QLICommon::ConstInfo& constInfo,
+                                                   const QLITilingData* __restrict tilingData)
 {
     this->constInfo_ = constInfo;
     blockS2StartIdx_ = 0;
@@ -273,7 +273,7 @@ __aicore__ inline void QLIVector<QLIT>::CleanInvalidOutput(int64_t invalidS1Offs
 }
 
 template <typename QLIT>
-__aicore__ inline void QLIVector<QLIT>::GetKeyScale(const QLICommon::RunInfo &runInfo, LocalTensor<SCALE_T> &kScaleUB,
+__aicore__ inline void QLIVector<QLIT>::GetKeyScale(const QLICommon::RunInfo& runInfo, LocalTensor<SCALE_T>& kScaleUB,
                                                     int64_t batchId, int64_t startS2, int64_t getLen)
 {
     // startS2一定能整除kCacheBlockSize_
@@ -327,7 +327,7 @@ __aicore__ inline void QLIVector<QLIT>::GetKeyScale(const QLICommon::RunInfo &ru
 }
 
 template <typename QLIT>
-__aicore__ inline void QLIVector<QLIT>::ProcessVec1(const QLICommon::RunInfo &info)
+__aicore__ inline void QLIVector<QLIT>::ProcessVec1(const QLICommon::RunInfo& info)
 {
     auto pingpong = (info.loop % 2);
     auto qliQScalePingpong = (info.qScaleLoop % 2);
@@ -430,7 +430,7 @@ __aicore__ inline void QLIVector<QLIT>::ProcessVec1(const QLICommon::RunInfo &in
 }
 
 template <typename QLIT>
-__aicore__ inline void QLIVector<QLIT>::ProcessTopK(const QLICommon::RunInfo &info)
+__aicore__ inline void QLIVector<QLIT>::ProcessTopK(const QLICommon::RunInfo& info)
 {
     SetFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);
     WaitFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);

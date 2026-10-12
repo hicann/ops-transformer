@@ -46,16 +46,16 @@ void QfaChecker::RegisterCheckers()
     checkers_.push_back(std::make_unique<SoftmaxLSEChecker>());
 }
 
-ge::graphStatus QfaChecker::Init(const QfaTilingInfo &qfaInfo)
+ge::graphStatus QfaChecker::Init(const QfaTilingInfo& qfaInfo)
 {
     (void)qfaInfo;
     RegisterCheckers();
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QfaChecker::RunCheck(const CheckMethod &method, const QfaTilingInfo &qfaInfo)
+ge::graphStatus QfaChecker::RunCheck(const CheckMethod& method, const QfaTilingInfo& qfaInfo)
 {
-    for (const auto &checker : checkers_) {
+    for (const auto& checker : checkers_) {
         if (ge::GRAPH_SUCCESS != method(checker.get(), qfaInfo)) {
             return ge::GRAPH_FAILED;
         }
@@ -63,27 +63,27 @@ ge::graphStatus QfaChecker::RunCheck(const CheckMethod &method, const QfaTilingI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QfaChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
+ge::graphStatus QfaChecker::CheckSinglePara(const QfaTilingInfo& qfaInfo)
 {
-    return RunCheck([](QfaBaseChecker *c, const QfaTilingInfo &info) { return c->CheckSinglePara(info); }, qfaInfo);
+    return RunCheck([](QfaBaseChecker* c, const QfaTilingInfo& info) { return c->CheckSinglePara(info); }, qfaInfo);
 }
 
-ge::graphStatus QfaChecker::CheckParaExistence(const QfaTilingInfo &qfaInfo)
+ge::graphStatus QfaChecker::CheckParaExistence(const QfaTilingInfo& qfaInfo)
 {
-    return RunCheck([](QfaBaseChecker *c, const QfaTilingInfo &info) { return c->CheckParaExistence(info); }, qfaInfo);
+    return RunCheck([](QfaBaseChecker* c, const QfaTilingInfo& info) { return c->CheckParaExistence(info); }, qfaInfo);
 }
 
-ge::graphStatus QfaChecker::CheckFeature(const QfaTilingInfo &qfaInfo)
+ge::graphStatus QfaChecker::CheckFeature(const QfaTilingInfo& qfaInfo)
 {
-    return RunCheck([](QfaBaseChecker *c, const QfaTilingInfo &info) { return c->CheckFeature(info); }, qfaInfo);
+    return RunCheck([](QfaBaseChecker* c, const QfaTilingInfo& info) { return c->CheckFeature(info); }, qfaInfo);
 }
 
-ge::graphStatus QfaChecker::CheckMultiPara(const QfaTilingInfo &qfaInfo)
+ge::graphStatus QfaChecker::CheckMultiPara(const QfaTilingInfo& qfaInfo)
 {
-    return RunCheck([](QfaBaseChecker *c, const QfaTilingInfo &info) { return c->CheckMultiPara(info); }, qfaInfo);
+    return RunCheck([](QfaBaseChecker* c, const QfaTilingInfo& info) { return c->CheckMultiPara(info); }, qfaInfo);
 }
 
-ge::graphStatus QfaChecker::Process(const QfaTilingInfo &qfaInfo)
+ge::graphStatus QfaChecker::Process(const QfaTilingInfo& qfaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckSinglePara(qfaInfo)) {
         return ge::GRAPH_FAILED;

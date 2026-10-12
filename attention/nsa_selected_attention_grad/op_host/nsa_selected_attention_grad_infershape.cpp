@@ -49,14 +49,14 @@ enum class AttrIndex : uint32_t {
     INPUT_LAYOUT
 };
 
-ge::graphStatus InferShape4NsaSelectedAttentionGrad(gert::InferShapeContext *context)
+ge::graphStatus InferShape4NsaSelectedAttentionGrad(gert::InferShapeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, "context");
     OP_LOGD(context, "Enter InferShape4NsaSelectedAttentionGrad.");
 
-    const gert::Shape *queryShape = context->GetInputShape(static_cast<size_t>(InputIndex::QUERY));
-    const gert::Shape *keyShape = context->GetInputShape(static_cast<size_t>(InputIndex::KEY));
-    const gert::Shape *valueShape = context->GetInputShape(static_cast<size_t>(InputIndex::VALUE));
+    const gert::Shape* queryShape = context->GetInputShape(static_cast<size_t>(InputIndex::QUERY));
+    const gert::Shape* keyShape = context->GetInputShape(static_cast<size_t>(InputIndex::KEY));
+    const gert::Shape* valueShape = context->GetInputShape(static_cast<size_t>(InputIndex::VALUE));
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
@@ -66,7 +66,7 @@ ge::graphStatus InferShape4NsaSelectedAttentionGrad(gert::InferShapeContext *con
     auto selectedBlockCount = attrs->GetInt(static_cast<size_t>(AttrIndex::SELECTED_BLOCK_COUNT));
     auto selectedBlockSize = attrs->GetInt(static_cast<size_t>(AttrIndex::SELECTED_BLOCK_SIZE));
     auto headNum = attrs->GetInt(static_cast<size_t>(AttrIndex::HEAD_NUM));
-    const char *inputLayout = attrs->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::INPUT_LAYOUT));
+    const char* inputLayout = attrs->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::INPUT_LAYOUT));
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
     OP_CHECK_NULL_WITH_CONTEXT(context, scaleValue);
     OP_CHECK_NULL_WITH_CONTEXT(context, selectedBlockCount);
@@ -75,7 +75,7 @@ ge::graphStatus InferShape4NsaSelectedAttentionGrad(gert::InferShapeContext *con
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayout);
 
     std::string inputLayoutStr = std::string(inputLayout);
-    for (auto &c : inputLayoutStr) {
+    for (auto& c : inputLayoutStr) {
         c = toupper(c);
     }
     if (inputLayoutStr != "TND") {
@@ -83,9 +83,9 @@ ge::graphStatus InferShape4NsaSelectedAttentionGrad(gert::InferShapeContext *con
         return GRAPH_FAILED;
     }
 
-    gert::Shape *dqShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DQ));
-    gert::Shape *dkShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DK));
-    gert::Shape *dvShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DV));
+    gert::Shape* dqShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DQ));
+    gert::Shape* dkShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DK));
+    gert::Shape* dvShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DV));
     OP_CHECK_NULL_WITH_CONTEXT(context, dqShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, dkShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, dvShape);
@@ -96,7 +96,7 @@ ge::graphStatus InferShape4NsaSelectedAttentionGrad(gert::InferShapeContext *con
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataType4NsaSelectedAttentionGrad(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataType4NsaSelectedAttentionGrad(gert::InferDataTypeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, "context");
     OP_LOGD(context, "Enter InferDataType4NsaSelectedAttentionGrad.");

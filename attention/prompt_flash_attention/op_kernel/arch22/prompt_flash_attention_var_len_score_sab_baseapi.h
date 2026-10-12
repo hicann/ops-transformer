@@ -38,13 +38,13 @@ class PromptFlashAttentionVarLenScoreSameABBaseApi
 public:
     __aicore__ inline PromptFlashAttentionVarLenScoreSameABBaseApi(){};
 
-    __aicore__ inline void UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                      __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                      __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *queryRope,
-                                      __gm__ uint8_t *keyRope, __gm__ uint8_t *blockTable,
-                                      __gm__ uint8_t *learnableSink, __gm__ uint8_t *attentionOut,
-                                      __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-                                      const TILING_TYPE *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void UnpackInit(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                      __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                                      __gm__ uint8_t* actualSeqLengthsKv, __gm__ uint8_t* queryRope,
+                                      __gm__ uint8_t* keyRope, __gm__ uint8_t* blockTable,
+                                      __gm__ uint8_t* learnableSink, __gm__ uint8_t* attentionOut,
+                                      __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                                      const TILING_TYPE* __restrict tiling, TPipe* tPipe);
 
     __aicore__ inline void Process();
 
@@ -56,19 +56,19 @@ protected:
 
     __aicore__ inline void ComputeAxisIdx(int64_t multiCoreInnerIdx);
 
-    __aicore__ inline void ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo);
+    __aicore__ inline void ComputeBmm1Tail(SplitSameABExtraInfo& extraInfo);
 
-    __aicore__ inline void SetExtraInfo(SplitSameABExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount,
+    __aicore__ inline void SetExtraInfo(SplitSameABExtraInfo& extraInfo, int64_t taskId, int64_t s2LoopCount,
                                         int64_t s2LoopLimit, int64_t multiCoreInnerIdx);
 
-    __aicore__ inline void SetPaCacheLayout(SplitSameABExtraInfo &extraInfo);
+    __aicore__ inline void SetPaCacheLayout(SplitSameABExtraInfo& extraInfo);
 
-    __aicore__ inline void CloneExtraInfo(SplitSameABExtraInfo &extraInfo, const SplitSameABExtraInfo &srcInfo,
+    __aicore__ inline void CloneExtraInfo(SplitSameABExtraInfo& extraInfo, const SplitSameABExtraInfo& srcInfo,
                                           int64_t taskId, int64_t s2LoopCount);
 
     __aicore__ inline void CalS1OuterSize(int64_t offset);
 
-    __aicore__ inline void GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvlen);
+    __aicore__ inline void GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t& actualSeqQlen, int64_t& actualSeqKvlen);
 
     __aicore__ inline void GetS2LoopRange();
     // Unpack 用参数
@@ -88,18 +88,18 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
     TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-    pageAttention>::UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                               __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                               __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-                               __gm__ uint8_t *blockTable, __gm__ uint8_t *learnableSink, __gm__ uint8_t *attentionOut,
-                               __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-                               const TILING_TYPE *__restrict tiling, TPipe *tPipe)
+    pageAttention>::UnpackInit(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                               __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                               __gm__ uint8_t* actualSeqLengthsKv, __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+                               __gm__ uint8_t* blockTable, __gm__ uint8_t* learnableSink, __gm__ uint8_t* attentionOut,
+                               __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                               const TILING_TYPE* __restrict tiling, TPipe* tPipe)
 {
     this->InitInput(query, key, value, queryRope, keyRope, attenMask, blockTable, learnableSink, attentionOut,
                     softmaxLse, workspace, tiling, tPipe); // gm设置
     this->ComputeConstexpr();
-    qListGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths);
-    kvListGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKv);
+    qListGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths);
+    kvListGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKv);
     // 初始化unpack
     actualSeqQlenAddr = actualSeqLengths;
     actualSeqKvlenAddr = actualSeqLengthsKv;
@@ -110,7 +110,7 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
         for (int64_t i = 0; i < this->tilingData->PFAinputParams.bSize; ++i) {
             GetSeqQlenKvlenByBoidx(i, actualS1Len, actualS2Len);
             if (actualS2Len <= 0 && actualS1Len != 0) {
-                int64_t accumSize = (i == 0) ? 0 : ((__gm__ int64_t *)actualSeqQlenAddr)[i - 1];
+                int64_t accumSize = (i == 0) ? 0 : ((__gm__ int64_t*)actualSeqQlenAddr)[i - 1];
                 if (actualS1Len < 0 && accumSize > 0) {
                     actualS1Len = this->s1Size - accumSize;
                 }
@@ -123,7 +123,7 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
             SyncAll(); // synchronize for attentionOutGm
             int64_t tmpBlockIdx = GetBlockIdx();
             const int64_t totalSoftMaxLseOutputSize =
-                ((__gm__ int64_t *)actualSeqQlenAddr)[this->tilingData->PFAinputParams.bSize - 1] * this->n2G;
+                ((__gm__ int64_t*)actualSeqQlenAddr)[this->tilingData->PFAinputParams.bSize - 1] * this->n2G;
             int64_t coreNum = this->tilingData->PFAmultiCoreParams.coreNum;
             if (coreNum != 0 && tmpBlockIdx < coreNum) {
                 int64_t singleCoreLseSize = totalSoftMaxLseOutputSize / coreNum;
@@ -146,7 +146,7 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
             LocalTensor<half> pseHelpBuffer = this->stage1PingBuf.template Get<half>();
         }
     }
-    this->s2SizeSum = ((__gm__ uint64_t *)actualSeqLengthsKv)[this->tilingData->PFAinputParams.bSize - 1];
+    this->s2SizeSum = ((__gm__ uint64_t*)actualSeqLengthsKv)[this->tilingData->PFAinputParams.bSize - 1];
     return;
 }
 
@@ -274,7 +274,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
     TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-    pageAttention>::GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvlen)
+    pageAttention>::GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t& actualSeqQlen, int64_t& actualSeqKvlen)
 {
     if (boIdx == 0) {
         actualSeqQlen = qListGm.GetValue(0);
@@ -421,7 +421,7 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
     } else if (this->tilingData->PFAinputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::PREFIX)) {
         this->s2StartIdx = 0;
         this->s2EndIdx = Max((this->s1oIdx + 1) * this->cubeS1BaseSize - actualS1Len + actualS2Len,
-                             ((__gm__ int64_t *)prefixNAddr)[this->boIdx]);
+                             ((__gm__ int64_t*)prefixNAddr)[this->boIdx]);
         this->s2EndIdx = Min(this->s2EndIdx, this->s2Size);
         if (this->s2EndIdx - this->s2StartIdx <= 0) {
             this->s2StartIdx = 0;
@@ -557,7 +557,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
     TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-    pageAttention>::SetPaCacheLayout(SplitSameABExtraInfo &extraInfo)
+    pageAttention>::SetPaCacheLayout(SplitSameABExtraInfo& extraInfo)
 {
     if (this->tilingData->PFAinputParams.paCacheLayoutType == paCacheBBH) {
         extraInfo.paCacheLayoutType = PaCacheLayoutType::PA_BBH;
@@ -572,7 +572,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
-                                             mmPolicyType, pageAttention>::SetExtraInfo(SplitSameABExtraInfo &extraInfo,
+                                             mmPolicyType, pageAttention>::SetExtraInfo(SplitSameABExtraInfo& extraInfo,
                                                                                         int64_t taskId,
                                                                                         int64_t s2LoopCount,
                                                                                         int64_t s2LoopLimit,
@@ -626,7 +626,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
     TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-    pageAttention>::CloneExtraInfo(SplitSameABExtraInfo &extraInfo, const SplitSameABExtraInfo &srcInfo, int64_t taskId,
+    pageAttention>::CloneExtraInfo(SplitSameABExtraInfo& extraInfo, const SplitSameABExtraInfo& srcInfo, int64_t taskId,
                                    int64_t s2LoopCount)
 {
     extraInfo.s2StartIdx = srcInfo.s2StartIdx;
@@ -710,7 +710,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
     TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-    pageAttention>::ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo)
+    pageAttention>::ComputeBmm1Tail(SplitSameABExtraInfo& extraInfo)
 {
     extraInfo.s1RealSize = (extraInfo.cubeS1RealSize + 1) / 2;
     extraInfo.vecCoreOffset = this->cubeSubIdx * extraInfo.s1RealSize * extraInfo.gBaseSize;

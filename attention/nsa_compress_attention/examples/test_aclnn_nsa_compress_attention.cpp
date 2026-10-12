@@ -21,19 +21,20 @@
 
 using namespace std;
 
-#define CHECK_RET(cond, return_expr)   \
-    do {                               \
-        if (!(cond)) {                 \
-            return_expr;               \
-        }                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)           \
-    do {                                  \
-        printf(message, ##__VA_ARGS__);   \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t>& shape) {
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
+{
     int64_t shapeSize = 1;
     for (auto i : shape) {
         shapeSize *= i;
@@ -41,7 +42,8 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape) {
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream* stream) {
+int Init(int32_t deviceId, aclrtStream* stream)
+{
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -52,11 +54,12 @@ int Init(int32_t deviceId, aclrtStream* stream) {
     return 0;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void** deviceAddr) {
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
+{
     auto size = GetShapeSize(shape);
     std::vector<float> resultData(size, 0);
-    auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]),
-                           *deviceAddr, size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), *deviceAddr,
+                           size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
     for (int64_t i = 0; i < size; i++) {
         LOG_PRINT("mean result[%ld] is: %f\n", i, resultData[i]);
@@ -65,7 +68,8 @@ void PrintOutResult(std::vector<int64_t> &shape, void** deviceAddr) {
 
 template <typename T>
 int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor) {
+                    aclDataType dataType, aclTensor** tensor)
+{
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -73,7 +77,7 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
     // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
     ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
-    
+
     // 计算连续tensor的strides
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = shape.size() - 2; i >= 0; i--) {
@@ -86,7 +90,8 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
     return 0;
 }
 
-int main() {
+int main()
+{
     // 1. （固定写法）device/stream初始化，参考AscendCL对外接口列表
     // 根据自己的实际device填写deviceId
     int32_t deviceId = 0;
@@ -108,8 +113,8 @@ int main() {
     std::vector<int64_t> qShape = {T1, N1, D1};
     std::vector<int64_t> kShape = {T2, N2, D1};
     std::vector<int64_t> vShape = {T2, N2, D2};
-    std::vector<int64_t> attenmaskShape = {T1, T2};                        //[maxS1, maxS2]
-    std::vector<int64_t> topkmaskShape = {T1, T1 / selectBlockSize};       //[maxS1, maxSelS2]
+    std::vector<int64_t> attenmaskShape = {T1, T2};                  //[maxS1, maxS2]
+    std::vector<int64_t> topkmaskShape = {T1, T1 / selectBlockSize}; //[maxS1, maxSelS2]
     std::vector<int64_t> softmaxMaxShape = {T1, N1, 8};
     std::vector<int64_t> softmaxSumShape = {T1, N1, 8};
     std::vector<int64_t> attenOutShape = {T1, N1, D2};                     //[T1, N1, D2]
@@ -155,13 +160,17 @@ int main() {
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(topkmaskHostData, topkmaskShape, &topkmaskDeviceAddr, aclDataType::ACL_UINT8, &topkmask);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(softmaxMaxHostData, softmaxMaxShape, &softmaxMaxDeviceAddr, aclDataType::ACL_FLOAT, &softmaxMax);
+    ret = CreateAclTensor(softmaxMaxHostData, softmaxMaxShape, &softmaxMaxDeviceAddr, aclDataType::ACL_FLOAT,
+                          &softmaxMax);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(softmaxSumHostData, softmaxSumShape, &softmaxSumDeviceAddr, aclDataType::ACL_FLOAT, &softmaxSum);
+    ret = CreateAclTensor(softmaxSumHostData, softmaxSumShape, &softmaxSumDeviceAddr, aclDataType::ACL_FLOAT,
+                          &softmaxSum);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(attenOutHostData, attenOutShape, &attentionOutDeviceAddr, aclDataType::ACL_FLOAT16, &attentionOut);
+    ret = CreateAclTensor(attenOutHostData, attenOutShape, &attentionOutDeviceAddr, aclDataType::ACL_FLOAT16,
+                          &attentionOut);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(topkIndicesHostData, topkIndicesOutShape, &topkIndicesOutDeviceAddr, aclDataType::ACL_INT32, &topkIndicesOut);
+    ret = CreateAclTensor(topkIndicesHostData, topkIndicesOutShape, &topkIndicesOutDeviceAddr, aclDataType::ACL_INT32,
+                          &topkIndicesOut);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<int64_t> actualSeqQLenVec(1, T1);
@@ -181,10 +190,12 @@ int main() {
     aclOpExecutor* executor;
 
     // 调用第一段接口
-    ret = aclnnNsaCompressAttentionGetWorkspaceSize(q, k, v, attenmask, topkmask, actualSeqQLen, actualCmpKvSeqLen,
-        actualSelKvSeqLen, scale, headNum, inputLayout, sparseMode, compressBlockSize, compressStride, selectBlockSize, selectBlockCount, 
-        softmaxMax, softmaxSum, attentionOut, topkIndicesOut, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNsaCompressAttentionGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+    ret = aclnnNsaCompressAttentionGetWorkspaceSize(
+        q, k, v, attenmask, topkmask, actualSeqQLen, actualCmpKvSeqLen, actualSelKvSeqLen, scale, headNum, inputLayout,
+        sparseMode, compressBlockSize, compressStride, selectBlockSize, selectBlockCount, softmaxMax, softmaxSum,
+        attentionOut, topkIndicesOut, &workspaceSize, &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNsaCompressAttentionGetWorkspaceSize failed. ERROR: %d\n", ret);
+              return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
     void* workspaceAddr = nullptr;

@@ -30,11 +30,11 @@ template <typename PFATypeNZ, PrecType prec_type>
 class PromptAttentionPrefill {
 public:
     __aicore__ inline PromptAttentionPrefill(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *attenMask, __gm__ uint8_t *_actualSeqLengths,
-                                __gm__ uint8_t *_actualSeqLengthsKV, __gm__ uint8_t *attentionOut,
-                                __gm__ uint8_t *workspace,
-                                const PromptFlashAttentionBaseApiTilingData *__restrict tiling);
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* attenMask, __gm__ uint8_t* _actualSeqLengths,
+                                __gm__ uint8_t* _actualSeqLengthsKV, __gm__ uint8_t* attentionOut,
+                                __gm__ uint8_t* workspace,
+                                const PromptFlashAttentionBaseApiTilingData* __restrict tiling);
     __aicore__ inline void Process();
 
     using T = typename PFATypeNZ::inputType;
@@ -44,7 +44,7 @@ public:
     using OUT_T = typename PFATypeNZ::outputType;
 
 protected:
-    const PromptFlashAttentionBaseApiTilingData *__restrict tilingData = nullptr;
+    const PromptFlashAttentionBaseApiTilingData* __restrict tilingData = nullptr;
 
     uint32_t long_seq = 0;
     uint32_t is_triu = 0;
@@ -89,13 +89,13 @@ protected:
     int64_t addrVScalar = 0;
     uint32_t inputLayout = 1;
 
-    __gm__ uint8_t *query;
-    __gm__ uint8_t *key;
-    __gm__ uint8_t *value;
-    __gm__ uint8_t *attenMask;
-    __gm__ uint8_t *attentionOut;
-    __gm__ uint8_t *actualSeqLengths;
-    __gm__ uint8_t *actualSeqLengthsKV;
+    __gm__ uint8_t* query;
+    __gm__ uint8_t* key;
+    __gm__ uint8_t* value;
+    __gm__ uint8_t* attenMask;
+    __gm__ uint8_t* attentionOut;
+    __gm__ uint8_t* actualSeqLengths;
+    __gm__ uint8_t* actualSeqLengthsKV;
     AscendC::GlobalTensor<int64_t> actualSeqLengthsGm;
     AscendC::GlobalTensor<int64_t> actualSeqLengthsKVGm;
 
@@ -109,9 +109,9 @@ protected:
 
 template <typename T, PrecType prec_type2>
 __aicore__ inline void PromptAttentionPrefill<T, prec_type2>::Init(
-    __gm__ uint8_t *_query, __gm__ uint8_t *_key, __gm__ uint8_t *_value, __gm__ uint8_t *_attenMask,
-    __gm__ uint8_t *_actualSeqLengths, __gm__ uint8_t *_actualSeqLengthsKV, __gm__ uint8_t *_attentionOut,
-    __gm__ uint8_t *workspace, const PromptFlashAttentionBaseApiTilingData *__restrict tiling)
+    __gm__ uint8_t* _query, __gm__ uint8_t* _key, __gm__ uint8_t* _value, __gm__ uint8_t* _attenMask,
+    __gm__ uint8_t* _actualSeqLengths, __gm__ uint8_t* _actualSeqLengthsKV, __gm__ uint8_t* _attentionOut,
+    __gm__ uint8_t* workspace, const PromptFlashAttentionBaseApiTilingData* __restrict tiling)
 {
     tilingData = tiling;
 
@@ -190,7 +190,7 @@ __aicore__ inline void PromptAttentionPrefill<T, prec_type2>::InitTilingData()
     scaleType = 0;
     inputLayout = tilingData->promptAttentionBaseApiBaseParams.inputLayoutType;
 
-    actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths, batchSize);
-    actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKV, batchSize);
+    actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths, batchSize);
+    actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKV, batchSize);
 }
 #endif

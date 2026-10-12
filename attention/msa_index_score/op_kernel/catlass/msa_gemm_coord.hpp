@@ -90,7 +90,7 @@ struct GemmCoord : public Coord<GEMM_COORD_RANK, uint32_t> {
 
     /// Constructs from Coord<GEMM_COORD_RANK> and a batch
     CATLASS_HOST_DEVICE
-    GemmCoord(Coord<GEMM_COORD_RANK, Index> const &coord)
+    GemmCoord(Coord<GEMM_COORD_RANK, Index> const& coord)
         : Base(coord)
     {}
 
@@ -102,42 +102,42 @@ struct GemmCoord : public Coord<GEMM_COORD_RANK, uint32_t> {
 
     /// Returns the Gemm M coordinate
     CATLASS_HOST_DEVICE
-    Index const &m() const
+    Index const& m() const
     {
         return this->At(M_INDEX);
     }
 
     /// Returns reference to the Gemm M coordinate
     CATLASS_HOST_DEVICE
-    Index &m()
+    Index& m()
     {
         return this->At(M_INDEX);
     }
 
     /// Returns the Gemm N coordinate
     CATLASS_HOST_DEVICE
-    Index const &n() const
+    Index const& n() const
     {
         return this->At(N_INDEX);
     }
 
     /// Returns reference to the Gemm N coordinate
     CATLASS_HOST_DEVICE
-    Index &n()
+    Index& n()
     {
         return this->At(N_INDEX);
     }
 
     /// Returns the Gemm K coordinate
     CATLASS_HOST_DEVICE
-    Index const &k() const
+    Index const& k() const
     {
         return this->At(K_INDEX);
     }
 
     /// Returns reference to the Gemm K coordinate
     CATLASS_HOST_DEVICE
-    Index &k()
+    Index& k()
     {
         return this->At(K_INDEX);
     }

@@ -13,7 +13,7 @@
 
 namespace MlaPreprocess {
 template <typename IN_DTYPE>
-__aicore__ inline void CreateCaMatrix(const AscendC::LocalTensor<IN_DTYPE> &dst, const uint16_t repeats,
+__aicore__ inline void CreateCaMatrix(const AscendC::LocalTensor<IN_DTYPE>& dst, const uint16_t repeats,
                                       const uint16_t blockNum, const uint16_t dstGap, const IN_DTYPE initValue)
 {
     AscendC::InitConstValue<IN_DTYPE>(dst,
@@ -62,7 +62,7 @@ __aicore__ inline void FftsCrossCoreSync(uint16_t flagId)
     AscendC::CrossCoreSetFlag<mode, pipe>(flagId);
 }
 template <typename IN_DTYPE, bool setRelu = false>
-__aicore__ inline void SetFpc(const AscendC::LocalTensor<IN_DTYPE> &preTensor, bool isUnitFlag = false)
+__aicore__ inline void SetFpc(const AscendC::LocalTensor<IN_DTYPE>& preTensor, bool isUnitFlag = false)
 {
     AscendC::SetFixPipeConfig<IN_DTYPE, setRelu>(preTensor, isUnitFlag);
 }

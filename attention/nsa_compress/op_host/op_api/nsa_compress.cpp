@@ -19,21 +19,21 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(NsaCompress);
 
-const aclTensor *NsaCompress(const aclTensor *input, const aclTensor *weight, const aclIntArray *actSeqLenOptional,
-                             char *layoutOptional, int64_t compressBlockSize, int64_t compressStride,
-                             int64_t actSeqLenType, aclOpExecutor *executor)
+const aclTensor* NsaCompress(const aclTensor* input, const aclTensor* weight, const aclIntArray* actSeqLenOptional,
+                             char* layoutOptional, int64_t compressBlockSize, int64_t compressStride,
+                             int64_t actSeqLenType, aclOpExecutor* executor)
 {
     // L0接口时延统计以及入参打印
     L0_DFX(NsaCompress, input, weight, actSeqLenOptional, layoutOptional, compressBlockSize, compressStride,
            actSeqLenType);
 
     // 处理aclIntArray，转换成aclTensor
-    const aclTensor *actSeqLen = nullptr;
+    const aclTensor* actSeqLen = nullptr;
     if (actSeqLenOptional) {
         actSeqLen = executor->ConvertToTensor(actSeqLenOptional, DataType::DT_INT64);
-        const_cast<aclTensor *>(actSeqLen)->SetStorageFormat(Format::FORMAT_ND);
-        const_cast<aclTensor *>(actSeqLen)->SetViewFormat(Format::FORMAT_ND);
-        const_cast<aclTensor *>(actSeqLen)->SetOriginalFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actSeqLen)->SetStorageFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actSeqLen)->SetViewFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actSeqLen)->SetOriginalFormat(Format::FORMAT_ND);
     } else {
         actSeqLen = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }

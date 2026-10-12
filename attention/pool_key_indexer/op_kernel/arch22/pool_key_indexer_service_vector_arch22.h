@@ -80,22 +80,22 @@ public:
     using MM1_OUT_T = float;
 
     __aicore__ inline PoolKeyIndexerServiceVector(){};
-    __aicore__ inline void ProcessVec(const PkiCommon::RunInfo &info);
+    __aicore__ inline void ProcessVec(const PkiCommon::RunInfo& info);
     __aicore__ inline void ProcessLD();
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitParams(const struct PkiCommon::ConstInfo &constInfo,
-                                      const PoolKeyIndexerTilingData *__restrict tilingData);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitParams(const struct PkiCommon::ConstInfo& constInfo,
+                                      const PoolKeyIndexerTilingData* __restrict tilingData);
     __aicore__ inline void InitVec1GlobalTensor(GlobalTensor<MM1_OUT_T> mm1ResGm, GlobalTensor<float> vec1ResGm,
                                                 GlobalTensor<int64_t> vec1ParamGm, GlobalTensor<W_T> weightsGm,
                                                 GlobalTensor<int32_t> indiceOutGm, GlobalTensor<float> valueOutGm);
     __aicore__ inline void CleanInvalidOutput(int64_t invalidS1offset);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void InitLDBuffers(TPipe *pipe);
+    __aicore__ inline void InitLDBuffers(TPipe* pipe);
 
 private:
-    __aicore__ inline void ExpandAndAppendIndices(LocalTensor<int32_t> poolIndices, LocalTensor<int32_t> &tokenIndices,
-                                                  LocalTensor<int32_t> &workBuf, GlobalTensor<int32_t> &idxOutGm,
+    __aicore__ inline void ExpandAndAppendIndices(LocalTensor<int32_t> poolIndices, LocalTensor<int32_t>& tokenIndices,
+                                                  LocalTensor<int32_t>& workBuf, GlobalTensor<int32_t>& idxOutGm,
                                                   int64_t idxOutBase, uint32_t sparseCount, uint32_t poolSize,
                                                   uint32_t validS2Len, int32_t poolTailK, int32_t L_orig,
                                                   uint32_t curS1Idx, uint32_t curS1Size);
@@ -207,7 +207,7 @@ private:
 };
 
 template <typename LIT>
-__aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitBuffers(TPipe* pipe)
 {
     uint32_t outNeedBufSize = (BASE_TOPK * 2) * 2 * sizeof(float);
     uint32_t reduceCacheSize = REDUCE_BANK_CONFLICT_OFFSETS + groupInner_ * s2BaseSize_ * sizeof(float);
@@ -298,7 +298,7 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitBuffers(TPipe *pipe
 }
 
 template <typename LIT>
-__aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitLDBuffers(TPipe *pipe)
+__aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitLDBuffers(TPipe* pipe)
 {
     pipe->Reset();
     // Reset 后按 LD 布局重分配缓冲(地址与主集不同): 先排空主集在途的
@@ -338,7 +338,7 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitLDBuffers(TPipe *pi
 
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitParams(
-    const struct PkiCommon::ConstInfo &constInfo, const PoolKeyIndexerTilingData *__restrict tilingData)
+    const struct PkiCommon::ConstInfo& constInfo, const PoolKeyIndexerTilingData* __restrict tilingData)
 {
     this->constInfo_ = constInfo;
     blockS2StartIdx_ = 0;
@@ -405,8 +405,8 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::BuildExpandGatherTpl()
 
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ExpandAndAppendIndices(
-    LocalTensor<int32_t> poolIndices, LocalTensor<int32_t> &tokenIndices, LocalTensor<int32_t> &workBuf,
-    GlobalTensor<int32_t> &idxOutGm, int64_t idxOutBase, uint32_t sparseCount, uint32_t poolSize, uint32_t validS2Len,
+    LocalTensor<int32_t> poolIndices, LocalTensor<int32_t>& tokenIndices, LocalTensor<int32_t>& workBuf,
+    GlobalTensor<int32_t>& idxOutGm, int64_t idxOutBase, uint32_t sparseCount, uint32_t poolSize, uint32_t validS2Len,
     int32_t poolTailK, int32_t L_orig, uint32_t curS1Idx, uint32_t curS1Size)
 {
     uint32_t topk = sparseCount * poolSize;
@@ -574,7 +574,7 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::CleanInvalidOutput(int6
         outQueue_.EnQue<uint32_t>(valueULocal);
         valueULocal = outQueue_.DeQue<uint32_t>();
         GlobalTensor<uint32_t> valueOutGmTmp;
-        valueOutGmTmp.SetGlobalBuffer((__gm__ uint32_t *)valueOutGm.GetPhyAddr());
+        valueOutGmTmp.SetGlobalBuffer((__gm__ uint32_t*)valueOutGm.GetPhyAddr());
         // invalidS1offset 是 indices 行偏移(行宽 outputLen_/sparseCount);
         // value 行宽为 sparseCount, 需换算行号后重算偏移, 否则越界写且本行 value 漏写
         uint64_t idxStride = (poolSize_ > 1) ? outputLen_ : constInfo_.sparseCount;
@@ -585,7 +585,7 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::CleanInvalidOutput(int6
 }
 
 template <typename LIT>
-__aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec(const PkiCommon::RunInfo &info)
+__aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec(const PkiCommon::RunInfo& info)
 {
     int32_t cuBaseS1Idx = info.gS1Idx * s1BaseSize_;
     int32_t cuBaseS2Idx = info.s2Idx * s2BaseSize_;

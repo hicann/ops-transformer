@@ -26,8 +26,8 @@ public:
     MetadataChecker() = default;
     ~MetadataChecker() = default;
 
-    ge::graphStatus CheckSinglePara(const QfaTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckParaExistence(const QfaTilingInfo &qfaInfo) override;
+    ge::graphStatus CheckSinglePara(const QfaTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckParaExistence(const QfaTilingInfo& qfaInfo) override;
 };
 
 } // namespace quant_flash_attn

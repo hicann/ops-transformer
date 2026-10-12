@@ -60,7 +60,7 @@ struct PerTileQuantParams {
  */
 template <typename T>
 __aicore__ inline void RowMuls(LocalTensor<T> dstUb, LocalTensor<T> src0Ub, LocalTensor<T> src1Ub,
-                               const Rectangle &rectangleParams)
+                               const Rectangle& rectangleParams)
 {
     uint32_t repeatElementNum = FP32_REPEAT_ELEMENT_NUM;
     uint32_t blockElementNum = FP32_BLOCK_ELEMENT_NUM;
@@ -137,7 +137,7 @@ __aicore__ inline void RowMuls(LocalTensor<T> dstUb, LocalTensor<T> src0Ub, Loca
           col 列数
           stride 一行的真实长度
  */
-__aicore__ inline void RowMax(LocalTensor<float> &dstUb, LocalTensor<float> &srcUb, const Rectangle rectangleParams)
+__aicore__ inline void RowMax(LocalTensor<float>& dstUb, LocalTensor<float>& srcUb, const Rectangle rectangleParams)
 {
     uint32_t dtypeMask = FP32_REPEAT_ELEMENT_NUM;
     uint32_t blockCount = rectangleParams.col / dtypeMask;
@@ -183,9 +183,9 @@ __aicore__ inline void RowMax(LocalTensor<float> &dstUb, LocalTensor<float> &src
           stride 一行的真实长度
  */
 template <typename T>
-__aicore__ inline void Dequant(const LocalTensor<float> &outputLocal, const LocalTensor<T> &inputLocal,
-                               const LocalTensor<float> &scaleLocal, const LocalTensor<float> &scale2Local,
-                               const Rectangle &rectangleParams)
+__aicore__ inline void Dequant(const LocalTensor<float>& outputLocal, const LocalTensor<T>& inputLocal,
+                               const LocalTensor<float>& scaleLocal, const LocalTensor<float>& scale2Local,
+                               const Rectangle& rectangleParams)
 {
     DequantVf(outputLocal, inputLocal, scaleLocal, scale2Local, rectangleParams.row, rectangleParams.col,
               rectangleParams.stride);
@@ -200,8 +200,8 @@ __aicore__ inline void Dequant(const LocalTensor<float> &outputLocal, const Loca
  * @param cnt tensor长度
  */
 template <typename O>
-__aicore__ inline void CastFP32ToINT8(const LocalTensor<O> outLocal, const LocalTensor<float> &inputLocal,
-                                      const LocalTensor<uint8_t> &shareTmpUb, uint64_t cnt)
+__aicore__ inline void CastFP32ToINT8(const LocalTensor<O> outLocal, const LocalTensor<float>& inputLocal,
+                                      const LocalTensor<uint8_t>& shareTmpUb, uint64_t cnt)
 {
     LocalTensor<int32_t> int32 = shareTmpUb.ReinterpretCast<int32_t>();
     LocalTensor<half> tmpHalf = shareTmpUb.ReinterpretCast<half>();
@@ -218,8 +218,8 @@ __aicore__ inline void CastFP32ToINT8(const LocalTensor<O> outLocal, const Local
 // dstUb[i, (j * 8) : (j * 8 + 7)] = src0Ub[i, (j * 8) : (j * 8 + 7)] / src1Ub[i, 0 : 7]
 // src0Ub:[dealRowCount, columnCount], src1Ub:[dealRowCount, FP32_BLOCK_ELEMENT_NUM] dstUb:[dealRowCount,
 // columnCount]
-__aicore__ inline void RowClips(LocalTensor<float> &dstUb, const LocalTensor<float> &src0Ub,
-                                const LocalTensor<float> &maxUb, const LocalTensor<float> &minUb, uint32_t dealRowCount,
+__aicore__ inline void RowClips(LocalTensor<float>& dstUb, const LocalTensor<float>& src0Ub,
+                                const LocalTensor<float>& maxUb, const LocalTensor<float>& minUb, uint32_t dealRowCount,
                                 uint32_t columnCount, uint32_t actualColumnCount)
 {
     uint32_t dtypeMask = FP32_REPEAT_ELEMENT_NUM;
@@ -249,10 +249,10 @@ __aicore__ inline void RowClips(LocalTensor<float> &dstUb, const LocalTensor<flo
     }
 }
 
-__aicore__ inline void PerTileClipWithAlpha(LocalTensor<float> &dstClipUb, LocalTensor<float> &aMax,
-                                            LocalTensor<float> &aMaxBrcb, const LocalTensor<float> &srcUb,
-                                            const LocalTensor<uint8_t> &shareTmpUb,
-                                            const PerTileQuantParams &perTileQuantParams)
+__aicore__ inline void PerTileClipWithAlpha(LocalTensor<float>& dstClipUb, LocalTensor<float>& aMax,
+                                            LocalTensor<float>& aMaxBrcb, const LocalTensor<float>& srcUb,
+                                            const LocalTensor<uint8_t>& shareTmpUb,
+                                            const PerTileQuantParams& perTileQuantParams)
 {
     constexpr uint32_t brcnNum = 8; // brcn一次性处理8个数据
     uint32_t srcSize = perTileQuantParams.row * perTileQuantParams.col;
@@ -295,9 +295,9 @@ __aicore__ inline void PerTileClipWithAlpha(LocalTensor<float> &dstClipUb, Local
  * @param row 待处理的行数
  * @param col 待处理的列数
  */
-__aicore__ inline void DynamicQuant(const LocalTensor<float> &outputLocal, const LocalTensor<float> &scale,
-                                    const LocalTensor<float> &inputLocal, const LocalTensor<float> &aMax,
-                                    const LocalTensor<float> &rowMaxBrcb, const LocalTensor<uint8_t> &shareTmpUb,
+__aicore__ inline void DynamicQuant(const LocalTensor<float>& outputLocal, const LocalTensor<float>& scale,
+                                    const LocalTensor<float>& inputLocal, const LocalTensor<float>& aMax,
+                                    const LocalTensor<float>& rowMaxBrcb, const LocalTensor<uint8_t>& shareTmpUb,
                                     float alpha, uint64_t row, uint64_t col)
 {
     constexpr float maxInt8 = 127.0f;
@@ -334,9 +334,9 @@ __aicore__ inline void DynamicQuant(const LocalTensor<float> &outputLocal, const
           stride 一行的真实长度
  */
 template <typename T, typename C, typename O>
-__aicore__ inline void QuantPerChannel(const LocalTensor<O> &outLocal, const LocalTensor<T> &inputLocal,
-                                       const LocalTensor<C> &quantScaleLocal, const LocalTensor<uint8_t> &shareTmpUb,
-                                       const Rectangle &rectangleParams)
+__aicore__ inline void QuantPerChannel(const LocalTensor<O>& outLocal, const LocalTensor<T>& inputLocal,
+                                       const LocalTensor<C>& quantScaleLocal, const LocalTensor<uint8_t>& shareTmpUb,
+                                       const Rectangle& rectangleParams)
 {
     QuantPerChannelVf(outLocal, inputLocal, quantScaleLocal, rectangleParams.row, rectangleParams.col,
                       rectangleParams.stride);
@@ -355,9 +355,9 @@ __aicore__ inline void QuantPerChannel(const LocalTensor<O> &outLocal, const Loc
           stride 一行的真实长度
  */
 template <typename T, typename C, typename O>
-__aicore__ inline void QuantPerTensor(const LocalTensor<O> &outLocal, const LocalTensor<T> &inputLocal,
-                                      const LocalTensor<C> &quantScaleLocal, const LocalTensor<uint8_t> &shareTmpUb,
-                                      const Rectangle &rectangleParams)
+__aicore__ inline void QuantPerTensor(const LocalTensor<O>& outLocal, const LocalTensor<T>& inputLocal,
+                                      const LocalTensor<C>& quantScaleLocal, const LocalTensor<uint8_t>& shareTmpUb,
+                                      const Rectangle& rectangleParams)
 {
     QuantPerTensorVF(outLocal, inputLocal, quantScaleLocal, rectangleParams.row, rectangleParams.col);
 }
@@ -377,8 +377,8 @@ __aicore__ inline void QuantPerTensor(const LocalTensor<O> &outLocal, const Loca
  *          col 待处理的列数 （col = tileSize * tileNum）
  */
 template <typename O>
-__aicore__ inline void QuantPerTile8Bit(const LocalTensor<O> &outLocal, const LocalTensor<float> &inputLocal,
-                                        const PerTileQuantParams &perTileQuantParams)
+__aicore__ inline void QuantPerTile8Bit(const LocalTensor<O>& outLocal, const LocalTensor<float>& inputLocal,
+                                        const PerTileQuantParams& perTileQuantParams)
 {
     LocalTensor<float> quantScaleLocal =
         outLocal[perTileQuantParams.row * perTileQuantParams.col].template ReinterpretCast<float>();
@@ -386,9 +386,9 @@ __aicore__ inline void QuantPerTile8Bit(const LocalTensor<O> &outLocal, const Lo
                                     perTileQuantParams.col, perTileQuantParams.tileSize);
 }
 
-__aicore__ inline void QuantPerTile(const LocalTensor<int8_t> &outLocal, const LocalTensor<float> &inputLocal,
-                                    const LocalTensor<uint8_t> &shareTmpUb,
-                                    const PerTileQuantParams &perTileQuantParams)
+__aicore__ inline void QuantPerTile(const LocalTensor<int8_t>& outLocal, const LocalTensor<float>& inputLocal,
+                                    const LocalTensor<uint8_t>& shareTmpUb,
+                                    const PerTileQuantParams& perTileQuantParams)
 {
     LocalTensor<float> scale =
         outLocal[perTileQuantParams.row * perTileQuantParams.col].template ReinterpretCast<float>();
@@ -421,9 +421,9 @@ __aicore__ inline void QuantPerTile(const LocalTensor<int8_t> &outLocal, const L
  * @param row 待处理的行数
  * @param col 待处理的列数
  */
-__aicore__ inline void DynamicQuant(const LocalTensor<float> &outputLocal, const LocalTensor<float> &scale,
-                                    const LocalTensor<float> &inputLocal, const LocalTensor<float> &maxInt8Tensor,
-                                    const LocalTensor<uint8_t> &shareTmpUb, uint64_t row, uint64_t col)
+__aicore__ inline void DynamicQuant(const LocalTensor<float>& outputLocal, const LocalTensor<float>& scale,
+                                    const LocalTensor<float>& inputLocal, const LocalTensor<float>& maxInt8Tensor,
+                                    const LocalTensor<uint8_t>& shareTmpUb, uint64_t row, uint64_t col)
 {
     constexpr uint64_t brcnNum = 8; // brcb一次处理8个数据
     uint64_t computeSize = row * col;

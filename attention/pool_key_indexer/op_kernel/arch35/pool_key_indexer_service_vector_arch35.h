@@ -68,11 +68,11 @@ public:
     using W_T = typename std::conditional<std::is_same<W_EXPLICIT_T, void>::value, W_DERIVED_T, W_EXPLICIT_T>::type;
 
     __aicore__ inline PoolKeyIndexerServiceVector(){};
-    __aicore__ inline void ProcessVec1(const PkiCommon::RunInfo &info);
-    __aicore__ inline void ProcessTopK(const PkiCommon::RunInfo &info);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitParams(const struct PkiCommon::ConstInfo &constInfo,
-                                      const PoolKeyIndexerTilingData *__restrict tilingData);
+    __aicore__ inline void ProcessVec1(const PkiCommon::RunInfo& info);
+    __aicore__ inline void ProcessTopK(const PkiCommon::RunInfo& info);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitParams(const struct PkiCommon::ConstInfo& constInfo,
+                                      const PoolKeyIndexerTilingData* __restrict tilingData);
     __aicore__ inline void InitVecWorkspaceTensor(GlobalTensor<SCORE_T> scoreGm);
     __aicore__ inline void InitVecInputTensor(GlobalTensor<W_T> weightsGm, GlobalTensor<int32_t> indiceOutGm,
                                               GlobalTensor<float> valueOutGm, GlobalTensor<int32_t> blockTableGm,
@@ -82,8 +82,8 @@ public:
     __aicore__ inline void FreeEventID();
 
 private:
-    __aicore__ inline void ExpandAndAppendIndices(LocalTensor<int32_t> poolIndices, LocalTensor<int32_t> &tokenIndices,
-                                                  LocalTensor<int32_t> &workBuf, uint32_t sparseCount,
+    __aicore__ inline void ExpandAndAppendIndices(LocalTensor<int32_t> poolIndices, LocalTensor<int32_t>& tokenIndices,
+                                                  LocalTensor<int32_t>& workBuf, uint32_t sparseCount,
                                                   uint32_t poolSize, uint32_t validS2Len, int32_t poolTailK,
                                                   int32_t L_orig, uint32_t curS1Idx, uint32_t curS1Size);
     // mode=0: k_descale GM->UB 搬运(非 PA 连续寻址 / PA 按 block_table 查物理块)。
@@ -209,7 +209,7 @@ private:
 };
 
 template <typename LIT>
-__aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(resMm1Buf_, 2 * CeilDiv(constInfo_.mBaseSize, 2) * s2BaseSize_ * sizeof(float));
     resMm1UB_ = resMm1Buf_.Get<float>();
@@ -283,7 +283,7 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitBuffers(TPipe *pipe
 
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitParams(
-    const struct PkiCommon::ConstInfo &constInfo, const PoolKeyIndexerTilingData *__restrict tilingData)
+    const struct PkiCommon::ConstInfo& constInfo, const PoolKeyIndexerTilingData* __restrict tilingData)
 {
     this->constInfo_ = constInfo;
     blockS2StartIdx_ = 0;
@@ -443,7 +443,7 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::CleanInvalidOutput(int6
 
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ExpandAndAppendIndices(
-    LocalTensor<int32_t> poolIndices, LocalTensor<int32_t> &tokenIndices, LocalTensor<int32_t> &workBuf,
+    LocalTensor<int32_t> poolIndices, LocalTensor<int32_t>& tokenIndices, LocalTensor<int32_t>& workBuf,
     uint32_t sparseCount, uint32_t poolSize, uint32_t validS2Len, int32_t poolTailK, int32_t L_orig, uint32_t curS1Idx,
     uint32_t curS1Size)
 {
@@ -581,7 +581,7 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ExpandAndAppendIndices(
 }
 
 template <typename LIT>
-__aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec1(const PkiCommon::RunInfo &info)
+__aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec1(const PkiCommon::RunInfo& info)
 {
     auto pingpong = (info.loop % 2);
     // CV同步, V核等C核计算完mm1，mm1Res已搬运到UB
@@ -658,9 +658,9 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec1(const PkiCo
             uint64_t dstOff = pingpong * CeilDiv(s1BaseSize_, 2) * 128 + s1IdxTmp * 128;
             // 独立 __simd_vf__ helper: bf16 Cast 需硬件展开,
             // 内联到普通 __aicore__ 函数不被编译器支持
-            vector1::MulWeightQScaleSIMD((__local_mem__ W_T *)weightUB_[srcOff].GetPhyAddr(),
-                                         (__local_mem__ float *)qScaleUB_[dstOff].GetPhyAddr(),
-                                         (__local_mem__ float *)weightScaleFp32UB_[dstOff].GetPhyAddr());
+            vector1::MulWeightQScaleSIMD((__local_mem__ W_T*)weightUB_[srcOff].GetPhyAddr(),
+                                         (__local_mem__ float*)qScaleUB_[dstOff].GetPhyAddr(),
+                                         (__local_mem__ float*)weightScaleFp32UB_[dstOff].GetPhyAddr());
         }
         // V 写落地后, WithScale 的向量 LoadAlign 才能读(同 pipe 有序性足够,
         // 但跨 ForEachS1 循环保险起见显式 barrier)
@@ -705,7 +705,7 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec1(const PkiCo
 }
 
 template <typename LIT>
-__aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessTopK(const PkiCommon::RunInfo &info)
+__aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessTopK(const PkiCommon::RunInfo& info)
 {
     SetFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);
     WaitFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);

@@ -30,10 +30,18 @@ def test_case_selector_preserves_requested_order(tmp_path):
         (tmp_path / name).touch()
 
     natural = QliV2CaseSelector.resolve(tmp_path)
-    assert [Path(path).name for path in natural] == ["case_1.pt", "case_2.pt", "case_10.pt"]
+    assert [Path(path).name for path in natural] == [
+        "case_1.pt",
+        "case_2.pt",
+        "case_10.pt",
+    ]
 
     indexed = QliV2CaseSelector.resolve(tmp_path, case_indexes="3,1,2-2")
-    assert [Path(path).name for path in indexed] == ["case_10.pt", "case_1.pt", "case_2.pt"]
+    assert [Path(path).name for path in indexed] == [
+        "case_10.pt",
+        "case_1.pt",
+        "case_2.pt",
+    ]
 
     named = QliV2CaseSelector.resolve(tmp_path, case_names="case_2,case_1.pt")
     assert [Path(path).name for path in named] == ["case_2.pt", "case_1.pt"]
@@ -55,17 +63,21 @@ def test_result_writer_uses_readable_name_and_migrates_legacy_result(tmp_path):
     name = QliV2ResultWriter.case_name(params)
     assert name == QliV2ResultWriter.case_name(params)
     assert name == (
-        "QLI_B0_S11_S22_N15_N26_D7_BSND_PA_BBND_INT8_"
-        "QM20_SM24_CR30_K23_RV31"
+        "QLI_B0_S11_S22_N15_N26_D7_BSND_PA_BBND_INT8_QM20_SM24_CR30_K23_RV31"
     )
-    assert QliV2ResultWriter.case_name(
-        params,
-        explicit_name="quant li/default:a5 v2",
-    ) == "quant_li_default_a5_v2"
+    assert (
+        QliV2ResultWriter.case_name(
+            params,
+            explicit_name="quant li/default:a5 v2",
+        )
+        == "quant_li_default_a5_v2"
+    )
 
     row = QliV2ResultWriter.row(name, params, "Pass", 100.0)
     output = tmp_path / "result.xlsx"
-    legacy = pd.DataFrame([{key: value for key, value in row.items() if key != "return_value"}])
+    legacy = pd.DataFrame(
+        [{key: value for key, value in row.items() if key != "return_value"}]
+    )
     legacy.to_excel(output, index=False)
 
     QliV2ResultWriter.append(output, row)
@@ -78,7 +90,9 @@ def test_result_writer_uses_readable_name_and_migrates_legacy_result(tmp_path):
 def test_comparison_failure_raises_serializable_assertion():
     ensure_comparison_passed("case_pass", "Pass", 100.0)
 
-    with pytest.raises(AssertionError, match="case_index_fail.*index result=Failed") as caught:
+    with pytest.raises(
+        AssertionError, match="case_index_fail.*index result=Failed"
+    ) as caught:
         ensure_comparison_passed("case_index_fail", "Failed", 97.5)
     restored = pickle.loads(pickle.dumps(caught.value))
     assert str(restored) == str(caught.value)

@@ -29,21 +29,21 @@ public:
     MaskChecker() = default;
     ~MaskChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const QfaTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckParaExistence(const QfaTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckFeature(const QfaTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckMultiPara(const QfaTilingInfo &qfaInfo) override;
+    ge::graphStatus CheckSinglePara(const QfaTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckParaExistence(const QfaTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckFeature(const QfaTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckMultiPara(const QfaTilingInfo& qfaInfo) override;
 
 private:
-    ge::graphStatus CheckSingleParaMaskMode(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaAttnMask(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaWindowParams(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus CheckSingleParaMaskMode(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaAttnMask(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaWindowParams(const QfaTilingInfo& qfaInfo);
 
     // --- MultiPara: mask_mode 与 attn_mask 的存在性关系校验 ---
-    ge::graphStatus CheckMaskModeAttnMaskConsistency(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus CheckMaskModeAttnMaskConsistency(const QfaTilingInfo& qfaInfo);
 
     // --- Feature: MxFP8 场景下 mask_mode 取值约束 ---
-    ge::graphStatus CheckMaskModeQuantMode(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus CheckMaskModeQuantMode(const QfaTilingInfo& qfaInfo);
 };
 
 } // namespace quant_flash_attn

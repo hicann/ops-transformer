@@ -20,8 +20,8 @@
 namespace MlaProlog {
 
 template <typename T>
-__simd_vf__ void DequantVFImpl(__ubuf__ float *yAddr, __ubuf__ T *xAddr, __ubuf__ float *scalePerChannelAddr,
-                               __ubuf__ float *scalePerTokenAddr, uint32_t floatRepSize, uint32_t fp32BlockElementNum,
+__simd_vf__ void DequantVFImpl(__ubuf__ float* yAddr, __ubuf__ T* xAddr, __ubuf__ float* scalePerChannelAddr,
+                               __ubuf__ float* scalePerTokenAddr, uint32_t floatRepSize, uint32_t fp32BlockElementNum,
                                uint32_t dLoops, uint32_t dTail, uint32_t dTailLoop, uint32_t row, uint32_t col,
                                uint32_t stride)
 {
@@ -102,15 +102,15 @@ __simd_vf__ void DequantVFImpl(__ubuf__ float *yAddr, __ubuf__ T *xAddr, __ubuf_
  * @param stride 待处理数据一行的真实长度
  */
 template <typename T>
-__aicore__ inline void DequantVf(const LocalTensor<float> &outputLocal, const LocalTensor<T> &inputLocal,
-                                 const LocalTensor<float> &scalePerChannelLocal,
-                                 const LocalTensor<float> &scalePerTokenLocal, uint32_t row, uint32_t col,
+__aicore__ inline void DequantVf(const LocalTensor<float>& outputLocal, const LocalTensor<T>& inputLocal,
+                                 const LocalTensor<float>& scalePerChannelLocal,
+                                 const LocalTensor<float>& scalePerTokenLocal, uint32_t row, uint32_t col,
                                  uint32_t stride)
 {
-    __ubuf__ float *outputUb = (__ubuf__ float *)outputLocal.GetPhyAddr();
-    __ubuf__ T *inputUb = (__ubuf__ T *)inputLocal.GetPhyAddr();
-    __ubuf__ float *scalePerChannelLocalUb = (__ubuf__ float *)scalePerChannelLocal.GetPhyAddr();
-    __ubuf__ float *scalePerTokenLocalUb = (__ubuf__ float *)scalePerTokenLocal.GetPhyAddr();
+    __ubuf__ float* outputUb = (__ubuf__ float*)outputLocal.GetPhyAddr();
+    __ubuf__ T* inputUb = (__ubuf__ T*)inputLocal.GetPhyAddr();
+    __ubuf__ float* scalePerChannelLocalUb = (__ubuf__ float*)scalePerChannelLocal.GetPhyAddr();
+    __ubuf__ float* scalePerTokenLocalUb = (__ubuf__ float*)scalePerTokenLocal.GetPhyAddr();
 
     const uint32_t floatRepSize = 64; // 一个寄存器能够存放64个FP32
     const uint32_t fp32BlockElementNum = 8;

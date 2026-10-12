@@ -18,11 +18,11 @@ using namespace std;
 using namespace ge;
 
 namespace {
-gert::StorageShape MakeStorageShape(const std::vector<int64_t> &dims)
+gert::StorageShape MakeStorageShape(const std::vector<int64_t>& dims)
 {
     gert::StorageShape shape;
-    auto &originShape = shape.MutableOriginShape();
-    auto &storageShape = shape.MutableStorageShape();
+    auto& originShape = shape.MutableOriginShape();
+    auto& storageShape = shape.MutableStorageShape();
     originShape.SetDimNum(dims.size());
     storageShape.SetDimNum(dims.size());
     for (size_t i = 0; i < dims.size(); ++i) {
@@ -75,14 +75,12 @@ TEST_P(MlaPreprocessTiling, mla_preprocess_test_tiling_case0)
     const std::vector<int64_t> normalRopeShape = {tokenNum, 64};
     const std::vector<int64_t> disabledRopeShape = {0};
     const std::vector<int64_t> tokenMismatchShape = {0, 64};
-    const std::vector<int64_t> cosShape =
-        ropeInputMode == 0 || ropeInputMode == 2
-            ? normalRopeShape
-            : (ropeInputMode == 1 ? disabledRopeShape : tokenMismatchShape);
+    const std::vector<int64_t> cosShape = ropeInputMode == 0 || ropeInputMode == 2 ?
+                                              normalRopeShape :
+                                              (ropeInputMode == 1 ? disabledRopeShape : tokenMismatchShape);
     const std::vector<int64_t> sinShape =
-        ropeInputMode == 0
-            ? normalRopeShape
-            : (ropeInputMode == 1 || ropeInputMode == 2 ? disabledRopeShape : tokenMismatchShape);
+        ropeInputMode == 0 ? normalRopeShape :
+                             (ropeInputMode == 1 || ropeInputMode == 2 ? disabledRopeShape : tokenMismatchShape);
     std::vector<gert::TilingContextPara::TensorDescription> inputTensorDesc = {
         // input info
         {{{tokenNum, hiddenNum}, {tokenNum, hiddenNum}},
@@ -103,8 +101,8 @@ TEST_P(MlaPreprocessTiling, mla_preprocess_test_tiling_case0)
         {{{headNum * 192}, {headNum * 192}}, ge::DT_INT64, ge::FORMAT_ND},                               // deScale1
         {{{headNum * 192}, {headNum * 192}}, ge::DT_INT32, ge::FORMAT_ND},                               // bias1
         {{{512}, {512}}, ge::DT_FLOAT16, ge::FORMAT_ND},                                                 // gamma2
-        {MakeStorageShape(cosShape), ge::DT_FLOAT16, ge::FORMAT_ND},                                 // cos
-        {MakeStorageShape(sinShape), ge::DT_FLOAT16, ge::FORMAT_ND},                                 // sin
+        {MakeStorageShape(cosShape), ge::DT_FLOAT16, ge::FORMAT_ND},                                     // cos
+        {MakeStorageShape(sinShape), ge::DT_FLOAT16, ge::FORMAT_ND},                                     // sin
         {{{headNum, 128, 512}, {headNum, 128, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},                     // wuk
         {{{blockNum, blockSize, 1, 576}, {blockNum, blockSize, 1, 576}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // kvCache
         {{{blockNum, blockSize, 1, 64}, {blockNum, blockSize, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // kvCacheRope

@@ -36,8 +36,8 @@ public:
 
 public:
     AclnnNsaCompressWithCacheCase();
-    AclnnNsaCompressWithCacheCase(const char *name, bool enable, const char *dbgInfo, OpInfo opInfo,
-                                  const AclnnNsaCompressWithCacheParam &param,
+    AclnnNsaCompressWithCacheCase(const char* name, bool enable, const char* dbgInfo, OpInfo opInfo,
+                                  const AclnnNsaCompressWithCacheParam& param,
                                   int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
     bool Run() override;
 

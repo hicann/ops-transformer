@@ -29,8 +29,8 @@ public:
     SoftmaxLSEChecker() = default;
     ~SoftmaxLSEChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const QfaTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckMultiPara(const QfaTilingInfo &qfaInfo) override;
+    ge::graphStatus CheckSinglePara(const QfaTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckMultiPara(const QfaTilingInfo& qfaInfo) override;
 };
 
 } // namespace quant_flash_attn

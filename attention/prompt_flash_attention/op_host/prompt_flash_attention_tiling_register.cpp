@@ -22,15 +22,16 @@ using namespace AscendC;
 namespace optiling {
 constexpr uint32_t ACTUAL_SEQ_Q_INDEX_PFA = 5;
 constexpr uint32_t ACTUAL_SEQ_KV_INDEX_PFA = 6;
-static ge::graphStatus TilingPrepareForPromptFlashAttention(gert::TilingParseContext* context) {
+static ge::graphStatus TilingPrepareForPromptFlashAttention(gert::TilingParseContext* context)
+{
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr,
-                    OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null!"),
-                    return ge::GRAPH_FAILED);
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null!"),
+                return ge::GRAPH_FAILED);
     auto compileInfoPtr = context->GetCompiledInfo<PromptFlashAttentionCompileInfo>();
     OP_CHECK_IF(compileInfoPtr == nullptr,
-                    OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "compileInfoPtr is null!"),
-                    return ge::GRAPH_FAILED);
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "compileInfoPtr is null!"),
+                return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
     compileInfoPtr->aicNum = ascendcPlatform.GetCoreNumAic();
@@ -54,5 +55,6 @@ static ge::graphStatus TilingPrepareForPromptFlashAttention(gert::TilingParseCon
 IMPL_OP_OPTILING(PromptFlashAttention)
     .TilingInputsDataDependency({ACTUAL_SEQ_Q_INDEX_PFA, ACTUAL_SEQ_KV_INDEX_PFA})
     .Tiling(TilingPromptFlashAttention)
-    .TilingParse<PromptFlashAttentionCompileInfo>(TilingPrepareForPromptFlashAttention); // Register entrance functions to the framework
-}  // namespace optiling
+    .TilingParse<PromptFlashAttentionCompileInfo>(
+        TilingPrepareForPromptFlashAttention); // Register entrance functions to the framework
+} // namespace optiling

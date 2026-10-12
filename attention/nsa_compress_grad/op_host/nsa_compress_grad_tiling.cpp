@@ -22,14 +22,14 @@
 #include "op_host/tiling_templates_registry.h"
 using namespace Ops::Transformer::OpTiling;
 namespace {
-    constexpr uint64_t WORKSIZE = static_cast<uint64_t>(16) * 1024 * 1024;
-    constexpr uint32_t BLOCK_SIZE_16 = 16;
-    constexpr uint32_t ONE_KILO = 1024;
-    constexpr uint32_t INDEXZERO = 0;
-    constexpr uint32_t INDEXONE = 1;
-    constexpr uint32_t INDEXTWO = 2;
-    constexpr uint32_t INDEXTHREE = 3;
-} // namespace 
+constexpr uint64_t WORKSIZE = static_cast<uint64_t>(16) * 1024 * 1024;
+constexpr uint32_t BLOCK_SIZE_16 = 16;
+constexpr uint32_t ONE_KILO = 1024;
+constexpr uint32_t INDEXZERO = 0;
+constexpr uint32_t INDEXONE = 1;
+constexpr uint32_t INDEXTWO = 2;
+constexpr uint32_t INDEXTHREE = 3;
+} // namespace
 
 namespace optiling {
 
@@ -49,11 +49,9 @@ bool NsaCompressGradTiling::PreparePlatformInfo()
     if (platformInfoPtr == nullptr) {
         OP_LOGI(context_, "NsaCompressGrad get platformInfo is null.");
         auto compileInfoPtr = context_->GetCompileInfo<NsaCompileInfo>();
-        OP_CHECK_IF(
-            compileInfoPtr == nullptr, 
-            OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(), "NsaCompressGrad CompileInfoPtr is null."), 
-            return false
-        );
+        OP_CHECK_IF(compileInfoPtr == nullptr,
+                    OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(), "NsaCompressGrad CompileInfoPtr is null."),
+                    return false);
         aicNum_ = compileInfoPtr->aicNum;
         aivNum_ = compileInfoPtr->aivNum;
         ubMaxSize_ = compileInfoPtr->ubSize;
@@ -63,13 +61,8 @@ bool NsaCompressGradTiling::PreparePlatformInfo()
         aivNum_ = ascendcPlatform.GetCoreNumAiv();
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubMaxSize_);
     }
-    OP_LOGI(
-        context_,
-        "NsaCompressGrad Platform info: aicNum(%u) aivNum(%u) ubSize(%lu).",
-        aicNum_,
-        aivNum_,
-        ubMaxSize_
-    );
+    OP_LOGI(context_, "NsaCompressGrad Platform info: aicNum(%u) aivNum(%u) ubSize(%lu).", aicNum_, aivNum_,
+            ubMaxSize_);
     return true;
 }
 
@@ -85,10 +78,9 @@ bool NsaCompressGradTiling::IsCapable()
 
 ge::graphStatus NsaCompressGradTiling::DoOpTiling()
 {
-    OP_CHECK_IF(!PreparePlatformInfo(), 
-               OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "NsaCompressGrad SetPlatformInfoForTiling fail."), 
-               return ge::GRAPH_FAILED
-    );
+    OP_CHECK_IF(!PreparePlatformInfo(),
+                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "NsaCompressGrad SetPlatformInfoForTiling fail."),
+                return ge::GRAPH_FAILED);
 
     const auto& outGradShape = GetShapeOfInput(INDEXZERO);
     auto nBlocks = static_cast<uint32_t>(outGradShape.GetDim(INDEXZERO));
@@ -135,21 +127,21 @@ ge::graphStatus NsaCompressGradTiling::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus NsaCompressGradTiling::DoLibApiTiling() {
+ge::graphStatus NsaCompressGradTiling::DoLibApiTiling()
+{
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus NsaCompressGradTiling::GetWorkspaceSize() {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+ge::graphStatus NsaCompressGradTiling::GetWorkspaceSize()
+{
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     size_t sysWorkspaceSize = WORKSIZE;
     /* usrWorkspaceSize = workspace for other gm */
     int64_t usrWorkspaceSizeTmp = static_cast<int64_t>(tilingData_.get_blockSize()) *
-                                  static_cast<int64_t>(tilingData_.get_numOfHead()) *
-                                  sizeof(uint32_t) * static_cast<int64_t>(aivNum_) +
-                                  static_cast<int64_t>(tSeqLen_) *
-                                  static_cast<int64_t>(tilingData_.get_numOfHead()) *
-                                  static_cast<int64_t>(tilingData_.get_dimOfHead()) *
-                                  sizeof(uint32_t) +
+                                      static_cast<int64_t>(tilingData_.get_numOfHead()) * sizeof(uint32_t) *
+                                      static_cast<int64_t>(aivNum_) +
+                                  static_cast<int64_t>(tSeqLen_) * static_cast<int64_t>(tilingData_.get_numOfHead()) *
+                                      static_cast<int64_t>(tilingData_.get_dimOfHead()) * sizeof(uint32_t) +
                                   static_cast<int64_t>(ONE_KILO) * ONE_KILO;
     size_t usrWorkspaceSize = static_cast<size_t>(usrWorkspaceSizeTmp);
     workspaces[0] = sysWorkspaceSize + usrWorkspaceSize;
@@ -163,23 +155,16 @@ uint64_t NsaCompressGradTiling::GetTilingKey() const
 
 ge::graphStatus NsaCompressGradTiling::PostTiling()
 {
-    OP_CHECK_IF(!CheckTilingData(), 
-               OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "Tiling data not support."), 
-               return ge::GRAPH_FAILED
-    );
-    
-    OP_CHECK_IF(aivNum_ == 0, 
-               OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "Get block dim is 0."), 
-               return ge::GRAPH_FAILED
-    );
+    OP_CHECK_IF(!CheckTilingData(), OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "Tiling data not support."),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(aivNum_ == 0, OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "Get block dim is 0."),
+                return ge::GRAPH_FAILED);
     context_->SetBlockDim(aivNum_);
 
     context_->SetTilingKey(GetTilingKey());
 
-    tilingData_.SaveToBuffer(
-        context_->GetRawTilingData()->GetData(),
-        context_->GetRawTilingData()->GetCapacity()
-    );
+    tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
 
     return ge::GRAPH_SUCCESS;
@@ -192,7 +177,8 @@ const gert::Shape NsaCompressGradTiling::GetShapeOfInput(const size_t index)
     return context_->GetInputShape(index)->GetStorageShape();
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingNsaCompressGrad(gert::TilingContext* context) {
+ASCENDC_EXTERN_C ge::graphStatus TilingNsaCompressGrad(gert::TilingContext* context)
+{
     NsaCompressGradTiling tiling(context);
     return tiling.DoTiling();
 }
@@ -215,29 +201,21 @@ ge::graphStatus TilingPrepareForNsaCompressGrad(gert::TilingParseContext* contex
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, compileInfoPtr->l0CSize);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, compileInfoPtr->l2Size);
 
-    OP_LOGI(
-        context->GetNodeName(),
-        "Parse compile info success, soc: %d", static_cast<int>(compileInfoPtr->socVersion)
-    );
+    OP_LOGI(context->GetNodeName(), "Parse compile info success, soc: %d",
+            static_cast<int>(compileInfoPtr->socVersion));
     return ge::GRAPH_SUCCESS;
 }
 
 bool NsaCompressGradTiling::CheckTilingData()
 {
-    OP_CHECK_IF(
-        tilingData_.get_blockSize() % BLOCK_SIZE_16 != 0,
-        OP_LOGE(context_->GetNodeName(), "Compress block size must be align to 16."),
-        return false);
+    OP_CHECK_IF(tilingData_.get_blockSize() % BLOCK_SIZE_16 != 0,
+                OP_LOGE(context_->GetNodeName(), "Compress block size must be align to 16."), return false);
 
-    OP_CHECK_IF(
-        tilingData_.get_blockStride() % BLOCK_SIZE_16 != 0,
-        OP_LOGE(context_->GetNodeName(), "Compress block stride must be align to 16."),
-        return false);
+    OP_CHECK_IF(tilingData_.get_blockStride() % BLOCK_SIZE_16 != 0,
+                OP_LOGE(context_->GetNodeName(), "Compress block stride must be align to 16."), return false);
 
-    OP_CHECK_IF(
-        tilingData_.get_dimOfHead() % BLOCK_SIZE_16 != 0,
-        OP_LOGE(context_->GetNodeName(), "Head dim must be align to 16."),
-        return false);
+    OP_CHECK_IF(tilingData_.get_dimOfHead() % BLOCK_SIZE_16 != 0,
+                OP_LOGE(context_->GetNodeName(), "Head dim must be align to 16."), return false);
 
     return true;
 }

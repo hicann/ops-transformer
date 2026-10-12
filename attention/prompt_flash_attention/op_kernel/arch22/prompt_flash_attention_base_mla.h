@@ -35,12 +35,12 @@ struct PFAMLAType {
 #ifdef __DAV_C220_CUBE__
 template <typename PFAT>
 __aicore__ inline void unpad_flashattention_mla(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-    __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-    __gm__ uint8_t *blocktable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-    __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix, __gm__ uint8_t *actualSharedPrefixLen,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-    const typename PFAT::tilingType *__restrict tiling, __gm__ uint8_t *gmTiling, TPipe *tPipe)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+    __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+    __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+    __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+    const typename PFAT::tilingType* __restrict tiling, __gm__ uint8_t* gmTiling, TPipe* tPipe)
 {
     AscendC::SetLoadDataPaddingValue<uint64_t>(0);
     AscendC::SetAtomicNone();
@@ -94,16 +94,16 @@ __aicore__ inline void unpad_flashattention_mla(
     AscendC::GlobalTensor<float> oTmpGmTensor;
     GlobalTensor<int64_t> actualSeqLengthsGm;
     GlobalTensor<int64_t> actualSeqLengthsKVGm;
-    qGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(query));
-    kGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(key));
-    vGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(value));
+    qGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(query));
+    kGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(key));
+    vGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(value));
     uint64_t workSize = tiling->promptAttentionBaseApiBaseParams.workSize;
-    sGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(workspace));
-    pGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(workspace + workSize));
-    oTmpGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(workspace + 2 * workSize));
-    actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths,
+    sGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(workspace));
+    pGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(workspace + workSize));
+    oTmpGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace + 2 * workSize));
+    actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths,
                                        tiling->promptAttentionBaseApiBaseParams.batchSize);
-    actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKV,
+    actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKV,
                                          tiling->promptAttentionBaseApiBaseParams.batchSize);
 
     AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>((EVENT_ID0));
@@ -544,12 +544,12 @@ __aicore__ __attribute__((always_inline)) inline void __set_vcg_mask_mla(int32_t
 
 template <typename PFAT>
 __aicore__ inline void unpad_flashattention_mla(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-    __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-    __gm__ uint8_t *blocktable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-    __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix, __gm__ uint8_t *actualSharedPrefixLen,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-    const typename PFAT::tilingType *__restrict tiling, __gm__ uint8_t *gmTiling, TPipe *tPipe)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+    __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+    __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+    __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+    const typename PFAT::tilingType* __restrict tiling, __gm__ uint8_t* gmTiling, TPipe* tPipe)
 {
     int32_t subblockIdx = AscendC::GetSubBlockIdx();
     AscendC::SetAtomicNone();
@@ -601,18 +601,18 @@ __aicore__ inline void unpad_flashattention_mla(
     AscendC::GlobalTensor<float> upoGmTensor;
     GlobalTensor<int64_t> actualSeqLengthsGm;
     GlobalTensor<int64_t> actualSeqLengthsKVGm;
-    maskGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(pseShift));
+    maskGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(pseShift));
     maskU8GmTensor.SetGlobalBuffer(pseShift);
-    oGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(attentionOut));
-    actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths,
+    oGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(attentionOut));
+    actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths,
                                        tiling->promptAttentionBaseApiBaseParams.batchSize);
-    actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKV,
+    actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKV,
                                          tiling->promptAttentionBaseApiBaseParams.batchSize);
     uint64_t workSize = tiling->promptAttentionBaseApiBaseParams.workSize;
-    sGmTensor.SetGlobalBuffer((__gm__ half *)(workspace));
-    pGmTensor.SetGlobalBuffer((__gm__ half *)(workspace + workSize));
-    oTmpGmTensor.SetGlobalBuffer((__gm__ float *)(workspace + 2 * workSize));
-    upoGmTensor.SetGlobalBuffer((__gm__ float *)(workspace + 3 * workSize));
+    sGmTensor.SetGlobalBuffer((__gm__ half*)(workspace));
+    pGmTensor.SetGlobalBuffer((__gm__ half*)(workspace + workSize));
+    oTmpGmTensor.SetGlobalBuffer((__gm__ float*)(workspace + 2 * workSize));
+    upoGmTensor.SetGlobalBuffer((__gm__ float*)(workspace + 3 * workSize));
 
     uint32_t batchSize = tiling->promptAttentionBaseApiBaseParams.batchSize;
     uint32_t maxSeqlen = tiling->promptAttentionBaseApiBaseParams.maxSeqLen;
@@ -1393,26 +1393,26 @@ template <typename PFAT>
 class PromptFlashAttentionBaseMLA {
 public:
     __aicore__ inline PromptFlashAttentionBaseMLA(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *pseShift, __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                __gm__ uint8_t *actualSeqLengthsKV, __gm__ uint8_t *blocktable,
-                                __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-                                __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-                                __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *attentionOut,
-                                __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-                                const typename PFAT::tilingType *__restrict tiling, __gm__ uint8_t *gmTiling,
-                                TPipe *tPipe, __gm__ uint8_t *alibi_coeff);
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                                __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* blocktable,
+                                __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+                                __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix,
+                                __gm__ uint8_t* actualSharedPrefixLen, __gm__ uint8_t* attentionOut,
+                                __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                                const typename PFAT::tilingType* __restrict tiling, __gm__ uint8_t* gmTiling,
+                                TPipe* tPipe, __gm__ uint8_t* alibi_coeff);
 };
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionBaseMLA<PFAT>::Init(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-    __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-    __gm__ uint8_t *blocktable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-    __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix, __gm__ uint8_t *actualSharedPrefixLen,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-    const typename PFAT::tilingType *__restrict tiling, __gm__ uint8_t *gmTiling, TPipe *tPipe,
-    __gm__ uint8_t *alibi_coeff)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+    __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+    __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+    __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+    const typename PFAT::tilingType* __restrict tiling, __gm__ uint8_t* gmTiling, TPipe* tPipe,
+    __gm__ uint8_t* alibi_coeff)
 {
 #ifdef __DAV_C220_CUBE__
     unpad_flashattention_mla<PFAT>(query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKV,

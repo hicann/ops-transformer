@@ -29,25 +29,25 @@ constexpr uint32_t ATTR_SPARSE_COUNT_INDEX = 4;
 constexpr uint32_t DIM_NUM_3 = 3;
 constexpr uint32_t DIM_NUM_4 = 4;
 
-static ge::graphStatus InferShapeQuantLightningIndexer(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeQuantLightningIndexer(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("QuantLightningIndexer", "context is nullptr");
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape *queryShape = context->GetInputShape(QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(KEY_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    gert::Shape *outShape = context->GetOutputShape(0);
+    gert::Shape* outShape = context->GetOutputShape(0);
 
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const char *inputLayoutQueryPtr = attrs->GetAttrPointer<char>(ATTR_QUERY_LAYOUT_INDEX);
+    const char* inputLayoutQueryPtr = attrs->GetAttrPointer<char>(ATTR_QUERY_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutQueryPtr);
-    const char *inputLayoutKeyPtr = attrs->GetAttrPointer<char>(ATTR_KV_LAYOUT_INDEX);
+    const char* inputLayoutKeyPtr = attrs->GetAttrPointer<char>(ATTR_KV_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutKeyPtr);
-    const int64_t *qliSparseCount = attrs->GetInt(ATTR_SPARSE_COUNT_INDEX);
+    const int64_t* qliSparseCount = attrs->GetInt(ATTR_SPARSE_COUNT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, qliSparseCount);
 
     std::string inputLayoutQueryPtrStr = std::string(inputLayoutQueryPtr);
@@ -76,7 +76,7 @@ static ge::graphStatus InferShapeQuantLightningIndexer(gert::InferShapeContext *
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeQuantLightningIndexer(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeQuantLightningIndexer(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("QuantLightningIndexer", "InferDataTypeContext context is nullptr");

@@ -37,19 +37,19 @@ public:
                                 GM_ADDR attention_out_grad, GM_ADDR softmax_max, GM_ADDR softmax_sum,
                                 GM_ADDR topk_indices, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen,
                                 GM_ADDR atten_mask, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace,
-                                const TILING_CLASS *__restrict ordTilingData, TPipe *pipe);
+                                const TILING_CLASS* __restrict ordTilingData, TPipe* pipe);
     __aicore__ inline void Process(const int64_t dyGmOffset, const int64_t sumGmOffset, const uint64_t indicesGmOffset,
                                    const int64_t s1Index, const int32_t blkCntOffset, int64_t mm12Addr,
                                    int64_t mm345Addr);
 
 protected:
-    __aicore__ inline void InitParams(const TILING_CLASS *__restrict ordTilingData, GM_ADDR actual_seq_qlen,
+    __aicore__ inline void InitParams(const TILING_CLASS* __restrict ordTilingData, GM_ADDR actual_seq_qlen,
                                       GM_ADDR actual_seq_kvlen);
     __aicore__ inline void InitGMBuffer(GM_ADDR attention_out, GM_ADDR attention_out_grad, GM_ADDR softmax_max,
                                         GM_ADDR softmax_sum, GM_ADDR topk_indices, GM_ADDR workspace);
-    __aicore__ inline void InitUB(TPipe *pipe);
+    __aicore__ inline void InitUB(TPipe* pipe);
     __aicore__ inline void AtomicClean();
-    __aicore__ inline void DumpGmZero(GlobalTensor<float> &gm, int64_t num);
+    __aicore__ inline void DumpGmZero(GlobalTensor<float>& gm, int64_t num);
     __aicore__ inline void CalRowsumAndSftCopyIn(const int64_t dyGmOffset, const int64_t sumGmOffset);
     __aicore__ inline void CalAttenMsk(const uint64_t indicesGmOffset, const int64_t s1Index, const int32_t processM,
                                        const int32_t blkCntOffset);
@@ -58,7 +58,7 @@ protected:
                                       const int32_t blkCntOffset);
     __aicore__ inline void CalSoftmaxGrad(const int32_t loopIdx, const int32_t processM, const int64_t mm12Addr,
                                           const int64_t mm345Addr);
-    __aicore__ inline void CalSub(LocalTensor<float> &dstTensor, LocalTensor<float> &srcTensor, int32_t baseM,
+    __aicore__ inline void CalSub(LocalTensor<float>& dstTensor, LocalTensor<float>& srcTensor, int32_t baseM,
                                   int32_t baseN);
 
 protected:
@@ -104,7 +104,7 @@ protected:
     constexpr static const int32_t MSK_LEN = 64;
     constexpr static const uint32_t ATTEN_MASK_SCALE = 0xFF7FFFFF;
 
-    const TILING_CLASS *__restrict tilingData;
+    const TILING_CLASS* __restrict tilingData;
     // Shape
     int64_t dimB;
     int64_t dimN2;
@@ -140,7 +140,7 @@ __aicore__ inline void VecOp<NSAGT>::Init(GM_ADDR query, GM_ADDR key, GM_ADDR va
                                           GM_ADDR attention_out_grad, GM_ADDR softmax_max, GM_ADDR softmax_sum,
                                           GM_ADDR topk_indices, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen,
                                           GM_ADDR atten_mask, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace,
-                                          const TILING_CLASS *__restrict ordTilingData, TPipe *pipe)
+                                          const TILING_CLASS* __restrict ordTilingData, TPipe* pipe)
 {
     InitParams(ordTilingData, actual_seq_qlen, actual_seq_kvlen);
     InitGMBuffer(attention_out, attention_out_grad, softmax_max, softmax_sum, topk_indices, workspace);
@@ -149,7 +149,7 @@ __aicore__ inline void VecOp<NSAGT>::Init(GM_ADDR query, GM_ADDR key, GM_ADDR va
 }
 
 template <typename NSAGT>
-__aicore__ inline void VecOp<NSAGT>::InitParams(const TILING_CLASS *__restrict ordTilingData, GM_ADDR actual_seq_qlen,
+__aicore__ inline void VecOp<NSAGT>::InitParams(const TILING_CLASS* __restrict ordTilingData, GM_ADDR actual_seq_qlen,
                                                 GM_ADDR actual_seq_kvlen)
 {
     cubeBlockIdx = GetBlockIdx() / 2;
@@ -189,11 +189,11 @@ __aicore__ inline void VecOp<NSAGT>::InitParams(const TILING_CLASS *__restrict o
         int64_t seqS1Len = 0;
         int64_t seqS2Len = 0;
         if (unlikely(i == 0)) {
-            seqS1Len = ((__gm__ int64_t *)actual_seq_qlen)[i];
-            seqS2Len = ((__gm__ int64_t *)actual_seq_kvlen)[i];
+            seqS1Len = ((__gm__ int64_t*)actual_seq_qlen)[i];
+            seqS2Len = ((__gm__ int64_t*)actual_seq_kvlen)[i];
         } else {
-            seqS1Len = ((__gm__ int64_t *)actual_seq_qlen)[i] - ((__gm__ int64_t *)actual_seq_qlen)[i - 1];
-            seqS2Len = ((__gm__ int64_t *)actual_seq_kvlen)[i] - ((__gm__ int64_t *)actual_seq_kvlen)[i - 1];
+            seqS1Len = ((__gm__ int64_t*)actual_seq_qlen)[i] - ((__gm__ int64_t*)actual_seq_qlen)[i - 1];
+            seqS2Len = ((__gm__ int64_t*)actual_seq_kvlen)[i] - ((__gm__ int64_t*)actual_seq_kvlen)[i - 1];
         }
         dimTq += (int64_t)seqS1Len;
         dimTkv += (int64_t)seqS2Len;
@@ -208,11 +208,11 @@ __aicore__ inline void VecOp<NSAGT>::InitGMBuffer(GM_ADDR attention_out, GM_ADDR
     /*
      * 初始化输入
      */
-    attentionGm.SetGlobalBuffer((__gm__ T1 *)attention_out);
-    attentionGradGm.SetGlobalBuffer((__gm__ T1 *)attention_out_grad);
-    softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmax_max);
-    softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmax_sum);
-    topkIndicesGm.SetGlobalBuffer((__gm__ int32_t *)topk_indices);
+    attentionGm.SetGlobalBuffer((__gm__ T1*)attention_out);
+    attentionGradGm.SetGlobalBuffer((__gm__ T1*)attention_out_grad);
+    softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmax_max);
+    softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmax_sum);
+    topkIndicesGm.SetGlobalBuffer((__gm__ int32_t*)topk_indices);
 
     /*
      * 初始化workspace
@@ -232,17 +232,17 @@ __aicore__ inline void VecOp<NSAGT>::InitGMBuffer(GM_ADDR attention_out, GM_ADDR
     int64_t dvAddr = dkAddr + dkWorkspaceLen / sizeof(float);
     usedWorkspaceLen += dqWorkspaceLen + dkWorkspaceLen + dvWorkspaceLen;
 
-    mm1WorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm1Addr);
-    mm2WorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm2Addr);
-    pWorkspaceGm.SetGlobalBuffer((__gm__ T1 *)workspace + pAddr);
-    dsWorkspaceGm.SetGlobalBuffer((__gm__ T1 *)workspace + dsAddr);
-    dqWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + dqAddr);
-    dkWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + dkAddr);
-    dvWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + dvAddr);
+    mm1WorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm1Addr);
+    mm2WorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm2Addr);
+    pWorkspaceGm.SetGlobalBuffer((__gm__ T1*)workspace + pAddr);
+    dsWorkspaceGm.SetGlobalBuffer((__gm__ T1*)workspace + dsAddr);
+    dqWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + dqAddr);
+    dkWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + dkAddr);
+    dvWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + dvAddr);
 }
 
 template <typename NSAGT>
-__aicore__ inline void VecOp<NSAGT>::InitUB(TPipe *pipe)
+__aicore__ inline void VecOp<NSAGT>::InitUB(TPipe* pipe)
 {
     uint32_t dataSize = params.singleM * dimDv;
     uint32_t ubOffset = 0;
@@ -333,7 +333,7 @@ __aicore__ inline void VecOp<NSAGT>::AtomicClean()
 }
 
 template <typename NSAGT>
-__aicore__ inline void VecOp<NSAGT>::DumpGmZero(GlobalTensor<float> &gm, int64_t num)
+__aicore__ inline void VecOp<NSAGT>::DumpGmZero(GlobalTensor<float>& gm, int64_t num)
 {
     int64_t perSize = (num + tilingData->opInfo.castUsedCoreNum - 1) / tilingData->opInfo.castUsedCoreNum;
     int64_t coreNum = (num + perSize - 1) / perSize;
@@ -350,7 +350,7 @@ __aicore__ inline void VecOp<NSAGT>::DumpGmZero(GlobalTensor<float> &gm, int64_t
 }
 
 template <typename NSAGT>
-__aicore__ inline void VecOp<NSAGT>::CalSub(LocalTensor<float> &dstTensor, LocalTensor<float> &srcTensor, int32_t baseM,
+__aicore__ inline void VecOp<NSAGT>::CalSub(LocalTensor<float>& dstTensor, LocalTensor<float>& srcTensor, int32_t baseM,
                                             int32_t baseN)
 {
     constexpr static int32_t subMsk = 64;
@@ -404,7 +404,7 @@ __aicore__ inline void VecOp<NSAGT>::CalAttenMsk(const uint64_t indicesGmOffset,
    */
     int32_t attenMskRsvLen = 0;
     int32_t attenMskStartIdx = -1; // 计算attenmask时attenmask开始计算的下标
-    float scalar = *((float *)&ATTEN_MASK_SCALE);
+    float scalar = *((float*)&ATTEN_MASK_SCALE);
     uint64_t mask[1];
     LocalTensor<float> tmpTensor;
 

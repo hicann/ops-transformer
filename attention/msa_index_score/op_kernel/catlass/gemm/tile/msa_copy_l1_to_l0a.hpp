@@ -181,7 +181,7 @@ struct CopyL1ToL0A<ArchTag, Catlass::Gemm::GemmType<Element, layout::NDC1HWC0, A
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<Element> dstTensor, AscendC::LocalTensor<Element> srcTensor,
                     LayoutDst layoutDst, LayoutSrc layoutSrc, uint32_t kStartPt, uint32_t mStartPt, uint32_t l1H,
-                    uint32_t l1W, uint8_t *padList)
+                    uint32_t l1W, uint8_t* padList)
     {
         loadData3Dv2Params.l1H = l1H;
         loadData3Dv2Params.l1W = l1W;
@@ -219,8 +219,8 @@ struct CopyL1ToL0A<ArchTag, Gemm::GemmType<Element, layout::zN, AscendC::TPositi
     CopyL1ToL0A() {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<Element> const &dstTensor, AscendC::LocalTensor<Element> const &srcTensor,
-                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    void operator()(AscendC::LocalTensor<Element> const& dstTensor, AscendC::LocalTensor<Element> const& srcTensor,
+                    LayoutDst const& layoutDst, LayoutSrc const& layoutSrc)
     {
         AscendC::LoadData2DParams loadDataParams;
 
@@ -254,8 +254,8 @@ struct CopyL1ToL0A<ArchTag, Gemm::GemmType<float, layout::zN, AscendC::TPosition
     CopyL1ToL0A() {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<Element> const &dstTensor, AscendC::LocalTensor<Element> const &srcTensor,
-                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    void operator()(AscendC::LocalTensor<Element> const& dstTensor, AscendC::LocalTensor<Element> const& srcTensor,
+                    LayoutDst const& layoutDst, LayoutSrc const& layoutSrc)
     {
         constexpr uint8_t PAD_LIST[4] = {0, 0, 0, 0};
         uint16_t l1M = layoutSrc.shape(0) * layoutSrc.shape(1);
@@ -285,8 +285,8 @@ struct CopyL1ToL0A<ArchTag, Gemm::GemmType<Element, layout::nZ, AscendC::TPositi
     CopyL1ToL0A() {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<Element> const &dstTensor, AscendC::LocalTensor<Element> const &srcTensor,
-                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    void operator()(AscendC::LocalTensor<Element> const& dstTensor, AscendC::LocalTensor<Element> const& srcTensor,
+                    LayoutDst const& layoutDst, LayoutSrc const& layoutSrc)
     {
         AscendC::LoadData2DParams loadDataParams;
 
@@ -320,8 +320,8 @@ struct CopyL1ToL0A<ArchTag, Gemm::GemmType<int8_t, layout::nZ, AscendC::TPositio
     CopyL1ToL0A() {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<Element> const &dstTensor, AscendC::LocalTensor<Element> const &srcTensor,
-                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    void operator()(AscendC::LocalTensor<Element> const& dstTensor, AscendC::LocalTensor<Element> const& srcTensor,
+                    LayoutDst const& layoutDst, LayoutSrc const& layoutSrc)
     {
         AscendC::LoadData2dTransposeParams loadDataParams;
 
@@ -354,8 +354,8 @@ struct CopyL1ToL0A<ArchTag, Gemm::GemmType<float, layout::nZ, AscendC::TPosition
     CopyL1ToL0A() {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<Element> const &dstTensor, AscendC::LocalTensor<Element> const &srcTensor,
-                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    void operator()(AscendC::LocalTensor<Element> const& dstTensor, AscendC::LocalTensor<Element> const& srcTensor,
+                    LayoutDst const& layoutDst, LayoutSrc const& layoutSrc)
     {
         constexpr uint8_t PAD_LIST[] = {0, 0, 0, 0};
         uint16_t l1M = layoutSrc.shape(0) * layoutSrc.shape(1);
@@ -394,8 +394,8 @@ struct CopyL1ToL0A<Arch::AtlasA5, Gemm::GemmType<Element, layout::zN, AscendC::T
     CopyL1ToL0A() {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<Element> const &dstTensor, AscendC::LocalTensor<Element> const &srcTensor,
-                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    void operator()(AscendC::LocalTensor<Element> const& dstTensor, AscendC::LocalTensor<Element> const& srcTensor,
+                    LayoutDst const& layoutDst, LayoutSrc const& layoutSrc)
     {
         AscendC::LoadData2DParamsV2 loadDataParams;
         loadDataParams.mStartPosition = 0;

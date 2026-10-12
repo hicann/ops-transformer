@@ -20,11 +20,11 @@
 #include "infer_shape_case_executor.h"
 
 namespace {
-constexpr int64_t kT = 128;          // total token count
-constexpr int64_t kN1 = 4;           // query head_num
-constexpr int64_t kN2 = 2;           // kv head_num (kN1/G with G=2)
-constexpr int64_t kQueryD = 128;     // query head dim
-constexpr int64_t kValueD = 64;      // value head dim (intentionally != kQueryD)
+constexpr int64_t kT = 128;      // total token count
+constexpr int64_t kN1 = 4;       // query head_num
+constexpr int64_t kN2 = 2;       // kv head_num (kN1/G with G=2)
+constexpr int64_t kQueryD = 128; // query head dim
+constexpr int64_t kValueD = 64;  // value head dim (intentionally != kQueryD)
 constexpr int64_t kBlockNum = 16;
 constexpr int64_t kSelectedBlockSize = 64;
 constexpr int64_t kSelectedBlockCount = 16;
@@ -32,7 +32,7 @@ constexpr int64_t kSelectedBlockCount = 16;
 using TensorDesc = gert::InfershapeContextPara::TensorDescription;
 using OpAttr = gert::InfershapeContextPara::OpAttr;
 
-std::vector<OpAttr> MakeAttrs(const std::string &layout)
+std::vector<OpAttr> MakeAttrs(const std::string& layout)
 {
     return {
         {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
@@ -77,11 +77,11 @@ std::vector<TensorDesc> MakeOutputs(ge::DataType outDtype)
 }
 
 const std::vector<std::vector<int64_t>> kExpectShapes = {
-    {kT, kN1, 8},        // softmax_max
-    {kT, kN1, 8},        // softmax_sum
-    {kT, kN1, kValueD},  // attention_out: query shape with dim(2) replaced by value.dim(2)
+    {kT, kN1, 8},       // softmax_max
+    {kT, kN1, 8},       // softmax_sum
+    {kT, kN1, kValueD}, // attention_out: query shape with dim(2) replaced by value.dim(2)
 };
-}  // namespace
+} // namespace
 
 class NsaSelectedAttentionProto : public testing::Test {
 protected:
@@ -98,36 +98,28 @@ protected:
 
 TEST_F(NsaSelectedAttentionProto, nsa_selected_attention_infershape_tnd_basic_fp16)
 {
-    gert::InfershapeContextPara para("NsaSelectedAttention",
-                                     MakeInputs(ge::DT_FLOAT16),
-                                     MakeOutputs(ge::DT_FLOAT16),
+    gert::InfershapeContextPara para("NsaSelectedAttention", MakeInputs(ge::DT_FLOAT16), MakeOutputs(ge::DT_FLOAT16),
                                      MakeAttrs("TND"));
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kExpectShapes);
 }
 
 TEST_F(NsaSelectedAttentionProto, nsa_selected_attention_infershape_tnd_basic_bf16)
 {
-    gert::InfershapeContextPara para("NsaSelectedAttention",
-                                     MakeInputs(ge::DT_BF16),
-                                     MakeOutputs(ge::DT_BF16),
+    gert::InfershapeContextPara para("NsaSelectedAttention", MakeInputs(ge::DT_BF16), MakeOutputs(ge::DT_BF16),
                                      MakeAttrs("TND"));
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kExpectShapes);
 }
 
 TEST_F(NsaSelectedAttentionProto, nsa_selected_attention_infershape_layout_lowercase)
 {
-    gert::InfershapeContextPara para("NsaSelectedAttention",
-                                     MakeInputs(ge::DT_FLOAT16),
-                                     MakeOutputs(ge::DT_FLOAT16),
+    gert::InfershapeContextPara para("NsaSelectedAttention", MakeInputs(ge::DT_FLOAT16), MakeOutputs(ge::DT_FLOAT16),
                                      MakeAttrs("tnd"));
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kExpectShapes);
 }
 
 TEST_F(NsaSelectedAttentionProto, nsa_selected_attention_infershape_layout_mixed_case)
 {
-    gert::InfershapeContextPara para("NsaSelectedAttention",
-                                     MakeInputs(ge::DT_FLOAT16),
-                                     MakeOutputs(ge::DT_FLOAT16),
+    gert::InfershapeContextPara para("NsaSelectedAttention", MakeInputs(ge::DT_FLOAT16), MakeOutputs(ge::DT_FLOAT16),
                                      MakeAttrs("Tnd"));
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kExpectShapes);
 }
@@ -135,18 +127,14 @@ TEST_F(NsaSelectedAttentionProto, nsa_selected_attention_infershape_layout_mixed
 TEST_F(NsaSelectedAttentionProto, nsa_selected_attention_infershape_invalid_layout_bsh)
 {
     // Anything but "TND" (case-insensitive) must fail.
-    gert::InfershapeContextPara para("NsaSelectedAttention",
-                                     MakeInputs(ge::DT_FLOAT16),
-                                     MakeOutputs(ge::DT_FLOAT16),
+    gert::InfershapeContextPara para("NsaSelectedAttention", MakeInputs(ge::DT_FLOAT16), MakeOutputs(ge::DT_FLOAT16),
                                      MakeAttrs("BSH"));
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
 
 TEST_F(NsaSelectedAttentionProto, nsa_selected_attention_infershape_invalid_layout_empty)
 {
-    gert::InfershapeContextPara para("NsaSelectedAttention",
-                                     MakeInputs(ge::DT_FLOAT16),
-                                     MakeOutputs(ge::DT_FLOAT16),
+    gert::InfershapeContextPara para("NsaSelectedAttention", MakeInputs(ge::DT_FLOAT16), MakeOutputs(ge::DT_FLOAT16),
                                      MakeAttrs(""));
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }

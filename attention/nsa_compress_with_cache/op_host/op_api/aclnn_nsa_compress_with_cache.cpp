@@ -48,9 +48,9 @@ struct CompressWithCacheShapeInfo {
 
 static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT16, DataType::DT_BF16};
 
-static aclnnStatus CheckNsaCompressWithCacheParam(const aclTensor *input, const aclTensor *weight,
-                                                  const aclTensor *slotMapping, const aclTensor *outputCacheRef,
-                                                  const uint64_t *workspaceSize, aclOpExecutor *const *executor)
+static aclnnStatus CheckNsaCompressWithCacheParam(const aclTensor* input, const aclTensor* weight,
+                                                  const aclTensor* slotMapping, const aclTensor* outputCacheRef,
+                                                  const uint64_t* workspaceSize, aclOpExecutor* const* executor)
 {
     // 必须的参数指针判空
     CHECK_RET(input != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -62,8 +62,8 @@ static aclnnStatus CheckNsaCompressWithCacheParam(const aclTensor *input, const 
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus Contiguous(const aclTensor *&input, const aclTensor *&weight, const aclTensor *&blockTableOptional,
-                              aclTensor *&outputCache, aclOpExecutor *executor)
+static aclnnStatus Contiguous(const aclTensor*& input, const aclTensor*& weight, const aclTensor*& blockTableOptional,
+                              aclTensor*& outputCache, aclOpExecutor* executor)
 {
     input = l0op::Contiguous(input, executor);
     CHECK_RET(input != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -71,7 +71,7 @@ static aclnnStatus Contiguous(const aclTensor *&input, const aclTensor *&weight,
     weight = l0op::Contiguous(weight, executor);
     CHECK_RET(weight != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    outputCache = const_cast<aclTensor *>(l0op::Contiguous(outputCache, executor));
+    outputCache = const_cast<aclTensor*>(l0op::Contiguous(outputCache, executor));
     CHECK_RET(outputCache != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     if (blockTableOptional != nullptr) {
@@ -81,8 +81,8 @@ static aclnnStatus Contiguous(const aclTensor *&input, const aclTensor *&weight,
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus InputDtypeCheck(const aclTensor *input, const aclTensor *weight, const aclTensor *slotMapping,
-                                   const aclTensor *blockTableOptional, const aclTensor *outputCache)
+static aclnnStatus InputDtypeCheck(const aclTensor* input, const aclTensor* weight, const aclTensor* slotMapping,
+                                   const aclTensor* blockTableOptional, const aclTensor* outputCache)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(input, DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
     OP_CHECK_DTYPE_NOT_SUPPORT(weight, DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
@@ -116,8 +116,8 @@ static bool IsSupportedFormat(ge::Format format)
            format == ge::FORMAT_NCDHW;
 }
 
-static aclnnStatus CheckNDFormat(const aclTensor *input, const aclTensor *weight, const aclTensor *slotMapping,
-                                 const aclTensor *blockTableOptional, const aclTensor *outputCache)
+static aclnnStatus CheckNDFormat(const aclTensor* input, const aclTensor* weight, const aclTensor* slotMapping,
+                                 const aclTensor* blockTableOptional, const aclTensor* outputCache)
 {
     auto inputFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(input->GetStorageFormat()));
     auto weightFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(weight->GetStorageFormat()));
@@ -135,7 +135,7 @@ static aclnnStatus CheckNDFormat(const aclTensor *input, const aclTensor *weight
     return true;
 }
 
-static bool CheckIsEmptyTensor(const aclTensor *input, const aclTensor *weight, const aclTensor *outputCache)
+static bool CheckIsEmptyTensor(const aclTensor* input, const aclTensor* weight, const aclTensor* outputCache)
 {
     int64_t inputShapeSize = input->GetViewShape().GetShapeSize();
     int64_t weightShapeSize = weight->GetViewShape().GetShapeSize();
@@ -147,10 +147,10 @@ static bool CheckIsEmptyTensor(const aclTensor *input, const aclTensor *weight, 
 }
 
 aclnnStatus aclnnNsaCompressWithCacheGetWorkspaceSize(
-    const aclTensor *input, const aclTensor *weight, const aclTensor *slotMapping, const aclIntArray *actSeqLenOptional,
-    const aclTensor *blockTableOptional, char *layoutOptional, int64_t compressBlockSize, int64_t compressStride,
-    int64_t actSeqLenType, int64_t pageBlockSize, aclTensor *outputCache, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor* input, const aclTensor* weight, const aclTensor* slotMapping, const aclIntArray* actSeqLenOptional,
+    const aclTensor* blockTableOptional, char* layoutOptional, int64_t compressBlockSize, int64_t compressStride,
+    int64_t actSeqLenType, int64_t pageBlockSize, aclTensor* outputCache, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     // L2接口阶段1
     L2_DFX_PHASE_1(aclnnNsaCompressWithCache,
@@ -178,7 +178,7 @@ aclnnStatus aclnnNsaCompressWithCacheGetWorkspaceSize(
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    aclOpExecutor *l0Executor = uniqueExecutor.get();
+    aclOpExecutor* l0Executor = uniqueExecutor.get();
     CHECK_RET(Contiguous(input, weight, blockTableOptional, outputCache, l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
 
@@ -199,7 +199,7 @@ aclnnStatus aclnnNsaCompressWithCacheGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnNsaCompressWithCache(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnNsaCompressWithCache(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                       aclrtStream stream)
 {
     // 固定写法

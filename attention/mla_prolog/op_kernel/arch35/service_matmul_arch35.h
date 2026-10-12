@@ -41,7 +41,7 @@ struct mmLocalTensors {
      * @brief Initialize all local tensors with buffer addresses from bufParam
      * @param bufParam Buffer parameter object containing all buffer addresses
      */
-    __aicore__ inline void Init(const MMBufParams &bufParam)
+    __aicore__ inline void Init(const MMBufParams& bufParam)
     {
         aL1Tensor.SetAddr(bufParam.aL1BufAddr);
         bL1Tensor.SetAddr(bufParam.bL1BufAddr);
@@ -63,7 +63,7 @@ __aicore__ inline constexpr uint32_t GetC0Num()
 }
 
 template <typename T>
-__aicore__ inline void CopyNDGmToL1(LocalTensor<T> &l1Tensor, const GlobalTensor<T> &gmSrcTensor, uint32_t srcN,
+__aicore__ inline void CopyNDGmToL1(LocalTensor<T>& l1Tensor, const GlobalTensor<T>& gmSrcTensor, uint32_t srcN,
                                     uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
@@ -79,7 +79,7 @@ __aicore__ inline void CopyNDGmToL1(LocalTensor<T> &l1Tensor, const GlobalTensor
 }
 
 template <typename T>
-__aicore__ inline void CopyNZGmToL1(LocalTensor<T> &l1Tensor, const GlobalTensor<T> &gmSrcTensor, uint32_t srcN,
+__aicore__ inline void CopyNZGmToL1(LocalTensor<T>& l1Tensor, const GlobalTensor<T>& gmSrcTensor, uint32_t srcN,
                                     uint32_t srcD, uint32_t srcNstride)
 {
     DataCopyParams param;
@@ -91,8 +91,8 @@ __aicore__ inline void CopyNZGmToL1(LocalTensor<T> &l1Tensor, const GlobalTensor
 }
 
 template <typename T, bool preload = false>
-__aicore__ inline void LoadL1A(const GlobalTensor<T> &tensorAGm, const uint32_t mInput, const uint32_t kL1StepSize,
-                               const uint32_t kInput, MMBufParams &bufParam)
+__aicore__ inline void LoadL1A(const GlobalTensor<T>& tensorAGm, const uint32_t mInput, const uint32_t kL1StepSize,
+                               const uint32_t kInput, MMBufParams& bufParam)
 {
     uint32_t bufIter = bufParam.aL1BufIter;
     if constexpr (preload) {
@@ -109,8 +109,8 @@ __aicore__ inline void LoadL1A(const GlobalTensor<T> &tensorAGm, const uint32_t 
 }
 
 template <typename T, DataFormat loadFormat = DataFormat::NZ, bool preload = false>
-__aicore__ inline void LoadL1B(const GlobalTensor<T> &tensorBGm, const uint32_t nL1Size, const uint32_t nInput,
-                               const uint32_t kL1StepSize, const uint32_t kInput, MMBufParams &bufParam)
+__aicore__ inline void LoadL1B(const GlobalTensor<T>& tensorBGm, const uint32_t nL1Size, const uint32_t nInput,
+                               const uint32_t kL1StepSize, const uint32_t kInput, MMBufParams& bufParam)
 {
     uint32_t bufIter = bufParam.bL1BufIter;
     if constexpr (preload) {
@@ -131,9 +131,9 @@ __aicore__ inline void LoadL1B(const GlobalTensor<T> &tensorBGm, const uint32_t 
 }
 
 template <typename T, typename S, bool preload = false, bool scaleSrcPadFlag = false>
-__aicore__ inline void LoadL1AAndScale(const GlobalTensor<T> &tensorAGm, const GlobalTensor<S> &tensorAScaleGm,
+__aicore__ inline void LoadL1AAndScale(const GlobalTensor<T>& tensorAGm, const GlobalTensor<S>& tensorAScaleGm,
                                        const uint32_t mInput, const uint32_t kL1StepSize, const uint32_t kInput,
-                                       const uint32_t nInput, const uint64_t scaleAInL1BOffset, MMBufParams &bufParam)
+                                       const uint32_t nInput, const uint64_t scaleAInL1BOffset, MMBufParams& bufParam)
 {
     uint32_t bufIter = bufParam.aL1BufIter;
     if constexpr (preload) {
@@ -150,7 +150,7 @@ __aicore__ inline void LoadL1AAndScale(const GlobalTensor<T> &tensorAGm, const G
         srcDValue = Align(nInput / FP8_TWO, BLOCK_CUBE_SIZE);
     }
     GlobalTensor<bfloat16_t> tensorScaleGmCast;
-    tensorScaleGmCast.SetGlobalBuffer(((__gm__ bfloat16_t *)(tensorAScaleGm.GetPhyAddr())));
+    tensorScaleGmCast.SetGlobalBuffer(((__gm__ bfloat16_t*)(tensorAScaleGm.GetPhyAddr())));
 
     WaitFlag<HardEvent::MTE1_MTE2>(A_EVENT0 + (bufIter & 1u));
     LocalTensor<T> aL1 = aL1Tensor[(bufIter & 1u) * aL1Offset];
@@ -172,9 +172,9 @@ __aicore__ inline void LoadL1AAndScale(const GlobalTensor<T> &tensorAGm, const G
 }
 
 template <typename T, typename S, DataFormat loadFormat = DataFormat::NZ, bool preload = false>
-__aicore__ inline void LoadL1BAndScale(const GlobalTensor<T> &tensorBGm, const GlobalTensor<S> &tensorBScaleGm,
+__aicore__ inline void LoadL1BAndScale(const GlobalTensor<T>& tensorBGm, const GlobalTensor<S>& tensorBScaleGm,
                                        const uint32_t nL1Size, const uint32_t kL1StepSize, const uint32_t kInput,
-                                       const uint32_t nInput, const uint64_t scaleBInL1BOffset, MMBufParams &bufParam)
+                                       const uint32_t nInput, const uint64_t scaleBInL1BOffset, MMBufParams& bufParam)
 {
     uint32_t bufIter = bufParam.bL1BufIter;
     if constexpr (preload) {
@@ -187,7 +187,7 @@ __aicore__ inline void LoadL1BAndScale(const GlobalTensor<T> &tensorBGm, const G
     LocalTensor<bfloat16_t> bL1ScaleTensor;
     bL1ScaleTensor.SetAddr(bufParam.bL1BufAddr);
     GlobalTensor<bfloat16_t> tensorScaleGmCast;
-    tensorScaleGmCast.SetGlobalBuffer(((__gm__ bfloat16_t *)(tensorBScaleGm.GetPhyAddr())));
+    tensorScaleGmCast.SetGlobalBuffer(((__gm__ bfloat16_t*)(tensorBScaleGm.GetPhyAddr())));
 
     WaitFlag<HardEvent::MTE1_MTE2>(B_EVENT0 + (bufIter & 1u));
 
@@ -225,7 +225,7 @@ __aicore__ inline void LoadL1BAndScale(const GlobalTensor<T> &tensorBGm, const G
  * @param kl1Size L1缓冲区中的大小，用于B矩阵转置
  */
 template <typename T, bool enTranspose = false>
-__aicore__ inline void LoadDataL1ToL0(const LocalTensor<T> &l0Tensor, const LocalTensor<T> &l1Tensor,
+__aicore__ inline void LoadDataL1ToL0(const LocalTensor<T>& l0Tensor, const LocalTensor<T>& l1Tensor,
                                       const uint32_t mSize, const uint32_t kSize, const uint32_t l1StepSize = 0)
 {
     if constexpr (enTranspose) { // B
@@ -271,8 +271,8 @@ __aicore__ inline void LoadDataL1ToL0(const LocalTensor<T> &l0Tensor, const Loca
 }
 
 template <typename T>
-__aicore__ inline void LoadDataL1ToL0Mxfp8(const LocalTensor<T> &l0Tensor, const LocalTensor<T> &l1Tensor,
-                                           const LocalTensor<T> &l1AMxTensor, const uint32_t mSize,
+__aicore__ inline void LoadDataL1ToL0Mxfp8(const LocalTensor<T>& l0Tensor, const LocalTensor<T>& l1Tensor,
+                                           const LocalTensor<T>& l1AMxTensor, const uint32_t mSize,
                                            const uint32_t kSize, const uint32_t kL1Size = 0)
 {
     // LoadData and A Scale
@@ -301,8 +301,8 @@ __aicore__ inline void LoadDataL1ToL0Mxfp8(const LocalTensor<T> &l0Tensor, const
 }
 
 template <typename T>
-__aicore__ inline void LoadDataL1ToL0B(const LocalTensor<T> &bL0Tensor, const LocalTensor<T> &bL1Tensor,
-                                       const LocalTensor<T> &bscaleL1, const uint32_t kSize, const uint32_t nSize,
+__aicore__ inline void LoadDataL1ToL0B(const LocalTensor<T>& bL0Tensor, const LocalTensor<T>& bL1Tensor,
+                                       const LocalTensor<T>& bscaleL1, const uint32_t kSize, const uint32_t nSize,
                                        const uint32_t kL1StepSize = 0, const uint32_t kL1Size = 0)
 {
     LoadData2DParamsV2 loadData2DV2;
@@ -333,11 +333,11 @@ __aicore__ inline void LoadDataL1ToL0B(const LocalTensor<T> &bL0Tensor, const Lo
 }
 
 template <typename T, typename O, typename S>
-__aicore__ inline void MatmulL0(MMBufParams &bufParam, const LocalTensor<T> &aL1, const LocalTensor<T> &bL1,
-                                const LocalTensor<T> &aL0Tensor, const LocalTensor<T> &bL0Tensor,
-                                const LocalTensor<O> &cL0Tensor, const MmadParams &mmadParams,
+__aicore__ inline void MatmulL0(MMBufParams& bufParam, const LocalTensor<T>& aL1, const LocalTensor<T>& bL1,
+                                const LocalTensor<T>& aL0Tensor, const LocalTensor<T>& bL0Tensor,
+                                const LocalTensor<O>& cL0Tensor, const MmadParams& mmadParams,
                                 const uint32_t kL1StepSize, const uint32_t kL1Size = 0,
-                                const LocalTensor<T> &aScaleL1 = {}, const LocalTensor<T> &bscaleL1 = {})
+                                const LocalTensor<T>& aScaleL1 = {}, const LocalTensor<T>& bscaleL1 = {})
 {
     WaitFlag<HardEvent::M_MTE1>(L0A_EVENT0 + (bufParam.aL0BufIter & 1u));
     LocalTensor<T> aL0 = aL0Tensor[(bufParam.aL0BufIter & 1u) * (L0A_PP_SIZE / sizeof(T))];
@@ -377,9 +377,9 @@ __aicore__ inline void MatmulL0(MMBufParams &bufParam, const LocalTensor<T> &aL1
 }
 
 template <typename T, typename O, typename O_L0C, bool enUnitFlag = false>
-__aicore__ inline void GetTensorC(const GlobalTensor<O> &tensorCGm, const LocalTensor<O_L0C> &cL0, const uint32_t mSize,
+__aicore__ inline void GetTensorC(const GlobalTensor<O>& tensorCGm, const LocalTensor<O_L0C>& cL0, const uint32_t mSize,
                                   const uint32_t nSize, const uint32_t srcStride, const uint32_t dstStride,
-                                  MMBufParams &bufParam)
+                                  MMBufParams& bufParam)
 {
     FixpipeParamsV220 fixParams;
     fixParams.nSize = nSize;         // 实现切片大小
@@ -417,9 +417,9 @@ __aicore__ inline void GetTensorC(const GlobalTensor<O> &tensorCGm, const LocalT
  * @param bufParam L1缓冲区管理的参数对象
  */
 template <typename T, bool hasL1ALoaded, DataFormat bLoadFormat = DataFormat::NZ>
-__aicore__ inline void LoadL1AB(const GlobalTensor<T> &tensorAGm, const GlobalTensor<T> &tensorBGm, uint32_t kL1,
-                                uint32_t kL1Loops, const MMParams &para, uint32_t nL1Offset, uint32_t nL1Size,
-                                uint32_t kOffesetUnit, MMBufParams &bufParam)
+__aicore__ inline void LoadL1AB(const GlobalTensor<T>& tensorAGm, const GlobalTensor<T>& tensorBGm, uint32_t kL1,
+                                uint32_t kL1Loops, const MMParams& para, uint32_t nL1Offset, uint32_t nL1Size,
+                                uint32_t kOffesetUnit, MMBufParams& bufParam)
 {
     if (kL1 == 0) {
         if constexpr (!hasL1ALoaded) {
@@ -467,10 +467,10 @@ __aicore__ inline void LoadL1AB(const GlobalTensor<T> &tensorAGm, const GlobalTe
  * @param bufParam L1缓冲区管理的参数对象
  */
 template <typename T, typename S, bool hasL1ALoaded, bool scaleSrcPadFlag = false>
-__aicore__ inline void LoadL1ABAndScale(const GlobalTensor<T> &tensorAGm, const GlobalTensor<T> &tensorBGm,
-                                        const GlobalTensor<S> &tensorAScaleGm, const GlobalTensor<S> &tensorBScaleGm,
-                                        uint32_t kL1, uint32_t kL1Loops, const MMParams &para, uint32_t nL1Offset,
-                                        uint32_t nL1Size, uint32_t kOffesetUnit, MMBufParams &bufParam)
+__aicore__ inline void LoadL1ABAndScale(const GlobalTensor<T>& tensorAGm, const GlobalTensor<T>& tensorBGm,
+                                        const GlobalTensor<S>& tensorAScaleGm, const GlobalTensor<S>& tensorBScaleGm,
+                                        uint32_t kL1, uint32_t kL1Loops, const MMParams& para, uint32_t nL1Offset,
+                                        uint32_t nL1Size, uint32_t kOffesetUnit, MMBufParams& bufParam)
 {
     uint64_t offsetL1B = L1_B_SIZE / 2 / sizeof(T); // // 2表示scale起始地址固定从L1B上ping的64k开始
     if (kL1 == 0) {
@@ -507,8 +507,8 @@ __aicore__ inline void LoadL1ABAndScale(const GlobalTensor<T> &tensorAGm, const 
  * @param kOffesetUnit K维度偏移单位
  */
 template <typename T, bool isContinuousCopy>
-__aicore__ inline void LoadL1BGroupCompute(LocalTensor<T> &bL1, const GlobalTensor<T> &tensorBGm,
-                                           uint32_t subNL1SplitSize, const MMParams &para, int64_t nL1, uint32_t kL1,
+__aicore__ inline void LoadL1BGroupCompute(LocalTensor<T>& bL1, const GlobalTensor<T>& tensorBGm,
+                                           uint32_t subNL1SplitSize, const MMParams& para, int64_t nL1, uint32_t kL1,
                                            uint32_t kOffesetUnit)
 {
     int64_t tensorBGmOffset = para.k * nL1 * para.baseN + kL1 * kOffesetUnit;
@@ -544,10 +544,10 @@ __aicore__ inline void LoadL1BGroupCompute(LocalTensor<T> &bL1, const GlobalTens
  * @param bOffset B矩阵计算的起始偏移
  */
 template <typename T, typename O, typename S, typename O_L0C, bool enUnitFlag>
-__aicore__ inline void MatmulL1(const LocalTensor<O_L0C> &cL0, const LocalTensor<T> &aL1, const LocalTensor<T> &bL1,
-                                const mmLocalTensors<T, O_L0C> &localTensors, MMBufParams &bufParam,
-                                const MMParams &para, uint32_t kL1, uint32_t kL1Loops, MmadParams &mmadParams,
-                                int64_t &aOffset)
+__aicore__ inline void MatmulL1(const LocalTensor<O_L0C>& cL0, const LocalTensor<T>& aL1, const LocalTensor<T>& bL1,
+                                const mmLocalTensors<T, O_L0C>& localTensors, MMBufParams& bufParam,
+                                const MMParams& para, uint32_t kL1, uint32_t kL1Loops, MmadParams& mmadParams,
+                                int64_t& aOffset)
 {
     uint32_t mSize = Align(para.m, BLOCK_CUBE_SIZE);
     uint64_t weightSizeL1B = L1_B_SIZE / 2 / sizeof(T); // 2表示scale起始地址固定从L1B上ping的64k开始
@@ -595,11 +595,11 @@ __aicore__ inline void MatmulL1(const LocalTensor<O_L0C> &cL0, const LocalTensor
  */
 template <typename T, typename O, typename S, bool hasL1ALoaded = false, bool scaleSrcPadFlag = false,
           bool enUnitFlag = false, DataFormat bLoadFormat = DataFormat::NZ>
-__aicore__ inline void MatmulSplitK(const GlobalTensor<O> &tensorCGm, const GlobalTensor<T> &tensorAGm,
-                                    const GlobalTensor<T> &tensorBGm, const MMParams &para, MMBufParams &bufParam,
+__aicore__ inline void MatmulSplitK(const GlobalTensor<O>& tensorCGm, const GlobalTensor<T>& tensorAGm,
+                                    const GlobalTensor<T>& tensorBGm, const MMParams& para, MMBufParams& bufParam,
                                     const uint32_t nL1Offset, const uint32_t nL1Size,
-                                    const GlobalTensor<S> &tensorAScaleGm = {},
-                                    const GlobalTensor<S> &tensorBScaleGm = {})
+                                    const GlobalTensor<S>& tensorAScaleGm = {},
+                                    const GlobalTensor<S>& tensorBScaleGm = {})
 {
     using O_L0C = typename std::conditional<std::is_same<T, int8_t>::value, int32_t, float>::type;
 
@@ -674,8 +674,8 @@ __aicore__ inline void MatmulSplitK(const GlobalTensor<O> &tensorCGm, const Glob
  * @param bufParam 管理L1 buffer地址和同步计数的结构体参数
  */
 template <typename T, typename O, typename S, bool hasL1BLoaded = false, bool enUnitFlag = false>
-__aicore__ inline void MatmulFullLoad(const GlobalTensor<O> &tensorCGm, const GlobalTensor<T> &tensorAGm,
-                                      const GlobalTensor<T> &tensorBGm, const MMParams &para, MMBufParams &bufParam)
+__aicore__ inline void MatmulFullLoad(const GlobalTensor<O>& tensorCGm, const GlobalTensor<T>& tensorAGm,
+                                      const GlobalTensor<T>& tensorBGm, const MMParams& para, MMBufParams& bufParam)
 {
     using O_L0C = typename std::conditional<std::is_same<T, int8_t>::value, int32_t, float>::type;
     uint32_t mSize = Align(para.m, BLOCK_CUBE_SIZE);
@@ -736,9 +736,9 @@ __aicore__ inline void MatmulFullLoad(const GlobalTensor<O> &tensorCGm, const Gl
  * @param bufParam 管理L1 buffer地址和同步计数的结构体参数
  */
 template <typename T, typename O, typename S, bool isContinuousCopy = true, bool enUnitFlag = false>
-__aicore__ inline void MatmulGroupComputeAFullLoad(const GlobalTensor<O> &tensorCGm, const GlobalTensor<T> &tensorAGm,
-                                                   const GlobalTensor<T> &tensorBGm, const MMParams &para,
-                                                   MMBufParams &bufParam)
+__aicore__ inline void MatmulGroupComputeAFullLoad(const GlobalTensor<O>& tensorCGm, const GlobalTensor<T>& tensorAGm,
+                                                   const GlobalTensor<T>& tensorBGm, const MMParams& para,
+                                                   MMBufParams& bufParam)
 {
     using O_L0C = typename std::conditional<std::is_same<T, int8_t>::value, int32_t, float>::type;
     // 全局L1管理
@@ -797,9 +797,9 @@ __aicore__ inline void MatmulGroupComputeAFullLoad(const GlobalTensor<O> &tensor
  *        bScaleL1Offset: B-scale在slot内的bf16偏移 (需放在A-scale之后避免冲突)
  */
 template <typename T, typename S, DataFormat loadFormat = DataFormat::NZ>
-__aicore__ inline void LoadL1BOuter(const GlobalTensor<T> &tensorBGm, const GlobalTensor<S> &tensorBScaleGm,
+__aicore__ inline void LoadL1BOuter(const GlobalTensor<T>& tensorBGm, const GlobalTensor<S>& tensorBScaleGm,
                                     uint32_t nL1Size, uint32_t kL1StepSize, uint32_t kInput, uint32_t kScale,
-                                    uint32_t bEventIdx, uint32_t bScaleL1Offset, MMBufParams &bufParam)
+                                    uint32_t bEventIdx, uint32_t bScaleL1Offset, MMBufParams& bufParam)
 {
     LocalTensor<T> bL1Tensor;
     bL1Tensor.SetAddr(bufParam.bL1BufAddr);
@@ -813,7 +813,7 @@ __aicore__ inline void LoadL1BOuter(const GlobalTensor<T> &tensorBGm, const Glob
 
         LocalTensor<bfloat16_t> bL1ScaleTensor = bL1.template ReinterpretCast<bfloat16_t>();
         GlobalTensor<bfloat16_t> tensorScaleGmCast;
-        tensorScaleGmCast.SetGlobalBuffer(((__gm__ bfloat16_t *)(tensorBScaleGm.GetPhyAddr())));
+        tensorScaleGmCast.SetGlobalBuffer(((__gm__ bfloat16_t*)(tensorBScaleGm.GetPhyAddr())));
         Dn2NzParams dn2Nzparam;
         dn2Nzparam.dnNum = 1;
         uint32_t nValueB = CeilDivT(kScale, static_cast<uint32_t>(FP8_TWO));
@@ -838,9 +838,9 @@ __aicore__ inline void LoadL1BOuter(const GlobalTensor<T> &tensorBGm, const Glob
  *        B每nb双缓冲加载，B-scale紧随B数据之后。FixPipe使用AtomicAdd累加到GM。
  */
 template <typename T, typename O, typename S>
-__aicore__ inline void MatmulSplitMKOuter(const GlobalTensor<O> &tensorCGm, const GlobalTensor<T> &tensorAGm,
-                                          const GlobalTensor<T> &tensorBGm, const MMParams &para, MMBufParams &bufParam,
-                                          const GlobalTensor<S> &tensorAScaleGm, const GlobalTensor<S> &tensorBScaleGm)
+__aicore__ inline void MatmulSplitMKOuter(const GlobalTensor<O>& tensorCGm, const GlobalTensor<T>& tensorAGm,
+                                          const GlobalTensor<T>& tensorBGm, const MMParams& para, MMBufParams& bufParam,
+                                          const GlobalTensor<S>& tensorAScaleGm, const GlobalTensor<S>& tensorBScaleGm)
 {
     using O_L0C = typename std::conditional<std::is_same<T, int8_t>::value, int32_t, float>::type;
 
@@ -865,7 +865,7 @@ __aicore__ inline void MatmulSplitMKOuter(const GlobalTensor<O> &tensorCGm, cons
         LocalTensor<bfloat16_t> bL1Bf16;
         bL1Bf16.SetAddr(bufParam.bL1BufAddr);
         GlobalTensor<bfloat16_t> scaleGmCast;
-        scaleGmCast.SetGlobalBuffer(((__gm__ bfloat16_t *)(tensorAScaleGm.GetPhyAddr())));
+        scaleGmCast.SetGlobalBuffer(((__gm__ bfloat16_t*)(tensorAScaleGm.GetPhyAddr())));
         Dn2NzParams dn2nz;
         dn2nz.dnNum = 1;
         uint32_t nValue = CeilDivT(para.kScale, static_cast<uint32_t>(FP8_TWO));

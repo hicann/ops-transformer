@@ -26,14 +26,14 @@ namespace optiling {
 #define CMP_EXTERN_C
 #endif
 
-CMP_EXTERN_C ge::graphStatus TilingQuantCompressorArch35(gert::TilingContext *context);
-CMP_EXTERN_C ge::graphStatus TilingQuantCompressorArch92(gert::TilingContext *context);
+CMP_EXTERN_C ge::graphStatus TilingQuantCompressorArch35(gert::TilingContext* context);
+CMP_EXTERN_C ge::graphStatus TilingQuantCompressorArch92(gert::TilingContext* context);
 
 struct QuantCompressorCompileInfo {
     int64_t core_num;
 };
 
-CMP_EXTERN_C ge::graphStatus TilingQuantCompressor(gert::TilingContext *context)
+CMP_EXTERN_C ge::graphStatus TilingQuantCompressor(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("QuantCompressor", "context", "is nullptr"),
@@ -50,7 +50,7 @@ CMP_EXTERN_C ge::graphStatus TilingQuantCompressor(gert::TilingContext *context)
     }
 }
 
-ge::graphStatus TilingPrepareForQuantCompressor(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForQuantCompressor(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

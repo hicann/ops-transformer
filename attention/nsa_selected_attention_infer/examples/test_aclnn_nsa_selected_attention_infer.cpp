@@ -36,7 +36,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -45,7 +45,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<float> resultData(size, 0);
@@ -57,7 +57,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -70,8 +70,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -94,7 +94,7 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     // 1. （固定写法）device/context/stream初始化，参考AscendCL对外接口列表
     // 根据自己的实际device填写deviceId
@@ -109,8 +109,8 @@ int main(int argc, char **argv)
 
     int64_t batch = 1;
     int64_t kvSeqlen = 48;
-    aclIntArray *actualCmpKvSeqLen = nullptr;
-    aclIntArray *actualCmpQSeqLen = nullptr;
+    aclIntArray* actualCmpKvSeqLen = nullptr;
+    aclIntArray* actualCmpQSeqLen = nullptr;
     // 创建actualCmpKvSeqLen aclIntArray
     std::vector<int64_t> actualCmpKvSeqLenVector(batch, kvSeqlen);
     actualCmpKvSeqLen = aclCreateIntArray(actualCmpKvSeqLenVector.data(), actualCmpKvSeqLenVector.size());
@@ -178,21 +178,21 @@ int main(int argc, char **argv)
     char layOut[sLayerOut.length() + 1];
     std::strcpy(layOut, sLayerOut.c_str());
 
-    void *queryDeviceAddr = nullptr;
-    void *keyDeviceAddr = nullptr;
-    void *valueDeviceAddr = nullptr;
-    void *blockTableOptionalDeviceAddr = nullptr;
-    void *outputDeviceAddr = nullptr;
-    void *topkIndicesDeviceAddr = nullptr;
-    aclTensor *queryTensor = nullptr;
-    aclTensor *keyTensor = nullptr;
-    aclTensor *valueTensor = nullptr;
-    aclTensor *blockTableOptionalTensor = nullptr;
-    aclTensor *outputTensor = nullptr;
-    aclTensor *topkIndicesTensor = nullptr;
+    void* queryDeviceAddr = nullptr;
+    void* keyDeviceAddr = nullptr;
+    void* valueDeviceAddr = nullptr;
+    void* blockTableOptionalDeviceAddr = nullptr;
+    void* outputDeviceAddr = nullptr;
+    void* topkIndicesDeviceAddr = nullptr;
+    aclTensor* queryTensor = nullptr;
+    aclTensor* keyTensor = nullptr;
+    aclTensor* valueTensor = nullptr;
+    aclTensor* blockTableOptionalTensor = nullptr;
+    aclTensor* outputTensor = nullptr;
+    aclTensor* topkIndicesTensor = nullptr;
 
     uint64_t workspaceSize = 0;
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
 
     if (argv == nullptr || argv[0] == nullptr) {
         LOG_PRINT("Environment error, Argv=%p, Argv[0]=%p", argv, argv == nullptr ? nullptr : argv[0]);
@@ -221,7 +221,7 @@ int main(int argc, char **argv)
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); destroyIntArrays(); return ret);
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 调用aclnnNsaSelectedAttention第一段接口
     ret = aclnnNsaSelectedAttentionInferGetWorkspaceSize(

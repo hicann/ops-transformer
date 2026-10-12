@@ -9,9 +9,9 @@
  */
 
 /*!
-  * \file mla_preprocess_infershape.cpp
-  * \brief
-  */
+ * \file mla_preprocess_infershape.cpp
+ * \brief
+ */
 
 #include <register/op_impl_registry.h>
 #include "log/log.h"
@@ -39,18 +39,17 @@ constexpr size_t DIM_SHAPE_QR = 64;
 constexpr size_t DIM_SHAPE_Q_CACHE = 576;
 constexpr int64_t ROPE_HEAD_DIM = 64;
 
-static bool IsDisabledRopeShape(const gert::Shape *shape)
+static bool IsDisabledRopeShape(const gert::Shape* shape)
 {
     return shape != nullptr && shape->GetDimNum() == 1 && shape->GetDim(0) == 0;
 }
 
-static ge::graphStatus CheckRopeInputShapes(gert::InferShapeContext *context, int64_t tokenNum)
+static ge::graphStatus CheckRopeInputShapes(gert::InferShapeContext* context, int64_t tokenNum)
 {
-    const gert::Shape *cosShape = context->GetRequiredInputShape(INPUT_COS);
-    const gert::Shape *sinShape = context->GetRequiredInputShape(INPUT_SIN);
+    const gert::Shape* cosShape = context->GetRequiredInputShape(INPUT_COS);
+    const gert::Shape* sinShape = context->GetRequiredInputShape(INPUT_SIN);
     OP_CHECK_IF(cosShape == nullptr || sinShape == nullptr,
-                OP_LOGE(context->GetNodeName(), "cos and sin must be provided."),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(context->GetNodeName(), "cos and sin must be provided."), return ge::GRAPH_FAILED);
 
     const bool cosDisablesRope = IsDisabledRopeShape(cosShape);
     const bool sinDisablesRope = IsDisabledRopeShape(sinShape);
@@ -67,22 +66,22 @@ static ge::graphStatus CheckRopeInputShapes(gert::InferShapeContext *context, in
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShapeMlaPreprocess(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeMlaPreprocess(gert::InferShapeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeMlaPreprocess.");
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const int64_t *cacheModePtr = attrs->GetAttrPointer<int64_t>(ATTR_CACHE_MODE);
+    const int64_t* cacheModePtr = attrs->GetAttrPointer<int64_t>(ATTR_CACHE_MODE);
     if (cacheModePtr == nullptr) {
         return ge::GRAPH_FAILED;
     }
     const int64_t cacheMode = *cacheModePtr;
 
-    const gert::Shape *kvCacheShape = context->GetRequiredInputShape(INPUT_KV_CACHE);
-    const gert::Shape *kvCacheRopeShape = context->GetRequiredInputShape(INPUT_KV_CACHE_ROPE);
-    const gert::Shape *inputShape = context->GetRequiredInputShape(INPUT_INPUT);
-    const gert::Shape *wukShape = context->GetRequiredInputShape(INPUT_WUK);
+    const gert::Shape* kvCacheShape = context->GetRequiredInputShape(INPUT_KV_CACHE);
+    const gert::Shape* kvCacheRopeShape = context->GetRequiredInputShape(INPUT_KV_CACHE_ROPE);
+    const gert::Shape* inputShape = context->GetRequiredInputShape(INPUT_INPUT);
+    const gert::Shape* wukShape = context->GetRequiredInputShape(INPUT_WUK);
 
     const int64_t tokenNum = inputShape->GetDim(0);
     const int64_t headNum = wukShape->GetDim(0);
@@ -91,8 +90,8 @@ static ge::graphStatus InferShapeMlaPreprocess(gert::InferShapeContext *context)
         return ge::GRAPH_FAILED;
     }
 
-    gert::Shape *qOutShape = context->GetOutputShape(OUTPUT_Q_OUT);
-    gert::Shape *kvCacheOutShape = context->GetOutputShape(OUTPUT_KV_CACHE_OUT);
+    gert::Shape* qOutShape = context->GetOutputShape(OUTPUT_Q_OUT);
+    gert::Shape* kvCacheOutShape = context->GetOutputShape(OUTPUT_KV_CACHE_OUT);
 
     *kvCacheOutShape = *kvCacheShape;
 
@@ -101,8 +100,8 @@ static ge::graphStatus InferShapeMlaPreprocess(gert::InferShapeContext *context)
     qOutShape->SetDim(1, headNum);
 
     if (cacheMode != 0) {
-        gert::Shape *qRopeOutShape = context->GetOutputShape(OUTPUT_Q_ROPE_OUT);
-        gert::Shape *krCacheOutShape = context->GetOutputShape(OUTPUT_KR_CACHE_OUT);
+        gert::Shape* qRopeOutShape = context->GetOutputShape(OUTPUT_Q_ROPE_OUT);
+        gert::Shape* krCacheOutShape = context->GetOutputShape(OUTPUT_KR_CACHE_OUT);
         *krCacheOutShape = *kvCacheRopeShape;
 
         qOutShape->SetDim(DIM_TWO, DIM_SHAPE_Q);
@@ -119,13 +118,13 @@ static ge::graphStatus InferShapeMlaPreprocess(gert::InferShapeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeMlaPreprocess(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeMlaPreprocess(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeMlaPreprocess.");
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const int64_t *cacheModePtr = attrs->GetAttrPointer<int64_t>(ATTR_CACHE_MODE);
+    const int64_t* cacheModePtr = attrs->GetAttrPointer<int64_t>(ATTR_CACHE_MODE);
     if (cacheModePtr == nullptr) {
         return ge::GRAPH_FAILED;
     }
@@ -145,4 +144,4 @@ static ge::graphStatus InferDataTypeMlaPreprocess(gert::InferDataTypeContext *co
 
 IMPL_OP_INFERSHAPE(MlaPreprocess).InferShape(InferShapeMlaPreprocess).InferDataType(InferDataTypeMlaPreprocess);
 
-}  // namespace ops
+} // namespace ops

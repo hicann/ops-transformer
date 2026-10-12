@@ -16,35 +16,35 @@
 namespace {
 
 extern "C" aclnnStatus aclnnInnerMlaPreprocessV2GetWorkspaceSize(
-    const aclTensor *input, const aclTensor *gamma0, const aclTensor *beta0, const aclTensor *quantScale0,
-    const aclTensor *quantOffset0, const aclTensor *wdqkv, const aclTensor *descale0, const aclTensor *bias0,
-    const aclTensor *gamma1, const aclTensor *beta1, const aclTensor *quantScale1, const aclTensor *quantOffset1,
-    const aclTensor *wuq, const aclTensor *descale1, const aclTensor *bias1, const aclTensor *gamma2,
-    const aclTensor *cos, const aclTensor *sin, const aclTensor *wuk, const aclTensor *kvCache,
-    const aclTensor *kvCacheRope, const aclTensor *slotMapping, const aclTensor *ctkvScale,
-    const aclTensor *qNopeScale, int64_t wdqDim, int64_t qRopeDim, int64_t kRopeDim, double epsilon,
-    int64_t qRotaryCoeff, int64_t kRotaryCoeff, bool transeposeWdq, bool transeposeWuq, bool transeposeWuk,
-    int64_t cacheMode, int64_t quantMode, bool doRmsNorm, int64_t wdkvSplitCount, bool qDownOutFlag,
-    const aclTensor *qOutOut, const aclTensor *kvCacheOutOut, const aclTensor *qRopeOutOut,
-    const aclTensor *krCacheOutOut, const aclTensor *qDownOutOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* input, const aclTensor* gamma0, const aclTensor* beta0, const aclTensor* quantScale0,
+    const aclTensor* quantOffset0, const aclTensor* wdqkv, const aclTensor* descale0, const aclTensor* bias0,
+    const aclTensor* gamma1, const aclTensor* beta1, const aclTensor* quantScale1, const aclTensor* quantOffset1,
+    const aclTensor* wuq, const aclTensor* descale1, const aclTensor* bias1, const aclTensor* gamma2,
+    const aclTensor* cos, const aclTensor* sin, const aclTensor* wuk, const aclTensor* kvCache,
+    const aclTensor* kvCacheRope, const aclTensor* slotMapping, const aclTensor* ctkvScale, const aclTensor* qNopeScale,
+    int64_t wdqDim, int64_t qRopeDim, int64_t kRopeDim, double epsilon, int64_t qRotaryCoeff, int64_t kRotaryCoeff,
+    bool transeposeWdq, bool transeposeWuq, bool transeposeWuk, int64_t cacheMode, int64_t quantMode, bool doRmsNorm,
+    int64_t wdkvSplitCount, bool qDownOutFlag, const aclTensor* qOutOut, const aclTensor* kvCacheOutOut,
+    const aclTensor* qRopeOutOut, const aclTensor* krCacheOutOut, const aclTensor* qDownOutOut, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
-extern "C" aclnnStatus aclnnInnerMlaPreprocessV2(
-    void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+extern "C" aclnnStatus aclnnInnerMlaPreprocessV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                                 aclrtStream stream);
 
-}  // namespace
+} // namespace
 
 extern "C" aclnnStatus aclnnMlaPreprocessV2GetWorkspaceSize(
-    const aclTensor *input, const aclTensor *gamma0, const aclTensor *beta0, const aclTensor *quantScale0,
-    const aclTensor *quantOffset0, const aclTensor *wdqkv, const aclTensor *descale0, const aclTensor *bias0,
-    const aclTensor *gamma1, const aclTensor *beta1, const aclTensor *quantScale1, const aclTensor *quantOffset1,
-    const aclTensor *wuq, const aclTensor *descale1, const aclTensor *bias1, const aclTensor *gamma2,
-    const aclTensor *cos, const aclTensor *sin, const aclTensor *wuk, const aclTensor *kvCache,
-    const aclTensor *kvCacheRope, const aclTensor *slotMapping, const aclTensor *ctkvScale,
-    const aclTensor *qNopeScale, int64_t wdqDim, int64_t qRopeDim, int64_t kRopeDim, double epsilon,
-    int64_t qRotaryCoeff, int64_t kRotaryCoeff, bool transeposeWdq, bool transeposeWuq, bool transeposeWuk,
-    int64_t cacheMode, int64_t quantMode, bool doRmsNorm, int64_t wdkvSplitCount, bool qDownOutFlag,
-    const aclTensor *qOutOut, const aclTensor *kvCacheOutOut, const aclTensor *qRopeOutOut,
-    const aclTensor *krCacheOutOut, const aclTensor *qDownOutOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* input, const aclTensor* gamma0, const aclTensor* beta0, const aclTensor* quantScale0,
+    const aclTensor* quantOffset0, const aclTensor* wdqkv, const aclTensor* descale0, const aclTensor* bias0,
+    const aclTensor* gamma1, const aclTensor* beta1, const aclTensor* quantScale1, const aclTensor* quantOffset1,
+    const aclTensor* wuq, const aclTensor* descale1, const aclTensor* bias1, const aclTensor* gamma2,
+    const aclTensor* cos, const aclTensor* sin, const aclTensor* wuk, const aclTensor* kvCache,
+    const aclTensor* kvCacheRope, const aclTensor* slotMapping, const aclTensor* ctkvScale, const aclTensor* qNopeScale,
+    int64_t wdqDim, int64_t qRopeDim, int64_t kRopeDim, double epsilon, int64_t qRotaryCoeff, int64_t kRotaryCoeff,
+    bool transeposeWdq, bool transeposeWuq, bool transeposeWuk, int64_t cacheMode, int64_t quantMode, bool doRmsNorm,
+    int64_t wdkvSplitCount, bool qDownOutFlag, const aclTensor* qOutOut, const aclTensor* kvCacheOutOut,
+    const aclTensor* qRopeOutOut, const aclTensor* krCacheOutOut, const aclTensor* qDownOutOut, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     const bool cosIsNull = cos == nullptr;
     const bool sinIsNull = sin == nullptr;
@@ -75,8 +75,8 @@ extern "C" aclnnStatus aclnnMlaPreprocessV2GetWorkspaceSize(
         qRopeOutOut, krCacheOutOut, qDownOutOut, workspaceSize, executor);
 }
 
-extern "C" aclnnStatus aclnnMlaPreprocessV2(
-    void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+extern "C" aclnnStatus aclnnMlaPreprocessV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                            aclrtStream stream)
 {
     return aclnnInnerMlaPreprocessV2(workspace, workspaceSize, executor, stream);
 }

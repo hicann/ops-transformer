@@ -56,11 +56,11 @@ template <typename QLIT>
 class QuantLightningIndexerKernel {
 public:
     __aicore__ inline QuantLightningIndexerKernel(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *weights,
-                                __gm__ uint8_t *queryScale, __gm__ uint8_t *keyScale, __gm__ uint8_t *actualSeqLengthsQ,
-                                __gm__ uint8_t *actualSeqLengthsK, __gm__ uint8_t *blockTable,
-                                __gm__ uint8_t *sparseIndices, __gm__ uint8_t *workspace,
-                                const QLITilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* weights,
+                                __gm__ uint8_t* queryScale, __gm__ uint8_t* keyScale, __gm__ uint8_t* actualSeqLengthsQ,
+                                __gm__ uint8_t* actualSeqLengthsK, __gm__ uint8_t* blockTable,
+                                __gm__ uint8_t* sparseIndices, __gm__ uint8_t* workspace,
+                                const QLITilingData* __restrict tiling, TPipe* tPipe);
     __aicore__ inline void Process();
 
     // =================================类型定义区=================================
@@ -92,7 +92,7 @@ public:
     static constexpr uint32_t WS_DOUBLE = 2;
 
 protected:
-    TPipe *pipe = nullptr;
+    TPipe* pipe = nullptr;
 
     // offset
     uint64_t queryCoreOffset = 0ULL;
@@ -123,10 +123,10 @@ protected:
 
     // ================================Init functions==================================
     __aicore__ inline void InitBuffers();
-    __aicore__ inline void InitTilingData(const QLITilingData *__restrict tilingData);
-    __aicore__ inline void InitActualSeqLen(__gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengthsK);
+    __aicore__ inline void InitTilingData(const QLITilingData* __restrict tilingData);
+    __aicore__ inline void InitActualSeqLen(__gm__ uint8_t* actualSeqLengthsQ, __gm__ uint8_t* actualSeqLengthsK);
     // ================================Split Core================================
-    __aicore__ inline void SplitCore(uint32_t curCoreIdx, uint32_t &coreNum, QLICommon::SplitCoreInfo &info);
+    __aicore__ inline void SplitCore(uint32_t curCoreIdx, uint32_t& coreNum, QLICommon::SplitCoreInfo& info);
     __aicore__ inline uint32_t GetTotalBaseBlockNum();
     __aicore__ inline uint32_t GetS2BaseBlockNumOnMask(uint32_t s1gIdx, uint32_t actS1Size, uint32_t actS2SizeOrig);
     // ================================Process functions================================
@@ -138,17 +138,17 @@ protected:
     __aicore__ inline void CalcGS1LoopParams(uint32_t bN2Idx);
     __aicore__ inline void GetBN2Idx(uint32_t bN2Idx);
     __aicore__ inline uint32_t GetActualSeqLen(uint32_t bIdx, uint32_t actualLenDims, bool isAccumSeq,
-                                               GlobalTensor<uint32_t> &actualSeqLengthsGm, uint32_t defaultSeqLen);
-    __aicore__ inline void GetS1S2ActualSeqLen(uint32_t bIdx, uint32_t &actS1Size, uint32_t &actS2Size,
-                                               uint32_t &actS2SizeOrig);
+                                               GlobalTensor<uint32_t>& actualSeqLengthsGm, uint32_t defaultSeqLen);
+    __aicore__ inline void GetS1S2ActualSeqLen(uint32_t bIdx, uint32_t& actS1Size, uint32_t& actS2Size,
+                                               uint32_t& actS2SizeOrig);
     __aicore__ inline void CalcS2LoopParams(uint32_t bN2LoopIdx, uint32_t gS1LoopIdx);
-    __aicore__ inline void CalcRunInfo(uint32_t loop, uint32_t s2LoopIdx, QLICommon::RunInfo &runInfo,
+    __aicore__ inline void CalcRunInfo(uint32_t loop, uint32_t s2LoopIdx, QLICommon::RunInfo& runInfo,
                                        uint32_t qScaleLoop, uint32_t kScaleLoop);
     __aicore__ inline void DealActSeqLenIsZero(uint32_t bIdx, uint32_t n2Idx, uint32_t s1Start);
 };
 
 template <typename QLIT>
-__aicore__ inline void QuantLightningIndexerKernel<QLIT>::InitTilingData(const QLITilingData *__restrict tilingData)
+__aicore__ inline void QuantLightningIndexerKernel<QLIT>::InitTilingData(const QLITilingData* __restrict tilingData)
 {
     usedCoreNum = tilingData->usedCoreNum;
     constInfo.batchSize = tilingData->bSize;
@@ -192,8 +192,8 @@ __aicore__ inline void QuantLightningIndexerKernel<QLIT>::InitBuffers()
 }
 
 template <typename QLIT>
-__aicore__ inline void QuantLightningIndexerKernel<QLIT>::InitActualSeqLen(__gm__ uint8_t *actualSeqLengthsQ,
-                                                                           __gm__ uint8_t *actualSeqLengthsK)
+__aicore__ inline void QuantLightningIndexerKernel<QLIT>::InitActualSeqLen(__gm__ uint8_t* actualSeqLengthsQ,
+                                                                           __gm__ uint8_t* actualSeqLengthsK)
 {
     LICommon::InitActualSeqLen(actualSeqLengthsQ, actualSeqLengthsK, constInfo, actualSeqLengthsGmQ,
                                actualSeqLengthsGm);
@@ -201,16 +201,16 @@ __aicore__ inline void QuantLightningIndexerKernel<QLIT>::InitActualSeqLen(__gm_
 
 template <typename QLIT>
 __aicore__ inline uint32_t QuantLightningIndexerKernel<QLIT>::GetActualSeqLen(
-    uint32_t bIdx, uint32_t actualLenDims, bool isAccumSeq, GlobalTensor<uint32_t> &actualSeqLengthsGm,
+    uint32_t bIdx, uint32_t actualLenDims, bool isAccumSeq, GlobalTensor<uint32_t>& actualSeqLengthsGm,
     uint32_t defaultSeqLen)
 {
     return LICommon::GetActualSeqLen(bIdx, actualLenDims, isAccumSeq, actualSeqLengthsGm, defaultSeqLen);
 }
 
 template <typename QLIT>
-__aicore__ inline void QuantLightningIndexerKernel<QLIT>::GetS1S2ActualSeqLen(uint32_t bIdx, uint32_t &actS1Size,
-                                                                              uint32_t &actS2Size,
-                                                                              uint32_t &actS2SizeOrig)
+__aicore__ inline void QuantLightningIndexerKernel<QLIT>::GetS1S2ActualSeqLen(uint32_t bIdx, uint32_t& actS1Size,
+                                                                              uint32_t& actS2Size,
+                                                                              uint32_t& actS2SizeOrig)
 {
     actS1Size = GetActualSeqLen(bIdx, constInfo.actualLenQDims, constInfo.isAccumSeqS1, actualSeqLengthsGmQ,
                                 constInfo.qSeqSize);
@@ -253,8 +253,8 @@ __aicore__ inline uint32_t QuantLightningIndexerKernel<QLIT>::GetTotalBaseBlockN
 
 // 多核版本，双闭区间。基本原则：计算每个核最少处理的块数, 剩余的部分前面的核每个核多处理一块
 template <typename QLIT>
-__aicore__ void inline QuantLightningIndexerKernel<QLIT>::SplitCore(uint32_t curCoreIdx, uint32_t &coreNum,
-                                                                    QLICommon::SplitCoreInfo &info)
+__aicore__ void inline QuantLightningIndexerKernel<QLIT>::SplitCore(uint32_t curCoreIdx, uint32_t& coreNum,
+                                                                    QLICommon::SplitCoreInfo& info)
 {
     uint32_t totalBlockNum = GetTotalBaseBlockNum();
     uint32_t minBlockPerCore = totalBlockNum / coreNum;
@@ -354,10 +354,10 @@ __aicore__ inline void QuantLightningIndexerKernel<QLIT>::DealActSeqLenIsZero(ui
 
 template <typename QLIT>
 __aicore__ inline void QuantLightningIndexerKernel<QLIT>::Init(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *weights, __gm__ uint8_t *queryScale,
-    __gm__ uint8_t *keyScale, __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengthsK,
-    __gm__ uint8_t *blockTable, __gm__ uint8_t *sparseIndices, __gm__ uint8_t *workspace,
-    const QLITilingData *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* weights, __gm__ uint8_t* queryScale,
+    __gm__ uint8_t* keyScale, __gm__ uint8_t* actualSeqLengthsQ, __gm__ uint8_t* actualSeqLengthsK,
+    __gm__ uint8_t* blockTable, __gm__ uint8_t* sparseIndices, __gm__ uint8_t* workspace,
+    const QLITilingData* __restrict tiling, TPipe* tPipe)
 {
     if ASCEND_IS_AIV {
         tmpBlockIdx = GetBlockIdx(); // vec:0-47
@@ -381,28 +381,28 @@ __aicore__ inline void QuantLightningIndexerKernel<QLIT>::Init(
     uint64_t singleCoreScoreSize = constInfo.s1BaseSize *
                                    QLICommon::Align((uint64_t)constInfo.kSeqSize, (uint64_t)constInfo.s2BaseSize) *
                                    sizeof(SCORE_T);
-    scoreGm.SetGlobalBuffer((__gm__ SCORE_T *)(workspace + aiCoreIdx * singleCoreScoreSize));
+    scoreGm.SetGlobalBuffer((__gm__ SCORE_T*)(workspace + aiCoreIdx * singleCoreScoreSize));
     offset += GetBlockNum() * singleCoreScoreSize;
 
     if ASCEND_IS_AIV {
         vectorService.InitParams(constInfo, tiling);
-        indiceOutGm.SetGlobalBuffer((__gm__ int32_t *)sparseIndices);
-        weightsGm.SetGlobalBuffer((__gm__ W_T *)weights);
-        qScaleGm.SetGlobalBuffer((__gm__ SCALE_T *)queryScale);
-        kScaleGm.SetGlobalBuffer((__gm__ SCALE_T *)keyScale);
+        indiceOutGm.SetGlobalBuffer((__gm__ int32_t*)sparseIndices);
+        weightsGm.SetGlobalBuffer((__gm__ W_T*)weights);
+        qScaleGm.SetGlobalBuffer((__gm__ SCALE_T*)queryScale);
+        kScaleGm.SetGlobalBuffer((__gm__ SCALE_T*)keyScale);
         if (constInfo.setL2DisableFlag) {
             kScaleGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
         }
-        blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
+        blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blockTable);
         vectorService.InitVecInputTensor(weightsGm, qScaleGm, kScaleGm, indiceOutGm, blockTableGm);
         vectorService.InitVecWorkspaceTensor(scoreGm);
     } else {
         matmulService.InitParams(constInfo);
-        queryGm.SetGlobalBuffer((__gm__ Q_T *)query);
+        queryGm.SetGlobalBuffer((__gm__ Q_T*)query);
         if constexpr (PAGE_ATTENTION) {
-            blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
+            blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blockTable);
         }
-        keyGm.SetGlobalBuffer((__gm__ K_T *)key);
+        keyGm.SetGlobalBuffer((__gm__ K_T*)key);
         if (constInfo.setL2DisableFlag) {
             keyGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
         }
@@ -438,7 +438,7 @@ __aicore__ inline void QuantLightningIndexerKernel<QLIT>::CalcGS1LoopParams(uint
 
 template <typename QLIT>
 __aicore__ inline void QuantLightningIndexerKernel<QLIT>::CalcRunInfo(uint32_t loop, uint32_t s2LoopIdx,
-                                                                      QLICommon::RunInfo &runInfo, uint32_t qScaleLoop,
+                                                                      QLICommon::RunInfo& runInfo, uint32_t qScaleLoop,
                                                                       uint32_t kScaleLoop)
 {
     runInfo.s2Start = splitCoreInfo.s2Start;

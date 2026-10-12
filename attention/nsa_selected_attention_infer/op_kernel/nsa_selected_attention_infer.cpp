@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
- /*!
+/*!
  * \file nsa_selected_attention_infer.cpp
  * \brief
  */
@@ -17,45 +17,42 @@
 #include "nsa_selected_attention_infer_kernel.h"
 #include "nsa_public_define.h"
 
-#define INVOKE_NSA_NO_KFC_OP_IMPL(templateClass, ...)                                                       \
-    do {                                                                                                    \
-        templateClass<NSAType<__VA_ARGS__>> op;                                                             \
-        COPY_TILING_DATA_ALL(tiling);                                                                       \
-        op.Init(query, key, value, topkIndices, attenMask, blocktable, actualQSeqLengths, actualKVSeqLengths,attentionOut,    \
-                user, tiling_data, tiling, &tPipe);                                                         \
-        op.Process();                                                                                       \
+#define INVOKE_NSA_NO_KFC_OP_IMPL(templateClass, ...) \
+    do { \
+        templateClass<NSAType<__VA_ARGS__>> op; \
+        COPY_TILING_DATA_ALL(tiling); \
+        op.Init(query, key, value, topkIndices, attenMask, blocktable, actualQSeqLengths, actualKVSeqLengths, \
+                attentionOut, user, tiling_data, tiling, &tPipe); \
+        op.Process(); \
     } while (0)
 
-#define COPY_TILING_DATA_ALL(tiling)                                                                        \
-    GET_TILING_DATA_MEMBER(NsaSelectAttentionInferTilingDataV2, tilingBase, tiling_data_in, tiling);        \
-    const NsaSelectAttentionInferTilingData *__restrict tiling_data = &tiling_data_in;                      \
-    const TCubeTiling *__restrict bmm1tiling = nullptr;                                                     \
-    const TCubeTiling *__restrict bmm2tiling = nullptr;
+#define COPY_TILING_DATA_ALL(tiling) \
+    GET_TILING_DATA_MEMBER(NsaSelectAttentionInferTilingDataV2, tilingBase, tiling_data_in, tiling); \
+    const NsaSelectAttentionInferTilingData* __restrict tiling_data = &tiling_data_in; \
+    const TCubeTiling* __restrict bmm1tiling = nullptr; \
+    const TCubeTiling* __restrict bmm2tiling = nullptr;
 
-extern "C" __global__ __aicore__ void
-nsa_selected_attention_infer(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                           __gm__ uint8_t *topkIndices, __gm__ uint8_t *attenMask, __gm__ uint8_t *blocktable,
-                           __gm__ uint8_t *actualQSeqLengths, __gm__ uint8_t *actualKVSeqLengths,
-                           __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+extern "C" __global__ __aicore__ void nsa_selected_attention_infer(
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* topkIndices,
+    __gm__ uint8_t* attenMask, __gm__ uint8_t* blocktable, __gm__ uint8_t* actualQSeqLengths,
+    __gm__ uint8_t* actualKVSeqLengths, __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     TPipe tPipe;
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
-    #if (ORIG_DTYPE_QUERY == DT_FLOAT16)
-        if (TILING_KEY_IS(0)) {
-            INVOKE_NSA_NO_KFC_OP_IMPL(NsaSelectAttentionInfer, half, half, half, half, false, false,
-                LAYOUT::BSND);
-        } else if (TILING_KEY_IS(1)) {
-            INVOKE_NSA_NO_KFC_OP_IMPL(NsaSelectAttentionInfer, half, half, half, half, false, false,
-                LAYOUT::TND);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
+#if (ORIG_DTYPE_QUERY == DT_FLOAT16)
+    if (TILING_KEY_IS(0)) {
+        INVOKE_NSA_NO_KFC_OP_IMPL(NsaSelectAttentionInfer, half, half, half, half, false, false, LAYOUT::BSND);
+    } else if (TILING_KEY_IS(1)) {
+        INVOKE_NSA_NO_KFC_OP_IMPL(NsaSelectAttentionInfer, half, half, half, half, false, false, LAYOUT::TND);
     }
-    #endif
-    #if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113)) && (ORIG_DTYPE_QUERY == DT_BF16)
-        if (TILING_KEY_IS(0)) {
-            INVOKE_NSA_NO_KFC_OP_IMPL(NsaSelectAttentionInfer, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false,
-                LAYOUT::BSND);
-        } else if (TILING_KEY_IS(1)) {
-            INVOKE_NSA_NO_KFC_OP_IMPL(NsaSelectAttentionInfer, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false,
-                LAYOUT::TND);
+#endif
+#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113)) && (ORIG_DTYPE_QUERY == DT_BF16)
+    if (TILING_KEY_IS(0)) {
+        INVOKE_NSA_NO_KFC_OP_IMPL(NsaSelectAttentionInfer, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false,
+                                  LAYOUT::BSND);
+    } else if (TILING_KEY_IS(1)) {
+        INVOKE_NSA_NO_KFC_OP_IMPL(NsaSelectAttentionInfer, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false,
+                                  LAYOUT::TND);
     }
-    #endif
+#endif
 }

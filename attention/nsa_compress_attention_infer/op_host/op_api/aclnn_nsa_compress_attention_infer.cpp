@@ -31,35 +31,19 @@ extern "C" {
 
 namespace {
 
-__attribute__((visibility("default"))) aclnnStatus aclnnNsaCompressAttentionInferGetMaxWorkspaceSize(    
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *attentionMaskOptional,
-    const aclTensor *blockTableOptional,
-    const aclIntArray *actualQSeqLenOptional,
-    const aclIntArray *actualCmpKvSeqLenOptional,
-    const aclIntArray *actualSelKvSeqLenOptional,
-    const aclTensor *topKMaskOptional,
-    int64_t numHeads,
-    int64_t numKeyValueHeads,
-    int64_t selectBlockSize,
-    int64_t selectBlockCount,
-    int64_t compressBlockSize,
-    int64_t compressBlockStride,
-    double scaleValue,
-    char *layoutOptional,
-    int64_t pageBlockSize,
-    int64_t sparseMode,
-    const aclTensor *output,
-    const aclTensor *topKOutput,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+__attribute__((visibility("default"))) aclnnStatus aclnnNsaCompressAttentionInferGetMaxWorkspaceSize(
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* attentionMaskOptional,
+    const aclTensor* blockTableOptional, const aclIntArray* actualQSeqLenOptional,
+    const aclIntArray* actualCmpKvSeqLenOptional, const aclIntArray* actualSelKvSeqLenOptional,
+    const aclTensor* topKMaskOptional, int64_t numHeads, int64_t numKeyValueHeads, int64_t selectBlockSize,
+    int64_t selectBlockCount, int64_t compressBlockSize, int64_t compressBlockStride, double scaleValue,
+    char* layoutOptional, int64_t pageBlockSize, int64_t sparseMode, const aclTensor* output,
+    const aclTensor* topKOutput, uint64_t* workspaceSize, aclOpExecutor** executor);
 
-aclnnStatus nsaCompressAttentionInferContiguous(const aclTensor *&query, const aclTensor *&key, const aclTensor *&value,
-                        const aclTensor *attentionMaskOptional, const aclTensor *&blockTableOptional,
-                        const aclTensor *&topKMaskOptional,
-                        aclOpExecutor *executor)
+aclnnStatus nsaCompressAttentionInferContiguous(const aclTensor*& query, const aclTensor*& key, const aclTensor*& value,
+                                                const aclTensor* attentionMaskOptional,
+                                                const aclTensor*& blockTableOptional,
+                                                const aclTensor*& topKMaskOptional, aclOpExecutor* executor)
 {
     query = l0op::Contiguous(query, executor);
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -82,13 +66,9 @@ aclnnStatus nsaCompressAttentionInferContiguous(const aclTensor *&query, const a
     return ACLNN_SUCCESS;
 }
 
-static bool nsaCompressAttentionInferCheckDataType(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *blockTableOptional,
-    const aclTensor *output,
-    const aclTensor *topKOutput)
+static bool nsaCompressAttentionInferCheckDataType(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                                   const aclTensor* blockTableOptional, const aclTensor* output,
+                                                   const aclTensor* topKOutput)
 {
     auto qDtype = query->GetDataType();
     auto kDtype = key->GetDataType();
@@ -127,32 +107,26 @@ static bool nsaCompressAttentionInferCheckDataType(
     return true;
 }
 
-aclnnStatus nsaCompressAttentionInferValidateParam(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *blockTableOptional,
-    const aclTensor *output,
-    const aclTensor *topKOutput)
+aclnnStatus nsaCompressAttentionInferValidateParam(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                                   const aclTensor* blockTableOptional, const aclTensor* output,
+                                                   const aclTensor* topKOutput)
 {
     Shape qShape = query->GetViewShape();
     auto batchSize = qShape[0];
-    if (batchSize > 10000U || batchSize < 1U ) {
+    if (batchSize > 10000U || batchSize < 1U) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "batchSize %ld not in  [1, 10000], please check", batchSize);
         return ACLNN_ERR_PARAM_INVALID;
     }
     CHECK_RET(nsaCompressAttentionInferCheckDataType(query, key, value, blockTableOptional, output, topKOutput),
-        ACLNN_ERR_PARAM_INVALID);
+              ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus nsaCompressAttentionInferCheckTensorNull(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-    const aclTensor *blockTableOptional,
-    const aclIntArray *actualCmpKvSeqLenOptional,
-    const char *layoutOptional,
-    const aclTensor *output,
-    const aclTensor *topKOutput,
-    const uint64_t *workspaceSize)
+aclnnStatus nsaCompressAttentionInferCheckTensorNull(const aclTensor* query, const aclTensor* key,
+                                                     const aclTensor* value, const aclTensor* blockTableOptional,
+                                                     const aclIntArray* actualCmpKvSeqLenOptional,
+                                                     const char* layoutOptional, const aclTensor* output,
+                                                     const aclTensor* topKOutput, const uint64_t* workspaceSize)
 {
     // 必须的参数指针判空
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -167,7 +141,8 @@ aclnnStatus nsaCompressAttentionInferCheckTensorNull(const aclTensor *query, con
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus FakeArray_cai(const aclIntArray *inArray, aclIntArray *&outArray) {
+aclnnStatus FakeArray_cai(const aclIntArray* inArray, aclIntArray*& outArray)
+{
     OP_LOGD("start fake array");
     if (inArray != nullptr) {
         OP_LOGD("input array is not nullptr");
@@ -184,98 +159,50 @@ aclnnStatus FakeArray_cai(const aclIntArray *inArray, aclIntArray *&outArray) {
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnNsaCompressAttentionInferGetMaxWorkspaceSize(    
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *attentionMaskOptional,
-    const aclTensor *blockTableOptional,
-    const aclIntArray *actualQSeqLenOptional,
-    const aclIntArray *actualCmpKvSeqLenOptional,
-    const aclIntArray *actualSelKvSeqLenOptional,
-    const aclTensor *topKMaskOptional,
-    int64_t numHeads,
-    int64_t numKeyValueHeads,
-    int64_t selectBlockSize,
-    int64_t selectBlockCount,
-    int64_t compressBlockSize,
-    int64_t compressBlockStride,
-    double scaleValue,
-    char *layoutOptional,
-    int64_t pageBlockSize,
-    int64_t sparseMode,
-    const aclTensor *output,
-    const aclTensor *topKOutput,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor){
-        aclIntArray *fakeActualCmpKvSeqLenOptional{nullptr};
-        // nullptr不处理， nullptr是空指针，这样不会影响原来就不传入actual seq length为空的逻辑
-        aclnnStatus ret = FakeArray_cai(actualCmpKvSeqLenOptional, fakeActualCmpKvSeqLenOptional);
-        CHECK_RET_CODE(ret, "Try alloc fake actualSeqLengthsKvOptional failed");
-        ret = aclnnNsaCompressAttentionInferGetWorkspaceSize(query,
-                                                             key,
-                                                             value,
-                                                             attentionMaskOptional,
-                                                             blockTableOptional,
-                                                             actualQSeqLenOptional,
-                                                             fakeActualCmpKvSeqLenOptional,
-                                                             actualSelKvSeqLenOptional,
-                                                             topKMaskOptional,
-                                                             numHeads,
-                                                             numKeyValueHeads,
-                                                             selectBlockSize,
-                                                             selectBlockCount,
-                                                             compressBlockSize,
-                                                             compressBlockStride,
-                                                             scaleValue,
-                                                             layoutOptional,
-                                                             pageBlockSize,
-                                                             sparseMode,
-                                                             output,
-                                                             topKOutput,
-                                                             workspaceSize,
-                                                             executor
-        );
-        aclDestroyIntArray(fakeActualCmpKvSeqLenOptional);
-        return ret;
-    }
+aclnnStatus aclnnNsaCompressAttentionInferGetMaxWorkspaceSize(
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* attentionMaskOptional,
+    const aclTensor* blockTableOptional, const aclIntArray* actualQSeqLenOptional,
+    const aclIntArray* actualCmpKvSeqLenOptional, const aclIntArray* actualSelKvSeqLenOptional,
+    const aclTensor* topKMaskOptional, int64_t numHeads, int64_t numKeyValueHeads, int64_t selectBlockSize,
+    int64_t selectBlockCount, int64_t compressBlockSize, int64_t compressBlockStride, double scaleValue,
+    char* layoutOptional, int64_t pageBlockSize, int64_t sparseMode, const aclTensor* output,
+    const aclTensor* topKOutput, uint64_t* workspaceSize, aclOpExecutor** executor)
+{
+    aclIntArray* fakeActualCmpKvSeqLenOptional{nullptr};
+    // nullptr不处理， nullptr是空指针，这样不会影响原来就不传入actual seq length为空的逻辑
+    aclnnStatus ret = FakeArray_cai(actualCmpKvSeqLenOptional, fakeActualCmpKvSeqLenOptional);
+    CHECK_RET_CODE(ret, "Try alloc fake actualSeqLengthsKvOptional failed");
+    ret = aclnnNsaCompressAttentionInferGetWorkspaceSize(
+        query, key, value, attentionMaskOptional, blockTableOptional, actualQSeqLenOptional,
+        fakeActualCmpKvSeqLenOptional, actualSelKvSeqLenOptional, topKMaskOptional, numHeads, numKeyValueHeads,
+        selectBlockSize, selectBlockCount, compressBlockSize, compressBlockStride, scaleValue, layoutOptional,
+        pageBlockSize, sparseMode, output, topKOutput, workspaceSize, executor);
+    aclDestroyIntArray(fakeActualCmpKvSeqLenOptional);
+    return ret;
+}
 
 aclnnStatus aclnnNsaCompressAttentionInferGetWorkspaceSize(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *attentionMaskOptional,
-    const aclTensor *blockTableOptional,
-    const aclIntArray *actualQSeqLenOptional,
-    const aclIntArray *actualCmpKvSeqLenOptional,
-    const aclIntArray *actualSelKvSeqLenOptional,
-    const aclTensor *topKMaskOptional,
-    int64_t numHeads,
-    int64_t numKeyValueHeads,
-    int64_t selectBlockSize,
-    int64_t selectBlockCount,
-    int64_t compressBlockSize,
-    int64_t compressBlockStride,
-    double scaleValue,
-    char *layoutOptional,
-    int64_t pageBlockSize,
-    int64_t sparseMode,
-    const aclTensor *output,
-    const aclTensor *topKOutput,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* attentionMaskOptional,
+    const aclTensor* blockTableOptional, const aclIntArray* actualQSeqLenOptional,
+    const aclIntArray* actualCmpKvSeqLenOptional, const aclIntArray* actualSelKvSeqLenOptional,
+    const aclTensor* topKMaskOptional, int64_t numHeads, int64_t numKeyValueHeads, int64_t selectBlockSize,
+    int64_t selectBlockCount, int64_t compressBlockSize, int64_t compressBlockStride, double scaleValue,
+    char* layoutOptional, int64_t pageBlockSize, int64_t sparseMode, const aclTensor* output,
+    const aclTensor* topKOutput, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    CHECK_RET(nsaCompressAttentionInferCheckTensorNull(query, key, value, blockTableOptional,
-        actualCmpKvSeqLenOptional, layoutOptional, output, topKOutput, 
-    workspaceSize) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(nsaCompressAttentionInferValidateParam(query, key, value, blockTableOptional,
-        output, topKOutput) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(
+        nsaCompressAttentionInferCheckTensorNull(query, key, value, blockTableOptional, actualCmpKvSeqLenOptional,
+                                                 layoutOptional, output, topKOutput, workspaceSize) == ACLNN_SUCCESS,
+        ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(nsaCompressAttentionInferValidateParam(query, key, value, blockTableOptional, output, topKOutput) ==
+                  ACLNN_SUCCESS,
+              ACLNN_ERR_PARAM_INVALID);
     L2_DFX_PHASE_1(aclnnNsaCompressAttentionInfer,
-                    DFX_IN(query, key, value, attentionMaskOptional, blockTableOptional, actualQSeqLenOptional,
-                    actualCmpKvSeqLenOptional, actualSelKvSeqLenOptional, topKMaskOptional, numHeads, numKeyValueHeads,
-                    selectBlockSize, selectBlockCount, compressBlockSize, compressBlockStride, scaleValue,
-                    layoutOptional, pageBlockSize, sparseMode),
-                    DFX_OUT(output, topKOutput));
+                   DFX_IN(query, key, value, attentionMaskOptional, blockTableOptional, actualQSeqLenOptional,
+                          actualCmpKvSeqLenOptional, actualSelKvSeqLenOptional, topKMaskOptional, numHeads,
+                          numKeyValueHeads, selectBlockSize, selectBlockCount, compressBlockSize, compressBlockStride,
+                          scaleValue, layoutOptional, pageBlockSize, sparseMode),
+                   DFX_OUT(output, topKOutput));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -291,16 +218,17 @@ aclnnStatus aclnnNsaCompressAttentionInferGetWorkspaceSize(
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    aclOpExecutor *l0Executor = uniqueExecutor.get();
+    aclOpExecutor* l0Executor = uniqueExecutor.get();
 
-    CHECK_RET(nsaCompressAttentionInferContiguous(query, key, value, attentionMaskOptional, blockTableOptional, topKMaskOptional, l0Executor) == ACLNN_SUCCESS,
+    CHECK_RET(nsaCompressAttentionInferContiguous(query, key, value, attentionMaskOptional, blockTableOptional,
+                                                  topKMaskOptional, l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
     string inputLayoutStr = op::ToString(layoutOptional).GetString();
     auto l0NsaCompressAttentionInferOuts = l0op::NsaCompressAttentionInfer(
-        query, key, value, attentionMaskOptional, blockTableOptional,
-        actualQSeqLenOptional, actualCmpKvSeqLenOptional, actualSelKvSeqLenOptional, topKMaskOptional, numHeads,
-        numKeyValueHeads, selectBlockSize, selectBlockCount, compressBlockSize, compressBlockStride, scaleValue,
-        inputLayoutStr.c_str(), pageBlockSize, sparseMode, l0Executor);
+        query, key, value, attentionMaskOptional, blockTableOptional, actualQSeqLenOptional, actualCmpKvSeqLenOptional,
+        actualSelKvSeqLenOptional, topKMaskOptional, numHeads, numKeyValueHeads, selectBlockSize, selectBlockCount,
+        compressBlockSize, compressBlockStride, scaleValue, inputLayoutStr.c_str(), pageBlockSize, sparseMode,
+        l0Executor);
 
     CHECK_RET(l0NsaCompressAttentionInferOuts[0] != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(l0NsaCompressAttentionInferOuts[1] != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -323,14 +251,14 @@ aclnnStatus aclnnNsaCompressAttentionInferGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnNsaCompressAttentionInfer(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnNsaCompressAttentionInfer(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnNsaCompressAttentionInfer);
     // 固定写法，调用框架能力，完成计算
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
 }
-}  // namespace
+} // namespace
 
 #ifdef __cplusplus
 }

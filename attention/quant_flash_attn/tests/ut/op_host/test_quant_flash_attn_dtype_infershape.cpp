@@ -17,9 +17,15 @@ namespace QuantFlashAttnUT {
 
 class QuantFlashAttnInferDTypeTest : public testing::TestWithParam<QuantFlashAttnInferDTypeUtParam> {
 protected:
-    static void SetUpTestCase() { std::cout << "QuantFlashAttn InferDTypeTest SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "QuantFlashAttn InferDTypeTest SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "QuantFlashAttn InferDTypeTest TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "QuantFlashAttn InferDTypeTest TearDown" << std::endl;
+    }
 };
 
 // 临时添加，待框架修复后删除
@@ -29,7 +35,7 @@ TEST_P(QuantFlashAttnInferDTypeTest, param)
 {
     auto param = GetParam();
 
-    std::vector<void *> inputDataTypes;
+    std::vector<void*> inputDataTypes;
     if (param.inputInstance[0] == 1)
         inputDataTypes.emplace_back(&param.q);
     if (param.inputInstance[1] == 1)
@@ -61,7 +67,7 @@ TEST_P(QuantFlashAttnInferDTypeTest, param)
     if (param.inputInstance[14] == 1)
         inputDataTypes.emplace_back(&param.metadata);
 
-    std::vector<void *> outputDataTypes;
+    std::vector<void*> outputDataTypes;
     if (param.outputInstance[0] == 1)
         outputDataTypes.emplace_back(&param.attn_out);
     if (param.outputInstance[1] == 1)

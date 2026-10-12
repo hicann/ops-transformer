@@ -40,7 +40,7 @@
     } while (0)
 
 template <typename T>
-bool ReadFile(const std::string &filePath, std::vector<int64_t> shape, std::vector<T> &hostData)
+bool ReadFile(const std::string& filePath, std::vector<int64_t> shape, std::vector<T>& hostData)
 {
     size_t fileSize = 1;
     for (int64_t i : shape) {
@@ -55,7 +55,7 @@ bool ReadFile(const std::string &filePath, std::vector<int64_t> shape, std::vect
     file.seekg(0, std::ios::end);
     file.seekg(0, std::ios::beg);
     hostData.reserve(fileSize);
-    if (file.read(reinterpret_cast<char *>(hostData.data()), fileSize * sizeof(T))) {
+    if (file.read(reinterpret_cast<char*>(hostData.data()), fileSize * sizeof(T))) {
     } else {
         std::cerr << "读取文件失败" << std::endl;
         return false;
@@ -65,7 +65,7 @@ bool ReadFile(const std::string &filePath, std::vector<int64_t> shape, std::vect
 }
 
 template <typename T>
-bool WriteFile(const std::string &filePath, int64_t size, std::vector<T> &hostData)
+bool WriteFile(const std::string& filePath, int64_t size, std::vector<T>& hostData)
 {
     int fd = open(filePath.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWRITE);
     if (fd < 0) {
@@ -73,7 +73,7 @@ bool WriteFile(const std::string &filePath, int64_t size, std::vector<T> &hostDa
         return false;
     }
 
-    size_t writeSize = write(fd, reinterpret_cast<char *>(hostData.data()), size * sizeof(T));
+    size_t writeSize = write(fd, reinterpret_cast<char*>(hostData.data()), size * sizeof(T));
     (void)close(fd);
     if (writeSize != size * sizeof(T)) {
         LOG_PRINT("Write file Failed.");
@@ -83,7 +83,7 @@ bool WriteFile(const std::string &filePath, int64_t size, std::vector<T> &hostDa
     return true;
 }
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -92,7 +92,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr, int num)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr, int num)
 {
     auto size = GetShapeSize(shape);
     std::vector<float> resultData(size, 0);
@@ -104,7 +104,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr, int num)
     }
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -117,8 +117,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -141,8 +141,8 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 }
 
 template <typename T>
-int CreateAclTensorND(const std::vector<T> &shape, void **deviceAddr, void **hostAddr, aclDataType dataType,
-                      aclTensor **tensor)
+int CreateAclTensorND(const std::vector<T>& shape, void** deviceAddr, void** hostAddr, aclDataType dataType,
+                      aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -162,8 +162,8 @@ int CreateAclTensorND(const std::vector<T> &shape, void **deviceAddr, void **hos
 }
 
 template <typename T>
-int CreateAclTensorNZ(const std::vector<T> &shape, void **deviceAddr, void **hostAddr, aclDataType dataType,
-                      aclTensor **tensor)
+int CreateAclTensorNZ(const std::vector<T>& shape, void** deviceAddr, void** hostAddr, aclDataType dataType,
+                      aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -182,7 +182,7 @@ int CreateAclTensorNZ(const std::vector<T> &shape, void **deviceAddr, void **hos
     return 0;
 }
 
-int TransToNZShape(std::vector<int64_t> &shapeND, size_t typeSize)
+int TransToNZShape(std::vector<int64_t>& shapeND, size_t typeSize)
 {
     int64_t h = shapeND[0];
     int64_t w = shapeND[1];
@@ -257,92 +257,92 @@ int main()
     std::vector<int64_t> qRopeOutShape = {tokenNum, headNum, 64};
     std::vector<int64_t> krCacheOutShape = {blockNum, blockSize, 1, 64};
 
-    void *inputDeviceAddr = nullptr;
-    void *gamma0DeviceAddr = nullptr;
-    void *beta0DeviceAddr = nullptr;
-    void *quantScale0DeviceAddr = nullptr;
-    void *quantOffset0DeviceAddr = nullptr;
-    void *wdqkvDeviceAddr = nullptr;
-    void *deScale0DeviceAddr = nullptr;
-    void *bias0DeviceAddr = nullptr;
-    void *gamma1DeviceAddr = nullptr;
-    void *beta1DeviceAddr = nullptr;
-    void *quantScale1DeviceAddr = nullptr;
-    void *quantOffset1DeviceAddr = nullptr;
-    void *wuqDeviceAddr = nullptr;
-    void *deScale1DeviceAddr = nullptr;
-    void *bias1DeviceAddr = nullptr;
-    void *gamma2DeviceAddr = nullptr;
-    void *cosDeviceAddr = nullptr;
-    void *sinDeviceAddr = nullptr;
-    void *wukDeviceAddr = nullptr;
-    void *kvCacheDeviceAddr = nullptr;
-    void *kvCacheRopeDeviceAddr = nullptr;
-    void *slotmappingDeviceAddr = nullptr;
-    void *ctkvScaleDeviceAddr = nullptr;
-    void *qNopeScaleDeviceAddr = nullptr;
-    void *qOutDeviceAddr = nullptr;
-    void *kvCacheOutDeviceAddr = nullptr;
-    void *qRopeOutDeviceAddr = nullptr;
-    void *krCacheOutDeviceAddr = nullptr;
+    void* inputDeviceAddr = nullptr;
+    void* gamma0DeviceAddr = nullptr;
+    void* beta0DeviceAddr = nullptr;
+    void* quantScale0DeviceAddr = nullptr;
+    void* quantOffset0DeviceAddr = nullptr;
+    void* wdqkvDeviceAddr = nullptr;
+    void* deScale0DeviceAddr = nullptr;
+    void* bias0DeviceAddr = nullptr;
+    void* gamma1DeviceAddr = nullptr;
+    void* beta1DeviceAddr = nullptr;
+    void* quantScale1DeviceAddr = nullptr;
+    void* quantOffset1DeviceAddr = nullptr;
+    void* wuqDeviceAddr = nullptr;
+    void* deScale1DeviceAddr = nullptr;
+    void* bias1DeviceAddr = nullptr;
+    void* gamma2DeviceAddr = nullptr;
+    void* cosDeviceAddr = nullptr;
+    void* sinDeviceAddr = nullptr;
+    void* wukDeviceAddr = nullptr;
+    void* kvCacheDeviceAddr = nullptr;
+    void* kvCacheRopeDeviceAddr = nullptr;
+    void* slotmappingDeviceAddr = nullptr;
+    void* ctkvScaleDeviceAddr = nullptr;
+    void* qNopeScaleDeviceAddr = nullptr;
+    void* qOutDeviceAddr = nullptr;
+    void* kvCacheOutDeviceAddr = nullptr;
+    void* qRopeOutDeviceAddr = nullptr;
+    void* krCacheOutDeviceAddr = nullptr;
 
-    void *inputHostAddr = nullptr;
-    void *gamma0HostAddr = nullptr;
-    void *beta0HostAddr = nullptr;
-    void *quantScale0HostAddr = nullptr;
-    void *quantOffset0HostAddr = nullptr;
-    void *wdqkvHostAddr = nullptr;
-    void *deScale0HostAddr = nullptr;
-    void *bias0HostAddr = nullptr;
-    void *gamma1HostAddr = nullptr;
-    void *beta1HostAddr = nullptr;
-    void *quantScale1HostAddr = nullptr;
-    void *quantOffset1HostAddr = nullptr;
-    void *wuqHostAddr = nullptr;
-    void *deScale1HostAddr = nullptr;
-    void *bias1HostAddr = nullptr;
-    void *gamma2HostAddr = nullptr;
-    void *cosHostAddr = nullptr;
-    void *sinHostAddr = nullptr;
-    void *wukHostAddr = nullptr;
-    void *kvCacheHostAddr = nullptr;
-    void *kvCacheRopeHostAddr = nullptr;
-    void *slotmappingHostAddr = nullptr;
-    void *ctkvScaleHostAddr = nullptr;
-    void *qNopeScaleHostAddr = nullptr;
-    void *qOutHostAddr = nullptr;
-    void *kvCacheOutHostAddr = nullptr;
-    void *qRopeOutHostAddr = nullptr;
-    void *krCacheOutHostAddr = nullptr;
+    void* inputHostAddr = nullptr;
+    void* gamma0HostAddr = nullptr;
+    void* beta0HostAddr = nullptr;
+    void* quantScale0HostAddr = nullptr;
+    void* quantOffset0HostAddr = nullptr;
+    void* wdqkvHostAddr = nullptr;
+    void* deScale0HostAddr = nullptr;
+    void* bias0HostAddr = nullptr;
+    void* gamma1HostAddr = nullptr;
+    void* beta1HostAddr = nullptr;
+    void* quantScale1HostAddr = nullptr;
+    void* quantOffset1HostAddr = nullptr;
+    void* wuqHostAddr = nullptr;
+    void* deScale1HostAddr = nullptr;
+    void* bias1HostAddr = nullptr;
+    void* gamma2HostAddr = nullptr;
+    void* cosHostAddr = nullptr;
+    void* sinHostAddr = nullptr;
+    void* wukHostAddr = nullptr;
+    void* kvCacheHostAddr = nullptr;
+    void* kvCacheRopeHostAddr = nullptr;
+    void* slotmappingHostAddr = nullptr;
+    void* ctkvScaleHostAddr = nullptr;
+    void* qNopeScaleHostAddr = nullptr;
+    void* qOutHostAddr = nullptr;
+    void* kvCacheOutHostAddr = nullptr;
+    void* qRopeOutHostAddr = nullptr;
+    void* krCacheOutHostAddr = nullptr;
 
-    aclTensor *input = nullptr;
-    aclTensor *gamma0 = nullptr;
-    aclTensor *beta0 = nullptr;
-    aclTensor *quantScale0 = nullptr;
-    aclTensor *quantOffset0 = nullptr;
-    aclTensor *wdqkv = nullptr;
-    aclTensor *deScale0 = nullptr;
-    aclTensor *bias0 = nullptr;
-    aclTensor *gamma1 = nullptr;
-    aclTensor *beta1 = nullptr;
-    aclTensor *quantScale1 = nullptr;
-    aclTensor *quantOffset1 = nullptr;
-    aclTensor *wuq = nullptr;
-    aclTensor *deScale1 = nullptr;
-    aclTensor *bias1 = nullptr;
-    aclTensor *gamma2 = nullptr;
-    aclTensor *cos = nullptr;
-    aclTensor *sin = nullptr;
-    aclTensor *wuk = nullptr;
-    aclTensor *kvCache = nullptr;
-    aclTensor *kvCacheRope = nullptr;
-    aclTensor *slotmapping = nullptr;
-    aclTensor *ctkvScale = nullptr;
-    aclTensor *qNopeScale = nullptr;
-    aclTensor *qOut = nullptr;
-    aclTensor *kvCacheOut = nullptr;
-    aclTensor *qRopeOut = nullptr;
-    aclTensor *krCacheOut = nullptr;
+    aclTensor* input = nullptr;
+    aclTensor* gamma0 = nullptr;
+    aclTensor* beta0 = nullptr;
+    aclTensor* quantScale0 = nullptr;
+    aclTensor* quantOffset0 = nullptr;
+    aclTensor* wdqkv = nullptr;
+    aclTensor* deScale0 = nullptr;
+    aclTensor* bias0 = nullptr;
+    aclTensor* gamma1 = nullptr;
+    aclTensor* beta1 = nullptr;
+    aclTensor* quantScale1 = nullptr;
+    aclTensor* quantOffset1 = nullptr;
+    aclTensor* wuq = nullptr;
+    aclTensor* deScale1 = nullptr;
+    aclTensor* bias1 = nullptr;
+    aclTensor* gamma2 = nullptr;
+    aclTensor* cos = nullptr;
+    aclTensor* sin = nullptr;
+    aclTensor* wuk = nullptr;
+    aclTensor* kvCache = nullptr;
+    aclTensor* kvCacheRope = nullptr;
+    aclTensor* slotmapping = nullptr;
+    aclTensor* ctkvScale = nullptr;
+    aclTensor* qNopeScale = nullptr;
+    aclTensor* qOut = nullptr;
+    aclTensor* kvCacheOut = nullptr;
+    aclTensor* qRopeOut = nullptr;
+    aclTensor* krCacheOut = nullptr;
 
     // 转换三个NZ格式变量的shape
     ret = TransToNZShape(wdqkvShape, sizeof(int8_t));
@@ -423,7 +423,7 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的API名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 调用aclnnMlaPreprocess第一段接口
     ret = aclnnMlaPreprocessGetWorkspaceSize(
@@ -435,7 +435,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMlaPreprocessGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

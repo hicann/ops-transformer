@@ -29,13 +29,13 @@
 namespace optiling {
 // ------------------公共定义--------------------------
 struct TilingRequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct TilingOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 enum class DataLayout : uint32_t {
@@ -142,22 +142,22 @@ struct QLIV2ParaInfo {
     TilingRequiredParaInfo attenOut = {nullptr, nullptr};
     TilingRequiredParaInfo sparseValues = {nullptr, nullptr};
 
-    const int32_t *quantMode = nullptr;
-    const int32_t *maxSeqlenQ = nullptr;
-    const char *layOutQuery = nullptr;
-    const char *layOutKey = nullptr;
-    const int32_t *blockSize = nullptr;
-    const int32_t *sparseMode = nullptr;
-    const int32_t *sparseCount = nullptr;
-    const int64_t *cmpRatio = nullptr;
-    const int32_t *returnValue = nullptr;
+    const int32_t* quantMode = nullptr;
+    const int32_t* maxSeqlenQ = nullptr;
+    const char* layOutQuery = nullptr;
+    const char* layOutKey = nullptr;
+    const int32_t* blockSize = nullptr;
+    const int32_t* sparseMode = nullptr;
+    const int32_t* sparseCount = nullptr;
+    const int64_t* cmpRatio = nullptr;
+    const int32_t* returnValue = nullptr;
 };
 
 // -----------算子Tiling入参信息类---------------
 class QLIV2TilingInfo {
 public:
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     QLIV2ParaInfo opParamInfo;
     // Base Param
     platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND910B;
@@ -197,7 +197,7 @@ public:
 // -----------算子Tiling入参信息解析及Check类---------------
 class QLIV2InfoParser {
 public:
-    explicit QLIV2InfoParser(gert::TilingContext *context)
+    explicit QLIV2InfoParser(gert::TilingContext* context)
         : context_(context)
     {}
     ~QLIV2InfoParser() = default;
@@ -205,8 +205,8 @@ public:
     ge::graphStatus CheckRequiredInOutExistence() const;
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckQliv2RequiredParameters() const;
-    ge::graphStatus GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor,
-                                        const std::string &actualSeqLenName) const;
+    ge::graphStatus GetActualSeqLenSize(int64_t& size, const gert::Tensor* tensor,
+                                        const std::string& actualSeqLenName) const;
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     void GetInputParaInfo();
@@ -234,13 +234,13 @@ public:
     ge::graphStatus GetAttenMaskInfo();
     ge::graphStatus GetActualSeqInfo();
     ge::graphStatus CheckKeyContiguous() const;
-    void GenerateInfo(QLIV2TilingInfo &QLIV2Info);
-    ge::graphStatus ParseAndCheck(QLIV2TilingInfo &QLIV2Info);
+    void GenerateInfo(QLIV2TilingInfo& QLIV2Info);
+    ge::graphStatus ParseAndCheck(QLIV2TilingInfo& QLIV2Info);
 
 public:
-    gert::TilingContext *context_ = nullptr;
-    const char *opName_;
-    fe::PlatFormInfos *platformInfo_;
+    gert::TilingContext* context_ = nullptr;
+    const char* opName_;
+    fe::PlatFormInfos* platformInfo_;
     QLIV2ParaInfo qliV2Params_;
 
     // BaseParams
@@ -275,12 +275,12 @@ public:
 // ---------------算子Tiling类---------------
 class QuantLightningIndexerV2Tiling {
 public:
-    explicit QuantLightningIndexerV2Tiling(gert::TilingContext *context)
+    explicit QuantLightningIndexerV2Tiling(gert::TilingContext* context)
         : context_(context) {};
-    ge::graphStatus DoTiling(QLIV2TilingInfo *tilingInfo);
+    ge::graphStatus DoTiling(QLIV2TilingInfo* tilingInfo);
 
 private:
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     QLIV2TilingData tilingData_;
 };
 

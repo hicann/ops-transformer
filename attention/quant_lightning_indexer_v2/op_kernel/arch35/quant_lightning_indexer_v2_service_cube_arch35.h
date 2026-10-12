@@ -40,15 +40,15 @@ public:
     using CL0_T = std::conditional_t<std::is_same_v<QK_T, int32_t>, int32_t, float>;
 
     __aicore__ inline QLIV2Matmul(){};
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitMm1GlobalTensor(const GlobalTensor<int32_t> &blkTableGm, const GlobalTensor<K_T> &keyGm,
-                                               const GlobalTensor<Q_T> &queryGm,
-                                               const GlobalTensor<bfloat16_t> &keyScaleGmBf16 = {},
-                                               const GlobalTensor<bfloat16_t> &queryScaleGmBf16 = {});
-    __aicore__ inline void InitParams(const ConstInfo &constInfo);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitMm1GlobalTensor(const GlobalTensor<int32_t>& blkTableGm, const GlobalTensor<K_T>& keyGm,
+                                               const GlobalTensor<Q_T>& queryGm,
+                                               const GlobalTensor<bfloat16_t>& keyScaleGmBf16 = {},
+                                               const GlobalTensor<bfloat16_t>& queryScaleGmBf16 = {});
+    __aicore__ inline void InitParams(const ConstInfo& constInfo);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void ComputeMm1(const QLIV2Common::RunInfo &qliV2CubeRunInfo);
+    __aicore__ inline void ComputeMm1(const QLIV2Common::RunInfo& qliV2CubeRunInfo);
 
     static constexpr IsResetLoad3dConfig LOAD3DV2_CONFIG = {true, true}; // isSetFMatrix isSetPadding;
     static constexpr uint64_t KEY_BUF_NUM = 3;
@@ -92,23 +92,23 @@ public:
 protected:
     __aicore__ inline void Fixp(uint64_t qliV2S1GmOffset, uint64_t qliV2S2GmOffset, uint64_t s1gL0RealSize,
                                 uint64_t s2L0RealSize, uint64_t s1gL1SizeAlign2G,
-                                const QLIV2Common::RunInfo &qliV2CubeRunInfo);
+                                const QLIV2Common::RunInfo& qliV2CubeRunInfo);
     __aicore__ inline void ComputeL0c(uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
-                                      const QLIV2Common::RunInfo &qliV2CubeRunInfo);
+                                      const QLIV2Common::RunInfo& qliV2CubeRunInfo);
     __aicore__ inline void LoadKeyToL0b(uint64_t s2L0Offset, uint64_t s2L1RealSize, uint64_t s2L0RealSize,
-                                        const QLIV2Common::RunInfo &qliV2CubeRunInfo);
+                                        const QLIV2Common::RunInfo& qliV2CubeRunInfo);
     __aicore__ inline void LoadQueryToL0a(uint64_t s1gL1Offset, uint64_t s1gL1RealSize, uint64_t s1gL0RealSize,
-                                          const QLIV2Common::RunInfo &qliV2CubeRunInfo);
+                                          const QLIV2Common::RunInfo& qliV2CubeRunInfo);
     __aicore__ inline void QueryNd2Nz(uint64_t s1gL1RealSize, uint64_t s1gL1Offset,
-                                      const QLIV2Common::RunInfo &qliV2CubeRunInfo);
+                                      const QLIV2Common::RunInfo& qliV2CubeRunInfo);
     __aicore__ inline void KeyNd2Nz(uint64_t s2L1RealSize, uint64_t qliV2S2GmOffset,
-                                    const QLIV2Common::RunInfo &qliV2CubeRunInfo);
+                                    const QLIV2Common::RunInfo& qliV2CubeRunInfo);
     __aicore__ inline void KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t qliV2S2GmOffset,
-                                         const QLIV2Common::RunInfo &qliV2CubeRunInfo);
+                                         const QLIV2Common::RunInfo& qliV2CubeRunInfo);
     __aicore__ inline void LoadQScaleToL1(uint64_t s1gL1RealSize, uint64_t qliV2S1GmOffset,
-                                          const QLIV2Common::RunInfo &qliV2CubeRunInfo);
+                                          const QLIV2Common::RunInfo& qliV2CubeRunInfo);
     __aicore__ inline void LoadKScaleToL1(uint64_t s2L1RealSize, uint64_t qliV2S2GmOffset,
-                                          const QLIV2Common::RunInfo &qliV2CubeRunInfo);
+                                          const QLIV2Common::RunInfo& qliV2CubeRunInfo);
     GlobalTensor<int32_t> blkTableGm_;
     GlobalTensor<K_T> keyGm_;
     GlobalTensor<Q_T> queryGm_;
@@ -162,7 +162,7 @@ private:
 };
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Matmul<QLIV2T>::InitParams(const ConstInfo &constInfo)
+__aicore__ inline void QLIV2Matmul<QLIV2T>::InitParams(const ConstInfo& constInfo)
 {
     qliV2CubeConstInfo = constInfo;
     s2BasicBlock_ = (qliV2CubeConstInfo.maxSeqlenQ <= 4 && qliV2CubeConstInfo.maxSeqlenQ >= 0) ? 256 : 128;
@@ -180,7 +180,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::InitParams(const ConstInfo &constInf
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Matmul<QLIV2T>::InitBuffers(TPipe *pipe)
+__aicore__ inline void QLIV2Matmul<QLIV2T>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(bufUB_,
                      2 * CeilDiv(qliV2CubeConstInfo.mBaseSizeMax, 2) * qliV2CubeConstInfo.s2BaseSize * sizeof(QK_T));
@@ -207,11 +207,11 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::InitBuffers(TPipe *pipe)
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Matmul<QLIV2T>::InitMm1GlobalTensor(const GlobalTensor<int32_t> &blkTableGm,
-                                                                const GlobalTensor<K_T> &keyGm,
-                                                                const GlobalTensor<Q_T> &queryGm,
-                                                                const GlobalTensor<bfloat16_t> &keyScaleGmBf16,
-                                                                const GlobalTensor<bfloat16_t> &queryScaleGmBf16)
+__aicore__ inline void QLIV2Matmul<QLIV2T>::InitMm1GlobalTensor(const GlobalTensor<int32_t>& blkTableGm,
+                                                                const GlobalTensor<K_T>& keyGm,
+                                                                const GlobalTensor<Q_T>& queryGm,
+                                                                const GlobalTensor<bfloat16_t>& keyScaleGmBf16,
+                                                                const GlobalTensor<bfloat16_t>& queryScaleGmBf16)
 {
     blkTableGm_ = blkTableGm;
     keyGm_ = keyGm;
@@ -223,7 +223,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::InitMm1GlobalTensor(const GlobalTens
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Matmul<QLIV2T>::ComputeMm1(const QLIV2Common::RunInfo &qliV2CubeRunInfo)
+__aicore__ inline void QLIV2Matmul<QLIV2T>::ComputeMm1(const QLIV2Common::RunInfo& qliV2CubeRunInfo)
 {
     CrossCoreWaitFlag<QLIV2Common::ConstInfo::QLIV2_SYNC_MODE4, PIPE_FIX>(QLIV2Common::ConstInfo::CROSS_VC_EVENT +
                                                                           qliV2CubeRunInfo.loop % 2);
@@ -420,7 +420,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::ComputeMm1(const QLIV2Common::RunInf
 
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2Nz(uint64_t s2L1RealSize, uint64_t qliV2S2GmOffset,
-                                                     const QLIV2Common::RunInfo &qliV2CubeRunInfo)
+                                                     const QLIV2Common::RunInfo& qliV2CubeRunInfo)
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -439,7 +439,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2Nz(uint64_t s2L1RealSize, uint
 // blkNum, blkSize, N2, D
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t qliV2S2GmOffset,
-                                                          const QLIV2Common::RunInfo &qliV2CubeRunInfo)
+                                                          const QLIV2Common::RunInfo& qliV2CubeRunInfo)
 {
     uint64_t s2L1Offset = 0;
     while (s2L1Offset < s2L1RealSize) {
@@ -473,7 +473,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2NzForPA(uint64_t s2L1RealSize,
 // batch, s1, n2, g, d
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::QueryNd2Nz(uint64_t s1gL1RealSize, uint64_t qliV2S1GmOffset,
-                                                       const QLIV2Common::RunInfo &qliV2CubeRunInfo)
+                                                       const QLIV2Common::RunInfo& qliV2CubeRunInfo)
 {
     uint64_t dstNzC0Stride = CeilAlign(s1gL1RealSize, qliV2CubeConstInfo.gSize * 2);
     Nd2NzParams nd2nzPara;
@@ -492,7 +492,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::QueryNd2Nz(uint64_t s1gL1RealSize, u
 
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadQScaleToL1(uint64_t s1gL1RealSize, uint64_t qliV2S1GmOffset,
-                                                           const QLIV2Common::RunInfo &qliV2CubeRunInfo)
+                                                           const QLIV2Common::RunInfo& qliV2CubeRunInfo)
 {
     uint64_t scaleOffsetInBuf = (qliV2QueryMte2BufferIndex % QUERY_BUF_NUM) * queryScaleBufferOffset;
     LocalTensor<bfloat16_t> scaleL1 = queryScaleL1_[scaleOffsetInBuf].template ReinterpretCast<bfloat16_t>();
@@ -512,7 +512,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadQScaleToL1(uint64_t s1gL1RealSiz
 
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadKScaleToL1(uint64_t s2L1RealSize, uint64_t qliV2S2GmOffset,
-                                                           const QLIV2Common::RunInfo &qliV2CubeRunInfo)
+                                                           const QLIV2Common::RunInfo& qliV2CubeRunInfo)
 {
     uint64_t scaleOffsetInBuf = (keyL1BufIdx_ % KEY_BUF_NUM) * keyScaleBufferOffset_;
     LocalTensor<bfloat16_t> scaleL1 = keyScaleL1_[scaleOffsetInBuf].template ReinterpretCast<bfloat16_t>();
@@ -564,7 +564,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadKScaleToL1(uint64_t s2L1RealSize
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadQueryToL0a(uint64_t s1gL1Offset, uint64_t s1gL1RealSize,
                                                            uint64_t s1gL0RealSize,
-                                                           const QLIV2Common::RunInfo &qliV2CubeRunInfo)
+                                                           const QLIV2Common::RunInfo& qliV2CubeRunInfo)
 {
     LoadData2DParamsV2 loadData2DParamsV2;
     loadData2DParamsV2.mStartPosition = CeilDiv(s1gL1Offset, BLOCK_CUBE);
@@ -609,7 +609,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadQueryToL0a(uint64_t s1gL1Offset,
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadKeyToL0b(uint64_t s2L1Offset, uint64_t s2L1RealSize,
                                                          uint64_t s2L0RealSize,
-                                                         const QLIV2Common::RunInfo &qliV2CubeRunInfo)
+                                                         const QLIV2Common::RunInfo& qliV2CubeRunInfo)
 {
     LoadData2DParamsV2 loadData2DParamsV2;
     loadData2DParamsV2.mStartPosition = CeilDiv(s2L1Offset, BLOCK_CUBE);
@@ -652,7 +652,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadKeyToL0b(uint64_t s2L1Offset, ui
 
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::ComputeL0c(uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
-                                                       const QLIV2Common::RunInfo &qliV2CubeRunInfo)
+                                                       const QLIV2Common::RunInfo& qliV2CubeRunInfo)
 {
     MmadParams mmadParams;
     mmadParams.m = CeilAlign(s1gL0RealSize, BLOCK_CUBE);
@@ -671,7 +671,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::ComputeL0c(uint64_t s1gL0RealSize, u
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::Fixp(uint64_t qliV2S1GmOffset, uint64_t qliV2S2GmOffset,
                                                  uint64_t s1gL0RealSize, uint64_t s2L0RealSize, uint64_t s1gSizeAlign2G,
-                                                 const QLIV2Common::RunInfo &qliV2CubeRunInfo)
+                                                 const QLIV2Common::RunInfo& qliV2CubeRunInfo)
 {
     SetFlag<HardEvent::M_FIX>(M_FIX_EVENT + l0BufIdx_ % L0_BUF_NUM);
     WaitFlag<HardEvent::M_FIX>(M_FIX_EVENT + l0BufIdx_ % L0_BUF_NUM);

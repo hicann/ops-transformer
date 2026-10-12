@@ -40,19 +40,19 @@ public:
 
     class DoTilingParam {
     public:
-        gert::TilingContext *ctx = nullptr;
+        gert::TilingContext* ctx = nullptr;
         ge::graphStatus ret = ge::GRAPH_SUCCESS;
-        gert::Tensor *actSeqSelQLenTensor = nullptr;
-        gert::Tensor *actSeqSelKVLenTensor = nullptr;
-        gert::Tensor *blocktableTensor = nullptr;
-        gert::Tensor *topkIndicesTensor = nullptr;
+        gert::Tensor* actSeqSelQLenTensor = nullptr;
+        gert::Tensor* actSeqSelKVLenTensor = nullptr;
+        gert::Tensor* blocktableTensor = nullptr;
+        gert::Tensor* topkIndicesTensor = nullptr;
     };
     /**
      * 执行 Tiling 前, 修改 TilingContext 回调函数.
      *
      * \attention: 一般用于异常用例.
      */
-    typedef void (*PreTilingRunCbf)(DoTilingParam &tilingParam);
+    typedef void (*PreTilingRunCbf)(DoTilingParam& tilingParam);
 
 public:
     /* 算子控制信息 */
@@ -66,17 +66,17 @@ public:
     PreTilingRunCbf mPreTilingRunCbf = nullptr;
 
     NsaSelectAttentionInferCase();
-    NsaSelectAttentionInferCase(const char *name, bool enable, const char *dbgInfo, OpInfo incre,
+    NsaSelectAttentionInferCase(const char* name, bool enable, const char* dbgInfo, OpInfo incre,
                                 NsaSelectAttentionInferParam param,
                                 int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
     bool Run() override;
-    bool DoOpTiling(DoTilingParam &tilingParam);
+    bool DoOpTiling(DoTilingParam& tilingParam);
 
-    static void PreTilingRunCbf_SetPlatformInfoNull(NsaSelectAttentionInferCase::DoTilingParam &tilingParam);
+    static void PreTilingRunCbf_SetPlatformInfoNull(NsaSelectAttentionInferCase::DoTilingParam& tilingParam);
 
 protected:
     std::string mNsaSelectAttentionInferOriginTilingFuncName;
-    void *mNsaSelectAttentionInferKernelFunc = nullptr;
+    void* mNsaSelectAttentionInferKernelFunc = nullptr;
 
     bool InitParam() override;
     bool InitOpInfo() override;

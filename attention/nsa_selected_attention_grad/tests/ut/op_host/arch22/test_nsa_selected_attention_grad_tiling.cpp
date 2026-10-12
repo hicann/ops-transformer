@@ -64,38 +64,38 @@ inline optiling::nsa::NsaSelectedAttentionGradCompileInfo MakeCompileInfo()
 
 // 11 inputs: q, k, v, attentionOut, attentionOutGrad, softmaxMax, softmaxSum,
 //            topkIndices, actualSeqQLen(opt), actualSeqKVLen(opt), attenMsk(opt)
-std::vector<TensorDesc> MakeBaseInputs(ge::DataType dtype, int64_t blockCount,
-                                       bool withMask, int64_t d = kDhead, int64_t d2 = kDhead2,
-                                       int64_t n1 = kN1, int64_t n2 = kN2,
-                                       int64_t t1 = kT1, int64_t t2 = kT2)
+std::vector<TensorDesc> MakeBaseInputs(ge::DataType dtype, int64_t blockCount, bool withMask, int64_t d = kDhead,
+                                       int64_t d2 = kDhead2, int64_t n1 = kN1, int64_t n2 = kN2, int64_t t1 = kT1,
+                                       int64_t t2 = kT2)
 {
     std::vector<TensorDesc> inputs = {
-        {{{t1, n1, d}, {t1, n1, d}}, dtype, ge::FORMAT_ND},           // query
-        {{{t2, n2, d}, {t2, n2, d}}, dtype, ge::FORMAT_ND},           // key
-        {{{t2, n2, d2}, {t2, n2, d2}}, dtype, ge::FORMAT_ND},         // value
-        {{{t1, n1, d2}, {t1, n1, d2}}, dtype, ge::FORMAT_ND},         // attentionOut
-        {{{t1, n1, d2}, {t1, n1, d2}}, dtype, ge::FORMAT_ND},         // attentionOutGrad
-        {{{t1, n1, 8}, {t1, n1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},    // softmaxMax (DT_FLOAT)
-        {{{t1, n1, 8}, {t1, n1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},    // softmaxSum (DT_FLOAT)
-        {{{t1, n2, blockCount}, {t1, n2, blockCount}},
-         ge::DT_INT32, ge::FORMAT_ND},                                 // topkIndices
-        {{{kBatch}, {kBatch}}, ge::DT_INT64, ge::FORMAT_ND, true,
-         static_cast<void *>(kActualSeqQLen)},                         // actualSeqQLen
-        {{{kBatch}, {kBatch}}, ge::DT_INT64, ge::FORMAT_ND, true,
-         static_cast<void *>(kActualSeqKVLen)},                        // actualSeqKVLen
+        {{{t1, n1, d}, {t1, n1, d}}, dtype, ge::FORMAT_ND},                          // query
+        {{{t2, n2, d}, {t2, n2, d}}, dtype, ge::FORMAT_ND},                          // key
+        {{{t2, n2, d2}, {t2, n2, d2}}, dtype, ge::FORMAT_ND},                        // value
+        {{{t1, n1, d2}, {t1, n1, d2}}, dtype, ge::FORMAT_ND},                        // attentionOut
+        {{{t1, n1, d2}, {t1, n1, d2}}, dtype, ge::FORMAT_ND},                        // attentionOutGrad
+        {{{t1, n1, 8}, {t1, n1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},                   // softmaxMax (DT_FLOAT)
+        {{{t1, n1, 8}, {t1, n1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},                   // softmaxSum (DT_FLOAT)
+        {{{t1, n2, blockCount}, {t1, n2, blockCount}}, ge::DT_INT32, ge::FORMAT_ND}, // topkIndices
+        {{{kBatch}, {kBatch}}, ge::DT_INT64, ge::FORMAT_ND, true, static_cast<void*>(kActualSeqQLen)}, // actualSeqQLen
+        {{{kBatch}, {kBatch}},
+         ge::DT_INT64,
+         ge::FORMAT_ND,
+         true,
+         static_cast<void*>(kActualSeqKVLen)}, // actualSeqKVLen
     };
     if (withMask) {
         inputs.push_back({{{kBlockSizeBasic, kBlockSizeBasic}, {kBlockSizeBasic, kBlockSizeBasic}},
-                          ge::DT_BOOL, ge::FORMAT_ND});                // attenMsk
+                          ge::DT_BOOL,
+                          ge::FORMAT_ND}); // attenMsk
     } else {
-        inputs.push_back({{{}, {}}, ge::DT_BOOL, ge::FORMAT_ND});      // attenMsk empty
+        inputs.push_back({{{}, {}}, ge::DT_BOOL, ge::FORMAT_ND}); // attenMsk empty
     }
     return inputs;
 }
 
-std::vector<TensorDesc> MakeBaseOutputs(ge::DataType dtype, int64_t d = kDhead, int64_t d2 = kDhead2,
-                                        int64_t n1 = kN1, int64_t n2 = kN2,
-                                        int64_t t1 = kT1, int64_t t2 = kT2)
+std::vector<TensorDesc> MakeBaseOutputs(ge::DataType dtype, int64_t d = kDhead, int64_t d2 = kDhead2, int64_t n1 = kN1,
+                                        int64_t n2 = kN2, int64_t t1 = kT1, int64_t t2 = kT2)
 {
     return {
         {{{t1, n1, d}, {t1, n1, d}}, dtype, ge::FORMAT_ND},
@@ -104,20 +104,16 @@ std::vector<TensorDesc> MakeBaseOutputs(ge::DataType dtype, int64_t d = kDhead, 
     };
 }
 
-std::vector<OpAttr> MakeAttrs(int64_t blockCount,
-                              int64_t blockSize = kBlockSizeBasic,
-                              int64_t sparseMode = 0,
-                              const std::string &layout = "TND",
-                              int64_t headNum = kN1,
-                              float scaleValue = 0.088388f)
+std::vector<OpAttr> MakeAttrs(int64_t blockCount, int64_t blockSize = kBlockSizeBasic, int64_t sparseMode = 0,
+                              const std::string& layout = "TND", int64_t headNum = kN1, float scaleValue = 0.088388f)
 {
     return {
-        {"scaleValue",         Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+        {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
         {"selectedBlockCount", Ops::Transformer::AnyValue::CreateFrom<int64_t>(blockCount)},
-        {"selectedBlockSize",  Ops::Transformer::AnyValue::CreateFrom<int64_t>(blockSize)},
-        {"headNum",            Ops::Transformer::AnyValue::CreateFrom<int64_t>(headNum)},
-        {"inputLayout",        Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
-        {"sparseMode",         Ops::Transformer::AnyValue::CreateFrom<int64_t>(sparseMode)},
+        {"selectedBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(blockSize)},
+        {"headNum", Ops::Transformer::AnyValue::CreateFrom<int64_t>(headNum)},
+        {"inputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
+        {"sparseMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(sparseMode)},
     };
 }
 } // namespace
@@ -140,11 +136,8 @@ TEST_F(NsaSelectedAttentionGradTiling, A1_basic_fp16_no_mask)
 {
     auto compileInfo = MakeCompileInfo();
     gert::TilingContextPara para(
-        "NsaSelectedAttentionGrad",
-        MakeBaseInputs(ge::DT_FLOAT16, kBlockCountBasic, /*withMask=*/false),
-        MakeBaseOutputs(ge::DT_FLOAT16),
-        MakeAttrs(kBlockCountBasic, kBlockSizeBasic, /*sparseMode=*/0),
-        &compileInfo,
+        "NsaSelectedAttentionGrad", MakeBaseInputs(ge::DT_FLOAT16, kBlockCountBasic, /*withMask=*/false),
+        MakeBaseOutputs(ge::DT_FLOAT16), MakeAttrs(kBlockCountBasic, kBlockSizeBasic, /*sparseMode=*/0), &compileInfo,
         "Ascend910B",
         /*coreNum=*/1,
         /*ubSize=*/196608ULL,
@@ -158,15 +151,9 @@ TEST_F(NsaSelectedAttentionGradTiling, A2_basic_bf16_with_mask)
 {
     auto compileInfo = MakeCompileInfo();
     gert::TilingContextPara para(
-        "NsaSelectedAttentionGrad",
-        MakeBaseInputs(ge::DT_BF16, kBlockCountBasic, /*withMask=*/true),
-        MakeBaseOutputs(ge::DT_BF16),
-        MakeAttrs(kBlockCountBasic, kBlockSizeBasic, /*sparseMode=*/2),
-        &compileInfo,
-        "Ascend910B",
-        1,
-        196608ULL,
-        8192);
+        "NsaSelectedAttentionGrad", MakeBaseInputs(ge::DT_BF16, kBlockCountBasic, /*withMask=*/true),
+        MakeBaseOutputs(ge::DT_BF16), MakeAttrs(kBlockCountBasic, kBlockSizeBasic, /*sparseMode=*/2), &compileInfo,
+        "Ascend910B", 1, 196608ULL, 8192);
 
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kTilingKeyBasicWithMask);
 }
@@ -177,15 +164,9 @@ TEST_F(NsaSelectedAttentionGradTiling, A3_general_fp16_no_mask)
 {
     auto compileInfo = MakeCompileInfo();
     gert::TilingContextPara para(
-        "NsaSelectedAttentionGrad",
-        MakeBaseInputs(ge::DT_FLOAT16, kBlockCountGeneral, /*withMask=*/false),
-        MakeBaseOutputs(ge::DT_FLOAT16),
-        MakeAttrs(kBlockCountGeneral, kBlockSizeBasic, /*sparseMode=*/0),
-        &compileInfo,
-        "Ascend910B",
-        1,
-        196608ULL,
-        8192);
+        "NsaSelectedAttentionGrad", MakeBaseInputs(ge::DT_FLOAT16, kBlockCountGeneral, /*withMask=*/false),
+        MakeBaseOutputs(ge::DT_FLOAT16), MakeAttrs(kBlockCountGeneral, kBlockSizeBasic, /*sparseMode=*/0), &compileInfo,
+        "Ascend910B", 1, 196608ULL, 8192);
 
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kTilingKeyGeneralNoMask);
 }
@@ -195,15 +176,9 @@ TEST_F(NsaSelectedAttentionGradTiling, E1_invalid_sparse_mode)
 {
     auto compileInfo = MakeCompileInfo();
     gert::TilingContextPara para(
-        "NsaSelectedAttentionGrad",
-        MakeBaseInputs(ge::DT_FLOAT16, kBlockCountBasic, /*withMask=*/false),
-        MakeBaseOutputs(ge::DT_FLOAT16),
-        MakeAttrs(kBlockCountBasic, kBlockSizeBasic, /*sparseMode=*/1),
-        &compileInfo,
-        "Ascend910B",
-        1,
-        196608ULL,
-        8192);
+        "NsaSelectedAttentionGrad", MakeBaseInputs(ge::DT_FLOAT16, kBlockCountBasic, /*withMask=*/false),
+        MakeBaseOutputs(ge::DT_FLOAT16), MakeAttrs(kBlockCountBasic, kBlockSizeBasic, /*sparseMode=*/1), &compileInfo,
+        "Ascend910B", 1, 196608ULL, 8192);
 
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
@@ -213,15 +188,9 @@ TEST_F(NsaSelectedAttentionGradTiling, E2_invalid_layout_BSH)
 {
     auto compileInfo = MakeCompileInfo();
     gert::TilingContextPara para(
-        "NsaSelectedAttentionGrad",
-        MakeBaseInputs(ge::DT_FLOAT16, kBlockCountBasic, /*withMask=*/false),
-        MakeBaseOutputs(ge::DT_FLOAT16),
-        MakeAttrs(kBlockCountBasic, kBlockSizeBasic, /*sparseMode=*/0, "BSH"),
-        &compileInfo,
-        "Ascend910B",
-        1,
-        196608ULL,
-        8192);
+        "NsaSelectedAttentionGrad", MakeBaseInputs(ge::DT_FLOAT16, kBlockCountBasic, /*withMask=*/false),
+        MakeBaseOutputs(ge::DT_FLOAT16), MakeAttrs(kBlockCountBasic, kBlockSizeBasic, /*sparseMode=*/0, "BSH"),
+        &compileInfo, "Ascend910B", 1, 196608ULL, 8192);
 
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
@@ -232,32 +201,26 @@ TEST_F(NsaSelectedAttentionGradTiling, E3_qkv_head_dim_mismatch)
 {
     auto compileInfo = MakeCompileInfo();
     std::vector<TensorDesc> inputs = {
-        {{{kT1, kN1, 128}, {kT1, kN1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // query d=128
-        {{{kT2, kN2, kDhead}, {kT2, kN2, kDhead}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // key d=192
-        {{{kT2, kN2, kDhead2}, {kT2, kN2, kDhead2}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // value d2=128
-        {{{kT1, kN1, kDhead2}, {kT1, kN1, kDhead2}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // attentionOut
-        {{{kT1, kN1, kDhead2}, {kT1, kN1, kDhead2}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // attentionOutGrad
-        {{{kT1, kN1, 8}, {kT1, kN1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},            // softmaxMax
-        {{{kT1, kN1, 8}, {kT1, kN1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},            // softmaxSum
-        {{{kT1, kN2, kBlockCountBasic}, {kT1, kN2, kBlockCountBasic}},
-         ge::DT_INT32, ge::FORMAT_ND},                                            // topkIndices
-        {{{kBatch}, {kBatch}}, ge::DT_INT64, ge::FORMAT_ND, true,
-         static_cast<void *>(kActualSeqQLen)},                                    // actualSeqQLen
-        {{{kBatch}, {kBatch}}, ge::DT_INT64, ge::FORMAT_ND, true,
-         static_cast<void *>(kActualSeqKVLen)},                                   // actualSeqKVLen
-        {{{}, {}}, ge::DT_BOOL, ge::FORMAT_ND},                                   // attenMsk empty
+        {{{kT1, kN1, 128}, {kT1, kN1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},                         // query d=128
+        {{{kT2, kN2, kDhead}, {kT2, kN2, kDhead}}, ge::DT_FLOAT16, ge::FORMAT_ND},                   // key d=192
+        {{{kT2, kN2, kDhead2}, {kT2, kN2, kDhead2}}, ge::DT_FLOAT16, ge::FORMAT_ND},                 // value d2=128
+        {{{kT1, kN1, kDhead2}, {kT1, kN1, kDhead2}}, ge::DT_FLOAT16, ge::FORMAT_ND},                 // attentionOut
+        {{{kT1, kN1, kDhead2}, {kT1, kN1, kDhead2}}, ge::DT_FLOAT16, ge::FORMAT_ND},                 // attentionOutGrad
+        {{{kT1, kN1, 8}, {kT1, kN1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},                               // softmaxMax
+        {{{kT1, kN1, 8}, {kT1, kN1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},                               // softmaxSum
+        {{{kT1, kN2, kBlockCountBasic}, {kT1, kN2, kBlockCountBasic}}, ge::DT_INT32, ge::FORMAT_ND}, // topkIndices
+        {{{kBatch}, {kBatch}}, ge::DT_INT64, ge::FORMAT_ND, true, static_cast<void*>(kActualSeqQLen)}, // actualSeqQLen
+        {{{kBatch}, {kBatch}},
+         ge::DT_INT64,
+         ge::FORMAT_ND,
+         true,
+         static_cast<void*>(kActualSeqKVLen)},  // actualSeqKVLen
+        {{{}, {}}, ge::DT_BOOL, ge::FORMAT_ND}, // attenMsk empty
     };
 
-    gert::TilingContextPara para(
-        "NsaSelectedAttentionGrad",
-        inputs,
-        MakeBaseOutputs(ge::DT_FLOAT16),
-        MakeAttrs(kBlockCountBasic, kBlockSizeBasic, /*sparseMode=*/0),
-        &compileInfo,
-        "Ascend910B",
-        1,
-        196608ULL,
-        8192);
+    gert::TilingContextPara para("NsaSelectedAttentionGrad", inputs, MakeBaseOutputs(ge::DT_FLOAT16),
+                                 MakeAttrs(kBlockCountBasic, kBlockSizeBasic, /*sparseMode=*/0), &compileInfo,
+                                 "Ascend910B", 1, 196608ULL, 8192);
 
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
@@ -268,30 +231,22 @@ TEST_F(NsaSelectedAttentionGradTiling, E4_missing_actual_seq_lens)
 {
     auto compileInfo = MakeCompileInfo();
     std::vector<TensorDesc> inputs = {
-        {{{kT1, kN1, kDhead}, {kT1, kN1, kDhead}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // query
-        {{{kT2, kN2, kDhead}, {kT2, kN2, kDhead}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // key
-        {{{kT2, kN2, kDhead2}, {kT2, kN2, kDhead2}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // value
-        {{{kT1, kN1, kDhead2}, {kT1, kN1, kDhead2}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // attentionOut
-        {{{kT1, kN1, kDhead2}, {kT1, kN1, kDhead2}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // attentionOutGrad
-        {{{kT1, kN1, 8}, {kT1, kN1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},               // softmaxMax
-        {{{kT1, kN1, 8}, {kT1, kN1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},               // softmaxSum
-        {{{kT1, kN2, kBlockCountBasic}, {kT1, kN2, kBlockCountBasic}},
-         ge::DT_INT32, ge::FORMAT_ND},                                               // topkIndices
-        {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},                                     // actualSeqQLen empty
-        {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},                                     // actualSeqKVLen empty
-        {{{}, {}}, ge::DT_BOOL, ge::FORMAT_ND},                                      // attenMsk empty
+        {{{kT1, kN1, kDhead}, {kT1, kN1, kDhead}}, ge::DT_FLOAT16, ge::FORMAT_ND},                   // query
+        {{{kT2, kN2, kDhead}, {kT2, kN2, kDhead}}, ge::DT_FLOAT16, ge::FORMAT_ND},                   // key
+        {{{kT2, kN2, kDhead2}, {kT2, kN2, kDhead2}}, ge::DT_FLOAT16, ge::FORMAT_ND},                 // value
+        {{{kT1, kN1, kDhead2}, {kT1, kN1, kDhead2}}, ge::DT_FLOAT16, ge::FORMAT_ND},                 // attentionOut
+        {{{kT1, kN1, kDhead2}, {kT1, kN1, kDhead2}}, ge::DT_FLOAT16, ge::FORMAT_ND},                 // attentionOutGrad
+        {{{kT1, kN1, 8}, {kT1, kN1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},                               // softmaxMax
+        {{{kT1, kN1, 8}, {kT1, kN1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},                               // softmaxSum
+        {{{kT1, kN2, kBlockCountBasic}, {kT1, kN2, kBlockCountBasic}}, ge::DT_INT32, ge::FORMAT_ND}, // topkIndices
+        {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND}, // actualSeqQLen empty
+        {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND}, // actualSeqKVLen empty
+        {{{}, {}}, ge::DT_BOOL, ge::FORMAT_ND},  // attenMsk empty
     };
 
-    gert::TilingContextPara para(
-        "NsaSelectedAttentionGrad",
-        inputs,
-        MakeBaseOutputs(ge::DT_FLOAT16),
-        MakeAttrs(kBlockCountBasic, kBlockSizeBasic, /*sparseMode=*/0),
-        &compileInfo,
-        "Ascend910B",
-        1,
-        196608ULL,
-        8192);
+    gert::TilingContextPara para("NsaSelectedAttentionGrad", inputs, MakeBaseOutputs(ge::DT_FLOAT16),
+                                 MakeAttrs(kBlockCountBasic, kBlockSizeBasic, /*sparseMode=*/0), &compileInfo,
+                                 "Ascend910B", 1, 196608ULL, 8192);
 
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
@@ -302,15 +257,9 @@ TEST_F(NsaSelectedAttentionGradTiling, E5_invalid_block_count_too_large)
 {
     auto compileInfo = MakeCompileInfo();
     gert::TilingContextPara para(
-        "NsaSelectedAttentionGrad",
-        MakeBaseInputs(ge::DT_FLOAT16, /*blockCount=*/200, /*withMask=*/false),
-        MakeBaseOutputs(ge::DT_FLOAT16),
-        MakeAttrs(/*blockCount=*/200, kBlockSizeBasic, /*sparseMode=*/0),
-        &compileInfo,
-        "Ascend910B",
-        1,
-        196608ULL,
-        8192);
+        "NsaSelectedAttentionGrad", MakeBaseInputs(ge::DT_FLOAT16, /*blockCount=*/200, /*withMask=*/false),
+        MakeBaseOutputs(ge::DT_FLOAT16), MakeAttrs(/*blockCount=*/200, kBlockSizeBasic, /*sparseMode=*/0), &compileInfo,
+        "Ascend910B", 1, 196608ULL, 8192);
 
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }

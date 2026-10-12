@@ -36,15 +36,15 @@ using namespace std;
 
 class MlaPrologV3Kernel : public testing::Test {
 protected:
-    static void FreeAllGmMemory(uint8_t *tokenX, uint8_t *weightDq, uint8_t *weightUqQr, uint8_t *weightUk,
-                                uint8_t *weightDkvKr, uint8_t *rmsnormGammaCq, uint8_t *rmsnormGammaCkv,
-                                uint8_t *ropeSin, uint8_t *ropeCos, uint8_t *kvCache, uint8_t *krCache,
-                                uint8_t *cacheIndex, uint8_t *dequantScaleX, uint8_t *dequantScaleWDq,
-                                uint8_t *dequantScaleWUqQr, uint8_t *dequantScaleWDkvKr, uint8_t *quantScaleCkv,
-                                uint8_t *quantScaleCkr, uint8_t *smoothScalesCq, uint8_t *actualSeqLen,
-                                uint8_t *kNopeClipAlpha, uint8_t *queryOut, uint8_t *queryRopeOut,
-                                uint8_t *dequantScaleQNopeOut, uint8_t *queryNormOut, uint8_t *dequantScaleQNormOut,
-                                uint8_t *workspace, uint8_t *tiling)
+    static void FreeAllGmMemory(uint8_t* tokenX, uint8_t* weightDq, uint8_t* weightUqQr, uint8_t* weightUk,
+                                uint8_t* weightDkvKr, uint8_t* rmsnormGammaCq, uint8_t* rmsnormGammaCkv,
+                                uint8_t* ropeSin, uint8_t* ropeCos, uint8_t* kvCache, uint8_t* krCache,
+                                uint8_t* cacheIndex, uint8_t* dequantScaleX, uint8_t* dequantScaleWDq,
+                                uint8_t* dequantScaleWUqQr, uint8_t* dequantScaleWDkvKr, uint8_t* quantScaleCkv,
+                                uint8_t* quantScaleCkr, uint8_t* smoothScalesCq, uint8_t* actualSeqLen,
+                                uint8_t* kNopeClipAlpha, uint8_t* queryOut, uint8_t* queryRopeOut,
+                                uint8_t* dequantScaleQNopeOut, uint8_t* queryNormOut, uint8_t* dequantScaleQNormOut,
+                                uint8_t* workspace, uint8_t* tiling)
     {
         // 逐个释放非空指针，避免空指针访问
         if (tokenX != nullptr)
@@ -102,8 +102,14 @@ protected:
         if (tiling != nullptr)
             AscendC::GmFree(tiling);
     }
-    static void SetUpTestCase() { std::cout << "MlaPrologV3Kernel SetUp\n" << std::endl; }
-    static void TearDownTestCase() { std::cout << "MlaPrologV3Kernel TearDown\n" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "MlaPrologV3Kernel SetUp\n" << std::endl;
+    }
+    static void TearDownTestCase()
+    {
+        std::cout << "MlaPrologV3Kernel TearDown\n" << std::endl;
+    }
 };
 
 // 非量化场景
@@ -127,40 +133,40 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_noQuant)
     uint32_t Hcq = 1536;
 
     // 输入变量
-    uint8_t *tokenX = (uint8_t *)AscendC::GmAlloc(B * S1 * He * sizeof(half));
-    uint8_t *weightDq = (uint8_t *)AscendC::GmAlloc(He * Hcq * sizeof(half));
-    uint8_t *weightUqQr = (uint8_t *)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(half));
-    uint8_t *weightUk = (uint8_t *)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
-    uint8_t *weightDkvKr = (uint8_t *)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
-    uint8_t *rmsnormGammaCq = (uint8_t *)AscendC::GmAlloc(Hcq * sizeof(half));
-    uint8_t *rmsnormGammaCkv = (uint8_t *)AscendC::GmAlloc(Hckv * sizeof(half));
-    uint8_t *ropeSin = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *ropeCos = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *cacheIndex = (uint8_t *)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
-    uint8_t *kvCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(half));
-    uint8_t *krCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(half));
-    uint8_t *dequantScaleX = nullptr;
-    uint8_t *dequantScaleWDq = nullptr;
-    uint8_t *dequantScaleWUqQr = nullptr;
-    uint8_t *dequantScaleWDkvKr = nullptr;
-    uint8_t *quantScaleCkv = nullptr;
-    uint8_t *quantScaleCkr = nullptr;
-    uint8_t *smoothScalesCq = nullptr;
-    uint8_t *actualSeqLen = nullptr;
-    uint8_t *kNopeClipAlpha = nullptr;
-    uint8_t *dequantScaleQNopeOut = nullptr;
+    uint8_t* tokenX = (uint8_t*)AscendC::GmAlloc(B * S1 * He * sizeof(half));
+    uint8_t* weightDq = (uint8_t*)AscendC::GmAlloc(He * Hcq * sizeof(half));
+    uint8_t* weightUqQr = (uint8_t*)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(half));
+    uint8_t* weightUk = (uint8_t*)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
+    uint8_t* weightDkvKr = (uint8_t*)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
+    uint8_t* rmsnormGammaCq = (uint8_t*)AscendC::GmAlloc(Hcq * sizeof(half));
+    uint8_t* rmsnormGammaCkv = (uint8_t*)AscendC::GmAlloc(Hckv * sizeof(half));
+    uint8_t* ropeSin = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* ropeCos = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* cacheIndex = (uint8_t*)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
+    uint8_t* kvCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(half));
+    uint8_t* krCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(half));
+    uint8_t* dequantScaleX = nullptr;
+    uint8_t* dequantScaleWDq = nullptr;
+    uint8_t* dequantScaleWUqQr = nullptr;
+    uint8_t* dequantScaleWDkvKr = nullptr;
+    uint8_t* quantScaleCkv = nullptr;
+    uint8_t* quantScaleCkr = nullptr;
+    uint8_t* smoothScalesCq = nullptr;
+    uint8_t* actualSeqLen = nullptr;
+    uint8_t* kNopeClipAlpha = nullptr;
+    uint8_t* dequantScaleQNopeOut = nullptr;
     // 输出类变量
-    uint8_t *queryOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
-    uint8_t *queryRopeOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
-    uint8_t *queryNormOut = nullptr;
-    uint8_t *dequantScaleQNormOut = nullptr;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16777216);
+    uint8_t* queryOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
+    uint8_t* queryRopeOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
+    uint8_t* queryNormOut = nullptr;
+    uint8_t* dequantScaleQNormOut = nullptr;
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16777216);
     size_t tilingDataSize = sizeof(optiling::MlaPrologBaseParams);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
 
     AscendC::SetKernelMode(KernelMode::MIX_MODE);
     // ===================tiligndata赋值====================
-    optiling::MlaPrologBaseParams *baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams *>(tiling);
+    optiling::MlaPrologBaseParams* baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams*>(tiling);
     baseParams_->batchSize = 1;
     baseParams_->stepBatchSize = 1;
     baseParams_->stepNumHeadDequant = 4;
@@ -254,40 +260,40 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_semiQuantKVNoQuant)
     uint32_t Hcq = 1536;
 
     // 输入变量
-    uint8_t *tokenX = (uint8_t *)AscendC::GmAlloc(B * S1 * He * sizeof(half));
-    uint8_t *weightDq = (uint8_t *)AscendC::GmAlloc(He * Hcq * sizeof(half));
-    uint8_t *weightUqQr = (uint8_t *)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(int8_t));
-    uint8_t *weightUk = (uint8_t *)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
-    uint8_t *weightDkvKr = (uint8_t *)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
-    uint8_t *rmsnormGammaCq = (uint8_t *)AscendC::GmAlloc(Hcq * sizeof(half));
-    uint8_t *rmsnormGammaCkv = (uint8_t *)AscendC::GmAlloc(Hckv * sizeof(half));
-    uint8_t *ropeSin = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *ropeCos = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *cacheIndex = (uint8_t *)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
-    uint8_t *kvCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(half));
-    uint8_t *krCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(half));
-    uint8_t *dequantScaleX = nullptr;
-    uint8_t *dequantScaleWDq = nullptr;
-    uint8_t *dequantScaleWUqQr = (uint8_t *)AscendC::GmAlloc(N * (D + Dr) * sizeof(float));
-    uint8_t *dequantScaleWDkvKr = nullptr;
-    uint8_t *quantScaleCkv = nullptr;
-    uint8_t *quantScaleCkr = nullptr;
-    uint8_t *smoothScalesCq = nullptr;
-    uint8_t *actualSeqLen = nullptr;
-    uint8_t *kNopeClipAlpha = nullptr;
-    uint8_t *dequantScaleQNopeOut = nullptr;
+    uint8_t* tokenX = (uint8_t*)AscendC::GmAlloc(B * S1 * He * sizeof(half));
+    uint8_t* weightDq = (uint8_t*)AscendC::GmAlloc(He * Hcq * sizeof(half));
+    uint8_t* weightUqQr = (uint8_t*)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(int8_t));
+    uint8_t* weightUk = (uint8_t*)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
+    uint8_t* weightDkvKr = (uint8_t*)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
+    uint8_t* rmsnormGammaCq = (uint8_t*)AscendC::GmAlloc(Hcq * sizeof(half));
+    uint8_t* rmsnormGammaCkv = (uint8_t*)AscendC::GmAlloc(Hckv * sizeof(half));
+    uint8_t* ropeSin = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* ropeCos = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* cacheIndex = (uint8_t*)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
+    uint8_t* kvCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(half));
+    uint8_t* krCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(half));
+    uint8_t* dequantScaleX = nullptr;
+    uint8_t* dequantScaleWDq = nullptr;
+    uint8_t* dequantScaleWUqQr = (uint8_t*)AscendC::GmAlloc(N * (D + Dr) * sizeof(float));
+    uint8_t* dequantScaleWDkvKr = nullptr;
+    uint8_t* quantScaleCkv = nullptr;
+    uint8_t* quantScaleCkr = nullptr;
+    uint8_t* smoothScalesCq = nullptr;
+    uint8_t* actualSeqLen = nullptr;
+    uint8_t* kNopeClipAlpha = nullptr;
+    uint8_t* dequantScaleQNopeOut = nullptr;
     // 输出类变量
-    uint8_t *queryOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
-    uint8_t *queryRopeOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
-    uint8_t *queryNormOut = nullptr;
-    uint8_t *dequantScaleQNormOut = nullptr;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16788608);
+    uint8_t* queryOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
+    uint8_t* queryRopeOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
+    uint8_t* queryNormOut = nullptr;
+    uint8_t* dequantScaleQNormOut = nullptr;
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16788608);
     size_t tilingDataSize = sizeof(optiling::MlaPrologBaseParams);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
 
     AscendC::SetKernelMode(KernelMode::MIX_MODE);
     // ===================tiligndata赋值====================
-    optiling::MlaPrologBaseParams *baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams *>(tiling);
+    optiling::MlaPrologBaseParams* baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams*>(tiling);
     baseParams_->batchSize = 1;
     baseParams_->stepBatchSize = 1;
     baseParams_->stepNumHeadDequant = 4;
@@ -395,39 +401,39 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_semiQuantKVQuant)
                              >(PARAM_LIST);
     };
     // 输入变量
-    uint8_t *tokenX = (uint8_t *)AscendC::GmAlloc(B * S1 * He * sizeof(half));
-    uint8_t *weightDq = (uint8_t *)AscendC::GmAlloc(He * Hcq * sizeof(half));
-    uint8_t *weightUqQr = (uint8_t *)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(int8_t));
-    uint8_t *weightUk = (uint8_t *)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
-    uint8_t *weightDkvKr = (uint8_t *)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
-    uint8_t *rmsnormGammaCq = (uint8_t *)AscendC::GmAlloc(Hcq * sizeof(half));
-    uint8_t *rmsnormGammaCkv = (uint8_t *)AscendC::GmAlloc(Hckv * sizeof(half));
-    uint8_t *ropeSin = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *ropeCos = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *cacheIndex = (uint8_t *)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
-    uint8_t *kvCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(int8_t));
-    uint8_t *krCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(int8_t));
-    uint8_t *dequantScaleX = nullptr;
-    uint8_t *dequantScaleWDq = nullptr;
-    uint8_t *dequantScaleWUqQr = (uint8_t *)AscendC::GmAlloc(N * (D + Dr) * sizeof(float));
-    uint8_t *dequantScaleWDkvKr = nullptr;
-    uint8_t *quantScaleCkv = (uint8_t *)AscendC::GmAlloc(Hckv * sizeof(float));
-    uint8_t *quantScaleCkr = (uint8_t *)AscendC::GmAlloc(Dr * sizeof(float));
-    uint8_t *smoothScalesCq = nullptr;
-    uint8_t *actualSeqLen = nullptr;
-    uint8_t *kNopeClipAlpha = nullptr;
-    uint8_t *dequantScaleQNopeOut = nullptr;
+    uint8_t* tokenX = (uint8_t*)AscendC::GmAlloc(B * S1 * He * sizeof(half));
+    uint8_t* weightDq = (uint8_t*)AscendC::GmAlloc(He * Hcq * sizeof(half));
+    uint8_t* weightUqQr = (uint8_t*)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(int8_t));
+    uint8_t* weightUk = (uint8_t*)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
+    uint8_t* weightDkvKr = (uint8_t*)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
+    uint8_t* rmsnormGammaCq = (uint8_t*)AscendC::GmAlloc(Hcq * sizeof(half));
+    uint8_t* rmsnormGammaCkv = (uint8_t*)AscendC::GmAlloc(Hckv * sizeof(half));
+    uint8_t* ropeSin = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* ropeCos = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* cacheIndex = (uint8_t*)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
+    uint8_t* kvCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(int8_t));
+    uint8_t* krCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(int8_t));
+    uint8_t* dequantScaleX = nullptr;
+    uint8_t* dequantScaleWDq = nullptr;
+    uint8_t* dequantScaleWUqQr = (uint8_t*)AscendC::GmAlloc(N * (D + Dr) * sizeof(float));
+    uint8_t* dequantScaleWDkvKr = nullptr;
+    uint8_t* quantScaleCkv = (uint8_t*)AscendC::GmAlloc(Hckv * sizeof(float));
+    uint8_t* quantScaleCkr = (uint8_t*)AscendC::GmAlloc(Dr * sizeof(float));
+    uint8_t* smoothScalesCq = nullptr;
+    uint8_t* actualSeqLen = nullptr;
+    uint8_t* kNopeClipAlpha = nullptr;
+    uint8_t* dequantScaleQNopeOut = nullptr;
     // 输出类变量
-    uint8_t *queryOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
-    uint8_t *queryRopeOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
-    uint8_t *queryNormOut = nullptr;
-    uint8_t *dequantScaleQNormOut = nullptr;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16788608);
+    uint8_t* queryOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
+    uint8_t* queryRopeOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
+    uint8_t* queryNormOut = nullptr;
+    uint8_t* dequantScaleQNormOut = nullptr;
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16788608);
     size_t tilingDataSize = sizeof(optiling::MlaPrologBaseParams);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
 
     // ===================tiligndata赋值====================
-    optiling::MlaPrologBaseParams *baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams *>(tiling);
+    optiling::MlaPrologBaseParams* baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams*>(tiling);
     baseParams_->batchSize = 1;
     baseParams_->stepBatchSize = 1;
     baseParams_->stepNumHeadDequant = 4;
@@ -522,39 +528,39 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_semiQuantKVQuantPerfill)
                              >(PARAM_LIST);
     };
     // 输入变量
-    uint8_t *tokenX = (uint8_t *)AscendC::GmAlloc(B * S1 * He * sizeof(half));
-    uint8_t *weightDq = (uint8_t *)AscendC::GmAlloc(He * Hcq * sizeof(half));
-    uint8_t *weightUqQr = (uint8_t *)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(int8_t));
-    uint8_t *weightUk = (uint8_t *)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
-    uint8_t *weightDkvKr = (uint8_t *)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
-    uint8_t *rmsnormGammaCq = (uint8_t *)AscendC::GmAlloc(Hcq * sizeof(half));
-    uint8_t *rmsnormGammaCkv = (uint8_t *)AscendC::GmAlloc(Hckv * sizeof(half));
-    uint8_t *ropeSin = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *ropeCos = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *cacheIndex = (uint8_t *)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
-    uint8_t *kvCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(int8_t));
-    uint8_t *krCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(int8_t));
-    uint8_t *dequantScaleX = nullptr;
-    uint8_t *dequantScaleWDq = nullptr;
-    uint8_t *dequantScaleWUqQr = (uint8_t *)AscendC::GmAlloc(N * (D + Dr) * sizeof(float));
-    uint8_t *dequantScaleWDkvKr = nullptr;
-    uint8_t *quantScaleCkv = (uint8_t *)AscendC::GmAlloc(Hckv * sizeof(float));
-    uint8_t *quantScaleCkr = (uint8_t *)AscendC::GmAlloc(Dr * sizeof(float));
-    uint8_t *smoothScalesCq = nullptr;
-    uint8_t *actualSeqLen = nullptr;
-    uint8_t *kNopeClipAlpha = nullptr;
-    uint8_t *dequantScaleQNopeOut = nullptr;
+    uint8_t* tokenX = (uint8_t*)AscendC::GmAlloc(B * S1 * He * sizeof(half));
+    uint8_t* weightDq = (uint8_t*)AscendC::GmAlloc(He * Hcq * sizeof(half));
+    uint8_t* weightUqQr = (uint8_t*)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(int8_t));
+    uint8_t* weightUk = (uint8_t*)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
+    uint8_t* weightDkvKr = (uint8_t*)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
+    uint8_t* rmsnormGammaCq = (uint8_t*)AscendC::GmAlloc(Hcq * sizeof(half));
+    uint8_t* rmsnormGammaCkv = (uint8_t*)AscendC::GmAlloc(Hckv * sizeof(half));
+    uint8_t* ropeSin = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* ropeCos = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* cacheIndex = (uint8_t*)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
+    uint8_t* kvCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(int8_t));
+    uint8_t* krCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(int8_t));
+    uint8_t* dequantScaleX = nullptr;
+    uint8_t* dequantScaleWDq = nullptr;
+    uint8_t* dequantScaleWUqQr = (uint8_t*)AscendC::GmAlloc(N * (D + Dr) * sizeof(float));
+    uint8_t* dequantScaleWDkvKr = nullptr;
+    uint8_t* quantScaleCkv = (uint8_t*)AscendC::GmAlloc(Hckv * sizeof(float));
+    uint8_t* quantScaleCkr = (uint8_t*)AscendC::GmAlloc(Dr * sizeof(float));
+    uint8_t* smoothScalesCq = nullptr;
+    uint8_t* actualSeqLen = nullptr;
+    uint8_t* kNopeClipAlpha = nullptr;
+    uint8_t* dequantScaleQNopeOut = nullptr;
     // 输出类变量
-    uint8_t *queryOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
-    uint8_t *queryRopeOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
-    uint8_t *queryNormOut = nullptr;
-    uint8_t *dequantScaleQNormOut = nullptr;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16788608);
+    uint8_t* queryOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
+    uint8_t* queryRopeOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
+    uint8_t* queryNormOut = nullptr;
+    uint8_t* dequantScaleQNormOut = nullptr;
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16788608);
     size_t tilingDataSize = sizeof(optiling::MlaPrologBaseParams);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
 
     // ===================tiligndata赋值====================
-    optiling::MlaPrologBaseParams *baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams *>(tiling);
+    optiling::MlaPrologBaseParams* baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams*>(tiling);
     baseParams_->batchSize = 1;
     baseParams_->stepBatchSize = 1;
     baseParams_->stepNumHeadDequant = 4;
@@ -649,39 +655,39 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_QuantKVNoQuant)
                              >(PARAM_LIST);
     };
     // 输入变量
-    uint8_t *tokenX = (uint8_t *)AscendC::GmAlloc(B * S1 * He * sizeof(half));
-    uint8_t *weightDq = (uint8_t *)AscendC::GmAlloc(He * Hcq * sizeof(half));
-    uint8_t *weightUqQr = (uint8_t *)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(int8_t));
-    uint8_t *weightUk = (uint8_t *)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
-    uint8_t *weightDkvKr = (uint8_t *)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
-    uint8_t *rmsnormGammaCq = (uint8_t *)AscendC::GmAlloc(Hcq * sizeof(half));
-    uint8_t *rmsnormGammaCkv = (uint8_t *)AscendC::GmAlloc(Hckv * sizeof(half));
-    uint8_t *ropeSin = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *ropeCos = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *cacheIndex = (uint8_t *)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
-    uint8_t *kvCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(int8_t));
-    uint8_t *krCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(int8_t));
-    uint8_t *dequantScaleX = nullptr;
-    uint8_t *dequantScaleWDq = nullptr;
-    uint8_t *dequantScaleWUqQr = (uint8_t *)AscendC::GmAlloc(N * (D + Dr) * sizeof(float));
-    uint8_t *dequantScaleWDkvKr = nullptr;
-    uint8_t *quantScaleCkv = (uint8_t *)AscendC::GmAlloc(Hckv * sizeof(float));
-    uint8_t *quantScaleCkr = (uint8_t *)AscendC::GmAlloc(Dr * sizeof(float));
-    uint8_t *smoothScalesCq = nullptr;
-    uint8_t *actualSeqLen = nullptr;
-    uint8_t *kNopeClipAlpha = nullptr;
-    uint8_t *dequantScaleQNopeOut = nullptr;
+    uint8_t* tokenX = (uint8_t*)AscendC::GmAlloc(B * S1 * He * sizeof(half));
+    uint8_t* weightDq = (uint8_t*)AscendC::GmAlloc(He * Hcq * sizeof(half));
+    uint8_t* weightUqQr = (uint8_t*)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(int8_t));
+    uint8_t* weightUk = (uint8_t*)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
+    uint8_t* weightDkvKr = (uint8_t*)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
+    uint8_t* rmsnormGammaCq = (uint8_t*)AscendC::GmAlloc(Hcq * sizeof(half));
+    uint8_t* rmsnormGammaCkv = (uint8_t*)AscendC::GmAlloc(Hckv * sizeof(half));
+    uint8_t* ropeSin = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* ropeCos = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* cacheIndex = (uint8_t*)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
+    uint8_t* kvCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(int8_t));
+    uint8_t* krCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(int8_t));
+    uint8_t* dequantScaleX = nullptr;
+    uint8_t* dequantScaleWDq = nullptr;
+    uint8_t* dequantScaleWUqQr = (uint8_t*)AscendC::GmAlloc(N * (D + Dr) * sizeof(float));
+    uint8_t* dequantScaleWDkvKr = nullptr;
+    uint8_t* quantScaleCkv = (uint8_t*)AscendC::GmAlloc(Hckv * sizeof(float));
+    uint8_t* quantScaleCkr = (uint8_t*)AscendC::GmAlloc(Dr * sizeof(float));
+    uint8_t* smoothScalesCq = nullptr;
+    uint8_t* actualSeqLen = nullptr;
+    uint8_t* kNopeClipAlpha = nullptr;
+    uint8_t* dequantScaleQNopeOut = nullptr;
     // 输出类变量
-    uint8_t *queryOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
-    uint8_t *queryRopeOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
-    uint8_t *queryNormOut = nullptr;
-    uint8_t *dequantScaleQNormOut = nullptr;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16788608);
+    uint8_t* queryOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
+    uint8_t* queryRopeOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
+    uint8_t* queryNormOut = nullptr;
+    uint8_t* dequantScaleQNormOut = nullptr;
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16788608);
     size_t tilingDataSize = sizeof(optiling::MlaPrologBaseParams);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
 
     // ===================tiligndata赋值====================
-    optiling::MlaPrologBaseParams *baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams *>(tiling);
+    optiling::MlaPrologBaseParams* baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams*>(tiling);
     baseParams_->batchSize = 1;
     baseParams_->stepBatchSize = 1;
     baseParams_->stepNumHeadDequant = 4;
@@ -776,39 +782,39 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_QuantKVQuant)
                              >(PARAM_LIST);
     };
     // 输入变量
-    uint8_t *tokenX = (uint8_t *)AscendC::GmAlloc(B * S1 * He * sizeof(half));
-    uint8_t *weightDq = (uint8_t *)AscendC::GmAlloc(He * Hcq * sizeof(half));
-    uint8_t *weightUqQr = (uint8_t *)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(int8_t));
-    uint8_t *weightUk = (uint8_t *)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
-    uint8_t *weightDkvKr = (uint8_t *)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
-    uint8_t *rmsnormGammaCq = (uint8_t *)AscendC::GmAlloc(Hcq * sizeof(half));
-    uint8_t *rmsnormGammaCkv = (uint8_t *)AscendC::GmAlloc(Hckv * sizeof(half));
-    uint8_t *ropeSin = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *ropeCos = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *cacheIndex = (uint8_t *)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
-    uint8_t *kvCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(int8_t));
-    uint8_t *krCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(half));
-    uint8_t *dequantScaleX = nullptr;
-    uint8_t *dequantScaleWDq = nullptr;
-    uint8_t *dequantScaleWUqQr = (uint8_t *)AscendC::GmAlloc(N * (D + Dr) * sizeof(float));
-    uint8_t *dequantScaleWDkvKr = nullptr;
-    uint8_t *quantScaleCkv = (uint8_t *)AscendC::GmAlloc(Hckv * sizeof(float));
-    uint8_t *quantScaleCkr = (uint8_t *)AscendC::GmAlloc(Dr * sizeof(float));
-    uint8_t *smoothScalesCq = nullptr;
-    uint8_t *actualSeqLen = nullptr;
-    uint8_t *kNopeClipAlpha = nullptr;
-    uint8_t *dequantScaleQNopeOut = nullptr;
+    uint8_t* tokenX = (uint8_t*)AscendC::GmAlloc(B * S1 * He * sizeof(half));
+    uint8_t* weightDq = (uint8_t*)AscendC::GmAlloc(He * Hcq * sizeof(half));
+    uint8_t* weightUqQr = (uint8_t*)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(int8_t));
+    uint8_t* weightUk = (uint8_t*)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
+    uint8_t* weightDkvKr = (uint8_t*)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
+    uint8_t* rmsnormGammaCq = (uint8_t*)AscendC::GmAlloc(Hcq * sizeof(half));
+    uint8_t* rmsnormGammaCkv = (uint8_t*)AscendC::GmAlloc(Hckv * sizeof(half));
+    uint8_t* ropeSin = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* ropeCos = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* cacheIndex = (uint8_t*)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
+    uint8_t* kvCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(int8_t));
+    uint8_t* krCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(half));
+    uint8_t* dequantScaleX = nullptr;
+    uint8_t* dequantScaleWDq = nullptr;
+    uint8_t* dequantScaleWUqQr = (uint8_t*)AscendC::GmAlloc(N * (D + Dr) * sizeof(float));
+    uint8_t* dequantScaleWDkvKr = nullptr;
+    uint8_t* quantScaleCkv = (uint8_t*)AscendC::GmAlloc(Hckv * sizeof(float));
+    uint8_t* quantScaleCkr = (uint8_t*)AscendC::GmAlloc(Dr * sizeof(float));
+    uint8_t* smoothScalesCq = nullptr;
+    uint8_t* actualSeqLen = nullptr;
+    uint8_t* kNopeClipAlpha = nullptr;
+    uint8_t* dequantScaleQNopeOut = nullptr;
     // 输出类变量
-    uint8_t *queryOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
-    uint8_t *queryRopeOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
-    uint8_t *queryNormOut = nullptr;
-    uint8_t *dequantScaleQNormOut = nullptr;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16788608);
+    uint8_t* queryOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
+    uint8_t* queryRopeOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
+    uint8_t* queryNormOut = nullptr;
+    uint8_t* dequantScaleQNormOut = nullptr;
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16788608);
     size_t tilingDataSize = sizeof(optiling::MlaPrologBaseParams);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
 
     // ===================tiligndata赋值====================
-    optiling::MlaPrologBaseParams *baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams *>(tiling);
+    optiling::MlaPrologBaseParams* baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams*>(tiling);
     baseParams_->batchSize = 1;
     baseParams_->stepBatchSize = 1;
     baseParams_->stepNumHeadDequant = 4;
@@ -903,39 +909,39 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_QuantKVQuantPerfill)
                              >(PARAM_LIST);
     };
     // 输入变量
-    uint8_t *tokenX = (uint8_t *)AscendC::GmAlloc(B * S1 * He * sizeof(half));
-    uint8_t *weightDq = (uint8_t *)AscendC::GmAlloc(He * Hcq * sizeof(half));
-    uint8_t *weightUqQr = (uint8_t *)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(int8_t));
-    uint8_t *weightUk = (uint8_t *)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
-    uint8_t *weightDkvKr = (uint8_t *)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
-    uint8_t *rmsnormGammaCq = (uint8_t *)AscendC::GmAlloc(Hcq * sizeof(half));
-    uint8_t *rmsnormGammaCkv = (uint8_t *)AscendC::GmAlloc(Hckv * sizeof(half));
-    uint8_t *ropeSin = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *ropeCos = (uint8_t *)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
-    uint8_t *cacheIndex = (uint8_t *)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
-    uint8_t *kvCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(int8_t));
-    uint8_t *krCache = (uint8_t *)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(half));
-    uint8_t *dequantScaleX = nullptr;
-    uint8_t *dequantScaleWDq = nullptr;
-    uint8_t *dequantScaleWUqQr = (uint8_t *)AscendC::GmAlloc(N * (D + Dr) * sizeof(float));
-    uint8_t *dequantScaleWDkvKr = nullptr;
-    uint8_t *quantScaleCkv = (uint8_t *)AscendC::GmAlloc(Hckv * sizeof(float));
-    uint8_t *quantScaleCkr = (uint8_t *)AscendC::GmAlloc(Dr * sizeof(float));
-    uint8_t *smoothScalesCq = nullptr;
-    uint8_t *actualSeqLen = nullptr;
-    uint8_t *kNopeClipAlpha = nullptr;
-    uint8_t *dequantScaleQNopeOut = nullptr;
+    uint8_t* tokenX = (uint8_t*)AscendC::GmAlloc(B * S1 * He * sizeof(half));
+    uint8_t* weightDq = (uint8_t*)AscendC::GmAlloc(He * Hcq * sizeof(half));
+    uint8_t* weightUqQr = (uint8_t*)AscendC::GmAlloc(Hcq * N * (D + Dr) * sizeof(int8_t));
+    uint8_t* weightUk = (uint8_t*)AscendC::GmAlloc(N * D * Hckv * sizeof(half));
+    uint8_t* weightDkvKr = (uint8_t*)AscendC::GmAlloc(He * (Hckv + Dr) * sizeof(half));
+    uint8_t* rmsnormGammaCq = (uint8_t*)AscendC::GmAlloc(Hcq * sizeof(half));
+    uint8_t* rmsnormGammaCkv = (uint8_t*)AscendC::GmAlloc(Hckv * sizeof(half));
+    uint8_t* ropeSin = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* ropeCos = (uint8_t*)AscendC::GmAlloc(B * S1 * Dr * sizeof(half));
+    uint8_t* cacheIndex = (uint8_t*)AscendC::GmAlloc(B * S1 * sizeof(int64_t));
+    uint8_t* kvCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Hckv * sizeof(int8_t));
+    uint8_t* krCache = (uint8_t*)AscendC::GmAlloc(Block_Number * Block_Size * Nkv * Dr * sizeof(half));
+    uint8_t* dequantScaleX = nullptr;
+    uint8_t* dequantScaleWDq = nullptr;
+    uint8_t* dequantScaleWUqQr = (uint8_t*)AscendC::GmAlloc(N * (D + Dr) * sizeof(float));
+    uint8_t* dequantScaleWDkvKr = nullptr;
+    uint8_t* quantScaleCkv = (uint8_t*)AscendC::GmAlloc(Hckv * sizeof(float));
+    uint8_t* quantScaleCkr = (uint8_t*)AscendC::GmAlloc(Dr * sizeof(float));
+    uint8_t* smoothScalesCq = nullptr;
+    uint8_t* actualSeqLen = nullptr;
+    uint8_t* kNopeClipAlpha = nullptr;
+    uint8_t* dequantScaleQNopeOut = nullptr;
     // 输出类变量
-    uint8_t *queryOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
-    uint8_t *queryRopeOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
-    uint8_t *queryNormOut = nullptr;
-    uint8_t *dequantScaleQNormOut = nullptr;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16788608);
+    uint8_t* queryOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
+    uint8_t* queryRopeOut = (uint8_t*)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
+    uint8_t* queryNormOut = nullptr;
+    uint8_t* dequantScaleQNormOut = nullptr;
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16788608);
     size_t tilingDataSize = sizeof(optiling::MlaPrologBaseParams);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
 
     // ===================tiligndata赋值====================
-    optiling::MlaPrologBaseParams *baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams *>(tiling);
+    optiling::MlaPrologBaseParams* baseParams_ = reinterpret_cast<optiling::MlaPrologBaseParams*>(tiling);
     baseParams_->batchSize = 1;
     baseParams_->stepBatchSize = 1;
     baseParams_->stepNumHeadDequant = 4;

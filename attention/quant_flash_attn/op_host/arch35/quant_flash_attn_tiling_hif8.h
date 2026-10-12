@@ -28,12 +28,12 @@ namespace quant_flash_attn {
 
 class QuantFlashAttnTilingHif8Impl : public FiaTilingBase {
 public:
-    explicit QuantFlashAttnTilingHif8Impl(gert::TilingContext *context)
+    explicit QuantFlashAttnTilingHif8Impl(gert::TilingContext* context)
         : FiaTilingBase(context)
     {}
     ~QuantFlashAttnTilingHif8Impl() override = default;
 
-    void InitTilingInfo(TilingInfo *tilingInfo) override;
+    void InitTilingInfo(TilingInfo* tilingInfo) override;
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
 
@@ -54,7 +54,7 @@ private:
     void CalcScheduleMode();
     void CalcNumBlocks(uint32_t aicNum);
     void FillTiling();
-    ge::graphStatus SetTilingData(QuantFlashAttnTilingData &tilingData);
+    ge::graphStatus SetTilingData(QuantFlashAttnTilingData& tilingData);
     bool CheckNeedInitOutput() const;
 
     QuantFlashAttnTilingData tilingData_;
@@ -71,7 +71,7 @@ private:
     ScheduleMode scheduleMode_ = ScheduleMode::BATCH_MODE;
     uint32_t numBlocks_ = 0;
 
-    QfaTilingInfo *qfaInfo_ = nullptr;
+    QfaTilingInfo* qfaInfo_ = nullptr;
 };
 
 } // namespace quant_flash_attn

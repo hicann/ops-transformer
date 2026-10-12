@@ -66,8 +66,8 @@ struct ScopeGuard {
           m_isDismissed(false)
     {}
     // 禁止拷贝
-    ScopeGuard(const ScopeGuard &) = delete;
-    ScopeGuard &operator=(const ScopeGuard &) = delete;
+    ScopeGuard(const ScopeGuard&) = delete;
+    ScopeGuard& operator=(const ScopeGuard&) = delete;
 
     ~ScopeGuard()
     {
@@ -86,9 +86,9 @@ struct ScopeGuard {
 };
 
 struct Tensor {
-    void *hostAddr{nullptr};
-    void *deviceAddr{nullptr};
-    aclTensor *data{nullptr};
+    void* hostAddr{nullptr};
+    void* deviceAddr{nullptr};
+    aclTensor* data{nullptr};
 };
 
 struct ArgScenario {
@@ -112,15 +112,15 @@ struct ArgContext {
     int64_t batchSize{0};
     int64_t maxSeqlenQ{0};
     int64_t maxSeqlenK{0};
-    char *layoutQOptional{nullptr};
-    char *layoutKOptional{nullptr};
+    char* layoutQOptional{nullptr};
+    char* layoutKOptional{nullptr};
     int64_t maskMode{0};
     int64_t cmpRatio{0};
     // output
     Tensor metadata{};
 };
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -129,7 +129,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-aclnnStatus Init(int32_t deviceId, aclrtStream *stream)
+aclnnStatus Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，初始化
     auto ret = aclInit(nullptr);
@@ -148,7 +148,7 @@ void Finalize(int32_t deviceId, aclrtStream stream)
     aclFinalize();
 }
 
-aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape, Tensor &tensor)
+aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t>& shape, Tensor& tensor)
 {
     auto size = GetShapeSize(shape) * aclDataTypeSize(dataType);
     // 调用aclrtMallocHost申请host侧内存
@@ -168,7 +168,7 @@ aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape
     return ACL_SUCCESS;
 }
 
-void DestroyTensor(Tensor &tensor)
+void DestroyTensor(Tensor& tensor)
 {
     if (tensor.data != nullptr) {
         aclDestroyTensor(tensor.data);
@@ -184,7 +184,7 @@ void DestroyTensor(Tensor &tensor)
     }
 }
 
-void DestroyArgs(ArgContext &context)
+void DestroyArgs(ArgContext& context)
 {
     DestroyTensor(context.metadata);
     DestroyTensor(context.cuSeqlensQOptional);
@@ -203,7 +203,7 @@ void DestroyArgs(ArgContext &context)
     }
 }
 
-aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
+aclnnStatus CreateArgs(const ArgScenario& scenario, ArgContext& context)
 {
     ScopeGuard argsGuard([&] { DestroyArgs(context); });
     aclnnStatus ret;
@@ -219,8 +219,8 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
 
     context.maskMode = 0; // 0: no mask, 3: causal
     context.cmpRatio = 1; // [1, 128], 1: no compress
-    context.layoutQOptional = (char *)malloc(sizeof(char) * 16);
-    context.layoutKOptional = (char *)malloc(sizeof(char) * 16);
+    context.layoutQOptional = (char*)malloc(sizeof(char) * 16);
+    context.layoutKOptional = (char*)malloc(sizeof(char) * 16);
     strcpy(context.layoutQOptional, "BSND"); // BSND,TND
     strcpy(context.layoutKOptional, "BSND"); // BSND,TND,PA_BBND
 
@@ -274,8 +274,8 @@ int main()
     // 3. 调用CANN算子库API，需要修改为具体的API
     // 调用aclnnLightningIndexerV2Metadata第一段接口
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
     ret = aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize(
         context.cuSeqlensQOptional.data, context.cuSeqlensKOptional.data, context.sequsedQOptional.data,
         context.sequsedKOptional.data, context.cmpResidualKOptional.data, context.numHeadsQ, context.numHeadsK,

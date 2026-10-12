@@ -26,4 +26,3 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
 else()
     add_modules_sources(OPTYPE nsa_compress_attention_infer ACLNNTYPE aclnn_exclude)
 endif()
-

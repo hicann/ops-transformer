@@ -32,7 +32,7 @@ inline optiling::NsaCompileInfo MakeCompileInfo()
     info.ubSize = kUbSize;
     return info;
 }
-}  // namespace
+} // namespace
 
 class NsaCompressGradTiling : public testing::Test {
 protected:
@@ -52,31 +52,25 @@ TEST_F(NsaCompressGradTiling, NsaCompressGrad_910b_tiling_A1_fp16)
 {
     int64_t actSeqLen[] = {0, 120, 140, 272};
     auto compileInfo = MakeCompileInfo();
-    gert::TilingContextPara para(
-        "NsaCompressGrad",
-        {
-            {{{13, 128, 192}, {13, 128, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{272, 128, 192}, {272, 128, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{32, 128}, {32, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{4}, {4}}, ge::DT_INT64, ge::FORMAT_ND, true, actSeqLen},
-        },
-        {
-            {{{272, 128, 192}, {272, 128, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{32, 128}, {32, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        },
-        {
-            {"compressBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(32)},
-            {"compressStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-            {"actSeqLenType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"layoutOptional", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-        },
-        kInputIrInstanceWithActSeq,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+    gert::TilingContextPara para("NsaCompressGrad",
+                                 {
+                                     {{{13, 128, 192}, {13, 128, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{272, 128, 192}, {272, 128, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{32, 128}, {32, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{4}, {4}}, ge::DT_INT64, ge::FORMAT_ND, true, actSeqLen},
+                                 },
+                                 {
+                                     {{{272, 128, 192}, {272, 128, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{32, 128}, {32, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {"compressBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(32)},
+                                     {"compressStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                     {"actSeqLenType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                     {"layoutOptional", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+                                 },
+                                 kInputIrInstanceWithActSeq, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum,
+                                 kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kTilingKey);
 }
 
@@ -85,31 +79,25 @@ TEST_F(NsaCompressGradTiling, NsaCompressGrad_910b_tiling_A2_bf16)
 {
     int64_t actSeqLen[] = {0, 120, 140, 272};
     auto compileInfo = MakeCompileInfo();
-    gert::TilingContextPara para(
-        "NsaCompressGrad",
-        {
-            {{{13, 128, 192}, {13, 128, 192}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{272, 128, 192}, {272, 128, 192}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{32, 128}, {32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{4}, {4}}, ge::DT_INT64, ge::FORMAT_ND, true, actSeqLen},
-        },
-        {
-            {{{272, 128, 192}, {272, 128, 192}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{32, 128}, {32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
-        },
-        {
-            {"compressBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(32)},
-            {"compressStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-            {"actSeqLenType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"layoutOptional", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-        },
-        kInputIrInstanceWithActSeq,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+    gert::TilingContextPara para("NsaCompressGrad",
+                                 {
+                                     {{{13, 128, 192}, {13, 128, 192}}, ge::DT_BF16, ge::FORMAT_ND},
+                                     {{{272, 128, 192}, {272, 128, 192}}, ge::DT_BF16, ge::FORMAT_ND},
+                                     {{{32, 128}, {32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+                                     {{{4}, {4}}, ge::DT_INT64, ge::FORMAT_ND, true, actSeqLen},
+                                 },
+                                 {
+                                     {{{272, 128, 192}, {272, 128, 192}}, ge::DT_BF16, ge::FORMAT_ND},
+                                     {{{32, 128}, {32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {"compressBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(32)},
+                                     {"compressStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                     {"actSeqLenType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                     {"layoutOptional", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+                                 },
+                                 kInputIrInstanceWithActSeq, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum,
+                                 kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kTilingKey);
 }
 
@@ -117,30 +105,24 @@ TEST_F(NsaCompressGradTiling, NsaCompressGrad_910b_tiling_A2_bf16)
 TEST_F(NsaCompressGradTiling, NsaCompressGrad_910b_tiling_A3_no_act_seq_len)
 {
     auto compileInfo = MakeCompileInfo();
-    gert::TilingContextPara para(
-        "NsaCompressGrad",
-        {
-            {{{4, 8, 32}, {4, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{64, 8, 32}, {64, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{16, 8}, {16, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        },
-        {
-            {{{64, 8, 32}, {64, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{16, 8}, {16, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        },
-        {
-            {"compressBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-            {"compressStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-            {"actSeqLenType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"layoutOptional", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-        },
-        kInputIrInstanceNoActSeq,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+    gert::TilingContextPara para("NsaCompressGrad",
+                                 {
+                                     {{{4, 8, 32}, {4, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{64, 8, 32}, {64, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{16, 8}, {16, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {{{64, 8, 32}, {64, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{16, 8}, {16, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {"compressBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                     {"compressStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                     {"actSeqLenType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                     {"layoutOptional", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+                                 },
+                                 kInputIrInstanceNoActSeq, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum,
+                                 kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kTilingKey);
 }
 
@@ -149,31 +131,25 @@ TEST_F(NsaCompressGradTiling, NsaCompressGrad_910b_tiling_E1_head_dim_misaligned
 {
     int64_t actSeqLen[] = {0, 64};
     auto compileInfo = MakeCompileInfo();
-    gert::TilingContextPara para(
-        "NsaCompressGrad",
-        {
-            {{{4, 8, 17}, {4, 8, 17}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{64, 8, 17}, {64, 8, 17}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{16, 8}, {16, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, actSeqLen},
-        },
-        {
-            {{{64, 8, 17}, {64, 8, 17}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{16, 8}, {16, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        },
-        {
-            {"compressBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-            {"compressStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-            {"actSeqLenType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"layoutOptional", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-        },
-        kInputIrInstanceWithActSeq,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+    gert::TilingContextPara para("NsaCompressGrad",
+                                 {
+                                     {{{4, 8, 17}, {4, 8, 17}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{64, 8, 17}, {64, 8, 17}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{16, 8}, {16, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, actSeqLen},
+                                 },
+                                 {
+                                     {{{64, 8, 17}, {64, 8, 17}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{16, 8}, {16, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {"compressBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                     {"compressStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                     {"actSeqLenType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                     {"layoutOptional", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+                                 },
+                                 kInputIrInstanceWithActSeq, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum,
+                                 kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
 
@@ -181,30 +157,24 @@ TEST_F(NsaCompressGradTiling, NsaCompressGrad_910b_tiling_E1_head_dim_misaligned
 TEST_F(NsaCompressGradTiling, NsaCompressGrad_910b_tiling_E2_block_size_misaligned)
 {
     auto compileInfo = MakeCompileInfo();
-    gert::TilingContextPara para(
-        "NsaCompressGrad",
-        {
-            {{{4, 8, 32}, {4, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{64, 8, 32}, {64, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{7, 8}, {7, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        },
-        {
-            {{{64, 8, 32}, {64, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{7, 8}, {7, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        },
-        {
-            {"compressBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(7)},
-            {"compressStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-            {"actSeqLenType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"layoutOptional", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-        },
-        kInputIrInstanceNoActSeq,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+    gert::TilingContextPara para("NsaCompressGrad",
+                                 {
+                                     {{{4, 8, 32}, {4, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{64, 8, 32}, {64, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{7, 8}, {7, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {{{64, 8, 32}, {64, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{7, 8}, {7, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {"compressBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(7)},
+                                     {"compressStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                     {"actSeqLenType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                     {"layoutOptional", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+                                 },
+                                 kInputIrInstanceNoActSeq, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum,
+                                 kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
 
@@ -212,29 +182,23 @@ TEST_F(NsaCompressGradTiling, NsaCompressGrad_910b_tiling_E2_block_size_misalign
 TEST_F(NsaCompressGradTiling, NsaCompressGrad_910b_tiling_E3_stride_misaligned)
 {
     auto compileInfo = MakeCompileInfo();
-    gert::TilingContextPara para(
-        "NsaCompressGrad",
-        {
-            {{{4, 8, 32}, {4, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{64, 8, 32}, {64, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{16, 8}, {16, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        },
-        {
-            {{{64, 8, 32}, {64, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{16, 8}, {16, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        },
-        {
-            {"compressBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-            {"compressStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(15)},
-            {"actSeqLenType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"layoutOptional", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-        },
-        kInputIrInstanceNoActSeq,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+    gert::TilingContextPara para("NsaCompressGrad",
+                                 {
+                                     {{{4, 8, 32}, {4, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{64, 8, 32}, {64, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{16, 8}, {16, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {{{64, 8, 32}, {64, 8, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{16, 8}, {16, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {"compressBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                     {"compressStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(15)},
+                                     {"actSeqLenType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                     {"layoutOptional", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+                                 },
+                                 kInputIrInstanceNoActSeq, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum,
+                                 kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }

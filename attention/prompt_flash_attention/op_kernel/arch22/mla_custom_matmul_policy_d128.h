@@ -28,7 +28,7 @@
 namespace AscendC {
 namespace Impl {
 namespace Detail {
-template <typename IMPL, class INPUT_TYPE, const auto &MM_CFG>
+template <typename IMPL, class INPUT_TYPE, const auto& MM_CFG>
 class MlaCopyCubeInMM2HeadDim128 {
     MATMUL_USE_MODULE(Context);
     MATMUL_USE_MODULE_ON(MatmulTensorInfo, INPUT_TYPE::TAG);
@@ -47,8 +47,8 @@ public:
     inline __aicore__ ~MlaCopyCubeInMM2HeadDim128() = default;
 
     __aicore__ inline void Init() {}
-    __aicore__ inline void SetInput(const LocalTensor<SrcT> &localMatrix, bool isTranspose) {}
-    __aicore__ inline void SetInput(const GlobalTensor<SrcT> &globalMatrix, bool isTranspose)
+    __aicore__ inline void SetInput(const LocalTensor<SrcT>& localMatrix, bool isTranspose) {}
+    __aicore__ inline void SetInput(const GlobalTensor<SrcT>& globalMatrix, bool isTranspose)
     {
         MATMUL_MODULE(MatmulTensorInfo)->template SetGlobalTensor<false>(globalMatrix, isTranspose);
         srcGlobalAddr_ = globalMatrix.address_;
@@ -181,7 +181,7 @@ public:
         return CurrentTensor;
     }
 
-    __aicore__ inline void ClearLoadData(const LocalTensor<TransT> &tensor = LocalTensor<TransT>{}, int32_t curRow = 0,
+    __aicore__ inline void ClearLoadData(const LocalTensor<TransT>& tensor = LocalTensor<TransT>{}, int32_t curRow = 0,
                                          int32_t curCol = 0)
     {
         MATMUL_MODULE(CubeInBuffer)->FreeTensor();
@@ -194,7 +194,7 @@ public:
 
 private:
     int32_t baseBlockSize{0};
-    __gm__ SrcT *srcGlobalAddr_{nullptr};
+    __gm__ SrcT* srcGlobalAddr_{nullptr};
     int64_t singleHeight_{0};
     int64_t singleWidth_{0};
     int64_t orgWidth_{0};
@@ -203,7 +203,7 @@ private:
     int64_t cacheBaseBlockNum = 0;
 };
 
-template <typename IMPL, class INPUT_TYPE, const auto &MM_CFG>
+template <typename IMPL, class INPUT_TYPE, const auto& MM_CFG>
 class FaCubeInBufferMM2HeadDim128 {
     MATMUL_USE_MODULE(Context);
 
@@ -254,7 +254,7 @@ public:
         }
     }
 
-    __aicore__ inline void FreeTensor(int32_t bufferPos = -1, const LocalTensor<SrcT> &tensor = LocalTensor<SrcT>{})
+    __aicore__ inline void FreeTensor(int32_t bufferPos = -1, const LocalTensor<SrcT>& tensor = LocalTensor<SrcT>{})
     {
         if constexpr (INPUT_TYPE::TAG == InputTypeTag::A) {
             if (MATMUL_MODULE(Context)->needFreeA) {
@@ -269,7 +269,7 @@ public:
         }
     }
 
-    __aicore__ inline void EnQue(LocalTensor<SrcT> &tensor) {}
+    __aicore__ inline void EnQue(LocalTensor<SrcT>& tensor) {}
     __aicore__ inline void DeQue() {}
     __aicore__ inline void Reset() {}
 
@@ -277,7 +277,7 @@ private:
     int32_t baseBlockSize_{0};
 };
 
-template <const auto &MM_CFG, typename IMPL, typename A_TYPE, typename B_TYPE, typename C_TYPE, typename BIAS_TYPE>
+template <const auto& MM_CFG, typename IMPL, typename A_TYPE, typename B_TYPE, typename C_TYPE, typename BIAS_TYPE>
 class MlaMatmulPolicyMM2HeadDim128 : public MatmulPolicy<MM_CFG, IMPL, A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE> {
 public:
     using Context = MlaContext<IMPL, MatmulInputAType<A_TYPE, typename A_TYPE::T>, MM_CFG>;

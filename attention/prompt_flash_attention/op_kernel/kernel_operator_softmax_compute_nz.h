@@ -28,9 +28,9 @@
 #pragma begin_pipe(V)
 namespace AscendC {
 constexpr bool SOFTMAX_EXP_FAST = true;
-__aicore__ inline void ReduceMaxLastNZImplPFA(const LocalTensor<half> &dst, const LocalTensor<half> &src,
-                                              const LocalTensor<half> &tmpBuffer, uint64_t mask[2],
-                                              const ReduceLastND &reduceParam)
+__aicore__ inline void ReduceMaxLastNZImplPFA(const LocalTensor<half>& dst, const LocalTensor<half>& src,
+                                              const LocalTensor<half>& tmpBuffer, uint64_t mask[2],
+                                              const ReduceLastND& reduceParam)
 {
     const uint32_t splitNZBlockCount = reduceParam.srcK / SOFTMAX_SHAPE_NZ_BASIC_COUNT;
     const uint32_t splitOffset = reduceParam.dstM * SOFTMAX_SHAPE_NZ_BASIC_COUNT;
@@ -76,9 +76,9 @@ __aicore__ inline void ReduceMaxLastNZImplPFA(const LocalTensor<half> &dst, cons
     TransDataTo5HD<half>(dstList, srcList, transDataParams);
 }
 
-__aicore__ inline void ReduceSumLastNZImplPFA(const LocalTensor<half> &dst, const LocalTensor<half> &src,
-                                              const LocalTensor<half> &tmpBuffer, uint64_t mask[2],
-                                              const ReduceLastND &reduceParam)
+__aicore__ inline void ReduceSumLastNZImplPFA(const LocalTensor<half>& dst, const LocalTensor<half>& src,
+                                              const LocalTensor<half>& tmpBuffer, uint64_t mask[2],
+                                              const ReduceLastND& reduceParam)
 {
     const uint32_t splitNZBlockCount = reduceParam.srcK / SOFTMAX_SHAPE_NZ_BASIC_COUNT;
     const uint32_t splitOffset = reduceParam.dstM * SOFTMAX_SHAPE_NZ_BASIC_COUNT;
@@ -124,8 +124,8 @@ __aicore__ inline void ReduceSumLastNZImplPFA(const LocalTensor<half> &dst, cons
     TransDataTo5HD<half>(dstList, srcList, transDataParams);
 }
 
-__aicore__ inline void CreateSpecialFormatMaskPFA(uint64_t &lowMask, const uint32_t &maskLen,
-                                                  const uint32_t &nzBlockCount)
+__aicore__ inline void CreateSpecialFormatMaskPFA(uint64_t& lowMask, const uint32_t& maskLen,
+                                                  const uint32_t& nzBlockCount)
 {
     ASSERT(maskLen <= SOFTMAX_SHAPE_NZ_BASIC_COUNT);
     ASSERT(nzBlockCount <= B32_BYTE_SIZE);
@@ -139,8 +139,8 @@ __aicore__ inline void CreateSpecialFormatMaskPFA(uint64_t &lowMask, const uint3
     }
 }
 
-__aicore__ inline void ReduceMaxBlockNZImplPFA(const LocalTensor<float> &dst, const LocalTensor<float> &src,
-                                               const ReduceLastND &reduceParam)
+__aicore__ inline void ReduceMaxBlockNZImplPFA(const LocalTensor<float>& dst, const LocalTensor<float>& src,
+                                               const ReduceLastND& reduceParam)
 {
     SetMaskCount();
     SetVectorMask<float, MaskMode::COUNTER>(0, reduceParam.srcM * FLOAT_NUM_PER_BLK);
@@ -156,8 +156,8 @@ __aicore__ inline void ReduceMaxBlockNZImplPFA(const LocalTensor<float> &dst, co
     ResetMask();
 }
 
-__aicore__ inline void ContinusColumnBrcbImplPFA(const LocalTensor<float> &dstLocal, const LocalTensor<float> &srcLocal,
-                                                 const uint32_t &repeat, const uint32_t &brcbCount)
+__aicore__ inline void ContinusColumnBrcbImplPFA(const LocalTensor<float>& dstLocal, const LocalTensor<float>& srcLocal,
+                                                 const uint32_t& repeat, const uint32_t& brcbCount)
 {
     float scalarList[SCALAR_STACK_DEPTH] = {0};
     SetVectorMask<float>(brcbCount);
@@ -184,10 +184,10 @@ __aicore__ inline void ContinusColumnBrcbImplPFA(const LocalTensor<float> &dstLo
 }
 
 __aicore__ inline void BinaryComputeWithSpecialMaskPFA(
-    const LocalTensor<float> &dst, const LocalTensor<float> &src0, const LocalTensor<float> &src1, uint64_t mask[2],
-    const uint32_t &lastBlockMaskLen, const uint32_t &splitCount,
-    void (*func)(const LocalTensor<float> &, const LocalTensor<float> &, const LocalTensor<float> &, uint64_t *,
-                 const uint8_t, const BinaryRepeatParams &))
+    const LocalTensor<float>& dst, const LocalTensor<float>& src0, const LocalTensor<float>& src1, uint64_t mask[2],
+    const uint32_t& lastBlockMaskLen, const uint32_t& splitCount,
+    void (*func)(const LocalTensor<float>&, const LocalTensor<float>&, const LocalTensor<float>&, uint64_t*,
+                 const uint8_t, const BinaryRepeatParams&))
 {
     uint32_t repeat = splitCount / FLOAT_REPEAT_SIZE;
     uint32_t tail = splitCount % FLOAT_REPEAT_SIZE;
@@ -215,7 +215,7 @@ __aicore__ inline void BinaryComputeWithSpecialMaskPFA(
     }
 }
 
-__aicore__ inline void BroadCastNZImplPFA(const LocalTensor<float> &dst, const LocalTensor<float> &src,
+__aicore__ inline void BroadCastNZImplPFA(const LocalTensor<float>& dst, const LocalTensor<float>& src,
                                           const uint32_t srcM)
 {
     uint8_t repeat = srcM / DEFAULT_REPEAT_STRIDE;
@@ -239,12 +239,11 @@ __aicore__ inline void BroadCastNZImplPFA(const LocalTensor<float> &dst, const L
     TransDataTo5HD<float>(dstList, srcList, transDataParams);
 }
 
-__aicore__ inline void UnaryComputeWithSpecialMaskPFA(const LocalTensor<float> &dst, const LocalTensor<float> &src,
-                                                      uint64_t mask[2], const uint32_t &lastBlockMaskLen,
-                                                      const uint32_t &splitCount,
-                                                      void (*func)(const LocalTensor<float> &,
-                                                                   const LocalTensor<float> &, uint64_t *,
-                                                                   const uint8_t, const UnaryRepeatParams &))
+__aicore__ inline void UnaryComputeWithSpecialMaskPFA(const LocalTensor<float>& dst, const LocalTensor<float>& src,
+                                                      uint64_t mask[2], const uint32_t& lastBlockMaskLen,
+                                                      const uint32_t& splitCount,
+                                                      void (*func)(const LocalTensor<float>&, const LocalTensor<float>&,
+                                                                   uint64_t*, const uint8_t, const UnaryRepeatParams&))
 {
     uint32_t repeat = splitCount / FLOAT_REPEAT_SIZE;
     uint32_t tail = splitCount % FLOAT_REPEAT_SIZE;
@@ -273,8 +272,8 @@ __aicore__ inline void UnaryComputeWithSpecialMaskPFA(const LocalTensor<float> &
 }
 
 template <typename T>
-__aicore__ inline void ExpFast(const LocalTensor<T> &dst, const LocalTensor<T> &src, const uint8_t repeatTimes,
-                               const UnaryRepeatParams &repeatParams)
+__aicore__ inline void ExpFast(const LocalTensor<T>& dst, const LocalTensor<T>& src, const uint8_t repeatTimes,
+                               const UnaryRepeatParams& repeatParams)
 {
     if constexpr (1) {
         int32_t N = 6;
@@ -319,11 +318,11 @@ __aicore__ inline void ExpFast(const LocalTensor<T> &dst, const LocalTensor<T> &
 }
 
 template <bool isFlashV2 = false>
-__aicore__ inline void SoftMaxGenericNZImplPFA(const LocalTensor<half> &dst, const LocalTensor<half> &sumTensor,
-                                               const LocalTensor<half> &maxTensor, const LocalTensor<half> &src,
-                                               const LocalTensor<float> &workLocal, const SoftMaxTiling &tiling,
-                                               uint64_t mask[2], const uint32_t &offset1, const uint32_t &offset2,
-                                               const uint32_t &splitCount, const ReduceLastND &reduceParam)
+__aicore__ inline void SoftMaxGenericNZImplPFA(const LocalTensor<half>& dst, const LocalTensor<half>& sumTensor,
+                                               const LocalTensor<half>& maxTensor, const LocalTensor<half>& src,
+                                               const LocalTensor<float>& workLocal, const SoftMaxTiling& tiling,
+                                               uint64_t mask[2], const uint32_t& offset1, const uint32_t& offset2,
+                                               const uint32_t& splitCount, const ReduceLastND& reduceParam)
 {
     LocalTensor<float> tmpBuffer0 = workLocal[0];
     LocalTensor<float> tmpBuffer1 = workLocal[tiling.splitSize];
@@ -366,14 +365,14 @@ __aicore__ inline void SoftMaxGenericNZImplPFA(const LocalTensor<half> &dst, con
     ResetMask();
 }
 
-__aicore__ inline void FlashV2NZUpdateGenericImplPFA(const LocalTensor<half> &dst, const LocalTensor<half> &sumTensor,
-                                                     const LocalTensor<half> &maxTensor, const LocalTensor<half> &src,
-                                                     const LocalTensor<half> &expMaxTensor,
-                                                     const LocalTensor<half> &inSumTensor,
-                                                     const LocalTensor<half> &inMaxTensor,
-                                                     const LocalTensor<float> &workLocal, const SoftMaxTiling &tiling,
-                                                     uint64_t mask[2], const uint32_t &offset1, const uint32_t &offset2,
-                                                     const uint32_t &splitCount, const ReduceLastND &reduceParam)
+__aicore__ inline void FlashV2NZUpdateGenericImplPFA(const LocalTensor<half>& dst, const LocalTensor<half>& sumTensor,
+                                                     const LocalTensor<half>& maxTensor, const LocalTensor<half>& src,
+                                                     const LocalTensor<half>& expMaxTensor,
+                                                     const LocalTensor<half>& inSumTensor,
+                                                     const LocalTensor<half>& inMaxTensor,
+                                                     const LocalTensor<float>& workLocal, const SoftMaxTiling& tiling,
+                                                     uint64_t mask[2], const uint32_t& offset1, const uint32_t& offset2,
+                                                     const uint32_t& splitCount, const ReduceLastND& reduceParam)
 {
     LocalTensor<float> tmpBuffer0 = workLocal[0];
     LocalTensor<float> tmpBuffer1 = workLocal[tiling.splitSize];
@@ -438,15 +437,15 @@ __aicore__ inline void FlashV2NZUpdateGenericImplPFA(const LocalTensor<half> &ds
 }
 
 template <typename T, bool isBasicBlock = false>
-__aicore__ inline void SoftmaxFlashV2NZNoUpdateImplPFA(const LocalTensor<T> &dstTensor, const LocalTensor<T> &sumTensor,
-                                                       const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor,
-                                                       const LocalTensor<float> &workLocal,
-                                                       const LastAxisShapeND &originalSrcShape,
-                                                       const SoftMaxTiling &tiling)
+__aicore__ inline void SoftmaxFlashV2NZNoUpdateImplPFA(const LocalTensor<T>& dstTensor, const LocalTensor<T>& sumTensor,
+                                                       const LocalTensor<T>& maxTensor, const LocalTensor<T>& srcTensor,
+                                                       const LocalTensor<float>& workLocal,
+                                                       const LastAxisShapeND& originalSrcShape,
+                                                       const SoftMaxTiling& tiling)
 {
-    const ReduceLastND &mainReduceParam = {tiling.splitM, originalSrcShape.k, tiling.splitM,
+    const ReduceLastND& mainReduceParam = {tiling.splitM, originalSrcShape.k, tiling.splitM,
                                            tiling.splitK, tiling.splitM,      SOFTMAX_SHAPE_NZ_BASIC_COUNT};
-    const ReduceLastND &tailReduceParam = {tiling.tailM,  originalSrcShape.k, tiling.splitM,
+    const ReduceLastND& tailReduceParam = {tiling.tailM,  originalSrcShape.k, tiling.splitM,
                                            tiling.splitK, tiling.splitM,      SOFTMAX_SHAPE_NZ_BASIC_COUNT};
     const uint32_t lastBlockMaskLen = originalSrcShape.k % SOFTMAX_SHAPE_NZ_BASIC_COUNT != 0 ?
                                           originalSrcShape.k % SOFTMAX_SHAPE_NZ_BASIC_COUNT :
@@ -481,14 +480,14 @@ __aicore__ inline void SoftmaxFlashV2NZNoUpdateImplPFA(const LocalTensor<T> &dst
 
 template <typename T, bool isBasicBlock = false>
 __aicore__ inline void SoftmaxFlashV2NZUpdateImplPFA(
-    const LocalTensor<T> &dstTensor, const LocalTensor<T> &sumTensor, const LocalTensor<T> &maxTensor,
-    const LocalTensor<T> &srcTensor, const LocalTensor<T> &expMaxTensor, const LocalTensor<T> &inSumTensor,
-    const LocalTensor<T> &inMaxTensor, const LocalTensor<float> &workLocal, const LastAxisShapeND &originalSrcShape,
-    const SoftMaxTiling &tiling)
+    const LocalTensor<T>& dstTensor, const LocalTensor<T>& sumTensor, const LocalTensor<T>& maxTensor,
+    const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor, const LocalTensor<T>& inSumTensor,
+    const LocalTensor<T>& inMaxTensor, const LocalTensor<float>& workLocal, const LastAxisShapeND& originalSrcShape,
+    const SoftMaxTiling& tiling)
 {
-    const ReduceLastND &mainReduceParam = {tiling.splitM, originalSrcShape.k, tiling.splitM,
+    const ReduceLastND& mainReduceParam = {tiling.splitM, originalSrcShape.k, tiling.splitM,
                                            tiling.splitK, tiling.splitM,      SOFTMAX_SHAPE_NZ_BASIC_COUNT};
-    const ReduceLastND &tailReduceParam = {tiling.tailM,  originalSrcShape.k, tiling.splitM,
+    const ReduceLastND& tailReduceParam = {tiling.tailM,  originalSrcShape.k, tiling.splitM,
                                            tiling.splitK, tiling.splitM,      SOFTMAX_SHAPE_NZ_BASIC_COUNT};
     uint32_t lastBlockMaskLen = originalSrcShape.k % SOFTMAX_SHAPE_NZ_BASIC_COUNT != 0 ?
                                     originalSrcShape.k % SOFTMAX_SHAPE_NZ_BASIC_COUNT :
@@ -521,11 +520,11 @@ __aicore__ inline void SoftmaxFlashV2NZUpdateImplPFA(
 }
 
 template <typename T, bool isUpdate = false, bool isBasicBlock = false>
-__aicore__ inline void SoftMaxFlashV2NZImplPFA(const LocalTensor<T> &dstTensor, const LocalTensor<T> &sumTensor,
-                                               const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor,
-                                               const LocalTensor<T> &expMaxTensor, const LocalTensor<T> &inSumTensor,
-                                               const LocalTensor<T> &inMaxTensor, const LocalTensor<float> &workLocal,
-                                               const LastAxisShapeND &originalSrcShape, const SoftMaxTiling &tiling)
+__aicore__ inline void SoftMaxFlashV2NZImplPFA(const LocalTensor<T>& dstTensor, const LocalTensor<T>& sumTensor,
+                                               const LocalTensor<T>& maxTensor, const LocalTensor<T>& srcTensor,
+                                               const LocalTensor<T>& expMaxTensor, const LocalTensor<T>& inSumTensor,
+                                               const LocalTensor<T>& inMaxTensor, const LocalTensor<float>& workLocal,
+                                               const LastAxisShapeND& originalSrcShape, const SoftMaxTiling& tiling)
 {
     if constexpr (!isUpdate) {
         SoftmaxFlashV2NZNoUpdateImplPFA<T, isBasicBlock>(dstTensor, sumTensor, maxTensor, srcTensor, workLocal,
@@ -536,7 +535,7 @@ __aicore__ inline void SoftMaxFlashV2NZImplPFA(const LocalTensor<T> &dstTensor, 
     }
 }
 
-__aicore__ inline LastAxisShapeND GetLastAxisOriginShapeNDPFA(const ShapeInfo &srcShapeInfo)
+__aicore__ inline LastAxisShapeND GetLastAxisOriginShapeNDPFA(const ShapeInfo& srcShapeInfo)
 {
     uint32_t calculateSize = 1;
     LastAxisShapeND ndinfo;
@@ -550,9 +549,9 @@ __aicore__ inline LastAxisShapeND GetLastAxisOriginShapeNDPFA(const ShapeInfo &s
     return ndinfo;
 }
 
-__aicore__ inline bool SoftMaxFlashV2TilingFuncPFA(const LastAxisShapeND &ndinfo, const uint32_t inputType,
+__aicore__ inline bool SoftMaxFlashV2TilingFuncPFA(const LastAxisShapeND& ndinfo, const uint32_t inputType,
                                                    const uint32_t maxSumType, const uint32_t workLocalSize,
-                                                   SoftMaxTiling &softmaxTiling, bool isUpdate = false,
+                                                   SoftMaxTiling& softmaxTiling, bool isUpdate = false,
                                                    bool isBasicBlock = false, bool isDataFormatNZ = false)
 {
     if (maxSumType == 0U) {
@@ -593,11 +592,11 @@ __aicore__ inline bool SoftMaxFlashV2TilingFuncPFA(const LastAxisShapeND &ndinfo
 
 template <typename T, bool isUpdate = false, bool isReuseSource = false, bool isBasicBlock = false,
           bool isDataFormatNZ = false>
-__aicore__ inline void SoftmaxFlashV2Tmp(const LocalTensor<T> &dstTensor, const LocalTensor<T> &expSumTensor,
-                                         const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor,
-                                         const LocalTensor<T> &expMaxTensor, const LocalTensor<T> &inExpSumTensor,
-                                         const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &sharedTmpBuffer,
-                                         const SoftMaxTiling &tiling, const SoftMaxShapeInfo &softmaxShapeInfo = {})
+__aicore__ inline void SoftmaxFlashV2Tmp(const LocalTensor<T>& dstTensor, const LocalTensor<T>& expSumTensor,
+                                         const LocalTensor<T>& maxTensor, const LocalTensor<T>& srcTensor,
+                                         const LocalTensor<T>& expMaxTensor, const LocalTensor<T>& inExpSumTensor,
+                                         const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& sharedTmpBuffer,
+                                         const SoftMaxTiling& tiling, const SoftMaxShapeInfo& softmaxShapeInfo = {})
 {
     if ASCEND_IS_AIC {
         return;

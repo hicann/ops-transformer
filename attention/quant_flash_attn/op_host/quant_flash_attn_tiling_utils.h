@@ -35,7 +35,7 @@ inline auto CeilDivision(T num1, T num2) -> T
     return (num1 + num2 - 1) / num2;
 }
 
-static std::vector<int64_t> ToVector(const gert::Shape &shape)
+static std::vector<int64_t> ToVector(const gert::Shape& shape)
 {
     size_t shapeSize = shape.GetDimNum();
     std::vector<int64_t> shapeVec(shapeSize, 0);
@@ -47,7 +47,7 @@ static std::vector<int64_t> ToVector(const gert::Shape &shape)
 }
 
 template <typename T>
-static std::string ToString(const std::vector<T> &v)
+static std::string ToString(const std::vector<T>& v)
 {
     std::ostringstream oss;
     oss << "[";
@@ -61,7 +61,7 @@ static std::string ToString(const std::vector<T> &v)
     return oss.str();
 }
 
-inline std::string ToString(const gert::Shape &shape)
+inline std::string ToString(const gert::Shape& shape)
 {
     return ToString(ToVector(shape));
 }

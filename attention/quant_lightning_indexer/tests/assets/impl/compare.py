@@ -79,9 +79,9 @@ class PytestTopKComparator:
         return {
             "pass": passed,
             "precision": float(precision),
-            "error_info": None if passed else (
-                f"pytest QuantLightningIndexer check_result returned {status!r}"
-            ),
+            "error_info": None
+            if passed
+            else (f"pytest QuantLightningIndexer check_result returned {status!r}"),
         }
 
     def compare(self, *outputs, compare_data=None):
@@ -96,7 +96,9 @@ class PytestTopKComparator:
         params = compare_data.get("params")
         topk_value = compare_data.get("topk_value")
         if params is None or topk_value is None:
-            raise ValueError("QuantLightningIndexer pytest compare data lacks params or topk_value")
+            raise ValueError(
+                "QuantLightningIndexer pytest compare data lacks params or topk_value"
+            )
         npu_output, golden = outputs
         result = self.load_module().check_result(
             self.to_torch(golden),

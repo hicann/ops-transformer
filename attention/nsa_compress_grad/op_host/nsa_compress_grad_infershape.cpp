@@ -17,33 +17,35 @@
 #include "log/log.h"
 using namespace ge;
 namespace ops {
-static ge::graphStatus InferShape4NsaCompressGrad(gert::InferShapeContext* context) {
-  OP_LOGD(context->GetNodeName(), "Begin to do NsaCompressGradInfershape.");
-  // 获取输入shape
-  const gert::Shape* inputShape = context->GetInputShape(1);
-  OP_CHECK_NULL_WITH_CONTEXT(context, inputShape);
-  const gert::Shape* weightShape = context->GetInputShape(2);
-  OP_CHECK_NULL_WITH_CONTEXT(context, weightShape);
+static ge::graphStatus InferShape4NsaCompressGrad(gert::InferShapeContext* context)
+{
+    OP_LOGD(context->GetNodeName(), "Begin to do NsaCompressGradInfershape.");
+    // 获取输入shape
+    const gert::Shape* inputShape = context->GetInputShape(1);
+    OP_CHECK_NULL_WITH_CONTEXT(context, inputShape);
+    const gert::Shape* weightShape = context->GetInputShape(2);
+    OP_CHECK_NULL_WITH_CONTEXT(context, weightShape);
 
-  gert::Shape* inputGradShape = context->GetOutputShape(0);
-  OP_CHECK_NULL_WITH_CONTEXT(context, inputGradShape);
-  gert::Shape* weightGradShape = context->GetOutputShape(1);
-  OP_CHECK_NULL_WITH_CONTEXT(context, weightGradShape);
+    gert::Shape* inputGradShape = context->GetOutputShape(0);
+    OP_CHECK_NULL_WITH_CONTEXT(context, inputGradShape);
+    gert::Shape* weightGradShape = context->GetOutputShape(1);
+    OP_CHECK_NULL_WITH_CONTEXT(context, weightGradShape);
 
-  *inputGradShape = *inputShape;
-  *weightGradShape = *weightShape;
+    *inputGradShape = *inputShape;
+    *weightGradShape = *weightShape;
 
-  return ge::GRAPH_SUCCESS;
+    return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataType4NsaCompressGrad(gert::InferDataTypeContext* context) {
-  OP_LOGD(context->GetNodeName(), "Begin to do NsaCompressGradInferDataType.");
-  auto inputDtype = context->GetInputDataType(1);
-  context->SetOutputDataType(0, inputDtype);
-  context->SetOutputDataType(1, inputDtype);
-  OP_LOGD(context->GetNodeName(), "End to do NsaCompressGradInferDataType.");
-  return ge::GRAPH_SUCCESS;
+static ge::graphStatus InferDataType4NsaCompressGrad(gert::InferDataTypeContext* context)
+{
+    OP_LOGD(context->GetNodeName(), "Begin to do NsaCompressGradInferDataType.");
+    auto inputDtype = context->GetInputDataType(1);
+    context->SetOutputDataType(0, inputDtype);
+    context->SetOutputDataType(1, inputDtype);
+    OP_LOGD(context->GetNodeName(), "End to do NsaCompressGradInferDataType.");
+    return ge::GRAPH_SUCCESS;
 }
 
 IMPL_OP_INFERSHAPE(NsaCompressGrad).InferShape(InferShape4NsaCompressGrad).InferDataType(InferDataType4NsaCompressGrad);
-}  // namespace ops
+} // namespace ops

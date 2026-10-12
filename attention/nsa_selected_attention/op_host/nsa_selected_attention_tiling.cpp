@@ -48,18 +48,20 @@ class NsaSelectedAttentionEmptyInputTiling {
 public:
     NsaSelectedAttentionTilingData tilingData;
 
-    void NsaSelectedAttentionSetEmptyInputTilingData(gert::TilingContext *context,
-                                                    NsaSelectedAttentionTilingData &nsaTilingData);
-    void GetTilingKeyAttentionScore4EmptyInput(uint32_t &tilingKey, const gert::TilingContext *context);
+    void NsaSelectedAttentionSetEmptyInputTilingData(gert::TilingContext* context,
+                                                     NsaSelectedAttentionTilingData& nsaTilingData);
+    void GetTilingKeyAttentionScore4EmptyInput(uint32_t& tilingKey, const gert::TilingContext* context);
 };
 
-void NsaSelectedAttentionEmptyInputTiling::GetTilingKeyAttentionScore4EmptyInput(uint32_t &tilingKey,
-                                                                                const gert::TilingContext *context)
+void NsaSelectedAttentionEmptyInputTiling::GetTilingKeyAttentionScore4EmptyInput(uint32_t& tilingKey,
+                                                                                 const gert::TilingContext* context)
 {
-    OP_CHECK_IF(context->GetInputDesc(KEY_INPUT_INDEX) == nullptr,
-                OP_LOGE(unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" :(context)->GetNodeName(),
-                "context->GetInputDesc(KEY_INPUT_INDEX) is nullptr!"),
-                return);
+    OP_CHECK_IF(
+        context->GetInputDesc(KEY_INPUT_INDEX) == nullptr,
+        OP_LOGE(
+            unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(),
+            "context->GetInputDesc(KEY_INPUT_INDEX) is nullptr!"),
+        return);
     auto kernelType = context->GetInputDesc(KEY_INPUT_INDEX)->GetDataType();
     if (kernelType == ge::DT_FLOAT16) {
         tilingKey = 90U;
@@ -71,54 +73,59 @@ void NsaSelectedAttentionEmptyInputTiling::GetTilingKeyAttentionScore4EmptyInput
 }
 
 void NsaSelectedAttentionEmptyInputTiling::NsaSelectedAttentionSetEmptyInputTilingData(
-    gert::TilingContext *context, NsaSelectedAttentionTilingData &nsaTilingData)
+    gert::TilingContext* context, NsaSelectedAttentionTilingData& nsaTilingData)
 {
-    OP_CHECK_IF(context->GetRawTilingData() == nullptr,
-                OP_LOGE(unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" :(context)->GetNodeName(),
-                "context->GetRawTilingData() is nullptr!"),
-                return);
+    OP_CHECK_IF(
+        context->GetRawTilingData() == nullptr,
+        OP_LOGE(
+            unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(),
+            "context->GetRawTilingData() is nullptr!"),
+        return);
     nsaTilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
     context->GetRawTilingData()->SetDataSize(nsaTilingData.GetDataSize());
 }
 
-static ge::graphStatus CheckParams(const gert::TilingContext *context)
+static ge::graphStatus CheckParams(const gert::TilingContext* context)
 {
     if (context->GetInputShape(QUERY_INPUT_INDEX) != nullptr && context->GetInputShape(KEY_INPUT_INDEX) != nullptr &&
         context->GetInputShape(VALUE_INPUT_INDEX) != nullptr && context->GetAttrs() != nullptr) {
-        auto &queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
-        auto &keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
-        auto &valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
-        const char *inputLayout = context->GetAttrs()->GetAttrPointer<char>(INPUTLAYOUT_ATTRS_INDEX);
+        auto& queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
+        auto& keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
+        auto& valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
+        const char* inputLayout = context->GetAttrs()->GetAttrPointer<char>(INPUTLAYOUT_ATTRS_INDEX);
         if (strlen(inputLayout) == 3) { // 3: BSH or SBH
             if (inputLayout[0] == 'B') {
                 // layout is BSH
                 OP_CHECK_IF((queryShape.GetDim(0) != keyShape.GetDim(0)),
-                        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "query or key shape is invalid"),
-                        return ge::GRAPH_FAILED);
+                            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "query or key shape is invalid"),
+                            return ge::GRAPH_FAILED);
             } else {
                 if (inputLayout[0] == 'T') { // TND  N1 != N2
                     // q_D != k_D
                     OP_CHECK_IF((queryShape.GetDim(2) != keyShape.GetDim(2)),
-                            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "query or key shape is invalid"),
-                            return ge::GRAPH_FAILED);
+                                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "query or key shape is invalid"),
+                                return ge::GRAPH_FAILED);
                     return ge::SUCCESS;
                 }
                 // layout is SBH
                 OP_CHECK_IF((queryShape.GetDim(1) != keyShape.GetDim(1)),
-                        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "query or key shape is invalid"),
-                        return ge::GRAPH_FAILED);
+                            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "query or key shape is invalid"),
+                            return ge::GRAPH_FAILED);
             }
             // kD < vD
             OP_CHECK_IF((keyShape.GetDim(2) < valueShape.GetDim(2)),
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "key or value shape is invalid"),
-                return ge::GRAPH_FAILED);
+                        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "key or value shape is invalid"),
+                        return ge::GRAPH_FAILED);
         } else if (strlen(inputLayout) == 4) { // 4: layout is BNSD or BSND
             OP_CHECK_IF((queryShape.GetDim(0) != keyShape.GetDim(0)),
-                    OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "query or key shape is invalid"), return ge::GRAPH_FAILED);
+                        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "query or key shape is invalid"),
+                        return ge::GRAPH_FAILED);
             OP_CHECK_IF((queryShape.GetDim(3) != keyShape.GetDim(3)),
-                    OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "query or key shape is invalid"), return ge::GRAPH_FAILED);
+                        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "query or key shape is invalid"),
+                        return ge::GRAPH_FAILED);
             OP_CHECK_IF((keyShape.GetDim(3) < valueShape.GetDim(3)),
-                    OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "key or value shape is invalid"), return ge::GRAPH_FAILED);
+                        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "key or value shape is invalid"),
+                        return ge::GRAPH_FAILED);
         } else {
             OP_LOGW(context, "invalid input_layout[%s].", inputLayout);
             return ge::GRAPH_FAILED;
@@ -129,37 +136,45 @@ static ge::graphStatus CheckParams(const gert::TilingContext *context)
     return ge::GRAPH_FAILED;
 }
 static uint32_t CalcTschBlockDim(uint32_t sliceNum, uint32_t aicCoreNum, uint32_t aivCoreNum)
-    {
-        uint32_t ration;
-        if (aicCoreNum == 0U || aivCoreNum == 0U || aicCoreNum > aivCoreNum) {
-            return sliceNum;
-        }
-        ration = aivCoreNum / aicCoreNum;
-        return (sliceNum + (ration - 1U)) / ration;
+{
+    uint32_t ration;
+    if (aicCoreNum == 0U || aivCoreNum == 0U || aicCoreNum > aivCoreNum) {
+        return sliceNum;
     }
+    ration = aivCoreNum / aicCoreNum;
+    return (sliceNum + (ration - 1U)) / ration;
+}
 
-static bool IsEmptyInput(gert::TilingContext *context)
+static bool IsEmptyInput(gert::TilingContext* context)
 {
     auto attenOutShape = context->GetOutputShape(ATTENTIONOUT_OUPUT_INDEX);
-    OP_CHECK_IF(attenOutShape == nullptr,
-                OP_LOGE(unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" :(context)->GetNodeName(),
-                "attenOutShape is nullptr!"),
-                return false);
+    OP_CHECK_IF(
+        attenOutShape == nullptr,
+        OP_LOGE(
+            unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(),
+            "attenOutShape is nullptr!"),
+        return false);
     auto queryShape = context->GetInputShape(QUERY_INPUT_INDEX);
-    OP_CHECK_IF(queryShape == nullptr,
-                OP_LOGE(unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" :(context)->GetNodeName(),
-                "queryShape is nullptr!"),
-                return false);
+    OP_CHECK_IF(
+        queryShape == nullptr,
+        OP_LOGE(
+            unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(),
+            "queryShape is nullptr!"),
+        return false);
     auto keyShape = context->GetInputShape(KEY_INPUT_INDEX);
-    OP_CHECK_IF(keyShape == nullptr,
-                OP_LOGE(unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" :(context)->GetNodeName(),
-                "keyShape is nullptr!"),
-                return false);
+    OP_CHECK_IF(
+        keyShape == nullptr,
+        OP_LOGE(
+            unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(),
+            "keyShape is nullptr!"),
+        return false);
     auto softmaxSumShape = context->GetOutputShape(SOFTMAXSUM_OUPUT_INDEX);
-    OP_CHECK_IF(softmaxSumShape == nullptr,
-                OP_LOGE(unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" :(context)->GetNodeName(),
-                "softmaxSumShape is nullptr!"),
-                return false);
+    OP_CHECK_IF(
+        softmaxSumShape == nullptr,
+        OP_LOGE(
+            unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(),
+            "softmaxSumShape is nullptr!"),
+        return false);
     int64_t attentionOutShapeSize = attenOutShape->GetStorageShape().GetShapeSize();
     int64_t queryShapeSize = queryShape->GetStorageShape().GetShapeSize();
     int64_t keyShapeSize = keyShape->GetStorageShape().GetShapeSize();
@@ -183,14 +198,17 @@ static bool IsEmptyInput(gert::TilingContext *context)
         auto kernelType = context->GetInputDesc(KEY_INPUT_INDEX)->GetDataType();
         NsaSelectedAttentionEmptyInputTiling emptyInputTiling;
         auto compileInfoPtr = context->GetCompileInfo<NsaSelectedAttentionCompileInfo>();
-        OP_CHECK_IF(compileInfoPtr == nullptr, OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "compileInfoPtr is null"),
-                return false);
+        OP_CHECK_IF(compileInfoPtr == nullptr,
+                    OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "compileInfoPtr is null"), return false);
         uint32_t coreNum = compileInfoPtr->aivNum;
-        OP_CHECK_IF((coreNum <= 0),
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "platform info is invalid, coreNum=%u.", coreNum), return false);
-        OP_CHECK_IF((kernelType != ge::DT_FLOAT16 && kernelType != ge::DT_FLOAT && kernelType != ge::DT_BF16),
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "kernelType is invalid, kernelType is %d", kernelType),
-                return false);
+        OP_CHECK_IF(
+            (coreNum <= 0),
+            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "platform info is invalid, coreNum=%u.", coreNum),
+            return false);
+        OP_CHECK_IF(
+            (kernelType != ge::DT_FLOAT16 && kernelType != ge::DT_FLOAT && kernelType != ge::DT_BF16),
+            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "kernelType is invalid, kernelType is %d", kernelType),
+            return false);
         uint32_t attentionOutFormerNum;          // attentionOut的主核
         uint32_t attentionOutTailNum;            // attentionOut的尾核
         uint32_t softmaxMaxFormerNum;            // softmaxMax 和 softmaxSum的主核
@@ -220,7 +238,7 @@ static bool IsEmptyInput(gert::TilingContext *context)
                 attentionOutLastCoreDataSize =
                     attentionOutSingleCoreDataSize -
                     (attentionOutBlockSize * MIN_COPY_UINT_SIZE / ge::GetSizeByDataType(kernelType) -
-                    attentionOutShapeSize);
+                     attentionOutShapeSize);
                 attentionOutLastCoreIndex = (attentionOutFormerNum - 1U) * attentionOutSingleCoreDataSize;
             } else {
                 attentionOutTailCoreDataSize =
@@ -293,7 +311,7 @@ static bool IsEmptyInput(gert::TilingContext *context)
         uint32_t aivActualNum =
             std::max((attentionOutFormerNum + attentionOutTailNum), (softmaxMaxFormerNum + softmaxMaxTailNum));
         context->SetBlockDim(CalcTschBlockDim(aivActualNum, 0, compileInfoPtr->aivNum));
-        size_t *workspaces = context->GetWorkspaceSizes(1);
+        size_t* workspaces = context->GetWorkspaceSizes(1);
         // workspace上预留100M
         workspaces[0] = static_cast<size_t>(100 * 1024 * 1024);
 
@@ -302,7 +320,7 @@ static bool IsEmptyInput(gert::TilingContext *context)
     return false;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingNsaSelectedAttention(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingNsaSelectedAttention(gert::TilingContext* context)
 {
     if (CheckParams(context) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -315,17 +333,13 @@ ASCENDC_EXTERN_C ge::graphStatus TilingNsaSelectedAttention(gert::TilingContext 
     }
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForNsaSelectedAttention(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForNsaSelectedAttention(gert::TilingParseContext* context)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfoPtr == nullptr,
-                OP_LOGE(context->GetNodeName(),
-                "platformInfoPtr is null"),
+    OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "platformInfoPtr is null"),
                 return ge::GRAPH_FAILED);
     auto compileInfoPtr = context->GetCompiledInfo<NsaSelectedAttentionCompileInfo>();
-    OP_CHECK_IF(compileInfoPtr == nullptr,
-                OP_LOGE(context->GetNodeName(),
-                "compileInfoPtr is null"),
+    OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "compileInfoPtr is null"),
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -341,6 +355,6 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForNsaSelectedAttention(gert::Tili
 IMPL_OP_OPTILING(NsaSelectedAttention)
     .Tiling(TilingNsaSelectedAttention)
     .TilingInputsDataDependency({5, 6})
-    .TilingParse<NsaSelectedAttentionCompileInfo>(TilingPrepareForNsaSelectedAttention);  // 向框架注册入口函数
+    .TilingParse<NsaSelectedAttentionCompileInfo>(TilingPrepareForNsaSelectedAttention); // 向框架注册入口函数
 
 } // namespace optiling

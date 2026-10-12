@@ -221,7 +221,7 @@ uint8_t FloatToFp8Nearest(float v, bool e5m2)
 }
 
 template <typename T>
-std::vector<T> ScatterPaKeyDim0(const std::vector<T> &packed, int64_t numPages, int64_t pageElems, int64_t gap,
+std::vector<T> ScatterPaKeyDim0(const std::vector<T>& packed, int64_t numPages, int64_t pageElems, int64_t gap,
                                 T poison)
 {
     std::vector<T> wide(static_cast<size_t>(numPages * gap * pageElems), poison);
@@ -233,7 +233,7 @@ std::vector<T> ScatterPaKeyDim0(const std::vector<T> &packed, int64_t numPages, 
     return wide;
 }
 
-std::vector<int64_t> ContiguousStrides(const std::vector<int64_t> &shape)
+std::vector<int64_t> ContiguousStrides(const std::vector<int64_t>& shape)
 {
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = static_cast<int64_t>(shape.size()) - kPrevDimOffset; i >= 0; i--) {
@@ -246,12 +246,12 @@ class DeviceBuffer {
 public:
     ~DeviceBuffer()
     {
-        for (auto *t : tensors_) {
+        for (auto* t : tensors_) {
             if (t != nullptr) {
                 (void)aclDestroyTensor(t);
             }
         }
-        for (auto *p : addrs_) {
+        for (auto* p : addrs_) {
             if (p != nullptr) {
                 (void)aclrtFree(p);
             }
@@ -259,11 +259,11 @@ public:
     }
 
     template <typename T>
-    aclTensor *Create(const std::vector<T> &host, const std::vector<int64_t> &shape, aclDataType dtype,
-                      void **addrOut = nullptr, const std::vector<int64_t> *storageShape = nullptr,
-                      const std::vector<int64_t> *stridesIn = nullptr)
+    aclTensor* Create(const std::vector<T>& host, const std::vector<int64_t>& shape, aclDataType dtype,
+                      void** addrOut = nullptr, const std::vector<int64_t>* storageShape = nullptr,
+                      const std::vector<int64_t>* stridesIn = nullptr)
     {
-        void *devAddr = nullptr;
+        void* devAddr = nullptr;
         const size_t bytes = host.size() * sizeof(T);
         // 空张量（T1=0 / T2=0）仍需要合法 device 指针；aclrtMalloc(0) 会失败。
         const size_t allocBytes = (bytes == 0) ? static_cast<size_t>(32) : bytes;
@@ -274,7 +274,7 @@ public:
         if (bytes > 0 && aclrtMemcpy(devAddr, bytes, host.data(), bytes, ACL_MEMCPY_HOST_TO_DEVICE) != ACL_SUCCESS) {
             return nullptr;
         }
-        const std::vector<int64_t> &stShape = (storageShape != nullptr) ? *storageShape : shape;
+        const std::vector<int64_t>& stShape = (storageShape != nullptr) ? *storageShape : shape;
         std::vector<int64_t> strides;
         if (stridesIn != nullptr) {
             strides = *stridesIn;
@@ -285,7 +285,7 @@ public:
                     shape[static_cast<size_t>(i + 1)] * strides[static_cast<size_t>(i + 1)];
             }
         }
-        aclTensor *t = aclCreateTensor(shape.data(), shape.size(), dtype, strides.data(), 0, ACL_FORMAT_ND,
+        aclTensor* t = aclCreateTensor(shape.data(), shape.size(), dtype, strides.data(), 0, ACL_FORMAT_ND,
                                        stShape.data(), stShape.size(), devAddr);
         tensors_.push_back(t);
         if (addrOut != nullptr) {
@@ -295,15 +295,15 @@ public:
     }
 
 private:
-    std::vector<void *> addrs_;
-    std::vector<aclTensor *> tensors_;
+    std::vector<void*> addrs_;
+    std::vector<aclTensor*> tensors_;
 };
 
 /// CPU 参考：score = Maxpool[(scale·)Q@Kᵀ + atten_mask] + local_mask
-void ComputeGolden(const TestCase &tc, const std::vector<int32_t> &actualSeqQlen,
-                   const std::vector<int32_t> &actualSeqKlen, const std::vector<int32_t> &blockTable, int64_t maxBlocks,
-                   int64_t scoreStride, int64_t totalQ, const std::vector<float> &queryF,
-                   const std::vector<float> &keyF, const std::vector<float> &deqScale, std::vector<float> &golden)
+void ComputeGolden(const TestCase& tc, const std::vector<int32_t>& actualSeqQlen,
+                   const std::vector<int32_t>& actualSeqKlen, const std::vector<int32_t>& blockTable, int64_t maxBlocks,
+                   int64_t scoreStride, int64_t totalQ, const std::vector<float>& queryF,
+                   const std::vector<float>& keyF, const std::vector<float>& deqScale, std::vector<float>& golden)
 {
     const int64_t batch = static_cast<int64_t>(tc.qLen.size());
     golden.assign(static_cast<size_t>(tc.numQHeads * totalQ * scoreStride), kNegInf);
@@ -391,7 +391,7 @@ void ComputeGolden(const TestCase &tc, const std::vector<int32_t> &actualSeqQlen
     }
 }
 
-void PrintVec(const std::string &tag, const float *data, int64_t n)
+void PrintVec(const std::string& tag, const float* data, int64_t n)
 {
     (void)printf("  %s[", tag.c_str());
     for (int64_t i = 0; i < n; ++i) {
@@ -401,10 +401,10 @@ void PrintVec(const std::string &tag, const float *data, int64_t n)
 }
 
 /// 小尺寸用例的 host 侧逐步拆解：Q/K -> DOT/DEQUANT -> MASK -> MAX。
-void PrintTracePipeline(const TestCase &tc, const std::vector<int32_t> &actualSeqQlen,
-                        const std::vector<int32_t> &blockTable, int64_t maxBlocks, int64_t scoreStride, int64_t totalQ,
-                        const std::vector<float> &queryF, const std::vector<float> &keyF,
-                        const std::vector<float> &deqScale, const std::vector<float> &actual)
+void PrintTracePipeline(const TestCase& tc, const std::vector<int32_t>& actualSeqQlen,
+                        const std::vector<int32_t>& blockTable, int64_t maxBlocks, int64_t scoreStride, int64_t totalQ,
+                        const std::vector<float>& queryF, const std::vector<float>& keyF,
+                        const std::vector<float>& deqScale, const std::vector<float>& actual)
 {
     (void)printf("\n======== HOST TRACE: %s (int8=%d) ========\n", tc.name.c_str(), tc.useInt8Key ? 1 : 0);
     (void)printf("shape: Hq=%ld D=%ld qLen=%d kvLen=%d startLoc=%d blockSize=%ld maxBlocks=%ld scoreStride=%ld\n",
@@ -413,7 +413,7 @@ void PrintTracePipeline(const TestCase &tc, const std::vector<int32_t> &actualSe
     for (int64_t t = 0; t < tc.qLen[0]; ++t) {
         for (int64_t h = 0; h < tc.numQHeads; ++h) {
             const int64_t flat = t * tc.numQHeads + h;
-            const float *q = &queryF[static_cast<size_t>(flat * tc.headDim)];
+            const float* q = &queryF[static_cast<size_t>(flat * tc.headDim)];
             (void)printf("\n-- row flat=%ld (token=%ld head=%ld) --\n", flat, t, h);
             PrintVec("Q", q, tc.headDim);
             const int32_t tOff = static_cast<int32_t>(t);
@@ -430,7 +430,7 @@ void PrintTracePipeline(const TestCase &tc, const std::vector<int32_t> &actualSe
             float best = kNegInf;
             bool any = false;
             for (int64_t n = 0; n < visibleKeyEnd + kTraceExtraTok && n < BLOCK_SIZE; ++n) {
-                const float *k = &keyF[static_cast<size_t>((page * BLOCK_SIZE + n) * tc.headDim)];
+                const float* k = &keyF[static_cast<size_t>((page * BLOCK_SIZE + n) * tc.headDim)];
                 const float ds = tc.useInt8Key ? deqScale[static_cast<size_t>(page) * BLOCK_SIZE + n] : 1.0F;
                 float acc = 0.0F;
                 for (int64_t d = 0; d < tc.headDim; ++d) {
@@ -453,7 +453,7 @@ void PrintTracePipeline(const TestCase &tc, const std::vector<int32_t> &actualSe
     (void)maxBlocks;
 }
 
-bool Compare(const std::string &name, const std::vector<float> &actual, const std::vector<float> &golden, float atol,
+bool Compare(const std::string& name, const std::vector<float>& actual, const std::vector<float>& golden, float atol,
              float rtol)
 {
     size_t badCount = 0;
@@ -516,7 +516,7 @@ bool Compare(const std::string &name, const std::vector<float> &actual, const st
     return pass;
 }
 
-bool RunCase(const TestCase &tc, aclrtStream stream)
+bool RunCase(const TestCase& tc, aclrtStream stream)
 {
     const int64_t batch = static_cast<int64_t>(tc.qLen.size());
     std::vector<int32_t> actualSeqQlen(batch + 1, 0);
@@ -625,7 +625,7 @@ bool RunCase(const TestCase &tc, aclrtStream stream)
     }
     const std::vector<int64_t> scoreShape = {tc.numQHeads, totalQ, scoreStride};
 
-    aclTensor *queryT = nullptr;
+    aclTensor* queryT = nullptr;
     if (isFp8) {
         const aclDataType fp8Dt = isE5M2 ? ACL_FLOAT8_E5M2 : ACL_FLOAT8_E4M3FN;
         queryT = buf.Create(queryFp8, queryShape, fp8Dt);
@@ -636,8 +636,8 @@ bool RunCase(const TestCase &tc, aclrtStream stream)
     const int64_t keyDim0Gap = (isTnd || tc.keyDim0Gap < 1) ? 1 : tc.keyDim0Gap;
     std::vector<int64_t> keyStorageShape = keyShape;
     std::vector<int64_t> keyStrides = ContiguousStrides(keyShape);
-    const std::vector<int64_t> *keyStoragePtr = nullptr;
-    const std::vector<int64_t> *keyStridePtr = nullptr;
+    const std::vector<int64_t>* keyStoragePtr = nullptr;
+    const std::vector<int64_t>* keyStridePtr = nullptr;
     int64_t pageElems = 1;
     if (keyDim0Gap > 1) {
         for (size_t d = 1; d < keyShape.size(); ++d) {
@@ -649,7 +649,7 @@ bool RunCase(const TestCase &tc, aclrtStream stream)
         keyStridePtr = &keyStrides;
     }
 
-    aclTensor *keyT = nullptr;
+    aclTensor* keyT = nullptr;
     if (tc.useInt8Key) {
         if (keyDim0Gap > 1) {
             const auto wide = ScatterPaKeyDim0(keyI8, tc.numPages, pageElems, keyDim0Gap, kKeyStridePoisonI8);
@@ -683,11 +683,11 @@ bool RunCase(const TestCase &tc, aclrtStream stream)
             keyT = buf.Create(keyHf, keyShape, ACL_FLOAT16);
         }
     }
-    aclTensor *blockTableT = nullptr;
+    aclTensor* blockTableT = nullptr;
     if (!isTnd) {
         blockTableT = buf.Create(blockTable, {batch, maxBlocks}, ACL_INT32);
     }
-    aclTensor *scaleT = nullptr;
+    aclTensor* scaleT = nullptr;
     if (tc.useInt8Key) {
         if (isTnd) {
             scaleT = buf.Create(deqScale, {totalK, NUM_KV_HEADS}, ACL_FLOAT);
@@ -695,19 +695,19 @@ bool RunCase(const TestCase &tc, aclrtStream stream)
             scaleT = buf.Create(deqScale, {tc.numPages, NUM_KV_HEADS, BLOCK_SIZE}, ACL_FLOAT);
         }
     }
-    aclTensor *actualSeqQlenT = buf.Create(actualSeqQlen, {batch + 1}, ACL_INT32);
-    aclTensor *actualSeqKlenT =
+    aclTensor* actualSeqQlenT = buf.Create(actualSeqQlen, {batch + 1}, ACL_INT32);
+    aclTensor* actualSeqKlenT =
         isTnd ? buf.Create(actualSeqKlenPrefix, {batch + 1}, ACL_INT32) : buf.Create(tc.kvLen, {batch}, ACL_INT32);
-    aclTensor *startLocT = buf.Create(tc.startLoc, {batch}, ACL_INT32);
+    aclTensor* startLocT = buf.Create(tc.startLoc, {batch}, ACL_INT32);
     std::vector<int8_t> attenMaskHost(static_cast<size_t>(kAttenMaskSize * kAttenMaskSize), 0);
-    aclTensor *attenMaskT = nullptr;
+    aclTensor* attenMaskT = nullptr;
     if (tc.sparseMode == kSparseModeRightDown) {
         attenMaskT = buf.Create(attenMaskHost, {kAttenMaskSize, kAttenMaskSize}, ACL_INT8);
     }
 
     std::vector<float> scoreInit(static_cast<size_t>(tc.numQHeads * totalQ * scoreStride), 0.0F);
-    void *scoreDev = nullptr;
-    aclTensor *scoreT = buf.Create(scoreInit, scoreShape, ACL_FLOAT, &scoreDev);
+    void* scoreDev = nullptr;
+    aclTensor* scoreT = buf.Create(scoreInit, scoreShape, ACL_FLOAT, &scoreDev);
 
     if (queryT == nullptr || keyT == nullptr || actualSeqQlenT == nullptr || actualSeqKlenT == nullptr ||
         startLocT == nullptr || scoreT == nullptr || (!isTnd && blockTableT == nullptr) ||
@@ -725,8 +725,8 @@ bool RunCase(const TestCase &tc, aclrtStream stream)
     }
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
     int ret = aclnnMsaIndexScoreGetWorkspaceSize(queryT, keyT, blockTableT, scaleT, attenMaskT, actualSeqQlenT,
                                                  actualSeqKlenT, startLocT, layoutKeyBuf, tc.sparseMode, kInitBlocks,
                                                  kLocalBlocks, scoreT, &workspaceSize, &executor);
@@ -1002,11 +1002,11 @@ int main()
     size_t passed = 0;
     size_t ran = 0;
     size_t skipped = 0;
-    const char *socName = aclrtGetSocName();
+    const char* socName = aclrtGetSocName();
     const std::string soc = (socName == nullptr) ? "" : socName;
     const bool isAscend950 = (soc.find("950") != std::string::npos) || (soc.find("910_95") != std::string::npos);
     (void)printf("running %zu MsaIndexScore cases (soc=%s)\n", cases.size(), soc.empty() ? "?" : soc.c_str());
-    for (const auto &tc : cases) {
+    for (const auto& tc : cases) {
         if (tc.fp8Kind != 0 && !isAscend950) {
             (void)printf("  [%s] SKIP: FP8 is Ascend 950 only\n", tc.name.c_str());
             ++skipped;

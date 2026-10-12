@@ -25,7 +25,7 @@ static const size_t VALUE_INDEX = 2;
 static const int64_t INNER_PRECISE_MIN = 0;
 static const int64_t INNER_PRECISE_MAX = 4;
 
-static graphStatus PromptHostExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus PromptHostExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
 
@@ -54,7 +54,7 @@ static graphStatus PromptHostExecuteFunc(OpExecuteContext *host_api_ctx)
 
     std::vector<int64_t> actSeqArray;
     if (actualSeqLengthsGe != nullptr) {
-        const int64_t *actSeqData = actualSeqLengthsGe->GetData<int64_t>();
+        const int64_t* actSeqData = actualSeqLengthsGe->GetData<int64_t>();
         OP_CHECK_IF(
             actSeqData == nullptr,
             OP_LOGE("aclnnfallback",
@@ -70,7 +70,7 @@ static graphStatus PromptHostExecuteFunc(OpExecuteContext *host_api_ctx)
 
     std::vector<int64_t> actSeqArrayKv;
     if (actualSeqLengthsGeKv != nullptr) {
-        const int64_t *actSeqData = actualSeqLengthsGeKv->GetData<int64_t>();
+        const int64_t* actSeqData = actualSeqLengthsGeKv->GetData<int64_t>();
         const size_t len = static_cast<size_t>(actualSeqLengthsGeKv->GetShapeSize());
         for (size_t i = 0; i < len; i++) {
             actSeqArrayKv.push_back(actSeqData[i]);
@@ -78,14 +78,14 @@ static graphStatus PromptHostExecuteFunc(OpExecuteContext *host_api_ctx)
     }
 
     auto attrs = host_api_ctx->GetAttrs();
-    const uint32_t *getNumHeads = attrs->GetAttrPointer<uint32_t>(0);
-    const float *scaleValue = attrs->GetAttrPointer<float>(1);
-    const int64_t *getPreTokens = attrs->GetAttrPointer<int64_t>(2);
-    const int64_t *getNextTokens = attrs->GetAttrPointer<int64_t>(3);
-    const char *layout = attrs->GetAttrPointer<char>(4);
-    const uint32_t *getKVHeadNum = attrs->GetAttrPointer<uint32_t>(5);
-    const uint32_t *getSparseMode = attrs->GetAttrPointer<uint32_t>(6);
-    const uint32_t *getInnerPrecise = attrs->GetAttrPointer<uint32_t>(7);
+    const uint32_t* getNumHeads = attrs->GetAttrPointer<uint32_t>(0);
+    const float* scaleValue = attrs->GetAttrPointer<float>(1);
+    const int64_t* getPreTokens = attrs->GetAttrPointer<int64_t>(2);
+    const int64_t* getNextTokens = attrs->GetAttrPointer<int64_t>(3);
+    const char* layout = attrs->GetAttrPointer<char>(4);
+    const uint32_t* getKVHeadNum = attrs->GetAttrPointer<uint32_t>(5);
+    const uint32_t* getSparseMode = attrs->GetAttrPointer<uint32_t>(6);
+    const uint32_t* getInnerPrecise = attrs->GetAttrPointer<uint32_t>(7);
 
     int64_t numHeads = *getNumHeads;
     double dScaleValue = *scaleValue;

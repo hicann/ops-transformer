@@ -49,12 +49,12 @@ template <typename LIT>
 class PoolKeyIndexerKernel {
 public:
     __aicore__ inline PoolKeyIndexerKernel(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *poolKey, __gm__ uint8_t *weights,
-                                __gm__ uint8_t *poolTailK, __gm__ uint8_t *actualSeqLengthsQ,
-                                __gm__ uint8_t *actualSeqLengthsK, __gm__ uint8_t *blockTable, __gm__ uint8_t *qDescale,
-                                __gm__ uint8_t *kDescale, __gm__ uint8_t *sparseIndices, __gm__ uint8_t *sparseValues,
-                                __gm__ uint8_t *workspace, const PoolKeyIndexerTilingData *__restrict tiling,
-                                TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* poolKey, __gm__ uint8_t* weights,
+                                __gm__ uint8_t* poolTailK, __gm__ uint8_t* actualSeqLengthsQ,
+                                __gm__ uint8_t* actualSeqLengthsK, __gm__ uint8_t* blockTable, __gm__ uint8_t* qDescale,
+                                __gm__ uint8_t* kDescale, __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseValues,
+                                __gm__ uint8_t* workspace, const PoolKeyIndexerTilingData* __restrict tiling,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
 
     // =================================类型定义区=================================
@@ -90,7 +90,7 @@ public:
     static constexpr int64_t LD_PREFETCH_LEN = 2;
 
 protected:
-    TPipe *pipe = nullptr;
+    TPipe* pipe = nullptr;
 
     // offset
     uint64_t queryCoreOffset = 0ULL;
@@ -131,11 +131,11 @@ protected:
     PkiCommon::SplitCoreInfo splitCoreInfo{};
 
     // ================================Init functions==================================
-    __aicore__ inline void InitTilingData(const PoolKeyIndexerTilingData *__restrict tilingData);
+    __aicore__ inline void InitTilingData(const PoolKeyIndexerTilingData* __restrict tilingData);
     __aicore__ inline void InitBuffers();
-    __aicore__ inline void InitActualSeqLen(__gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengthsK);
+    __aicore__ inline void InitActualSeqLen(__gm__ uint8_t* actualSeqLengthsQ, __gm__ uint8_t* actualSeqLengthsK);
     // ================================Split Core================================
-    __aicore__ inline void SplitCore(uint32_t curCoreIdx, uint32_t &coreNum, PkiCommon::SplitCoreInfo &info);
+    __aicore__ inline void SplitCore(uint32_t curCoreIdx, uint32_t& coreNum, PkiCommon::SplitCoreInfo& info);
     __aicore__ inline uint32_t GetTotalBaseBlockNum();
     __aicore__ inline uint32_t GetS2BaseBlockNumOnMask(uint32_t s1gIdx, uint32_t actS1Size, uint32_t actS2SizeOrig);
     // ================================Process functions================================
@@ -146,16 +146,16 @@ protected:
     __aicore__ inline void CalcGS1LoopParams(uint32_t bN2Idx);
     __aicore__ inline void GetBN2Idx(uint32_t bN2Idx);
     __aicore__ inline uint32_t GetActualSeqLen(uint32_t bIdx, uint32_t actualLenDims, bool isAccumSeq,
-                                               GlobalTensor<int64_t> &actualSeqLengthsGmKv, uint32_t defaultSeqLen);
-    __aicore__ inline void GetS1S2ActualSeqLen(uint32_t bIdx, uint32_t &actS1Size, uint32_t &actS2Size,
-                                               uint32_t &actS2SizeOrig);
+                                               GlobalTensor<int64_t>& actualSeqLengthsGmKv, uint32_t defaultSeqLen);
+    __aicore__ inline void GetS1S2ActualSeqLen(uint32_t bIdx, uint32_t& actS1Size, uint32_t& actS2Size,
+                                               uint32_t& actS2SizeOrig);
     __aicore__ inline void CalcS2LoopParams(uint32_t bN2LoopIdx, uint32_t gS1LoopIdx);
-    __aicore__ inline void CalcRunInfo(uint32_t loop, uint32_t s2LoopIdx, PkiCommon::RunInfo &runInfo);
+    __aicore__ inline void CalcRunInfo(uint32_t loop, uint32_t s2LoopIdx, PkiCommon::RunInfo& runInfo);
     __aicore__ inline void DealActSeqLenIsZero(uint32_t bIdx, uint32_t n2Idx, uint32_t s1Start);
 };
 
 template <typename LIT>
-__aicore__ inline void PoolKeyIndexerKernel<LIT>::InitTilingData(const PoolKeyIndexerTilingData *__restrict tilingData)
+__aicore__ inline void PoolKeyIndexerKernel<LIT>::InitTilingData(const PoolKeyIndexerTilingData* __restrict tilingData)
 {
     usedCoreNum = tilingData->usedCoreNum;
     constInfo.keyStride0 = tilingData->keyStride0;
@@ -237,27 +237,27 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::InitBuffers()
 }
 
 template <typename LIT>
-__aicore__ inline void PoolKeyIndexerKernel<LIT>::InitActualSeqLen(__gm__ uint8_t *actualSeqLengthsQ,
-                                                                   __gm__ uint8_t *actualSeqLengthsK)
+__aicore__ inline void PoolKeyIndexerKernel<LIT>::InitActualSeqLen(__gm__ uint8_t* actualSeqLengthsQ,
+                                                                   __gm__ uint8_t* actualSeqLengthsK)
 {
     if (actualSeqLengthsQ == nullptr) {
         constInfo.actualLenQDims = 0;
     } else {
         constInfo.actualLenQDims = constInfo.batchSize;
-        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsQ, constInfo.actualLenQDims);
+        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsQ, constInfo.actualLenQDims);
     }
     if (actualSeqLengthsK == nullptr) {
         constInfo.actualLenDims = 0;
     } else {
         constInfo.actualLenDims = constInfo.batchSize;
-        actualSeqLengthsGmKv.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsK, constInfo.actualLenDims);
+        actualSeqLengthsGmKv.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsK, constInfo.actualLenDims);
     }
 }
 
 template <typename LIT>
 __aicore__ inline uint32_t PoolKeyIndexerKernel<LIT>::GetActualSeqLen(uint32_t bIdx, uint32_t actualLenDims,
                                                                       bool isAccumSeq,
-                                                                      GlobalTensor<int64_t> &actualSeqLengthsGmKv,
+                                                                      GlobalTensor<int64_t>& actualSeqLengthsGmKv,
                                                                       uint32_t defaultSeqLen)
 {
     if (actualLenDims == 0) {
@@ -270,8 +270,8 @@ __aicore__ inline uint32_t PoolKeyIndexerKernel<LIT>::GetActualSeqLen(uint32_t b
 }
 
 template <typename LIT>
-__aicore__ inline void PoolKeyIndexerKernel<LIT>::GetS1S2ActualSeqLen(uint32_t bIdx, uint32_t &actS1Size,
-                                                                      uint32_t &actS2Size, uint32_t &actS2SizeOrig)
+__aicore__ inline void PoolKeyIndexerKernel<LIT>::GetS1S2ActualSeqLen(uint32_t bIdx, uint32_t& actS1Size,
+                                                                      uint32_t& actS2Size, uint32_t& actS2SizeOrig)
 {
     actS1Size = GetActualSeqLen(bIdx, constInfo.actualLenQDims, constInfo.isAccumSeqS1, actualSeqLengthsGmQ,
                                 constInfo.qSeqSize);
@@ -324,8 +324,8 @@ __aicore__ inline uint32_t PoolKeyIndexerKernel<LIT>::GetTotalBaseBlockNum()
 
 // 多核版本，双闭区间。基本原则：计算每个核最少处理的块数, 剩余的部分前面的核每个核多处理一块
 template <typename LIT>
-__aicore__ void inline PoolKeyIndexerKernel<LIT>::SplitCore(uint32_t curCoreIdx, uint32_t &coreNum,
-                                                            PkiCommon::SplitCoreInfo &info)
+__aicore__ void inline PoolKeyIndexerKernel<LIT>::SplitCore(uint32_t curCoreIdx, uint32_t& coreNum,
+                                                            PkiCommon::SplitCoreInfo& info)
 {
     uint32_t totalBlockNum = GetTotalBaseBlockNum();
     uint32_t minBlockPerCore = totalBlockNum / coreNum;
@@ -443,10 +443,10 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::DealActSeqLenIsZero(uint32_t b
 
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerKernel<LIT>::Init(
-    __gm__ uint8_t *query, __gm__ uint8_t *poolKey, __gm__ uint8_t *weights, __gm__ uint8_t *poolTailK,
-    __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengthsK, __gm__ uint8_t *blockTable,
-    __gm__ uint8_t *qDescale, __gm__ uint8_t *kDescale, __gm__ uint8_t *sparseIndices, __gm__ uint8_t *sparseValues,
-    __gm__ uint8_t *workspace, const PoolKeyIndexerTilingData *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t* query, __gm__ uint8_t* poolKey, __gm__ uint8_t* weights, __gm__ uint8_t* poolTailK,
+    __gm__ uint8_t* actualSeqLengthsQ, __gm__ uint8_t* actualSeqLengthsK, __gm__ uint8_t* blockTable,
+    __gm__ uint8_t* qDescale, __gm__ uint8_t* kDescale, __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseValues,
+    __gm__ uint8_t* workspace, const PoolKeyIndexerTilingData* __restrict tiling, TPipe* tPipe)
 {
     if ASCEND_IS_AIV {
         tmpBlockIdx = GetBlockIdx(); // vec:0-47
@@ -459,7 +459,7 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::Init(
     InitTilingData(tiling);
     InitActualSeqLen(actualSeqLengthsQ, actualSeqLengthsK);
     if (poolTailK != nullptr) {
-        poolTailKGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(poolTailK), constInfo.batchSize);
+        poolTailKGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(poolTailK), constInfo.batchSize);
         hasPoolTailK_ = true;
     }
 
@@ -474,19 +474,19 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::Init(
     uint64_t singleCoreScoreSize = constInfo.s1BaseSize *
                                    PkiCommon::Align((uint64_t)constInfo.kSeqSize, (uint64_t)constInfo.s2BaseSize) *
                                    sizeof(SCORE_T);
-    scoreGm.SetGlobalBuffer((__gm__ SCORE_T *)(workspace + aiCoreIdx * singleCoreScoreSize));
+    scoreGm.SetGlobalBuffer((__gm__ SCORE_T*)(workspace + aiCoreIdx * singleCoreScoreSize));
     offset += GetBlockNum() * singleCoreScoreSize;
 
     if ASCEND_IS_AIV {
         vectorService.InitParams(constInfo, tiling);
-        indiceOutGm.SetGlobalBuffer((__gm__ int32_t *)sparseIndices);
-        valueOutGm.SetGlobalBuffer((__gm__ float *)sparseValues);
-        weightsGm.SetGlobalBuffer((__gm__ W_ACT_T *)weights);
-        blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
+        indiceOutGm.SetGlobalBuffer((__gm__ int32_t*)sparseIndices);
+        valueOutGm.SetGlobalBuffer((__gm__ float*)sparseValues);
+        weightsGm.SetGlobalBuffer((__gm__ W_ACT_T*)weights);
+        blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blockTable);
         if constexpr (LIT::isFp8PerToken) {
             // mode=0: q/k_descale 为 float, vector 侧融合
-            qScaleGmFp32.SetGlobalBuffer((__gm__ float *)qDescale);
-            kScaleGmFp32.SetGlobalBuffer((__gm__ float *)kDescale);
+            qScaleGmFp32.SetGlobalBuffer((__gm__ float*)qDescale);
+            kScaleGmFp32.SetGlobalBuffer((__gm__ float*)kDescale);
             vectorService.InitVecInputTensor(weightsGm, indiceOutGm, valueOutGm, blockTableGm, qScaleGmFp32,
                                              kScaleGmFp32);
         } else {
@@ -495,15 +495,15 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::Init(
         vectorService.InitVecWorkspaceTensor(scoreGm);
     } else {
         matmulService.InitParams(constInfo);
-        queryGm.SetGlobalBuffer((__gm__ Q_T *)query);
+        queryGm.SetGlobalBuffer((__gm__ Q_T*)query);
         if constexpr (PAGE_ATTENTION) {
-            blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
+            blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blockTable);
         }
-        keyGm.SetGlobalBuffer((__gm__ K_T *)poolKey);
+        keyGm.SetGlobalBuffer((__gm__ K_T*)poolKey);
         if constexpr (LIT::isMxFp8) {
             // mode=1: E8M0 scale 按 2 个打包成 1 个 bf16 寻址, 块数 = e8m0 元素数 / 2
-            qScaleGmBf16.SetGlobalBuffer((__gm__ bfloat16_t *)qDescale);
-            kScaleGmBf16.SetGlobalBuffer((__gm__ bfloat16_t *)kDescale);
+            qScaleGmBf16.SetGlobalBuffer((__gm__ bfloat16_t*)qDescale);
+            kScaleGmBf16.SetGlobalBuffer((__gm__ bfloat16_t*)kDescale);
             matmulService.InitMm1GlobalTensor(blockTableGm, keyGm, queryGm, kScaleGmBf16, qScaleGmBf16);
         } else {
             matmulService.InitMm1GlobalTensor(blockTableGm, keyGm, queryGm);
@@ -568,7 +568,7 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::CalcGS1LoopParams(uint32_t bN2
 
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerKernel<LIT>::CalcRunInfo(uint32_t loop, uint32_t s2LoopIdx,
-                                                              PkiCommon::RunInfo &runInfo)
+                                                              PkiCommon::RunInfo& runInfo)
 {
     runInfo.loop = loop;
     runInfo.bIdx = tempLoopInfo.bIdx;
@@ -710,7 +710,7 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::ProcessInvalid()
                 WaitFlag<HardEvent::MTE3_V>(eventIDMTE3ToV);
 
                 GlobalTensor<uint32_t> valueOutGmTmp;
-                valueOutGmTmp.SetGlobalBuffer((__gm__ uint32_t *)valueOutGm.GetPhyAddr());
+                valueOutGmTmp.SetGlobalBuffer((__gm__ uint32_t*)valueOutGm.GetPhyAddr());
                 GlobalTensor<uint32_t> valueOut = valueOutGmTmp[valueBase];
                 AscendC::InitGlobalMemory(valueOut, valueDealSize, constInfo.INVALID_VAL);
             }

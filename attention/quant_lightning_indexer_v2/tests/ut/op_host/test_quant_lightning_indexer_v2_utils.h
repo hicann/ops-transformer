@@ -66,7 +66,7 @@ struct CaseParam {
     int64_t returnValue = 0;
 };
 
-inline gert::StorageShape ToStorageShape(const std::vector<int64_t> &dims)
+inline gert::StorageShape ToStorageShape(const std::vector<int64_t>& dims)
 {
     gert::StorageShape shape;
     if (dims.empty()) {
@@ -81,12 +81,12 @@ inline gert::StorageShape ToStorageShape(const std::vector<int64_t> &dims)
     return shape;
 }
 
-inline gert::TilingContextPara::TensorDescription Desc(const std::vector<int64_t> &dims, ge::DataType dtype)
+inline gert::TilingContextPara::TensorDescription Desc(const std::vector<int64_t>& dims, ge::DataType dtype)
 {
     return gert::TilingContextPara::TensorDescription(ToStorageShape(dims), dtype, ge::FORMAT_ND);
 }
 
-inline void RunTilingCase(const CaseParam &p, ge::graphStatus expect)
+inline void RunTilingCase(const CaseParam& p, ge::graphStatus expect)
 {
     struct QLIV2CompileInfo {
     } compileInfo;

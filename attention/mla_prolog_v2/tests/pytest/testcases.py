@@ -26,15 +26,17 @@ TEST_PARAMS = {
         "rope_head_dim": [64],
         "q_seq": [1],
         "kv_seq": [1024],
-        "block_size" : [128],
-        "input_layout":["BSH"],
-        "cache_mode" : ["PA_BSND"],
-        "cq_epsilon" : [0.0005],
-        "ckv_epsilon" : [0.0005],
-        "dtype" : [torch.bfloat16],
+        "block_size": [128],
+        "input_layout": ["BSH"],
+        "cache_mode": ["PA_BSND"],
+        "cq_epsilon": [0.0005],
+        "ckv_epsilon": [0.0005],
+        "dtype": [torch.bfloat16],
         # "block_num" : [batch_size * kv_seq / block_size]
     }
 }
 
 # 按需选择要启用的测试参数（例如默认启用所有）
-ENABLED_PARAMS = [TEST_PARAMS["base_default"]] # 或指定子集，如[TEST_PARAMS["base"], TEST_PARAMS["mixed"]], TEST_PARAMS
+ENABLED_PARAMS = [
+    TEST_PARAMS["base_default"]
+]  # 或指定子集，如[TEST_PARAMS["base"], TEST_PARAMS["mixed"]], TEST_PARAMS

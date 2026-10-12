@@ -57,11 +57,15 @@ class QuantLightningIndexerSpec:
 
     def compare(*outputs, compare_context=None, **kwargs):
         del kwargs
-        testcase_name = None if compare_context is None else compare_context.testcase_name
+        testcase_name = (
+            None if compare_context is None else compare_context.testcase_name
+        )
         data = golden_module.get_compare_data(testcase_name)
         if data is None:
             if compare_context is None:
-                raise RuntimeError("QuantLightningIndexer pytest compare requires compare_context")
+                raise RuntimeError(
+                    "QuantLightningIndexer pytest compare requires compare_context"
+                )
             data = inputs_module.rebuild_qli_compare_data(compare_context)
             golden_module.set_compare_data(compare_context.testcase_name, data)
         return compare_module.compare(*outputs, compare_data=data)

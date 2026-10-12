@@ -99,7 +99,7 @@ public:
 
     // Element-wise addition
     CATLASS_HOST_DEVICE
-    Coord operator+(Coord const &b) const
+    Coord operator+(Coord const& b) const
     {
         Coord c;
         for (int i = 0; i < RANK; ++i) {
@@ -121,7 +121,7 @@ public:
 
     // Element-wise subtraction
     CATLASS_HOST_DEVICE
-    Coord operator-(Coord const &b) const
+    Coord operator-(Coord const& b) const
     {
         Coord c;
         for (int i = 0; i < RANK; i++) {
@@ -143,7 +143,7 @@ public:
 
     // Element-wise multiply
     CATLASS_HOST_DEVICE
-    Coord operator*(Coord const &b) const
+    Coord operator*(Coord const& b) const
     {
         Coord c;
         for (int i = 0; i < RANK; i++) {
@@ -154,7 +154,7 @@ public:
 
     // Element-wise division
     CATLASS_HOST_DEVICE
-    Coord operator/(Coord const &b) const
+    Coord operator/(Coord const& b) const
     {
         Coord c;
         for (int i = 0; i < RANK; i++) {
@@ -165,7 +165,7 @@ public:
 
     // Element-wise mod
     CATLASS_HOST_DEVICE
-    Coord operator%(Coord const &b) const
+    Coord operator%(Coord const& b) const
     {
         Coord c;
         for (int i = 0; i < RANK; i++) {
@@ -176,7 +176,7 @@ public:
 
     // In-place addition
     CATLASS_HOST_DEVICE
-    Coord &operator+=(Coord const &b)
+    Coord& operator+=(Coord const& b)
     {
         for (int i = 0; i < RANK; ++i) {
             idx[i] += b.idx[i];
@@ -186,7 +186,7 @@ public:
 
     // In-place equal
     CATLASS_HOST_DEVICE
-    bool operator==(Coord const &b) const
+    bool operator==(Coord const& b) const
     {
         for (int i = 0; i < RANK; ++i) {
             if (idx[i] != b.idx[i]) {
@@ -210,42 +210,42 @@ public:
 
     // Member acces operator
     CATLASS_HOST_DEVICE
-    Index &operator[](int dim)
+    Index& operator[](int dim)
     {
         return idx[dim];
     }
 
     // Member access operator
     CATLASS_HOST_DEVICE
-    Index const &operator[](int dim) const
+    Index const& operator[](int dim) const
     {
         return idx[dim];
     }
 
     // Gets the index of a given Coord element
     template <int DIM>
-    CATLASS_HOST_DEVICE Index &At()
+    CATLASS_HOST_DEVICE Index& At()
     {
         return idx[DIM];
     }
 
     // Access via index; may limit unrolling potential
     CATLASS_HOST_DEVICE
-    Index &At(int dim)
+    Index& At(int dim)
     {
         return idx[dim];
     }
 
     // Gets the index of a given Coord element
     template <int DIM>
-    CATLASS_HOST_DEVICE Index const &At() const
+    CATLASS_HOST_DEVICE Index const& At() const
     {
         return idx[DIM];
     }
 
     // Access via index; may limit unrolling potential
     CATLASS_HOST_DEVICE
-    Index const &At(int dim) const
+    Index const& At(int dim) const
     {
         return idx[dim];
     }
@@ -258,7 +258,7 @@ public:
     }
 
     CATLASS_HOST_DEVICE
-    static Coord Min(Coord const &a, Coord const &b)
+    static Coord Min(Coord const& a, Coord const& b)
     {
         Coord res;
         for (int i = 0; i < RANK; ++i) {

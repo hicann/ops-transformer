@@ -43,7 +43,7 @@ static constexpr uint32_t PFA_INPUT_ACTUAL_SEQ_LENGTHS_KV_INDEX = 6;
 static constexpr uint32_t PFA_QUANT_SCALE2_INDEX = 10;
 } // namespace ops
 namespace ops {
-static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext *context)
+static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("PromptFlashAttention", "Context for inferring shape is nullptr!");
@@ -51,15 +51,15 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext *c
     }
     OP_LOGD(context->GetNodeName(), "Enter PromptFlashAttention inferShape impl.");
     // query shape : (B, S, H)
-    const gert::Shape *queryShape = context->GetInputShape(PFA_QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(PFA_QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
 
     // value shape
-    const gert::Shape *valueShape = context->GetInputShape(PFA_VALUE_INDEX);
+    const gert::Shape* valueShape = context->GetInputShape(PFA_VALUE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
 
     // attentionOut: (B, S, H)
-    gert::Shape *attentionOutShape = context->GetOutputShape(PFA_ATTENTION_OUT_INDEX);
+    gert::Shape* attentionOutShape = context->GetOutputShape(PFA_ATTENTION_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
 
     *attentionOutShape = *queryShape;
@@ -75,11 +75,11 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext *c
     // Get attr
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const char *inputLayoutPtr = attrs->GetAttrPointer<char>(PFA_ATTR_INPUT_LAYOUT_INDEX);
+    const char* inputLayoutPtr = attrs->GetAttrPointer<char>(PFA_ATTR_INPUT_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutPtr);
-    const int64_t *numHeadsPtr = attrs->GetInt(PFA_ATTR_NUM_HEADS_INDEX);
+    const int64_t* numHeadsPtr = attrs->GetInt(PFA_ATTR_NUM_HEADS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numHeadsPtr);
-    const int64_t *numKeyValueHeadsPtr = attrs->GetInt(PFA_ATTR_NUM_KV_HEADS_INDEX);
+    const int64_t* numKeyValueHeadsPtr = attrs->GetInt(PFA_ATTR_NUM_KV_HEADS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numKeyValueHeadsPtr);
 
     // KV_N除零保护, 当KV_N为零时KV_N = Q_N
@@ -103,8 +103,8 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext *c
         (*attentionOutShape)[PFA_LAYOUT_DIM3] = outputD;
     } else if (strcmp(inputLayoutPtr, "TND") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_TND_DIMS || valueShape->GetDimNum() != PFA_LAYOUT_TND_DIMS) {
-            OP_LOGE(context->GetNodeName(), "Layout %s, queryDims(%zu) valueDims(%zu) must be 3!",
-                inputLayoutPtr, queryShape->GetDimNum(), valueShape->GetDimNum());
+            OP_LOGE(context->GetNodeName(), "Layout %s, queryDims(%zu) valueDims(%zu) must be 3!", inputLayoutPtr,
+                    queryShape->GetDimNum(), valueShape->GetDimNum());
             return ge::GRAPH_FAILED;
         }
         int64_t outputD = (*valueShape)[PFA_LAYOUT_DIM2];
@@ -115,7 +115,7 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext *c
     } else if (strcmp(inputLayoutPtr, "NTD") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_NTD_DIMS || valueShape->GetDimNum() != PFA_LAYOUT_NTD_DIMS) {
             OP_LOGE(context->GetNodeName(), "Layout NTD, queryDims(%zu) valueDims(%zu) must be 3!",
-                queryShape->GetDimNum(), valueShape->GetDimNum());
+                    queryShape->GetDimNum(), valueShape->GetDimNum());
             return ge::GRAPH_FAILED;
         }
         int64_t outputD = (*valueShape)[PFA_LAYOUT_DIM2];
@@ -126,21 +126,21 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext *c
     } else if (strcmp(inputLayoutPtr, "NTD_TND") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_TND_DIMS || valueShape->GetDimNum() != PFA_LAYOUT_TND_DIMS) {
             OP_LOGE(context->GetNodeName(), "Layout NTD_TND, queryDims(%zu) valueDims(%zu) must be 3!",
-                queryShape->GetDimNum(), valueShape->GetDimNum());
+                    queryShape->GetDimNum(), valueShape->GetDimNum());
             return ge::GRAPH_FAILED;
         }
         (*attentionOutShape)[PFA_LAYOUT_DIM0] = (*queryShape)[PFA_LAYOUT_DIM1];
         (*attentionOutShape)[PFA_LAYOUT_DIM1] = (*queryShape)[PFA_LAYOUT_DIM0];
         (*attentionOutShape)[PFA_LAYOUT_DIM2] = (*valueShape)[PFA_LAYOUT_DIM2];
     } else if (strcmp(inputLayoutPtr, "TND_NTD") == 0) {
- 	    if (queryShape->GetDimNum() != PFA_LAYOUT_TND_DIMS || valueShape->GetDimNum() != PFA_LAYOUT_TND_DIMS) {
- 	        OP_LOGE(context->GetNodeName(), "Layout TND_NTD, queryDims(%zu) valueDims(%zu) must be 3!",
- 	            queryShape->GetDimNum(), valueShape->GetDimNum());
- 	        return ge::GRAPH_FAILED;
- 	    }
- 	    (*attentionOutShape)[PFA_LAYOUT_DIM0] = (*queryShape)[PFA_LAYOUT_DIM1];
- 	    (*attentionOutShape)[PFA_LAYOUT_DIM1] = (*queryShape)[PFA_LAYOUT_DIM0];
- 	    (*attentionOutShape)[PFA_LAYOUT_DIM2] = (*valueShape)[PFA_LAYOUT_DIM2];
+        if (queryShape->GetDimNum() != PFA_LAYOUT_TND_DIMS || valueShape->GetDimNum() != PFA_LAYOUT_TND_DIMS) {
+            OP_LOGE(context->GetNodeName(), "Layout TND_NTD, queryDims(%zu) valueDims(%zu) must be 3!",
+                    queryShape->GetDimNum(), valueShape->GetDimNum());
+            return ge::GRAPH_FAILED;
+        }
+        (*attentionOutShape)[PFA_LAYOUT_DIM0] = (*queryShape)[PFA_LAYOUT_DIM1];
+        (*attentionOutShape)[PFA_LAYOUT_DIM1] = (*queryShape)[PFA_LAYOUT_DIM0];
+        (*attentionOutShape)[PFA_LAYOUT_DIM2] = (*valueShape)[PFA_LAYOUT_DIM2];
     } else if (strcmp(inputLayoutPtr, "SH") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_SH_DIMS) {
             OP_LOGE(context->GetNodeName(), "Layout SH, queryDims(%zu) must be 2!", queryShape->GetDimNum());
@@ -194,7 +194,7 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext *c
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypePromptFlashAttention(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypePromptFlashAttention(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("PromptFlashAttention", "Context for inferring data type is nullptr!");

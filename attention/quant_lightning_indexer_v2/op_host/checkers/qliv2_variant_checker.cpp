@@ -24,7 +24,7 @@ constexpr uint32_t SCALAR_RANK = 1U;
 constexpr uint32_t SCALAR_AXIS = 0U;
 } // namespace
 
-ge::graphStatus QLIV2VariantChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus QLIV2VariantChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo& info) const
 {
     if (!info.queryDescale.IsPresent() || info.queryDescale.desc == nullptr ||
         info.queryDescale.GetShape() == nullptr || !info.keyDescale.IsPresent() || info.keyDescale.desc == nullptr ||
@@ -37,7 +37,7 @@ ge::graphStatus QLIV2VariantChecker::CheckParaExistence(const LightningIndexerV2
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QLIV2VariantChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus QLIV2VariantChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo& info) const
 {
     if (info.quantMode < QUANT_MODE_FP8 || info.quantMode > QUANT_MODE_MXFP4) {
         const std::string actual = std::to_string(info.quantMode);
@@ -71,12 +71,12 @@ ge::graphStatus QLIV2VariantChecker::CheckSinglePara(const LightningIndexerV2Che
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QLIV2VariantChecker::CheckScaleShape(const LightningIndexerV2CheckerInfo &info,
-                                                     const CheckerTensor &input, const CheckerTensor &scale,
-                                                     const char *inputName, const char *scaleName) const
+ge::graphStatus QLIV2VariantChecker::CheckScaleShape(const LightningIndexerV2CheckerInfo& info,
+                                                     const CheckerTensor& input, const CheckerTensor& scale,
+                                                     const char* inputName, const char* scaleName) const
 {
-    const gert::Shape &inputShape = *input.GetShape();
-    const gert::Shape &scaleShape = *scale.GetShape();
+    const gert::Shape& inputShape = *input.GetShape();
+    const gert::Shape& scaleShape = *scale.GetShape();
     const uint32_t inputRank = inputShape.GetDimNum();
     if (info.quantMode == QUANT_MODE_HIFLOAT8) {
         if (scaleShape.GetDimNum() != SCALAR_RANK || scaleShape.GetDim(SCALAR_AXIS) != 1) {
@@ -122,7 +122,7 @@ ge::graphStatus QLIV2VariantChecker::CheckScaleShape(const LightningIndexerV2Che
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QLIV2VariantChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus QLIV2VariantChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo& info) const
 {
     if (CheckScaleShape(info, info.query, info.queryDescale, "q", "q_descale") != ge::GRAPH_SUCCESS ||
         CheckScaleShape(info, info.key, info.keyDescale, "k", "k_descale") != ge::GRAPH_SUCCESS) {

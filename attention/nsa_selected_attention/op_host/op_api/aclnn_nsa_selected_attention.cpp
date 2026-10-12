@@ -76,7 +76,7 @@ struct NSAShapeInfo {
     bool needPadValue = false;
 };
 
-void AnalysisAxisForTnd(const Shape &qShape, const Shape &kShape, const Shape &vShape, NSAShapeInfo &shapeInfo)
+void AnalysisAxisForTnd(const Shape& qShape, const Shape& kShape, const Shape& vShape, NSAShapeInfo& shapeInfo)
 {
     shapeInfo.inputLayout = InputLayout::TND;
     shapeInfo.l0InputLayoutStr = "TND";
@@ -87,8 +87,8 @@ void AnalysisAxisForTnd(const Shape &qShape, const Shape &kShape, const Shape &v
     shapeInfo.axes.dv = vShape[DIM_NUM_2];
 }
 
-aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, const aclTensor *value, const char *inputLayout,
-                         NSAShapeInfo &shapeInfo)
+aclnnStatus AnalysisAxis(const aclTensor* query, const aclTensor* key, const aclTensor* value, const char* inputLayout,
+                         NSAShapeInfo& shapeInfo)
 {
     Shape qShape = query->GetViewShape();
     Shape kShape = key->GetViewShape();
@@ -136,7 +136,7 @@ aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, const acl
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus InputDtypeCheck(const aclTensor *query, const aclTensor *key, const aclTensor *value)
+aclnnStatus InputDtypeCheck(const aclTensor* query, const aclTensor* key, const aclTensor* value)
 {
     auto vDtype = value->GetDataType();
     auto kDtype = key->GetDataType();
@@ -150,10 +150,10 @@ aclnnStatus InputDtypeCheck(const aclTensor *query, const aclTensor *key, const 
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus AnalysisInput(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                          [[maybe_unused]] const aclTensor *topkIndices, char *inputLayout, NSAShapeInfo &shapeInfo,
-                          const aclIntArray *actualSeqQLenOptional = nullptr,
-                          const aclIntArray *actualSeqKvLenOptional = nullptr)
+aclnnStatus AnalysisInput(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                          [[maybe_unused]] const aclTensor* topkIndices, char* inputLayout, NSAShapeInfo& shapeInfo,
+                          const aclIntArray* actualSeqQLenOptional = nullptr,
+                          const aclIntArray* actualSeqKvLenOptional = nullptr)
 {
     CHECK_RET(AnalysisAxis(query, key, value, inputLayout, shapeInfo) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
@@ -185,7 +185,7 @@ aclnnStatus AnalysisInput(const aclTensor *query, const aclTensor *key, const ac
     return ACLNN_SUCCESS;
 }
 
-static inline const aclTensor *GeneratePaddings(int32_t dimNum, int32_t padNum, aclOpExecutor *executor)
+static inline const aclTensor* GeneratePaddings(int32_t dimNum, int32_t padNum, aclOpExecutor* executor)
 {
     // 2代表每根轴的前后都可以补0
     FVector<int64_t> padVec(dimNum * 2, 0);
@@ -201,8 +201,8 @@ static inline const aclTensor *GeneratePaddings(int32_t dimNum, int32_t padNum, 
     return padTensor;
 }
 
-aclnnStatus Contiguous(const aclTensor *&query, const aclTensor *&key, const aclTensor *&value,
-                       const aclTensor *&topkIndices, const aclTensor *&attenMaskOptional, aclOpExecutor *executor)
+aclnnStatus Contiguous(const aclTensor*& query, const aclTensor*& key, const aclTensor*& value,
+                       const aclTensor*& topkIndices, const aclTensor*& attenMaskOptional, aclOpExecutor* executor)
 {
     query = l0op::Contiguous(query, executor);
     CHECK_RET(query != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -219,7 +219,7 @@ aclnnStatus Contiguous(const aclTensor *&query, const aclTensor *&key, const acl
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus PreprocessQKV(const aclTensor *&value, const struct NSAShapeInfo &shapeInfo, aclOpExecutor *executor)
+aclnnStatus PreprocessQKV(const aclTensor*& value, const struct NSAShapeInfo& shapeInfo, aclOpExecutor* executor)
 {
     if (shapeInfo.needPadValue) {
         int32_t dimNum = (shapeInfo.inputLayout == InputLayout::TND) ? DIM_NUM_3 : DIM_NUM_4;
@@ -230,11 +230,11 @@ aclnnStatus PreprocessQKV(const aclTensor *&value, const struct NSAShapeInfo &sh
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckNsaParam(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                          const aclTensor *topkIndices, const aclIntArray *actualSeqQLenOptional,
-                          const aclIntArray *actualSeqKvLenOptional, const char *inputLayout,
-                          const aclTensor *softmaxMaxOut, const aclTensor *softmaxSumOut, const aclTensor *attentionOut,
-                          const uint64_t *workspaceSize, aclOpExecutor **const executor)
+aclnnStatus CheckNsaParam(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                          const aclTensor* topkIndices, const aclIntArray* actualSeqQLenOptional,
+                          const aclIntArray* actualSeqKvLenOptional, const char* inputLayout,
+                          const aclTensor* softmaxMaxOut, const aclTensor* softmaxSumOut, const aclTensor* attentionOut,
+                          const uint64_t* workspaceSize, aclOpExecutor** const executor)
 {
     // 必须的参数指针判空
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -253,11 +253,11 @@ aclnnStatus CheckNsaParam(const aclTensor *query, const aclTensor *key, const ac
 }
 
 aclnnStatus aclnnNsaSelectedAttentionGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *topkIndices,
-    const aclTensor *attenMaskOptional, const aclIntArray *actualSeqQLenOptional,
-    const aclIntArray *actualSeqKvLenOptional, double scaleValue, int64_t headNum, char *inputLayout,
-    int64_t sparseMode, int64_t selectedBlockSize, int64_t selectedBlockCount, const aclTensor *softmaxMaxOut,
-    const aclTensor *softmaxSumOut, const aclTensor *attentionOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* topkIndices,
+    const aclTensor* attenMaskOptional, const aclIntArray* actualSeqQLenOptional,
+    const aclIntArray* actualSeqKvLenOptional, double scaleValue, int64_t headNum, char* inputLayout,
+    int64_t sparseMode, int64_t selectedBlockSize, int64_t selectedBlockCount, const aclTensor* softmaxMaxOut,
+    const aclTensor* softmaxSumOut, const aclTensor* attentionOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     CHECK_RET(CheckNsaParam(query, key, value, topkIndices, actualSeqQLenOptional, actualSeqKvLenOptional, inputLayout,
                             softmaxMaxOut, softmaxSumOut, attentionOut, workspaceSize, executor) == ACLNN_SUCCESS,
@@ -288,7 +288,7 @@ aclnnStatus aclnnNsaSelectedAttentionGetWorkspaceSize(
                             actualSeqKvLenOptional) == ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_INVALID);
 
-    aclOpExecutor *l0Executor = uniqueExecutor.get();
+    aclOpExecutor* l0Executor = uniqueExecutor.get();
 
     CHECK_RET(Contiguous(query, key, value, topkIndices, attenMaskOptional, l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
@@ -326,7 +326,7 @@ aclnnStatus aclnnNsaSelectedAttentionGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnNsaSelectedAttention(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnNsaSelectedAttention(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                       const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnNsaSelectedAttention);

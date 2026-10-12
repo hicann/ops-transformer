@@ -72,7 +72,7 @@ static std::string QLIDataTypeToSerialString(ge::DataType type)
     }
 }
 
-static std::string ToStringRaw(const gert::Shape &shape)
+static std::string ToStringRaw(const gert::Shape& shape)
 {
     std::ostringstream oss;
     const size_t qliDimensionCount = shape.GetDimNum();
@@ -618,8 +618,8 @@ ge::graphStatus QLIInfoParser::GetN1Size()
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus QliGetActualSeqLenSize(int64_t &qliSize, const gert::Tensor *qliTensor,
-                                              const std::string &qliActualSeqLenName, const char *qliOpName)
+static ge::graphStatus QliGetActualSeqLenSize(int64_t& qliSize, const gert::Tensor* qliTensor,
+                                              const std::string& qliActualSeqLenName, const char* qliOpName)
 {
     qliSize = qliTensor->GetShapeSize();
     if (qliSize == 0) {
@@ -631,8 +631,8 @@ static ge::graphStatus QliGetActualSeqLenSize(int64_t &qliSize, const gert::Tens
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QLIInfoParser::GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor,
-                                                   const std::string &actualSeqLenName) const
+ge::graphStatus QLIInfoParser::GetActualSeqLenSize(int64_t& size, const gert::Tensor* tensor,
+                                                   const std::string& actualSeqLenName) const
 {
     return QliGetActualSeqLenSize(size, tensor, actualSeqLenName, opName_);
 }
@@ -701,8 +701,8 @@ ge::graphStatus QLIInfoParser::GetBatchSize()
     }
 }
 
-static ge::graphStatus QliGetHeadDim(const TilingRequiredParaInfo &qliQuery, DataLayout qliQLayout,
-                                     const char *qliOpName, int64_t &qliHeadDim)
+static ge::graphStatus QliGetHeadDim(const TilingRequiredParaInfo& qliQuery, DataLayout qliQLayout,
+                                     const char* qliOpName, int64_t& qliHeadDim)
 {
     uint32_t qliDIndex = DIM_IDX_TWO;
     switch (qliQLayout) {
@@ -1054,7 +1054,7 @@ ge::graphStatus QLIInfoParser::CheckContiguous()
     // Non-PA_BSND: check starts from axis 0
     size_t checkStartIdx = (kLayout_ == DataLayout::PA_BSND) ? 1 : 0;
     if (!keyStridesVec_.empty() && qliParams_.key.shape != nullptr) {
-        auto &shape = qliParams_.key.shape->GetStorageShape();
+        auto& shape = qliParams_.key.shape->GetStorageShape();
         std::vector<uint32_t> qliExpectedStrides;
         if (kLayout_ == DataLayout::BSND || kLayout_ == DataLayout::PA_BSND) {
             qliExpectedStrides = {shape.GetDim(1) * shape.GetDim(2) * shape.GetDim(3),
@@ -1070,7 +1070,7 @@ ge::graphStatus QLIInfoParser::CheckContiguous()
         }
     }
     if (!keyDequantScaleStridesVec_.empty() && qliParams_.key_dequant_scale.shape != nullptr) {
-        auto &shape = qliParams_.key_dequant_scale.shape->GetStorageShape();
+        auto& shape = qliParams_.key_dequant_scale.shape->GetStorageShape();
         std::vector<uint32_t> expectedStrides;
         if (kLayout_ == DataLayout::BSND || kLayout_ == DataLayout::PA_BSND) {
             expectedStrides = {shape.GetDim(1) * shape.GetDim(2), shape.GetDim(2), 1};
@@ -1093,7 +1093,7 @@ ge::graphStatus QLIInfoParser::CheckContiguous()
     return ge::GRAPH_SUCCESS;
 }
 
-void QLIInfoParser::GenerateInfo(QLITilingInfo &QLIInfo)
+void QLIInfoParser::GenerateInfo(QLITilingInfo& QLIInfo)
 {
     QLIInfo.opName = opName_;
     QLIInfo.platformInfo = platformInfo_;
@@ -1136,7 +1136,7 @@ void QLIInfoParser::GenerateInfo(QLITilingInfo &QLIInfo)
     QLIInfo.inputKLayout = kLayout_;
 }
 
-ge::graphStatus QLIInfoParser::ParseAndCheck(QLITilingInfo &QLIInfo)
+ge::graphStatus QLIInfoParser::ParseAndCheck(QLITilingInfo& QLIInfo)
 {
     if (ge::GRAPH_SUCCESS != GetOpName() || ge::GRAPH_SUCCESS != GetNpuInfo() || ge::GRAPH_SUCCESS != GetOpParaInfo() ||
         ge::GRAPH_SUCCESS != CheckQliRequiredParameters()) {
@@ -1172,13 +1172,13 @@ ge::graphStatus QLIInfoParser::ParseAndCheck(QLITilingInfo &QLIInfo)
 }
 
 // --------------------------TilingPrepare函数定义-------------------------------------
-static ge::graphStatus TilingPrepareForQuantLightningIndexer(gert::TilingParseContext * /* context */)
+static ge::graphStatus TilingPrepareForQuantLightningIndexer(gert::TilingParseContext* /* context */)
 {
     return ge::GRAPH_SUCCESS;
 }
 
 // --------------------------QuantLightningIndexerTiling类成员函数定义-----------------------
-static uint64_t QliCalcWorkspaceSize(const platform_ascendc::PlatformAscendC &qliPlatform, int64_t qliS2Size,
+static uint64_t QliCalcWorkspaceSize(const platform_ascendc::PlatformAscendC& qliPlatform, int64_t qliS2Size,
                                      uint32_t qliAicNum, ge::DataType inputQType)
 {
     constexpr uint32_t qliMm1ResElemSize = 4;
@@ -1211,7 +1211,7 @@ static uint64_t QliCalcWorkspaceSize(const platform_ascendc::PlatformAscendC &ql
     return qliWorkspaceSize;
 }
 
-ge::graphStatus QuantLightningIndexerTiling::DoTiling(QLITilingInfo *tilingInfo)
+ge::graphStatus QuantLightningIndexerTiling::DoTiling(QLITilingInfo* tilingInfo)
 {
     // -------------set blockdim-----------------
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
@@ -1222,7 +1222,7 @@ ge::graphStatus QuantLightningIndexerTiling::DoTiling(QLITilingInfo *tilingInfo)
 
     // -------------set workspacesize-----------------
     uint64_t workspaceSize = QliCalcWorkspaceSize(ascendcPlatform, tilingInfo->s2Size, aicNum, tilingInfo->inputQType);
-    size_t *workSpaces = context_->GetWorkspaceSizes(1);
+    size_t* workSpaces = context_->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
 
     // -------------set tilingdata-----------------
@@ -1258,7 +1258,7 @@ ge::graphStatus QuantLightningIndexerTiling::DoTiling(QLITilingInfo *tilingInfo)
 }
 
 // --------------------------Tiling函数定义---------------------------
-ge::graphStatus TilingForQuantLightningIndexer(gert::TilingContext *context)
+ge::graphStatus TilingForQuantLightningIndexer(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("QuantLightningIndexer", "Tilingcontext is null"), return ge::GRAPH_FAILED);
     QLITilingInfo QLIInfo;

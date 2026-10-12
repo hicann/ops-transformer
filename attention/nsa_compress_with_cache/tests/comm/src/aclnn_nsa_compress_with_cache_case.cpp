@@ -20,18 +20,18 @@
 
 using namespace ops::adv::tests::NsaCompressWithCache;
 
-bool NsaCompressWithCacheTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opExecutor)
+bool NsaCompressWithCacheTilingRunCbf(void* curCase, uint64_t* workSpaceSize, aclOpExecutor** opExecutor)
 {
-    auto *cs = static_cast<AclnnNsaCompressWithCacheCase *>(curCase);
-    auto *mAclnnParam = &cs->mAclnnParam;
-    auto *exp = &cs->mOpInfo.mExp;
+    auto* cs = static_cast<AclnnNsaCompressWithCacheCase*>(curCase);
+    auto* mAclnnParam = &cs->mAclnnParam;
+    auto* exp = &cs->mOpInfo.mExp;
 
     aclnnStatus ret;
 
     ret = aclnnNsaCompressWithCacheGetWorkspaceSize(
         mAclnnParam->aclnnInput.GetAclTensor(), mAclnnParam->aclnnWeight.GetAclTensor(),
         mAclnnParam->aclnnSlotMapping.GetAclTensor(), mAclnnParam->aclnnActualSeqLenIntAry,
-        mAclnnParam->aclnnBlockTable.GetAclTensor(), const_cast<char *>(mAclnnParam->mLayoutOptional.c_str()),
+        mAclnnParam->aclnnBlockTable.GetAclTensor(), const_cast<char*>(mAclnnParam->mLayoutOptional.c_str()),
         mAclnnParam->mCompressBlockSize, mAclnnParam->mCompressStride, mAclnnParam->mActSeqLenType,
         mAclnnParam->mPageBlockSize, mAclnnParam->aclnnOutputCache.GetAclTensor(), workSpaceSize, opExecutor);
     LOG_IF(ret != ACL_SUCCESS && exp->mSuccess,
@@ -40,11 +40,11 @@ bool NsaCompressWithCacheTilingRunCbf(void *curCase, uint64_t *workSpaceSize, ac
     return ret == ACL_SUCCESS;
 }
 
-bool NsaCompressWithCacheKernelRunCbf(void *curCase)
+bool NsaCompressWithCacheKernelRunCbf(void* curCase)
 {
-    auto *cs = static_cast<AclnnNsaCompressWithCacheCase *>(curCase);
+    auto* cs = static_cast<AclnnNsaCompressWithCacheCase*>(curCase);
     // auto *mAclnnParam = &cs->mAclnnParam;
-    auto *ctx = &cs->mAclnnCtx;
+    auto* ctx = &cs->mAclnnCtx;
 
     aclnnStatus ret;
 
@@ -55,20 +55,19 @@ bool NsaCompressWithCacheKernelRunCbf(void *curCase)
     return ret == ACL_SUCCESS;
 }
 
-
 AclnnNsaCompressWithCacheCase::AclnnNsaCompressWithCacheCase()
-    : NsaCompressWithCacheCase(), mAclnnCtx(AclnnContext()), mAclnnParam(AclnnNsaCompressWithCacheParam())
-{
-}
+    : NsaCompressWithCacheCase(),
+      mAclnnCtx(AclnnContext()),
+      mAclnnParam(AclnnNsaCompressWithCacheParam())
+{}
 
-AclnnNsaCompressWithCacheCase::AclnnNsaCompressWithCacheCase(const char *name, bool enable, const char *dbgInfo,
-                                                             OpInfo opInfo, const AclnnNsaCompressWithCacheParam &param,
+AclnnNsaCompressWithCacheCase::AclnnNsaCompressWithCacheCase(const char* name, bool enable, const char* dbgInfo,
+                                                             OpInfo opInfo, const AclnnNsaCompressWithCacheParam& param,
                                                              int32_t tilingTemplatePriority)
     : NsaCompressWithCacheCase(name, enable, dbgInfo, std::move(opInfo), NsaCompressWithCacheParam(),
                                tilingTemplatePriority),
       mAclnnParam(param)
-{
-}
+{}
 
 bool AclnnNsaCompressWithCacheCase::InitParam()
 {
@@ -93,7 +92,6 @@ bool AclnnNsaCompressWithCacheCase::InitCurrentCasePtr()
     Case::mCurrentCasePtr = this;
     return true;
 }
-
 
 bool AclnnNsaCompressWithCacheCase::Run()
 {

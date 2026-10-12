@@ -19,7 +19,7 @@
 #include "quant_lightning_indexer_v2_tiling.h"
 
 namespace optiling {
-ge::graphStatus ParseAndCheckQLIV2Arch35(gert::TilingContext *context, QLIV2TilingInfo &tilingInfo);
+ge::graphStatus ParseAndCheckQLIV2Arch35(gert::TilingContext* context, QLIV2TilingInfo& tilingInfo);
 } // namespace optiling
 
 #endif // QUANT_LIGHTNING_INDEXER_V2_TILING_INFO_PARSER_H_

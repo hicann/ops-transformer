@@ -31,12 +31,12 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35QFA;
 
-ge::graphStatus SeqLenChecker::CheckSingleParaSequsedQ(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSingleParaSequsedQ(const QfaTilingInfo& qfaInfo)
 {
     // 约束(单参数校验): dtype=INT32, format=ND, shape=(B,)
     // 值约束(非负、<=Q_S)需读 tensor 数值，tiling 阶段无法获取，不校验（见文档 line 214）
-    const gert::Tensor *tensor = qfaInfo.opParamInfo.sequsedQ.tensor;
-    const gert::CompileTimeTensorDesc *desc = qfaInfo.opParamInfo.sequsedQ.desc;
+    const gert::Tensor* tensor = qfaInfo.opParamInfo.sequsedQ.tensor;
+    const gert::CompileTimeTensorDesc* desc = qfaInfo.opParamInfo.sequsedQ.desc;
     if (tensor == nullptr || desc == nullptr) {
         return ge::GRAPH_SUCCESS; // 可选参数，存在性由 CheckParaExistence 负责
     }
@@ -47,7 +47,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaSequsedQ(const QfaTilingInfo &qfaI
     if (CheckFormatSupport(desc, SEQUSED_Q_NAME) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape &shape = tensor->GetStorageShape();
+    const gert::Shape& shape = tensor->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, SEQUSED_Q_NAME.c_str(),
                                              (std::to_string(shape.GetDimNum()) + "D").c_str(), "1D"),
@@ -62,12 +62,12 @@ ge::graphStatus SeqLenChecker::CheckSingleParaSequsedQ(const QfaTilingInfo &qfaI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSingleParaSequsedKv(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSingleParaSequsedKv(const QfaTilingInfo& qfaInfo)
 {
     // 约束(单参数校验): dtype=INT32, format=ND, shape=(B,)
     // 值约束(非负、<=KV_S)需读 tensor 数值，tiling 阶段无法获取，不校验
-    const gert::Tensor *tensor = qfaInfo.opParamInfo.sequsedKv.tensor;
-    const gert::CompileTimeTensorDesc *desc = qfaInfo.opParamInfo.sequsedKv.desc;
+    const gert::Tensor* tensor = qfaInfo.opParamInfo.sequsedKv.tensor;
+    const gert::CompileTimeTensorDesc* desc = qfaInfo.opParamInfo.sequsedKv.desc;
     if (tensor == nullptr || desc == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -78,7 +78,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaSequsedKv(const QfaTilingInfo &qfa
     if (CheckFormatSupport(desc, SEQUSED_KV_NAME) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape &shape = tensor->GetStorageShape();
+    const gert::Shape& shape = tensor->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, SEQUSED_KV_NAME.c_str(),
                                              (std::to_string(shape.GetDimNum()) + "D").c_str(), "1D"),
@@ -93,12 +93,12 @@ ge::graphStatus SeqLenChecker::CheckSingleParaSequsedKv(const QfaTilingInfo &qfa
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensQ(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensQ(const QfaTilingInfo& qfaInfo)
 {
     // 约束(单参数校验): dtype=INT32, format=ND, shape=(B+1,)
     // 值约束(非递减、首元素0、末元素=Q_T)需读 tensor 数值，不校验
-    const gert::Tensor *tensor = qfaInfo.opParamInfo.cuSeqlensQ.tensor;
-    const gert::CompileTimeTensorDesc *desc = qfaInfo.opParamInfo.cuSeqlensQ.desc;
+    const gert::Tensor* tensor = qfaInfo.opParamInfo.cuSeqlensQ.tensor;
+    const gert::CompileTimeTensorDesc* desc = qfaInfo.opParamInfo.cuSeqlensQ.desc;
     if (tensor == nullptr || desc == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -109,7 +109,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensQ(const QfaTilingInfo &qf
     if (CheckFormatSupport(desc, CU_SEQLENS_Q_NAME) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape &shape = tensor->GetStorageShape();
+    const gert::Shape& shape = tensor->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, CU_SEQLENS_Q_NAME.c_str(),
                                              (std::to_string(shape.GetDimNum()) + "D").c_str(), "1D"),
@@ -124,12 +124,12 @@ ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensQ(const QfaTilingInfo &qf
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensKv(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensKv(const QfaTilingInfo& qfaInfo)
 {
     // 约束(单参数校验): dtype=INT32, format=ND, shape=(B+1,)
     // 值约束(非递减、首元素0、末元素=KV_T)需读 tensor 数值，不校验
-    const gert::Tensor *tensor = qfaInfo.opParamInfo.cuSeqlensKv.tensor;
-    const gert::CompileTimeTensorDesc *desc = qfaInfo.opParamInfo.cuSeqlensKv.desc;
+    const gert::Tensor* tensor = qfaInfo.opParamInfo.cuSeqlensKv.tensor;
+    const gert::CompileTimeTensorDesc* desc = qfaInfo.opParamInfo.cuSeqlensKv.desc;
     if (tensor == nullptr || desc == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -140,7 +140,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensKv(const QfaTilingInfo &q
     if (CheckFormatSupport(desc, CU_SEQLENS_KV_NAME) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape &shape = tensor->GetStorageShape();
+    const gert::Shape& shape = tensor->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, CU_SEQLENS_KV_NAME.c_str(),
                                              (std::to_string(shape.GetDimNum()) + "D").c_str(), "1D"),
@@ -155,7 +155,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensKv(const QfaTilingInfo &q
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenQ(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenQ(const QfaTilingInfo& qfaInfo)
 {
     // 约束(单参数校验): data_type 支持 INT32，默认值为 -1
     // 数值约束已移至特性交叉校验(CheckFeature): 非TND时与seqused_q至少传1个
@@ -163,7 +163,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenQ(const QfaTilingInfo &qf
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenKv(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenKv(const QfaTilingInfo& qfaInfo)
 {
     // 约束(单参数校验): data_type 支持 INT32，默认值为 -1
     // 数值约束已移至特性交叉校验(CheckFeature): 非TND非PA时与seqused_kv至少传1个
@@ -171,7 +171,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenKv(const QfaTilingInfo &q
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSinglePara(const QfaTilingInfo& qfaInfo)
 {
     if (CheckSingleParaSequsedQ(qfaInfo) != ge::GRAPH_SUCCESS ||
         CheckSingleParaSequsedKv(qfaInfo) != ge::GRAPH_SUCCESS ||
@@ -184,7 +184,7 @@ ge::graphStatus SeqLenChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckParaExistence(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckParaExistence(const QfaTilingInfo& qfaInfo)
 {
     // 约束(存在性校验列):
     //   - seqused_q / seqused_kv: 可选参数
@@ -196,7 +196,7 @@ ge::graphStatus SeqLenChecker::CheckParaExistence(const QfaTilingInfo &qfaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckCuSeqlensLayoutConsistency(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckCuSeqlensLayoutConsistency(const QfaTilingInfo& qfaInfo)
 {
     // 约束(特性交叉校验列):
     //   - cu_seqlens_q: 当 layout_q 为 TND 时，必须传入；当 layout_q 不为 TND 时，不支持传入
@@ -233,7 +233,7 @@ ge::graphStatus SeqLenChecker::CheckCuSeqlensLayoutConsistency(const QfaTilingIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSequsedMaxSeqlenAtLeastOne(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSequsedMaxSeqlenAtLeastOne(const QfaTilingInfo& qfaInfo)
 {
     // 约束(特性交叉校验列):
     //   - seqused_q: 当 layout_q 不为 TND 时, seqused_q 与 max_seqlen_q 至少传入其中一个
@@ -274,7 +274,7 @@ ge::graphStatus SeqLenChecker::CheckSequsedMaxSeqlenAtLeastOne(const QfaTilingIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckFeature(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckFeature(const QfaTilingInfo& qfaInfo)
 {
     // 约束(特性交叉校验列):
     //   - cu_seqlens_q / cu_seqlens_kv: 与 layout 的关系约束
@@ -290,7 +290,7 @@ ge::graphStatus SeqLenChecker::CheckFeature(const QfaTilingInfo &qfaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckMultiPara(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckMultiPara(const QfaTilingInfo& qfaInfo)
 {
     // 约束(一致性校验列): 全部标注为"无"
     //   - seqused_q / seqused_kv / cu_seqlens_q / cu_seqlens_kv / max_seqlen_q / max_seqlen_kv

@@ -37,30 +37,29 @@ extern "C" {
 #endif
 
 struct NsaSelectedAttentionGradParams {
-    const aclTensor *query = nullptr;
-    const aclTensor *key = nullptr;
-    const aclTensor *value = nullptr;
-    const aclTensor *attentionOut = nullptr;
-    const aclTensor *attentionOutGrad = nullptr;
-    const aclTensor *softmaxMax = nullptr;
-    const aclTensor *softmaxSum = nullptr;
-    const aclTensor *topkIndices = nullptr;
-    const aclIntArray *actualSeqQLenOptional = nullptr;
-    const aclIntArray *actualSeqKvLenOptional = nullptr;
-    const aclTensor *attenMaskOptional = nullptr;
+    const aclTensor* query = nullptr;
+    const aclTensor* key = nullptr;
+    const aclTensor* value = nullptr;
+    const aclTensor* attentionOut = nullptr;
+    const aclTensor* attentionOutGrad = nullptr;
+    const aclTensor* softmaxMax = nullptr;
+    const aclTensor* softmaxSum = nullptr;
+    const aclTensor* topkIndices = nullptr;
+    const aclIntArray* actualSeqQLenOptional = nullptr;
+    const aclIntArray* actualSeqKvLenOptional = nullptr;
+    const aclTensor* attenMaskOptional = nullptr;
     double scaleValue;
     int64_t selectedBlockSize;
     int64_t selectedBlockCount;
     int64_t headNum;
-    char *inputLayout;
+    char* inputLayout;
     int64_t sparseMode;
-    const aclTensor *dqOut = nullptr;
-    const aclTensor *dkOut = nullptr;
-    const aclTensor *dvOut = nullptr;
+    const aclTensor* dqOut = nullptr;
+    const aclTensor* dkOut = nullptr;
+    const aclTensor* dvOut = nullptr;
 };
 
-
-static aclnnStatus CheckParams(const NsaSelectedAttentionGradParams &params)
+static aclnnStatus CheckParams(const NsaSelectedAttentionGradParams& params)
 {
     CHECK_COND(params.query != nullptr, ACLNN_ERR_PARAM_NULLPTR, "query must not be nullptr.");
     CHECK_COND(params.key != nullptr, ACLNN_ERR_PARAM_NULLPTR, "key must not be nullptr.");
@@ -96,13 +95,13 @@ static aclnnStatus CheckParams(const NsaSelectedAttentionGradParams &params)
     return ACLNN_SUCCESS;
 }
 
-static bool CheckViewShape(const aclTensor *input1, const aclTensor *input2)
+static bool CheckViewShape(const aclTensor* input1, const aclTensor* input2)
 {
-    int64_t *viewDims1 = nullptr;
+    int64_t* viewDims1 = nullptr;
     uint64_t viewDimsNum1 = 0;
     auto ret = aclGetViewShape(input1, &viewDims1, &viewDimsNum1);
 
-    int64_t *viewDims2 = nullptr;
+    int64_t* viewDims2 = nullptr;
     uint64_t viewDimsNum2 = 0;
     ret = aclGetViewShape(input2, &viewDims2, &viewDimsNum2);
 
@@ -118,7 +117,7 @@ static bool CheckViewShape(const aclTensor *input1, const aclTensor *input2)
 
     return true;
 }
-static void CheckFormatValid(const NsaSelectedAttentionGradParams &params)
+static void CheckFormatValid(const NsaSelectedAttentionGradParams& params)
 {
     // 检查输入张量的格式是否为 ND 格式
     if (params.query != nullptr) {
@@ -202,9 +201,9 @@ static void CheckFormatValid(const NsaSelectedAttentionGradParams &params)
     }
 }
 
-aclnnStatus ContiguousAndNsaSelectedAttentionGrad(const NsaSelectedAttentionGradParams &params, aclOpExecutor *executor,
-                                                  const aclTensor *dqOut, const aclTensor *dkOut,
-                                                  const aclTensor *dvOut)
+aclnnStatus ContiguousAndNsaSelectedAttentionGrad(const NsaSelectedAttentionGradParams& params, aclOpExecutor* executor,
+                                                  const aclTensor* dqOut, const aclTensor* dkOut,
+                                                  const aclTensor* dvOut)
 {
     auto queryContiguous = l0op::Contiguous(params.query, executor);
     CHECK_RET(queryContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -222,7 +221,7 @@ aclnnStatus ContiguousAndNsaSelectedAttentionGrad(const NsaSelectedAttentionGrad
     CHECK_RET(softmaxSumContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     auto topkIndicesContiguous = l0op::Contiguous(params.topkIndices, executor);
     CHECK_RET(topkIndicesContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *attenMaskOptionalContiguous = nullptr;
+    const aclTensor* attenMaskOptionalContiguous = nullptr;
     if (params.attenMaskOptional != nullptr) {
         attenMaskOptionalContiguous = l0op::Contiguous(params.attenMaskOptional, executor);
         CHECK_RET(attenMaskOptionalContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -253,12 +252,12 @@ aclnnStatus ContiguousAndNsaSelectedAttentionGrad(const NsaSelectedAttentionGrad
 }
 
 aclnnStatus aclnnNsaSelectedAttentionGradGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *attentionOut,
-    const aclTensor *attentionOutGrad, const aclTensor *softmaxMax, const aclTensor *softmaxSum,
-    const aclTensor *topkIndices, const aclIntArray *actualSeqQLenOptional, const aclIntArray *actualSeqKvLenOptional,
-    const aclTensor *attenMaskOptional, double scaleValue, int64_t selectedBlockSize, int64_t selectedBlockCount,
-    int64_t headNum, char *inputLayout, int64_t sparseMode, const aclTensor *dqOut, const aclTensor *dkOut,
-    const aclTensor *dvOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* attentionOut,
+    const aclTensor* attentionOutGrad, const aclTensor* softmaxMax, const aclTensor* softmaxSum,
+    const aclTensor* topkIndices, const aclIntArray* actualSeqQLenOptional, const aclIntArray* actualSeqKvLenOptional,
+    const aclTensor* attenMaskOptional, double scaleValue, int64_t selectedBlockSize, int64_t selectedBlockCount,
+    int64_t headNum, char* inputLayout, int64_t sparseMode, const aclTensor* dqOut, const aclTensor* dkOut,
+    const aclTensor* dvOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnNsaSelectedAttentionGrad,
                    DFX_IN(query, key, value, attentionOut, attentionOutGrad, softmaxMax, softmaxSum, topkIndices,
@@ -306,7 +305,7 @@ aclnnStatus aclnnNsaSelectedAttentionGradGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnNsaSelectedAttentionGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnNsaSelectedAttentionGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                           aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnNsaSelectedAttentionGrad);

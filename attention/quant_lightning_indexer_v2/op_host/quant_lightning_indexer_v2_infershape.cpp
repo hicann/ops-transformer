@@ -30,28 +30,28 @@ constexpr uint32_t ATTR_RETURN_VALUE_INDEX = 7;
 constexpr uint32_t DIM_NUM_3 = 3;
 constexpr uint32_t DIM_NUM_4 = 4;
 
-static ge::graphStatus InferShapeQuantLightningIndexerV2(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeQuantLightningIndexerV2(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("QuantLightningIndexerV2", "context is nullptr!");
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape *queryShape = context->GetInputShape(QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(KEY_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    gert::Shape *sparseIndicesShape = context->GetOutputShape(0);
+    gert::Shape* sparseIndicesShape = context->GetOutputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, sparseIndicesShape);
-    gert::Shape *sparseValuesShape = context->GetOutputShape(1);
+    gert::Shape* sparseValuesShape = context->GetOutputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, sparseValuesShape);
 
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const char *inputLayoutQueryPtr = attrs->GetAttrPointer<char>(ATTR_QUERY_LAYOUT_INDEX);
+    const char* inputLayoutQueryPtr = attrs->GetAttrPointer<char>(ATTR_QUERY_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutQueryPtr);
-    const char *inputLayoutKeyPtr = attrs->GetAttrPointer<char>(ATTR_KV_LAYOUT_INDEX);
+    const char* inputLayoutKeyPtr = attrs->GetAttrPointer<char>(ATTR_KV_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutKeyPtr);
-    const int64_t *sparse_count = attrs->GetInt(ATTR_SPARSE_COUNT_INDEX);
+    const int64_t* sparse_count = attrs->GetInt(ATTR_SPARSE_COUNT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, sparse_count);
 
     std::string inputLayoutQueryPtrStr = std::string(inputLayoutQueryPtr);
@@ -74,7 +74,7 @@ static ge::graphStatus InferShapeQuantLightningIndexerV2(gert::InferShapeContext
         sparseIndicesShape->SetDim(1, keyHeadNum);            // 1:output shape's N Dim, 2: key shape's N Dim
         sparseIndicesShape->SetDim(2, *sparse_count);         // 2:Dim K
     }
-    const int32_t *return_value = attrs->GetAttrPointer<int32_t>(ATTR_RETURN_VALUE_INDEX);
+    const int32_t* return_value = attrs->GetAttrPointer<int32_t>(ATTR_RETURN_VALUE_INDEX);
     bool returnValueFlag = (return_value != nullptr) ? (*return_value != 0) : false;
     if (returnValueFlag) {
         *sparseValuesShape = *sparseIndicesShape;
@@ -87,7 +87,7 @@ static ge::graphStatus InferShapeQuantLightningIndexerV2(gert::InferShapeContext
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeQuantLightningIndexerV2(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeQuantLightningIndexerV2(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("QuantLightningIndexerV2", "InferDataTypeContext context is nullptr!");

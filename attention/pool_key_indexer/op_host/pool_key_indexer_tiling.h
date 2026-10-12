@@ -142,8 +142,8 @@ struct PoolKeyIndexerCompileInfo {
 
 // ------------------ TilingInfo ------------------
 struct PoolKeyIndexerTilingInfo {
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     NpuArch npuArch = NpuArch::DAV_2201;
     uint32_t bSize = 0;
     uint32_t n1Size = 0;
@@ -177,24 +177,24 @@ struct PoolKeyIndexerTilingInfo {
 // ------------------ Tiling Class ------------------
 class PoolKeyIndexerTiling {
 public:
-    explicit PoolKeyIndexerTiling(gert::TilingContext *context)
+    explicit PoolKeyIndexerTiling(gert::TilingContext* context)
         : context_(context)
     {}
-    ge::graphStatus DoTiling(PoolKeyIndexerTilingInfo *tilingInfo);
+    ge::graphStatus DoTiling(PoolKeyIndexerTilingInfo* tilingInfo);
 
 private:
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     PoolKeyIndexerTilingData tilingData_;
     std::vector<uint32_t> keyStridesVec_;
     // k_descale 运行时 stride(PA 0 轴非连续支持, 与 keyStridesVec_ 同源时机捕获)
     std::vector<uint32_t> keyDequantScaleStridesVec_;
 
-    ge::graphStatus ParseAndCheckParams(PoolKeyIndexerTilingInfo &info);
-    ge::graphStatus CalcTilingParams(PoolKeyIndexerTilingInfo &info);
-    ge::graphStatus CalcWorkspaceSize(PoolKeyIndexerTilingInfo &info, uint64_t &workspaceSize);
-    ge::graphStatus CheckKeyContiguous(const PoolKeyIndexerTilingInfo &info) const;
+    ge::graphStatus ParseAndCheckParams(PoolKeyIndexerTilingInfo& info);
+    ge::graphStatus CalcTilingParams(PoolKeyIndexerTilingInfo& info);
+    ge::graphStatus CalcWorkspaceSize(PoolKeyIndexerTilingInfo& info, uint64_t& workspaceSize);
+    ge::graphStatus CheckKeyContiguous(const PoolKeyIndexerTilingInfo& info) const;
     uint32_t GetTrunkLen(uint32_t sparseCount);
-    void SetTilingData(PoolKeyIndexerTilingInfo &info);
+    void SetTilingData(PoolKeyIndexerTilingInfo& info);
 };
 
 } // namespace optiling

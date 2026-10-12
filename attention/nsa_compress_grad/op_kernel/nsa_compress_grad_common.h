@@ -12,7 +12,7 @@
  * \file compress_grad_common.h
  * \brief compress_grad head file
  */
- 
+
 #ifndef NSA_COMPRESS_GRAD_COMMON_H
 #define NSA_COMPRESS_GRAD_COMMON_H
 
@@ -36,11 +36,11 @@ __aicore__ inline int64_t CompressBlkNum(int64_t inputLen, int64_t blkSize, int6
     if (inputLen < blkSize) {
         return 0;
     }
-    if(blkStride != 0){
+    if (blkStride != 0) {
         return (inputLen - blkSize) / blkStride + 1;
     }
     return 0;
 }
 
-}
+} // namespace NsaCompressGrad
 #endif

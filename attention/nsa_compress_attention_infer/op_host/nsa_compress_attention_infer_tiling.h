@@ -101,18 +101,18 @@ struct NsaCompressAttentionInferCompileInfo {
 };
 
 struct RequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct OptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 struct NsaCompressAttentionInferContext {
-    const char *opName;
-    fe::PlatFormInfos *platformInfo;
+    const char* opName;
+    fe::PlatFormInfos* platformInfo;
     RequiredParaInfo query;
     RequiredParaInfo key;
     RequiredParaInfo value;
@@ -126,19 +126,19 @@ struct NsaCompressAttentionInferContext {
     RequiredParaInfo attenOut;
     RequiredParaInfo selectOut;
 
-    const int64_t *numHeads;
-    const int64_t *kvHeadNums;
-    const int64_t *selectSize;
-    const int64_t *selectNum;
-    const int64_t *compSizeL;
-    const int64_t *compStrideD;
-    const float *scaleValue;
+    const int64_t* numHeads;
+    const int64_t* kvHeadNums;
+    const int64_t* selectSize;
+    const int64_t* selectNum;
+    const int64_t* compSizeL;
+    const int64_t* compStrideD;
+    const float* scaleValue;
 
-    const char *layOut;
-    const int64_t *blockSize;
-    const int64_t *sparseMode;
+    const char* layOut;
+    const int64_t* blockSize;
+    const int64_t* sparseMode;
 
-    size_t *workSpaces;
+    size_t* workSpaces;
     uint64_t tilingKey;
     uint32_t blockDim;
 };
@@ -152,10 +152,10 @@ public:
     NCAITiling() = default;
     ~NCAITiling() = default;
 
-    ge::graphStatus GetNCAITiling(NsaCompressAttentionInferContext &ncaiContext,
-                                  NsaCompressAttentionInferTilingData &tilingData, bool isWorkspace = false);
-    ge::graphStatus NSICASetTilingData(gert::TilingContext &context, NsaCompressAttentionInferTilingData &tilingData);
-    static ge::graphStatus ConvertContext(gert::TilingContext &context, NsaCompressAttentionInferContext &ncaiContext);
+    ge::graphStatus GetNCAITiling(NsaCompressAttentionInferContext& ncaiContext,
+                                  NsaCompressAttentionInferTilingData& tilingData, bool isWorkspace = false);
+    ge::graphStatus NSICASetTilingData(gert::TilingContext& context, NsaCompressAttentionInferTilingData& tilingData);
+    static ge::graphStatus ConvertContext(gert::TilingContext& context, NsaCompressAttentionInferContext& ncaiContext);
 
 private:
     ge::graphStatus GetNpuInfo();
@@ -233,8 +233,8 @@ private:
     uint32_t baseRowLenHeadCore_ = 0;
     uint32_t baseRowLenTailCore_ = 0;
 
-    NsaCompressAttentionInferContext *ncaiContext_ = nullptr;
-    NsaCompressAttentionInferTilingData *tilingData_ = nullptr;
+    NsaCompressAttentionInferContext* ncaiContext_ = nullptr;
+    NsaCompressAttentionInferTilingData* tilingData_ = nullptr;
 };
 
 } // namespace optiling

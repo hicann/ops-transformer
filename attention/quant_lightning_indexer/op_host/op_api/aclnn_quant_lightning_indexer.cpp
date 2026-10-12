@@ -36,22 +36,22 @@ constexpr uint32_t DIM_NUM_THREE = 3;
 constexpr uint32_t DIM_NUM_FOUR = 4;
 
 extern aclnnStatus aclnnInnerQuantLightningIndexerGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *weights, const aclTensor *queryDequantScale,
-    const aclTensor *keyDequantScale, const aclTensor *actualSeqLengthsQueryOptional,
-    const aclTensor *actualSeqLengthsKeyOptional, const aclTensor *blockTableOptional, int64_t queryQuantMode,
-    int64_t keyQuantMode, char *layoutQueryOptional, char *layoutKeyOptional, int64_t sparseCount, int64_t sparseMode,
-    int64_t preTokens, int64_t nextTokens, int64_t keyStride0, int64_t keyDequantScaleStride0, const aclTensor *out,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* query, const aclTensor* key, const aclTensor* weights, const aclTensor* queryDequantScale,
+    const aclTensor* keyDequantScale, const aclTensor* actualSeqLengthsQueryOptional,
+    const aclTensor* actualSeqLengthsKeyOptional, const aclTensor* blockTableOptional, int64_t queryQuantMode,
+    int64_t keyQuantMode, char* layoutQueryOptional, char* layoutKeyOptional, int64_t sparseCount, int64_t sparseMode,
+    int64_t preTokens, int64_t nextTokens, int64_t keyStride0, int64_t keyDequantScaleStride0, const aclTensor* out,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
-extern aclnnStatus aclnnInnerQuantLightningIndexer(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerQuantLightningIndexer(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                    const aclrtStream stream);
 
 aclnnStatus aclnnQuantLightningIndexerGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *weights, const aclTensor *queryDequantScale,
-    const aclTensor *keyDequantScale, const aclTensor *actualSeqLengthsQueryOptional,
-    const aclTensor *actualSeqLengthsKeyOptional, const aclTensor *blockTableOptional, int64_t queryQuantMode,
-    int64_t keyQuantMode, char *layoutQueryOptional, char *layoutKeyOptional, int64_t sparseCount, int64_t sparseMode,
-    int64_t preTokens, int64_t nextTokens, const aclTensor *out, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* weights, const aclTensor* queryDequantScale,
+    const aclTensor* keyDequantScale, const aclTensor* actualSeqLengthsQueryOptional,
+    const aclTensor* actualSeqLengthsKeyOptional, const aclTensor* blockTableOptional, int64_t queryQuantMode,
+    int64_t keyQuantMode, char* layoutQueryOptional, char* layoutKeyOptional, int64_t sparseCount, int64_t sparseMode,
+    int64_t preTokens, int64_t nextTokens, const aclTensor* out, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (query == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Query pointer is null, cannot get data type!");
@@ -108,7 +108,7 @@ aclnnStatus aclnnQuantLightningIndexerGetWorkspaceSize(
         workspaceSize, executor);
 }
 
-aclnnStatus aclnnQuantLightningIndexer(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnQuantLightningIndexer(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                        const aclrtStream stream)
 {
     return aclnnInnerQuantLightningIndexer(workspace, workspaceSize, executor, stream);

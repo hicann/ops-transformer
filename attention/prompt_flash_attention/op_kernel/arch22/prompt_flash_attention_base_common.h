@@ -49,30 +49,30 @@ __aicore__ __attribute__((always_inline)) inline void SetBlockReduceMask(int32_t
 
 template <typename T, RowCalcTile TILE_MODE>
 struct Rowsum {
-    __aicore__ __attribute__((always_inline)) inline Rowsum(const AscendC::LocalTensor<T> &srcUb,
-                                                            const AscendC::LocalTensor<T> &rowsumUb,
-                                                            const AscendC::LocalTensor<T> &tmpUb, uint32_t numRowsRound,
+    __aicore__ __attribute__((always_inline)) inline Rowsum(const AscendC::LocalTensor<T>& srcUb,
+                                                            const AscendC::LocalTensor<T>& rowsumUb,
+                                                            const AscendC::LocalTensor<T>& tmpUb, uint32_t numRowsRound,
                                                             uint32_t numElems, uint32_t numElemsAligned);
 };
 
 template <typename T, RowCalcTile TILE_MODE>
 struct Rowmax {
-    __aicore__ __attribute__((always_inline)) inline Rowmax(const AscendC::LocalTensor<T> &srcUb,
-                                                            const AscendC::LocalTensor<T> &rowmaxUb,
-                                                            const AscendC::LocalTensor<T> &tmpUb, uint32_t numRowsRound,
+    __aicore__ __attribute__((always_inline)) inline Rowmax(const AscendC::LocalTensor<T>& srcUb,
+                                                            const AscendC::LocalTensor<T>& rowmaxUb,
+                                                            const AscendC::LocalTensor<T>& tmpUb, uint32_t numRowsRound,
                                                             uint32_t numElems, uint32_t numElemsAligned);
 };
 
 template <typename S_DTYPE, typename EXP_DTYPE, typename P_DTYPE, typename MASK_DTYPE, MaskType MASK_TYPE>
 struct OnlineSoftmaxStage1 {
     __aicore__ __attribute__((always_inline)) inline OnlineSoftmaxStage1(
-        const AscendC::LocalTensor<S_DTYPE> &sUb, const AscendC::LocalTensor<MASK_DTYPE> &maskOrigUb,
-        const AscendC::LocalTensor<S_DTYPE> &maskProcessedUb, const AscendC::LocalTensor<S_DTYPE> &localRowmaxUb,
-        const AscendC::LocalTensor<S_DTYPE> &hatRowmaxUb, const AscendC::LocalTensor<S_DTYPE> &globalRowmaxUb,
-        const AscendC::LocalTensor<S_DTYPE> &diffRowmaxUb, const AscendC::LocalTensor<EXP_DTYPE> &sExpUb,
-        const AscendC::LocalTensor<EXP_DTYPE> &localRowsumUb, const AscendC::LocalTensor<EXP_DTYPE> &globalRowsumUb,
-        const AscendC::LocalTensor<P_DTYPE> &pUb, const AscendC::LocalTensor<EXP_DTYPE> &tmpUb,
-        const AscendC::GlobalTensor<S_DTYPE> &sGm, const AscendC::GlobalTensor<P_DTYPE> &pGm, bool firstNIter,
+        const AscendC::LocalTensor<S_DTYPE>& sUb, const AscendC::LocalTensor<MASK_DTYPE>& maskOrigUb,
+        const AscendC::LocalTensor<S_DTYPE>& maskProcessedUb, const AscendC::LocalTensor<S_DTYPE>& localRowmaxUb,
+        const AscendC::LocalTensor<S_DTYPE>& hatRowmaxUb, const AscendC::LocalTensor<S_DTYPE>& globalRowmaxUb,
+        const AscendC::LocalTensor<S_DTYPE>& diffRowmaxUb, const AscendC::LocalTensor<EXP_DTYPE>& sExpUb,
+        const AscendC::LocalTensor<EXP_DTYPE>& localRowsumUb, const AscendC::LocalTensor<EXP_DTYPE>& globalRowsumUb,
+        const AscendC::LocalTensor<P_DTYPE>& pUb, const AscendC::LocalTensor<EXP_DTYPE>& tmpUb,
+        const AscendC::GlobalTensor<S_DTYPE>& sGm, const AscendC::GlobalTensor<P_DTYPE>& pGm, bool firstNIter,
         S_DTYPE tor, uint32_t m, uint32_t nReal, uint32_t nStride, uint32_t pingpongFlag);
 };
 
@@ -104,9 +104,9 @@ __aicore__ __attribute__((always_inline)) inline void SetBlockReduceMask<half>(i
 template <>
 struct Rowsum<float, RowCalcTile::SPEC_TILE_512> {
     __aicore__
-        __attribute__((always_inline)) inline Rowsum(const AscendC::LocalTensor<float> &srcUb,
-                                                     const AscendC::LocalTensor<float> &rowsumUb,
-                                                     const AscendC::LocalTensor<float> &tmpUb, uint32_t numRowsRound,
+        __attribute__((always_inline)) inline Rowsum(const AscendC::LocalTensor<float>& srcUb,
+                                                     const AscendC::LocalTensor<float>& rowsumUb,
+                                                     const AscendC::LocalTensor<float>& tmpUb, uint32_t numRowsRound,
                                                      uint32_t numElems, uint32_t numElemsAligned)
     {
         AscendC::BlockReduceSum<float, false>(tmpUb, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0, 1, 1,
@@ -126,9 +126,9 @@ struct Rowsum<float, RowCalcTile::SPEC_TILE_512> {
 template <>
 struct Rowsum<float, RowCalcTile::SPEC_TILE_256> {
     __aicore__
-        __attribute__((always_inline)) inline Rowsum(const AscendC::LocalTensor<float> &srcUb,
-                                                     const AscendC::LocalTensor<float> &rowsumUb,
-                                                     const AscendC::LocalTensor<float> &tmpUb, uint32_t numRowsRound,
+        __attribute__((always_inline)) inline Rowsum(const AscendC::LocalTensor<float>& srcUb,
+                                                     const AscendC::LocalTensor<float>& rowsumUb,
+                                                     const AscendC::LocalTensor<float>& tmpUb, uint32_t numRowsRound,
                                                      uint32_t numElems, uint32_t numElemsAligned)
     {
         AscendC::BlockReduceSum<float, false>(tmpUb, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0, 1, 1,
@@ -149,9 +149,9 @@ struct Rowsum<float, RowCalcTile::SPEC_TILE_256> {
 template <>
 struct Rowsum<float, RowCalcTile::TAIL_TILE> {
     __aicore__
-        __attribute__((always_inline)) inline Rowsum(const AscendC::LocalTensor<float> &srcUb,
-                                                     const AscendC::LocalTensor<float> &rowsumUb,
-                                                     const AscendC::LocalTensor<float> &tmpUb, uint32_t numRowsRound,
+        __attribute__((always_inline)) inline Rowsum(const AscendC::LocalTensor<float>& srcUb,
+                                                     const AscendC::LocalTensor<float>& rowsumUb,
+                                                     const AscendC::LocalTensor<float>& tmpUb, uint32_t numRowsRound,
                                                      uint32_t numElems, uint32_t numElemsAligned)
     {
         if (numElems >= FLOAT_VECTOR_SIZE) {
@@ -206,9 +206,9 @@ struct Rowsum<float, RowCalcTile::TAIL_TILE> {
 template <>
 struct Rowmax<float, RowCalcTile::SPEC_TILE_512> {
     __aicore__
-        __attribute__((always_inline)) inline Rowmax(const AscendC::LocalTensor<float> &srcUb,
-                                                     const AscendC::LocalTensor<float> &rowmaxUb,
-                                                     const AscendC::LocalTensor<float> &tmpUb, uint32_t numRowsRound,
+        __attribute__((always_inline)) inline Rowmax(const AscendC::LocalTensor<float>& srcUb,
+                                                     const AscendC::LocalTensor<float>& rowmaxUb,
+                                                     const AscendC::LocalTensor<float>& tmpUb, uint32_t numRowsRound,
                                                      uint32_t numElems, uint32_t numElemsAligned)
     {
         AscendC::BlockReduceMax<float, false>(tmpUb, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0, 1, 1,
@@ -228,9 +228,9 @@ struct Rowmax<float, RowCalcTile::SPEC_TILE_512> {
 template <>
 struct Rowmax<float, RowCalcTile::SPEC_TILE_256> {
     __aicore__
-        __attribute__((always_inline)) inline Rowmax(const AscendC::LocalTensor<float> &srcUb,
-                                                     const AscendC::LocalTensor<float> &rowmaxUb,
-                                                     const AscendC::LocalTensor<float> &tmpUb, uint32_t numRowsRound,
+        __attribute__((always_inline)) inline Rowmax(const AscendC::LocalTensor<float>& srcUb,
+                                                     const AscendC::LocalTensor<float>& rowmaxUb,
+                                                     const AscendC::LocalTensor<float>& tmpUb, uint32_t numRowsRound,
                                                      uint32_t numElems, uint32_t numElemsAligned)
     {
         AscendC::BlockReduceMax<float, false>(tmpUb, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0, 1, 1,
@@ -251,9 +251,9 @@ struct Rowmax<float, RowCalcTile::SPEC_TILE_256> {
 template <>
 struct Rowmax<float, RowCalcTile::TAIL_TILE> {
     __aicore__
-        __attribute__((always_inline)) inline Rowmax(const AscendC::LocalTensor<float> &srcUb,
-                                                     const AscendC::LocalTensor<float> &rowmaxUb,
-                                                     const AscendC::LocalTensor<float> &tmpUb, uint32_t numRowsRound,
+        __attribute__((always_inline)) inline Rowmax(const AscendC::LocalTensor<float>& srcUb,
+                                                     const AscendC::LocalTensor<float>& rowmaxUb,
+                                                     const AscendC::LocalTensor<float>& tmpUb, uint32_t numRowsRound,
                                                      uint32_t numElems, uint32_t numElemsAligned)
     {
         if (numElems >= FLOAT_VECTOR_SIZE) {
@@ -308,13 +308,13 @@ struct Rowmax<float, RowCalcTile::TAIL_TILE> {
 template <typename P_DTYPE, typename MASK_DTYPE>
 struct OnlineSoftmaxStage1<float, float, P_DTYPE, MASK_DTYPE, MaskType::MASK_TYPE_NONE> {
     __aicore__ __attribute__((always_inline)) inline OnlineSoftmaxStage1(
-        const AscendC::LocalTensor<float> &sUb, const AscendC::LocalTensor<MASK_DTYPE> &maskOrigUb,
-        const AscendC::LocalTensor<float> &maskProcessedUb, const AscendC::LocalTensor<float> &localRowmaxUb,
-        const AscendC::LocalTensor<float> &hatRowmaxUb, const AscendC::LocalTensor<float> &globalRowmaxUb,
-        const AscendC::LocalTensor<float> &diffRowmaxUb, const AscendC::LocalTensor<float> &sExpUb,
-        const AscendC::LocalTensor<float> &localRowsumUb, const AscendC::LocalTensor<float> &globalRowsumUb,
-        const AscendC::LocalTensor<P_DTYPE> &pUb, const AscendC::LocalTensor<float> &tmpUb,
-        const AscendC::GlobalTensor<float> &sGm, const AscendC::GlobalTensor<P_DTYPE> &pGm, bool firstNIter, float tor,
+        const AscendC::LocalTensor<float>& sUb, const AscendC::LocalTensor<MASK_DTYPE>& maskOrigUb,
+        const AscendC::LocalTensor<float>& maskProcessedUb, const AscendC::LocalTensor<float>& localRowmaxUb,
+        const AscendC::LocalTensor<float>& hatRowmaxUb, const AscendC::LocalTensor<float>& globalRowmaxUb,
+        const AscendC::LocalTensor<float>& diffRowmaxUb, const AscendC::LocalTensor<float>& sExpUb,
+        const AscendC::LocalTensor<float>& localRowsumUb, const AscendC::LocalTensor<float>& globalRowsumUb,
+        const AscendC::LocalTensor<P_DTYPE>& pUb, const AscendC::LocalTensor<float>& tmpUb,
+        const AscendC::GlobalTensor<float>& sGm, const AscendC::GlobalTensor<P_DTYPE>& pGm, bool firstNIter, float tor,
         uint32_t m, uint32_t nReal, uint32_t nStride, uint32_t pingpongFlag)
     {
         uint32_t roundM = (m + FLOAT_BLOCK_SIZE - 1) / FLOAT_BLOCK_SIZE * FLOAT_BLOCK_SIZE;

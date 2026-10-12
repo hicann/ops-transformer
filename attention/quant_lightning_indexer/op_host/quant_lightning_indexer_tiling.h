@@ -28,13 +28,13 @@
 namespace optiling {
 // ------------------公共定义--------------------------
 struct TilingRequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct QLITilingOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 enum class DataLayout : uint32_t {
@@ -119,15 +119,15 @@ struct QLIParaInfo {
     QLITilingOptionalParaInfo blockTable = {nullptr, nullptr};
     TilingRequiredParaInfo attenOut = {nullptr, nullptr};
 
-    const int32_t *queryQuantMode = nullptr;
-    const int32_t *keyQuantMode = nullptr;
-    const char *layOutQuery = nullptr;
-    const char *layOutKey = nullptr;
-    const int32_t *blockSize = nullptr;
-    const int32_t *sparseMode = nullptr;
-    const int32_t *sparseCount = nullptr;
-    const int64_t *preTokens = nullptr;
-    const int64_t *nextTokens = nullptr;
+    const int32_t* queryQuantMode = nullptr;
+    const int32_t* keyQuantMode = nullptr;
+    const char* layOutQuery = nullptr;
+    const char* layOutKey = nullptr;
+    const int32_t* blockSize = nullptr;
+    const int32_t* sparseMode = nullptr;
+    const int32_t* sparseCount = nullptr;
+    const int64_t* preTokens = nullptr;
+    const int64_t* nextTokens = nullptr;
     int64_t keyStride0 = 0;
     int64_t keyDequantScaleStride0 = 0;
 };
@@ -135,8 +135,8 @@ struct QLIParaInfo {
 // -----------算子Tiling入参信息类---------------
 class QLITilingInfo {
 public:
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     QLIParaInfo opParamInfo;
     // Base Param
     NpuArch npuArch = NpuArch::DAV_2201;
@@ -172,7 +172,7 @@ public:
 // -----------算子Tiling入参信息解析及Check类---------------
 class QLIInfoParser {
 public:
-    explicit QLIInfoParser(gert::TilingContext *context)
+    explicit QLIInfoParser(gert::TilingContext* context)
         : context_(context)
     {}
     ~QLIInfoParser() = default;
@@ -182,8 +182,8 @@ public:
     ge::graphStatus CheckTensorDescriptions() const;
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckQliRequiredParameters() const;
-    ge::graphStatus GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor,
-                                        const std::string &actualSeqLenName) const;
+    ge::graphStatus GetActualSeqLenSize(int64_t& size, const gert::Tensor* tensor,
+                                        const std::string& actualSeqLenName) const;
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     void GetOptionalInputParaInfo();
@@ -210,16 +210,16 @@ public:
     ge::graphStatus GetGSize();
     ge::graphStatus GetAttenMaskInfo();
     ge::graphStatus GetActualSeqInfo();
-    void GenerateInfo(QLITilingInfo &QLIInfo);
-    ge::graphStatus ParseAndCheck(QLITilingInfo &QLIInfo);
+    void GenerateInfo(QLITilingInfo& QLIInfo);
+    ge::graphStatus ParseAndCheck(QLITilingInfo& QLIInfo);
     size_t GetTensorDimNum(const uint32_t tensorIdx);
     int64_t GetTensorDim(const uint32_t tensorIdx, const size_t idx);
     ge::graphStatus CheckContiguous();
 
 public:
-    gert::TilingContext *context_ = nullptr;
-    const char *opName_;
-    fe::PlatFormInfos *platformInfo_;
+    gert::TilingContext* context_ = nullptr;
+    const char* opName_;
+    fe::PlatFormInfos* platformInfo_;
     QLIParaInfo qliParams_;
 
     // BaseParams
@@ -251,12 +251,12 @@ public:
 // ---------------算子Tiling类---------------
 class QuantLightningIndexerTiling {
 public:
-    explicit QuantLightningIndexerTiling(gert::TilingContext *context)
+    explicit QuantLightningIndexerTiling(gert::TilingContext* context)
         : context_(context) {};
-    ge::graphStatus DoTiling(QLITilingInfo *tilingInfo);
+    ge::graphStatus DoTiling(QLITilingInfo* tilingInfo);
 
 private:
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     QLITilingData tilingData_;
 };
 

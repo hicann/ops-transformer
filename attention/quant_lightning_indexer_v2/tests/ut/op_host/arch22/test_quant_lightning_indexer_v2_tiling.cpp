@@ -194,7 +194,7 @@ TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_tiling_unsup
 // Tiling data classes are registered for the op
 TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_tiling_data_class_registered)
 {
-    auto &factory = optiling::CTilingDataClassFactory::GetInstance();
+    auto& factory = optiling::CTilingDataClassFactory::GetInstance();
     EXPECT_NE(factory.CreateTilingDataInstance("QuantLightningIndexerV2"), nullptr);
 }
 

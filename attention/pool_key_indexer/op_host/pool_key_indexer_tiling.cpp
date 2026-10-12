@@ -21,7 +21,7 @@ namespace optiling {
 
 // ValueDepend 输入的 host 可见性判断: GetData() 对 device tensor 返回 device
 // 地址(host 解引用段错误); 仅 kOnHost/kFollowing 可读, 其余由 kernel 从 GM 读值
-static bool IsHostVisibleValue(const gert::Tensor *tensor)
+static bool IsHostVisibleValue(const gert::Tensor* tensor)
 {
     if (tensor == nullptr) {
         return false;
@@ -45,12 +45,12 @@ static uint64_t RoundUp64(uint64_t val, uint64_t align)
     return (align == 0) ? val : (val + align - 1) / align * align;
 }
 
-ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingInfo &info)
+ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingInfo& info)
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
-    const int64_t *topkPtr = attrs->GetInt(PKI_ATTR_TOPK);
+    const int64_t* topkPtr = attrs->GetInt(PKI_ATTR_TOPK);
     OP_CHECK_NULL_WITH_CONTEXT(context_, topkPtr);
     int64_t topkVal = *topkPtr;
     bool topkValid = (topkVal >= 1 && topkVal <= 2048) || topkVal == 3072 || topkVal == 4096 || topkVal == 5120 ||
@@ -61,7 +61,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         return ge::GRAPH_FAILED);
     info.topk = static_cast<uint32_t>(topkVal);
 
-    const int64_t *poolSizePtr = attrs->GetInt(PKI_ATTR_POOL_SIZE);
+    const int64_t* poolSizePtr = attrs->GetInt(PKI_ATTR_POOL_SIZE);
     OP_CHECK_NULL_WITH_CONTEXT(context_, poolSizePtr);
     int64_t poolSizeVal = *poolSizePtr;
     OP_CHECK_IF(poolSizeVal < 1 || poolSizeVal > PKI_POOL_SIZE_LIMIT,
@@ -69,7 +69,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
                 return ge::GRAPH_FAILED);
     info.poolSize = static_cast<uint32_t>(poolSizeVal);
 
-    const char *layoutQPtr = attrs->GetAttrPointer<char>(PKI_ATTR_LAYOUT_Q);
+    const char* layoutQPtr = attrs->GetAttrPointer<char>(PKI_ATTR_LAYOUT_Q);
     OP_CHECK_NULL_WITH_CONTEXT(context_, layoutQPtr);
     std::string layoutQStr(layoutQPtr);
     if (layoutQStr == "BSND") {
@@ -81,7 +81,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         return ge::GRAPH_FAILED;
     }
 
-    const char *layoutKPtr = attrs->GetAttrPointer<char>(PKI_ATTR_LAYOUT_K);
+    const char* layoutKPtr = attrs->GetAttrPointer<char>(PKI_ATTR_LAYOUT_K);
     OP_CHECK_NULL_WITH_CONTEXT(context_, layoutKPtr);
     std::string layoutKStr(layoutKPtr);
     if (layoutKStr == "BSND") {
@@ -104,9 +104,9 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
     }
 
     // ---- 2/3. act_seq / block_table presence rules ----
-    const gert::Tensor *actSeqQ = context_->GetOptionalInputTensor(PKI_ACTUAL_SEQ_Q_INDEX);
-    const gert::Tensor *actSeqK = context_->GetOptionalInputTensor(PKI_ACTUAL_SEQ_K_INDEX);
-    const gert::Tensor *blockTable = context_->GetOptionalInputTensor(PKI_BLOCK_TABLE_INDEX);
+    const gert::Tensor* actSeqQ = context_->GetOptionalInputTensor(PKI_ACTUAL_SEQ_Q_INDEX);
+    const gert::Tensor* actSeqK = context_->GetOptionalInputTensor(PKI_ACTUAL_SEQ_K_INDEX);
+    const gert::Tensor* blockTable = context_->GetOptionalInputTensor(PKI_BLOCK_TABLE_INDEX);
 
     if (info.pageAttention) {
         // PA scenario: actual_seq_k and block_table must be non-null
@@ -142,7 +142,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         }
     }
 
-    const int64_t *maskModePtr = attrs->GetInt(PKI_ATTR_MASK_MODE);
+    const int64_t* maskModePtr = attrs->GetInt(PKI_ATTR_MASK_MODE);
     OP_CHECK_NULL_WITH_CONTEXT(context_, maskModePtr);
     info.maskMode = static_cast<int32_t>(*maskModePtr);
     if (info.maskMode != 0 && info.maskMode != 3) {
@@ -150,7 +150,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         return ge::GRAPH_FAILED;
     }
 
-    const int64_t *quantModePtr = attrs->GetInt(PKI_ATTR_QUANT_MODE);
+    const int64_t* quantModePtr = attrs->GetInt(PKI_ATTR_QUANT_MODE);
     OP_CHECK_NULL_WITH_CONTEXT(context_, quantModePtr);
     info.quantMode = static_cast<int32_t>(*quantModePtr);
     if (info.quantMode != -1 && info.quantMode != 0 && info.quantMode != 1) {
@@ -158,7 +158,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         return ge::GRAPH_FAILED;
     }
 
-    const bool *returnValuePtr = attrs->GetAttrPointer<bool>(PKI_ATTR_RETURN_VALUE);
+    const bool* returnValuePtr = attrs->GetAttrPointer<bool>(PKI_ATTR_RETURN_VALUE);
     OP_CHECK_NULL_WITH_CONTEXT(context_, returnValuePtr);
     info.returnValue = *returnValuePtr;
 
@@ -170,9 +170,9 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
     info.sparseCount = info.topk / info.poolSize;
 
     // Parse shapes
-    const gert::StorageShape *queryShape = context_->GetInputShape(PKI_QUERY_INDEX);
+    const gert::StorageShape* queryShape = context_->GetInputShape(PKI_QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, queryShape);
-    const gert::StorageShape *keyShape = context_->GetInputShape(PKI_POOL_KEY_INDEX);
+    const gert::StorageShape* keyShape = context_->GetInputShape(PKI_POOL_KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, keyShape);
 
     info.queryDtype = context_->GetInputDesc(PKI_QUERY_INDEX)->GetDataType();
@@ -180,13 +180,13 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
     info.weightsDtype = context_->GetInputDesc(PKI_WEIGHTS_INDEX)->GetDataType();
 
     // ---- Required inputs non-null and non-empty ----
-    const gert::Tensor *queryTensor = context_->GetInputTensor(PKI_QUERY_INDEX);
+    const gert::Tensor* queryTensor = context_->GetInputTensor(PKI_QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, queryTensor);
-    const gert::Tensor *poolKeyTensor = context_->GetInputTensor(PKI_POOL_KEY_INDEX);
+    const gert::Tensor* poolKeyTensor = context_->GetInputTensor(PKI_POOL_KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, poolKeyTensor);
-    const gert::Tensor *weightsTensor = context_->GetInputTensor(PKI_WEIGHTS_INDEX);
+    const gert::Tensor* weightsTensor = context_->GetInputTensor(PKI_WEIGHTS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, weightsTensor);
-    const gert::Tensor *poolTailKTensor = context_->GetInputTensor(PKI_POOL_TAIL_K_INDEX);
+    const gert::Tensor* poolTailKTensor = context_->GetInputTensor(PKI_POOL_TAIL_K_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, poolTailKTensor);
     OP_CHECK_IF(queryShape->GetStorageShape().GetShapeSize() == 0, OP_LOGE(context_, "query must not be empty tensor"),
                 return ge::GRAPH_FAILED);
@@ -204,7 +204,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
             keyStridesVec_.push_back(keyStrides->GetStride(i));
         }
         // 图模式下属性与运行时 stride 同时存在, 必须一致(否则以错误来源寻址)
-        const int64_t *keyStride0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_KEY_STRIDE0);
+        const int64_t* keyStride0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_KEY_STRIDE0);
         if (keyStride0Attr != nullptr && *keyStride0Attr >= 0 &&
             keyStridesVec_[0] != static_cast<uint32_t>(*keyStride0Attr)) {
             OP_LOGE(context_, "key_stride0 attr(%ld) conflicts with runtime stride(%u)", *keyStride0Attr,
@@ -222,7 +222,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         for (size_t i = 0; i < kDescaleStrides->GetDimNum(); i++) {
             keyDequantScaleStridesVec_.push_back(kDescaleStrides->GetStride(i));
         }
-        const int64_t *kdsStride0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_K_DESCALE_STRIDE0);
+        const int64_t* kdsStride0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_K_DESCALE_STRIDE0);
         if (kdsStride0Attr != nullptr && *kdsStride0Attr >= 0 &&
             keyDequantScaleStridesVec_[0] != static_cast<uint32_t>(*kdsStride0Attr)) {
             OP_LOGE(context_, "k_descale_stride0 attr(%ld) conflicts with runtime stride(%u)", *kdsStride0Attr,
@@ -230,11 +230,11 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
             return ge::GRAPH_FAILED;
         }
     }
-    const gert::StorageShape *weightsShape = context_->GetInputShape(PKI_WEIGHTS_INDEX);
+    const gert::StorageShape* weightsShape = context_->GetInputShape(PKI_WEIGHTS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, weightsShape);
     OP_CHECK_IF(weightsShape->GetStorageShape().GetShapeSize() == 0,
                 OP_LOGE(context_, "weights must not be empty tensor"), return ge::GRAPH_FAILED);
-    const gert::StorageShape *poolTailKShape = context_->GetInputShape(PKI_POOL_TAIL_K_INDEX);
+    const gert::StorageShape* poolTailKShape = context_->GetInputShape(PKI_POOL_TAIL_K_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, poolTailKShape);
     OP_CHECK_IF(poolTailKShape->GetStorageShape().GetShapeSize() == 0,
                 OP_LOGE(context_, "pool_tail_k must not be empty tensor"), return ge::GRAPH_FAILED);
@@ -253,8 +253,8 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
     }
 
     // ---- quantMode-driven dtype + descale validation ----
-    const gert::Tensor *qDescaleTensor = context_->GetOptionalInputTensor(PKI_Q_DESCALE_INDEX);
-    const gert::Tensor *kDescaleTensor = context_->GetOptionalInputTensor(PKI_K_DESCALE_INDEX);
+    const gert::Tensor* qDescaleTensor = context_->GetOptionalInputTensor(PKI_Q_DESCALE_INDEX);
+    const gert::Tensor* kDescaleTensor = context_->GetOptionalInputTensor(PKI_K_DESCALE_INDEX);
 
     // ---- FP8 量化仅 arch35 (Ascend 950) 支持: 架构门禁 ----
     // arch22 (A2/A3) 硬件不支持 FP8, 必须在 tiling 层拒绝而非静默产出错误结果
@@ -394,7 +394,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
             return ge::GRAPH_FAILED);
         // keyStride0 优先级: 属性 key_stride0(eager 路径来源) >
         // 运行时 stride(图模式) > 连续推导 blockSize*N2*headDim
-        const int64_t *keyStride0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_KEY_STRIDE0);
+        const int64_t* keyStride0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_KEY_STRIDE0);
         if (keyStride0Attr != nullptr && *keyStride0Attr >= 0) {
             uint64_t contiguousStride0 = static_cast<uint64_t>(info.blockSize) * info.n2Size * info.headDim;
             OP_CHECK_IF(static_cast<uint64_t>(*keyStride0Attr) < contiguousStride0,
@@ -413,7 +413,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         // k_descale stride0 接线(量化场景): 优先级同 key_stride0;
         // 连续 stride0: mode=0=blockSize*N2, mode=1=blockSize*N2*(D/32); 非量化保持 0
         if (info.quantMode == PKI_QUANT_FP8_PER_TOKEN || info.quantMode == PKI_QUANT_MXFP8) {
-            const int64_t *kdsStride0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_K_DESCALE_STRIDE0);
+            const int64_t* kdsStride0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_K_DESCALE_STRIDE0);
             if (kdsStride0Attr != nullptr && *kdsStride0Attr >= 0) {
                 // 属性指定: 校验不小于连续 stride(0 轴非连续只允许加 padding)
                 uint64_t contigKdsStride0 =
@@ -449,14 +449,14 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         // BSND: kernel 按 tensorKeyOffset 连续寻址, stride0 属性仅 PA 分支消费;
         // 非 PA 下显式指定说明输入非连续, 显式拒绝
         {
-            const int64_t *ks0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_KEY_STRIDE0);
+            const int64_t* ks0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_KEY_STRIDE0);
             OP_CHECK_IF(ks0Attr != nullptr && *ks0Attr >= 0,
                         OP_LOGE(context_,
                                 "key_stride0(%ld) is only supported with layout_k=PA_BBND, "
                                 "but layout_k is BSND; pass a contiguous pool_key",
                                 *ks0Attr),
                         return ge::GRAPH_FAILED);
-            const int64_t *kds0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_K_DESCALE_STRIDE0);
+            const int64_t* kds0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_K_DESCALE_STRIDE0);
             OP_CHECK_IF(kds0Attr != nullptr && *kds0Attr >= 0,
                         OP_LOGE(context_,
                                 "k_descale_stride0(%ld) is only supported with layout_k=PA_BBND, "
@@ -480,14 +480,14 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         // TND: kernel 按 tensorKeyOffset 连续寻址, stride0 属性仅 PA 分支消费;
         // 非 PA 下显式指定说明输入非连续, 显式拒绝
         {
-            const int64_t *ks0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_KEY_STRIDE0);
+            const int64_t* ks0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_KEY_STRIDE0);
             OP_CHECK_IF(ks0Attr != nullptr && *ks0Attr >= 0,
                         OP_LOGE(context_,
                                 "key_stride0(%ld) is only supported with layout_k=PA_BBND, "
                                 "but layout_k is TND; pass a contiguous pool_key",
                                 *ks0Attr),
                         return ge::GRAPH_FAILED);
-            const int64_t *kds0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_K_DESCALE_STRIDE0);
+            const int64_t* kds0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_K_DESCALE_STRIDE0);
             OP_CHECK_IF(kds0Attr != nullptr && *kds0Attr >= 0,
                         OP_LOGE(context_,
                                 "k_descale_stride0(%ld) is only supported with layout_k=PA_BBND, "
@@ -499,9 +499,9 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
     }
     // block_table for PA
     if (info.pageAttention) {
-        const gert::Tensor *blockTableTensor = context_->GetOptionalInputTensor(PKI_BLOCK_TABLE_INDEX);
+        const gert::Tensor* blockTableTensor = context_->GetOptionalInputTensor(PKI_BLOCK_TABLE_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, blockTableTensor);
-        const gert::StorageShape *btShape = context_->GetOptionalInputShape(PKI_BLOCK_TABLE_INDEX);
+        const gert::StorageShape* btShape = context_->GetOptionalInputShape(PKI_BLOCK_TABLE_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, btShape);
         OP_CHECK_IF(btShape->GetStorageShape().GetDimNum() != 2,
                     OP_LOGE(context_, "block_table must be 2D (B, maxBlockNumPerSeq)"), return ge::GRAPH_FAILED);
@@ -515,7 +515,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
 
     // weights shape: BSND (B,S1,N1) 3D / TND (T1,N1) 2D
     {
-        const gert::StorageShape *wShape = context_->GetInputShape(PKI_WEIGHTS_INDEX);
+        const gert::StorageShape* wShape = context_->GetInputShape(PKI_WEIGHTS_INDEX);
         if (info.layoutQ == PkiDataLayout::BSND) {
             OP_CHECK_IF(
                 wShape->GetStorageShape().GetDimNum() != 3,
@@ -551,7 +551,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
 
     // pool_tail_k shape: (B,) 1D
     {
-        const gert::StorageShape *ptkShape = context_->GetInputShape(PKI_POOL_TAIL_K_INDEX);
+        const gert::StorageShape* ptkShape = context_->GetInputShape(PKI_POOL_TAIL_K_INDEX);
         OP_CHECK_IF(ptkShape->GetStorageShape().GetDimNum() != 1,
                     OP_LOGE(context_, "pool_tail_k must be 1D (B,), got %zu", ptkShape->GetStorageShape().GetDimNum()),
                     return ge::GRAPH_FAILED);
@@ -560,9 +560,9 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
 
     // actual_seq_q shape (non-null, TND only): (B,) 1D prefix sum
     {
-        const gert::Tensor *actSeqQT = context_->GetOptionalInputTensor(PKI_ACTUAL_SEQ_Q_INDEX);
+        const gert::Tensor* actSeqQT = context_->GetOptionalInputTensor(PKI_ACTUAL_SEQ_Q_INDEX);
         if (actSeqQT != nullptr) {
-            const gert::StorageShape *asqShape = context_->GetOptionalInputShape(PKI_ACTUAL_SEQ_Q_INDEX);
+            const gert::StorageShape* asqShape = context_->GetOptionalInputShape(PKI_ACTUAL_SEQ_Q_INDEX);
             OP_CHECK_NULL_WITH_CONTEXT(context_, asqShape);
             OP_CHECK_IF(asqShape->GetStorageShape().GetDimNum() != 1,
                         OP_LOGE(context_, "actual_seq_q must be 1D, got %zu", asqShape->GetStorageShape().GetDimNum()),
@@ -572,9 +572,9 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
 
     // actual_seq_k shape (non-null, TND/PA): (B,) 1D
     {
-        const gert::Tensor *actSeqKT = context_->GetOptionalInputTensor(PKI_ACTUAL_SEQ_K_INDEX);
+        const gert::Tensor* actSeqKT = context_->GetOptionalInputTensor(PKI_ACTUAL_SEQ_K_INDEX);
         if (actSeqKT != nullptr) {
-            const gert::StorageShape *askShape = context_->GetOptionalInputShape(PKI_ACTUAL_SEQ_K_INDEX);
+            const gert::StorageShape* askShape = context_->GetOptionalInputShape(PKI_ACTUAL_SEQ_K_INDEX);
             OP_CHECK_NULL_WITH_CONTEXT(context_, askShape);
             OP_CHECK_IF(askShape->GetStorageShape().GetDimNum() != 1,
                         OP_LOGE(context_, "actual_seq_k must be 1D, got %zu", askShape->GetStorageShape().GetDimNum()),
@@ -585,7 +585,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
     // q_descale shape (non-null, quantMode>=0): mode=0 为 BSND 3D / TND 2D;
     // mode=1 (mxFP8) 追加 [D/64, 2] 尾维 -> BSND 5D / TND 4D
     if (qDescaleTensor != nullptr) {
-        const gert::StorageShape *qdsShape = context_->GetOptionalInputShape(PKI_Q_DESCALE_INDEX);
+        const gert::StorageShape* qdsShape = context_->GetOptionalInputShape(PKI_Q_DESCALE_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, qdsShape);
         if (info.layoutQ == PkiDataLayout::BSND) {
             size_t expectDims = (info.quantMode == PKI_QUANT_MXFP8) ? 5 : 3;
@@ -644,7 +644,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
     // k_descale shape (non-null, quantMode>=0): mode=0 为 BSND/PA 3D 或 TND 2D;
     // mode=1 (mxFP8) 追加 [D/64, 2] 尾维 -> BSND/PA 5D / TND 4D
     if (kDescaleTensor != nullptr) {
-        const gert::StorageShape *kdsShape = context_->GetOptionalInputShape(PKI_K_DESCALE_INDEX);
+        const gert::StorageShape* kdsShape = context_->GetOptionalInputShape(PKI_K_DESCALE_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, kdsShape);
         if (info.pageAttention) {
             size_t expectDims = (info.quantMode == PKI_QUANT_MXFP8) ? 5 : 3;
@@ -728,7 +728,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
 
     // sparse_indices_out shape: BSND (B,S1,topk+poolSize-1) 3D / TND (T1,topk+poolSize-1) 2D
     {
-        const gert::StorageShape *idxOutShape = context_->GetOutputShape(PKI_SPARSE_INDICES_INDEX);
+        const gert::StorageShape* idxOutShape = context_->GetOutputShape(PKI_SPARSE_INDICES_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, idxOutShape);
         int64_t outLastDim = static_cast<int64_t>(info.topk) + info.poolSize - 1;
         if (info.layoutQ == PkiDataLayout::BSND) {
@@ -766,7 +766,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
 
     // sparse_values_out shape (returnValue=true): BSND (B,S1,topk//poolSize) 3D / TND (T1,topk//poolSize) 2D
     if (info.returnValue) {
-        const gert::StorageShape *valOutShape = context_->GetOutputShape(PKI_SPARSE_VALUES_INDEX);
+        const gert::StorageShape* valOutShape = context_->GetOutputShape(PKI_SPARSE_VALUES_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, valOutShape);
         int64_t valLastDim = static_cast<int64_t>(info.sparseCount);
         if (info.layoutQ == PkiDataLayout::BSND) {
@@ -806,13 +806,13 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
 
     // #5/#6: actual_seq_q prefix-sum (TND): determines B, validates non-decreasing + last==T1
     if (info.layoutQ == PkiDataLayout::TND) {
-        const gert::Tensor *asqTensor = context_->GetOptionalInputTensor(PKI_ACTUAL_SEQ_Q_INDEX);
+        const gert::Tensor* asqTensor = context_->GetOptionalInputTensor(PKI_ACTUAL_SEQ_Q_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, asqTensor);
         // B is derived from the shape (element count), available in both eager and
         // GE graph mode.
         int64_t asqCount = asqTensor->GetShapeSize();
         info.bSize = static_cast<uint32_t>(asqCount);
-        const int64_t *asqData = IsHostVisibleValue(asqTensor) ? asqTensor->GetData<int64_t>() : nullptr;
+        const int64_t* asqData = IsHostVisibleValue(asqTensor) ? asqTensor->GetData<int64_t>() : nullptr;
         if (asqData == nullptr) {
             // Device tensor(GE 图模式 / eager Tensor 变体 NPU 输入): tiling 期值不可见。
             // 跳过 host 侧值校验; kernel 运行期从 GM 读前缀和(GetActualSeqLen)。
@@ -839,9 +839,9 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
 
     // #5: actual_seq_k values: TND prefix-sum / PA non-prefix-sum
     if (info.layoutK == PkiDataLayout::TND || info.pageAttention) {
-        const gert::Tensor *askTensor = context_->GetOptionalInputTensor(PKI_ACTUAL_SEQ_K_INDEX);
+        const gert::Tensor* askTensor = context_->GetOptionalInputTensor(PKI_ACTUAL_SEQ_K_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, askTensor);
-        const int64_t *askData = IsHostVisibleValue(askTensor) ? askTensor->GetData<int64_t>() : nullptr;
+        const int64_t* askData = IsHostVisibleValue(askTensor) ? askTensor->GetData<int64_t>() : nullptr;
         int64_t askCount = askTensor->GetShapeSize();
         OP_CHECK_IF(static_cast<uint32_t>(askCount) != info.bSize,
                     OP_LOGE(context_, "actual_seq_k count(%ld) must equal B(%u)", askCount, info.bSize),
@@ -889,7 +889,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
 
     // #2: block_table dim(0) == B (PA, after B determined)
     if (info.pageAttention) {
-        const gert::StorageShape *btShape = context_->GetOptionalInputShape(PKI_BLOCK_TABLE_INDEX);
+        const gert::StorageShape* btShape = context_->GetOptionalInputShape(PKI_BLOCK_TABLE_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, btShape);
         OP_CHECK_IF(static_cast<uint32_t>(btShape->GetStorageShape().GetDim(0)) != info.bSize,
                     OP_LOGE(context_, "block_table dim(0)(%ld) must equal B(%u)", btShape->GetStorageShape().GetDim(0),
@@ -899,12 +899,12 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
 
     // #4: pool_tail_k values: each must be in [0, pool_size-1]
     {
-        const gert::Tensor *ptkTensor = context_->GetInputTensor(PKI_POOL_TAIL_K_INDEX);
+        const gert::Tensor* ptkTensor = context_->GetInputTensor(PKI_POOL_TAIL_K_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, ptkTensor);
         OP_CHECK_IF(static_cast<uint32_t>(ptkTensor->GetShapeSize()) != info.bSize,
                     OP_LOGE(context_, "pool_tail_k count(%ld) must equal B(%u)", ptkTensor->GetShapeSize(), info.bSize),
                     return ge::GRAPH_FAILED);
-        const int64_t *ptkData = IsHostVisibleValue(ptkTensor) ? ptkTensor->GetData<int64_t>() : nullptr;
+        const int64_t* ptkData = IsHostVisibleValue(ptkTensor) ? ptkTensor->GetData<int64_t>() : nullptr;
         if (ptkData != nullptr) {
             int64_t ptkCount = ptkTensor->GetShapeSize();
             for (int64_t i = 0; i < ptkCount; ++i) {
@@ -923,7 +923,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PoolKeyIndexerTiling::CheckKeyContiguous(const PoolKeyIndexerTilingInfo &info) const
+ge::graphStatus PoolKeyIndexerTiling::CheckKeyContiguous(const PoolKeyIndexerTilingInfo& info) const
 {
     // PA_BBND: axis 0 allows non-contiguous, check starts from axis 1
     // Non-PA: check starts from axis 0 (all axes must be contiguous)
@@ -931,9 +931,9 @@ ge::graphStatus PoolKeyIndexerTiling::CheckKeyContiguous(const PoolKeyIndexerTil
 
     // ---- pool_key 连续性校验(失败日志含 tensor 名/轴号/实际 stride/期望 stride/shape) ----
     if (!keyStridesVec_.empty()) {
-        const gert::StorageShape *keyShape = context_->GetInputShape(PKI_POOL_KEY_INDEX);
+        const gert::StorageShape* keyShape = context_->GetInputShape(PKI_POOL_KEY_INDEX);
         if (keyShape != nullptr) {
-            auto &shape = keyShape->GetStorageShape();
+            auto& shape = keyShape->GetStorageShape();
             std::vector<uint32_t> expectedStrides;
             if (info.layoutK == PkiDataLayout::BSND || info.layoutK == PkiDataLayout::PA_BBND) {
                 expectedStrides = {static_cast<uint32_t>(shape.GetDim(1) * shape.GetDim(2) * shape.GetDim(3)),
@@ -973,9 +973,9 @@ ge::graphStatus PoolKeyIndexerTiling::CheckKeyContiguous(const PoolKeyIndexerTil
     // ---- k_descale 非连续校验(量化场景, 与 pool_key 同规则: PA 仅 0 轴可非连续, 其余轴必须连续) ----
     if (info.quantMode == PKI_QUANT_FP8_PER_TOKEN || info.quantMode == PKI_QUANT_MXFP8) {
         if (!keyDequantScaleStridesVec_.empty()) {
-            const gert::StorageShape *kdsShape = context_->GetOptionalInputShape(PKI_K_DESCALE_INDEX);
+            const gert::StorageShape* kdsShape = context_->GetOptionalInputShape(PKI_K_DESCALE_INDEX);
             if (kdsShape != nullptr) {
-                auto &sShape = kdsShape->GetStorageShape();
+                auto& sShape = kdsShape->GetStorageShape();
                 size_t dimNum = sShape.GetDimNum();
                 // 逐轴推导连续 stride(倒序), 末轴 stride 恒 1
                 std::vector<uint32_t> expectedStrides(dimNum, 1U);
@@ -1012,7 +1012,7 @@ ge::graphStatus PoolKeyIndexerTiling::CheckKeyContiguous(const PoolKeyIndexerTil
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PoolKeyIndexerTiling::CalcTilingParams(PoolKeyIndexerTilingInfo &info)
+ge::graphStatus PoolKeyIndexerTiling::CalcTilingParams(PoolKeyIndexerTilingInfo& info)
 {
     if (info.sparseCount > PKI_TOPK_6K) {
         tilingData_.set_s1BaseSize(PKI_S1_BASE_SIZE_SMALL);
@@ -1047,7 +1047,7 @@ uint32_t PoolKeyIndexerTiling::GetTrunkLen(uint32_t sparseCount)
     return PKI_TRUNK_LEN_12K;
 }
 
-ge::graphStatus PoolKeyIndexerTiling::CalcWorkspaceSize(PoolKeyIndexerTilingInfo &info, uint64_t &workspaceSize)
+ge::graphStatus PoolKeyIndexerTiling::CalcWorkspaceSize(PoolKeyIndexerTilingInfo& info, uint64_t& workspaceSize)
 {
     // workspace 布局须与 kernel 侧一致: | mm1ResGm(双缓冲score) | vec1ResGm(LD中间结果) |
     // vec1ParamGm(LD参数) |; MIX 核上 GetBlockNum() = aicNum, 直接使用 aicNum
@@ -1104,7 +1104,7 @@ ge::graphStatus PoolKeyIndexerTiling::CalcWorkspaceSize(PoolKeyIndexerTilingInfo
     return ge::GRAPH_SUCCESS;
 }
 
-void PoolKeyIndexerTiling::SetTilingData(PoolKeyIndexerTilingInfo &info)
+void PoolKeyIndexerTiling::SetTilingData(PoolKeyIndexerTilingInfo& info)
 {
     tilingData_.set_bSize(info.bSize);
     tilingData_.set_gSize(info.gSize);
@@ -1127,9 +1127,9 @@ void PoolKeyIndexerTiling::SetTilingData(PoolKeyIndexerTilingInfo &info)
     tilingData_.set_qkScale(1.0f / std::sqrt(static_cast<float>(info.headDim)));
 }
 
-ge::graphStatus PoolKeyIndexerTiling::DoTiling(PoolKeyIndexerTilingInfo *tilingInfo)
+ge::graphStatus PoolKeyIndexerTiling::DoTiling(PoolKeyIndexerTilingInfo* tilingInfo)
 {
-    auto &info = *tilingInfo;
+    auto& info = *tilingInfo;
     info.opName = context_->GetNodeName();
 
     // Get platform info
@@ -1170,7 +1170,7 @@ ge::graphStatus PoolKeyIndexerTiling::DoTiling(PoolKeyIndexerTilingInfo *tilingI
 
     // Set workspace size
     // GE 图模式 workspaces[0] 可能为 SIZE_MAX 哨兵, 必须直接覆写(取 max 会烘焙进图导致溢出/OOM)
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     if (workspaces != nullptr) {
         workspaces[0] = static_cast<size_t>(workspaceSize);
     }
@@ -1205,7 +1205,7 @@ ge::graphStatus PoolKeyIndexerTiling::DoTiling(PoolKeyIndexerTilingInfo *tilingI
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingPoolKeyIndexer(gert::TilingContext *context)
+static ge::graphStatus TilingPoolKeyIndexer(gert::TilingContext* context)
 {
     PoolKeyIndexerTiling tiling(context);
     PoolKeyIndexerTilingInfo info;
@@ -1214,11 +1214,11 @@ static ge::graphStatus TilingPoolKeyIndexer(gert::TilingContext *context)
 
 // 图模式 compile info 解析回调: te 编译期将平台信息写入 CompileInfo,
 // 框架据此生成 compile info JSON 供 FE 图编译期解析
-static ge::graphStatus TilingPrepareForPoolKeyIndexer(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForPoolKeyIndexer(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("PoolKeyIndexer", "TilingParseContext is nullptr!"),
                 return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context->GetNodeName(), "TilingParse: platformInfo is nullptr"),
                 return ge::GRAPH_FAILED);
     auto compileInfoPtr = context->GetCompiledInfo<PoolKeyIndexerCompileInfo>();

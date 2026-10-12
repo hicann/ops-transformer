@@ -31,7 +31,7 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35QFA;
 
-ge::graphStatus SinksChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
+ge::graphStatus SinksChecker::CheckSinglePara(const QfaTilingInfo& qfaInfo)
 {
     // 约束(单参数校验列): 暂不支持
     // 传入 sinks 时直接报错

@@ -31,12 +31,12 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35QFA;
 
-ge::graphStatus MetadataChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
+ge::graphStatus MetadataChecker::CheckSinglePara(const QfaTilingInfo& qfaInfo)
 {
     // 单参数校验：仅当 metadata 传入时校验其自身属性（dtype/format/shape）。
     // 存在性校验（必须传入）由 CheckParaExistence 负责。
-    const gert::Tensor *metadataTensor = qfaInfo.opParamInfo.metadata.tensor;
-    const gert::CompileTimeTensorDesc *metadataDesc = qfaInfo.opParamInfo.metadata.desc;
+    const gert::Tensor* metadataTensor = qfaInfo.opParamInfo.metadata.tensor;
+    const gert::CompileTimeTensorDesc* metadataDesc = qfaInfo.opParamInfo.metadata.desc;
     if (metadataTensor == nullptr || metadataDesc == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -75,7 +75,7 @@ ge::graphStatus MetadataChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
 // ParaExistence — metadata 必须传入
 // ============================================================================
 
-ge::graphStatus MetadataChecker::CheckParaExistence(const QfaTilingInfo &qfaInfo)
+ge::graphStatus MetadataChecker::CheckParaExistence(const QfaTilingInfo& qfaInfo)
 {
     // 当前不支持不传入 metadata，未传入将发出拦截报警
     OP_CHECK_IF(qfaInfo.opParamInfo.metadata.tensor == nullptr || qfaInfo.opParamInfo.metadata.desc == nullptr,

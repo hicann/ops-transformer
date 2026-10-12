@@ -20,9 +20,15 @@ struct QuantCompressorUtCompileInfo {
 
 class QuantCompressorTiling : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "QuantCompressorTiling SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "QuantCompressorTiling SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "QuantCompressorTiling TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "QuantCompressorTiling TearDown" << std::endl;
+    }
 };
 
 // C4Li: D=128, coff=2, cmp_ratio=4; BSH layout; cache_mode=1 (LINEAR_BUFFER).

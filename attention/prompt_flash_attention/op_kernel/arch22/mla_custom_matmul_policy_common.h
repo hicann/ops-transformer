@@ -39,9 +39,9 @@ struct GlobalL1Array {
     int32_t bufferSize{0}; // base块元素个数
 };
 
-__BLOCK_LOCAL__ __inline__ GlobalL1Array *l1Global;
+__BLOCK_LOCAL__ __inline__ GlobalL1Array* l1Global;
 
-__aicore__ inline void InitL1Buffer(TPipe *tPipe, GlobalL1Array *l1Global)
+__aicore__ inline void InitL1Buffer(TPipe* tPipe, GlobalL1Array* l1Global)
 {
     if (g_coreType == AIC) {
         tPipe->InitBuffer(l1Global[Q_VEC1_INDEX].localQue, 1, Q_VEC1_BUFFER_SIZE);
@@ -51,7 +51,7 @@ __aicore__ inline void InitL1Buffer(TPipe *tPipe, GlobalL1Array *l1Global)
 
 namespace Impl {
 namespace Detail {
-template <typename IMPL, class INPUT_TYPE, const auto &MM_CFG>
+template <typename IMPL, class INPUT_TYPE, const auto& MM_CFG>
 class MlaCubeInBuffer {
     MATMUL_USE_MODULE(Context);
     using SrcT = typename INPUT_TYPE::TRANS_T;
@@ -99,7 +99,7 @@ public:
         }
     }
 
-    __aicore__ inline void FreeTensor(int32_t bufferPos = -1, const LocalTensor<SrcT> &tensor = LocalTensor<SrcT>{})
+    __aicore__ inline void FreeTensor(int32_t bufferPos = -1, const LocalTensor<SrcT>& tensor = LocalTensor<SrcT>{})
     {
         if constexpr (INPUT_TYPE::TAG == InputTypeTag::A) {
             if (MATMUL_MODULE(Context)->needFreeA) {
@@ -114,7 +114,7 @@ public:
         }
     }
 
-    __aicore__ inline void EnQue(LocalTensor<SrcT> &tensor) {}
+    __aicore__ inline void EnQue(LocalTensor<SrcT>& tensor) {}
 
     __aicore__ inline void DeQue() {}
 
@@ -124,7 +124,7 @@ private:
     int32_t baseBlockSize_{0};
 };
 
-template <typename IMPL, class INPUT_TYPE, const auto &MM_CFG>
+template <typename IMPL, class INPUT_TYPE, const auto& MM_CFG>
 class MlaContext {
     using SrcT = typename INPUT_TYPE::TRANS_T;
 

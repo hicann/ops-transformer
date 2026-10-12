@@ -48,7 +48,7 @@ extern "C" __global__ __aicore__ void msa_index_score(GM_ADDR query, GM_ADDR key
         userWs = workspace;
     }
     GET_TILING_DATA_WITH_STRUCT(MsaIndexScoreTilingData, tilingDataIn, tiling);
-    const MsaIndexScoreTilingData *__restrict tilingData = &tilingDataIn;
+    const MsaIndexScoreTilingData* __restrict tilingData = &tilingDataIn;
 
     if (TILING_KEY_IS(MSA_TILING_KEY_BF16)) {
         MSA_INVOKE_KERNEL(bfloat16_t, false);

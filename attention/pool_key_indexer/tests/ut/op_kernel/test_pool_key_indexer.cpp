@@ -56,7 +56,7 @@ struct KernelTestConfig {
     uint32_t usedCoreNum;
 };
 
-void SetTilingData(optiling::PoolKeyIndexerTilingData *td, const KernelTestConfig &cfg)
+void SetTilingData(optiling::PoolKeyIndexerTilingData* td, const KernelTestConfig& cfg)
 {
     td->bSize = cfg.bSize;
     td->gSize = cfg.n1;
@@ -87,7 +87,7 @@ void SetTilingData(optiling::PoolKeyIndexerTilingData *td, const KernelTestConfi
 }
 
 template <typename T>
-void FillTensor(vector<T> &data, int64_t count, T value)
+void FillTensor(vector<T>& data, int64_t count, T value)
 {
     data.resize(count, value);
 }
@@ -146,14 +146,14 @@ TEST_F(PoolKeyIndexerKernelTest, Degraded_BSND_FP16_Mask0_PoolSize1)
     size_t valuesBytes = valuesSize * sizeof(float);
     size_t tilingBytes = sizeof(optiling::PoolKeyIndexerTilingData);
 
-    uint8_t *queryGm = (uint8_t *)AscendC::GmAlloc(queryBytes);
-    uint8_t *poolKeyGm = (uint8_t *)AscendC::GmAlloc(poolKeyBytes);
-    uint8_t *weightsGm = (uint8_t *)AscendC::GmAlloc(weightsBytes);
-    uint8_t *poolTailKGm = (uint8_t *)AscendC::GmAlloc(poolTailKBytes);
-    uint8_t *indicesGm = (uint8_t *)AscendC::GmAlloc(indicesBytes);
-    uint8_t *valuesGm = (uint8_t *)AscendC::GmAlloc(valuesBytes);
-    uint8_t *workspaceGm = (uint8_t *)AscendC::GmAlloc(WORKSPACE_SIZE);
-    uint8_t *tilingGm = (uint8_t *)AscendC::GmAlloc(tilingBytes);
+    uint8_t* queryGm = (uint8_t*)AscendC::GmAlloc(queryBytes);
+    uint8_t* poolKeyGm = (uint8_t*)AscendC::GmAlloc(poolKeyBytes);
+    uint8_t* weightsGm = (uint8_t*)AscendC::GmAlloc(weightsBytes);
+    uint8_t* poolTailKGm = (uint8_t*)AscendC::GmAlloc(poolTailKBytes);
+    uint8_t* indicesGm = (uint8_t*)AscendC::GmAlloc(indicesBytes);
+    uint8_t* valuesGm = (uint8_t*)AscendC::GmAlloc(valuesBytes);
+    uint8_t* workspaceGm = (uint8_t*)AscendC::GmAlloc(WORKSPACE_SIZE);
+    uint8_t* tilingGm = (uint8_t*)AscendC::GmAlloc(tilingBytes);
 
     ASSERT_NE(queryGm, nullptr);
     ASSERT_NE(poolKeyGm, nullptr);
@@ -178,7 +178,7 @@ TEST_F(PoolKeyIndexerKernelTest, Degraded_BSND_FP16_Mask0_PoolSize1)
     memcpy(weightsGm, weightsData.data(), weightsBytes);
     memcpy(poolTailKGm, poolTailKData.data(), poolTailKBytes);
 
-    auto *td = reinterpret_cast<optiling::PoolKeyIndexerTilingData *>(tilingGm);
+    auto* td = reinterpret_cast<optiling::PoolKeyIndexerTilingData*>(tilingGm);
     SetTilingData(td, cfg);
 
     auto kernelFn = [&](GM_ADDR query, GM_ADDR poolKey, GM_ADDR weights, GM_ADDR poolTailK, GM_ADDR actSeqQ,
@@ -193,7 +193,7 @@ TEST_F(PoolKeyIndexerKernelTest, Degraded_BSND_FP16_Mask0_PoolSize1)
     ICPU_RUN_KF(kernelFn, cfg.usedCoreNum, queryGm, poolKeyGm, weightsGm, poolTailKGm, nullptr, nullptr, nullptr,
                 nullptr, nullptr, indicesGm, valuesGm, workspaceGm, tilingGm);
 
-    int32_t *indicesOut = reinterpret_cast<int32_t *>(indicesGm);
+    int32_t* indicesOut = reinterpret_cast<int32_t*>(indicesGm);
     for (int64_t i = 0; i < indicesSize; i++) {
         EXPECT_GE(indicesOut[i], -1);
     }
@@ -248,14 +248,14 @@ TEST_F(PoolKeyIndexerKernelTest, Degraded_BSND_BF16_MaskCausal_PoolSize1)
     size_t valuesBytes = valuesSize * sizeof(float);
     size_t tilingBytes = sizeof(optiling::PoolKeyIndexerTilingData);
 
-    uint8_t *queryGm = (uint8_t *)AscendC::GmAlloc(queryBytes);
-    uint8_t *poolKeyGm = (uint8_t *)AscendC::GmAlloc(poolKeyBytes);
-    uint8_t *weightsGm = (uint8_t *)AscendC::GmAlloc(weightsBytes);
-    uint8_t *poolTailKGm = (uint8_t *)AscendC::GmAlloc(poolTailKBytes);
-    uint8_t *indicesGm = (uint8_t *)AscendC::GmAlloc(indicesBytes);
-    uint8_t *valuesGm = (uint8_t *)AscendC::GmAlloc(valuesBytes);
-    uint8_t *workspaceGm = (uint8_t *)AscendC::GmAlloc(WORKSPACE_SIZE);
-    uint8_t *tilingGm = (uint8_t *)AscendC::GmAlloc(tilingBytes);
+    uint8_t* queryGm = (uint8_t*)AscendC::GmAlloc(queryBytes);
+    uint8_t* poolKeyGm = (uint8_t*)AscendC::GmAlloc(poolKeyBytes);
+    uint8_t* weightsGm = (uint8_t*)AscendC::GmAlloc(weightsBytes);
+    uint8_t* poolTailKGm = (uint8_t*)AscendC::GmAlloc(poolTailKBytes);
+    uint8_t* indicesGm = (uint8_t*)AscendC::GmAlloc(indicesBytes);
+    uint8_t* valuesGm = (uint8_t*)AscendC::GmAlloc(valuesBytes);
+    uint8_t* workspaceGm = (uint8_t*)AscendC::GmAlloc(WORKSPACE_SIZE);
+    uint8_t* tilingGm = (uint8_t*)AscendC::GmAlloc(tilingBytes);
 
     ASSERT_NE(queryGm, nullptr);
     ASSERT_NE(poolKeyGm, nullptr);
@@ -276,7 +276,7 @@ TEST_F(PoolKeyIndexerKernelTest, Degraded_BSND_BF16_MaskCausal_PoolSize1)
     memcpy(weightsGm, weightsData.data(), weightsBytes);
     memcpy(poolTailKGm, poolTailKData.data(), poolTailKBytes);
 
-    auto *td = reinterpret_cast<optiling::PoolKeyIndexerTilingData *>(tilingGm);
+    auto* td = reinterpret_cast<optiling::PoolKeyIndexerTilingData*>(tilingGm);
     SetTilingData(td, cfg);
 
     auto kernelFn = [&](GM_ADDR query, GM_ADDR poolKey, GM_ADDR weights, GM_ADDR poolTailK, GM_ADDR actSeqQ,
@@ -291,7 +291,7 @@ TEST_F(PoolKeyIndexerKernelTest, Degraded_BSND_BF16_MaskCausal_PoolSize1)
     ICPU_RUN_KF(kernelFn, cfg.usedCoreNum, queryGm, poolKeyGm, weightsGm, poolTailKGm, nullptr, nullptr, nullptr,
                 nullptr, nullptr, indicesGm, valuesGm, workspaceGm, tilingGm);
 
-    int32_t *indicesOut = reinterpret_cast<int32_t *>(indicesGm);
+    int32_t* indicesOut = reinterpret_cast<int32_t*>(indicesGm);
     for (int64_t i = 0; i < indicesSize; i++) {
         EXPECT_GE(indicesOut[i], -1);
     }
@@ -347,14 +347,14 @@ TEST_F(PoolKeyIndexerKernelTest, PoolSize4_BSND_FP16_Mask0)
     size_t valuesBytes = valuesSize * sizeof(float);
     size_t tilingBytes = sizeof(optiling::PoolKeyIndexerTilingData);
 
-    uint8_t *queryGm = (uint8_t *)AscendC::GmAlloc(queryBytes);
-    uint8_t *poolKeyGm = (uint8_t *)AscendC::GmAlloc(poolKeyBytes);
-    uint8_t *weightsGm = (uint8_t *)AscendC::GmAlloc(weightsBytes);
-    uint8_t *poolTailKGm = (uint8_t *)AscendC::GmAlloc(poolTailKBytes);
-    uint8_t *indicesGm = (uint8_t *)AscendC::GmAlloc(indicesBytes);
-    uint8_t *valuesGm = (uint8_t *)AscendC::GmAlloc(valuesBytes);
-    uint8_t *workspaceGm = (uint8_t *)AscendC::GmAlloc(WORKSPACE_SIZE);
-    uint8_t *tilingGm = (uint8_t *)AscendC::GmAlloc(tilingBytes);
+    uint8_t* queryGm = (uint8_t*)AscendC::GmAlloc(queryBytes);
+    uint8_t* poolKeyGm = (uint8_t*)AscendC::GmAlloc(poolKeyBytes);
+    uint8_t* weightsGm = (uint8_t*)AscendC::GmAlloc(weightsBytes);
+    uint8_t* poolTailKGm = (uint8_t*)AscendC::GmAlloc(poolTailKBytes);
+    uint8_t* indicesGm = (uint8_t*)AscendC::GmAlloc(indicesBytes);
+    uint8_t* valuesGm = (uint8_t*)AscendC::GmAlloc(valuesBytes);
+    uint8_t* workspaceGm = (uint8_t*)AscendC::GmAlloc(WORKSPACE_SIZE);
+    uint8_t* tilingGm = (uint8_t*)AscendC::GmAlloc(tilingBytes);
 
     ASSERT_NE(queryGm, nullptr);
     ASSERT_NE(poolKeyGm, nullptr);
@@ -375,7 +375,7 @@ TEST_F(PoolKeyIndexerKernelTest, PoolSize4_BSND_FP16_Mask0)
     memcpy(weightsGm, weightsData.data(), weightsBytes);
     memcpy(poolTailKGm, poolTailKData.data(), poolTailKBytes);
 
-    auto *td = reinterpret_cast<optiling::PoolKeyIndexerTilingData *>(tilingGm);
+    auto* td = reinterpret_cast<optiling::PoolKeyIndexerTilingData*>(tilingGm);
     SetTilingData(td, cfg);
 
     auto kernelFn = [&](GM_ADDR query, GM_ADDR poolKey, GM_ADDR weights, GM_ADDR poolTailK, GM_ADDR actSeqQ,
@@ -390,7 +390,7 @@ TEST_F(PoolKeyIndexerKernelTest, PoolSize4_BSND_FP16_Mask0)
     ICPU_RUN_KF(kernelFn, cfg.usedCoreNum, queryGm, poolKeyGm, weightsGm, poolTailKGm, nullptr, nullptr, nullptr,
                 nullptr, nullptr, indicesGm, valuesGm, workspaceGm, tilingGm);
 
-    int32_t *indicesOut = reinterpret_cast<int32_t *>(indicesGm);
+    int32_t* indicesOut = reinterpret_cast<int32_t*>(indicesGm);
     for (int64_t i = 0; i < indicesSize; i++) {
         EXPECT_GE(indicesOut[i], -1);
     }

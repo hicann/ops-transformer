@@ -41,7 +41,7 @@ public:
                                 GM_ADDR attention_out_grad, GM_ADDR softmax_max, GM_ADDR softmax_sum,
                                 GM_ADDR topk_indices, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen,
                                 GM_ADDR atten_mask, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace,
-                                const TILING_CLASS *__restrict ordTilingData, TPipe *pipe);
+                                const TILING_CLASS* __restrict ordTilingData, TPipe* pipe);
     __aicore__ inline void Process();
     __aicore__ inline void DeterministicProcess();
 
@@ -69,25 +69,25 @@ protected:
     __aicore__ inline void InitGMBuffer(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR attention_out,
                                         GM_ADDR attention_out_grad, GM_ADDR softmax_max, GM_ADDR softmax_sum,
                                         GM_ADDR topk_indices, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv);
-    __aicore__ inline void InitParams(const TILING_CLASS *__restrict ordTilingData, GM_ADDR actual_seq_qlen,
+    __aicore__ inline void InitParams(const TILING_CLASS* __restrict ordTilingData, GM_ADDR actual_seq_qlen,
                                       GM_ADDR actual_seq_kvlen);
     __aicore__ inline void InitWorkspace(GM_ADDR workspace);
-    __aicore__ inline void InitAddrArray(int64_t *scatterDkAddrArray, int64_t *scatterDvAddrArray,
-                                         int64_t *mmPingpongIdxArray);
+    __aicore__ inline void InitAddrArray(int64_t* scatterDkAddrArray, int64_t* scatterDvAddrArray,
+                                         int64_t* mmPingpongIdxArray);
     __aicore__ inline void AtomicClean();
-    __aicore__ inline void DumpGmZero(GlobalTensor<float> &gm, int64_t num);
-    __aicore__ inline void InitUB(TPipe *pipe);
+    __aicore__ inline void DumpGmZero(GlobalTensor<float>& gm, int64_t num);
+    __aicore__ inline void InitUB(TPipe* pipe);
     // process
     __aicore__ inline void GetTndSeqLen(const int64_t t1Idx);
-    __aicore__ inline void Getbindex(const int64_t ProcessID, const int64_t coreNum, int64_t *bIndexArray);
+    __aicore__ inline void Getbindex(const int64_t ProcessID, const int64_t coreNum, int64_t* bIndexArray);
     __aicore__ inline void CVProcess();
     __aicore__ inline void CVProcessWithOutScatter();
     __aicore__ inline void SelectAndGather();
-    __aicore__ inline void ScatterProcess(GlobalTensor<float> &inGmTensor, GlobalTensor<float> &outGmTensor,
+    __aicore__ inline void ScatterProcess(GlobalTensor<float>& inGmTensor, GlobalTensor<float>& outGmTensor,
                                           int64_t scatterGmOffset, int64_t headDim);
     __aicore__ inline void Scatter();
     __aicore__ inline void recordSecondToLastInfo();
-    __aicore__ inline void Gather(GlobalTensor<T1> &inGmTensor, GlobalTensor<T1> &outGmTensor, uint64_t workSpaceOffset,
+    __aicore__ inline void Gather(GlobalTensor<T1>& inGmTensor, GlobalTensor<T1>& outGmTensor, uint64_t workSpaceOffset,
                                   int64_t headDim);
     __aicore__ inline void SendMatmul12(const int64_t mm2_a_in_addr, const int64_t mm1_a_in_addr,
                                         const int64_t out_addr);
@@ -104,12 +104,12 @@ protected:
                                       const int64_t mm345Addr);
     __aicore__ inline void CalSoftmaxGrad(const int32_t loopIdx, const int32_t processM, const int64_t mm12Addr,
                                           const int64_t mm345Addr);
-    __aicore__ inline void CalSub(LocalTensor<float> &dstTensor, LocalTensor<float> &srcTensor, int32_t baseM,
+    __aicore__ inline void CalSub(LocalTensor<float>& dstTensor, LocalTensor<float>& srcTensor, int32_t baseM,
                                   int32_t baseN);
     __aicore__ inline void SetLastComputeInfo(int64_t mm12GmAddr, int64_t scatterDkGmAddr, int64_t scatterDvGmAddr);
     __aicore__ inline void SetAddrInfo();
-    __aicore__ inline void ScatterUseOneCore(int64_t *scatterDkAddrArray, int64_t *scatterDvAddrArray,
-                                             int64_t *mmPingpongIdxArray, int64_t *bIndexArray, int64_t processNum);
+    __aicore__ inline void ScatterUseOneCore(int64_t* scatterDkAddrArray, int64_t* scatterDvAddrArray,
+                                             int64_t* mmPingpongIdxArray, int64_t* bIndexArray, int64_t processNum);
 
 protected:
     StaticParams params;
@@ -167,7 +167,7 @@ protected:
     int64_t usedCoreNum;
     int64_t formerCoreNum;
     uint32_t blockIdx;
-    const TILING_CLASS *__restrict tilingData;
+    const TILING_CLASS* __restrict tilingData;
     // Shape
     int64_t dimB;
     int64_t dimN2;
@@ -270,7 +270,7 @@ template <typename NSAGT>
 __aicore__ inline void SelectedAttentionGrad<NSAGT>::Init(
     GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR attention_out, GM_ADDR attention_out_grad, GM_ADDR softmax_max,
     GM_ADDR softmax_sum, GM_ADDR topk_indices, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen, GM_ADDR atten_mask,
-    GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace, const TILING_CLASS *__restrict ordTilingData, TPipe *pipe)
+    GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace, const TILING_CLASS* __restrict ordTilingData, TPipe* pipe)
 {
     InitGMBuffer(query, key, value, attention_out, attention_out_grad, softmax_max, softmax_sum, topk_indices, dq, dk,
                  dv);
@@ -289,23 +289,23 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::InitGMBuffer(GM_ADDR query,
                                                                   GM_ADDR dv)
 {
     // 必选输入初始化
-    queryGm.SetGlobalBuffer((__gm__ T1 *)query);
-    keyGm.SetGlobalBuffer((__gm__ T1 *)key);
-    valueGm.SetGlobalBuffer((__gm__ T1 *)value);
-    attentionGm.SetGlobalBuffer((__gm__ T1 *)attention_out);
-    attentionGradGm.SetGlobalBuffer((__gm__ T1 *)attention_out_grad);
-    softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmax_max);
-    softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmax_sum);
-    topkIndicesGm.SetGlobalBuffer((__gm__ int32_t *)topk_indices);
+    queryGm.SetGlobalBuffer((__gm__ T1*)query);
+    keyGm.SetGlobalBuffer((__gm__ T1*)key);
+    valueGm.SetGlobalBuffer((__gm__ T1*)value);
+    attentionGm.SetGlobalBuffer((__gm__ T1*)attention_out);
+    attentionGradGm.SetGlobalBuffer((__gm__ T1*)attention_out_grad);
+    softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmax_max);
+    softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmax_sum);
+    topkIndicesGm.SetGlobalBuffer((__gm__ int32_t*)topk_indices);
 
     // 输出初始化
-    dqGm.SetGlobalBuffer((__gm__ T1 *)dq);
-    dkGm.SetGlobalBuffer((__gm__ T1 *)dk);
-    dvGm.SetGlobalBuffer((__gm__ T1 *)dv);
+    dqGm.SetGlobalBuffer((__gm__ T1*)dq);
+    dkGm.SetGlobalBuffer((__gm__ T1*)dk);
+    dvGm.SetGlobalBuffer((__gm__ T1*)dv);
 }
 
 template <typename NSAGT>
-__aicore__ inline void SelectedAttentionGrad<NSAGT>::InitParams(const TILING_CLASS *__restrict ordTilingData,
+__aicore__ inline void SelectedAttentionGrad<NSAGT>::InitParams(const TILING_CLASS* __restrict ordTilingData,
                                                                 GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen)
 {
     // op_info
@@ -363,11 +363,11 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::InitParams(const TILING_CLA
         int64_t seqS1Len = 0;
         int64_t seqS2Len = 0;
         if (unlikely(i == 0)) {
-            seqS1Len = ((__gm__ int64_t *)actual_seq_qlen)[i];
-            seqS2Len = ((__gm__ int64_t *)actual_seq_kvlen)[i];
+            seqS1Len = ((__gm__ int64_t*)actual_seq_qlen)[i];
+            seqS2Len = ((__gm__ int64_t*)actual_seq_kvlen)[i];
         } else {
-            seqS1Len = ((__gm__ int64_t *)actual_seq_qlen)[i] - ((__gm__ int64_t *)actual_seq_qlen)[i - 1];
-            seqS2Len = ((__gm__ int64_t *)actual_seq_kvlen)[i] - ((__gm__ int64_t *)actual_seq_kvlen)[i - 1];
+            seqS1Len = ((__gm__ int64_t*)actual_seq_qlen)[i] - ((__gm__ int64_t*)actual_seq_qlen)[i - 1];
+            seqS2Len = ((__gm__ int64_t*)actual_seq_kvlen)[i] - ((__gm__ int64_t*)actual_seq_kvlen)[i - 1];
         }
         dimTq += (int64_t)seqS1Len;
         dimTkv += (int64_t)seqS2Len;
@@ -384,23 +384,23 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::InitParams(const TILING_CLA
 template <typename NSAGT>
 __aicore__ inline void SelectedAttentionGrad<NSAGT>::GetTndSeqLen(const int64_t t1Idx)
 {
-    int64_t curT1 = ((__gm__ int64_t *)actual_seq_qlen_addr)[bIndex];
+    int64_t curT1 = ((__gm__ int64_t*)actual_seq_qlen_addr)[bIndex];
     while (t1Idx >= curT1) {
-        curT1 = ((__gm__ int64_t *)actual_seq_qlen_addr)[++bIndex];
+        curT1 = ((__gm__ int64_t*)actual_seq_qlen_addr)[++bIndex];
     }
 
     if (unlikely(bIndex == 0)) {
-        currentS1 = ((__gm__ int64_t *)actual_seq_qlen_addr)[0];
-        currentS2 = ((__gm__ int64_t *)actual_seq_kvlen_addr)[0];
+        currentS1 = ((__gm__ int64_t*)actual_seq_qlen_addr)[0];
+        currentS2 = ((__gm__ int64_t*)actual_seq_kvlen_addr)[0];
         currentS1Offset = 0;
         currentS2Offset = 0;
     } else {
         currentS1 =
-            ((__gm__ int64_t *)actual_seq_qlen_addr)[bIndex] - ((__gm__ int64_t *)actual_seq_qlen_addr)[bIndex - 1];
+            ((__gm__ int64_t*)actual_seq_qlen_addr)[bIndex] - ((__gm__ int64_t*)actual_seq_qlen_addr)[bIndex - 1];
         currentS2 =
-            ((__gm__ int64_t *)actual_seq_kvlen_addr)[bIndex] - ((__gm__ int64_t *)actual_seq_kvlen_addr)[bIndex - 1];
-        currentS1Offset = ((__gm__ int64_t *)actual_seq_qlen_addr)[bIndex - 1];
-        currentS2Offset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[bIndex - 1];
+            ((__gm__ int64_t*)actual_seq_kvlen_addr)[bIndex] - ((__gm__ int64_t*)actual_seq_kvlen_addr)[bIndex - 1];
+        currentS1Offset = ((__gm__ int64_t*)actual_seq_qlen_addr)[bIndex - 1];
+        currentS2Offset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[bIndex - 1];
     }
 
     s1Index = t1Idx - currentS1Offset;
@@ -408,19 +408,19 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::GetTndSeqLen(const int64_t 
 
 template <typename NSAGT>
 __aicore__ inline void SelectedAttentionGrad<NSAGT>::Getbindex(const int64_t ProcessID, const int64_t coreNum,
-                                                               int64_t *bIndexArray)
+                                                               int64_t* bIndexArray)
 {
     for (int64_t i = 0; i < coreNum; i++) {
-        int64_t curT1 = ((__gm__ int64_t *)actual_seq_qlen_addr)[bIndex];
+        int64_t curT1 = ((__gm__ int64_t*)actual_seq_qlen_addr)[bIndex];
         while (ProcessID * usedCoreNum + i >= curT1) {
-            curT1 = ((__gm__ int64_t *)actual_seq_qlen_addr)[++bIndex];
+            curT1 = ((__gm__ int64_t*)actual_seq_qlen_addr)[++bIndex];
         }
         bIndexArray[i] = bIndex;
     }
 }
 
 template <typename NSAGT>
-__aicore__ inline void SelectedAttentionGrad<NSAGT>::InitUB(TPipe *pipe)
+__aicore__ inline void SelectedAttentionGrad<NSAGT>::InitUB(TPipe* pipe)
 {
     uint32_t dataSize = params.singleM * dimDv;
     uint32_t ubOffset = 0;
@@ -498,7 +498,7 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::InitUB(TPipe *pipe)
 }
 
 template <typename NSAGT>
-__aicore__ inline void SelectedAttentionGrad<NSAGT>::DumpGmZero(GlobalTensor<float> &gm, int64_t num)
+__aicore__ inline void SelectedAttentionGrad<NSAGT>::DumpGmZero(GlobalTensor<float>& gm, int64_t num)
 {
     // dump 0 to gm by blockIdx
     int64_t perSize = (num + tilingData->opInfo.castUsedCoreNum - 1) / tilingData->opInfo.castUsedCoreNum;
@@ -532,9 +532,9 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::AtomicClean()
     InitOutput<T1>(selectedVWorkspaceGm, selectedVWorkspaceLen / sizeof(T1), 0);
 }
 template <typename NSAGT>
-__aicore__ inline void SelectedAttentionGrad<NSAGT>::InitAddrArray(int64_t *scatterDkAddrArray,
-                                                                   int64_t *scatterDvAddrArray,
-                                                                   int64_t *mmPingpongIdxArray)
+__aicore__ inline void SelectedAttentionGrad<NSAGT>::InitAddrArray(int64_t* scatterDkAddrArray,
+                                                                   int64_t* scatterDvAddrArray,
+                                                                   int64_t* mmPingpongIdxArray)
 {
     int64_t usedWorkspaceLen{0};
     // select
@@ -600,17 +600,17 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::InitWorkspace(GM_ADDR works
     int64_t dvAddr = dkAddr + dkWorkspaceLen / sizeof(float);
     usedWorkspaceLen += dqWorkspaceLen + dkWorkspaceLen + dvWorkspaceLen;
 
-    mm1WorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm1Addr);
-    mm2WorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm2Addr);
-    dsInputWorkspaceGm.SetGlobalBuffer((__gm__ T1 *)workspace + mm3Addr);
-    dvInputWorkspaceGm.SetGlobalBuffer((__gm__ T1 *)workspace + mm4Addr);
-    dqWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + dqAddr);
-    dkWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + dkAddr);
-    dvWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + dvAddr);
-    selectedKWorkspaceGm.SetGlobalBuffer((__gm__ T1 *)workspace + selectedKAddr);
-    selectedVWorkspaceGm.SetGlobalBuffer((__gm__ T1 *)workspace + selectedVAddr);
-    scatterDkWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + scatterDkAddr);
-    scatterDvWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + scatterDvAddr);
+    mm1WorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm1Addr);
+    mm2WorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm2Addr);
+    dsInputWorkspaceGm.SetGlobalBuffer((__gm__ T1*)workspace + mm3Addr);
+    dvInputWorkspaceGm.SetGlobalBuffer((__gm__ T1*)workspace + mm4Addr);
+    dqWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + dqAddr);
+    dkWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + dkAddr);
+    dvWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + dvAddr);
+    selectedKWorkspaceGm.SetGlobalBuffer((__gm__ T1*)workspace + selectedKAddr);
+    selectedVWorkspaceGm.SetGlobalBuffer((__gm__ T1*)workspace + selectedVAddr);
+    scatterDkWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + scatterDkAddr);
+    scatterDvWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + scatterDvAddr);
 }
 
 template <typename NSAGT>
@@ -677,8 +677,8 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::SendMatmulDK(const int64_t 
 }
 
 template <typename NSAGT>
-__aicore__ inline void SelectedAttentionGrad<NSAGT>::CalSub(LocalTensor<float> &dstTensor,
-                                                            LocalTensor<float> &srcTensor, int32_t baseM, int32_t baseN)
+__aicore__ inline void SelectedAttentionGrad<NSAGT>::CalSub(LocalTensor<float>& dstTensor,
+                                                            LocalTensor<float>& srcTensor, int32_t baseM, int32_t baseN)
 {
     constexpr static int32_t subMsk = 64;
     int8_t s2Repeat = baseN / subMsk;
@@ -732,7 +732,7 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::CalAttenMsk(const int32_t p
     }
     LocalTensor<float> tmpTensor;
     uint64_t mask[1];
-    float scalar = *((float *)&ATTEN_MASK_SCALE);
+    float scalar = *((float*)&ATTEN_MASK_SCALE);
 
     for (int32_t i = 0; i < processM; i++) {
         int32_t pOffset = i * params.sftBaseN;
@@ -866,8 +866,8 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::VectorProcess(int64_t mm12A
 }
 
 template <typename NSAGT>
-__aicore__ inline void SelectedAttentionGrad<NSAGT>::ScatterProcess(GlobalTensor<float> &inGmTensor,
-                                                                    GlobalTensor<float> &outGmTensor,
+__aicore__ inline void SelectedAttentionGrad<NSAGT>::ScatterProcess(GlobalTensor<float>& inGmTensor,
+                                                                    GlobalTensor<float>& outGmTensor,
                                                                     int64_t scatterGmOffset, int64_t headDim)
 {
     DataCopyParams intriParams;
@@ -919,7 +919,7 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::Scatter()
 }
 
 template <typename NSAGT>
-__aicore__ inline void SelectedAttentionGrad<NSAGT>::Gather(GlobalTensor<T1> &inGmTensor, GlobalTensor<T1> &outGmTensor,
+__aicore__ inline void SelectedAttentionGrad<NSAGT>::Gather(GlobalTensor<T1>& inGmTensor, GlobalTensor<T1>& outGmTensor,
                                                             uint64_t workSpaceOffset, int64_t headDim)
 {
     DataCopyParams intriParams;
@@ -1144,30 +1144,30 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::Process()
 }
 
 template <typename NSAGT>
-__aicore__ inline void SelectedAttentionGrad<NSAGT>::ScatterUseOneCore(int64_t *scatterDkAddrArray,
-                                                                       int64_t *scatterDvAddrArray,
-                                                                       int64_t *mmPingpongIdxArray,
-                                                                       int64_t *bIndexArray, int64_t processNum)
+__aicore__ inline void SelectedAttentionGrad<NSAGT>::ScatterUseOneCore(int64_t* scatterDkAddrArray,
+                                                                       int64_t* scatterDvAddrArray,
+                                                                       int64_t* mmPingpongIdxArray,
+                                                                       int64_t* bIndexArray, int64_t processNum)
 {
     for (int64_t n2Idx = 0; n2Idx < dimN2; n2Idx++) {
         SyncAll();
         for (int64_t nowblockIdx = 0; nowblockIdx < scatterCoreNum; nowblockIdx++) {
             if (unlikely(bIndexArray[nowblockIdx] == 0)) {
-                currentS1 = ((__gm__ int64_t *)actual_seq_qlen_addr)[0];
-                currentS2 = ((__gm__ int64_t *)actual_seq_kvlen_addr)[0];
+                currentS1 = ((__gm__ int64_t*)actual_seq_qlen_addr)[0];
+                currentS2 = ((__gm__ int64_t*)actual_seq_kvlen_addr)[0];
                 currentS1Offset = 0;
                 currentS2Offset = 0;
             } else {
-                currentS1 = ((__gm__ int64_t *)actual_seq_qlen_addr)[bIndexArray[nowblockIdx]] -
-                            ((__gm__ int64_t *)actual_seq_qlen_addr)[bIndexArray[nowblockIdx] - 1];
-                currentS2 = ((__gm__ int64_t *)actual_seq_kvlen_addr)[bIndexArray[nowblockIdx]] -
-                            ((__gm__ int64_t *)actual_seq_kvlen_addr)[bIndexArray[nowblockIdx] - 1];
-                currentS1Offset = ((__gm__ int64_t *)actual_seq_qlen_addr)[bIndexArray[nowblockIdx] - 1];
-                currentS2Offset = ((__gm__ int64_t *)actual_seq_kvlen_addr)[bIndexArray[nowblockIdx] - 1];
+                currentS1 = ((__gm__ int64_t*)actual_seq_qlen_addr)[bIndexArray[nowblockIdx]] -
+                            ((__gm__ int64_t*)actual_seq_qlen_addr)[bIndexArray[nowblockIdx] - 1];
+                currentS2 = ((__gm__ int64_t*)actual_seq_kvlen_addr)[bIndexArray[nowblockIdx]] -
+                            ((__gm__ int64_t*)actual_seq_kvlen_addr)[bIndexArray[nowblockIdx] - 1];
+                currentS1Offset = ((__gm__ int64_t*)actual_seq_qlen_addr)[bIndexArray[nowblockIdx] - 1];
+                currentS2Offset = ((__gm__ int64_t*)actual_seq_kvlen_addr)[bIndexArray[nowblockIdx] - 1];
             }
             s1Index = nowblockIdx + usedCoreNum * processNum - currentS1Offset;
-            scatterDkWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace_ + scatterDkAddrArray[nowblockIdx]);
-            scatterDvWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace_ + scatterDvAddrArray[nowblockIdx]);
+            scatterDkWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace_ + scatterDkAddrArray[nowblockIdx]);
+            scatterDvWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace_ + scatterDvAddrArray[nowblockIdx]);
             n2Index = n2Idx;
             secondLastScatterDkGmAddr = mmPingpongIdxArray[nowblockIdx] * scatterdkWspOffset;
             secondLastScatterDvGmAddr = mmPingpongIdxArray[nowblockIdx] * scatterdvWspOffset;

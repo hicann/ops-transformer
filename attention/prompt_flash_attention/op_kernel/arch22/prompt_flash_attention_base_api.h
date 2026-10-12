@@ -163,14 +163,14 @@ public:
     __aicore__ inline UnpadAttentionDecoderAic(){};
 
     __aicore__ __attribute__((always_inline)) inline void Run(
-        __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-        __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-        __gm__ uint8_t *blocktable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-        __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix, __gm__ uint8_t *actualSharedPrefixLen,
-        __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-        const typename PFAT::tilingType *__restrict tiling, __gm__ uint8_t *gmTiling, TPipe *tPipe,
-        __gm__ uint8_t *deqScale1, __gm__ uint8_t *scale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *scale2,
-        __gm__ uint8_t *offset2)
+        __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+        __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+        __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+        __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
+        __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+        const typename PFAT::tilingType* __restrict tiling, __gm__ uint8_t* gmTiling, TPipe* tPipe,
+        __gm__ uint8_t* deqScale1, __gm__ uint8_t* scale1, __gm__ uint8_t* deqScale2, __gm__ uint8_t* scale2,
+        __gm__ uint8_t* offset2)
     {
         AscendC::SetLoadDataPaddingValue<uint64_t>(0);
         AscendC::SetAtomicNone();
@@ -178,21 +178,21 @@ public:
         AscendC::SetMaskNorm();
 
         // GlobalTensor init set
-        qGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ Q_T *>(query));
-        kGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ Q_T *>(key));
-        vGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ KV_T *>(value));
-        oGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ O_T *>(attentionOut));
+        qGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ Q_T*>(query));
+        kGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ Q_T*>(key));
+        vGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ KV_T*>(value));
+        oGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ O_T*>(attentionOut));
 
         // 待修改workspace
         uint64_t workSize = tiling->promptAttentionBaseApiBaseParams.workSize;
-        sGmTensor.SetGlobalBuffer((__gm__ S_T *)(workspace));
-        pGmTensor.SetGlobalBuffer((__gm__ P_T *)(workspace + workSize));
-        oTmpGmTensor.SetGlobalBuffer((__gm__ TMP_T *)(workspace + 2 * workSize));
-        deqQkGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(deqScale1));
+        sGmTensor.SetGlobalBuffer((__gm__ S_T*)(workspace));
+        pGmTensor.SetGlobalBuffer((__gm__ P_T*)(workspace + workSize));
+        oTmpGmTensor.SetGlobalBuffer((__gm__ TMP_T*)(workspace + 2 * workSize));
+        deqQkGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(deqScale1));
 
-        actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths,
+        actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths,
                                            tiling->promptAttentionBaseApiBaseParams.batchSize);
-        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKV,
+        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKV,
                                              tiling->promptAttentionBaseApiBaseParams.batchSize);
 
         // LocalTensor init set
@@ -479,7 +479,7 @@ public:
                     svRoundN = (svN + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
                     if constexpr (IsSameType<KV_T, int8_t>::value) {
                         float tmp = deqQkGmTensor.GetValue(headIdx);
-                        uint64_t deqScalar = static_cast<uint64_t>(*reinterpret_cast<int32_t *>(&tmp));
+                        uint64_t deqScalar = static_cast<uint64_t>(*reinterpret_cast<int32_t*>(&tmp));
                         AscendC::SetFixpipeNz2ndFlag(1, 0, 0);
                         AscendC::DataCopyCO12DstParams intriParams(svRoundN, qkM, svRoundN, qkRoundM,
                                                                    QuantMode_t::DEQF16, 0, false, true);
@@ -850,9 +850,9 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void RowMaxRepeatM(const AscendC::LocalTensor<T> &dst, const AscendC::LocalTensor<T> &src,
-                                         const AscendC::LocalTensor<T> &tempTensor, const uint32_t &subM,
-                                         const uint32_t &qkN, const uint32_t &qkRoundN)
+    __aicore__ inline void RowMaxRepeatM(const AscendC::LocalTensor<T>& dst, const AscendC::LocalTensor<T>& src,
+                                         const AscendC::LocalTensor<T>& tempTensor, const uint32_t& subM,
+                                         const uint32_t& qkN, const uint32_t& qkRoundN)
     {
         uint32_t T_BLOCK_SIZE = 32 / sizeof(T);
         uint32_t T_VECTOR_SIZE = 256 / sizeof(T);
@@ -885,9 +885,9 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void MulRepeatM(const AscendC::LocalTensor<T> &dst, const AscendC::LocalTensor<T> &src0,
-                                      const AscendC::LocalTensor<T> &src1, const uint32_t &subM, const uint32_t &subN,
-                                      const uint32_t &subRoundN)
+    __aicore__ inline void MulRepeatM(const AscendC::LocalTensor<T>& dst, const AscendC::LocalTensor<T>& src0,
+                                      const AscendC::LocalTensor<T>& src1, const uint32_t& subM, const uint32_t& subN,
+                                      const uint32_t& subRoundN)
     {
         uint32_t T_BLOCK_SIZE = 32 / sizeof(T);
         uint32_t T_VECTOR_SIZE = 256 / sizeof(T);
@@ -909,9 +909,9 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void DivRepeatM(const AscendC::LocalTensor<T> &dst, const AscendC::LocalTensor<T> &src0,
-                                      const AscendC::LocalTensor<T> &src1, const uint32_t &subM, const uint32_t &subN,
-                                      const uint32_t &subRoundN)
+    __aicore__ inline void DivRepeatM(const AscendC::LocalTensor<T>& dst, const AscendC::LocalTensor<T>& src0,
+                                      const AscendC::LocalTensor<T>& src1, const uint32_t& subM, const uint32_t& subN,
+                                      const uint32_t& subRoundN)
     {
         uint32_t temp = sizeof(T);
         uint32_t T_BLOCK_SIZE = 32 / sizeof(T);
@@ -934,15 +934,15 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void SymmetricQuant(const AscendC::LocalTensor<T> &dst, const AscendC::LocalTensor<T> &src,
-                                          const AscendC::LocalTensor<T> &scaleUbufTensor,
-                                          const AscendC::LocalTensor<T> &tempTensor,
-                                          const AscendC::GlobalTensor<T> &quantPGmTensor,
-                                          const AscendC::LocalTensor<half> &lmUbufTensor,
-                                          const AscendC::LocalTensor<half> &hmUbufTensor, const uint32_t &headIdx,
-                                          const uint32_t &quantType, const uint32_t &mSplit,
-                                          const uint32_t &roundMSplit, const uint32_t &qkN, const uint32_t &qkRoundN,
-                                          const uint32_t &nIdx)
+    __aicore__ inline void SymmetricQuant(const AscendC::LocalTensor<T>& dst, const AscendC::LocalTensor<T>& src,
+                                          const AscendC::LocalTensor<T>& scaleUbufTensor,
+                                          const AscendC::LocalTensor<T>& tempTensor,
+                                          const AscendC::GlobalTensor<T>& quantPGmTensor,
+                                          const AscendC::LocalTensor<half>& lmUbufTensor,
+                                          const AscendC::LocalTensor<half>& hmUbufTensor, const uint32_t& headIdx,
+                                          const uint32_t& quantType, const uint32_t& mSplit,
+                                          const uint32_t& roundMSplit, const uint32_t& qkN, const uint32_t& qkRoundN,
+                                          const uint32_t& nIdx)
     {
         if (quantType == quantType_3) {
             if (nIdx == 0) {
@@ -973,11 +973,11 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void SymmetricDeQuant(const AscendC::LocalTensor<float> &loUbufTensor,
-                                            const AscendC::LocalTensor<T> &scaleUbufTensor,
-                                            const AscendC::LocalTensor<T> &tvUbufTensor,
-                                            const AscendC::GlobalTensor<T> &deqPvGmTensor,
-                                            const AscendC::GlobalTensor<T> &quantPGmTensor, uint32_t headIdx,
+    __aicore__ inline void SymmetricDeQuant(const AscendC::LocalTensor<float>& loUbufTensor,
+                                            const AscendC::LocalTensor<T>& scaleUbufTensor,
+                                            const AscendC::LocalTensor<T>& tvUbufTensor,
+                                            const AscendC::GlobalTensor<T>& deqPvGmTensor,
+                                            const AscendC::GlobalTensor<T>& quantPGmTensor, uint32_t headIdx,
                                             uint32_t subM, uint32_t roundSubM, uint32_t qkN, uint32_t qkRoundN,
                                             uint32_t quantType)
     {
@@ -1008,34 +1008,34 @@ public:
     }
 
     __aicore__ __attribute__((always_inline)) inline void Run(
-        __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-        __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-        __gm__ uint8_t *blocktable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-        __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix, __gm__ uint8_t *actualSharedPrefixLen,
-        __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-        const typename PFAT::tilingType *__restrict tiling, __gm__ uint8_t *gmTiling, TPipe *tPipe,
-        __gm__ uint8_t *deqScale1, __gm__ uint8_t *scale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *scale2,
-        __gm__ uint8_t *offset2)
+        __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+        __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+        __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+        __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
+        __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+        const typename PFAT::tilingType* __restrict tiling, __gm__ uint8_t* gmTiling, TPipe* tPipe,
+        __gm__ uint8_t* deqScale1, __gm__ uint8_t* scale1, __gm__ uint8_t* deqScale2, __gm__ uint8_t* scale2,
+        __gm__ uint8_t* offset2)
     {
         AscendC::SetAtomicNone();
         AscendC::SetMaskNorm();
         AscendC::SetVectorMask<int8_t>((uint64_t)-1, (uint64_t)-1);
 
-        maskGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(pseShift));
+        maskGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(pseShift));
         maskU8GmTensor.SetGlobalBuffer(pseShift);
-        oGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(attentionOut));
+        oGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(attentionOut));
 
         uint64_t workSize = tiling->promptAttentionBaseApiBaseParams.workSize;
-        sGmTensor.SetGlobalBuffer((__gm__ half *)(workspace));
-        pGmTensor.SetGlobalBuffer((__gm__ P_T *)(workspace + workSize));
-        oTmpGmTensor.SetGlobalBuffer((__gm__ TMP_T *)(workspace + 2 * workSize));
+        sGmTensor.SetGlobalBuffer((__gm__ half*)(workspace));
+        pGmTensor.SetGlobalBuffer((__gm__ P_T*)(workspace + workSize));
+        oTmpGmTensor.SetGlobalBuffer((__gm__ TMP_T*)(workspace + 2 * workSize));
 
-        deqPvGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(deqScale2));
-        quantPGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(scale1));
-        logNGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(softmaxLse));
-        actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths,
+        deqPvGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(deqScale2));
+        quantPGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(scale1));
+        logNGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(softmaxLse));
+        actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths,
                                            tiling->promptAttentionBaseApiBaseParams.batchSize);
-        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKV,
+        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKV,
                                              tiling->promptAttentionBaseApiBaseParams.batchSize);
 
         // LocalTensor
@@ -2229,14 +2229,14 @@ template <typename PFAT>
 class FlashAttentionEncoderHighPrecisionVec {
 public:
     __aicore__ __attribute__((always_inline)) inline FlashAttentionEncoderHighPrecisionVec(
-        __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-        __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-        __gm__ uint8_t *blocktable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-        __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix, __gm__ uint8_t *actualSharedPrefixLen,
-        __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-        const typename PFAT::tilingType *__restrict tiling, __gm__ uint8_t *gmTiling, TPipe *tPipe,
-        __gm__ uint8_t *deqScale1, __gm__ uint8_t *scale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *scale2,
-        __gm__ uint8_t *offset2, __gm__ uint8_t *alibiCoeff)
+        __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+        __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+        __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+        __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
+        __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+        const typename PFAT::tilingType* __restrict tiling, __gm__ uint8_t* gmTiling, TPipe* tPipe,
+        __gm__ uint8_t* deqScale1, __gm__ uint8_t* scale1, __gm__ uint8_t* deqScale2, __gm__ uint8_t* scale2,
+        __gm__ uint8_t* offset2, __gm__ uint8_t* alibiCoeff)
         : deqQkGm(deqScale1),
           offQkGm(scale1),
           quantPGm(deqScale2),
@@ -2249,16 +2249,16 @@ public:
         AscendC::SetVectorMask<int8_t>((uint64_t)-1, (uint64_t)-1);
 
         uint64_t workSize = tiling->promptAttentionBaseApiBaseParams.workSize;
-        maskGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ U_T *>(pseShift));
-        oGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ O_T *>(attentionOut));
-        sGmTensor.SetGlobalBuffer((__gm__ float *)(workspace));
-        pGmTensor.SetGlobalBuffer((__gm__ P_T *)(workspace + workSize));
-        oTmpGmTensor.SetGlobalBuffer((__gm__ TMP_T *)(workspace + 2 * workSize));
-        logNGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ U_T *>(softmaxLse));
-        logNFloatGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(softmaxLse));
-        actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths,
+        maskGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ U_T*>(pseShift));
+        oGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ O_T*>(attentionOut));
+        sGmTensor.SetGlobalBuffer((__gm__ float*)(workspace));
+        pGmTensor.SetGlobalBuffer((__gm__ P_T*)(workspace + workSize));
+        oTmpGmTensor.SetGlobalBuffer((__gm__ TMP_T*)(workspace + 2 * workSize));
+        logNGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ U_T*>(softmaxLse));
+        logNFloatGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(softmaxLse));
+        actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths,
                                            tiling->promptAttentionBaseApiBaseParams.batchSize);
-        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKV,
+        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKV,
                                              tiling->promptAttentionBaseApiBaseParams.batchSize);
         this->tiling = tiling;
         this->subBlockIdx = AscendC::GetSubBlockIdx();
@@ -2326,9 +2326,9 @@ public:
         return (num + VectorSize<Dtype>() - 1) / VectorSize<Dtype>();
     }
 
-    __aicore__ __attribute__((always_inline)) inline void DeqPerHeadS322F32(AscendC::LocalTensor<float> &s,
-                                                                            __gm__ uint8_t *deqQkGm,
-                                                                            __gm__ uint8_t *offQkGm, uint32_t headIdx,
+    __aicore__ __attribute__((always_inline)) inline void DeqPerHeadS322F32(AscendC::LocalTensor<float>& s,
+                                                                            __gm__ uint8_t* deqQkGm,
+                                                                            __gm__ uint8_t* offQkGm, uint32_t headIdx,
                                                                             uint32_t len)
     {
         // dequant QK
@@ -2339,15 +2339,15 @@ public:
         AscendC::PipeBarrier<PIPE_V>();
 
         // scale
-        float s_quant_scale = *((__gm__ float *)deqQkGm + headIdx);
+        float s_quant_scale = *((__gm__ float*)deqQkGm + headIdx);
         AscendC::Muls<float, false>(s, s, s_quant_scale, (uint64_t)0, NumVectorsRoundUp<float>(len),
                                     AscendC::UnaryRepeatParams(1, 1, STRIDE_8, STRIDE_8));
         AscendC::PipeBarrier<PIPE_V>();
     }
 
     template <typename T>
-    __aicore__ inline void DivRepeatM(const AscendC::LocalTensor<T> &dst, const AscendC::LocalTensor<T> &src0,
-                                      const AscendC::LocalTensor<T> &src1, const uint32_t subM, const uint32_t qkN,
+    __aicore__ inline void DivRepeatM(const AscendC::LocalTensor<T>& dst, const AscendC::LocalTensor<T>& src0,
+                                      const AscendC::LocalTensor<T>& src1, const uint32_t subM, const uint32_t qkN,
                                       const uint32_t qkRoundN)
     {
         uint32_t T_BLOCK_SIZE = BlockSize<T>();
@@ -2367,8 +2367,8 @@ public:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void SymmetricDeQuant(const AscendC::LocalTensor<float> &loUbufTensor,
-                                            const AscendC::LocalTensor<float> &pScaleUbufTensor, uint32_t subM,
+    __aicore__ inline void SymmetricDeQuant(const AscendC::LocalTensor<float>& loUbufTensor,
+                                            const AscendC::LocalTensor<float>& pScaleUbufTensor, uint32_t subM,
                                             uint32_t roundSubM, uint32_t qkN, uint32_t qkRoundN, uint32_t headIdx)
     {
         if (quantType == quantType_3) {
@@ -2393,7 +2393,7 @@ public:
             }
             AscendC::PipeBarrier<PIPE_V>();
         } else {
-            float pScale = *((__gm__ float *)quantPGm + headIdx);
+            float pScale = *((__gm__ float*)quantPGm + headIdx);
             AscendC::Muls<float, false>(loUbufTensor, loUbufTensor, pScale, (uint64_t)0,
                                         (subM * qkRoundN + VectorSize<float>() - 1) / VectorSize<float>(),
                                         AscendC::UnaryRepeatParams(1, 1, STRIDE_8, STRIDE_8));
@@ -2401,11 +2401,11 @@ public:
         }
     }
 
-    __aicore__ inline void SymmetricQuant(const AscendC::LocalTensor<float> &lpUbufTensor,
-                                          const AscendC::LocalTensor<float> &ls32UbufTensor,
-                                          const AscendC::LocalTensor<float> &lmUbufTensor,
-                                          const AscendC::LocalTensor<float> &hmUbufTensor,
-                                          const AscendC::LocalTensor<float> &pScaleUbufTensor, const uint32_t subM,
+    __aicore__ inline void SymmetricQuant(const AscendC::LocalTensor<float>& lpUbufTensor,
+                                          const AscendC::LocalTensor<float>& ls32UbufTensor,
+                                          const AscendC::LocalTensor<float>& lmUbufTensor,
+                                          const AscendC::LocalTensor<float>& hmUbufTensor,
+                                          const AscendC::LocalTensor<float>& pScaleUbufTensor, const uint32_t subM,
                                           const uint32_t roundSubM, const uint32_t qkN, const uint32_t qkRoundN,
                                           uint32_t headIdx)
     {
@@ -2425,7 +2425,7 @@ public:
             AscendC::PipeBarrier<PIPE_V>();
             DivRepeatM<float>(lpUbufTensor, ls32UbufTensor, tvUbufTensor, subM, qkN, qkRoundN);
         } else { // offline quant
-            float pScale = (float)1.0 / *((__gm__ float *)quantPGm + headIdx);
+            float pScale = (float)1.0 / *((__gm__ float*)quantPGm + headIdx);
             AscendC::Muls<float, false>(lpUbufTensor, ls32UbufTensor, pScale, (uint64_t)0,
                                         (subM * qkRoundN + VectorSize<float>() - 1) / VectorSize<float>(),
                                         AscendC::UnaryRepeatParams(1, 1, STRIDE_8, STRIDE_8));
@@ -2497,7 +2497,7 @@ public:
             uint32_t mIdx = processIdx / qHeads;
             uint64_t headIdx = processIdx % qHeads;
             if (alibiCoeffGm != nullptr) {
-                alibiCoeff = (float)(*((__gm__ float *)alibiCoeffGm + headIdx));
+                alibiCoeff = (float)(*((__gm__ float*)alibiCoeffGm + headIdx));
             }
 
             uint32_t mLoop = (qSeqlen + ppMScalar - 1) / ppMScalar;
@@ -3888,7 +3888,7 @@ private:
     static constexpr bool ISBF16 = IsSameType<Q_T, bfloat16_t>::value;
     static constexpr bool int8Flag = IsSameType<KV_T, int8_t>::value;
 
-    const typename PFAT::tilingType *__restrict tiling;
+    const typename PFAT::tilingType* __restrict tiling;
 
     const uint32_t lsUbufOffset = 0;
     const uint32_t lpUbufOffset = 0;
@@ -3938,12 +3938,12 @@ private:
     GlobalTensor<int64_t> actualSeqLengthsGm;
     GlobalTensor<int64_t> actualSeqLengthsKVGm;
 
-    __gm__ uint8_t *__restrict__ alibiCoeffGm{nullptr};
-    __gm__ uint8_t *__restrict__ deqQkGm{nullptr};
-    __gm__ uint8_t *__restrict__ deqPvGm{nullptr};
-    __gm__ uint8_t *__restrict__ quantPGm{nullptr};
-    __gm__ uint8_t *__restrict__ offQkGm{nullptr};
-    __gm__ uint8_t *__restrict__ offPvGm{nullptr};
+    __gm__ uint8_t* __restrict__ alibiCoeffGm{nullptr};
+    __gm__ uint8_t* __restrict__ deqQkGm{nullptr};
+    __gm__ uint8_t* __restrict__ deqPvGm{nullptr};
+    __gm__ uint8_t* __restrict__ quantPGm{nullptr};
+    __gm__ uint8_t* __restrict__ offQkGm{nullptr};
+    __gm__ uint8_t* __restrict__ offPvGm{nullptr};
 
     ScaleType scaleType = ScaleType::SCALE_TOR;
     uint32_t batchSize{0};
@@ -3983,17 +3983,17 @@ template <typename PFAT>
 class PromptFlashAttentionBaseApiHighPerformance {
 public:
     __aicore__ inline PromptFlashAttentionBaseApiHighPerformance(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *pseShift, __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                __gm__ uint8_t *actualSeqLengthsKV, __gm__ uint8_t *blocktable,
-                                __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-                                __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-                                __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *attentionOut,
-                                __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-                                const typename PFAT::tilingType *__restrict tiling, __gm__ uint8_t *gmTiling,
-                                TPipe *tPipe, __gm__ uint8_t *deqScale1, __gm__ uint8_t *scale1,
-                                __gm__ uint8_t *deqScale2, __gm__ uint8_t *scale2, __gm__ uint8_t *offset2,
-                                __gm__ uint8_t *alibiCoeff)
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                                __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* blocktable,
+                                __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+                                __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix,
+                                __gm__ uint8_t* actualSharedPrefixLen, __gm__ uint8_t* attentionOut,
+                                __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                                const typename PFAT::tilingType* __restrict tiling, __gm__ uint8_t* gmTiling,
+                                TPipe* tPipe, __gm__ uint8_t* deqScale1, __gm__ uint8_t* scale1,
+                                __gm__ uint8_t* deqScale2, __gm__ uint8_t* scale2, __gm__ uint8_t* offset2,
+                                __gm__ uint8_t* alibiCoeff)
     {
 #ifdef __DAV_C220_CUBE__
         UnpadAttentionDecoderAic<PFAT> fa_aic_fp16;
@@ -4015,17 +4015,17 @@ template <typename PFAT>
 class PromptFlashAttentionBaseApiHighPrecisionV {
 public:
     __aicore__ inline PromptFlashAttentionBaseApiHighPrecisionV(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *pseShift, __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                __gm__ uint8_t *actualSeqLengthsKV, __gm__ uint8_t *blocktable,
-                                __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-                                __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-                                __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *attentionOut,
-                                __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-                                const typename PFAT::tilingType *__restrict tiling, __gm__ uint8_t *gmTiling,
-                                TPipe *tPipe, __gm__ uint8_t *deqScale1, __gm__ uint8_t *scale1,
-                                __gm__ uint8_t *deqScale2, __gm__ uint8_t *scale2, __gm__ uint8_t *offset2,
-                                __gm__ uint8_t *alibiCoeff)
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                                __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* blocktable,
+                                __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+                                __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix,
+                                __gm__ uint8_t* actualSharedPrefixLen, __gm__ uint8_t* attentionOut,
+                                __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                                const typename PFAT::tilingType* __restrict tiling, __gm__ uint8_t* gmTiling,
+                                TPipe* tPipe, __gm__ uint8_t* deqScale1, __gm__ uint8_t* scale1,
+                                __gm__ uint8_t* deqScale2, __gm__ uint8_t* scale2, __gm__ uint8_t* offset2,
+                                __gm__ uint8_t* alibiCoeff)
     {
 #ifdef __DAV_C220_CUBE__
         UnpadAttentionDecoderAic<PFAT> fa_aic_fp16;

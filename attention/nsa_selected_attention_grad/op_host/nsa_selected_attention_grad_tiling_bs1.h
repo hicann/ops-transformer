@@ -44,7 +44,7 @@ struct TempParams {
 
 class NsaSelectedAttentionGradTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit NsaSelectedAttentionGradTiling(gert::TilingContext *context)
+    explicit NsaSelectedAttentionGradTiling(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
@@ -71,8 +71,8 @@ private:
     ge::graphStatus Setmm3TilingData(matmul_tiling::DataType inputDtype, matmul_tiling::DataType outputDtype);
     ge::graphStatus Setmm4TilingData(matmul_tiling::DataType inputDtype, matmul_tiling::DataType outputDtype);
     ge::graphStatus Setmm5TilingData(matmul_tiling::DataType inputDtype, matmul_tiling::DataType outputDtype);
-    ge::graphStatus SetBaseInfo(const gert::Shape &queryShape, const gert::Shape &keyShape,
-                                const gert::Shape &valueShape, int64_t dimN1);
+    ge::graphStatus SetBaseInfo(const gert::Shape& queryShape, const gert::Shape& keyShape,
+                                const gert::Shape& valueShape, int64_t dimN1);
     void PrintShapeInfo();
     void DoPreTiling();
 

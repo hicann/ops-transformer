@@ -30,8 +30,8 @@ namespace MlaProlog {
  * @param sinCosRepStride 行与行之间sin/cos系数的偏移，单位为元素个数。
  */
 template <typename C>
-__aicore__ inline void RotaryPosEmb(const LocalTensor<C> &outputLocal, const LocalTensor<C> &inputLocal,
-                                    const LocalTensor<C> &cosLocal, const LocalTensor<C> &sinLocal, uint64_t row,
+__aicore__ inline void RotaryPosEmb(const LocalTensor<C>& outputLocal, const LocalTensor<C>& inputLocal,
+                                    const LocalTensor<C>& cosLocal, const LocalTensor<C>& sinLocal, uint64_t row,
                                     uint64_t col, uint8_t sinCosRepStride)
 {
     DataSyncBarrier<MemDsbT::UB>();

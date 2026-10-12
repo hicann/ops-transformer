@@ -27,11 +27,11 @@
  * 参数所控制的 Kernel 入口一致.
  */
 
-#define NCAI_KERNEL_PARAM                                                                                             \
-    (__gm__ uint8_t * query, __gm__ uint8_t * key, __gm__ uint8_t * value, __gm__ uint8_t * attention_mask,             \
-    __gm__ uint8_t * block_table, __gm__ uint8_t * actualQSeqLen, __gm__ uint8_t * actualCmpKvSeqLen,                   \
-    __gm__ uint8_t * actualSelKvSeqLen, __gm__ uint8_t * topkMask, __gm__ uint8_t * output,                    \
-    __gm__ uint8_t * topkIndicesOut, __gm__ uint8_t * workspace, __gm__ uint8_t * tiling)
+#define NCAI_KERNEL_PARAM \
+    (__gm__ uint8_t * query, __gm__ uint8_t * key, __gm__ uint8_t * value, __gm__ uint8_t * attention_mask, \
+     __gm__ uint8_t * block_table, __gm__ uint8_t * actualQSeqLen, __gm__ uint8_t * actualCmpKvSeqLen, \
+     __gm__ uint8_t * actualSelKvSeqLen, __gm__ uint8_t * topkMask, __gm__ uint8_t * output, \
+     __gm__ uint8_t * topkIndicesOut, __gm__ uint8_t * workspace, __gm__ uint8_t * tiling)
 
 typedef void(*NcaiKernalFunc) NCAI_KERNEL_PARAM;
 
@@ -42,10 +42,9 @@ using TensorIntf = ops::adv::tests::utils::TensorIntf;
 using Case = ops::adv::tests::utils::Case;
 using Platform = ops::adv::tests::utils::Platform;
 
-
-bool RunNcai(void *func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
-                       std::vector<TensorIntf *> &outputs, uint8_t *workspace, uint8_t *tilingData)
-{   
+bool RunNcai(void* func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf*>& inputs,
+             std::vector<TensorIntf*>& outputs, uint8_t* workspace, uint8_t* tilingData)
+{
     constexpr uint32_t ATTEN_OUTPUT_INDEX = 0;
     constexpr uint32_t SELECT_OUTPUT_INDEX = 1;
     constexpr uint32_t QUERY_INPUT_INDEX = 0;
@@ -62,34 +61,36 @@ bool RunNcai(void *func, uint64_t tilingKey, int64_t blockDim, std::vector<Tenso
     auto kernelFunc = (NcaiKernalFunc)func;
     ICPU_SET_TILING_KEY(tilingKey);
     ICPU_RUN_KF(kernelFunc, blockDim,
-                inputs[QUERY_INPUT_INDEX]->GetDevData(),  // query
-                inputs[KEY_INPUT_INDEX]->GetDevData(),  // key
-                inputs[VALUE_INPUT_INDEX]->GetDevData(),  // value
-                inputs[ATTEN_MASK_INPUT_INDEX]->GetDevData(),  // attentionMaskOptional
-                inputs[BLOCK_TABLE_INPUT_INDEX]->GetDevData(),  // blockTableOptional
-                inputs[ACT_Q_SEQ_LEN_INPUT_INDEX]->GetDevData(),  // actualQSeqLenOptional
-                inputs[ACT_CMP_KV_SEQ_LEN_INPUT_INDEX]->GetDevData(),  // actualCmpKvSeqLenOptional
-                inputs[ACT_SEL_KV_SEQ_LEN_INPUT_INDEX]->GetDevData(),  // actualSelKvSeqLenOptional
-                inputs[TOPK_MASK_INPUT_INDEX]->GetDevData(),  // topkMaskOptional
-                outputs[ATTEN_OUTPUT_INDEX]->GetDevData(), // output
-                outputs[SELECT_OUTPUT_INDEX]->GetDevData(),  // topkIndicesOut
+                inputs[QUERY_INPUT_INDEX]->GetDevData(),              // query
+                inputs[KEY_INPUT_INDEX]->GetDevData(),                // key
+                inputs[VALUE_INPUT_INDEX]->GetDevData(),              // value
+                inputs[ATTEN_MASK_INPUT_INDEX]->GetDevData(),         // attentionMaskOptional
+                inputs[BLOCK_TABLE_INPUT_INDEX]->GetDevData(),        // blockTableOptional
+                inputs[ACT_Q_SEQ_LEN_INPUT_INDEX]->GetDevData(),      // actualQSeqLenOptional
+                inputs[ACT_CMP_KV_SEQ_LEN_INPUT_INDEX]->GetDevData(), // actualCmpKvSeqLenOptional
+                inputs[ACT_SEL_KV_SEQ_LEN_INPUT_INDEX]->GetDevData(), // actualSelKvSeqLenOptional
+                inputs[TOPK_MASK_INPUT_INDEX]->GetDevData(),          // topkMaskOptional
+                outputs[ATTEN_OUTPUT_INDEX]->GetDevData(),            // output
+                outputs[SELECT_OUTPUT_INDEX]->GetDevData(),           // topkIndicesOut
                 workspace, tilingData);
     return true;
 }
 
-extern "C" ge::graphStatus TilingNsaCompressAttentionInferStub(gert::TilingContext *context)
-{   
+extern "C" ge::graphStatus TilingNsaCompressAttentionInferStub(gert::TilingContext* context)
+{
     constexpr uint32_t ACT_Q_SEQ_LEN_INPUT_INDEX = 5;
     constexpr uint32_t ACT_CMP_KV_SEQ_LEN_INPUT_INDEX = 6;
     constexpr uint32_t ACT_SEL_KV_SEQ_LEN_INPUT_INDEX = 7;
-    auto *ncaInferCase = static_cast<NcaInferCase *>(Case::GetCurrentCase());
+    auto* ncaInferCase = static_cast<NcaInferCase*>(Case::GetCurrentCase());
     if (ncaInferCase != nullptr) {
         NcaInferCase::DoTilingParam p;
         p.ctx = context;
         p.ret = ge::GRAPH_SUCCESS;
-        p.actQSeqLenTensor = const_cast<gert::Tensor *>(context->GetOptionalInputTensor(ACT_Q_SEQ_LEN_INPUT_INDEX));
-        p.actSeqCmpKVLenTensor = const_cast<gert::Tensor *>(context->GetOptionalInputTensor(ACT_CMP_KV_SEQ_LEN_INPUT_INDEX));
-        p.actSeqSelKVLenTensor = const_cast<gert::Tensor *>(context->GetOptionalInputTensor(ACT_SEL_KV_SEQ_LEN_INPUT_INDEX));
+        p.actQSeqLenTensor = const_cast<gert::Tensor*>(context->GetOptionalInputTensor(ACT_Q_SEQ_LEN_INPUT_INDEX));
+        p.actSeqCmpKVLenTensor =
+            const_cast<gert::Tensor*>(context->GetOptionalInputTensor(ACT_CMP_KV_SEQ_LEN_INPUT_INDEX));
+        p.actSeqSelKVLenTensor =
+            const_cast<gert::Tensor*>(context->GetOptionalInputTensor(ACT_SEL_KV_SEQ_LEN_INPUT_INDEX));
         if (!ncaInferCase->DoOpTiling(p)) {
             return p.ret;
         }
@@ -99,7 +100,7 @@ extern "C" ge::graphStatus TilingNsaCompressAttentionInferStub(gert::TilingConte
 }
 
 bool NcaInferCase::InitParam()
-{   
+{
     std::vector<int64_t> qShape;
     std::vector<int64_t> outShape;
     std::vector<int64_t> topkOutShape;
@@ -108,14 +109,15 @@ bool NcaInferCase::InitParam()
     int64_t defaultBlockNum = 1000;
     mParam.actualQSeqLenOptionalLenList = std::vector(mParam.B, static_cast<int64_t>(mParam.S1));
     mParam.actualCmpKvSeqLenOptionalLenList = std::vector(mParam.B, static_cast<int64_t>(mParam.S2));
-    mParam.actualSelKvSeqLenOptionalLenList = std::vector(mParam.B, static_cast<int64_t>((mParam.S2 - 1) * mParam.compressStride + mParam.compressBlockSize));
+    mParam.actualSelKvSeqLenOptionalLenList =
+        std::vector(mParam.B, static_cast<int64_t>((mParam.S2 - 1) * mParam.compressStride + mParam.compressBlockSize));
 
     int64_t qSeqLenSum = 0;
     int64_t kvSeqLenSum = 0;
-    for (long &it : mParam.actualQSeqLenOptionalLenList) {
+    for (long& it : mParam.actualQSeqLenOptionalLenList) {
         qSeqLenSum += it;
     }
-    for (long &it : mParam.actualCmpKvSeqLenOptionalLenList) {
+    for (long& it : mParam.actualCmpKvSeqLenOptionalLenList) {
         kvSeqLenSum += it;
     }
     int64_t blockNum = (kvSeqLenSum + mParam.pageBlockSize - 1) / mParam.pageBlockSize;
@@ -134,21 +136,30 @@ bool NcaInferCase::InitParam()
         topkOutShape = {mParam.B, mParam.S1, mParam.N2, mParam.selectBlockCount};
     }
     query = Tensor("query", qShape, mParam.layoutOptional.c_str(), ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
-    key = Tensor("key", {blockNum, mParam.pageBlockSize, mParam.N2 * mParam.D}, mParam.layoutOptional.c_str(), ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
-    value = Tensor("value", {blockNum, mParam.pageBlockSize, mParam.N2 * headSizeVO}, mParam.layoutOptional.c_str(), ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
-    attentionMaskOptional = Tensor("attentionMaskOptional", {128, 128}, mParam.layoutOptional.c_str(), ge::DataType::DT_BOOL, ge::FORMAT_ND);
-    blockTableOptional = Tensor("blockTableOptional", {mParam.B, maxBlockPerQuery}, mParam.layoutOptional.c_str(), ge::DataType::DT_INT32, ge::FORMAT_ND);
-    
-    actualQSeqLenOptional = Tensor("actualQSeqLenOptional", {mParam.B}, mParam.layoutOptional.c_str(), ge::DataType::DT_INT64, ge::FORMAT_ND);
-    actualCmpKvSeqLenOptional = Tensor("actualCmpKvSeqLenOptional", {mParam.B}, mParam.layoutOptional.c_str(), ge::DataType::DT_INT64, ge::FORMAT_ND);
-    actualSelKvSeqLenOptional = Tensor("actualSelKvSeqLenOptional", {mParam.B}, mParam.layoutOptional.c_str(), ge::DataType::DT_INT64, ge::FORMAT_ND);
-    
-    topkMaskOptional = Tensor("topkMaskOptional", {20, 4096}, mParam.layoutOptional.c_str(), ge::DataType::DT_BOOL, ge::FORMAT_ND);
+    key = Tensor("key", {blockNum, mParam.pageBlockSize, mParam.N2 * mParam.D}, mParam.layoutOptional.c_str(),
+                 ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
+    value = Tensor("value", {blockNum, mParam.pageBlockSize, mParam.N2 * headSizeVO}, mParam.layoutOptional.c_str(),
+                   ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
+    attentionMaskOptional = Tensor("attentionMaskOptional", {128, 128}, mParam.layoutOptional.c_str(),
+                                   ge::DataType::DT_BOOL, ge::FORMAT_ND);
+    blockTableOptional = Tensor("blockTableOptional", {mParam.B, maxBlockPerQuery}, mParam.layoutOptional.c_str(),
+                                ge::DataType::DT_INT32, ge::FORMAT_ND);
+
+    actualQSeqLenOptional = Tensor("actualQSeqLenOptional", {mParam.B}, mParam.layoutOptional.c_str(),
+                                   ge::DataType::DT_INT64, ge::FORMAT_ND);
+    actualCmpKvSeqLenOptional = Tensor("actualCmpKvSeqLenOptional", {mParam.B}, mParam.layoutOptional.c_str(),
+                                       ge::DataType::DT_INT64, ge::FORMAT_ND);
+    actualSelKvSeqLenOptional = Tensor("actualSelKvSeqLenOptional", {mParam.B}, mParam.layoutOptional.c_str(),
+                                       ge::DataType::DT_INT64, ge::FORMAT_ND);
+
+    topkMaskOptional =
+        Tensor("topkMaskOptional", {20, 4096}, mParam.layoutOptional.c_str(), ge::DataType::DT_BOOL, ge::FORMAT_ND);
 
     output = Tensor("output", outShape, mParam.layoutOptional.c_str(), ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
-    topkIndicesOut = Tensor("topkIndicesOut", topkOutShape, mParam.layoutOptional.c_str(), ge::DataType::DT_INT32, ge::FORMAT_ND);
-    
-    if (!InitTensor(actualQSeqLenOptional, mParam.actualQSeqLenOptionalLenList) || 
+    topkIndicesOut =
+        Tensor("topkIndicesOut", topkOutShape, mParam.layoutOptional.c_str(), ge::DataType::DT_INT32, ge::FORMAT_ND);
+
+    if (!InitTensor(actualQSeqLenOptional, mParam.actualQSeqLenOptionalLenList) ||
         !InitTensor(actualCmpKvSeqLenOptional, mParam.actualCmpKvSeqLenOptionalLenList) ||
         !InitTensor(actualSelKvSeqLenOptional, mParam.actualSelKvSeqLenOptionalLenList)) {
         return false;
@@ -157,13 +168,15 @@ bool NcaInferCase::InitParam()
 }
 
 bool NcaInferCase::InitOpInfo()
-{   
+{
     constexpr uint32_t TILING_DATA_MAX_SIZE = 2280;
-    auto *ncaiKernalFunc = (void *)nsa_compress_attention_infer;
+    auto* ncaiKernalFunc = (void*)nsa_compress_attention_infer;
 
     bool rst = mCtx.SetOpName("NsaCompressAttentionInfer");
     rst = rst && mCtx.SetDeterministic(false);
-    rst = rst && mCtx.SetInputs({&query, &key, &value, &attentionMaskOptional, &blockTableOptional, &actualQSeqLenOptional, &actualCmpKvSeqLenOptional, &actualSelKvSeqLenOptional, &topkMaskOptional});
+    rst = rst &&
+          mCtx.SetInputs({&query, &key, &value, &attentionMaskOptional, &blockTableOptional, &actualQSeqLenOptional,
+                          &actualCmpKvSeqLenOptional, &actualSelKvSeqLenOptional, &topkMaskOptional});
     rst = rst && mCtx.SetOutputs({&output, &topkIndicesOut});
     rst = rst && mCtx.SetAttrs({{"numHeads", mParam.numHeads},
                                 {"numKeyValueHeads", mParam.numKeyValueHeads},
@@ -180,13 +193,14 @@ bool NcaInferCase::InitOpInfo()
     rst = rst && mCtx.SetKernelMainFunc(ncaiKernalFunc);
     rst = rst && mOpInfo.SetContext(&mCtx);
 
-    auto *platform = Platform::GetGlobalPlatform();
+    auto* platform = Platform::GetGlobalPlatform();
     if (platform == nullptr) {
         LOG_ERR("Global Platform is null");
         return false;
     }
 
-    NcaiTilingFunc = (gert::OpImplRegisterV2::TilingKernelFunc)platform->LoadOpTilingSoSym("TilingNsaCompressAttentionInfer");
+    NcaiTilingFunc =
+        (gert::OpImplRegisterV2::TilingKernelFunc)platform->LoadOpTilingSoSym("TilingNsaCompressAttentionInfer");
     if (NcaiTilingFunc == nullptr) {
         LOG_ERR("Can't get origin tiling func, ncai(%p)", NcaiTilingFunc);
         return false;
@@ -216,32 +230,44 @@ bool NcaInferCase::Run()
     return true;
 }
 
-NcaInferCase::NcaInferCase(const char *name, bool enable, const char *dbgInfo, OpInfo incre, ncaInferParam param)
-    : Case(name, enable, dbgInfo), mOpInfo(std::move(incre)), mParam(std::move(param))
+NcaInferCase::NcaInferCase(const char* name, bool enable, const char* dbgInfo, OpInfo incre, ncaInferParam param)
+    : Case(name, enable, dbgInfo),
+      mOpInfo(std::move(incre)),
+      mParam(std::move(param))
 {
     this->mOpInfo.mName = "NsaCompressAttentionInfer";
 }
 
-NcaInferCase::NcaInferCase()
-{
-}
+NcaInferCase::NcaInferCase() {}
 
-NcaInferCase::ncaInferParam::ncaInferParam()
-{
-}
+NcaInferCase::ncaInferParam::ncaInferParam() {}
 
-NcaInferCase::ncaInferParam::ncaInferParam(int64_t pB, int64_t pS1, int64_t pS2, int64_t pN1, int64_t pG, int64_t pD, int64_t pN2,
-        int64_t pnumHeads, int64_t pnumKeyValueHeads, int64_t pselectBlockSize, 
-        int64_t pselectBlockCount,int64_t pcompressBlockSize,int64_t pcompressStride, float pscaleValue, 
-        std::string playoutOptional, int64_t ppageBlockSize, int64_t pSparseMode)
-    : B(pB), S1(pS1), S2(pS2), N1(pN1), G(pG), D(pD), N2(pN2), numHeads(pnumHeads),
-    numKeyValueHeads(pnumKeyValueHeads), selectBlockSize(pselectBlockSize), selectBlockCount(pselectBlockCount), 
-    compressBlockSize(pcompressBlockSize), compressStride(pcompressStride), scaleValue(pscaleValue), 
-    layoutOptional(playoutOptional), pageBlockSize(ppageBlockSize), sparseMode(pSparseMode)
-{
-}
+NcaInferCase::ncaInferParam::ncaInferParam(int64_t pB, int64_t pS1, int64_t pS2, int64_t pN1, int64_t pG, int64_t pD,
+                                           int64_t pN2, int64_t pnumHeads, int64_t pnumKeyValueHeads,
+                                           int64_t pselectBlockSize, int64_t pselectBlockCount,
+                                           int64_t pcompressBlockSize, int64_t pcompressStride, float pscaleValue,
+                                           std::string playoutOptional, int64_t ppageBlockSize, int64_t pSparseMode)
+    : B(pB),
+      S1(pS1),
+      S2(pS2),
+      N1(pN1),
+      G(pG),
+      D(pD),
+      N2(pN2),
+      numHeads(pnumHeads),
+      numKeyValueHeads(pnumKeyValueHeads),
+      selectBlockSize(pselectBlockSize),
+      selectBlockCount(pselectBlockCount),
+      compressBlockSize(pcompressBlockSize),
+      compressStride(pcompressStride),
+      scaleValue(pscaleValue),
+      layoutOptional(playoutOptional),
+      pageBlockSize(ppageBlockSize),
+      sparseMode(pSparseMode)
+{}
 
-bool NcaInferCase::DoOpTiling(DoTilingParam& tilingParam) {
+bool NcaInferCase::DoOpTiling(DoTilingParam& tilingParam)
+{
     if (tilingParam.ctx == nullptr) {
         return false;
     }

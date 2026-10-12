@@ -59,9 +59,9 @@ std::string ParseLayoutKey(c10::string_view layout_key)
     return layoutKeyStr;
 }
 
-void CheckMsaRequiredTensors(const at::Tensor &query, const at::Tensor &key, const at::Tensor &start_loc,
-                             const c10::optional<at::Tensor> &actual_seq_qlen,
-                             const c10::optional<at::Tensor> &actual_seq_klen)
+void CheckMsaRequiredTensors(const at::Tensor& query, const at::Tensor& key, const at::Tensor& start_loc,
+                             const c10::optional<at::Tensor>& actual_seq_qlen,
+                             const c10::optional<at::Tensor>& actual_seq_klen)
 {
     TORCH_CHECK(query.defined(), "Tensor query is not defined.");
     TORCH_CHECK(key.defined(), "Tensor key is not defined.");
@@ -71,9 +71,9 @@ void CheckMsaRequiredTensors(const at::Tensor &query, const at::Tensor &key, con
     TORCH_CHECK(actual_seq_klen.has_value() && actual_seq_klen.value().defined(), "actual_seq_klen is required.");
 }
 
-void CheckMsaLayoutRanks(const at::Tensor &query, const at::Tensor &key, const c10::optional<at::Tensor> &block_table,
-                         const std::string &layoutKeyStr, bool is_tnd, const at::Tensor &cu_q, const at::Tensor &kv_len,
-                         const at::Tensor &start_loc)
+void CheckMsaLayoutRanks(const at::Tensor& query, const at::Tensor& key, const c10::optional<at::Tensor>& block_table,
+                         const std::string& layoutKeyStr, bool is_tnd, const at::Tensor& cu_q, const at::Tensor& kv_len,
+                         const at::Tensor& start_loc)
 {
     TORCH_CHECK(query.dim() == QUERY_DIM, "query must be 3D [T, Hq, D], but got dim=", query.dim());
     if (is_tnd) {
@@ -91,9 +91,9 @@ void CheckMsaLayoutRanks(const at::Tensor &query, const at::Tensor &key, const c
     TORCH_CHECK(start_loc.dim() == START_LOC_DIM, "start_loc must be 1D [B], but got dim=", start_loc.dim());
 }
 
-void CheckMsaSparseAndDtypes(const at::Tensor &query, const at::Tensor &key, const c10::optional<at::Tensor> &scale,
-                             const c10::optional<at::Tensor> &atten_mask, const at::Tensor &cu_q,
-                             const at::Tensor &kv_len, const at::Tensor &start_loc, int64_t sparse_mode, bool is_tnd)
+void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, const c10::optional<at::Tensor>& scale,
+                             const c10::optional<at::Tensor>& atten_mask, const at::Tensor& cu_q,
+                             const at::Tensor& kv_len, const at::Tensor& start_loc, int64_t sparse_mode, bool is_tnd)
 {
     TORCH_CHECK(sparse_mode == SPARSE_MODE_DEFAULT || sparse_mode == SPARSE_MODE_RIGHT_DOWN,
                 "sparse_mode must be 0 or 3, but got ", sparse_mode);
@@ -110,7 +110,7 @@ void CheckMsaSparseAndDtypes(const at::Tensor &query, const at::Tensor &key, con
     }
 
     auto is_hifloat8 = [](at::ScalarType t) {
-        const char *name = c10::toString(t);
+        const char* name = c10::toString(t);
         return name != nullptr && (std::string(name) == "hifloat8" || std::string(name) == "HiFloat8");
     };
     const bool q_ok = query.scalar_type() == at::kHalf || query.scalar_type() == at::kBFloat16 ||
@@ -142,8 +142,8 @@ void CheckMsaSparseAndDtypes(const at::Tensor &query, const at::Tensor &key, con
     TORCH_CHECK(start_loc.scalar_type() == at::kInt, "start_loc dtype must be int32.");
 }
 
-MsaKeyMeta ResolveTndKeyMeta(const at::Tensor &key, const at::Tensor &cu_q, const at::Tensor &kv_len,
-                             const at::Tensor &start_loc, int64_t init_blocks, int64_t local_blocks)
+MsaKeyMeta ResolveTndKeyMeta(const at::Tensor& key, const at::Tensor& cu_q, const at::Tensor& kv_len,
+                             const at::Tensor& start_loc, int64_t init_blocks, int64_t local_blocks)
 {
     MsaKeyMeta meta;
     meta.numKvHeads = key.size(1);
@@ -152,7 +152,7 @@ MsaKeyMeta ResolveTndKeyMeta(const at::Tensor &key, const at::Tensor &cu_q, cons
     TORCH_CHECK(start_loc.size(0) + 1 == kv_len.size(0), "start_loc size must equal batch.");
     TORCH_CHECK(init_blocks >= 0 && local_blocks >= 0, "init_blocks/local_blocks must be >= 0.");
     auto kv_host = kv_len.cpu();
-    const int32_t *pref = kv_host.data_ptr<int32_t>();
+    const int32_t* pref = kv_host.data_ptr<int32_t>();
     const int64_t npref = kv_host.size(0);
     for (int64_t i = 0; i + 1 < npref; ++i) {
         const int64_t kv = static_cast<int64_t>(pref[i + 1]) - static_cast<int64_t>(pref[i]);
@@ -170,8 +170,8 @@ MsaKeyMeta ResolveTndKeyMeta(const at::Tensor &key, const at::Tensor &cu_q, cons
     return meta;
 }
 
-MsaKeyMeta ResolvePaKeyMeta(const at::Tensor &key, const at::Tensor &bt, const std::string &layoutKeyStr,
-                            const at::Tensor &cu_q, const at::Tensor &kv_len, const at::Tensor &start_loc,
+MsaKeyMeta ResolvePaKeyMeta(const at::Tensor& key, const at::Tensor& bt, const std::string& layoutKeyStr,
+                            const at::Tensor& cu_q, const at::Tensor& kv_len, const at::Tensor& start_loc,
                             int64_t init_blocks, int64_t local_blocks)
 {
     MsaKeyMeta meta;
@@ -198,14 +198,14 @@ MsaKeyMeta ResolvePaKeyMeta(const at::Tensor &key, const at::Tensor &bt, const s
     return meta;
 }
 
-void CheckHeadDim(const at::Tensor &query, int64_t keyHeadDim)
+void CheckHeadDim(const at::Tensor& query, int64_t keyHeadDim)
 {
     TORCH_CHECK(query.size(DIM_2) == keyHeadDim, "query/key head_dim mismatch.");
     TORCH_CHECK(query.size(DIM_2) > 0 && (query.size(DIM_2) % HEAD_DIM_ALIGN) == 0, "head_dim align error.");
     TORCH_CHECK(query.size(DIM_2) <= MAX_HEAD_DIM, "head_dim too large.");
 }
 
-at::Tensor AllocMsaScore(const at::Tensor &query, int64_t maxBlocks)
+at::Tensor AllocMsaScore(const at::Tensor& query, int64_t maxBlocks)
 {
     auto local_device = c10::Device(query.device());
     const c10::OptionalDeviceGuard device_guard(local_device);
@@ -216,17 +216,17 @@ at::Tensor AllocMsaScore(const at::Tensor &query, int64_t maxBlocks)
 }
 } // namespace
 
-at::Tensor msa_index_score(const at::Tensor &query, const at::Tensor &key, const c10::optional<at::Tensor> &block_table,
-                           const c10::optional<at::Tensor> &scale, const c10::optional<at::Tensor> &atten_mask,
-                           const c10::optional<at::Tensor> &actual_seq_qlen,
-                           const c10::optional<at::Tensor> &actual_seq_klen, const at::Tensor &start_loc,
+at::Tensor msa_index_score(const at::Tensor& query, const at::Tensor& key, const c10::optional<at::Tensor>& block_table,
+                           const c10::optional<at::Tensor>& scale, const c10::optional<at::Tensor>& atten_mask,
+                           const c10::optional<at::Tensor>& actual_seq_qlen,
+                           const c10::optional<at::Tensor>& actual_seq_klen, const at::Tensor& start_loc,
                            c10::string_view layout_key, int64_t sparse_mode, int64_t init_blocks, int64_t local_blocks)
 {
     CheckMsaRequiredTensors(query, key, start_loc, actual_seq_qlen, actual_seq_klen);
     const std::string layoutKeyStr = ParseLayoutKey(layout_key);
     const bool is_tnd = (layoutKeyStr == "TND");
-    const at::Tensor &cu_q = actual_seq_qlen.value();
-    const at::Tensor &kv_len = actual_seq_klen.value();
+    const at::Tensor& cu_q = actual_seq_qlen.value();
+    const at::Tensor& kv_len = actual_seq_klen.value();
     CheckMsaLayoutRanks(query, key, block_table, layoutKeyStr, is_tnd, cu_q, kv_len, start_loc);
     CheckMsaSparseAndDtypes(query, key, scale, atten_mask, cu_q, kv_len, start_loc, sparse_mode, is_tnd);
     const MsaKeyMeta meta = is_tnd ? ResolveTndKeyMeta(key, cu_q, kv_len, start_loc, init_blocks, local_blocks) :

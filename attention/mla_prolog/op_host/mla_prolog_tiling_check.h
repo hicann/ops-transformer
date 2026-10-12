@@ -68,18 +68,18 @@ constexpr uint32_t PARAM_MAP_INIT_RESERVE_NUM = 28; // 预分配所有key的个�
 
 struct ParamInfo {
     ParamInfo() = default;
-    explicit ParamInfo(const ParamInfo &) = default;
-    ParamInfo &operator=(const ParamInfo &) = default;
-    explicit ParamInfo(ParamInfo &&) = default;
-    ParamInfo &operator=(ParamInfo &&other) = default;
+    explicit ParamInfo(const ParamInfo&) = default;
+    ParamInfo& operator=(const ParamInfo&) = default;
+    explicit ParamInfo(ParamInfo&&) = default;
+    ParamInfo& operator=(ParamInfo&& other) = default;
     ~ParamInfo() = default;
-    ParamInfo(const gert::CompileTimeTensorDesc *actualDesc, const gert::StorageShape *actualShape)
+    ParamInfo(const gert::CompileTimeTensorDesc* actualDesc, const gert::StorageShape* actualShape)
     {
         if (actualDesc != nullptr && actualShape != nullptr) {
             isValid = true;
             dtype = actualDesc->GetDataType();
             format = static_cast<ge::Format>(ge::GetPrimaryFormat(actualDesc->GetStorageFormat()));
-            auto &&actualStorageShape = actualShape->GetStorageShape();
+            auto&& actualStorageShape = actualShape->GetStorageShape();
             dimNum = actualStorageShape.GetDimNum();
             this->shape.reserve(dimNum);
             for (size_t i = 0; i < dimNum; i++) {
@@ -87,10 +87,10 @@ struct ParamInfo {
             }
         }
     }
-    explicit ParamInfo(const BaseParaInfo &info)
+    explicit ParamInfo(const BaseParaInfo& info)
         : ParamInfo(info.desc, info.shape)
     {}
-    explicit ParamInfo(const std::vector<uint32_t> &expectedShape)
+    explicit ParamInfo(const std::vector<uint32_t>& expectedShape)
     {
         isValid = true;
         format = ge::FORMAT_ND;
@@ -101,7 +101,7 @@ struct ParamInfo {
         }
     }
 
-    bool operator==(const ParamInfo &other) const
+    bool operator==(const ParamInfo& other) const
     {
         if (!isValid && !other.isValid) {
             return true;
@@ -113,7 +113,7 @@ struct ParamInfo {
         }
         return (isValid == other.isValid && dtype == other.dtype && dimNum == other.dimNum && shape == other.shape);
     }
-    bool operator!=(const ParamInfo &other) const
+    bool operator!=(const ParamInfo& other) const
     {
         return !(*this == other);
     }
@@ -129,8 +129,8 @@ using ParamInfoMap = std::unordered_map<std::string, ParamInfo>;
 
 class MlaPrologTilingCheck {
 public:
-    MlaPrologTilingCheck(const MlaPrologContext &context, const MlaPrologBaseShapeInfo &baseShapeInfo,
-                         const MlaPrologScenarioInfo &scenarioInfo)
+    MlaPrologTilingCheck(const MlaPrologContext& context, const MlaPrologBaseShapeInfo& baseShapeInfo,
+                         const MlaPrologScenarioInfo& scenarioInfo)
         : context_(context),
           baseShapeInfo_(baseShapeInfo),
           scenarioInfo_(scenarioInfo)
@@ -156,9 +156,9 @@ private:
     ge::graphStatus CheckDSize() const;
     ge::graphStatus CheckDtileSize() const;
     // ==================================单参数校验==================================
-    bool IsSingleParamValid(const BaseParaInfo &param, const std::string &paramName,
-                            const std::set<ge::DataType> &expectedDtype, const std::set<ge::Format> &expectedFormat,
-                            const std::set<size_t> &expectedDimNum) const;
+    bool IsSingleParamValid(const BaseParaInfo& param, const std::string& paramName,
+                            const std::set<ge::DataType>& expectedDtype, const std::set<ge::Format>& expectedFormat,
+                            const std::set<size_t>& expectedDimNum) const;
     bool CheckTokenX() const;
     bool CheckWDq() const;
     bool CheckWDkvKr() const;
@@ -173,7 +173,7 @@ private:
     bool CheckKrCache() const;
     bool CheckActSeqLen() const;
     bool IsRopeDisabled() const;
-    bool IsEmptyTensor(const BaseParaInfo &param) const;
+    bool IsEmptyTensor(const BaseParaInfo& param) const;
     // ==================================单参数校验==================================
 
     // =================================全量参数校验=================================
@@ -189,8 +189,8 @@ private:
     void FillTokenAndQueryShapes();
     void FillWeightAndNormShapes();
     void FillCacheShapes();
-    void CheckRepoMode(bool isPertile, ge::graphStatus &isCorrect);
-    void CheckQueryQuantMode(bool isPertensor, ge::graphStatus &isCorrect);
+    void CheckRepoMode(bool isPertile, ge::graphStatus& isCorrect);
+    void CheckQueryQuantMode(bool isPertensor, ge::graphStatus& isCorrect);
     void FillNonQuantParamInfo();
     void FillPartialQuantParamInfo();
     void FillPartialKVQuantParamInfo();
@@ -211,9 +211,9 @@ private:
     void GenActualParamInfo();
     // =================================全量参数校验=================================
 
-    const MlaPrologContext &context_;
-    const MlaPrologBaseShapeInfo &baseShapeInfo_;
-    const MlaPrologScenarioInfo &scenarioInfo_;
+    const MlaPrologContext& context_;
+    const MlaPrologBaseShapeInfo& baseShapeInfo_;
+    const MlaPrologScenarioInfo& scenarioInfo_;
     ParamInfoMap expectedParamInfo_ = ParamInfoMap(PARAM_MAP_INIT_RESERVE_NUM);
     ParamInfoMap actualParamInfo_ = ParamInfoMap(PARAM_MAP_INIT_RESERVE_NUM);
 };

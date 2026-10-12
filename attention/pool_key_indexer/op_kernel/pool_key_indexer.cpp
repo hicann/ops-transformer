@@ -24,22 +24,22 @@ using namespace PkiKernel;
     do { \
         templateClass<PkiType<__VA_ARGS__>> op; \
         GET_TILING_DATA_WITH_STRUCT(PoolKeyIndexerTilingData, tiling_data_in, tiling); \
-        const PoolKeyIndexerTilingData *__restrict tiling_data = &tiling_data_in; \
+        const PoolKeyIndexerTilingData* __restrict tiling_data = &tiling_data_in; \
         op.Init(query, poolKey, weights, poolTailK, actualSeqQ, actualSeqK, blockTable, qDescale, kDescale, \
                 sparseIndices, sparseValues, user, tiling_data, &tPipe); \
         op.Process(); \
     } while (0)
 
 template <int DT_Q, int DT_K, int DT_OUT, int LAYOUT_Q, int LAYOUT_K, int MASK_MODE, int QUANT_MODE, int RETURN_VALUE>
-__global__ __aicore__ void pool_key_indexer(__gm__ uint8_t *query, __gm__ uint8_t *poolKey, __gm__ uint8_t *weights,
-                                            __gm__ uint8_t *poolTailK, __gm__ uint8_t *actualSeqQ,
-                                            __gm__ uint8_t *actualSeqK, __gm__ uint8_t *blockTable,
-                                            __gm__ uint8_t *qDescale, __gm__ uint8_t *kDescale,
-                                            __gm__ uint8_t *sparseIndices, __gm__ uint8_t *sparseValues,
-                                            __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+__global__ __aicore__ void pool_key_indexer(__gm__ uint8_t* query, __gm__ uint8_t* poolKey, __gm__ uint8_t* weights,
+                                            __gm__ uint8_t* poolTailK, __gm__ uint8_t* actualSeqQ,
+                                            __gm__ uint8_t* actualSeqK, __gm__ uint8_t* blockTable,
+                                            __gm__ uint8_t* qDescale, __gm__ uint8_t* kDescale,
+                                            __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseValues,
+                                            __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     TPipe tPipe;
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 
 #if (__CCE_AICORE__ == 310)

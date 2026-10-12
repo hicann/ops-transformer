@@ -149,10 +149,10 @@ template <typename T = half, typename SType = half, PrecType prec_type1 = PrecTy
 class UnpadFlashAttentionCommon {
 public:
     __aicore__ inline UnpadFlashAttentionCommon(
-        __gm__ uint8_t *__restrict__ gmSrcq, __gm__ uint8_t *__restrict__ gmSrck, __gm__ uint8_t *__restrict__ gmSrcv,
-        __gm__ uint8_t *__restrict__ gmSrcm, __gm__ uint8_t *__restrict__ gmSrcLayerid,
-        __gm__ uint8_t *__restrict__ gmSrcAlibiCoeff, __gm__ uint8_t *__restrict__ gmSrcLogn,
-        __gm__ uint8_t *__restrict__ gmDsto)
+        __gm__ uint8_t* __restrict__ gmSrcq, __gm__ uint8_t* __restrict__ gmSrck, __gm__ uint8_t* __restrict__ gmSrcv,
+        __gm__ uint8_t* __restrict__ gmSrcm, __gm__ uint8_t* __restrict__ gmSrcLayerid,
+        __gm__ uint8_t* __restrict__ gmSrcAlibiCoeff, __gm__ uint8_t* __restrict__ gmSrcLogn,
+        __gm__ uint8_t* __restrict__ gmDsto)
         : gmSrcq(gmSrcq),
           gmSrck(gmSrck),
           gmSrcv(gmSrcv),
@@ -204,7 +204,7 @@ public:
         const SType delta1, const uint32_t scale_type, const uint32_t alibi_left_align);
 
     __aicore__ inline void Run(
-        const PromptFlashAttentionBaseApiTilingData *__restrict tilingData, __gm__ uint8_t *__restrict__ alibi_coeff_gm,
+        const PromptFlashAttentionBaseApiTilingData* __restrict tilingData, __gm__ uint8_t* __restrict__ alibi_coeff_gm,
         AscendC::GlobalTensor<int64_t> actualSeqLengthsGm, AscendC::GlobalTensor<int64_t> actualSeqLengthsKVGm,
         uint32_t mask_type, uint32_t window_len, uint32_t long_seq, uint64_t stride_qo, uint64_t stride_kv,
         int64_t head_mask_stride, int64_t batch_mask_stride, uint32_t start_batch, uint32_t end_batch,
@@ -212,7 +212,7 @@ public:
         uint32_t mask_stride, uint32_t q_tokens, int32_t embd, uint32_t q_tight, uint32_t scaleType, SType tor,
         int32_t kv_copy_stride, uint32_t is_sqrt, int64_t heads, uint32_t max_seqlen, uint32_t batch_size,
         int32_t kv_real_heads, const uint32_t alibi_left_align, uint32_t inputLayout);
-    __aicore__ inline void InitBatchParam(const PromptFlashAttentionBaseApiTilingData *__restrict tilingData,
+    __aicore__ inline void InitBatchParam(const PromptFlashAttentionBaseApiTilingData* __restrict tilingData,
                                           int32_t heads, uint32_t max_seqlen, uint32_t max_kv_seqlen, int32_t embd,
                                           uint32_t kvHead, uint32_t embeddingSizeV, uint32_t inputLayout,
                                           uint32_t q_tight);
@@ -272,7 +272,7 @@ public:
                                        int32_t len)
     {
         for (int32_t rowIdx = 0; rowIdx < len; rowIdx++) {
-            float scale = (float)*((__ubuf__ float *)src_tensor.GetPhyAddr() + rowIdx);
+            float scale = (float)*((__ubuf__ float*)src_tensor.GetPhyAddr() + rowIdx);
             SET_FLAG(S, V, EVENT_ID0);
             WAIT_FLAG(S, V, EVENT_ID0);
             PIPE_BARRIER(V);
@@ -284,14 +284,14 @@ public:
 public:
     int32_t vmPingpongFlag = 1;
 
-    __gm__ uint8_t *__restrict__ gmSrcq;
-    __gm__ uint8_t *__restrict__ gmSrck;
-    __gm__ uint8_t *__restrict__ gmSrcv;
-    __gm__ uint8_t *__restrict__ gmSrcm;
-    __gm__ uint8_t *__restrict__ gmSrcLayerid;
-    __gm__ uint8_t *__restrict__ gmSrcAlibiCoeff;
-    __gm__ uint8_t *__restrict__ gmSrcLogn;
-    __gm__ uint8_t *__restrict__ gmDsto;
+    __gm__ uint8_t* __restrict__ gmSrcq;
+    __gm__ uint8_t* __restrict__ gmSrck;
+    __gm__ uint8_t* __restrict__ gmSrcv;
+    __gm__ uint8_t* __restrict__ gmSrcm;
+    __gm__ uint8_t* __restrict__ gmSrcLayerid;
+    __gm__ uint8_t* __restrict__ gmSrcAlibiCoeff;
+    __gm__ uint8_t* __restrict__ gmSrcLogn;
+    __gm__ uint8_t* __restrict__ gmDsto;
 
     const uint32_t lq_buf_offset = 0;
     const uint32_t lk_buf_offset = 2 * UB_UINT8_BLOCK_SIZE;
@@ -318,11 +318,11 @@ public:
     const uint32_t go_ubuf_offset = 6 * UB_UINT8_BLOCK_SIZE;
     const uint32_t mask_ubuf_offset = DEC_UB_UINT8_BLOCK_SIZE * 8;
 
-    __cbuf__ uint8_t *l1qBufAddr;
-    __cbuf__ uint8_t *l1kBufAddr;
-    __cbuf__ uint8_t *l1pBufAddr;
-    __cbuf__ uint8_t *l1vBufAddr;
-    __cbuf__ uint8_t *l1maskBufAddr;
+    __cbuf__ uint8_t* l1qBufAddr;
+    __cbuf__ uint8_t* l1kBufAddr;
+    __cbuf__ uint8_t* l1pBufAddr;
+    __cbuf__ uint8_t* l1vBufAddr;
+    __cbuf__ uint8_t* l1maskBufAddr;
 
     AsdopsBuffer<ArchType::ASCEND_V200> buf;
 
@@ -686,7 +686,7 @@ UnpadFlashAttentionCommon<float, half, PrecType::BMM1_FP16_EXP_FP32, PrecType::B
     if (scaleType == 1) {
         WAIT_FLAG(V, MTE2, EVENT_ID6);
         AscendC::GlobalTensor<half> logn_gm_tensor;
-        logn_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(gmSrcLogn));
+        logn_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(gmSrcLogn));
         gm_to_ub<ArchType::ASCEND_V200, half>(logn_ub_tensor, logn_gm_tensor[lognOffset], 0, 1, fm / BLOCK_SIZE, 0, 0);
 
         SET_FLAG(MTE2, V, Pingflag + 2);
@@ -1442,23 +1442,23 @@ __aicore__ inline void UnpadFlashAttentionCommon<T, SType, prec_type1, prec_type
         l1diagBufAddr_tensor.ReinterpretCast<uint8_t>()[Pongflag * l1diag_buf_addr_offset].ReinterpretCast<half>();
     AscendC::LocalTensor<half> l1oTempBuf_tensor = l1oBufAddr_tensor.ReinterpretCast<half>();
 
-    gmSrcq_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(gmSrcq));
-    gmSrck_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(gmSrck));
-    gmSrcv_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(gmSrcv));
-    gmSrcm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(gmSrcm));
-    gmDsto_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(gmDsto));
+    gmSrcq_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(gmSrcq));
+    gmSrck_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(gmSrck));
+    gmSrcv_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(gmSrcv));
+    gmSrcm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(gmSrcm));
+    gmDsto_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(gmDsto));
 
     // 4 for ping-pong memory offset in L1
-    __cbuf__ uint8_t *l1qBuf = l1qBufAddr;
+    __cbuf__ uint8_t* l1qBuf = l1qBufAddr;
     // 4 for ping-pong memory offset in L1
-    __cbuf__ uint8_t *l1kPingBuf = l1kBufAddr + Pingflag * 4 * L1_UINT8_BLOCK_SIZE;
-    __cbuf__ uint8_t *l1kPongBuf = l1kBufAddr + Pongflag * 4 * L1_UINT8_BLOCK_SIZE;
+    __cbuf__ uint8_t* l1kPingBuf = l1kBufAddr + Pingflag * 4 * L1_UINT8_BLOCK_SIZE;
+    __cbuf__ uint8_t* l1kPongBuf = l1kBufAddr + Pongflag * 4 * L1_UINT8_BLOCK_SIZE;
     // 4 for ping-pong memory offset in L1
-    __cbuf__ uint8_t *l1vPingBuf = l1vBufAddr + Pingflag * 4 * L1_UINT8_BLOCK_SIZE;
-    __cbuf__ uint8_t *l1vPongBuf = l1vBufAddr + Pongflag * 4 * L1_UINT8_BLOCK_SIZE;
+    __cbuf__ uint8_t* l1vPingBuf = l1vBufAddr + Pingflag * 4 * L1_UINT8_BLOCK_SIZE;
+    __cbuf__ uint8_t* l1vPongBuf = l1vBufAddr + Pongflag * 4 * L1_UINT8_BLOCK_SIZE;
     // 4 for ping-pong memory offset in L1
-    __cbuf__ uint8_t *l1pPingBuf = l1pBufAddr + Pingflag * 4 * L1_UINT8_BLOCK_SIZE;
-    __cbuf__ uint8_t *l1pPongBuf = l1pBufAddr + Pongflag * 4 * L1_UINT8_BLOCK_SIZE;
+    __cbuf__ uint8_t* l1pPingBuf = l1pBufAddr + Pingflag * 4 * L1_UINT8_BLOCK_SIZE;
+    __cbuf__ uint8_t* l1pPongBuf = l1pBufAddr + Pongflag * 4 * L1_UINT8_BLOCK_SIZE;
 
     int32_t oSize = fm * fk;
     int32_t mD64 = (fm + FLOAT_VECTOR_SIZE - 1) / FLOAT_VECTOR_SIZE;
@@ -2024,7 +2024,7 @@ __aicore__ inline void UnpadFlashAttentionCommon<T, SType, prec_type1, prec_type
 
 template <typename T, typename SType, PrecType prec_type1, PrecType prec_type2>
 __aicore__ inline void UnpadFlashAttentionCommon<T, SType, prec_type1, prec_type2>::InitBatchParam(
-    const PromptFlashAttentionBaseApiTilingData *__restrict tilingData, int32_t heads, uint32_t max_seqlen,
+    const PromptFlashAttentionBaseApiTilingData* __restrict tilingData, int32_t heads, uint32_t max_seqlen,
     uint32_t max_kv_seqlen, int32_t embd, uint32_t kvHead, uint32_t embeddingSizeV, uint32_t inputLayout,
     uint32_t q_tight)
 {
@@ -2087,7 +2087,7 @@ __aicore__ inline void UnpadFlashAttentionCommon<T, SType, prec_type1, prec_type
 template <>
 __aicore__ inline void
 UnpadFlashAttentionCommon<float, half, PrecType::BMM1_FP16_EXP_FP32, PrecType::BMM1_FP16_EXP_FP32>::Run(
-    const PromptFlashAttentionBaseApiTilingData *__restrict tilingData, __gm__ uint8_t *__restrict__ alibi_coeff_gm,
+    const PromptFlashAttentionBaseApiTilingData* __restrict tilingData, __gm__ uint8_t* __restrict__ alibi_coeff_gm,
     AscendC::GlobalTensor<int64_t> actualSeqLengthsGm, AscendC::GlobalTensor<int64_t> actualSeqLengthsKVGm,
     uint32_t mask_type, uint32_t window_len, uint32_t long_seq, uint64_t stride_qo, uint64_t stride_kv,
     int64_t head_mask_stride, int64_t batch_mask_stride, uint32_t start_batch, uint32_t end_batch, int32_t start_blk,
@@ -2193,12 +2193,12 @@ UnpadFlashAttentionCommon<float, half, PrecType::BMM1_FP16_EXP_FP32, PrecType::B
                 AscendC::LocalTensor<half> alibi_coeff_ub_tensor =
                     buf.GetBuffer<BufferType::ASCEND_UB, half>(5 * UB_UINT8_BLOCK_SIZE + 28 * UB_UINT8_LINE_SIZE);
                 AscendC::GlobalTensor<half> alibi_coeff_gm_tensor;
-                alibi_coeff_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half *>(alibi_coeff_gm));
+                alibi_coeff_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(alibi_coeff_gm));
                 gm_to_ub<ArchType::ASCEND_V200, half>(alibi_coeff_ub_tensor, alibi_coeff_gm_tensor, 0, 1,
                                                       (heads + 15) / 16, 0, 0);
                 SET_FLAG(MTE2, S, EVENT_ID0);
                 WAIT_FLAG(MTE2, S, EVENT_ID0);
-                alibi_coeff = *(__ubuf__ half *)(alibi_coeff_ub_tensor[head_idx0].GetPhyAddr());
+                alibi_coeff = *(__ubuf__ half*)(alibi_coeff_ub_tensor[head_idx0].GetPhyAddr());
                 if (m_idx0 == n_idx0) {
                     mask_offset0 = 0;
                 } else {

@@ -29,29 +29,29 @@ public:
     CommonChecker() = default;
     ~CommonChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const QfaTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckParaExistence(const QfaTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckFeature(const QfaTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckMultiPara(const QfaTilingInfo &qfaInfo) override;
+    ge::graphStatus CheckSinglePara(const QfaTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckParaExistence(const QfaTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckFeature(const QfaTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckMultiPara(const QfaTilingInfo& qfaInfo) override;
 
 private:
     // --- Layout checks ---
-    ge::graphStatus CheckSingleParaLayout(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus CheckSingleParaLayout(const QfaTilingInfo& qfaInfo);
 
     // --- Dtype/shapeDim checks (SinglePara) ---
-    ge::graphStatus CheckSingleParaDtype(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaShapeDim(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus CheckSingleParaDtype(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaShapeDim(const QfaTilingInfo& qfaInfo);
 
     // --- Attr checks (SinglePara) ---
-    ge::graphStatus CheckSingleParaSoftmaxScale(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus CheckSingleParaSoftmaxScale(const QfaTilingInfo& qfaInfo);
 
     // --- MultiPara: dtype consistency ---
-    ge::graphStatus CheckQuantDataType(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckDtypeConsistency(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus CheckQuantDataType(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckDtypeConsistency(const QfaTilingInfo& qfaInfo);
 
     // --- Feature: axis & headNum cross-check ---
-    ge::graphStatus CheckAxis(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckHeadNum(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus CheckAxis(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckHeadNum(const QfaTilingInfo& qfaInfo);
 };
 
 } // namespace quant_flash_attn

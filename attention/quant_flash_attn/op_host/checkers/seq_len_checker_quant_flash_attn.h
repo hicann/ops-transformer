@@ -29,26 +29,26 @@ public:
     SeqLenChecker() = default;
     ~SeqLenChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const QfaTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckParaExistence(const QfaTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckFeature(const QfaTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckMultiPara(const QfaTilingInfo &qfaInfo) override;
+    ge::graphStatus CheckSinglePara(const QfaTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckParaExistence(const QfaTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckFeature(const QfaTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckMultiPara(const QfaTilingInfo& qfaInfo) override;
 
 private:
-    ge::graphStatus CheckSingleParaSequsedQ(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaSequsedKv(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaCuSeqlensQ(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaCuSeqlensKv(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaMaxSeqlenQ(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaMaxSeqlenKv(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus CheckSingleParaSequsedQ(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaSequsedKv(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaCuSeqlensQ(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaCuSeqlensKv(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaMaxSeqlenQ(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaMaxSeqlenKv(const QfaTilingInfo& qfaInfo);
 
     // --- Feature: cu_seqlens_q/kv 与 layout 的关系约束 ---
-    ge::graphStatus CheckCuSeqlensLayoutConsistency(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus CheckCuSeqlensLayoutConsistency(const QfaTilingInfo& qfaInfo);
 
     // --- Feature: 非TND时 seqused 与 max_seqlen 至少传1组 ---
     //  layout_q/kv 不为TND时, seqused_q/kv 与 max_seqlen_q/kv 至少传入其中一个;
     //          PA场景下 seqused_kv 必传(由 paged_attention_checker 负责, 此处不重复)
-    ge::graphStatus CheckSequsedMaxSeqlenAtLeastOne(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus CheckSequsedMaxSeqlenAtLeastOne(const QfaTilingInfo& qfaInfo);
 };
 
 } // namespace quant_flash_attn

@@ -30,34 +30,33 @@ constexpr size_t VALUE_INPUT_INDEX = 2;
 constexpr size_t TOPK_INDICES_INPUT_INDEX = 3;
 constexpr size_t INPUT_LAYOUT_ATTR_INDEX = 3;
 
-ge::graphStatus InferShapeNsaSelectedAttention(gert::InferShapeContext *context)
+ge::graphStatus InferShapeNsaSelectedAttention(gert::InferShapeContext* context)
 {
     OP_LOGI(context, "Enter NsaSelectedAttention runtime infershape impl.");
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape *queryShape = context->GetInputShape(QUERY_INPUT_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QUERY_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(KEY_INPUT_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(KEY_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    const gert::Shape *valueShape = context->GetInputShape(VALUE_INPUT_INDEX);
+    const gert::Shape* valueShape = context->GetInputShape(VALUE_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
-    const gert::Shape *topkIndicesShape = context->GetInputShape(TOPK_INDICES_INPUT_INDEX);
+    const gert::Shape* topkIndicesShape = context->GetInputShape(TOPK_INDICES_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, topkIndicesShape);
     auto attrs = context->GetAttrs();
-    const auto *queryDesc = context->GetInputDesc(QUERY_INPUT_INDEX);
+    const auto* queryDesc = context->GetInputDesc(QUERY_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryDesc);
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const char *inputLayout = attrs->GetAttrPointer<char>(INPUT_LAYOUT_ATTR_INDEX);
+    const char* inputLayout = attrs->GetAttrPointer<char>(INPUT_LAYOUT_ATTR_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayout);
     std::string inputLayoutStr = std::string(inputLayout);
-    for (auto &c : inputLayoutStr) {
+    for (auto& c : inputLayoutStr) {
         c = toupper(c);
     }
     if (inputLayoutStr != "TND") {
-        OP_LOGE(context, "The inputLayout should be TND(case-insensitive), but got %s.",
-                inputLayoutStr.c_str());
+        OP_LOGE(context, "The inputLayout should be TND(case-insensitive), but got %s.", inputLayoutStr.c_str());
         return GRAPH_FAILED;
     }
 
@@ -67,7 +66,7 @@ ge::graphStatus InferShapeNsaSelectedAttention(gert::InferShapeContext *context)
     OP_CHECK_NULL_WITH_CONTEXT(context, headNum);
 
     // softmaxMax, fp32: (T, N, 8)
-    gert::Shape *softmaxMaxShape = context->GetOutputShape(0);
+    gert::Shape* softmaxMaxShape = context->GetOutputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxMaxShape);
     softmaxMaxShape->SetDimNum(DIM_NUM_3);
     softmaxMaxShape->SetDim(0, shapeT);
@@ -75,21 +74,21 @@ ge::graphStatus InferShapeNsaSelectedAttention(gert::InferShapeContext *context)
     softmaxMaxShape->SetDim(DIM_NUM_2, NSA_SOFTMAXMAX_F32_DIM0SHAPE);
 
     // softmaxSum, shape same as softmaxMax
-    gert::Shape *softmaxSumShape = context->GetOutputShape(1);
+    gert::Shape* softmaxSumShape = context->GetOutputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxSumShape);
     *softmaxSumShape = *softmaxMaxShape;
 
-    gert::Shape *attentionOutShape = context->GetOutputShape(2);
+    gert::Shape* attentionOutShape = context->GetOutputShape(2);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
     *attentionOutShape = *queryShape;
-    //TND
+    // TND
     auto shapeD2 = valueShape->GetDim(2);
     attentionOutShape->SetDim(2, shapeD2);
     return GRAPH_SUCCESS;
-}    
+}
 
-ge::graphStatus InferDataTypeNsaSelectedAttention(gert::InferDataTypeContext *context)
-{   
+ge::graphStatus InferDataTypeNsaSelectedAttention(gert::InferDataTypeContext* context)
+{
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
@@ -103,5 +102,7 @@ ge::graphStatus InferDataTypeNsaSelectedAttention(gert::InferDataTypeContext *co
     return ge::GRAPH_SUCCESS;
 }
 
-IMPL_OP_INFERSHAPE(NsaSelectedAttention).InferShape(InferShapeNsaSelectedAttention).InferDataType(InferDataTypeNsaSelectedAttention);
+IMPL_OP_INFERSHAPE(NsaSelectedAttention)
+    .InferShape(InferShapeNsaSelectedAttention)
+    .InferDataType(InferDataTypeNsaSelectedAttention);
 } // namespace ops

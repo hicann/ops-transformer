@@ -90,7 +90,7 @@ inline uint64_t RoundDown(const uint64_t val, const uint64_t align = 16)
     return val / align * align;
 }
 
-inline uint64_t GetDefaultStride0(const gert::Shape &shape)
+inline uint64_t GetDefaultStride0(const gert::Shape& shape)
 {
     uint64_t stride = 1;
     for (size_t dim = 1; dim < shape.GetDimNum(); ++dim) {
@@ -99,17 +99,16 @@ inline uint64_t GetDefaultStride0(const gert::Shape &shape)
     return stride;
 }
 
-inline uint64_t GetInputStride0(gert::TilingContext *context, const uint64_t inputIndex, const gert::Shape &shape)
+inline uint64_t GetInputStride0(gert::TilingContext* context, const uint64_t inputIndex, const gert::Shape& shape)
 {
     const uint64_t defaultStride0 = GetDefaultStride0(shape);
 
     // 不再用 InputIsView 校验，直接按「连续判据」处理：拿到首轴 stride 后与连续布局应有的
     // stride（GetDefaultStride0）比较——一致即视为连续，否则按真实 stride 跳。
-    auto *stride = context->GetRequiredInputStride(inputIndex);
+    auto* stride = context->GetRequiredInputStride(inputIndex);
 
     if (stride == nullptr || stride->GetDimNum() != shape.GetDimNum()) {
-        OP_LOGD(context->GetNodeName(),
-                "GetInputStride0 irIdx=%lu: no stride desc, treat as contiguous, stride0=%lu.",
+        OP_LOGD(context->GetNodeName(), "GetInputStride0 irIdx=%lu: no stride desc, treat as contiguous, stride0=%lu.",
                 inputIndex, defaultStride0);
         return defaultStride0;
     }
@@ -118,20 +117,18 @@ inline uint64_t GetInputStride0(gert::TilingContext *context, const uint64_t inp
     // IsContiguous: 首轴 stride 等于连续布局应有值即连续。
     const bool isContiguous = (actualStride0 == defaultStride0);
     OP_LOGD(context->GetNodeName(),
-            "GetInputStride0 irIdx=%lu: actualStride0=%lu, defaultStride0=%lu, isContiguous=%d.",
-            inputIndex, actualStride0, defaultStride0, static_cast<int>(isContiguous));
+            "GetInputStride0 irIdx=%lu: actualStride0=%lu, defaultStride0=%lu, isContiguous=%d.", inputIndex,
+            actualStride0, defaultStride0, static_cast<int>(isContiguous));
 
     return isContiguous ? defaultStride0 : actualStride0;
 }
 
 // 校验 cache tensor 的非首轴必须保持连续：仅首轴允许 stride 与连续布局不一致
 // 其余轴的 stride 必须等于按 shape 计算的连续布局应有的值。
-inline bool ValidateCacheNonFirstAxisContiguous(gert::TilingContext *context,
-                                                const uint64_t inputIndex,
-                                                const gert::Shape &shape,
-                                                const char *tensorName)
+inline bool ValidateCacheNonFirstAxisContiguous(gert::TilingContext* context, const uint64_t inputIndex,
+                                                const gert::Shape& shape, const char* tensorName)
 {
-    auto *stride = context->GetRequiredInputStride(inputIndex);
+    auto* stride = context->GetRequiredInputStride(inputIndex);
     if (stride == nullptr || stride->GetDimNum() != shape.GetDimNum()) {
         // 没有 stride 描述，按连续处理，通过校验
         return true;
@@ -155,12 +152,14 @@ inline bool ValidateCacheNonFirstAxisContiguous(gert::TilingContext *context,
     return true;
 }
 
-template <typename T = uint64_t> inline T Max(const T a, const T b)
+template <typename T = uint64_t>
+inline T Max(const T a, const T b)
 {
     return a > b ? a : b;
 }
 
-template <typename T = uint64_t> inline T Min(const T a, const T b)
+template <typename T = uint64_t>
+inline T Min(const T a, const T b)
 {
     return a < b ? a : b;
 }
@@ -173,13 +172,21 @@ class PpMatmulTilingApi {
 public:
     PpMatmulTilingApi(uint64_t numBatch, uint64_t m, uint64_t k, uint64_t n, bool transA, bool transB, bool enDequant,
                       bool deqOnTheFly, uint64_t aicNumPlatForm, uint64_t l0SizePlatForm, uint64_t l2SizePlatForm)
-        : numBatch_(numBatch), m_(m), k_(k), n_(n), transA_(transA), transB_(transB), enDequant_(enDequant),
-          deqOnTheFly_(deqOnTheFly), aicNumPlatForm_(aicNumPlatForm), l0SizePlatForm_(l0SizePlatForm),
+        : numBatch_(numBatch),
+          m_(m),
+          k_(k),
+          n_(n),
+          transA_(transA),
+          transB_(transB),
+          enDequant_(enDequant),
+          deqOnTheFly_(deqOnTheFly),
+          aicNumPlatForm_(aicNumPlatForm),
+          l0SizePlatForm_(l0SizePlatForm),
           l2SizePlatForm_(l2SizePlatForm)
     {
         inDataSize_ = enDequant ? sizeof(uint8_t) : sizeof(uint16_t);
     }
-    void GetTilingData(optiling::MlaPpMatmulTilingData *tiling);
+    void GetTilingData(optiling::MlaPpMatmulTilingData* tiling);
 
 private:
     void GetTileSize();
@@ -219,7 +226,7 @@ private:
     bool enLoadAllAmat_{false};
 };
 
-void PpMatmulTilingApi::GetTilingData(optiling::MlaPpMatmulTilingData *tiling)
+void PpMatmulTilingApi::GetTilingData(optiling::MlaPpMatmulTilingData* tiling)
 {
     GetTileSize(); // 计算，然后下面赋值
     tiling->set_numBatch(numBatch_);
@@ -416,7 +423,7 @@ void MlaPreprocessTiling::RmsNormQuantTiling(const uint64_t numTokens, const uin
     mlaTilingData.set_rmsQuantMin2(-CONST_128);
 }
 
-void MlaPreprocessTiling::RopeConcatTiling(const OpParam::MlaPreprocessParam &param, const uint64_t &aicNum)
+void MlaPreprocessTiling::RopeConcatTiling(const OpParam::MlaPreprocessParam& param, const uint64_t& aicNum)
 {
     uint64_t ntokens = param.N;
     uint64_t hiddenSizeQ = HEADDIM * param.headNum;
@@ -437,9 +444,9 @@ void MlaPreprocessTiling::RopeConcatTiling(const OpParam::MlaPreprocessParam &pa
     // 计算一次能搬几行 q 4+2、reverseq 4、neg 4、sin 4+2、cos 4+2  + concat 2
     uint64_t allSize = headDim * (3 * (4 + dataTypeSize) + 2 * 4) + concatSize * dataTypeSize; // rope内部升精度计算
     uint64_t maxNPerLoopForUb = maxUbSize / allSize; // ub每次能载入最大行数（包括所有计算数据）
-    uint64_t preCoreLoopTime = (nlCoreRun + maxNPerLoopForUb - 1) / maxNPerLoopForUb;  // 前核循环次数
-    uint64_t preCoreLoopNLast = nlCoreRun - (preCoreLoopTime - 1) * maxNPerLoopForUb;  // 前核最后一批处理数据行数
-    uint64_t lastCoreLoopTime = (lCoreRun + maxNPerLoopForUb - 1) / maxNPerLoopForUb;  // 尾核循环次数
+    uint64_t preCoreLoopTime = (nlCoreRun + maxNPerLoopForUb - 1) / maxNPerLoopForUb; // 前核循环次数
+    uint64_t preCoreLoopNLast = nlCoreRun - (preCoreLoopTime - 1) * maxNPerLoopForUb; // 前核最后一批处理数据行数
+    uint64_t lastCoreLoopTime = (lCoreRun + maxNPerLoopForUb - 1) / maxNPerLoopForUb; // 尾核循环次数
     uint64_t lastCoreLoopNLast = lCoreRun - (lastCoreLoopTime - 1) * maxNPerLoopForUb; // 尾核最后一批处理数据行数
 
     mlaTilingData.set_hiddenSizeQ(hiddenSizeQ);
@@ -458,21 +465,27 @@ void MlaPreprocessTiling::RopeConcatTiling(const OpParam::MlaPreprocessParam &pa
     mlaTilingData.set_lastCoreLoopNLast(lastCoreLoopNLast);
 }
 
-void MlaPreprocessTiling::EinSumQuantTiling(const OpParam::MlaPreprocessParam &param, const uint64_t &aicNum,
+void MlaPreprocessTiling::EinSumQuantTiling(const OpParam::MlaPreprocessParam& param, const uint64_t& aicNum,
                                             const ge::DataType inDtype, const bool doRmsQuant)
 {
-    uint64_t aivCore = aicNum * 2;uint64_t ubSize = UB_SIZE - 1024;
+    uint64_t aivCore = aicNum * 2;
+    uint64_t ubSize = UB_SIZE - 1024;
     // input shape
     // tokenNum  // headNum
-    uint64_t esqBatch = param.N;uint64_t esqHeadNum = param.headNum;
+    uint64_t esqBatch = param.N;
+    uint64_t esqHeadNum = param.headNum;
     uint64_t esqColNum = AXES_ALIGN_SIZE; // 512
 
     // split core
-    uint64_t esqFrontCore = esqBatch % aivCore;uint64_t esqTailCore = aivCore - esqFrontCore;
-    uint64_t esqFrontCoreBatch = CeilDiv(esqBatch, aivCore);uint64_t esqTailCoreBatch = esqBatch / aivCore;
+    uint64_t esqFrontCore = esqBatch % aivCore;
+    uint64_t esqTailCore = aivCore - esqFrontCore;
+    uint64_t esqFrontCoreBatch = CeilDiv(esqBatch, aivCore);
+    uint64_t esqTailCoreBatch = esqBatch / aivCore;
 
     // split ub --> calc H' <-- 一次ub循环中搬运处理的行数  // ub每次计算的head行数
-    uint64_t splitFactor = 0;uint64_t esqHeadPerLoop = 0; uint64_t repeatMask = 0;
+    uint64_t splitFactor = 0;
+    uint64_t esqHeadPerLoop = 0;
+    uint64_t repeatMask = 0;
 
     if (inDtype == ge::DT_BF16 || param.quantMode == QuantMode::PER_TOKEN_SYMM_QUANT) {
         if (doRmsQuant) {
@@ -484,26 +497,27 @@ void MlaPreprocessTiling::EinSumQuantTiling(const OpParam::MlaPreprocessParam &p
             esqHeadPerLoop = (ubSize - scaleUb) / splitFactor; // 26
             repeatMask = FP32_REPEAT_MASK;
         } else {
-            splitFactor = esqColNum * (NUM2 * sizeof(uint16_t) + sizeof(uint8_t)) + sizeof(uint16_t) + (CONST_16 * sizeof(uint16_t));
+            splitFactor = esqColNum * (NUM2 * sizeof(uint16_t) + sizeof(uint8_t)) + sizeof(uint16_t) +
+                          (CONST_16 * sizeof(uint16_t));
             esqHeadPerLoop = ubSize / splitFactor;
             repeatMask = FP16_REPEAT_MASK;
             esqHeadPerLoop = RoundDown(esqHeadPerLoop); // 向下16对齐
         }
     } else {
         // fp16 input [H', cloNum](fp16*2 + int8) + [H', 1](fp16) + [H', 16](fp16)
-        splitFactor = esqColNum * (NUM2 * sizeof(uint16_t) + sizeof(uint8_t)) + sizeof(uint16_t) + (CONST_16 * sizeof(uint16_t));
+        splitFactor =
+            esqColNum * (NUM2 * sizeof(uint16_t) + sizeof(uint8_t)) + sizeof(uint16_t) + (CONST_16 * sizeof(uint16_t));
         esqHeadPerLoop = ubSize / splitFactor;
         repeatMask = FP16_REPEAT_MASK;
         esqHeadPerLoop = RoundDown(esqHeadPerLoop); // 向下16对齐
     }
     uint64_t esqUbHeadLoop = esqHeadNum; // ub完整循环次数
-    uint64_t esqHeadTail = esqHeadNum; // ub最后一次处理head的行数
-    uint64_t esqColLoop = esqHeadNum; // ub完整循环次数
-    uint64_t esqColTail = esqHeadNum; // ub最后一次处理head的行数
-    if(esqHeadPerLoop !=0)
-    {
-        esqUbHeadLoop = esqHeadNum / esqHeadPerLoop;// ub完整循环次数
-        esqHeadTail = esqHeadNum % esqHeadPerLoop;// ub最后一次处理head的行数
+    uint64_t esqHeadTail = esqHeadNum;   // ub最后一次处理head的行数
+    uint64_t esqColLoop = esqHeadNum;    // ub完整循环次数
+    uint64_t esqColTail = esqHeadNum;    // ub最后一次处理head的行数
+    if (esqHeadPerLoop != 0) {
+        esqUbHeadLoop = esqHeadNum / esqHeadPerLoop; // ub完整循环次数
+        esqHeadTail = esqHeadNum % esqHeadPerLoop;   // ub最后一次处理head的行数
         esqColLoop = esqColNum / repeatMask;         // 每行按列计算要循环处理的次数
         esqColTail = esqColNum % repeatMask;         // colNum非64/128对齐时，最后一次计算列数
     }
@@ -521,8 +535,8 @@ void MlaPreprocessTiling::EinSumQuantTiling(const OpParam::MlaPreprocessParam &p
     mlaTilingData.set_esqColTail(esqColTail);
 }
 
-void MlaPreprocessTiling::SetTilingKey(const ge::DataType inDtype, const OpParam::MlaPreprocessParam &param,
-                                       const bool doRmsQuant, gert::TilingContext *context)
+void MlaPreprocessTiling::SetTilingKey(const ge::DataType inDtype, const OpParam::MlaPreprocessParam& param,
+                                       const bool doRmsQuant, gert::TilingContext* context)
 {
     auto formatWeight1 =
         static_cast<ge::Format>(ge::GetPrimaryFormat(context->GetRequiredInputDesc(INDEX_WDQKV)->GetStorageFormat()));
@@ -538,15 +552,15 @@ void MlaPreprocessTiling::SetTilingKey(const ge::DataType inDtype, const OpParam
     tilingKey = (tilingKey << 1) + static_cast<uint64_t>(formatWeight3 == ge::FORMAT_FRACTAL_NZ);
     tilingKey = (tilingKey << 2) + static_cast<uint64_t>(param.quantMode); // 2bit for quantMode.
 
-    if (!doRmsQuant){
+    if (!doRmsQuant) {
         tilingKey += 1000; // 1000 : 代表匹配量化输入分支
     }
 
     context->SetTilingKey(tilingKey);
 }
 
-void MlaPreprocessTiling::SetMlapoWorkSpace(const ge::DataType inDtype, const OpParam::MlaPreprocessParam &param,
-                                            uint32_t sysWorkSpaceSize, gert::TilingContext *context)
+void MlaPreprocessTiling::SetMlapoWorkSpace(const ge::DataType inDtype, const OpParam::MlaPreprocessParam& param,
+                                            uint32_t sysWorkSpaceSize, gert::TilingContext* context)
 {
     uint64_t hiddtenState = static_cast<uint64_t>(mlaTilingData.get_hiddtenState());
     uint64_t s1wsFactor =
@@ -567,7 +581,7 @@ void MlaPreprocessTiling::SetMlapoWorkSpace(const ge::DataType inDtype, const Op
     maxWorkspaceSize = std::max(maxWorkspaceSize, workSizeS3);
     maxWorkspaceSize = std::max(maxWorkspaceSize, workSizeS4);
 
-    size_t *currentWorkspace = context->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context->GetWorkspaceSizes(1);
 
     const int BF16_WORK_NUM = 4;
     if (inDtype == ge::DT_BF16 || param.quantMode == QuantMode::PER_TOKEN_SYMM_QUANT) {
@@ -578,56 +592,53 @@ void MlaPreprocessTiling::SetMlapoWorkSpace(const ge::DataType inDtype, const Op
     mlaTilingData.set_maxWorkspaceSize(maxWorkspaceSize);
 }
 
-void MlaPreprocessTiling::PrintTilingData(gert::TilingContext *context)
+void MlaPreprocessTiling::PrintTilingData(gert::TilingContext* context)
 {
     MlaPreprocessTiling::PrintFirstTilingData(context);
     MlaPreprocessTiling::PrintLastTilingData(context);
 }
 
-void MlaPreprocessTiling::PrintFirstTilingData(gert::TilingContext *context)
+void MlaPreprocessTiling::PrintFirstTilingData(gert::TilingContext* context)
 {
     OP_LOGD(context->GetNodeName(), ">>>>>>>>>> Start to print MlaPreprocess tiling data <<<<<<<<<<");
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: numCore is %ld.", mlaTilingData.get_numCore());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: n is %ld.", mlaTilingData.get_n());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: perTaskNum is %ld.", mlaTilingData.get_perTaskNum());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: resTaskNum is %ld.", mlaTilingData.get_resTaskNum());
-    OP_LOGD(
-        context->GetNodeName(),
-        "MlaPreprocess_tiling: mm1: bSize is %ld, mSize is %ld, kSize is %ld, nSize is %ld,  m0 is %ld, k0 is %ld, "
-        "n0 is %ld, mLoop is %ld, kLoop is %ld, nLoop is %ld, coreLoop is %ld, SwizzleCount is %ld, "
-        "SwizzleDirect is %ld, blockDim is %ld",
-        mlaTilingData.mm1.get_numBatch(), mlaTilingData.mm1.get_m(), mlaTilingData.mm1.get_k(),
-        mlaTilingData.mm1.get_n(), mlaTilingData.mm1.get_m0(), mlaTilingData.mm1.get_k0(), mlaTilingData.mm1.get_n0(),
-        mlaTilingData.mm1.get_mLoop(), mlaTilingData.mm1.get_kLoop(), mlaTilingData.mm1.get_nLoop(),
-        mlaTilingData.mm1.get_coreLoop(), mlaTilingData.mm1.get_swizzleCount(), mlaTilingData.mm1.get_swizzleDirect(),
-        mlaTilingData.mm1.get_blockDim());
-    OP_LOGD(
-        context->GetNodeName(),
-        "MlaPreprocess_tiling: mm2: bSize is %ld, mSize is %ld, kSize is %ld, nSize is %ld,  m0 is %ld, k0 is %ld, "
-        "n0 is %ld, mLoop is %ld, kLoop is %ld, nLoop is %ld, coreLoop is %ld, SwizzleCount is %ld, "
-        "SwizzleDirect is %ld, blockDim is %ld",
-        mlaTilingData.mm2.get_numBatch(), mlaTilingData.mm2.get_m(), mlaTilingData.mm2.get_k(),
-        mlaTilingData.mm2.get_n(), mlaTilingData.mm2.get_m0(), mlaTilingData.mm2.get_k0(), mlaTilingData.mm2.get_n0(),
-        mlaTilingData.mm2.get_mLoop(), mlaTilingData.mm2.get_kLoop(), mlaTilingData.mm2.get_nLoop(),
-        mlaTilingData.mm2.get_coreLoop(), mlaTilingData.mm2.get_swizzleCount(), mlaTilingData.mm2.get_swizzleDirect(),
-        mlaTilingData.mm2.get_blockDim());
-    OP_LOGD(
-        context->GetNodeName(),
-        "MlaPreprocess_tiling: mm3: bSize is %ld, mSize is %ld, kSize is %ld, nSize is %ld,  m0 is %ld, k0 is %ld, "
-        "n0 is %ld, mLoop is %ld, kLoop is %ld, nLoop is %ld, coreLoop is %ld, SwizzleCount is %ld, "
-        "SwizzleDirect is %ld, blockDim is %ld",
-        mlaTilingData.mm3.get_numBatch(), mlaTilingData.mm3.get_m(), mlaTilingData.mm3.get_k(),
-        mlaTilingData.mm3.get_n(), mlaTilingData.mm3.get_m0(), mlaTilingData.mm3.get_k0(), mlaTilingData.mm3.get_n0(),
-        mlaTilingData.mm3.get_mLoop(), mlaTilingData.mm3.get_kLoop(), mlaTilingData.mm3.get_nLoop(),
-        mlaTilingData.mm3.get_coreLoop(), mlaTilingData.mm3.get_swizzleCount(), mlaTilingData.mm3.get_swizzleDirect(),
-        mlaTilingData.mm3.get_blockDim());
+    OP_LOGD(context->GetNodeName(),
+            "MlaPreprocess_tiling: mm1: bSize is %ld, mSize is %ld, kSize is %ld, nSize is %ld,  m0 is %ld, k0 is %ld, "
+            "n0 is %ld, mLoop is %ld, kLoop is %ld, nLoop is %ld, coreLoop is %ld, SwizzleCount is %ld, "
+            "SwizzleDirect is %ld, blockDim is %ld",
+            mlaTilingData.mm1.get_numBatch(), mlaTilingData.mm1.get_m(), mlaTilingData.mm1.get_k(),
+            mlaTilingData.mm1.get_n(), mlaTilingData.mm1.get_m0(), mlaTilingData.mm1.get_k0(),
+            mlaTilingData.mm1.get_n0(), mlaTilingData.mm1.get_mLoop(), mlaTilingData.mm1.get_kLoop(),
+            mlaTilingData.mm1.get_nLoop(), mlaTilingData.mm1.get_coreLoop(), mlaTilingData.mm1.get_swizzleCount(),
+            mlaTilingData.mm1.get_swizzleDirect(), mlaTilingData.mm1.get_blockDim());
+    OP_LOGD(context->GetNodeName(),
+            "MlaPreprocess_tiling: mm2: bSize is %ld, mSize is %ld, kSize is %ld, nSize is %ld,  m0 is %ld, k0 is %ld, "
+            "n0 is %ld, mLoop is %ld, kLoop is %ld, nLoop is %ld, coreLoop is %ld, SwizzleCount is %ld, "
+            "SwizzleDirect is %ld, blockDim is %ld",
+            mlaTilingData.mm2.get_numBatch(), mlaTilingData.mm2.get_m(), mlaTilingData.mm2.get_k(),
+            mlaTilingData.mm2.get_n(), mlaTilingData.mm2.get_m0(), mlaTilingData.mm2.get_k0(),
+            mlaTilingData.mm2.get_n0(), mlaTilingData.mm2.get_mLoop(), mlaTilingData.mm2.get_kLoop(),
+            mlaTilingData.mm2.get_nLoop(), mlaTilingData.mm2.get_coreLoop(), mlaTilingData.mm2.get_swizzleCount(),
+            mlaTilingData.mm2.get_swizzleDirect(), mlaTilingData.mm2.get_blockDim());
+    OP_LOGD(context->GetNodeName(),
+            "MlaPreprocess_tiling: mm3: bSize is %ld, mSize is %ld, kSize is %ld, nSize is %ld,  m0 is %ld, k0 is %ld, "
+            "n0 is %ld, mLoop is %ld, kLoop is %ld, nLoop is %ld, coreLoop is %ld, SwizzleCount is %ld, "
+            "SwizzleDirect is %ld, blockDim is %ld",
+            mlaTilingData.mm3.get_numBatch(), mlaTilingData.mm3.get_m(), mlaTilingData.mm3.get_k(),
+            mlaTilingData.mm3.get_n(), mlaTilingData.mm3.get_m0(), mlaTilingData.mm3.get_k0(),
+            mlaTilingData.mm3.get_n0(), mlaTilingData.mm3.get_mLoop(), mlaTilingData.mm3.get_kLoop(),
+            mlaTilingData.mm3.get_nLoop(), mlaTilingData.mm3.get_coreLoop(), mlaTilingData.mm3.get_swizzleCount(),
+            mlaTilingData.mm3.get_swizzleDirect(), mlaTilingData.mm3.get_blockDim());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: rmsNumCore1 is %ld.", mlaTilingData.get_rmsNumCore1());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: rmsNumCol1 is %ld.", mlaTilingData.get_rmsNumCol1());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: rmsNumRow1 is %ld.", mlaTilingData.get_rmsNumRow1());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: rmsQuantMin1 is %ld.", mlaTilingData.get_rmsQuantMin1());
 }
 
-void MlaPreprocessTiling::PrintLastTilingData(gert::TilingContext *context)
+void MlaPreprocessTiling::PrintLastTilingData(gert::TilingContext* context)
 {
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: hiddtenState is %ld.", mlaTilingData.get_hiddtenState());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: rmsNumCore2 is %ld.", mlaTilingData.get_rmsNumCore2());
@@ -644,39 +655,34 @@ void MlaPreprocessTiling::PrintLastTilingData(gert::TilingContext *context)
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: nlCoreRun is %ld.", mlaTilingData.get_nlCoreRun());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: lCoreRun is %ld.", mlaTilingData.get_lCoreRun());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: maxNPerLoopForUb  is %ld.",
-              mlaTilingData.get_maxNPerLoopForUb());
+            mlaTilingData.get_maxNPerLoopForUb());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: preCoreLoopTime   is %ld.",
-              mlaTilingData.get_preCoreLoopTime());
+            mlaTilingData.get_preCoreLoopTime());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: preCoreLoopNLast  is %ld.",
-              mlaTilingData.get_preCoreLoopNLast());
+            mlaTilingData.get_preCoreLoopNLast());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: lastCoreLoopTime  is %ld.",
-              mlaTilingData.get_lastCoreLoopTime());
+            mlaTilingData.get_lastCoreLoopTime());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: lastCoreLoopNLast is %ld.",
-              mlaTilingData.get_lastCoreLoopNLast());
+            mlaTilingData.get_lastCoreLoopNLast());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqFrontCore      is %ld.",
-              mlaTilingData.get_esqFrontCore());
-    OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqTailCore       is %ld.",
-              mlaTilingData.get_esqTailCore());
+            mlaTilingData.get_esqFrontCore());
+    OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqTailCore       is %ld.", mlaTilingData.get_esqTailCore());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqFrontCoreBatch is %ld.",
-              mlaTilingData.get_esqFrontCoreBatch());
+            mlaTilingData.get_esqFrontCoreBatch());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqTailCoreBatch  is %ld.",
-              mlaTilingData.get_esqTailCoreBatch());
-    OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqHeadNum        is %ld.",
-              mlaTilingData.get_esqHeadNum());
+            mlaTilingData.get_esqTailCoreBatch());
+    OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqHeadNum        is %ld.", mlaTilingData.get_esqHeadNum());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqColNum         is %ld.", mlaTilingData.get_esqColNum());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqUbHeadLoop     is %ld.",
-              mlaTilingData.get_esqUbHeadLoop());
+            mlaTilingData.get_esqUbHeadLoop());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqHeadPerLoop    is %ld.",
-              mlaTilingData.get_esqHeadPerLoop());
-    OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqHeadTail       is %ld.",
-              mlaTilingData.get_esqHeadTail());
-    OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqColLoop        is %ld.",
-              mlaTilingData.get_esqColLoop());
-    OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqColTail        is %ld.",
-              mlaTilingData.get_esqColTail());
+            mlaTilingData.get_esqHeadPerLoop());
+    OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqHeadTail       is %ld.", mlaTilingData.get_esqHeadTail());
+    OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqColLoop        is %ld.", mlaTilingData.get_esqColLoop());
+    OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: esqColTail        is %ld.", mlaTilingData.get_esqColTail());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: epsilon           is %f.", mlaTilingData.get_epsilon());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: maxWorkspaceSize  is %ld.",
-              mlaTilingData.get_maxWorkspaceSize());
+            mlaTilingData.get_maxWorkspaceSize());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: kvCacheBlockSize  is %ld.",
             mlaTilingData.get_kvCacheBlockSize());
     OP_LOGD(context->GetNodeName(), "MlaPreprocess_tiling: kvCacheStride0    is %ld.",
@@ -685,29 +691,27 @@ void MlaPreprocessTiling::PrintLastTilingData(gert::TilingContext *context)
             mlaTilingData.get_kvCacheRopeStride0());
 }
 
-ge::graphStatus MlaPreprocessTiling::Init(gert::TilingContext *context)
+ge::graphStatus MlaPreprocessTiling::Init(gert::TilingContext* context)
 {
     OpParam::MlaPreprocessParam param = MlaPreprocessTiling::GetParam(context);
-    const auto *cosShape = context->GetRequiredInputShape(INDEX_COS);
-    const auto *sinShape = context->GetRequiredInputShape(INDEX_SIN);
-    OP_CHECK_IF(cosShape == nullptr || sinShape == nullptr,
-                OP_LOGE(context, "cos and sin must be provided."),
+    const auto* cosShape = context->GetRequiredInputShape(INDEX_COS);
+    const auto* sinShape = context->GetRequiredInputShape(INDEX_SIN);
+    OP_CHECK_IF(cosShape == nullptr || sinShape == nullptr, OP_LOGE(context, "cos and sin must be provided."),
                 return ge::GRAPH_FAILED);
-    const auto &cosStorageShape = cosShape->GetStorageShape();
-    const auto &sinStorageShape = sinShape->GetStorageShape();
+    const auto& cosStorageShape = cosShape->GetStorageShape();
+    const auto& sinStorageShape = sinShape->GetStorageShape();
     const bool cosDisablesRope = cosStorageShape.GetDimNum() == 1 && cosStorageShape.GetDim(0) == 0;
     const bool sinDisablesRope = sinStorageShape.GetDimNum() == 1 && sinStorageShape.GetDim(0) == 0;
     OP_CHECK_IF(cosDisablesRope != sinDisablesRope,
                 OP_LOGE(context, "cos and sin must both have shape [0] or neither have shape [0]."),
                 return ge::GRAPH_FAILED);
     if (!cosDisablesRope) {
-        const auto &inputStorageShape = context->GetRequiredInputShape(INDEX_INPUT)->GetStorageShape();
+        const auto& inputStorageShape = context->GetRequiredInputShape(INDEX_INPUT)->GetStorageShape();
         const int64_t tokenNum = inputStorageShape.GetDim(0);
         OP_CHECK_IF(cosStorageShape.GetDimNum() != 2 || sinStorageShape.GetDimNum() != 2 ||
                         cosStorageShape.GetDim(0) != tokenNum || sinStorageShape.GetDim(0) != tokenNum ||
                         cosStorageShape.GetDim(1) != HEADDIM || sinStorageShape.GetDim(1) != HEADDIM,
-                    OP_LOGE(context, "cos and sin must have shape [tokenNum, 64]."),
-                    return ge::GRAPH_FAILED);
+                    OP_LOGE(context, "cos and sin must have shape [tokenNum, 64]."), return ge::GRAPH_FAILED);
     }
     param.enableRope = !cosDisablesRope;
 
@@ -722,19 +726,16 @@ ge::graphStatus MlaPreprocessTiling::Init(gert::TilingContext *context)
                 return ge::GRAPH_FAILED);
 
     // headNum 限制：范围 1~128
-    OP_CHECK_IF(param.headNum <= 0 || param.headNum > 128,
-                OP_LOGE(context, "headNum must be in range [1, 128]"),
+    OP_CHECK_IF(param.headNum <= 0 || param.headNum > 128, OP_LOGE(context, "headNum must be in range [1, 128]"),
                 return ge::GRAPH_FAILED);
 
     // qLoraRank (qlora) 限制：范围 32~4096，必须 32 对齐
     OP_CHECK_IF(param.qLoraRank < 32 || param.qLoraRank > 4096 || (param.qLoraRank % 32) != 0,
-                OP_LOGE(context, "qLoraRank must be in range [32, 4096] and aligned to 32"),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(context, "qLoraRank must be in range [32, 4096] and aligned to 32"), return ge::GRAPH_FAILED);
 
     // nopeDim (nope) 限制：范围 16~256，必须 16 对齐
     OP_CHECK_IF(param.nopeDim < 16 || param.nopeDim > 256 || (param.nopeDim % 16) != 0,
-                OP_LOGE(context, "nopeDim must be in range [16, 256] and aligned to 16"),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(context, "nopeDim must be in range [16, 256] and aligned to 16"), return ge::GRAPH_FAILED);
 
     bool doRmsNorm = *(context->GetAttrs()->GetAttrPointer<bool>(ATTR_DO_RMS_NORM_IDX));
     mlaTilingData.set_doRmsNorm(doRmsNorm);
@@ -742,7 +743,7 @@ ge::graphStatus MlaPreprocessTiling::Init(gert::TilingContext *context)
     uint64_t hiddtenState = static_cast<uint64_t>(
         context->GetRequiredInputShape(INDEX_INPUT)->GetStorageShape().GetDim(DIM_1)); // hiddtenState
     mlaTilingData.set_hiddtenState(hiddtenState);
-    
+
     bool doRmsNormQuant = true;
     if (context->GetRequiredInputDesc(INDEX_WDQKV)->GetDataType() == ge::DT_BF16 &&
         context->GetRequiredInputDesc(INDEX_WUQ)->GetDataType() == ge::DT_BF16) {
@@ -755,11 +756,11 @@ ge::graphStatus MlaPreprocessTiling::Init(gert::TilingContext *context)
     auto inDtype = context->GetRequiredInputDesc(INDEX_INPUT)->GetDataType();
 
     auto platformInfo = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context,"platformInfo is null"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context, "platformInfo is null"), return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-    const uint64_t &aicNum = ascendcPlatform.GetCoreNumAic();
-    const uint64_t &aivNum = ascendcPlatform.GetCoreNumAiv();
+    const uint64_t& aicNum = ascendcPlatform.GetCoreNumAic();
+    const uint64_t& aivNum = ascendcPlatform.GetCoreNumAiv();
     uint32_t sysWorkSpaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
 
     uint64_t l0CSizePlatForm = 0;
@@ -786,14 +787,14 @@ ge::graphStatus MlaPreprocessTiling::Init(gert::TilingContext *context)
     auto tilingParamMm3 = &mlaTilingData.mm3;
 
     bool enDequant = doRmsNormQuant;
-    PpMatmulTilingApi mm1TilingApi(1, param.N, hiddtenState, param.hiddenStateMm, false, true,
-                                   enDequant, deqOnTheFly, aicNum, l0CSizePlatForm, l2SizePlatForm);
+    PpMatmulTilingApi mm1TilingApi(1, param.N, hiddtenState, param.hiddenStateMm, false, true, enDequant, deqOnTheFly,
+                                   aicNum, l0CSizePlatForm, l2SizePlatForm);
     mm1TilingApi.GetTilingData(tilingParamMm1);
     PpMatmulTilingApi mm2TilingApi(1, param.N, param.qLoraRank, param.headNum * param.headDimMm2, false, true,
                                    enDequant, deqOnTheFly, aicNum, l0CSizePlatForm, l2SizePlatForm);
     mm2TilingApi.GetTilingData(tilingParamMm2);
-    PpMatmulTilingApi mm3TilingApi(param.headNum, param.N, param.nopeDim, CONCAT_SIZE,
-                                   false, false, false, deqOnTheFly, aicNum, l0CSizePlatForm, l2SizePlatForm);
+    PpMatmulTilingApi mm3TilingApi(param.headNum, param.N, param.nopeDim, CONCAT_SIZE, false, false, false, deqOnTheFly,
+                                   aicNum, l0CSizePlatForm, l2SizePlatForm);
     mm3TilingApi.GetTilingData(tilingParamMm3);
 
     SetMlapoWorkSpace(inDtype, param, sysWorkSpaceSize, context);
@@ -804,7 +805,7 @@ ge::graphStatus MlaPreprocessTiling::Init(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-OpParam::MlaPreprocessParam MlaPreprocessTiling::GetParam(gert::TilingContext *context)
+OpParam::MlaPreprocessParam MlaPreprocessTiling::GetParam(gert::TilingContext* context)
 {
     OpParam::MlaPreprocessParam param;
 
@@ -823,7 +824,7 @@ OpParam::MlaPreprocessParam MlaPreprocessTiling::GetParam(gert::TilingContext *c
     auto deqScaleShape = context->GetRequiredInputShape(INDEX_DEQSCALE)->GetStorageShape();
     param.hiddenStateMm = static_cast<uint64_t>(deqScaleShape.GetDim(DIM_0));
 
-    constexpr uint64_t CONCAT_SIZE_PLUS_HEAD_DIM = 576;  // concatSize(512) + headDim(64)
+    constexpr uint64_t CONCAT_SIZE_PLUS_HEAD_DIM = 576; // concatSize(512) + headDim(64)
     param.qLoraRank = param.hiddenStateMm - CONCAT_SIZE_PLUS_HEAD_DIM;
 
     auto wukShape = context->GetRequiredInputShape(INDEX_WUK)->GetStorageShape();
@@ -841,7 +842,7 @@ OpParam::MlaPreprocessParam MlaPreprocessTiling::GetParam(gert::TilingContext *c
     //       a) 物理 NZ storage shape [blockNum, C1, blockSize, C0]，blockSize 在 dim2；
     //       b) 逻辑 shape + npu_format_cast(NZ)，storage/origin 仍为 [blockNum, blockSize, 1, dim]，
     //          此时 dim2 恒为 1，blockSize 在 dim1。
-    const bool isNzCache = (param.cacheMode == NUM2 || param.cacheMode == NUM3);  // 2:INT8_NZ, 3:NZ
+    const bool isNzCache = (param.cacheMode == NUM2 || param.cacheMode == NUM3); // 2:INT8_NZ, 3:NZ
     const bool blockSizeFromStorageDim2 =
         isNzCache && kvCacheShape.GetDimNum() > DIM_2 && kvCacheShape.GetDim(DIM_2) != 1;
     if (blockSizeFromStorageDim2) {
@@ -853,7 +854,7 @@ OpParam::MlaPreprocessParam MlaPreprocessTiling::GetParam(gert::TilingContext *c
     param.kvCacheRopeStride0 = GetInputStride0(context, INDEX_KV_CACHE_ROPE, kvCacheRopeShape);
 
     auto kvCacheRopeOriginShape = context->GetRequiredInputShape(INDEX_KV_CACHE_ROPE)->GetOriginShape();
-    auto shapeToStr = [](const gert::Shape &s, char *buf, size_t cap) {
+    auto shapeToStr = [](const gert::Shape& s, char* buf, size_t cap) {
         size_t off = 0;
         off += snprintf(buf + off, cap - off, "[");
         for (size_t d = 0; d < s.GetDimNum() && off < cap; ++d) {
@@ -872,8 +873,7 @@ OpParam::MlaPreprocessParam MlaPreprocessTiling::GetParam(gert::TilingContext *c
     OP_LOGD(context->GetNodeName(),
             "MlaPreprocess shape dump: cacheMode=%lu isNzCache=%d | kvCache storage=%s origin=%s | "
             "kvCacheRope storage=%s origin=%s.",
-            param.cacheMode, static_cast<int>(isNzCache), kvStorageBuf, kvOriginBuf,
-            kvRopeStorageBuf, kvRopeOriginBuf);
+            param.cacheMode, static_cast<int>(isNzCache), kvStorageBuf, kvOriginBuf, kvRopeStorageBuf, kvRopeOriginBuf);
     OP_LOGD(context->GetNodeName(),
             "MlaPreprocess derived: kvCacheBlockSize=%lu (from %s.dim%d) kvCacheStride0=%lu kvCacheRopeStride0=%lu.",
             param.kvCacheBlockSize, blockSizeFromStorageDim2 ? "storage" : "origin",
@@ -882,24 +882,24 @@ OpParam::MlaPreprocessParam MlaPreprocessTiling::GetParam(gert::TilingContext *c
     return param;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingMLAPreprocess(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingMLAPreprocess(gert::TilingContext* context)
 {
     MlaPreprocessTiling mlaTiling;
     auto status = mlaTiling.Init(context);
     if (status != ge::GRAPH_SUCCESS) {
         return status;
     }
-    mlaTiling.mlaTilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
+    mlaTiling.mlaTilingData.SaveToBuffer(context->GetRawTilingData()->GetData(),
+                                         context->GetRawTilingData()->GetCapacity());
     context->GetRawTilingData()->SetDataSize(mlaTiling.mlaTilingData.GetDataSize());
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingPrepareForMlaPreprocess(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForMlaPreprocess(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
-
 
 IMPL_OP_OPTILING(MlaPreprocess)
     .Tiling(TilingMLAPreprocess)

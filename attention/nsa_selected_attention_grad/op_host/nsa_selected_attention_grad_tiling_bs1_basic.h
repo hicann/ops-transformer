@@ -45,7 +45,7 @@ struct TempParams {
 
 class NsaSelectedAttentionGradBasicTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit NsaSelectedAttentionGradBasicTiling(gert::TilingContext *context)
+    explicit NsaSelectedAttentionGradBasicTiling(gert::TilingContext* context)
         : TilingBaseClass(context) {};
     NsaSelectedAttentionGradBasicTilingData tilingData;
 

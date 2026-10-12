@@ -26,7 +26,7 @@ extern "C" {
 
 namespace {
 
-static constexpr const char *QLI_V2_ACLNN_OP_NAME = "QuantLightningIndexerV2Metadata";
+static constexpr const char* QLI_V2_ACLNN_OP_NAME = "QuantLightningIndexerV2Metadata";
 
 inline constexpr int64_t QLI_V2_QUANT_MODE_1 = 1;
 inline constexpr int64_t QLI_V2_QUANT_MODE_2 = 2;
@@ -43,12 +43,12 @@ inline constexpr int64_t QLI_V2_TOPK_LOWER_BOUND = 1;
 inline constexpr int64_t QLI_V2_A5_TOPK_UPPER_BOUND = 8192;
 inline constexpr int64_t QLI_V2_A3_TOPK_UPPER_BOUND = 2048;
 
-inline bool IsTensorExistQliV2(const aclTensor *tensor)
+inline bool IsTensorExistQliV2(const aclTensor* tensor)
 {
     return (tensor != nullptr) && (tensor->GetViewShape().GetDimNum() > 0) && (tensor->GetViewShape().GetDim(0) > 0);
 }
 
-int64_t GetDimNumQliV2(const aclTensor *tensor)
+int64_t GetDimNumQliV2(const aclTensor* tensor)
 {
     if (tensor == nullptr) {
         return -1;
@@ -56,7 +56,7 @@ int64_t GetDimNumQliV2(const aclTensor *tensor)
     return tensor->GetViewShape().GetDimNum();
 }
 
-aclDataType GetDataTypeQliV2(const aclTensor *tensor)
+aclDataType GetDataTypeQliV2(const aclTensor* tensor)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     if (tensor == nullptr) {
@@ -66,12 +66,12 @@ aclDataType GetDataTypeQliV2(const aclTensor *tensor)
     return dataType;
 }
 
-inline bool IsTensorSourceQLiV2(const std::string &source)
+inline bool IsTensorSourceQLiV2(const std::string& source)
 {
     return source != "batch_size";
 }
 
-inline int64_t GetRawShapeSizeQLiV2(const std::string &source, int64_t batchValue)
+inline int64_t GetRawShapeSizeQLiV2(const std::string& source, int64_t batchValue)
 {
     if (source.find("cu_seqlens") != std::string::npos) {
         return batchValue + 1;
@@ -79,8 +79,8 @@ inline int64_t GetRawShapeSizeQLiV2(const std::string &source, int64_t batchValu
     return batchValue;
 }
 
-int64_t GetQueryBatchSizeQliV2(int64_t batchSize, const aclTensor *cuSeqlensQOptional,
-                               const aclTensor *sequsedQOptional, const char *layoutQOptional, std::string &source)
+int64_t GetQueryBatchSizeQliV2(int64_t batchSize, const aclTensor* cuSeqlensQOptional,
+                               const aclTensor* sequsedQOptional, const char* layoutQOptional, std::string& source)
 {
     // 1. 如果sequsedQOptional 传了，使用sequsedQOptional获取BatchSize
     if (IsTensorExistQliV2(sequsedQOptional)) {
@@ -100,8 +100,8 @@ int64_t GetQueryBatchSizeQliV2(int64_t batchSize, const aclTensor *cuSeqlensQOpt
     return batchSize;
 }
 
-int64_t GetKeyBatchSizeQliV2(int64_t batchSize, const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedKOptional,
-                             const char *layoutKOptional, std::string &source)
+int64_t GetKeyBatchSizeQliV2(int64_t batchSize, const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedKOptional,
+                             const char* layoutKOptional, std::string& source)
 {
     // 1. 如果sequsedKOptional 传了，使用sequsedKOptional获取BatchSize
     if (IsTensorExistQliV2(sequsedKOptional)) {
@@ -123,9 +123,9 @@ int64_t GetKeyBatchSizeQliV2(int64_t batchSize, const aclTensor *cuSeqlensKOptio
 
 aclnnStatus CheckSingleParamQliV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk,
                                   int64_t quantMode, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK,
-                                  const char *layoutQOptional, const char *layoutKOptional, int64_t maskMode,
+                                  const char* layoutQOptional, const char* layoutKOptional, int64_t maskMode,
                                   int64_t cmpRatio, uint32_t aicCoreNum, uint32_t aivCoreNum,
-                                  const std::string &socVersion)
+                                  const std::string& socVersion)
 {
     // num_heads_k 校验
     if (numHeadsK != 1) {
@@ -271,11 +271,11 @@ aclnnStatus CheckSingleParamQliV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t 
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckExistenceQliV2(int64_t maskMode, int64_t cmpRatio, const aclTensor *cuSeqlensQOptional,
-                                const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedQOptional,
-                                const aclTensor *sequsedKOptional, const aclTensor *cmpResidualKOptional,
-                                int64_t maxSeqlenQ, int64_t maxSeqlenK, const char *layoutQOptional,
-                                const char *layoutKOptional, const aclTensor *metadata)
+aclnnStatus CheckExistenceQliV2(int64_t maskMode, int64_t cmpRatio, const aclTensor* cuSeqlensQOptional,
+                                const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
+                                const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional,
+                                int64_t maxSeqlenQ, int64_t maxSeqlenK, const char* layoutQOptional,
+                                const char* layoutKOptional, const aclTensor* metadata)
 {
     // cu_seqlens_q 存在性校验
     if ((strcmp(layoutQOptional, "TND") == 0) && !IsTensorExistQliV2(cuSeqlensQOptional)) {
@@ -325,10 +325,10 @@ aclnnStatus CheckExistenceQliV2(int64_t maskMode, int64_t cmpRatio, const aclTen
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckConsistencyQliV2(int64_t batchSize, const aclTensor *cuSeqlensQOptional,
-                                  const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedQOptional,
-                                  const aclTensor *sequsedKOptional, const aclTensor *cmpResidualKOptional,
-                                  const char *layoutQOptional, const char *layoutKOptional, const aclTensor *metadata)
+aclnnStatus CheckConsistencyQliV2(int64_t batchSize, const aclTensor* cuSeqlensQOptional,
+                                  const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
+                                  const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional,
+                                  const char* layoutQOptional, const char* layoutKOptional, const aclTensor* metadata)
 {
     int64_t dimNum = -1;
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
@@ -506,13 +506,13 @@ aclnnStatus CheckConsistencyQliV2(int64_t batchSize, const aclTensor *cuSeqlensQ
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus ParamsCheckQliV2(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKOptional,
-                             const aclTensor *sequsedQOptional, const aclTensor *sequsedKOptional,
-                             const aclTensor *cmpResidualKOptional, int64_t numHeadsQ, int64_t numHeadsK,
+aclnnStatus ParamsCheckQliV2(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional,
+                             const aclTensor* sequsedQOptional, const aclTensor* sequsedKOptional,
+                             const aclTensor* cmpResidualKOptional, int64_t numHeadsQ, int64_t numHeadsK,
                              int64_t headDim, int64_t topk, int64_t quantMode, int64_t batchSize, int64_t maxSeqlenQ,
-                             int64_t maxSeqlenK, char *layoutQOptional, char *layoutKOptional, int64_t maskMode,
-                             int64_t cmpRatio, const aclTensor *metadata, uint32_t aicCoreNum, uint32_t aivCoreNum,
-                             const std::string &socVersion)
+                             int64_t maxSeqlenK, char* layoutQOptional, char* layoutKOptional, int64_t maskMode,
+                             int64_t cmpRatio, const aclTensor* metadata, uint32_t aicCoreNum, uint32_t aivCoreNum,
+                             const std::string& socVersion)
 {
     auto ret =
         CheckSingleParamQliV2(numHeadsQ, numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ, maxSeqlenK,

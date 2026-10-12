@@ -74,7 +74,7 @@ REGISTER_TILING_DATA_CLASS(MsaIndexScore, MsaIndexScoreTilingData)
 struct MsaIndexScoreCompileInfo {};
 
 struct MsaIndexScoreInfo {
-    fe::PlatFormInfos *platformInfo = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     uint32_t batch = 0;
     uint32_t totalQ = 0;
     uint32_t numQHeads = 0;

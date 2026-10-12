@@ -19,7 +19,7 @@
 using namespace ge;
 using namespace AscendC;
 namespace optiling {
-ge::graphStatus TilingPrepareForNsaSelectAttentionInfer(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForNsaSelectAttentionInfer(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

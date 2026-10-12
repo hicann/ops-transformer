@@ -48,7 +48,6 @@ static const uint64_t LAYOUT_STR_LENGTH_4 = 4;
 static const uint64_t LAYOUT_STR_LENGTH_9 = 9;
 static const uint64_t NZ_N0_16 = 16;
 
-
 struct AxesInfo {
     int64_t b;
     int64_t n1;
@@ -61,7 +60,17 @@ struct AxesInfo {
     int64_t t2;
 };
 
-enum class InputLayout { SH, BSH, NSD, BNSD, BSND, BNSD_BSND, TND, NTD, NONE, };
+enum class InputLayout {
+    SH,
+    BSH,
+    NSD,
+    BNSD,
+    BSND,
+    BNSD_BSND,
+    TND,
+    NTD,
+    NONE,
+};
 
 static const std::unordered_map<DataType, string> StrDataTypePfa = {
     {DataType::DT_FLOAT, "DT_FLOAT"},
@@ -94,7 +103,8 @@ static const std::unordered_map<DataType, string> StrDataTypePfa = {
     {DataType::DT_UNDEFINED, "DT_UNDEFINED"},
 };
 
-static DataType ValidPfaAclDataType(DataType type) {
+static DataType ValidPfaAclDataType(DataType type)
+{
     return (StrDataTypePfa.find(type) == StrDataTypePfa.end()) ? DataType::DT_UNDEFINED : type;
 }
 
@@ -120,48 +130,50 @@ struct FaShapeInfo {
     bool needReshape = false;
 };
 
-static aclnnStatus CheckDimsAndLayout(const aclTensor *query, const aclTensor *key, const aclTensor *value, const char *inputLayout) {
+static aclnnStatus CheckDimsAndLayout(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                      const char* inputLayout)
+{
     auto qDimNum = query->GetViewShape().GetDimNum();
     auto kDimNum = key->GetViewShape().GetDimNum();
     auto vDimNum = value->GetViewShape().GetDimNum();
     if (qDimNum != kDimNum || qDimNum != vDimNum) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "the layout of q and k v must be same, but got q dim:%lu k dim:%lu v dim:%lu", qDimNum, kDimNum, vDimNum);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "the layout of q and k v must be same, but got q dim:%lu k dim:%lu v dim:%lu",
+                qDimNum, kDimNum, vDimNum);
         return ACLNN_ERR_PARAM_INVALID;
-    } else if ((qDimNum != DIM_NUM_4) && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_4 && (inputLayout[LAYOUT_STR_LENGTH_0] == 'B' && inputLayout[LAYOUT_STR_LENGTH_1] == 'N' &&
-        inputLayout[LAYOUT_STR_LENGTH_2] == 'S' && inputLayout[LAYOUT_STR_LENGTH_3] == 'D')) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "layout is BNSD, input shape dim should be 4, but got %lu", qDimNum);
+    } else if ((qDimNum != DIM_NUM_4) && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_4 &&
+               (inputLayout[LAYOUT_STR_LENGTH_0] == 'B' && inputLayout[LAYOUT_STR_LENGTH_1] == 'N' &&
+                inputLayout[LAYOUT_STR_LENGTH_2] == 'S' && inputLayout[LAYOUT_STR_LENGTH_3] == 'D')) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "layout is BNSD, input shape dim should be 4, but got %lu", qDimNum);
         return ACLNN_ERR_PARAM_INVALID;
-    } else if ((qDimNum != DIM_NUM_4) && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_4 && (inputLayout[LAYOUT_STR_LENGTH_0] == 'B' && inputLayout[LAYOUT_STR_LENGTH_1] == 'S' &&
-        inputLayout[LAYOUT_STR_LENGTH_2] == 'N' && inputLayout[LAYOUT_STR_LENGTH_3] == 'D')) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "layout is BSND, input shape dim should be 4, but got %lu", qDimNum);
+    } else if ((qDimNum != DIM_NUM_4) && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_4 &&
+               (inputLayout[LAYOUT_STR_LENGTH_0] == 'B' && inputLayout[LAYOUT_STR_LENGTH_1] == 'S' &&
+                inputLayout[LAYOUT_STR_LENGTH_2] == 'N' && inputLayout[LAYOUT_STR_LENGTH_3] == 'D')) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "layout is BSND, input shape dim should be 4, but got %lu", qDimNum);
         return ACLNN_ERR_PARAM_INVALID;
-    } else if ((qDimNum != DIM_NUM_3) && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 && (inputLayout[LAYOUT_STR_LENGTH_0] == 'N' && inputLayout[LAYOUT_STR_LENGTH_1] == 'S' &&
-               inputLayout[LAYOUT_STR_LENGTH_2] == 'D')) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "layout is NSD, input shape dim should be 3, but got %lu", qDimNum);
-        return ACLNN_ERR_PARAM_INVALID;
-    } else if ((qDimNum != DIM_NUM_3) && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 && (inputLayout[LAYOUT_STR_LENGTH_0] == 'T' && inputLayout[LAYOUT_STR_LENGTH_1] == 'N' &&
+    } else if ((qDimNum != DIM_NUM_3) && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 &&
+               (inputLayout[LAYOUT_STR_LENGTH_0] == 'N' && inputLayout[LAYOUT_STR_LENGTH_1] == 'S' &&
                 inputLayout[LAYOUT_STR_LENGTH_2] == 'D')) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "layout is TND, input shape dim should be 3, but got %lu", qDimNum);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "layout is NSD, input shape dim should be 3, but got %lu", qDimNum);
         return ACLNN_ERR_PARAM_INVALID;
-    } else if ((qDimNum != DIM_NUM_3) && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 && (inputLayout[LAYOUT_STR_LENGTH_0] == 'N' && inputLayout[LAYOUT_STR_LENGTH_1] == 'T' &&
+    } else if ((qDimNum != DIM_NUM_3) && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 &&
+               (inputLayout[LAYOUT_STR_LENGTH_0] == 'T' && inputLayout[LAYOUT_STR_LENGTH_1] == 'N' &&
                 inputLayout[LAYOUT_STR_LENGTH_2] == 'D')) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "layout is NTD, input shape dim should be 3, but got %lu", qDimNum);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "layout is TND, input shape dim should be 3, but got %lu", qDimNum);
         return ACLNN_ERR_PARAM_INVALID;
-    } else if ((qDimNum != DIM_NUM_2) && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_2 && (inputLayout[LAYOUT_STR_LENGTH_0] == 'S' && inputLayout[LAYOUT_STR_LENGTH_1] == 'H')) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "layout is SH, input shape dim should be 2, but got %lu", qDimNum);
+    } else if ((qDimNum != DIM_NUM_3) && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 &&
+               (inputLayout[LAYOUT_STR_LENGTH_0] == 'N' && inputLayout[LAYOUT_STR_LENGTH_1] == 'T' &&
+                inputLayout[LAYOUT_STR_LENGTH_2] == 'D')) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "layout is NTD, input shape dim should be 3, but got %lu", qDimNum);
+        return ACLNN_ERR_PARAM_INVALID;
+    } else if ((qDimNum != DIM_NUM_2) && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_2 &&
+               (inputLayout[LAYOUT_STR_LENGTH_0] == 'S' && inputLayout[LAYOUT_STR_LENGTH_1] == 'H')) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "layout is SH, input shape dim should be 2, but got %lu", qDimNum);
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
 }
-static aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                                const char *inputLayout, int64_t headNum, int64_t headNumKV, FaShapeInfo &shapeInfo)
+static aclnnStatus AnalysisAxis(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                const char* inputLayout, int64_t headNum, int64_t headNumKV, FaShapeInfo& shapeInfo)
 {
     Shape qShape = query->GetViewShape();
     Shape kShape = key->GetViewShape();
@@ -183,11 +195,13 @@ static aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, co
 
     // query: (B*S1, N1*D)
     // key/value: (B*S2, N2*D)
-    if (shapeInfo.dimNum == DIM_NUM_2 && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_2 && inputLayout[0] == 'S' && inputLayout[1] == 'H') {
+    if (shapeInfo.dimNum == DIM_NUM_2 && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_2 &&
+        inputLayout[0] == 'S' && inputLayout[1] == 'H') {
         uint64_t dSize = qShape[1] / headNum;
         uint64_t dSizeV = headNumKV == 0 ? vShape[1] / headNum : vShape[1] / headNumKV;
         if (dSize == 0) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Input query shape is (S[%ld], H[%ld]), input num_head N is %ld, "
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "Input query shape is (S[%ld], H[%ld]), input num_head N is %ld, "
                     "corresponding headsize D = H/N = %lu, is invalid.",
                     qShape[0], qShape[1], headNum, dSize); // 0:S, 1:H
             return ACLNN_ERR_PARAM_INVALID;
@@ -205,20 +219,22 @@ static aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, co
 
     // query: (B,S1,N1*D)
     // key/value: (B,S2,N2*D)
-    if (strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 && inputLayout[0] == 'B' && inputLayout[1] == 'S' && inputLayout[2] == 'H') {
+    if (strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 && inputLayout[0] == 'B' &&
+        inputLayout[1] == 'S' && inputLayout[2] == 'H') {
         uint64_t dSize = 0;
         uint64_t dSizeV = 0;
         if (shapeInfo.dimNum == DIM_NUM_4 && qShape[INDEX_3] == NZ_N0_16) {
             // NZ 格式
             dSize = qShape[1] * NZ_N0_16 / headNum;
-            dSizeV = headNumKV == 0 ? vShape[1] * NZ_N0_16 / headNum :  vShape[1] * NZ_N0_16 / headNumKV;
+            dSizeV = headNumKV == 0 ? vShape[1] * NZ_N0_16 / headNum : vShape[1] * NZ_N0_16 / headNumKV;
         } else {
             dSize = qShape[INDEX_2] / headNum;
             dSizeV = headNumKV == 0 ? vShape[INDEX_2] / headNum : vShape[INDEX_2] / headNumKV;
         }
 
         if (dSize == 0) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Input query shape is (B[%ld], S[%ld], H[%ld]), input num_head N is %ld, "
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "Input query shape is (B[%ld], S[%ld], H[%ld]), input num_head N is %ld, "
                     "corresponding headsize D = H/N = %lu, is invalid.",
                     qShape[0], qShape[1], qShape[2], headNum, dSize); // 0:B, 1:S, 2:H
             return ACLNN_ERR_PARAM_INVALID;
@@ -244,7 +260,8 @@ static aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, co
     }
 
     // TND
-    if (shapeInfo.dimNum == DIM_NUM_3 && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 && inputLayout[0] == 'T' && inputLayout[1] == 'N' && inputLayout[2] == 'D') {
+    if (shapeInfo.dimNum == DIM_NUM_3 && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 &&
+        inputLayout[0] == 'T' && inputLayout[1] == 'N' && inputLayout[2] == 'D') {
         shapeInfo.axes.b = 1;
         shapeInfo.axes.n2 = kShape[1];
         shapeInfo.axes.s1 = 1;
@@ -258,7 +275,8 @@ static aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, co
     }
 
     // NTD
-    if (shapeInfo.dimNum == DIM_NUM_3 && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 && inputLayout[0] == 'N' && inputLayout[1] == 'T' && inputLayout[2] == 'D') {
+    if (shapeInfo.dimNum == DIM_NUM_3 && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 &&
+        inputLayout[0] == 'N' && inputLayout[1] == 'T' && inputLayout[2] == 'D') {
         shapeInfo.axes.b = 1;
         shapeInfo.axes.n2 = kShape[0];
         shapeInfo.axes.s1 = 1;
@@ -273,8 +291,8 @@ static aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, co
 
     // query: (B,S1,N1,D)
     // key/value: (B,S2,N2,D)
-    if (shapeInfo.dimNum == DIM_NUM_4 && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_4 && inputLayout[0] == 'B' && inputLayout[1] == 'S' && inputLayout[2] == 'N' &&
-        inputLayout[INDEX_3] == 'D') {
+    if (shapeInfo.dimNum == DIM_NUM_4 && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_4 &&
+        inputLayout[0] == 'B' && inputLayout[1] == 'S' && inputLayout[2] == 'N' && inputLayout[INDEX_3] == 'D') {
         shapeInfo.axes.b = qShape[0];
         shapeInfo.axes.n2 = kShape[INDEX_2];
         shapeInfo.axes.s1 = qShape[1];
@@ -287,7 +305,8 @@ static aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, co
 
     // query: (B*N1,S1,D)
     // key/value: (B*N2,S2,D)
-    if (shapeInfo.dimNum == DIM_NUM_3 && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 && inputLayout[0] == 'N' && inputLayout[1] == 'S' && inputLayout[2] == 'D') {
+    if (shapeInfo.dimNum == DIM_NUM_3 && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_3 &&
+        inputLayout[0] == 'N' && inputLayout[1] == 'S' && inputLayout[2] == 'D') {
         shapeInfo.axes.b = 1;
         shapeInfo.axes.n2 = kShape[0];
         shapeInfo.axes.s1 = qShape[1];
@@ -300,16 +319,18 @@ static aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, co
 
     // query: (B,N1,S1,D)
     // key/value: (B,N2,S2,D)
-    if (shapeInfo.dimNum == DIM_NUM_4 && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_4 && inputLayout[0] == 'B' && inputLayout[1] == 'N' && inputLayout[2] == 'S' &&
-        inputLayout[INDEX_3] == 'D') {
+    if (shapeInfo.dimNum == DIM_NUM_4 && strnlen(inputLayout, LAYOUT_STR_LENGTH_4) >= LAYOUT_STR_LENGTH_4 &&
+        inputLayout[0] == 'B' && inputLayout[1] == 'N' && inputLayout[2] == 'S' && inputLayout[INDEX_3] == 'D') {
         shapeInfo.axes.b = qShape[0];
         shapeInfo.axes.n2 = kShape[1];
         shapeInfo.axes.s1 = qShape[INDEX_2];
         shapeInfo.axes.s2 = kShape[INDEX_2];
         shapeInfo.axes.d = qShape[INDEX_3];
         shapeInfo.axes.dV = vShape[INDEX_3];
-        if (strnlen(inputLayout, LAYOUT_STR_LENGTH_9) == LAYOUT_STR_LENGTH_9 && inputLayout[4] == '_' && inputLayout[5] == 'B' && inputLayout[6] == 'S' && inputLayout[7] == 'N' &&   // 4,5,6,7 : The 5th, 6th, 7th and 8th characters
-            inputLayout[8] == 'D') {  // 8 : The ninth character
+        if (strnlen(inputLayout, LAYOUT_STR_LENGTH_9) == LAYOUT_STR_LENGTH_9 && inputLayout[4] == '_' &&
+            inputLayout[5] == 'B' && inputLayout[6] == 'S' &&
+            inputLayout[7] == 'N' && // 4,5,6,7 : The 5th, 6th, 7th and 8th characters
+            inputLayout[8] == 'D') { // 8 : The ninth character
             shapeInfo.inputLayout = InputLayout::BNSD_BSND;
             shapeInfo.l0InputLayoutStr = "BNSD_BSND";
         } else {
@@ -319,49 +340,55 @@ static aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, co
     }
 
     if (shapeInfo.inputLayout == InputLayout::NONE) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "PFA inputLayout only supports BSH, BNSD, BSND, BNSD_BSND, TND, NTD, current layout: %s", inputLayout);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "PFA inputLayout only supports BSH, BNSD, BSND, BNSD_BSND, TND, NTD, current layout: %s", inputLayout);
         return ACLNN_ERR_PARAM_INVALID;
     }
 
     if (shapeInfo.axes.d > 512 || shapeInfo.axes.dV > 512) { // 512: D is limited at 512
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "D should <= 512, but the D of query is %ld and the D of value is %ld.", shapeInfo.axes.d, shapeInfo.axes.dV);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "D should <= 512, but the D of query is %ld and the D of value is %ld.",
+                shapeInfo.axes.d, shapeInfo.axes.dV);
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (inputLayout[0] == 'T' && inputLayout[1] == 'N' && inputLayout[2] == 'D') {
         OP_LOGD("Analysis axis success. "
-            "The axis result: [t1]: %ld, [t2]: %ld, [n1]: %ld, [n2]: %ld, [d]: %ld, [dV]: %ld",
-            shapeInfo.axes.t1, shapeInfo.axes.t2, shapeInfo.axes.n1, shapeInfo.axes.n2, shapeInfo.axes.d,
-            shapeInfo.axes.dV);
+                "The axis result: [t1]: %ld, [t2]: %ld, [n1]: %ld, [n2]: %ld, [d]: %ld, [dV]: %ld",
+                shapeInfo.axes.t1, shapeInfo.axes.t2, shapeInfo.axes.n1, shapeInfo.axes.n2, shapeInfo.axes.d,
+                shapeInfo.axes.dV);
     } else {
         OP_LOGD("Analysis axis success. "
-            "The axis result: [B]: %ld, [n1]: %ld, [n2]: %ld, [s1]: %ld, [s2]: %ld, [d]: %ld, [dV]: %ld",
-            shapeInfo.axes.b, shapeInfo.axes.n1, shapeInfo.axes.n2, shapeInfo.axes.s1, shapeInfo.axes.s2,
-            shapeInfo.axes.d, shapeInfo.axes.dV);
+                "The axis result: [B]: %ld, [n1]: %ld, [n2]: %ld, [s1]: %ld, [s2]: %ld, [d]: %ld, [dV]: %ld",
+                shapeInfo.axes.b, shapeInfo.axes.n1, shapeInfo.axes.n2, shapeInfo.axes.s1, shapeInfo.axes.s2,
+                shapeInfo.axes.d, shapeInfo.axes.dV);
     }
     return ACLNN_SUCCESS;
 }
 
-static void SetShapeInfoForSH(FaShapeInfo &shapeInfo) {
+static void SetShapeInfoForSH(FaShapeInfo& shapeInfo)
+{
     if (shapeInfo.needPad) {
         shapeInfo.needReshape = true;
         shapeInfo.reshapedQueryShape.assign({shapeInfo.axes.b, shapeInfo.axes.s1, shapeInfo.axes.n1, shapeInfo.axes.d});
         shapeInfo.reshapedKeyShape.assign({shapeInfo.axes.b, shapeInfo.axes.s2, shapeInfo.axes.n2, shapeInfo.axes.d});
-        shapeInfo.reshapedValueShape.assign({shapeInfo.axes.b, shapeInfo.axes.s2, shapeInfo.axes.n2, shapeInfo.axes.dV});
+        shapeInfo.reshapedValueShape.assign(
+            {shapeInfo.axes.b, shapeInfo.axes.s2, shapeInfo.axes.n2, shapeInfo.axes.dV});
     }
 }
 
-static void SetShapeInfoForNSD(FaShapeInfo &shapeInfo) {
+static void SetShapeInfoForNSD(FaShapeInfo& shapeInfo)
+{
     if (shapeInfo.needPad) {
         shapeInfo.needReshape = true;
         shapeInfo.reshapedQueryShape.assign({shapeInfo.axes.b, shapeInfo.axes.n1, shapeInfo.axes.s1, shapeInfo.axes.d});
         shapeInfo.reshapedKeyShape.assign({shapeInfo.axes.b, shapeInfo.axes.n2, shapeInfo.axes.s2, shapeInfo.axes.d});
-        shapeInfo.reshapedValueShape.assign({shapeInfo.axes.b, shapeInfo.axes.n2, shapeInfo.axes.s2, shapeInfo.axes.dV});
+        shapeInfo.reshapedValueShape.assign(
+            {shapeInfo.axes.b, shapeInfo.axes.n2, shapeInfo.axes.s2, shapeInfo.axes.dV});
     }
 }
 
-static aclnnStatus AnalysisInputShapeInfo(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                                          char *inputLayout, int64_t headNum, int64_t headNumKV, FaShapeInfo &shapeInfo,
-                                          const aclTensor *attentionOut)
+static aclnnStatus AnalysisInputShapeInfo(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                          char* inputLayout, int64_t headNum, int64_t headNumKV, FaShapeInfo& shapeInfo,
+                                          const aclTensor* attentionOut)
 {
     if (headNum <= 0) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "head_num must > 0, but got %ld", headNum);
@@ -369,55 +396,64 @@ static aclnnStatus AnalysisInputShapeInfo(const aclTensor *query, const aclTenso
     }
     CHECK_RET(CheckDimsAndLayout(query, key, value, inputLayout) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
-    CHECK_RET(AnalysisAxis(query, key, value, inputLayout, headNum, headNumKV, shapeInfo) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(AnalysisAxis(query, key, value, inputLayout, headNum, headNumKV, shapeInfo) == ACLNN_SUCCESS,
+              ACLNN_ERR_PARAM_INVALID);
 
     if (shapeInfo.axes.n2 == 0 || shapeInfo.axes.s2 == 0 || shapeInfo.axes.d == 0 || shapeInfo.axes.dV == 0) {
         return ACLNN_SUCCESS;
     }
 
-    // When D padding is calculated based on dtype, the input q, k, v, and output format need to be considered. As long as there is the int8 type, the elements are aligned by 32.
+    // When D padding is calculated based on dtype, the input q, k, v, and output format need to be considered. As long
+    // as there is the int8 type, the elements are aligned by 32.
     DataType queryDataType = query->GetDataType();
     DataType keyDataType = key->GetDataType();
     DataType valueDataType = value->GetDataType();
     DataType outputDataType = attentionOut->GetDataType();
     if (shapeInfo.axes.d > shapeInfo.axes.dV) {
         if (outputDataType == DataType::DT_INT8) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Please check Input Tensor shape, when the D of query(%ld) is greater than D of value(%ld), "
-                    "the output type can't be int8.", shapeInfo.axes.d, shapeInfo.axes.dV);
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "Please check Input Tensor shape, when the D of query(%ld) is greater than D of value(%ld), "
+                    "the output type can't be int8.",
+                    shapeInfo.axes.d, shapeInfo.axes.dV);
             return ACLNN_ERR_PARAM_INVALID;
         }
-        if ((shapeInfo.inputLayout != InputLayout::TND && shapeInfo.inputLayout != InputLayout::NTD) && shapeInfo.axes.d > 128) {  // 128 : When D of query and value are different, D > 128, it should be aligned with 256, and D <= 128, it should be aligned with 32B.
+        if ((shapeInfo.inputLayout != InputLayout::TND && shapeInfo.inputLayout != InputLayout::NTD) &&
+            shapeInfo.axes.d > 128) { // 128 : When D of query and value are different, D > 128, it should be aligned
+                                      // with 256, and D <= 128, it should be aligned with 32B.
             shapeInfo.basicBlock = PAD_BASIC_BLOCK_256;
         }
     } else if ((queryDataType == DataType::DT_INT8) || (keyDataType == DataType::DT_INT8) ||
-              (valueDataType == DataType::DT_INT8) || (outputDataType == DataType::DT_INT8)) {
-              shapeInfo.basicBlock = PAD_BASIC_BLOCK;
+               (valueDataType == DataType::DT_INT8) || (outputDataType == DataType::DT_INT8)) {
+        shapeInfo.basicBlock = PAD_BASIC_BLOCK;
     }
 
     if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         shapeInfo.needPad = false;
-    } else if (shapeInfo.inputLayout != InputLayout::TND && (shapeInfo.axes.d % shapeInfo.basicBlock != 0 || shapeInfo.axes.d > shapeInfo.axes.dV)) {
-            shapeInfo.needPad = true;
-            shapeInfo.padNum =
-                (shapeInfo.axes.d + shapeInfo.basicBlock - 1) / shapeInfo.basicBlock * shapeInfo.basicBlock -
-                shapeInfo.axes.d;
-            shapeInfo.padNumV = shapeInfo.axes.d > shapeInfo.axes.dV ? shapeInfo.axes.d + shapeInfo.padNum - shapeInfo.axes.dV : shapeInfo.padNum;
+    } else if (shapeInfo.inputLayout != InputLayout::TND &&
+               (shapeInfo.axes.d % shapeInfo.basicBlock != 0 || shapeInfo.axes.d > shapeInfo.axes.dV)) {
+        shapeInfo.needPad = true;
+        shapeInfo.padNum = (shapeInfo.axes.d + shapeInfo.basicBlock - 1) / shapeInfo.basicBlock * shapeInfo.basicBlock -
+                           shapeInfo.axes.d;
+        shapeInfo.padNumV = shapeInfo.axes.d > shapeInfo.axes.dV ?
+                                shapeInfo.axes.d + shapeInfo.padNum - shapeInfo.axes.dV :
+                                shapeInfo.padNum;
     }
 
-    if ((shapeInfo.inputLayout == InputLayout::BSH) ||
-        (shapeInfo.inputLayout == InputLayout::SH)) {
+    if ((shapeInfo.inputLayout == InputLayout::BSH) || (shapeInfo.inputLayout == InputLayout::SH)) {
         SetShapeInfoForSH(shapeInfo);
     } else if (shapeInfo.inputLayout == InputLayout::NSD) {
         SetShapeInfoForNSD(shapeInfo);
     }
 
-    OP_LOGD("Analysis input success. The analysis result: [needReshape]: %d, [needPad]: %d, [padNum]: %lu, [padNumV]: %lu,"
+    OP_LOGD(
+        "Analysis input success. The analysis result: [needReshape]: %d, [needPad]: %d, [padNum]: %lu, [padNumV]: %lu,"
         "[needTranspose]: %d, [basicBlock]: %lu ",
-        shapeInfo.needReshape, shapeInfo.needPad, shapeInfo.padNum, shapeInfo.padNumV, shapeInfo.needTranspose, shapeInfo.basicBlock);
+        shapeInfo.needReshape, shapeInfo.needPad, shapeInfo.padNum, shapeInfo.padNumV, shapeInfo.needTranspose,
+        shapeInfo.basicBlock);
     return ACLNN_SUCCESS;
 }
 
-static inline const aclTensor *GeneratePaddings(int32_t dimNum, int32_t padNum, aclOpExecutor *executor)
+static inline const aclTensor* GeneratePaddings(int32_t dimNum, int32_t padNum, aclOpExecutor* executor)
 {
     // 2 represents that 0 can be added to the front and back of each axis
     FVector<int64_t> padVec(dimNum * 2, 0);
@@ -433,9 +469,8 @@ static inline const aclTensor *GeneratePaddings(int32_t dimNum, int32_t padNum, 
     return padTensor;
 }
 
-static aclnnStatus ContiguousInput(const aclTensor *&query, const aclTensor *&key, const aclTensor *&value,
-                                   const aclTensor *&pseShift, const aclTensor *&attenMask,
-                                   aclOpExecutor *executor)
+static aclnnStatus ContiguousInput(const aclTensor*& query, const aclTensor*& key, const aclTensor*& value,
+                                   const aclTensor*& pseShift, const aclTensor*& attenMask, aclOpExecutor* executor)
 {
     query = l0op::Contiguous(query, executor);
     CHECK_RET(query != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -460,10 +495,9 @@ static aclnnStatus ContiguousInput(const aclTensor *&query, const aclTensor *&ke
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus reShapeMiddle(const aclTensor *&query, const aclTensor *&key, const aclTensor *&value,
-                                 const int64_t *queryValue, uint64_t querySize,
-                                 const int64_t *keyValueValue, uint64_t keyValueSize,
-                                 aclOpExecutor *executor)
+static aclnnStatus reShapeMiddle(const aclTensor*& query, const aclTensor*& key, const aclTensor*& value,
+                                 const int64_t* queryValue, uint64_t querySize, const int64_t* keyValueValue,
+                                 uint64_t keyValueSize, aclOpExecutor* executor)
 {
     query = l0op::Reshape(query, executor->AllocIntArray(queryValue, querySize), executor);
     CHECK_RET(query != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -475,9 +509,9 @@ static aclnnStatus reShapeMiddle(const aclTensor *&query, const aclTensor *&key,
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus PreprocessQKVInput(const aclTensor *&query, const aclTensor *&key, const aclTensor *&value,
-                                      const aclTensor *&quantScale2, const aclTensor *&quantOffset2,
-                                      const struct FaShapeInfo &shapeInfo, aclOpExecutor *executor)
+static aclnnStatus PreprocessQKVInput(const aclTensor*& query, const aclTensor*& key, const aclTensor*& value,
+                                      const aclTensor*& quantScale2, const aclTensor*& quantOffset2,
+                                      const struct FaShapeInfo& shapeInfo, aclOpExecutor* executor)
 {
     if (shapeInfo.needReshape) {
         query = l0op::Reshape(
@@ -485,13 +519,11 @@ static aclnnStatus PreprocessQKVInput(const aclTensor *&query, const aclTensor *
             executor);
         CHECK_RET(query != nullptr, ACLNN_ERR_INNER_NULLPTR);
         key = l0op::Reshape(
-            key,
-            executor->AllocIntArray(shapeInfo.reshapedKeyShape.data(), shapeInfo.reshapedKeyShape.size()),
+            key, executor->AllocIntArray(shapeInfo.reshapedKeyShape.data(), shapeInfo.reshapedKeyShape.size()),
             executor);
         CHECK_RET(key != nullptr, ACLNN_ERR_INNER_NULLPTR);
         value = l0op::Reshape(
-            value,
-            executor->AllocIntArray(shapeInfo.reshapedValueShape.data(), shapeInfo.reshapedValueShape.size()),
+            value, executor->AllocIntArray(shapeInfo.reshapedValueShape.data(), shapeInfo.reshapedValueShape.size()),
             executor);
         CHECK_RET(value != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
@@ -526,25 +558,29 @@ static aclnnStatus PreprocessQKVInput(const aclTensor *&query, const aclTensor *
 
     if (shapeInfo.inputLayout == InputLayout::BSH && shapeInfo.needPad) {
         // (B,S,N,D) -> (B,S,N*D)
-        FVector<int64_t, DIM_NUM_3> queryShape{shapeInfo.axes.b, shapeInfo.axes.s1,
-                                               shapeInfo.axes.n1 * (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
-        FVector<int64_t, DIM_NUM_3> keyValueShape{shapeInfo.axes.b, shapeInfo.axes.s2,
-                                                  shapeInfo.axes.n2 * (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
+        FVector<int64_t, DIM_NUM_3> queryShape{
+            shapeInfo.axes.b, shapeInfo.axes.s1,
+            shapeInfo.axes.n1 * (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
+        FVector<int64_t, DIM_NUM_3> keyValueShape{
+            shapeInfo.axes.b, shapeInfo.axes.s2,
+            shapeInfo.axes.n2 * (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
 
-        CHECK_RET(reShapeMiddle(query, key, value, queryShape.data(), queryShape.size(),
-                                keyValueShape.data(), keyValueShape.size(), executor) == ACLNN_SUCCESS,
+        CHECK_RET(reShapeMiddle(query, key, value, queryShape.data(), queryShape.size(), keyValueShape.data(),
+                                keyValueShape.size(), executor) == ACLNN_SUCCESS,
                   ACLNN_ERR_INNER_TILING_ERROR);
     }
 
     if (shapeInfo.inputLayout == InputLayout::SH && shapeInfo.needPad) {
         // (B,S,N,D) -> (B*S,N*D)
-        FVector<int64_t, DIM_NUM_2> queryShape{shapeInfo.axes.b * shapeInfo.axes.s1,
-                                               shapeInfo.axes.n1 * (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
-        FVector<int64_t, DIM_NUM_2> keyValueShape{shapeInfo.axes.b * shapeInfo.axes.s2,
-                                                  shapeInfo.axes.n2 * (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
+        FVector<int64_t, DIM_NUM_2> queryShape{
+            shapeInfo.axes.b * shapeInfo.axes.s1,
+            shapeInfo.axes.n1 * (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
+        FVector<int64_t, DIM_NUM_2> keyValueShape{
+            shapeInfo.axes.b * shapeInfo.axes.s2,
+            shapeInfo.axes.n2 * (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
 
-        CHECK_RET(reShapeMiddle(query, key, value, queryShape.data(), queryShape.size(),
-                                keyValueShape.data(), keyValueShape.size(), executor) == ACLNN_SUCCESS,
+        CHECK_RET(reShapeMiddle(query, key, value, queryShape.data(), queryShape.size(), keyValueShape.data(),
+                                keyValueShape.size(), executor) == ACLNN_SUCCESS,
                   ACLNN_ERR_INNER_TILING_ERROR);
     }
 
@@ -552,37 +588,34 @@ static aclnnStatus PreprocessQKVInput(const aclTensor *&query, const aclTensor *
         // (B,N,S,Dp) -> (B*N,S,Dp)
         FVector<int64_t, DIM_NUM_3> queryShape{shapeInfo.axes.b * shapeInfo.axes.n1, shapeInfo.axes.s1,
                                                (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
-        FVector<int64_t, DIM_NUM_3> keyValueShape{shapeInfo.axes.b * shapeInfo.axes.n2, shapeInfo.axes.s2, 
+        FVector<int64_t, DIM_NUM_3> keyValueShape{shapeInfo.axes.b * shapeInfo.axes.n2, shapeInfo.axes.s2,
                                                   (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
 
-        CHECK_RET(reShapeMiddle(query, key, value, queryShape.data(), queryShape.size(),
-                                keyValueShape.data(), keyValueShape.size(), executor) == ACLNN_SUCCESS,
+        CHECK_RET(reShapeMiddle(query, key, value, queryShape.data(), queryShape.size(), keyValueShape.data(),
+                                keyValueShape.size(), executor) == ACLNN_SUCCESS,
                   ACLNN_ERR_INNER_TILING_ERROR);
     }
 
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus PostProcessOutput(const aclTensor *&l0AttentionOutOut, const aclTensor *attentionOutOut,
-                                     struct FaShapeInfo &shapeInfo, aclOpExecutor *executor)
+static aclnnStatus PostProcessOutput(const aclTensor*& l0AttentionOutOut, const aclTensor* attentionOutOut,
+                                     struct FaShapeInfo& shapeInfo, aclOpExecutor* executor)
 {
     if (shapeInfo.needPad) {
-        if ((shapeInfo.inputLayout == InputLayout::BSH) ||
-            (shapeInfo.inputLayout == InputLayout::SH)) {
+        if ((shapeInfo.inputLayout == InputLayout::BSH) || (shapeInfo.inputLayout == InputLayout::SH)) {
             // (B,S,Hp) -> (B,S,N,Dp)
             FVector<int64_t, DIM_NUM_4> paddedSBNDShape{shapeInfo.axes.b, shapeInfo.axes.s1, shapeInfo.axes.n1,
-                                                shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum)};
-            l0AttentionOutOut =
-                l0op::Reshape(l0AttentionOutOut,
-                            executor->AllocIntArray(paddedSBNDShape.data(), paddedSBNDShape.size()), executor);
+                                                        shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum)};
+            l0AttentionOutOut = l0op::Reshape(
+                l0AttentionOutOut, executor->AllocIntArray(paddedSBNDShape.data(), paddedSBNDShape.size()), executor);
             CHECK_RET(l0AttentionOutOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
         } else if (shapeInfo.inputLayout == InputLayout::NSD) {
             // (N,S,Dp) -> (B,N,S,Dp)
             FVector<int64_t, DIM_NUM_4> paddedSBNDShape{shapeInfo.axes.b, shapeInfo.axes.n1, shapeInfo.axes.s1,
-                                                shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum)};
-            l0AttentionOutOut =
-                l0op::Reshape(l0AttentionOutOut,
-                            executor->AllocIntArray(paddedSBNDShape.data(), paddedSBNDShape.size()), executor);
+                                                        shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum)};
+            l0AttentionOutOut = l0op::Reshape(
+                l0AttentionOutOut, executor->AllocIntArray(paddedSBNDShape.data(), paddedSBNDShape.size()), executor);
             CHECK_RET(l0AttentionOutOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
         }
     }
@@ -611,8 +644,9 @@ static aclnnStatus PostProcessOutput(const aclTensor *&l0AttentionOutOut, const 
     return ACLNN_SUCCESS;
 }
 
-static bool CheckNotNull(const aclTensor* query, const aclTensor* key, const aclTensor* value,
-                         char *inputLayout, const aclTensor *attentionOut) {
+static bool CheckNotNull(const aclTensor* query, const aclTensor* key, const aclTensor* value, char* inputLayout,
+                         const aclTensor* attentionOut)
+{
     OP_CHECK_NULL(query, return false);
     OP_CHECK_NULL(key, return false);
     OP_CHECK_NULL(value, return false);
@@ -625,8 +659,8 @@ static bool CheckNotNull(const aclTensor* query, const aclTensor* key, const acl
 }
 
 static bool CheckTensorDataType(const aclTensor* query, const aclTensor* key, const aclTensor* value,
-                                const aclTensor *pseShift, const aclTensor* attenMask,
-                                const aclTensor* attentionOut) {
+                                const aclTensor* pseShift, const aclTensor* attenMask, const aclTensor* attentionOut)
+{
     const DataType queryDataType = query->GetDataType();
     const DataType keyDataType = key->GetDataType();
     const DataType valueDataType = value->GetDataType();
@@ -634,64 +668,78 @@ static bool CheckTensorDataType(const aclTensor* query, const aclTensor* key, co
 
     // In the current PFA scenario, the datatypes of q, k, and v must be the same.
     if ((queryDataType != keyDataType) || (queryDataType != valueDataType)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Please check input Tensor datatype. "
+        OP_LOGE(
+            ACLNN_ERR_PARAM_INVALID,
+            "Please check input Tensor datatype. "
             "The combination of [queryDataType]: %s, [keyDataType]: %s, [valueDataType]: %s is not supported by PFA.",
-            StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(keyDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(valueDataType)).c_str());
+            StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str(),
+            StrDataTypePfa.at(ValidPfaAclDataType(keyDataType)).c_str(),
+            StrDataTypePfa.at(ValidPfaAclDataType(valueDataType)).c_str());
         return false;
     }
     // map for dataType, {q/k/v, pseShift}
     static const unordered_map<DataType, DataType> qkvAndPseTypeRangeMap = {
         {DataType::DT_FLOAT16, DataType::DT_FLOAT16},
         {DataType::DT_BF16, DataType::DT_BF16},
-        {DataType::DT_INT8, DataType::DT_FLOAT16}
-    };
+        {DataType::DT_INT8, DataType::DT_FLOAT16}};
     // check dataType of q/k/v
     if (qkvAndPseTypeRangeMap.find(queryDataType) == qkvAndPseTypeRangeMap.end()) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "query/value/key dataType(%s) is invalid, valid range is {%s, %s, %s}",
-            StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_FLOAT16)).c_str(),
-            StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_BF16)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_INT8)).c_str());
+                StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str(),
+                StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_FLOAT16)).c_str(),
+                StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_BF16)).c_str(),
+                StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_INT8)).c_str());
         return false;
     }
     if (pseShift != nullptr) {
         const DataType pseDataType = pseShift->GetDataType(); // check dataType combination of q and pseShift
         if (pseDataType != qkvAndPseTypeRangeMap.at(queryDataType)) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "pseShift dataType(%s) is invalid, should be %s when q/k/v is %s",
-                StrDataTypePfa.at(ValidPfaAclDataType(pseDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(qkvAndPseTypeRangeMap.at(queryDataType))).c_str(),
-                StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str());
+                    StrDataTypePfa.at(ValidPfaAclDataType(pseDataType)).c_str(),
+                    StrDataTypePfa.at(ValidPfaAclDataType(qkvAndPseTypeRangeMap.at(queryDataType))).c_str(),
+                    StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str());
             return false;
         }
     }
 
-    // Currently, only the input and output dtype are different when quantifying related scenarios (int8_in/fp16_out or fp16_in/int8_out)
+    // Currently, only the input and output dtype are different when quantifying related scenarios (int8_in/fp16_out or
+    // fp16_in/int8_out)
     if (queryDataType != outputDataType) {
-        bool isQuant = (((queryDataType == DataType::DT_INT8 || queryDataType == DataType::DT_HIFLOAT8 || 
-        queryDataType == DataType::DT_FLOAT8_E4M3FN) && outputDataType == DataType::DT_FLOAT16) || 
-        (queryDataType == DataType::DT_FLOAT16 && outputDataType == DataType::DT_INT8) ||
-        (queryDataType == DataType::DT_BF16 && outputDataType == DataType::DT_INT8));
+        bool isQuant = (((queryDataType == DataType::DT_INT8 || queryDataType == DataType::DT_HIFLOAT8 ||
+                          queryDataType == DataType::DT_FLOAT8_E4M3FN) &&
+                         outputDataType == DataType::DT_FLOAT16) ||
+                        (queryDataType == DataType::DT_FLOAT16 && outputDataType == DataType::DT_INT8) ||
+                        (queryDataType == DataType::DT_BF16 && outputDataType == DataType::DT_INT8));
         if (!isQuant) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Please check input/output Tensor datatype. "
-                "The combination of [queryDataType]: %s, [outputDataType]: %s is not supported by PFA.",
-                StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(outputDataType)).c_str());
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "Please check input/output Tensor datatype. "
+                    "The combination of [queryDataType]: %s, [outputDataType]: %s is not supported by PFA.",
+                    StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str(),
+                    StrDataTypePfa.at(ValidPfaAclDataType(outputDataType)).c_str());
             return false;
         }
     }
 
     // Int8 quantization scene, does not support fp16 type atten mask
     if (attenMask != nullptr) {
-        const std::set<DataType> validMaskType = {DataType::DT_FLOAT16, DataType::DT_INT8,
-            DataType::DT_UINT8, DataType::DT_BOOL};
+        const std::set<DataType> validMaskType = {DataType::DT_FLOAT16, DataType::DT_INT8, DataType::DT_UINT8,
+                                                  DataType::DT_BOOL};
         const DataType attenMaskDataType = attenMask->GetDataType();
         if (validMaskType.find(attenMaskDataType) == validMaskType.end()) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "attenMask dataType(%s) is invalid, should be in range {%s, %s, %s, %s}",
-                StrDataTypePfa.at(ValidPfaAclDataType(attenMaskDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_FLOAT16)).c_str(),
-                StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_INT8)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_UINT8)).c_str(),
-                StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_BOOL)).c_str());
+                    StrDataTypePfa.at(ValidPfaAclDataType(attenMaskDataType)).c_str(),
+                    StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_FLOAT16)).c_str(),
+                    StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_INT8)).c_str(),
+                    StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_UINT8)).c_str(),
+                    StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_BOOL)).c_str());
             return false;
         }
         if ((queryDataType == DataType::DT_INT8) && (attenMaskDataType == DataType::DT_FLOAT16)) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Please check Tensor datatype. "
-                "When input tensor datatype is %s, attenMaskDataType can not be %s.",
-                StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(attenMaskDataType)).c_str());
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "Please check Tensor datatype. "
+                    "When input tensor datatype is %s, attenMaskDataType can not be %s.",
+                    StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str(),
+                    StrDataTypePfa.at(ValidPfaAclDataType(attenMaskDataType)).c_str());
             return false;
         }
     }
@@ -699,7 +747,8 @@ static bool CheckTensorDataType(const aclTensor* query, const aclTensor* key, co
     return true;
 }
 
-static bool CheckTensorFormatPrivate(const aclTensor* tensor) {
+static bool CheckTensorFormatPrivate(const aclTensor* tensor)
+{
     if (tensor->GetStorageFormat() == op::Format::FORMAT_NC1HWC0 ||
         tensor->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ ||
         tensor->GetStorageFormat() == op::Format::FORMAT_NDC1HWC0) {
@@ -709,8 +758,8 @@ static bool CheckTensorFormatPrivate(const aclTensor* tensor) {
 }
 
 static bool CheckTensorFormat(const aclTensor* query, const aclTensor* key, const aclTensor* value,
-                                const aclTensor *pseShift, const aclTensor* attenMask,
-                                const aclTensor* attentionOut) {
+                              const aclTensor* pseShift, const aclTensor* attenMask, const aclTensor* attentionOut)
+{
     if (CheckTensorFormatPrivate(query)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Query format only support ND.");
         return false;
@@ -738,13 +787,16 @@ static bool CheckTensorFormat(const aclTensor* query, const aclTensor* key, cons
     return true;
 }
 
-static inline bool CheckResultOutShapePfa(const aclTensor *inferOut, const aclTensor *out) {
-    auto const &xShape = inferOut->GetViewShape();
-    auto const &yShape = out->GetViewShape();
-    if(xShape != yShape) {
-        if(!(xShape.GetShapeSize() == 1 && yShape.GetShapeSize() == 1)) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Out tensor's shape[%s] is not equal with Expect Out tensor's shape[%s], Please check the Out tensor's shape.",
-                op::ToString(out->GetViewShape()).GetString(), op::ToString(inferOut->GetViewShape()).GetString());
+static inline bool CheckResultOutShapePfa(const aclTensor* inferOut, const aclTensor* out)
+{
+    auto const& xShape = inferOut->GetViewShape();
+    auto const& yShape = out->GetViewShape();
+    if (xShape != yShape) {
+        if (!(xShape.GetShapeSize() == 1 && yShape.GetShapeSize() == 1)) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "Out tensor's shape[%s] is not equal with Expect Out tensor's shape[%s], Please check the Out "
+                    "tensor's shape.",
+                    op::ToString(out->GetViewShape()).GetString(), op::ToString(inferOut->GetViewShape()).GetString());
             return false;
         }
     }
@@ -752,19 +804,18 @@ static inline bool CheckResultOutShapePfa(const aclTensor *inferOut, const aclTe
 }
 
 aclnnStatus InnerPromptFlashAttentionGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *pseShift,
-    const aclTensor *attenMask, const aclIntArray *actualSeqLengths, const aclIntArray *actualSeqLengthsKv,
-    const aclTensor *deqScale1, const aclTensor *quantScale1, const aclTensor *deqScale2, const aclTensor *quantScale2,
-    const aclTensor *quantOffset2, int64_t numHeads, double scaleValue, int64_t preTokens, int64_t nextTokens,
-    char *inputLayout, int64_t numKeyValueHeads, int64_t sparseMode, int64_t innerPrecise,
-    const aclTensor *attentionOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* pseShift,
+    const aclTensor* attenMask, const aclIntArray* actualSeqLengths, const aclIntArray* actualSeqLengthsKv,
+    const aclTensor* deqScale1, const aclTensor* quantScale1, const aclTensor* deqScale2, const aclTensor* quantScale2,
+    const aclTensor* quantOffset2, int64_t numHeads, double scaleValue, int64_t preTokens, int64_t nextTokens,
+    char* inputLayout, int64_t numKeyValueHeads, int64_t sparseMode, int64_t innerPrecise,
+    const aclTensor* attentionOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(InnerPromptFlashAttention,
-                DFX_IN(query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKv,
-                        deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2,
-                        numHeads, scaleValue, preTokens, nextTokens, inputLayout, numKeyValueHeads,
-                        sparseMode, innerPrecise),
-                DFX_OUT(attentionOut));
+                   DFX_IN(query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKv, deqScale1,
+                          quantScale1, deqScale2, quantScale2, quantOffset2, numHeads, scaleValue, preTokens,
+                          nextTokens, inputLayout, numKeyValueHeads, sparseMode, innerPrecise),
+                   DFX_OUT(attentionOut));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -783,25 +834,24 @@ aclnnStatus InnerPromptFlashAttentionGetWorkspaceSize(
     CHECK_RET(CheckTensorDataType(query, key, value, pseShift, attenMask, attentionOut), ACLNN_ERR_PARAM_INVALID);
 
     FaShapeInfo shapeInfo;
-    CHECK_RET(AnalysisInputShapeInfo(query, key, value, inputLayout, numHeads, numKeyValueHeads, shapeInfo, attentionOut) ==
-              ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(AnalysisInputShapeInfo(query, key, value, inputLayout, numHeads, numKeyValueHeads, shapeInfo,
+                                     attentionOut) == ACLNN_SUCCESS,
+              ACLNN_ERR_PARAM_INVALID);
     if (shapeInfo.needPad) {
         CHECK_RET(CheckTensorFormat(query, key, value, pseShift, attenMask, attentionOut), ACLNN_ERR_PARAM_INVALID);
     }
 
-    aclOpExecutor *l0Executor = uniqueExecutor.get();
+    aclOpExecutor* l0Executor = uniqueExecutor.get();
     CHECK_RET(ContiguousInput(query, key, value, pseShift, attenMask, l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
 
-    CHECK_RET(PreprocessQKVInput(query, key, value, quantScale2, quantOffset2, shapeInfo, l0Executor) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(PreprocessQKVInput(query, key, value, quantScale2, quantOffset2, shapeInfo, l0Executor) == ACLNN_SUCCESS,
+              ACLNN_ERR_INNER_NULLPTR);
 
-    auto l0AttentionOutOut = l0op::PromptFlashAttention(query, key, value, pseShift, attenMask,
-                                                        actualSeqLengths, actualSeqLengthsKv,
-                                                        deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2,
-                                                        numHeads, scaleValue, preTokens, nextTokens,
-                                                        inputLayout,
-                                                        numKeyValueHeads, sparseMode, innerPrecise,
-                                                        attentionOut, l0Executor);
+    auto l0AttentionOutOut = l0op::PromptFlashAttention(
+        query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKv, deqScale1, quantScale1, deqScale2,
+        quantScale2, quantOffset2, numHeads, scaleValue, preTokens, nextTokens, inputLayout, numKeyValueHeads,
+        sparseMode, innerPrecise, attentionOut, l0Executor);
     CHECK_RET(l0AttentionOutOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(PostProcessOutput(l0AttentionOutOut, attentionOut, shapeInfo, l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
@@ -814,15 +864,15 @@ aclnnStatus InnerPromptFlashAttentionGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus InnerPromptFlashAttention(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
-                                           const aclrtStream stream)
+aclnnStatus InnerPromptFlashAttention(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                      const aclrtStream stream)
 {
     L2_DFX_PHASE_2(InnerPromptFlashAttention);
     // Fixed format. The calculation is completed by calling the framework capability.
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
 }
 
-}  // namespace
+} // namespace
 
 #ifdef __cplusplus
 }

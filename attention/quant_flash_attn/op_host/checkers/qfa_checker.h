@@ -39,18 +39,18 @@ public:
     QfaChecker() = default;
     ~QfaChecker() = default;
 
-    ge::graphStatus Init(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus Process(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus Init(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus Process(const QfaTilingInfo& qfaInfo);
 
-    ge::graphStatus CheckSinglePara(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckParaExistence(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckFeature(const QfaTilingInfo &qfaInfo);
-    ge::graphStatus CheckMultiPara(const QfaTilingInfo &qfaInfo);
+    ge::graphStatus CheckSinglePara(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckParaExistence(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckFeature(const QfaTilingInfo& qfaInfo);
+    ge::graphStatus CheckMultiPara(const QfaTilingInfo& qfaInfo);
 
 private:
-    using CheckMethod = std::function<ge::graphStatus(QfaBaseChecker *, const QfaTilingInfo &)>;
+    using CheckMethod = std::function<ge::graphStatus(QfaBaseChecker*, const QfaTilingInfo&)>;
 
-    ge::graphStatus RunCheck(const CheckMethod &method, const QfaTilingInfo &qfaInfo);
+    ge::graphStatus RunCheck(const CheckMethod& method, const QfaTilingInfo& qfaInfo);
 
     void RegisterCheckers();
 

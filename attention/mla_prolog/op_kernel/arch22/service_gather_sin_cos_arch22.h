@@ -33,9 +33,9 @@ namespace MlaProlog {
  * @param col 列数
  */
 template <typename T, typename O>
-__aicore__ inline void GatherSinCos(LocalTensor<O> &cosLocal, LocalTensor<O> &sinLocal, const GlobalTensor<T> &cosGm,
-                                    const GlobalTensor<T> &sinGm, int64_t tokenIndex, int64_t curVecToken,
-                                    LocalTensor<uint8_t> &shareTmpUb, int64_t row, int64_t col)
+__aicore__ inline void GatherSinCos(LocalTensor<O>& cosLocal, LocalTensor<O>& sinLocal, const GlobalTensor<T>& cosGm,
+                                    const GlobalTensor<T>& sinGm, int64_t tokenIndex, int64_t curVecToken,
+                                    LocalTensor<uint8_t>& shareTmpUb, int64_t row, int64_t col)
 {
     int64_t offset = tokenIndex * col;
     int64_t curDataSize = curVecToken * col;

@@ -62,8 +62,8 @@ struct CompressShapeInfo {
     int64_t actSeqLenType = 0;
 };
 
-static aclnnStatus CheckNsaCompressParam(const aclTensor *input, const aclTensor *weight, const aclTensor *output,
-                                         const uint64_t *workspaceSize, aclOpExecutor **const executor)
+static aclnnStatus CheckNsaCompressParam(const aclTensor* input, const aclTensor* weight, const aclTensor* output,
+                                         const uint64_t* workspaceSize, aclOpExecutor** const executor)
 {
     // 必须的参数指针判空
     CHECK_RET(input != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -74,7 +74,7 @@ static aclnnStatus CheckNsaCompressParam(const aclTensor *input, const aclTensor
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus InputDtypeCheck(const aclTensor *input, const aclTensor *weight, const aclTensor *output)
+static aclnnStatus InputDtypeCheck(const aclTensor* input, const aclTensor* weight, const aclTensor* output)
 {
     auto inputDtype = input->GetDataType();
     auto weightDtype = weight->GetDataType();
@@ -88,7 +88,7 @@ static aclnnStatus InputDtypeCheck(const aclTensor *input, const aclTensor *weig
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus Contiguous(const aclTensor *&input, const aclTensor *&weight, aclOpExecutor *executor)
+static aclnnStatus Contiguous(const aclTensor*& input, const aclTensor*& weight, aclOpExecutor* executor)
 {
     input = l0op::Contiguous(input, executor);
     CHECK_RET(input != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -97,8 +97,8 @@ static aclnnStatus Contiguous(const aclTensor *&input, const aclTensor *&weight,
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus AnalysisAxis(const aclTensor *input, const aclTensor *weight, char *layoutOptional,
-                                int64_t compressBlockSize, int64_t compressStride, CompressShapeInfo &shapeInfo)
+static aclnnStatus AnalysisAxis(const aclTensor* input, const aclTensor* weight, char* layoutOptional,
+                                int64_t compressBlockSize, int64_t compressStride, CompressShapeInfo& shapeInfo)
 {
     Shape inputShape = input->GetViewShape();
     Shape weightShape = weight->GetViewShape();
@@ -150,9 +150,9 @@ static aclnnStatus AnalysisAxis(const aclTensor *input, const aclTensor *weight,
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus AnalysisInput(const aclTensor *input, const aclTensor *weight, char *layoutOptional,
+static aclnnStatus AnalysisInput(const aclTensor* input, const aclTensor* weight, char* layoutOptional,
                                  int64_t compressBlockSize, int64_t compressStride, int64_t actSeqLenType,
-                                 CompressShapeInfo &shapeInfo, const aclIntArray *actSeqLenOptional = nullptr)
+                                 CompressShapeInfo& shapeInfo, const aclIntArray* actSeqLenOptional = nullptr)
 {
     // 从shape中取需要的值到shapeInfo
     CHECK_RET(
@@ -173,10 +173,10 @@ static aclnnStatus AnalysisInput(const aclTensor *input, const aclTensor *weight
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnNsaCompressGetWorkspaceSize(const aclTensor *input, const aclTensor *weight,
-                                             const aclIntArray *actSeqLenOptional, char *layoutOptional,
+aclnnStatus aclnnNsaCompressGetWorkspaceSize(const aclTensor* input, const aclTensor* weight,
+                                             const aclIntArray* actSeqLenOptional, char* layoutOptional,
                                              int64_t compressBlockSize, int64_t compressStride, int64_t actSeqLenType,
-                                             aclTensor *output, uint64_t *workspaceSize, aclOpExecutor **executor)
+                                             aclTensor* output, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     // 检查入参
     CHECK_RET(CheckNsaCompressParam(input, weight, output, workspaceSize, executor) == ACLNN_SUCCESS,
@@ -198,7 +198,7 @@ aclnnStatus aclnnNsaCompressGetWorkspaceSize(const aclTensor *input, const aclTe
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    aclOpExecutor *l0Executor = uniqueExecutor.get();
+    aclOpExecutor* l0Executor = uniqueExecutor.get();
 
     CHECK_RET(Contiguous(input, weight, l0Executor) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR);
 
@@ -217,7 +217,7 @@ aclnnStatus aclnnNsaCompressGetWorkspaceSize(const aclTensor *input, const aclTe
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnNsaCompress(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnNsaCompress(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     // 固定写法
     L2_DFX_PHASE_2(aclnnNsaCompress);

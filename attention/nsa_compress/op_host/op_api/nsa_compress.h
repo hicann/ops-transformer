@@ -13,9 +13,9 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *NsaCompress(const aclTensor *input, const aclTensor *weight, const aclIntArray *actSeqLenOptional,
-                             char *layoutOptional, int64_t compressBlockSize, int64_t compressStride,
-                             int64_t actSeqLenType, aclOpExecutor *executor);
+const aclTensor* NsaCompress(const aclTensor* input, const aclTensor* weight, const aclIntArray* actSeqLenOptional,
+                             char* layoutOptional, int64_t compressBlockSize, int64_t compressStride,
+                             int64_t actSeqLenType, aclOpExecutor* executor);
 } // namespace l0op
 
 #endif

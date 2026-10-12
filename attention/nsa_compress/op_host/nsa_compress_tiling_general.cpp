@@ -23,7 +23,8 @@ namespace optiling {
 namespace Nsa {
 class NsaCompressTiling : public TilingBaseClass {
 public:
-    explicit NsaCompressTiling(gert::TilingContext *context) : TilingBaseClass(context) {};
+    explicit NsaCompressTiling(gert::TilingContext* context)
+        : TilingBaseClass(context) {};
     ~NsaCompressTiling() override = default;
 
 protected:
@@ -36,7 +37,7 @@ protected:
         auto compressBlockSizePtr = attrs->GetAttrPointer<int64_t>(idx++);
         auto compressStridePtr = attrs->GetAttrPointer<int64_t>(idx++);
         auto actSeqLenTypePtr = attrs->GetAttrPointer<int64_t>(idx++);
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
 
         OP_CHECK_NULL_WITH_CONTEXT(context_, compressBlockSizePtr);
         OP_CHECK_NULL_WITH_CONTEXT(context_, compressStridePtr);
@@ -51,11 +52,11 @@ protected:
         OP_CHECK_NULL_WITH_CONTEXT(context_, weightShape);
         OP_CHECK_NULL_WITH_CONTEXT(context_, context_->GetRawTilingData());
         OP_CHECK_NULL_WITH_CONTEXT(context_, context_->GetRawTilingData()->GetData());
-        OP_CHECK_IF(context_->GetRawTilingData()->GetCapacity() < tilingData.GetDataSize(),
-                   OPS_REPORT_VECTOR_INNER_ERR(opName,
-                                               "context tiling data capacity %zu < actual tiling data size %zu.",
-                                               context_->GetRawTilingData()->GetCapacity(), tilingData.GetDataSize()),
-                   return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            context_->GetRawTilingData()->GetCapacity() < tilingData.GetDataSize(),
+            OPS_REPORT_VECTOR_INNER_ERR(opName, "context tiling data capacity %zu < actual tiling data size %zu.",
+                                        context_->GetRawTilingData()->GetCapacity(), tilingData.GetDataSize()),
+            return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
 
@@ -99,7 +100,7 @@ protected:
             return false;
         }
         ubBlockHalfNum = MIN_COPY_UINT_SIZE / inputDtypeBytes; // 当前输入的Dtype下(fp16/bf16),对齐32B所需的元素个数
-        ubBlockFloatNum = MIN_COPY_UINT_SIZE / calcTypeSize;   // 当前计算的Dtype下(fp32),对齐32B所需的元素个数
+        ubBlockFloatNum = MIN_COPY_UINT_SIZE / calcTypeSize; // 当前计算的Dtype下(fp32),对齐32B所需的元素个数
 
         switch (inputDtype) {
             case ge::DT_FLOAT16:
@@ -121,14 +122,14 @@ protected:
             OP_LOGW(context_, "actSeqLenTensor is null pointer");
             return false;
         }
-        auto &actSeqLenShape = actSeqLenTensor->GetShape().GetStorageShape();
+        auto& actSeqLenShape = actSeqLenTensor->GetShape().GetStorageShape();
         if (actSeqLenShape.GetDimNum() != 1 || actSeqLenShape.GetDim(Zero) == 0) {
             OP_LOGW(context_, "actSeqLenShape is invalid %lu %ld", actSeqLenShape.GetDimNum(),
-                      actSeqLenShape.GetDim(Zero));
+                    actSeqLenShape.GetDim(Zero));
             return false;
         }
         /* Get Data from tensor. */
-        const int64_t *value = actSeqLenTensor->GetData<int64_t>();
+        const int64_t* value = actSeqLenTensor->GetData<int64_t>();
         if (value == nullptr) {
             OP_LOGW(context_, "actSeqLenTensor data is null pointer");
             return false;
@@ -165,7 +166,7 @@ protected:
         if (platformInfoPtr == nullptr) {
             auto compileInfoPtr = context_->GetCompileInfo<NsaCompressCompileInfo>();
             OP_CHECK_IF(compileInfoPtr == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName, "compileInfoPtr is null."),
-                       return ge::GRAPH_FAILED);
+                        return ge::GRAPH_FAILED);
             aivNum = compileInfoPtr->aivNum;
             ubSize = compileInfoPtr->ubSize;
         } else {
@@ -175,7 +176,8 @@ protected:
         }
         OP_LOGI(context_,
                 "get platform from compileInfo.aivNum(%u)"
-                " ubSize(%lu).", aivNum, ubSize);
+                " ubSize(%lu).",
+                aivNum, ubSize);
         return ge::GRAPH_SUCCESS;
     };
     // 2、获取INPUT/OUTPUT/ATTR信息
@@ -183,13 +185,13 @@ protected:
     {
         opName = context_->GetNodeName();
         OP_LOGD(opName,
-                       "TilingContext:"
-                       " %s.",
-                       GetTilingContextDebugStr().c_str());
+                "TilingContext:"
+                " %s.",
+                GetTilingContextDebugStr().c_str());
         OP_CHECK_IF(CheckContext() != ge::GRAPH_SUCCESS, OPS_REPORT_VECTOR_INNER_ERR(opName, "invalid context."),
-                   return ge::GRAPH_FAILED);
+                    return ge::GRAPH_FAILED);
         OP_CHECK_IF(!AnalyzeInputShape() || !AnalyzeAttrs() || !AnalyzeDtype() || !AnalyzeOptionalInput(),
-                   OPS_REPORT_VECTOR_INNER_ERR(opName, "fail to analyze context info."), return ge::GRAPH_FAILED);
+                    OPS_REPORT_VECTOR_INNER_ERR(opName, "fail to analyze context info."), return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     };
 
@@ -238,7 +240,7 @@ protected:
         uint32_t unitSubResultMemory =
             headDim * calcTypeSize; // 单位中间结果subresult所需的ub大小， 需要补乘subSeqlen 与 maxHeadPerCore
         uint32_t unitOverlapMemory =
-            maxOverlap * headDim * calcTypeSize;                   // 单位overlap所需ub大小, 需要补乘maxHeadPerCore
+            maxOverlap * headDim * calcTypeSize; // 单位overlap所需ub大小, 需要补乘maxHeadPerCore
         uint32_t unitCompressKvMemory = headDim * inputDtypeBytes; // 单位输出所需的ub大小, 需要补乘maxHeadPerCore
 
         // 递增，先从能不切开始
@@ -334,9 +336,8 @@ protected:
     {
         GetDivisors(aivNum); // 求解aivNum的因子
         OP_CHECK_IF(!GetSplitInfo(),
-                OP_LOGE(context_->GetNodeName(),
-                "Unable to process current input size and parameters."),
-                return ge::GRAPH_FAILED);
+                    OP_LOGE(context_->GetNodeName(), "Unable to process current input size and parameters."),
+                    return ge::GRAPH_FAILED);
         GetTilingDataInfo();
 
         tilingData.set_InputDtype(inputDtype);
@@ -377,7 +378,7 @@ protected:
     {
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
         uint32_t sysWorkSpaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
-        size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+        size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
         currentWorkspace[0] = static_cast<size_t>(0UL + sysWorkSpaceSize);
         return ge::GRAPH_SUCCESS;
     };
@@ -394,12 +395,12 @@ protected:
     uint32_t inputDtypeBytes;
     uint32_t calcTypeSize;
 
-    const char *opName = "NsaCompress";
+    const char* opName = "NsaCompress";
     uint32_t aivNum;
     uint64_t ubSize;
     uint32_t NeedUBMemory = 0;
 
-    const char *inputLayout;
+    const char* inputLayout;
 
     uint32_t batchSize;
     uint32_t compressBlockSize;
@@ -434,14 +435,14 @@ protected:
     uint32_t ubBlockHalfNum;  // 当前输入的Dtype下(fp16/bf16),对齐32B所需的元素个数
     uint32_t ubBlockFloatNum; // 当前计算的Dtype下(fp32),对齐32B所需的元素个数
 
-    std::vector<uint32_t> actualSeqLen;                    // 各batch的seq_len长度，前缀和方式
-    std::vector<uint64_t> actualOutputSeqLen;              // 各batch可以输出的token数，前缀和方式
-    std::vector<uint32_t> divisorNums;                     // aivNum的因子
-    uint32_t PerCoreHeadIdx[MAX_CORE_NUM] = {0};           // 记录每个核处理的head索引
-    uint32_t PerCoreHeadNum[MAX_CORE_NUM] = {0};           // 记录每个核处理的head数量
-    uint32_t kvStartTokenPerCore[MAX_CORE_NUM] = {0};      // 计算每个core所需搬运的首个kv块在输入中的seq索引数
-    uint32_t kvStartBatchPerCore[MAX_CORE_NUM] = {0};      // 计算每个core所需搬运的首个kv块对应的batch数量
-    uint32_t kvStartOffsetPerCore[MAX_CORE_NUM] = {0};     // 计算每个core所需搬运的首个kv块相较于全量kv初始地址的偏移量
+    std::vector<uint32_t> actualSeqLen;          // 各batch的seq_len长度，前缀和方式
+    std::vector<uint64_t> actualOutputSeqLen;    // 各batch可以输出的token数，前缀和方式
+    std::vector<uint32_t> divisorNums;           // aivNum的因子
+    uint32_t PerCoreHeadIdx[MAX_CORE_NUM] = {0}; // 记录每个核处理的head索引
+    uint32_t PerCoreHeadNum[MAX_CORE_NUM] = {0}; // 记录每个核处理的head数量
+    uint32_t kvStartTokenPerCore[MAX_CORE_NUM] = {0}; // 计算每个core所需搬运的首个kv块在输入中的seq索引数
+    uint32_t kvStartBatchPerCore[MAX_CORE_NUM] = {0}; // 计算每个core所需搬运的首个kv块对应的batch数量
+    uint32_t kvStartOffsetPerCore[MAX_CORE_NUM] = {0}; // 计算每个core所需搬运的首个kv块相较于全量kv初始地址的偏移量
     uint32_t perCoreOutputNumsArr[MAX_CORE_NUM] = {0};     // 记录每个核需要输出的output数量
     uint32_t perCoreStartOutputOffset[MAX_CORE_NUM] = {0}; // 记录每个核输出的首个output偏移量
 

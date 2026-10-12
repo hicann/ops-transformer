@@ -195,14 +195,14 @@ TEST_F(nsa_selected_attention_opapi_ut, required_null_parameters_return_param_nu
     auto seq = IntArrayDesc(vector<int64_t>{kT}).ToAclType();
     for (size_t i = 0; i < 12; ++i) {
         SCOPED_TRACE(i);
-        array<const aclTensor *, 7> tensors;
+        array<const aclTensor*, 7> tensors;
         tensors.fill(tensor.get());
         if (i < tensors.size()) {
             tensors[i] = nullptr;
         }
         char layout[] = "TND";
         uint64_t workspaceSize = 0;
-        aclOpExecutor *executor = nullptr;
+        aclOpExecutor* executor = nullptr;
         EXPECT_EQ(aclnnNsaSelectedAttentionGetWorkspaceSize(
                       tensors[0], tensors[1], tensors[2], tensors[3], nullptr, i == 7 ? nullptr : seq.get(),
                       i == 8 ? nullptr : seq.get(), 0.088388, kN1, i == 9 ? nullptr : layout, 0, kSelectedBlockSize,

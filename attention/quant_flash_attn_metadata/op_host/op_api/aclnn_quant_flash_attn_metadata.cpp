@@ -35,11 +35,11 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
     int64_t numHeadsKv, int64_t headDim, int64_t headDimV, int64_t quantMode, int64_t maskMode, int64_t winLeft,
-    int64_t winRight, const char *layoutQ, const char *layoutQDescale, const char *layoutKv, const char *layoutOut,
-    bool isGradEnabled, const aclTensor *metaData, uint64_t *workspaceSize, aclOpExecutor **executor)
+    int64_t winRight, const char* layoutQ, const char* layoutQDescale, const char* layoutKv, const char* layoutOut,
+    bool isGradEnabled, const aclTensor* metaData, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnQuantFlashAttnMetadata,
                    DFX_IN(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, batchSize,
@@ -56,7 +56,7 @@ aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
         layoutQDescale, layoutKv, layoutOut, isGradEnabled, metaData);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
+    const op::PlatformInfo& npuInfo = op::GetCurrentPlatformInfo();
     // 与主算子 ACLNN tiling 保持一致：优先获取当前线程的有效核数（含 stream 控核）。
     // 查询失败时，与 opbase InitL2Phase1Context 一样回退到硬件平台核数。
     uint32_t aicCoreNum = 0;
@@ -67,7 +67,7 @@ aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
     if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivCoreNum) != ACL_SUCCESS) {
         aivCoreNum = npuInfo.GetVectorCoreNum();
     }
-    const char *socVersion = npuInfo.GetSocLongVersion().c_str();
+    const char* socVersion = npuInfo.GetSocLongVersion().c_str();
 
     // 宿主侧读取输出 tensor 的 shape 并经 attr 下发: AICPU 侧输出 TensorShape 可能未填充,
     // FAG 偏移与容量校验依赖该值, 必须使用宿主侧可靠 shape。
@@ -98,8 +98,8 @@ aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-__attribute__((visibility("default"))) aclnnStatus aclnnQuantFlashAttnMetadata(void *workspace, uint64_t workspaceSize,
-                                                                               aclOpExecutor *executor,
+__attribute__((visibility("default"))) aclnnStatus aclnnQuantFlashAttnMetadata(void* workspace, uint64_t workspaceSize,
+                                                                               aclOpExecutor* executor,
                                                                                aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnQuantFlashAttnMetadata);

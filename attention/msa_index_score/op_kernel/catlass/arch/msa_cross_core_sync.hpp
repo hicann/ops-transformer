@@ -90,25 +90,25 @@ CATLASS_DEVICE void CrossCoreBarrier()
 }
 
 template <uint8_t MODE, pipe_t PIPE>
-CATLASS_DEVICE void CrossCoreSetFlag(CrossCoreFlag &flag)
+CATLASS_DEVICE void CrossCoreSetFlag(CrossCoreFlag& flag)
 {
     AscendC::CrossCoreSetFlag<MODE, PIPE>(flag.id);
 }
 
 CATLASS_DEVICE
-void CrossCoreWaitFlag(CrossCoreFlag &flag)
+void CrossCoreWaitFlag(CrossCoreFlag& flag)
 {
     AscendC::CrossCoreWaitFlag(flag.id);
 }
 
 template <uint8_t MODE, pipe_t PIPE>
-CATLASS_DEVICE void CrossCoreWaitFlag(CrossCoreFlag &flag)
+CATLASS_DEVICE void CrossCoreWaitFlag(CrossCoreFlag& flag)
 {
     AscendC::CrossCoreWaitFlag<MODE, PIPE>(flag.id);
 }
 
 template <uint8_t MODE, pipe_t PIPE, uint32_t REVERSE_DEPTH>
-CATLASS_DEVICE void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
+CATLASS_DEVICE void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH>& flag)
 {
     AscendC::CrossCoreSetFlag<MODE, PIPE>(flag.id);
     if (++flag.count >= REVERSE_DEPTH) {
@@ -118,7 +118,7 @@ CATLASS_DEVICE void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVERSE
 }
 
 template <uint8_t MODE, pipe_t PIPE, uint32_t REVERSE_DEPTH>
-CATLASS_DEVICE void CrossCoreWaitFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
+CATLASS_DEVICE void CrossCoreWaitFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH>& flag)
 {
     AscendC::CrossCoreWaitFlag(flag.id);
     if (++flag.count >= REVERSE_DEPTH) {

@@ -18,14 +18,13 @@
 #include "nsa_compress_tiling.h"
 #include "nsa_compress_kernel.h"
 
-
 using namespace NASCompress;
 
 namespace NASCompress {
 
-extern "C" __global__ __aicore__ void nsa_compress(__gm__ uint8_t *input, __gm__ uint8_t *weight,
-                                                   __gm__ uint8_t *actSeqLenOptional, __gm__ uint8_t *output,
-                                                   __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+extern "C" __global__ __aicore__ void nsa_compress(__gm__ uint8_t* input, __gm__ uint8_t* weight,
+                                                   __gm__ uint8_t* actSeqLenOptional, __gm__ uint8_t* output,
+                                                   __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     AscendC::TPipe pipe;
 

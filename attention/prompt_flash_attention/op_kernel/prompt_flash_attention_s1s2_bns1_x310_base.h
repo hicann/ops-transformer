@@ -71,17 +71,17 @@ template <typename PFAT>
 class PromptFlashAttentionS1s2Bns1X310Base {
 public:
     __aicore__ inline PromptFlashAttentionS1s2Bns1X310Base(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *pseShift, __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                __gm__ uint8_t *actualSeqLengthsKV, __gm__ uint8_t *blocktable,
-                                __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-                                __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-                                __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *attentionOut,
-                                __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-                                const PromptFlashAttentionTilingData *__restrict tiling, __gm__ uint8_t *gmTiling,
-                                TPipe *tPipe);
-    __aicore__ inline void InitMsd(__gm__ uint8_t *key_antiquant_scale, __gm__ uint8_t *key_antiquant_offset,
-                                   __gm__ uint8_t *value_antiquant_scale, __gm__ uint8_t *value_antiquant_offset);
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                                __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* blocktable,
+                                __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+                                __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix,
+                                __gm__ uint8_t* actualSharedPrefixLen, __gm__ uint8_t* attentionOut,
+                                __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                                const PromptFlashAttentionTilingData* __restrict tiling, __gm__ uint8_t* gmTiling,
+                                TPipe* tPipe);
+    __aicore__ inline void InitMsd(__gm__ uint8_t* key_antiquant_scale, __gm__ uint8_t* key_antiquant_offset,
+                                   __gm__ uint8_t* value_antiquant_scale, __gm__ uint8_t* value_antiquant_offset);
     using T = typename PFAT::inputType;
     using U = typename PFAT::maskType;
     using O = typename PFAT::outputType;
@@ -111,8 +111,8 @@ public:
     Matmul<a2Type, b2Type, c2Type, bias2Type> bmm2;
 
 protected:
-    const PromptFlashAttentionTilingData *__restrict tilingData;
-    TPipe *pipe;
+    const PromptFlashAttentionTilingData* __restrict tilingData;
+    TPipe* pipe;
     // define the que
     TBuf<> attenMaskUb_;
     TQue<QuePosition::VECIN, 1> eleWiseInQueue;
@@ -251,58 +251,58 @@ protected:
     uint32_t queryStride;
     uint32_t keyValueStride;
 
-    __aicore__ inline void ElewiseCompute310P(LocalTensor<mm1OutputType> &mmResUb, uint32_t SInnerSize,
+    __aicore__ inline void ElewiseCompute310P(LocalTensor<mm1OutputType>& mmResUb, uint32_t SInnerSize,
                                               uint32_t SOuterSize);
 
     __aicore__ inline void AttenMaskCopyIn(uint64_t offset, uint32_t sinnerSize, uint32_t sInnerIdx);
 
     __aicore__ inline void AttenMaskTransND2NZ(uint32_t SInnerSize, uint32_t SOuterSize);
 
-    __aicore__ inline void SoftmaxBasicComputeFirstTail(LocalTensor<mm1OutputType> &mmResUb,
-                                                        LocalTensor<float> &softmaxMaxUb,
-                                                        LocalTensor<float> &softmaxSumUb,
-                                                        LocalTensor<softmaxType> &softmaxExpUb,
-                                                        LocalTensor<uint8_t> &sharedTmpUb,
-                                                        const SoftMaxShapeInfo &softmaxShapeInfo);
-    __aicore__ inline void SoftmaxBasicComputeTail(LocalTensor<mm1OutputType> &mmResUb,
-                                                   LocalTensor<float> &softmaxMaxUb, LocalTensor<float> &softmaxSumUb,
-                                                   LocalTensor<softmaxType> &softmaxExpUb,
-                                                   LocalTensor<uint8_t> &sharedTmpUb,
-                                                   const SoftMaxShapeInfo &softmaxShapeInfo);
-    __aicore__ inline void SoftmaxBasicComputeFirstTailTmp(LocalTensor<mmOutputType> &mmResUb,
-                                                           LocalTensor<mmOutputType> &softmaxMaxUb,
-                                                           LocalTensor<mmOutputType> &softmaxSumUb,
-                                                           LocalTensor<mmOutputType> &softmaxExpUb,
-                                                           LocalTensor<uint8_t> &sharedTmpUb,
-                                                           const SoftMaxShapeInfo &softmaxShapeInfo);
-    __aicore__ inline void SoftmaxBasicComputeTailTmp(LocalTensor<mmOutputType> &mmResUb,
-                                                      LocalTensor<mmOutputType> &softmaxMaxUb,
-                                                      LocalTensor<mmOutputType> &softmaxSumUb,
-                                                      LocalTensor<mmOutputType> &softmaxExpUb,
-                                                      LocalTensor<uint8_t> &sharedTmpUb,
-                                                      const SoftMaxShapeInfo &softmaxShapeInfo);
+    __aicore__ inline void SoftmaxBasicComputeFirstTail(LocalTensor<mm1OutputType>& mmResUb,
+                                                        LocalTensor<float>& softmaxMaxUb,
+                                                        LocalTensor<float>& softmaxSumUb,
+                                                        LocalTensor<softmaxType>& softmaxExpUb,
+                                                        LocalTensor<uint8_t>& sharedTmpUb,
+                                                        const SoftMaxShapeInfo& softmaxShapeInfo);
+    __aicore__ inline void SoftmaxBasicComputeTail(LocalTensor<mm1OutputType>& mmResUb,
+                                                   LocalTensor<float>& softmaxMaxUb, LocalTensor<float>& softmaxSumUb,
+                                                   LocalTensor<softmaxType>& softmaxExpUb,
+                                                   LocalTensor<uint8_t>& sharedTmpUb,
+                                                   const SoftMaxShapeInfo& softmaxShapeInfo);
+    __aicore__ inline void SoftmaxBasicComputeFirstTailTmp(LocalTensor<mmOutputType>& mmResUb,
+                                                           LocalTensor<mmOutputType>& softmaxMaxUb,
+                                                           LocalTensor<mmOutputType>& softmaxSumUb,
+                                                           LocalTensor<mmOutputType>& softmaxExpUb,
+                                                           LocalTensor<uint8_t>& sharedTmpUb,
+                                                           const SoftMaxShapeInfo& softmaxShapeInfo);
+    __aicore__ inline void SoftmaxBasicComputeTailTmp(LocalTensor<mmOutputType>& mmResUb,
+                                                      LocalTensor<mmOutputType>& softmaxMaxUb,
+                                                      LocalTensor<mmOutputType>& softmaxSumUb,
+                                                      LocalTensor<mmOutputType>& softmaxExpUb,
+                                                      LocalTensor<uint8_t>& sharedTmpUb,
+                                                      const SoftMaxShapeInfo& softmaxShapeInfo);
     __aicore__ inline void QuantCompute(LocalTensor<int8_t> quantResUb, LocalTensor<mmOutputType> mmResUb, float scale,
                                         float offset, uint32_t computeSize);
 
-    __aicore__ inline void CopyND2NZOnTheFly(const LocalTensor<mmOutputType> &dst,
-                                             const GlobalTensor<mmOutputType> &src, const int height, const int width,
+    __aicore__ inline void CopyND2NZOnTheFly(const LocalTensor<mmOutputType>& dst,
+                                             const GlobalTensor<mmOutputType>& src, const int height, const int width,
                                              const int gCol, const bool isA1);
 
-    __aicore__ inline void Bmm2UpdateDivNoTail310P(LocalTensor<mmOutputType> &bmm2ResPreUb,
-                                                   LocalTensor<float> &softmaxSumUb,
-                                                   LocalTensor<softmaxType> &softmaxExpUb);
+    __aicore__ inline void Bmm2UpdateDivNoTail310P(LocalTensor<mmOutputType>& bmm2ResPreUb,
+                                                   LocalTensor<float>& softmaxSumUb,
+                                                   LocalTensor<softmaxType>& softmaxExpUb);
 
-    __aicore__ inline void Bmm2UpdateDivNoTail310PTmp(LocalTensor<mmOutputType> &bmm2ResPreUb,
-                                                      LocalTensor<mmOutputType> &softmaxSumUb,
-                                                      LocalTensor<softmaxType> &softmaxExpUb);
+    __aicore__ inline void Bmm2UpdateDivNoTail310PTmp(LocalTensor<mmOutputType>& bmm2ResPreUb,
+                                                      LocalTensor<mmOutputType>& softmaxSumUb,
+                                                      LocalTensor<softmaxType>& softmaxExpUb);
 
-    __aicore__ inline void Bmm2Compute(LocalTensor<mmOutputType> &bmm2ResL1);
+    __aicore__ inline void Bmm2Compute(LocalTensor<mmOutputType>& bmm2ResL1);
 
-    __aicore__ inline void UpdateVmul(LocalTensor<softmaxType> &softmaxExpUb);
+    __aicore__ inline void UpdateVmul(LocalTensor<softmaxType>& softmaxExpUb);
 
-    __aicore__ inline void Bmm2UpdateAdd(LocalTensor<mmOutputType> &bmm2ResUb);
+    __aicore__ inline void Bmm2UpdateAdd(LocalTensor<mmOutputType>& bmm2ResUb);
 
-    __aicore__ inline void DataCopyTransposeOut(LocalTensor<mmOutputType> &bmm2ResUb);
+    __aicore__ inline void DataCopyTransposeOut(LocalTensor<mmOutputType>& bmm2ResUb);
 
     __aicore__ inline void ComputeAttenMaskOffset(uint32_t sInnerLoopIdx, bool isLast);
 
@@ -316,33 +316,33 @@ protected:
 
     __aicore__ inline void initOffset();
 
-    __aicore__ inline void InitTensorSize(const PromptAttentionSingleCoreTensorSize *tensorSizeTiling);
+    __aicore__ inline void InitTensorSize(const PromptAttentionSingleCoreTensorSize* tensorSizeTiling);
 
     __aicore__ inline void GetSingleCoreParam(int sIdx);
 
     __aicore__ inline void InitOutputSingleCore();
 
-    __aicore__ inline void Bmm1Compute(LocalTensor<mmInputType> &a1Local, LocalTensor<mmInputType> &b1Local,
+    __aicore__ inline void Bmm1Compute(LocalTensor<mmInputType>& a1Local, LocalTensor<mmInputType>& b1Local,
                                        int32_t singleM, int32_t singleN, int32_t singleK);
 };
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Init(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-    __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-    __gm__ uint8_t *blocktable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-    __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix, __gm__ uint8_t *actualSharedPrefixLen,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-    const PromptFlashAttentionTilingData *__restrict tiling, __gm__ uint8_t *gmTiling, TPipe *tPipe)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+    __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+    __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+    __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+    const PromptFlashAttentionTilingData* __restrict tiling, __gm__ uint8_t* gmTiling, TPipe* tPipe)
 {
     tmp_block_idx = GetBlockIdx();
     // init global buffer
     tilingData = tiling;
-    queryGm.SetGlobalBuffer((__gm__ T *)query);
-    keyGm.SetGlobalBuffer((__gm__ T *)key);
-    valueGm.SetGlobalBuffer((__gm__ T *)value);
-    attentionOutGm.SetGlobalBuffer((__gm__ O *)attentionOut);
-    workspaceGm.SetGlobalBuffer((__gm__ softmaxType *)workspace);
+    queryGm.SetGlobalBuffer((__gm__ T*)query);
+    keyGm.SetGlobalBuffer((__gm__ T*)key);
+    valueGm.SetGlobalBuffer((__gm__ T*)value);
+    attentionOutGm.SetGlobalBuffer((__gm__ O*)attentionOut);
+    workspaceGm.SetGlobalBuffer((__gm__ softmaxType*)workspace);
 
     pipe = tPipe;
     typeByteNum = tilingData->promptAttentionBaseParams.typeByteNum;
@@ -358,12 +358,12 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Init(
     isActualLenDimsNull = true;
     isActualLenDimsKVNull = true;
     if (!tilingData->promptAttentionBaseParams.isActualSeqLengthsNull) { // actual seq length is null
-        actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths,
+        actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths,
                                            tilingData->promptAttentionBaseParams.batchSize);
         isActualLenDimsNull = false;
     }
     if (!tilingData->promptAttentionBaseParams.isActualSeqLengthsKVNull) {
-        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKV,
+        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKV,
                                              tilingData->promptAttentionBaseParams.batchSize);
         isActualLenDimsKVNull = false;
     }
@@ -443,7 +443,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Init(
     attentionMaskType = tilingData->promptAttentionBaseParams.sparseMode;
     if ((attenMask != NULL) && (tilingData->promptAttentionBaseParams.useMask == 1)) {
         needCalMask_ = true;
-        attenMaskGm.SetGlobalBuffer((__gm__ U *)attenMask);
+        attenMaskGm.SetGlobalBuffer((__gm__ U*)attenMask);
         attentionMaskStride = tilingData->promptAttentionBaseParams.maskKVsSize;
     }
 
@@ -464,10 +464,10 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Init(
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::InitMsd(__gm__ uint8_t *key_antiquant_scale,
-                                                                           __gm__ uint8_t *key_antiquant_offset,
-                                                                           __gm__ uint8_t *value_antiquant_scale,
-                                                                           __gm__ uint8_t *value_antiquant_offset)
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::InitMsd(__gm__ uint8_t* key_antiquant_scale,
+                                                                           __gm__ uint8_t* key_antiquant_offset,
+                                                                           __gm__ uint8_t* value_antiquant_scale,
+                                                                           __gm__ uint8_t* value_antiquant_offset)
 {
     return;
 }
@@ -475,7 +475,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::InitMsd(__gm_
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::InitOutputSingleCore()
 {
-    auto &initParams = tilingData->promptAttentionInitOutputParams;
+    auto& initParams = tilingData->promptAttentionInitOutputParams;
     uint32_t tailSize = initParams.totalOutputSize - tmp_block_idx * initParams.singleCoreSize;
     uint32_t singleInitOutputSize = tailSize < initParams.singleCoreSize ? tailSize : initParams.singleCoreSize;
     InitOutput<O>(attentionOutGm[tmp_block_idx * initParams.singleCoreSize], singleInitOutputSize, 0);
@@ -524,7 +524,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::initOffset()
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::InitTensorSize(
-    const PromptAttentionSingleCoreTensorSize *tensorSizeTiling)
+    const PromptAttentionSingleCoreTensorSize* tensorSizeTiling)
 {
     mmResUbSize = tensorSizeTiling->mmResUbSize;
     attenMaskUbSize = tensorSizeTiling->attenMaskUbSize;
@@ -587,7 +587,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::AttenMaskTran
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::ElewiseCompute310P(
-    LocalTensor<mm1OutputType> &mmResUb, uint32_t SInnerSize, uint32_t SOuterSize)
+    LocalTensor<mm1OutputType>& mmResUb, uint32_t SInnerSize, uint32_t SOuterSize)
 {
     uint32_t computeSize = SInnerSize * SOuterSize;
 
@@ -613,8 +613,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::ElewiseComput
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::SoftmaxBasicComputeFirstTail(
-    LocalTensor<mm1OutputType> &mmResUb, LocalTensor<float> &softmaxMaxUb, LocalTensor<float> &softmaxSumUb,
-    LocalTensor<softmaxType> &softmaxExpUb, LocalTensor<uint8_t> &sharedTmpUb, const SoftMaxShapeInfo &softmaxShapeInfo)
+    LocalTensor<mm1OutputType>& mmResUb, LocalTensor<float>& softmaxMaxUb, LocalTensor<float>& softmaxSumUb,
+    LocalTensor<softmaxType>& softmaxExpUb, LocalTensor<uint8_t>& sharedTmpUb, const SoftMaxShapeInfo& softmaxShapeInfo)
 {
     SoftmaxFlashV2<softmaxType, false, true, true, true>(mmResUb, softmaxSumUb, softmaxMaxUb, mmResUb, softmaxExpUb,
                                                          softmaxSumUb, softmaxMaxUb, sharedTmpUb,
@@ -632,8 +632,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::SoftmaxBasicC
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::SoftmaxBasicComputeTail(
-    LocalTensor<mm1OutputType> &mmResUb, LocalTensor<float> &softmaxMaxUb, LocalTensor<float> &softmaxSumUb,
-    LocalTensor<softmaxType> &softmaxExpUb, LocalTensor<uint8_t> &sharedTmpUb, const SoftMaxShapeInfo &softmaxShapeInfo)
+    LocalTensor<mm1OutputType>& mmResUb, LocalTensor<float>& softmaxMaxUb, LocalTensor<float>& softmaxSumUb,
+    LocalTensor<softmaxType>& softmaxExpUb, LocalTensor<uint8_t>& sharedTmpUb, const SoftMaxShapeInfo& softmaxShapeInfo)
 {
     SoftmaxFlashV2<softmaxType, true, true, true, true>(mmResUb, softmaxSumUb, softmaxMaxUb, mmResUb, softmaxExpUb,
                                                         softmaxSumUb, softmaxMaxUb, sharedTmpUb, softmaxFlashTilingData,
@@ -652,9 +652,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::SoftmaxBasicC
 }
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::SoftmaxBasicComputeFirstTailTmp(
-    LocalTensor<mmOutputType> &mmResUb, LocalTensor<mmOutputType> &softmaxMaxUb,
-    LocalTensor<mmOutputType> &softmaxSumUb, LocalTensor<mmOutputType> &softmaxExpUb, LocalTensor<uint8_t> &sharedTmpUb,
-    const SoftMaxShapeInfo &softmaxShapeInfo)
+    LocalTensor<mmOutputType>& mmResUb, LocalTensor<mmOutputType>& softmaxMaxUb,
+    LocalTensor<mmOutputType>& softmaxSumUb, LocalTensor<mmOutputType>& softmaxExpUb, LocalTensor<uint8_t>& sharedTmpUb,
+    const SoftMaxShapeInfo& softmaxShapeInfo)
 {
     SoftmaxFlashV2Tmp<mmOutputType, false, true, true, true>(mmResUb, softmaxSumUb, softmaxMaxUb, mmResUb, softmaxExpUb,
                                                              softmaxSumUb, softmaxMaxUb, sharedTmpUb,
@@ -672,9 +672,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::SoftmaxBasicC
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::SoftmaxBasicComputeTailTmp(
-    LocalTensor<mmOutputType> &mmResUb, LocalTensor<mmOutputType> &softmaxMaxUb,
-    LocalTensor<mmOutputType> &softmaxSumUb, LocalTensor<mmOutputType> &softmaxExpUb, LocalTensor<uint8_t> &sharedTmpUb,
-    const SoftMaxShapeInfo &softmaxShapeInfo)
+    LocalTensor<mmOutputType>& mmResUb, LocalTensor<mmOutputType>& softmaxMaxUb,
+    LocalTensor<mmOutputType>& softmaxSumUb, LocalTensor<mmOutputType>& softmaxExpUb, LocalTensor<uint8_t>& sharedTmpUb,
+    const SoftMaxShapeInfo& softmaxShapeInfo)
 {
     SoftmaxFlashV2Tmp<mmOutputType, true, true, true, true>(mmResUb, softmaxSumUb, softmaxMaxUb, mmResUb, softmaxExpUb,
                                                             softmaxSumUb, softmaxMaxUb, sharedTmpUb,
@@ -692,7 +692,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::SoftmaxBasicC
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2UpdateDivNoTail310P(
-    LocalTensor<mmOutputType> &bmm2ResPreUb, LocalTensor<float> &softmaxSumUb, LocalTensor<softmaxType> &softmaxExpUb)
+    LocalTensor<mmOutputType>& bmm2ResPreUb, LocalTensor<float>& softmaxSumUb, LocalTensor<softmaxType>& softmaxExpUb)
 {
     int32_t headLoop = tilingData->promptAttentionBaseParams.headSize / softmaxTypeByteNum;
     constexpr int32_t REPEAT_DATA_NUM = 256 / sizeof(softmaxType);
@@ -741,8 +741,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2UpdateDiv
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2UpdateDivNoTail310PTmp(
-    LocalTensor<mmOutputType> &bmm2ResPreUb, LocalTensor<mmOutputType> &softmaxSumUb,
-    LocalTensor<softmaxType> &softmaxExpUb)
+    LocalTensor<mmOutputType>& bmm2ResPreUb, LocalTensor<mmOutputType>& softmaxSumUb,
+    LocalTensor<softmaxType>& softmaxExpUb)
 {
     int32_t headLoop = tilingData->promptAttentionBaseParams.headSize / softmaxTypeByteNum;
     constexpr int32_t REPEAT_DATA_NUM = 256 / sizeof(softmaxType);
@@ -770,7 +770,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2UpdateDiv
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2Compute(LocalTensor<mmOutputType> &bmm2ResL1)
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2Compute(LocalTensor<mmOutputType>& bmm2ResL1)
 {
     bmm2.SetTensorA(bmm2ResL1);
     bmm2.SetTensorB(c1Local_);
@@ -784,7 +784,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2Compute(L
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::UpdateVmul(LocalTensor<softmaxType> &softmaxExpUb)
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::UpdateVmul(LocalTensor<softmaxType>& softmaxExpUb)
 {
     LocalTensor<mmOutputType> bmm2ResPreUb = tempBmm2Ub.Get<mmOutputType>(bmm2ResUbSize);
     BinaryRepeatParams repeatParams;
@@ -859,7 +859,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::ComputeOffset
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::DataCopyTransposeOut(
-    LocalTensor<mmOutputType> &bmm2ResUb)
+    LocalTensor<mmOutputType>& bmm2ResUb)
 {
     if ((PFAT::layout == PFALayoutNZ::BSH) ||
         (PFAT::layout == PFALayoutNZ::BNSD && this->tilingData->promptAttentionBaseParams.isBSNDOut == 1)) {
@@ -901,8 +901,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::DataCopyTrans
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm1Compute(LocalTensor<mmInputType> &a1Local,
-                                                                               LocalTensor<mmInputType> &b1Local,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm1Compute(LocalTensor<mmInputType>& a1Local,
+                                                                               LocalTensor<mmInputType>& b1Local,
                                                                                int32_t singleM, int32_t singleN,
                                                                                int32_t singleK)
 {
@@ -991,7 +991,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::LoopSOuterOff
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2UpdateAdd(LocalTensor<mmOutputType> &bmm2ResUb)
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2UpdateAdd(LocalTensor<mmOutputType>& bmm2ResUb)
 {
     LocalTensor<mmOutputType> bmm2ResPreUb = tempBmm2Ub.Get<mmOutputType>(bmm2ResUbSize);
     Add(bmm2ResPreUb, bmm2ResUb, bmm2ResPreUb, bmm2ResUbSize);
@@ -1034,7 +1034,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::GetSingleCore
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::CopyND2NZOnTheFly(
-    const LocalTensor<mmOutputType> &dst, const GlobalTensor<mmOutputType> &src, const int height, const int width,
+    const LocalTensor<mmOutputType>& dst, const GlobalTensor<mmOutputType>& src, const int height, const int width,
     const int gCol, const bool isA1)
 {
     ASSERT(gCol >= width && "Copy ND block gm->ub width larger than origin matrix width.");

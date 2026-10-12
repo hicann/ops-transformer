@@ -27,33 +27,32 @@ static const uint64_t DIM_NUM_1 = 1;
 static const uint64_t DIM_NUM_2 = 2;
 static const uint64_t DIM_NUM_3 = 3;
 
-ge::graphStatus InferShapeNsaCompressAttention(gert::InferShapeContext *context)
+ge::graphStatus InferShapeNsaCompressAttention(gert::InferShapeContext* context)
 {
     OP_LOGI(context, "Enter NsaCompressAttention runtime infershape impl.");
 
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape *queryShape = context->GetInputShape(0); // N2, T, G, D
+    const gert::Shape* queryShape = context->GetInputShape(0); // N2, T, G, D
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(1);
+    const gert::Shape* keyShape = context->GetInputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    const gert::Shape *valueShape = context->GetInputShape(2);
+    const gert::Shape* valueShape = context->GetInputShape(2);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
     auto attrs = context->GetAttrs();
-    const auto *queryDesc = context->GetInputDesc(0);
+    const auto* queryDesc = context->GetInputDesc(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryDesc);
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const char *inputLayout = attrs->GetAttrPointer<char>(2);
+    const char* inputLayout = attrs->GetAttrPointer<char>(2);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayout);
     std::string inputLayoutStr = std::string(inputLayout);
-    for (auto &c : inputLayoutStr) {
+    for (auto& c : inputLayoutStr) {
         c = toupper(c);
     }
     if (inputLayoutStr != "TND") {
-        OP_LOGE(context, "The inputLayout should be TND(case-insensitive), but got %s.",
-                  inputLayoutStr.c_str());
+        OP_LOGE(context, "The inputLayout should be TND(case-insensitive), but got %s.", inputLayoutStr.c_str());
         return GRAPH_FAILED;
     }
 
@@ -62,7 +61,7 @@ ge::graphStatus InferShapeNsaCompressAttention(gert::InferShapeContext *context)
     int64_t shapeG = queryShape->GetDim(2);
 
     // softmaxMax, fp32: (B, N, S, 8)
-    gert::Shape *softmaxMaxShape = context->GetOutputShape(0);
+    gert::Shape* softmaxMaxShape = context->GetOutputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxMaxShape);
     // TN8 for fake
     softmaxMaxShape->SetDimNum(DIM_NUM_3);
@@ -71,21 +70,21 @@ ge::graphStatus InferShapeNsaCompressAttention(gert::InferShapeContext *context)
     softmaxMaxShape->SetDim(DIM_NUM_2, SOFTMAXMAX_F32_DIM0SHAPE);
 
     // softmaxSum, shape same as softmaxMax
-    gert::Shape *softmaxSumShape = context->GetOutputShape(1);
+    gert::Shape* softmaxSumShape = context->GetOutputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxSumShape);
     *softmaxSumShape = *softmaxMaxShape;
 
     // attenOut: (N2, T, G, D2)
-    gert::Shape *attentionOutShape = context->GetOutputShape(2);
+    gert::Shape* attentionOutShape = context->GetOutputShape(2);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
     *attentionOutShape = *queryShape;
     auto shapeD2 = valueShape->GetDim(2);
     attentionOutShape->SetDim(DIM_NUM_3, shapeD2);
 
     // topkIndicesOut: (N2, T, selectBlockCount)
-    gert::Shape *topkIndicesOutShape = context->GetOutputShape(3);
+    gert::Shape* topkIndicesOutShape = context->GetOutputShape(3);
     OP_CHECK_NULL_WITH_CONTEXT(context, topkIndicesOutShape);
-    const int *selectBlockCountPtr = attrs->GetAttrPointer<int32_t>(7);
+    const int* selectBlockCountPtr = attrs->GetAttrPointer<int32_t>(7);
     auto selectBlockCount = *selectBlockCountPtr;
     topkIndicesOutShape->SetDimNum(DIM_NUM_3);
     topkIndicesOutShape->SetDim(DIM_NUM_0, shapeN2);
@@ -95,7 +94,7 @@ ge::graphStatus InferShapeNsaCompressAttention(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeNsaCompressAttention(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeNsaCompressAttention(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
@@ -112,6 +111,8 @@ ge::graphStatus InferDataTypeNsaCompressAttention(gert::InferDataTypeContext *co
     return GRAPH_SUCCESS;
 }
 
-IMPL_OP_INFERSHAPE(NsaCompressAttention).InferShape(InferShapeNsaCompressAttention).InferDataType(InferDataTypeNsaCompressAttention);
+IMPL_OP_INFERSHAPE(NsaCompressAttention)
+    .InferShape(InferShapeNsaCompressAttention)
+    .InferDataType(InferDataTypeNsaCompressAttention);
 
 } // namespace ops

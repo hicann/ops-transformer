@@ -37,9 +37,15 @@ std::string MlaPrologV2_tiling_A2SocInfo = "{\n"
 
 class MlaPrologV2 : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "MlaPrologV3 SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "MlaPrologV3 SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "MlaPrologV3 TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "MlaPrologV3 TearDown" << std::endl;
+    }
 };
 
 // 全量化kvcache pertensor量化

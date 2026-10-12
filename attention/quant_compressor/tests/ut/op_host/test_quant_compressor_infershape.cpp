@@ -17,9 +17,15 @@
 
 class QuantCompressorProto : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "QuantCompressorProto SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "QuantCompressorProto SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "QuantCompressorProto TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "QuantCompressorProto TearDown" << std::endl;
+    }
 };
 
 // BSH layout: x=[B,S,H]=[1,128,4096], wkv=[coff*D,H]=[256,4096], cmp_ratio=4, coff=2.

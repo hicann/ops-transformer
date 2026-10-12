@@ -41,15 +41,15 @@ public:
     using L0_K_T = std::conditional_t<LIT::isMxFp8, mx_fp8_e4m3_t, K_T>;
 
     __aicore__ inline PoolKeyIndexerServiceCube(){};
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitMm1GlobalTensor(const GlobalTensor<int32_t> &blkTableGm, const GlobalTensor<K_T> &keyGm,
-                                               const GlobalTensor<Q_T> &queryGm,
-                                               const GlobalTensor<bfloat16_t> &keyScaleGmBf16 = {},
-                                               const GlobalTensor<bfloat16_t> &queryScaleGmBf16 = {});
-    __aicore__ inline void InitParams(const ConstInfo &constInfo);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitMm1GlobalTensor(const GlobalTensor<int32_t>& blkTableGm, const GlobalTensor<K_T>& keyGm,
+                                               const GlobalTensor<Q_T>& queryGm,
+                                               const GlobalTensor<bfloat16_t>& keyScaleGmBf16 = {},
+                                               const GlobalTensor<bfloat16_t>& queryScaleGmBf16 = {});
+    __aicore__ inline void InitParams(const ConstInfo& constInfo);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void ComputeMm1(const PkiCommon::RunInfo &runInfo);
+    __aicore__ inline void ComputeMm1(const PkiCommon::RunInfo& runInfo);
 
     static constexpr uint64_t KEY_BUF_NUM = 3;
     static constexpr uint64_t QUERY_BUF_NUM = 2;
@@ -91,20 +91,20 @@ public:
 
 protected:
     __aicore__ inline void Fixp(uint64_t s1gGmOffset, uint64_t s2GmOffset, uint64_t s1gL0RealSize,
-                                uint64_t s2L0RealSize, const PkiCommon::RunInfo &runInfo);
-    __aicore__ inline void ComputeL0c(uint64_t s1gL0RealSize, uint64_t s2L0RealSize, const PkiCommon::RunInfo &runInfo);
+                                uint64_t s2L0RealSize, const PkiCommon::RunInfo& runInfo);
+    __aicore__ inline void ComputeL0c(uint64_t s1gL0RealSize, uint64_t s2L0RealSize, const PkiCommon::RunInfo& runInfo);
     __aicore__ inline void LoadKeyToL0b(uint64_t s2L0Offset, uint64_t s2L1RealSize, uint64_t s2L0RealSize,
-                                        const PkiCommon::RunInfo &runInfo);
+                                        const PkiCommon::RunInfo& runInfo);
     __aicore__ inline void LoadQueryToL0a(uint64_t s1gL1Offset, uint64_t s1gL0Offset, uint64_t s1gL1RealSize,
-                                          uint64_t s1gL0RealSize, const PkiCommon::RunInfo &runInfo);
-    __aicore__ inline void QueryNd2Nz(uint64_t s1gL1RealSize, uint64_t s1gL1Offset, const PkiCommon::RunInfo &runInfo);
-    __aicore__ inline void KeyNd2Nz(uint64_t s2L1RealSize, uint64_t s2GmOffset, const PkiCommon::RunInfo &runInfo);
-    __aicore__ inline void KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t s2GmOffset, const PkiCommon::RunInfo &runInfo);
+                                          uint64_t s1gL0RealSize, const PkiCommon::RunInfo& runInfo);
+    __aicore__ inline void QueryNd2Nz(uint64_t s1gL1RealSize, uint64_t s1gL1Offset, const PkiCommon::RunInfo& runInfo);
+    __aicore__ inline void KeyNd2Nz(uint64_t s2L1RealSize, uint64_t s2GmOffset, const PkiCommon::RunInfo& runInfo);
+    __aicore__ inline void KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t s2GmOffset, const PkiCommon::RunInfo& runInfo);
     // mxFP8: E8M0 scale GM -> L1(Dn2Nz, 2 个 e8m0 打包 1 个 bf16)
     __aicore__ inline void LoadQScaleToL1(uint64_t s1gL1RealSize, uint64_t s1gGmOffset,
-                                          const PkiCommon::RunInfo &runInfo);
+                                          const PkiCommon::RunInfo& runInfo);
     __aicore__ inline void LoadKScaleToL1(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                          const PkiCommon::RunInfo &runInfo);
+                                          const PkiCommon::RunInfo& runInfo);
     GlobalTensor<int32_t> blkTableGm_;
     GlobalTensor<K_T> keyGm_;
     GlobalTensor<Q_T> queryGm_;
@@ -149,7 +149,7 @@ private:
 };
 
 template <typename LIT>
-__aicore__ inline void PoolKeyIndexerServiceCube<LIT>::InitParams(const ConstInfo &constInfo)
+__aicore__ inline void PoolKeyIndexerServiceCube<LIT>::InitParams(const ConstInfo& constInfo)
 {
     constInfo_ = constInfo;
     // mxFP8 scale L1 乒乓步长(以 e8m0 计, 与 L1 数据乒乓容量一致)
@@ -158,7 +158,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::InitParams(const ConstInf
 }
 
 template <typename LIT>
-__aicore__ inline void PoolKeyIndexerServiceCube<LIT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void PoolKeyIndexerServiceCube<LIT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(bufUB_, 2 * CeilDiv(constInfo_.mBaseSize, 2) * constInfo_.s2BaseSize *
                                  sizeof(float)); // 大小：2(开dB) * 2 * 64 * 128 * 4 = 128KB
@@ -186,8 +186,8 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::InitBuffers(TPipe *pipe)
 
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::InitMm1GlobalTensor(
-    const GlobalTensor<int32_t> &blkTableGm, const GlobalTensor<K_T> &keyGm, const GlobalTensor<Q_T> &queryGm,
-    const GlobalTensor<bfloat16_t> &keyScaleGmBf16, const GlobalTensor<bfloat16_t> &queryScaleGmBf16)
+    const GlobalTensor<int32_t>& blkTableGm, const GlobalTensor<K_T>& keyGm, const GlobalTensor<Q_T>& queryGm,
+    const GlobalTensor<bfloat16_t>& keyScaleGmBf16, const GlobalTensor<bfloat16_t>& queryScaleGmBf16)
 {
     blkTableGm_ = blkTableGm;
     keyGm_ = keyGm;
@@ -199,7 +199,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::InitMm1GlobalTensor(
 }
 
 template <typename LIT>
-__aicore__ inline void PoolKeyIndexerServiceCube<LIT>::ComputeMm1(const PkiCommon::RunInfo &runInfo)
+__aicore__ inline void PoolKeyIndexerServiceCube<LIT>::ComputeMm1(const PkiCommon::RunInfo& runInfo)
 {
     CrossCoreWaitFlag<PkiCommon::ConstInfo::PKI_SYNC_MODE4, PIPE_FIX>(PkiCommon::ConstInfo::CROSS_VC_EVENT +
                                                                       runInfo.loop % 2);
@@ -305,7 +305,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::ComputeMm1(const PkiCommo
 
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::KeyNd2Nz(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                                                const PkiCommon::RunInfo &runInfo)
+                                                                const PkiCommon::RunInfo& runInfo)
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -326,7 +326,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::KeyNd2Nz(uint64_t s2L1Rea
 // blkNum, blkSize, N2, D
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                                                     const PkiCommon::RunInfo &runInfo)
+                                                                     const PkiCommon::RunInfo& runInfo)
 {
     uint64_t s2L1Offset = 0;
     while (s2L1Offset < s2L1RealSize) {
@@ -360,7 +360,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::KeyNd2NzForPA(uint64_t s2
 // batch, s1, n2, g, d
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::QueryNd2Nz(uint64_t s1gL1RealSize, uint64_t s1gGmOffset,
-                                                                  const PkiCommon::RunInfo &runInfo)
+                                                                  const PkiCommon::RunInfo& runInfo)
 {
     uint64_t dstNzC0Stride = CeilAlign(s1gL1RealSize, 2 * constInfo_.gSize);
     Nd2NzParams nd2nzPara;
@@ -381,7 +381,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::QueryNd2Nz(uint64_t s1gL1
 // scale GM 布局: (B,S1,N1,D/64,2) 连续展开 -> 每 s1 行 scalePerToken 个 e8m0
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadQScaleToL1(uint64_t s1gL1RealSize, uint64_t s1gGmOffset,
-                                                                      const PkiCommon::RunInfo &runInfo)
+                                                                      const PkiCommon::RunInfo& runInfo)
 {
     uint64_t scaleOffsetInBuf = (queryL1Mte2BufIdx_ % QUERY_BUF_NUM) * queryScaleBufferOffset_;
     LocalTensor<bfloat16_t> scaleL1 = queryScaleL1_[scaleOffsetInBuf].template ReinterpretCast<bfloat16_t>();
@@ -402,7 +402,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadQScaleToL1(uint64_t s
 // mxFP8: k_descale GM -> L1(非 PA 连续; PA 按 block_table × keyDequantScaleStride0)
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadKScaleToL1(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                                                      const PkiCommon::RunInfo &runInfo)
+                                                                      const PkiCommon::RunInfo& runInfo)
 {
     uint64_t scaleOffsetInBuf = (keyL1BufIdx_ % KEY_BUF_NUM) * keyScaleBufferOffset_;
     LocalTensor<bfloat16_t> scaleL1 = keyScaleL1_[scaleOffsetInBuf].template ReinterpretCast<bfloat16_t>();
@@ -453,7 +453,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadKScaleToL1(uint64_t s
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t s1gGmOffset, uint64_t s1gL1Offset,
                                                                       uint64_t s1gL1RealSize, uint64_t s1gL0RealSize,
-                                                                      const PkiCommon::RunInfo &runInfo)
+                                                                      const PkiCommon::RunInfo& runInfo)
 {
     LoadData2DParamsV2 loadData2DParamsV2;
     if (constInfo_.splitMFlag && runInfo.actMBaseSize > 128) { // 非尾块，切M
@@ -523,7 +523,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t s
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadKeyToL0b(uint64_t s2L1Offset, uint64_t s2L1RealSize,
                                                                     uint64_t s2L0RealSize,
-                                                                    const PkiCommon::RunInfo &runInfo)
+                                                                    const PkiCommon::RunInfo& runInfo)
 {
     LoadData2DParamsV2 loadData2DParamsV2;
     loadData2DParamsV2.mStartPosition = CeilDiv(s2L1Offset, BLOCK_CUBE);
@@ -555,7 +555,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadKeyToL0b(uint64_t s2L
 
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::ComputeL0c(uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
-                                                                  const PkiCommon::RunInfo &runInfo)
+                                                                  const PkiCommon::RunInfo& runInfo)
 {
     MmadParams mmadParams;
     mmadParams.m = CeilAlign(s1gL0RealSize, BLOCK_CUBE);
@@ -573,7 +573,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::ComputeL0c(uint64_t s1gL0
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::Fixp(uint64_t s1gGmOffset, uint64_t s2GmOffset,
                                                             uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
-                                                            const PkiCommon::RunInfo &runInfo)
+                                                            const PkiCommon::RunInfo& runInfo)
 {
     SetFlag<HardEvent::M_FIX>(M_FIX_EVENT + l0BufIdx_ % L0_BUF_NUM);
     WaitFlag<HardEvent::M_FIX>(M_FIX_EVENT + l0BufIdx_ % L0_BUF_NUM);

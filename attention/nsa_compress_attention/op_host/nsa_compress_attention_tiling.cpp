@@ -35,14 +35,14 @@ constexpr size_t VALUE_INPUT_INDEX = 2;
 constexpr size_t INPUTLAYOUT_ATTRS_INDEX = 2;
 constexpr size_t DIM_3 = 3;
 
-static ge::graphStatus CheckParams(const gert::TilingContext *context)
+static ge::graphStatus CheckParams(const gert::TilingContext* context)
 {
     if (context->GetInputShape(QUERY_INPUT_INDEX) != nullptr && context->GetInputShape(KEY_INPUT_INDEX) != nullptr &&
         context->GetInputShape(VALUE_INPUT_INDEX) != nullptr && context->GetAttrs() != nullptr) {
-        auto &queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
-        auto &keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
-        auto &valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
-        const char *inputLayout = context->GetAttrs()->GetAttrPointer<char>(INPUTLAYOUT_ATTRS_INDEX);
+        auto& queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
+        auto& keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
+        auto& valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
+        const char* inputLayout = context->GetAttrs()->GetAttrPointer<char>(INPUTLAYOUT_ATTRS_INDEX);
         if (strlen(inputLayout) == DIM_3 && strcmp(inputLayout, "TND") == 0) {
             // q_D != k_D
             // q shape: N2, T, G, D1
@@ -52,8 +52,8 @@ static ge::graphStatus CheckParams(const gert::TilingContext *context)
                         return ge::GRAPH_FAILED);
             // kD < vD
             OP_CHECK_IF((keyShape.GetDim(2) < valueShape.GetDim(2)),
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "key or value shape is invalid"),
-                return ge::GRAPH_FAILED);
+                        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "key or value shape is invalid"),
+                        return ge::GRAPH_FAILED);
             return ge::SUCCESS;
         } else {
             OP_LOGW(context, "Got invalid input_layout[%s]. Only support TND now.", inputLayout);
@@ -65,7 +65,7 @@ static ge::graphStatus CheckParams(const gert::TilingContext *context)
     return ge::GRAPH_FAILED;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingNsaCompressAttention(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingNsaCompressAttention(gert::TilingContext* context)
 {
     if (CheckParams(context) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -74,17 +74,13 @@ ASCENDC_EXTERN_C ge::graphStatus TilingNsaCompressAttention(gert::TilingContext 
     return resultCode;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForNsaCompressAttention(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForNsaCompressAttention(gert::TilingParseContext* context)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfoPtr == nullptr,
-                OP_LOGE(context->GetNodeName(),
-                "platformInfoPtr is null"),
+    OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "platformInfoPtr is null"),
                 return ge::GRAPH_FAILED);
     auto compileInfoPtr = context->GetCompiledInfo<NsaCompressAttentionCompileInfo>();
-    OP_CHECK_IF(compileInfoPtr == nullptr,
-                OP_LOGE(context->GetNodeName(),
-                "compileInfoPtr is null"),
+    OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "compileInfoPtr is null"),
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -100,6 +96,6 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForNsaCompressAttention(gert::Tili
 IMPL_OP_OPTILING(NsaCompressAttention)
     .Tiling(TilingNsaCompressAttention)
     .TilingInputsDataDependency({4, 5, 6})
-    .TilingParse<NsaCompressAttentionCompileInfo>(TilingPrepareForNsaCompressAttention);  // 向框架注册入口函数
+    .TilingParse<NsaCompressAttentionCompileInfo>(TilingPrepareForNsaCompressAttention); // 向框架注册入口函数
 
 } // namespace optiling

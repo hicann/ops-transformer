@@ -68,44 +68,44 @@ class QuantFlashAttnMetadataCpuKernel : public CpuKernel {
 public:
     QuantFlashAttnMetadataCpuKernel() = default;
     ~QuantFlashAttnMetadataCpuKernel() = default;
-    uint32_t Compute(CpuKernelContext &ctx) override;
+    uint32_t Compute(CpuKernelContext& ctx) override;
 
 private:
-    bool Prepare(CpuKernelContext &ctx);
-    bool BalanceSchedule(SectionStreamKResult &splitRes);
-    bool GenMetaData(SectionStreamKResult &splitRes);
-    void SetMetadataHead(const SectionStreamKResult &splitRes, optiling::detail::FaMetaData &faMetadata);
-    void SetMetadataFa(const SectionStreamKResult &splitRes, optiling::detail::FaMetaData &faMetadata);
-    void SetMetadataFd(const SectionStreamKResult &splitRes, optiling::detail::FaMetaData &faMetadata);
+    bool Prepare(CpuKernelContext& ctx);
+    bool BalanceSchedule(SectionStreamKResult& splitRes);
+    bool GenMetaData(SectionStreamKResult& splitRes);
+    void SetMetadataHead(const SectionStreamKResult& splitRes, optiling::detail::FaMetaData& faMetadata);
+    void SetMetadataFa(const SectionStreamKResult& splitRes, optiling::detail::FaMetaData& faMetadata);
+    void SetMetadataFd(const SectionStreamKResult& splitRes, optiling::detail::FaMetaData& faMetadata);
     bool ParamsInit();
     bool CheckNeedInitOutput();
-    std::vector<int64_t> GetTensorDataAsInt64(Tensor *tensor, size_t size);
+    std::vector<int64_t> GetTensorDataAsInt64(Tensor* tensor, size_t size);
     uint32_t GetS1SeqSize(uint32_t bIdx);
     uint32_t GetS2SeqSize(uint32_t bIdx);
     int64_t CalDeterMaxRound();
     bool HasVarlenSeq() const;
-    void GetMetadataRowInfo(int32_t &dimNum, int64_t &rowSize);
+    void GetMetadataRowInfo(int32_t& dimNum, int64_t& rowSize);
     uint32_t GetFagOffset();
-    bool CalDeterSwizzleSchedule(std::vector<int64_t> &roundPrefix, std::vector<int64_t> &s1OuterList,
-                                 std::vector<int64_t> &s2OuterList, std::vector<std::vector<int64_t>> &sparseData);
+    bool CalDeterSwizzleSchedule(std::vector<int64_t>& roundPrefix, std::vector<int64_t>& s1OuterList,
+                                 std::vector<int64_t>& s2OuterList, std::vector<std::vector<int64_t>>& sparseData);
     bool GenQuantFagGradMetaData();
     bool IsTndLineBandMode() const;
-    void CalTndLineActualToken(uint32_t bIdx, int64_t &s1Token, int64_t &s2Token);
-    void GetTndLineOuterMN(uint32_t bIdx, int64_t &m, int64_t &n);
+    void CalTndLineActualToken(uint32_t bIdx, int64_t& s1Token, int64_t& s2Token);
+    void GetTndLineOuterMN(uint32_t bIdx, int64_t& m, int64_t& n);
     TndLineRunShape MakeTndLineRunShape(uint32_t bIdx);
-    int64_t CountTndLineSameShapeRun(uint32_t start, TndLineRunShape &shape);
-    int64_t CalTndLineRunRounds(const TndLineRunShape &shape, int64_t total);
+    int64_t CountTndLineSameShapeRun(uint32_t start, TndLineRunShape& shape);
+    int64_t CalTndLineRunRounds(const TndLineRunShape& shape, int64_t total);
     bool PreferTndLineSwizzle();
-    bool CalTndLineSwizzleSchedule(TndLineSchedule &sched);
-    bool GenQuantFagTndLineSchedule(optiling::detail::QuantFAGMetaData &gradMetaData);
+    bool CalTndLineSwizzleSchedule(TndLineSchedule& sched);
+    bool GenQuantFagTndLineSchedule(optiling::detail::QuantFAGMetaData& gradMetaData);
 
 private:
-    CpuKernelContext *context_ = nullptr;
-    Tensor *cuSeqlensQ_ = nullptr;
-    Tensor *cuSeqlensKv_ = nullptr;
-    Tensor *sequsedQ_ = nullptr;
-    Tensor *sequsedKv_ = nullptr;
-    Tensor *metaData_ = nullptr;
+    CpuKernelContext* context_ = nullptr;
+    Tensor* cuSeqlensQ_ = nullptr;
+    Tensor* cuSeqlensKv_ = nullptr;
+    Tensor* sequsedQ_ = nullptr;
+    Tensor* sequsedKv_ = nullptr;
+    Tensor* metaData_ = nullptr;
 
     int32_t batchSize_ = 0;
     int32_t maxSeqlenQ_ = -1;

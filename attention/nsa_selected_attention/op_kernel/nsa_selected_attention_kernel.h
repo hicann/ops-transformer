@@ -42,7 +42,7 @@ public:
     __aicore__ inline void Init(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR topkIndices, GM_ADDR attenMask,
                                 GM_ADDR actualSeqQLen, GM_ADDR actualSeqKvLen, GM_ADDR softmaxMax, GM_ADDR softmaxSum,
                                 GM_ADDR attentionOut, GM_ADDR workspace,
-                                const NsaSelectedAttentionTilingData *__restrict tiling, TPipe *tPipe);
+                                const NsaSelectedAttentionTilingData* __restrict tiling, TPipe* tPipe);
     __aicore__ inline void Process();
 
     // define matmul1
@@ -63,7 +63,7 @@ protected:
     __aicore__ inline void InitIOGm(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR topkIndices, GM_ADDR attenMask,
                                     GM_ADDR actualSeqQLen, GM_ADDR actualSeqKvLen, GM_ADDR softmaxMax,
                                     GM_ADDR softmaxSum, GM_ADDR attentionOut);
-    __aicore__ inline void SetTiling(const NsaSelectedAttentionTilingData *__restrict tiling);
+    __aicore__ inline void SetTiling(const NsaSelectedAttentionTilingData* __restrict tiling);
     __aicore__ inline void InitWorkspace(GM_ADDR workspace);
     __aicore__ inline void InitBuffer();
 
@@ -73,18 +73,18 @@ protected:
     __aicore__ inline void SelectAndGatherK();
     __aicore__ inline void SelectAndGatherV();
 
-    __aicore__ inline void IterateBmm1(SplitExtraInfo &extraInfo);
-    __aicore__ inline void IterateBmm2(SplitExtraInfo &extraInfo);
+    __aicore__ inline void IterateBmm1(SplitExtraInfo& extraInfo);
+    __aicore__ inline void IterateBmm2(SplitExtraInfo& extraInfo);
     __aicore__ inline void WaitBmm1Result();
     __aicore__ inline void WaitBmm2Result();
-    __aicore__ inline void SetBmm1TensorA(SplitExtraInfo &extraInfo);
-    __aicore__ inline void SetBmm1TensorB(SplitExtraInfo &extraInfo);
+    __aicore__ inline void SetBmm1TensorA(SplitExtraInfo& extraInfo);
+    __aicore__ inline void SetBmm1TensorB(SplitExtraInfo& extraInfo);
 
-    __aicore__ inline void SetExtraInfo(SplitExtraInfo &extraInfo);
-    __aicore__ inline void GetBmm1Result(SplitExtraInfo &extraInfo, uint32_t bmmResOffset, uint32_t currentProcessSize);
-    __aicore__ inline void ProcessSoftmax(SplitExtraInfo &extraInfo);
-    __aicore__ inline void SoftmaxDataCopyOut(SplitExtraInfo &extraInfo, int64_t s1oIdx);
-    __aicore__ inline void GetShiftLeftMask(uint32_t totalSize, uint32_t shiftCount, uint64_t &mask);
+    __aicore__ inline void SetExtraInfo(SplitExtraInfo& extraInfo);
+    __aicore__ inline void GetBmm1Result(SplitExtraInfo& extraInfo, uint32_t bmmResOffset, uint32_t currentProcessSize);
+    __aicore__ inline void ProcessSoftmax(SplitExtraInfo& extraInfo);
+    __aicore__ inline void SoftmaxDataCopyOut(SplitExtraInfo& extraInfo, int64_t s1oIdx);
+    __aicore__ inline void GetShiftLeftMask(uint32_t totalSize, uint32_t shiftCount, uint64_t& mask);
     __aicore__ inline void DuplicateWithLoop(size_t selectedBlockIdx, uint32_t saveNum, uint32_t currentProcessSize,
                                              uint64_t mask[]);
     __aicore__ inline void HandleMask(uint32_t currentProcessSize);
@@ -137,7 +137,7 @@ protected:
     float positiveFloatScalar;
 
     int32_t blockIdx;
-    const NsaSelectedAttentionTilingData *__restrict tilingData;
+    const NsaSelectedAttentionTilingData* __restrict tilingData;
     // gather模块 变量
     uint32_t dimK;
     uint32_t dimV;
@@ -156,7 +156,7 @@ protected:
     float negativeScalar;
     float positiveScalar;
 
-    TPipe *pipe;
+    TPipe* pipe;
 
     // input
     GlobalTensor<INPUT_T> queryGm;
@@ -199,7 +199,7 @@ template <typename INPUT_T, bool ATTEN_ENABLE>
 __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::Init(
     GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR topkIndices, GM_ADDR attenMask, GM_ADDR actualSeqQLen,
     GM_ADDR actualSeqKvLen, GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR attentionOut, GM_ADDR workspace,
-    const NsaSelectedAttentionTilingData *__restrict tiling, TPipe *tPipe)
+    const NsaSelectedAttentionTilingData* __restrict tiling, TPipe* tPipe)
 {
     this->blockIdx = GetBlockIdx();
     this->pipe = tPipe;
@@ -213,7 +213,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::Init(
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
 __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SetTiling(
-    const NsaSelectedAttentionTilingData *__restrict tiling)
+    const NsaSelectedAttentionTilingData* __restrict tiling)
 {
     // copy base params
     this->tilingData = tiling;
@@ -288,17 +288,17 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::InitIOGm(GM_
                                                                              GM_ADDR actualSeqKvLen, GM_ADDR softmaxMax,
                                                                              GM_ADDR softmaxSum, GM_ADDR attentionOut)
 {
-    this->queryGm.SetGlobalBuffer((__gm__ INPUT_T *)query);
-    this->keyGm.SetGlobalBuffer((__gm__ INPUT_T *)key);
-    this->valueGm.SetGlobalBuffer((__gm__ INPUT_T *)value);
-    this->topkIndicesGm.SetGlobalBuffer((__gm__ int32_t *)topkIndices);
-    this->attenMaskGmInt.SetGlobalBuffer((__gm__ uint8_t *)attenMask);
-    this->actualSeqQLenGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqQLen);
-    this->actualSeqKvLenGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqKvLen);
+    this->queryGm.SetGlobalBuffer((__gm__ INPUT_T*)query);
+    this->keyGm.SetGlobalBuffer((__gm__ INPUT_T*)key);
+    this->valueGm.SetGlobalBuffer((__gm__ INPUT_T*)value);
+    this->topkIndicesGm.SetGlobalBuffer((__gm__ int32_t*)topkIndices);
+    this->attenMaskGmInt.SetGlobalBuffer((__gm__ uint8_t*)attenMask);
+    this->actualSeqQLenGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqQLen);
+    this->actualSeqKvLenGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqKvLen);
 
-    this->softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmaxMax);
-    this->softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmaxSum);
-    this->attentionOutGm.SetGlobalBuffer((__gm__ INPUT_T *)attentionOut);
+    this->softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmaxMax);
+    this->softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmaxSum);
+    this->attentionOutGm.SetGlobalBuffer((__gm__ INPUT_T*)attentionOut);
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
@@ -312,10 +312,10 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::InitWorkspac
     uint64_t selectedVCoreOffset = this->d2Size * selectedDataSize * this->blockIdx;
     uint64_t mm1ResCoreOffset = this->gSize * this->selectedLength * sizeof(float) * this->blockIdx;
 
-    this->selectedKRes.SetGlobalBuffer((__gm__ INPUT_T *)(workspace + selectedKCoreOffset));
-    this->selectedVRes.SetGlobalBuffer((__gm__ INPUT_T *)(workspace + selectedKSize + selectedVCoreOffset));
-    this->mm1Res.SetGlobalBuffer((__gm__ float *)(workspace + selectedKSize + selectedVSize + mm1ResCoreOffset));
-    this->softmaxRes.SetGlobalBuffer((__gm__ INPUT_T *)(workspace + selectedKSize + selectedVSize + mm1ResCoreOffset));
+    this->selectedKRes.SetGlobalBuffer((__gm__ INPUT_T*)(workspace + selectedKCoreOffset));
+    this->selectedVRes.SetGlobalBuffer((__gm__ INPUT_T*)(workspace + selectedKSize + selectedVCoreOffset));
+    this->mm1Res.SetGlobalBuffer((__gm__ float*)(workspace + selectedKSize + selectedVSize + mm1ResCoreOffset));
+    this->softmaxRes.SetGlobalBuffer((__gm__ INPUT_T*)(workspace + selectedKSize + selectedVSize + mm1ResCoreOffset));
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
@@ -522,7 +522,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SelectAndGat
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
-__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::ProcessSoftmax(SplitExtraInfo &extraInfo)
+__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::ProcessSoftmax(SplitExtraInfo& extraInfo)
 {
     event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>());
     event_t eventIdVToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
@@ -578,7 +578,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::ProcessSoftm
 template <typename INPUT_T, bool ATTEN_ENABLE>
 __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::GetShiftLeftMask(uint32_t totalSize,
                                                                                      uint32_t shiftCount,
-                                                                                     uint64_t &mask)
+                                                                                     uint64_t& mask)
 {
     mask = (~0ULL) << shiftCount;
     if (totalSize < UL_BIT_COUNT) {
@@ -663,7 +663,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::HandleMask(u
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
-__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::GetBmm1Result(SplitExtraInfo &extraInfo,
+__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::GetBmm1Result(SplitExtraInfo& extraInfo,
                                                                                   uint32_t bmmResOffset,
                                                                                   uint32_t currentProcessSize)
 {
@@ -675,7 +675,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::GetBmm1Resul
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
-__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SetExtraInfo(SplitExtraInfo &extraInfo)
+__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SetExtraInfo(SplitExtraInfo& extraInfo)
 {
     extraInfo.bs1oIdx = this->currentBS1;
     extraInfo.n2oIdx = this->currentN2;
@@ -684,7 +684,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SetExtraInfo
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
-__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::IterateBmm1(SplitExtraInfo &extraInfo)
+__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::IterateBmm1(SplitExtraInfo& extraInfo)
 {
     this->SetBmm1TensorA(extraInfo);
     this->SetBmm1TensorB(extraInfo);
@@ -693,7 +693,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::IterateBmm1(
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
-__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SetBmm1TensorA(SplitExtraInfo &extraInfo)
+__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SetBmm1TensorA(SplitExtraInfo& extraInfo)
 {
     // 计算gm上的offset
     int64_t bs1Offset = 0;
@@ -706,7 +706,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SetBmm1Tenso
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
-__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SetBmm1TensorB(SplitExtraInfo &extraInfo)
+__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SetBmm1TensorB(SplitExtraInfo& extraInfo)
 {
     this->bmm1.SetTensorB(this->selectedKRes, true);
     this->bmm1.SetTail(this->tilingData->inputParams.gSize, extraInfo.selectedS2RealSize);
@@ -720,7 +720,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::WaitBmm1Resu
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
-__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::IterateBmm2(SplitExtraInfo &extraInfo)
+__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::IterateBmm2(SplitExtraInfo& extraInfo)
 {
     // 计算gm上的offset
     int64_t bs1Offset = 0;

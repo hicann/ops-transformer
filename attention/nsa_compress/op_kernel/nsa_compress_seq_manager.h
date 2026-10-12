@@ -68,7 +68,7 @@ struct SampleManager_st {
     /// @param id
     /// @param lenth
     /// @return
-    __aicore__ inline void UpdateSampleHead(int32_t lenth, NSACompressTiling *tiling)
+    __aicore__ inline void UpdateSampleHead(int32_t lenth, NSACompressTiling* tiling)
     {
         sampleOffset += lenth;
     }
@@ -80,7 +80,7 @@ struct SampleManager_st {
     /// @param lenth 当前compress_token 对应的整个sample长度。sample 中间分核时，值不变;
     /// @param tiling tiling参数
     /// @return
-    __aicore__ inline void InitSampleHead(int32_t sid, int32_t offset, int32_t lenth, NSACompressTiling *tiling)
+    __aicore__ inline void InitSampleHead(int32_t sid, int32_t offset, int32_t lenth, NSACompressTiling* tiling)
     {
         sampleIdx = sid;
         sampleLen = lenth;
@@ -148,7 +148,7 @@ struct SingleCompressionTokenMetadata_st {
         return compressBlockSize - tokenProcessingLenth;
     }
 
-    __aicore__ inline void RefreshSingleCompressionTokenMetadata(struct SingleCompressionTokenMetadata_st *meta,
+    __aicore__ inline void RefreshSingleCompressionTokenMetadata(struct SingleCompressionTokenMetadata_st* meta,
                                                                  uint32_t processingLenth, uint32_t newSampleOffset,
                                                                  CompressState state)
     {
@@ -162,7 +162,7 @@ struct SingleCompressionTokenMetadata_st {
         tokenState = state;
     }
 
-    __aicore__ inline void InitCompressTokenMetaData(NSACompressTiling *tiling)
+    __aicore__ inline void InitCompressTokenMetaData(NSACompressTiling* tiling)
     {
         uint32_t initWeightOffset = 0;
         SetCompressBlockSize(tiling->compressBlockSize);
@@ -192,7 +192,7 @@ struct SingleCompressionTokenMetadata_st {
         return;
     }
 
-    __aicore__ inline uint64_t _GetWeightOffset(WeightOffsetType type, SubTilingInfo *subtiling = nullptr)
+    __aicore__ inline uint64_t _GetWeightOffset(WeightOffsetType type, SubTilingInfo* subtiling = nullptr)
     {
         if (type == WeightOffsetType::BUFFSET_OFFSET && subtiling == nullptr) {
             return WEIGHT_OFFSET_INVALID;
@@ -279,7 +279,7 @@ struct SequenceManager {
     /// @param subtiling UB Tiling
     /// @param tiling NSACompress Tiling相关信息
     /// @return
-    __aicore__ inline int32_t UpdateCompressTokenMetadata(NSACompressTiling *tiling, SubTilingInfo *subtiling,
+    __aicore__ inline int32_t UpdateCompressTokenMetadata(NSACompressTiling* tiling, SubTilingInfo* subtiling,
                                                           uint32_t curCompressLen)
     {
         uint32_t tokenLen = curCompressLen;
@@ -299,8 +299,8 @@ struct SequenceManager {
         }
     }
 
-    __aicore__ inline void UpdateCompletedCompressTokenMetadata(SingleTokenMetadata *meta, uint32_t tailLenth,
-                                                                uint32_t overlapNum, NSACompressTiling *tiling)
+    __aicore__ inline void UpdateCompletedCompressTokenMetadata(SingleTokenMetadata* meta, uint32_t tailLenth,
+                                                                uint32_t overlapNum, NSACompressTiling* tiling)
     {
         // （tokenProcessingLenth|compressTokenInSampleOffset|tokenState)
         uint32_t newSampleOffset =
@@ -318,7 +318,7 @@ struct SequenceManager {
     /// @param subtiling
     /// @param tiling
     /// @return
-    __aicore__ inline void UpdateSampleContext(SubTilingInfo *subtiling, NSACompressTiling *tiling,
+    __aicore__ inline void UpdateSampleContext(SubTilingInfo* subtiling, NSACompressTiling* tiling,
                                                uint32_t curCompressLen)
     {
         uint32_t len = curCompressLen;
@@ -334,7 +334,7 @@ struct SequenceManager {
 
     /// @brief
     /// @return
-    __aicore__ inline uint64_t GetWeightOffset(WeightOffsetType offsetType, SubTilingInfo *subtiling = nullptr)
+    __aicore__ inline uint64_t GetWeightOffset(WeightOffsetType offsetType, SubTilingInfo* subtiling = nullptr)
     {
         return compressMeta._GetWeightOffset(offsetType, subtiling);
     }
@@ -386,7 +386,7 @@ struct OverlapBufferManager_st {
     struct SequenceManager seqContext[MAX_OVERLAP_NUM];
 
     __aicore__ inline int32_t CheckSubTilingOverlap(int overlapIdx, int32_t sampleId, int32_t offset, uint32_t len,
-                                                    SubTilingInfo *subptr, struct CompSingleCoreInfo *pcore)
+                                                    SubTilingInfo* subptr, struct CompSingleCoreInfo* pcore)
     {
         int result = HAS_OVERLAP;
         if (sampleId != seqContext[overlapIdx].GetSampleId()) {
@@ -410,7 +410,7 @@ struct OverlapBufferManager_st {
         overlapIdx = (overlapIdx + delta) % overlapNum;
     }
 
-    __aicore__ inline int32_t InitOverlapMgt(AscendC::TPipe *pipe, NSACompressTiling *tiling, SubTilingInfo *subtiling)
+    __aicore__ inline int32_t InitOverlapMgt(AscendC::TPipe* pipe, NSACompressTiling* tiling, SubTilingInfo* subtiling)
     {
         {
             overlapIdx = 0;

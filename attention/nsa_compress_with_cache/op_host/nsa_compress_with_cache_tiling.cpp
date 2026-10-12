@@ -32,7 +32,7 @@ constexpr size_t INPUT_INPUT_INDEX = 0;
 constexpr size_t WEIGHT_INPUT_INDEX = 1;
 constexpr size_t OUTPUT_CACHE_INPUT_INDEX = 3;
 
-static ge::graphStatus CheckParams(const gert::TilingContext *context)
+static ge::graphStatus CheckParams(const gert::TilingContext* context)
 {
     if (context->GetInputShape(INPUT_INPUT_INDEX) != nullptr && context->GetInputShape(WEIGHT_INPUT_INDEX) != nullptr &&
         context->GetInputShape(OUTPUT_CACHE_INPUT_INDEX) != nullptr && context->GetAttrs() != nullptr) {
@@ -42,24 +42,30 @@ static ge::graphStatus CheckParams(const gert::TilingContext *context)
     return ge::GRAPH_FAILED;
 }
 
-static bool IsEmptyInput(gert::TilingContext *context)
+static bool IsEmptyInput(gert::TilingContext* context)
 {
     auto inputShape = context->GetInputShape(INPUT_INPUT_INDEX);
-    OP_CHECK_IF(inputShape == nullptr,
-                OP_LOGE(unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(),
-                "inputShape is nullptr!"),
-                return false);
+    OP_CHECK_IF(
+        inputShape == nullptr,
+        OP_LOGE(
+            unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(),
+            "inputShape is nullptr!"),
+        return false);
     auto weightShape = context->GetInputShape(WEIGHT_INPUT_INDEX);
-    OP_CHECK_IF(weightShape == nullptr,
-                OP_LOGE(unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(),
-                "weightShape is nullptr!"),
-                return false);
+    OP_CHECK_IF(
+        weightShape == nullptr,
+        OP_LOGE(
+            unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(),
+            "weightShape is nullptr!"),
+        return false);
     auto outputCacheShape = context->GetInputShape(OUTPUT_CACHE_INPUT_INDEX);
 
-    OP_CHECK_IF(outputCacheShape == nullptr,
-                OP_LOGE(unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(),
-                "outputCacheShape is nullptr!"),
-                return false);
+    OP_CHECK_IF(
+        outputCacheShape == nullptr,
+        OP_LOGE(
+            unlikely(((context) == nullptr) || (context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(),
+            "outputCacheShape is nullptr!"),
+        return false);
 
     int64_t inputShapeSize = inputShape->GetStorageShape().GetShapeSize();
     int64_t weightShapeSize = weightShape->GetStorageShape().GetShapeSize();
@@ -70,7 +76,7 @@ static bool IsEmptyInput(gert::TilingContext *context)
     return false;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus NsaCompressWithCache(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus NsaCompressWithCache(gert::TilingContext* context)
 {
     if (CheckParams(context) != ge::GRAPH_SUCCESS) {
         OP_LOGE(context, "[NSACompressWithCache] CheckParams failed");
@@ -86,9 +92,9 @@ ASCENDC_EXTERN_C ge::graphStatus NsaCompressWithCache(gert::TilingContext *conte
     return ge::GRAPH_FAILED;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForNsaCompressWithCache(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForNsaCompressWithCache(gert::TilingParseContext* context)
 {
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfoPtr);
     auto compileInfoPtr = context->GetCompiledInfo<NsaCompressWithCacheCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfoPtr);
@@ -98,9 +104,9 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForNsaCompressWithCache(gert::Tili
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfoPtr->ubSize);
 
     OP_CHECK_IF((compileInfoPtr->aivNum == 0 || compileInfoPtr->ubSize == 0),
-               OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "platform info is invalid, aivNum=%u, ubSize=%lu",
+                OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "platform info is invalid, aivNum=%u, ubSize=%lu",
                                             compileInfoPtr->aivNum, compileInfoPtr->ubSize),
-               return ge::GRAPH_FAILED);
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

@@ -434,7 +434,7 @@ inline auto CeilDivideBy(T num1, T num2) -> T
 }
 
 template <class T>
-inline std::vector<T> SliceVector(const std::vector<T> &arr, const int64_t step)
+inline std::vector<T> SliceVector(const std::vector<T>& arr, const int64_t step)
 {
     if (step == 1) {
         return arr;
@@ -447,43 +447,43 @@ inline std::vector<T> SliceVector(const std::vector<T> &arr, const int64_t step)
     return result;
 }
 
-ge::graphStatus CheckSoftmaxLseShape(gert::TilingContext *context, int64_t b, int64_t n1, int64_t s1, bool isQuant);
-ge::graphStatus CheckAttentionInShape(gert::TilingContext *context);
-ge::graphStatus CheckShapeValid(gert::TilingContext *context, int64_t b, int64_t n1, int64_t s1, int64_t d);
+ge::graphStatus CheckSoftmaxLseShape(gert::TilingContext* context, int64_t b, int64_t n1, int64_t s1, bool isQuant);
+ge::graphStatus CheckAttentionInShape(gert::TilingContext* context);
+ge::graphStatus CheckShapeValid(gert::TilingContext* context, int64_t b, int64_t n1, int64_t s1, int64_t d);
 
-ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase &fBaseParams);
-ge::graphStatus QuantShapeValidCheck(gert::TilingContext *context_, const FuzzyBaseInfoParamsRegbase &fBaseParams);
-ge::graphStatus QuantScaleShapeValidCheck(gert::TilingContext *context_);
-ge::graphStatus QuantScaleDtypeValidCheck(gert::TilingContext *context_);
-void JudgeIsNeedDeter(FuzzyBaseInfoParamsRegbase &fBaseParams, std::array<int64_t, CORE_LIST_NUM> &dqOffset,
-                      std::array<int64_t, CORE_LIST_NUM> &dkDvOffset, std::array<int64_t, CORE_LIST_NUM> &dqOffsetpre,
-                      std::array<int64_t, CORE_LIST_NUM> &dkDvOffsetpre, int64_t calcNum, bool &noNeedDeter,
-                      bool &dqNeedDeterpre, bool &dkDvNeedDeterpre);
-void GetOffset(FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t &currentDqOffset, int64_t &currentDkDvOffset,
+ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase& fBaseParams);
+ge::graphStatus QuantShapeValidCheck(gert::TilingContext* context_, const FuzzyBaseInfoParamsRegbase& fBaseParams);
+ge::graphStatus QuantScaleShapeValidCheck(gert::TilingContext* context_);
+ge::graphStatus QuantScaleDtypeValidCheck(gert::TilingContext* context_);
+void JudgeIsNeedDeter(FuzzyBaseInfoParamsRegbase& fBaseParams, std::array<int64_t, CORE_LIST_NUM>& dqOffset,
+                      std::array<int64_t, CORE_LIST_NUM>& dkDvOffset, std::array<int64_t, CORE_LIST_NUM>& dqOffsetpre,
+                      std::array<int64_t, CORE_LIST_NUM>& dkDvOffsetpre, int64_t calcNum, bool& noNeedDeter,
+                      bool& dqNeedDeterpre, bool& dkDvNeedDeterpre);
+void GetOffset(FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t& currentDqOffset, int64_t& currentDkDvOffset,
                int64_t blockIdx);
-void PrintShapeInfo(gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams);
-bool CheckSparseModeValue(FuzzyBaseInfoParamsRegbase &fBaseParams);
-bool CheckPrefixNExist(FuzzyBaseInfoParamsRegbase &fBaseParams, const int64_t bIdx, const int64_t prefixN,
-                       std::vector<std::vector<std::pair<int64_t, int64_t>>> &s1ValidIdx);
-void CalcleBandDeterParam(FuzzyBaseInfoParamsRegbase &fBaseParams);
-void CalcleCausalDeterParam(FuzzyBaseInfoParamsRegbase &fBaseParams);
-void SetSparsePrefixBlockInterval(const FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t bIdx, int64_t nIdx,
-                                  std::vector<std::vector<std::pair<int64_t, int64_t>>> &s1ValidIdx,
+void PrintShapeInfo(gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams);
+bool CheckSparseModeValue(FuzzyBaseInfoParamsRegbase& fBaseParams);
+bool CheckPrefixNExist(FuzzyBaseInfoParamsRegbase& fBaseParams, const int64_t bIdx, const int64_t prefixN,
+                       std::vector<std::vector<std::pair<int64_t, int64_t>>>& s1ValidIdx);
+void CalcleBandDeterParam(FuzzyBaseInfoParamsRegbase& fBaseParams);
+void CalcleCausalDeterParam(FuzzyBaseInfoParamsRegbase& fBaseParams);
+void SetSparsePrefixBlockInterval(const FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t bIdx, int64_t nIdx,
+                                  std::vector<std::vector<std::pair<int64_t, int64_t>>>& s1ValidIdx,
                                   int64_t (&blockStarts)[CORE_LIST_NUM], int64_t (&blockEnds)[CORE_LIST_NUM],
-                                  uint32_t &coreNum, int64_t &tmepBlock);
-std::pair<uint32_t, uint32_t> GetS1S2TemplateType(FuzzyBaseInfoParamsRegbase &fBaseParams);
-uint32_t GetDTemplateType(FuzzyBaseInfoParamsRegbase &fBaseParams);
-void GetCommS1S2OuterInfo(FuzzyBaseInfoParamsRegbase &fBaseParams, const int64_t prefixN,
-                          std::vector<std::pair<int64_t, int64_t>> &s1ValidIdx);
-void GetCommonS1S2OuterIndex(const FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t (*parseInfo)[ARRAY_LENGTH],
-                             int64_t gTail, int64_t &s1oIdx, int64_t &s2oIdx);
-void CalcleActualToken(FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t batchIdx, int64_t &actualCalcS1Token,
-                       int64_t &actualCalcS2Token);
-ge::graphStatus ProcessOptionalInput(gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams);
-ge::graphStatus ProcessQuantInfo(gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams);
-ge::graphStatus ProcessSparseModeInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams);
-ge::graphStatus ProcessTokensInfo(FuzzyBaseInfoParamsRegbase &fBaseParams);
-bool SetSparseParams(gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams);
-void DetermineMode(FuzzyBaseInfoParamsRegbase &fBaseParams);
+                                  uint32_t& coreNum, int64_t& tmepBlock);
+std::pair<uint32_t, uint32_t> GetS1S2TemplateType(FuzzyBaseInfoParamsRegbase& fBaseParams);
+uint32_t GetDTemplateType(FuzzyBaseInfoParamsRegbase& fBaseParams);
+void GetCommS1S2OuterInfo(FuzzyBaseInfoParamsRegbase& fBaseParams, const int64_t prefixN,
+                          std::vector<std::pair<int64_t, int64_t>>& s1ValidIdx);
+void GetCommonS1S2OuterIndex(const FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t (*parseInfo)[ARRAY_LENGTH],
+                             int64_t gTail, int64_t& s1oIdx, int64_t& s2oIdx);
+void CalcleActualToken(FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t batchIdx, int64_t& actualCalcS1Token,
+                       int64_t& actualCalcS2Token);
+ge::graphStatus ProcessOptionalInput(gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams);
+ge::graphStatus ProcessQuantInfo(gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams);
+ge::graphStatus ProcessSparseModeInfo(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams);
+ge::graphStatus ProcessTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams);
+bool SetSparseParams(gert::TilingContext* context_, FuzzyBaseInfoParamsRegbase& fBaseParams);
+void DetermineMode(FuzzyBaseInfoParamsRegbase& fBaseParams);
 } // namespace QuantFag
 } // namespace optiling

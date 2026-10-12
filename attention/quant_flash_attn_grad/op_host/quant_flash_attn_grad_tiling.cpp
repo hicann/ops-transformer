@@ -58,16 +58,16 @@ constexpr int64_t LAYOUT_KV = 8;
 constexpr int64_t MAIN_INPUT_COUNT = 5;
 constexpr int64_t SUPPORTED_HEAD_DIM = 128;
 
-static bool IsTnd(gert::TilingContext *context)
+static bool IsTnd(gert::TilingContext* context)
 {
     auto layout = context->GetAttrs()->GetAttrPointer<char>(LAYOUT_Q);
     return layout != nullptr && std::string(layout) == "TND";
 }
 
-static ge::graphStatus ValidateTnd(gert::TilingContext *context, const string &opName)
+static ge::graphStatus ValidateTnd(gert::TilingContext* context, const string& opName)
 {
-    const auto &queryShape = context->GetInputShape(QUERY_IDX)->GetStorageShape();
-    const auto &keyShape = context->GetInputShape(KEY_IDX)->GetStorageShape();
+    const auto& queryShape = context->GetInputShape(QUERY_IDX)->GetStorageShape();
+    const auto& keyShape = context->GetInputShape(KEY_IDX)->GetStorageShape();
     int64_t prefixSize = 0;
     for (int64_t idx = 12; idx <= 13; ++idx) {
         auto desc = context->GetOptionalInputDesc(idx);
@@ -90,27 +90,27 @@ static ge::graphStatus ValidateTnd(gert::TilingContext *context, const string &o
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ParseAttrs(gert::TilingContext *context, const string &opName)
+static ge::graphStatus ParseAttrs(gert::TilingContext* context, const string& opName)
 {
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const auto *quantMode = attrs->GetAttrPointer<int64_t>(QUANT_MODE_IDX);
+    const auto* quantMode = attrs->GetAttrPointer<int64_t>(QUANT_MODE_IDX);
     OP_CHECK_IF(quantMode == nullptr, OP_LOGE(opName, "quant_mode must be provided."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(*quantMode != 0, OP_LOGE(opName, "quant_mode only supports 0, got %ld.", *quantMode),
                 return ge::GRAPH_FAILED);
-    const int64_t *maxSeqlenQ = attrs->GetAttrPointer<int64_t>(MAX_SEQLEN_Q);
+    const int64_t* maxSeqlenQ = attrs->GetAttrPointer<int64_t>(MAX_SEQLEN_Q);
     OP_CHECK_IF(maxSeqlenQ != nullptr && (IsTnd(context) ? (*maxSeqlenQ != -1 && *maxSeqlenQ <= 0) : *maxSeqlenQ != -1),
                 OP_LOGE(opName, "maxSeqlenQ not support."), return ge ::GRAPH_FAILED);
-    const int64_t *maxSeqlenKV = attrs->GetAttrPointer<int64_t>(MAX_SEQLEN_KV);
+    const int64_t* maxSeqlenKV = attrs->GetAttrPointer<int64_t>(MAX_SEQLEN_KV);
     OP_CHECK_IF(
         maxSeqlenKV != nullptr && (IsTnd(context) ? (*maxSeqlenKV != -1 && *maxSeqlenKV <= 0) : *maxSeqlenKV != -1),
         OP_LOGE(opName, "maxSeqlenKV not support."), return ge::GRAPH_FAILED);
-    const int64_t *maskMode = attrs->GetAttrPointer<int64_t>(MASK_MODE);
+    const int64_t* maskMode = attrs->GetAttrPointer<int64_t>(MASK_MODE);
     int64_t maskModeValue = (maskMode != nullptr) ? *maskMode : 0;
     OP_CHECK_IF(maskModeValue != 0 && maskModeValue != 3 && maskModeValue != 4,
                 OP_LOGE(opName, "maskMode only support 0, 3, 4, now is %ld.", maskModeValue), return ge::GRAPH_FAILED);
-    const int64_t *winLeft = attrs->GetAttrPointer<int64_t>(WIN_LEFT);
-    const int64_t *winRight = attrs->GetAttrPointer<int64_t>(WIN_RIGHT);
+    const int64_t* winLeft = attrs->GetAttrPointer<int64_t>(WIN_LEFT);
+    const int64_t* winRight = attrs->GetAttrPointer<int64_t>(WIN_RIGHT);
     int64_t winLeftValue = (winLeft != nullptr) ? *winLeft : -1;
     int64_t winRightValue = (winRight != nullptr) ? *winRight : -1;
     if (maskModeValue == 4) {
@@ -130,11 +130,11 @@ static ge::graphStatus ParseAttrs(gert::TilingContext *context, const string &op
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateMainInputShapes(gert::TilingContext *context, const string &opName)
+static ge::graphStatus ValidateMainInputShapes(gert::TilingContext* context, const string& opName)
 {
-    const auto *attrs = context->GetAttrs();
-    const char *layoutQ = attrs->GetAttrPointer<char>(LAYOUT_Q);
-    const char *layoutKV = attrs->GetAttrPointer<char>(LAYOUT_KV);
+    const auto* attrs = context->GetAttrs();
+    const char* layoutQ = attrs->GetAttrPointer<char>(LAYOUT_Q);
+    const char* layoutKV = attrs->GetAttrPointer<char>(LAYOUT_KV);
     if (layoutQ == nullptr && layoutKV == nullptr) {
         layoutQ = "BSND";
     } else {
@@ -148,8 +148,8 @@ static ge::graphStatus ValidateMainInputShapes(gert::TilingContext *context, con
 
     const size_t expectedRank = layout == "TND" ? 3 : 4;
     const size_t headAxis = layout == "BSND" ? 2 : 1;
-    const char *inputNames[MAIN_INPUT_COUNT] = {"q", "k", "v", "dout", "attn_out"};
-    const gert::StorageShape *inputShapes[MAIN_INPUT_COUNT] = {};
+    const char* inputNames[MAIN_INPUT_COUNT] = {"q", "k", "v", "dout", "attn_out"};
+    const gert::StorageShape* inputShapes[MAIN_INPUT_COUNT] = {};
     for (int64_t idx = 0; idx < MAIN_INPUT_COUNT; ++idx) {
         inputShapes[idx] = context->GetInputShape(idx);
         OP_CHECK_IF(inputShapes[idx] == nullptr, OP_LOGE(opName, "%s requires a shape.", inputNames[idx]),
@@ -165,7 +165,7 @@ static ge::graphStatus ValidateMainInputShapes(gert::TilingContext *context, con
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(n1 != n2, OP_LOGE(opName, "N1 must equal N2, got N1=%ld and N2=%ld.", n1, n2), return ge::GRAPH_FAILED);
     for (int64_t idx = 0; idx < MAIN_INPUT_COUNT; ++idx) {
-        const auto &shape = inputShapes[idx]->GetStorageShape();
+        const auto& shape = inputShapes[idx]->GetStorageShape();
         for (size_t axis = 0; axis < expectedRank; ++axis) {
             OP_CHECK_IF(shape.GetDim(axis) <= 0,
                         OP_LOGE(opName, "%s dimension %zu must be positive, got %ld.", inputNames[idx], axis,
@@ -180,7 +180,7 @@ static ge::graphStatus ValidateMainInputShapes(gert::TilingContext *context, con
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateSequsedInput(gert::TilingContext *context, const string &opName, int64_t inputIdx,
+static ge::graphStatus ValidateSequsedInput(gert::TilingContext* context, const string& opName, int64_t inputIdx,
                                             int64_t batchSize)
 {
     auto desc = context->GetOptionalInputDesc(inputIdx);
@@ -192,7 +192,7 @@ static ge::graphStatus ValidateSequsedInput(gert::TilingContext *context, const 
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(desc->GetDataType() != ge::DT_INT32,
                 OP_LOGE(opName, "seqused input %ld must have int32 dtype.", inputIdx), return ge::GRAPH_FAILED);
-    const auto &storageShape = shape->GetStorageShape();
+    const auto& storageShape = shape->GetStorageShape();
     OP_CHECK_IF(storageShape.GetDimNum() != 1, OP_LOGE(opName, "seqused input %ld must have rank 1.", inputIdx),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(storageShape.GetDim(0) != batchSize,
@@ -201,7 +201,7 @@ static ge::graphStatus ValidateSequsedInput(gert::TilingContext *context, const 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateRequiredInputs(gert::TilingContext *context, const string &opName)
+static ge::graphStatus ValidateRequiredInputs(gert::TilingContext* context, const string& opName)
 {
     auto queryDesc = context->GetInputDesc(QUERY_IDX);
     auto keyDesc = context->GetInputDesc(KEY_IDX);
@@ -314,7 +314,7 @@ static ge::graphStatus ValidateRequiredInputs(gert::TilingContext *context, cons
     return ge::GRAPH_SUCCESS;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingQuantFlashAttnGrad(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingQuantFlashAttnGrad(gert::TilingContext* context)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -332,13 +332,13 @@ ASCENDC_EXTERN_C ge::graphStatus TilingQuantFlashAttnGrad(gert::TilingContext *c
     return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingParseForQuantFlashAttnGrad([[maybe_unused]] gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingParseForQuantFlashAttnGrad([[maybe_unused]] gert::TilingParseContext* context)
 {
     OP_CHECK_IF(
         context == nullptr,
         OP_LOGE(context, "The op [QuantFlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
         return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(
         platformInfoPtr == nullptr,
         OP_LOGE(context,

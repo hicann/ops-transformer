@@ -86,11 +86,11 @@ public:
 
     __aicore__ inline MsaSegRowMaxEpilogue() {}
 
-    __aicore__ inline void Init(Catlass::Arch::Resource<ArchTag> &resource, uint32_t numQHeads, uint32_t strideOutHead,
+    __aicore__ inline void Init(Catlass::Arch::Resource<ArchTag>& resource, uint32_t numQHeads, uint32_t strideOutHead,
                                 uint32_t strideOutToken, uint32_t maxBlocksPerBatch, uint32_t strideScalePage,
                                 uint32_t strideScaleHead, bool isQuant, uint32_t keyLayout, uint32_t totalK,
-                                const AscendC::GlobalTensor<float> &gScore, const AscendC::GlobalTensor<float> &gScale,
-                                const AscendC::GlobalTensor<int32_t> &gBlockTable)
+                                const AscendC::GlobalTensor<float>& gScore, const AscendC::GlobalTensor<float>& gScale,
+                                const AscendC::GlobalTensor<int32_t>& gBlockTable)
     {
         numQHeads_ = numQHeads;
         strideOutHead_ = strideOutHead;
@@ -123,7 +123,7 @@ public:
     }
 
     /// 进入一个新任务（M-tile）：确定本 subcore 负责的行区间并复位 score 暂存窗口。
-    __aicore__ inline void BeginTask(const MsaTask &task, uint32_t subIdx, uint32_t subBlockNum)
+    __aicore__ inline void BeginTask(const MsaTask& task, uint32_t subIdx, uint32_t subBlockNum)
     {
         const uint32_t subM = MsaCeilDiv(task.mActual, subBlockNum);
         mOff_ = subIdx * subM;
@@ -184,14 +184,14 @@ public:
         stageBlkEnd_ = blkBase + MSA_BLOCKS_PER_STILE;
     }
 
-    __aicore__ inline void ProcessOnePass(const AscendC::GlobalTensor<ElementS> &gS, const MsaTask &task,
+    __aicore__ inline void ProcessOnePass(const AscendC::GlobalTensor<ElementS>& gS, const MsaTask& task,
                                           uint32_t blkBase, uint32_t rowOff, uint32_t rows)
     {
         ProcessPass(gS, task, blkBase, rowOff, rows);
     }
 
     /// 处理一个 S tile（MSA_BLOCKS_PER_STILE 个 sparse block）中属于本 subcore 的行。
-    __aicore__ inline void ProcessSTile(const AscendC::GlobalTensor<ElementS> &gS, const MsaTask &task,
+    __aicore__ inline void ProcessSTile(const AscendC::GlobalTensor<ElementS>& gS, const MsaTask& task,
                                         uint32_t blkBase)
     {
         if (mSub_ == 0U) {
@@ -244,7 +244,7 @@ public:
 
 private:
     /// 非量化乒乓：把本 pass 的 S 搬进 ubS16Ping_[stage]，不阻塞 Vector。
-    __aicore__ inline void IssueS16(const AscendC::GlobalTensor<ElementS> &gS, uint32_t rowOff, uint32_t rows,
+    __aicore__ inline void IssueS16(const AscendC::GlobalTensor<ElementS>& gS, uint32_t rowOff, uint32_t rows,
                                     uint32_t stage)
     {
         if constexpr (IS_QUANT) {
@@ -275,7 +275,7 @@ private:
 
     /// 处理一个 pass（最多 MSA_ROWS_PER_PASS 行 × MSA_BLOCKS_PER_STILE 个 block）。
     /// sLoaded：非量化乒乓路径已把 S 搬进 ubS16_，跳过本函数内的 GM→UB。
-    __aicore__ inline void ProcessPass(const AscendC::GlobalTensor<ElementS> &gS, const MsaTask &task, uint32_t blkBase,
+    __aicore__ inline void ProcessPass(const AscendC::GlobalTensor<ElementS>& gS, const MsaTask& task, uint32_t blkBase,
                                        uint32_t rowOff, uint32_t rows, bool sLoaded = false)
     {
         const bool allInvalid = (blkBase >= task.visibleEndBlk);
@@ -406,7 +406,7 @@ private:
     }
 
     /// sparse_mode=3：rightDownCausal；否则仅 kv_len 截断。
-    __aicore__ inline int32_t VisibleKeyEnd(const MsaTask &task, int32_t tOff) const
+    __aicore__ inline int32_t VisibleKeyEnd(const MsaTask& task, int32_t tOff) const
     {
         if (task.sparseMode == MSA_SPARSE_MODE_RIGHT_DOWN) {
             return MsaClampI32(task.kvLen - task.qLen + tOff + 1, 0, task.kvLen < 0 ? 0 : task.kvLen);
@@ -416,7 +416,7 @@ private:
 
     /// 只对 [fullEndBlk, visibleEndBlk) 的边界 block 逐行置 -inf。
     /// 全可见 block 走无 mask 快通道；全不可见 block 的结果在 FillInvalidBlocks 中整体覆盖。
-    __aicore__ inline void ApplyMask(const MsaTask &task, uint32_t blkBase, uint32_t rowOff, uint32_t rows)
+    __aicore__ inline void ApplyMask(const MsaTask& task, uint32_t blkBase, uint32_t rowOff, uint32_t rows)
     {
         if (task.fullEndBlk >= task.visibleEndBlk) {
             return;
@@ -459,7 +459,7 @@ private:
 
     /// Maxpool 之后、Store 之前施加 local_mask。
     /// 用与 FillInvalidBlocks 相同的位掩码 Duplicate，保证 32B 对齐访问。
-    __aicore__ inline void ApplyLocalMaskUb(const MsaTask &task, uint32_t blkBase, uint32_t rows)
+    __aicore__ inline void ApplyLocalMaskUb(const MsaTask& task, uint32_t blkBase, uint32_t rows)
     {
         if (task.initBlocks == 0 && task.localBlocks == 0) {
             return;
@@ -552,7 +552,7 @@ private:
 
     /// int8 路径：S 已是 Q · cast(K_int8)，再按列乘 scale[page,0,n] 完成反量化。
     /// 数学上 Q·(K_int8*s) = (Q·cast(K_int8))*s（int8→fp 对整数精确）。
-    __aicore__ inline void ApplyDequantScale(const MsaTask &task, uint32_t blkBase, uint32_t rows)
+    __aicore__ inline void ApplyDequantScale(const MsaTask& task, uint32_t blkBase, uint32_t rows)
     {
         for (uint32_t j = 0; j < MSA_BLOCKS_PER_STILE; ++j) {
             const uint32_t blk = blkBase + j;
@@ -661,7 +661,7 @@ private:
     }
 
     /// blk >= visibleEndBlk 的位置整体置为 -inf。
-    __aicore__ inline void FillInvalidBlocks(const MsaTask &task, uint32_t blkBase)
+    __aicore__ inline void FillInvalidBlocks(const MsaTask& task, uint32_t blkBase)
     {
         const uint32_t invStart = (task.visibleEndBlk > blkBase) ? (task.visibleEndBlk - blkBase) : 0;
         if (invStart >= MSA_BLOCKS_PER_STILE) {
@@ -687,7 +687,7 @@ private:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void StoreScore(const MsaTask &task, uint32_t blkBase, uint32_t rowOff, uint32_t rows)
+    __aicore__ inline void StoreScore(const MsaTask& task, uint32_t blkBase, uint32_t rowOff, uint32_t rows)
     {
         // 行 = (token, head) 扁平索引、head 为低位，故 pass 内逐行递推即可，
         // 无需每行一次标量整除（整除在 AIV 上是数十 cycle 的长指令）。

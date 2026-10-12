@@ -45,7 +45,7 @@ protected:
 
     __aicore__ inline void ComputeEachCore(uint32_t coreIdx);
 
-    __aicore__ inline void ComputeSoftmax(LocalTensor<mm1OutputType> &mmResUb, bool isInnerLoopStart);
+    __aicore__ inline void ComputeSoftmax(LocalTensor<mm1OutputType>& mmResUb, bool isInnerLoopStart);
 };
 
 template <typename PFAT>
@@ -68,7 +68,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310<PFAT>::SInnerLoopFunc(in
 }
 
 template <typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X310<PFAT>::ComputeSoftmax(LocalTensor<mm1OutputType> &mmResUb,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X310<PFAT>::ComputeSoftmax(LocalTensor<mm1OutputType>& mmResUb,
                                                                               bool isInnerLoopStart)
 {
     LocalTensor<uint8_t> sharedTmpUb = this->tmpSoftmaxFlashV2Ub_.template Get<uint8_t>(this->softMaxV2Size_);

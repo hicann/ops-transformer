@@ -109,18 +109,18 @@ struct NsaSelectAttentionCompileInfo {
 };
 
 struct RequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct OptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 struct NsaSelectAttentionInferContext {
-    const char *opName;
-    fe::PlatFormInfos *platformInfo;
+    const char* opName;
+    fe::PlatFormInfos* platformInfo;
     RequiredParaInfo query;
     RequiredParaInfo key;
     RequiredParaInfo value;
@@ -131,17 +131,17 @@ struct NsaSelectAttentionInferContext {
     OptionalParaInfo actualKVSeqLengths;
 
     RequiredParaInfo attenOut;
-    const char *layOut;
-    const int64_t *numHeads;
-    const int64_t *numKVHeads;
-    const int64_t *kvHeadNums;
-    const int64_t *selectedBlockSize;
-    const int64_t *selectedBlockCount;
-    const int64_t *blockSize;
-    const float *scaleValue;
-    const int64_t *sparseMode;
+    const char* layOut;
+    const int64_t* numHeads;
+    const int64_t* numKVHeads;
+    const int64_t* kvHeadNums;
+    const int64_t* selectedBlockSize;
+    const int64_t* selectedBlockCount;
+    const int64_t* blockSize;
+    const float* scaleValue;
+    const int64_t* sparseMode;
 
-    size_t *workSpaces;
+    size_t* workSpaces;
     uint64_t tilingKey;
     uint32_t blockDim;
 };
@@ -201,12 +201,12 @@ public:
     NsaSelectTiling() = default;
     ~NsaSelectTiling() = default;
 
-    ge::graphStatus DoTiling(gert::TilingContext &context);
-    ge::graphStatus RunBigKernelTiling(NsaSelectAttentionInferContext &context,
-                                       NsaSelectAttentionInferTilingDataV2 &tilingData, bool isWorkspace = false);
-    ge::graphStatus NsaSelectAttentionInferSetTilingData(gert::TilingContext &context,
-                                                         NsaSelectAttentionInferTilingDataV2 &tilingData) const;
-    static ge::graphStatus ConvertContext(gert::TilingContext &context, NsaSelectAttentionInferContext &nsaContext);
+    ge::graphStatus DoTiling(gert::TilingContext& context);
+    ge::graphStatus RunBigKernelTiling(NsaSelectAttentionInferContext& context,
+                                       NsaSelectAttentionInferTilingDataV2& tilingData, bool isWorkspace = false);
+    ge::graphStatus NsaSelectAttentionInferSetTilingData(gert::TilingContext& context,
+                                                         NsaSelectAttentionInferTilingDataV2& tilingData) const;
+    static ge::graphStatus ConvertContext(gert::TilingContext& context, NsaSelectAttentionInferContext& nsaContext);
 
 private:
     ge::graphStatus GetNpuInfo();
@@ -241,13 +241,13 @@ private:
     ge::graphStatus CalcInnerSize(uint32_t seqSize);
     ge::graphStatus SplitBN();
 
-    std::vector<int64_t> InitSparseValidArray(const int64_t *actualLens) const;
-    bool BalanceLoad(const std::vector<int64_t> &sparseValidArray, int64_t totalSize, int64_t validAivNum,
-                     std::vector<int64_t> &localValue, std::vector<int64_t> &sparseStartIdx) const;
-    void InitLoadValue(const std::vector<int64_t> &sparseValidArray, int64_t totalSize, int64_t validAivNum,
-                       const std::vector<int64_t> &sparseStartIdx, std::vector<int64_t> &localValue) const;
-    void SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray, int64_t totalSize, int64_t validAivNum,
-                           uint32_t *sparseStartIdx, int64_t splitFactorSize);
+    std::vector<int64_t> InitSparseValidArray(const int64_t* actualLens) const;
+    bool BalanceLoad(const std::vector<int64_t>& sparseValidArray, int64_t totalSize, int64_t validAivNum,
+                     std::vector<int64_t>& localValue, std::vector<int64_t>& sparseStartIdx) const;
+    void InitLoadValue(const std::vector<int64_t>& sparseValidArray, int64_t totalSize, int64_t validAivNum,
+                       const std::vector<int64_t>& sparseStartIdx, std::vector<int64_t>& localValue) const;
+    void SetSparseStartIdx(const std::vector<int64_t>& sparseValidArray, int64_t totalSize, int64_t validAivNum,
+                           uint32_t* sparseStartIdx, int64_t splitFactorSize);
 
     ge::graphStatus SplitBN_V0();
 
@@ -344,8 +344,8 @@ private:
     uint32_t usedCoreNum_ = 0;
 
     uint32_t startIdxEachCore_[MAX_CORE_NUM] = {};
-    NsaSelectAttentionInferContext *context_ = nullptr;
-    NsaSelectAttentionInferTilingData *tilingData_ = nullptr;
+    NsaSelectAttentionInferContext* context_ = nullptr;
+    NsaSelectAttentionInferTilingData* tilingData_ = nullptr;
     bool isWorkspace_ = false;
 
     uint32_t formerCoreNum_ = 0;
@@ -364,12 +364,12 @@ private:
     uint32_t ONE = 1;
 };
 
-ge::graphStatus TilingPrepareForNsaSelectAttentionInfer(gert::TilingParseContext *context);
-ge::graphStatus TilingNsaSelectAttentionInferAdapter(gert::TilingContext *context,
-                                                     NsaSelectAttentionInferContext &nsaContext,
-                                                     NsaSelectAttentionInferTilingDataV2 &nsaTilingData);
+ge::graphStatus TilingPrepareForNsaSelectAttentionInfer(gert::TilingParseContext* context);
+ge::graphStatus TilingNsaSelectAttentionInferAdapter(gert::TilingContext* context,
+                                                     NsaSelectAttentionInferContext& nsaContext,
+                                                     NsaSelectAttentionInferTilingDataV2& nsaTilingData);
 
-Nsa_EXTERN_C ge::graphStatus TilingNsaSelectAttentionInfer(gert::TilingContext *context);
+Nsa_EXTERN_C ge::graphStatus TilingNsaSelectAttentionInfer(gert::TilingContext* context);
 
 } // namespace optiling
 #endif // NSA_SELECTED_ATTENTION_INFER_TILING_H_

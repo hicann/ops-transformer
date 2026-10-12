@@ -33,7 +33,7 @@ namespace {
         (void)printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -42,7 +42,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
@@ -63,8 +63,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -90,20 +90,20 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 }
 
 struct TensorResources {
-    void *queryDeviceAddr = nullptr;
-    void *keyDeviceAddr = nullptr;
-    void *valueDeviceAddr = nullptr;
-    void *attenDeviceAddr = nullptr;
-    void *outDeviceAddr = nullptr;
-    aclTensor *queryTensor = nullptr;
-    aclTensor *keyTensor = nullptr;
-    aclTensor *valueTensor = nullptr;
-    aclTensor *attenTensor = nullptr;
-    aclTensor *outTensor = nullptr;
-    aclIntArray *actualSeqLengths = nullptr;
+    void* queryDeviceAddr = nullptr;
+    void* keyDeviceAddr = nullptr;
+    void* valueDeviceAddr = nullptr;
+    void* attenDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
+    aclTensor* queryTensor = nullptr;
+    aclTensor* keyTensor = nullptr;
+    aclTensor* valueTensor = nullptr;
+    aclTensor* attenTensor = nullptr;
+    aclTensor* outTensor = nullptr;
+    aclIntArray* actualSeqLengths = nullptr;
 };
 
-int InitializeTensors(TensorResources &resources)
+int InitializeTensors(TensorResources& resources)
 {
     std::vector<int64_t> queryShape = {1, 2, 1, 16};
     std::vector<int64_t> keyShape = {1, 2, 2, 16};
@@ -159,8 +159,8 @@ int InitializeTensors(TensorResources &resources)
     return ACL_SUCCESS;
 }
 
-int ExecutePromptFlashAttention(TensorResources &resources, aclrtStream stream, void **workspaceAddr,
-                                uint64_t *workspaceSize)
+int ExecutePromptFlashAttention(TensorResources& resources, aclrtStream stream, void** workspaceAddr,
+                                uint64_t* workspaceSize)
 {
     int64_t numHeads = 2;
     int64_t numKeyValueHeads = numHeads;
@@ -175,7 +175,7 @@ int ExecutePromptFlashAttention(TensorResources &resources, aclrtStream stream, 
     char layerOut[LAYER_OUT_LEN];
     memcpy_s(layerOut, LAYER_OUT_LEN, LAYER_OUT_STR, LAYER_OUT_LEN);
 
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     int ret = aclnnPromptFlashAttentionV3GetWorkspaceSize(
         resources.queryTensor, resources.keyTensor, resources.valueTensor, nullptr, nullptr, nullptr, nullptr, nullptr,
         nullptr, nullptr, nullptr, nullptr, numHeads, scaleValue, preTokens, nextTokens, layerOut, numKeyValueHeads,
@@ -203,7 +203,7 @@ int ExecutePromptFlashAttention(TensorResources &resources, aclrtStream stream, 
     return ACL_SUCCESS;
 }
 
-int ProcessResults(TensorResources &resources, const std::vector<int64_t> &outShape)
+int ProcessResults(TensorResources& resources, const std::vector<int64_t>& outShape)
 {
     auto size = GetShapeSize(outShape);
     std::vector<op::fp16_t> resultData(size, 0);
@@ -222,7 +222,7 @@ int ProcessResults(TensorResources &resources, const std::vector<int64_t> &outSh
     return ACL_SUCCESS;
 }
 
-void CleanupResources(TensorResources &resources, void *workspaceAddr, aclrtStream stream, int32_t deviceId)
+void CleanupResources(TensorResources& resources, void* workspaceAddr, aclrtStream stream, int32_t deviceId)
 {
     if (resources.queryTensor) {
         aclDestroyTensor(resources.queryTensor);
@@ -277,7 +277,7 @@ int main()
     int32_t deviceId = 0;
     aclrtStream stream = nullptr;
     TensorResources resources = {};
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     uint64_t workspaceSize = 0;
     std::vector<int64_t> outShape = {1, 2, 1, 16};
     int ret = ACL_SUCCESS;

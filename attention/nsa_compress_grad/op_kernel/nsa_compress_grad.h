@@ -12,7 +12,7 @@
  * \file compress_backward.h
  * \brief compress_backward head file
  */
- 
+
 #ifndef NSA_COMPRESS_GRAD_H
 #define NSA_COMPRESS_GRAD_H
 
@@ -30,19 +30,11 @@ constexpr uint32_t ONE_KILO = 1024;
 constexpr float ZERO_FLOAT = 0.0;
 constexpr uint32_t UB_PRESERVE = 24;
 
-
 template <typename T>
-__aicore__ inline void NsaCompressGradND<T>::Init(GM_ADDR outputGrad, 
-                                            GM_ADDR input,
-                                            GM_ADDR weight,
-                                            GM_ADDR actSeqLen,
-                                            GM_ADDR inputGrad, 
-                                            GM_ADDR weightGrad, 
-                                            GM_ADDR workspace,
-                                            const NsaCompressGradTilingData *tilingData,
-                                            TPipe *tPipe) {
-    
-
+__aicore__ inline void NsaCompressGradND<T>::Init(GM_ADDR outputGrad, GM_ADDR input, GM_ADDR weight, GM_ADDR actSeqLen,
+                                                  GM_ADDR inputGrad, GM_ADDR weightGrad, GM_ADDR workspace,
+                                                  const NsaCompressGradTilingData* tilingData, TPipe* tPipe)
+{
     pipe_ = tPipe;
     InitTilingData(tilingData);
     InitGlobalTensor(outputGrad, input, weight, actSeqLen, inputGrad, weightGrad);
@@ -53,7 +45,8 @@ __aicore__ inline void NsaCompressGradND<T>::Init(GM_ADDR outputGrad,
 }
 
 template <typename T>
-__aicore__ inline void NsaCompressGradND<T>::InitTilingData(const NsaCompressGradTilingData *tilingData) {
+__aicore__ inline void NsaCompressGradND<T>::InitTilingData(const NsaCompressGradTilingData* tilingData)
+{
     batchSize_ = tilingData->batchSize;
     blockSize_ = tilingData->blockSize;
     blockStride_ = tilingData->blockStride;
@@ -89,12 +82,9 @@ __aicore__ inline void NsaCompressGradND<T>::InitTilingData(const NsaCompressGra
 }
 
 template <typename T>
-__aicore__ inline void NsaCompressGradND<T>::InitGlobalTensor(GM_ADDR outputGrad, 
-                                                            GM_ADDR input,
-                                                            GM_ADDR weight,
-                                                            GM_ADDR actSeqLen,
-                                                            GM_ADDR inputGrad, 
-                                                            GM_ADDR weightGrad) {
+__aicore__ inline void NsaCompressGradND<T>::InitGlobalTensor(GM_ADDR outputGrad, GM_ADDR input, GM_ADDR weight,
+                                                              GM_ADDR actSeqLen, GM_ADDR inputGrad, GM_ADDR weightGrad)
+{
     outputGradGm_.SetGlobalBuffer((__gm__ T*)outputGrad);
     inputGm_.SetGlobalBuffer((__gm__ T*)input);
     weightGm_.SetGlobalBuffer((__gm__ T*)weight);
@@ -104,7 +94,8 @@ __aicore__ inline void NsaCompressGradND<T>::InitGlobalTensor(GM_ADDR outputGrad
 }
 
 template <typename T>
-__aicore__ inline void NsaCompressGradND<T>::InitWorkspace(GM_ADDR workspace) {
+__aicore__ inline void NsaCompressGradND<T>::InitWorkspace(GM_ADDR workspace)
+{
     wtGradAtomicWs_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace));
 
     if (isOverLap_) {
@@ -115,7 +106,8 @@ __aicore__ inline void NsaCompressGradND<T>::InitWorkspace(GM_ADDR workspace) {
 }
 
 template <typename T>
-__aicore__ inline void NsaCompressGradND<T>::InitBuffers() {
+__aicore__ inline void NsaCompressGradND<T>::InitBuffers()
+{
     uint32_t maxInputNum = maxHeadNumInUb_ * headDim_;
 
     pipe_->InitBuffer(ubTBuf, ubMaxSize_);
@@ -146,7 +138,7 @@ __aicore__ inline void NsaCompressGradND<T>::InitBuffers() {
     halfTransInputGradPing_ = ubTBuf.GetWithOffset<T>(maxInputNum, maxInputNum * sizeof(float));
     halfTransInputGradPong_ = ubTBuf.GetWithOffset<T>(maxInputNum, maxInputNum * sizeof(float) * 2);
 
-    if (deterministicFlag_){
+    if (deterministicFlag_) {
         transDeterministicWtGrad_ = ubTBuf.GetWithOffset<float>(headNum_ * coreNum_ * (blockSize_ / coreNum_ + 1), 0);
         halfTransDeterministicWtGrad_ = ubTBuf.GetWithOffset<T>(headNum_ * coreNum_ * (blockSize_ / coreNum_ + 1), 0);
     } else {
@@ -156,7 +148,8 @@ __aicore__ inline void NsaCompressGradND<T>::InitBuffers() {
 }
 
 template <typename T>
-__aicore__ inline void NsaCompressGradND<T>::calculateProcessInfo() {
+__aicore__ inline void NsaCompressGradND<T>::calculateProcessInfo()
+{
     auto nBlcBase = totalBlockNum_ / coreNum_;
     auto nRemainder = totalBlockNum_ % coreNum_;
     // 当前core从第几个block开始计算
@@ -187,7 +180,8 @@ __aicore__ inline void NsaCompressGradND<T>::calculateProcessInfo() {
 }
 
 template <typename T>
-__aicore__ inline void NsaCompressGradND<T>::SetWsToZero() {
+__aicore__ inline void NsaCompressGradND<T>::SetWsToZero()
+{
     if ASCEND_IS_NOT_AIV {
         return;
     }
@@ -215,10 +209,11 @@ __aicore__ inline void NsaCompressGradND<T>::SetWsToZero() {
         uint32_t copyTimes = CeilDiv(headToProcess_, maxHeadNumInUb_);
 
         for (uint32_t copyIdx = 0; copyIdx < copyTimes; copyIdx++) {
-            uint32_t nHeadCur = (copyIdx == copyTimes - 1) ? (headToProcess_ - copyIdx * maxHeadNumInUb_) : maxHeadNumInUb_;
+            uint32_t nHeadCur =
+                (copyIdx == copyTimes - 1) ? (headToProcess_ - copyIdx * maxHeadNumInUb_) : maxHeadNumInUb_;
             uint32_t processNumCur = nHeadCur * headDim_;
             uint32_t inputGradOffset = (headOffsetCurCore_ + copyIdx * maxHeadNumInUb_) * headDim_;
-            
+
             DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(processNumCur * sizeof(float)), 0, 0, 0};
             DataCopyPad(inputGradAtomicWs_[inputGradOffset], transInputGradPing_, dataCopyParams);
         }
@@ -226,13 +221,14 @@ __aicore__ inline void NsaCompressGradND<T>::SetWsToZero() {
         AscendC::InitOutput<T>(inputGradGm_[headOffsetCurCore_ * headDim_], headToProcess_ * headDim_, 0);
     }
 
-    #ifndef __CCE_KT_TEST__
-        AscendC::SyncAll();
-    #endif
+#ifndef __CCE_KT_TEST__
+    AscendC::SyncAll();
+#endif
 }
 
 template <typename T>
-__aicore__ inline void NsaCompressGradND<T>::Process() {
+__aicore__ inline void NsaCompressGradND<T>::Process()
+{
     if ASCEND_IS_NOT_AIV {
         return;
     }
@@ -275,8 +271,8 @@ __aicore__ inline void NsaCompressGradND<T>::Process() {
 
             WaitFlag<HardEvent::V_MTE2>(EVENT_ID6);
             CopyInCmpGrad(cmpOffset, headToProcess * headDim_);
-            
-            for (auto rowId = 0; rowId < blockSize_; rowId+=nRowsOnce_) {
+
+            for (auto rowId = 0; rowId < blockSize_; rowId += nRowsOnce_) {
                 uint64_t inputOffset =
                     blcOffset + static_cast<uint64_t>(rowId) * offsetPerRow + static_cast<uint64_t>(headId) * headDim_;
                 uint64_t weightOffset = static_cast<uint64_t>(rowId) * headNum_ + headId;
@@ -301,8 +297,9 @@ __aicore__ inline void NsaCompressGradND<T>::Process() {
     ClearPresetFlag();
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::CopyInCmpGrad(uint32_t offsetCmpGrad, uint32_t size) {
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::CopyInCmpGrad(uint32_t offsetCmpGrad, uint32_t size)
+{
     DataCopyExtParams cdataCopyParams{1, static_cast<uint32_t>(size * sizeof(T)), 0, 0, 0};
     DataCopyPadExtParams<T> padParams{false, 0, 0, 0};
     DataCopyPad(cmpGradHf, outputGradGm_[offsetCmpGrad], cdataCopyParams, padParams);
@@ -318,17 +315,19 @@ __aicore__ inline void NsaCompressGradND<T>::CopyInCmpGrad(uint32_t offsetCmpGra
     }
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::CopyInInput(uint32_t offset, uint32_t size) {
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::CopyInInput(uint32_t offset, uint32_t size)
+{
     WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID3);
     DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(size * sizeof(T)), 0, 0, 0};
     DataCopyPadExtParams<T> padParams{false, 0, 0, 0};
     DataCopyPad(inputHf, inputGm_[offset], dataCopyParams, padParams);
-    SetFlag<HardEvent::MTE2_V>(EVENT_ID3); 
+    SetFlag<HardEvent::MTE2_V>(EVENT_ID3);
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::ComputeWtGrad(uint32_t size) {
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::ComputeWtGrad(uint32_t size)
+{
     WaitFlag<HardEvent::MTE2_V>(EVENT_ID3);
     Cast(inputFp32Ub_, inputHf, RoundMode::CAST_NONE, size);
     PipeBarrier<PIPE_V>();
@@ -336,21 +335,22 @@ __aicore__ inline void NsaCompressGradND<T>::ComputeWtGrad(uint32_t size) {
     PipeBarrier<PIPE_V>();
     int32_t m = headDim_ / 64;
     int32_t n = headDim_ % 64;
-    for (int32_t a = 0; a < m; a++){
-        BlockReduceSum(tmpx[8*a], inputFp32Ub_[64*a], size/headDim_, 64, m + 1, 1, headDim_/8);
+    for (int32_t a = 0; a < m; a++) {
+        BlockReduceSum(tmpx[8 * a], inputFp32Ub_[64 * a], size / headDim_, 64, m + 1, 1, headDim_ / 8);
         PipeBarrier<PIPE_V>();
     }
-    if (n != 0){
-            BlockReduceSum(tmpx[8*m], inputFp32Ub_[64*m], size/headDim_, n, m + 1, 1, headDim_/8);
-            PipeBarrier<PIPE_V>();
-        }
-    WholeReduceSum(tmpx, tmpx, headDim_/8, size/headDim_, 1, 1, m + 1);
+    if (n != 0) {
+        BlockReduceSum(tmpx[8 * m], inputFp32Ub_[64 * m], size / headDim_, n, m + 1, 1, headDim_ / 8);
+        PipeBarrier<PIPE_V>();
+    }
+    WholeReduceSum(tmpx, tmpx, headDim_ / 8, size / headDim_, 1, 1, m + 1);
     PipeBarrier<PIPE_V>();
     SetFlag<HardEvent::V_MTE3>(EVENT_ID3);
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::ComputeInputGrad(uint32_t size) {
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::ComputeInputGrad(uint32_t size)
+{
     WaitFlag<HardEvent::MTE2_V>(EVENT_ID2);
 
     // cast to fp32
@@ -370,12 +370,12 @@ __aicore__ inline void NsaCompressGradND<T>::ComputeInputGrad(uint32_t size) {
     SetFlag<HardEvent::V_MTE3>(EVENT_ID2);
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::CopyOutWtGrad(uint32_t offsetWt, uint32_t size) {
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::CopyOutWtGrad(uint32_t offsetWt, uint32_t size)
+{
     WaitFlag<HardEvent::V_MTE3>(EVENT_ID3);
 
     if (deterministicFlag_) {
-
         DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(size * sizeof(float)), 0, 0, 0};
         AscendC::SetAtomicAdd<float>();
         DataCopyPad(wtGradAtomicWs_[offsetWt + blockSize_ * headNum_ * coreId_], tmpx, dataCopyParams);
@@ -390,8 +390,9 @@ __aicore__ inline void NsaCompressGradND<T>::CopyOutWtGrad(uint32_t offsetWt, ui
     SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID3);
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::CopyInWt(uint32_t offset, uint32_t size) {
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::CopyInWt(uint32_t offset, uint32_t size)
+{
     WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID2);
     DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(size * sizeof(T)), 0, 0, 0};
     DataCopyPadExtParams<T> padParams{false, 0, 0, 0};
@@ -399,10 +400,11 @@ __aicore__ inline void NsaCompressGradND<T>::CopyInWt(uint32_t offset, uint32_t 
     SetFlag<HardEvent::MTE2_V>(EVENT_ID2);
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::CopyOutInputGrad(uint32_t offsetInput, uint32_t size) {
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::CopyOutInputGrad(uint32_t offsetInput, uint32_t size)
+{
     WaitFlag<HardEvent::V_MTE3>(EVENT_ID2);
-    
+
     if (isOverLap_) {
         AscendC::SetAtomicAdd<float>();
         DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(size * sizeof(float)), 0, 0, 0};
@@ -416,18 +418,19 @@ __aicore__ inline void NsaCompressGradND<T>::CopyOutInputGrad(uint32_t offsetInp
     SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID2);
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::MoveResult() {
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::MoveResult()
+{
     if ASCEND_IS_NOT_AIV {
         return;
     }
-    #ifndef __CCE_KT_TEST__
-        AscendC::SyncAll();
-    #endif
+#ifndef __CCE_KT_TEST__
+    AscendC::SyncAll();
+#endif
 
     if (deterministicFlag_) {
         DeterministicComputeSumWtGrad();
-    } else if (coreId_ == 0){
+    } else if (coreId_ == 0) {
         // wtGrad数量很少，一个核搬运即可
         MoveWtGrad();
     }
@@ -437,9 +440,10 @@ __aicore__ inline void NsaCompressGradND<T>::MoveResult() {
     }
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::DeterministicComputeSumWtGrad() {
-    if (coreId_ >= coreNum_){
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::DeterministicComputeSumWtGrad()
+{
+    if (coreId_ >= coreNum_) {
         return;
     }
 
@@ -447,14 +451,16 @@ __aicore__ inline void NsaCompressGradND<T>::DeterministicComputeSumWtGrad() {
     uint64_t minOffset = 16;
     uint64_t nLengthBase = (static_cast<uint64_t>(blockSize_) * headNum_ / minOffset) / coreNum_;
     uint64_t nLengthReminder = (static_cast<uint64_t>(blockSize_) * headNum_ / minOffset) % coreNum_;
-    //当前core从第几个数据开始算
+    // 当前core从第几个数据开始算
     auto startLengthIdx = (nLengthBase * coreId_ + (coreId_ < nLengthReminder ? coreId_ : nLengthReminder)) * minOffset;
-    //当前core需要处理几个数据
+    // 当前core需要处理几个数据
     auto nLengthCurCore = (nLengthBase + (coreId_ < nLengthReminder ? 1 : 0)) * minOffset;
 
     auto linesNum = coreNum_;
 
-    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(coreNum_), static_cast<uint32_t>(nLengthCurCore * sizeof(float)), static_cast<uint32_t>((totalWeightLength - nLengthCurCore) * sizeof(float)), 0, 0};
+    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(coreNum_),
+                                     static_cast<uint32_t>(nLengthCurCore * sizeof(float)),
+                                     static_cast<uint32_t>((totalWeightLength - nLengthCurCore) * sizeof(float)), 0, 0};
     DataCopyPadExtParams<float> padParams{false, 0, 0, 0};
     DataCopyPad(transDeterministicWtGrad_, wtGradAtomicWs_[startLengthIdx], dataCopyParams, padParams);
 
@@ -467,17 +473,21 @@ __aicore__ inline void NsaCompressGradND<T>::DeterministicComputeSumWtGrad() {
         PipeBarrier<PIPE_V>();
         if (linesNum % 2 == 0) {
             // 偶数，前一半加后一半
-            Add(transDeterministicWtGrad_, transDeterministicWtGrad_, transDeterministicWtGrad_[(linesNum / 2) * nLengthCurCore], linesNum / 2 * nLengthCurCore);
+            Add(transDeterministicWtGrad_, transDeterministicWtGrad_,
+                transDeterministicWtGrad_[(linesNum / 2) * nLengthCurCore], linesNum / 2 * nLengthCurCore);
         } else {
             // 奇数，总行数减一后前一半加后一半
             // 判断行数减一后是否大于1，如果是则相加
             if (linesNum > 1) {
-                Add(transDeterministicWtGrad_, transDeterministicWtGrad_, transDeterministicWtGrad_[(linesNum / 2) * nLengthCurCore], linesNum / 2 * nLengthCurCore);
+                Add(transDeterministicWtGrad_, transDeterministicWtGrad_,
+                    transDeterministicWtGrad_[(linesNum / 2) * nLengthCurCore], linesNum / 2 * nLengthCurCore);
             }
             // 如果之前存在额外行
             if (extraLine <= coreNum_) {
                 PipeBarrier<PIPE_V>();
-                Add(transDeterministicWtGrad_[(linesNum / 2) * nLengthCurCore], transDeterministicWtGrad_[(linesNum - 1) * nLengthCurCore], transDeterministicWtGrad_[(extraLine - 1) * nLengthCurCore], nLengthCurCore);
+                Add(transDeterministicWtGrad_[(linesNum / 2) * nLengthCurCore],
+                    transDeterministicWtGrad_[(linesNum - 1) * nLengthCurCore],
+                    transDeterministicWtGrad_[(extraLine - 1) * nLengthCurCore], nLengthCurCore);
                 extraLine = linesNum / 2 + 1;
             } else {
                 // 否则记录额外行
@@ -489,19 +499,20 @@ __aicore__ inline void NsaCompressGradND<T>::DeterministicComputeSumWtGrad() {
 
     PipeBarrier<PIPE_V>();
 
-    //每个核有自己的计算结果，原地cast，每份数据大小为nLengthCurCore
+    // 每个核有自己的计算结果，原地cast，每份数据大小为nLengthCurCore
     CastByCondition(halfTransDeterministicWtGrad_, transDeterministicWtGrad_, nLengthCurCore, true);
 
     PipeBarrier<PIPE_V>();
     SetFlag<HardEvent::V_MTE3>(EVENT_ID7);
     WaitFlag<HardEvent::V_MTE3>(EVENT_ID7);
-    //copyout ,核把自己的处理好的数据拷出到对应位置，每份数据大小为nLengthCurCore
+    // copyout ,核把自己的处理好的数据拷出到对应位置，每份数据大小为nLengthCurCore
     DataCopyExtParams copyOutParams{1, static_cast<uint32_t>(nLengthCurCore * sizeof(T)), 0, 0, 0};
     DataCopyPad(weightGradGm_[startLengthIdx], halfTransDeterministicWtGrad_, copyOutParams);
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::MoveWtGrad() {
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::MoveWtGrad()
+{
     uint64_t wtNum = static_cast<uint64_t>(blockSize_) * headNum_;
     DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(wtNum * sizeof(float)), 0, 0, 0};
     DataCopyPadExtParams<float> padParams{false, 0, 0, 0};
@@ -519,15 +530,16 @@ __aicore__ inline void NsaCompressGradND<T>::MoveWtGrad() {
     DataCopyPad(weightGradGm_, halfTransWtGrad_, copyOutParams);
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::MoveInputGrad() {
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::MoveInputGrad()
+{
     if (coreId_ >= coreNum_) {
         return;
     }
 
     uint32_t copyTimes = CeilDiv(headToProcess_, maxHeadNumInUb_);
     uint32_t pingPongFlag = 0;
-    
+
     SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
     SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
 
@@ -537,7 +549,7 @@ __aicore__ inline void NsaCompressGradND<T>::MoveInputGrad() {
         uint32_t inputGradOffset = (headOffsetCurCore_ + copyIdx * maxHeadNumInUb_) * headDim_;
         LocalTensor<float> transUbCur = pingPongFlag ? transInputGradPong_ : transInputGradPing_;
         LocalTensor<T> halfTransUbCur = pingPongFlag ? halfTransInputGradPong_ : halfTransInputGradPing_;
-        
+
         WaitFlag<HardEvent::MTE3_MTE2>(pingPongFlag);
         DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(processNumCur * sizeof(float)), 0, 0, 0};
         DataCopyPadExtParams<float> padParams{false, 0, 0, 0};
@@ -562,5 +574,5 @@ __aicore__ inline void NsaCompressGradND<T>::MoveInputGrad() {
     WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
 }
 
-}
+} // namespace NsaCompressGrad
 #endif

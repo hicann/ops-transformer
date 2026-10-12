@@ -38,9 +38,15 @@ std::string MlaProlog_A2SocInfo = "{\n"
 
 class MlaProlog : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "MlaProlog SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "MlaProlog SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "MlaProlog TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "MlaProlog TearDown" << std::endl;
+    }
 };
 
 // 全量化kvcache pertensor量化

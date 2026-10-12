@@ -27,7 +27,6 @@
 #include <tiling/tiling_api.h>
 #include "op_host/tiling_base.h"
 
-
 namespace optiling {
 
 enum class TilingKeyInfo : int {
@@ -36,16 +35,16 @@ enum class TilingKeyInfo : int {
 };
 
 BEGIN_TILING_DATA_DEF(NsaCompressGradTilingData)
-    TILING_DATA_FIELD_DEF(uint32_t, batchSize);
-    TILING_DATA_FIELD_DEF(uint32_t, numOfBlock);
-    TILING_DATA_FIELD_DEF(uint32_t, numOfHead);
-    TILING_DATA_FIELD_DEF(uint32_t, dimOfHead);
-    TILING_DATA_FIELD_DEF(uint32_t, blockSize);
-    TILING_DATA_FIELD_DEF(uint32_t, blockStride);
-    TILING_DATA_FIELD_DEF(uint32_t, seqLenType);
-    TILING_DATA_FIELD_DEF(uint32_t, headToProcess);
-    TILING_DATA_FIELD_DEF(uint32_t, headRemainder);
-    TILING_DATA_FIELD_DEF(uint64_t, ubMaxSize);
+TILING_DATA_FIELD_DEF(uint32_t, batchSize);
+TILING_DATA_FIELD_DEF(uint32_t, numOfBlock);
+TILING_DATA_FIELD_DEF(uint32_t, numOfHead);
+TILING_DATA_FIELD_DEF(uint32_t, dimOfHead);
+TILING_DATA_FIELD_DEF(uint32_t, blockSize);
+TILING_DATA_FIELD_DEF(uint32_t, blockStride);
+TILING_DATA_FIELD_DEF(uint32_t, seqLenType);
+TILING_DATA_FIELD_DEF(uint32_t, headToProcess);
+TILING_DATA_FIELD_DEF(uint32_t, headRemainder);
+TILING_DATA_FIELD_DEF(uint64_t, ubMaxSize);
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(NsaCompressGrad, NsaCompressGradTilingData)
@@ -64,13 +63,14 @@ struct NsaCompileInfo {
 
 class NsaCompressGradTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit NsaCompressGradTiling(gert::TilingContext *context): TilingBaseClass(context)
+    explicit NsaCompressGradTiling(gert::TilingContext* context)
+        : TilingBaseClass(context)
     {
         Reset();
     }
     ~NsaCompressGradTiling() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();

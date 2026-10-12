@@ -26,6 +26,7 @@ from atk.common.log import Logger
 logging = Logger().get_logger()
 TOPK_CHECK_OUT_SUFFIX = 2
 
+
 def golden_add_gen(input_shape, l, d, ll, x=None):
     q_seqlen, S1, S2 = input_shape
     pcmp = torch.randn(input_shape, dtype=torch.float)
@@ -48,7 +49,7 @@ def golden_add_gen(input_shape, l, d, ll, x=None):
 
 def golden_reduce_sum(pslc, q_seqlen, s2, g, s2_new):
     pslc[:, 0, :] = np.inf
-    pslc[:, s2_new - 2:s2_new, :] = np.inf
+    pslc[:, s2_new - 2 : s2_new, :] = np.inf
     p = pslc.reshape(q_seqlen, s2, -1, g)
     res = p.sum(-1)
     return res.transpose(2, 1)[:, :, :s2_new]
@@ -59,7 +60,9 @@ def sort_and_select(input_tensor, k):
     q_seqlen, rows, cols = input_tensor.shape
 
     # 结果矩阵，用来存储每行处理后的结果
-    result = np.zeros((q_seqlen, rows, k), dtype=np.int32)  # 每行保留k个元素，指定 dtype 为 int32
+    result = np.zeros(
+        (q_seqlen, rows, k), dtype=np.int32
+    )  # 每行保留k个元素，指定 dtype 为 int32
 
     # 每行多存几个结果，用于topk校验
     topk_check = np.zeros((q_seqlen, rows, k + TOPK_CHECK_OUT_SUFFIX), dtype=np.int32)
@@ -76,18 +79,24 @@ def sort_and_select(input_tensor, k):
             # 排序其余元素，去除第一个和最后两个元素
             middle_elements = row[1:-2]
             # sorted_middle = np.argsort(middle_elements)[::-1]  # 返回排序后的索引（降序）
-            sorted_middle = np.argsort(-middle_elements, kind='mergesort')  # 返回排序后的索引（降序）
+            sorted_middle = np.argsort(
+                -middle_elements, kind="mergesort"
+            )  # 返回排序后的索引（降序）
 
             # 获取前k-3个最大的数的索引
-            top_k_indices = sorted_middle[:k - 3]
+            top_k_indices = sorted_middle[: k - 3]
 
             # 每行多存几个结果，用于topk校验
-            topk_check_indices = sorted_middle[:k - 3 + TOPK_CHECK_OUT_SUFFIX]
+            topk_check_indices = sorted_middle[: k - 3 + TOPK_CHECK_OUT_SUFFIX]
 
             # 构建新的行索引
-            result_row_indices = np.concatenate(([0], [cols - 2, cols - 1], top_k_indices + 1))  # 修改这里，选择最后两个元素
+            result_row_indices = np.concatenate(
+                ([0], [cols - 2, cols - 1], top_k_indices + 1)
+            )  # 修改这里，选择最后两个元素
             # 每行多存几个结果，用于topk校验
-            result_check_row_indices = np.concatenate(([0], [cols - 2, cols - 1], topk_check_indices + 1))
+            result_check_row_indices = np.concatenate(
+                ([0], [cols - 2, cols - 1], topk_check_indices + 1)
+            )
 
             # 将结果存储到 result 中
             result[s, i, :] = result_row_indices.astype(np.int32)  # 转换为 int32 类型
@@ -96,7 +105,8 @@ def sort_and_select(input_tensor, k):
 
     return result, topk_check
 
-class TestPagedMLAttention():
+
+class TestPagedMLAttention:
     @dataclass
     class AttentionInputs:
         query: any
@@ -122,9 +132,18 @@ class TestPagedMLAttention():
         dtype: any
 
     @classmethod
-    def check_attr(cls, batch: int, q_seqlen_list: int, kv_seqlen: int, num_blocks: int, block_size: int):
+    def check_attr(
+        cls,
+        batch: int,
+        q_seqlen_list: int,
+        kv_seqlen: int,
+        num_blocks: int,
+        block_size: int,
+    ):
         if batch * kv_seqlen > num_blocks * block_size:
-            logging("[ERROR] the number of K and V tokens is too big to fit in the paged cache.")
+            logging(
+                "[ERROR] the number of K and V tokens is too big to fit in the paged cache."
+            )
             sys.exit()
 
         if block_size > 128:
@@ -136,9 +155,23 @@ class TestPagedMLAttention():
             sys.exit()
 
     @classmethod
-    def check_attr1(cls, batch: int, q_seqlen: int, max_kv_seqlen: int, min_kv_seqlen: int, l: int, d: int, ll: int, num_blocks: int, block_size: int, topk: int):
+    def check_attr1(
+        cls,
+        batch: int,
+        q_seqlen: int,
+        max_kv_seqlen: int,
+        min_kv_seqlen: int,
+        l: int,
+        d: int,
+        ll: int,
+        num_blocks: int,
+        block_size: int,
+        topk: int,
+    ):
         if batch * max_kv_seqlen > num_blocks * block_size:
-            logging("[ERROR] the number of K and V tokens is too big to fit in the paged cache.")
+            logging(
+                "[ERROR] the number of K and V tokens is too big to fit in the paged cache."
+            )
             return False
 
         if block_size > 128:
@@ -147,12 +180,14 @@ class TestPagedMLAttention():
 
         selectKvSeqlenMax = (max_kv_seqlen - 1) * d + l
         selectBlockNumMax = (selectKvSeqlenMax + ll - 1) / ll
-        if selectBlockNumMax > 4096: 
-            logging(f"[ERROR] selectBlockNum must be within (0, 4096]. selectBlockNumMax = {selectBlockNumMax}")
+        if selectBlockNumMax > 4096:
+            logging(
+                f"[ERROR] selectBlockNum must be within (0, 4096]. selectBlockNumMax = {selectBlockNumMax}"
+            )
             return False
         selectKvSeqlenMin = (min_kv_seqlen - 1) * d + l
         selectBlockNumMin = (selectKvSeqlenMin + ll - 1) // ll
-        if selectBlockNumMin < topk + TOPK_CHECK_OUT_SUFFIX: 
+        if selectBlockNumMin < topk + TOPK_CHECK_OUT_SUFFIX:
             return False
         return True
 
@@ -161,8 +196,10 @@ class TestPagedMLAttention():
         group_num = head // kv_head
         score = None
         for i in range(kv_head):
-            group_score = torch.matmul(A[i * group_num: (i + 1) * group_num, :, :].to(torch.float32),
-                                    B[i : (i + 1), :, :].to(torch.float32))
+            group_score = torch.matmul(
+                A[i * group_num : (i + 1) * group_num, :, :].to(torch.float32),
+                B[i : (i + 1), :, :].to(torch.float32),
+            )
             if score is None:
                 score = group_score
             else:
@@ -179,32 +216,40 @@ class TestPagedMLAttention():
         soft_res = sim_sub / row_sum
         return soft_res
 
-    def ref_masked_attention(self,
-                             query,  # (q_seqlen, num_heads, head_size)
-                             key,  # (k_seqlen, kv_heads, head_size)
-                             value,
-                             scale: float,
-                             mask,  # (q_seqlen, k_seqlen)
-                             index, l, d, ll, top_k, g
-                             ):
+    def ref_masked_attention(
+        self,
+        query,  # (q_seqlen, num_heads, head_size)
+        key,  # (k_seqlen, kv_heads, head_size)
+        value,
+        scale: float,
+        mask,  # (q_seqlen, k_seqlen)
+        index,
+        l,
+        d,
+        ll,
+        top_k,
+        g,
+    ):
         query = query
 
         query = torch.permute(query, (1, 0, 2))  # [1, 64, 192]   -> [64, 1, 192]
         key = torch.permute(key, (1, 2, 0))  # [4096, 4, 192] -> [4, 192, 4096]
 
-        sim_high = self.group_matmul(query.shape[0], key.shape[0], query, key)  # (head_num, q_seqlen, k_seqlen)
+        sim_high = self.group_matmul(
+            query.shape[0], key.shape[0], query, key
+        )  # (head_num, q_seqlen, k_seqlen)
 
         sim_high = sim_high * scale
 
         if mask is not None and self.q_seqlen > 1:
-            # 需要知道当前的batch qseqlen 
+            # 需要知道当前的batch qseqlen
             lastValidStart = (self.selectKvseqlen - l) // d * d
             lastValidEnd = lastValidStart + l - 1
             tailKvTokens = self.selectKvseqlen - lastValidEnd - 1
-            
+
             for i in range(self.q_seqlen):
-                if(self.q_seqlen - i - 1 > tailKvTokens):
-                    sim_high[:, i, self.k_seqlen-1] = -10000
+                if self.q_seqlen - i - 1 > tailKvTokens:
+                    sim_high[:, i, self.k_seqlen - 1] = -10000
 
         p_high = self.softmax_numpy(sim_high)
         p = torch.from_numpy(p_high).to(query.dtype)
@@ -228,10 +273,34 @@ class TestPagedMLAttention():
         pslc = golden_reduce_sum(pslc_add, q_seqlen, s2, g, s2_new)
 
         topk_output, topk_check_output = sort_and_select(pslc.numpy(), top_k)
-        return out, out_high, p_high, p, sim_high, pslc, topk_output, s2_new, topk_check_output
+        return (
+            out,
+            out_high,
+            p_high,
+            p,
+            sim_high,
+            pslc,
+            topk_output,
+            s2_new,
+            topk_check_output,
+        )
 
-    def ref_single_query_cached_kv_attention(self, attention_inputs: AttentionInputs, output, true_out, topk_out,
-                                             pslc_out, topk_check_out, scale, l, d, ll, top_k, g, sel_kv_seqlen):
+    def ref_single_query_cached_kv_attention(
+        self,
+        attention_inputs: AttentionInputs,
+        output,
+        true_out,
+        topk_out,
+        pslc_out,
+        topk_check_out,
+        scale,
+        l,
+        d,
+        ll,
+        top_k,
+        g,
+        sel_kv_seqlen,
+    ):
         num_heads = attention_inputs.query.shape[1]
         kv_heads = attention_inputs.value_cache.shape[2]
         head_size_qk = attention_inputs.key_cache.shape[3]
@@ -240,15 +309,21 @@ class TestPagedMLAttention():
 
         batch = len(attention_inputs.q_seqlen_list)
         cu_seqlen = 0
-        p_high_out = torch.ones((batch, num_heads, 1, max(attention_inputs.k_seqlen_list)), dtype=torch.float32)
-        p_out = torch.ones((batch, num_heads, 1, max(attention_inputs.k_seqlen_list)), dtype=attention_inputs.query.dtype)
+        p_high_out = torch.ones(
+            (batch, num_heads, 1, max(attention_inputs.k_seqlen_list)),
+            dtype=torch.float32,
+        )
+        p_out = torch.ones(
+            (batch, num_heads, 1, max(attention_inputs.k_seqlen_list)),
+            dtype=attention_inputs.query.dtype,
+        )
         for i in range(batch):
             q_seqlen = int(attention_inputs.q_seqlen_list[i])
             k_seqlen = int(attention_inputs.k_seqlen_list[i])
             self.q_seqlen = q_seqlen
             self.k_seqlen = k_seqlen
             self.selectKvseqlen = sel_kv_seqlen[i]
-            q = attention_inputs.query[cu_seqlen:(cu_seqlen + q_seqlen), :, :]
+            q = attention_inputs.query[cu_seqlen : (cu_seqlen + q_seqlen), :, :]
             block_table = attention_inputs.block_tables[i]
             keys = []
             values = []
@@ -269,23 +344,51 @@ class TestPagedMLAttention():
                 mask = torch.zeros((128, 128), dtype=torch.bool)
             else:
                 mask = None
-            out, out_high, p_high, p, sim_high, pslc, topk_output, s2_new, topk_check_output = self.ref_masked_attention(q, keys, values, scale,
-                                                                                              mask, i, l, d, ll, top_k, g)
+            (
+                out,
+                out_high,
+                p_high,
+                p,
+                sim_high,
+                pslc,
+                topk_output,
+                s2_new,
+                topk_check_output,
+            ) = self.ref_masked_attention(
+                q, keys, values, scale, mask, i, l, d, ll, top_k, g
+            )
 
             out = out.reshape(-1, num_heads, head_size_vo)
             out_high = out_high.reshape(-1, num_heads, head_size_vo)
             pslc = pslc.reshape(-1, kv_heads, s2_new)
-            output[cu_seqlen: cu_seqlen + q_seqlen, :, :] = out
-            true_out[cu_seqlen: cu_seqlen + q_seqlen, :, :] = out_high
-            pslc_out[cu_seqlen: cu_seqlen + q_seqlen, :, :s2_new] = pslc
-            topk_out[cu_seqlen: cu_seqlen + q_seqlen, :, :] = topk_output
-            topk_check_out[cu_seqlen: cu_seqlen + q_seqlen, :, :] = topk_check_output
+            output[cu_seqlen : cu_seqlen + q_seqlen, :, :] = out
+            true_out[cu_seqlen : cu_seqlen + q_seqlen, :, :] = out_high
+            pslc_out[cu_seqlen : cu_seqlen + q_seqlen, :, :s2_new] = pslc
+            topk_out[cu_seqlen : cu_seqlen + q_seqlen, :, :] = topk_output
+            topk_check_out[cu_seqlen : cu_seqlen + q_seqlen, :, :] = topk_check_output
             cu_seqlen += attention_inputs.q_seqlen_list[i]
 
         return scale
 
-    def calc_data(self, gen_data_params: GenDataParams, query, key_cache, value_cache, block_tables, kv_seqlen_list, sel_kv_seqlen,
-                num_head, kv_heads, ll, top_k, l, d, scale, block_size, input_dtype):
+    def calc_data(
+        self,
+        gen_data_params: GenDataParams,
+        query,
+        key_cache,
+        value_cache,
+        block_tables,
+        kv_seqlen_list,
+        sel_kv_seqlen,
+        num_head,
+        kv_heads,
+        ll,
+        top_k,
+        l,
+        d,
+        scale,
+        block_size,
+        input_dtype,
+    ):
         head_size_qk = gen_data_params.head_size + gen_data_params.head_size_rope
         head_size_vo = gen_data_params.head_size
         num_tokens = np.array(gen_data_params.q_seqlen_list).sum()
@@ -302,12 +405,23 @@ class TestPagedMLAttention():
         topk_shape_out = (num_tokens, gen_data_params.kv_heads, top_k)
         topk_out = np.zeros(topk_shape_out, dtype=np.float32)
         # 用于辅助topk校验
-        topk_check_shape_out = (num_tokens, gen_data_params.kv_heads, top_k + TOPK_CHECK_OUT_SUFFIX)
+        topk_check_shape_out = (
+            num_tokens,
+            gen_data_params.kv_heads,
+            top_k + TOPK_CHECK_OUT_SUFFIX,
+        )
         topk_check_out = np.zeros(topk_check_shape_out, dtype=np.float32)
 
-        attention_inputs = self.AttentionInputs(query, key_cache, value_cache, block_tables,
-                                                gen_data_params.q_seqlen_list, gen_data_params.k_seqlen_list, mask,
-                                                gen_data_params.mask_type)
+        attention_inputs = self.AttentionInputs(
+            query,
+            key_cache,
+            value_cache,
+            block_tables,
+            gen_data_params.q_seqlen_list,
+            gen_data_params.k_seqlen_list,
+            mask,
+            gen_data_params.mask_type,
+        )
         g = num_head // kv_heads
         scale = self.ref_single_query_cached_kv_attention(
             attention_inputs,
@@ -315,28 +429,66 @@ class TestPagedMLAttention():
             true_out,
             topk_out,
             pslc_out,
-            topk_check_out, scale, l, d, ll, top_k, g, sel_kv_seqlen,
+            topk_check_out,
+            scale,
+            l,
+            d,
+            ll,
+            top_k,
+            g,
+            sel_kv_seqlen,
         )
 
-        atten_mask = np.zeros((len(gen_data_params.k_seqlen_list), gen_data_params.k_seqlen_list[0]), dtype=np.float32)
+        atten_mask = np.zeros(
+            (len(gen_data_params.k_seqlen_list), gen_data_params.k_seqlen_list[0]),
+            dtype=np.float32,
+        )
 
-        key_cache_reshape = key_cache.reshape(gen_data_params.num_blocks, gen_data_params.block_size, gen_data_params.kv_heads * head_size_qk)
+        key_cache_reshape = key_cache.reshape(
+            gen_data_params.num_blocks,
+            gen_data_params.block_size,
+            gen_data_params.kv_heads * head_size_qk,
+        )
 
-        value_cache_reshape = value_cache.reshape(gen_data_params.num_blocks, gen_data_params.block_size, gen_data_params.kv_heads * head_size_vo)
+        value_cache_reshape = value_cache.reshape(
+            gen_data_params.num_blocks,
+            gen_data_params.block_size,
+            gen_data_params.kv_heads * head_size_vo,
+        )
 
-        return (query,
-                key_cache_reshape,
-                value_cache_reshape,
-                torch.from_numpy(np.array(block_tables).astype(np.int32)),
-                np.array(gen_data_params.k_seqlen_list).astype(np.int64),
-                torch.from_numpy(atten_mask),
-                ref_output,
-                true_out,
-                torch.from_numpy(topk_out.astype(np.int32)),
-                torch.from_numpy(topk_check_out.astype(np.int32)),
-                scale)
+        return (
+            query,
+            key_cache_reshape,
+            value_cache_reshape,
+            torch.from_numpy(np.array(block_tables).astype(np.int32)),
+            np.array(gen_data_params.k_seqlen_list).astype(np.int64),
+            torch.from_numpy(atten_mask),
+            ref_output,
+            true_out,
+            torch.from_numpy(topk_out.astype(np.int32)),
+            torch.from_numpy(topk_check_out.astype(np.int32)),
+            scale,
+        )
 
-    def cpu_result(query, key_cache, value_cache, block_table, q_seqlen_list, kv_seqlen_list, sel_kv_seqlen, num_head, kv_heads, ll, top_k, l, d, scale, block_size, layout, is_benchmark_task):
+    def cpu_result(
+        query,
+        key_cache,
+        value_cache,
+        block_table,
+        q_seqlen_list,
+        kv_seqlen_list,
+        sel_kv_seqlen,
+        num_head,
+        kv_heads,
+        ll,
+        top_k,
+        l,
+        d,
+        scale,
+        block_size,
+        layout,
+        is_benchmark_task,
+    ):
         input_dtype = query.dtype  # torch.float16 / torch.bfloat16
         # 计算cpu结果
         batch = block_table.size(0)
@@ -352,14 +504,61 @@ class TestPagedMLAttention():
 
         testObj = TestPagedMLAttention()
         testObj.check_attr(batch, q_seqlen_list, max_kv_seqlen, num_blocks, block_size)
-        testObj.check_attr1(batch, 1, max_kv_seqlen, min_kv_seqlen, l, d, ll, num_blocks, block_size, top_k)
-        gen_data_params = testObj.GenDataParams(q_seqlen_list, kv_seqlen_list, num_head,
-                                kv_heads, embedding_size, embedding_size_rope,
-                                num_blocks, block_size, mask_type, input_dtype)
-                                
-        _, _, _, _, _, _, golden_atten_out, high_percision_atten_out, golden_topk_out, topk_check_out, _ = testObj.calc_data(
-            gen_data_params, query, key_cache, value_cache, block_table, kv_seqlen_list, sel_kv_seqlen,
-            num_head, kv_heads, ll, top_k, l, d, scale, block_size, input_dtype)
+        testObj.check_attr1(
+            batch,
+            1,
+            max_kv_seqlen,
+            min_kv_seqlen,
+            l,
+            d,
+            ll,
+            num_blocks,
+            block_size,
+            top_k,
+        )
+        gen_data_params = testObj.GenDataParams(
+            q_seqlen_list,
+            kv_seqlen_list,
+            num_head,
+            kv_heads,
+            embedding_size,
+            embedding_size_rope,
+            num_blocks,
+            block_size,
+            mask_type,
+            input_dtype,
+        )
+
+        (
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            golden_atten_out,
+            high_percision_atten_out,
+            golden_topk_out,
+            topk_check_out,
+            _,
+        ) = testObj.calc_data(
+            gen_data_params,
+            query,
+            key_cache,
+            value_cache,
+            block_table,
+            kv_seqlen_list,
+            sel_kv_seqlen,
+            num_head,
+            kv_heads,
+            ll,
+            top_k,
+            l,
+            d,
+            scale,
+            block_size,
+            input_dtype,
+        )
 
         if not is_benchmark_task:
             # 返回标杆
@@ -367,75 +566,113 @@ class TestPagedMLAttention():
         else:
             # 返回真值
             return high_percision_atten_out, topk_check_out
-    
+
 
 @register("executor_nsa_compress_attention_infer")
 class NsaCompressAttentionInferApi(BaseApi):
     def __call__(self, input_data: InputDataset, with_output: bool = False):
         from atk.common.connection import RemoteManager
+
         post_node = self.task_result.nodes.get_main_node()
         remote_nodes = []
         for node in self.task_result.nodes.nodes:
             if node != post_node:
                 remote_nodes.append(node)
-        remote_manager = RemoteManager(self.task_result.case_config, post_node,remote_nodes[0] )
+        remote_manager = RemoteManager(
+            self.task_result.case_config, post_node, remote_nodes[0]
+        )
         local_dir, remote_dir = remote_manager.get_local_and_remote_dir()
         logging.info(f"local_dir{local_dir}, remote_dir{remote_dir}")
 
         if self.device == "cpu":
-            cpu_result_out, _ = TestPagedMLAttention.cpu_result(self.query, self.key, self.value, self.block_table, self.actual_q_seq_len, self.actual_cmp_seq_kvlen, self.actual_sel_seq_kvlen, self.head_num,
-                                                                                                                          self.key_value_head_num, self.select_block_size, self.select_block_count, self.compress_block_size, self.compress_stride, self.scale_value, self.page_block_size, layout = "TND",
-                                                                                                                          is_benchmark_task = self.task_result.is_benchmark_task)
+            cpu_result_out, _ = TestPagedMLAttention.cpu_result(
+                self.query,
+                self.key,
+                self.value,
+                self.block_table,
+                self.actual_q_seq_len,
+                self.actual_cmp_seq_kvlen,
+                self.actual_sel_seq_kvlen,
+                self.head_num,
+                self.key_value_head_num,
+                self.select_block_size,
+                self.select_block_count,
+                self.compress_block_size,
+                self.compress_stride,
+                self.scale_value,
+                self.page_block_size,
+                layout="TND",
+                is_benchmark_task=self.task_result.is_benchmark_task,
+            )
             cpu_result_topk = torch.zeros_like(_)
             return cpu_result_out, cpu_result_topk
 
         elif self.device == "npu":
-            real_atten_out, real_topk_out = torch_npu.npu_nsa_compress_attention_infer(self.query, self.key, self.value, self.scale_value, self.head_num, self.key_value_head_num, self.select_block_size,
-            self.select_block_count, self.page_block_size, self.compress_block_size, self.compress_stride, atten_mask=None, block_table=self.block_table, topk_mask=None,
-            actual_seq_qlen=None, actual_cmp_seq_kvlen=self.actual_cmp_seq_kvlen, actual_sel_seq_kvlen=None)
+            real_atten_out, real_topk_out = torch_npu.npu_nsa_compress_attention_infer(
+                self.query,
+                self.key,
+                self.value,
+                self.scale_value,
+                self.head_num,
+                self.key_value_head_num,
+                self.select_block_size,
+                self.select_block_count,
+                self.page_block_size,
+                self.compress_block_size,
+                self.compress_stride,
+                atten_mask=None,
+                block_table=self.block_table,
+                topk_mask=None,
+                actual_seq_qlen=None,
+                actual_cmp_seq_kvlen=self.actual_cmp_seq_kvlen,
+                actual_sel_seq_kvlen=None,
+            )
             result = [real_atten_out.cpu(), real_atten_out.dtype]
             torch.save(result, f"{local_dir}/result.bin")
             return real_atten_out
 
     def init_by_input_data(self, input_data: InputDataset):
-        self.query = input_data.kwargs['query']
-        self.key = input_data.kwargs['key']
-        self.value = input_data.kwargs['value']
-        self.scale_value = input_data.kwargs['scaleValue']
-        self.head_num = input_data.kwargs['numHeads']
-        self.key_value_head_num = input_data.kwargs['numKeyValueHeads']
-        self.select_block_size = input_data.kwargs['selectBlockSize']
-        self.select_block_count = input_data.kwargs['selectBlockCount']
-        self.page_block_size = input_data.kwargs['pageBlockSize']
-        self.compress_block_size = input_data.kwargs['compressBlockSize']
-        self.compress_stride = input_data.kwargs['compressBlockStride']
-        self.block_table = input_data.kwargs['blockTableOptional']
-        self.actual_q_seq_len = input_data.kwargs['actualQSeqLenOptional']
+        self.query = input_data.kwargs["query"]
+        self.key = input_data.kwargs["key"]
+        self.value = input_data.kwargs["value"]
+        self.scale_value = input_data.kwargs["scaleValue"]
+        self.head_num = input_data.kwargs["numHeads"]
+        self.key_value_head_num = input_data.kwargs["numKeyValueHeads"]
+        self.select_block_size = input_data.kwargs["selectBlockSize"]
+        self.select_block_count = input_data.kwargs["selectBlockCount"]
+        self.page_block_size = input_data.kwargs["pageBlockSize"]
+        self.compress_block_size = input_data.kwargs["compressBlockSize"]
+        self.compress_stride = input_data.kwargs["compressBlockStride"]
+        self.block_table = input_data.kwargs["blockTableOptional"]
+        self.actual_q_seq_len = input_data.kwargs["actualQSeqLenOptional"]
         # 新增sel actual kv seqlen
-        self.actual_sel_seq_kvlen = input_data.kwargs['actualSelKvSeqLenOptional']
-        self.actual_cmp_seq_kvlen = input_data.kwargs['actualCmpKvSeqLenOptional']
+        self.actual_sel_seq_kvlen = input_data.kwargs["actualSelKvSeqLenOptional"]
+        self.actual_cmp_seq_kvlen = input_data.kwargs["actualCmpKvSeqLenOptional"]
         self.embedding_size = self.value.shape[2] / self.key_value_head_num
         self.embedding_size_rope = self.query.shape[2] - self.embedding_size
         self.max_kv_seqlen = max(self.actual_cmp_seq_kvlen)
+
 
 @register("executor_aclnn_nsa_compress_attention_infer")
 class SampleAclnnApi(AclnnBaseApi):
     def after_call(self, output_packages):
         output1, output2 = super().after_call(output_packages)
         from atk.common.connection import RemoteManager
+
         post_node = self.task_result.nodes.get_main_node()
         remote_nodes = []
         for node in self.task_result.nodes.nodes:
             if node != post_node:
                 remote_nodes.append(node)
-        remote_manager = RemoteManager(self.task_result.case_config, post_node,remote_nodes[0] )
+        remote_manager = RemoteManager(
+            self.task_result.case_config, post_node, remote_nodes[0]
+        )
         local_dir, remote_dir = remote_manager.get_local_and_remote_dir()
         logging.info(f"local_dir{local_dir}, remote_dir{remote_dir}")
         result = [output1.cpu(), output1.dtype]
         output2.zero_()
         # torch.save(result, f"{local_dir}/result.bin")
         return output1, output2
-
 
     def get_cpp_func_signature_type(self):
         return """aclnnStatus aclnnNsaCompressAttentionInferGetWorkspaceSize(

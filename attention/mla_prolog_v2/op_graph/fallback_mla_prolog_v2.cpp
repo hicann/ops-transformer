@@ -18,14 +18,14 @@ namespace fallback {
 using namespace ge;
 using namespace gert;
 
-graphStatus GetMlaPrologV2InputTensor(const OpExecuteContext *ctx, MlaPrologV2FallBackParam &param)
+graphStatus GetMlaPrologV2InputTensor(const OpExecuteContext* ctx, MlaPrologV2FallBackParam& param)
 {
     auto ret = GetMlaPrologInputTensor(ctx, param);
     OP_CHECK_IF(ret != GRAPH_SUCCESS, OP_LOGE("aclnnfallback", "GetInputTensor failed"), return GRAPH_FAILED);
     return GRAPH_SUCCESS;
 }
 
-graphStatus GetMlaPrologV2OutputTensor(const OpExecuteContext *ctx, MlaPrologV2FallBackParam &param)
+graphStatus GetMlaPrologV2OutputTensor(const OpExecuteContext* ctx, MlaPrologV2FallBackParam& param)
 {
     auto ret = GetMlaPrologOutputTensor(ctx, param);
     OP_CHECK_IF(ret != GRAPH_SUCCESS, OP_LOGE("aclnnfallback", "GetOutputTensor failed"), return GRAPH_FAILED);
@@ -37,14 +37,14 @@ graphStatus GetMlaPrologV2OutputTensor(const OpExecuteContext *ctx, MlaPrologV2F
     return GRAPH_SUCCESS;
 }
 
-graphStatus GetMlaPrologV2Attr(const OpExecuteContext *ctx, MlaPrologV2FallBackParam &param)
+graphStatus GetMlaPrologV2Attr(const OpExecuteContext* ctx, MlaPrologV2FallBackParam& param)
 {
     auto ret = GetMlaPrologAttr(ctx, param);
     OP_CHECK_IF(ret != GRAPH_SUCCESS, OP_LOGE("aclnnfallback", "GetAttr failed"), return GRAPH_FAILED);
     return GRAPH_SUCCESS;
 }
 
-graphStatus MlaV2HostExecuteFunc(OpExecuteContext *host_api_ctx)
+graphStatus MlaV2HostExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
 

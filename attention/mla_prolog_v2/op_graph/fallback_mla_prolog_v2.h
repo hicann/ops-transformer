@@ -25,11 +25,11 @@ namespace fallback {
 constexpr size_t DEQUANT_SCALE_Q_NOPE_INDEX = 4;
 
 struct MlaPrologV2FallBackParam : MlaPrologFallBackParam {
-    const gert::Tensor *dequantScaleQNope = nullptr;
+    const gert::Tensor* dequantScaleQNope = nullptr;
 };
 
-graphStatus GetMlaPrologV2OutputTensor(const OpExecuteContext *ctx, MlaPrologV2FallBackParam &param);
-graphStatus MlaV2HostExecuteFunc(OpExecuteContext *host_api_ctx);
+graphStatus GetMlaPrologV2OutputTensor(const OpExecuteContext* ctx, MlaPrologV2FallBackParam& param);
+graphStatus MlaV2HostExecuteFunc(OpExecuteContext* host_api_ctx);
 
 } // namespace fallback
 

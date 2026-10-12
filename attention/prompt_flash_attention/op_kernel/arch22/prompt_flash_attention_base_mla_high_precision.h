@@ -56,28 +56,28 @@ template <typename PFAT>
 class FlashAttentionEncoderHighPrecisionMLA {
 public:
     __aicore__ __attribute__((always_inline)) inline FlashAttentionEncoderHighPrecisionMLA(
-        __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-        __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-        __gm__ uint8_t *blocktable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-        __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix, __gm__ uint8_t *actualSharedPrefixLen,
-        __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-        const typename PFAT::tilingType *__restrict tiling, __gm__ uint8_t *gmTiling, TPipe *tPipe)
+        __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+        __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+        __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+        __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
+        __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+        const typename PFAT::tilingType* __restrict tiling, __gm__ uint8_t* gmTiling, TPipe* tPipe)
     {
         AscendC::SetLoadDataPaddingValue<uint64_t>(0);
         AscendC::SetAtomicNone();
         AscendC::SetFixpipeNz2ndFlag(1, 0, 0);
         AscendC::SetMaskNorm();
 
-        qGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE *>(query));
-        kGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE *>(key));
-        vGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE *>(value));
+        qGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE*>(query));
+        kGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE*>(key));
+        vGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE*>(value));
         uint64_t workSize = tiling->promptAttentionBaseApiBaseParams.workSize;
-        sGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(workspace));
-        pGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE *>(workspace + workSize));
-        oTmpGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(workspace + 2 * workSize));
-        actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths,
+        sGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace));
+        pGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE*>(workspace + workSize));
+        oTmpGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace + 2 * workSize));
+        actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths,
                                            tiling->promptAttentionBaseApiBaseParams.batchSize);
-        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKV,
+        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKV,
                                              tiling->promptAttentionBaseApiBaseParams.batchSize);
         this->tiling = tiling;
         this->batchSize = tiling->promptAttentionBaseApiBaseParams.batchSize;
@@ -559,7 +559,7 @@ private:
     using IN_DATA_TYPE = typename PFAT::inDataType;
     static constexpr bool IS_BF16 = PFAT::isBF16;
 
-    const typename PFAT::tilingType *__restrict tiling;
+    const typename PFAT::tilingType* __restrict tiling;
     const uint32_t l1qBufAddrOffset = 0;
     const uint32_t l1kBufAddrOffset = 2 * L0AB_UINT8_BLOCK_SIZE;
     const uint32_t l1pBufAddrOffset = 4 * L0AB_UINT8_BLOCK_SIZE;
@@ -612,13 +612,13 @@ template <typename PFAT>
 class FlashAttentionEncoderHighPrecisionMLAVec {
 public:
     __aicore__ __attribute__((always_inline)) inline FlashAttentionEncoderHighPrecisionMLAVec(
-        __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-        __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-        __gm__ uint8_t *blocktable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-        __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix, __gm__ uint8_t *actualSharedPrefixLen,
-        __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-        const typename PFAT::tilingType *__restrict tiling, __gm__ uint8_t *gmTiling, TPipe *tPipe,
-        __gm__ uint8_t *alibiCoeff)
+        __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+        __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+        __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+        __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
+        __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+        const typename PFAT::tilingType* __restrict tiling, __gm__ uint8_t* gmTiling, TPipe* tPipe,
+        __gm__ uint8_t* alibiCoeff)
         : alibiCoeffGm(alibiCoeff)
     {
         AscendC::SetAtomicNone();
@@ -629,15 +629,15 @@ public:
         this->tiling = tiling;
 
         uint64_t workSize = tiling->promptAttentionBaseApiBaseParams.workSize;
-        maskGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE *>(pseShift));
-        oGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE *>(attentionOut));
-        sGmTensor.SetGlobalBuffer((__gm__ float *)(workspace));
-        pGmTensor.SetGlobalBuffer((__gm__ IN_DATA_TYPE *)(workspace + workSize));
-        oTmpGmTensor.SetGlobalBuffer((__gm__ float *)(workspace + 2 * workSize));
-        upoGmTensor.SetGlobalBuffer((__gm__ float *)(workspace + 3 * workSize));
-        actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths,
+        maskGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE*>(pseShift));
+        oGmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE*>(attentionOut));
+        sGmTensor.SetGlobalBuffer((__gm__ float*)(workspace));
+        pGmTensor.SetGlobalBuffer((__gm__ IN_DATA_TYPE*)(workspace + workSize));
+        oTmpGmTensor.SetGlobalBuffer((__gm__ float*)(workspace + 2 * workSize));
+        upoGmTensor.SetGlobalBuffer((__gm__ float*)(workspace + 3 * workSize));
+        actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths,
                                            tiling->promptAttentionBaseApiBaseParams.batchSize);
-        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKV,
+        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKV,
                                              tiling->promptAttentionBaseApiBaseParams.batchSize);
         this->batchSize = tiling->promptAttentionBaseApiBaseParams.batchSize;
         this->maxSeqlen = tiling->promptAttentionBaseApiBaseParams.maxSeqLen;
@@ -772,7 +772,7 @@ public:
             uint32_t mIdx = processIdx / qHeads;
             uint64_t headIdx = processIdx % qHeads;
             if (alibiCoeffGm != nullptr) {
-                alibiCoeff = (float)(*((__gm__ float *)alibiCoeffGm + headIdx));
+                alibiCoeff = (float)(*((__gm__ float*)alibiCoeffGm + headIdx));
             }
 
             uint32_t mLoop = (qSeqlen + ppMScalar - 1) / ppMScalar;
@@ -1774,7 +1774,7 @@ private:
     using IN_DATA_TYPE = typename PFAT::inDataType;
     static constexpr bool IS_BF16 = PFAT::isBF16;
 
-    const typename PFAT::tilingType *__restrict tiling;
+    const typename PFAT::tilingType* __restrict tiling;
     const uint32_t lsUbufOffset = 0;
     const uint32_t lpUbufOffset = 0;
     const uint32_t ls32UbufOffset = 2 * UB_UINT8_BLOCK_SIZE;
@@ -1816,7 +1816,7 @@ private:
     AscendC::GlobalTensor<float> upoGmTensor;
     GlobalTensor<int64_t> actualSeqLengthsGm;
     GlobalTensor<int64_t> actualSeqLengthsKVGm;
-    __gm__ uint8_t *__restrict__ alibiCoeffGm{nullptr};
+    __gm__ uint8_t* __restrict__ alibiCoeffGm{nullptr};
 
     uint32_t batchSize{0};
     uint32_t maxSeqlen{0};
@@ -1849,15 +1849,15 @@ template <typename PFAT>
 class PromptFlashAttentionBaseMLAHighPrecision {
 public:
     __aicore__ inline PromptFlashAttentionBaseMLAHighPrecision(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *pseShift, __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                __gm__ uint8_t *actualSeqLengthsKV, __gm__ uint8_t *blocktable,
-                                __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-                                __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-                                __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *attentionOut,
-                                __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-                                const typename PFAT::tilingType *__restrict tiling, __gm__ uint8_t *gmTiling,
-                                TPipe *tPipe, __gm__ uint8_t *alibiCoeff)
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                                __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* blocktable,
+                                __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+                                __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix,
+                                __gm__ uint8_t* actualSharedPrefixLen, __gm__ uint8_t* attentionOut,
+                                __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                                const typename PFAT::tilingType* __restrict tiling, __gm__ uint8_t* gmTiling,
+                                TPipe* tPipe, __gm__ uint8_t* alibiCoeff)
     {
 #ifdef __DAV_C220_CUBE__
         FlashAttentionEncoderHighPrecisionMLA<PFAT> fa_cube(

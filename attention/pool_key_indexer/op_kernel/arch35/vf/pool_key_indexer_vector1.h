@@ -43,7 +43,7 @@ struct UIntSortConstCtx {
 };
 
 template <typename FloatT>
-__simd_callee__ inline void InitUIntSortConstCtx(UIntSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
+__simd_callee__ inline void InitUIntSortConstCtx(UIntSortConstCtx<FloatT>& ctx, AscendC::Reg::MaskReg& maskAll)
 {
     using Traits = UIntSortTraits<FloatT>;
     AscendC::Reg::Duplicate(ctx.zeros, Traits::ZERO, maskAll);
@@ -53,9 +53,9 @@ __simd_callee__ inline void InitUIntSortConstCtx(UIntSortConstCtx<FloatT> &ctx, 
 }
 
 template <typename FloatT>
-__simd_callee__ inline void UIntToSortableKey(AscendC::Reg::RegTensor<FloatT> &outKey,
-                                              AscendC::Reg::RegTensor<typename UIntSortConstCtx<FloatT>::UInt> &inVal,
-                                              UIntSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
+__simd_callee__ inline void UIntToSortableKey(AscendC::Reg::RegTensor<FloatT>& outKey,
+                                              AscendC::Reg::RegTensor<typename UIntSortConstCtx<FloatT>::UInt>& inVal,
+                                              UIntSortConstCtx<FloatT>& ctx, AscendC::Reg::MaskReg& maskAll)
 {
     using Traits = UIntSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
@@ -65,30 +65,29 @@ __simd_callee__ inline void UIntToSortableKey(AscendC::Reg::RegTensor<FloatT> &o
     AscendC::Reg::MaskReg regSelectZero;
     AscendC::Reg::MaskReg regSelectSign;
 
-    auto &inBits = inVal;
+    auto& inBits = inVal;
 
     // 1. 0 check
     AscendC::Reg::Compare<UInt, CMPMODE::EQ>(regSelectZero, inBits, ctx.zeros, maskAll);
 
     // 2. 0 -> -NAN
-    AscendC::Reg::Select((AscendC::Reg::RegTensor<UInt> &)outKey, ctx.nan, inBits, regSelectZero);
+    AscendC::Reg::Select((AscendC::Reg::RegTensor<UInt>&)outKey, ctx.nan, inBits, regSelectZero);
 
     // 3. sign bit
-    AscendC::Reg::And(regTemp, (AscendC::Reg::RegTensor<UInt> &)outKey, ctx.signMask, maskAll);
+    AscendC::Reg::And(regTemp, (AscendC::Reg::RegTensor<UInt>&)outKey, ctx.signMask, maskAll);
 
     AscendC::Reg::Compare<UInt, CMPMODE::GT>(regSelectSign, regTemp, ctx.zeros, maskAll);
 
     // 4. xor mask
     AscendC::Reg::Select(regMask, ctx.signMask, ctx.allOne, regSelectSign);
-    AscendC::Reg::Xor((AscendC::Reg::RegTensor<UInt> &)outKey, (AscendC::Reg::RegTensor<UInt> &)outKey, regMask,
-                      maskAll);
+    AscendC::Reg::Xor((AscendC::Reg::RegTensor<UInt>&)outKey, (AscendC::Reg::RegTensor<UInt>&)outKey, regMask, maskAll);
 }
 
-__aicore__ inline void UIntToFloatReturnValue(const LocalTensor<bfloat16_t> &out_, const LocalTensor<uint32_t> &in,
+__aicore__ inline void UIntToFloatReturnValue(const LocalTensor<bfloat16_t>& out_, const LocalTensor<uint32_t>& in,
                                               const uint32_t topK)
 {
-    auto outBuf = (__local_mem__ bfloat16_t *)out_.GetPhyAddr();
-    auto inBuf = (__local_mem__ uint32_t *)in.GetPhyAddr();
+    auto outBuf = (__local_mem__ bfloat16_t*)out_.GetPhyAddr();
+    auto inBuf = (__local_mem__ uint32_t*)in.GetPhyAddr();
 
     const uint16_t repeatSize32 = 128;
     uint16_t topkLoopNum = (topK + repeatSize32 - 1) / repeatSize32;
@@ -123,11 +122,11 @@ __aicore__ inline void UIntToFloatReturnValue(const LocalTensor<bfloat16_t> &out
     }
 }
 
-__aicore__ inline void UIntToFloatReturnValue(const LocalTensor<half> &out_, const LocalTensor<uint32_t> &in,
+__aicore__ inline void UIntToFloatReturnValue(const LocalTensor<half>& out_, const LocalTensor<uint32_t>& in,
                                               const uint32_t topK)
 {
-    auto outBuf = (__local_mem__ half *)out_.GetPhyAddr();
-    auto inBuf = (__local_mem__ uint32_t *)in.GetPhyAddr();
+    auto outBuf = (__local_mem__ half*)out_.GetPhyAddr();
+    auto inBuf = (__local_mem__ uint32_t*)in.GetPhyAddr();
 
     const uint16_t repeatSize32 = 128;
     uint16_t topkLoopNum = (topK + repeatSize32 - 1) / repeatSize32;
@@ -163,11 +162,11 @@ __aicore__ inline void UIntToFloatReturnValue(const LocalTensor<half> &out_, con
 }
 
 // PKI: float output version (no Cast needed, values output is FLOAT)
-__aicore__ inline void UIntToFloatReturnValue(const LocalTensor<float> &out_, const LocalTensor<uint32_t> &in,
+__aicore__ inline void UIntToFloatReturnValue(const LocalTensor<float>& out_, const LocalTensor<uint32_t>& in,
                                               const uint32_t topK)
 {
-    auto outBuf = (__local_mem__ float *)out_.GetPhyAddr();
-    auto inBuf = (__local_mem__ uint32_t *)in.GetPhyAddr();
+    auto outBuf = (__local_mem__ float*)out_.GetPhyAddr();
+    auto inBuf = (__local_mem__ uint32_t*)in.GetPhyAddr();
 
     const uint16_t repeatSize32 = 128;
     uint16_t topkLoopNum = (topK + repeatSize32 - 1) / repeatSize32;
@@ -196,26 +195,26 @@ __aicore__ inline void UIntToFloatReturnValue(const LocalTensor<float> &out_, co
     }
 }
 
-__simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<float> &dst, __local_mem__ float *src,
+__simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<float>& dst, __local_mem__ float* src,
                                           uint16_t laneIdx)
 {
     AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(dst, src + laneIdx);
 }
 
 template <typename W_T>
-__aicore__ inline void MulWeightAndReduceSum(const LocalTensor<uint32_t> &out, // out    [S2Base]     [128   ] 2
-                                             const LocalTensor<float> &qk,     // q*k^t  [G, S2Base]  [64 128] 2
-                                             const LocalTensor<W_T> &weight,   // w      [G]          [64    ] 1
+__aicore__ inline void MulWeightAndReduceSum(const LocalTensor<uint32_t>& out, // out    [S2Base]     [128   ] 2
+                                             const LocalTensor<float>& qk,     // q*k^t  [G, S2Base]  [64 128] 2
+                                             const LocalTensor<W_T>& weight,   // w      [G]          [64    ] 1
                                              const int gSize,                  // G 64
                                              const float scale)                // 1/sqrt(headDim)
 {
-    __local_mem__ W_T *weight_ = (__local_mem__ W_T *)weight.GetPhyAddr();
+    __local_mem__ W_T* weight_ = (__local_mem__ W_T*)weight.GetPhyAddr();
 
     constexpr uint32_t VL = 64; // vector length
 
-    auto qk0 = (__local_mem__ float *)qk.GetPhyAddr();
+    auto qk0 = (__local_mem__ float*)qk.GetPhyAddr();
     auto qk1 = qk0 + VL;
-    auto out0 = (__local_mem__ uint32_t *)out.GetPhyAddr();
+    auto out0 = (__local_mem__ uint32_t*)out.GetPhyAddr();
     auto out1 = out0 + VL;
 
     __VEC_SCOPE__
@@ -274,21 +273,21 @@ __aicore__ inline void MulWeightAndReduceSum(const LocalTensor<uint32_t> &out, /
 // mode=0 (FP8 per-token-head) scale 融合版: scale 为正标量, 可从 D 维点积中
 // 完全提出, out = (Σ_g relu(Σ_d q·k)·w_g·dq)·dk; weight 为已预乘 qScale 的 fp32 UB
 __aicore__ inline void MulWeightAndReduceSumWithScale(
-    const LocalTensor<uint32_t> &out, // out    [S2Base]     [128   ] 2
-    const LocalTensor<float> &qk,     // q*k^t  [G, S2Base]  [64 128] 2
-    const LocalTensor<float> &weight, // w*dq   [G]          [64    ] 1
-    const LocalTensor<float> &kScale, // kScale [S2Base]     [128   ] 2
+    const LocalTensor<uint32_t>& out, // out    [S2Base]     [128   ] 2
+    const LocalTensor<float>& qk,     // q*k^t  [G, S2Base]  [64 128] 2
+    const LocalTensor<float>& weight, // w*dq   [G]          [64    ] 1
+    const LocalTensor<float>& kScale, // kScale [S2Base]     [128   ] 2
     const int gSize,                  // G 64
     const float scale)                // 1/sqrt(headDim)
 {
-    __local_mem__ float *weight_ = (__local_mem__ float *)weight.GetPhyAddr();
-    __local_mem__ float *kScale_ = (__local_mem__ float *)kScale.GetPhyAddr();
+    __local_mem__ float* weight_ = (__local_mem__ float*)weight.GetPhyAddr();
+    __local_mem__ float* kScale_ = (__local_mem__ float*)kScale.GetPhyAddr();
 
     constexpr uint32_t VL = 64; // vector length
 
-    auto qk0 = (__local_mem__ float *)qk.GetPhyAddr();
+    auto qk0 = (__local_mem__ float*)qk.GetPhyAddr();
     auto qk1 = qk0 + VL;
-    auto out0 = (__local_mem__ uint32_t *)out.GetPhyAddr();
+    auto out0 = (__local_mem__ uint32_t*)out.GetPhyAddr();
     auto out1 = out0 + VL;
     auto kScale0 = kScale_;
     auto kScale1 = kScale_ + VL;
@@ -346,8 +345,8 @@ __aicore__ inline void MulWeightAndReduceSumWithScale(
 // mode=0: weight×qScale SIMD 预乘(单 s1 行, 64 lanes): 半精度 weight -> fp32
 // cast -> 乘 qScale -> 落 fp32 UB; 独立 __simd_vf__ 保证 bf16 Cast 硬件展开
 template <typename W_T>
-__simd_vf__ void MulWeightQScaleSIMD(__local_mem__ W_T *weight_, __local_mem__ float *qScale_,
-                                     __local_mem__ float *dst_)
+__simd_vf__ void MulWeightQScaleSIMD(__local_mem__ W_T* weight_, __local_mem__ float* qScale_,
+                                     __local_mem__ float* dst_)
 {
     Reg::MaskReg maskAllB32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
     Reg::MaskReg maskAllB16 = Reg::CreateMask<W_T, Reg::MaskPattern::ALL>();

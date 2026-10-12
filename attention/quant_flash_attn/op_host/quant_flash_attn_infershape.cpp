@@ -43,32 +43,32 @@ static constexpr size_t OUTPUT_IDX_SOFTMAX_LSE = 1;
 
 static std::string ToUpper(std::string s)
 {
-    for (auto &c : s) {
+    for (auto& c : s) {
         c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
     }
     return s;
 }
 
-ge::graphStatus InferShapeQuantFlashAttn(gert::InferShapeContext *context)
+ge::graphStatus InferShapeQuantFlashAttn(gert::InferShapeContext* context)
 {
     OP_LOGI(context, "QuantFlashAttn InferShape start.");
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
 
-    const gert::Shape *qShape = context->GetInputShape(INPUT_IDX_Q);
+    const gert::Shape* qShape = context->GetInputShape(INPUT_IDX_Q);
     OP_CHECK_NULL_WITH_CONTEXT(context, qShape);
-    const gert::Shape *kShape = context->GetInputShape(INPUT_IDX_K);
+    const gert::Shape* kShape = context->GetInputShape(INPUT_IDX_K);
     OP_CHECK_NULL_WITH_CONTEXT(context, kShape);
-    const gert::Shape *vShape = context->GetInputShape(INPUT_IDX_V);
+    const gert::Shape* vShape = context->GetInputShape(INPUT_IDX_V);
     OP_CHECK_NULL_WITH_CONTEXT(context, vShape);
 
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const char *layoutQ = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_Q);
-    const char *layoutKv = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_KV);
-    const char *layoutOut = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_OUT);
+    const char* layoutQ = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_Q);
+    const char* layoutKv = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_KV);
+    const char* layoutOut = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_OUT);
     OP_CHECK_NULL_WITH_CONTEXT(context, layoutQ);
     OP_CHECK_NULL_WITH_CONTEXT(context, layoutKv);
     OP_CHECK_NULL_WITH_CONTEXT(context, layoutOut);
@@ -126,14 +126,14 @@ ge::graphStatus InferShapeQuantFlashAttn(gert::InferShapeContext *context)
     } else if (layoutQStr == "NTD") {
         if (qShape->GetDimNum() != 3) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "q",
-                std::to_string(qShape->GetDimNum()).c_str(),
-                "The shape dim of q must be 3 when layout_q is NTD");
+                                                     std::to_string(qShape->GetDimNum()).c_str(),
+                                                     "The shape dim of q must be 3 when layout_q is NTD");
             return ge::GRAPH_FAILED;
         }
         numHeadsQ = qShape->GetDim(0);
-        seqLenQ   = qShape->GetDim(1);
-        headDim   = qShape->GetDim(2);
-        isTND     = true;
+        seqLenQ = qShape->GetDim(1);
+        headDim = qShape->GetDim(2);
+        isTND = true;
     } else {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "layout_q", layoutQStr.c_str(),
                                               "The value of layout_q must be in BSND/BNSD/TND/NTD");
@@ -155,7 +155,7 @@ ge::graphStatus InferShapeQuantFlashAttn(gert::InferShapeContext *context)
         headDimV = vShape->GetDim(2) * vShape->GetDim(4);
     }
 
-    gert::Shape *attnOutShape = context->GetOutputShape(OUTPUT_IDX_ATTN_OUT);
+    gert::Shape* attnOutShape = context->GetOutputShape(OUTPUT_IDX_ATTN_OUT);
     OP_CHECK_NULL_WITH_CONTEXT(context, attnOutShape);
 
     if (layoutOutStr == "BSND") {
@@ -181,7 +181,7 @@ ge::graphStatus InferShapeQuantFlashAttn(gert::InferShapeContext *context)
         return ge::GRAPH_FAILED;
     }
 
-    gert::Shape *lseShape = context->GetOutputShape(OUTPUT_IDX_SOFTMAX_LSE);
+    gert::Shape* lseShape = context->GetOutputShape(OUTPUT_IDX_SOFTMAX_LSE);
     if (lseShape != nullptr) {
         if (returnSoftmaxLse) {
             if (isTND) {
@@ -206,7 +206,7 @@ ge::graphStatus InferShapeQuantFlashAttn(gert::InferShapeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeQuantFlashAttn(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeQuantFlashAttn(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         return ge::GRAPH_FAILED;

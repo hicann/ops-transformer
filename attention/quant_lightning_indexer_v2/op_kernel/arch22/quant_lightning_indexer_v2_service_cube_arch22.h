@@ -38,14 +38,14 @@ public:
     using K_T = typename QLIV2T::keyType;
 
     __aicore__ inline QLIV2Matmul(){};
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitMm1GlobalTensor(const GlobalTensor<int32_t> &blkTableGm, const GlobalTensor<K_T> &keyGm,
-                                               const GlobalTensor<Q_T> &queryGm, const GlobalTensor<float> &mm1ResGm,
-                                               const GlobalTensor<half> &weightWorkspaceGm);
-    __aicore__ inline void InitParams(const ConstInfo &constInfo);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitMm1GlobalTensor(const GlobalTensor<int32_t>& blkTableGm, const GlobalTensor<K_T>& keyGm,
+                                               const GlobalTensor<Q_T>& queryGm, const GlobalTensor<float>& mm1ResGm,
+                                               const GlobalTensor<half>& weightWorkspaceGm);
+    __aicore__ inline void InitParams(const ConstInfo& constInfo);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void ComputeMm1(const QLIV2Common::RunInfo &runInfo);
+    __aicore__ inline void ComputeMm1(const QLIV2Common::RunInfo& runInfo);
 
     static constexpr IsResetLoad3dConfig LOAD3DV2_CONFIG = {true, true}; // isSetFMatrix isSetPadding;
     static constexpr uint64_t DOUBLE_BUF_NUM = 2;
@@ -78,27 +78,27 @@ public:
     static constexpr uint64_t L0C_BUFFER_OFFSET = 64 * 256;
 
 private:
-    __aicore__ inline void WeightDmaCopy(uint64_t s1gL1RealSize, const QLIV2Common::RunInfo &runInfo);
+    __aicore__ inline void WeightDmaCopy(uint64_t s1gL1RealSize, const QLIV2Common::RunInfo& runInfo);
     __aicore__ inline void LoadKeyToL0b(uint64_t s2L0RealSize);
     __aicore__ inline void LoadQueryToL0a(uint64_t s1gL1Offset, uint64_t s1gL1RealSize, uint64_t s1gL0RealSize);
-    __aicore__ inline void QueryNd2Nz(uint64_t s1gL1RealSize, const QLIV2Common::RunInfo &runInfo);
+    __aicore__ inline void QueryNd2Nz(uint64_t s1gL1RealSize, const QLIV2Common::RunInfo& runInfo);
     __aicore__ inline void KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                         const QLIV2Common::RunInfo &runInfo);
-    __aicore__ inline void KeyNd2Nz(uint64_t s2L1RealSize, const MmInfo &mmInfo, const QLIV2Common::RunInfo &runInfo);
+                                         const QLIV2Common::RunInfo& runInfo);
+    __aicore__ inline void KeyNd2Nz(uint64_t s2L1RealSize, const MmInfo& mmInfo, const QLIV2Common::RunInfo& runInfo);
     __aicore__ inline void FixpSToL1(uint64_t s1gL0RealSize, uint64_t s2L0RealSize);
     __aicore__ inline void LoadSToL0b(uint64_t s1gL1RealSize, uint64_t s2L0RealSize, uint64_t sL1BufIdx,
                                       int64_t mStartPt);
     __aicore__ inline void LoadWeightToL0a(uint64_t s1gL1Offset);
     __aicore__ inline void ComputeWs(uint64_t s1gL0RealSize, uint64_t s2L0RealSize, int64_t s1gOffset);
     __aicore__ inline void FixpResToGm(uint64_t s1L0RealCount, uint64_t s2L0RealSize, uint64_t s1GmOffset,
-                                       uint64_t s2GmOffset, const QLIV2Common::RunInfo &runInfo);
+                                       uint64_t s2GmOffset, const QLIV2Common::RunInfo& runInfo);
     __aicore__ inline void ComputeQk(uint64_t s1gL0RealSize, uint64_t s2L0RealSize);
     __aicore__ inline void ProcessWs(uint64_t s1gL0RealSize, uint64_t s1gL1Offset, uint64_t sL1BufIdx,
-                                     const MmInfo &mmInfo, const QLIV2Common::RunInfo &runInfo);
+                                     const MmInfo& mmInfo, const QLIV2Common::RunInfo& runInfo);
     __aicore__ inline void ProcessQk(uint64_t s1gL0RealSize, uint64_t s1gL1Offset, uint64_t s1L0LoopCnt,
-                                     const MmInfo &mmInfo, const QLIV2Common::RunInfo &runInfo);
-    __aicore__ inline void CalcMmInfo(MmInfo &mmInfo, uint64_t loopIdx, uint64_t s1L0LoopCnt, const MmInfo &lastMmInfo,
-                                      const QLIV2Common::RunInfo &runInfo);
+                                     const MmInfo& mmInfo, const QLIV2Common::RunInfo& runInfo);
+    __aicore__ inline void CalcMmInfo(MmInfo& mmInfo, uint64_t loopIdx, uint64_t s1L0LoopCnt, const MmInfo& lastMmInfo,
+                                      const QLIV2Common::RunInfo& runInfo);
     static constexpr LI_LAYOUT Q_LAYOUT_T = QLIV2T::layout;
     static constexpr LI_LAYOUT K_LAYOUT_T = QLIV2T::keyLayout;
     GlobalTensor<int32_t> blkTableGm_;
@@ -134,13 +134,13 @@ private:
 };
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Matmul<QLIV2T>::InitParams(const ConstInfo &constInfo)
+__aicore__ inline void QLIV2Matmul<QLIV2T>::InitParams(const ConstInfo& constInfo)
 {
     constInfo_ = constInfo;
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Matmul<QLIV2T>::InitBuffers(TPipe *pipe)
+__aicore__ inline void QLIV2Matmul<QLIV2T>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(bufQL1_, DOUBLE_BUF_NUM * S1G_BASIC_BLOCK_L1 * D_BASIC_BLOCK * sizeof(Q_T));
     queryL1_ = bufQL1_.Get<Q_T>();
@@ -162,11 +162,11 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::InitBuffers(TPipe *pipe)
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Matmul<QLIV2T>::InitMm1GlobalTensor(const GlobalTensor<int32_t> &blkTableGm,
-                                                                const GlobalTensor<K_T> &keyGm,
-                                                                const GlobalTensor<Q_T> &queryGm,
-                                                                const GlobalTensor<float> &mm1ResGm,
-                                                                const GlobalTensor<half> &weightWorkspaceGm)
+__aicore__ inline void QLIV2Matmul<QLIV2T>::InitMm1GlobalTensor(const GlobalTensor<int32_t>& blkTableGm,
+                                                                const GlobalTensor<K_T>& keyGm,
+                                                                const GlobalTensor<Q_T>& queryGm,
+                                                                const GlobalTensor<float>& mm1ResGm,
+                                                                const GlobalTensor<half>& weightWorkspaceGm)
 {
     blkTableGm_ = blkTableGm;
     keyGm_ = keyGm;
@@ -177,7 +177,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::InitMm1GlobalTensor(const GlobalTens
 
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::ProcessWs(uint64_t s1gL0RealSize, uint64_t s1gL1Offset, uint64_t sL1BufIdx,
-                                                      const MmInfo &mmInfo, const QLIV2Common::RunInfo &runInfo)
+                                                      const MmInfo& mmInfo, const QLIV2Common::RunInfo& runInfo)
 {
     WaitFlag<HardEvent::FIX_M>(FIX_M_EVENT + l0cBufIdx_ % DOUBLE_BUF_NUM);
     for (int64_t s1gOffset = 0; s1gOffset < s1gL0RealSize; s1gOffset += constInfo_.gSize) {
@@ -199,8 +199,8 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::ProcessWs(uint64_t s1gL0RealSize, ui
 
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::ProcessQk(uint64_t s1gL0RealSize, uint64_t s1gL1Offset,
-                                                      uint64_t s1L0LoopCnt, const MmInfo &mmInfo,
-                                                      const QLIV2Common::RunInfo &runInfo)
+                                                      uint64_t s1L0LoopCnt, const MmInfo& mmInfo,
+                                                      const QLIV2Common::RunInfo& runInfo)
 {
     if (mmInfo.s1gL0LoopId == 0) {
         WaitFlag<HardEvent::MTE1_MTE2>(KEY_MTE1_MTE2_EVENT + keyL1BufIdx_ % DOUBLE_BUF_NUM);
@@ -234,8 +234,8 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::ProcessQk(uint64_t s1gL0RealSize, ui
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Matmul<QLIV2T>::CalcMmInfo(MmInfo &mmInfo, uint64_t loopIdx, uint64_t s1L0LoopCnt,
-                                                       const MmInfo &lastMmInfo, const QLIV2Common::RunInfo &runInfo)
+__aicore__ inline void QLIV2Matmul<QLIV2T>::CalcMmInfo(MmInfo& mmInfo, uint64_t loopIdx, uint64_t s1L0LoopCnt,
+                                                       const MmInfo& lastMmInfo, const QLIV2Common::RunInfo& runInfo)
 {
     mmInfo.s2L0LoopId = loopIdx / s1L0LoopCnt;
     mmInfo.s1gL0LoopId = loopIdx % s1L0LoopCnt;
@@ -251,7 +251,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::CalcMmInfo(MmInfo &mmInfo, uint64_t 
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Matmul<QLIV2T>::ComputeMm1(const QLIV2Common::RunInfo &runInfo)
+__aicore__ inline void QLIV2Matmul<QLIV2T>::ComputeMm1(const QLIV2Common::RunInfo& runInfo)
 {
     if (runInfo.isFirstS2InnerLoop) {
         WaitFlag<HardEvent::MTE1_MTE2>(QW_MTE1_MTE2_EVENT + qwL1Mte2BufIdx_ % DOUBLE_BUF_NUM);
@@ -307,7 +307,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::ComputeMm1(const QLIV2Common::RunInf
 // blkNum, blkSize, N2, D
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                                          const QLIV2Common::RunInfo &runInfo)
+                                                          const QLIV2Common::RunInfo& runInfo)
 {
     uint64_t s2L1Offset = 0;
     while (s2L1Offset < s2L1RealSize) {
@@ -336,8 +336,8 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2NzForPA(uint64_t s2L1RealSize,
 }
 
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2Nz(uint64_t s2L1RealSize, const MmInfo &mmInfo,
-                                                     const QLIV2Common::RunInfo &runInfo)
+__aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2Nz(uint64_t s2L1RealSize, const MmInfo& mmInfo,
+                                                     const QLIV2Common::RunInfo& runInfo)
 {
     uint64_t dStride = constInfo_.headDim;
     if constexpr (K_LAYOUT_T == LI_LAYOUT::BSND || K_LAYOUT_T == LI_LAYOUT::TND) {
@@ -359,7 +359,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2Nz(uint64_t s2L1RealSize, cons
 
 // batch, s1, g, 1
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Matmul<QLIV2T>::WeightDmaCopy(uint64_t s1gL1RealSize, const QLIV2Common::RunInfo &runInfo)
+__aicore__ inline void QLIV2Matmul<QLIV2T>::WeightDmaCopy(uint64_t s1gL1RealSize, const QLIV2Common::RunInfo& runInfo)
 {
     DataCopyParams copyInParams;
     copyInParams.blockCount = 1;
@@ -372,7 +372,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::WeightDmaCopy(uint64_t s1gL1RealSize
 
 // batch, s1, n2, g, d
 template <typename QLIV2T>
-__aicore__ inline void QLIV2Matmul<QLIV2T>::QueryNd2Nz(uint64_t s1gL1RealSize, const QLIV2Common::RunInfo &runInfo)
+__aicore__ inline void QLIV2Matmul<QLIV2T>::QueryNd2Nz(uint64_t s1gL1RealSize, const QLIV2Common::RunInfo& runInfo)
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -551,7 +551,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::FixpSToL1(uint64_t s1gL0RealSize, ui
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::FixpResToGm(uint64_t s1L0RealCount, uint64_t s2L0RealSize,
                                                         uint64_t s1GmOffset, uint64_t s2GmOffset,
-                                                        const QLIV2Common::RunInfo &runInfo)
+                                                        const QLIV2Common::RunInfo& runInfo)
 {
     SetFlag<HardEvent::M_FIX>(M_FIX_EVENT);
     WaitFlag<HardEvent::M_FIX>(M_FIX_EVENT);

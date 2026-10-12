@@ -17,10 +17,10 @@
 
 namespace QuantFlashAttnUT {
 
-inline gert::Stride MakeContiguousStride(const gert::StorageShape &shape)
+inline gert::Stride MakeContiguousStride(const gert::StorageShape& shape)
 {
     gert::Stride stride;
-    const auto &storageShape = shape.GetStorageShape();
+    const auto& storageShape = shape.GetStorageShape();
     const auto dimNum = storageShape.GetDimNum();
     if (dimNum == 0) {
         return stride;
@@ -47,7 +47,7 @@ struct QuantFlashAttnHostUtParamBase : public HostUtParamBase {
     std::string layout_out;
     bool return_softmax_lse;
 
-    QuantFlashAttnHostUtParamBase(const csv_map &csvMap)
+    QuantFlashAttnHostUtParamBase(const csv_map& csvMap)
         : HostUtParamBase(csvMap)
     {
         this->quant_compute_mode = std::stoll(ReadMap(csvMap, "quant_compute_mode"));
@@ -94,9 +94,9 @@ struct QuantFlashAttnTilingUtParam : public QuantFlashAttnHostUtParamBase {
     std::string expectTilingDataHash;
 
     // QFA const data inputs use int32 (DT_INT32), unlike FIA which uses int64.
-    static void ApplyConstData(const csv_map &csvMap, const std::string &name,
-                               gert::TilingContextPara::TensorDescription &desc,
-                               std::shared_ptr<std::vector<int32_t>> &buf)
+    static void ApplyConstData(const csv_map& csvMap, const std::string& name,
+                               gert::TilingContextPara::TensorDescription& desc,
+                               std::shared_ptr<std::vector<int32_t>>& buf)
     {
         std::string dataStr = ReadMap(csvMap, name + "_data");
         if (!dataStr.empty()) {
@@ -111,7 +111,7 @@ struct QuantFlashAttnTilingUtParam : public QuantFlashAttnHostUtParamBase {
         }
     }
 
-    QuantFlashAttnTilingUtParam(const csv_map &csvMap)
+    QuantFlashAttnTilingUtParam(const csv_map& csvMap)
         : QuantFlashAttnHostUtParamBase(csvMap)
     {
         // 输入顺序与 quant_flash_attn_def.cpp 中 Input() 注册顺序保持一致
@@ -181,7 +181,7 @@ struct QuantFlashAttnTilingUtParam : public QuantFlashAttnHostUtParamBase {
             GetTensorGE(csvMap, "softmax_lse_shape", "softmax_lse_dtype", "softmax_lse_format", this->softmax_lse));
 
         if (this->expectResult == ge::GRAPH_SUCCESS) {
-            const std::string &tilingKeyStr = ReadMap(csvMap, "expectTilingKey");
+            const std::string& tilingKeyStr = ReadMap(csvMap, "expectTilingKey");
             // 留空时使用 SKIP_TILING_KEY_VALIDATION(UINT64_MAX) 跳过 tiling key 校验
             this->expectTilingKey = tilingKeyStr.empty() ? UINT64_MAX : stoull(tilingKeyStr);
             this->expectTilingDataHash = ReadMap(csvMap, "expectTilingDataHash");
@@ -211,7 +211,7 @@ struct QuantFlashAttnInferShapeUtParam : public QuantFlashAttnHostUtParamBase {
 
     std::vector<std::vector<int64_t>> expectOutputShape;
 
-    QuantFlashAttnInferShapeUtParam(const csv_map &csvMap)
+    QuantFlashAttnInferShapeUtParam(const csv_map& csvMap)
         : QuantFlashAttnHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "q_shape", "q_dtype", "q_format", this->q));
@@ -274,7 +274,7 @@ struct QuantFlashAttnInferDTypeUtParam : public QuantFlashAttnHostUtParamBase {
     ge::DataType attn_out = ge::DT_UNDEFINED;
     ge::DataType softmax_lse = ge::DT_UNDEFINED;
 
-    QuantFlashAttnInferDTypeUtParam(const csv_map &csvMap)
+    QuantFlashAttnInferDTypeUtParam(const csv_map& csvMap)
         : QuantFlashAttnHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetDataTypeGE(csvMap, "q_dtype", this->q));

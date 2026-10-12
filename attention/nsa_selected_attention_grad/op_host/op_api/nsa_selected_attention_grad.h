@@ -21,12 +21,12 @@
 namespace l0op {
 const std::size_t NSA_GRAD_OUTPUT_CNT = 3;
 
-const std::array<const aclTensor *, NSA_GRAD_OUTPUT_CNT> NsaSelectedAttentionGrad(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *attentionOut,
-    const aclTensor *attentionOutGrad, const aclTensor *softmaxMax, const aclTensor *softmaxSum,
-    const aclTensor *topkIndices, const aclIntArray *actualSeqQLenOptional, const aclIntArray *actualSeqKVLlenOptional,
-    const aclTensor *attenMskOptional, double scaleValue, int64_t selectedBlockCount, int64_t selectedBlockSize,
-    int64_t headNum, const char *inputLayout, int64_t sparseMode, aclOpExecutor *executor);
+const std::array<const aclTensor*, NSA_GRAD_OUTPUT_CNT> NsaSelectedAttentionGrad(
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* attentionOut,
+    const aclTensor* attentionOutGrad, const aclTensor* softmaxMax, const aclTensor* softmaxSum,
+    const aclTensor* topkIndices, const aclIntArray* actualSeqQLenOptional, const aclIntArray* actualSeqKVLlenOptional,
+    const aclTensor* attenMskOptional, double scaleValue, int64_t selectedBlockCount, int64_t selectedBlockSize,
+    int64_t headNum, const char* inputLayout, int64_t sparseMode, aclOpExecutor* executor);
 } // namespace l0op
 
 #endif // OP_API_INC_LEVEL0_OP_NSA_SELECTED_ATTENTION_GRAD_OP_H

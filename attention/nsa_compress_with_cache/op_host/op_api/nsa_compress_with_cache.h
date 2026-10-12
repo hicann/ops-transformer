@@ -14,11 +14,11 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *NsaCompressWithCache(const aclTensor *input, const aclTensor *weight, const aclTensor *slotMapping,
-                                      aclTensor *outputCacheRef, const aclIntArray *actSeqLenOptional,
-                                      const aclTensor *blockTableOptional, char *layoutOptional,
+const aclTensor* NsaCompressWithCache(const aclTensor* input, const aclTensor* weight, const aclTensor* slotMapping,
+                                      aclTensor* outputCacheRef, const aclIntArray* actSeqLenOptional,
+                                      const aclTensor* blockTableOptional, char* layoutOptional,
                                       int64_t compressBlockSize, int64_t compressStride, int64_t actSeqLenType,
-                                      int64_t pageBlockSize, aclOpExecutor *executor);
+                                      int64_t pageBlockSize, aclOpExecutor* executor);
 }
 
 #endif

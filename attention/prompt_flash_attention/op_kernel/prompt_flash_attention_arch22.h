@@ -153,43 +153,43 @@ constexpr uint32_t INT8BYTENUM = 32;
     } while (0)
 #define INVOKE_PFA_NO_KFC_TILING_DATA_MLA(tiling) \
     GET_TILING_DATA_WITH_STRUCT(MLAGeneralTilingData, tiling_data_in, tiling); \
-    const MLAGeneralTilingData *__restrict tilingData = &tiling_data_in; \
-    const TCubeTiling *__restrict bmm1tiling = nullptr; \
-    const TCubeTiling *__restrict bmm2tiling = nullptr
+    const MLAGeneralTilingData* __restrict tilingData = &tiling_data_in; \
+    const TCubeTiling* __restrict bmm1tiling = nullptr; \
+    const TCubeTiling* __restrict bmm2tiling = nullptr
 #ifdef __DAV_C220_CUBE__
 #define INVOKE_PFA_TILING_DATA(tiling) \
     GET_TILING_DATA_MEMBER(PromptFlashAttentionTilingData, bmm1TilingDataRect, bmm1TilingData, tiling); \
     GET_TILING_DATA_MEMBER(PromptFlashAttentionTilingData, bmm2TilingDataRect, bmm2TilingData, tiling); \
-    const TCubeTiling *__restrict bmm1tiling = &bmm1TilingData; \
-    const TCubeTiling *__restrict bmm2tiling = &bmm2TilingData; \
-    const PromptFlashAttentionTilingData *__restrict tiling_data = nullptr
+    const TCubeTiling* __restrict bmm1tiling = &bmm1TilingData; \
+    const TCubeTiling* __restrict bmm2tiling = &bmm2TilingData; \
+    const PromptFlashAttentionTilingData* __restrict tiling_data = nullptr
 
 #define INVOKE_PFA_TILING_DATA_BASE_API(tiling) \
     GET_TILING_DATA_WITH_STRUCT(PromptFlashAttentionBaseApiTilingData, tiling_data_in, tiling); \
-    const PromptFlashAttentionBaseApiTilingData *__restrict tiling_data = &tiling_data_in
+    const PromptFlashAttentionBaseApiTilingData* __restrict tiling_data = &tiling_data_in
 
 #define INVOKE_PFA_TILING_DATA_MLA(tiling) \
     GET_TILING_DATA_MEMBER(MLAGeneralTilingData, bmm1TilingData, bmm1TilingDataVar, tiling); \
     GET_TILING_DATA_MEMBER(MLAGeneralTilingData, bmm2TilingData, bmm2TilingDataVar, tiling); \
-    const MLAGeneralTilingData *__restrict tilingData = nullptr; \
-    const TCubeTiling *__restrict bmm1tiling = &bmm1TilingDataVar; \
-    const TCubeTiling *__restrict bmm2tiling = &bmm2TilingDataVar
+    const MLAGeneralTilingData* __restrict tilingData = nullptr; \
+    const TCubeTiling* __restrict bmm1tiling = &bmm1TilingDataVar; \
+    const TCubeTiling* __restrict bmm2tiling = &bmm2TilingDataVar
 #else
 #define INVOKE_PFA_TILING_DATA(tiling) \
     GET_TILING_DATA_WITH_STRUCT(PromptFlashAttentionTilingData, tiling_data_in, tiling); \
-    const PromptFlashAttentionTilingData *__restrict tiling_data = &tiling_data_in; \
-    const TCubeTiling *__restrict bmm1tiling = &(tiling_data->bmm1TilingDataRect); \
-    const TCubeTiling *__restrict bmm2tiling = &(tiling_data->bmm2TilingDataRect)
+    const PromptFlashAttentionTilingData* __restrict tiling_data = &tiling_data_in; \
+    const TCubeTiling* __restrict bmm1tiling = &(tiling_data->bmm1TilingDataRect); \
+    const TCubeTiling* __restrict bmm2tiling = &(tiling_data->bmm2TilingDataRect)
 
 #define INVOKE_PFA_TILING_DATA_MLA(tiling) \
     GET_TILING_DATA_WITH_STRUCT(MLAGeneralTilingData, tiling_data_in, tiling); \
-    const MLAGeneralTilingData *__restrict tilingData = &tiling_data_in; \
-    const TCubeTiling *__restrict bmm1tiling = &(tilingData->bmm1TilingData); \
-    const TCubeTiling *__restrict bmm2tiling = &(tilingData->bmm2TilingData)
+    const MLAGeneralTilingData* __restrict tilingData = &tiling_data_in; \
+    const TCubeTiling* __restrict bmm1tiling = &(tilingData->bmm1TilingData); \
+    const TCubeTiling* __restrict bmm2tiling = &(tilingData->bmm2TilingData)
 
 #define INVOKE_PFA_TILING_DATA_BASE_API(tiling) \
     GET_TILING_DATA_WITH_STRUCT(PromptFlashAttentionBaseApiTilingData, tiling_data_in, tiling); \
-    const PromptFlashAttentionBaseApiTilingData *__restrict tiling_data = &tiling_data_in
+    const PromptFlashAttentionBaseApiTilingData* __restrict tiling_data = &tiling_data_in
 #endif
 #define INVOKE_PFA_NEW_GQA_OP_IMPL(templateClass, ...) \
     do { \
@@ -203,22 +203,22 @@ constexpr uint32_t INT8BYTENUM = 32;
     } while (0)
 
 inline __aicore__ void prompt_flash_attention_FIAS_arch22(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-    __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-    __gm__ uint8_t *deq_scale1, __gm__ uint8_t *quant_scale1, __gm__ uint8_t *deq_scale2, __gm__ uint8_t *quant_scale2,
-    __gm__ uint8_t *quant_offset2, __gm__ uint8_t *antiquant_scale, __gm__ uint8_t *antiquant_offset,
-    __gm__ uint8_t *blocktable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-    __gm__ uint8_t *key_antiquant_scale, __gm__ uint8_t *key_antiquant_offset, __gm__ uint8_t *value_antiquant_scale,
-    __gm__ uint8_t *value_antiquant_offset, __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-    __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-    __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *learnableSink, __gm__ uint8_t *attentionOut,
-    __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+    __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+    __gm__ uint8_t* deq_scale1, __gm__ uint8_t* quant_scale1, __gm__ uint8_t* deq_scale2, __gm__ uint8_t* quant_scale2,
+    __gm__ uint8_t* quant_offset2, __gm__ uint8_t* antiquant_scale, __gm__ uint8_t* antiquant_offset,
+    __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+    __gm__ uint8_t* key_antiquant_scale, __gm__ uint8_t* key_antiquant_offset, __gm__ uint8_t* value_antiquant_scale,
+    __gm__ uint8_t* value_antiquant_offset, __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix,
+    __gm__ uint8_t* actualSharedPrefixLen, __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+    __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* learnableSink, __gm__ uint8_t* attentionOut,
+    __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
 #if (__CCE_AICORE__ > 200)
     GET_TILING_DATA_MEMBER(PromptFlashAttentionTilingData, promptAttentionBaseParams, baseParams, tiling);
     auto maskByteNum = baseParams.maskTypeByteNum;
 
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16) && (ORIG_DTYPE_KEY != DT_INT4)
 
@@ -1018,7 +1018,7 @@ inline __aicore__ void prompt_flash_attention_FIAS_arch22(
     GET_TILING_DATA_MEMBER(PromptFlashAttentionTilingData, promptAttentionBaseParams, baseParams, tiling);
     auto maskByteNum = baseParams.maskTypeByteNum;
 
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     TILING_KEY_IS(QINT8_KVFP16_OUTBF16_BSH_HIGHLEVELAPI_MDL_310TILING);
     TILING_KEY_IS(QINT8_KVFP16_OUTINT8_BSH_HIGHLEVELAPI_MDL_310TILING);

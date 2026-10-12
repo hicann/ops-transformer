@@ -38,7 +38,7 @@ TEST_F(prompt_flash_attention_v3_opapi_ut, prompt_flash_attention_v3_aclnn_950_u
     op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
     char inputLayout[] = "BNSD";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnPromptFlashAttentionV3GetWorkspaceSize(
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 8,

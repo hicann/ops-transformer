@@ -17,9 +17,15 @@ namespace QuantFlashAttnUT {
 
 class QuantFlashAttnArch35TilingTest : public testing::TestWithParam<QuantFlashAttnTilingUtParam> {
 protected:
-    static void SetUpTestCase() { std::cout << "QuantFlashAttn Arch35 TilingTest SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "QuantFlashAttn Arch35 TilingTest SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "QuantFlashAttn Arch35 TilingTest TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "QuantFlashAttn Arch35 TilingTest TearDown" << std::endl;
+    }
 };
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(QuantFlashAttnArch35TilingTest);

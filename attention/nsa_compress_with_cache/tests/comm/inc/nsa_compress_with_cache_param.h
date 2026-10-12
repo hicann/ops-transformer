@@ -79,7 +79,7 @@ public:
     virtual bool Init();
 
     template <class T>
-    static bool InitTensor(Tensor &tensor, std::vector<T> &hostData)
+    static bool InitTensor(Tensor& tensor, std::vector<T>& hostData)
     {
         if (hostData.empty()) {
             return true;

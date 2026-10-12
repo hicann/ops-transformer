@@ -21,10 +21,10 @@
 
 namespace MlaProlog {
 template <typename T, typename C>
-__aicore__ inline void MulQr(const GlobalTensor<T> &outputGmRope, const GlobalTensor<T> &inputGmRope,
-                             LocalTensor<T> outputLocalRope, const LocalTensor<T> &qrInputLocal,
-                             const LocalTensor<C> &qrFp32Local, const LocalTensor<C> &reciprocalLocal,
-                             const LocalTensor<C> &dequantScaleBrcbLocal, uint64_t row, uint64_t colRope,
+__aicore__ inline void MulQr(const GlobalTensor<T>& outputGmRope, const GlobalTensor<T>& inputGmRope,
+                             LocalTensor<T> outputLocalRope, const LocalTensor<T>& qrInputLocal,
+                             const LocalTensor<C>& qrFp32Local, const LocalTensor<C>& reciprocalLocal,
+                             const LocalTensor<C>& dequantScaleBrcbLocal, uint64_t row, uint64_t colRope,
                              uint64_t subRowRope, uint64_t qrOutputStrideRope, float quantScaleCkvRope,
                              uint32_t MUL_QR_INPUT_COPY_READY, uint32_t MUL_QR)
 {
@@ -86,10 +86,10 @@ __aicore__ inline void MulQr(const GlobalTensor<T> &outputGmRope, const GlobalTe
 }
 
 template <typename T, typename C, typename O>
-__aicore__ inline void DynamicQuantMultiRow(const GlobalTensor<O> &outputGm, const LocalTensor<C> &scaleOutputLocal,
-                                            const GlobalTensor<T> &inputGm, const LocalTensor<C> outputLocal,
-                                            const LocalTensor<T> &inputHalf, const LocalTensor<C> &inputLocal,
-                                            const LocalTensor<C> &maxInt8Tensor, const LocalTensor<uint8_t> &shareTmpUb,
+__aicore__ inline void DynamicQuantMultiRow(const GlobalTensor<O>& outputGm, const LocalTensor<C>& scaleOutputLocal,
+                                            const GlobalTensor<T>& inputGm, const LocalTensor<C> outputLocal,
+                                            const LocalTensor<T>& inputHalf, const LocalTensor<C>& inputLocal,
+                                            const LocalTensor<C>& maxInt8Tensor, const LocalTensor<uint8_t>& shareTmpUb,
                                             uint64_t row, uint64_t col, uint64_t subRow, uint64_t queryOutStride,
                                             uint32_t DYNAMIC_QUANT_INPUT_READY, uint32_t DYNAMIC_QUANT_OUTPUT_READY)
 {
@@ -166,12 +166,12 @@ __aicore__ inline void DynamicQuantMultiRow(const GlobalTensor<O> &outputGm, con
 template <typename T, typename C, typename O>
 __aicore__ inline void DynamicQuantQnWithMulQr(
     // Dynamic Quant With MulQr 输出
-    const GlobalTensor<C> &scaleOutputGm, const GlobalTensor<O> &outputGm, const GlobalTensor<T> &outputGmRope,
+    const GlobalTensor<C>& scaleOutputGm, const GlobalTensor<O>& outputGm, const GlobalTensor<T>& outputGmRope,
     // Dynamic Quant 入参
-    const GlobalTensor<T> &inputGm, LocalTensor<uint8_t> &shareTmpUb, uint64_t row, uint64_t col,
+    const GlobalTensor<T>& inputGm, LocalTensor<uint8_t>& shareTmpUb, uint64_t row, uint64_t col,
     uint64_t scaleOutStride, uint64_t queryOutStride,
     // Mul Qr 入参
-    const GlobalTensor<T> &inputGmRope, float quantScaleCkvRope, uint64_t colRope, uint64_t qrOutputStrideRope,
+    const GlobalTensor<T>& inputGmRope, float quantScaleCkvRope, uint64_t colRope, uint64_t qrOutputStrideRope,
     uint32_t cvRatio)
 {
     if (col == 0 || row == 0) {

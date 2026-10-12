@@ -22,7 +22,7 @@
 namespace MlaProlog {
 
 template <typename C>
-__simd_vf__ inline void RopeVFImpl(__ubuf__ C *outputUb, __ubuf__ C *inputUb, __ubuf__ C *sinUb, __ubuf__ C *cosUb,
+__simd_vf__ inline void RopeVFImpl(__ubuf__ C* outputUb, __ubuf__ C* inputUb, __ubuf__ C* sinUb, __ubuf__ C* cosUb,
                                    uint32_t row, uint64_t srcStride, uint64_t dstStride, uint64_t sinCosStride)
 {
     Reg::RegTensor<C> vregX;
@@ -41,10 +41,10 @@ __simd_vf__ inline void RopeVFImpl(__ubuf__ C *outputUb, __ubuf__ C *inputUb, __
     Reg::Not(maskHighHalf, maskLowHalf, maskAll);
 
     for (uint16_t i = 0; i < row; ++i) {
-        __ubuf__ C *curXUb = inputUb + i * srcStride;
-        __ubuf__ C *curResUb = outputUb + i * dstStride;
-        __ubuf__ C *curSinUb = sinUb + i * sinCosStride;
-        __ubuf__ C *curCosUb = cosUb + i * sinCosStride;
+        __ubuf__ C* curXUb = inputUb + i * srcStride;
+        __ubuf__ C* curResUb = outputUb + i * dstStride;
+        __ubuf__ C* curSinUb = sinUb + i * sinCosStride;
+        __ubuf__ C* curCosUb = cosUb + i * sinCosStride;
 
         Reg::LoadAlign(vregX, curXUb);
         Reg::LoadAlign(vregSin, curSinUb);
@@ -74,14 +74,14 @@ __simd_vf__ inline void RopeVFImpl(__ubuf__ C *outputUb, __ubuf__ C *inputUb, __
 
 // col == 64
 template <typename C>
-__aicore__ inline void RotaryPosEmbVF(const LocalTensor<C> &outputLocal, const LocalTensor<C> &inputLocal,
-                                      const LocalTensor<C> &cosLocal, const LocalTensor<C> &sinLocal, uint32_t row,
+__aicore__ inline void RotaryPosEmbVF(const LocalTensor<C>& outputLocal, const LocalTensor<C>& inputLocal,
+                                      const LocalTensor<C>& cosLocal, const LocalTensor<C>& sinLocal, uint32_t row,
                                       uint64_t srcStride, uint64_t dstStride, uint64_t sinCosStride)
 {
-    __ubuf__ C *inputUb = (__ubuf__ C *)inputLocal.GetPhyAddr();
-    __ubuf__ C *sinUb = (__ubuf__ C *)sinLocal.GetPhyAddr();
-    __ubuf__ C *cosUb = (__ubuf__ C *)cosLocal.GetPhyAddr();
-    __ubuf__ C *outputUb = (__ubuf__ C *)outputLocal.GetPhyAddr();
+    __ubuf__ C* inputUb = (__ubuf__ C*)inputLocal.GetPhyAddr();
+    __ubuf__ C* sinUb = (__ubuf__ C*)sinLocal.GetPhyAddr();
+    __ubuf__ C* cosUb = (__ubuf__ C*)cosLocal.GetPhyAddr();
+    __ubuf__ C* outputUb = (__ubuf__ C*)outputLocal.GetPhyAddr();
 
     RopeVFImpl(outputUb, inputUb, sinUb, cosUb, row, srcStride, dstStride, sinCosStride);
 }

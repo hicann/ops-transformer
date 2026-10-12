@@ -39,10 +39,10 @@ namespace MlaProlog {
  */
 // 用于enableGroupComputeOpt场景
 template <typename T, typename C, typename O>
-__aicore__ inline void DequantSplitNQc(const GlobalTensor<O> &outputGm, const GlobalTensor<T> &inputGm,
-                                       const GlobalTensor<C> &deqScaleQcQrWGm,
-                                       const LocalTensor<C> &deQuantScaleQcQrLocal,
-                                       const LocalTensor<uint8_t> &shareTmpUb, Rectangle dequantRowColStrideParams,
+__aicore__ inline void DequantSplitNQc(const GlobalTensor<O>& outputGm, const GlobalTensor<T>& inputGm,
+                                       const GlobalTensor<C>& deqScaleQcQrWGm,
+                                       const LocalTensor<C>& deQuantScaleQcQrLocal,
+                                       const LocalTensor<uint8_t>& shareTmpUb, Rectangle dequantRowColStrideParams,
                                        uint32_t oriCol, uint32_t dstStride, uint32_t subBlockIdx_)
 {
     int64_t a22Count = dequantRowColStrideParams.col * 1;
@@ -102,10 +102,10 @@ __aicore__ inline void DequantSplitNQc(const GlobalTensor<O> &outputGm, const Gl
  * @param oriRow 一共有多少行
 */
 template <typename T, typename C, typename O>
-__aicore__ inline void DequantPerTokenQc(const GlobalTensor<O> &outputGm, const GlobalTensor<T> &inputGm,
-                                         const GlobalTensor<C> &deqScaleQcQrWGm,
+__aicore__ inline void DequantPerTokenQc(const GlobalTensor<O>& outputGm, const GlobalTensor<T>& inputGm,
+                                         const GlobalTensor<C>& deqScaleQcQrWGm,
                                          const LocalTensor<float> deQuantScaleQcQrLocal,
-                                         const LocalTensor<uint8_t> &shareTmpUb, Rectangle dequantRowColStrideParams,
+                                         const LocalTensor<uint8_t>& shareTmpUb, Rectangle dequantRowColStrideParams,
                                          uint32_t oriRow)
 {
     int64_t count = dequantRowColStrideParams.col * dequantRowColStrideParams.row;
@@ -160,8 +160,8 @@ __aicore__ inline void DequantPerTokenQc(const GlobalTensor<O> &outputGm, const 
  * @param oriRow 一共有多少行
 */
 template <typename T, typename O>
-__aicore__ inline void CastPerTokenQc(const GlobalTensor<O> &outputGm, const GlobalTensor<T> &inputGm,
-                                      const LocalTensor<uint8_t> &shareTmpUb, Rectangle castRowColStrideParams,
+__aicore__ inline void CastPerTokenQc(const GlobalTensor<O>& outputGm, const GlobalTensor<T>& inputGm,
+                                      const LocalTensor<uint8_t>& shareTmpUb, Rectangle castRowColStrideParams,
                                       uint32_t oriRow)
 {
     int64_t count = castRowColStrideParams.col * castRowColStrideParams.row;

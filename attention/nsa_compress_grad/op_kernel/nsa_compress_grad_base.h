@@ -12,7 +12,7 @@
  * \file nsa_compress_grad_bash.h
  * \brief nsa_compress_grad_bash head file
  */
- 
+
 #ifndef NSA_COMPRESS_GRAD_BASE_H
 #define NSA_COMPRESS_GRAD_BASE_H
 
@@ -27,26 +27,16 @@ template <typename T>
 class NsaCompressGradND {
 public:
     __aicore__ inline NsaCompressGradND(){};
-    __aicore__ inline void Init(GM_ADDR outputGrad,
-                                GM_ADDR input,
-                                GM_ADDR weight,
-                                GM_ADDR actSeqLen,
-                                GM_ADDR inputGrad,
-                                GM_ADDR weightGrad,
-                                GM_ADDR workspace,
-                                const NsaCompressGradTilingData* tilingData,
-                                TPipe *tPipe);
+    __aicore__ inline void Init(GM_ADDR outputGrad, GM_ADDR input, GM_ADDR weight, GM_ADDR actSeqLen, GM_ADDR inputGrad,
+                                GM_ADDR weightGrad, GM_ADDR workspace, const NsaCompressGradTilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void MoveResult();
 
 private:
     __aicore__ inline void InitTilingData(const NsaCompressGradTilingData* tilingData);
-    __aicore__ inline void InitGlobalTensor(GM_ADDR outputGrad, 
-                                            GM_ADDR input,
-                                            GM_ADDR weight,
-                                            GM_ADDR actSeqLen,
-                                            GM_ADDR inputGrad, 
-                                            GM_ADDR weightGrad);
+    __aicore__ inline void InitGlobalTensor(GM_ADDR outputGrad, GM_ADDR input, GM_ADDR weight, GM_ADDR actSeqLen,
+                                            GM_ADDR inputGrad, GM_ADDR weightGrad);
     __aicore__ inline void InitWorkspace(GM_ADDR workspace);
     __aicore__ inline void InitBuffers();
     __aicore__ inline void calculateProcessInfo();
@@ -58,7 +48,8 @@ private:
     __aicore__ inline void CopyOutWtGrad(uint32_t offsetWt, uint32_t size);
     __aicore__ inline void CopyInWt(uint32_t offset, uint32_t size);
     __aicore__ inline void CopyOutInputGrad(uint32_t offsetWt, uint32_t size);
-    __aicore__ inline void CastByCondition(LocalTensor<T> dstTensor, LocalTensor<float> srcTensor, uint32_t castSize, bool condition);
+    __aicore__ inline void CastByCondition(LocalTensor<T> dstTensor, LocalTensor<float> srcTensor, uint32_t castSize,
+                                           bool condition);
     __aicore__ inline void MoveInputGrad();
     __aicore__ inline void MoveWtGrad();
     __aicore__ inline void PresetFlag();
@@ -67,7 +58,7 @@ private:
     __aicore__ inline uint32_t GetSeqLenTarBch(uint32_t batchIdx);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
 
     // Global tensors
     GlobalTensor<T> outputGradGm_;
@@ -130,21 +121,23 @@ private:
     bool deterministicFlag_ = true;
 };
 
-template<typename T>
+template <typename T>
 __aicore__ inline void NsaCompressGradND<T>::CastByCondition(LocalTensor<T> dstTensor, LocalTensor<float> srcTensor,
-                                                             uint32_t castSize, bool condition) {
+                                                             uint32_t castSize, bool condition)
+{
     if (!condition) {
         return;
     }
-    if (std::is_same_v<T, half>){
+    if (std::is_same_v<T, half>) {
         Cast(dstTensor, srcTensor, RoundMode::CAST_NONE, castSize);
-    } else if (std::is_same_v<T, bfloat16_t>){
+    } else if (std::is_same_v<T, bfloat16_t>) {
         Cast(dstTensor, srcTensor, RoundMode::CAST_RINT, castSize);
     }
 }
 
-template<typename T>
-__aicore__ inline uint32_t NsaCompressGradND<T>::GetSeqLenTarBch(uint32_t batchIdx) {
+template <typename T>
+__aicore__ inline uint32_t NsaCompressGradND<T>::GetSeqLenTarBch(uint32_t batchIdx)
+{
     if (seqLenType_ == 1) {
         return actSeqLenListGm_.GetValue(batchIdx);
     }
@@ -156,8 +149,9 @@ __aicore__ inline uint32_t NsaCompressGradND<T>::GetSeqLenTarBch(uint32_t batchI
     }
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::PresetFlag() {
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::PresetFlag()
+{
     // weight的搬运
     SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID2);
     // inputKV的搬运
@@ -166,8 +160,9 @@ __aicore__ inline void NsaCompressGradND<T>::PresetFlag() {
     SetFlag<HardEvent::V_MTE2>(EVENT_ID6);
 }
 
-template<typename T>
-__aicore__ inline void NsaCompressGradND<T>::ClearPresetFlag() {
+template <typename T>
+__aicore__ inline void NsaCompressGradND<T>::ClearPresetFlag()
+{
     // weight的搬运
     WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID2);
     // inputKV的搬运
@@ -175,6 +170,6 @@ __aicore__ inline void NsaCompressGradND<T>::ClearPresetFlag() {
     // cmpGrad的搬运
     WaitFlag<HardEvent::V_MTE2>(EVENT_ID6);
 }
-}
+} // namespace NsaCompressGrad
 
 #endif

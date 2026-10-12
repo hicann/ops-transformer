@@ -38,7 +38,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -47,7 +47,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shape_size;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -60,8 +60,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensorND(const std::vector<T> &shape, void **deviceAddr, void **hostAddr, aclDataType dataType,
-                      aclTensor **tensor)
+int CreateAclTensorND(const std::vector<T>& shape, void** deviceAddr, void** hostAddr, aclDataType dataType,
+                      aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * aclDataTypeSize(dataType);
     // 调用aclrtMalloc申请device侧内存
@@ -81,8 +81,8 @@ int CreateAclTensorND(const std::vector<T> &shape, void **deviceAddr, void **hos
 }
 
 template <typename T>
-int CreateAclTensorNZ(const std::vector<T> &shape, void **deviceAddr, void **hostAddr, aclDataType dataType,
-                      aclTensor **tensor)
+int CreateAclTensorNZ(const std::vector<T>& shape, void** deviceAddr, void** hostAddr, aclDataType dataType,
+                      aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * aclDataTypeSize(dataType);
     // 调用aclrtMalloc申请device侧内存
@@ -101,7 +101,7 @@ int CreateAclTensorNZ(const std::vector<T> &shape, void **deviceAddr, void **hos
     return 0;
 }
 
-int TransToNZShape(std::vector<int64_t> &shapeND, size_t typeSize)
+int TransToNZShape(std::vector<int64_t>& shapeND, size_t typeSize)
 {
     if (typeSize == static_cast<size_t>(0)) {
         return 0;
@@ -120,13 +120,13 @@ int TransToNZShape(std::vector<int64_t> &shapeND, size_t typeSize)
 }
 
 template <typename T>
-int FillHostDataAndCopy(void *deviceAddr, void *hostAddr, int64_t num, T value)
+int FillHostDataAndCopy(void* deviceAddr, void* hostAddr, int64_t num, T value)
 {
     if (hostAddr == nullptr || deviceAddr == nullptr) {
         LOG_PRINT("FillHostDataAndCopy: null address.\n");
         return -1;
     }
-    auto *hostData = static_cast<T *>(hostAddr);
+    auto* hostData = static_cast<T*>(hostAddr);
     for (int64_t i = 0; i < num; ++i) {
         hostData[i] = value;
     }
@@ -169,65 +169,65 @@ int main()
     double rmsnormEpsilonCkv = 1e-5;
     char cacheMode[] = "PA_BSND";
 
-    void *tokenXDeviceAddr = nullptr;
-    void *weightDqDeviceAddr = nullptr;
-    void *weightUqQrDeviceAddr = nullptr;
-    void *weightUkDeviceAddr = nullptr;
-    void *weightDkvKrDeviceAddr = nullptr;
-    void *rmsnormGammaCqDeviceAddr = nullptr;
-    void *rmsnormGammaCkvDeviceAddr = nullptr;
-    void *ropeSinDeviceAddr = nullptr;
-    void *ropeCosDeviceAddr = nullptr;
-    void *cacheIndexDeviceAddr = nullptr;
-    void *kvCacheDeviceAddr = nullptr;
-    void *krCacheDeviceAddr = nullptr;
-    void *dequantScaleXDeviceAddr = nullptr;
-    void *dequantScaleWDqDeviceAddr = nullptr;
-    void *dequantScaleWUqQrDeviceAddr = nullptr;
-    void *dequantScaleWDkvKrDeviceAddr = nullptr;
-    void *quantScaleCkvDeviceAddr = nullptr;
-    void *queryDeviceAddr = nullptr;
-    void *queryRopeDeviceAddr = nullptr;
-    void *dequantScaleQNopeDeviceAddr = nullptr;
+    void* tokenXDeviceAddr = nullptr;
+    void* weightDqDeviceAddr = nullptr;
+    void* weightUqQrDeviceAddr = nullptr;
+    void* weightUkDeviceAddr = nullptr;
+    void* weightDkvKrDeviceAddr = nullptr;
+    void* rmsnormGammaCqDeviceAddr = nullptr;
+    void* rmsnormGammaCkvDeviceAddr = nullptr;
+    void* ropeSinDeviceAddr = nullptr;
+    void* ropeCosDeviceAddr = nullptr;
+    void* cacheIndexDeviceAddr = nullptr;
+    void* kvCacheDeviceAddr = nullptr;
+    void* krCacheDeviceAddr = nullptr;
+    void* dequantScaleXDeviceAddr = nullptr;
+    void* dequantScaleWDqDeviceAddr = nullptr;
+    void* dequantScaleWUqQrDeviceAddr = nullptr;
+    void* dequantScaleWDkvKrDeviceAddr = nullptr;
+    void* quantScaleCkvDeviceAddr = nullptr;
+    void* queryDeviceAddr = nullptr;
+    void* queryRopeDeviceAddr = nullptr;
+    void* dequantScaleQNopeDeviceAddr = nullptr;
 
-    void *tokenXHostAddr = nullptr;
-    void *weightDqHostAddr = nullptr;
-    void *weightUqQrHostAddr = nullptr;
-    void *weightUkHostAddr = nullptr;
-    void *weightDkvKrHostAddr = nullptr;
-    void *rmsnormGammaCqHostAddr = nullptr;
-    void *rmsnormGammaCkvHostAddr = nullptr;
-    void *ropeSinHostAddr = nullptr;
-    void *ropeCosHostAddr = nullptr;
-    void *cacheIndexHostAddr = nullptr;
-    void *kvCacheHostAddr = nullptr;
-    void *krCacheHostAddr = nullptr;
-    void *dequantScaleXHostAddr = nullptr;
-    void *dequantScaleWDqHostAddr = nullptr;
-    void *dequantScaleWUqQrHostAddr = nullptr;
-    void *dequantScaleWDkvKrHostAddr = nullptr;
-    void *quantScaleCkvHostAddr = nullptr;
-    void *queryHostAddr = nullptr;
-    void *queryRopeHostAddr = nullptr;
-    void *dequantScaleQNopeHostAddr = nullptr;
+    void* tokenXHostAddr = nullptr;
+    void* weightDqHostAddr = nullptr;
+    void* weightUqQrHostAddr = nullptr;
+    void* weightUkHostAddr = nullptr;
+    void* weightDkvKrHostAddr = nullptr;
+    void* rmsnormGammaCqHostAddr = nullptr;
+    void* rmsnormGammaCkvHostAddr = nullptr;
+    void* ropeSinHostAddr = nullptr;
+    void* ropeCosHostAddr = nullptr;
+    void* cacheIndexHostAddr = nullptr;
+    void* kvCacheHostAddr = nullptr;
+    void* krCacheHostAddr = nullptr;
+    void* dequantScaleXHostAddr = nullptr;
+    void* dequantScaleWDqHostAddr = nullptr;
+    void* dequantScaleWUqQrHostAddr = nullptr;
+    void* dequantScaleWDkvKrHostAddr = nullptr;
+    void* quantScaleCkvHostAddr = nullptr;
+    void* queryHostAddr = nullptr;
+    void* queryRopeHostAddr = nullptr;
+    void* dequantScaleQNopeHostAddr = nullptr;
 
-    aclTensor *tokenX = nullptr;
-    aclTensor *weightDq = nullptr;
-    aclTensor *weightUqQr = nullptr;
-    aclTensor *weightUk = nullptr;
-    aclTensor *weightDkvKr = nullptr;
-    aclTensor *rmsnormGammaCq = nullptr;
-    aclTensor *rmsnormGammaCkv = nullptr;
-    aclTensor *ropeSin = nullptr;
-    aclTensor *ropeCos = nullptr;
-    aclTensor *kvCache = nullptr;
-    aclTensor *krCache = nullptr;
-    aclTensor *cacheIndex = nullptr;
-    aclTensor *dequantScaleX = nullptr;
-    aclTensor *dequantScaleWDq = nullptr;
-    aclTensor *dequantScaleWUqQr = nullptr;
-    aclTensor *dequantScaleWDkvKr = nullptr;
-    aclTensor *quantScaleCkv = nullptr;
+    aclTensor* tokenX = nullptr;
+    aclTensor* weightDq = nullptr;
+    aclTensor* weightUqQr = nullptr;
+    aclTensor* weightUk = nullptr;
+    aclTensor* weightDkvKr = nullptr;
+    aclTensor* rmsnormGammaCq = nullptr;
+    aclTensor* rmsnormGammaCkv = nullptr;
+    aclTensor* ropeSin = nullptr;
+    aclTensor* ropeCos = nullptr;
+    aclTensor* kvCache = nullptr;
+    aclTensor* krCache = nullptr;
+    aclTensor* cacheIndex = nullptr;
+    aclTensor* dequantScaleX = nullptr;
+    aclTensor* dequantScaleWDq = nullptr;
+    aclTensor* dequantScaleWUqQr = nullptr;
+    aclTensor* dequantScaleWDkvKr = nullptr;
+    aclTensor* quantScaleCkv = nullptr;
     bool queryNormFlag = false;
     int64_t weightQuantMode = 3;
     int64_t kvQuantMode = 1;
@@ -238,9 +238,9 @@ int main()
     double qcQrScale = 1.0f;
     double kcScale = 1.0f;
     bool doRope = true;
-    aclTensor *query = nullptr;
-    aclTensor *queryRope = nullptr;
-    aclTensor *dequantScaleQNope = nullptr;
+    aclTensor* query = nullptr;
+    aclTensor* queryRope = nullptr;
+    aclTensor* dequantScaleQNope = nullptr;
 
     // 转换三个NZ格式变量的shape
     constexpr size_t EXAMPLE_INT8_SIZE = sizeof(int8_t);
@@ -322,7 +322,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 设置cacheIndex，为每个token分配不同的cache slot，避免所有token写入同一slot
     CHECK_RET(cacheIndexHostAddr != nullptr, LOG_PRINT("cacheIndexHostAddr is null.\n"); return 0);
-    int64_t *cacheIndexData = static_cast<int64_t *>(cacheIndexHostAddr);
+    int64_t* cacheIndexData = static_cast<int64_t*>(cacheIndexHostAddr);
     for (int64_t i = 0; i < cacheIndexShape[0]; ++i) {
         cacheIndexData[i] = i;
     }
@@ -396,7 +396,7 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的API
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     // 调用aclnnMlaPrologV4WeightNz第一段接口
     ret = aclnnMlaPrologV4WeightNzGetWorkspaceSize(
         tokenX, weightDq, weightUqQr, weightUk, weightDkvKr, rmsnormGammaCq, rmsnormGammaCkv, ropeSin, ropeCos, kvCache,
@@ -407,7 +407,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMlaPrologV4WeightNzGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > static_cast<uint64_t>(0)) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret;);

@@ -62,7 +62,7 @@ inline uint32_t RoundUpU32(uint32_t value, uint32_t align)
 // Host 读不到 per-request q_len。kernel TotalTasks = Σ CeilDiv(qLen_b * Hq, MSA_ROW_TILE_M)。
 // Σ ceil(x_i) <= ceil(Σ x_i) + B；B=1 时 packed == actual。B>1 用 packed+B 上界，避免少估把
 // 多 tile 请求串到已启动核上。多 M-tile / 大 batch 仍截到全量 AIC。
-inline uint32_t EstPackedMTasks(const MsaIndexScoreInfo &info, uint32_t aicNum)
+inline uint32_t EstPackedMTasks(const MsaIndexScoreInfo& info, uint32_t aicNum)
 {
     if (info.totalQ == 0U || aicNum == 0U) {
         return 1U;
@@ -86,7 +86,7 @@ inline uint32_t EstPackedMTasks(const MsaIndexScoreInfo &info, uint32_t aicNum)
 
 // 可见 KV page 上界：优先 host 可读的 actual_seq_klen；否则 min(表宽, PA numPages)。
 // GetData() 对 device tensor 也返回非空指针，解引用会段错误；仅 kOnHost/kFollowing 可读。
-inline bool IsHostVisibleTensor(const gert::Tensor *tensor)
+inline bool IsHostVisibleTensor(const gert::Tensor* tensor)
 {
     if (tensor == nullptr) {
         return false;
@@ -95,7 +95,7 @@ inline bool IsHostVisibleTensor(const gert::Tensor *tensor)
     return (placement == gert::kOnHost) || (placement == gert::kFollowing);
 }
 
-inline uint32_t EstMaxVisibleBlocks(gert::TilingContext *context, const MsaIndexScoreInfo &info)
+inline uint32_t EstMaxVisibleBlocks(gert::TilingContext* context, const MsaIndexScoreInfo& info)
 {
     uint32_t vis = info.maxBlocksPerBatch;
     if (info.keyLayout != MSA_KEY_LAYOUT_TND && info.numPages > 0U && info.numPages < vis) {
@@ -105,7 +105,7 @@ inline uint32_t EstMaxVisibleBlocks(gert::TilingContext *context, const MsaIndex
     if (!IsHostVisibleTensor(klenTensor)) {
         return vis;
     }
-    const int32_t *data = klenTensor->GetData<int32_t>();
+    const int32_t* data = klenTensor->GetData<int32_t>();
     if (data == nullptr) {
         return vis;
     }
@@ -132,7 +132,7 @@ inline uint32_t EstMaxVisibleBlocks(gert::TilingContext *context, const MsaIndex
 }
 
 // 950：M-task 填不满 AIC 且可见 KV stile 足够时，沿 S 切开打满核。A1 类 packedM≈aicNum 时 kvChunks=1。
-inline uint32_t EstKvChunks(const MsaIndexScoreInfo &info, uint32_t aicNum, uint32_t packedM, uint32_t visBlocks)
+inline uint32_t EstKvChunks(const MsaIndexScoreInfo& info, uint32_t aicNum, uint32_t packedM, uint32_t visBlocks)
 {
     if (!info.isAscend950 || packedM == 0U || aicNum == 0U || packedM >= aicNum) {
         return 1U;
@@ -170,7 +170,7 @@ inline uint32_t EstLaunchAic(uint32_t aicNum, uint32_t packedM, uint32_t kvChunk
     return est;
 }
 
-inline uint64_t GetDefaultStride0(const gert::Shape &shape)
+inline uint64_t GetDefaultStride0(const gert::Shape& shape)
 {
     uint64_t stride = 1;
     for (size_t dim = 1; dim < shape.GetDimNum(); ++dim) {
@@ -181,10 +181,10 @@ inline uint64_t GetDefaultStride0(const gert::Shape &shape)
 
 // 逻辑 view：优先 OriginShape（aclCreateTensor 的 viewDims / torch sizes）。
 // StorageShape 在 dim0 插空时可能是 [NP*gap, ...]，不能当 numPages。
-inline const gert::Shape &KeyLogicalShape(const gert::StorageShape *keyShape, uint32_t keyLayout)
+inline const gert::Shape& KeyLogicalShape(const gert::StorageShape* keyShape, uint32_t keyLayout)
 {
     const size_t expectRank = (keyLayout == MSA_KEY_LAYOUT_TND) ? MSA_KEY_TND_DIM_NUM : MSA_KEY_PA_DIM_NUM;
-    const gert::Shape &origin = keyShape->GetOriginShape();
+    const gert::Shape& origin = keyShape->GetOriginShape();
     if (origin.GetDimNum() == expectRank) {
         return origin;
     }
@@ -193,9 +193,9 @@ inline const gert::Shape &KeyLogicalShape(const gert::StorageShape *keyShape, ui
 
 // aclnn TensorV2 优先 GetRequiredInputStride；
 // 文档接口 GetInputStride 作为兼容回退。
-inline const gert::Stride *GetKeyStrideDesc(gert::TilingContext *context)
+inline const gert::Stride* GetKeyStrideDesc(gert::TilingContext* context)
 {
-    const gert::Stride *stride = context->GetRequiredInputStride(MSA_IDX_KEY);
+    const gert::Stride* stride = context->GetRequiredInputStride(MSA_IDX_KEY);
     if (stride != nullptr) {
         return stride;
     }
@@ -205,8 +205,8 @@ inline const gert::Stride *GetKeyStrideDesc(gert::TilingContext *context)
 // 对齐 MlaProlog GetCacheStride0：dim1…末维须等于紧凑 stride，仅 dim0 可非连续。
 // size-1 轴不参与寻址：PyTorch / torch_npu 对其 stride 不做连续约束（BBND↔BNBD 且 N2=1
 // 时 permute().contiguous() 仍可能是 dim1 stride=P 而非 N2*P*D），跳过该轴比较。
-inline ge::graphStatus ValidateKeyInnerAxesContiguous(gert::TilingContext *context, const gert::Stride *stride,
-                                                      const gert::Shape &shape)
+inline ge::graphStatus ValidateKeyInnerAxesContiguous(gert::TilingContext* context, const gert::Stride* stride,
+                                                      const gert::Shape& shape)
 {
     if (stride == nullptr || stride->GetDimNum() != shape.GetDimNum()) {
         return ge::GRAPH_SUCCESS;
@@ -230,20 +230,20 @@ inline ge::graphStatus ValidateKeyInnerAxesContiguous(gert::TilingContext *conte
 }
 
 // PA：strideKvBlock 取 key dim0 元素 stride。连续输入写入值与 shape 推算相同。
-inline ge::graphStatus ResolveStrideKvBlock(gert::TilingContext *context, const MsaIndexScoreInfo &info,
-                                            uint32_t defaultStrideKvBlock, uint32_t &strideKvBlock)
+inline ge::graphStatus ResolveStrideKvBlock(gert::TilingContext* context, const MsaIndexScoreInfo& info,
+                                            uint32_t defaultStrideKvBlock, uint32_t& strideKvBlock)
 {
     strideKvBlock = defaultStrideKvBlock;
 
-    const gert::StorageShape *keyShape = context->GetInputShape(MSA_IDX_KEY);
+    const gert::StorageShape* keyShape = context->GetInputShape(MSA_IDX_KEY);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    const gert::Shape &kc = KeyLogicalShape(keyShape, info.keyLayout);
+    const gert::Shape& kc = KeyLogicalShape(keyShape, info.keyLayout);
     if (kc.GetShapeSize() == 0) {
         return ge::GRAPH_SUCCESS;
     }
 
     const uint64_t defaultStride0 = GetDefaultStride0(kc);
-    const gert::Stride *stride = GetKeyStrideDesc(context);
+    const gert::Stride* stride = GetKeyStrideDesc(context);
     if (stride == nullptr || stride->GetDimNum() != kc.GetDimNum()) {
         OP_LOGD(context->GetNodeName(), "key has no stride desc, treat as contiguous, strideKvBlock=%u.",
                 strideKvBlock);
@@ -274,7 +274,7 @@ inline ge::graphStatus ResolveStrideKvBlock(gert::TilingContext *context, const 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ParseLayoutKeyAttr(gert::TilingContext *context, const std::string &layoutKey, uint32_t &keyLayout)
+ge::graphStatus ParseLayoutKeyAttr(gert::TilingContext* context, const std::string& layoutKey, uint32_t& keyLayout)
 {
     const std::string s = layoutKey.empty() ? "BBND" : layoutKey;
     if (s == "TND") {
@@ -290,32 +290,32 @@ ge::graphStatus ParseLayoutKeyAttr(gert::TilingContext *context, const std::stri
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ParseAndCheck(gert::TilingContext *context, MsaIndexScoreInfo &info)
+ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& info)
 {
     info.platformInfo = context->GetPlatformInfo();
     OP_CHECK_IF(info.platformInfo == nullptr, OP_LOGE(context, "GetPlatformInfo is nullptr."), return ge::GRAPH_FAILED);
     auto ascendcPlatformEarly = platform_ascendc::PlatformAscendC(info.platformInfo);
     info.isAscend950 = (ascendcPlatformEarly.GetCurNpuArch() == NpuArch::DAV_3510);
 
-    const gert::StorageShape *queryShape = context->GetInputShape(MSA_IDX_QUERY);
+    const gert::StorageShape* queryShape = context->GetInputShape(MSA_IDX_QUERY);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::StorageShape *keyShape = context->GetInputShape(MSA_IDX_KEY);
+    const gert::StorageShape* keyShape = context->GetInputShape(MSA_IDX_KEY);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    const gert::StorageShape *blockTableShape = context->GetOptionalInputShape(MSA_IDX_BLOCK_TABLE);
-    const gert::StorageShape *actualSeqQlenShape = context->GetOptionalInputShape(MSA_IDX_ACTUAL_SEQ_QLEN);
+    const gert::StorageShape* blockTableShape = context->GetOptionalInputShape(MSA_IDX_BLOCK_TABLE);
+    const gert::StorageShape* actualSeqQlenShape = context->GetOptionalInputShape(MSA_IDX_ACTUAL_SEQ_QLEN);
     OP_CHECK_IF(actualSeqQlenShape == nullptr, OP_LOGE(context, "TND query requires actual_seq_qlen."),
                 return ge::GRAPH_FAILED);
-    const gert::StorageShape *actualSeqKlenShape = context->GetOptionalInputShape(MSA_IDX_ACTUAL_SEQ_KLEN);
+    const gert::StorageShape* actualSeqKlenShape = context->GetOptionalInputShape(MSA_IDX_ACTUAL_SEQ_KLEN);
     OP_CHECK_IF(actualSeqKlenShape == nullptr, OP_LOGE(context, "actual_seq_klen is required."),
                 return ge::GRAPH_FAILED);
-    const gert::StorageShape *startLocShape = context->GetInputShape(MSA_IDX_START_LOC);
+    const gert::StorageShape* startLocShape = context->GetInputShape(MSA_IDX_START_LOC);
     OP_CHECK_NULL_WITH_CONTEXT(context, startLocShape);
 
-    const gert::Shape &q = queryShape->GetStorageShape();
-    const gert::Shape &qlen = actualSeqQlenShape->GetStorageShape();
-    const gert::Shape &klen = actualSeqKlenShape->GetStorageShape();
+    const gert::Shape& q = queryShape->GetStorageShape();
+    const gert::Shape& qlen = actualSeqQlenShape->GetStorageShape();
+    const gert::Shape& klen = actualSeqKlenShape->GetStorageShape();
 
-    const auto *keyDesc = context->GetInputDesc(MSA_IDX_KEY);
+    const auto* keyDesc = context->GetInputDesc(MSA_IDX_KEY);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyDesc);
     info.keyDtype = keyDesc->GetDataType();
     OP_CHECK_IF(static_cast<ge::Format>(ge::GetPrimaryFormat(keyDesc->GetStorageFormat())) == ge::FORMAT_FRACTAL_NZ,
@@ -331,14 +331,14 @@ ge::graphStatus ParseAndCheck(gert::TilingContext *context, MsaIndexScoreInfo &i
     info.headDim = static_cast<uint32_t>(q.GetDim(MSA_DIM_2));
     info.batch = static_cast<uint32_t>(qlen.GetDim(MSA_DIM_0) - 1);
 
-    const auto *attrs = context->GetAttrs();
+    const auto* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const char *layoutKeyPtr = attrs->GetStr(MSA_ATTR_LAYOUT_KEY);
+    const char* layoutKeyPtr = attrs->GetStr(MSA_ATTR_LAYOUT_KEY);
     const std::string layoutKey = (layoutKeyPtr == nullptr) ? "" : layoutKeyPtr;
     if (ParseLayoutKeyAttr(context, layoutKey, info.keyLayout) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape &kc = KeyLogicalShape(keyShape, info.keyLayout);
+    const gert::Shape& kc = KeyLogicalShape(keyShape, info.keyLayout);
 
     if (info.keyLayout == MSA_KEY_LAYOUT_TND) {
         info.totalK = static_cast<uint32_t>(kc.GetDim(MSA_DIM_0));
@@ -359,7 +359,7 @@ ge::graphStatus ParseAndCheck(gert::TilingContext *context, MsaIndexScoreInfo &i
     } else {
         OP_CHECK_IF(blockTableShape == nullptr, OP_LOGE(context, "PageAttention (BBND/BNBD) requires block_table."),
                     return ge::GRAPH_FAILED);
-        const gert::Shape &bt = blockTableShape->GetStorageShape();
+        const gert::Shape& bt = blockTableShape->GetStorageShape();
         OP_CHECK_IF(bt.GetDimNum() != MSA_BLOCK_TABLE_DIM_NUM,
                     OP_LOGE(context, "block_table must have 2 dims, got %zu.", bt.GetDimNum()),
                     return ge::GRAPH_FAILED);
@@ -393,9 +393,9 @@ ge::graphStatus ParseAndCheck(gert::TilingContext *context, MsaIndexScoreInfo &i
     }
 
     if (info.keyLayout == MSA_KEY_LAYOUT_TND) {
-        const gert::StorageShape *scoreShape = context->GetOutputShape(0);
+        const gert::StorageShape* scoreShape = context->GetOutputShape(0);
         OP_CHECK_NULL_WITH_CONTEXT(context, scoreShape);
-        const gert::Shape &scOut = scoreShape->GetStorageShape();
+        const gert::Shape& scOut = scoreShape->GetStorageShape();
         OP_CHECK_IF(scOut.GetDimNum() != MSA_QUERY_DIM_NUM, OP_LOGE(context, "score must be 3D [N1,T1,stride]."),
                     return ge::GRAPH_FAILED);
         info.maxBlocksPerBatch = static_cast<uint32_t>(scOut.GetDim(MSA_DIM_2));
@@ -429,7 +429,7 @@ ge::graphStatus ParseAndCheck(gert::TilingContext *context, MsaIndexScoreInfo &i
     OP_CHECK_IF(static_cast<uint32_t>(startLocShape->GetStorageShape().GetDim(MSA_DIM_0)) != info.batch,
                 OP_LOGE(context, "start_loc size must equal batch."), return ge::GRAPH_FAILED);
 
-    const auto *queryDesc = context->GetInputDesc(MSA_IDX_QUERY);
+    const auto* queryDesc = context->GetInputDesc(MSA_IDX_QUERY);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryDesc);
     info.queryDtype = queryDesc->GetDataType();
     OP_CHECK_IF(!IsNonQuantQueryDtype(info.queryDtype, info.isAscend950),
@@ -448,11 +448,11 @@ ge::graphStatus ParseAndCheck(gert::TilingContext *context, MsaIndexScoreInfo &i
                     OP_LOGE(context, "FP8 query/key is only supported on Ascend 950."), return ge::GRAPH_FAILED);
     }
 
-    const gert::StorageShape *scaleShape = context->GetOptionalInputShape(MSA_IDX_SCALE);
+    const gert::StorageShape* scaleShape = context->GetOptionalInputShape(MSA_IDX_SCALE);
     if (info.isQuant) {
         OP_CHECK_IF(scaleShape == nullptr, OP_LOGE(context, "int8 key requires dequant scale."),
                     return ge::GRAPH_FAILED);
-        const gert::Shape &sc = scaleShape->GetStorageShape();
+        const gert::Shape& sc = scaleShape->GetStorageShape();
         if (info.keyLayout == MSA_KEY_LAYOUT_TND) {
             const bool ok2d = (sc.GetDimNum() == MSA_SCALE_TND_DIM_NUM &&
                                static_cast<uint32_t>(sc.GetDim(MSA_DIM_0)) == info.totalK &&
@@ -475,7 +475,7 @@ ge::graphStatus ParseAndCheck(gert::TilingContext *context, MsaIndexScoreInfo &i
                                 sc.GetDim(MSA_DIM_1), sc.GetDim(MSA_DIM_2)),
                         return ge::GRAPH_FAILED);
         }
-        const auto *scaleDesc = context->GetOptionalInputDesc(MSA_IDX_SCALE);
+        const auto* scaleDesc = context->GetOptionalInputDesc(MSA_IDX_SCALE);
         OP_CHECK_NULL_WITH_CONTEXT(context, scaleDesc);
         OP_CHECK_IF(scaleDesc->GetDataType() != ge::DT_FLOAT, OP_LOGE(context, "dequant scale dtype must be float32."),
                     return ge::GRAPH_FAILED);
@@ -484,20 +484,20 @@ ge::graphStatus ParseAndCheck(gert::TilingContext *context, MsaIndexScoreInfo &i
                     return ge::GRAPH_FAILED);
     }
 
-    const int64_t *sparseModeAttr = attrs->GetInt(MSA_ATTR_SPARSE_MODE);
+    const int64_t* sparseModeAttr = attrs->GetInt(MSA_ATTR_SPARSE_MODE);
     info.sparseMode = (sparseModeAttr == nullptr) ? MSA_SPARSE_MODE_RIGHT_DOWN : static_cast<uint32_t>(*sparseModeAttr);
     OP_CHECK_IF(info.sparseMode != MSA_SPARSE_MODE_DEFAULT && info.sparseMode != MSA_SPARSE_MODE_RIGHT_DOWN,
                 OP_LOGE(context, "sparse_mode must be %u or %u, got %u.", MSA_SPARSE_MODE_DEFAULT,
                         MSA_SPARSE_MODE_RIGHT_DOWN, info.sparseMode),
                 return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *attenMaskShape = context->GetOptionalInputShape(MSA_IDX_ATTEN_MASK);
+    const gert::StorageShape* attenMaskShape = context->GetOptionalInputShape(MSA_IDX_ATTEN_MASK);
     if (info.sparseMode == MSA_SPARSE_MODE_RIGHT_DOWN) {
         OP_CHECK_IF(attenMaskShape == nullptr,
                     OP_LOGE(context, "sparse_mode=%u requires atten_mask of shape [%u, %u].",
                             MSA_SPARSE_MODE_RIGHT_DOWN, MSA_ATTEN_MASK_SIZE, MSA_ATTEN_MASK_SIZE),
                     return ge::GRAPH_FAILED);
-        const gert::Shape &am = attenMaskShape->GetStorageShape();
+        const gert::Shape& am = attenMaskShape->GetStorageShape();
         OP_CHECK_IF(am.GetDimNum() != MSA_ATTEN_MASK_DIM_NUM ||
                         static_cast<uint32_t>(am.GetDim(MSA_DIM_0)) != MSA_ATTEN_MASK_SIZE ||
                         static_cast<uint32_t>(am.GetDim(MSA_DIM_1)) != MSA_ATTEN_MASK_SIZE,
@@ -511,8 +511,8 @@ ge::graphStatus ParseAndCheck(gert::TilingContext *context, MsaIndexScoreInfo &i
                     return ge::GRAPH_FAILED);
     }
 
-    const int64_t *initBlocksAttr = attrs->GetInt(MSA_ATTR_INIT_BLOCKS);
-    const int64_t *localBlocksAttr = attrs->GetInt(MSA_ATTR_LOCAL_BLOCKS);
+    const int64_t* initBlocksAttr = attrs->GetInt(MSA_ATTR_INIT_BLOCKS);
+    const int64_t* localBlocksAttr = attrs->GetInt(MSA_ATTR_LOCAL_BLOCKS);
     info.initBlocks = (initBlocksAttr == nullptr) ? MSA_DEFAULT_INIT_BLOCKS : static_cast<uint32_t>(*initBlocksAttr);
     info.localBlocks =
         (localBlocksAttr == nullptr) ? MSA_DEFAULT_LOCAL_BLOCKS : static_cast<uint32_t>(*localBlocksAttr);
@@ -521,7 +521,7 @@ ge::graphStatus ParseAndCheck(gert::TilingContext *context, MsaIndexScoreInfo &i
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DoTiling(gert::TilingContext *context, const MsaIndexScoreInfo &info)
+ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& info)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(info.platformInfo);
     const uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
@@ -623,7 +623,7 @@ ge::graphStatus DoTiling(gert::TilingContext *context, const MsaIndexScoreInfo &
         context->SetBlockDim(ascendcPlatform.CalcTschBlockDim(sliceAiv, aicNum, aivNum));
     }
 
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, workspaces);
     workspaces[0] =
         ascendcPlatform.GetLibApiWorkSpaceSize() + static_cast<size_t>(sWsBytes) + static_cast<size_t>(kScratchBytes);
@@ -652,12 +652,12 @@ ge::graphStatus DoTiling(gert::TilingContext *context, const MsaIndexScoreInfo &
 }
 } // namespace
 
-static ge::graphStatus TilingPrepareForMsaIndexScore(gert::TilingParseContext * /* context */)
+static ge::graphStatus TilingPrepareForMsaIndexScore(gert::TilingParseContext* /* context */)
 {
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingForMsaIndexScore(gert::TilingContext *context)
+static ge::graphStatus TilingForMsaIndexScore(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("MsaIndexScore", "Tiling context is null."),
                 return ge::GRAPH_FAILED);

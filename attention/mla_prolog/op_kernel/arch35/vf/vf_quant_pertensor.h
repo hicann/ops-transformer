@@ -19,7 +19,7 @@
 
 namespace MlaProlog {
 template <typename T, typename U>
-__simd_vf__ void QuantPerTensorVFImpl(__ubuf__ T *inputBuf, __ubuf__ T *quantScaleBuf, __ubuf__ U *outputBuf,
+__simd_vf__ void QuantPerTensorVFImpl(__ubuf__ T* inputBuf, __ubuf__ T* quantScaleBuf, __ubuf__ U* outputBuf,
                                       uint32_t cnt, const uint16_t floatRepSize, uint16_t repeatTimes)
 {
     Reg::MaskReg pregAll = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
@@ -72,16 +72,16 @@ __simd_vf__ void QuantPerTensorVFImpl(__ubuf__ T *inputBuf, __ubuf__ T *quantSca
  * @param col 处理数据的列数
  */
 template <typename T, typename U>
-__aicore__ inline void QuantPerTensorVF(const LocalTensor<U> &outputLocal, const LocalTensor<T> &inputLocal,
-                                        const LocalTensor<T> &quantScaleLocal, const uint32_t row, const uint32_t col)
+__aicore__ inline void QuantPerTensorVF(const LocalTensor<U>& outputLocal, const LocalTensor<T>& inputLocal,
+                                        const LocalTensor<T>& quantScaleLocal, const uint32_t row, const uint32_t col)
 {
     uint32_t cnt = row * col;
     const uint16_t floatRepSize = 64;                               // 一个寄存器能够存放64个FP32
     uint16_t repeatTimes = (cnt + floatRepSize - 1) / floatRepSize; // 对尾块处理的扩展，循环处理的次数
 
-    __ubuf__ T *inputBuf = (__ubuf__ T *)inputLocal.GetPhyAddr();
-    __ubuf__ T *quantScaleBuf = (__ubuf__ T *)quantScaleLocal.GetPhyAddr();
-    __ubuf__ U *outputBuf = (__ubuf__ U *)outputLocal.GetPhyAddr();
+    __ubuf__ T* inputBuf = (__ubuf__ T*)inputLocal.GetPhyAddr();
+    __ubuf__ T* quantScaleBuf = (__ubuf__ T*)quantScaleLocal.GetPhyAddr();
+    __ubuf__ U* outputBuf = (__ubuf__ U*)outputLocal.GetPhyAddr();
 
     QuantPerTensorVFImpl<T, U>(inputBuf, quantScaleBuf, outputBuf, cnt, floatRepSize, repeatTimes);
 }

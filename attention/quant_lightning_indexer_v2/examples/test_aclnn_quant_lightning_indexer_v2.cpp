@@ -33,7 +33,7 @@ namespace {
         (void)printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -42,7 +42,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
@@ -63,8 +63,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -90,26 +90,26 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 }
 
 struct TensorResources {
-    void *queryDeviceAddr = nullptr;
-    void *keyDeviceAddr = nullptr;
-    void *weightsDeviceAddr = nullptr;
-    void *qScaleDeviceAddr = nullptr;
-    void *kScaleDeviceAddr = nullptr;
-    void *metadataDeviceAddr = nullptr;
-    void *sparseIndicesDeviceAddr = nullptr;
-    void *sparseValuesDeviceAddr = nullptr;
+    void* queryDeviceAddr = nullptr;
+    void* keyDeviceAddr = nullptr;
+    void* weightsDeviceAddr = nullptr;
+    void* qScaleDeviceAddr = nullptr;
+    void* kScaleDeviceAddr = nullptr;
+    void* metadataDeviceAddr = nullptr;
+    void* sparseIndicesDeviceAddr = nullptr;
+    void* sparseValuesDeviceAddr = nullptr;
 
-    aclTensor *queryTensor = nullptr;
-    aclTensor *keyTensor = nullptr;
-    aclTensor *weightsTensor = nullptr;
-    aclTensor *qScaleTensor = nullptr;
-    aclTensor *kScaleTensor = nullptr;
-    aclTensor *metadataTensor = nullptr;
-    aclTensor *sparseIndicesTensor = nullptr;
-    aclTensor *sparseValuesTensor = nullptr;
+    aclTensor* queryTensor = nullptr;
+    aclTensor* keyTensor = nullptr;
+    aclTensor* weightsTensor = nullptr;
+    aclTensor* qScaleTensor = nullptr;
+    aclTensor* kScaleTensor = nullptr;
+    aclTensor* metadataTensor = nullptr;
+    aclTensor* sparseIndicesTensor = nullptr;
+    aclTensor* sparseValuesTensor = nullptr;
 };
 
-int InitializeTensors(TensorResources &resources)
+int InitializeTensors(TensorResources& resources)
 {
     int64_t B = 2;
     int64_t S1 = 4;
@@ -197,7 +197,7 @@ int InitializeTensors(TensorResources &resources)
     return ACL_SUCCESS;
 }
 
-int GenerateMetadata(TensorResources &resources, aclrtStream stream, int64_t B, int64_t S1, int64_t S2, int64_t N1,
+int GenerateMetadata(TensorResources& resources, aclrtStream stream, int64_t B, int64_t S1, int64_t S2, int64_t N1,
                      int64_t N2, int64_t D, int64_t topk, int64_t quantMode, int64_t maskMode, int64_t cmpRatio)
 {
     constexpr const char layoutQ[] = "BSND";
@@ -216,7 +216,7 @@ int GenerateMetadata(TensorResources &resources, aclrtStream stream, int64_t B, 
         return -1;
     }
 
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     uint64_t workspaceSize = 0;
     int ret = aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize(
         nullptr, nullptr, nullptr, nullptr, nullptr, N1, N2, D, topk, quantMode, B, S1, S2, layoutQCopy, layoutKCopy,
@@ -226,7 +226,7 @@ int GenerateMetadata(TensorResources &resources, aclrtStream stream, int64_t B, 
         return ret;
     }
 
-    void *metadataWsAddr = nullptr;
+    void* metadataWsAddr = nullptr;
     if (workspaceSize > 0ULL) {
         ret = aclrtMalloc(&metadataWsAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         if (!CHECK_RET(ret == ACL_SUCCESS)) {
@@ -259,8 +259,8 @@ int GenerateMetadata(TensorResources &resources, aclrtStream stream, int64_t B, 
     return ACL_SUCCESS;
 }
 
-int ExecuteQuantLightningIndexerV2(TensorResources &resources, aclrtStream stream, void **workspaceAddr,
-                                   uint64_t *workspaceSize)
+int ExecuteQuantLightningIndexerV2(TensorResources& resources, aclrtStream stream, void** workspaceAddr,
+                                   uint64_t* workspaceSize)
 {
     int64_t topk = 512;
     int64_t quantMode = 1;
@@ -283,7 +283,7 @@ int ExecuteQuantLightningIndexerV2(TensorResources &resources, aclrtStream strea
         LOG_PRINT("memcpy_s layoutK failed. ERROR: %d\n", memcpyRet);
         return -1;
     }
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     int ret = aclnnQuantLightningIndexerV2GetWorkspaceSize(
         resources.queryTensor, resources.keyTensor, resources.weightsTensor, resources.qScaleTensor,
@@ -313,7 +313,7 @@ int ExecuteQuantLightningIndexerV2(TensorResources &resources, aclrtStream strea
     return ACL_SUCCESS;
 }
 
-int PrintOutResult(const std::vector<int64_t> &shape, void *deviceAddr)
+int PrintOutResult(const std::vector<int64_t>& shape, void* deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<int32_t> resultData(size, 0);
@@ -330,7 +330,7 @@ int PrintOutResult(const std::vector<int64_t> &shape, void *deviceAddr)
     return ACL_SUCCESS;
 }
 
-void CleanupResources(TensorResources &resources, void *workspaceAddr, aclrtStream stream, int32_t deviceId)
+void CleanupResources(TensorResources& resources, void* workspaceAddr, aclrtStream stream, int32_t deviceId)
 {
     if (resources.queryTensor) {
         aclDestroyTensor(resources.queryTensor);
@@ -402,7 +402,7 @@ int main()
     int32_t deviceId = 0;
     aclrtStream stream = nullptr;
     TensorResources resources = {};
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     uint64_t workspaceSize = 0;
     int64_t B = 2;
     int64_t S1 = 4;

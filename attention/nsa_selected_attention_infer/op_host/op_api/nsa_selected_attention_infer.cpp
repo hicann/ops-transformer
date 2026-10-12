@@ -22,74 +22,63 @@ namespace l0op {
 
 OP_TYPE_REGISTER(NsaSelectedAttentionInfer);
 
-const aclTensor* NsaSelectedAttentionInfer(
-    const aclTensor *query, 
-    const aclTensor *key, 
-    const aclTensor *value, 
-    const aclTensor *topkIndices, 
-    const aclTensor *attenMaskOptional,
-    const aclTensor *blockTableOptional,
-    const aclIntArray *actualQSeqLenOptional,
-    const aclIntArray *actualKvSeqLenOptional,
-    char *layoutOptional,
-    int64_t numHeads,    
-    int64_t numKeyValueHeads,
-    int64_t selectBlockSize,
-    int64_t selectBlockCount,
-    int64_t pageBlockSize,
-    double scaleValue,
-    int64_t sparseMode,
-    aclOpExecutor *executor)
+const aclTensor* NsaSelectedAttentionInfer(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                           const aclTensor* topkIndices, const aclTensor* attenMaskOptional,
+                                           const aclTensor* blockTableOptional,
+                                           const aclIntArray* actualQSeqLenOptional,
+                                           const aclIntArray* actualKvSeqLenOptional, char* layoutOptional,
+                                           int64_t numHeads, int64_t numKeyValueHeads, int64_t selectBlockSize,
+                                           int64_t selectBlockCount, int64_t pageBlockSize, double scaleValue,
+                                           int64_t sparseMode, aclOpExecutor* executor)
 {
     L0_DFX(NsaSelectedAttentionInfer, query, key, value, topkIndices, attenMaskOptional, blockTableOptional,
-            actualQSeqLenOptional, actualKvSeqLenOptional, layoutOptional, numHeads,
-            numKeyValueHeads, selectBlockSize, selectBlockCount, pageBlockSize, scaleValue, sparseMode);
+           actualQSeqLenOptional, actualKvSeqLenOptional, layoutOptional, numHeads, numKeyValueHeads, selectBlockSize,
+           selectBlockCount, pageBlockSize, scaleValue, sparseMode);
 
     if (attenMaskOptional == nullptr) {
         attenMaskOptional = executor->AllocTensor(DataType::DT_BOOL, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
-    const aclTensor *actualSeqQLen = nullptr;
+    const aclTensor* actualSeqQLen = nullptr;
     if (actualQSeqLenOptional) {
         actualSeqQLen = executor->ConvertToTensor(actualQSeqLenOptional, DataType::DT_INT64);
-        const_cast<aclTensor *>(actualSeqQLen)->SetStorageFormat(Format::FORMAT_ND);
-        const_cast<aclTensor *>(actualSeqQLen)->SetViewFormat(Format::FORMAT_ND);
-        const_cast<aclTensor *>(actualSeqQLen)->SetOriginalFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actualSeqQLen)->SetStorageFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actualSeqQLen)->SetViewFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actualSeqQLen)->SetOriginalFormat(Format::FORMAT_ND);
     } else {
         actualSeqQLen = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
-    const aclTensor *actualSeqKvLen = nullptr;
+    const aclTensor* actualSeqKvLen = nullptr;
     if (actualKvSeqLenOptional) {
         actualSeqKvLen = executor->ConvertToTensor(actualKvSeqLenOptional, DataType::DT_INT64);
-        const_cast<aclTensor *>(actualSeqKvLen)->SetStorageFormat(Format::FORMAT_ND);
-        const_cast<aclTensor *>(actualSeqKvLen)->SetViewFormat(Format::FORMAT_ND);
-        const_cast<aclTensor *>(actualSeqKvLen)->SetOriginalFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actualSeqKvLen)->SetStorageFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actualSeqKvLen)->SetViewFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actualSeqKvLen)->SetOriginalFormat(Format::FORMAT_ND);
     } else {
         actualSeqKvLen = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
     auto attentionOut = executor->AllocTensor(query->GetDataType(), Format::FORMAT_ND, Format::FORMAT_ND);
 
-    auto ret = INFER_SHAPE(NsaSelectedAttentionInfer,
-                        OP_INPUT(query, key, value, topkIndices, attenMaskOptional, blockTableOptional,
-                                    actualSeqQLen, actualSeqKvLen),
-                        OP_OUTPUT(attentionOut),
-                        OP_ATTR(layoutOptional, numHeads, numKeyValueHeads, selectBlockSize, selectBlockCount,
-                                pageBlockSize, static_cast<float>(scaleValue), sparseMode));
+    auto ret = INFER_SHAPE(
+        NsaSelectedAttentionInfer,
+        OP_INPUT(query, key, value, topkIndices, attenMaskOptional, blockTableOptional, actualSeqQLen, actualSeqKvLen),
+        OP_OUTPUT(attentionOut),
+        OP_ATTR(layoutOptional, numHeads, numKeyValueHeads, selectBlockSize, selectBlockCount, pageBlockSize,
+                static_cast<float>(scaleValue), sparseMode));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "NsaSelectedAttentionInfer InferShape failed.");
         return nullptr;
     }
 
-    ADD_TO_LAUNCHER_LIST_AICORE(NsaSelectedAttentionInfer,
-                                OP_INPUT(query, key, value, topkIndices, attenMaskOptional, blockTableOptional,
-                                        actualSeqQLen, actualSeqKvLen),
-                                OP_OUTPUT(attentionOut),
-                                OP_ATTR(layoutOptional, numHeads, numKeyValueHeads, selectBlockSize, selectBlockCount,
-                                pageBlockSize, static_cast<float>(scaleValue), sparseMode));
+    ADD_TO_LAUNCHER_LIST_AICORE(
+        NsaSelectedAttentionInfer,
+        OP_INPUT(query, key, value, topkIndices, attenMaskOptional, blockTableOptional, actualSeqQLen, actualSeqKvLen),
+        OP_OUTPUT(attentionOut),
+        OP_ATTR(layoutOptional, numHeads, numKeyValueHeads, selectBlockSize, selectBlockCount, pageBlockSize,
+                static_cast<float>(scaleValue), sparseMode));
     return attentionOut;
 }
 
 } // namespace l0op
- 

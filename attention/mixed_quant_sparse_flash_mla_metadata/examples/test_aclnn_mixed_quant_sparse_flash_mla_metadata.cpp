@@ -67,8 +67,8 @@ struct ScopeGuard {
           m_isDismissed(false)
     {}
     // 禁止拷贝
-    ScopeGuard(const ScopeGuard &) = delete;
-    ScopeGuard &operator=(const ScopeGuard &) = delete;
+    ScopeGuard(const ScopeGuard&) = delete;
+    ScopeGuard& operator=(const ScopeGuard&) = delete;
 
     ~ScopeGuard()
     {
@@ -87,9 +87,9 @@ struct ScopeGuard {
 };
 
 struct Tensor {
-    void *hostAddr{nullptr};
-    void *deviceAddr{nullptr};
-    aclTensor *data{nullptr};
+    void* hostAddr{nullptr};
+    void* deviceAddr{nullptr};
+    aclTensor* data{nullptr};
 };
 
 struct ArgScenario {
@@ -125,15 +125,15 @@ struct ArgContext {
     int64_t cmpMaskMode{0};
     int64_t oriWinLeft{-1};
     int64_t oriWinRight{-1};
-    char *layoutQOptional{nullptr};
-    char *layoutKvOptional{nullptr};
+    char* layoutQOptional{nullptr};
+    char* layoutKvOptional{nullptr};
     bool hasOriKv{true};
     bool hasCmpKv{true};
     // output
     Tensor metadata{};
 };
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -142,7 +142,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-aclnnStatus Init(int32_t deviceId, aclrtStream *stream)
+aclnnStatus Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，初始化
     auto ret = aclInit(nullptr);
@@ -161,7 +161,7 @@ void Finalize(int32_t deviceId, aclrtStream stream)
     aclFinalize();
 }
 
-aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape, Tensor &tensor)
+aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t>& shape, Tensor& tensor)
 {
     auto size = GetShapeSize(shape) * aclDataTypeSize(dataType);
     // 调用aclrtMallocHost申请host侧内存
@@ -181,7 +181,7 @@ aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape
     return ACL_SUCCESS;
 }
 
-void DestroyTensor(Tensor &tensor)
+void DestroyTensor(Tensor& tensor)
 {
     if (tensor.data != nullptr) {
         aclDestroyTensor(tensor.data);
@@ -197,7 +197,7 @@ void DestroyTensor(Tensor &tensor)
     }
 }
 
-void DestroyArgs(ArgContext &context)
+void DestroyArgs(ArgContext& context)
 {
     DestroyTensor(context.metadata);
     DestroyTensor(context.cuSeqlensQOptional);
@@ -220,7 +220,7 @@ void DestroyArgs(ArgContext &context)
     }
 }
 
-aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
+aclnnStatus CreateArgs(const ArgScenario& scenario, ArgContext& context)
 {
     ScopeGuard argsGuard([&] { DestroyArgs(context); });
     aclnnStatus ret;
@@ -239,8 +239,8 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     context.cmpMaskMode = 3;  // 3：q和cmp_kv计算的mask模式，3表示RightDownCausal模式
     context.oriWinLeft = 127; // 127：q和ori_kv计算中q对过去token计算的数量
     context.oriWinRight = 0;
-    context.layoutQOptional = (char *)malloc(sizeof(char) * 16); // 16：为layoutQOptional指针分配16字节内存空间
-    context.layoutKvOptional = (char *)malloc(sizeof(char) * 16); // 16：为layoutKvOptional指针分配16字节内存空间
+    context.layoutQOptional = (char*)malloc(sizeof(char) * 16); // 16：为layoutQOptional指针分配16字节内存空间
+    context.layoutKvOptional = (char*)malloc(sizeof(char) * 16); // 16：为layoutKvOptional指针分配16字节内存空间
     CHECK_LOG_RET(context.layoutQOptional != nullptr, ACL_ERROR_FAILURE, "Create layoutQOptional failed");
     CHECK_LOG_RET(context.layoutKvOptional != nullptr, ACL_ERROR_FAILURE, "Create layoutKvOptional failed");
     strcpy(context.layoutQOptional, "BSND");  // BSND,TND
@@ -305,8 +305,8 @@ int main()
     // 3. 调用CANN算子库API，需要修改为具体的API
     // 调用aclnnMixedQuantSparseFlashMlaMetadata第一段接口
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
     ret = aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
         context.cuSeqlensQOptional.data, context.cuSeqlensOriKvOptional.data, context.cuSeqlensCmpKvOptional.data,
         context.sequsedQOptional.data, context.sequsedOriKvOptional.data, context.sequsedCmpKvOptional.data,

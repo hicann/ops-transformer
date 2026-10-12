@@ -11,7 +11,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 import os
-import pandas as pd 
+import pandas as pd
 import numpy as np
 import torch
 import torch_npu
@@ -20,56 +20,59 @@ import random
 import math
 import ast
 
+
 def test_qli_process(filepath, device_id=0):
     # 加载测试数据
     test_data = torch.load(filepath, map_location="cpu")
 
-    params = test_data['params']
-    cpu_result = test_data['cpu_result']
-    topk_value = test_data['topk_value']
+    params = test_data["params"]
+    cpu_result = test_data["cpu_result"]
+    topk_value = test_data["topk_value"]
     print("执行用例：", filepath)
     torch_npu.npu.set_device(device_id)
 
-    if params[10] == 'FLOAT8_E4M3FN':
-        query = test_data['query'].to(dtype=torch.float8_e4m3fn).npu()
-        key = test_data['key'].to(dtype=torch.float8_e4m3fn).npu()
+    if params[10] == "FLOAT8_E4M3FN":
+        query = test_data["query"].to(dtype=torch.float8_e4m3fn).npu()
+        key = test_data["key"].to(dtype=torch.float8_e4m3fn).npu()
     else:
-        query = test_data['query'].npu()
-        key = test_data['key'].npu()
+        query = test_data["query"].npu()
+        key = test_data["key"].npu()
 
-    
-    weights =test_data['weights'].npu()
-    query_dequant_scale = test_data['query_dequant_scale'].npu()
-    key_dequant_scale = test_data['key_dequant_scale'].npu()
-    actual_seq_lengths_query = test_data['actual_seq_lengths_query'].npu()
-    actual_seq_lengths_key = test_data['actual_seq_lengths_key'].npu()
-    block_table = test_data['block_table']
+    weights = test_data["weights"].npu()
+    query_dequant_scale = test_data["query_dequant_scale"].npu()
+    key_dequant_scale = test_data["key_dequant_scale"].npu()
+    actual_seq_lengths_query = test_data["actual_seq_lengths_query"].npu()
+    actual_seq_lengths_key = test_data["actual_seq_lengths_key"].npu()
+    block_table = test_data["block_table"]
     if isinstance(block_table, torch.Tensor):
         block_table = block_table.npu()
-    query_quant_mode = test_data['query_quant_mode']
-    key_quant_mode = test_data['key_quant_mode']
-    layout_query = test_data['layout_query']
-    layout_key = test_data['layout_key']
-    sparse_count = test_data['sparse_count']
-    sparse_mode = test_data['sparse_mode']
+    query_quant_mode = test_data["query_quant_mode"]
+    key_quant_mode = test_data["key_quant_mode"]
+    layout_query = test_data["layout_query"]
+    layout_key = test_data["layout_key"]
+    sparse_count = test_data["sparse_count"]
+    sparse_mode = test_data["sparse_mode"]
 
     # 调用QLI算子
-    npu_result = torch_npu.npu_quant_lightning_indexer(query, key, weights, 
-                                                    query_dequant_scale,
-                                                    key_dequant_scale,
-                                                    actual_seq_lengths_query=actual_seq_lengths_query,
-                                                    actual_seq_lengths_key=actual_seq_lengths_key,
-                                                    block_table=block_table,
-                                                    query_quant_mode=query_quant_mode,
-                                                    key_quant_mode=key_quant_mode,
-                                                    layout_query=layout_query,
-                                                    layout_key=layout_key, 
-                                                    sparse_count=sparse_count,
-                                                    sparse_mode=sparse_mode,
-                                                    pre_tokens = (1<<63)-1,
-                                                    next_tokens = (1<<63)-1)
-    
+    npu_result = torch_npu.npu_quant_lightning_indexer(
+        query,
+        key,
+        weights,
+        query_dequant_scale,
+        key_dequant_scale,
+        actual_seq_lengths_query=actual_seq_lengths_query,
+        actual_seq_lengths_key=actual_seq_lengths_key,
+        block_table=block_table,
+        query_quant_mode=query_quant_mode,
+        key_quant_mode=key_quant_mode,
+        layout_query=layout_query,
+        layout_key=layout_key,
+        sparse_count=sparse_count,
+        sparse_mode=sparse_mode,
+        pre_tokens=(1 << 63) - 1,
+        next_tokens=(1 << 63) - 1,
+    )
+
     torch.npu.synchronize()
 
     return cpu_result, npu_result, topk_value, params
-

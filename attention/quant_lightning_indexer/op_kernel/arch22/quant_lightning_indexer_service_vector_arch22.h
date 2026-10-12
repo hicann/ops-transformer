@@ -41,12 +41,12 @@ public:
     using MM1_OUT_T = float;
 
     __aicore__ inline QLIVector(){};
-    __aicore__ inline void ProcessVec0(const QLICommon::RunInfo &info);
-    __aicore__ inline void ProcessVec1(const QLICommon::RunInfo &info);
+    __aicore__ inline void ProcessVec0(const QLICommon::RunInfo& info);
+    __aicore__ inline void ProcessVec1(const QLICommon::RunInfo& info);
     __aicore__ inline void ProcessLD();
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitParams(const struct QLICommon::ConstInfo &constInfo,
-                                      const QLITilingData *__restrict tilingData);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitParams(const struct QLICommon::ConstInfo& constInfo,
+                                      const QLITilingData* __restrict tilingData);
     __aicore__ inline void InitVecWorkspaceTensor(GlobalTensor<half> vec0OutGm, GlobalTensor<MM1_OUT_T> mm1ResGm,
                                                   GlobalTensor<float> vec1ResGm, GlobalTensor<int64_t> vec1ParamGm);
     __aicore__ inline void InitVecInputTensor(GlobalTensor<half> weightsGm, GlobalTensor<half> qScaleGm,
@@ -55,7 +55,7 @@ public:
     __aicore__ inline void CleanInvalidOutput(int64_t invalidS1offset);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void InitLDBuffers(TPipe *pipe);
+    __aicore__ inline void InitLDBuffers(TPipe* pipe);
 
 protected:
     GlobalTensor<MM1_OUT_T> mm1ResGm;
@@ -70,7 +70,7 @@ protected:
     // =================================常量区=================================
 
 private:
-    __aicore__ inline void GetKeyScale(const QLICommon::RunInfo &runInfo, const LocalTensor<half> &resUb,
+    __aicore__ inline void GetKeyScale(const QLICommon::RunInfo& runInfo, const LocalTensor<half>& resUb,
                                        int64_t batchId, int64_t startS2, int64_t getLen);
     // ================================Local Buffer区====================================
     // queue
@@ -114,7 +114,7 @@ private:
 };
 
 template <typename QLIT>
-__aicore__ inline void QLIVector<QLIT>::GetKeyScale(const QLICommon::RunInfo &runInfo, const LocalTensor<half> &resUb,
+__aicore__ inline void QLIVector<QLIT>::GetKeyScale(const QLICommon::RunInfo& runInfo, const LocalTensor<half>& resUb,
                                                     int64_t batchId, int64_t startS2, int64_t getLen)
 {
     // startS2一定能整除kCacheBlockSize_
@@ -164,7 +164,7 @@ __aicore__ inline void QLIVector<QLIT>::GetKeyScale(const QLICommon::RunInfo &ru
 }
 
 template <typename QLIT>
-__aicore__ inline void QLIVector<QLIT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void QLIVector<QLIT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(paramBuf_, LD_PARAM_NUM * sizeof(int64_t));                                       // 1 KB
     pipe->InitBuffer(inQueue_, 2, s2BaseSize_ * sizeof(float) * 2);                                    // 32KB
@@ -198,7 +198,7 @@ __aicore__ inline void QLIVector<QLIT>::InitBuffers(TPipe *pipe)
 }
 
 template <typename QLIT>
-__aicore__ inline void QLIVector<QLIT>::InitLDBuffers(TPipe *pipe)
+__aicore__ inline void QLIVector<QLIT>::InitLDBuffers(TPipe* pipe)
 {
     pipe->Reset();
     pipe->InitBuffer(ldToBeMrgBuf_, BASE_TOPK_VALUE_IDX_SIZE * mrgListNum_ * sizeof(float));
@@ -208,8 +208,8 @@ __aicore__ inline void QLIVector<QLIT>::InitLDBuffers(TPipe *pipe)
 }
 
 template <typename QLIT>
-__aicore__ inline void QLIVector<QLIT>::InitParams(const struct QLICommon::ConstInfo &constInfo,
-                                                   const QLITilingData *__restrict tilingData)
+__aicore__ inline void QLIVector<QLIT>::InitParams(const struct QLICommon::ConstInfo& constInfo,
+                                                   const QLITilingData* __restrict tilingData)
 {
     this->constInfo_ = constInfo;
     blockS2StartIdx_ = 0;
@@ -273,7 +273,7 @@ __aicore__ inline void QLIVector<QLIT>::CleanInvalidOutput(int64_t invalidS1offs
 }
 
 template <typename QLIT>
-__aicore__ inline void QLIVector<QLIT>::ProcessVec0(const QLICommon::RunInfo &info)
+__aicore__ inline void QLIVector<QLIT>::ProcessVec0(const QLICommon::RunInfo& info)
 {
     // 只需要一个v核做
     if (blockId_ % 2 != 0) {
@@ -320,7 +320,7 @@ __aicore__ inline void QLIVector<QLIT>::ProcessVec0(const QLICommon::RunInfo &in
 }
 
 template <typename QLIT>
-__aicore__ inline void QLIVector<QLIT>::ProcessVec1(const QLICommon::RunInfo &info)
+__aicore__ inline void QLIVector<QLIT>::ProcessVec1(const QLICommon::RunInfo& info)
 {
     int32_t cuBaseS1Idx = info.gS1Idx * s1BaseSize_;
     int32_t cuBaseS2Idx = info.s2Idx * s2BaseSize_;

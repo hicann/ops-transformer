@@ -89,28 +89,28 @@ public:
 
     __aicore__ inline void Init(GM_ADDR query, GM_ADDR key, GM_ADDR blockTable, GM_ADDR scale, GM_ADDR actualSeqQlen,
                                 GM_ADDR actualSeqKlen, GM_ADDR startLoc, GM_ADDR score, GM_ADDR workspace,
-                                const MsaIndexScoreTilingData *__restrict tiling)
+                                const MsaIndexScoreTilingData* __restrict tiling)
     {
         tiling_ = tiling;
-        gQuery_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ *>(query));
+        gQuery_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ*>(query));
         if constexpr (IS_QUANT_V) {
-            gKeyInt8_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(key));
+            gKeyInt8_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(key));
         } else {
-            gKeyFp_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ *>(key));
+            gKeyFp_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ*>(key));
         }
         if (IS_QUANT_V || tiling_->keyLayout == MSA_KEY_LAYOUT_TND) {
-            gKeyScratch_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ *>(
-                reinterpret_cast<__gm__ float *>(workspace) + tiling_->kScratchOffsetElems));
+            gKeyScratch_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ*>(reinterpret_cast<__gm__ float*>(workspace) +
+                                                                            tiling_->kScratchOffsetElems));
         }
         if (tiling_->keyLayout != MSA_KEY_LAYOUT_TND) {
-            gBlockTable_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(blockTable));
+            gBlockTable_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(blockTable));
         }
-        gScale_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(scale));
-        gActualSeqQlen_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(actualSeqQlen));
-        gActualSeqKlen_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(actualSeqKlen));
-        gStartLoc_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(startLoc));
-        gScore_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(score));
-        gWorkspace_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementS *>(workspace));
+        gScale_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(scale));
+        gActualSeqQlen_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(actualSeqQlen));
+        gActualSeqKlen_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(actualSeqKlen));
+        gStartLoc_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(startLoc));
+        gScore_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(score));
+        gWorkspace_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementS*>(workspace));
 
         scheduler_.Init(tiling_->batch, tiling_->numQHeads, tiling_->maxBlocksPerBatch, tiling_->scoreBlockStride,
                         tiling_->sparseMode, tiling_->initBlocks, tiling_->localBlocks, tiling_->keyLayout,
@@ -143,7 +143,7 @@ private:
         }
     }
 
-    __aicore__ inline void ProcessCubeGm(BlockMmad &blockMmad, uint32_t coreIdx, uint32_t coreNum,
+    __aicore__ inline void ProcessCubeGm(BlockMmad& blockMmad, uint32_t coreIdx, uint32_t coreNum,
                                          uint64_t coreKScratch, uint32_t totalTasks)
     {
         Catlass::Arch::CrossCoreFlagWithReverse<REVERSE_DEPTH> flagSReady{MSA_FLAG_S_READY, MSA_FLAG_S_READY_REVERSE};
@@ -171,7 +171,7 @@ private:
         AscendC::PipeBarrier<PIPE_ALL>();
     }
 
-    __aicore__ inline void ProcessCubeC2Ub(Catlass::Arch::Resource<ArchTag> &resource, BlockMmad &blockMmad,
+    __aicore__ inline void ProcessCubeC2Ub(Catlass::Arch::Resource<ArchTag>& resource, BlockMmad& blockMmad,
                                            uint32_t coreIdx, uint32_t coreNum, uint64_t coreKScratch,
                                            uint32_t totalTasks)
     {
@@ -206,7 +206,7 @@ private:
     }
 #endif
 
-    __aicore__ inline bool KeyBlockNeedsScratch(const MsaTask &task, uint32_t blk) const
+    __aicore__ inline bool KeyBlockNeedsScratch(const MsaTask& task, uint32_t blk) const
     {
         if constexpr (IS_QUANT_V) {
             return true;
@@ -220,7 +220,7 @@ private:
         return (nValidTok > 0) && (nValidTok < MSA_BLOCK_SIZE) && (task.batchIdx + 1U == tiling_->batch);
     }
 
-    __aicore__ inline bool StileNeedsKScratch(const MsaTask &task, uint32_t blkBase) const
+    __aicore__ inline bool StileNeedsKScratch(const MsaTask& task, uint32_t blkBase) const
     {
         for (uint32_t j = 0; j < MSA_BLOCKS_PER_STILE; ++j) {
             const uint32_t blk = blkBase + j;
@@ -234,7 +234,7 @@ private:
         return false;
     }
 
-    __aicore__ inline uint32_t KeyBlockValidTokens(const MsaTask &task, uint32_t blk) const
+    __aicore__ inline uint32_t KeyBlockValidTokens(const MsaTask& task, uint32_t blk) const
     {
         if (tiling_->keyLayout != MSA_KEY_LAYOUT_TND) {
             return MSA_BLOCK_SIZE;
@@ -247,7 +247,7 @@ private:
         return seqRemain < MSA_BLOCK_SIZE ? seqRemain : MSA_BLOCK_SIZE;
     }
 
-    __aicore__ inline uint64_t KeyBlockGmOffset(const MsaTask &task, uint32_t blk) const
+    __aicore__ inline uint64_t KeyBlockGmOffset(const MsaTask& task, uint32_t blk) const
     {
         if (tiling_->keyLayout == MSA_KEY_LAYOUT_TND) {
             const uint32_t tokenStart = task.cuKStart + blk * tiling_->blockSize;
@@ -259,7 +259,7 @@ private:
     }
 
     template <typename T>
-    __aicore__ inline void CopyGmToUbPartial(const AscendC::LocalTensor<T> &ub, const AscendC::GlobalTensor<T> &gm,
+    __aicore__ inline void CopyGmToUbPartial(const AscendC::LocalTensor<T>& ub, const AscendC::GlobalTensor<T>& gm,
                                              uint32_t nElem)
     {
         if (nElem == 0) {
@@ -288,7 +288,7 @@ private:
     }
 
     /// AIV：把一个可见 page 的 K 收进 per-core scratch（int8 cast 或 TND fp copy+尾填充）。
-    __aicore__ inline void GatherKeyPageToScratch(Catlass::Arch::Resource<ArchTag> &resource, const MsaTask &task,
+    __aicore__ inline void GatherKeyPageToScratch(Catlass::Arch::Resource<ArchTag>& resource, const MsaTask& task,
                                                   uint32_t blk, uint64_t scratchOff)
     {
         AscendC::LocalTensor<int8_t> ubI8 = resource.ubBuf.template GetBufferByByte<int8_t>(UB_OFF_CAST_I8);
@@ -354,7 +354,7 @@ private:
     }
 
     /// AIV：把本 S-tile 可见 block 的 K 收进 per-core scratch（int8 cast 或 TND fp copy+尾填充）。
-    __aicore__ inline void GatherKeySTileToScratch(Catlass::Arch::Resource<ArchTag> &resource, const MsaTask &task,
+    __aicore__ inline void GatherKeySTileToScratch(Catlass::Arch::Resource<ArchTag>& resource, const MsaTask& task,
                                                    uint32_t blkBase, uint64_t kScratchBase)
     {
         const uint32_t pageStride = MSA_BLOCK_SIZE * MSA_K_TILE;
@@ -373,7 +373,7 @@ private:
     }
 
 #if defined(__DAV_C310_CUBE__) || defined(__DAV_310R6_CUBE__)
-    __aicore__ inline void ComputeSTile(BlockMmad &blockMmad, const MsaTask &task, uint32_t blkBase, uint64_t sBase,
+    __aicore__ inline void ComputeSTile(BlockMmad& blockMmad, const MsaTask& task, uint32_t blkBase, uint64_t sBase,
                                         uint64_t kScratchBase, bool needLoadL1)
     {
         const uint32_t mActual = task.mActual;
@@ -404,8 +404,8 @@ private:
         }
     }
 
-    __aicore__ inline void ComputePageToUb(BlockMmad &blockMmad, const MsaTask &task, uint32_t blk,
-                                           const AscendC::LocalTensor<float> &ubS, uint64_t kScratchBase,
+    __aicore__ inline void ComputePageToUb(BlockMmad& blockMmad, const MsaTask& task, uint32_t blk,
+                                           const AscendC::LocalTensor<float>& ubS, uint64_t kScratchBase,
                                            bool needLoadL1)
     {
         const uint32_t mActual = task.mActual;
@@ -445,8 +445,8 @@ private:
         }
     }
 
-    __aicore__ inline void ProcessVectorGm(Catlass::Arch::Resource<ArchTag> &resource,
-                                           MsaSegRowMaxEpilogue<IS_QUANT_V> &epilogue, uint32_t subIdx,
+    __aicore__ inline void ProcessVectorGm(Catlass::Arch::Resource<ArchTag>& resource,
+                                           MsaSegRowMaxEpilogue<IS_QUANT_V>& epilogue, uint32_t subIdx,
                                            uint32_t subBlockNum, uint32_t coreIdx, uint32_t coreNum,
                                            uint64_t coreKScratch, uint32_t totalTasks)
     {
@@ -482,8 +482,8 @@ private:
         AscendC::PipeBarrier<PIPE_ALL>();
     }
 
-    __aicore__ inline void ProcessVectorC2Ub(Catlass::Arch::Resource<ArchTag> &resource,
-                                             MsaSegRowMaxEpilogue<IS_QUANT_V> &epilogue, uint32_t subIdx,
+    __aicore__ inline void ProcessVectorC2Ub(Catlass::Arch::Resource<ArchTag>& resource,
+                                             MsaSegRowMaxEpilogue<IS_QUANT_V>& epilogue, uint32_t subIdx,
                                              uint32_t subBlockNum, uint32_t coreIdx, uint32_t coreNum,
                                              uint64_t coreKScratch, uint32_t totalTasks)
     {
@@ -517,7 +517,7 @@ private:
         AscendC::PipeBarrier<PIPE_ALL>();
     }
 
-    const MsaIndexScoreTilingData *__restrict tiling_ = nullptr;
+    const MsaIndexScoreTilingData* __restrict tiling_ = nullptr;
     MsaTaskScheduler scheduler_;
 
     AscendC::GlobalTensor<ElementQ> gQuery_;

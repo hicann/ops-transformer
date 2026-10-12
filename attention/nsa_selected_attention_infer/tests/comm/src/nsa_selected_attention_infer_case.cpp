@@ -22,11 +22,10 @@
 #include "tests/utils/platform.h"
 #include "op_host/tiling_templates_registry.h"
 
-
 extern "C" __global__ __aicore__ void nsa_selected_attention_infer NSA_SELECT_ATTENTION_INFER_KERNEL_PARAM;
 
 namespace optiling {
-ASCENDC_EXTERN_C ge::graphStatus NsaSelectedAttentionInfer(gert::TilingContext *context);
+ASCENDC_EXTERN_C ge::graphStatus NsaSelectedAttentionInfer(gert::TilingContext* context);
 } // namespace optiling
 
 using Case = ops::adv::tests::utils::Case;
@@ -34,22 +33,21 @@ using Platform = ops::adv::tests::utils::Platform;
 using NsaSelectAttentionInferCase = ops::adv::tests::NsaSelectedAttentionInfer::NsaSelectAttentionInferCase;
 using NsaSelectAttentionInferCase = ops::adv::tests::NsaSelectedAttentionInfer::NsaSelectAttentionInferCase;
 
-
-ASCENDC_EXTERN_C ge::graphStatus TilingForNsaSelectAttentionInferStub(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingForNsaSelectAttentionInferStub(gert::TilingContext* context)
 {
-        auto *nsaSelectAttentionInferCase = static_cast<NsaSelectAttentionInferCase *>(Case::GetCurrentCase());
+    auto* nsaSelectAttentionInferCase = static_cast<NsaSelectAttentionInferCase*>(Case::GetCurrentCase());
     if (nsaSelectAttentionInferCase != nullptr) {
-    NsaSelectAttentionInferCase::DoTilingParam p;
-    p.ctx = context;
-    p.ret = ge::GRAPH_SUCCESS;
-    p.actSeqSelQLenTensor = const_cast<gert::Tensor *>(context->GetOptionalInputTensor(6));
-    p.actSeqSelKVLenTensor = const_cast<gert::Tensor *>(context->GetOptionalInputTensor(7));
-    p.blocktableTensor = const_cast<gert::Tensor *>(context->GetOptionalInputTensor(5));
-    p.topkIndicesTensor = const_cast<gert::Tensor *>(context->GetOptionalInputTensor(3));
-    if (!nsaSelectAttentionInferCase->DoOpTiling(p)) {
-        return p.ret;
-    }
-    return nsaSelectAttentionInferCase->nsaSelectAttentionInferTilingFunc(context);
+        NsaSelectAttentionInferCase::DoTilingParam p;
+        p.ctx = context;
+        p.ret = ge::GRAPH_SUCCESS;
+        p.actSeqSelQLenTensor = const_cast<gert::Tensor*>(context->GetOptionalInputTensor(6));
+        p.actSeqSelKVLenTensor = const_cast<gert::Tensor*>(context->GetOptionalInputTensor(7));
+        p.blocktableTensor = const_cast<gert::Tensor*>(context->GetOptionalInputTensor(5));
+        p.topkIndicesTensor = const_cast<gert::Tensor*>(context->GetOptionalInputTensor(3));
+        if (!nsaSelectAttentionInferCase->DoOpTiling(p)) {
+            return p.ret;
+        }
+        return nsaSelectAttentionInferCase->nsaSelectAttentionInferTilingFunc(context);
     }
     return ge::GRAPH_FAILED;
 }
@@ -69,32 +67,34 @@ enum class KernelParams : uint32_t {
     BLOCK_TABLE
 };
 
-bool RunNsaSelectAttentionInfer(void *func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
-                             std::vector<TensorIntf *> &outputs, uint8_t *workspace, uint8_t *tilingData)
+bool RunNsaSelectAttentionInfer(void* func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf*>& inputs,
+                                std::vector<TensorIntf*>& outputs, uint8_t* workspace, uint8_t* tilingData)
 {
     (void)blockDim;
     // Kernel 运行
     auto kernelFunc = (NsaSelectAttentionInferCase::NsaSelectAttentionInferKernelFunc)func;
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(kernelFunc, blockDim, inputs[0]->GetDevData(), inputs[1]->GetDevData(), inputs[2]->GetDevData(), 
-                inputs[3]->GetDevData(), inputs[4]->GetDevData(), inputs[5]->GetDevData(), inputs[6]->GetDevData(), 
+    ICPU_RUN_KF(kernelFunc, blockDim, inputs[0]->GetDevData(), inputs[1]->GetDevData(), inputs[2]->GetDevData(),
+                inputs[3]->GetDevData(), inputs[4]->GetDevData(), inputs[5]->GetDevData(), inputs[6]->GetDevData(),
                 inputs[7]->GetDevData(), outputs[0]->GetDevData(), workspace, tilingData);
     return true;
 }
 
 NsaSelectAttentionInferCase::NsaSelectAttentionInferCase()
     : NsaSelectAttentionInferCase("Undefined", true, "", OpInfo(), NsaSelectAttentionInferParam(), 0)
-{
-}
+{}
 
-NsaSelectAttentionInferCase::NsaSelectAttentionInferCase(const char *name, bool enable, const char *dbgInfo, OpInfo opinfo,
-                                                   NsaSelectAttentionInferParam param, int32_t tilingTemplatePriority)
-    : Case(name, enable, dbgInfo, tilingTemplatePriority), mOpInfo(std::move(opinfo)), mParam(std::move(param))
+NsaSelectAttentionInferCase::NsaSelectAttentionInferCase(const char* name, bool enable, const char* dbgInfo,
+                                                         OpInfo opinfo, NsaSelectAttentionInferParam param,
+                                                         int32_t tilingTemplatePriority)
+    : Case(name, enable, dbgInfo, tilingTemplatePriority),
+      mOpInfo(std::move(opinfo)),
+      mParam(std::move(param))
 {
     mOpInfo.mName = "NsaSelectedAttentionInfer";
     mNsaSelectAttentionInferOriginTilingFuncName = "TilingNsaSelectAttentionInfer";
 
-    mNsaSelectAttentionInferKernelFunc = (void *)nsa_selected_attention_infer;
+    mNsaSelectAttentionInferKernelFunc = (void*)nsa_selected_attention_infer;
 }
 
 bool NsaSelectAttentionInferCase::Run()
@@ -138,7 +138,8 @@ bool NsaSelectAttentionInferCase::InitOpInfoCtx()
 {
     bool rst = mCtx.SetOpName(mOpInfo.mName.c_str());
     rst = rst && mCtx.SetDeterministic(mOpInfo.mCtr.mDeterministic);
-    rst = rst && mCtx.SetInputs({&mParam.query, &mParam.key, &mParam.value, &mParam.topkIndices, &mParam.blocktable, &mParam.actualQSeqLengths, &mParam.actualKvSeqLengths});
+    rst = rst && mCtx.SetInputs({&mParam.query, &mParam.key, &mParam.value, &mParam.topkIndices, &mParam.blocktable,
+                                 &mParam.actualQSeqLengths, &mParam.actualKvSeqLengths});
     rst = rst && mCtx.SetOutputs({&mParam.attentionOut});
     rst = rst && mCtx.SetAttrs({{"input_layout", mParam.inputLayout},
                                 {"num_heads", mParam.headSize},
@@ -150,21 +151,21 @@ bool NsaSelectAttentionInferCase::InitOpInfoCtx()
                                 {"sparse_mode", mParam.sparseMode}});
 
     rst = rst && mCtx.SetKernelRunCbf(RunNsaSelectAttentionInfer);
-    rst = rst && mCtx.SetKernelMainFunc((void *)mNsaSelectAttentionInferKernelFunc);
+    rst = rst && mCtx.SetKernelMainFunc((void*)mNsaSelectAttentionInferKernelFunc);
     rst = rst && mOpInfo.SetContext(&mCtx);
     return rst;
 }
 
 bool NsaSelectAttentionInferCase::InitOriginTilingFunc()
 {
-    auto *platform = Platform::GetGlobalPlatform();
+    auto* platform = Platform::GetGlobalPlatform();
     if (platform == nullptr) {
         LOG_ERR("Global Platform is null");
         return false;
     }
 
-    nsaSelectAttentionInferTilingFunc =
-        (gert::OpImplRegisterV2::TilingKernelFunc)platform->LoadOpTilingSoSym(mNsaSelectAttentionInferOriginTilingFuncName.c_str());
+    nsaSelectAttentionInferTilingFunc = (gert::OpImplRegisterV2::TilingKernelFunc)platform->LoadOpTilingSoSym(
+        mNsaSelectAttentionInferOriginTilingFuncName.c_str());
     if (nsaSelectAttentionInferTilingFunc == nullptr) {
         LOG_ERR("Can't get origin tiling func, nsaCompressWithCache(%p)", nsaSelectAttentionInferTilingFunc);
         return false;
@@ -178,7 +179,7 @@ bool NsaSelectAttentionInferCase::InitCurrentCasePtr()
     return true;
 }
 
-bool NsaSelectAttentionInferCase::DoOpTiling(DoTilingParam &tilingParam)
+bool NsaSelectAttentionInferCase::DoOpTiling(DoTilingParam& tilingParam)
 {
     if (tilingParam.ctx == nullptr) {
         return false;
@@ -192,7 +193,7 @@ bool NsaSelectAttentionInferCase::DoOpTiling(DoTilingParam &tilingParam)
     if (tilingParam.actSeqSelKVLenTensor != nullptr) {
         tilingParam.actSeqSelKVLenTensor->SetData(gert::TensorData{mParam.actualSeqKVLenList.data()});
     }
-    
+
     tilingParam.ret = Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(tilingParam.ctx);
     return true;
 }

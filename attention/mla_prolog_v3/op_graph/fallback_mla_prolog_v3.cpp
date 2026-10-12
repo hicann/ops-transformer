@@ -18,7 +18,7 @@ namespace fallback {
 using namespace ge;
 using namespace gert;
 
-graphStatus GetMlaPrologV3InputTensor(const OpExecuteContext *ctx, MlaPrologV3FallBackParam &param)
+graphStatus GetMlaPrologV3InputTensor(const OpExecuteContext* ctx, MlaPrologV3FallBackParam& param)
 {
     param.tokenX = ctx->GetRequiredInputTensor(TOKEN_X_INDEX_V3);
     OP_CHECK_IF(param.tokenX == nullptr, OP_LOGE_WITH_INVALID_INPUT("MlaPrologV3", "tokenX"), return GRAPH_FAILED);
@@ -71,7 +71,7 @@ graphStatus GetMlaPrologV3InputTensor(const OpExecuteContext *ctx, MlaPrologV3Fa
     return GRAPH_SUCCESS;
 }
 
-graphStatus GetMlaPrologV3OutputTensor(const OpExecuteContext *ctx, MlaPrologV3FallBackParam &param)
+graphStatus GetMlaPrologV3OutputTensor(const OpExecuteContext* ctx, MlaPrologV3FallBackParam& param)
 {
     param.query = ctx->GetOutputTensor(QUERY_INDEX);
     OP_CHECK_IF(param.query == nullptr, OP_LOGE_WITH_INVALID_INPUT("MlaPrologV3", "query"), return GRAPH_FAILED);
@@ -103,21 +103,21 @@ graphStatus GetMlaPrologV3OutputTensor(const OpExecuteContext *ctx, MlaPrologV3F
     return GRAPH_SUCCESS;
 }
 
-graphStatus GetMlaPrologV3Attr(const OpExecuteContext *ctx, MlaPrologV3FallBackParam &param)
+graphStatus GetMlaPrologV3Attr(const OpExecuteContext* ctx, MlaPrologV3FallBackParam& param)
 {
     auto attrs = ctx->GetAttrs();
-    const double *getRmsnormEpsilonCq = attrs->GetAttrPointer<double>(ATTR_RMSNORM_EPSILON_CQ_INDEX);
-    const double *getRmsnormEpsilonCkv = attrs->GetAttrPointer<double>(ATTR_RMSNORM_EPSILON_CKV_INDEX);
-    const char *getCacheMode = attrs->GetAttrPointer<char>(ATTR_CACHE_MODE_INDEX);
-    const bool *getQueryNormFlag = attrs->GetAttrPointer<bool>(ATTR_QUERY_NORM_FLAG_INDEX);
-    const int64_t *getWeightQuantMode = attrs->GetAttrPointer<int64_t>(ATTR_WEIGHT_QUANT_MODE_INDEX);
-    const int64_t *getKvCacheQuantMode = attrs->GetAttrPointer<int64_t>(ATTR_KV_CACHE_QUANT_MODE_INDEX);
-    const int64_t *getQueryQuantMode = attrs->GetAttrPointer<int64_t>(ATTR_QUERY_QUANT_MODE_INDEX);
-    const int64_t *getCkvkrRepoMode = attrs->GetAttrPointer<int64_t>(ATTR_CKVKR_REPO_MODE_INDEX);
-    const int64_t *getQuantScaleRepoMode = attrs->GetAttrPointer<int64_t>(ATTR_QUANT_SCALE_REPO_MODE_INDEX);
-    const int64_t *getTileSize = attrs->GetAttrPointer<int64_t>(ATTR_TILE_SIZE_INDEX);
-    const double *getQcQrScale = attrs->GetAttrPointer<double>(ATTR_QC_QR_SCALE_INDEX);
-    const double *getKcScale = attrs->GetAttrPointer<double>(ATTR_KC_SCALE_INDEX);
+    const double* getRmsnormEpsilonCq = attrs->GetAttrPointer<double>(ATTR_RMSNORM_EPSILON_CQ_INDEX);
+    const double* getRmsnormEpsilonCkv = attrs->GetAttrPointer<double>(ATTR_RMSNORM_EPSILON_CKV_INDEX);
+    const char* getCacheMode = attrs->GetAttrPointer<char>(ATTR_CACHE_MODE_INDEX);
+    const bool* getQueryNormFlag = attrs->GetAttrPointer<bool>(ATTR_QUERY_NORM_FLAG_INDEX);
+    const int64_t* getWeightQuantMode = attrs->GetAttrPointer<int64_t>(ATTR_WEIGHT_QUANT_MODE_INDEX);
+    const int64_t* getKvCacheQuantMode = attrs->GetAttrPointer<int64_t>(ATTR_KV_CACHE_QUANT_MODE_INDEX);
+    const int64_t* getQueryQuantMode = attrs->GetAttrPointer<int64_t>(ATTR_QUERY_QUANT_MODE_INDEX);
+    const int64_t* getCkvkrRepoMode = attrs->GetAttrPointer<int64_t>(ATTR_CKVKR_REPO_MODE_INDEX);
+    const int64_t* getQuantScaleRepoMode = attrs->GetAttrPointer<int64_t>(ATTR_QUANT_SCALE_REPO_MODE_INDEX);
+    const int64_t* getTileSize = attrs->GetAttrPointer<int64_t>(ATTR_TILE_SIZE_INDEX);
+    const double* getQcQrScale = attrs->GetAttrPointer<double>(ATTR_QC_QR_SCALE_INDEX);
+    const double* getKcScale = attrs->GetAttrPointer<double>(ATTR_KC_SCALE_INDEX);
     param.rmsnormEpsilonCq = *getRmsnormEpsilonCq;
     param.rmsnormEpsilonCkv = *getRmsnormEpsilonCkv;
     param.cacheMode = getCacheMode;
@@ -133,7 +133,7 @@ graphStatus GetMlaPrologV3Attr(const OpExecuteContext *ctx, MlaPrologV3FallBackP
     // 入图场景下旧图不携带 do_rope，attr 数组可能不足 13 个，先判越界再取值，缺省视为开启
     param.doRope = true;
     if (attrs->GetAttrNum() > ATTR_DO_ROPE_INDEX) {
-        const bool *getDoRope = attrs->GetAttrPointer<bool>(ATTR_DO_ROPE_INDEX);
+        const bool* getDoRope = attrs->GetAttrPointer<bool>(ATTR_DO_ROPE_INDEX);
         if (getDoRope != nullptr) {
             param.doRope = *getDoRope;
         }
@@ -141,7 +141,7 @@ graphStatus GetMlaPrologV3Attr(const OpExecuteContext *ctx, MlaPrologV3FallBackP
     return GRAPH_SUCCESS;
 }
 
-graphStatus MlaV3HostExecuteFunc(OpExecuteContext *host_api_ctx)
+graphStatus MlaV3HostExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE_WITH_INVALID_INPUT("MlaPrologV3", "host_api_ctx"),
                 return GRAPH_FAILED);
@@ -163,8 +163,8 @@ graphStatus MlaV3HostExecuteFunc(OpExecuteContext *host_api_ctx)
     if (attrs->GetAttrNum() > ATTR_DO_ROPE_INDEX) {
         // attrNum > 12,说明是入图接口，走aclnnV4
         // doRope=false 时图上是空 tensor 占位，V4 要求 ropeSin/ropeCos 同时为 nullptr
-        const gert::Tensor *ropeSin = param.doRope ? param.ropeSin : nullptr;
-        const gert::Tensor *ropeCos = param.doRope ? param.ropeCos : nullptr;
+        const gert::Tensor* ropeSin = param.doRope ? param.ropeSin : nullptr;
+        const gert::Tensor* ropeCos = param.doRope ? param.ropeCos : nullptr;
         apiRet = EXEC_OPAPI_CMD(
             aclnnMlaPrologV4WeightNz, param.tokenX, param.weightDq, param.weightUqQr, param.weightUk, param.weightDkvKr,
             param.rmsnormGammaCq, param.rmsnormGammaCkv, ropeSin, ropeCos, param.kvCache, param.krCache,

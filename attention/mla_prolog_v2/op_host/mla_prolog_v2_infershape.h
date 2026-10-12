@@ -27,10 +27,10 @@ constexpr uint32_t QUANT_SCALE_CKV_INDEX = 16;
 // OUTPUT
 constexpr uint32_t DEQUANT_SCALE_Q_NOPE_INDEX = 4;
 
-ge::graphStatus SetMlaPrologV2ShapeDim(const MlaPrologProtoShapeParam &shapeParam, gert::InferShapeContext *context);
+ge::graphStatus SetMlaPrologV2ShapeDim(const MlaPrologProtoShapeParam& shapeParam, gert::InferShapeContext* context);
 
-ge::graphStatus InferShapeMlaPrologV2(gert::InferShapeContext *context);
-ge::graphStatus InferDataTypeMlaPrologV2(gert::InferDataTypeContext *context);
+ge::graphStatus InferShapeMlaPrologV2(gert::InferShapeContext* context);
+ge::graphStatus InferDataTypeMlaPrologV2(gert::InferDataTypeContext* context);
 
 } // namespace ops
 

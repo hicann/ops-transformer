@@ -15,12 +15,12 @@
 
 namespace l0op {
 
-const std::array<const aclTensor *, 4> NsaCompressAttention(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *attenMaskOptional,
-    const aclIntArray *actualSeqQLenOptional, const aclIntArray *actualCmpSeqKvLenOptional,
-    const aclIntArray *actualSelSeqKvLenOptional, const aclTensor *topkMaskOptional, double scaleValueOptional,
-    int64_t headNum, const char *inputLayout, int64_t sparseModeOptional, int64_t compressBlockSize,
-    int64_t compressStride, int64_t selectBlockSize, int64_t selectBlockCount, aclOpExecutor *executor);
+const std::array<const aclTensor*, 4> NsaCompressAttention(
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* attenMaskOptional,
+    const aclIntArray* actualSeqQLenOptional, const aclIntArray* actualCmpSeqKvLenOptional,
+    const aclIntArray* actualSelSeqKvLenOptional, const aclTensor* topkMaskOptional, double scaleValueOptional,
+    int64_t headNum, const char* inputLayout, int64_t sparseModeOptional, int64_t compressBlockSize,
+    int64_t compressStride, int64_t selectBlockSize, int64_t selectBlockCount, aclOpExecutor* executor);
 }
 
 #endif // OP_API_INC_LEVEL0_OP_NSA_COMPRESS_ATTENTION_OP_H_

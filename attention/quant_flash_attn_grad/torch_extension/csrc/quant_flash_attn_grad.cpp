@@ -23,19 +23,19 @@ const int64_t QUANT_MODE_MXFP4 = 5;
 const int64_t FLOAT4_E2M1 = 296;
 const int64_t FLOAT8_E8M0 = 293;
 
-inline TensorWrapper make_wrapper(const at::Tensor &tensor, aclDataType tensorAcltype)
+inline TensorWrapper make_wrapper(const at::Tensor& tensor, aclDataType tensorAcltype)
 {
     return {tensor, tensorAcltype};
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> quant_flash_attn_grad(
-    const at::Tensor &query, const at::Tensor &key, const at::Tensor &value, const at::Tensor &dout,
-    const at::Tensor &attn_out, const at::Tensor &q_descale, const at::Tensor &k_descale, const at::Tensor &v_descale,
-    const at::Tensor &do_descale, const at::Tensor &p_scale, const at::Tensor &ds_scale, const at::Tensor &softmax_lse,
-    const c10::optional<at::Tensor> &cu_seqlens_q, const c10::optional<at::Tensor> &cu_seqlens_kv,
-    const c10::optional<at::Tensor> &seqused_q, const c10::optional<at::Tensor> &seqused_kv,
-    const c10::optional<at::Tensor> &sinks, const c10::optional<at::Tensor> &attn_mask,
-    const c10::optional<at::Tensor> &metadata, int64_t quant_mode, double softmax_scale, int64_t mask_mode,
+    const at::Tensor& query, const at::Tensor& key, const at::Tensor& value, const at::Tensor& dout,
+    const at::Tensor& attn_out, const at::Tensor& q_descale, const at::Tensor& k_descale, const at::Tensor& v_descale,
+    const at::Tensor& do_descale, const at::Tensor& p_scale, const at::Tensor& ds_scale, const at::Tensor& softmax_lse,
+    const c10::optional<at::Tensor>& cu_seqlens_q, const c10::optional<at::Tensor>& cu_seqlens_kv,
+    const c10::optional<at::Tensor>& seqused_q, const c10::optional<at::Tensor>& seqused_kv,
+    const c10::optional<at::Tensor>& sinks, const c10::optional<at::Tensor>& attn_mask,
+    const c10::optional<at::Tensor>& metadata, int64_t quant_mode, double softmax_scale, int64_t mask_mode,
     int64_t win_left, int64_t win_right, int64_t max_seqlen_q, int64_t max_seqlen_kv, std::string layout_q,
     std::string layout_k)
 {

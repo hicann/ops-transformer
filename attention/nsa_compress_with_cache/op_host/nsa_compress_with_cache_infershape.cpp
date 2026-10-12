@@ -22,15 +22,15 @@ namespace ops {
 static constexpr size_t INDEX_IN_OUTPUT_CACHE = 3;
 static constexpr size_t INDEX_OUT_OUTPUT_CACHE = 0;
 
-static ge::graphStatus InferShapeNsaCompressWithCache(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeNsaCompressWithCache(gert::InferShapeContext* context)
 {
-    const gert::Shape *outputCacheShape = context->GetInputShape(INDEX_IN_OUTPUT_CACHE);
-    gert::Shape *outputCacheRefShape = context->GetOutputShape(INDEX_OUT_OUTPUT_CACHE);
+    const gert::Shape* outputCacheShape = context->GetInputShape(INDEX_IN_OUTPUT_CACHE);
+    gert::Shape* outputCacheRefShape = context->GetOutputShape(INDEX_OUT_OUTPUT_CACHE);
     *outputCacheRefShape = *outputCacheShape;
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeNsaCompressWithCache(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeNsaCompressWithCache(gert::InferDataTypeContext* context)
 {
     const auto outputCacheDataType = context->GetInputDataType(INDEX_IN_OUTPUT_CACHE);
     context->SetOutputDataType(INDEX_OUT_OUTPUT_CACHE, outputCacheDataType);

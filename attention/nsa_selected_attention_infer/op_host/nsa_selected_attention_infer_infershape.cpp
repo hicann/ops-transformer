@@ -28,27 +28,27 @@ constexpr size_t VALUE_INPUT_INDEX = 2;
 constexpr size_t INPUT_LAYOUT_ATTR_INDEX = 0;
 static const int64_t HEAD_DIM_V_MAX = 128;
 
-ge::graphStatus InferShapeNsaSelectAttentionInfer(gert::InferShapeContext *context)
+ge::graphStatus InferShapeNsaSelectAttentionInfer(gert::InferShapeContext* context)
 {
     OP_LOGI(context, "Enter NsaSelectedAttentionInfer runtime infershape impl.");
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape *queryShape = context->GetInputShape(QUERY_INPUT_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QUERY_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(KEY_INPUT_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(KEY_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    const gert::Shape *valueShape = context->GetInputShape(VALUE_INPUT_INDEX);
+    const gert::Shape* valueShape = context->GetInputShape(VALUE_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
     auto attrs = context->GetAttrs();
-    const auto *queryDesc = context->GetInputDesc(QUERY_INPUT_INDEX);
+    const auto* queryDesc = context->GetInputDesc(QUERY_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryDesc);
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const char *inputLayout = attrs->GetAttrPointer<char>(INPUT_LAYOUT_ATTR_INDEX);
+    const char* inputLayout = attrs->GetAttrPointer<char>(INPUT_LAYOUT_ATTR_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayout);
     std::string inputLayoutStr = std::string(inputLayout);
-    for (auto &c : inputLayoutStr) {
+    for (auto& c : inputLayoutStr) {
         c = toupper(c);
     }
     if (inputLayoutStr != "BSND" && inputLayoutStr != "BSH" && inputLayoutStr != "TND") {
@@ -56,7 +56,7 @@ ge::graphStatus InferShapeNsaSelectAttentionInfer(gert::InferShapeContext *conte
         return GRAPH_FAILED;
     }
 
-    gert::Shape *attentionOutShape = context->GetOutputShape(0);
+    gert::Shape* attentionOutShape = context->GetOutputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
     *attentionOutShape = *queryShape;
     if (inputLayoutStr == "BSND") {
@@ -81,7 +81,7 @@ ge::graphStatus InferShapeNsaSelectAttentionInfer(gert::InferShapeContext *conte
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeNsaSelectAttentionInfer(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeNsaSelectAttentionInfer(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         return ge::GRAPH_FAILED;

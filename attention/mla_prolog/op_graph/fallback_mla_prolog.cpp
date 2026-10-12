@@ -18,7 +18,7 @@ namespace fallback {
 using namespace ge;
 using namespace gert;
 
-graphStatus GetMlaPrologInputTensor(const OpExecuteContext *ctx, MlaPrologFallBackParam &param)
+graphStatus GetMlaPrologInputTensor(const OpExecuteContext* ctx, MlaPrologFallBackParam& param)
 {
     param.tokenX = ctx->GetRequiredInputTensor(TOKEN_X_INDEX);
     OP_CHECK_IF(param.tokenX == nullptr, OP_LOGE("aclnnfallback", "tokenX is null"), return GRAPH_FAILED);
@@ -69,7 +69,7 @@ graphStatus GetMlaPrologInputTensor(const OpExecuteContext *ctx, MlaPrologFallBa
     return GRAPH_SUCCESS;
 }
 
-graphStatus GetMlaPrologOutputTensor(const OpExecuteContext *ctx, MlaPrologFallBackParam &param)
+graphStatus GetMlaPrologOutputTensor(const OpExecuteContext* ctx, MlaPrologFallBackParam& param)
 {
     param.query = ctx->GetOutputTensor(QUERY_INDEX);
     OP_CHECK_IF(param.query == nullptr, OP_LOGE("aclnnfallback", "query is null"), return GRAPH_FAILED);
@@ -86,12 +86,12 @@ graphStatus GetMlaPrologOutputTensor(const OpExecuteContext *ctx, MlaPrologFallB
     return GRAPH_SUCCESS;
 }
 
-graphStatus GetMlaPrologAttr(const OpExecuteContext *ctx, MlaPrologFallBackParam &param)
+graphStatus GetMlaPrologAttr(const OpExecuteContext* ctx, MlaPrologFallBackParam& param)
 {
     auto attrs = ctx->GetAttrs();
-    const double *getRmsnormEpsilonCq = attrs->GetAttrPointer<double>(ATTR_RMSNORM_EPSILON_CQ_INDEX);
-    const double *getRmsnormEpsilonCkv = attrs->GetAttrPointer<double>(ATTR_RMSNORM_EPSILON_CKV_INDEX);
-    const char *getCacheMode = attrs->GetAttrPointer<char>(ATTR_CACHE_MODE_INDEX);
+    const double* getRmsnormEpsilonCq = attrs->GetAttrPointer<double>(ATTR_RMSNORM_EPSILON_CQ_INDEX);
+    const double* getRmsnormEpsilonCkv = attrs->GetAttrPointer<double>(ATTR_RMSNORM_EPSILON_CKV_INDEX);
+    const char* getCacheMode = attrs->GetAttrPointer<char>(ATTR_CACHE_MODE_INDEX);
 
     param.rmsnormEpsilonCq = *getRmsnormEpsilonCq;
     param.rmsnormEpsilonCkv = *getRmsnormEpsilonCkv;
@@ -103,7 +103,7 @@ graphStatus GetMlaPrologAttr(const OpExecuteContext *ctx, MlaPrologFallBackParam
     return GRAPH_SUCCESS;
 }
 
-graphStatus MlaHostExecuteFunc(OpExecuteContext *host_api_ctx)
+graphStatus MlaHostExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
 

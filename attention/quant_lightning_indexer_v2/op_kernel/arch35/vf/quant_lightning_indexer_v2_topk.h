@@ -25,7 +25,7 @@ namespace topk {
 template <typename T>
 class LITopk {
 public:
-    __aicore__ inline void operator()(LocalTensor<uint32_t> &outputIdxLocal, LocalTensor<T> &inputLocal,
+    __aicore__ inline void operator()(LocalTensor<uint32_t>& outputIdxLocal, LocalTensor<T>& inputLocal,
                                       uint32_t s2SeqLen)
     {}
 };
@@ -49,7 +49,7 @@ public:
         this->topK = topK;
     }
 
-    __aicore__ inline void InitBuffers(LocalTensor<uint32_t> &sharedTmpBuffer)
+    __aicore__ inline void InitBuffers(LocalTensor<uint32_t>& sharedTmpBuffer)
     {
         tmpIdxLocal = sharedTmpBuffer[0];
         tmpValueLocal = tmpIdxLocal[topK];
@@ -62,7 +62,7 @@ public:
         outputValueLocal = nkValueLocal[64]; // 64：单核/单线程输出元素容量（G维度切分阈值）
     }
 
-    __aicore__ inline void operator()(LocalTensor<uint32_t> &outputIdxLocal, LocalTensor<uint32_t> &inputLocal,
+    __aicore__ inline void operator()(LocalTensor<uint32_t>& outputIdxLocal, LocalTensor<uint32_t>& inputLocal,
                                       uint32_t s2SeqLen)
     {
         topkb32::LiTopKVF(outputIdxLocal,   // filter阶段使用输出value Buf topK * 4B
@@ -107,7 +107,7 @@ public:
         this->trunkLen = trunkLen;
     }
 
-    __aicore__ inline void InitBuffers(LocalTensor<uint32_t> &sharedTmpBuffer, LocalTensor<uint32_t> &indicesOutLocal)
+    __aicore__ inline void InitBuffers(LocalTensor<uint32_t>& sharedTmpBuffer, LocalTensor<uint32_t>& indicesOutLocal)
     {
         LocalTensor<uint32_t> hisIndexLocal1 = indicesOutLocal;
         LocalTensor<uint32_t> hisIndexLocal2 = sharedTmpBuffer[0];
@@ -121,8 +121,8 @@ public:
         tmpIndexLocal = tmpIndexLocalTmp.template ReinterpretCast<uint16_t>();
     }
 
-    __aicore__ inline void TopK(LocalTensor<uint16_t> &mrgValueLocal, LocalTensor<uint32_t> &indicesOutLocal,
-                                LocalTensor<uint16_t> &hisValueLocal, uint32_t s2SeqLen, uint32_t loopIdx,
+    __aicore__ inline void TopK(LocalTensor<uint16_t>& mrgValueLocal, LocalTensor<uint32_t>& indicesOutLocal,
+                                LocalTensor<uint16_t>& hisValueLocal, uint32_t s2SeqLen, uint32_t loopIdx,
                                 uint32_t s2LoopNum, bool isNeedLD, bool returnValueFlag, uint32_t outputIdxOffset)
     {
         // true: 开启返回hisValueLocal
@@ -189,8 +189,8 @@ public:
             topkb16gather::IndicesAddOffset(indicesOutLocal, outputIdxOffset, topK);
         }
     }
-    __aicore__ inline void LdTopK(LocalTensor<uint16_t> &mrgValueLocal, LocalTensor<uint32_t> indexLocal,
-                                  LocalTensor<uint32_t> &indicesOutLocal, LocalTensor<uint16_t> &hisValueLocal,
+    __aicore__ inline void LdTopK(LocalTensor<uint16_t>& mrgValueLocal, LocalTensor<uint32_t> indexLocal,
+                                  LocalTensor<uint32_t>& indicesOutLocal, LocalTensor<uint16_t>& hisValueLocal,
                                   uint32_t s2SeqLen, uint32_t loopIdx, uint32_t s2LoopNum)
     {
         topkb16gather::QLiV2TopKVF<true>(tmpIndexLocal, hisValueLocal, mrgValueLocal, histogramsLocal, idxHighLocal,

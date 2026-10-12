@@ -33,21 +33,21 @@ static constexpr size_t OUTPUT_IDX_DSINK = 3;
 static constexpr size_t LAYOUT_Q = 7;
 static constexpr size_t LAYOUT_KV = 8;
 
-ge::graphStatus InferShapeQuantFlashAttnGrad(gert::InferShapeContext *context)
+ge::graphStatus InferShapeQuantFlashAttnGrad(gert::InferShapeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const char *qInputLayout = attrs->GetAttrPointer<char>(LAYOUT_Q);
+    const char* qInputLayout = attrs->GetAttrPointer<char>(LAYOUT_Q);
     OP_CHECK_NULL_WITH_CONTEXT(context, qInputLayout);
-    const char *kvInputLayout = attrs->GetAttrPointer<char>(LAYOUT_KV);
+    const char* kvInputLayout = attrs->GetAttrPointer<char>(LAYOUT_KV);
     OP_CHECK_NULL_WITH_CONTEXT(context, kvInputLayout);
     std::string qInputLayoutStr = std::string(qInputLayout) == "" ? "empty" : std::string(qInputLayout);
-    for (auto &c : qInputLayoutStr) {
+    for (auto& c : qInputLayoutStr) {
         c = toupper(c);
     }
     std::string kvInputLayoutStr = std::string(kvInputLayout) == "" ? "empty" : std::string(kvInputLayout);
-    for (auto &c : kvInputLayoutStr) {
+    for (auto& c : kvInputLayoutStr) {
         c = toupper(c);
     }
     if ((qInputLayoutStr != "BSND" && qInputLayoutStr != "BNSD" && qInputLayoutStr != "TND") ||
@@ -56,25 +56,25 @@ ge::graphStatus InferShapeQuantFlashAttnGrad(gert::InferShapeContext *context)
         OP_LOGI(context, "QuantFlashAttnGrad inputLayout error.");
         return GRAPH_FAILED;
     }
-    const gert::Shape *queryShape = context->GetInputShape(OUTPUT_IDX_DQ);
+    const gert::Shape* queryShape = context->GetInputShape(OUTPUT_IDX_DQ);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(OUTPUT_IDX_DK);
+    const gert::Shape* keyShape = context->GetInputShape(OUTPUT_IDX_DK);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    const gert::Shape *valueShape = context->GetInputShape(OUTPUT_IDX_DV);
+    const gert::Shape* valueShape = context->GetInputShape(OUTPUT_IDX_DV);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
-    gert::Shape *dqShape = context->GetOutputShape(OUTPUT_IDX_DQ);
+    gert::Shape* dqShape = context->GetOutputShape(OUTPUT_IDX_DQ);
     OP_CHECK_NULL_WITH_CONTEXT(context, dqShape);
     *dqShape = *queryShape;
-    gert::Shape *dkShape = context->GetOutputShape(OUTPUT_IDX_DK);
+    gert::Shape* dkShape = context->GetOutputShape(OUTPUT_IDX_DK);
     OP_CHECK_NULL_WITH_CONTEXT(context, dkShape);
     *dkShape = *keyShape;
-    gert::Shape *dvShape = context->GetOutputShape(OUTPUT_IDX_DV);
+    gert::Shape* dvShape = context->GetOutputShape(OUTPUT_IDX_DV);
     OP_CHECK_NULL_WITH_CONTEXT(context, dvShape);
     *dvShape = *valueShape;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeQuantFlashAttnGrad(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeQuantFlashAttnGrad(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         return ge::GRAPH_FAILED;

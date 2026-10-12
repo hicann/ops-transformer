@@ -39,10 +39,10 @@ class MlaS1s2Bn2gs1SameABBaseApi {
 public:
     __aicore__ inline MlaS1s2Bn2gs1SameABBaseApi(){};
     static constexpr bool PAGE_ATTENTION = pageAttention;
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *attenMask, __gm__ uint8_t *blockTable, __gm__ uint8_t *attentionOut,
-                                __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-                                const TILING_TYPE *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* attenMask, __gm__ uint8_t* blockTable, __gm__ uint8_t* attentionOut,
+                                __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                                const TILING_TYPE* __restrict tiling, TPipe* tPipe);
     __aicore__ inline void Process();
 
     // define matmul
@@ -67,50 +67,50 @@ protected:
         return (layOutType == LayOutTypeEnum::LAYOUT_TND) || (layOutType == LayOutTypeEnum::LAYOUT_NTD_TND);
     }
 
-    __aicore__ inline void InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                     __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope, __gm__ uint8_t *attenMask,
-                                     __gm__ uint8_t *blockTable, __gm__ uint8_t *learnableSink,
-                                     __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-                                     __gm__ uint8_t *workspace, const TILING_TYPE *__restrict tiling, TPipe *tPipe);
-    __aicore__ inline uint64_t CalcBmm2TensorBGmOffset(const SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void NdToNz(SplitSameABExtraInfo &extraInfo, LocalTensor<INPUT_T> &nzResUb,
-                                  LocalTensor<INPUT_T> &vec1ResUb, int64_t loopIdx);
-    __aicore__ inline void SetExtraInfo(SplitSameABExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount,
+    __aicore__ inline void InitInput(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                     __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope, __gm__ uint8_t* attenMask,
+                                     __gm__ uint8_t* blockTable, __gm__ uint8_t* learnableSink,
+                                     __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse,
+                                     __gm__ uint8_t* workspace, const TILING_TYPE* __restrict tiling, TPipe* tPipe);
+    __aicore__ inline uint64_t CalcBmm2TensorBGmOffset(const SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline void NdToNz(SplitSameABExtraInfo& extraInfo, LocalTensor<INPUT_T>& nzResUb,
+                                  LocalTensor<INPUT_T>& vec1ResUb, int64_t loopIdx);
+    __aicore__ inline void SetExtraInfo(SplitSameABExtraInfo& extraInfo, int64_t taskId, int64_t s2LoopCount,
                                         int64_t s2LoopLimit, int64_t multiCoreInnerIdx);
-    __aicore__ inline void SetTiling(const TILING_TYPE *__restrict tilingData);
+    __aicore__ inline void SetTiling(const TILING_TYPE* __restrict tilingData);
     __aicore__ inline void InitBuffer();
     __aicore__ inline void ComputeConstexpr();
     __aicore__ inline void AllocEvent();
     __aicore__ inline void FreeEvent();
     __aicore__ inline void ComputeAxisIdx(int64_t multiCoreInnerIdx);
-    __aicore__ inline uint64_t CalcBmm1TensorAGmOffset(const SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline uint64_t CalcBmm1QRopeGmOffset(const SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline uint64_t CalcBmm1TensorBGmOffset(const SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline uint64_t CalcBmm1KRopeGmOffset(const SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void ProcessVec1(SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void CopyInAttenMask(SplitSameABExtraInfo &extraInfo, int64_t loopIdx, int64_t maskOffset,
+    __aicore__ inline uint64_t CalcBmm1TensorAGmOffset(const SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline uint64_t CalcBmm1QRopeGmOffset(const SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline uint64_t CalcBmm1TensorBGmOffset(const SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline uint64_t CalcBmm1KRopeGmOffset(const SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline void ComputeBmm1Tail(SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline void ProcessVec1(SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline void CopyInAttenMask(SplitSameABExtraInfo& extraInfo, int64_t loopIdx, int64_t maskOffset,
                                            bool secondTime = false);
     __aicore__ inline void GetAttenMaskComputeMode(int64_t deltaCausalOrNext, int64_t deltaPre, int64_t s1Offset,
-                                                   SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline int64_t ComputeAttenMaskOffset(SplitSameABExtraInfo &extraInfo, int64_t loopIdx);
-    __aicore__ inline int64_t ComputeOffsetForNoCompress(SplitSameABExtraInfo &extraInfo, int64_t loopIdx);
-    __aicore__ inline void GetBmm1Result(SplitSameABExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb, int64_t loopIdx);
-    __aicore__ inline void ComputeAttenMask(SelectWithBytesMaskShapeInfo &shapeInfo, LocalTensor<T> &bmm1ResUb,
-                                            LocalTensor<uint8_t> &maskUb, const uint8_t maskType, event_t vWaitMte2);
+                                                   SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline int64_t ComputeAttenMaskOffset(SplitSameABExtraInfo& extraInfo, int64_t loopIdx);
+    __aicore__ inline int64_t ComputeOffsetForNoCompress(SplitSameABExtraInfo& extraInfo, int64_t loopIdx);
+    __aicore__ inline void GetBmm1Result(SplitSameABExtraInfo& extraInfo, LocalTensor<T>& bmm1ResUb, int64_t loopIdx);
+    __aicore__ inline void ComputeAttenMask(SelectWithBytesMaskShapeInfo& shapeInfo, LocalTensor<T>& bmm1ResUb,
+                                            LocalTensor<uint8_t>& maskUb, const uint8_t maskType, event_t vWaitMte2);
 
-    __aicore__ inline void SoftMaxCompute(SplitSameABExtraInfo &extraInfo, LocalTensor<T> &srcTensor, int64_t loopIdx);
-    __aicore__ inline void SoftMaxCheckResCompress(SplitSameABExtraInfo &extraInfo, int64_t vec1S1realSplitN);
-    __aicore__ inline void InvalidLineSplitS2Process(SplitSameABExtraInfo &extraInfo, LocalTensor<T> &srcTensor,
-                                                     LocalTensor<T> &maxUb, int64_t loopIdx);
-    __aicore__ inline void ProcessVec2(SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void Bmm2ResultMul(SplitSameABExtraInfo &extraInfo, LocalTensor<T> &bmm2ResUb, int64_t s1oIdx);
-    __aicore__ inline void Bmm2ResultDiv(SplitSameABExtraInfo &extraInfo, LocalTensor<T> &srcBmm2ResUb, int64_t s1oIdx);
-    __aicore__ inline void Bmm2DataCopyOut(SplitSameABExtraInfo &extraInfo, int64_t s1oIdx, int64_t mm2ResCalcSize);
-    __aicore__ inline void SoftmaxDataCopyOut(SplitSameABExtraInfo &extraInfo);
+    __aicore__ inline void SoftMaxCompute(SplitSameABExtraInfo& extraInfo, LocalTensor<T>& srcTensor, int64_t loopIdx);
+    __aicore__ inline void SoftMaxCheckResCompress(SplitSameABExtraInfo& extraInfo, int64_t vec1S1realSplitN);
+    __aicore__ inline void InvalidLineSplitS2Process(SplitSameABExtraInfo& extraInfo, LocalTensor<T>& srcTensor,
+                                                     LocalTensor<T>& maxUb, int64_t loopIdx);
+    __aicore__ inline void ProcessVec2(SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline void Bmm2ResultMul(SplitSameABExtraInfo& extraInfo, LocalTensor<T>& bmm2ResUb, int64_t s1oIdx);
+    __aicore__ inline void Bmm2ResultDiv(SplitSameABExtraInfo& extraInfo, LocalTensor<T>& srcBmm2ResUb, int64_t s1oIdx);
+    __aicore__ inline void Bmm2DataCopyOut(SplitSameABExtraInfo& extraInfo, int64_t s1oIdx, int64_t mm2ResCalcSize);
+    __aicore__ inline void SoftmaxDataCopyOut(SplitSameABExtraInfo& extraInfo);
 
     // sparse 用函数
-    __aicore__ inline void GetS1LoopRange(int64_t &multiCoreInnerOffset, int64_t &multiCoreInnerLimit);
+    __aicore__ inline void GetS1LoopRange(int64_t& multiCoreInnerOffset, int64_t& multiCoreInnerLimit);
     __aicore__ inline void GetS2LoopRange();
 
     uint32_t cubeS1BaseSize;
@@ -268,19 +268,19 @@ protected:
     int32_t vecBlockIdx;
     int32_t cubeBlockIdx;
     int32_t cubeSubIdx;
-    const TILING_TYPE *__restrict tilingData;
+    const TILING_TYPE* __restrict tilingData;
 
     int64_t boIdx;
     int64_t n2oIdx;
     int64_t goIdx;
     int64_t s1oIdx;
 
-    TPipe *pipe;
+    TPipe* pipe;
 
-    __gm__ uint8_t *key_ptr;
-    __gm__ uint8_t *value_ptr;
-    __gm__ uint8_t *currentKey;
-    __gm__ uint8_t *currentValue;
+    __gm__ uint8_t* key_ptr;
+    __gm__ uint8_t* value_ptr;
+    __gm__ uint8_t* currentKey;
+    __gm__ uint8_t* currentValue;
 
     GlobalTensor<INPUT_T> queryGm;
     GlobalTensor<INPUT_T> qRopeGm;
@@ -308,11 +308,11 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                                __gm__ uint8_t *attenMask, __gm__ uint8_t *blockTable,
-                                                __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-                                                __gm__ uint8_t *workspace, const TILING_TYPE *__restrict tiling,
-                                                TPipe *tPipe)
+                           pageAttention>::Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                                __gm__ uint8_t* attenMask, __gm__ uint8_t* blockTable,
+                                                __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse,
+                                                __gm__ uint8_t* workspace, const TILING_TYPE* __restrict tiling,
+                                                TPipe* tPipe)
 {
     this->InitInput(query, key, value, nullptr, nullptr, attenMask, nullptr, nullptr, attentionOut, softmaxLse,
                     workspace, tiling, tPipe); // gm设置
@@ -325,12 +325,12 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                                     __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-                                                     __gm__ uint8_t *attenMask, __gm__ uint8_t *blockTable,
-                                                     __gm__ uint8_t *learnableSink, __gm__ uint8_t *attentionOut,
-                                                     __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-                                                     const TILING_TYPE *__restrict tiling, TPipe *tPipe)
+                           pageAttention>::InitInput(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                                     __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+                                                     __gm__ uint8_t* attenMask, __gm__ uint8_t* blockTable,
+                                                     __gm__ uint8_t* learnableSink, __gm__ uint8_t* attentionOut,
+                                                     __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                                                     const TILING_TYPE* __restrict tiling, TPipe* tPipe)
 {
     if ASCEND_IS_AIV {
         this->vecBlockIdx = GetBlockIdx();
@@ -351,33 +351,33 @@ MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T,
     this->value_ptr = value;
 
     // init global buffer
-    this->queryGm.SetGlobalBuffer((__gm__ INPUT_T *)query);
+    this->queryGm.SetGlobalBuffer((__gm__ INPUT_T*)query);
     if (this->tilingData->PFAinputParams.fromFused) {
-        ListTensorDesc keyListTensorDescInit((__gm__ void *)key_ptr);
-        ListTensorDesc valueListTensorDescInit((__gm__ void *)value_ptr);
-        this->currentKey = (__gm__ uint8_t *)keyListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
-        this->currentValue = (__gm__ uint8_t *)valueListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
-        this->keyGm.SetGlobalBuffer((__gm__ INPUT_T *)this->currentKey);
-        this->valueGm.SetGlobalBuffer((__gm__ INPUT_T *)this->currentValue);
+        ListTensorDesc keyListTensorDescInit((__gm__ void*)key_ptr);
+        ListTensorDesc valueListTensorDescInit((__gm__ void*)value_ptr);
+        this->currentKey = (__gm__ uint8_t*)keyListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
+        this->currentValue = (__gm__ uint8_t*)valueListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
+        this->keyGm.SetGlobalBuffer((__gm__ INPUT_T*)this->currentKey);
+        this->valueGm.SetGlobalBuffer((__gm__ INPUT_T*)this->currentValue);
     } else {
-        this->keyGm.SetGlobalBuffer((__gm__ INPUT_T *)key);
-        this->valueGm.SetGlobalBuffer((__gm__ INPUT_T *)value);
+        this->keyGm.SetGlobalBuffer((__gm__ INPUT_T*)key);
+        this->valueGm.SetGlobalBuffer((__gm__ INPUT_T*)value);
     }
 
-    this->qRopeGm.SetGlobalBuffer((__gm__ INPUT_T *)queryRope);
-    this->kRopeGm.SetGlobalBuffer((__gm__ INPUT_T *)keyRope);
-    this->attenMaskGmInt.SetGlobalBuffer((__gm__ uint8_t *)attenMask);
+    this->qRopeGm.SetGlobalBuffer((__gm__ INPUT_T*)queryRope);
+    this->kRopeGm.SetGlobalBuffer((__gm__ INPUT_T*)keyRope);
+    this->attenMaskGmInt.SetGlobalBuffer((__gm__ uint8_t*)attenMask);
     if constexpr (PAGE_ATTENTION) {
-        this->blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
+        this->blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blockTable);
     }
-    this->attentionOutGm.SetGlobalBuffer((__gm__ INPUT_T *)attentionOut);
+    this->attentionOutGm.SetGlobalBuffer((__gm__ INPUT_T*)attentionOut);
     if (this->tilingData->PFAinputParams.isSoftMaxLseEnable) {
-        this->softmaxLseGm.SetGlobalBuffer((__gm__ float *)softmaxLse);
+        this->softmaxLseGm.SetGlobalBuffer((__gm__ float*)softmaxLse);
     }
 
     if (this->tilingData->PFAinputParams.hasLearnableSink) {
         this->hasSink = true;
-        this->sinkGm.SetGlobalBuffer((__gm__ bfloat16_t *)learnableSink);
+        this->sinkGm.SetGlobalBuffer((__gm__ bfloat16_t*)learnableSink);
     }
 
     // 补齐到512， 统一按T处理
@@ -397,26 +397,26 @@ MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T,
     int64_t totalOffset = mmNRatioOffset * bmm1AndVec1Ratio + mm2Offset * 2 * GM_DOUBLE_BUFFER;
 
     // bmm1Result，占用2倍mmNRatioOffset空间
-    this->mm1Res[0].SetGlobalBuffer((__gm__ T *)(workspace + this->cubeBlockIdx * totalOffset));
-    this->mm1Res[1].SetGlobalBuffer((__gm__ T *)(workspace + this->cubeBlockIdx * totalOffset + mmNRatioOffset));
+    this->mm1Res[0].SetGlobalBuffer((__gm__ T*)(workspace + this->cubeBlockIdx * totalOffset));
+    this->mm1Res[1].SetGlobalBuffer((__gm__ T*)(workspace + this->cubeBlockIdx * totalOffset + mmNRatioOffset));
 
     // stage1Result，不占用/占用1倍/占用2倍mmNRatioOffset空间
     this->stage1Res[0].SetGlobalBuffer(
-        (__gm__ INPUT_T *)(workspace + this->cubeBlockIdx * totalOffset + vector1OffsetPing));
+        (__gm__ INPUT_T*)(workspace + this->cubeBlockIdx * totalOffset + vector1OffsetPing));
     this->stage1Res[1].SetGlobalBuffer(
-        (__gm__ INPUT_T *)(workspace + this->cubeBlockIdx * totalOffset + vector1OffsetPong));
+        (__gm__ INPUT_T*)(workspace + this->cubeBlockIdx * totalOffset + vector1OffsetPong));
 
     // bmm2Result，占用2倍mmOffset空间
     this->mm2Res[0].SetGlobalBuffer(
-        (__gm__ T *)(workspace + this->cubeBlockIdx * totalOffset + mmNRatioOffset * bmm1AndVec1Ratio));
+        (__gm__ T*)(workspace + this->cubeBlockIdx * totalOffset + mmNRatioOffset * bmm1AndVec1Ratio));
     this->mm2Res[1].SetGlobalBuffer(
-        (__gm__ T *)(workspace + this->cubeBlockIdx * totalOffset + mmNRatioOffset * bmm1AndVec1Ratio + mm2Offset));
+        (__gm__ T*)(workspace + this->cubeBlockIdx * totalOffset + mmNRatioOffset * bmm1AndVec1Ratio + mm2Offset));
 
     // vec2阶段，占用2倍mmOffset空间，仅在D轴大于64的情况下出现
     this->vec2Res[0].SetGlobalBuffer(
-        (__gm__ T *)(workspace + this->cubeBlockIdx * totalOffset + mmNRatioOffset * bmm1AndVec1Ratio + mm2Offset * 2));
+        (__gm__ T*)(workspace + this->cubeBlockIdx * totalOffset + mmNRatioOffset * bmm1AndVec1Ratio + mm2Offset * 2));
     this->vec2Res[1].SetGlobalBuffer(
-        (__gm__ T *)(workspace + this->cubeBlockIdx * totalOffset + mmNRatioOffset * bmm1AndVec1Ratio + mm2Offset * 3));
+        (__gm__ T*)(workspace + this->cubeBlockIdx * totalOffset + mmNRatioOffset * bmm1AndVec1Ratio + mm2Offset * 3));
     if constexpr (IsSameType<T, half>::value) {
         this->negativeIntScalar = MLA_NEGATIVE_MIN_VAULE_FP16;
     }
@@ -435,7 +435,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::SetTiling(const TILING_TYPE *__restrict tilingData)
+                           pageAttention>::SetTiling(const TILING_TYPE* __restrict tilingData)
 {
     // copy base params
     this->tilingData = tilingData;
@@ -664,7 +664,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::GetS1LoopRange(int64_t &multiCoreInnerOffset, int64_t &multiCoreInnerLimit)
+                           pageAttention>::GetS1LoopRange(int64_t& multiCoreInnerOffset, int64_t& multiCoreInnerLimit)
 {
     // 计算sparse场景下s1的循环范围
     if constexpr (InputLayoutIsTNDLike()) {
@@ -745,7 +745,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::SetExtraInfo(SplitSameABExtraInfo &extraInfo, int64_t taskId,
+                           pageAttention>::SetExtraInfo(SplitSameABExtraInfo& extraInfo, int64_t taskId,
                                                         int64_t s2LoopCount, int64_t s2LoopLimit,
                                                         int64_t multiCoreInnerIdx)
 {
@@ -782,7 +782,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo)
+                           pageAttention>::ComputeBmm1Tail(SplitSameABExtraInfo& extraInfo)
 {
     extraInfo.s2RealSize = this->s2BaseNRatioSize;
     extraInfo.s2AlignedSize = extraInfo.s2RealSize;
@@ -825,7 +825,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline uint64_t
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::CalcBmm1TensorAGmOffset(const SplitSameABExtraInfo &extraInfo)
+                           pageAttention>::CalcBmm1TensorAGmOffset(const SplitSameABExtraInfo& extraInfo)
 {
     // 计算gm上的offset
     int64_t bOffset = 0;
@@ -861,7 +861,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline uint64_t
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::CalcBmm1QRopeGmOffset(const SplitSameABExtraInfo &extraInfo)
+                           pageAttention>::CalcBmm1QRopeGmOffset(const SplitSameABExtraInfo& extraInfo)
 {
     int64_t ropeBOffset = 0;
     int64_t ropeS1Offset = 0;
@@ -888,7 +888,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline uint64_t
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::CalcBmm1TensorBGmOffset(const SplitSameABExtraInfo &extraInfo)
+                           pageAttention>::CalcBmm1TensorBGmOffset(const SplitSameABExtraInfo& extraInfo)
 {
     // 计算gm上的offset
     int64_t bOffset = 0;
@@ -916,7 +916,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline uint64_t
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::CalcBmm1KRopeGmOffset(const SplitSameABExtraInfo &extraInfo)
+                           pageAttention>::CalcBmm1KRopeGmOffset(const SplitSameABExtraInfo& extraInfo)
 {
     int64_t ropeBOffset = 0;
     int64_t ropeS2Offset = 0;
@@ -939,9 +939,9 @@ MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T,
 template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
-                                                  mmPolicyType, pageAttention>::NdToNz(SplitSameABExtraInfo &extraInfo,
-                                                                                       LocalTensor<INPUT_T> &nzResUb,
-                                                                                       LocalTensor<INPUT_T> &vec1ResUb,
+                                                  mmPolicyType, pageAttention>::NdToNz(SplitSameABExtraInfo& extraInfo,
+                                                                                       LocalTensor<INPUT_T>& nzResUb,
+                                                                                       LocalTensor<INPUT_T>& vec1ResUb,
                                                                                        int64_t loopIdx)
 {
     auto nzResUbTmp = nzResUb.template ReinterpretCast<half>();
@@ -1003,13 +1003,13 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::ProcessVec1(SplitSameABExtraInfo &extraInfo)
+                           pageAttention>::ProcessVec1(SplitSameABExtraInfo& extraInfo)
 {
     if (extraInfo.s1RealSize == 0) {
         return;
     }
 
-    LocalTensor<T> &bmm1ResNdUb = (extraInfo.needNz2Nd == 0) ? this->bmm1ResUb : this->v1CalcUb;
+    LocalTensor<T>& bmm1ResNdUb = (extraInfo.needNz2Nd == 0) ? this->bmm1ResUb : this->v1CalcUb;
 
     extraInfo.vec1S1RealSize = extraInfo.vec1S1BaseSize;
     for (int32_t loopIdx = 0; loopIdx < extraInfo.realSplitN; ++loopIdx) {
@@ -1121,7 +1121,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::CopyInAttenMask(SplitSameABExtraInfo &extraInfo, int64_t loopIdx,
+                           pageAttention>::CopyInAttenMask(SplitSameABExtraInfo& extraInfo, int64_t loopIdx,
                                                            int64_t maskOffset, bool secondTime)
 {
     if constexpr (hasAtten) {
@@ -1175,7 +1175,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline int64_t
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::ComputeAttenMaskOffset(SplitSameABExtraInfo &extraInfo, int64_t loopIdx)
+                           pageAttention>::ComputeAttenMaskOffset(SplitSameABExtraInfo& extraInfo, int64_t loopIdx)
 {
     if constexpr (hasAtten) {
         if (this->tilingData->PFAinputParams.attenMaskCompressMode ==
@@ -1263,7 +1263,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
                            pageAttention>::GetAttenMaskComputeMode(int64_t deltaCausalOrNext, int64_t deltaPre,
-                                                                   int64_t s1Offset, SplitSameABExtraInfo &extraInfo)
+                                                                   int64_t s1Offset, SplitSameABExtraInfo& extraInfo)
 {
     if constexpr (hasAtten) {
         int64_t causalOrNextFactor = deltaCausalOrNext - extraInfo.s2AlignedSize;
@@ -1299,7 +1299,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline int64_t
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::ComputeOffsetForNoCompress(SplitSameABExtraInfo &extraInfo, int64_t loopIdx)
+                           pageAttention>::ComputeOffsetForNoCompress(SplitSameABExtraInfo& extraInfo, int64_t loopIdx)
 {
     if constexpr (hasAtten) {
         int64_t bOffset = 0;
@@ -1333,7 +1333,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::GetBmm1Result(SplitSameABExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb,
+                           pageAttention>::GetBmm1Result(SplitSameABExtraInfo& extraInfo, LocalTensor<T>& bmm1ResUb,
                                                          int64_t loopIdx)
 {
     if constexpr (bmm1Format == CubeFormat::NZ) {
@@ -1398,9 +1398,9 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::ComputeAttenMask(SelectWithBytesMaskShapeInfo &shapeInfo,
-                                                            LocalTensor<T> &bmm1ResUb,
-                                                            LocalTensor<uint8_t> &attenMaskUb, const uint8_t maskType,
+                           pageAttention>::ComputeAttenMask(SelectWithBytesMaskShapeInfo& shapeInfo,
+                                                            LocalTensor<T>& bmm1ResUb,
+                                                            LocalTensor<uint8_t>& attenMaskUb, const uint8_t maskType,
                                                             event_t vWaitMte2)
 {
     if constexpr (hasAtten) {
@@ -1424,7 +1424,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::SoftMaxCheckResCompress(SplitSameABExtraInfo &extraInfo,
+                           pageAttention>::SoftMaxCheckResCompress(SplitSameABExtraInfo& extraInfo,
                                                                    int64_t vec1S1realSplitN)
 {
     if constexpr (implMode == ImplModeEnum::AA_HIGH_PRECISION) {
@@ -1449,8 +1449,8 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::InvalidLineSplitS2Process(SplitSameABExtraInfo &extraInfo,
-                                                                     LocalTensor<T> &srcTensor, LocalTensor<T> &maxUb,
+                           pageAttention>::InvalidLineSplitS2Process(SplitSameABExtraInfo& extraInfo,
+                                                                     LocalTensor<T>& srcTensor, LocalTensor<T>& maxUb,
                                                                      int64_t loopIdx)
 {
     if constexpr (implMode == ImplModeEnum::AA_HIGH_PRECISION) {
@@ -1500,7 +1500,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::SoftMaxCompute(SplitSameABExtraInfo &extraInfo, LocalTensor<T> &srcTensor,
+                           pageAttention>::SoftMaxCompute(SplitSameABExtraInfo& extraInfo, LocalTensor<T>& srcTensor,
                                                           int64_t loopIdx)
 {
     int64_t vec1S1RealSize = CeilDiv(extraInfo.vec1S1RealSize, 8) * 8;
@@ -1523,13 +1523,13 @@ MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T,
     if (extraInfo.s2LastLoop) {
         if constexpr (hasAtten == false) {
             uint64_t mask[2] = {extraInfo.duplicateMask, 0};
-            Duplicate<T>(srcTensor[extraInfo.s2RealSizeFloorAlign8], *((float *)&MLA_NEGATIVE_INF_VALUE_FP32), mask,
+            Duplicate<T>(srcTensor[extraInfo.s2RealSizeFloorAlign8], *((float*)&MLA_NEGATIVE_INF_VALUE_FP32), mask,
                          vec1S1RealSize, 1, extraInfo.s2RealSizeAlign64 * sizeof(T) / blockBytes);
         } else if (this->tilingData->PFAinputParams.attenMaskCompressMode !=
                        static_cast<uint8_t>(AttenMaskCompressMode::NO_COMPRESS_MODE) ||
                    extraInfo.s2RealSize < 64) {
             uint64_t mask[2] = {extraInfo.duplicateMask, 0};
-            Duplicate<T>(srcTensor[extraInfo.s2RealSizeFloorAlign8], *((float *)&MLA_NEGATIVE_INF_VALUE_FP32), mask,
+            Duplicate<T>(srcTensor[extraInfo.s2RealSizeFloorAlign8], *((float*)&MLA_NEGATIVE_INF_VALUE_FP32), mask,
                          vec1S1RealSize, 1, extraInfo.s2RealSizeAlign64 * sizeof(T) / blockBytes);
         }
     }
@@ -1626,7 +1626,7 @@ MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T,
         Log(lseTensor, sumTensor, extraInfo.s1RealSize);
         PipeBarrier<PIPE_V>();
         Add(lseTensor, lseTensor, maxTensor, extraInfo.s1RealSize);
-        LocalTensor<T> &softmaxTemp = this->softmaxLseTmpUb;
+        LocalTensor<T>& softmaxTemp = this->softmaxLseTmpUb;
         PipeBarrier<PIPE_V>();
         Brcb(softmaxTemp, lseTensor, (extraInfo.s1RealSize + 7) / 8, {1, 8});
         if (unlikely(this->hasSparse4InvalidLine)) {
@@ -1658,7 +1658,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline uint64_t
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::CalcBmm2TensorBGmOffset(const SplitSameABExtraInfo &extraInfo)
+                           pageAttention>::CalcBmm2TensorBGmOffset(const SplitSameABExtraInfo& extraInfo)
 {
     int64_t bOffset = 0;
     int64_t n2Offset = 0;
@@ -1688,13 +1688,13 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::ProcessVec2(SplitSameABExtraInfo &extraInfo)
+                           pageAttention>::ProcessVec2(SplitSameABExtraInfo& extraInfo)
 {
     if (extraInfo.s1RealSize == 0) {
         return;
     }
     // 获取缓存bmm2的计算结果
-    auto &curBmm2ResTensor = unlikely(extraInfo.s2LoopCount == 0) ? this->bmm2ResUb : this->curBmm2ResUb;
+    auto& curBmm2ResTensor = unlikely(extraInfo.s2LoopCount == 0) ? this->bmm2ResUb : this->curBmm2ResUb;
     int64_t vec2LoopLimit = CeilDiv(extraInfo.s1RealSize, extraInfo.vec2S1BaseSize);
 
     event_t eventIdMte3ToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
@@ -1780,7 +1780,7 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::Bmm2ResultMul(SplitSameABExtraInfo &extraInfo, LocalTensor<T> &bmm2ResUb,
+                           pageAttention>::Bmm2ResultMul(SplitSameABExtraInfo& extraInfo, LocalTensor<T>& bmm2ResUb,
                                                          int64_t s1oIdx)
 {
     PipeBarrier<PIPE_V>();
@@ -1827,10 +1827,10 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::Bmm2ResultDiv(SplitSameABExtraInfo &extraInfo, LocalTensor<T> &srcBmm2ResUb,
+                           pageAttention>::Bmm2ResultDiv(SplitSameABExtraInfo& extraInfo, LocalTensor<T>& srcBmm2ResUb,
                                                          int64_t s1oIdx)
 {
-    LocalTensor<T> &bmm2ResOutUb = this->bmm2ResOutUb;
+    LocalTensor<T>& bmm2ResOutUb = this->bmm2ResOutUb;
     BinaryRepeatParams repeatParams;
     repeatParams.src0BlkStride = 1;
     repeatParams.src0RepStride = valueDSizeAlign16 / blockSize;
@@ -1892,12 +1892,12 @@ template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType
           typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
 __aicore__ inline void
 MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
-                           pageAttention>::Bmm2DataCopyOut(SplitSameABExtraInfo &extraInfo, int64_t s1oIdx,
+                           pageAttention>::Bmm2DataCopyOut(SplitSameABExtraInfo& extraInfo, int64_t s1oIdx,
                                                            int64_t mm2ResCalcSize)
 {
     static_assert(sizeof(INPUT_T) <= sizeof(T), "sizeof(INPUT_T) MUST <= sizeof(T)");
-    LocalTensor<T> &bmm2ResOutUb = this->bmm2ResOutUb;
-    LocalTensor<INPUT_T> &attenOut = reinterpret_cast<LocalTensor<INPUT_T> &>(bmm2ResOutUb);
+    LocalTensor<T>& bmm2ResOutUb = this->bmm2ResOutUb;
+    LocalTensor<INPUT_T>& attenOut = reinterpret_cast<LocalTensor<INPUT_T>&>(bmm2ResOutUb);
     bmm2ResOutUb.SetSize(mm2ResCalcSize);
     PipeBarrier<PIPE_V>();
 

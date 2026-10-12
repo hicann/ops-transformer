@@ -21,12 +21,12 @@ using namespace std;
 using namespace op;
 
 namespace {
-void DestroyAclTensor(aclTensor *tensor)
+void DestroyAclTensor(aclTensor* tensor)
 {
     Release(tensor);
 }
 
-void DestroyAclIntArray(aclIntArray *arr)
+void DestroyAclIntArray(aclIntArray* arr)
 {
     aclDestroyIntArray(arr);
 }
@@ -34,7 +34,7 @@ void DestroyAclIntArray(aclIntArray *arr)
 using AclTensorPtr = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>;
 using AclIntArrayPtr = unique_ptr<aclIntArray, decltype(&DestroyAclIntArray)>;
 
-AclTensorPtr MakeTensor(const vector<int64_t> &shape, aclDataType dtype, aclFormat fmt = ACL_FORMAT_ND)
+AclTensorPtr MakeTensor(const vector<int64_t>& shape, aclDataType dtype, aclFormat fmt = ACL_FORMAT_ND)
 {
     return AclTensorPtr(TensorDesc(shape, dtype, fmt).ToAclTypeRawPtr(), DestroyAclTensor);
 }
@@ -89,7 +89,7 @@ TEST_F(NsaSelectedAttentionGradOpapiUt, A1_tnd_fp16_no_mask)
 
     char inputLayout[] = "TND";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnNsaSelectedAttentionGradGetWorkspaceSize(
         query.get(), key.get(), value.get(), attentionOut.get(), attentionOutGrad.get(), softmaxMax.get(),
@@ -136,7 +136,7 @@ TEST_F(NsaSelectedAttentionGradOpapiUt, A2_tnd_bf16_with_mask)
 
     char inputLayout[] = "TND";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnNsaSelectedAttentionGradGetWorkspaceSize(
         query.get(), key.get(), value.get(), attentionOut.get(), attentionOutGrad.get(), softmaxMax.get(),
@@ -165,7 +165,7 @@ TEST_F(NsaSelectedAttentionGradOpapiUt, E1_null_query)
 
     char inputLayout[] = "TND";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnNsaSelectedAttentionGradGetWorkspaceSize(
         /*query=*/nullptr, key.get(), value.get(), attentionOut.get(), attentionOutGrad.get(), softmaxMax.get(),
@@ -195,7 +195,7 @@ TEST_F(NsaSelectedAttentionGradOpapiUt, E2_null_topk_indices)
 
     char inputLayout[] = "TND";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnNsaSelectedAttentionGradGetWorkspaceSize(
         query.get(), key.get(), value.get(), attentionOut.get(), attentionOutGrad.get(), softmaxMax.get(),
@@ -225,7 +225,7 @@ TEST_F(NsaSelectedAttentionGradOpapiUt, E3_null_dq_output)
 
     char inputLayout[] = "TND";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnNsaSelectedAttentionGradGetWorkspaceSize(
         query.get(), key.get(), value.get(), attentionOut.get(), attentionOutGrad.get(), softmaxMax.get(),

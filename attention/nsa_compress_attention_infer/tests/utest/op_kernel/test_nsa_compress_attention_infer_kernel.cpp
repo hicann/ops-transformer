@@ -40,7 +40,7 @@ TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_0_kernel)
     cs.mParam.G = CASE1_NUMHEADS / CASE1_NUMKVHEADS;
     cs.mParam.D = CASE1_HEADSIZE_QK;
     cs.mParam.N2 = CASE1_NUMKVHEADS;
-    
+
     // attr
     cs.mParam.numHeads = CASE1_NUMHEADS;
     cs.mParam.numKeyValueHeads = CASE1_NUMKVHEADS;
@@ -83,7 +83,7 @@ TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_1_kernel)
     cs.mParam.G = CASE2_NUMHEADS / CASE2_NUMKVHEADS;
     cs.mParam.D = CASE2_HEADSIZE_QK;
     cs.mParam.N2 = CASE2_NUMKVHEADS;
-    
+
     // attr
     cs.mParam.numHeads = CASE2_NUMHEADS;
     cs.mParam.numKeyValueHeads = CASE2_NUMKVHEADS;
@@ -127,7 +127,7 @@ TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_aclgraph_kernel)
     cs.mParam.G = CASE3_NUMHEADS / CASE3_NUMKVHEADS;
     cs.mParam.D = CASE3_HEADSIZE_QK;
     cs.mParam.N2 = CASE3_NUMKVHEADS;
-    
+
     // attr
     cs.mParam.numHeads = CASE3_NUMHEADS;
     cs.mParam.numKeyValueHeads = CASE3_NUMKVHEADS;
@@ -171,7 +171,7 @@ TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_mtp_kernel)
     cs.mParam.G = CASE4_NUMHEADS / CASE4_NUMKVHEADS;
     cs.mParam.D = CASE4_HEADSIZE_QK;
     cs.mParam.N2 = CASE4_NUMKVHEADS;
-    
+
     // attr
     cs.mParam.numHeads = CASE4_NUMHEADS;
     cs.mParam.numKeyValueHeads = CASE4_NUMKVHEADS;

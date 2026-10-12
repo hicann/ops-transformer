@@ -24,7 +24,7 @@ namespace lightning_indexer_v2_checker {
 
 class QLIV2Checker {
 public:
-    explicit QLIV2Checker(const LightningIndexerV2CheckerInfo &info)
+    explicit QLIV2Checker(const LightningIndexerV2CheckerInfo& info)
         : info_(info)
     {}
     ge::graphStatus Process() const;

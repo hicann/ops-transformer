@@ -51,7 +51,7 @@ struct TileCastInt4ToInt8 {
 
     /// Construct
     CATLASS_DEVICE
-    TileCastInt4ToInt8(Arch::Resource<ArchTag> const &resource, Params const &params)
+    TileCastInt4ToInt8(Arch::Resource<ArchTag> const& resource, Params const& params)
     {
         if constexpr (g_coreType == AscendC::AIV) {
             uint32_t ubOffset = 0;
@@ -87,8 +87,8 @@ struct TileCastInt4ToInt8 {
     }
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementDst> const &gmDst, LayoutDst const &layoutDst,
-                    AscendC::GlobalTensor<ElementSrc> const &gmSrc, LayoutSrc const &layoutSrc)
+    void operator()(AscendC::GlobalTensor<ElementDst> const& gmDst, LayoutDst const& layoutDst,
+                    AscendC::GlobalTensor<ElementSrc> const& gmSrc, LayoutSrc const& layoutSrc)
     {
         uint32_t tilesNum = layoutSrc.shape(0);
         uint32_t tileLen = layoutSrc.shape(1);

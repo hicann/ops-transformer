@@ -32,36 +32,36 @@ constexpr int64_t TOPK_MAX_CONTINUOUS = 2048;
 constexpr int64_t POOL_SIZE_MIN = 1;
 constexpr int64_t POOL_SIZE_MAX = 128;
 
-static ge::graphStatus InferShapePoolKeyIndexer(gert::InferShapeContext *context)
+static ge::graphStatus InferShapePoolKeyIndexer(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("PoolKeyIndexer", "InferShapeContext is nullptr!"),
                 return ge::GRAPH_FAILED);
-    const gert::Shape *queryShape = context->GetInputShape(QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(POOL_KEY_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(POOL_KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
 
-    gert::Shape *sparseIndicesShape = context->GetOutputShape(0);
+    gert::Shape* sparseIndicesShape = context->GetOutputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, sparseIndicesShape);
-    gert::Shape *sparseValuesShape = context->GetOutputShape(1);
+    gert::Shape* sparseValuesShape = context->GetOutputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, sparseValuesShape);
 
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const char *layoutQPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_Q_INDEX);
+    const char* layoutQPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_Q_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, layoutQPtr);
-    const char *layoutKPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_K_INDEX);
+    const char* layoutKPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_K_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, layoutKPtr);
-    const int64_t *topkPtr = attrs->GetInt(ATTR_TOPK_INDEX);
+    const int64_t* topkPtr = attrs->GetInt(ATTR_TOPK_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, topkPtr);
-    const int64_t *poolSizePtr = attrs->GetInt(ATTR_POOL_SIZE_INDEX);
+    const int64_t* poolSizePtr = attrs->GetInt(ATTR_POOL_SIZE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, poolSizePtr);
-    const int64_t *maskModePtr = attrs->GetInt(ATTR_MASK_MODE_INDEX);
+    const int64_t* maskModePtr = attrs->GetInt(ATTR_MASK_MODE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, maskModePtr);
-    const int64_t *quantModePtr = attrs->GetInt(ATTR_QUANT_MODE_INDEX);
+    const int64_t* quantModePtr = attrs->GetInt(ATTR_QUANT_MODE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, quantModePtr);
-    const bool *returnValuePtr = attrs->GetAttrPointer<bool>(ATTR_RETURN_VALUE_INDEX);
+    const bool* returnValuePtr = attrs->GetAttrPointer<bool>(ATTR_RETURN_VALUE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, returnValuePtr);
 
     std::string layoutQ(layoutQPtr);
@@ -153,7 +153,7 @@ static ge::graphStatus InferShapePoolKeyIndexer(gert::InferShapeContext *context
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypePoolKeyIndexer(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypePoolKeyIndexer(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("PoolKeyIndexer", "InferDataTypeContext is nullptr!"),
                 return ge::GRAPH_FAILED);

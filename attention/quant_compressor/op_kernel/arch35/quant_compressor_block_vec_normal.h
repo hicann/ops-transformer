@@ -40,35 +40,35 @@ public:
 
     __aicore__ inline QuantCompressorBlockVectorNormal(){};
     // =================================资源管理=================================
-    __aicore__ inline void InitBuffers(TPipe *pipe);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
     // =================================执行计算=================================
-    __aicore__ inline void ComputeVec1(const Vec1RunInfo &info);
+    __aicore__ inline void ComputeVec1(const Vec1RunInfo& info);
 
 private:
-    __aicore__ inline void CopyInApe(const LocalTensor<T> &apeUb, uint32_t dStartIdx, uint32_t dDealSize);
-    __aicore__ inline void AddApeToScore(const LocalTensor<T> &scoreLocal, const LocalTensor<T> &apeUb,
-                                         const Vec1SliceInfo &sliceInfo, uint32_t dDealSize);
-    __aicore__ inline void AddSingleApeToScore(const LocalTensor<T> &scoreLocal, const LocalTensor<T> &apeUb,
-                                               const Vec1SliceInfo &sliceInfo, uint32_t dDealSize);
+    __aicore__ inline void CopyInApe(const LocalTensor<T>& apeUb, uint32_t dStartIdx, uint32_t dDealSize);
+    __aicore__ inline void AddApeToScore(const LocalTensor<T>& scoreLocal, const LocalTensor<T>& apeUb,
+                                         const Vec1SliceInfo& sliceInfo, uint32_t dDealSize);
+    __aicore__ inline void AddSingleApeToScore(const LocalTensor<T>& scoreLocal, const LocalTensor<T>& apeUb,
+                                               const Vec1SliceInfo& sliceInfo, uint32_t dDealSize);
     template <bool IS_SCORE>
-    __aicore__ inline void OverLap(const LocalTensor<T> &dstLocal, const LocalTensor<T> &srcLocal,
-                                   const GlobalTensor<T> &srcGm, const GlobalTensor<T> &stateGm,
-                                   const GlobalTensor<int32_t> &blockTableGm, const GlobalTensor<T> &cacheTcGm,
-                                   const Vec1RunInfo &info, const Vec1SliceInfo &sliceInfo, const LoopInfo &loopInfo,
+    __aicore__ inline void OverLap(const LocalTensor<T>& dstLocal, const LocalTensor<T>& srcLocal,
+                                   const GlobalTensor<T>& srcGm, const GlobalTensor<T>& stateGm,
+                                   const GlobalTensor<int32_t>& blockTableGm, const GlobalTensor<T>& cacheTcGm,
+                                   const Vec1RunInfo& info, const Vec1SliceInfo& sliceInfo, const LoopInfo& loopInfo,
                                    uint32_t dStartIdx, uint32_t globalSeqIdx, uint32_t dDealSize);
-    __aicore__ inline void OverLapScoreKv(const LocalTensor<T> &scoreLocal, const LocalTensor<T> &kvLocal,
-                                          const Vec1RunInfo &info, const LoopInfo &loopInfo,
-                                          const StatisticInfo &statisticInfo, const Vec1SliceInfo &originSliceInfo,
+    __aicore__ inline void OverLapScoreKv(const LocalTensor<T>& scoreLocal, const LocalTensor<T>& kvLocal,
+                                          const Vec1RunInfo& info, const LoopInfo& loopInfo,
+                                          const StatisticInfo& statisticInfo, const Vec1SliceInfo& originSliceInfo,
                                           uint32_t dStartIdx, uint32_t dDealSize, uint32_t dBaseSize,
                                           uint32_t needDealTcSize);
-    __aicore__ inline void DealVec1BaseBlock(const Vec1RunInfo &info,
-                                             QuantCompressorVec1SliceIterator<COMP> &sliceIterator,
-                                             const LoopInfo &loopInfo, uint32_t dStartIdx, uint32_t dDealSize,
+    __aicore__ inline void DealVec1BaseBlock(const Vec1RunInfo& info,
+                                             QuantCompressorVec1SliceIterator<COMP>& sliceIterator,
+                                             const LoopInfo& loopInfo, uint32_t dStartIdx, uint32_t dDealSize,
                                              uint32_t dBaseSize);
-    __aicore__ inline void CalcGroupInfo(const Vec1RunInfo &info, Vec1SplitInfo &splitInfo);
-    __aicore__ inline void CalcTaskDistribution(const Vec1RunInfo &info, Vec1SplitInfo &splitInfo);
-    __aicore__ inline void UpdateIteratorState(const Vec1RunInfo &info, Vec1SplitInfo &splitInfo);
-    __aicore__ inline Vec1SplitInfo SplitCoreV1(const Vec1RunInfo &info);
+    __aicore__ inline void CalcGroupInfo(const Vec1RunInfo& info, Vec1SplitInfo& splitInfo);
+    __aicore__ inline void CalcTaskDistribution(const Vec1RunInfo& info, Vec1SplitInfo& splitInfo);
+    __aicore__ inline void UpdateIteratorState(const Vec1RunInfo& info, Vec1SplitInfo& splitInfo);
+    __aicore__ inline Vec1SplitInfo SplitCoreV1(const Vec1RunInfo& info);
 
     // ================================NORMAL 独有成员====================================
     uint32_t prevApeDStartIdx_ = 0;
@@ -78,7 +78,7 @@ private:
 };
 
 template <typename COMP>
-__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::InitBuffers(TPipe *pipe)
+__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(this->inputQue1, 1, BUFFER_SIZE_BYTE_32K);
     pipe->InitBuffer(this->inputQue2, 1, BUFFER_SIZE_BYTE_32K);
@@ -99,7 +99,7 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::InitBuffers(TPipe
 }
 
 template <typename COMP>
-__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::CopyInApe(const LocalTensor<T> &apeUb,
+__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::CopyInApe(const LocalTensor<T>& apeUb,
                                                                          uint32_t dStartIdx, uint32_t dDealSize)
 {
     if (apeIsLoad_ && prevApeDStartIdx_ == dStartIdx && prevApeDDealSize_ == dDealSize) {
@@ -123,9 +123,9 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::CopyInApe(const L
 }
 
 template <typename COMP>
-__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::AddApeToScore(const LocalTensor<T> &scoreLocal,
-                                                                             const LocalTensor<T> &apeUb,
-                                                                             const Vec1SliceInfo &sliceInfo,
+__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::AddApeToScore(const LocalTensor<T>& scoreLocal,
+                                                                             const LocalTensor<T>& apeUb,
+                                                                             const Vec1SliceInfo& sliceInfo,
                                                                              uint32_t dDealSize)
 {
     uint32_t singleRowElemNum = dDealSize * this->coff_;
@@ -160,9 +160,9 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::AddApeToScore(con
 }
 
 template <typename COMP>
-__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::AddSingleApeToScore(const LocalTensor<T> &scoreLocal,
-                                                                                   const LocalTensor<T> &apeUb,
-                                                                                   const Vec1SliceInfo &sliceInfo,
+__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::AddSingleApeToScore(const LocalTensor<T>& scoreLocal,
+                                                                                   const LocalTensor<T>& apeUb,
+                                                                                   const Vec1SliceInfo& sliceInfo,
                                                                                    uint32_t dDealSize)
 {
     uint32_t singleRowElemNum = dDealSize * this->coff_;
@@ -175,9 +175,9 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::AddSingleApeToSco
 template <typename COMP>
 template <bool IS_SCORE>
 __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::OverLap(
-    const LocalTensor<T> &dstLocal, const LocalTensor<T> &srcLocal, const GlobalTensor<T> &srcGm,
-    const GlobalTensor<T> &stateGm, const GlobalTensor<int32_t> &blockTableGm, const GlobalTensor<T> &cacheTcGm,
-    const Vec1RunInfo &info, const Vec1SliceInfo &sliceInfo, const LoopInfo &loopInfo, uint32_t dStartIdx,
+    const LocalTensor<T>& dstLocal, const LocalTensor<T>& srcLocal, const GlobalTensor<T>& srcGm,
+    const GlobalTensor<T>& stateGm, const GlobalTensor<int32_t>& blockTableGm, const GlobalTensor<T>& cacheTcGm,
+    const Vec1RunInfo& info, const Vec1SliceInfo& sliceInfo, const LoopInfo& loopInfo, uint32_t dStartIdx,
     uint32_t globalSeqIdx, uint32_t dDealSize)
 {
     if (sliceInfo.dealTcSize == 0) {
@@ -210,13 +210,13 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::OverLap(
 
 template <typename COMP>
 __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::OverLapScoreKv(
-    const LocalTensor<T> &scoreLocal, const LocalTensor<T> &kvLocal, const Vec1RunInfo &info, const LoopInfo &loopInfo,
-    const StatisticInfo &statisticInfo, const Vec1SliceInfo &originSliceInfo, uint32_t dStartIdx, uint32_t dDealSize,
+    const LocalTensor<T>& scoreLocal, const LocalTensor<T>& kvLocal, const Vec1RunInfo& info, const LoopInfo& loopInfo,
+    const StatisticInfo& statisticInfo, const Vec1SliceInfo& originSliceInfo, uint32_t dStartIdx, uint32_t dDealSize,
     uint32_t dBaseSize, uint32_t needDealTcSize)
 {
     QuantCompressorVec1SliceIterator overLapSliceIterator(this->tools_);
     overLapSliceIterator.SetMaxBatchSize(this->constInfo_.batchSize);
-    Vec1SliceInfo &overLapSliceInfo = overLapSliceIterator.GetSlice();
+    Vec1SliceInfo& overLapSliceInfo = overLapSliceIterator.GetSlice();
 
     GlobalTensor<T> scoreDBMm1ResGm = this->scoreMm1ResGm_[info.c1v1DbIdx * this->constInfo_.dbSize];
     LocalTensor<T> scoreUb = this->inputQue1.template AllocTensor<T>();
@@ -271,12 +271,12 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::OverLapScoreKv(
 
 template <typename COMP>
 __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::DealVec1BaseBlock(
-    const Vec1RunInfo &info, QuantCompressorVec1SliceIterator<COMP> &sliceIterator, const LoopInfo &loopInfo,
+    const Vec1RunInfo& info, QuantCompressorVec1SliceIterator<COMP>& sliceIterator, const LoopInfo& loopInfo,
     uint32_t dStartIdx, uint32_t dDealSize, uint32_t dBaseSize)
 {
     Vec1SliceInfo originSliceInfo = sliceIterator.GetSlice();
     uint32_t needDealTcSize = sliceIterator.GetNeedDealTcSize();
-    StatisticInfo &statisticInfo = sliceIterator.template FullIteratorSlice<true>();
+    StatisticInfo& statisticInfo = sliceIterator.template FullIteratorSlice<true>();
     if (statisticInfo.actualTcCnt == 0) {
         return;
     }
@@ -299,8 +299,8 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::DealVec1BaseBlock
 }
 
 template <typename COMP>
-__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::CalcGroupInfo(const Vec1RunInfo &info,
-                                                                             Vec1SplitInfo &splitInfo)
+__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::CalcGroupInfo(const Vec1RunInfo& info,
+                                                                             Vec1SplitInfo& splitInfo)
 {
     uint32_t aiCoreNum = this->constInfo_.usedCoreNum * 2;
     splitInfo.dBaseSize =
@@ -322,8 +322,8 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::CalcGroupInfo(con
 }
 
 template <typename COMP>
-__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::CalcTaskDistribution(const Vec1RunInfo &info,
-                                                                                    Vec1SplitInfo &splitInfo)
+__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::CalcTaskDistribution(const Vec1RunInfo& info,
+                                                                                    Vec1SplitInfo& splitInfo)
 {
     uint32_t blockIdx = GetBlockIdx();
     uint32_t groupSize = splitInfo.vec1GroupSize;
@@ -343,18 +343,18 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::CalcTaskDistribut
 }
 
 template <typename COMP>
-__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::UpdateIteratorState(const Vec1RunInfo &info,
-                                                                                   Vec1SplitInfo &splitInfo)
+__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::UpdateIteratorState(const Vec1RunInfo& info,
+                                                                                   Vec1SplitInfo& splitInfo)
 {
     QuantCompressorVec1SliceIterator sliceIterator(this->tools_);
     sliceIterator.SetMaxBatchSize(this->constInfo_.batchSize);
     sliceIterator.Reset(info.bStart, info.sStart, 0U, 0U);
-    Vec1SliceInfo &sliceInfo = sliceIterator.GetSlice();
+    Vec1SliceInfo& sliceInfo = sliceIterator.GetSlice();
 
     // 处理前序任务量，更新起始索引
     if (splitInfo.preDealTcSize > 0) {
         sliceIterator.SetNeedDealTcSize(splitInfo.preDealTcSize);
-        StatisticInfo &statisticInfo = sliceIterator.template FullIteratorSlice<true>();
+        StatisticInfo& statisticInfo = sliceIterator.template FullIteratorSlice<true>();
         splitInfo.curCompressedCnt = statisticInfo.compressorScCnt;
         splitInfo.dealSeqStartIdx = sliceInfo.dealedSeqCnt;
         splitInfo.curBStart = sliceInfo.bIdx;
@@ -368,12 +368,12 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::UpdateIteratorSta
 
     // 处理当前核实际要跑的任务量
     sliceIterator.SetNeedDealTcSize(info.dealTcNum - splitInfo.preDealTcSize);
-    StatisticInfo &statisticInfo = sliceIterator.template FullIteratorSlice<true>();
+    StatisticInfo& statisticInfo = sliceIterator.template FullIteratorSlice<true>();
     splitInfo.totalCompressedCnt = splitInfo.curCompressedCnt + statisticInfo.compressorScCnt;
 }
 
 template <typename COMP>
-__aicore__ inline Vec1SplitInfo QuantCompressorBlockVectorNormal<COMP>::SplitCoreV1(const Vec1RunInfo &info)
+__aicore__ inline Vec1SplitInfo QuantCompressorBlockVectorNormal<COMP>::SplitCoreV1(const Vec1RunInfo& info)
 {
     Vec1SplitInfo splitInfo;
 
@@ -397,7 +397,7 @@ __aicore__ inline Vec1SplitInfo QuantCompressorBlockVectorNormal<COMP>::SplitCor
 }
 
 template <typename COMP>
-__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::ComputeVec1(const Vec1RunInfo &info)
+__aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::ComputeVec1(const Vec1RunInfo& info)
 {
     if (info.dealTcNum == 0) {
         return;

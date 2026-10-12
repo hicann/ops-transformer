@@ -13,6 +13,7 @@
 import fileinput
 import sys
 
+
 def replace_paths_in_test_file(test_file_path, path):
     """
     替换test_qli_batch.py中的占位符为实际路径
@@ -21,18 +22,19 @@ def replace_paths_in_test_file(test_file_path, path):
     """
     try:
         # 逐行替换占位符
-        with fileinput.FileInput(test_file_path, inplace=True, backup='.bak') as f:
+        with fileinput.FileInput(test_file_path, inplace=True, backup=".bak") as f:
             for line in f:
                 # 替换__PATH__为实际路径
-                line = line.replace('__PATH__', path)
+                line = line.replace("__PATH__", path)
                 # 输出替换后的行（inplace=True会自动写回文件）
-                print(line, end='')
+                print(line, end="")
         print(f" 已成功替换 {test_file_path} 中的路径")
     except Exception as e:
         print(f" 替换路径失败：{e}")
         sys.exit(1)
 
-if __name__ == '__main__':    
+
+if __name__ == "__main__":
     test_file = sys.argv[1]
     path = sys.argv[2]
     replace_paths_in_test_file(test_file, path)

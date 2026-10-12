@@ -20,7 +20,7 @@
 namespace MlaProlog {
 
 template <typename T, typename C, typename O>
-__simd_vf__ void QuantChannelVFImpl(__ubuf__ O *yAddr, __ubuf__ T *xAddr, __ubuf__ C *quantScaleAddr,
+__simd_vf__ void QuantChannelVFImpl(__ubuf__ O* yAddr, __ubuf__ T* xAddr, __ubuf__ C* quantScaleAddr,
                                     const uint32_t floatRepSize, uint32_t dLoops, uint32_t dTail, uint32_t dTailLoop,
                                     uint32_t row, uint32_t col, uint32_t stride)
 {
@@ -83,13 +83,13 @@ __simd_vf__ void QuantChannelVFImpl(__ubuf__ O *yAddr, __ubuf__ T *xAddr, __ubuf
  * @param stride 待处理数据一行的真实长度
  */
 template <typename T, typename C, typename O>
-__aicore__ inline void QuantPerChannelVf(const LocalTensor<O> &outputLocal, const LocalTensor<T> &inputLocal,
-                                         const LocalTensor<C> &quantScaleLocal, const uint32_t row, const uint32_t col,
+__aicore__ inline void QuantPerChannelVf(const LocalTensor<O>& outputLocal, const LocalTensor<T>& inputLocal,
+                                         const LocalTensor<C>& quantScaleLocal, const uint32_t row, const uint32_t col,
                                          const uint32_t stride)
 {
-    __ubuf__ O *outputUb = (__ubuf__ O *)outputLocal.GetPhyAddr();
-    __ubuf__ T *inputUb = (__ubuf__ T *)inputLocal.GetPhyAddr();
-    __ubuf__ C *quantScaleUb = (__ubuf__ C *)quantScaleLocal.GetPhyAddr();
+    __ubuf__ O* outputUb = (__ubuf__ O*)outputLocal.GetPhyAddr();
+    __ubuf__ T* inputUb = (__ubuf__ T*)inputLocal.GetPhyAddr();
+    __ubuf__ C* quantScaleUb = (__ubuf__ C*)quantScaleLocal.GetPhyAddr();
 
     const uint32_t floatRepSize = 64; // 一个寄存器能够存放64个FP32
     uint32_t dLoops = col / floatRepSize;

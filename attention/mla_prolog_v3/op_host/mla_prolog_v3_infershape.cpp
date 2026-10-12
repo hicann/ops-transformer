@@ -13,10 +13,10 @@
 using namespace ge;
 
 namespace ops {
-static ge::graphStatus ValidateInputShapeDims(const gert::InferShapeContext *context, const gert::Shape *tokenXShape,
-                                              const gert::Shape *weightUkShape, const gert::Shape *ropeSinShape,
-                                              const gert::Shape *weightDqShape, const gert::Shape *kvCacheShape,
-                                              const gert::Shape *krCacheShape, const bool &doRope)
+static ge::graphStatus ValidateInputShapeDims(const gert::InferShapeContext* context, const gert::Shape* tokenXShape,
+                                              const gert::Shape* weightUkShape, const gert::Shape* ropeSinShape,
+                                              const gert::Shape* weightDqShape, const gert::Shape* kvCacheShape,
+                                              const gert::Shape* krCacheShape, const bool& doRope)
 {
     OP_CHECK_IF(((tokenXShape->GetDimNum() != DIM_NUM_2) && (tokenXShape->GetDimNum() != DIM_NUM_3)),
                 OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "tokenX",
@@ -47,7 +47,7 @@ static ge::graphStatus ValidateInputShapeDims(const gert::InferShapeContext *con
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus GetMlaPrologV3ShapeDim(const gert::InferShapeContext *context, MlaPrologProtoShapeParam &shapeParam)
+ge::graphStatus GetMlaPrologV3ShapeDim(const gert::InferShapeContext* context, MlaPrologProtoShapeParam& shapeParam)
 {
     auto tokenXShape = context->GetRequiredInputShape(TOKEN_X_INDEX); // (B, S, He) | (T, He)
     OP_CHECK_NULL_WITH_CONTEXT(context, tokenXShape);
@@ -70,7 +70,7 @@ ge::graphStatus GetMlaPrologV3ShapeDim(const gert::InferShapeContext *context, M
     // 入图场景下旧图不携带 do_rope，attr 数组可能不足 13 个，先判越界再取值，避免 GetAttrPointer 越界报错
     bool doRope = true;
     if (attrs->GetAttrNum() > ATTR_DO_ROPE_INDEX) {
-        const bool *doRopePtr = attrs->GetAttrPointer<bool>(ATTR_DO_ROPE_INDEX);
+        const bool* doRopePtr = attrs->GetAttrPointer<bool>(ATTR_DO_ROPE_INDEX);
         if (doRopePtr != nullptr) {
             doRope = *doRopePtr;
         }
@@ -119,8 +119,8 @@ static bool IsWeightFullQuantFamily(int64_t weightQuantMode)
            weightQuantMode == WEIGHT_QUANT_MODE_MXFP8_FULL_QUANT;
 }
 
-static void SetQueryAndRopeShape(const MlaPrologProtoShapeParam &shapeParam, gert::Shape *queryShape,
-                                 gert::Shape *queryRopeShape)
+static void SetQueryAndRopeShape(const MlaPrologProtoShapeParam& shapeParam, gert::Shape* queryShape,
+                                 gert::Shape* queryRopeShape)
 {
     if (!shapeParam.isBsMerge) {
         queryShape->SetDimNum(DIM_NUM_4); // (B, S, N, Hckv)
@@ -147,7 +147,7 @@ static void SetQueryAndRopeShape(const MlaPrologProtoShapeParam &shapeParam, ger
     }
 }
 
-static void SetDequantScaleQNopeShape(const MlaPrologProtoShapeParam &shapeParam, gert::Shape *dequantScaleQNopeShape,
+static void SetDequantScaleQNopeShape(const MlaPrologProtoShapeParam& shapeParam, gert::Shape* dequantScaleQNopeShape,
                                       int64_t weightQuantMode, int64_t kvQuantMode)
 {
     if (kvQuantMode == KV_QUANT_MODE_PER_TENSOR && IsWeightFullQuantFamily(weightQuantMode)) {
@@ -161,8 +161,8 @@ static void SetDequantScaleQNopeShape(const MlaPrologProtoShapeParam &shapeParam
     }
 }
 
-static ge::graphStatus SetQueryNormShape(const MlaPrologProtoShapeParam &shapeParam, gert::InferShapeContext *context,
-                                         gert::Shape *queryNormShape, gert::Shape *dequantScaleQNormShape,
+static ge::graphStatus SetQueryNormShape(const MlaPrologProtoShapeParam& shapeParam, gert::InferShapeContext* context,
+                                         gert::Shape* queryNormShape, gert::Shape* dequantScaleQNormShape,
                                          int64_t weightQuantMode, bool queryNormFlag)
 {
     if (!queryNormFlag) {
@@ -206,7 +206,7 @@ static ge::graphStatus SetQueryNormShape(const MlaPrologProtoShapeParam &shapePa
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus SetMlaPrologV3ShapeDim(const MlaPrologProtoShapeParam &shapeParam, gert::InferShapeContext *context)
+ge::graphStatus SetMlaPrologV3ShapeDim(const MlaPrologProtoShapeParam& shapeParam, gert::InferShapeContext* context)
 {
     auto queryShape = context->GetOutputShape(QUERY_INDEX); // query: (B, S, N, Hckv) | (T, N, Hckv)
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
@@ -222,11 +222,11 @@ ge::graphStatus SetMlaPrologV3ShapeDim(const MlaPrologProtoShapeParam &shapePara
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
     // Get attribute pointers and dereference once
-    const int64_t *weightQuantModePtr = attrs->GetAttrPointer<int64_t>(ATTR_WEIGHT_QUANT_MODE_FLAG_INDEX);
+    const int64_t* weightQuantModePtr = attrs->GetAttrPointer<int64_t>(ATTR_WEIGHT_QUANT_MODE_FLAG_INDEX);
     const int64_t weightQuantMode = (weightQuantModePtr == nullptr) ? 0 : *weightQuantModePtr;
-    const int64_t *kvQuantModePtr = attrs->GetAttrPointer<int64_t>(ATTR_KV_QUANT_MODE_FLAG_INDEX);
+    const int64_t* kvQuantModePtr = attrs->GetAttrPointer<int64_t>(ATTR_KV_QUANT_MODE_FLAG_INDEX);
     const int64_t kvQuantMode = (kvQuantModePtr == nullptr) ? 0 : *kvQuantModePtr;
-    const bool *queryNormFlagPtr = attrs->GetAttrPointer<bool>(ATTR_QUERY_NORM_FLAG_INDEX);
+    const bool* queryNormFlagPtr = attrs->GetAttrPointer<bool>(ATTR_QUERY_NORM_FLAG_INDEX);
     const bool queryNormFlag = (queryNormFlagPtr == nullptr) ? 0 : *queryNormFlagPtr;
 
     // dequantScaleQNope: (B*S, N ,1) | (T, N, 1). (1) if not enabled
@@ -234,9 +234,9 @@ ge::graphStatus SetMlaPrologV3ShapeDim(const MlaPrologProtoShapeParam &shapePara
     OP_CHECK_NULL_WITH_CONTEXT(context, dequantScaleQNopeShape);
 
     // queryNorm
-    gert::Shape *queryNormShape = context->GetOutputShape(QUERY_NORM_INDEX);
+    gert::Shape* queryNormShape = context->GetOutputShape(QUERY_NORM_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryNormShape);
-    gert::Shape *dequantScaleQNormShape = context->GetOutputShape(DEQUANT_SCALE_Q_NORM_INDEX);
+    gert::Shape* dequantScaleQNormShape = context->GetOutputShape(DEQUANT_SCALE_Q_NORM_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, dequantScaleQNormShape);
 
     SetQueryAndRopeShape(shapeParam, queryShape, queryRopeShape);
@@ -247,7 +247,7 @@ ge::graphStatus SetMlaPrologV3ShapeDim(const MlaPrologProtoShapeParam &shapePara
                              queryNormFlag);
 }
 
-ge::graphStatus InferShapeMlaPrologV3(gert::InferShapeContext *context)
+ge::graphStatus InferShapeMlaPrologV3(gert::InferShapeContext* context)
 {
     OP_LOGI(context->GetNodeName(), "Enter MlaPrologV3 infershape impl.");
 
@@ -264,7 +264,7 @@ ge::graphStatus InferShapeMlaPrologV3(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeMlaPrologV3(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeMlaPrologV3(gert::InferDataTypeContext* context)
 {
     OP_LOGI(context->GetNodeName(), "Enter MlaPrologV3 inferDataType impl.");
 
@@ -272,9 +272,9 @@ ge::graphStatus InferDataTypeMlaPrologV3(gert::InferDataTypeContext *context)
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
     // Get attribute pointers and dereference once
-    const int64_t *weightQuantModePtr = attrs->GetAttrPointer<int64_t>(ATTR_WEIGHT_QUANT_MODE_FLAG_INDEX);
+    const int64_t* weightQuantModePtr = attrs->GetAttrPointer<int64_t>(ATTR_WEIGHT_QUANT_MODE_FLAG_INDEX);
     const int weightQuantMode = (weightQuantModePtr == nullptr) ? 0 : *weightQuantModePtr;
-    const int64_t *kvQuantModePtr = attrs->GetAttrPointer<int64_t>(ATTR_KV_QUANT_MODE_FLAG_INDEX);
+    const int64_t* kvQuantModePtr = attrs->GetAttrPointer<int64_t>(ATTR_KV_QUANT_MODE_FLAG_INDEX);
     const int kvQuantMode = (kvQuantModePtr == nullptr) ? 0 : *kvQuantModePtr;
 
     // mxfp8 quant

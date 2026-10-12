@@ -38,7 +38,7 @@ using namespace Ops::Base;
 // Layout — SinglePara
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckSingleParaLayout(const QfaTilingInfo &qfaInfo)
+ge::graphStatus CommonChecker::CheckSingleParaLayout(const QfaTilingInfo& qfaInfo)
 {
     const std::vector<QfaLayout> supportedQLayouts = {QfaLayout::BSND, QfaLayout::BNSD, QfaLayout::TND, QfaLayout::NTD};
     const std::vector<QfaLayout> supportedKvLayouts = {QfaLayout::BSND,    QfaLayout::BNSD,    QfaLayout::TND,
@@ -80,11 +80,11 @@ ge::graphStatus CommonChecker::CheckSingleParaLayout(const QfaTilingInfo &qfaInf
 // Dtype — SinglePara
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckSingleParaDtype(const QfaTilingInfo &qfaInfo)
+ge::graphStatus CommonChecker::CheckSingleParaDtype(const QfaTilingInfo& qfaInfo)
 {
     const std::vector<ge::DataType> supportedQuantDtypes = {ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8};
-    const auto checkQuantDtype = [&](const gert::CompileTimeTensorDesc *desc,
-                                     const std::string &name) -> ge::graphStatus {
+    const auto checkQuantDtype = [&](const gert::CompileTimeTensorDesc* desc,
+                                     const std::string& name) -> ge::graphStatus {
         if (desc == nullptr) {
             return ge::GRAPH_SUCCESS;
         }
@@ -107,7 +107,7 @@ ge::graphStatus CommonChecker::CheckSingleParaDtype(const QfaTilingInfo &qfaInfo
     }
 
     // attn_out: data_type 仅支持 BFLOAT16
-    const gert::CompileTimeTensorDesc *attnOutDesc = qfaInfo.opParamInfo.attnOut.desc;
+    const gert::CompileTimeTensorDesc* attnOutDesc = qfaInfo.opParamInfo.attnOut.desc;
     if (attnOutDesc != nullptr) {
         OP_CHECK_IF(attnOutDesc->GetDataType() != ge::DT_BF16,
                     OP_LOGE_FOR_INVALID_DTYPE(qfaInfo.opName, ATTN_OUT_NAME.c_str(),
@@ -125,13 +125,13 @@ ge::graphStatus CommonChecker::CheckSingleParaDtype(const QfaTilingInfo &qfaInfo
 // ShapeDim — SinglePara
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckSingleParaShapeDim(const QfaTilingInfo &qfaInfo)
+ge::graphStatus CommonChecker::CheckSingleParaShapeDim(const QfaTilingInfo& qfaInfo)
 {
     const std::vector<uint32_t> supportedKvDims = {DIM_NUM_3, DIM_NUM_4, DIM_NUM_5};
     const std::vector<uint32_t> supportedQOutDims = {DIM_NUM_3, DIM_NUM_4};
 
     // q: shape dim 支持 3D/4D
-    const gert::StorageShape *queryShape = qfaInfo.opParamInfo.query.shape;
+    const gert::StorageShape* queryShape = qfaInfo.opParamInfo.query.shape;
     if (queryShape != nullptr) {
         uint32_t queryDimNum = queryShape->GetStorageShape().GetDimNum();
         OP_CHECK_IF(
@@ -142,7 +142,7 @@ ge::graphStatus CommonChecker::CheckSingleParaShapeDim(const QfaTilingInfo &qfaI
     }
 
     // k: shape dim 支持 3、4、5
-    const gert::StorageShape *keyShape = qfaInfo.opParamInfo.key.shape;
+    const gert::StorageShape* keyShape = qfaInfo.opParamInfo.key.shape;
     if (keyShape != nullptr) {
         uint32_t keyDimNum = keyShape->GetStorageShape().GetDimNum();
         OP_CHECK_IF(std::find(supportedKvDims.begin(), supportedKvDims.end(), keyDimNum) == supportedKvDims.end(),
@@ -152,7 +152,7 @@ ge::graphStatus CommonChecker::CheckSingleParaShapeDim(const QfaTilingInfo &qfaI
     }
 
     // v: shape dim 支持 3、4、5
-    const gert::StorageShape *valueShape = qfaInfo.opParamInfo.value.shape;
+    const gert::StorageShape* valueShape = qfaInfo.opParamInfo.value.shape;
     if (valueShape != nullptr) {
         uint32_t valueDimNum = valueShape->GetStorageShape().GetDimNum();
         OP_CHECK_IF(std::find(supportedKvDims.begin(), supportedKvDims.end(), valueDimNum) == supportedKvDims.end(),
@@ -162,7 +162,7 @@ ge::graphStatus CommonChecker::CheckSingleParaShapeDim(const QfaTilingInfo &qfaI
     }
 
     // attn_out: shape dim 支持 3D/4D
-    const gert::StorageShape *attnOutShape = qfaInfo.opParamInfo.attnOut.shape;
+    const gert::StorageShape* attnOutShape = qfaInfo.opParamInfo.attnOut.shape;
     if (attnOutShape != nullptr) {
         uint32_t attnOutDimNum = attnOutShape->GetStorageShape().GetDimNum();
         OP_CHECK_IF(
@@ -179,7 +179,7 @@ ge::graphStatus CommonChecker::CheckSingleParaShapeDim(const QfaTilingInfo &qfaI
 // Attr — SinglePara
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckSingleParaSoftmaxScale(const QfaTilingInfo &qfaInfo)
+ge::graphStatus CommonChecker::CheckSingleParaSoftmaxScale(const QfaTilingInfo& qfaInfo)
 {
     //  softmax_scale 必须大于 0
     OP_CHECK_IF(qfaInfo.softmaxScale <= 0.0f,
@@ -194,7 +194,7 @@ ge::graphStatus CommonChecker::CheckSingleParaSoftmaxScale(const QfaTilingInfo &
 // Dtype consistency
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckQuantDataType(const QfaTilingInfo &qfaInfo)
+ge::graphStatus CommonChecker::CheckQuantDataType(const QfaTilingInfo& qfaInfo)
 {
     // q/k/v dtype 必须为 FLOAT8_E4M3FN，attn_out dtype 必须为 BFLOAT16
     // (单参数校验阶段已完成，此处复用基类 CheckDtypeSupport 以覆盖 DTYPE_SUPPORT_MAP)
@@ -207,12 +207,12 @@ ge::graphStatus CommonChecker::CheckQuantDataType(const QfaTilingInfo &qfaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckDtypeConsistency(const QfaTilingInfo &qfaInfo)
+ge::graphStatus CommonChecker::CheckDtypeConsistency(const QfaTilingInfo& qfaInfo)
 {
     //  q、k、v 的数据类型必须相同
-    const gert::CompileTimeTensorDesc *queryDesc = qfaInfo.opParamInfo.query.desc;
-    const gert::CompileTimeTensorDesc *keyDesc = qfaInfo.opParamInfo.key.desc;
-    const gert::CompileTimeTensorDesc *valueDesc = qfaInfo.opParamInfo.value.desc;
+    const gert::CompileTimeTensorDesc* queryDesc = qfaInfo.opParamInfo.query.desc;
+    const gert::CompileTimeTensorDesc* keyDesc = qfaInfo.opParamInfo.key.desc;
+    const gert::CompileTimeTensorDesc* valueDesc = qfaInfo.opParamInfo.value.desc;
 
     ge::DataType queryDtype = queryDesc->GetDataType();
 
@@ -238,7 +238,7 @@ ge::graphStatus CommonChecker::CheckDtypeConsistency(const QfaTilingInfo &qfaInf
 // HeadNum
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckHeadNum(const QfaTilingInfo &qfaInfo)
+ge::graphStatus CommonChecker::CheckHeadNum(const QfaTilingInfo& qfaInfo)
 {
     //  Q_N % KV_N == 0 且 Q_N / KV_N > 0
     OP_CHECK_IF(
@@ -272,7 +272,7 @@ ge::graphStatus CommonChecker::CheckHeadNum(const QfaTilingInfo &qfaInfo)
 // Axis
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckAxis(const QfaTilingInfo &qfaInfo)
+ge::graphStatus CommonChecker::CheckAxis(const QfaTilingInfo& qfaInfo)
 {
     // 约束(特性交叉校验):
     //   65536 > B > 0；Q_S ≥ 0；KV_S ≥ 0；Q_T ≥ 0、KV_T ≥ 0；D 仅支持 64 或 128
@@ -330,7 +330,7 @@ ge::graphStatus CommonChecker::CheckAxis(const QfaTilingInfo &qfaInfo)
 // SinglePara — combined
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
+ge::graphStatus CommonChecker::CheckSinglePara(const QfaTilingInfo& qfaInfo)
 {
     if (CheckSingleParaLayout(qfaInfo) != ge::GRAPH_SUCCESS || CheckSingleParaDtype(qfaInfo) != ge::GRAPH_SUCCESS ||
         CheckSingleParaShapeDim(qfaInfo) != ge::GRAPH_SUCCESS ||
@@ -344,7 +344,7 @@ ge::graphStatus CommonChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
 // ParaExistence
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckParaExistence(const QfaTilingInfo &qfaInfo)
+ge::graphStatus CommonChecker::CheckParaExistence(const QfaTilingInfo& qfaInfo)
 {
     // q/k/v/attn_out 为必选参数，desc 和 shape 均不能为空
     OP_CHECK_IF(qfaInfo.opParamInfo.query.desc == nullptr || qfaInfo.opParamInfo.query.shape == nullptr,
@@ -362,7 +362,7 @@ ge::graphStatus CommonChecker::CheckParaExistence(const QfaTilingInfo &qfaInfo)
 // Feature — combined (文档"特性交叉校验"列: 轴校验 + HeadNum)
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckFeature(const QfaTilingInfo &qfaInfo)
+ge::graphStatus CommonChecker::CheckFeature(const QfaTilingInfo& qfaInfo)
 {
     if (CheckAxis(qfaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -379,7 +379,7 @@ ge::graphStatus CommonChecker::CheckFeature(const QfaTilingInfo &qfaInfo)
 //     已移至 QuantChecker::CheckFeature。
 // ============================================================================
 
-ge::graphStatus CommonChecker::CheckMultiPara(const QfaTilingInfo &qfaInfo)
+ge::graphStatus CommonChecker::CheckMultiPara(const QfaTilingInfo& qfaInfo)
 {
     if (CheckQuantDataType(qfaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;

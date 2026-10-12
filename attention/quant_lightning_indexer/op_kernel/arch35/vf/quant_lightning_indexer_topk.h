@@ -25,7 +25,7 @@ namespace topk {
 template <typename T>
 class LITopk {
 public:
-    __aicore__ inline void operator()(LocalTensor<uint32_t> &outputIdxLocal, LocalTensor<T> &inputLocal,
+    __aicore__ inline void operator()(LocalTensor<uint32_t>& outputIdxLocal, LocalTensor<T>& inputLocal,
                                       uint32_t s2SeqLen)
     {}
 };
@@ -44,7 +44,7 @@ public:
         this->qliTrunkLength = qliTrunkLength;
     }
 
-    __aicore__ inline void InitBuffers(LocalTensor<uint32_t> &qliSharedBuffer, LocalTensor<uint32_t> &qliIndicesOut)
+    __aicore__ inline void InitBuffers(LocalTensor<uint32_t>& qliSharedBuffer, LocalTensor<uint32_t>& qliIndicesOut)
     {
         LocalTensor<uint32_t> hisIndex1 = qliIndicesOut;
         LocalTensor<uint32_t> hisIndex2 = qliSharedBuffer[0];
@@ -59,8 +59,8 @@ public:
         tmpIndexLocal = nkValueLocal[64]; // 64: 单核/单线程输出元素容量（G维度切分阈值）
     }
 
-    __aicore__ inline void operator()(LocalTensor<uint32_t> &mrgValueLocal, LocalTensor<uint32_t> &qliIndicesOut,
-                                      LocalTensor<uint32_t> &hisValueLocal, uint32_t s2SeqLen, uint32_t loopIdx,
+    __aicore__ inline void operator()(LocalTensor<uint32_t>& mrgValueLocal, LocalTensor<uint32_t>& qliIndicesOut,
+                                      LocalTensor<uint32_t>& hisValueLocal, uint32_t s2SeqLen, uint32_t loopIdx,
                                       uint32_t s2LoopNum)
     {
         if (s2LoopNum == 1) {
@@ -125,7 +125,7 @@ public:
         this->qliTrunkLength = qliTrunkLen;
     }
 
-    __aicore__ inline void InitBuffers(LocalTensor<uint32_t> &qliSharedBuffer, LocalTensor<uint32_t> &qliIndicesOut)
+    __aicore__ inline void InitBuffers(LocalTensor<uint32_t>& qliSharedBuffer, LocalTensor<uint32_t>& qliIndicesOut)
     {
         // 256: 将 topK 实际分配容量向上取整至 256 的倍数
         LocalTensor<uint32_t> hisIndexLocal1 = qliIndicesOut;
@@ -140,8 +140,8 @@ public:
         tmpIndexLocal = tmpIndexLocalTmp.template ReinterpretCast<uint16_t>();
     }
 
-    __aicore__ inline void operator()(LocalTensor<uint16_t> &mrgValueLocal, LocalTensor<uint32_t> &qliIndicesOut,
-                                      LocalTensor<uint16_t> &hisValueLocal, uint32_t s2SeqLen, uint32_t loopIdx,
+    __aicore__ inline void operator()(LocalTensor<uint16_t>& mrgValueLocal, LocalTensor<uint32_t>& qliIndicesOut,
+                                      LocalTensor<uint16_t>& hisValueLocal, uint32_t s2SeqLen, uint32_t loopIdx,
                                       uint32_t s2LoopNum)
     {
         if (s2LoopNum == 1) {

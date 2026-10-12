@@ -26,48 +26,48 @@ extern "C" {
 
 class QuantFlashAttnMetadataCheck {
 public:
-    static inline aclnnStatus ParamsCheck(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional,
-                                          const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
+    static inline aclnnStatus ParamsCheck(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional,
+                                          const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
                                           int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
                                           int64_t numHeadsKv, int64_t headDim, int64_t headDimV, int64_t quantMode,
-                                          int64_t maskMode, int64_t winLeft, int64_t winRight, const char *layoutQ,
-                                          const char *layoutQDescale, const char *layoutKv, const char *layoutOut,
-                                          bool isGradEnabled, const aclTensor *metadata);
+                                          int64_t maskMode, int64_t winLeft, int64_t winRight, const char* layoutQ,
+                                          const char* layoutQDescale, const char* layoutKv, const char* layoutOut,
+                                          bool isGradEnabled, const aclTensor* metadata);
 
 private:
-    static inline bool IsTensorExist(const aclTensor *tensor);
+    static inline bool IsTensorExist(const aclTensor* tensor);
 
-    static inline aclnnStatus CheckSeqLens(bool isCu, int64_t batchSize, const aclTensor *seqLens);
+    static inline aclnnStatus CheckSeqLens(bool isCu, int64_t batchSize, const aclTensor* seqLens);
 
     // 校验基础属性：batchSize / maxSeqlen / numHeads / headDim / quantMode / layout
     // 文档约束: headDim 仅支持 64/128; quantMode 当前仅支持 1（A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32）
     static inline aclnnStatus CheckBaseAttr(int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv,
                                             int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, int64_t headDimV,
-                                            int64_t quantMode, const char *layoutQ, const char *layoutQDescale,
-                                            const char *layoutKv, const char *layoutOut, bool isGradEnabled);
+                                            int64_t quantMode, const char* layoutQ, const char* layoutQDescale,
+                                            const char* layoutKv, const char* layoutOut, bool isGradEnabled);
     // 校验 mask 参数组: maskMode 支持 0/3/4, winLeft/winRight >= -1
     static inline aclnnStatus CheckMask(int64_t maskMode, int64_t winLeft, int64_t winRight);
 
     // 校验参数存在性: metadata 必须传入; TND 时必须传 cu_seqlens, 非 TND 时不可传 cu_seqlens 且
     // max_seqlen/seqused 至少提供一个
-    static inline aclnnStatus CheckExistency(int64_t maxSeqlenQ, int64_t maxSeqlenKv, const char *layoutQ,
-                                             const char *layoutKv, const aclTensor *cuSeqlensQOptional,
-                                             const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-                                             const aclTensor *sequsedKvOptional, const aclTensor *metadata);
+    static inline aclnnStatus CheckExistency(int64_t maxSeqlenQ, int64_t maxSeqlenKv, const char* layoutQ,
+                                             const char* layoutKv, const aclTensor* cuSeqlensQOptional,
+                                             const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+                                             const aclTensor* sequsedKvOptional, const aclTensor* metadata);
 
     // 校验一致性: seqLens 形状与 batchSize 匹配; numHeadsQ 必须能被 numHeadsKv 整除
     static inline aclnnStatus CheckConsistency(int64_t batchSize, int64_t numHeadsQ, int64_t numHeadsKv,
-                                               const aclTensor *cuSeqlensQOptional,
-                                               const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-                                               const aclTensor *sequsedKvOptional);
+                                               const aclTensor* cuSeqlensQOptional,
+                                               const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+                                               const aclTensor* sequsedKvOptional);
 };
 
 inline aclnnStatus QuantFlashAttnMetadataCheck::ParamsCheck(
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
     int64_t numHeadsKv, int64_t headDim, int64_t headDimV, int64_t quantMode, int64_t maskMode, int64_t winLeft,
-    int64_t winRight, const char *layoutQ, const char *layoutQDescale, const char *layoutKv, const char *layoutOut,
-    bool isGradEnabled, const aclTensor *metadata)
+    int64_t winRight, const char* layoutQ, const char* layoutQDescale, const char* layoutKv, const char* layoutOut,
+    bool isGradEnabled, const aclTensor* metadata)
 {
     auto ret = CheckBaseAttr(batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV, quantMode,
                              layoutQ, layoutQDescale, layoutKv, layoutOut, isGradEnabled);
@@ -83,7 +83,7 @@ inline aclnnStatus QuantFlashAttnMetadataCheck::ParamsCheck(
     return ACLNN_SUCCESS;
 }
 
-inline bool QuantFlashAttnMetadataCheck::IsTensorExist(const aclTensor *tensor)
+inline bool QuantFlashAttnMetadataCheck::IsTensorExist(const aclTensor* tensor)
 {
     return (tensor != nullptr) && (tensor->GetViewShape().GetDimNum() > 0) && (tensor->GetViewShape().GetDim(0) > 0) &&
            (tensor->GetData() != nullptr);
@@ -92,9 +92,9 @@ inline bool QuantFlashAttnMetadataCheck::IsTensorExist(const aclTensor *tensor)
 inline aclnnStatus QuantFlashAttnMetadataCheck::CheckBaseAttr(int64_t batchSize, int64_t maxSeqlenQ,
                                                               int64_t maxSeqlenKv, int64_t numHeadsQ,
                                                               int64_t numHeadsKv, int64_t headDim, int64_t headDimV,
-                                                              int64_t quantMode, const char *layoutQ,
-                                                              const char *layoutQDescale, const char *layoutKv,
-                                                              const char *layoutOut, bool isGradEnabled)
+                                                              int64_t quantMode, const char* layoutQ,
+                                                              const char* layoutQDescale, const char* layoutKv,
+                                                              const char* layoutOut, bool isGradEnabled)
 {
     CHECK_COND((batchSize == -1 || batchSize > 0), ACLNN_ERR_RUNTIME_ERROR,
                "batchSize must be -1 or greater than 0, but got %ld", batchSize);
@@ -188,9 +188,9 @@ inline aclnnStatus QuantFlashAttnMetadataCheck::CheckMask(int64_t maskMode, int6
 }
 
 inline aclnnStatus QuantFlashAttnMetadataCheck::CheckExistency(
-    int64_t maxSeqlenQ, int64_t maxSeqlenKv, const char *layoutQ, const char *layoutKv,
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, const aclTensor *metadata)
+    int64_t maxSeqlenQ, int64_t maxSeqlenKv, const char* layoutQ, const char* layoutKv,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, const aclTensor* metadata)
 {
     CHECK_COND(metadata != nullptr, ACLNN_ERR_RUNTIME_ERROR, "metadata should be provided, but got null");
 
@@ -235,8 +235,8 @@ inline aclnnStatus QuantFlashAttnMetadataCheck::CheckExistency(
 }
 
 inline aclnnStatus QuantFlashAttnMetadataCheck::CheckConsistency(
-    int64_t batchSize, int64_t numHeadsQ, int64_t numHeadsKv, const aclTensor *cuSeqlensQOptional,
-    const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional)
+    int64_t batchSize, int64_t numHeadsQ, int64_t numHeadsKv, const aclTensor* cuSeqlensQOptional,
+    const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional)
 {
     if (batchSize <= 0) {
         return ACLNN_SUCCESS;
@@ -259,7 +259,7 @@ inline aclnnStatus QuantFlashAttnMetadataCheck::CheckConsistency(
     return ACLNN_SUCCESS;
 }
 
-inline aclnnStatus QuantFlashAttnMetadataCheck::CheckSeqLens(bool isCu, int64_t batchSize, const aclTensor *seqLens)
+inline aclnnStatus QuantFlashAttnMetadataCheck::CheckSeqLens(bool isCu, int64_t batchSize, const aclTensor* seqLens)
 {
     if (seqLens == nullptr) {
         return ACLNN_SUCCESS;

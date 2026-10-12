@@ -26,12 +26,12 @@ namespace QuantFag {
 
 class QuantFlashAttentionScoreGradTilingNormalRegbase : public TilingBaseClass {
 public:
-    explicit QuantFlashAttentionScoreGradTilingNormalRegbase(gert::TilingContext *curContext_)
+    explicit QuantFlashAttentionScoreGradTilingNormalRegbase(gert::TilingContext* curContext_)
         : TilingBaseClass(curContext_)
     {}
     ~QuantFlashAttentionScoreGradTilingNormalRegbase() override = default;
 
-    QuantFlashAttnGradTiling *quantFagTilingData_ = nullptr;
+    QuantFlashAttnGradTiling* quantFagTilingData_ = nullptr;
 
 protected:
     bool IsCapable() override;
@@ -50,7 +50,7 @@ protected:
     uint8_t GetSparseType();
     void CalcleDeterParam();
 
-    void GetWorkspaceSize4Deter(size_t &workspaceSize);
+    void GetWorkspaceSize4Deter(size_t& workspaceSize);
     void GetIsDeterArr();
     bool IsValid(int64_t blockIdx);
     std::tuple<uint32_t, uint32_t, uint32_t> FuzzyForBestSplit();

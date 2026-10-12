@@ -293,6 +293,6 @@ TEST_F(QuantLightningIndexerTiling, QuantLightningIndexer_910b_tiling_7)
 // Tiling data classes are registered for the op
 TEST_F(QuantLightningIndexerTiling, QuantLightningIndexer_tiling_data_class_registered)
 {
-    auto &factory = optiling::CTilingDataClassFactory::GetInstance();
+    auto& factory = optiling::CTilingDataClassFactory::GetInstance();
     EXPECT_NE(factory.CreateTilingDataInstance("QuantLightningIndexer"), nullptr);
 }

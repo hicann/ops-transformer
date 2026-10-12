@@ -61,11 +61,11 @@ constexpr size_t ATTR_KC_SCALE_INDEX = 11;
 constexpr size_t ATTR_DO_ROPE_INDEX = 12;
 
 struct MlaPrologV3FallBackParam : MlaPrologFallBackParam {
-    const gert::Tensor *actualAeqLen = nullptr;
-    const gert::Tensor *kNopeClipAlpha = nullptr;
-    const gert::Tensor *dequantScaleQNope = nullptr;
-    const gert::Tensor *queryNorm = nullptr;
-    const gert::Tensor *dequantScaleQNorm = nullptr;
+    const gert::Tensor* actualAeqLen = nullptr;
+    const gert::Tensor* kNopeClipAlpha = nullptr;
+    const gert::Tensor* dequantScaleQNope = nullptr;
+    const gert::Tensor* queryNorm = nullptr;
+    const gert::Tensor* dequantScaleQNorm = nullptr;
     bool queryNormFlag = false;
     int weightQuantMode = 0;
     int kvCacheQuantMode = 0;
@@ -78,8 +78,8 @@ struct MlaPrologV3FallBackParam : MlaPrologFallBackParam {
     bool doRope = true;
 };
 
-graphStatus GetMlaPrologV3OutputTensor(const OpExecuteContext *ctx, MlaPrologV3FallBackParam &param);
-graphStatus MlaV3HostExecuteFunc(OpExecuteContext *host_api_ctx);
+graphStatus GetMlaPrologV3OutputTensor(const OpExecuteContext* ctx, MlaPrologV3FallBackParam& param);
+graphStatus MlaV3HostExecuteFunc(OpExecuteContext* host_api_ctx);
 
 } // namespace fallback
 

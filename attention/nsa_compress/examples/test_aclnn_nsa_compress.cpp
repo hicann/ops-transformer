@@ -19,41 +19,39 @@
 #include "aclnnop/aclnn_nsa_compress.h"
 
 #define CHECK_RET(cond, return_expr) \
-    do {                             \
-        if (!(cond)) {               \
-            return_expr;             \
-        }                            \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)         \
-    do {                                \
+#define LOG_PRINT(message, ...) \
+    do { \
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
-    for (auto i : shape)
-    {
+    for (auto i : shape) {
         shapeSize *= i;
     }
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<aclFloat16> resultData(size, 0);
     auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), *deviceAddr,
-                        size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+                           size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
-    for (int64_t i = 0; i < size; i++)
-    {
+    for (int64_t i = 0; i < size; i++) {
         LOG_PRINT("mean result[%ld] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -70,8 +68,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -84,7 +82,7 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 
     // 调用aclCreateTensor接口创建aclTensor
     *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, nullptr, 0, aclFormat::ACL_FORMAT_ND, shape.data(),
-                            shape.size(), *deviceAddr);
+                              shape.size(), *deviceAddr);
     return ACL_SUCCESS;
 }
 int main()
@@ -98,20 +96,20 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
     // 2. 构造输入与输出，需要根据API的接口自定义构造
-    void *inputDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *outputDeviceAddr = nullptr;
+    void* inputDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* outputDeviceAddr = nullptr;
 
-    aclTensor *input = nullptr;
-    aclTensor *weight = nullptr;
-    aclIntArray *actSeqLenOptional = nullptr;
-    aclTensor *output = nullptr;
+    aclTensor* input = nullptr;
+    aclTensor* weight = nullptr;
+    aclIntArray* actSeqLenOptional = nullptr;
+    aclTensor* output = nullptr;
 
     // 自定义输入与属性
     int64_t compressBlockSize = 32;
     int64_t compressStride = 32;
     int64_t actSeqLenType = 0; // 0是前缀和模式，1是count计数模式
-    char *layout = "TND";
+    char* layout = "TND";
     int32_t batchSize = 1;
     int32_t sampleLen = 64;
     int32_t headNum = 4;
@@ -124,30 +122,23 @@ int main()
     std::vector<aclFloat16> weightHostData(compressBlockSize * headNum);
     std::vector<int64_t> actSeqHostData(batchSize);
 
-    for (int i = 0; i < inputHostData.size(); i++)
-    {
+    for (int i = 0; i < inputHostData.size(); i++) {
         inputHostData[i] = aclFloatToFloat16(1.0);
     }
-    for (int i = 0; i < weightHostData.size(); i++)
-    {
+    for (int i = 0; i < weightHostData.size(); i++) {
         weightHostData[i] = aclFloatToFloat16(1.0);
     }
 
     int outputNum = 0;
     int preActSeqLen = 0;
-    for (int i = 0; i < batchSize; i++)
-    {
-        if (actSeqLenType == 0)
-        {
+    for (int i = 0; i < batchSize; i++) {
+        if (actSeqLenType == 0) {
             actSeqHostData[i] = sampleLen + preActSeqLen;
             preActSeqLen = actSeqHostData[i];
-        }
-        else if (actSeqLenType == 1)
-        {
+        } else if (actSeqLenType == 1) {
             actSeqHostData[i] = sampleLen;
         }
-        if (sampleLen >= compressBlockSize)
-        {
+        if (sampleLen >= compressBlockSize) {
             outputNum += (sampleLen - compressBlockSize) / compressStride + 1;
         }
     }
@@ -166,17 +157,16 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 调用aclnnNsaCompressGetWorkspaceSize第一段接口
     ret = aclnnNsaCompressGetWorkspaceSize(input, weight, actSeqLenOptional, layout, compressBlockSize, compressStride,
-                                        actSeqLenType, output, &workspaceSize, &executor);
+                                           actSeqLenType, output, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNsaCompressGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
-    if (workspaceSize > 0)
-    {
+    void* workspaceAddr = nullptr;
+    if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
     }
@@ -203,8 +193,7 @@ int main()
     aclrtFree(weightDeviceAddr);
     // aclrtFree(actSeqDeviceAddr);
     aclrtFree(outputDeviceAddr);
-    if (workspaceSize > 0)
-    {
+    if (workspaceSize > 0) {
         aclrtFree(workspaceAddr);
     }
     aclrtDestroyStream(stream);

@@ -18,7 +18,7 @@
 
 namespace MlaProlog {
 template <typename T>
-__simd_vf__ void MulQrVFImpl(__ubuf__ T *inputBuf, __ubuf__ T *outputBuf, __ubuf__ T *dequantScaleBrcbBuf,
+__simd_vf__ void MulQrVFImpl(__ubuf__ T* inputBuf, __ubuf__ T* outputBuf, __ubuf__ T* dequantScaleBrcbBuf,
                              const uint16_t floatRepSize, uint16_t repeatTimes, float quantScaleCkvRope,
                              uint64_t computeBlockAlign)
 {
@@ -56,16 +56,16 @@ __simd_vf__ void MulQrVFImpl(__ubuf__ T *inputBuf, __ubuf__ T *outputBuf, __ubuf
  * @param computeBlockAlign 输入动态量化参数的单个数据块存放多少个动态量化参数
  */
 template <typename T>
-__aicore__ inline void MulQrVF(const LocalTensor<T> &outputLocal, const LocalTensor<T> &inputLocal,
-                               const LocalTensor<T> &dequantScaleBrcbLocal, float quantScaleCkvRope,
+__aicore__ inline void MulQrVF(const LocalTensor<T>& outputLocal, const LocalTensor<T>& inputLocal,
+                               const LocalTensor<T>& dequantScaleBrcbLocal, float quantScaleCkvRope,
                                uint64_t computeSizeRope, uint64_t computeBlockAlign)
 {
     const uint16_t floatRepSize = 64;                                           // 一个寄存器能够存放64个FP32
     uint16_t repeatTimes = (computeSizeRope + floatRepSize - 1) / floatRepSize; // 对尾块处理的扩展，循环处理的次数
 
-    __ubuf__ T *inputBuf = (__ubuf__ T *)inputLocal.GetPhyAddr();
-    __ubuf__ T *outputBuf = (__ubuf__ T *)outputLocal.GetPhyAddr();
-    __ubuf__ T *dequantScaleBrcbBuf = (__ubuf__ T *)dequantScaleBrcbLocal.GetPhyAddr();
+    __ubuf__ T* inputBuf = (__ubuf__ T*)inputLocal.GetPhyAddr();
+    __ubuf__ T* outputBuf = (__ubuf__ T*)outputLocal.GetPhyAddr();
+    __ubuf__ T* dequantScaleBrcbBuf = (__ubuf__ T*)dequantScaleBrcbLocal.GetPhyAddr();
     MulQrVFImpl<T>(inputBuf, outputBuf, dequantScaleBrcbBuf, floatRepSize, repeatTimes, quantScaleCkvRope,
                    computeBlockAlign);
 }

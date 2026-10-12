@@ -63,8 +63,8 @@ __aicore__ inline int64_t GetCacheOffset(int64_t tokenIdx, int64_t blkSize, int6
 }
 
 template <typename T, bool IS_NZ>
-__aicore__ inline void ScatterCache(const GlobalTensor<T> &cacheGm, const LocalTensor<T> &inputLocal,
-                                    const ScatterCacheParams &scatterCacheParams)
+__aicore__ inline void ScatterCache(const GlobalTensor<T>& cacheGm, const LocalTensor<T>& inputLocal,
+                                    const ScatterCacheParams& scatterCacheParams)
 {
     if (scatterCacheParams.paTokenIdx < 0) {
         return;
@@ -84,8 +84,8 @@ __aicore__ inline void ScatterCache(const GlobalTensor<T> &cacheGm, const LocalT
 }
 
 template <typename T, bool IS_NZ>
-__aicore__ inline void ScatterCacheUnAligned(const GlobalTensor<T> &cacheGm, const LocalTensor<T> &inputLocal,
-                                             const ScatterCacheParams &scatterCacheParams)
+__aicore__ inline void ScatterCacheUnAligned(const GlobalTensor<T>& cacheGm, const LocalTensor<T>& inputLocal,
+                                             const ScatterCacheParams& scatterCacheParams)
 {
     if (scatterCacheParams.paTokenIdx < 0) {
         return;
@@ -100,8 +100,8 @@ __aicore__ inline void ScatterCacheUnAligned(const GlobalTensor<T> &cacheGm, con
 }
 
 template <typename T, bool IS_NZ>
-__aicore__ inline void ScatterCacheMultiRows(GlobalTensor<T> &cacheGm, const LocalTensor<T> &inputLocal,
-                                             const ScatterCacheParams &scatterCacheParams, int64_t rowsInCurBatch,
+__aicore__ inline void ScatterCacheMultiRows(GlobalTensor<T>& cacheGm, const LocalTensor<T>& inputLocal,
+                                             const ScatterCacheParams& scatterCacheParams, int64_t rowsInCurBatch,
                                              int64_t cacheOffset, int64_t nextBatchOffset)
 {
     if (cacheOffset < 0) {
@@ -131,7 +131,7 @@ __aicore__ inline void ScatterCacheMultiRows(GlobalTensor<T> &cacheGm, const Loc
 template <typename T, bool IS_NZ>
 __aicore__ inline void MaterializeOffsetsWithHeadSize(int64_t pageId, int64_t tokenOffsetInPage, int64_t rowsThisStep,
                                                       bool spill, int64_t nextPageId, int64_t headSize,
-                                                      int64_t cacheStride0, CkvkrParams &ckvkrParams)
+                                                      int64_t cacheStride0, CkvkrParams& ckvkrParams)
 {
     ckvkrParams.rowsInCurBatch = rowsThisStep;
     if constexpr (IS_NZ) {

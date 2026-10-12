@@ -17,23 +17,25 @@
 #include <iostream>
 #include <vector>
 #define CHECK_RET(cond, return_expr) \
-  do {                               \
-    if (!(cond)) {                   \
-      return_expr;                   \
-    }                                \
-  } while (0)
-#define LOG_PRINT(message, ...)     \
-  do {                              \
-    printf(message, ##__VA_ARGS__); \
-  } while (0)
-int64_t GetShapeSize(const std::vector<int64_t>& shape) {
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
+    } while (0)
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
+    } while (0)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
+{
     int64_t shape_size = 1;
     for (auto i : shape) {
         shape_size *= i;
     }
     return shape_size;
 }
-int Init(int32_t deviceId, aclrtStream* stream) {
+int Init(int32_t deviceId, aclrtStream* stream)
+{
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -45,7 +47,8 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 }
 template <typename T>
 int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor) {
+                    aclDataType dataType, aclTensor** tensor)
+{
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -63,7 +66,8 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
                               shape.data(), shape.size(), *deviceAddr);
     return 0;
 }
-int main() {
+int main()
+{
     // 输入shape相关参数设置
     constexpr int64_t compress_block_size = 32;
     constexpr int64_t compress_stride = 16;
@@ -90,29 +94,29 @@ int main() {
     std::vector<int64_t> actSeqLenShape = {batch_size};
     std::vector<int64_t> blockTableShape = {batch_size, block_num_per_batch};
 
-    void *inputDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *slotMappingDeviceAddr = nullptr;
-    void *outputCacheRefDeviceAddr = nullptr;
-    void *actSeqLenDeviceAddr = nullptr;
-    void *blockTableDeviceAddr = nullptr;
+    void* inputDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* slotMappingDeviceAddr = nullptr;
+    void* outputCacheRefDeviceAddr = nullptr;
+    void* actSeqLenDeviceAddr = nullptr;
+    void* blockTableDeviceAddr = nullptr;
 
-    aclTensor *input = nullptr;
-    aclTensor *weight = nullptr;
-    aclTensor *slotMapping = nullptr;
-    aclTensor *outputCacheRef = nullptr;
-    aclIntArray *actSeqLen = nullptr;
-    aclTensor *blockTable = nullptr;
+    aclTensor* input = nullptr;
+    aclTensor* weight = nullptr;
+    aclTensor* slotMapping = nullptr;
+    aclTensor* outputCacheRef = nullptr;
+    aclIntArray* actSeqLen = nullptr;
+    aclTensor* blockTable = nullptr;
 
     std::vector<aclFloat16> inputHostData(inputShape[0] * inputShape[1] * inputShape[2] * inputShape[3],
                                           aclFloatToFloat16(1.0));
     std::vector<aclFloat16> weightHostData(weightShape[0] * weightShape[1], aclFloatToFloat16(1.0));
     std::vector<int32_t> slotMappingHostData(slotMappingShape[0], 0);
-    std::vector<aclFloat16> outputCacheRefHostData(outputCacheRefShape[0] * outputCacheRefShape[1] *
-                                                   outputCacheRefShape[2], aclFloatToFloat16(1.0));
+    std::vector<aclFloat16> outputCacheRefHostData(
+        outputCacheRefShape[0] * outputCacheRefShape[1] * outputCacheRefShape[2], aclFloatToFloat16(1.0));
     std::vector<int64_t> actSeqLenHostData(actSeqLenShape[0], 0);
     std::vector<int32_t> blockTableHostData(blockTableShape[0] * blockTableShape[1]);
-    actSeqLenHostData[0]=32;
+    actSeqLenHostData[0] = 32;
     // 创建self aclTensor
     ret = CreateAclTensor(inputHostData, inputShape, &inputDeviceAddr, aclDataType::ACL_FLOAT16, &input);
     CHECK_RET(ret == ACL_SUCCESS, return ret);

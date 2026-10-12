@@ -62,10 +62,10 @@ struct MlaPrologProtoShapeParam {
     int64_t Hcq{0};
 };
 
-ge::graphStatus GetMlaPrologShapeDim(const gert::InferShapeContext *context, MlaPrologProtoShapeParam &shapeParam);
-ge::graphStatus SetMlaPrologShapeDim(const MlaPrologProtoShapeParam &shapeParam, gert::InferShapeContext *context);
-ge::graphStatus InferShapeMlaProlog(gert::InferShapeContext *context);
-ge::graphStatus InferDataTypeMlaProlog(gert::InferDataTypeContext *context);
+ge::graphStatus GetMlaPrologShapeDim(const gert::InferShapeContext* context, MlaPrologProtoShapeParam& shapeParam);
+ge::graphStatus SetMlaPrologShapeDim(const MlaPrologProtoShapeParam& shapeParam, gert::InferShapeContext* context);
+ge::graphStatus InferShapeMlaProlog(gert::InferShapeContext* context);
+ge::graphStatus InferDataTypeMlaProlog(gert::InferDataTypeContext* context);
 } // namespace ops
 
 #endif // MLA_PROLOG_INFERSHAPE_H

@@ -25,7 +25,7 @@ extern "C" {
 
 namespace {
 
-static constexpr const char *MQSMLA_ACLNN_OP_NAME = "aclnnMixedQuantSparseFlashMlaMetadata";
+static constexpr const char* MQSMLA_ACLNN_OP_NAME = "aclnnMixedQuantSparseFlashMlaMetadata";
 // Dim Num
 constexpr uint32_t DIM_NUM_ONE = 1;
 constexpr uint32_t DIM_NUM_TWO = 2;
@@ -47,12 +47,12 @@ inline constexpr int64_t MQSMLA_CMP_RATIO_UPPER_BOUND = 128;
 inline constexpr int64_t MQSMLA_NUM_HEADS_Q_LOWER_BOUND = 1;
 inline constexpr int64_t MQSMLA_NUM_HEADS_Q_UPPER_BOUND = 128;
 
-inline bool IsTensorExistMqsmla(const aclTensor *tensor)
+inline bool IsTensorExistMqsmla(const aclTensor* tensor)
 {
     return (tensor != nullptr) && (tensor->GetViewShape().GetDimNum() > 0) && (tensor->GetViewShape().GetDim(0) > 0);
 }
 
-int64_t GetDimNumMqsmla(const aclTensor *tensor)
+int64_t GetDimNumMqsmla(const aclTensor* tensor)
 {
     if (tensor == nullptr) {
         return -1;
@@ -60,7 +60,7 @@ int64_t GetDimNumMqsmla(const aclTensor *tensor)
     return tensor->GetViewShape().GetDimNum();
 }
 
-aclDataType GetDataTypeMqsmla(const aclTensor *tensor)
+aclDataType GetDataTypeMqsmla(const aclTensor* tensor)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     if (tensor == nullptr) {
@@ -70,12 +70,12 @@ aclDataType GetDataTypeMqsmla(const aclTensor *tensor)
     return dataType;
 }
 
-inline bool IsTensorSourceMqsmla(const std::string &source)
+inline bool IsTensorSourceMqsmla(const std::string& source)
 {
     return source != "batch_size";
 }
 
-inline int64_t GetRawShapeSizeMqsmla(const std::string &source, int64_t batchValue)
+inline int64_t GetRawShapeSizeMqsmla(const std::string& source, int64_t batchValue)
 {
     if (source.find("cu_seqlens") != std::string::npos) {
         return batchValue + 1;
@@ -83,7 +83,7 @@ inline int64_t GetRawShapeSizeMqsmla(const std::string &source, int64_t batchVal
     return batchValue;
 }
 
-inline std::string GetSourceDescMqsmla(const std::string &source)
+inline std::string GetSourceDescMqsmla(const std::string& source)
 {
     if (source == "batch_size") {
         return "batch_size";
@@ -98,9 +98,9 @@ aclnnStatus CheckSingleParamMqsmla(int64_t batchSize, int64_t maxSeqlenQ, int64_
                                    int64_t maxSeqlenCmpKv, int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim,
                                    int64_t quantMode, int64_t oriTopk, int64_t cmpTopk, int64_t ropeHeadDim,
                                    int64_t cmpRatio, int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft,
-                                   int64_t oriWinRight, const char *layoutQOptional, const char *layoutKvOptional,
+                                   int64_t oriWinRight, const char* layoutQOptional, const char* layoutKvOptional,
                                    bool hasOriKv, bool hasCmpKv, uint32_t aicCoreNum, uint32_t aivCoreNum,
-                                   const char *socVersion)
+                                   const char* socVersion)
 {
     // batch_size >= 0
     if (batchSize < 0) {
@@ -305,13 +305,13 @@ aclnnStatus CheckSingleParamMqsmla(int64_t batchSize, int64_t maxSeqlenQ, int64_
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckExistenceMqsmla(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensOriKvOptional,
-                                 const aclTensor *cuSeqlensCmpKvOptional, const aclTensor *sequsedOriKvOptional,
-                                 const aclTensor *sequsedCmpKvOptional, const aclTensor *cmpResidualKvOptional,
-                                 const aclTensor *oriTopkLengthOptional, const aclTensor *cmpTopkLengthOptional,
+aclnnStatus CheckExistenceMqsmla(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensOriKvOptional,
+                                 const aclTensor* cuSeqlensCmpKvOptional, const aclTensor* sequsedOriKvOptional,
+                                 const aclTensor* sequsedCmpKvOptional, const aclTensor* cmpResidualKvOptional,
+                                 const aclTensor* oriTopkLengthOptional, const aclTensor* cmpTopkLengthOptional,
                                  int64_t oriTopk, int64_t cmpTopk, int64_t cmpRatio, int64_t oriMaskMode,
-                                 int64_t cmpMaskMode, bool hasOriKv, bool hasCmpKv, const char *layoutQOptional,
-                                 const char *layoutKvOptional, const aclTensor *metadata)
+                                 int64_t cmpMaskMode, bool hasOriKv, bool hasCmpKv, const char* layoutQOptional,
+                                 const char* layoutKvOptional, const aclTensor* metadata)
 {
     // cu_seqlens_q 存在性校验
     if (strcmp(layoutQOptional, "TND") == 0) {
@@ -398,8 +398,8 @@ aclnnStatus CheckExistenceMqsmla(const aclTensor *cuSeqlensQOptional, const aclT
     return ACLNN_SUCCESS;
 }
 
-int64_t GetQueryBatchSizeMqsmla(const aclTensor *sequsedQOptional, const aclTensor *cuSeqlensQOptional,
-                                const char *layoutQOptional, int64_t batchSize, std::string *source)
+int64_t GetQueryBatchSizeMqsmla(const aclTensor* sequsedQOptional, const aclTensor* cuSeqlensQOptional,
+                                const char* layoutQOptional, int64_t batchSize, std::string* source)
 {
     if (IsTensorExistMqsmla(sequsedQOptional)) {
         *source = "seqused_q";
@@ -415,8 +415,8 @@ int64_t GetQueryBatchSizeMqsmla(const aclTensor *sequsedQOptional, const aclTens
     return batchSize;
 }
 
-int64_t GetOriKvBatchSizeMqsmla(const aclTensor *sequsedOriKvOptional, const aclTensor *cuSeqlensOriKvOptional,
-                                const char *layoutKvOptional, int64_t batchSize, std::string *source)
+int64_t GetOriKvBatchSizeMqsmla(const aclTensor* sequsedOriKvOptional, const aclTensor* cuSeqlensOriKvOptional,
+                                const char* layoutKvOptional, int64_t batchSize, std::string* source)
 {
     if (IsTensorExistMqsmla(sequsedOriKvOptional)) {
         *source = "seqused_ori_kv";
@@ -432,8 +432,8 @@ int64_t GetOriKvBatchSizeMqsmla(const aclTensor *sequsedOriKvOptional, const acl
     return batchSize;
 }
 
-int64_t GetCmpKvBatchSizeMqsmla(const aclTensor *sequsedCmpKvOptional, const aclTensor *cuSeqlensCmpKvOptional,
-                                const char *layoutKvOptional, int64_t batchSize, std::string *source)
+int64_t GetCmpKvBatchSizeMqsmla(const aclTensor* sequsedCmpKvOptional, const aclTensor* cuSeqlensCmpKvOptional,
+                                const char* layoutKvOptional, int64_t batchSize, std::string* source)
 {
     if (IsTensorExistMqsmla(sequsedCmpKvOptional)) {
         *source = "seqused_cmp_kv";
@@ -449,9 +449,9 @@ int64_t GetCmpKvBatchSizeMqsmla(const aclTensor *sequsedCmpKvOptional, const acl
     return batchSize;
 }
 
-std::string TopkLengthShapeToStringMqsmla(const aclTensor *topkLengthOptional)
+std::string TopkLengthShapeToStringMqsmla(const aclTensor* topkLengthOptional)
 {
-    const auto &shape = topkLengthOptional->GetViewShape();
+    const auto& shape = topkLengthOptional->GetViewShape();
     std::string result;
     for (size_t i = 0; i < shape.GetDimNum(); ++i) {
         if (i != 0) {
@@ -462,8 +462,8 @@ std::string TopkLengthShapeToStringMqsmla(const aclTensor *topkLengthOptional)
     return result;
 }
 
-aclnnStatus CheckTopkLengthFirstDimMqsmla(const aclTensor *topkLengthOptional, const std::string &topkLengthName,
-                                          int64_t queryBatchSize, const std::string &querySource)
+aclnnStatus CheckTopkLengthFirstDimMqsmla(const aclTensor* topkLengthOptional, const std::string& topkLengthName,
+                                          int64_t queryBatchSize, const std::string& querySource)
 {
     if (topkLengthOptional->GetViewShape().GetDim(0) == queryBatchSize) {
         return ACLNN_SUCCESS;
@@ -483,15 +483,15 @@ aclnnStatus CheckTopkLengthFirstDimMqsmla(const aclTensor *topkLengthOptional, c
 
 struct TopkLengthAxisMqsmla {
     int64_t index;
-    const char *desc;
+    const char* desc;
 };
 
 inline constexpr TopkLengthAxisMqsmla MQSMLA_TOPK_LENGTH_SECOND_AXIS{1, "second"};
 inline constexpr TopkLengthAxisMqsmla MQSMLA_TOPK_LENGTH_THIRD_AXIS{2, "third"};
 
-aclnnStatus CheckTopkLengthSingleDimMqsmla(const aclTensor *topkLengthOptional, const std::string &topkLengthName,
+aclnnStatus CheckTopkLengthSingleDimMqsmla(const aclTensor* topkLengthOptional, const std::string& topkLengthName,
                                            TopkLengthAxisMqsmla axis, int64_t expectedValue,
-                                           const std::string &expectedDesc, const char *layoutQOptional)
+                                           const std::string& expectedDesc, const char* layoutQOptional)
 {
     if (topkLengthOptional->GetViewShape().GetDim(axis.index) == expectedValue) {
         return ACLNN_SUCCESS;
@@ -504,15 +504,15 @@ aclnnStatus CheckTopkLengthSingleDimMqsmla(const aclTensor *topkLengthOptional, 
     return ACLNN_ERR_PARAM_INVALID;
 }
 
-aclnnStatus CheckConsistencyMqsmla(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensOriKvOptional,
-                                   const aclTensor *cuSeqlensCmpKvOptional, const aclTensor *sequsedQOptional,
-                                   const aclTensor *sequsedOriKvOptional, const aclTensor *sequsedCmpKvOptional,
-                                   const aclTensor *cmpResidualKvOptional, const aclTensor *oriTopkLengthOptional,
-                                   const aclTensor *cmpTopkLengthOptional, int64_t batchSize,
-                                   const char *layoutQOptional, const char *layoutKvOptional, bool hasOriKv,
+aclnnStatus CheckConsistencyMqsmla(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensOriKvOptional,
+                                   const aclTensor* cuSeqlensCmpKvOptional, const aclTensor* sequsedQOptional,
+                                   const aclTensor* sequsedOriKvOptional, const aclTensor* sequsedCmpKvOptional,
+                                   const aclTensor* cmpResidualKvOptional, const aclTensor* oriTopkLengthOptional,
+                                   const aclTensor* cmpTopkLengthOptional, int64_t batchSize,
+                                   const char* layoutQOptional, const char* layoutKvOptional, bool hasOriKv,
                                    bool hasCmpKv, int64_t oriTopk, int64_t cmpTopk, int64_t oriMaskMode,
                                    int64_t cmpMaskMode, int64_t maxSeqlenQ, int64_t numHeadsKv,
-                                   const aclTensor *metadata)
+                                   const aclTensor* metadata)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     int64_t dimNum = -1;
@@ -914,17 +914,17 @@ aclnnStatus CheckConsistencyMqsmla(const aclTensor *cuSeqlensQOptional, const ac
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ParamsCheck(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensOriKvOptional,
-                               const aclTensor *cuSeqlensCmpKvOptional, const aclTensor *sequsedQOptional,
-                               const aclTensor *sequsedOriKvOptional, const aclTensor *sequsedCmpKvOptional,
-                               const aclTensor *cmpResidualKvOptional, const aclTensor *oriTopkLengthOptional,
-                               const aclTensor *cmpTopkLengthOptional, int64_t numHeadsQ, int64_t numHeadsKv,
+static aclnnStatus ParamsCheck(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensOriKvOptional,
+                               const aclTensor* cuSeqlensCmpKvOptional, const aclTensor* sequsedQOptional,
+                               const aclTensor* sequsedOriKvOptional, const aclTensor* sequsedCmpKvOptional,
+                               const aclTensor* cmpResidualKvOptional, const aclTensor* oriTopkLengthOptional,
+                               const aclTensor* cmpTopkLengthOptional, int64_t numHeadsQ, int64_t numHeadsKv,
                                int64_t headDim, int64_t quantMode, int64_t batchSize, int64_t maxSeqlenQ,
                                int64_t maxSeqlenOriKv, int64_t maxSeqlenCmpKv, int64_t oriTopk, int64_t cmpTopk,
                                int64_t ropeHeadDim, int64_t cmpRatio, int64_t oriMaskMode, int64_t cmpMaskMode,
-                               int64_t oriWinLeft, int64_t oriWinRight, const char *layoutQOptional,
-                               const char *layoutKvOptional, bool hasOriKv, bool hasCmpKv, uint32_t aicCoreNum,
-                               uint32_t aivCoreNum, const char *socVersion, const aclTensor *metaData)
+                               int64_t oriWinLeft, int64_t oriWinRight, const char* layoutQOptional,
+                               const char* layoutKvOptional, bool hasOriKv, bool hasCmpKv, uint32_t aicCoreNum,
+                               uint32_t aivCoreNum, const char* socVersion, const aclTensor* metaData)
 {
     if (CheckSingleParamMqsmla(batchSize, maxSeqlenQ, maxSeqlenOriKv, maxSeqlenCmpKv, numHeadsQ, numHeadsKv, headDim,
                                quantMode, oriTopk, cmpTopk, ropeHeadDim, cmpRatio, oriMaskMode, cmpMaskMode, oriWinLeft,

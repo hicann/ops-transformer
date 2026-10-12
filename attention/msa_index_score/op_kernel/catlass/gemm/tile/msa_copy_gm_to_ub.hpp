@@ -34,8 +34,8 @@ struct CopyGm2Ub<Arch::AtlasA2, Gemm::GemmType<Element, layout::VectorLayout>> {
     CopyGm2Ub() = default;
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<Element> const &dstTensor, AscendC::GlobalTensor<Element> const &srcTensor,
-                    layout::VectorLayout const &layoutDst, layout::VectorLayout const &layoutSrc)
+    void operator()(AscendC::LocalTensor<Element> const& dstTensor, AscendC::GlobalTensor<Element> const& srcTensor,
+                    layout::VectorLayout const& layoutDst, layout::VectorLayout const& layoutSrc)
     {
         AscendC::DataCopyExtParams dataCopyParams(1, layoutSrc.shape(0) * sizeof(Element), 0, 0, 0);
         AscendC::DataCopyPadExtParams<Element> padParams(false, 0, 0, 0);

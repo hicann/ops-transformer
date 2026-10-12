@@ -31,9 +31,9 @@ namespace MlaProlog {
           col 列数，对应H
  */
 template <typename GammaType>
-__aicore__ inline void RmsNorm(const LocalTensor<float> &outLocal, const LocalTensor<float> &inputLocal,
-                               const LocalTensor<GammaType> &gammaLocal, const LocalTensor<uint8_t> &shareTmpUb,
-                               const RmsNormParam &rmsNormParams)
+__aicore__ inline void RmsNorm(const LocalTensor<float>& outLocal, const LocalTensor<float>& inputLocal,
+                               const LocalTensor<GammaType>& gammaLocal, const LocalTensor<uint8_t>& shareTmpUb,
+                               const RmsNormParam& rmsNormParams)
 {
     uint64_t cnt = rmsNormParams.row * rmsNormParams.col;
     LocalTensor<float> xSquareLocal = shareTmpUb.ReinterpretCast<float>();

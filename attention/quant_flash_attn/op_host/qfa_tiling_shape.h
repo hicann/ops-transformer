@@ -22,7 +22,7 @@ namespace optiling {
 namespace quant_flash_attn {
 
 template <typename T>
-using QfaCompareFunc = bool (*)(const T &, const T &);
+using QfaCompareFunc = bool (*)(const T&, const T&);
 
 enum class QfaCompareType : uint32_t {
     EQUAL = 0,
@@ -68,14 +68,14 @@ class QfaTilingShape {
     static constexpr int64_t invalidDimValue_ = std::numeric_limits<int64_t>::min();
 
 public:
-    QfaTilingShape(const gert::Shape &shape, QfaLayout layout, std::string name, std::string opName)
+    QfaTilingShape(const gert::Shape& shape, QfaLayout layout, std::string name, std::string opName)
         : shape_(shape),
           layout_(layout),
           name_(name),
           opName_(opName) {};
 
 public:
-    const gert::Shape &shape_;
+    const gert::Shape& shape_;
     QfaLayout layout_;
     std::string name_;
     std::string opName_;
@@ -163,66 +163,66 @@ public:
         return invalidDimValue_;
     }
 
-    ge::graphStatus CheckHasShapeB(const std::string &funcName) const
+    ge::graphStatus CheckHasShapeB(const std::string& funcName) const
     {
         return CheckHasAxis(QfaAxis::B, funcName);
     }
-    ge::graphStatus CheckHasShapeS(const std::string &funcName) const
+    ge::graphStatus CheckHasShapeS(const std::string& funcName) const
     {
         return CheckHasAxis(QfaAxis::S, funcName);
     }
-    ge::graphStatus CheckHasShapeD(const std::string &funcName) const
+    ge::graphStatus CheckHasShapeD(const std::string& funcName) const
     {
         return CheckHasAxis(QfaAxis::D, funcName);
     }
-    ge::graphStatus CheckHasShapeN(const std::string &funcName) const
+    ge::graphStatus CheckHasShapeN(const std::string& funcName) const
     {
         return CheckHasAxis(QfaAxis::N, funcName);
     }
-    ge::graphStatus CheckHasShapeT(const std::string &funcName) const
+    ge::graphStatus CheckHasShapeT(const std::string& funcName) const
     {
         return CheckHasAxis(QfaAxis::T, funcName);
     }
-    ge::graphStatus CheckHasShapeBlockSize(const std::string &funcName) const
+    ge::graphStatus CheckHasShapeBlockSize(const std::string& funcName) const
     {
         return CheckHasAxis(QfaAxis::Bs, funcName);
     }
-    ge::graphStatus CheckHasShapeBlockNum(const std::string &funcName) const
+    ge::graphStatus CheckHasShapeBlockNum(const std::string& funcName) const
     {
         return CheckHasAxis(QfaAxis::Bn, funcName);
     }
 
 private:
-    bool HasAxis(const QfaAxis &axis) const;
-    size_t GetAxisIdx(const QfaAxis &axis) const;
-    int64_t GetAxisNum(const QfaAxis &axis) const;
-    ge::graphStatus CheckHasAxis(const QfaAxis &axis, const std::string &funcName) const;
+    bool HasAxis(const QfaAxis& axis) const;
+    size_t GetAxisIdx(const QfaAxis& axis) const;
+    int64_t GetAxisNum(const QfaAxis& axis) const;
+    ge::graphStatus CheckHasAxis(const QfaAxis& axis, const std::string& funcName) const;
 };
 
 class QfaTilingShapeCompare {
     static const std::map<QfaCompareType, QfaCompareFunc<int64_t>> compareFuncMap_;
 
 public:
-    QfaTilingShapeCompare(const gert::Shape &shape, QfaLayout layout, std::string name, std::string opName)
+    QfaTilingShapeCompare(const gert::Shape& shape, QfaLayout layout, std::string name, std::string opName)
         : shape_(shape),
           layout_(layout),
           name_(name),
           opName_(opName) {};
 
 public:
-    const gert::Shape &shape_;
+    const gert::Shape& shape_;
     QfaLayout layout_;
     std::string name_;
     std::string opName_;
 
     std::string CompareTypeToSerialString(const QfaCompareType compareType) const;
-    std::string CompareTypeToSerialSymbolString(const QfaCompareType &compareType) const;
-    ge::graphStatus GetExpectedShape(gert::Shape &shapeExpected, const QfaTilingShapeCompareParam &param,
-                                     const std::string &funcName) const;
-    QfaCompareType GetCompareType(const std::map<QfaAxis, QfaCompareType> &compareTypeMap, const QfaAxis &axis) const;
-    ge::graphStatus GetCompareFunc(const QfaCompareType &compareType, QfaCompareFunc<int64_t> &compareFunc,
-                                   const std::string &funcName) const;
-    ge::graphStatus CompareShape(QfaTilingShapeCompareParam &param, const std::string &funcName) const;
+    std::string CompareTypeToSerialSymbolString(const QfaCompareType& compareType) const;
+    ge::graphStatus GetExpectedShape(gert::Shape& shapeExpected, const QfaTilingShapeCompareParam& param,
+                                     const std::string& funcName) const;
+    QfaCompareType GetCompareType(const std::map<QfaAxis, QfaCompareType>& compareTypeMap, const QfaAxis& axis) const;
+    ge::graphStatus GetCompareFunc(const QfaCompareType& compareType, QfaCompareFunc<int64_t>& compareFunc,
+                                   const std::string& funcName) const;
+    ge::graphStatus CompareShape(QfaTilingShapeCompareParam& param, const std::string& funcName) const;
 };
 
 } // namespace quant_flash_attn

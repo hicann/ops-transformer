@@ -19,7 +19,7 @@ using namespace std;
 using namespace op;
 
 namespace {
-void DestroyAclTensor(aclTensor *tensor)
+void DestroyAclTensor(aclTensor* tensor)
 {
     Release(tensor);
 }
@@ -45,7 +45,7 @@ TEST_F(quant_lightning_indexer_opapi_ut, quant_lightning_indexer_aclnn_0)
     char layoutQuery[] = "BSND";
     char layoutKey[] = "BSND";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnQuantLightningIndexerGetWorkspaceSize(
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, layoutQuery, layoutKey, 4, 3,
@@ -73,7 +73,7 @@ TEST_F(quant_lightning_indexer_opapi_ut, quant_lightning_indexer_aclnn_1)
     auto out = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({1, 8, 1, 4}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnQuantLightningIndexerGetWorkspaceSize(
         query.get(), key.get(), weights.get(), queryDequantScale.get(), keyDequantScale.get(), nullptr, nullptr,
@@ -99,7 +99,7 @@ TEST_F(quant_lightning_indexer_opapi_ut, quant_lightning_indexer_aclnn_2)
     auto out = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({1, 8, 1, 4}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnQuantLightningIndexerGetWorkspaceSize(
         query.get(), key.get(), weights.get(), nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, layoutQuery,
@@ -125,7 +125,7 @@ TEST_F(quant_lightning_indexer_opapi_ut, quant_lightning_indexer_aclnn_3)
     auto out = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({1, 8, 1, 4}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnQuantLightningIndexerGetWorkspaceSize(
         query.get(), key.get(), weights.get(), nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, layoutQuery,
@@ -152,7 +152,7 @@ TEST_F(quant_lightning_indexer_opapi_ut, quant_lightning_indexer_aclnn_4)
     auto out = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({1, 8, 1, 4}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnQuantLightningIndexerGetWorkspaceSize(
         query.get(), key.get(), weights.get(), nullptr, keyDequantScale.get(), nullptr, nullptr, nullptr, 0, 0,
@@ -179,7 +179,7 @@ TEST_F(quant_lightning_indexer_opapi_ut, quant_lightning_indexer_aclnn_5)
     auto out = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({1, 8, 1, 4}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnQuantLightningIndexerGetWorkspaceSize(
         query.get(), key.get(), weights.get(), nullptr, keyDequantScale.get(), nullptr, nullptr, nullptr, 0, 0,
@@ -205,7 +205,7 @@ TEST_F(quant_lightning_indexer_opapi_ut, quant_lightning_indexer_aclnn_6)
     auto out = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({1, 8, 1, 4}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnQuantLightningIndexerGetWorkspaceSize(
         query.get(), key.get(), weights.get(), nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, layoutQuery,

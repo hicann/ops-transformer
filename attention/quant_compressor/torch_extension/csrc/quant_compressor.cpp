@@ -27,12 +27,12 @@ const int64_t VALUE_2 = 2;
 const int64_t CMP_RATIO_MIN = 2;
 const int64_t CMP_RATIO_MAX = 128;
 
-inline TensorWrapper make_wrapper(const at::Tensor &tensor, aclDataType tensorAcltype)
+inline TensorWrapper make_wrapper(const at::Tensor& tensor, aclDataType tensorAcltype)
 {
     return {tensor, tensorAcltype};
 }
 
-std::vector<bool> IsContiguousAxes(const at::Tensor &tensor)
+std::vector<bool> IsContiguousAxes(const at::Tensor& tensor)
 {
     auto sizes = tensor.sizes();
     auto strides = tensor.strides();
@@ -53,8 +53,8 @@ std::vector<bool> IsContiguousAxes(const at::Tensor &tensor)
     return result;
 }
 
-at::Tensor ConstructQuantCompressorOutputTensor(const at::Tensor &x, const at::Tensor &wkv,
-                                                const c10::optional<at::Tensor> &cuSeqlens, int64_t cmpRatio,
+at::Tensor ConstructQuantCompressorOutputTensor(const at::Tensor& x, const at::Tensor& wkv,
+                                                const c10::optional<at::Tensor>& cuSeqlens, int64_t cmpRatio,
                                                 int64_t coff)
 {
     auto xDim = x.dim();
@@ -82,12 +82,12 @@ at::Tensor ConstructQuantCompressorOutputTensor(const at::Tensor &x, const at::T
     return cmpKv;
 }
 
-at::Tensor QuantCompressor(const at::Tensor &x, const at::Tensor &wkv, const at::Tensor &wgate, at::Tensor &stateCache,
-                           const at::Tensor &ape, int64_t quantMode, int64_t cmpRatio,
-                           const c10::optional<at::Tensor> &xDescale, const c10::optional<at::Tensor> &wkvDescale,
-                           const c10::optional<at::Tensor> &wgateDescale,
-                           const c10::optional<at::Tensor> &stateBlockTable, const c10::optional<at::Tensor> &cuSeqlens,
-                           const c10::optional<at::Tensor> &seqused, const c10::optional<at::Tensor> &startPos,
+at::Tensor QuantCompressor(const at::Tensor& x, const at::Tensor& wkv, const at::Tensor& wgate, at::Tensor& stateCache,
+                           const at::Tensor& ape, int64_t quantMode, int64_t cmpRatio,
+                           const c10::optional<at::Tensor>& xDescale, const c10::optional<at::Tensor>& wkvDescale,
+                           const c10::optional<at::Tensor>& wgateDescale,
+                           const c10::optional<at::Tensor>& stateBlockTable, const c10::optional<at::Tensor>& cuSeqlens,
+                           const c10::optional<at::Tensor>& seqused, const c10::optional<at::Tensor>& startPos,
                            int64_t coff, int64_t cacheMode)
 {
     TORCH_CHECK(x.defined(), "Check x != nullptr failed");
@@ -125,13 +125,13 @@ at::Tensor QuantCompressor(const at::Tensor &x, const at::Tensor &wkv, const at:
     return cmpKv;
 }
 
-at::Tensor QuantCompressorMeta(const at::Tensor &x, const at::Tensor &wkv, const at::Tensor &wgate,
-                               at::Tensor &stateCache, const at::Tensor &ape, int64_t quantMode, int64_t cmpRatio,
-                               const c10::optional<at::Tensor> &xDescale, const c10::optional<at::Tensor> &wkvDescale,
-                               const c10::optional<at::Tensor> &wgateDescale,
-                               const c10::optional<at::Tensor> &stateBlockTable,
-                               const c10::optional<at::Tensor> &cuSeqlens, const c10::optional<at::Tensor> &seqused,
-                               const c10::optional<at::Tensor> &startPos, int64_t coff, int64_t cacheMode)
+at::Tensor QuantCompressorMeta(const at::Tensor& x, const at::Tensor& wkv, const at::Tensor& wgate,
+                               at::Tensor& stateCache, const at::Tensor& ape, int64_t quantMode, int64_t cmpRatio,
+                               const c10::optional<at::Tensor>& xDescale, const c10::optional<at::Tensor>& wkvDescale,
+                               const c10::optional<at::Tensor>& wgateDescale,
+                               const c10::optional<at::Tensor>& stateBlockTable,
+                               const c10::optional<at::Tensor>& cuSeqlens, const c10::optional<at::Tensor>& seqused,
+                               const c10::optional<at::Tensor>& startPos, int64_t coff, int64_t cacheMode)
 {
     TORCH_CHECK(x.defined(), "Check x != nullptr failed");
     TORCH_CHECK(x.scalar_type() == at::kByte, "x dtype should be uint8 (carrier for hifloat8), got ", x.scalar_type());

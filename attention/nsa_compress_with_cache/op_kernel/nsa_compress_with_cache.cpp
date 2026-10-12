@@ -20,24 +20,22 @@ constexpr uint32_t FP32_NUM_PER_UB_REPEAT = 64;
 constexpr uint32_t FP16_NUM_PER_UB_BLOCK = 16;
 constexpr uint32_t NUM_2 = 2;
 
-#define INVOKE_NCWC_GENERAL_OP_IMPL(templateClass, ...)                                                                \
-    do {                                                                                                               \
-        templateClass<__VA_ARGS__> op;                                                                                 \
-        op.Init(input, weight, slotMapping, output_cache_ref, act_seq_len, block_table, &tiling_data);                 \
-        op.Process();                                                                                                  \
+#define INVOKE_NCWC_GENERAL_OP_IMPL(templateClass, ...) \
+    do { \
+        templateClass<__VA_ARGS__> op; \
+        op.Init(input, weight, slotMapping, output_cache_ref, act_seq_len, block_table, &tiling_data); \
+        op.Process(); \
     } while (0)
 
 template <typename T>
 class KernelNsaCompressWithCacheBase {
 public:
-    __aicore__ inline KernelNsaCompressWithCacheBase()
-    {
-    }
+    __aicore__ inline KernelNsaCompressWithCacheBase() {}
 
 protected:
     __aicore__ inline void InitBase(GM_ADDR kv_cache, GM_ADDR weight, GM_ADDR slot_mapping, GM_ADDR compress_kv_cache,
                                     GM_ADDR act_seq_len, GM_ADDR block_table,
-                                    const NsaCompressWithCacheTilingData *__restrict tilingData)
+                                    const NsaCompressWithCacheTilingData* __restrict tilingData)
     {
         this->tilingData = tilingData;
         this->blockIdx = AscendC::GetBlockIdx();
@@ -49,17 +47,18 @@ protected:
 
         kvCalcBufSize =
             (tilingData->tokenNumPerTile + tilingData->tokenRepeatCount) * tilingData->compressKvCacheSizePerCore;
-        this->kvCacheGm.SetGlobalBuffer((__gm__ T *)kv_cache, this->tilingData->kvCacheSize);
-        this->weightGm.SetGlobalBuffer((__gm__ T *)weight, this->tilingData->weightSize);
-        this->slotMappingGm.SetGlobalBuffer((__gm__ int32_t *)slot_mapping, this->tilingData->batchSize);
-        this->compressKvCacheGm.SetGlobalBuffer((__gm__ T *)compress_kv_cache, this->tilingData->compressKvCacheSize);
-        this->actSeqLenGm.SetGlobalBuffer((__gm__ int64_t *)act_seq_len, this->tilingData->batchSize);
-        this->blockTableGm.SetGlobalBuffer((__gm__ int32_t *)block_table, this->tilingData->blockTableSize);
+        this->kvCacheGm.SetGlobalBuffer((__gm__ T*)kv_cache, this->tilingData->kvCacheSize);
+        this->weightGm.SetGlobalBuffer((__gm__ T*)weight, this->tilingData->weightSize);
+        this->slotMappingGm.SetGlobalBuffer((__gm__ int32_t*)slot_mapping, this->tilingData->batchSize);
+        this->compressKvCacheGm.SetGlobalBuffer((__gm__ T*)compress_kv_cache, this->tilingData->compressKvCacheSize);
+        this->actSeqLenGm.SetGlobalBuffer((__gm__ int64_t*)act_seq_len, this->tilingData->batchSize);
+        this->blockTableGm.SetGlobalBuffer((__gm__ int32_t*)block_table, this->tilingData->blockTableSize);
         uint32_t inQueueSize = tilingData->kvCacheSizePerCore > tilingData->weightSize ?
                                    tilingData->kvCacheSizePerCore :
                                    tilingData->weightSize;
         this->pipe.InitBuffer(this->inQueue, this->tilingData->bufferNum, inQueueSize * sizeof(T));
-        this->pipe.InitBuffer(this->outQueue, this->tilingData->bufferNum, this->tilingData->compressKvCacheSizePerCore * sizeof(T));
+        this->pipe.InitBuffer(this->outQueue, this->tilingData->bufferNum,
+                              this->tilingData->compressKvCacheSizePerCore * sizeof(T));
         this->pipe.InitBuffer(this->kvCalcBuf, this->tilingData->bufferNum * kvCalcBufSize * sizeof(float));
     }
 
@@ -101,7 +100,7 @@ protected:
         seqLenStartidx = seqLen - tilingData->compressBlockSize;
         int32_t slotMappingIdx = slotMappingGm.GetValue(batchIdx);
         outputOffset = static_cast<uint64_t>(slotMappingIdx) * tilingData->headDim * tilingData->headNum +
-            static_cast<uint64_t>(headIdx) * tilingData->headDim;
+                       static_cast<uint64_t>(headIdx) * tilingData->headDim;
     }
 
     __aicore__ inline void CopyKvCache(uint32_t tileIdx)
@@ -234,18 +233,16 @@ protected:
     uint32_t compressBatchSize;
     uint64_t outputOffset;
     uint32_t compressBatchIdxList[MAX_BATCH_SIZE];
-    const NsaCompressWithCacheTilingData *__restrict tilingData;
+    const NsaCompressWithCacheTilingData* __restrict tilingData;
 }; // namespace NsaCompressWithCacheBasetemplate<typenameT>class KernelNsaCompressWithCacheBase
 
 template <typename T>
 class KernelNsaCompressWithCacheDoubleBroadcast : public KernelNsaCompressWithCacheBase<T> {
 public:
-    __aicore__ inline KernelNsaCompressWithCacheDoubleBroadcast()
-    {
-    }
+    __aicore__ inline KernelNsaCompressWithCacheDoubleBroadcast() {}
     __aicore__ inline void Init(GM_ADDR kv_cache, GM_ADDR weight, GM_ADDR slot_mapping, GM_ADDR compress_kv_cache,
                                 GM_ADDR act_seq_len, GM_ADDR block_table,
-                                const NsaCompressWithCacheTilingData *__restrict tilingData)
+                                const NsaCompressWithCacheTilingData* __restrict tilingData)
     {
         this->InitBase(kv_cache, weight, slot_mapping, compress_kv_cache, act_seq_len, block_table, tilingData);
 
@@ -269,9 +266,11 @@ public:
             this->tilingData->tokenNumPerTile * this->tilingData->headsNumPerCore * this->firstBroadCastSize;
 
         this->pipe.InitBuffer(this->castWeightBuf, (this->castWeightLen) * sizeof(float));
-        this->pipe.InitBuffer(this->firstBroadCastWeightBuf, this->tilingData->bufferNum * (this->firstBroadcastWeightLen) * sizeof(float));
+        this->pipe.InitBuffer(this->firstBroadCastWeightBuf,
+                              this->tilingData->bufferNum * (this->firstBroadcastWeightLen) * sizeof(float));
         this->pipe.InitBuffer(this->tileWeightBuf, this->tilingData->bufferNum * (this->tileWeightLen) * sizeof(float));
-        this->pipe.InitBuffer(this->broadcastWeightBuf, this->tilingData->bufferNum * (this->broadcastWeightLen) * sizeof(float));
+        this->pipe.InitBuffer(this->broadcastWeightBuf,
+                              this->tilingData->bufferNum * (this->broadcastWeightLen) * sizeof(float));
 
         this->InitActSeqLen();
     }
@@ -335,12 +334,10 @@ protected:
 template <typename T>
 class KernelNsaCompressWithCacheTileBroadcast : public KernelNsaCompressWithCacheBase<T> {
 public:
-    __aicore__ inline KernelNsaCompressWithCacheTileBroadcast()
-    {
-    }
+    __aicore__ inline KernelNsaCompressWithCacheTileBroadcast() {}
     __aicore__ inline void Init(GM_ADDR kv_cache, GM_ADDR weight, GM_ADDR slot_mapping, GM_ADDR compress_kv_cache,
                                 GM_ADDR act_seq_len, GM_ADDR block_table,
-                                const NsaCompressWithCacheTilingData *__restrict tilingData)
+                                const NsaCompressWithCacheTilingData* __restrict tilingData)
     {
         this->InitBase(kv_cache, weight, slot_mapping, compress_kv_cache, act_seq_len, block_table, tilingData);
 
@@ -351,7 +348,8 @@ public:
 
         this->tileWeightLen = this->tiledweightShape[0];
         this->pipe.InitBuffer(this->castWeightBuf, this->tilingData->weightSize * sizeof(float));
-        this->pipe.InitBuffer(this->broadcastWeightBuf, this->tilingData->bufferNum * this->tilingData->weightSizePerCore * sizeof(float));
+        this->pipe.InitBuffer(this->broadcastWeightBuf,
+                              this->tilingData->bufferNum * this->tilingData->weightSizePerCore * sizeof(float));
         this->pipe.InitBuffer(this->tileWeightBuf, this->tilingData->bufferNum * this->tileWeightLen * sizeof(float));
         this->InitActSeqLen();
     }
@@ -403,12 +401,10 @@ protected:
 template <typename T>
 class KernelNsaCompressWithCacheFullBroadcast : public KernelNsaCompressWithCacheBase<T> {
 public:
-    __aicore__ inline KernelNsaCompressWithCacheFullBroadcast()
-    {
-    }
+    __aicore__ inline KernelNsaCompressWithCacheFullBroadcast() {}
     __aicore__ inline void Init(GM_ADDR kv_cache, GM_ADDR weight, GM_ADDR slot_mapping, GM_ADDR compress_kv_cache,
                                 GM_ADDR act_seq_len, GM_ADDR block_table,
-                                const NsaCompressWithCacheTilingData *__restrict tilingData)
+                                const NsaCompressWithCacheTilingData* __restrict tilingData)
     {
         this->InitBase(kv_cache, weight, slot_mapping, compress_kv_cache, act_seq_len, block_table, tilingData);
 
@@ -421,7 +417,8 @@ public:
 
         this->pipe.InitBuffer(this->castWeightBuf,
                               this->tilingData->compressBlockSize * this->tilingData->headNum * sizeof(float));
-        this->pipe.InitBuffer(this->broadcastWeightBuf, this->tilingData->bufferNum * this->tilingData->weightSizePerCore * sizeof(float));
+        this->pipe.InitBuffer(this->broadcastWeightBuf,
+                              this->tilingData->bufferNum * this->tilingData->weightSizePerCore * sizeof(float));
 
         this->InitActSeqLen();
     }

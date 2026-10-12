@@ -17,45 +17,35 @@ namespace l0op {
 
 OP_TYPE_REGISTER(NsaSelectedAttention);
 
-const std::array<const aclTensor *, 3> NsaSelectedAttention(const aclTensor *query, 
-                                                            const aclTensor *key, 
-                                                            const aclTensor *value, 
-                                                            const aclTensor *topkIndices, 
-                                                            const aclTensor *attenMaskOptional,
-                                                            const aclIntArray *actualSeqQLenOptional, 
-                                                            const aclIntArray *actualSeqKvLenOptional, 
-                                                            double scaleValue, 
-                                                            int64_t headNum, 
-                                                            const char *inputLayout,
-                                                            int64_t sparseMode, 
-                                                            int64_t selectedBlockSize, 
-                                                            int64_t selectedBlockCount,
-                                                            aclOpExecutor *executor)
+const std::array<const aclTensor*, 3> NsaSelectedAttention(
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* topkIndices,
+    const aclTensor* attenMaskOptional, const aclIntArray* actualSeqQLenOptional,
+    const aclIntArray* actualSeqKvLenOptional, double scaleValue, int64_t headNum, const char* inputLayout,
+    int64_t sparseMode, int64_t selectedBlockSize, int64_t selectedBlockCount, aclOpExecutor* executor)
 {
-    L0_DFX(NsaSelectedAttention, query, key, value, topkIndices, attenMaskOptional,
-            actualSeqQLenOptional, actualSeqKvLenOptional, scaleValue, headNum,
-            inputLayout, sparseMode, selectedBlockSize, selectedBlockCount);
+    L0_DFX(NsaSelectedAttention, query, key, value, topkIndices, attenMaskOptional, actualSeqQLenOptional,
+           actualSeqKvLenOptional, scaleValue, headNum, inputLayout, sparseMode, selectedBlockSize, selectedBlockCount);
 
     if (attenMaskOptional == nullptr) {
         attenMaskOptional = executor->AllocTensor(DataType::DT_BOOL, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
-    const aclTensor *actualSeqQLen = nullptr;
+    const aclTensor* actualSeqQLen = nullptr;
     if (actualSeqQLenOptional) {
         actualSeqQLen = executor->ConvertToTensor(actualSeqQLenOptional, DataType::DT_INT64);
-        const_cast<aclTensor *>(actualSeqQLen)->SetStorageFormat(Format::FORMAT_ND);
-        const_cast<aclTensor *>(actualSeqQLen)->SetViewFormat(Format::FORMAT_ND);
-        const_cast<aclTensor *>(actualSeqQLen)->SetOriginalFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actualSeqQLen)->SetStorageFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actualSeqQLen)->SetViewFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actualSeqQLen)->SetOriginalFormat(Format::FORMAT_ND);
     } else {
         actualSeqQLen = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
-    const aclTensor *actualSeqKvLen = nullptr;
+    const aclTensor* actualSeqKvLen = nullptr;
     if (actualSeqKvLenOptional) {
         actualSeqKvLen = executor->ConvertToTensor(actualSeqKvLenOptional, DataType::DT_INT64);
-        const_cast<aclTensor *>(actualSeqKvLen)->SetStorageFormat(Format::FORMAT_ND);
-        const_cast<aclTensor *>(actualSeqKvLen)->SetViewFormat(Format::FORMAT_ND);
-        const_cast<aclTensor *>(actualSeqKvLen)->SetOriginalFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actualSeqKvLen)->SetStorageFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actualSeqKvLen)->SetViewFormat(Format::FORMAT_ND);
+        const_cast<aclTensor*>(actualSeqKvLen)->SetOriginalFormat(Format::FORMAT_ND);
     } else {
         actualSeqKvLen = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
@@ -65,22 +55,21 @@ const std::array<const aclTensor *, 3> NsaSelectedAttention(const aclTensor *que
     auto attentionOut = executor->AllocTensor(query->GetDataType(), Format::FORMAT_ND, Format::FORMAT_ND);
 
     auto ret = INFER_SHAPE(NsaSelectedAttention,
-                           OP_INPUT(query, key, value, topkIndices, attenMaskOptional, 
-                                    actualSeqQLen, actualSeqKvLen),
+                           OP_INPUT(query, key, value, topkIndices, attenMaskOptional, actualSeqQLen, actualSeqKvLen),
                            OP_OUTPUT(softmaxMaxOut, softmaxSumOut, attentionOut),
-                           OP_ATTR(static_cast<float>(scaleValue), headNum, sparseMode, inputLayout,
-                                    selectedBlockSize, selectedBlockCount));
+                           OP_ATTR(static_cast<float>(scaleValue), headNum, sparseMode, inputLayout, selectedBlockSize,
+                                   selectedBlockCount));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "NsaSelectedAttention InferShape failed.");
         return {nullptr, nullptr, nullptr};
     }
 
-    ADD_TO_LAUNCHER_LIST_AICORE(NsaSelectedAttention,
-                                OP_INPUT(query, key, value, topkIndices, attenMaskOptional,  
-                                        actualSeqQLen, actualSeqKvLen),
-                                OP_OUTPUT(softmaxMaxOut, softmaxSumOut, attentionOut),
-                                OP_ATTR(static_cast<float>(scaleValue), headNum, sparseMode, inputLayout,
-                                    selectedBlockSize, selectedBlockCount));
+    ADD_TO_LAUNCHER_LIST_AICORE(
+        NsaSelectedAttention,
+        OP_INPUT(query, key, value, topkIndices, attenMaskOptional, actualSeqQLen, actualSeqKvLen),
+        OP_OUTPUT(softmaxMaxOut, softmaxSumOut, attentionOut),
+        OP_ATTR(static_cast<float>(scaleValue), headNum, sparseMode, inputLayout, selectedBlockSize,
+                selectedBlockCount));
     return {softmaxMaxOut, softmaxSumOut, attentionOut};
 }
 

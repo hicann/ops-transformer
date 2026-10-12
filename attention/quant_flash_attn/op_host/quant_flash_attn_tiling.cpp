@@ -30,13 +30,13 @@ using namespace Ops::Transformer::OpTiling;
 namespace optiling {
 using namespace quant_flash_attn;
 
-static bool IsEmptyInput(gert::TilingContext *context)
+static bool IsEmptyInput(gert::TilingContext* context)
 {
     (void)context;
     return false;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingQuantFlashAttn(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingQuantFlashAttn(gert::TilingContext* context)
 {
     OP_LOGI(context, "QuantFlashAttn TilingQuantFlashAttn start.");
 
@@ -65,7 +65,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingQuantFlashAttn(gert::TilingContext *conte
     return FiaTilingRegistry::GetInstance().DoTilingImpl(context, &qfaInfo);
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForQuantFlashAttn(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForQuantFlashAttn(gert::TilingParseContext* context)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context, "platformInfoPtr is null"), return ge::GRAPH_FAILED);

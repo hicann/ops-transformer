@@ -28,8 +28,8 @@ template <class T>
 class KernelNASCompress {
 public:
     __aicore__ inline KernelNASCompress(){};
-    __aicore__ inline void Init(__gm__ uint8_t *input, __gm__ uint8_t *weight, __gm__ uint8_t *actSeqLens,
-                                __gm__ uint8_t *output, NsaCompressTilingData tilingData, AscendC::TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t* input, __gm__ uint8_t* weight, __gm__ uint8_t* actSeqLens,
+                                __gm__ uint8_t* output, NsaCompressTilingData tilingData, AscendC::TPipe* tPipe);
 
     __aicore__ inline void CopyIn();
     __aicore__ inline void Compute();
@@ -290,7 +290,7 @@ public:
     }
 
 private:
-    AscendC::TPipe *pipe;
+    AscendC::TPipe* pipe;
     const int32_t QUE_DEPTH = 1;
     AscendC::TQue<AscendC::QuePosition::VECIN, 1> inQueueKvFp16;
     AscendC::TQue<AscendC::QuePosition::VECIN, 1> inQueueKvFp32;
@@ -316,18 +316,18 @@ private:
 };
 
 template <typename T>
-__aicore__ inline void KernelNASCompress<T>::Init(__gm__ uint8_t *input, __gm__ uint8_t *weight,
-                                                  __gm__ uint8_t *actSeqLens, __gm__ uint8_t *output,
-                                                  NsaCompressTilingData tilingData, AscendC::TPipe *tPipe)
+__aicore__ inline void KernelNASCompress<T>::Init(__gm__ uint8_t* input, __gm__ uint8_t* weight,
+                                                  __gm__ uint8_t* actSeqLens, __gm__ uint8_t* output,
+                                                  NsaCompressTilingData tilingData, AscendC::TPipe* tPipe)
 {
     pipe = tPipe;
 
     setTiling(tilingData);
 
-    kvGm.SetGlobalBuffer((__gm__ T *)input, this->tiling.totalKvSize * sizeof(T));
-    weightGm.SetGlobalBuffer((__gm__ T *)weight, this->tiling.weightSize * sizeof(T));
-    actseqlensGm.SetGlobalBuffer((__gm__ int64_t *)actSeqLens, this->tiling.batchSize * sizeof(int64_t));
-    compressKvGm.SetGlobalBuffer((__gm__ T *)output, this->tiling.totalCompressSize * sizeof(T));
+    kvGm.SetGlobalBuffer((__gm__ T*)input, this->tiling.totalKvSize * sizeof(T));
+    weightGm.SetGlobalBuffer((__gm__ T*)weight, this->tiling.weightSize * sizeof(T));
+    actseqlensGm.SetGlobalBuffer((__gm__ int64_t*)actSeqLens, this->tiling.batchSize * sizeof(int64_t));
+    compressKvGm.SetGlobalBuffer((__gm__ T*)output, this->tiling.totalCompressSize * sizeof(T));
 
     pipe->InitBuffer(inQueueKvFp16, 1, this->subTiling.subKvSize * sizeof(T));
     pipe->InitBuffer(inQueueKvFp32, 1, this->subTiling.subKvSize * sizeof(float));

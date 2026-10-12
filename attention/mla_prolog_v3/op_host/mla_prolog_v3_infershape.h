@@ -47,11 +47,11 @@ constexpr uint32_t KV_QUANT_MODE_PER_TENSOR = 1;
 constexpr uint32_t KV_QUANT_MODE_PER_CHANNEL = 2;
 constexpr uint32_t KV_QUANT_MODE_PER_TILE = 3;
 
-ge::graphStatus GetMlaPrologV3ShapeDim(const gert::InferShapeContext *context, MlaPrologProtoShapeParam &shapeParam);
-ge::graphStatus SetMlaPrologV3ShapeDim(const MlaPrologProtoShapeParam &shapeParam, gert::InferShapeContext *context);
+ge::graphStatus GetMlaPrologV3ShapeDim(const gert::InferShapeContext* context, MlaPrologProtoShapeParam& shapeParam);
+ge::graphStatus SetMlaPrologV3ShapeDim(const MlaPrologProtoShapeParam& shapeParam, gert::InferShapeContext* context);
 
-ge::graphStatus InferShapeMlaPrologV3(gert::InferShapeContext *context);
-ge::graphStatus InferDataTypeMlaPrologV3(gert::InferDataTypeContext *context);
+ge::graphStatus InferShapeMlaPrologV3(gert::InferShapeContext* context);
+ge::graphStatus InferDataTypeMlaPrologV3(gert::InferDataTypeContext* context);
 
 } // namespace ops
 

@@ -19,24 +19,30 @@
 namespace op_api {
 using namespace at_npu::native;
 
-inline TensorWrapper MakeWrapper(const at::Tensor &tensor)
+inline TensorWrapper MakeWrapper(const at::Tensor& tensor)
 {
     return {tensor, ConvertToAclDataType(tensor.scalar_type())};
 }
 
-inline bool IsMxQuantMode(int64_t quantMode) { return quantMode == 3 || quantMode == 5; }
+inline bool IsMxQuantMode(int64_t quantMode)
+{
+    return quantMode == 3 || quantMode == 5;
+}
 
-inline bool IsE8M0Tensor(const at::Tensor &tensor) { return tensor.scalar_type() == at::kFloat8_e8m0fnu; }
+inline bool IsE8M0Tensor(const at::Tensor& tensor)
+{
+    return tensor.scalar_type() == at::kFloat8_e8m0fnu;
+}
 
-inline bool IsFp4CompatibleTensor(const at::Tensor &tensor)
+inline bool IsFp4CompatibleTensor(const at::Tensor& tensor)
 {
     return tensor.scalar_type() == at::kFloat4_e2m1fn_x2 || tensor.scalar_type() == at::kByte;
 }
 
 constexpr int64_t E8M0_SCALE_PACK_NUM = 2;
 
-inline void FixQLIV2AclDtypes(int64_t quantMode, TensorWrapper &queryWrapper, TensorWrapper &keyWrapper,
-                              TensorWrapper &queryScaleWrapper, TensorWrapper &keyScaleWrapper)
+inline void FixQLIV2AclDtypes(int64_t quantMode, TensorWrapper& queryWrapper, TensorWrapper& keyWrapper,
+                              TensorWrapper& queryScaleWrapper, TensorWrapper& keyScaleWrapper)
 {
     if (quantMode == 4) {
         TORCH_CHECK(queryWrapper.tensor_.scalar_type() == at::kByte, "When quant_mode is 4, query must be hifp8 type");
@@ -84,11 +90,11 @@ const int DIM_3 = 3;
 constexpr int64_t QLI_V2_METADATA_SIZE = 1024;
 
 at::Tensor QuantLightningIndexerMetadata(int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk,
-                                         int64_t quantMode, const c10::optional<at::Tensor> &cuSeqlensQ,
-                                         const c10::optional<at::Tensor> &cuSeqlensK,
-                                         const c10::optional<at::Tensor> &sequsedQ,
-                                         const c10::optional<at::Tensor> &sequsedK,
-                                         const c10::optional<at::Tensor> &cmpResidualK, int64_t batchSize,
+                                         int64_t quantMode, const c10::optional<at::Tensor>& cuSeqlensQ,
+                                         const c10::optional<at::Tensor>& cuSeqlensK,
+                                         const c10::optional<at::Tensor>& sequsedQ,
+                                         const c10::optional<at::Tensor>& sequsedK,
+                                         const c10::optional<at::Tensor>& cmpResidualK, int64_t batchSize,
                                          int64_t maxSeqlenQ, int64_t maxSeqlenK, c10::string_view layoutQ,
                                          c10::string_view layoutK, int64_t maskMode, int64_t cmpRatio)
 {
@@ -114,8 +120,8 @@ at::Tensor QuantLightningIndexerMetadata(int64_t numHeadsQ, int64_t numHeadsK, i
 
     std::string layoutQStr = std::string(layoutQ);
     std::string layoutKStr = std::string(layoutK);
-    char *layoutQPtr = const_cast<char *>(layoutQStr.c_str());
-    char *layoutKPtr = const_cast<char *>(layoutKStr.c_str());
+    char* layoutQPtr = const_cast<char*>(layoutQStr.c_str());
+    char* layoutKPtr = const_cast<char*>(layoutKStr.c_str());
 
     ACLNN_CMD(aclnnQuantLightningIndexerV2Metadata, cuSeqlensQVal, cuSeqlensKVal, sequsedQVal, sequsedKVal,
               cmpResidualKVal, numHeadsQ, numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ, maxSeqlenK,
@@ -125,7 +131,7 @@ at::Tensor QuantLightningIndexerMetadata(int64_t numHeadsQ, int64_t numHeadsK, i
 
 // 工具函数，推导输出shape
 std::tuple<at::Tensor, at::Tensor> ConstructQuantLightningIndexerOutputTensor(
-    const at::Tensor &query, const at::Tensor &key, int64_t sparseCount, std::string queryLayoutStr,
+    const at::Tensor& query, const at::Tensor& key, int64_t sparseCount, std::string queryLayoutStr,
     std::string keyLayoutStr, int64_t returnValue)
 {
     at::SmallVector<int64_t, SIZE> outputSize;
@@ -162,12 +168,12 @@ std::tuple<at::Tensor, at::Tensor> ConstructQuantLightningIndexerOutputTensor(
 }
 
 std::tuple<at::Tensor, at::Tensor> QuantLightningIndexer(
-    const at::Tensor &query, const at::Tensor &key, const at::Tensor &weights, const at::Tensor &queryDequantScale,
-    const at::Tensor &keyDequantScale, int64_t topk, int64_t quantMode, const c10::optional<at::Tensor> &cuSeqlensQ,
-    const c10::optional<at::Tensor> &cuSeqlensK, const c10::optional<at::Tensor> &sequsedQ,
-    const c10::optional<at::Tensor> &sequsedK, const c10::optional<at::Tensor> &cmpResidualK,
-    const c10::optional<at::Tensor> &blockTable, const c10::optional<at::Tensor> &outputIdxOffset,
-    const c10::optional<at::Tensor> &metadata, int64_t maxSeqlenQ, c10::string_view layoutQ, c10::string_view layoutK,
+    const at::Tensor& query, const at::Tensor& key, const at::Tensor& weights, const at::Tensor& queryDequantScale,
+    const at::Tensor& keyDequantScale, int64_t topk, int64_t quantMode, const c10::optional<at::Tensor>& cuSeqlensQ,
+    const c10::optional<at::Tensor>& cuSeqlensK, const c10::optional<at::Tensor>& sequsedQ,
+    const c10::optional<at::Tensor>& sequsedK, const c10::optional<at::Tensor>& cmpResidualK,
+    const c10::optional<at::Tensor>& blockTable, const c10::optional<at::Tensor>& outputIdxOffset,
+    const c10::optional<at::Tensor>& metadata, int64_t maxSeqlenQ, c10::string_view layoutQ, c10::string_view layoutK,
     int64_t maskMode, int64_t cmpRatio, int64_t returnValue)
 {
     TORCH_CHECK(query.numel() > 0, "Tensor query is empty.")
@@ -182,8 +188,8 @@ std::tuple<at::Tensor, at::Tensor> QuantLightningIndexer(
     at::Tensor sparseIndicesOut = std::get<0>(quantLightningIndexerOutput);
     at::Tensor sparseValuesOut = std::get<1>(quantLightningIndexerOutput);
     // convert str
-    char *queryLayoutPtr = const_cast<char *>(queryLayoutStr.c_str());
-    char *keyLayoutPtr = const_cast<char *>(keyLayoutStr.c_str());
+    char* queryLayoutPtr = const_cast<char*>(queryLayoutStr.c_str());
+    char* keyLayoutPtr = const_cast<char*>(keyLayoutStr.c_str());
 
     auto queryWrapper = MakeWrapper(query);
     auto keyWrapper = MakeWrapper(key);

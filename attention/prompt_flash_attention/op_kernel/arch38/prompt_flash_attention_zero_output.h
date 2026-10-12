@@ -29,19 +29,19 @@ template <typename T>
 class PromptFlashAttentionZeroOutPut {
 public:
     __aicore__ inline PromptFlashAttentionZeroOutPut(){};
-    __aicore__ inline void Init(__gm__ uint8_t *attentionOut, const PromptFlashAttentionTilingData *__restrict tiling);
+    __aicore__ inline void Init(__gm__ uint8_t* attentionOut, const PromptFlashAttentionTilingData* __restrict tiling);
     __aicore__ inline void Process();
 
 protected:
-    const PromptFlashAttentionTilingData *__restrict tilingData;
+    const PromptFlashAttentionTilingData* __restrict tilingData;
     GlobalTensor<T> attentionOutGm;
 };
 
 template <typename T>
-__aicore__ inline void PromptFlashAttentionZeroOutPut<T>::Init(__gm__ uint8_t *attentionOut,
-                                                               const PromptFlashAttentionTilingData *__restrict tiling)
+__aicore__ inline void PromptFlashAttentionZeroOutPut<T>::Init(__gm__ uint8_t* attentionOut,
+                                                               const PromptFlashAttentionTilingData* __restrict tiling)
 {
-    attentionOutGm.SetGlobalBuffer((__gm__ T *)attentionOut);
+    attentionOutGm.SetGlobalBuffer((__gm__ T*)attentionOut);
     tilingData = tiling;
 }
 
@@ -49,7 +49,7 @@ template <typename T>
 __aicore__ inline void PromptFlashAttentionZeroOutPut<T>::Process()
 {
     uint32_t tmp_block_idx = GetBlockIdx();
-    auto &initParams = tilingData->promptAttentionInitOutputParams;
+    auto& initParams = tilingData->promptAttentionInitOutputParams;
     uint32_t tailSize = initParams.totalOutputSize - tmp_block_idx * initParams.singleCoreSize;
     uint32_t singleInitOutputSize = tailSize < initParams.singleCoreSize ? tailSize : initParams.singleCoreSize;
     InitOutput<T>(attentionOutGm[tmp_block_idx * initParams.singleCoreSize], singleInitOutputSize, 0);

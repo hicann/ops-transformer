@@ -66,7 +66,7 @@ struct TileCastFp8ToFp16Dequant {
     TileCastFp8ToFp16Dequant() {}
 
     CATLASS_DEVICE
-    TileCastFp8ToFp16Dequant(Arch::Resource<ArchTag> &resource, Params const &params_)
+    TileCastFp8ToFp16Dequant(Arch::Resource<ArchTag>& resource, Params const& params_)
         : params(params_)
     {
         int64_t bufferOffset = 0;
@@ -88,8 +88,8 @@ struct TileCastFp8ToFp16Dequant {
     }
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementDst> gmDst, LayoutDst const &layoutDst,
-                    AscendC::GlobalTensor<ElementSrc> gmSrc, LayoutSrc const &layoutSrc, uint32_t &bufferIndex)
+    void operator()(AscendC::GlobalTensor<ElementDst> gmDst, LayoutDst const& layoutDst,
+                    AscendC::GlobalTensor<ElementSrc> gmSrc, LayoutSrc const& layoutSrc, uint32_t& bufferIndex)
     {
         uint32_t tilesNum, tileLen, srcStride, dstStride;
         if constexpr (std::is_same_v<LayoutSrc, layout::RowMajor>) {
@@ -310,7 +310,7 @@ struct TileCastFp8ToFp16Dequant {
 
 private:
     CATLASS_DEVICE
-    void InitLocalMaskVec(Arch::Resource<ArchTag> &resource, int64_t &bufferOffset)
+    void InitLocalMaskVec(Arch::Resource<ArchTag>& resource, int64_t& bufferOffset)
     {
         int16_t value_uint = MASK_VEC1;
         value_vector1 = (resource.ubBuf.template GetBufferByByte<ElementSrc>(bufferOffset * sizeof(ElementSrc)))
@@ -328,9 +328,9 @@ private:
     }
 
     CATLASS_DEVICE
-    void Dequant(AscendC::LocalTensor<int8_t> &src, AscendC::LocalTensor<half> &dst,
-                 AscendC::LocalTensor<int16_t> &value_vector1, AscendC::LocalTensor<int16_t> &value_vector2,
-                 AscendC::LocalTensor<half> &workspace)
+    void Dequant(AscendC::LocalTensor<int8_t>& src, AscendC::LocalTensor<half>& dst,
+                 AscendC::LocalTensor<int16_t>& value_vector1, AscendC::LocalTensor<int16_t>& value_vector2,
+                 AscendC::LocalTensor<half>& workspace)
     {
         pipe_barrier(PIPE_V);
         uint32_t num = COMPUTE_LENGTH;

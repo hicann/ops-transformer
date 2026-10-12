@@ -41,7 +41,7 @@ enum class CopyTransposeType {
     TRANSPOSE_ND_UB_GM,            //  [B, N, S, H/N] -> [B, S, H]
 };
 
-__aicore__ inline void DataCopyUB2GMAlign(const GlobalTensor<half> &dstGlobal, const LocalTensor<half> &srcLocal,
+__aicore__ inline void DataCopyUB2GMAlign(const GlobalTensor<half>& dstGlobal, const LocalTensor<half>& srcLocal,
                                           uint16_t nBurst, uint32_t lenBurst, uint8_t srcGap, uint8_t dstGap)
 {
     if (g_coreType == AIV) {
@@ -50,8 +50,8 @@ __aicore__ inline void DataCopyUB2GMAlign(const GlobalTensor<half> &dstGlobal, c
 }
 
 #if (__CCE_AICORE__ > 200)
-__aicore__ inline void DataCopyUB2GMAlign(const GlobalTensor<bfloat16_t> &dstGlobal,
-                                          const LocalTensor<bfloat16_t> &srcLocal, uint16_t nBurst, uint32_t lenBurst,
+__aicore__ inline void DataCopyUB2GMAlign(const GlobalTensor<bfloat16_t>& dstGlobal,
+                                          const LocalTensor<bfloat16_t>& srcLocal, uint16_t nBurst, uint32_t lenBurst,
                                           uint8_t srcGap, uint8_t dstGap)
 {
     if (g_coreType == AIV) {
@@ -60,7 +60,7 @@ __aicore__ inline void DataCopyUB2GMAlign(const GlobalTensor<bfloat16_t> &dstGlo
 }
 #endif
 
-__aicore__ inline void DataCopyUB2GMAlign(const GlobalTensor<float> &dstGlobal, const LocalTensor<float> &srcLocal,
+__aicore__ inline void DataCopyUB2GMAlign(const GlobalTensor<float>& dstGlobal, const LocalTensor<float>& srcLocal,
                                           uint16_t nBurst, uint32_t lenBurst, uint8_t srcGap, uint8_t dstGap)
 {
     if (g_coreType == AIV) {
@@ -68,7 +68,7 @@ __aicore__ inline void DataCopyUB2GMAlign(const GlobalTensor<float> &dstGlobal, 
     }
 }
 
-__aicore__ inline void DataCopyUB2GMAlign(const GlobalTensor<int8_t> &dstGlobal, const LocalTensor<int8_t> &srcLocal,
+__aicore__ inline void DataCopyUB2GMAlign(const GlobalTensor<int8_t>& dstGlobal, const LocalTensor<int8_t>& srcLocal,
                                           uint16_t nBurst, uint32_t lenBurst, uint8_t srcGap, uint8_t dstGap)
 {
     if (g_coreType == AIV) {
@@ -84,7 +84,7 @@ using TransposeParams = struct TransposeParams {
 }; // Index the position of the segmented small block within the original large block
 
 template <typename T>
-__aicore__ inline void DataCopyTranspose(const GlobalTensor<T> &dstGlobal, const LocalTensor<T> &srcLocal,
+__aicore__ inline void DataCopyTranspose(const GlobalTensor<T>& dstGlobal, const LocalTensor<T>& srcLocal,
                                          CopyTransposeType transposeType, TransposeParams transposeParams,
                                          CopyTransposeTiling tiling)
 {
@@ -111,7 +111,7 @@ __aicore__ inline void DataCopyTranspose(const GlobalTensor<T> &dstGlobal, const
 }
 
 template <typename T>
-__aicore__ inline void DataCopyTranspose2(const GlobalTensor<T> &dstGlobal, const LocalTensor<T> &srcLocal,
+__aicore__ inline void DataCopyTranspose2(const GlobalTensor<T>& dstGlobal, const LocalTensor<T>& srcLocal,
                                           CopyTransposeType transposeType, TransposeParams transposeParams,
                                           CopyTransposeTiling tiling, int64_t multi_seq_offset)
 {

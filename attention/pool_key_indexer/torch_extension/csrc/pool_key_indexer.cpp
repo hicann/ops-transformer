@@ -19,22 +19,22 @@ using namespace at_npu::native;
 
 // ACLNN_CMD 宏按 "<api>GetWorkspaceSize" 拼接函数名, 无法覆盖 GWS 与 run 函数
 // 前缀不同的场景; 本辅助函数按显式函数名调用(语义同 ACLNN_CMD), 并缓存函数地址。
-static void *CachedOpApiFuncAddr(const char *apiName)
+static void* CachedOpApiFuncAddr(const char* apiName)
 {
     static std::mutex mu;
-    static std::unordered_map<std::string, void *> cache;
+    static std::unordered_map<std::string, void*> cache;
     std::lock_guard<std::mutex> guard(mu);
     auto it = cache.find(apiName);
     if (it != cache.end()) {
         return it->second;
     }
-    void *addr = GetOpApiFuncAddr(apiName);
+    void* addr = GetOpApiFuncAddr(apiName);
     cache.emplace(apiName, addr);
     return addr;
 }
 
 template <typename... Ts>
-static void AclnnCallNamed(const char *gwsApiName, const char *runApiName, Ts &...args)
+static void AclnnCallNamed(const char* gwsApiName, const char* runApiName, Ts&... args)
 {
     auto device = DecodeDevice(args...);
     const c10::OptionalDeviceGuard device_guard(device);
@@ -47,9 +47,9 @@ static void AclnnCallNamed(const char *gwsApiName, const char *runApiName, Ts &.
                 " not in opapi lib.");
     auto acl_stream = c10_npu::getCurrentNPUStream().stream(false);
     uint64_t workspace_size = 0;
-    uint64_t *workspace_size_addr = &workspace_size;
-    aclOpExecutor *executor = nullptr;
-    aclOpExecutor **executor_addr = &executor;
+    uint64_t* workspace_size_addr = &workspace_size;
+    aclOpExecutor* executor = nullptr;
+    aclOpExecutor** executor_addr = &executor;
     InitHugeMemThreadLocal initMemFunc = reinterpret_cast<InitHugeMemThreadLocal>(initMemAddr);
     UnInitHugeMemThreadLocal unInitMemFunc = reinterpret_cast<UnInitHugeMemThreadLocal>(unInitMemAddr);
     if (initMemFunc) {
@@ -64,16 +64,16 @@ static void AclnnCallNamed(const char *gwsApiName, const char *runApiName, Ts &.
         TORCH_CHECK(false, "call ", gwsApiName, " failed, detail:", aclGetRecentErrMsg());
     }
     at::Tensor workspace_tensor;
-    void *workspace_addr = nullptr;
+    void* workspace_addr = nullptr;
     if (workspace_size != 0) {
         at::TensorOptions options = at::TensorOptions(torch_npu::utils::get_npu_device_type());
         workspace_tensor = at::empty({workspace_size}, options.dtype(at::kByte));
-        workspace_addr = const_cast<void *>(workspace_tensor.storage().data());
+        workspace_addr = const_cast<void*>(workspace_tensor.storage().data());
     }
     ReleaseHugeMem releaseMemFunc = reinterpret_cast<ReleaseHugeMem>(releaseMemAddr);
     auto acl_call = [converted_params, workspace_addr, workspace_size, acl_stream, executor, opApiFuncAddr,
                      releaseMemFunc, runApiName]() -> int {
-        typedef int (*OpApiFunc)(void *, uint64_t, aclOpExecutor *, const aclrtStream);
+        typedef int (*OpApiFunc)(void*, uint64_t, aclOpExecutor*, const aclrtStream);
         OpApiFunc opApiFunc = reinterpret_cast<OpApiFunc>(opApiFuncAddr);
         auto api_ret = opApiFunc(workspace_addr, workspace_size, executor, acl_stream);
         ReleaseConvertTypes(converted_params);
@@ -96,17 +96,17 @@ const int SIZE = 8;
 const int DIM_0 = 0;
 const int DIM_1 = 1;
 
-inline TensorWrapper PkiMakeWrapper(const at::Tensor &tensor)
+inline TensorWrapper PkiMakeWrapper(const at::Tensor& tensor)
 {
     return {tensor, ConvertToAclDataType(tensor.scalar_type())};
 }
 
-inline bool PkiIsFp8Tensor(const at::Tensor &tensor)
+inline bool PkiIsFp8Tensor(const at::Tensor& tensor)
 {
     return tensor.scalar_type() == at::kFloat8_e4m3fn;
 }
 
-inline bool PkiIsE8M0Tensor(const at::Tensor &tensor)
+inline bool PkiIsE8M0Tensor(const at::Tensor& tensor)
 {
     return tensor.scalar_type() == at::kFloat8_e8m0fnu;
 }
@@ -115,8 +115,8 @@ constexpr int64_t PKI_E8M0_SCALE_PACK_NUM = 2;
 
 // PKI 量化 dtype 修正: quantMode=0 的 descale=FLOAT 按 aclnn 输入 dtype 自动
 // 识别; quantMode=1 需显式设置 ACL_FLOAT8_E8M0 并校验 2 元素打包对齐。
-inline void FixPkiAclDtypes(int64_t quantMode, TensorWrapper &queryWrapper, TensorWrapper &poolKeyWrapper,
-                            TensorWrapper &qScaleWrapper, TensorWrapper &kScaleWrapper)
+inline void FixPkiAclDtypes(int64_t quantMode, TensorWrapper& queryWrapper, TensorWrapper& poolKeyWrapper,
+                            TensorWrapper& qScaleWrapper, TensorWrapper& kScaleWrapper)
 {
     if (quantMode == 0 || quantMode == 1) {
         TORCH_CHECK(PkiIsFp8Tensor(queryWrapper.tensor_),
@@ -156,9 +156,9 @@ inline void FixPkiAclDtypes(int64_t quantMode, TensorWrapper &queryWrapper, Tens
 
 // Derive output shapes from query shape + layout: BSND query (B,S1,N1,D) -> indices
 // (B,S1,topk+poolSize-1) / values (B,S1,topk/poolSize); TND 少一维且无 N2(N2 恒 1)。
-std::tuple<at::Tensor, at::Tensor> ConstructPoolKeyIndexerOutputTensor(const at::Tensor &query, int64_t topk,
+std::tuple<at::Tensor, at::Tensor> ConstructPoolKeyIndexerOutputTensor(const at::Tensor& query, int64_t topk,
                                                                        int64_t poolSize,
-                                                                       const std::string &queryLayoutStr,
+                                                                       const std::string& queryLayoutStr,
                                                                        bool returnValue)
 {
     for (size_t i = 0; i < query.sizes().size(); i++) {
@@ -194,7 +194,7 @@ std::tuple<at::Tensor, at::Tensor> ConstructPoolKeyIndexerOutputTensor(const at:
     return std::tuple<at::Tensor, at::Tensor>(sparseIndicesOut, sparseValuesOut);
 }
 
-std::vector<bool> IsContiguousAxes(const at::Tensor &tensor)
+std::vector<bool> IsContiguousAxes(const at::Tensor& tensor)
 {
     auto sizes = tensor.sizes();
     auto strides = tensor.strides();
@@ -216,10 +216,10 @@ std::vector<bool> IsContiguousAxes(const at::Tensor &tensor)
 }
 
 std::tuple<at::Tensor, at::Tensor> PoolKeyIndexer(
-    const at::Tensor &query, const at::Tensor &poolKey, const at::Tensor &weights, const at::Tensor &poolTailK,
-    const c10::optional<at::Tensor> &actualSeqQ, const c10::optional<at::Tensor> &actualSeqK,
-    const c10::optional<at::Tensor> &blockTable, const c10::optional<at::Tensor> &qDescale,
-    const c10::optional<at::Tensor> &kDescale, c10::string_view layoutQ, c10::string_view layoutK, int64_t topk,
+    const at::Tensor& query, const at::Tensor& poolKey, const at::Tensor& weights, const at::Tensor& poolTailK,
+    const c10::optional<at::Tensor>& actualSeqQ, const c10::optional<at::Tensor>& actualSeqK,
+    const c10::optional<at::Tensor>& blockTable, const c10::optional<at::Tensor>& qDescale,
+    const c10::optional<at::Tensor>& kDescale, c10::string_view layoutQ, c10::string_view layoutK, int64_t topk,
     int64_t poolSize, int64_t maskMode, int64_t quantMode, bool returnValue)
 {
     TORCH_CHECK(query.numel() > 0, "Tensor query is empty.")
@@ -238,8 +238,8 @@ std::tuple<at::Tensor, at::Tensor> PoolKeyIndexer(
     at::Device outputDevice = query.device();
     (void)outputDevice;
 
-    char *queryLayoutPtr = const_cast<char *>(queryLayoutStr.c_str());
-    char *keyLayoutPtr = const_cast<char *>(keyLayoutStr.c_str());
+    char* queryLayoutPtr = const_cast<char*>(queryLayoutStr.c_str());
+    char* keyLayoutPtr = const_cast<char*>(keyLayoutStr.c_str());
 
     // pool_key 0轴非连续支持: eager 链路 tiling 不上报运行时 stride, 此处直读
     // stride(0) 作为 key_stride0 属性下传; 非 0 轴必须连续, 非 PA 布局显式拒绝。

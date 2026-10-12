@@ -14,7 +14,5 @@
 using namespace ge;
 using namespace AscendC;
 namespace optiling {
-IMPL_OP_OPTILING(MlaPrologV3)
-    .Tiling(TilingMlaProlog)
-    .TilingParse<MlaPrologCompileInfo>(TilingPrepareForMlaProlog);
+IMPL_OP_OPTILING(MlaPrologV3).Tiling(TilingMlaProlog).TilingParse<MlaPrologCompileInfo>(TilingPrepareForMlaProlog);
 } // namespace optiling

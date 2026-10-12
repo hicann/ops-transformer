@@ -16,9 +16,15 @@ namespace QuantFlashAttnUT {
 
 class QuantFlashAttnInferShapeTest : public testing::TestWithParam<QuantFlashAttnInferShapeUtParam> {
 protected:
-    static void SetUpTestCase() { std::cout << "QuantFlashAttn InferShapeTest SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "QuantFlashAttn InferShapeTest SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "QuantFlashAttn InferShapeTest TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "QuantFlashAttn InferShapeTest TearDown" << std::endl;
+    }
 };
 
 // 临时添加，待框架修复后删除

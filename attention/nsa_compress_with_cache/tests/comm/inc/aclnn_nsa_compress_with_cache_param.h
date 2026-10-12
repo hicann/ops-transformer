@@ -27,7 +27,7 @@ public:
 public:
     /* 输入输出 */
     AclnnTensor aclnnInput, aclnnWeight, aclnnActSeqLenOptional, aclnnOutputCache, aclnnSlotMapping, aclnnBlockTable;
-    aclIntArray *aclnnActualSeqLenIntAry = nullptr;
+    aclIntArray* aclnnActualSeqLenIntAry = nullptr;
 
 public:
     AclnnNsaCompressWithCacheParam() = default;

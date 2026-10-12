@@ -33,9 +33,8 @@ const std::vector<uint32_t> kOutputIrInstance{1, 1, 1};
 using TensorDesc = gert::InfershapeContextPara::TensorDescription;
 using OpAttr = gert::InfershapeContextPara::OpAttr;
 
-std::vector<TensorDesc> MakeInputs(ge::DataType qkvDtype, int64_t t1 = kT1, int64_t t2 = kT2,
-                                   int64_t n1 = kN1, int64_t n2 = kN2,
-                                   int64_t d = kHeadDim, int64_t d2 = kValueHeadDim)
+std::vector<TensorDesc> MakeInputs(ge::DataType qkvDtype, int64_t t1 = kT1, int64_t t2 = kT2, int64_t n1 = kN1,
+                                   int64_t n2 = kN2, int64_t d = kHeadDim, int64_t d2 = kValueHeadDim)
 {
     return {
         // query: [t1, n1, d]
@@ -72,23 +71,20 @@ std::vector<TensorDesc> MakeEmptyOutputs()
     };
 }
 
-std::vector<OpAttr> MakeAttrs(const std::string& layout,
-                              int64_t blockCount = kBlockCount,
-                              int64_t blockSize = kBlockSize,
-                              int64_t headNum = kN1,
-                              int64_t sparseMode = 0,
+std::vector<OpAttr> MakeAttrs(const std::string& layout, int64_t blockCount = kBlockCount,
+                              int64_t blockSize = kBlockSize, int64_t headNum = kN1, int64_t sparseMode = 0,
                               float scaleValue = 0.088388f)
 {
     return {
-        {"scaleValue",         Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
+        {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(scaleValue)},
         {"selectedBlockCount", Ops::Transformer::AnyValue::CreateFrom<int64_t>(blockCount)},
-        {"selectedBlockSize",  Ops::Transformer::AnyValue::CreateFrom<int64_t>(blockSize)},
-        {"headNum",            Ops::Transformer::AnyValue::CreateFrom<int64_t>(headNum)},
-        {"inputLayout",        Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
-        {"sparseMode",         Ops::Transformer::AnyValue::CreateFrom<int64_t>(sparseMode)},
+        {"selectedBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(blockSize)},
+        {"headNum", Ops::Transformer::AnyValue::CreateFrom<int64_t>(headNum)},
+        {"inputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
+        {"sparseMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(sparseMode)},
     };
 }
-}  // namespace
+} // namespace
 
 class NsaSelectedAttentionGradProto : public testing::Test {
 protected:
@@ -106,13 +102,8 @@ protected:
 // A1: positive, TND layout, fp16, single batch
 TEST_F(NsaSelectedAttentionGradProto, A1_TND_fp16_basic)
 {
-    gert::InfershapeContextPara para(
-        "NsaSelectedAttentionGrad",
-        MakeInputs(ge::DT_FLOAT16),
-        MakeEmptyOutputs(),
-        MakeAttrs("TND"),
-        kInputIrInstanceFull,
-        kOutputIrInstance);
+    gert::InfershapeContextPara para("NsaSelectedAttentionGrad", MakeInputs(ge::DT_FLOAT16), MakeEmptyOutputs(),
+                                     MakeAttrs("TND"), kInputIrInstanceFull, kOutputIrInstance);
 
     std::vector<std::vector<int64_t>> expectShapes = {
         {kT1, kN1, kHeadDim},      // dq = query shape
@@ -125,13 +116,9 @@ TEST_F(NsaSelectedAttentionGradProto, A1_TND_fp16_basic)
 // A2: positive, TND layout, bf16
 TEST_F(NsaSelectedAttentionGradProto, A2_TND_bf16_basic)
 {
-    gert::InfershapeContextPara para(
-        "NsaSelectedAttentionGrad",
-        MakeInputs(ge::DT_BF16),
-        MakeEmptyOutputs(),
-        MakeAttrs("TND", kBlockCount, kBlockSize, kN1, 2),
-        kInputIrInstanceFull,
-        kOutputIrInstance);
+    gert::InfershapeContextPara para("NsaSelectedAttentionGrad", MakeInputs(ge::DT_BF16), MakeEmptyOutputs(),
+                                     MakeAttrs("TND", kBlockCount, kBlockSize, kN1, 2), kInputIrInstanceFull,
+                                     kOutputIrInstance);
 
     std::vector<std::vector<int64_t>> expectShapes = {
         {kT1, kN1, kHeadDim},
@@ -144,13 +131,8 @@ TEST_F(NsaSelectedAttentionGradProto, A2_TND_bf16_basic)
 // A3: positive, lower-case "tnd" should be accepted (case-insensitive layout in infershape)
 TEST_F(NsaSelectedAttentionGradProto, A3_tnd_lowercase_layout)
 {
-    gert::InfershapeContextPara para(
-        "NsaSelectedAttentionGrad",
-        MakeInputs(ge::DT_FLOAT16),
-        MakeEmptyOutputs(),
-        MakeAttrs("tnd"),
-        kInputIrInstanceFull,
-        kOutputIrInstance);
+    gert::InfershapeContextPara para("NsaSelectedAttentionGrad", MakeInputs(ge::DT_FLOAT16), MakeEmptyOutputs(),
+                                     MakeAttrs("tnd"), kInputIrInstanceFull, kOutputIrInstance);
 
     std::vector<std::vector<int64_t>> expectShapes = {
         {kT1, kN1, kHeadDim},
@@ -166,13 +148,8 @@ TEST_F(NsaSelectedAttentionGradProto, A4_TND_multi_batch)
     constexpr int64_t kMultiT1 = 8;
     constexpr int64_t kMultiT2 = 8192;
 
-    gert::InfershapeContextPara para(
-        "NsaSelectedAttentionGrad",
-        MakeInputs(ge::DT_FLOAT16, kMultiT1, kMultiT2),
-        MakeEmptyOutputs(),
-        MakeAttrs("TND"),
-        kInputIrInstanceFull,
-        kOutputIrInstance);
+    gert::InfershapeContextPara para("NsaSelectedAttentionGrad", MakeInputs(ge::DT_FLOAT16, kMultiT1, kMultiT2),
+                                     MakeEmptyOutputs(), MakeAttrs("TND"), kInputIrInstanceFull, kOutputIrInstance);
 
     std::vector<std::vector<int64_t>> expectShapes = {
         {kMultiT1, kN1, kHeadDim},
@@ -185,13 +162,8 @@ TEST_F(NsaSelectedAttentionGradProto, A4_TND_multi_batch)
 // E1: negative, invalid layout BSH
 TEST_F(NsaSelectedAttentionGradProto, E1_invalid_layout_BSH)
 {
-    gert::InfershapeContextPara para(
-        "NsaSelectedAttentionGrad",
-        MakeInputs(ge::DT_FLOAT16),
-        MakeEmptyOutputs(),
-        MakeAttrs("BSH"),
-        kInputIrInstanceFull,
-        kOutputIrInstance);
+    gert::InfershapeContextPara para("NsaSelectedAttentionGrad", MakeInputs(ge::DT_FLOAT16), MakeEmptyOutputs(),
+                                     MakeAttrs("BSH"), kInputIrInstanceFull, kOutputIrInstance);
 
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
@@ -199,13 +171,8 @@ TEST_F(NsaSelectedAttentionGradProto, E1_invalid_layout_BSH)
 // E2: negative, invalid layout SBH
 TEST_F(NsaSelectedAttentionGradProto, E2_invalid_layout_SBH)
 {
-    gert::InfershapeContextPara para(
-        "NsaSelectedAttentionGrad",
-        MakeInputs(ge::DT_FLOAT16),
-        MakeEmptyOutputs(),
-        MakeAttrs("SBH"),
-        kInputIrInstanceFull,
-        kOutputIrInstance);
+    gert::InfershapeContextPara para("NsaSelectedAttentionGrad", MakeInputs(ge::DT_FLOAT16), MakeEmptyOutputs(),
+                                     MakeAttrs("SBH"), kInputIrInstanceFull, kOutputIrInstance);
 
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }

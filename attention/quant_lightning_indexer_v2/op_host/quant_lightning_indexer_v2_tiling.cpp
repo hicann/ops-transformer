@@ -75,7 +75,7 @@ std::string QLIV2DataTypeToSerialString(ge::DataType type)
     }
 }
 
-static std::string ToStringRaw(const gert::Shape &shape)
+static std::string ToStringRaw(const gert::Shape& shape)
 {
     std::ostringstream oss;
     const size_t dimCount = shape.GetDimNum();
@@ -794,8 +794,8 @@ ge::graphStatus QLIV2InfoParser::GetN1Size()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QLIV2InfoParser::GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor,
-                                                     const std::string &actualSeqLenName) const
+ge::graphStatus QLIV2InfoParser::GetActualSeqLenSize(int64_t& size, const gert::Tensor* tensor,
+                                                     const std::string& actualSeqLenName) const
 {
     size = tensor->GetShapeSize();
     if (size <= 0) {
@@ -1349,7 +1349,7 @@ ge::graphStatus QLIV2InfoParser::CheckKeyContiguous() const
     // 非PA_BBND: 所有轴都必须连续 Non-PA_BBND: check starts from axis 0
     size_t checkStartIdx = (kLayout_ == DataLayout::PA_BBND) ? 1 : 0;
     if (!keyStridesVec_.empty() && qliV2Params_.key.shape != nullptr) {
-        auto &shape = qliV2Params_.key.shape->GetStorageShape();
+        auto& shape = qliV2Params_.key.shape->GetStorageShape();
         std::vector<uint32_t> expectedStrides;
         if (kLayout_ == DataLayout::BSND || kLayout_ == DataLayout::PA_BBND) {
             expectedStrides = {shape.GetDim(1) * shape.GetDim(2) * shape.GetDim(3), shape.GetDim(2) * shape.GetDim(3),
@@ -1367,7 +1367,7 @@ ge::graphStatus QLIV2InfoParser::CheckKeyContiguous() const
     bool isMxQuantMode = (*qliV2Params_.quantMode == QUANT_MODE_MXFP8) || (*qliV2Params_.quantMode == QUANT_MODE_MXFP4);
     if ((*qliV2Params_.quantMode != QUANT_MODE_HIFLOAT8) && !keyDequantScaleStridesVec_.empty() &&
         qliV2Params_.key_dequant_scale.shape != nullptr) {
-        auto &shape = qliV2Params_.key_dequant_scale.shape->GetStorageShape();
+        auto& shape = qliV2Params_.key_dequant_scale.shape->GetStorageShape();
         std::vector<uint32_t> expectedStrides;
         if (isMxQuantMode) {
             if (kLayout_ == DataLayout::BSND || kLayout_ == DataLayout::PA_BBND) {
@@ -1431,7 +1431,7 @@ ge::graphStatus QLIV2InfoParser::CheckKeyContiguous() const
     return ge::GRAPH_SUCCESS;
 }
 
-void QLIV2InfoParser::GenerateInfo(QLIV2TilingInfo &QLIV2Info)
+void QLIV2InfoParser::GenerateInfo(QLIV2TilingInfo& QLIV2Info)
 {
     QLIV2Info.opName = opName_;
     QLIV2Info.platformInfo = platformInfo_;
@@ -1484,7 +1484,7 @@ void QLIV2InfoParser::GenerateInfo(QLIV2TilingInfo &QLIV2Info)
     QLIV2Info.inputKLayout = kLayout_;
 }
 
-ge::graphStatus QLIV2InfoParser::ParseAndCheck(QLIV2TilingInfo &QLIV2Info)
+ge::graphStatus QLIV2InfoParser::ParseAndCheck(QLIV2TilingInfo& QLIV2Info)
 {
     if (ge::GRAPH_SUCCESS != GetOpName() || ge::GRAPH_SUCCESS != GetNpuInfo() || ge::GRAPH_SUCCESS != GetOpParaInfo() ||
         ge::GRAPH_SUCCESS != CheckQliv2RequiredParameters()) {
@@ -1517,13 +1517,13 @@ ge::graphStatus QLIV2InfoParser::ParseAndCheck(QLIV2TilingInfo &QLIV2Info)
 }
 
 // --------------------------TilingPrepare函数定义-------------------------------------
-static ge::graphStatus TilingPrepareForQuantLightningIndexerV2(gert::TilingParseContext * /* context */)
+static ge::graphStatus TilingPrepareForQuantLightningIndexerV2(gert::TilingParseContext* /* context */)
 {
     return ge::GRAPH_SUCCESS;
 }
 
 // --------------------------QuantLightningIndexerV2Tiling类成员函数定义-----------------------
-ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo *tilingInfo)
+ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingInfo)
 {
     // -------------set blockdim-----------------
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
@@ -1567,7 +1567,7 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo *tilingI
         // 临时存储Decode中间参数信息大小: 2(头/尾)*8(s1Base)*16(paramNum)*sizeof(int64_t)*24=48k
         workspaceSize += V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_DECODE_PARAM_NUM * V1_DECODE_PARAM_ELEM_SIZE * aicNum;
     }
-    size_t *workSpaces = context_->GetWorkspaceSizes(1);
+    size_t* workSpaces = context_->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
 
     // -------------set tilingdata-----------------
@@ -1606,7 +1606,7 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo *tilingI
 }
 
 // --------------------------Tiling函数定义---------------------------
-ge::graphStatus TilingForQuantLightningIndexerV2(gert::TilingContext *context)
+ge::graphStatus TilingForQuantLightningIndexerV2(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("QuantLightningIndexerV2", "Tiling context is null."),
                 return ge::GRAPH_FAILED);

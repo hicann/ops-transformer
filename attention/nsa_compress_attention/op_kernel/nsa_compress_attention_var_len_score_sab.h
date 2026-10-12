@@ -28,13 +28,13 @@ class NsaCompressAttentionVarLenScoreSameAB
 public:
     __aicore__ inline NsaCompressAttentionVarLenScoreSameAB(){};
 
-    __aicore__ inline void UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                      __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                      __gm__ uint8_t *actualSeqLengthsCmpKv, __gm__ uint8_t *actualSeqLengthsSelKv,
-                                      __gm__ uint8_t *topkMask, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-                                      __gm__ uint8_t *attentionOut, __gm__ uint8_t *topkIndicesOut,
-                                      __gm__ uint8_t *workspace,
-                                      const NsaCompressAttentionGeneralTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void UnpackInit(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                      __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                                      __gm__ uint8_t* actualSeqLengthsCmpKv, __gm__ uint8_t* actualSeqLengthsSelKv,
+                                      __gm__ uint8_t* topkMask, __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum,
+                                      __gm__ uint8_t* attentionOut, __gm__ uint8_t* topkIndicesOut,
+                                      __gm__ uint8_t* workspace,
+                                      const NsaCompressAttentionGeneralTilingData* __restrict tiling, TPipe* tPipe);
 
     __aicore__ inline void Process();
 
@@ -43,13 +43,13 @@ protected:
 
     __aicore__ inline void ComputeAxisIdx(int64_t multiCoreInnerIdx);
 
-    __aicore__ inline void ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo);
+    __aicore__ inline void ComputeBmm1Tail(SplitSameABExtraInfo& extraInfo);
 
-    __aicore__ inline void SetExtraInfo(SplitSameABExtraInfo &extraInfo, int64_t taskId, int64_t multiCoreInnerIdx);
+    __aicore__ inline void SetExtraInfo(SplitSameABExtraInfo& extraInfo, int64_t taskId, int64_t multiCoreInnerIdx);
 
     __aicore__ inline void CalS1OuterSize(int64_t offset);
 
-    __aicore__ inline void GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvlen);
+    __aicore__ inline void GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t& actualSeqQlen, int64_t& actualSeqKvlen);
 
     // Unpack 用参数
     GM_ADDR actualSeqQlenAddr;
@@ -66,18 +66,18 @@ template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename I
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void NsaCompressAttentionVarLenScoreSameAB<
     layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-    mmPolicyType>::UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                              __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                              __gm__ uint8_t *actualSeqLengthsCmpKv, __gm__ uint8_t *actualSeqLengthsSelKv,
-                              __gm__ uint8_t *topkMask, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-                              __gm__ uint8_t *attentionOut, __gm__ uint8_t *topkIndicesOut, __gm__ uint8_t *workspace,
-                              const NsaCompressAttentionGeneralTilingData *__restrict tiling, TPipe *tPipe)
+    mmPolicyType>::UnpackInit(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                              __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                              __gm__ uint8_t* actualSeqLengthsCmpKv, __gm__ uint8_t* actualSeqLengthsSelKv,
+                              __gm__ uint8_t* topkMask, __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum,
+                              __gm__ uint8_t* attentionOut, __gm__ uint8_t* topkIndicesOut, __gm__ uint8_t* workspace,
+                              const NsaCompressAttentionGeneralTilingData* __restrict tiling, TPipe* tPipe)
 {
     this->InitInput(query, key, value, attenMask, topkMask, softmaxMax, softmaxSum, attentionOut, topkIndicesOut,
                     workspace, tiling, tPipe); // gm设置
     this->ComputeConstexpr();
-    qListGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths);
-    kvListGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsCmpKv);
+    qListGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths);
+    kvListGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsCmpKv);
     // 初始化unpack
     actualSeqQlenAddr = actualSeqLengths;
     actualSeqKvlenAddr = actualSeqLengthsCmpKv;
@@ -85,7 +85,7 @@ __aicore__ inline void NsaCompressAttentionVarLenScoreSameAB<
     int64_t actualS2Len;
     this->InitBuffer();
 
-    this->s2SizeSum = ((__gm__ uint64_t *)actualSeqLengthsCmpKv)[this->tilingData->inputParams.bSize - 1];
+    this->s2SizeSum = ((__gm__ uint64_t*)actualSeqLengthsCmpKv)[this->tilingData->inputParams.bSize - 1];
     return;
 }
 
@@ -103,8 +103,8 @@ template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename I
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void
 NsaCompressAttentionVarLenScoreSameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-                                      mmPolicyType>::GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t &actualSeqQlen,
-                                                                            int64_t &actualSeqKvlen)
+                                      mmPolicyType>::GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t& actualSeqQlen,
+                                                                            int64_t& actualSeqKvlen)
 {
     if (boIdx == 0) {
         actualSeqQlen = qListGm.GetValue(0);
@@ -242,7 +242,7 @@ template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename I
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void
 NsaCompressAttentionVarLenScoreSameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-                                      mmPolicyType>::SetExtraInfo(SplitSameABExtraInfo &extraInfo, int64_t taskId,
+                                      mmPolicyType>::SetExtraInfo(SplitSameABExtraInfo& extraInfo, int64_t taskId,
                                                                   int64_t multiCoreInnerIdx)
 {
     extraInfo.s1oIdx = this->s1oIdx;
@@ -269,7 +269,7 @@ template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename I
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void
 NsaCompressAttentionVarLenScoreSameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-                                      mmPolicyType>::ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo)
+                                      mmPolicyType>::ComputeBmm1Tail(SplitSameABExtraInfo& extraInfo)
 {
     extraInfo.s1RealSize = (extraInfo.cubeS1RealSize + 1) / 2; // s1Base / 2
     extraInfo.vecCoreOffset = this->cubeSubIdx * extraInfo.s1RealSize * this->gSize;

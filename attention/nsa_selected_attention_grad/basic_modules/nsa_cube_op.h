@@ -238,7 +238,7 @@ __aicore__ inline void CubeOp<NSAGT>::Init(GM_ADDR query, GM_ADDR key, GM_ADDR v
                                            GM_ADDR attention_out_grad, GM_ADDR softmax_max, GM_ADDR softmax_sum,
                                            GM_ADDR topk_indices, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen,
                                            GM_ADDR atten_mask, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace,
-                                           const TILING_CLASS *__restrict tilingData, TPipe *pipe)
+                                           const TILING_CLASS* __restrict tilingData, TPipe* pipe)
 {
     dimG = tilingData->opInfo.G;
     dimN2 = tilingData->opInfo.N2;
@@ -293,14 +293,14 @@ __aicore__ inline void CubeOp<NSAGT>::InitGMBuffer(GM_ADDR query, GM_ADDR key, G
                                                    GM_ADDR topk_indices, GM_ADDR workspace)
 {
     // 必选输入初始化
-    queryGm.SetGlobalBuffer((__gm__ T1 *)query);
-    keyGm.SetGlobalBuffer((__gm__ T1 *)key);
-    valueGm.SetGlobalBuffer((__gm__ T1 *)value);
-    attentionGm.SetGlobalBuffer((__gm__ T1 *)attention_out);
-    attentionGradGm.SetGlobalBuffer((__gm__ T1 *)attention_out_grad);
-    softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmax_max);
-    softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmax_sum);
-    topkIndicesGm.SetGlobalBuffer((__gm__ int32_t *)topk_indices);
+    queryGm.SetGlobalBuffer((__gm__ T1*)query);
+    keyGm.SetGlobalBuffer((__gm__ T1*)key);
+    valueGm.SetGlobalBuffer((__gm__ T1*)value);
+    attentionGm.SetGlobalBuffer((__gm__ T1*)attention_out);
+    attentionGradGm.SetGlobalBuffer((__gm__ T1*)attention_out_grad);
+    softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmax_max);
+    softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmax_sum);
+    topkIndicesGm.SetGlobalBuffer((__gm__ int32_t*)topk_indices);
 
     int64_t usedWorkspaceLen = 0;
     uint32_t blockIdx = GetBlockIdx();
@@ -323,13 +323,13 @@ __aicore__ inline void CubeOp<NSAGT>::InitGMBuffer(GM_ADDR query, GM_ADDR key, G
     int64_t dvAddr = dkAddr + dkWorkspaceLen / sizeof(float);
     usedWorkspaceLen += dqWorkspaceLen + dkWorkspaceLen + dvWorkspaceLen;
 
-    mm1WorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm1Addr);
-    mm2WorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm2Addr);
-    pWorkspaceGm.SetGlobalBuffer((__gm__ T1 *)workspace + pAddr);
-    dsWorkspaceGm.SetGlobalBuffer((__gm__ T1 *)workspace + dsAddr);
-    dqWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + dqAddr);
-    dkWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + dkAddr);
-    dvWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + dvAddr);
+    mm1WorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm1Addr);
+    mm2WorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm2Addr);
+    pWorkspaceGm.SetGlobalBuffer((__gm__ T1*)workspace + pAddr);
+    dsWorkspaceGm.SetGlobalBuffer((__gm__ T1*)workspace + dsAddr);
+    dqWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + dqAddr);
+    dkWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + dkAddr);
+    dvWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + dvAddr);
 }
 
 template <typename NSAGT>

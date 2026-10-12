@@ -70,7 +70,7 @@ constexpr AscendC::SoftmaxConfig SOFTMAX_REDUCE_CFG = {false, 0, 0, AscendC::Sof
 // L1 extension
 template <MmPolicyType mmPolicyType>
 struct MatmulPolicySelector {
-    template <const auto &MM_CFG, typename IMPL, typename A_TYPE, typename B_TYPE, typename C_TYPE, typename BIAS_TYPE>
+    template <const auto& MM_CFG, typename IMPL, typename A_TYPE, typename B_TYPE, typename C_TYPE, typename BIAS_TYPE>
     struct Result : AscendC::Impl::Detail::MatmulPolicy<MM_CFG, IMPL, A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE> {};
 };
 
@@ -104,44 +104,44 @@ public:
         bmm2;
 
 protected:
-    __aicore__ inline void InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                     __gm__ uint8_t *attenMask, __gm__ uint8_t *topkMask, __gm__ uint8_t *softmaxMax,
-                                     __gm__ uint8_t *softmaxSum, __gm__ uint8_t *attentionOut,
-                                     __gm__ uint8_t *topkIndicesOut, __gm__ uint8_t *workspace,
-                                     const NsaCompressAttentionGeneralTilingData *__restrict tiling, TPipe *tPipe);
-    __aicore__ inline void WaitBmm1Result(SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void WaitBmm2Result(SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void IterateBmm2(SplitSameABExtraInfo &extraInfo,
+    __aicore__ inline void InitInput(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                     __gm__ uint8_t* attenMask, __gm__ uint8_t* topkMask, __gm__ uint8_t* softmaxMax,
+                                     __gm__ uint8_t* softmaxSum, __gm__ uint8_t* attentionOut,
+                                     __gm__ uint8_t* topkIndicesOut, __gm__ uint8_t* workspace,
+                                     const NsaCompressAttentionGeneralTilingData* __restrict tiling, TPipe* tPipe);
+    __aicore__ inline void WaitBmm1Result(SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline void WaitBmm2Result(SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline void IterateBmm2(SplitSameABExtraInfo& extraInfo,
                                        matmul::Matmul<a2Type, b2Type, c2NzType, bias2Type, CFG_EXCEED,
                                                       matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                                                      MatmulPolicySelector<mmPolicyType>::template Result> &bmm2);
-    __aicore__ inline void SetTiling(const NsaCompressAttentionGeneralTilingData *__restrict tilingData);
+                                                      MatmulPolicySelector<mmPolicyType>::template Result>& bmm2);
+    __aicore__ inline void SetTiling(const NsaCompressAttentionGeneralTilingData* __restrict tilingData);
     __aicore__ inline void InitBuffer();
     template <typename T2>
     __aicore__ inline void IterateBmm1(
-        SplitSameABExtraInfo &extraInfo,
+        SplitSameABExtraInfo& extraInfo,
         matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1);
+                       MatmulPolicySelector<mmPolicyType>::template Result>& bmm1);
     template <typename T2>
     __aicore__ inline void Bmm1SetTensorA(
-        SplitSameABExtraInfo &extraInfo,
+        SplitSameABExtraInfo& extraInfo,
         matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1);
+                       MatmulPolicySelector<mmPolicyType>::template Result>& bmm1);
     template <typename T2>
     __aicore__ inline void SetBmm1TensorB(
-        SplitSameABExtraInfo &extraInfo,
+        SplitSameABExtraInfo& extraInfo,
         matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1);
-    __aicore__ inline void ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void ProcessVec1(SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void ProcessVec2(SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void GetBmm1Result(SplitSameABExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb, int64_t s1LoopIdx,
+                       MatmulPolicySelector<mmPolicyType>::template Result>& bmm1);
+    __aicore__ inline void ComputeBmm1Tail(SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline void ProcessVec1(SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline void ProcessVec2(SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline void GetBmm1Result(SplitSameABExtraInfo& extraInfo, LocalTensor<T>& bmm1ResUb, int64_t s1LoopIdx,
                                          int64_t gLoopIdx);
-    __aicore__ inline void CopyInAttenMask(SplitSameABExtraInfo &extraInfo, LocalTensor<uint8_t> &attenMaskUb,
+    __aicore__ inline void CopyInAttenMask(SplitSameABExtraInfo& extraInfo, LocalTensor<uint8_t>& attenMaskUb,
                                            int64_t s1LoopIdx);
-    __aicore__ inline void TopkCompute(SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void TransposeTilingCompute(ConfusionTransposeTiling &tiling, uint64_t row, uint64_t col);
-    __aicore__ inline void TopkTilingCompute(TopkTiling &tiling, uint64_t inner, uint64_t outter);
+    __aicore__ inline void TopkCompute(SplitSameABExtraInfo& extraInfo);
+    __aicore__ inline void TransposeTilingCompute(ConfusionTransposeTiling& tiling, uint64_t row, uint64_t col);
+    __aicore__ inline void TopkTilingCompute(TopkTiling& tiling, uint64_t inner, uint64_t outter);
 
     uint32_t cubeS1BaseSize;
     uint32_t vecS1BaseSize;
@@ -176,7 +176,7 @@ protected:
     int32_t vecBlockIdx;
     int32_t cubeBlockIdx;
     int32_t cubeSubIdx;
-    const NsaCompressAttentionGeneralTilingData *__restrict tilingData;
+    const NsaCompressAttentionGeneralTilingData* __restrict tilingData;
     SoftMaxTiling softmaxtiling;
     TopkTiling topktiling;
 
@@ -185,7 +185,7 @@ protected:
     int64_t goIdx;
     int64_t s1oIdx;
 
-    TPipe *pipe;
+    TPipe* pipe;
 
     GlobalTensor<INPUT_T> queryGm;
     GlobalTensor<INPUT_T> keyGm;
@@ -241,11 +241,11 @@ template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename I
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<
     layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-    mmPolicyType>::InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                             __gm__ uint8_t *attenMask, __gm__ uint8_t *topkMask, __gm__ uint8_t *softmaxMax,
-                             __gm__ uint8_t *softmaxSum, __gm__ uint8_t *attentionOut, __gm__ uint8_t *topkIndicesOut,
-                             __gm__ uint8_t *workspace, const NsaCompressAttentionGeneralTilingData *__restrict tiling,
-                             TPipe *tPipe)
+    mmPolicyType>::InitInput(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                             __gm__ uint8_t* attenMask, __gm__ uint8_t* topkMask, __gm__ uint8_t* softmaxMax,
+                             __gm__ uint8_t* softmaxSum, __gm__ uint8_t* attentionOut, __gm__ uint8_t* topkIndicesOut,
+                             __gm__ uint8_t* workspace, const NsaCompressAttentionGeneralTilingData* __restrict tiling,
+                             TPipe* tPipe)
 {
     this->vecBlockIdx = GetBlockIdx();
     this->cubeBlockIdx = this->vecBlockIdx / 2;
@@ -256,15 +256,15 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<
     this->topktiling = this->tilingData->topkTilingData;
 
     // init global buffer
-    this->queryGm.SetGlobalBuffer((__gm__ INPUT_T *)query);
-    this->keyGm.SetGlobalBuffer((__gm__ INPUT_T *)key);
-    this->valueGm.SetGlobalBuffer((__gm__ INPUT_T *)value);
-    this->attenMaskGmInt.SetGlobalBuffer((__gm__ uint8_t *)attenMask);
-    this->topKMaskGmInt.SetGlobalBuffer((__gm__ uint8_t *)topkMask);
-    this->softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmaxMax);
-    this->softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmaxSum);
-    this->attentionOutGm.SetGlobalBuffer((__gm__ INPUT_T *)attentionOut);
-    this->topkIndicesOutGm.SetGlobalBuffer((__gm__ int32_t *)topkIndicesOut);
+    this->queryGm.SetGlobalBuffer((__gm__ INPUT_T*)query);
+    this->keyGm.SetGlobalBuffer((__gm__ INPUT_T*)key);
+    this->valueGm.SetGlobalBuffer((__gm__ INPUT_T*)value);
+    this->attenMaskGmInt.SetGlobalBuffer((__gm__ uint8_t*)attenMask);
+    this->topKMaskGmInt.SetGlobalBuffer((__gm__ uint8_t*)topkMask);
+    this->softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmaxMax);
+    this->softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmaxSum);
+    this->attentionOutGm.SetGlobalBuffer((__gm__ INPUT_T*)attentionOut);
+    this->topkIndicesOutGm.SetGlobalBuffer((__gm__ int32_t*)topkIndicesOut);
 
     int64_t mm1BaseCount = NSA_BASE_S1G_SIZE * this->tilingData->inputParams.alignedS2;
     int64_t mm1BaseSize = mm1BaseCount * sizeof(float); // s2的最大值 //向上16对齐
@@ -272,12 +272,12 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<
     int64_t totalOffset = mm1BaseSize * GM_DOUBLE_BUFFER + mm1BaseSizeHalf;
 
     // bmm1Result
-    this->mm1Res[0].SetGlobalBuffer((__gm__ T *)(workspace + this->cubeBlockIdx * totalOffset));
-    this->mm1Res[1].SetGlobalBuffer((__gm__ T *)(workspace + this->cubeBlockIdx * totalOffset + mm1BaseSize));
+    this->mm1Res[0].SetGlobalBuffer((__gm__ T*)(workspace + this->cubeBlockIdx * totalOffset));
+    this->mm1Res[1].SetGlobalBuffer((__gm__ T*)(workspace + this->cubeBlockIdx * totalOffset + mm1BaseSize));
 
     // stage1Result
     this->stage1Res.SetGlobalBuffer(
-        (__gm__ INPUT_T *)(workspace + this->cubeBlockIdx * totalOffset + mm1BaseSize * GM_DOUBLE_BUFFER));
+        (__gm__ INPUT_T*)(workspace + this->cubeBlockIdx * totalOffset + mm1BaseSize * GM_DOUBLE_BUFFER));
 
     // impScore
     int64_t totalAicNum = AscendC::GetBlockNum();
@@ -288,10 +288,10 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<
                             static_cast<uint64_t>(this->tilingData->importanceScoreParams.isM);
     uint64_t perCoreOffsetU64 = baseS1G * alignedS2Div * sizeof(float) * GM_DOUBLE_BUFFER;
     this->impScoreRes[0].SetGlobalBuffer(
-        (__gm__ T *)(workspace + impScoreOffsetU64 + perCoreOffsetU64 * static_cast<uint64_t>(this->cubeBlockIdx)));
-    this->impScoreRes[1].SetGlobalBuffer((__gm__ T *)(workspace + impScoreOffsetU64 +
-                                                      perCoreOffsetU64 * static_cast<uint64_t>(this->cubeBlockIdx) +
-                                                      perCoreOffsetU64 / 2));
+        (__gm__ T*)(workspace + impScoreOffsetU64 + perCoreOffsetU64 * static_cast<uint64_t>(this->cubeBlockIdx)));
+    this->impScoreRes[1].SetGlobalBuffer((__gm__ T*)(workspace + impScoreOffsetU64 +
+                                                     perCoreOffsetU64 * static_cast<uint64_t>(this->cubeBlockIdx) +
+                                                     perCoreOffsetU64 / 2));
 
     GetExtremeValue(this->negativeFloatScalar, this->positiveFloatScalar);
 }
@@ -300,7 +300,7 @@ template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename I
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<
     layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-    mmPolicyType>::SetTiling(const NsaCompressAttentionGeneralTilingData *__restrict tilingData)
+    mmPolicyType>::SetTiling(const NsaCompressAttentionGeneralTilingData* __restrict tilingData)
 {
     // copy base params
     this->tilingData = tilingData;
@@ -345,7 +345,7 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten
     attenMaskLocal = allUbBuffer.GetWithOffset<uint8_t>(attenMaskLen, addrOffset);
 
     // importance score ub
-    const auto &isInfo = this->tilingData->importanceScoreParams;
+    const auto& isInfo = this->tilingData->importanceScoreParams;
     this->innerLoop = isInfo.innerLoop;
     this->s2Length = isInfo.s2ScoreLoopLen;
     this->scoreLoop = isInfo.outerLoop;
@@ -385,7 +385,7 @@ template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename I
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void
 NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-                                     mmPolicyType>::WaitBmm1Result(SplitSameABExtraInfo &extraInfo)
+                                     mmPolicyType>::WaitBmm1Result(SplitSameABExtraInfo& extraInfo)
 {
     this->bmm1.WaitIterateAll();
     this->bmm1.End();
@@ -397,9 +397,9 @@ template <typename T2>
 __aicore__ inline void
 NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format, mmPolicyType>::
     IterateBmm1(
-        SplitSameABExtraInfo &extraInfo,
+        SplitSameABExtraInfo& extraInfo,
         matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1)
+                       MatmulPolicySelector<mmPolicyType>::template Result>& bmm1)
 {
     bmm1.SetOrgShape(extraInfo.cubeS1gRealSize, extraInfo.s2RealSize, this->dSize,
                      this->tilingData->inputParams.n2Size * this->dSize, extraInfo.s2RealSize); // b,s2,n2,d
@@ -415,9 +415,9 @@ template <typename T2>
 __aicore__ inline void
 NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format, mmPolicyType>::
     Bmm1SetTensorA(
-        SplitSameABExtraInfo &extraInfo,
+        SplitSameABExtraInfo& extraInfo,
         matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1)
+                       MatmulPolicySelector<mmPolicyType>::template Result>& bmm1)
 {
     // 计算gm上的offset
     int64_t bOffset = 0;
@@ -449,9 +449,9 @@ template <typename T2>
 __aicore__ inline void
 NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format, mmPolicyType>::
     SetBmm1TensorB(
-        SplitSameABExtraInfo &extraInfo,
+        SplitSameABExtraInfo& extraInfo,
         matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1)
+                       MatmulPolicySelector<mmPolicyType>::template Result>& bmm1)
 {
     // 计算gm上的offset
     int64_t bOffset = 0;
@@ -469,7 +469,7 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
 template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-                                                            mmPolicyType>::ProcessVec1(SplitSameABExtraInfo &extraInfo)
+                                                            mmPolicyType>::ProcessVec1(SplitSameABExtraInfo& extraInfo)
 {
     if (extraInfo.s1RealSize == 0) {
         return;
@@ -577,7 +577,7 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten
 template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-                                                            mmPolicyType>::ProcessVec2(SplitSameABExtraInfo &extraInfo)
+                                                            mmPolicyType>::ProcessVec2(SplitSameABExtraInfo& extraInfo)
 {
     if (extraInfo.s1RealSize == 0) {
         return;
@@ -590,7 +590,7 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten
     event_t eventIdMte3ToVMask = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE3_V>());
     event_t eventIdMte2ToVMask = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>());
 
-    const auto &isInfo = this->tilingData->importanceScoreParams;
+    const auto& isInfo = this->tilingData->importanceScoreParams;
     uint64_t impScoreNums = CeilDiv(static_cast<uint64_t>(extraInfo.s2RealSize), isInfo.isM);
     this->s2Loop = CeilDiv(impScoreNums, isInfo.outerLoop);
     this->innerLoop = isInfo.innerLoop;
@@ -805,7 +805,7 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten
 template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-                                                            mmPolicyType>::TopkCompute(SplitSameABExtraInfo &extraInfo)
+                                                            mmPolicyType>::TopkCompute(SplitSameABExtraInfo& extraInfo)
 {
     AscendC::TopKInfo topKInfoData;
     uint32_t blockLength = 32;
@@ -942,7 +942,7 @@ template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename I
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void
 NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-                                     mmPolicyType>::TransposeTilingCompute(ConfusionTransposeTiling &tiling,
+                                     mmPolicyType>::TransposeTilingCompute(ConfusionTransposeTiling& tiling,
                                                                            uint64_t row, uint64_t col)
 {
     uint32_t blockSizeT = 8;
@@ -961,7 +961,7 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
 template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-                                                            mmPolicyType>::TopkTilingCompute(TopkTiling &tiling,
+                                                            mmPolicyType>::TopkTilingCompute(TopkTiling& tiling,
                                                                                              uint64_t inner,
                                                                                              uint64_t outter)
 {
@@ -983,8 +983,8 @@ template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename I
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void
 NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-                                     mmPolicyType>::GetBmm1Result(SplitSameABExtraInfo &extraInfo,
-                                                                  LocalTensor<T> &bmm1ResUb, int64_t s1LoopIdx,
+                                     mmPolicyType>::GetBmm1Result(SplitSameABExtraInfo& extraInfo,
+                                                                  LocalTensor<T>& bmm1ResUb, int64_t s1LoopIdx,
                                                                   int64_t gLoopIdx)
 {
     if (likely(extraInfo.s2RealSizeAlign32 == extraInfo.s2RealSize)) {
@@ -1031,8 +1031,8 @@ template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename I
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void
 NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-                                     mmPolicyType>::CopyInAttenMask(SplitSameABExtraInfo &extraInfo,
-                                                                    LocalTensor<uint8_t> &attenMaskUb,
+                                     mmPolicyType>::CopyInAttenMask(SplitSameABExtraInfo& extraInfo,
+                                                                    LocalTensor<uint8_t>& attenMaskUb,
                                                                     int64_t s1LoopIdx)
 {
     if constexpr (hasAtten == true) {
@@ -1062,7 +1062,7 @@ template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename I
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void
 NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-                                     mmPolicyType>::WaitBmm2Result(SplitSameABExtraInfo &extraInfo)
+                                     mmPolicyType>::WaitBmm2Result(SplitSameABExtraInfo& extraInfo)
 {
     this->bmm2.WaitIterateAll();
     this->bmm2.End();
@@ -1072,10 +1072,10 @@ template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename I
           CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<
     layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
-    mmPolicyType>::IterateBmm2(SplitSameABExtraInfo &extraInfo,
+    mmPolicyType>::IterateBmm2(SplitSameABExtraInfo& extraInfo,
                                matmul::Matmul<a2Type, b2Type, c2NzType, bias2Type, CFG_EXCEED,
                                               matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                                              MatmulPolicySelector<mmPolicyType>::template Result> &bmm2)
+                                              MatmulPolicySelector<mmPolicyType>::template Result>& bmm2)
 {
     int64_t bOffset = 0;
     int64_t n2Offset = 0;

@@ -28,14 +28,14 @@ using liV2Vector1::FloatX2ToSortableKey;
 using liV2Vector1::InitFloatSortConstCtx;
 using liV2Vector1::WeightedAccum;
 
-__simd_callee__ inline void BroadcastLaneV1(AscendC::Reg::RegTensor<float> &dst, __ubuf__ float *src, uint16_t laneIdx)
+__simd_callee__ inline void BroadcastLaneV1(AscendC::Reg::RegTensor<float>& dst, __ubuf__ float* src, uint16_t laneIdx)
 {
     AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(dst, src + laneIdx);
 }
 
 __simd_callee__ inline void CastFP32ToFP16ToFP32(AscendC::Reg::RegTensor<float> (&regQK0)[2],
                                                  AscendC::Reg::RegTensor<half> (&regQK0Half)[2],
-                                                 AscendC::Reg::MaskReg &qliMaskB32)
+                                                 AscendC::Reg::MaskReg& qliMaskB32)
 {
     AscendC::Reg::MaskReg qliMaskB16 = AscendC::Reg::CreateMask<bfloat16_t, AscendC::Reg::MaskPattern::ALL>();
     constexpr static Reg::CastTrait castTraitFP32ToFP16 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
@@ -57,9 +57,9 @@ __simd_callee__ inline void CastFP32ToFP16ToFP32(AscendC::Reg::RegTensor<float> 
 template <typename QK_T>
 __simd_callee__ inline void ReduceSumLoopBody(
     AscendC::Reg::RegTensor<float> (&regQK)[2], AscendC::Reg::RegTensor<half> (&regQKHalf)[2],
-    AscendC::Reg::RegTensor<int32_t> (&regQKInt32)[2], AscendC::Reg::RegTensor<float> &qliWeightBroadcast,
-    AscendC::Reg::RegTensor<float> &qliWeightReg, AscendC::Reg::RegTensor<float> (&regSum0)[2],
-    AscendC::Reg::RegTensor<float> (&regSum1)[2], AscendC::Reg::MaskReg &qliMaskB32, __ubuf__ QK_T *qk_,
+    AscendC::Reg::RegTensor<int32_t> (&regQKInt32)[2], AscendC::Reg::RegTensor<float>& qliWeightBroadcast,
+    AscendC::Reg::RegTensor<float>& qliWeightReg, AscendC::Reg::RegTensor<float> (&regSum0)[2],
+    AscendC::Reg::RegTensor<float> (&regSum1)[2], AscendC::Reg::MaskReg& qliMaskB32, __ubuf__ QK_T* qk_,
     const uint32_t qliQkVectorStride, const int qliGroupSize)
 {
     constexpr static Reg::CastTrait castTraitInt32ToFP32 = {Reg::RegLayout::UNKNOWN, Reg::SatMode::NO_SAT,
@@ -98,8 +98,8 @@ __simd_callee__ inline void ReduceSumLoopBody(
 __simd_callee__ inline void ReduceSumFinalize(AscendC::Reg::RegTensor<float> (&regSum0)[2],
                                               AscendC::Reg::RegTensor<float> (&regSum1)[2],
                                               AscendC::Reg::RegTensor<float> (&qliKeyScaleReg)[2],
-                                              AscendC::Reg::MaskReg &qliMaskB32, FloatSortConstCtx<bfloat16_t> &bf16Ctx,
-                                              AscendC::Reg::MaskReg &qliMaskB16, __ubuf__ uint16_t *out_)
+                                              AscendC::Reg::MaskReg& qliMaskB32, FloatSortConstCtx<bfloat16_t>& bf16Ctx,
+                                              AscendC::Reg::MaskReg& qliMaskB16, __ubuf__ uint16_t* out_)
 {
     AscendC::Reg::Add(regSum0[0], regSum0[0], regSum1[0], qliMaskB32);
     AscendC::Reg::Add(regSum0[1], regSum0[1], regSum1[1], qliMaskB32);
@@ -126,8 +126,8 @@ __simd_callee__ inline void ReduceSumFinalize(AscendC::Reg::RegTensor<float> (&r
 __simd_callee__ inline void ReduceSumFinalize(AscendC::Reg::RegTensor<float> (&regSum0)[2],
                                               AscendC::Reg::RegTensor<float> (&regSum1)[2],
                                               AscendC::Reg::RegTensor<float> (&qliKeyScaleReg)[2],
-                                              AscendC::Reg::MaskReg &qliMaskB32, FloatSortConstCtx<float> &fp32Ctx,
-                                              __ubuf__ uint32_t *out_)
+                                              AscendC::Reg::MaskReg& qliMaskB32, FloatSortConstCtx<float>& fp32Ctx,
+                                              __ubuf__ uint32_t* out_)
 {
     AscendC::Reg::Add(regSum0[0], regSum0[0], regSum1[0], qliMaskB32);
     AscendC::Reg::Add(regSum0[1], regSum0[1], regSum1[1], qliMaskB32);
@@ -149,8 +149,8 @@ __simd_callee__ inline void ReduceSum2LoopBody(
     AscendC::Reg::RegTensor<int32_t> (&regQK0Int32)[2], AscendC::Reg::RegTensor<int32_t> (&regQK1Int32)[2],
     AscendC::Reg::RegTensor<float> (&qliWeightBroadcast)[2], AscendC::Reg::RegTensor<float> (&qliWeightReg)[2],
     AscendC::Reg::RegTensor<float> (&regSum0)[2], AscendC::Reg::RegTensor<float> (&regSum1)[2],
-    AscendC::Reg::MaskReg &qliMaskB32, __ubuf__ QK_T *qk0_, __ubuf__ QK_T *qk1_, const uint32_t qliQkVectorStride,
-    __ubuf__ float *brcWeight_, const int qliGroupSize)
+    AscendC::Reg::MaskReg& qliMaskB32, __ubuf__ QK_T* qk0_, __ubuf__ QK_T* qk1_, const uint32_t qliQkVectorStride,
+    __ubuf__ float* brcWeight_, const int qliGroupSize)
 {
     constexpr static Reg::CastTrait castTraitInt32ToFP32 = {Reg::RegLayout::UNKNOWN, Reg::SatMode::NO_SAT,
                                                             Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
@@ -192,10 +192,10 @@ __simd_callee__ inline void ReduceSum2LoopBody(
 __simd_callee__ inline void ReduceSum2Finalize(AscendC::Reg::RegTensor<float> (&regSum0)[2],
                                                AscendC::Reg::RegTensor<float> (&regSum1)[2],
                                                AscendC::Reg::RegTensor<float> (&qliKeyScaleReg)[2],
-                                               AscendC::Reg::MaskReg &qliMaskB32,
-                                               FloatSortConstCtx<bfloat16_t> &bf16Ctx,
-                                               AscendC::Reg::MaskReg &qliMaskB16, __ubuf__ uint16_t *out0_,
-                                               __ubuf__ uint16_t *out1_)
+                                               AscendC::Reg::MaskReg& qliMaskB32,
+                                               FloatSortConstCtx<bfloat16_t>& bf16Ctx,
+                                               AscendC::Reg::MaskReg& qliMaskB16, __ubuf__ uint16_t* out0_,
+                                               __ubuf__ uint16_t* out1_)
 {
     AscendC::Reg::Mul(regSum0[0], regSum0[0], qliKeyScaleReg[0], qliMaskB32);
     AscendC::Reg::Mul(regSum0[1], regSum0[1], qliKeyScaleReg[1], qliMaskB32);
@@ -224,8 +224,8 @@ __simd_callee__ inline void ReduceSum2Finalize(AscendC::Reg::RegTensor<float> (&
 __simd_callee__ inline void ReduceSum2Finalize(AscendC::Reg::RegTensor<float> (&regSum0)[2],
                                                AscendC::Reg::RegTensor<float> (&regSum1)[2],
                                                AscendC::Reg::RegTensor<float> (&qliKeyScaleReg)[2],
-                                               AscendC::Reg::MaskReg &qliMaskB32, FloatSortConstCtx<float> &fp32Ctx,
-                                               __ubuf__ uint32_t *out0_, __ubuf__ uint32_t *out1_)
+                                               AscendC::Reg::MaskReg& qliMaskB32, FloatSortConstCtx<float>& fp32Ctx,
+                                               __ubuf__ uint32_t* out0_, __ubuf__ uint32_t* out1_)
 {
     AscendC::Reg::Mul(regSum0[0], regSum0[0], qliKeyScaleReg[0], qliMaskB32);
     AscendC::Reg::Mul(regSum0[1], regSum0[1], qliKeyScaleReg[1], qliMaskB32);
@@ -245,7 +245,7 @@ __simd_callee__ inline void ReduceSum2Finalize(AscendC::Reg::RegTensor<float> (&
 
 __simd_callee__ inline void LoadKScaleFP16(AscendC::Reg::RegTensor<half> (&regKScaleFP16)[2],
                                            AscendC::Reg::RegTensor<float> (&qliKeyScaleReg)[2],
-                                           AscendC::Reg::MaskReg &qliMaskB16, __ubuf__ half *kScale_)
+                                           AscendC::Reg::MaskReg& qliMaskB16, __ubuf__ half* kScale_)
 {
     constexpr static Reg::CastTrait castTraitFP16ToFP32 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
                                                            Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
@@ -257,9 +257,9 @@ __simd_callee__ inline void LoadKScaleFP16(AscendC::Reg::RegTensor<half> (&regKS
 
 // float in uint16 out
 template <typename QK_T>
-__simd_vf__ inline void MulWeightAndReduceSum(__ubuf__ uint16_t *out_, __ubuf__ QK_T *qk_,
-                                              const uint32_t qliQkVectorStride, __ubuf__ float *weight_,
-                                              __ubuf__ float *kScale_, __ubuf__ float *qScale_, const int qliGroupSize)
+__simd_vf__ inline void MulWeightAndReduceSum(__ubuf__ uint16_t* out_, __ubuf__ QK_T* qk_,
+                                              const uint32_t qliQkVectorStride, __ubuf__ float* weight_,
+                                              __ubuf__ float* kScale_, __ubuf__ float* qScale_, const int qliGroupSize)
 {
     AscendC::Reg::RegTensor<float> qliWeightBroadcast;
     AscendC::Reg::RegTensor<float> regQK[2];
@@ -294,9 +294,9 @@ __simd_vf__ inline void MulWeightAndReduceSum(__ubuf__ uint16_t *out_, __ubuf__ 
 
 // float in uint16 out
 template <typename QK_T>
-__simd_vf__ inline void MulWeightAndReduceSum(__ubuf__ uint16_t *out_, __ubuf__ QK_T *qk_,
-                                              const uint32_t qliQkVectorStride, __ubuf__ half *weight_,
-                                              __ubuf__ half *kScale_, __ubuf__ half *qScale_, const int qliGroupSize)
+__simd_vf__ inline void MulWeightAndReduceSum(__ubuf__ uint16_t* out_, __ubuf__ QK_T* qk_,
+                                              const uint32_t qliQkVectorStride, __ubuf__ half* weight_,
+                                              __ubuf__ half* kScale_, __ubuf__ half* qScale_, const int qliGroupSize)
 {
     AscendC::Reg::RegTensor<float> qliWeightBroadcast;
     AscendC::Reg::RegTensor<float> regQK[2];
@@ -337,9 +337,9 @@ __simd_vf__ inline void MulWeightAndReduceSum(__ubuf__ uint16_t *out_, __ubuf__ 
 
 // float in uint16 out
 template <typename QK_T>
-__simd_vf__ inline void MulWeightAndReduceSum(__ubuf__ uint16_t *out_, __ubuf__ QK_T *qk_,
-                                              const uint32_t qliQkVectorStride, __ubuf__ bfloat16_t *weight_,
-                                              __ubuf__ float *kScale_, __ubuf__ float *qScale_, const int qliGroupSize)
+__simd_vf__ inline void MulWeightAndReduceSum(__ubuf__ uint16_t* out_, __ubuf__ QK_T* qk_,
+                                              const uint32_t qliQkVectorStride, __ubuf__ bfloat16_t* weight_,
+                                              __ubuf__ float* kScale_, __ubuf__ float* qScale_, const int qliGroupSize)
 {
     AscendC::Reg::RegTensor<float> qliWeightBroadcast;
     AscendC::Reg::RegTensor<float> regQK[2];
@@ -378,9 +378,9 @@ __simd_vf__ inline void MulWeightAndReduceSum(__ubuf__ uint16_t *out_, __ubuf__ 
 
 // float in uint32 out
 template <typename QK_T>
-__simd_vf__ inline void MulWeightAndReduceSum(__ubuf__ uint32_t *out_, __ubuf__ QK_T *qk_,
-                                              const uint32_t qliQkVectorStride, __ubuf__ half *weight_,
-                                              __ubuf__ half *kScale_, __ubuf__ half *qScale_, const int qliGroupSize)
+__simd_vf__ inline void MulWeightAndReduceSum(__ubuf__ uint32_t* out_, __ubuf__ QK_T* qk_,
+                                              const uint32_t qliQkVectorStride, __ubuf__ half* weight_,
+                                              __ubuf__ half* kScale_, __ubuf__ half* qScale_, const int qliGroupSize)
 {
     AscendC::Reg::RegTensor<float> qliWeightBroadcast;
     AscendC::Reg::RegTensor<float> regQK[2];
@@ -428,12 +428,12 @@ __simd_vf__ inline void MulWeightAndReduceSum(__ubuf__ uint32_t *out_, __ubuf__ 
 // 计算S1=2
 // float weight in uint16 out
 template <typename QK_T>
-__simd_vf__ inline void MulWeightAndReduceSum2(__ubuf__ uint16_t *out0_, __ubuf__ uint16_t *out1_, uint32_t outStride,
-                                               __ubuf__ QK_T *qk0_, __ubuf__ QK_T *qk1_, uint32_t qliQkVectorStride,
-                                               uint32_t qkStride, __ubuf__ float *weight0_, __ubuf__ float *weight1_,
-                                               uint32_t weightStride, __ubuf__ float *weightFloat_,
-                                               __ubuf__ float *kScale_, uint32_t kScaleStride, __ubuf__ float *qScale0_,
-                                               __ubuf__ float *qScale1_, uint32_t qScaleStride, const int qliGroupSize)
+__simd_vf__ inline void MulWeightAndReduceSum2(__ubuf__ uint16_t* out0_, __ubuf__ uint16_t* out1_, uint32_t outStride,
+                                               __ubuf__ QK_T* qk0_, __ubuf__ QK_T* qk1_, uint32_t qliQkVectorStride,
+                                               uint32_t qkStride, __ubuf__ float* weight0_, __ubuf__ float* weight1_,
+                                               uint32_t weightStride, __ubuf__ float* weightFloat_,
+                                               __ubuf__ float* kScale_, uint32_t kScaleStride, __ubuf__ float* qScale0_,
+                                               __ubuf__ float* qScale1_, uint32_t qScaleStride, const int qliGroupSize)
 {
     AscendC::Reg::RegTensor<float> qliWeightBroadcast[2];
     AscendC::Reg::RegTensor<float> regQK0[2], regQK1[2];
@@ -473,13 +473,13 @@ __simd_vf__ inline void MulWeightAndReduceSum2(__ubuf__ uint16_t *out0_, __ubuf_
 // 计算S1=2
 // bfloat16_t weight in uint16 out
 template <typename QK_T>
-__simd_vf__ inline void MulWeightAndReduceSum2(__ubuf__ uint16_t *out0_, __ubuf__ uint16_t *out1_, uint32_t outStride,
-                                               __ubuf__ QK_T *qk0_, __ubuf__ QK_T *qk1_, uint32_t qliQkVectorStride,
-                                               uint32_t qkStride, __ubuf__ bfloat16_t *weight0_,
-                                               __ubuf__ bfloat16_t *weight1_, uint32_t weightStride,
-                                               __ubuf__ float *weightFloat_, __ubuf__ float *kScale_,
-                                               uint32_t kScaleStride, __ubuf__ float *qScale0_,
-                                               __ubuf__ float *qScale1_, uint32_t qScaleStride, const int qliGroupSize)
+__simd_vf__ inline void MulWeightAndReduceSum2(__ubuf__ uint16_t* out0_, __ubuf__ uint16_t* out1_, uint32_t outStride,
+                                               __ubuf__ QK_T* qk0_, __ubuf__ QK_T* qk1_, uint32_t qliQkVectorStride,
+                                               uint32_t qkStride, __ubuf__ bfloat16_t* weight0_,
+                                               __ubuf__ bfloat16_t* weight1_, uint32_t weightStride,
+                                               __ubuf__ float* weightFloat_, __ubuf__ float* kScale_,
+                                               uint32_t kScaleStride, __ubuf__ float* qScale0_,
+                                               __ubuf__ float* qScale1_, uint32_t qScaleStride, const int qliGroupSize)
 {
     AscendC::Reg::RegTensor<float> qliWeightReg[2];
     AscendC::Reg::RegTensor<float> qliWeightBroadcast[2];
@@ -526,12 +526,12 @@ __simd_vf__ inline void MulWeightAndReduceSum2(__ubuf__ uint16_t *out0_, __ubuf_
 // 计算S1=2
 // half weight in uint16 out
 template <typename QK_T>
-__simd_vf__ inline void MulWeightAndReduceSum2(__ubuf__ uint16_t *out0_, __ubuf__ uint16_t *out1_, uint32_t outStride,
-                                               __ubuf__ QK_T *qk0_, __ubuf__ QK_T *qk1_, uint32_t qliQkVectorStride,
-                                               uint32_t qkStride, __ubuf__ half *weight0_, __ubuf__ half *weight1_,
-                                               uint32_t weightStride, __ubuf__ float *weightFloat_,
-                                               __ubuf__ half *kScale_, uint32_t kScaleStride, __ubuf__ half *qScale0_,
-                                               __ubuf__ half *qScale1_, uint32_t qScaleStride, const int qliGroupSize)
+__simd_vf__ inline void MulWeightAndReduceSum2(__ubuf__ uint16_t* out0_, __ubuf__ uint16_t* out1_, uint32_t outStride,
+                                               __ubuf__ QK_T* qk0_, __ubuf__ QK_T* qk1_, uint32_t qliQkVectorStride,
+                                               uint32_t qkStride, __ubuf__ half* weight0_, __ubuf__ half* weight1_,
+                                               uint32_t weightStride, __ubuf__ float* weightFloat_,
+                                               __ubuf__ half* kScale_, uint32_t kScaleStride, __ubuf__ half* qScale0_,
+                                               __ubuf__ half* qScale1_, uint32_t qScaleStride, const int qliGroupSize)
 {
     AscendC::Reg::RegTensor<float> qliWeightBroadcast[2];
     AscendC::Reg::RegTensor<float> regQK0[2], regQK1[2];
@@ -579,12 +579,12 @@ __simd_vf__ inline void MulWeightAndReduceSum2(__ubuf__ uint16_t *out0_, __ubuf_
 // 计算S1=2
 // float in uint32 out
 template <typename QK_T>
-__simd_vf__ inline void MulWeightAndReduceSum2(__ubuf__ uint32_t *out0_, __ubuf__ uint32_t *out1_, uint32_t outStride,
-                                               __ubuf__ QK_T *qk0_, __ubuf__ QK_T *qk1_, uint32_t qliQkVectorStride,
-                                               uint32_t qkStride, __ubuf__ half *weight0_, __ubuf__ half *weight1_,
-                                               uint32_t weightStride, __ubuf__ float *weightFloat_,
-                                               __ubuf__ half *kScale_, uint32_t kScaleStride, __ubuf__ half *qScale0_,
-                                               __ubuf__ half *qScale1_, uint32_t qScaleStride, const int qliGroupSize)
+__simd_vf__ inline void MulWeightAndReduceSum2(__ubuf__ uint32_t* out0_, __ubuf__ uint32_t* out1_, uint32_t outStride,
+                                               __ubuf__ QK_T* qk0_, __ubuf__ QK_T* qk1_, uint32_t qliQkVectorStride,
+                                               uint32_t qkStride, __ubuf__ half* weight0_, __ubuf__ half* weight1_,
+                                               uint32_t weightStride, __ubuf__ float* weightFloat_,
+                                               __ubuf__ half* kScale_, uint32_t kScaleStride, __ubuf__ half* qScale0_,
+                                               __ubuf__ half* qScale1_, uint32_t qScaleStride, const int qliGroupSize)
 {
     AscendC::Reg::RegTensor<float> qliWeightBroadcast[2];
     AscendC::Reg::RegTensor<float> regQK0[2], regQK1[2];
@@ -640,15 +640,15 @@ __simd_vf__ inline void MulWeightAndReduceSum2(__ubuf__ uint32_t *out0_, __ubuf_
 }
 
 template <typename QK_T, typename W_T, typename SCALE_T, typename SCORE_T>
-__aicore__ inline void BatchMulWeightAndReduceSum(const LocalTensor<SCORE_T> &out_, // out    [S2Base]     [128   ]
+__aicore__ inline void BatchMulWeightAndReduceSum(const LocalTensor<SCORE_T>& out_, // out    [S2Base]     [128   ]
                                                   uint32_t outStride,
-                                                  const LocalTensor<QK_T> &qk_, // q*k^t  [G, S2Base]  [64 128]
+                                                  const LocalTensor<QK_T>& qk_, // q*k^t  [G, S2Base]  [64 128]
                                                   uint32_t qliQkVectorStride, uint32_t qkStride,
-                                                  const LocalTensor<W_T> &weight_, // w      [G]          [64    ]
-                                                  uint32_t weightStride, const LocalTensor<float> &weightFloat_,
-                                                  const LocalTensor<SCALE_T> &kScale_, // kScale [S2Base]     [128   ]
+                                                  const LocalTensor<W_T>& weight_, // w      [G]          [64    ]
+                                                  uint32_t weightStride, const LocalTensor<float>& weightFloat_,
+                                                  const LocalTensor<SCALE_T>& kScale_, // kScale [S2Base]     [128   ]
                                                   uint32_t kScaleStride,
-                                                  const LocalTensor<SCALE_T> &qScale_, // qScale [G]          [64    ]
+                                                  const LocalTensor<SCALE_T>& qScale_, // qScale [G]          [64    ]
                                                   uint32_t qScaleStride,
                                                   const int qliGroupSize, // G 64
                                                   const int batch)
@@ -657,12 +657,12 @@ __aicore__ inline void BatchMulWeightAndReduceSum(const LocalTensor<SCORE_T> &ou
     if (batch != 2 && batch != 1) {
         return;
     }
-    auto weight = (__ubuf__ W_T *)weight_.GetPhyAddr();
-    auto weightFloat = (__ubuf__ float *)weightFloat_.GetPhyAddr();
-    auto qScale = (__ubuf__ SCALE_T *)qScale_.GetPhyAddr();
-    auto kScale = (__ubuf__ SCALE_T *)kScale_.GetPhyAddr();
-    auto qk = (__ubuf__ QK_T *)qk_.GetPhyAddr();
-    auto out = (__ubuf__ SCORE_T *)out_.GetPhyAddr();
+    auto weight = (__ubuf__ W_T*)weight_.GetPhyAddr();
+    auto weightFloat = (__ubuf__ float*)weightFloat_.GetPhyAddr();
+    auto qScale = (__ubuf__ SCALE_T*)qScale_.GetPhyAddr();
+    auto kScale = (__ubuf__ SCALE_T*)kScale_.GetPhyAddr();
+    auto qk = (__ubuf__ QK_T*)qk_.GetPhyAddr();
+    auto out = (__ubuf__ SCORE_T*)out_.GetPhyAddr();
 
     if (batch == 2) {
         auto weight1 = weight + weightStride;

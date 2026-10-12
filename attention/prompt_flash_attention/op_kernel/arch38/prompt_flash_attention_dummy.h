@@ -29,20 +29,20 @@ template <typename T>
 class PromptFlashAttentionDummy {
 public:
     __aicore__ inline PromptFlashAttentionDummy(){};
-    __aicore__ inline void Init(__gm__ uint8_t *attentionOut,
-                                const FlashAttentionScoreSimplifiedTilingData *__restrict tiling);
+    __aicore__ inline void Init(__gm__ uint8_t* attentionOut,
+                                const FlashAttentionScoreSimplifiedTilingData* __restrict tiling);
     __aicore__ inline void Process();
 
 protected:
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData;
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tilingData;
     GlobalTensor<T> attentionOutGm;
 };
 
 template <typename T>
 __aicore__ inline void PromptFlashAttentionDummy<T>::Init(
-    __gm__ uint8_t *attentionOut, const FlashAttentionScoreSimplifiedTilingData *__restrict tiling)
+    __gm__ uint8_t* attentionOut, const FlashAttentionScoreSimplifiedTilingData* __restrict tiling)
 {
-    attentionOutGm.SetGlobalBuffer((__gm__ T *)attentionOut);
+    attentionOutGm.SetGlobalBuffer((__gm__ T*)attentionOut);
     tilingData = tiling;
 }
 

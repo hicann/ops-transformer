@@ -634,8 +634,8 @@ constexpr int64_t TEST_MX_SCALE_BLOCK = 64;
 constexpr int64_t TEST_MX_SCALE_PACK = 2;
 
 struct ShapeCase {
-    const char *name;
-    const char *layout;
+    const char* name;
+    const char* layout;
     std::vector<int64_t> qliv2_ut::CaseParam::*shapeMember;
     std::vector<int64_t> shape;
     ge::graphStatus expected = ge::GRAPH_FAILED;
@@ -647,7 +647,7 @@ struct ScaleCase {
     std::string variant;
 };
 
-qliv2_ut::CaseParam Make950ShapeCase(const std::string &layout, int64_t mode)
+qliv2_ut::CaseParam Make950ShapeCase(const std::string& layout, int64_t mode)
 {
     const bool tnd = layout == "TND" || layout == "TND_PA";
     const bool paged = layout == "PA_BBND" || layout == "TND_PA";
@@ -711,10 +711,10 @@ qliv2_ut::CaseParam Make950ShapeCase(const std::string &layout, int64_t mode)
 std::vector<ScaleCase> MakeScaleCases()
 {
     std::vector<ScaleCase> cases;
-    for (const auto *layout : {"BSND", "TND", "PA_BBND", "TND_PA"}) {
+    for (const auto* layout : {"BSND", "TND", "PA_BBND", "TND_PA"}) {
         for (const auto mode :
              {TEST_QUANT_FP8, TEST_QUANT_INT8, TEST_QUANT_MXFP8, TEST_QUANT_HIFLOAT8, TEST_QUANT_MXFP4}) {
-            for (const auto *variant : {"q_rank", "k_rank", "q_axis", "k_axis", "valid"}) {
+            for (const auto* variant : {"q_rank", "k_rank", "q_axis", "k_axis", "valid"}) {
                 cases.push_back({layout, mode, variant});
             }
         }
@@ -727,7 +727,7 @@ class QuantLightningIndexerV2ShapeContract : public testing::TestWithParam<Shape
 
 TEST_P(QuantLightningIndexerV2ShapeContract, RejectInvalidShape)
 {
-    const auto &test = GetParam();
+    const auto& test = GetParam();
     auto p = Make950ShapeCase(test.layout, TEST_QUANT_FP8);
     p.*test.shapeMember = test.shape;
     qliv2_ut::RunTilingCase(p, test.expected);
@@ -855,16 +855,16 @@ INSTANTIATE_TEST_SUITE_P(
         ShapeCase{
             "TND_cu_seqlens_k_rank2", "TND", &qliv2_ut::CaseParam::cuSeqK, {TEST_SINGLETON_DIM, TEST_CU_SEQLENS_SIZE}},
         ShapeCase{"BSND_cu_seqlens_k_forbidden", "BSND", &qliv2_ut::CaseParam::cuSeqK, {TEST_CU_SEQLENS_SIZE}}),
-    [](const testing::TestParamInfo<ShapeCase> &info) { return info.param.name; });
+    [](const testing::TestParamInfo<ShapeCase>& info) { return info.param.name; });
 
 class QuantLightningIndexerV2ScaleContract : public testing::TestWithParam<ScaleCase> {};
 
 TEST_P(QuantLightningIndexerV2ScaleContract, CheckScaleShape)
 {
-    const auto &test = GetParam();
+    const auto& test = GetParam();
     auto p = Make950ShapeCase(test.layout, test.mode);
     if (test.variant != "valid") {
-        auto &shape = test.variant.front() == 'q' ? p.qScaleShape : p.kScaleShape;
+        auto& shape = test.variant.front() == 'q' ? p.qScaleShape : p.kScaleShape;
         if (test.variant == "q_rank" || test.variant == "k_rank") {
             shape.push_back(TEST_SINGLETON_DIM);
         } else {
@@ -875,7 +875,7 @@ TEST_P(QuantLightningIndexerV2ScaleContract, CheckScaleShape)
 }
 
 INSTANTIATE_TEST_SUITE_P(Ascend950, QuantLightningIndexerV2ScaleContract, testing::ValuesIn(MakeScaleCases()),
-                         [](const testing::TestParamInfo<ScaleCase> &info) {
+                         [](const testing::TestParamInfo<ScaleCase>& info) {
                              return info.param.layout + "_mode" + std::to_string(info.param.mode) + "_" +
                                     info.param.variant;
                          });

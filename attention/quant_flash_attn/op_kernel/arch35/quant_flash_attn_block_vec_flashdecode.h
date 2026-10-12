@@ -30,7 +30,7 @@ namespace BaseApi {
 // DN 路径全 mask 行写入的 max 经过了 scaleValue 乘法 + ln2 量化 + ln(pScale) 偏移，
 // 使用与 vec1 相同的硬件 Truncate(CAST_CEIL) 保证判值 bit 级一致；非 DN 路径保持原始 minValue
 template <bool useDn>
-__simd_vf__ inline void CalcMinCheckValueVF(__ubuf__ float *dstUb, const float minValue, const float scaleValue,
+__simd_vf__ inline void CalcMinCheckValueVF(__ubuf__ float* dstUb, const float minValue, const float scaleValue,
                                             const float pScale)
 {
     RegTensor<float> vregMin;
@@ -47,7 +47,7 @@ __simd_vf__ inline void CalcMinCheckValueVF(__ubuf__ float *dstUb, const float m
         Muls(vregMin, vregMin, LN2, pregAll);
         Sub(vregMin, vregMin, vregLnPScale, pregAll);
     }
-    StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)dstUb, vregMin, pregAll);
+    StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float*&)dstUb, vregMin, pregAll);
 }
 
 template <LayOutTypeEnum LAYOUT>
@@ -136,7 +136,7 @@ protected:
 
     static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<layout>();
     static constexpr ActualSeqLensMode KV_MODE = GetKvActSeqMode<layout, isPa>();
-    __gm__ uint8_t *keyPtr_ = nullptr;
+    __gm__ uint8_t* keyPtr_ = nullptr;
 
     using QSeqParserType =
         typename std::conditional<(layout == LayOutTypeEnum::LAYOUT_TND || layout == LayOutTypeEnum::LAYOUT_NTD),
@@ -147,14 +147,14 @@ protected:
         (!isPa && (layout == LayOutTypeEnum::LAYOUT_TND || layout == LayOutTypeEnum::LAYOUT_NTD)),
         ActualSeqLensParser<KV_MODE, int32_t, true>, ActualSeqLensParser<KV_MODE, int32_t>>::type;
 
-    QSeqParserType *qActSeqLensParser_ = nullptr;
-    KvSeqParserType *kvActSeqLensParser_ = nullptr;
+    QSeqParserType* qActSeqLensParser_ = nullptr;
+    KvSeqParserType* kvActSeqLensParser_ = nullptr;
 
     int64_t preTokensPerBatch_ = 0;
     int64_t nextTokensPerBatch_ = 0;
 
     static constexpr T BOOL_ATTEN_MASK_SCALAR_VALUE = -1000000000000.0; // 用于mask为bool类型
-    uint32_t negativeIntScalar_ = *((uint32_t *)&BOOL_ATTEN_MASK_SCALAR_VALUE);
+    uint32_t negativeIntScalar_ = *((uint32_t*)&BOOL_ATTEN_MASK_SCALAR_VALUE);
 
     float pScaleValue_{1.0f};
 
@@ -162,7 +162,7 @@ protected:
     uint64_t actSeqLensQ_ = 0;
     // ================================类成员变量====================================
     // 结构体
-    const ConstInfoX &constInfo_;
+    const ConstInfoX& constInfo_;
     TaskInfo taskInfo_{};
 
 private:
@@ -183,12 +183,12 @@ private:
     LocalTensor<float> fdMinCheckBuf_; // 256B
 
 public:
-    __aicore__ inline QuantFlashAttnBlockVecFlashDecode(ConstInfoX &constInfo)
+    __aicore__ inline QuantFlashAttnBlockVecFlashDecode(ConstInfoX& constInfo)
         : constInfo_(constInfo){};
 
     __aicore__ inline void InitGlobalTensor(GlobalTensor<float> lseMaxFdGm, GlobalTensor<float> lseSumFdGm,
                                             GlobalTensor<float> accumOutGm, GlobalTensor<OUTPUT_T> attentionOutGm,
-                                            __gm__ uint8_t *key)
+                                            __gm__ uint8_t* key)
     {
         this->lseMaxFdGm_ = lseMaxFdGm;
         this->lseSumFdGm_ = lseSumFdGm;
@@ -197,7 +197,7 @@ public:
         this->keyPtr_ = key;
     }
 
-    __aicore__ inline void SetCuSeqLensParsers(QSeqParserType &qParser, KvSeqParserType &kvParser)
+    __aicore__ inline void SetCuSeqLensParsers(QSeqParserType& qParser, KvSeqParserType& kvParser)
     {
         this->qActSeqLensParser_ = &qParser;
         this->kvActSeqLensParser_ = &kvParser;
@@ -270,7 +270,7 @@ public:
 
     // TPipe兼容版: 供尚未切换静态布局的kernel(fp8/hif8)使用, 保持原Reset+分配语义,
     // buffer尺寸与静态版保持一致
-    __aicore__ inline void InitBuffers(TPipe *pipe)
+    __aicore__ inline void InitBuffers(TPipe* pipe)
     {
         if ASCEND_IS_AIV {
             pipe->Reset();
@@ -316,7 +316,7 @@ public:
     __aicore__ inline void FreeEventID() {}
 
 protected:
-    __aicore__ inline void CopyAccumOutIn(LocalTensor<T> &accumOutLocal, uint32_t splitKVIndex, uint32_t startRow,
+    __aicore__ inline void CopyAccumOutIn(LocalTensor<T>& accumOutLocal, uint32_t splitKVIndex, uint32_t startRow,
                                           uint32_t dealRowCount)
     {
         DataCopyExtParams copyInParams;
@@ -357,14 +357,14 @@ protected:
         // 与 FA 侧 UpdateMinCheckValue 保持一致：DN 路径全 mask 行写入的 max 经过了
         // scaleValue 乘法 + ln2 量化 + ln(pScale) 偏移；非 DN 路径保持原始 minValue
         uint32_t minBits = NEGATIVE_MIN_VALUE_FP32_LN2; // NEGATIVE_MIN_VALUE_FP32_LN2
-        float minValue = *((float *)&minBits);
+        float minValue = *((float*)&minBits);
         LocalTensor<float> minCheckUb = fdMinCheckBuf_;
-        CalcMinCheckValueVF<useDn>((__ubuf__ float *)minCheckUb.GetPhyAddr(), minValue, constInfo_.scaleValue,
+        CalcMinCheckValueVF<useDn>((__ubuf__ float*)minCheckUb.GetPhyAddr(), minValue, constInfo_.scaleValue,
                                    pScaleValue_);
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void ComputeScaleValue(LocalTensor<T> &lseExp, uint32_t dealRowCount,
+    __aicore__ inline void ComputeScaleValue(LocalTensor<T>& lseExp, uint32_t dealRowCount,
                                              uint32_t actualCombineLoopSize, uint32_t cntM, uint32_t startRow)
     {
         LocalTensor<T> lseSum = (cntM & 1) == 0 ? fdSumBuf1_ : fdSumBuf2_;
@@ -380,7 +380,7 @@ protected:
                                       dealRowCount, actualCombineLoopSize, constInfo_.isSoftmaxLseEnable, false);
     }
 
-    __aicore__ inline void Bmm2DataCopyOutTrans(LocalTensor<OUTPUT_T> &attenOutUb, uint32_t startRow,
+    __aicore__ inline void Bmm2DataCopyOutTrans(LocalTensor<OUTPUT_T>& attenOutUb, uint32_t startRow,
                                                 uint32_t dealRowCount, uint32_t columnCount)
     {
         FaUbTensor<OUTPUT_T> ubTensor{
@@ -429,13 +429,13 @@ protected:
             copyAttenOutUbToGm(outGmTensor, ubTensor, gmCoord);
         }
     }
-    __aicore__ inline void ReduceFinalRes(LocalTensor<T> &reduceOut, LocalTensor<T> &mm2Res, LocalTensor<T> &lseLocal,
+    __aicore__ inline void ReduceFinalRes(LocalTensor<T>& reduceOut, LocalTensor<T>& mm2Res, LocalTensor<T>& lseLocal,
                                           uint32_t cntKV, uint32_t dealRowCount)
     {
         uint64_t dSizeV_Align = (uint64_t)this->dSizeV_Align_;
         ReduceFinalRes_VF<T>(reduceOut, lseLocal, mm2Res, dealRowCount, dSizeV_Align, cntKV);
     }
-    __aicore__ inline void CopyFinalResOut(LocalTensor<T> &accumOutLocal, uint32_t startRow, uint32_t dealRowCount,
+    __aicore__ inline void CopyFinalResOut(LocalTensor<T>& accumOutLocal, uint32_t startRow, uint32_t dealRowCount,
                                            uint32_t cntM)
     {
         LocalTensor<OUTPUT_T> tmpBmm2ResCastTensor = fdOutputBuf_;
@@ -480,7 +480,7 @@ protected:
     }
 
     template <typename UBOUT_T>
-    __aicore__ inline void DealInvalidRows(LocalTensor<UBOUT_T> &attenOutUb, uint32_t startRow, uint32_t dealRowCount,
+    __aicore__ inline void DealInvalidRows(LocalTensor<UBOUT_T>& attenOutUb, uint32_t startRow, uint32_t dealRowCount,
                                            uint32_t columnCount)
     {
         if constexpr (!HAS_MASK) {
@@ -506,7 +506,7 @@ protected:
     }
 
     template <typename UBOUT_T>
-    __aicore__ inline void DealInvalidMaskRows(LocalTensor<UBOUT_T> &attenOutUb, uint32_t startRow,
+    __aicore__ inline void DealInvalidMaskRows(LocalTensor<UBOUT_T>& attenOutUb, uint32_t startRow,
                                                uint32_t dealRowCount, uint32_t columnCount, uint32_t cntM)
     {
         if constexpr (!HAS_MASK) {
@@ -526,7 +526,7 @@ protected:
     }
 
 public:
-    __aicore__ inline void FlashDecode(FDparamsX &fd)
+    __aicore__ inline void FlashDecode(FDparamsX& fd)
     {
         if (!fd.fdCoreEnable) {
             return;
@@ -644,7 +644,7 @@ template <typename INPUT_T, typename T, typename OUTPUT_T, LayOutTypeEnum layout
 class QuantFlashAttnBlockVecFlashDecodeDummy {
 public:
     using ConstInfoX = ConstInfo_t;
-    __aicore__ inline QuantFlashAttnBlockVecFlashDecodeDummy(ConstInfoX &constInfo){};
+    __aicore__ inline QuantFlashAttnBlockVecFlashDecodeDummy(ConstInfoX& constInfo){};
 };
 
 } // namespace BaseApi

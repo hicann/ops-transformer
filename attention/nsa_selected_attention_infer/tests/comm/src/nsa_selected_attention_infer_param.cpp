@@ -20,55 +20,65 @@ using Tensor = ops::adv::tests::utils::Tensor;
 
 using namespace ops::adv::tests::NsaSelectedAttentionInfer;
 
-
-NsaSelectAttentionInferParam::NsaSelectAttentionInferParam(int64_t pBatchSize, int64_t pQSeqSize,
-            int64_t pHeadSize, int64_t pHeadDim, int64_t pMaxBlockNumPerBatch,
-            int64_t pBlockSize, int64_t pSeqSize, int64_t pHeadDimV, int64_t pHeadSizeV, 
-            int64_t pSelectedBlockSize, int64_t pSelectedBlockCount, int64_t pSparseMode,
-            float pScaleValue, std::string pInputLayout, ge::DataType pOptionalDataType, 
-            std::vector<int64_t> pActualSeqQLenList, std::vector<int64_t> pActualSeqKVLenList, int64_t numtokens)
-    : batchSize(pBatchSize), qSeqSize(pQSeqSize), headSize(pHeadSize), headDim(pHeadDim),
-      maxBlockNumPerBatch(pMaxBlockNumPerBatch), blockSize(pBlockSize), seqSize(pSeqSize),
-      headDimV(pHeadDimV), headSizeV(pHeadSizeV), selectedBlockSize(pSelectedBlockSize), selectedBlockCount(pSelectedBlockCount),
-      sparseMode(pSparseMode), scaleValue(pScaleValue), inputLayout(pInputLayout), optionalDataType(pOptionalDataType), actualSeqQLenList(std::move(pActualSeqQLenList)),
-      actualSeqKVLenList(std::move(pActualSeqKVLenList)), numtokens(numtokens)
-{
-}
+NsaSelectAttentionInferParam::NsaSelectAttentionInferParam(
+    int64_t pBatchSize, int64_t pQSeqSize, int64_t pHeadSize, int64_t pHeadDim, int64_t pMaxBlockNumPerBatch,
+    int64_t pBlockSize, int64_t pSeqSize, int64_t pHeadDimV, int64_t pHeadSizeV, int64_t pSelectedBlockSize,
+    int64_t pSelectedBlockCount, int64_t pSparseMode, float pScaleValue, std::string pInputLayout,
+    ge::DataType pOptionalDataType, std::vector<int64_t> pActualSeqQLenList, std::vector<int64_t> pActualSeqKVLenList,
+    int64_t numtokens)
+    : batchSize(pBatchSize),
+      qSeqSize(pQSeqSize),
+      headSize(pHeadSize),
+      headDim(pHeadDim),
+      maxBlockNumPerBatch(pMaxBlockNumPerBatch),
+      blockSize(pBlockSize),
+      seqSize(pSeqSize),
+      headDimV(pHeadDimV),
+      headSizeV(pHeadSizeV),
+      selectedBlockSize(pSelectedBlockSize),
+      selectedBlockCount(pSelectedBlockCount),
+      sparseMode(pSparseMode),
+      scaleValue(pScaleValue),
+      inputLayout(pInputLayout),
+      optionalDataType(pOptionalDataType),
+      actualSeqQLenList(std::move(pActualSeqQLenList)),
+      actualSeqKVLenList(std::move(pActualSeqKVLenList)),
+      numtokens(numtokens)
+{}
 
 void NsaSelectAttentionInferParam::BSNDInitParam()
 {
-    query = Tensor("query", {batchSize, qSeqSize, headSize, headDim}, inputLayout.c_str(), optionalDataType,
-        ge::FORMAT_ND);
+    query =
+        Tensor("query", {batchSize, qSeqSize, headSize, headDim}, inputLayout.c_str(), optionalDataType, ge::FORMAT_ND);
     key = Tensor("key", {maxBlockNumPerBatch, blockSize, headSizeV, headDim}, inputLayout.c_str(), optionalDataType,
-        ge::FORMAT_ND);
-    value = Tensor("value", {maxBlockNumPerBatch, blockSize, headSizeV, headDimV}, inputLayout.c_str(), optionalDataType,
-        ge::FORMAT_ND);
+                 ge::FORMAT_ND);
+    value = Tensor("value", {maxBlockNumPerBatch, blockSize, headSizeV, headDimV}, inputLayout.c_str(),
+                   optionalDataType, ge::FORMAT_ND);
     attentionOut = Tensor("attentionOut", {batchSize, qSeqSize, headSize, headDimV}, inputLayout.c_str(),
-        optionalDataType, ge::FORMAT_ND);
+                          optionalDataType, ge::FORMAT_ND);
 }
 
 void NsaSelectAttentionInferParam::BSHInitParam()
 {
-    query = Tensor("query", {batchSize, qSeqSize, headSize*headDim}, inputLayout.c_str(), optionalDataType,
-        ge::FORMAT_ND);
-    key = Tensor("key", {maxBlockNumPerBatch, blockSize, headSizeV*headDim}, inputLayout.c_str(), optionalDataType,
-        ge::FORMAT_ND);
-    value = Tensor("value", {maxBlockNumPerBatch, blockSize, headSizeV*headDimV}, inputLayout.c_str(), optionalDataType,
-        ge::FORMAT_ND);
-    attentionOut = Tensor("attentionOut", {batchSize, qSeqSize, headSize*headDimV}, inputLayout.c_str(),
-        optionalDataType, ge::FORMAT_ND);
+    query = Tensor("query", {batchSize, qSeqSize, headSize * headDim}, inputLayout.c_str(), optionalDataType,
+                   ge::FORMAT_ND);
+    key = Tensor("key", {maxBlockNumPerBatch, blockSize, headSizeV * headDim}, inputLayout.c_str(), optionalDataType,
+                 ge::FORMAT_ND);
+    value = Tensor("value", {maxBlockNumPerBatch, blockSize, headSizeV * headDimV}, inputLayout.c_str(),
+                   optionalDataType, ge::FORMAT_ND);
+    attentionOut = Tensor("attentionOut", {batchSize, qSeqSize, headSize * headDimV}, inputLayout.c_str(),
+                          optionalDataType, ge::FORMAT_ND);
 }
 
 void NsaSelectAttentionInferParam::TNDInitParam()
 {
-    query = Tensor("query", {numtokens, headSize, headDim}, inputLayout.c_str(), optionalDataType,
-        ge::FORMAT_ND);
+    query = Tensor("query", {numtokens, headSize, headDim}, inputLayout.c_str(), optionalDataType, ge::FORMAT_ND);
     key = Tensor("key", {maxBlockNumPerBatch, blockSize, headSizeV * headDim}, inputLayout.c_str(), optionalDataType,
-        ge::FORMAT_ND);
-    value = Tensor("value", {maxBlockNumPerBatch, blockSize, headSizeV * headDimV}, inputLayout.c_str(), optionalDataType,
-        ge::FORMAT_ND);
-    attentionOut = Tensor("attentionOut", {numtokens, headSize , headDimV}, inputLayout.c_str(),
-        optionalDataType, ge::FORMAT_ND);
+                 ge::FORMAT_ND);
+    value = Tensor("value", {maxBlockNumPerBatch, blockSize, headSizeV * headDimV}, inputLayout.c_str(),
+                   optionalDataType, ge::FORMAT_ND);
+    attentionOut =
+        Tensor("attentionOut", {numtokens, headSize, headDimV}, inputLayout.c_str(), optionalDataType, ge::FORMAT_ND);
 }
 
 void NsaSelectAttentionInferParam::TopkInitParam()
@@ -126,17 +136,18 @@ bool NsaSelectAttentionInferParam::Init()
     }
 
     if (inputLayout == "TND") {
-        topkIndices = Tensor("topkIndices", {numtokens, headSizeV, selectedBlockCount}, inputLayout.c_str(), ge::DT_INT32,
-            ge::FORMAT_ND);
+        topkIndices = Tensor("topkIndices", {numtokens, headSizeV, selectedBlockCount}, inputLayout.c_str(),
+                             ge::DT_INT32, ge::FORMAT_ND);
     } else {
-        topkIndices = Tensor("topkIndices", {batchSize, qSeqSize, headSizeV, selectedBlockCount}, inputLayout.c_str(), ge::DT_INT32,
-            ge::FORMAT_ND);
+        topkIndices = Tensor("topkIndices", {batchSize, qSeqSize, headSizeV, selectedBlockCount}, inputLayout.c_str(),
+                             ge::DT_INT32, ge::FORMAT_ND);
     }
-    blocktable = Tensor("blocktable", {batchSize, maxBlockNumPerBatch}, inputLayout.c_str(), ge::DT_INT32, ge::FORMAT_ND);
-    
+    blocktable =
+        Tensor("blocktable", {batchSize, maxBlockNumPerBatch}, inputLayout.c_str(), ge::DT_INT32, ge::FORMAT_ND);
+
     if (!actualSeqQLenList.empty()) {
-        actualQSeqLengths = Tensor("actualQSeqLengths", {batchSize}, inputLayout.c_str(), ge::DataType::DT_INT64, ge::FORMAT_ND,
-                                    Tensor::TensorType::OPTIONAL_INPUT);
+        actualQSeqLengths = Tensor("actualQSeqLengths", {batchSize}, inputLayout.c_str(), ge::DataType::DT_INT64,
+                                   ge::FORMAT_ND, Tensor::TensorType::OPTIONAL_INPUT);
     } else {
         LOG_ERR("Currently, actualQSeqLengths must not be empty.");
     }
@@ -144,8 +155,8 @@ bool NsaSelectAttentionInferParam::Init()
     TopkInitParam();
 
     if (!actualSeqKVLenList.empty()) {
-        actualKvSeqLengths = Tensor("actualKvSeqLengths", {batchSize}, inputLayout.c_str(), ge::DataType::DT_INT64, ge::FORMAT_ND,
-                                    Tensor::TensorType::OPTIONAL_INPUT);
+        actualKvSeqLengths = Tensor("actualKvSeqLengths", {batchSize}, inputLayout.c_str(), ge::DataType::DT_INT64,
+                                    ge::FORMAT_ND, Tensor::TensorType::OPTIONAL_INPUT);
     } else {
         LOG_ERR("Currently, actualKvSeqLengths must not be empty.");
     }
@@ -154,18 +165,21 @@ bool NsaSelectAttentionInferParam::Init()
         blocktableData.push_back(0);
     }
 
-    if (!ops::adv::tests::NsaSelectedAttentionInfer::NsaSelectAttentionInferParam::InitTensor(actualKvSeqLengths, actualSeqKVLenList)) {
+    if (!ops::adv::tests::NsaSelectedAttentionInfer::NsaSelectAttentionInferParam::InitTensor(actualKvSeqLengths,
+                                                                                              actualSeqKVLenList)) {
         return false;
     }
 
-    if (!ops::adv::tests::NsaSelectedAttentionInfer::NsaSelectAttentionInferParam::InitTensor(actualQSeqLengths, actualSeqQLenList)) {
+    if (!ops::adv::tests::NsaSelectedAttentionInfer::NsaSelectAttentionInferParam::InitTensor(actualQSeqLengths,
+                                                                                              actualSeqQLenList)) {
         return false;
     }
 
     if (!ops::adv::tests::NsaSelectedAttentionInfer::NsaSelectAttentionInferParam::InitTensor(topkIndices, topkData)) {
         return false;
     }
-    if (!ops::adv::tests::NsaSelectedAttentionInfer::NsaSelectAttentionInferParam::InitTensor(blocktable, blocktableData)) {
+    if (!ops::adv::tests::NsaSelectedAttentionInfer::NsaSelectAttentionInferParam::InitTensor(blocktable,
+                                                                                              blocktableData)) {
         return false;
     }
     return true;

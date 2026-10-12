@@ -52,38 +52,38 @@ constexpr size_t KV_CACHE_OUT_INDEX = 2;
 constexpr size_t KR_CACHE_OUT_INDEX = 3;
 
 struct MlaPrologFallBackParam {
-    const gert::Tensor *tokenX = nullptr;
-    const gert::Tensor *weightDq = nullptr;
-    const gert::Tensor *weightUqQr = nullptr;
-    const gert::Tensor *weightUk = nullptr;
-    const gert::Tensor *weightDkvKr = nullptr;
-    const gert::Tensor *rmsnormGammaCq = nullptr;
-    const gert::Tensor *rmsnormGammaCkv = nullptr;
-    const gert::Tensor *ropeSin = nullptr;
-    const gert::Tensor *ropeCos = nullptr;
-    const gert::Tensor *cacheIndex = nullptr;
-    const gert::Tensor *kvCache = nullptr;
-    const gert::Tensor *krCache = nullptr;
-    const gert::Tensor *query = nullptr;
-    const gert::Tensor *queryRope = nullptr;
-    const gert::Tensor *kvCacheOut = nullptr;
-    const gert::Tensor *krCacheOut = nullptr;
-    const gert::Tensor *dequantScaleX = nullptr;
-    const gert::Tensor *dequantScaleWDq = nullptr;
-    const gert::Tensor *dequantScaleWUqQr = nullptr;
-    const gert::Tensor *dequantScaleWDkvKr = nullptr;
-    const gert::Tensor *quantScaleCkv = nullptr;
-    const gert::Tensor *quantScaleCkr = nullptr;
-    const gert::Tensor *smoothScalesCq = nullptr;
+    const gert::Tensor* tokenX = nullptr;
+    const gert::Tensor* weightDq = nullptr;
+    const gert::Tensor* weightUqQr = nullptr;
+    const gert::Tensor* weightUk = nullptr;
+    const gert::Tensor* weightDkvKr = nullptr;
+    const gert::Tensor* rmsnormGammaCq = nullptr;
+    const gert::Tensor* rmsnormGammaCkv = nullptr;
+    const gert::Tensor* ropeSin = nullptr;
+    const gert::Tensor* ropeCos = nullptr;
+    const gert::Tensor* cacheIndex = nullptr;
+    const gert::Tensor* kvCache = nullptr;
+    const gert::Tensor* krCache = nullptr;
+    const gert::Tensor* query = nullptr;
+    const gert::Tensor* queryRope = nullptr;
+    const gert::Tensor* kvCacheOut = nullptr;
+    const gert::Tensor* krCacheOut = nullptr;
+    const gert::Tensor* dequantScaleX = nullptr;
+    const gert::Tensor* dequantScaleWDq = nullptr;
+    const gert::Tensor* dequantScaleWUqQr = nullptr;
+    const gert::Tensor* dequantScaleWDkvKr = nullptr;
+    const gert::Tensor* quantScaleCkv = nullptr;
+    const gert::Tensor* quantScaleCkr = nullptr;
+    const gert::Tensor* smoothScalesCq = nullptr;
     double rmsnormEpsilonCq = 1e-05f;
     double rmsnormEpsilonCkv = 1e-05f;
-    const char *cacheMode = nullptr;
+    const char* cacheMode = nullptr;
 };
 
-graphStatus GetMlaPrologInputTensor(const OpExecuteContext *ctx, MlaPrologFallBackParam &param);
-graphStatus GetMlaPrologOutputTensor(const OpExecuteContext *ctx, MlaPrologFallBackParam &param);
-graphStatus GetMlaPrologAttr(const OpExecuteContext *ctx, MlaPrologFallBackParam &param);
-graphStatus MlaHostExecuteFunc(OpExecuteContext *host_api_ctx);
+graphStatus GetMlaPrologInputTensor(const OpExecuteContext* ctx, MlaPrologFallBackParam& param);
+graphStatus GetMlaPrologOutputTensor(const OpExecuteContext* ctx, MlaPrologFallBackParam& param);
+graphStatus GetMlaPrologAttr(const OpExecuteContext* ctx, MlaPrologFallBackParam& param);
+graphStatus MlaHostExecuteFunc(OpExecuteContext* host_api_ctx);
 } // namespace fallback
 
 #ifdef __cplusplus

@@ -43,14 +43,14 @@ constexpr int64_t DTILE_PTPG = 656;
 constexpr int64_t HEAD_NUM_MIN = 1;
 constexpr int64_t HEAD_NUM_MAX = 128;
 
-inline bool HasDefinedTensor(const c10::optional<at::Tensor> &opt_tensor)
+inline bool HasDefinedTensor(const c10::optional<at::Tensor>& opt_tensor)
 {
     return opt_tensor.has_value() && opt_tensor.value().defined() && opt_tensor.value().numel() > 0;
 }
 
 // do_rope 由 ropeSin/ropeCos 是否成对传入决定：二者同时为空（或 None）视为关闭，
 // 二者同时非空视为开启，一空一非空为非法输入，须拦截报错。
-bool ResolveDoRope(const c10::optional<at::Tensor> &rope_sin, const c10::optional<at::Tensor> &rope_cos)
+bool ResolveDoRope(const c10::optional<at::Tensor>& rope_sin, const c10::optional<at::Tensor>& rope_cos)
 {
     const bool has_rope_sin = HasDefinedTensor(rope_sin);
     const bool has_rope_cos = HasDefinedTensor(rope_cos);
@@ -63,8 +63,8 @@ bool ResolveDoRope(const c10::optional<at::Tensor> &rope_sin, const c10::optiona
 
 // do_rope=false 时 Dr 由 weightDkvKr 的 (Hckv+Dr) 与 weightUk 的 Hckv 推导；
 // do_rope=true 时 Dr 取 ropeSin 最后一维。
-int64_t ResolveRopeDim(const at::Tensor &token_x, const c10::optional<at::Tensor> &rope_sin,
-                       const at::Tensor &weight_uk, const at::Tensor &weight_dkv_kr)
+int64_t ResolveRopeDim(const at::Tensor& token_x, const c10::optional<at::Tensor>& rope_sin,
+                       const at::Tensor& weight_uk, const at::Tensor& weight_dkv_kr)
 {
     const bool has_rope_sin = HasDefinedTensor(rope_sin);
     if (!has_rope_sin) {
@@ -72,7 +72,7 @@ int64_t ResolveRopeDim(const at::Tensor &token_x, const c10::optional<at::Tensor
             (weight_dkv_kr.dim() == 4) ? weight_dkv_kr.size(0) * weight_dkv_kr.size(3) : weight_dkv_kr.size(1);
         return hckv_plus_dr - weight_uk.size(2);
     }
-    const at::Tensor &rope_sin_tensor = rope_sin.value();
+    const at::Tensor& rope_sin_tensor = rope_sin.value();
     const int64_t token_x_dim = token_x.dim();
     const int64_t rope_sin_dim = rope_sin_tensor.dim();
     if (token_x_dim == DIM_3) {
@@ -86,7 +86,7 @@ int64_t ResolveRopeDim(const at::Tensor &token_x, const c10::optional<at::Tensor
 }
 
 // 返回权重张量的逻辑行列数：2 维（ND）直接取 (s0, s1)；4 维（FRACTAL_NZ）取 (s0*16, s1*16)。
-std::pair<int64_t, int64_t> ResolveLogicalDims(const at::Tensor &tensor)
+std::pair<int64_t, int64_t> ResolveLogicalDims(const at::Tensor& tensor)
 {
     if (tensor.dim() == 4) {
         return {tensor.size(0) * 16, tensor.size(1) * 16};
@@ -94,13 +94,13 @@ std::pair<int64_t, int64_t> ResolveLogicalDims(const at::Tensor &tensor)
     return {tensor.size(0), tensor.size(1)};
 }
 
-bool IsInSupportedSet(int64_t value, const int64_t *supported, int64_t size)
+bool IsInSupportedSet(int64_t value, const int64_t* supported, int64_t size)
 {
     return std::find(supported, supported + size, value) != supported + size;
 }
 
 // 算子对 weight_dq/weight_uq_qr/weight_dkv_kr 严格要求 FRACTAL_NZ 格式，此处提前校验。
-void CheckFractalNzFormat(const at::Tensor &tensor, const std::string &name)
+void CheckFractalNzFormat(const at::Tensor& tensor, const std::string& name)
 {
     if (!torch_npu::utils::is_npu(tensor)) {
         return;
@@ -117,7 +117,7 @@ constexpr int64_t HCQ_SUPPORTED_SIZE = sizeof(HCQ_SUPPORTED) / sizeof(HCQ_SUPPOR
 constexpr int64_t D_SUPPORTED_SIZE = sizeof(D_SUPPORTED) / sizeof(D_SUPPORTED[0]);
 
 // 校验 kv_cache 最后一维（Dtile）：pertoken-pergroup 场景（kv_cache_quant_mode=3）为 656，其余为 512。
-void _CheckDtile(const at::Tensor &kv_cache, int64_t kv_cache_quant_mode)
+void _CheckDtile(const at::Tensor& kv_cache, int64_t kv_cache_quant_mode)
 {
     const int64_t dtile = kv_cache.size(kv_cache.dim() - 1);
     const int64_t expected_dtile = (kv_cache_quant_mode == MODE_3) ? DTILE_PTPG : DTILE_NON_PTPG;
@@ -127,7 +127,7 @@ void _CheckDtile(const at::Tensor &kv_cache, int64_t kv_cache_quant_mode)
 
 // ckvkrRepoMode=1：kv/kr 合并存储，kr_cache 必须为空 Tensor（shape 乘积为 0），
 // 维度应包含 0，支持 shape 为 (0)。此时不再按 cache_mode 校验 3D/4D 布局。
-void CheckKrCacheMergedRepo(const at::Tensor &kr_cache)
+void CheckKrCacheMergedRepo(const at::Tensor& kr_cache)
 {
     bool has_zero_dim = false;
     for (int64_t i = 0; i < kr_cache.dim(); ++i) {
@@ -142,7 +142,7 @@ void CheckKrCacheMergedRepo(const at::Tensor &kr_cache)
                 kr_cache.sizes());
 }
 
-void CheckKrCacheLayout(const at::Tensor &kr_cache, int64_t rope_dim)
+void CheckKrCacheLayout(const at::Tensor& kr_cache, int64_t rope_dim)
 {
     TORCH_CHECK(kr_cache.size(kr_cache.dim() - 2) == NKV, "kv head num Nkv (kr_cache dim -2) must be ", NKV,
                 ", but the actual value is ", kr_cache.size(kr_cache.dim() - 2));
@@ -151,8 +151,8 @@ void CheckKrCacheLayout(const at::Tensor &kr_cache, int64_t rope_dim)
 }
 
 // 校验 cache 张量（kv_cache/kr_cache）的 shape 格式字段约束。
-void CheckCacheShapes(const at::Tensor &kv_cache, const at::Tensor &kr_cache, const std::string &cache_mode,
-                      int64_t kv_cache_quant_mode, int64_t rope_dim, const c10::optional<at::Tensor> &cache_index,
+void CheckCacheShapes(const at::Tensor& kv_cache, const at::Tensor& kr_cache, const std::string& cache_mode,
+                      int64_t kv_cache_quant_mode, int64_t rope_dim, const c10::optional<at::Tensor>& cache_index,
                       int64_t ckvkr_repo_mode)
 {
     const bool is_merged_repo = (ckvkr_repo_mode == MODE_1);
@@ -209,12 +209,12 @@ void CheckCacheShapes(const at::Tensor &kv_cache, const at::Tensor &kr_cache, co
 
 // 校验接口的 shape 格式字段约束（与 torch_npu.npu_mla_prolog_v3 对齐）。
 // N（Head-Num 多头数）在新接口上放开取值，支持 [1, 128] 之间的任意整型值。
-void CheckShapeConstraints(const at::Tensor &token_x, const at::Tensor &weight_dq, const at::Tensor &weight_uq_qr,
-                           const at::Tensor &weight_uk, const at::Tensor &weight_dkv_kr,
-                           const at::Tensor &rmsnorm_gamma_cq, const at::Tensor &rmsnorm_gamma_ckv,
-                           const at::Tensor &kv_cache, const at::Tensor &kr_cache,
-                           const c10::optional<at::Tensor> &rope_sin, const c10::optional<at::Tensor> &rope_cos,
-                           const c10::optional<at::Tensor> &cache_index, const std::string &cache_mode,
+void CheckShapeConstraints(const at::Tensor& token_x, const at::Tensor& weight_dq, const at::Tensor& weight_uq_qr,
+                           const at::Tensor& weight_uk, const at::Tensor& weight_dkv_kr,
+                           const at::Tensor& rmsnorm_gamma_cq, const at::Tensor& rmsnorm_gamma_ckv,
+                           const at::Tensor& kv_cache, const at::Tensor& kr_cache,
+                           const c10::optional<at::Tensor>& rope_sin, const c10::optional<at::Tensor>& rope_cos,
+                           const c10::optional<at::Tensor>& cache_index, const std::string& cache_mode,
                            int64_t kv_cache_quant_mode, int64_t ckvkr_repo_mode)
 {
     const int64_t token_x_dim = token_x.dim();
@@ -291,7 +291,7 @@ bool IsFullQuantKvScene(int64_t weight_quant_mode, int64_t kv_cache_quant_mode)
            kv_cache_quant_mode == MODE_1;
 }
 
-at::Tensor MakeQueryTensor(const at::Tensor &token_x, const at::Tensor &weight_uk, int64_t weight_quant_mode,
+at::Tensor MakeQueryTensor(const at::Tensor& token_x, const at::Tensor& weight_uk, int64_t weight_quant_mode,
                            int64_t kv_cache_quant_mode, bool is_hifloat8)
 {
     const bool full_quant_kv = IsFullQuantKvScene(weight_quant_mode, kv_cache_quant_mode);
@@ -303,7 +303,7 @@ at::Tensor MakeQueryTensor(const at::Tensor &token_x, const at::Tensor &weight_u
     return at::empty({token_x.size(0), weight_uk.size(0), weight_uk.size(2)}, token_x.options().dtype(query_dtype));
 }
 
-at::Tensor MakeQueryRopeTensor(const at::Tensor &token_x, const at::Tensor &weight_uk, int64_t rope_dim)
+at::Tensor MakeQueryRopeTensor(const at::Tensor& token_x, const at::Tensor& weight_uk, int64_t rope_dim)
 {
     if (token_x.dim() == DIM_3) {
         return at::empty({token_x.size(0), token_x.size(1), weight_uk.size(0), rope_dim},
@@ -312,7 +312,7 @@ at::Tensor MakeQueryRopeTensor(const at::Tensor &token_x, const at::Tensor &weig
     return at::empty({token_x.size(0), weight_uk.size(0), rope_dim}, token_x.options().dtype(at::kBFloat16));
 }
 
-at::Tensor MakeDequantScaleQNopeTensor(const at::Tensor &token_x, const at::Tensor &weight_uk)
+at::Tensor MakeDequantScaleQNopeTensor(const at::Tensor& token_x, const at::Tensor& weight_uk)
 {
     if (token_x.dim() == DIM_3) {
         return at::empty({token_x.size(0) * token_x.size(1), weight_uk.size(0), 1},
@@ -321,7 +321,7 @@ at::Tensor MakeDequantScaleQNopeTensor(const at::Tensor &token_x, const at::Tens
     return at::empty({token_x.size(0), weight_uk.size(0), 1}, token_x.options().dtype(at::kFloat));
 }
 
-at::Tensor MakeQueryNormTensor(const at::Tensor &token_x, const at::Tensor &weight_dq, const at::Tensor &weight_uq_qr,
+at::Tensor MakeQueryNormTensor(const at::Tensor& token_x, const at::Tensor& weight_dq, const at::Tensor& weight_uq_qr,
                                bool is_hifloat8)
 {
     at::ScalarType query_norm_dtype = is_hifloat8 ? at::kByte : weight_uq_qr.scalar_type();
@@ -332,8 +332,8 @@ at::Tensor MakeQueryNormTensor(const at::Tensor &token_x, const at::Tensor &weig
     return at::empty({token_x.size(0), weight_dq.size(1)}, token_x.options().dtype(query_norm_dtype));
 }
 
-at::Tensor MakeDequantScaleQNormTensor(const at::Tensor &token_x, const at::Tensor &weight_dq,
-                                       int64_t weight_quant_mode, const c10::optional<at::Tensor> &dequant_scale_x)
+at::Tensor MakeDequantScaleQNormTensor(const at::Tensor& token_x, const at::Tensor& weight_dq,
+                                       int64_t weight_quant_mode, const c10::optional<at::Tensor>& dequant_scale_x)
 {
     at::ScalarType dtype = at::kFloat;
     int64_t norm_dim = 1;
@@ -347,15 +347,15 @@ at::Tensor MakeDequantScaleQNormTensor(const at::Tensor &token_x, const at::Tens
     return at::empty({token_x.size(0), norm_dim}, token_x.options().dtype(dtype));
 }
 
-at::Tensor MakeEmptyScalarTensor(const at::Tensor &ref, at::ScalarType dtype)
+at::Tensor MakeEmptyScalarTensor(const at::Tensor& ref, at::ScalarType dtype)
 {
     return at::empty({0}, ref.options().dtype(dtype));
 }
 
-void CheckMxfp8Inputs(int64_t weight_quant_mode, const c10::optional<at::Tensor> &dequant_scale_x,
-                      const c10::optional<at::Tensor> &dequant_scale_w_dq,
-                      const c10::optional<at::Tensor> &dequant_scale_w_uq_qr,
-                      const c10::optional<at::Tensor> &dequant_scale_w_dkv_kr)
+void CheckMxfp8Inputs(int64_t weight_quant_mode, const c10::optional<at::Tensor>& dequant_scale_x,
+                      const c10::optional<at::Tensor>& dequant_scale_w_dq,
+                      const c10::optional<at::Tensor>& dequant_scale_w_uq_qr,
+                      const c10::optional<at::Tensor>& dequant_scale_w_dkv_kr)
 {
     if (weight_quant_mode != MODE_3) {
         return;
@@ -372,11 +372,11 @@ void CheckMxfp8Inputs(int64_t weight_quant_mode, const c10::optional<at::Tensor>
                 "dequant_scale_w_dkv_kr dtype must be torch.float8_e8m0fnu");
 }
 
-bool IsHifloat8Scene(int64_t weight_quant_mode, const at::Tensor &token_x, const at::Tensor &weight_dq,
-                     const at::Tensor &weight_uq_qr, const at::Tensor &weight_dkv_kr,
-                     const c10::optional<int64_t> &token_x_dtype, const c10::optional<int64_t> &weight_dq_dtype,
-                     const c10::optional<int64_t> &weight_uq_qr_dtype,
-                     const c10::optional<int64_t> &weight_dkv_kr_dtype, const c10::optional<int64_t> &kv_cache_dtype,
+bool IsHifloat8Scene(int64_t weight_quant_mode, const at::Tensor& token_x, const at::Tensor& weight_dq,
+                     const at::Tensor& weight_uq_qr, const at::Tensor& weight_dkv_kr,
+                     const c10::optional<int64_t>& token_x_dtype, const c10::optional<int64_t>& weight_dq_dtype,
+                     const c10::optional<int64_t>& weight_uq_qr_dtype,
+                     const c10::optional<int64_t>& weight_dkv_kr_dtype, const c10::optional<int64_t>& kv_cache_dtype,
                      int64_t kv_cache_quant_mode)
 {
     if (weight_quant_mode != MODE_5) {
@@ -408,7 +408,7 @@ bool IsHifloat8Scene(int64_t weight_quant_mode, const at::Tensor &token_x, const
     return true;
 }
 
-inline aclDataType ResolveTensorAclDtype(const at::Tensor &tensor, bool force_hifloat8)
+inline aclDataType ResolveTensorAclDtype(const at::Tensor& tensor, bool force_hifloat8)
 {
     if (force_hifloat8) {
         return ACL_HIFLOAT8;
@@ -419,20 +419,20 @@ inline aclDataType ResolveTensorAclDtype(const at::Tensor &tensor, bool force_hi
 } // namespace
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> mla_prolog(
-    const at::Tensor &token_x, const at::Tensor &weight_dq, const at::Tensor &weight_uq_qr, const at::Tensor &weight_uk,
-    const at::Tensor &weight_dkv_kr, const at::Tensor &rmsnorm_gamma_cq, const at::Tensor &rmsnorm_gamma_ckv,
-    at::Tensor &kv_cache, at::Tensor &kr_cache, const c10::optional<at::Tensor> &rope_sin,
-    const c10::optional<at::Tensor> &rope_cos, const c10::optional<at::Tensor> &cache_index,
-    const c10::optional<at::Tensor> &dequant_scale_x, const c10::optional<at::Tensor> &dequant_scale_w_dq,
-    const c10::optional<at::Tensor> &dequant_scale_w_uq_qr, const c10::optional<at::Tensor> &dequant_scale_w_dkv_kr,
-    const c10::optional<at::Tensor> &quant_scale_ckv, const c10::optional<at::Tensor> &quant_scale_ckr,
-    const c10::optional<at::Tensor> &smooth_scales_cq, const c10::optional<at::Tensor> &actual_seq_len,
-    const c10::optional<at::Tensor> &k_nope_clip_alpha, double rmsnorm_epsilon_cq, double rmsnorm_epsilon_ckv,
-    const std::string &cache_mode, bool query_norm_flag, int64_t weight_quant_mode, int64_t kv_cache_quant_mode,
+    const at::Tensor& token_x, const at::Tensor& weight_dq, const at::Tensor& weight_uq_qr, const at::Tensor& weight_uk,
+    const at::Tensor& weight_dkv_kr, const at::Tensor& rmsnorm_gamma_cq, const at::Tensor& rmsnorm_gamma_ckv,
+    at::Tensor& kv_cache, at::Tensor& kr_cache, const c10::optional<at::Tensor>& rope_sin,
+    const c10::optional<at::Tensor>& rope_cos, const c10::optional<at::Tensor>& cache_index,
+    const c10::optional<at::Tensor>& dequant_scale_x, const c10::optional<at::Tensor>& dequant_scale_w_dq,
+    const c10::optional<at::Tensor>& dequant_scale_w_uq_qr, const c10::optional<at::Tensor>& dequant_scale_w_dkv_kr,
+    const c10::optional<at::Tensor>& quant_scale_ckv, const c10::optional<at::Tensor>& quant_scale_ckr,
+    const c10::optional<at::Tensor>& smooth_scales_cq, const c10::optional<at::Tensor>& actual_seq_len,
+    const c10::optional<at::Tensor>& k_nope_clip_alpha, double rmsnorm_epsilon_cq, double rmsnorm_epsilon_ckv,
+    const std::string& cache_mode, bool query_norm_flag, int64_t weight_quant_mode, int64_t kv_cache_quant_mode,
     int64_t query_quant_mode, int64_t ckvkr_repo_mode, int64_t quant_scale_repo_mode, int64_t tile_size,
-    double qc_qr_scale, double kc_scale, const c10::optional<int64_t> &token_x_dtype,
-    const c10::optional<int64_t> &weight_dq_dtype, const c10::optional<int64_t> &weight_uq_qr_dtype,
-    const c10::optional<int64_t> &weight_dkv_kr_dtype, const c10::optional<int64_t> &kv_cache_dtype)
+    double qc_qr_scale, double kc_scale, const c10::optional<int64_t>& token_x_dtype,
+    const c10::optional<int64_t>& weight_dq_dtype, const c10::optional<int64_t>& weight_uq_qr_dtype,
+    const c10::optional<int64_t>& weight_dkv_kr_dtype, const c10::optional<int64_t>& kv_cache_dtype)
 {
     const c10::OptionalDeviceGuard device_guard(token_x.device());
 
@@ -471,7 +471,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> mla_prolo
         }
     }
 
-    char *cache_mode_ptr = const_cast<char *>(cache_mode.data());
+    char* cache_mode_ptr = const_cast<char*>(cache_mode.data());
 
     // 仅当 hifloat8 场景且 kv_cache 以 HIFLOAT8 存储（kv_cache_quant_mode 1/3）时强制 HIFLOAT8，
     // 其余 tensor 按自身 dtype 透传（非 hifloat8 场景下与直接传裸 tensor 完全等价）。
@@ -519,20 +519,20 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> mla_prolo
 // 图模式配套接口：
 // clone kv_cache/kr_cache 后再走原地实现，返回 7 个 Tensor（前 5 个输出 + 两份 cache）。
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> mla_prolog_functional(
-    const at::Tensor &token_x, const at::Tensor &weight_dq, const at::Tensor &weight_uq_qr, const at::Tensor &weight_uk,
-    const at::Tensor &weight_dkv_kr, const at::Tensor &rmsnorm_gamma_cq, const at::Tensor &rmsnorm_gamma_ckv,
-    const at::Tensor &kv_cache, const at::Tensor &kr_cache, const c10::optional<at::Tensor> &rope_sin,
-    const c10::optional<at::Tensor> &rope_cos, const c10::optional<at::Tensor> &cache_index,
-    const c10::optional<at::Tensor> &dequant_scale_x, const c10::optional<at::Tensor> &dequant_scale_w_dq,
-    const c10::optional<at::Tensor> &dequant_scale_w_uq_qr, const c10::optional<at::Tensor> &dequant_scale_w_dkv_kr,
-    const c10::optional<at::Tensor> &quant_scale_ckv, const c10::optional<at::Tensor> &quant_scale_ckr,
-    const c10::optional<at::Tensor> &smooth_scales_cq, const c10::optional<at::Tensor> &actual_seq_len,
-    const c10::optional<at::Tensor> &k_nope_clip_alpha, double rmsnorm_epsilon_cq, double rmsnorm_epsilon_ckv,
-    const std::string &cache_mode, bool query_norm_flag, int64_t weight_quant_mode, int64_t kv_cache_quant_mode,
+    const at::Tensor& token_x, const at::Tensor& weight_dq, const at::Tensor& weight_uq_qr, const at::Tensor& weight_uk,
+    const at::Tensor& weight_dkv_kr, const at::Tensor& rmsnorm_gamma_cq, const at::Tensor& rmsnorm_gamma_ckv,
+    const at::Tensor& kv_cache, const at::Tensor& kr_cache, const c10::optional<at::Tensor>& rope_sin,
+    const c10::optional<at::Tensor>& rope_cos, const c10::optional<at::Tensor>& cache_index,
+    const c10::optional<at::Tensor>& dequant_scale_x, const c10::optional<at::Tensor>& dequant_scale_w_dq,
+    const c10::optional<at::Tensor>& dequant_scale_w_uq_qr, const c10::optional<at::Tensor>& dequant_scale_w_dkv_kr,
+    const c10::optional<at::Tensor>& quant_scale_ckv, const c10::optional<at::Tensor>& quant_scale_ckr,
+    const c10::optional<at::Tensor>& smooth_scales_cq, const c10::optional<at::Tensor>& actual_seq_len,
+    const c10::optional<at::Tensor>& k_nope_clip_alpha, double rmsnorm_epsilon_cq, double rmsnorm_epsilon_ckv,
+    const std::string& cache_mode, bool query_norm_flag, int64_t weight_quant_mode, int64_t kv_cache_quant_mode,
     int64_t query_quant_mode, int64_t ckvkr_repo_mode, int64_t quant_scale_repo_mode, int64_t tile_size,
-    double qc_qr_scale, double kc_scale, const c10::optional<int64_t> &token_x_dtype,
-    const c10::optional<int64_t> &weight_dq_dtype, const c10::optional<int64_t> &weight_uq_qr_dtype,
-    const c10::optional<int64_t> &weight_dkv_kr_dtype, const c10::optional<int64_t> &kv_cache_dtype)
+    double qc_qr_scale, double kc_scale, const c10::optional<int64_t>& token_x_dtype,
+    const c10::optional<int64_t>& weight_dq_dtype, const c10::optional<int64_t>& weight_uq_qr_dtype,
+    const c10::optional<int64_t>& weight_dkv_kr_dtype, const c10::optional<int64_t>& kv_cache_dtype)
 {
     at::Tensor kv_cache_inplace = kv_cache.clone();
     at::Tensor kr_cache_inplace = kr_cache.clone();

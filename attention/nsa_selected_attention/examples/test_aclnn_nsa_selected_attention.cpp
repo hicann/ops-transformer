@@ -34,7 +34,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -44,7 +44,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-void CopyOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void CopyOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<T> resultData(size, 0);
@@ -53,7 +53,7 @@ void CopyOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -73,8 +73,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -97,11 +97,11 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-void FreeResource(aclTensor *q, aclTensor *k, aclTensor *v, aclTensor *attentionOut, aclTensor *softmaxMax,
-                  aclTensor *softmaxSum, void *qDeviceAddr, void *kDeviceAddr, void *vDeviceAddr,
-                  void *attentionOutDeviceAddr, void *softmaxMaxDeviceAddr, void *softmaxSumDeviceAddr,
-                  uint64_t workspaceSize, void *workspaceAddr, aclIntArray *actualSeqQLen, aclIntArray *actualSeqKvLen,
-                  int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+void FreeResource(aclTensor* q, aclTensor* k, aclTensor* v, aclTensor* attentionOut, aclTensor* softmaxMax,
+                  aclTensor* softmaxSum, void* qDeviceAddr, void* kDeviceAddr, void* vDeviceAddr,
+                  void* attentionOutDeviceAddr, void* softmaxMaxDeviceAddr, void* softmaxSumDeviceAddr,
+                  uint64_t workspaceSize, void* workspaceAddr, aclIntArray* actualSeqQLen, aclIntArray* actualSeqKvLen,
+                  int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
     if (q != nullptr) {
@@ -196,27 +196,27 @@ int main()
     int64_t sparseMod = 2;
     char layOut[] = "TND";
 
-    void *qDeviceAddr = nullptr;
-    void *kDeviceAddr = nullptr;
-    void *vDeviceAddr = nullptr;
-    void *topKIndicesDeviceAddr = nullptr;
-    void *attentionOutDeviceAddr = nullptr;
-    void *softmaxMaxDeviceAddr = nullptr;
-    void *softmaxSumDeviceAddr = nullptr;
+    void* qDeviceAddr = nullptr;
+    void* kDeviceAddr = nullptr;
+    void* vDeviceAddr = nullptr;
+    void* topKIndicesDeviceAddr = nullptr;
+    void* attentionOutDeviceAddr = nullptr;
+    void* softmaxMaxDeviceAddr = nullptr;
+    void* softmaxSumDeviceAddr = nullptr;
 
-    aclTensor *q = nullptr;
-    aclTensor *k = nullptr;
-    aclTensor *v = nullptr;
-    aclTensor *topKIndices = nullptr;
-    aclTensor *attenMaskOptional = nullptr;
-    aclTensor *softmaxMax = nullptr;
-    aclTensor *softmaxSum = nullptr;
-    aclTensor *attentionOut = nullptr;
+    aclTensor* q = nullptr;
+    aclTensor* k = nullptr;
+    aclTensor* v = nullptr;
+    aclTensor* topKIndices = nullptr;
+    aclTensor* attenMaskOptional = nullptr;
+    aclTensor* softmaxMax = nullptr;
+    aclTensor* softmaxSum = nullptr;
+    aclTensor* attentionOut = nullptr;
 
     std::vector<int64_t> actualSeqQLenVec = {512, 1024};
     std::vector<int64_t> actualSeqKvLenVec = {2048, 4096};
-    aclIntArray *actualSeqQLenOptional = aclCreateIntArray(actualSeqQLenVec.data(), actualSeqQLenVec.size());
-    aclIntArray *actualSeqKvLenOptional = aclCreateIntArray(actualSeqKvLenVec.data(), actualSeqKvLenVec.size());
+    aclIntArray* actualSeqQLenOptional = aclCreateIntArray(actualSeqQLenVec.data(), actualSeqQLenVec.size());
+    aclIntArray* actualSeqKvLenOptional = aclCreateIntArray(actualSeqKvLenVec.data(), actualSeqKvLenVec.size());
 
     std::vector<aclFloat16> qHostData(GetShapeSize(qShape), 1);
     std::vector<aclFloat16> kHostData(GetShapeSize(kShape), 1);
@@ -226,7 +226,7 @@ int main()
     std::vector<float> softmaxMaxHostData(GetShapeSize(softmaxMaxShape), 0.0);
     std::vector<float> softmaxSumHostData(GetShapeSize(softmaxSumShape), 0.0);
     uint64_t workspaceSize = 0;
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
 
     // 创建acl Tensor
     ret = CreateAclTensor(qHostData, qShape, &qDeviceAddr, aclDataType::ACL_FLOAT16, &q);
@@ -278,7 +278,7 @@ int main()
               return ret);
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 调用aclnnNsaSelectedAttention第一段接口
     ret = aclnnNsaSelectedAttentionGetWorkspaceSize(q, k, v, topKIndices, attenMaskOptional, actualSeqQLenOptional,
