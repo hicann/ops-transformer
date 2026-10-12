@@ -24,8 +24,8 @@ class QkvRmsNormRopeCacheWithKScaleController {
                   "RoPE/M-RoPE Controller only supports PerTokenPerHead K quantization");
 
 public:
-    __aicore__ inline void Process(const GlobalTensors &tensors,
-                                   const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData)
+    __aicore__ inline void Process(const GlobalTensors& tensors,
+                                   const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData)
     {
         uint32_t cubeIndex = GetBlockIdx();
         if ASCEND_IS_AIV {
@@ -51,8 +51,8 @@ private:
         uint64_t end;
     };
 
-    __aicore__ inline void MakeCoreTokenRange(TokenRange &range,
-                                              const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData,
+    __aicore__ inline void MakeCoreTokenRange(TokenRange& range,
+                                              const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData,
                                               uint32_t cubeIndex) const
     {
         range.begin = 0U;
@@ -66,7 +66,7 @@ private:
         range.end = MinU64(tilingData->totalTokens, range.begin + tilingData->coreTokenTile);
     }
 
-    __aicore__ inline void ResetTileParam(TileParam &tile) const
+    __aicore__ inline void ResetTileParam(TileParam& tile) const
     {
         tile.tokenOffset = 0U;
         tile.tokenSize = 0U;
@@ -78,7 +78,7 @@ private:
         tile.vHeadSize = 0U;
     }
 
-    __aicore__ inline void FillTileParam(TileParam &tile, const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData,
+    __aicore__ inline void FillTileParam(TileParam& tile, const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData,
                                          uint64_t tokenOffset, uint64_t tokenSize) const
     {
         ResetTileParam(tile);
@@ -98,15 +98,15 @@ private:
         FillAivTileParam(tile, GetSubBlockIdx());
     }
 
-    __aicore__ inline void FillAivTileParam(TileParam &tile, uint32_t aivLocalId) const
+    __aicore__ inline void FillAivTileParam(TileParam& tile, uint32_t aivLocalId) const
     {
         tile.aivBlockTokenOffset = aivLocalId * tile.cubeHalfTokenSize;
         tile.aivTokenOffset = tile.tokenOffset + tile.aivBlockTokenOffset;
         tile.aivTokenSize = aivLocalId == 0U ? tile.cubeHalfTokenSize : tile.tokenSize - tile.cubeHalfTokenSize;
     }
 
-    __aicore__ inline uint64_t ForEachTile(const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData,
-                                           const TokenRange &range, TileParam tileParam[TILE_PARAM_BUFFER_NUM])
+    __aicore__ inline uint64_t ForEachTile(const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData,
+                                           const TokenRange& range, TileParam tileParam[TILE_PARAM_BUFFER_NUM])
     {
         uint64_t tileCount = 0U;
         for (uint64_t tokenOffset = range.begin; tokenOffset < range.end;) {

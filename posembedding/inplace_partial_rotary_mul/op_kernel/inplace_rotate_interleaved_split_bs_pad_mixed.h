@@ -24,7 +24,7 @@ class InterleavedSplitBSPadMixed {
 public:
     __aicore__ inline InterleavedSplitBSPadMixed(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
-                                const InplacePartialRopeRegbaseTilingData *tiling, TPipe *pipe);
+                                const InplacePartialRopeRegbaseTilingData* tiling, TPipe* pipe);
     __aicore__ inline void Process();
 
 protected:
@@ -38,7 +38,7 @@ protected:
     TBuf<TPosition::VECCALC> tmpFp32Buf1;
     TBuf<TPosition::VECCALC> tmpFp32Buf3;
     TBuf<TPosition::VECCALC> gatherOffsetBuf;
-    const InplacePartialRopeRegbaseTilingData *tiling_;
+    const InplacePartialRopeRegbaseTilingData* tiling_;
     uint64_t allHeadDim;
     uint64_t start;
     uint64_t ioOffsetAll;
@@ -73,21 +73,21 @@ protected:
     uint64_t gatherOffsetLenSize;
     uint32_t triBlockNum = BLOCK_SIZE / sizeof(float);
 
-    __aicore__ inline void InitData(const InplacePartialRopeRegbaseTilingData *tiling);
-    __aicore__ inline void CopyInX(LocalTensor<T> &x, uint32_t seqIdx, uint32_t batchIdx, uint32_t calcLen);
-    __aicore__ inline void CopyInCos(LocalTensor<float> &cos, uint32_t seqIdx, uint32_t calcLen);
-    __aicore__ inline void CopyInSin(LocalTensor<float> &sin, uint32_t seqIdx, uint32_t calcLen);
+    __aicore__ inline void InitData(const InplacePartialRopeRegbaseTilingData* tiling);
+    __aicore__ inline void CopyInX(LocalTensor<T>& x, uint32_t seqIdx, uint32_t batchIdx, uint32_t calcLen);
+    __aicore__ inline void CopyInCos(LocalTensor<float>& cos, uint32_t seqIdx, uint32_t calcLen);
+    __aicore__ inline void CopyInSin(LocalTensor<float>& sin, uint32_t seqIdx, uint32_t calcLen);
     __aicore__ inline void CopyOut(uint32_t seqIdx, uint32_t batchIdx, uint32_t calcLen);
-    __aicore__ inline void Compute(uint32_t seqIdx, uint32_t batchIdx, LocalTensor<uint32_t> &gatherOffsetCast,
+    __aicore__ inline void Compute(uint32_t seqIdx, uint32_t batchIdx, LocalTensor<uint32_t>& gatherOffsetCast,
                                    uint32_t calcLen);
-    __aicore__ inline void ComputeCastFp32(uint32_t seqIdx, uint32_t batchIdx, LocalTensor<uint32_t> &gatherOffsetCast,
+    __aicore__ inline void ComputeCastFp32(uint32_t seqIdx, uint32_t batchIdx, LocalTensor<uint32_t>& gatherOffsetCast,
                                            uint32_t calcLen);
 };
 
 template <typename T>
 __aicore__ inline void InterleavedSplitBSPadMixed<T>::Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
-                                                           const InplacePartialRopeRegbaseTilingData *tiling,
-                                                           TPipe *pipe)
+                                                           const InplacePartialRopeRegbaseTilingData* tiling,
+                                                           TPipe* pipe)
 {
     InitData(tiling);
 
@@ -110,10 +110,10 @@ __aicore__ inline void InterleavedSplitBSPadMixed<T>::Init(GM_ADDR x, GM_ADDR co
     }
 
     bufferBsndSize = batchSize * seqLen * bufferNdSizeAll;
-    xGm.SetGlobalBuffer((__gm__ T *)x + ioOffsetAll, bufferBsndSize);
-    yGm.SetGlobalBuffer((__gm__ T *)y + ioOffsetAll, bufferBsndSize);
-    cosGm.SetGlobalBuffer((__gm__ float *)cos + triOffset, bufferSdSize);
-    sinGm.SetGlobalBuffer((__gm__ float *)sin + triOffset, bufferSdSize);
+    xGm.SetGlobalBuffer((__gm__ T*)x + ioOffsetAll, bufferBsndSize);
+    yGm.SetGlobalBuffer((__gm__ T*)y + ioOffsetAll, bufferBsndSize);
+    cosGm.SetGlobalBuffer((__gm__ float*)cos + triOffset, bufferSdSize);
+    sinGm.SetGlobalBuffer((__gm__ float*)sin + triOffset, bufferSdSize);
 
     bufferLenSize = ubCalcBNum * numHeads * headDimAlign * sizeof(T);
     pipe->InitBuffer(inQueX, BUFFER_NUM, bufferLenSize);
@@ -129,7 +129,7 @@ __aicore__ inline void InterleavedSplitBSPadMixed<T>::Init(GM_ADDR x, GM_ADDR co
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitBSPadMixed<T>::InitData(const InplacePartialRopeRegbaseTilingData *tiling)
+__aicore__ inline void InterleavedSplitBSPadMixed<T>::InitData(const InplacePartialRopeRegbaseTilingData* tiling)
 {
     tiling_ = tiling;
     batchSize = tiling_->batchSize;
@@ -151,7 +151,7 @@ __aicore__ inline void InterleavedSplitBSPadMixed<T>::InitData(const InplacePart
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitBSPadMixed<T>::CopyInX(LocalTensor<T> &x, uint32_t seqIdx, uint32_t batchIdx,
+__aicore__ inline void InterleavedSplitBSPadMixed<T>::CopyInX(LocalTensor<T>& x, uint32_t seqIdx, uint32_t batchIdx,
                                                               uint32_t calcLen)
 {
     DataCopyExtParams dataCopyParams;
@@ -172,7 +172,7 @@ __aicore__ inline void InterleavedSplitBSPadMixed<T>::CopyInX(LocalTensor<T> &x,
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitBSPadMixed<T>::CopyInCos(LocalTensor<float> &cos, uint32_t seqIdx,
+__aicore__ inline void InterleavedSplitBSPadMixed<T>::CopyInCos(LocalTensor<float>& cos, uint32_t seqIdx,
                                                                 uint32_t calcLen)
 {
     DataCopyExtParams bsPadDataCopyTriParams;
@@ -188,7 +188,7 @@ __aicore__ inline void InterleavedSplitBSPadMixed<T>::CopyInCos(LocalTensor<floa
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitBSPadMixed<T>::CopyInSin(LocalTensor<float> &sin, uint32_t seqIdx,
+__aicore__ inline void InterleavedSplitBSPadMixed<T>::CopyInSin(LocalTensor<float>& sin, uint32_t seqIdx,
                                                                 uint32_t calcLen)
 {
     event_t eventIdVToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
@@ -257,7 +257,7 @@ __aicore__ inline void InterleavedSplitBSPadMixed<T>::Process()
 
 template <typename T>
 __aicore__ inline void InterleavedSplitBSPadMixed<T>::Compute(uint32_t seqIdx, uint32_t batchIdx,
-                                                              LocalTensor<uint32_t> &gatherOffsetCast, uint32_t calcLen)
+                                                              LocalTensor<uint32_t>& gatherOffsetCast, uint32_t calcLen)
 {
     uint64_t calcTotalNum = calcLen * numHeads * headDimAlign;
 
@@ -286,7 +286,7 @@ __aicore__ inline void InterleavedSplitBSPadMixed<T>::Compute(uint32_t seqIdx, u
 
 template <typename T>
 __aicore__ inline void InterleavedSplitBSPadMixed<T>::ComputeCastFp32(uint32_t seqIdx, uint32_t batchIdx,
-                                                                      LocalTensor<uint32_t> &gatherOffsetCast,
+                                                                      LocalTensor<uint32_t>& gatherOffsetCast,
                                                                       uint32_t calcLen)
 {
     uint64_t calcTotalNum = calcLen * numHeads * headDimAlign;

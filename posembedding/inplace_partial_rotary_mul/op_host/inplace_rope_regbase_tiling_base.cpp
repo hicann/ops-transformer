@@ -48,7 +48,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::GetPlatformInfo()
         aicoreParams_.ubSize = ubSizePlatForm;
     } else {
         auto compileInfoPtr =
-            reinterpret_cast<const InplacePartialRotaryPositionEmbeddingCompileInfo *>(context_->GetCompileInfo());
+            reinterpret_cast<const InplacePartialRotaryPositionEmbeddingCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         aicoreParams_.blockDim = compileInfoPtr->blockDim;
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
@@ -79,7 +79,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::CheckShapeAllPositive(cons
         if (shape.GetDim(i) <= 0) {
             std::string reasonMsg = "All dimensions of input must be positive, but dim " + std::to_string(i) + " is " +
                                     std::to_string(shape.GetDim(i));
-            const char *tensorName = (idx == X_INDEX) ? "x" : (idx == COS_INDEX) ? "cos" : "sin";
+            const char* tensorName = (idx == X_INDEX) ? "x" : (idx == COS_INDEX) ? "cos" : "sin";
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), tensorName, ToString(shape).c_str(),
                                                   reasonMsg.c_str());
             return ge::GRAPH_FAILED;
@@ -124,8 +124,8 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::CheckShapeAllPositive() co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus InplacePartialRopeRegBaseTilingClass::JudgeLayoutByShape(const gert::Shape &xShape,
-                                                                         const gert::Shape &cosShape)
+ge::graphStatus InplacePartialRopeRegBaseTilingClass::JudgeLayoutByShape(const gert::Shape& xShape,
+                                                                         const gert::Shape& cosShape)
 {
     uint64_t xShape0 = xShape.GetDim(DIM_0);
     uint64_t xShape1 = xShape.GetDim(DIM_1);
@@ -160,10 +160,10 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::JudgeLayoutByShape(const g
 
 ge::graphStatus InplacePartialRopeRegBaseTilingClass::CheckShape()
 {
-    auto &xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
-    auto &yShape = context_->GetOutputShape(Y_INDEX)->GetStorageShape();
+    auto& xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    auto& yShape = context_->GetOutputShape(Y_INDEX)->GetStorageShape();
     if (xShape.GetDimNum() != DIM_NUM || cosShape.GetDimNum() != DIM_NUM || sinShape.GetDimNum() != DIM_NUM) {
         std::string dimNumMsg = std::to_string(xShape.GetDimNum()) + ", " + std::to_string(cosShape.GetDimNum()) +
                                 " and " + std::to_string(sinShape.GetDimNum());
@@ -341,9 +341,9 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::JudgeSliceInfo()
 
 ge::graphStatus InplacePartialRopeRegBaseTilingClass::GetShapeAttrsInfo()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
-    const int32_t *mode = attrs->GetAttrPointer<int32_t>(0);
+    const int32_t* mode = attrs->GetAttrPointer<int32_t>(0);
     int32_t modeValue = (mode == nullptr) ? 0 : static_cast<int32_t>(*mode);
     OP_CHECK_IF(modeValue != static_cast<int32_t>(InplacePartialRotaryPosEmbeddingMode::INTERLEAVE),
                 OP_LOGE(context_->GetNodeName(),
@@ -354,22 +354,22 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::GetShapeAttrsInfo()
     OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check param fail."), return ge::GRAPH_FAILED);
 
     dtype_ = context_->GetInputDesc(X_INDEX)->GetDataType();
-    auto &xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    auto& xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
 
     d_ = xShape.GetDim(DIM_3);
     cosd_ = cosShape.GetDim(DIM_3);
     sind_ = sinShape.GetDim(DIM_3);
 
     // 获取slice
-    const gert::ContinuousVector *sliceRangeListPtr = attrs->GetAttrPointer<gert::ContinuousVector>(1);
+    const gert::ContinuousVector* sliceRangeListPtr = attrs->GetAttrPointer<gert::ContinuousVector>(1);
     if (sliceRangeListPtr == nullptr || sliceRangeListPtr->GetSize() == 0) {
         // Ascend950 default: an omitted partial_slice is an empty slice.
         sliceStart_ = 0;
         sliceEnd_ = 0;
     } else {
-        const int64_t *expertRangeList = reinterpret_cast<const int64_t *>(sliceRangeListPtr->GetData());
+        const int64_t* expertRangeList = reinterpret_cast<const int64_t*>(sliceRangeListPtr->GetData());
         sliceStart_ = expertRangeList[0];
         sliceEnd_ = expertRangeList[1];
     }

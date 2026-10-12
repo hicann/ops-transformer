@@ -53,17 +53,15 @@ constexpr uint64_t B1SD_TILINGKEY = 3000;
 constexpr uint64_t BN1D_TILINGKEY = 4000;
 constexpr uint64_t BNSD_TILINGKEY = 5000;
 
-static std::tuple<int64_t, int64_t, int64_t, int64_t> GetShapeTuple(
-    const gert::TilingContext* context, const int64_t index = 0)
+static std::tuple<int64_t, int64_t, int64_t, int64_t> GetShapeTuple(const gert::TilingContext* context,
+                                                                    const int64_t index = 0)
 {
     const gert::StorageShape* shapePtr = context->GetInputShape(index);
-    OP_CHECK_IF(
-        shapePtr == nullptr, OP_LOGE(context, "Shape is nullptr."), return std::make_tuple(0, 0, 0, 0));
+    OP_CHECK_IF(shapePtr == nullptr, OP_LOGE(context, "Shape is nullptr."), return std::make_tuple(0, 0, 0, 0));
 
     // check shape length is DIM_SIZE
-    OP_CHECK_IF(
-        shapePtr->GetStorageShape().GetDimNum() != DIM_SIZE,
-        OP_LOGE(context, "Shape must be (B,N,S,D)."), return std::make_tuple(0, 0, 0, 0));
+    OP_CHECK_IF(shapePtr->GetStorageShape().GetDimNum() != DIM_SIZE, OP_LOGE(context, "Shape must be (B,N,S,D)."),
+                return std::make_tuple(0, 0, 0, 0));
 
     return std::make_tuple(
         shapePtr->GetStorageShape().GetDim(SHAPE_IDX_B), shapePtr->GetStorageShape().GetDim(SHAPE_IDX_N),
@@ -75,9 +73,7 @@ ge::graphStatus InterleaveRopeTiling::GetPlatformInfo()
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
         auto compileInfoPtr = reinterpret_cast<const InterleaveRopeCompileInfo*>(context_->GetCompileInfo());
-        OP_CHECK_IF(
-            compileInfoPtr == nullptr, OP_LOGE(context_, "CompileInfo is nullptr."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "CompileInfo is nullptr."), return ge::GRAPH_FAILED);
         coreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
     } else {
@@ -99,17 +95,10 @@ ge::graphStatus InterleaveRopeTiling::GetShapeAttrsInfo()
     numHead_ = std::get<SHAPE_IDX_N>(xShapeTuple);
     seqLength_ = std::get<SHAPE_IDX_S>(xShapeTuple);
     hiddenDim_ = std::get<SHAPE_IDX_D>(xShapeTuple);
-    OP_CHECK_IF(
-        batchSize_ <= 0, OP_LOGE(context_, "batchSize should be greater than 0."),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        numHead_ <= 0, OP_LOGE(context_, "numHead should be greater than 0."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        seqLength_ <= 0, OP_LOGE(context_, "seqLength should be greater than 0."),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        hiddenDim_ <= 0, OP_LOGE(context_, "hiddenDim should be greater than 0."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(batchSize_ <= 0, OP_LOGE(context_, "batchSize should be greater than 0."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(numHead_ <= 0, OP_LOGE(context_, "numHead should be greater than 0."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(seqLength_ <= 0, OP_LOGE(context_, "seqLength should be greater than 0."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(hiddenDim_ <= 0, OP_LOGE(context_, "hiddenDim should be greater than 0."), return ge::GRAPH_FAILED);
 
     tilingData_.set_batchSize(batchSize_);
     tilingData_.set_numHead(numHead_);
@@ -117,34 +106,27 @@ ge::graphStatus InterleaveRopeTiling::GetShapeAttrsInfo()
     tilingData_.set_hiddenDim(hiddenDim_);
 
     // Check hiddenDim must be DEFAULT_HIDDEN_DIM
-    OP_CHECK_IF(
-        hiddenDim_ != DEFAULT_HIDDEN_DIM, OP_LOGE(context_, "hiddenDim must be 64."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(hiddenDim_ != DEFAULT_HIDDEN_DIM, OP_LOGE(context_, "hiddenDim must be 64."), return ge::GRAPH_FAILED);
     // Check cos sin shape must be same
-    OP_CHECK_IF(
-        cosShapeTuple != GetShapeTuple(context_, SIN_INDEX),
-        OP_LOGE(context_, "cos and sin shape must be the same."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(cosShapeTuple != GetShapeTuple(context_, SIN_INDEX),
+                OP_LOGE(context_, "cos and sin shape must be the same."), return ge::GRAPH_FAILED);
 
     // Check cosB must be batchSize
     cosB_ = std::get<SHAPE_IDX_B>(cosShapeTuple);
-    OP_CHECK_IF(
-        cosB_ != batchSize_, OP_LOGE(context_, "cos or sin batchSize must be the same as x batchSize."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(cosB_ != batchSize_, OP_LOGE(context_, "cos or sin batchSize must be the same as x batchSize."),
+                return ge::GRAPH_FAILED);
     // Check cosN must be 1
     cosN_ = std::get<SHAPE_IDX_N>(cosShapeTuple);
-    OP_CHECK_IF(
-        cosN_ != 1, OP_LOGE(context_, "cos or sin numHead must be 1."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(cosN_ != 1, OP_LOGE(context_, "cos or sin numHead must be 1."), return ge::GRAPH_FAILED);
     // Check cosS must 1
     cosS_ = std::get<SHAPE_IDX_S>(cosShapeTuple);
-    OP_CHECK_IF(
-        cosS_ != seqLength_ && cosS_ != 1,
-        OP_LOGE(context_, "cos or sin seqLength must be 1 or the same as x seqLength."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(cosS_ != seqLength_ && cosS_ != 1,
+                OP_LOGE(context_, "cos or sin seqLength must be 1 or the same as x seqLength."),
+                return ge::GRAPH_FAILED);
     // Check cosD must be hiddenDim
     int64_t cosD = std::get<SHAPE_IDX_D>(cosShapeTuple);
-    OP_CHECK_IF(
-        cosD != hiddenDim_, OP_LOGE(context_, "cos or sin hiddenDim must be the same as x hiddenDim."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(cosD != hiddenDim_, OP_LOGE(context_, "cos or sin hiddenDim must be the same as x hiddenDim."),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -210,23 +192,21 @@ ge::graphStatus InterleaveRopeTiling::SplitHiddenDim()
     int64_t hiddenDimLoopsPerBlock;
     int64_t hiddenDimCountPerLoopPerBlock;
     int64_t hiddenDimCountLastLoopPerBlock;
-    SplitHiddenDimInblock(
-        hiddenDimCountPerBlock, hiddenDimLoopsPerBlock, hiddenDimCountPerLoopPerBlock, hiddenDimCountLastLoopPerBlock);
+    SplitHiddenDimInblock(hiddenDimCountPerBlock, hiddenDimLoopsPerBlock, hiddenDimCountPerLoopPerBlock,
+                          hiddenDimCountLastLoopPerBlock);
     tilingData_.set_hiddenDimLoopsPerBlock(hiddenDimLoopsPerBlock);
     tilingData_.set_hiddenDimCountPerLoopPerBlock(hiddenDimCountPerLoopPerBlock);
     tilingData_.set_hiddenDimCountLastLoopPerBlock(hiddenDimCountLastLoopPerBlock);
-    OP_LOGD(
-        context_,
-        "hiddenDimLoopsPerBlock is: %ld, hiddenDimCountPerLoopPerBlock is: %ld, hiddenDimCountLastLoopPerBlock is: "
-        "%ld.",
-        hiddenDimLoopsPerBlock, hiddenDimCountPerLoopPerBlock, hiddenDimCountLastLoopPerBlock);
+    OP_LOGD(context_,
+            "hiddenDimLoopsPerBlock is: %ld, hiddenDimCountPerLoopPerBlock is: %ld, hiddenDimCountLastLoopPerBlock is: "
+            "%ld.",
+            hiddenDimLoopsPerBlock, hiddenDimCountPerLoopPerBlock, hiddenDimCountLastLoopPerBlock);
 
     int64_t hiddenDimLoopsLastBlock;
     int64_t hiddenDimCountPerLoopLastBlock;
     int64_t hiddenDimCountLastLoopLastBlock;
-    SplitHiddenDimInblock(
-        hiddenDimCountLastBlock, hiddenDimLoopsLastBlock, hiddenDimCountPerLoopLastBlock,
-        hiddenDimCountLastLoopLastBlock);
+    SplitHiddenDimInblock(hiddenDimCountLastBlock, hiddenDimLoopsLastBlock, hiddenDimCountPerLoopLastBlock,
+                          hiddenDimCountLastLoopLastBlock);
     tilingData_.set_hiddenDimLoopsLastBlock(hiddenDimLoopsLastBlock);
     tilingData_.set_hiddenDimCountPerLoopLastBlock(hiddenDimCountPerLoopLastBlock);
     tilingData_.set_hiddenDimCountLastLoopLastBlock(hiddenDimCountLastLoopLastBlock);
@@ -238,8 +218,9 @@ ge::graphStatus InterleaveRopeTiling::SplitHiddenDim()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus InterleaveRopeTiling::SplitHiddenDimInblock(
-    int64_t hiddenDimCount, int64_t& hiddenDimLoops, int64_t& hiddenDimCountPerLoop, int64_t& hiddenDimCountLastLoop)
+ge::graphStatus InterleaveRopeTiling::SplitHiddenDimInblock(int64_t hiddenDimCount, int64_t& hiddenDimLoops,
+                                                            int64_t& hiddenDimCountPerLoop,
+                                                            int64_t& hiddenDimCountLastLoop)
 {
     if (tilingKey_ == B11D_TILINGKEY) {
         hiddenDimCountPerLoop =
@@ -338,15 +319,12 @@ ge::graphStatus TilingPrepare4InterleaveRope(gert::TilingParseContext* context)
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     compileInfo->coreNum = ascendcPlatform.GetCoreNumAiv();
-    OP_CHECK_IF(
-        compileInfo->coreNum <= 0, OP_LOGE(context, "coreNum must be greater than 0."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(compileInfo->coreNum <= 0, OP_LOGE(context, "coreNum must be greater than 0."),
+                return ge::GRAPH_FAILED);
     uint64_t ubSize = 0;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
     compileInfo->ubSize = ubSize;
-    OP_CHECK_IF(
-        compileInfo->ubSize <= 0, OP_LOGE(context, "ubSize must be greater than 0."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(compileInfo->ubSize <= 0, OP_LOGE(context, "ubSize must be greater than 0."), return ge::GRAPH_FAILED);
     OP_LOGD(context, "coreNum: %ld, ubSize: %ld", compileInfo->coreNum, compileInfo->ubSize);
     OP_LOGD(context, "TilingPrepare4InterleaveRope success.");
     return ge::GRAPH_SUCCESS;

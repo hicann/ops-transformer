@@ -19,15 +19,15 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const std::array<const aclTensor *, 14> NormRopeConcatGrad(
-    const aclTensor *gradQueryOutput, const aclTensor *gradKeyOutput, const aclTensor *gradValueOutput,
-    const aclTensor *query, const aclTensor *key, const aclTensor *encoderQuery, const aclTensor *encoderKey,
-    const aclTensor *normQueryWeight, const aclTensor *normQueryMean, const aclTensor *normQueryRstd,
-    const aclTensor *normKeyWeight, const aclTensor *normKeyMean, const aclTensor *normKeyRstd,
-    const aclTensor *normAddedQueryWeight, const aclTensor *normAddedQueryMean, const aclTensor *normAddedQueryRstd,
-    const aclTensor *normAddedKeyWeight, const aclTensor *normAddedKeyMean, const aclTensor *normAddedKeyRstd,
-    const aclTensor *ropeSin, const aclTensor *ropeCos, int64_t normType, int64_t normAddedType, int64_t ropeType,
-    int64_t concatOrder, aclOpExecutor *executor);
+const std::array<const aclTensor*, 14> NormRopeConcatGrad(
+    const aclTensor* gradQueryOutput, const aclTensor* gradKeyOutput, const aclTensor* gradValueOutput,
+    const aclTensor* query, const aclTensor* key, const aclTensor* encoderQuery, const aclTensor* encoderKey,
+    const aclTensor* normQueryWeight, const aclTensor* normQueryMean, const aclTensor* normQueryRstd,
+    const aclTensor* normKeyWeight, const aclTensor* normKeyMean, const aclTensor* normKeyRstd,
+    const aclTensor* normAddedQueryWeight, const aclTensor* normAddedQueryMean, const aclTensor* normAddedQueryRstd,
+    const aclTensor* normAddedKeyWeight, const aclTensor* normAddedKeyMean, const aclTensor* normAddedKeyRstd,
+    const aclTensor* ropeSin, const aclTensor* ropeCos, int64_t normType, int64_t normAddedType, int64_t ropeType,
+    int64_t concatOrder, aclOpExecutor* executor);
 }
 
 // namespace l0op

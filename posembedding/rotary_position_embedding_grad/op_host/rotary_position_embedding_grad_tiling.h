@@ -133,11 +133,11 @@ enum class ropeGradTilingKey : uint32_t {
 
 class RotaryPosEmbeddingGradMembaseTilingClass : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit RotaryPosEmbeddingGradMembaseTilingClass(gert::TilingContext *context)
+    explicit RotaryPosEmbeddingGradMembaseTilingClass(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         RotaryPosEmbeddingGradMembaseTilingClass::Reset(context);
     }
@@ -186,11 +186,11 @@ protected:
 
 class RopeGradRegBaseTilingClass : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit RopeGradRegBaseTilingClass(gert::TilingContext *context)
+    explicit RopeGradRegBaseTilingClass(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
     }
@@ -204,9 +204,9 @@ private:
     ge::graphStatus CheckShapeLimit();
     ge::graphStatus CheckOptionalInput() const;
     ge::graphStatus CheckShapeDim() const;
-    ge::graphStatus JudgeLayoutByShape(const gert::Shape &xShape, const gert::Shape &cosShape);
-    bool Is3dBsdBroadcastLayout(const gert::Shape &xShape, const gert::Shape &cosShape) const;
-    void Set3dBsdShapeAttrs(const gert::Shape &xShape);
+    ge::graphStatus JudgeLayoutByShape(const gert::Shape& xShape, const gert::Shape& cosShape);
+    bool Is3dBsdBroadcastLayout(const gert::Shape& xShape, const gert::Shape& cosShape) const;
+    void Set3dBsdShapeAttrs(const gert::Shape& xShape);
     ge::graphStatus CheckRotaryModeShapeRelation(const int64_t d);
     ge::graphStatus CheckInPutShapeAllPositive(const int64_t idx) const;
     ge::graphStatus CheckOutPutShapeAllPositive(const int64_t idx) const;
@@ -242,8 +242,8 @@ protected:
     {
         return true;
     }
-    ge::graphStatus GetReduceOpCompileInfo(Ops::Base::ReduceOpCompileInfo *compileInfo);
-    ge::graphStatus GetInputParam(Ops::Base::ReduceOpInputParam &opInput, uint32_t inputIdx, uint32_t axesIdx);
+    ge::graphStatus GetReduceOpCompileInfo(Ops::Base::ReduceOpCompileInfo* compileInfo);
+    ge::graphStatus GetInputParam(Ops::Base::ReduceOpInputParam& opInput, uint32_t inputIdx, uint32_t axesIdx);
     ge::graphStatus InitTilingData();
     ge::graphStatus TilingReduce();
     ge::graphStatus SetTilingKeyBlockDim(uint32_t dxTilingKey);
@@ -259,7 +259,7 @@ protected:
     ge::DataType dtype_;
     RopeLayout layout_;
     RotaryPosEmbeddingMode rotaryMode_;
-    RopeGradTilingData *tilingData_{nullptr};
+    RopeGradTilingData* tilingData_{nullptr};
 
     gert::Shape dyShape_;
     gert::Shape cosShape_;

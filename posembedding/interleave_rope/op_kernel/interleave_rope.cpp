@@ -25,8 +25,8 @@ using namespace InterleaveRope;
 #define INTERLEAVE_ROPE_B1SD 3000
 #define INTERLEAVE_ROPE_SPLIT_S 4000
 
-extern "C" __global__ __aicore__ void interleave_rope(
-    GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void interleave_rope(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y, GM_ADDR workspace,
+                                                      GM_ADDR tiling)
 {
     TPipe pipe;
     GET_TILING_DATA(tilingData, tiling);

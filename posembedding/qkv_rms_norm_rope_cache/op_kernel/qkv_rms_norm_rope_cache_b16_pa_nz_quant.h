@@ -22,7 +22,7 @@ using namespace AscendC;
 template <typename QKV_DTYPE, typename K_DTYPE, typename V_DTYPE>
 class KernelQkvRmsNormRopeCacheQuantB16PANZ : public KernelQkvRmsNormRopeCacheCutBSN<QKV_DTYPE, K_DTYPE, V_DTYPE> {
 public:
-    __aicore__ inline KernelQkvRmsNormRopeCacheQuantB16PANZ(TPipe *pipe, const QkvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline KernelQkvRmsNormRopeCacheQuantB16PANZ(TPipe* pipe, const QkvRmsNormRopeCacheTilingData* tiling)
         : KernelQkvRmsNormRopeCacheCutBSN<QKV_DTYPE, K_DTYPE, V_DTYPE>(pipe, tiling)
     {}
 
@@ -75,31 +75,31 @@ public:
         this->ubTailV = currentBlockFactorV - this->ubLoopV * this->ubFactorV;
 
         // init global memory
-        this->qkvGm.SetGlobalBuffer((__gm__ QKV_DTYPE *)qkv);        // [B*S, N*D]
-        this->gammaQGm.SetGlobalBuffer((__gm__ QKV_DTYPE *)q_gamma); // [D]
-        this->gammaKGm.SetGlobalBuffer((__gm__ QKV_DTYPE *)k_gamma); // [D]
+        this->qkvGm.SetGlobalBuffer((__gm__ QKV_DTYPE*)qkv);        // [B*S, N*D]
+        this->gammaQGm.SetGlobalBuffer((__gm__ QKV_DTYPE*)q_gamma); // [D]
+        this->gammaKGm.SetGlobalBuffer((__gm__ QKV_DTYPE*)k_gamma); // [D]
 
-        this->cosGm.SetGlobalBuffer((__gm__ QKV_DTYPE *)cos);      // [B*S, 1*D]
-        this->sinGm.SetGlobalBuffer((__gm__ QKV_DTYPE *)sin);      // [B*S, 1*D]
-        this->indexGm.SetGlobalBuffer((__gm__ int64_t *)index);    // [B * ceil_div(S, BlkSize)]
-        this->qOutGm.SetGlobalBuffer(((__gm__ QKV_DTYPE *)q_out)); // [B*S, Nq*D]
-        this->kCacheGm.SetGlobalBuffer((__gm__ K_DTYPE *)k_cache); // [BlkNum, BlkSize, Nk, D]
-        this->vCacheGm.SetGlobalBuffer((__gm__ V_DTYPE *)v_cache); // [BlkNum, BlkSize, Nv, D]
+        this->cosGm.SetGlobalBuffer((__gm__ QKV_DTYPE*)cos);      // [B*S, 1*D]
+        this->sinGm.SetGlobalBuffer((__gm__ QKV_DTYPE*)sin);      // [B*S, 1*D]
+        this->indexGm.SetGlobalBuffer((__gm__ int64_t*)index);    // [B * ceil_div(S, BlkSize)]
+        this->qOutGm.SetGlobalBuffer(((__gm__ QKV_DTYPE*)q_out)); // [B*S, Nq*D]
+        this->kCacheGm.SetGlobalBuffer((__gm__ K_DTYPE*)k_cache); // [BlkNum, BlkSize, Nk, D]
+        this->vCacheGm.SetGlobalBuffer((__gm__ V_DTYPE*)v_cache); // [BlkNum, BlkSize, Nv, D]
 
         if (this->tilingData_->isOutputQkv) {
-            this->qCacheGmNd.SetGlobalBuffer((__gm__ QKV_DTYPE *)q_out_proto);   // [B*S, Nq*D]
-            this->kCacheGmNd.SetGlobalBuffer((__gm__ QKV_DTYPE *)k_cache_proto); // [B*S, Nk*D]
-            this->vCacheGmNd.SetGlobalBuffer((__gm__ QKV_DTYPE *)v_cache_proto); // [B*S, Nq*D]
+            this->qCacheGmNd.SetGlobalBuffer((__gm__ QKV_DTYPE*)q_out_proto);   // [B*S, Nq*D]
+            this->kCacheGmNd.SetGlobalBuffer((__gm__ QKV_DTYPE*)k_cache_proto); // [B*S, Nk*D]
+            this->vCacheGmNd.SetGlobalBuffer((__gm__ QKV_DTYPE*)v_cache_proto); // [B*S, Nq*D]
         }
-        this->kScaleGm.SetGlobalBuffer((__gm__ float *)k_scale); // [Nk, D]
-        this->vScaleGm.SetGlobalBuffer((__gm__ float *)v_scale); // [Nv, D]
+        this->kScaleGm.SetGlobalBuffer((__gm__ float*)k_scale); // [Nk, D]
+        this->vScaleGm.SetGlobalBuffer((__gm__ float*)v_scale); // [Nv, D]
 
         if (k_offset != nullptr && this->tilingData_->isKQuant) {
-            this->kOffsetGm.SetGlobalBuffer((__gm__ float *)k_offset);
+            this->kOffsetGm.SetGlobalBuffer((__gm__ float*)k_offset);
             isAsymmetricKQuant = true;
         }
         if (v_offset != nullptr && this->tilingData_->isVQuant) {
-            this->vOffsetGm.SetGlobalBuffer((__gm__ float *)v_offset);
+            this->vOffsetGm.SetGlobalBuffer((__gm__ float*)v_offset);
             isAsymmetricVQuant = true;
         }
 
@@ -212,7 +212,7 @@ public:
                 quantOutLocal = outLocal.template ReinterpretCast<int8_t>();
                 // Scatter Update kCache
                 ScatterUpdateNZWithQuant<int8_t, D1_SIZE4_PA_NZ_QUANT, D0_SIZE32_PA_NZ_QUANT>(
-                    (GlobalTensor<int8_t> &)this->kCacheGm, quantOutLocal, startIdx, this->ubFactorK,
+                    (GlobalTensor<int8_t>&)this->kCacheGm, quantOutLocal, startIdx, this->ubFactorK,
                     this->rmsNormLength, this->numHeadK);
             } else {
                 // Cast and Scatter Update kCache
@@ -274,7 +274,7 @@ public:
                 quantOutLocal = outLocal.template ReinterpretCast<int8_t>();
                 // Scatter Update kCache
                 ScatterUpdateNZWithQuant<int8_t, D1_SIZE4_PA_NZ_QUANT, D0_SIZE32_PA_NZ_QUANT>(
-                    (GlobalTensor<int8_t> &)this->kCacheGm, quantOutLocal, startIdx, this->ubTailK, this->rmsNormLength,
+                    (GlobalTensor<int8_t>&)this->kCacheGm, quantOutLocal, startIdx, this->ubTailK, this->rmsNormLength,
                     this->numHeadK);
             } else {
                 // Cast and Scatter Update kCache
@@ -327,7 +327,7 @@ public:
                 quantOutLocal = outLocal.template ReinterpretCast<int8_t>();
                 // Scatter Update vCache
                 ScatterUpdateNZWithQuant<int8_t, D1_SIZE4_PA_NZ_QUANT, D0_SIZE32_PA_NZ_QUANT>(
-                    (GlobalTensor<int8_t> &)this->vCacheGm, quantOutLocal, startIdx, this->ubFactorV,
+                    (GlobalTensor<int8_t>&)this->vCacheGm, quantOutLocal, startIdx, this->ubFactorV,
                     this->rmsNormLength, this->numHeadV);
             } else {
                 // Cast
@@ -377,7 +377,7 @@ public:
                 quantOutLocal = outLocal.template ReinterpretCast<int8_t>();
                 // Scatter Update vCache
                 ScatterUpdateNZWithQuant<int8_t, D1_SIZE4_PA_NZ_QUANT, D0_SIZE32_PA_NZ_QUANT>(
-                    (GlobalTensor<int8_t> &)this->vCacheGm, quantOutLocal, startIdx, this->ubTailV, this->rmsNormLength,
+                    (GlobalTensor<int8_t>&)this->vCacheGm, quantOutLocal, startIdx, this->ubTailV, this->rmsNormLength,
                     this->numHeadV);
             } else {
                 // Cast
@@ -477,7 +477,7 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void SplitQkv(const LocalTensor<T> &xLocal, int64_t rows, int64_t startIdx, int64_t numHeadBefore,
+    __aicore__ inline void SplitQkv(const LocalTensor<T>& xLocal, int64_t rows, int64_t startIdx, int64_t numHeadBefore,
                                     int64_t numHeads)
     {
         DataCopyPadExtParams<T> padParams{false, 0, 0, 0};
@@ -505,8 +505,8 @@ public:
         }
     }
 
-    __aicore__ inline void CopyInQuantFac(const LocalTensor<float> &scaleLocal, const LocalTensor<float> &offsetLocal,
-                                          const GlobalTensor<float> &scaleGm, const GlobalTensor<float> &offsetGm,
+    __aicore__ inline void CopyInQuantFac(const LocalTensor<float>& scaleLocal, const LocalTensor<float>& offsetLocal,
+                                          const GlobalTensor<float>& scaleGm, const GlobalTensor<float>& offsetGm,
                                           int64_t rows, int64_t startIdx, int64_t numHead, bool ifAsymmetricQuant)
     {
         DataCopyPadExtParams<float> padParams{false, 0, 0, 0};
@@ -526,7 +526,7 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void CopyInRopeFac(const LocalTensor<float> &cosSinLocalFp32, int64_t rows, int64_t ropeLen,
+    __aicore__ inline void CopyInRopeFac(const LocalTensor<float>& cosSinLocalFp32, int64_t rows, int64_t ropeLen,
                                          int64_t numHead, int64_t startIdx)
     {
         DataCopyPadExtParams<T> padParams{false, 0, 0, 0};
@@ -553,8 +553,8 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void Quant(const LocalTensor<int8_t> &quantOutLocal, const LocalTensor<float> &srcTensor,
-                                 const LocalTensor<float> &scaleLocal, const LocalTensor<float> &offsetLocal,
+    __aicore__ inline void Quant(const LocalTensor<int8_t>& quantOutLocal, const LocalTensor<float>& srcTensor,
+                                 const LocalTensor<float>& scaleLocal, const LocalTensor<float>& offsetLocal,
                                  bool ifAsymmetricQuant, int64_t headSize, int64_t rows)
     {
         LocalTensor<float> buf0 = this->locBuf0.template Get<float>();
@@ -580,7 +580,7 @@ public:
         RoundFloat2Int8(quantOutLocal, buf0, rows * headSize);
     }
 
-    __aicore__ inline void RoundFloat2Int8(const LocalTensor<int8_t> &dstTensor, const LocalTensor<float> &srcTensor,
+    __aicore__ inline void RoundFloat2Int8(const LocalTensor<int8_t>& dstTensor, const LocalTensor<float>& srcTensor,
                                            int32_t size)
     {
         Cast(srcTensor.ReinterpretCast<int32_t>(), srcTensor, RoundMode::CAST_RINT, size);
@@ -593,7 +593,7 @@ public:
     }
 
     template <typename T1, int64_t D1, int64_t D0>
-    __aicore__ inline void ScatterUpdateNZWithQuant(const GlobalTensor<T1> &dst, const LocalTensor<T1> &outLocal,
+    __aicore__ inline void ScatterUpdateNZWithQuant(const GlobalTensor<T1>& dst, const LocalTensor<T1>& outLocal,
                                                     int64_t startIdx, int64_t rows, int64_t headSize, int64_t numHead)
     {
         DataCopyExtParams copyParamsNz{
@@ -624,9 +624,9 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void RmsNorm(const LocalTensor<float> &xLocalFp32, const LocalTensor<float> &xSquareLocal,
-                                   const LocalTensor<float> &xSumLocal, const LocalTensor<float> &dstLocalFp32,
-                                   const LocalTensor<float> &gammaLocalFp32, int64_t rows, int64_t headSize)
+    __aicore__ inline void RmsNorm(const LocalTensor<float>& xLocalFp32, const LocalTensor<float>& xSquareLocal,
+                                   const LocalTensor<float>& xSumLocal, const LocalTensor<float>& dstLocalFp32,
+                                   const LocalTensor<float>& gammaLocalFp32, int64_t rows, int64_t headSize)
     {
         Mul(xSquareLocal, xLocalFp32, xLocalFp32, rows * headSize);
         PipeBarrier<PIPE_V>();
@@ -668,7 +668,7 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void Rope(const LocalTensor<float> &srcLocalFp32, const LocalTensor<float> &cosSinLocalFp32,
+    __aicore__ inline void Rope(const LocalTensor<float>& srcLocalFp32, const LocalTensor<float>& cosSinLocalFp32,
                                 int64_t rows, int64_t ropeLen)
     {
         // step #1: Get odd and even, cos and sin space
@@ -717,7 +717,7 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void CopyoutProto(const LocalTensor<float> &srcLocalFp32, const GlobalTensor<T> &dstNd,
+    __aicore__ inline void CopyoutProto(const LocalTensor<float>& srcLocalFp32, const GlobalTensor<T>& dstNd,
                                         int64_t startIdx, int64_t rows, int64_t headSize)
     {
         LocalTensor<T> outLocal = this->outQueue.template AllocTensor<T>();

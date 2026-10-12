@@ -70,7 +70,7 @@ constexpr int64_t DATA_TYPE_INT32 = 2;
 constexpr int64_t DATA_TYPE_BF16 = 3;
 
 template <typename T1, typename T2>
-inline auto UpAlign(const T1 &a, const T2 &b) -> T1
+inline auto UpAlign(const T1& a, const T2& b) -> T1
 {
     if (b != 0) {
         return (a + b - 1) / b * b;
@@ -79,7 +79,7 @@ inline auto UpAlign(const T1 &a, const T2 &b) -> T1
 }
 
 template <typename T>
-static auto GetRem(const T &value1, const T &value2) -> T
+static auto GetRem(const T& value1, const T& value2) -> T
 {
     if (value2 == 0) {
         return value2;
@@ -88,7 +88,7 @@ static auto GetRem(const T &value1, const T &value2) -> T
 }
 
 template <typename T>
-static auto GetCeilInt(const T &value1, const T &value2) -> T
+static auto GetCeilInt(const T& value1, const T& value2) -> T
 {
     if (value2 == 0) {
         return value2;
@@ -97,7 +97,7 @@ static auto GetCeilInt(const T &value1, const T &value2) -> T
 }
 
 template <typename T>
-static auto GetDiv(const T &value1, const T &value2) -> T
+static auto GetDiv(const T& value1, const T& value2) -> T
 {
     if (value2 == 0) {
         return value2;
@@ -106,7 +106,7 @@ static auto GetDiv(const T &value1, const T &value2) -> T
 }
 
 template <typename T>
-std::string Shape2String(const T &shape)
+std::string Shape2String(const T& shape)
 {
     std::ostringstream oss;
     oss << "[";
@@ -144,14 +144,14 @@ struct TilingInfoDRQK {
     int64_t hasAS = 0;
     int64_t biasDataType = 0;
     int64_t isDequant = 0;
-    const int64_t *attrData;
+    const int64_t* attrData;
 };
 } // namespace
 using namespace std;
 
 namespace optiling {
 
-static void DQRKPrintParam(gert::TilingContext *context, DequantRopeQuantKvcacheTilingData &tiling)
+static void DQRKPrintParam(gert::TilingContext* context, DequantRopeQuantKvcacheTilingData& tiling)
 {
     auto nodeName = context->GetNodeName();
     OP_LOGD(nodeName, ">>>>>>>>>>>>>>> Start to print DequantRopeQuantKvcache tiling data <<<<<<<<<<<<<<<<");
@@ -178,7 +178,7 @@ static void DQRKPrintParam(gert::TilingContext *context, DequantRopeQuantKvcache
     OP_LOGD(nodeName, ">>> hasAS:              %ld", tiling.get_hasAS());
     OP_LOGD(nodeName, ">>> batch:              %ld", tiling.get_batch());
 }
-ge::graphStatus checkOptDtype(const uint64_t index, gert::TilingContext *context, const ge::char_t *nodeName_)
+ge::graphStatus checkOptDtype(const uint64_t index, gert::TilingContext* context, const ge::char_t* nodeName_)
 {
     auto optDesc = context->GetOptionalInputDesc(index);
     if (optDesc != nullptr) {
@@ -188,8 +188,8 @@ ge::graphStatus checkOptDtype(const uint64_t index, gert::TilingContext *context
     }
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus checkDRQKDim(const gert::StorageShape *inShape, const std::vector<int64_t> &realShape,
-                             const ge::char_t *nodeName_, std::string logName)
+ge::graphStatus checkDRQKDim(const gert::StorageShape* inShape, const std::vector<int64_t>& realShape,
+                             const ge::char_t* nodeName_, std::string logName)
 {
     OP_CHECK_IF(inShape->GetStorageShape().GetDimNum() != realShape.size(),
                 OP_LOGE(nodeName_, "%s's dim size should be %zu but got %zu", logName.c_str(), realShape.size(),
@@ -204,9 +204,9 @@ ge::graphStatus checkDRQKDim(const gert::StorageShape *inShape, const std::vecto
     return ge::GRAPH_SUCCESS;
 }
 
-bool CheckPaCacheMode(const gert::RuntimeAttrs *attrs)
+bool CheckPaCacheMode(const gert::RuntimeAttrs* attrs)
 {
-    const char *tmpmode = attrs->GetStr(CACHE_MODE_IDX);
+    const char* tmpmode = attrs->GetStr(CACHE_MODE_IDX);
     if (tmpmode == nullptr) {
         return false;
     }
@@ -215,7 +215,7 @@ bool CheckPaCacheMode(const gert::RuntimeAttrs *attrs)
     return (cacheMode == "page");
 }
 
-ge::graphStatus getDRQKShapeInfo(gert::TilingContext *context, TilingInfoDRQK &tilingInfoDRQK)
+ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& tilingInfoDRQK)
 {
     auto platformInfo = context->GetPlatformInfo();
     auto nodeName = context->GetNodeName();
@@ -234,7 +234,7 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext *context, TilingInfoDRQK &t
         attr->GetSize() != QKV_NUM,
         OP_LOGE(context->GetNodeName(), "the attr size_splits's size %zu is invalid, it should be 3", attr->GetSize()),
         return ge::GRAPH_FAILED);
-    tilingInfoDRQK.attrData = reinterpret_cast<const int64_t *>(attr->GetData());
+    tilingInfoDRQK.attrData = reinterpret_cast<const int64_t*>(attr->GetData());
     int64_t qHiddensize = tilingInfoDRQK.attrData[0];
     int64_t kHiddensize = tilingInfoDRQK.attrData[1];
     int64_t vHiddensize = tilingInfoDRQK.attrData[2];
@@ -285,7 +285,7 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext *context, TilingInfoDRQK &t
     auto as = context->GetOptionalInputDesc(ACTIVATION_INPUT_INDEX);
     tilingInfoDRQK.hasAS = (as == nullptr) ? 0 : 1;
 
-    const gert::StorageShape *xShape = context->GetInputShape(X_INPUT_INDEX);
+    const gert::StorageShape* xShape = context->GetInputShape(X_INPUT_INDEX);
 
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
     int64_t xShapeDimNum = xShape->GetStorageShape().GetDimNum();
@@ -300,7 +300,7 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext *context, TilingInfoDRQK &t
                 OP_LOGE(context->GetNodeName(), "x's dim[-1] [%ld] should be [%ld].",
                         xShape->GetStorageShape().GetDim(xShapeDimNum - 1), qkvHiddensize),
                 return ge::GRAPH_FAILED);
-    const gert::StorageShape *cacheShape = context->GetInputShape(KVCACHE_INPUT_INDEX);
+    const gert::StorageShape* cacheShape = context->GetInputShape(KVCACHE_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, cacheShape);
 
     OP_CHECK_IF(
@@ -330,12 +330,12 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext *context, TilingInfoDRQK &t
                 OP_LOGE(context->GetNodeName(), "vhiddenSize [%ld] should be a multiple of hiddenSize", vHiddensize),
                 return ge::GRAPH_FAILED);
     tilingInfoDRQK.qHeadNum = GetDiv(tilingInfoDRQK.attrData[0], tilingInfoDRQK.hiddenSize);
-    const gert::StorageShape *cosShape = context->GetInputShape(COS_INDEX);
-    const gert::StorageShape *sinShape = context->GetInputShape(SIN_INDEX);
-    const gert::StorageShape *vCacheShape = context->GetInputShape(VCACHE_INPUT_INDEX);
-    const gert::StorageShape *indicesShape = context->GetInputShape(INDICES_INPUT_INDEX);
-    const gert::StorageShape *kScaleShape = context->GetInputShape(QUANT_K_SCALE_INPUT_INDEX);
-    const gert::StorageShape *vScaleShape = context->GetInputShape(QUANT_V_SCALE_INPUT_INDEX);
+    const gert::StorageShape* cosShape = context->GetInputShape(COS_INDEX);
+    const gert::StorageShape* sinShape = context->GetInputShape(SIN_INDEX);
+    const gert::StorageShape* vCacheShape = context->GetInputShape(VCACHE_INPUT_INDEX);
+    const gert::StorageShape* indicesShape = context->GetInputShape(INDICES_INPUT_INDEX);
+    const gert::StorageShape* kScaleShape = context->GetInputShape(QUANT_K_SCALE_INPUT_INDEX);
+    const gert::StorageShape* vScaleShape = context->GetInputShape(QUANT_V_SCALE_INPUT_INDEX);
 
     std::vector<int64_t> expSinCos = {tilingInfoDRQK.batch, tilingInfoDRQK.seqlen, 1, tilingInfoDRQK.hiddenSize};
     std::vector<int64_t> expX = {tilingInfoDRQK.batch, tilingInfoDRQK.seqlen, qkvHiddensize};
@@ -391,8 +391,8 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext *context, TilingInfoDRQK &t
     auto scaleDesc = context->GetInputDesc(QUANT_K_SCALE_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, scaleDesc);
     if (tilingInfoDRQK.hasQuantOffset == 1) {
-        const gert::StorageShape *kOffsetShape = context->GetOptionalInputShape(QUANT_K_OFFSET_INPUT_INDEX);
-        const gert::StorageShape *vOffsetShape = context->GetOptionalInputShape(QUANT_V_OFFSET_INPUT_INDEX);
+        const gert::StorageShape* kOffsetShape = context->GetOptionalInputShape(QUANT_K_OFFSET_INPUT_INDEX);
+        const gert::StorageShape* vOffsetShape = context->GetOptionalInputShape(QUANT_V_OFFSET_INPUT_INDEX);
         OP_CHECK_IF((kOffsetShape->GetStorageShape().GetShapeSize() != quantShapeSize ||
                      vOffsetShape->GetStorageShape().GetShapeSize() != quantShapeSize),
                     OP_LOGE(context->GetNodeName(),
@@ -442,7 +442,7 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext *context, TilingInfoDRQK &t
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingDequantRopeQuantKvcache(gert::TilingContext *context)
+static ge::graphStatus TilingDequantRopeQuantKvcache(gert::TilingContext* context)
 {
     TilingInfoDRQK tilingInfoDRQK;
     auto nodeName = context->GetNodeName();
@@ -460,7 +460,7 @@ static ge::graphStatus TilingDequantRopeQuantKvcache(gert::TilingContext *contex
         DequantRopeQuantKvcacheTilingData emptyTiling;
         emptyTiling.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
         context->GetRawTilingData()->SetDataSize(emptyTiling.GetDataSize());
-        size_t *currentWorkspace = context->GetWorkspaceSizes(1);
+        size_t* currentWorkspace = context->GetWorkspaceSizes(1);
         OP_CHECK_NULL_WITH_CONTEXT(context, currentWorkspace);
         currentWorkspace[0] = MINIMAL_WORKSPACE;
         return ge::GRAPH_SUCCESS;
@@ -506,7 +506,7 @@ static ge::graphStatus TilingDequantRopeQuantKvcache(gert::TilingContext *contex
     context->SetBlockDim(numBlocks);
     context->SetTilingKey(tilingKey);
 
-    size_t *currentWorkspace = context->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, currentWorkspace);
 
     currentWorkspace[0] = MINIMAL_WORKSPACE;
@@ -518,7 +518,7 @@ static ge::graphStatus TilingDequantRopeQuantKvcache(gert::TilingContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingPrepareForDequantRopeQuantKvcache(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForDequantRopeQuantKvcache(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

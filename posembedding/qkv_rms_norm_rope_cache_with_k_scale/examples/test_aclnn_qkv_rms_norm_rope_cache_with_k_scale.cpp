@@ -28,8 +28,8 @@
     } while (0)
 
 struct TensorResource {
-    aclTensor *tensor = nullptr;
-    void *deviceAddr = nullptr;
+    aclTensor* tensor = nullptr;
+    void* deviceAddr = nullptr;
 };
 
 struct AclResource {
@@ -37,13 +37,13 @@ struct AclResource {
     aclrtStream stream = nullptr;
     bool aclInited = false;
     bool deviceSet = false;
-    std::vector<TensorResource *> tensors;
-    aclIntArray *headNums = nullptr;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    std::vector<TensorResource*> tensors;
+    aclIntArray* headNums = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
 };
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto dim : shape) {
@@ -52,7 +52,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-std::vector<int64_t> GetContiguousStrides(const std::vector<int64_t> &shape)
+std::vector<int64_t> GetContiguousStrides(const std::vector<int64_t>& shape)
 {
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = static_cast<int64_t>(shape.size()) - 2; i >= 0; --i) {
@@ -68,7 +68,7 @@ uint16_t FloatToBf16(float value)
     return static_cast<uint16_t>(bits >> 16);
 }
 
-int Init(int32_t deviceId, AclResource &resource)
+int Init(int32_t deviceId, AclResource& resource)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -84,9 +84,9 @@ int Init(int32_t deviceId, AclResource &resource)
     return ACL_SUCCESS;
 }
 
-void FreeResource(AclResource &resource)
+void FreeResource(AclResource& resource)
 {
-    for (auto *tensorResource : resource.tensors) {
+    for (auto* tensorResource : resource.tensors) {
         if (tensorResource != nullptr && tensorResource->tensor != nullptr) {
             aclDestroyTensor(tensorResource->tensor);
             tensorResource->tensor = nullptr;
@@ -96,7 +96,7 @@ void FreeResource(AclResource &resource)
         aclDestroyIntArray(resource.headNums);
         resource.headNums = nullptr;
     }
-    for (auto *tensorResource : resource.tensors) {
+    for (auto* tensorResource : resource.tensors) {
         if (tensorResource != nullptr && tensorResource->deviceAddr != nullptr) {
             aclrtFree(tensorResource->deviceAddr);
             tensorResource->deviceAddr = nullptr;
@@ -120,15 +120,15 @@ void FreeResource(AclResource &resource)
     }
 }
 
-int ReturnAfterCleanup(int ret, AclResource &resource)
+int ReturnAfterCleanup(int ret, AclResource& resource)
 {
     FreeResource(resource);
     return ret;
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, aclDataType dataType,
-                    TensorResource &resource)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, aclDataType dataType,
+                    TensorResource& resource)
 {
     const size_t size = static_cast<size_t>(GetShapeSize(shape)) * sizeof(T);
     auto ret = aclrtMalloc(&resource.deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -250,8 +250,8 @@ int main()
     CHECK_RET(resource.headNums != nullptr, LOG_PRINT("aclCreateIntArray failed.\n");
               return ReturnAfterCleanup(ACL_ERROR_INVALID_PARAM, resource));
 
-    const char *layoutQkv = "TND";
-    const char *layoutQOut = "TND";
+    const char* layoutQkv = "TND";
+    const char* layoutQOut = "TND";
     float epsilon = 1e-6f;
     uint64_t workspaceSize = 0;
     aclnnStatus status = aclnnQkvRmsNormRopeCacheWithKScaleGetWorkspaceSize(

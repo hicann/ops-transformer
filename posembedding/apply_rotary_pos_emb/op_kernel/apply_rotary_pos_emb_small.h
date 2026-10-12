@@ -26,17 +26,17 @@ class ARPESmall : public ApplyRotaryPosEmbBase<T1> {
 public:
     __aicore__ inline ARPESmall(){};
     __aicore__ inline void Init(GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut, GM_ADDR kOut,
-                                GM_ADDR workspace, const ApplyRotaryPosEmbTilingData *tilingData);
-    __aicore__ inline void Process(const ApplyRotaryPosEmbTilingData *tilingData);
+                                GM_ADDR workspace, const ApplyRotaryPosEmbTilingData* tilingData);
+    __aicore__ inline void Process(const ApplyRotaryPosEmbTilingData* tilingData);
 
 private:
-    __aicore__ inline void ProcessPerCore(const ApplyRotaryPosEmbTilingData *tilingData);
-    __aicore__ inline void CastCopyIn(const ApplyRotaryPosEmbTilingData *tilingData);
-    __aicore__ inline void CopyInQK(const ApplyRotaryPosEmbTilingData *tilingData);
-    __aicore__ inline void ComputeTotary(LocalTensor<T1> &qSize, LocalTensor<T1> &cosSize, LocalTensor<T1> &sinSize,
-                                         LocalTensor<T1> &qoutSize, const ApplyRotaryPosEmbTilingData *tilingData);
-    __aicore__ inline void ComputeBF16(LocalTensor<T1> &qSize, LocalTensor<T1> &cosSize, LocalTensor<T1> &sinSize,
-                                       LocalTensor<T1> &qoutSize, const ApplyRotaryPosEmbTilingData *tilingData);
+    __aicore__ inline void ProcessPerCore(const ApplyRotaryPosEmbTilingData* tilingData);
+    __aicore__ inline void CastCopyIn(const ApplyRotaryPosEmbTilingData* tilingData);
+    __aicore__ inline void CopyInQK(const ApplyRotaryPosEmbTilingData* tilingData);
+    __aicore__ inline void ComputeTotary(LocalTensor<T1>& qSize, LocalTensor<T1>& cosSize, LocalTensor<T1>& sinSize,
+                                         LocalTensor<T1>& qoutSize, const ApplyRotaryPosEmbTilingData* tilingData);
+    __aicore__ inline void ComputeBF16(LocalTensor<T1>& qSize, LocalTensor<T1>& cosSize, LocalTensor<T1>& sinSize,
+                                       LocalTensor<T1>& qoutSize, const ApplyRotaryPosEmbTilingData* tilingData);
 
     constexpr static int32_t bufferNum = 1;
 
@@ -68,13 +68,13 @@ private:
 template <typename T1, typename T2>
 __aicore__ inline void ARPESmall<T1, T2>::Init(GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut,
                                                GM_ADDR kOut, GM_ADDR workspace,
-                                               const ApplyRotaryPosEmbTilingData *tilingData)
+                                               const ApplyRotaryPosEmbTilingData* tilingData)
 {
     blockIdx = GetBlockIdx();
-    qGm.SetGlobalBuffer((__gm__ T1 *)q);
-    kGm.SetGlobalBuffer((__gm__ T1 *)k);
-    cosGm.SetGlobalBuffer((__gm__ T1 *)cos);
-    sinGm.SetGlobalBuffer((__gm__ T1 *)sin);
+    qGm.SetGlobalBuffer((__gm__ T1*)q);
+    kGm.SetGlobalBuffer((__gm__ T1*)k);
+    cosGm.SetGlobalBuffer((__gm__ T1*)cos);
+    sinGm.SetGlobalBuffer((__gm__ T1*)sin);
     pipe.InitBuffer(cosInQueue, bufferNum, tilingData->cosPart1Ub);
     pipe.InitBuffer(mul1, tilingData->q2q1Part1Ub);
     pipe.InitBuffer(sinInQueue, bufferNum, tilingData->cosPart1Ub);
@@ -121,7 +121,7 @@ __aicore__ inline void ARPESmall<T1, T2>::Init(GM_ADDR q, GM_ADDR k, GM_ADDR cos
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void ARPESmall<T1, T2>::CopyInQK(const ApplyRotaryPosEmbTilingData *tilingData)
+__aicore__ inline void ARPESmall<T1, T2>::CopyInQK(const ApplyRotaryPosEmbTilingData* tilingData)
 {
     LocalTensor<T1> qUb = qInQueue.AllocTensor<T1>();
     LocalTensor<T1> cosUb = cosInQueue.AllocTensor<T1>();
@@ -142,7 +142,7 @@ __aicore__ inline void ARPESmall<T1, T2>::CopyInQK(const ApplyRotaryPosEmbTiling
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void ARPESmall<T1, T2>::CastCopyIn(const ApplyRotaryPosEmbTilingData *tilingData)
+__aicore__ inline void ARPESmall<T1, T2>::CastCopyIn(const ApplyRotaryPosEmbTilingData* tilingData)
 {
     CopyInQK(tilingData);
     LocalTensor<T1> qSize = qInQueue.DeQue<T1>();
@@ -170,9 +170,9 @@ __aicore__ inline void ARPESmall<T1, T2>::CastCopyIn(const ApplyRotaryPosEmbTili
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void ARPESmall<T1, T2>::ComputeBF16(LocalTensor<T1> &qUb, LocalTensor<T1> &cosUb,
-                                                      LocalTensor<T1> &sinUb, LocalTensor<T1> &qoutSize,
-                                                      const ApplyRotaryPosEmbTilingData *tilingData)
+__aicore__ inline void ARPESmall<T1, T2>::ComputeBF16(LocalTensor<T1>& qUb, LocalTensor<T1>& cosUb,
+                                                      LocalTensor<T1>& sinUb, LocalTensor<T1>& qoutSize,
+                                                      const ApplyRotaryPosEmbTilingData* tilingData)
 {
     LocalTensor<float> mul2Ub = mul2.Get<float>();
     LocalTensor<float> mul1Ub = mul1.Get<float>();
@@ -204,9 +204,9 @@ __aicore__ inline void ARPESmall<T1, T2>::ComputeBF16(LocalTensor<T1> &qUb, Loca
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void ARPESmall<T1, T2>::ComputeTotary(LocalTensor<T1> &qUb, LocalTensor<T1> &cosUb,
-                                                        LocalTensor<T1> &sinUb, LocalTensor<T1> &qoutSize,
-                                                        const ApplyRotaryPosEmbTilingData *tilingData)
+__aicore__ inline void ARPESmall<T1, T2>::ComputeTotary(LocalTensor<T1>& qUb, LocalTensor<T1>& cosUb,
+                                                        LocalTensor<T1>& sinUb, LocalTensor<T1>& qoutSize,
+                                                        const ApplyRotaryPosEmbTilingData* tilingData)
 {
 #if ORIG_DTYPE_QUERY == DT_BF16
     ComputeBF16(qUb, cosUb, sinUb, qoutSize, tilingData);
@@ -228,14 +228,14 @@ __aicore__ inline void ARPESmall<T1, T2>::ComputeTotary(LocalTensor<T1> &qUb, Lo
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void ARPESmall<T1, T2>::ProcessPerCore(const ApplyRotaryPosEmbTilingData *tilingData)
+__aicore__ inline void ARPESmall<T1, T2>::ProcessPerCore(const ApplyRotaryPosEmbTilingData* tilingData)
 
 {
     CastCopyIn(tilingData);
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void ARPESmall<T1, T2>::Process(const ApplyRotaryPosEmbTilingData *tilingData)
+__aicore__ inline void ARPESmall<T1, T2>::Process(const ApplyRotaryPosEmbTilingData* tilingData)
 {
     if (blockIdx >= tilingData->useCoreNum) {
         return;

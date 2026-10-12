@@ -25,7 +25,7 @@ class ApplyRotaryPosEmbAB {
 public:
     __aicore__ inline ApplyRotaryPosEmbAB(){};
     __aicore__ inline void Init(GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR q_out, GM_ADDR k_out,
-                                GM_ADDR workspace, const ApplyRotaryPosEmbRegbaseABTilingData *tilingData, TPipe *pipe);
+                                GM_ADDR workspace, const ApplyRotaryPosEmbRegbaseABTilingData* tilingData, TPipe* pipe);
     __aicore__ inline void Process();
 
 private:
@@ -34,15 +34,15 @@ private:
     __aicore__ inline void ProcessQKLoop(const int64_t qkGmOffset, LocalTensor<T> cosBuffer, LocalTensor<T> sinBuffer,
                                          GlobalTensor<T> inGm, GlobalTensor<T> outGm, const uint32_t currBSNum,
                                          const int64_t count);
-    __aicore__ inline void CopyInByRotaryMode(LocalTensor<T> &inTensor, GlobalTensor<T> &gmTensor, const int64_t offset,
+    __aicore__ inline void CopyInByRotaryMode(LocalTensor<T>& inTensor, GlobalTensor<T>& gmTensor, const int64_t offset,
                                               const uint32_t blockCount, const uint32_t blockLen,
-                                              const DataCopyPadExtParams<T> &padParams);
-    __aicore__ inline void CopyOutByRotaryMode(LocalTensor<T> &outTensor, GlobalTensor<T> &gmTensor,
+                                              const DataCopyPadExtParams<T>& padParams);
+    __aicore__ inline void CopyOutByRotaryMode(LocalTensor<T>& outTensor, GlobalTensor<T>& gmTensor,
                                                const int64_t offset, const uint32_t blockCount,
                                                const uint32_t blockLen);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> qkInQueue_;
     TQue<QuePosition::VECIN, 1> cosInQueue_;
     TQue<QuePosition::VECIN, 1> sinInQueue_;
@@ -54,7 +54,7 @@ private:
     GlobalTensor<T> sinGm_;
     GlobalTensor<T> qOutGm_;
     GlobalTensor<T> kOutGm_;
-    const ApplyRotaryPosEmbRegbaseABTilingData *tilingData_;
+    const ApplyRotaryPosEmbRegbaseABTilingData* tilingData_;
     DataCopyPadExtParams<T> padParams_ = {false, 0, 0, static_cast<T>(0)};
     uint8_t DB_FLAG = 2;
     uint32_t dSplitSize_ = 0;
@@ -65,7 +65,7 @@ private:
 template <typename T>
 __aicore__ inline void ApplyRotaryPosEmbAB<T>::Init(GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR q_out,
                                                     GM_ADDR k_out, GM_ADDR workspace,
-                                                    const ApplyRotaryPosEmbRegbaseABTilingData *tilingData, TPipe *pipe)
+                                                    const ApplyRotaryPosEmbRegbaseABTilingData* tilingData, TPipe* pipe)
 {
     pipe_ = pipe;
     tilingData_ = tilingData;
@@ -73,12 +73,12 @@ __aicore__ inline void ApplyRotaryPosEmbAB<T>::Init(GM_ADDR q, GM_ADDR k, GM_ADD
     dSplitCoef_ = tilingData_->dSplitCoef;
     int64_t cosOffset = GetBlockIdx() * tilingData_->blockFactorBS * tilingData_->realDim;
     int64_t qOffset = GetBlockIdx() * tilingData_->blockFactorBS * tilingData_->D;
-    this->cosGm_.SetGlobalBuffer((__gm__ T *)cos + cosOffset);
-    this->sinGm_.SetGlobalBuffer((__gm__ T *)sin + cosOffset);
-    this->qGm_.SetGlobalBuffer((__gm__ T *)q + qOffset * tilingData_->QN);
-    this->kGm_.SetGlobalBuffer((__gm__ T *)k + qOffset * tilingData_->KN);
-    this->qOutGm_.SetGlobalBuffer((__gm__ T *)q_out + qOffset * tilingData_->QN);
-    this->kOutGm_.SetGlobalBuffer((__gm__ T *)k_out + qOffset * tilingData_->KN);
+    this->cosGm_.SetGlobalBuffer((__gm__ T*)cos + cosOffset);
+    this->sinGm_.SetGlobalBuffer((__gm__ T*)sin + cosOffset);
+    this->qGm_.SetGlobalBuffer((__gm__ T*)q + qOffset * tilingData_->QN);
+    this->kGm_.SetGlobalBuffer((__gm__ T*)k + qOffset * tilingData_->KN);
+    this->qOutGm_.SetGlobalBuffer((__gm__ T*)q_out + qOffset * tilingData_->QN);
+    this->kOutGm_.SetGlobalBuffer((__gm__ T*)k_out + qOffset * tilingData_->KN);
 
     int64_t bufferSize = tilingData_->dAlign * sizeof(T);
     ubFactorBS_ = tilingData_->ubFactorBS;
@@ -243,7 +243,7 @@ __aicore__ inline void ApplyRotaryPosEmbAB<T>::ProcessQKLoop(const int64_t qkGmO
 }
 
 template <typename T>
-__aicore__ inline void ApplyRotaryPosEmbAB<T>::CopyOutByRotaryMode(LocalTensor<T> &outTensor, GlobalTensor<T> &gmTensor,
+__aicore__ inline void ApplyRotaryPosEmbAB<T>::CopyOutByRotaryMode(LocalTensor<T>& outTensor, GlobalTensor<T>& gmTensor,
                                                                    const int64_t offset, const uint32_t blockCount,
                                                                    const uint32_t blockLen)
 {
@@ -259,10 +259,10 @@ __aicore__ inline void ApplyRotaryPosEmbAB<T>::CopyOutByRotaryMode(LocalTensor<T
 }
 
 template <typename T>
-__aicore__ inline void ApplyRotaryPosEmbAB<T>::CopyInByRotaryMode(LocalTensor<T> &inTensor, GlobalTensor<T> &gmTensor,
+__aicore__ inline void ApplyRotaryPosEmbAB<T>::CopyInByRotaryMode(LocalTensor<T>& inTensor, GlobalTensor<T>& gmTensor,
                                                                   const int64_t offset, const uint32_t blockCount,
                                                                   const uint32_t blockLen,
-                                                                  const DataCopyPadExtParams<T> &padParams)
+                                                                  const DataCopyPadExtParams<T>& padParams)
 {
     if (tilingData_->rotaryMode == static_cast<int64_t>(ApplyRotaryPosEmbRotaryMode::HALF)) {
         CopyInHalfMode(inTensor, gmTensor, offset, blockCount, blockLen, padParams, tilingData_->D,

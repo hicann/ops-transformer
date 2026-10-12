@@ -26,7 +26,7 @@ constexpr int64_t STG3_TMP_BUF_NUM = 1;
 
 class ApplyRotaryPosEmbGradRegbaseTilingClassA : public ApplyRotaryPosEmbGradRegbaseTilingClass {
 public:
-    explicit ApplyRotaryPosEmbGradRegbaseTilingClassA(gert::TilingContext *context)
+    explicit ApplyRotaryPosEmbGradRegbaseTilingClassA(gert::TilingContext* context)
         : ApplyRotaryPosEmbGradRegbaseTilingClass(context)
     {}
 

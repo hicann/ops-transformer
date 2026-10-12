@@ -92,7 +92,7 @@ END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(InplacePartialRotaryMul, InplacePartialRopeRegbaseTilingData)
 
-ge::graphStatus Tiling4InplacePartialRotaryMul(gert::TilingContext *context);
+ge::graphStatus Tiling4InplacePartialRotaryMul(gert::TilingContext* context);
 struct InplacePartialRotaryPositionEmbeddingCompileInfo {
     int64_t blockDim;
     uint64_t ubSize;
@@ -155,11 +155,11 @@ static inline T FloorAlign(T x, T y)
 
 class InplacePartialRotaryPosEmbeddingMembaseTilingClass {
 public:
-    explicit InplacePartialRotaryPosEmbeddingMembaseTilingClass(gert::TilingContext *context)
+    explicit InplacePartialRotaryPosEmbeddingMembaseTilingClass(gert::TilingContext* context)
         : context_(context)
     {}
 
-    void Reset(gert::TilingContext *context)
+    void Reset(gert::TilingContext* context)
     {
         InplacePartialRotaryPosEmbeddingMembaseTilingClass::Reset(context);
     }
@@ -201,7 +201,7 @@ public:
 protected:
     static const uint32_t MODE_ROTATE_INTERLEAVED = 1;
     uint32_t inputMode_ = 0;
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     std::unique_ptr<platform_ascendc::PlatformAscendC> ascendcPlatform_{nullptr};
     uint32_t blockDim_{0};
     uint64_t workspaceSize_{0};
@@ -211,11 +211,11 @@ protected:
 
 class InplacePartialRopeRegBaseTilingClass {
 public:
-    explicit InplacePartialRopeRegBaseTilingClass(gert::TilingContext *context)
+    explicit InplacePartialRopeRegBaseTilingClass(gert::TilingContext* context)
         : context_(context)
     {}
 
-    void Reset(gert::TilingContext *context)
+    void Reset(gert::TilingContext* context)
     {
         InplacePartialRopeRegBaseTilingClass::Reset(context);
     }
@@ -225,7 +225,7 @@ public:
     ge::graphStatus CheckShape();
     ge::graphStatus CheckDtypeAndAttr();
     ge::graphStatus CheckParam();
-    ge::graphStatus JudgeLayoutByShape(const gert::Shape &xShape, const gert::Shape &cosShape);
+    ge::graphStatus JudgeLayoutByShape(const gert::Shape& xShape, const gert::Shape& cosShape);
     ge::graphStatus CheckRotaryModeShapeRelation(const int64_t d);
     ge::graphStatus CheckShapeAllPositive(const int64_t idx) const;
     ge::graphStatus CheckShapeAllPositive() const;
@@ -289,7 +289,7 @@ public:
             noopTiling.set_D(d_);
             context_->SetBlockDim(1);
             context_->SetTilingKey(20040); // TILING_KEY_A: valid key, kernel will check sliceLength==0
-            size_t *workspaces = context_->GetWorkspaceSizes(1);
+            size_t* workspaces = context_->GetWorkspaceSizes(1);
             if (workspaces != nullptr) {
                 workspaces[0] = static_cast<size_t>(16) * 1024 * 1024;
             }
@@ -338,7 +338,7 @@ protected:
     int64_t blockSize_;
     int64_t dSplitCoef_;
     bool is1snd_ = false;
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     std::unique_ptr<platform_ascendc::PlatformAscendC> ascendcPlatform_{nullptr};
     uint32_t blockDim_{0};
     uint64_t workspaceSize_{0};
@@ -354,7 +354,7 @@ protected:
 
 class InplacePartialRopeRegBaseTilingClassAAndB : public InplacePartialRopeRegBaseTilingClass {
 public:
-    explicit InplacePartialRopeRegBaseTilingClassAAndB(gert::TilingContext *context)
+    explicit InplacePartialRopeRegBaseTilingClassAAndB(gert::TilingContext* context)
         : InplacePartialRopeRegBaseTilingClass(context)
     {}
 
@@ -389,7 +389,7 @@ private:
 
 class InplacePartialRopeRegBaseTilingClassAB : public InplacePartialRopeRegBaseTilingClass {
 public:
-    explicit InplacePartialRopeRegBaseTilingClassAB(gert::TilingContext *context)
+    explicit InplacePartialRopeRegBaseTilingClassAB(gert::TilingContext* context)
         : InplacePartialRopeRegBaseTilingClass(context)
     {}
 
@@ -413,7 +413,7 @@ private:
 
 class InplacePartialRopeRegBaseTilingClassABAAndBA : public InplacePartialRopeRegBaseTilingClass {
 public:
-    explicit InplacePartialRopeRegBaseTilingClassABAAndBA(gert::TilingContext *context)
+    explicit InplacePartialRopeRegBaseTilingClassABAAndBA(gert::TilingContext* context)
         : InplacePartialRopeRegBaseTilingClass(context)
     {}
 
@@ -447,7 +447,7 @@ private:
 
 class InplacePartialRopeRegBaseTilingClassBAB : public InplacePartialRopeRegBaseTilingClass {
 public:
-    explicit InplacePartialRopeRegBaseTilingClassBAB(gert::TilingContext *context_)
+    explicit InplacePartialRopeRegBaseTilingClassBAB(gert::TilingContext* context_)
         : InplacePartialRopeRegBaseTilingClass(context_)
     {}
 

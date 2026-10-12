@@ -24,7 +24,7 @@ class InterleavedSplitBS {
 public:
     __aicore__ inline InterleavedSplitBS(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
-                                const RotaryPositionEmbeddingTilingData &tiling, TPipe *pipe);
+                                const RotaryPositionEmbeddingTilingData& tiling, TPipe* pipe);
     __aicore__ inline void Process();
 
 protected:
@@ -64,20 +64,20 @@ protected:
     uint64_t bufferLenSize;
     uint64_t gatherOffsetLenSize;
 
-    __aicore__ inline void InitData(const RotaryPositionEmbeddingTilingData &tiling);
-    __aicore__ inline void CopyInX(LocalTensor<T> &x, uint32_t seqIdx, uint32_t batchIdx, uint32_t calcLen);
-    __aicore__ inline void CopyInCos(LocalTensor<T> &cos, uint32_t seqIdx, uint32_t calcLen);
-    __aicore__ inline void CopyInSin(LocalTensor<T> &sin, uint32_t seqIdx, uint32_t calcLen);
+    __aicore__ inline void InitData(const RotaryPositionEmbeddingTilingData& tiling);
+    __aicore__ inline void CopyInX(LocalTensor<T>& x, uint32_t seqIdx, uint32_t batchIdx, uint32_t calcLen);
+    __aicore__ inline void CopyInCos(LocalTensor<T>& cos, uint32_t seqIdx, uint32_t calcLen);
+    __aicore__ inline void CopyInSin(LocalTensor<T>& sin, uint32_t seqIdx, uint32_t calcLen);
     __aicore__ inline void CopyOut(uint32_t seqIdx, uint32_t batchIdx, uint32_t calcLen);
-    __aicore__ inline void Compute(uint32_t seqIdx, uint32_t batchIdx, LocalTensor<uint32_t> &gatherOffsetCast,
+    __aicore__ inline void Compute(uint32_t seqIdx, uint32_t batchIdx, LocalTensor<uint32_t>& gatherOffsetCast,
                                    uint32_t calcLen);
-    __aicore__ inline void ComputeCastFp32(uint32_t seqIdx, uint32_t batchIdx, LocalTensor<uint32_t> &gatherOffsetCast,
+    __aicore__ inline void ComputeCastFp32(uint32_t seqIdx, uint32_t batchIdx, LocalTensor<uint32_t>& gatherOffsetCast,
                                            uint32_t calcLen);
 };
 
 template <typename T>
 __aicore__ inline void InterleavedSplitBS<T>::Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
-                                                   const RotaryPositionEmbeddingTilingData &tiling, TPipe *pipe)
+                                                   const RotaryPositionEmbeddingTilingData& tiling, TPipe* pipe)
 {
     InitData(tiling);
 
@@ -96,10 +96,10 @@ __aicore__ inline void InterleavedSplitBS<T>::Init(GM_ADDR x, GM_ADDR cos, GM_AD
     }
 
     bufferBsndSize = batchSize * seqLen * bufferNdSize;
-    xGm.SetGlobalBuffer((__gm__ T *)x + ioOffset, bufferBsndSize);
-    yGm.SetGlobalBuffer((__gm__ T *)y + ioOffset, bufferBsndSize);
-    cosGm.SetGlobalBuffer((__gm__ T *)cos + triOffset, bufferSdSize);
-    sinGm.SetGlobalBuffer((__gm__ T *)sin + triOffset, bufferSdSize);
+    xGm.SetGlobalBuffer((__gm__ T*)x + ioOffset, bufferBsndSize);
+    yGm.SetGlobalBuffer((__gm__ T*)y + ioOffset, bufferBsndSize);
+    cosGm.SetGlobalBuffer((__gm__ T*)cos + triOffset, bufferSdSize);
+    sinGm.SetGlobalBuffer((__gm__ T*)sin + triOffset, bufferSdSize);
 
     bufferLenSize = ubCalcBNum * bufferNdSize * sizeof(T);
     pipe->InitBuffer(inQueX, BUFFER_NUM, bufferLenSize);
@@ -118,9 +118,9 @@ __aicore__ inline void InterleavedSplitBS<T>::Init(GM_ADDR x, GM_ADDR cos, GM_AD
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitBS<T>::InitData(const RotaryPositionEmbeddingTilingData &tiling)
+__aicore__ inline void InterleavedSplitBS<T>::InitData(const RotaryPositionEmbeddingTilingData& tiling)
 {
-    const RopeInterleavedParams &rotateInterleavedTiling = tiling.ropeInterleavedParams;
+    const RopeInterleavedParams& rotateInterleavedTiling = tiling.ropeInterleavedParams;
     batchSize = rotateInterleavedTiling.batchSize;
     seqLen = rotateInterleavedTiling.seqLen;
     numHeads = rotateInterleavedTiling.numHeads;
@@ -135,7 +135,7 @@ __aicore__ inline void InterleavedSplitBS<T>::InitData(const RotaryPositionEmbed
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitBS<T>::CopyInX(LocalTensor<T> &x, uint32_t seqIdx, uint32_t batchIdx,
+__aicore__ inline void InterleavedSplitBS<T>::CopyInX(LocalTensor<T>& x, uint32_t seqIdx, uint32_t batchIdx,
                                                       uint32_t calcLen)
 {
     DataCopyExtParams dataCopyParams;
@@ -151,7 +151,7 @@ __aicore__ inline void InterleavedSplitBS<T>::CopyInX(LocalTensor<T> &x, uint32_
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitBS<T>::CopyInCos(LocalTensor<T> &cos, uint32_t seqIdx, uint32_t calcLen)
+__aicore__ inline void InterleavedSplitBS<T>::CopyInCos(LocalTensor<T>& cos, uint32_t seqIdx, uint32_t calcLen)
 {
     DataCopyExtParams bsDataCopyTriParams;
     bsDataCopyTriParams.blockCount = 1;
@@ -166,7 +166,7 @@ __aicore__ inline void InterleavedSplitBS<T>::CopyInCos(LocalTensor<T> &cos, uin
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitBS<T>::CopyInSin(LocalTensor<T> &sin, uint32_t seqIdx, uint32_t calcLen)
+__aicore__ inline void InterleavedSplitBS<T>::CopyInSin(LocalTensor<T>& sin, uint32_t seqIdx, uint32_t calcLen)
 {
     event_t eventIdVToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
     SetFlag<HardEvent::V_MTE2>(eventIdVToMTE2);
@@ -231,7 +231,7 @@ __aicore__ inline void InterleavedSplitBS<T>::Process()
 
 template <typename T>
 __aicore__ inline void InterleavedSplitBS<T>::Compute(uint32_t seqIdx, uint32_t batchIdx,
-                                                      LocalTensor<uint32_t> &gatherOffsetCast, uint32_t calcLen)
+                                                      LocalTensor<uint32_t>& gatherOffsetCast, uint32_t calcLen)
 {
     uint64_t calcTotalNum = calcLen * bufferNdSize;
 
@@ -259,7 +259,7 @@ __aicore__ inline void InterleavedSplitBS<T>::Compute(uint32_t seqIdx, uint32_t 
 
 template <typename T>
 __aicore__ inline void InterleavedSplitBS<T>::ComputeCastFp32(uint32_t seqIdx, uint32_t batchIdx,
-                                                              LocalTensor<uint32_t> &gatherOffsetCast, uint32_t calcLen)
+                                                              LocalTensor<uint32_t>& gatherOffsetCast, uint32_t calcLen)
 {
     uint64_t calcTotalNum = calcLen * bufferNdSize;
 

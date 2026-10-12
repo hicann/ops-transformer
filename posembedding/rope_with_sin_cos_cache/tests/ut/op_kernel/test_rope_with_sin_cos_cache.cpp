@@ -22,12 +22,11 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void rope_with_sin_cos_cache(
-    GM_ADDR positions, GM_ADDR queryIn, GM_ADDR keyIn, GM_ADDR cosSinCache, GM_ADDR queryOut, GM_ADDR keyOut,
-    GM_ADDR workspace, GM_ADDR tiling);
+extern "C" __global__ __aicore__ void rope_with_sin_cos_cache(GM_ADDR positions, GM_ADDR queryIn, GM_ADDR keyIn,
+                                                              GM_ADDR cosSinCache, GM_ADDR queryOut, GM_ADDR keyOut,
+                                                              GM_ADDR workspace, GM_ADDR tiling);
 
-class rope_with_sin_cos_cache_test : public testing::Test
-{
+class rope_with_sin_cos_cache_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -41,9 +40,8 @@ protected:
 
 TEST_F(rope_with_sin_cos_cache_test, test_case_bf16)
 {
-    system(
-        "cp -rf "
-        "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
+    system("cp -rf "
+           "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
     system("chmod -R 755 ./rope_with_sin_cos_cache_data/");
     system("cd ./rope_with_sin_cos_cache_data/ && python3 gen_data.py '48' '2' '4' '128' '128' 'bf16' ");
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
@@ -105,8 +103,8 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_bf16)
     ReadFile("./rope_with_sin_cos_cache_data/output_keyOut.bin", keyOutSize, keyOut, keyOutSize);
 
     ICPU_SET_TILING_KEY(20);
-    ICPU_RUN_KF(
-        rope_with_sin_cos_cache, blockDim, position, query, key, cosSinCache, queryOut, keyOut, workspace, tiling);
+    ICPU_RUN_KF(rope_with_sin_cos_cache, blockDim, position, query, key, cosSinCache, queryOut, keyOut, workspace,
+                tiling);
 
     AscendC::GmFree(position);
     AscendC::GmFree(query);
@@ -120,9 +118,8 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_bf16)
 
 TEST_F(rope_with_sin_cos_cache_test, test_case_fp32)
 {
-    system(
-        "cp -rf "
-        "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
+    system("cp -rf "
+           "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
     system("chmod -R 755 ./rope_with_sin_cos_cache_data/");
     system("cd ./rope_with_sin_cos_cache_data/ && python3 gen_data.py '48' '2' '4' '128' '128' 'fp32' ");
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
@@ -184,8 +181,8 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_fp32)
     ReadFile("./rope_with_sin_cos_cache_data/output_keyOut.bin", keyOutSize, keyOut, keyOutSize);
 
     ICPU_SET_TILING_KEY(22);
-    ICPU_RUN_KF(
-        rope_with_sin_cos_cache, blockDim, position, query, key, cosSinCache, queryOut, keyOut, workspace, tiling);
+    ICPU_RUN_KF(rope_with_sin_cos_cache, blockDim, position, query, key, cosSinCache, queryOut, keyOut, workspace,
+                tiling);
 
     AscendC::GmFree(position);
     AscendC::GmFree(query);
@@ -199,9 +196,8 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_fp32)
 
 TEST_F(rope_with_sin_cos_cache_test, test_case_fp16)
 {
-    system(
-        "cp -rf "
-        "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
+    system("cp -rf "
+           "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
     system("chmod -R 755 ./rope_with_sin_cos_cache_data/");
     system("cd ./rope_with_sin_cos_cache_data/ && python3 gen_data.py '48' '2' '4' '128' '128' 'fp16' ");
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
@@ -263,8 +259,8 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_fp16)
     ReadFile("./rope_with_sin_cos_cache_data/output_keyOut.bin", keyOutSize, keyOut, keyOutSize);
 
     ICPU_SET_TILING_KEY(21);
-    ICPU_RUN_KF(
-        rope_with_sin_cos_cache, blockDim, position, query, key, cosSinCache, queryOut, keyOut, workspace, tiling);
+    ICPU_RUN_KF(rope_with_sin_cos_cache, blockDim, position, query, key, cosSinCache, queryOut, keyOut, workspace,
+                tiling);
 
     AscendC::GmFree(position);
     AscendC::GmFree(query);
@@ -278,9 +274,8 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_fp16)
 
 TEST_F(rope_with_sin_cos_cache_test, test_case_fp32_2)
 {
-    system(
-        "cp -rf "
-        "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
+    system("cp -rf "
+           "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
     system("chmod -R 755 ./rope_with_sin_cos_cache_data/");
     system("cd ./rope_with_sin_cos_cache_data/ && python3 gen_data.py '48' '2' '4' '128' '128' 'fp32' ");
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
@@ -342,8 +337,8 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_fp32_2)
     ReadFile("./rope_with_sin_cos_cache_data/output_keyOut.bin", keyOutSize, keyOut, keyOutSize);
 
     ICPU_SET_TILING_KEY(22);
-    ICPU_RUN_KF(
-        rope_with_sin_cos_cache, blockDim, position, query, key, cosSinCache, queryOut, keyOut, workspace, tiling);
+    ICPU_RUN_KF(rope_with_sin_cos_cache, blockDim, position, query, key, cosSinCache, queryOut, keyOut, workspace,
+                tiling);
 
     AscendC::GmFree(position);
     AscendC::GmFree(query);
@@ -357,9 +352,8 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_fp32_2)
 
 TEST_F(rope_with_sin_cos_cache_test, test_case_v2_fp32)
 {
-    system(
-        "cp -rf "
-        "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
+    system("cp -rf "
+           "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
     system("chmod -R 755 ./rope_with_sin_cos_cache_data/");
     system("cd ./rope_with_sin_cos_cache_data/ && python3 gen_data.py '48' '2' '4' '128' '128' 'fp32' ");
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
@@ -422,8 +416,8 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_v2_fp32)
     ReadFile("./rope_with_sin_cos_cache_data/output_keyOut.bin", keyOutSize, keyOut, keyOutSize);
 
     ICPU_SET_TILING_KEY(22);
-    ICPU_RUN_KF(
-        rope_with_sin_cos_cache, blockDim, position, query, key, cosSinCache, queryOut, keyOut, workspace, tiling);
+    ICPU_RUN_KF(rope_with_sin_cos_cache, blockDim, position, query, key, cosSinCache, queryOut, keyOut, workspace,
+                tiling);
 
     AscendC::GmFree(position);
     AscendC::GmFree(query);

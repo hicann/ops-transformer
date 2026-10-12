@@ -20,7 +20,7 @@ constexpr uint32_t MIN_UB_LOAD_D_NUM = 4;
 
 class InplacePartialRotaryMulGradRegbaseTilingBab : public InplacePartialRotaryMulGradRegbaseTiling {
 public:
-    explicit InplacePartialRotaryMulGradRegbaseTilingBab(gert::TilingContext *context)
+    explicit InplacePartialRotaryMulGradRegbaseTilingBab(gert::TilingContext* context)
         : InplacePartialRotaryMulGradRegbaseTiling(context)
     {}
 
@@ -180,7 +180,7 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTilingBab::PostTiling()
     tilingDataBab_.set_dSplitCoef(dSplitCoef_);
 
     // 设置 userWorkspace
-    size_t *userWorkspaceSize = context_->GetWorkspaceSizes(WORKSPACE_COUNT);
+    size_t* userWorkspaceSize = context_->GetWorkspaceSizes(WORKSPACE_COUNT);
     OP_CHECK_NULL_WITH_CONTEXT(context_, userWorkspaceSize);
     userWorkspaceSize[0] = RESERVED_WORKSPACE;
 

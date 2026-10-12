@@ -56,7 +56,8 @@ extern "C" __global__ __aicore__ void rotary_position_embedding(GM_ADDR x, GM_AD
         RotateHalfRopeFullLoadXd<half, float> op;
         op.Init(x, cos, sin, y, tilingData);
         op.Process();
-#if !(((defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113)) || (defined(__CCE_AICORE__) && __CCE_AICORE__ == 200)))
+#if !(((defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113)) || \
+       (defined(__CCE_AICORE__) && __CCE_AICORE__ == 200)))
     } else if (TILING_KEY_IS(1113) || TILING_KEY_IS(1123) || TILING_KEY_IS(1133) || TILING_KEY_IS(1143) ||
                TILING_KEY_IS(1153) || TILING_KEY_IS(1163)) {
         RotateHalfRopeFullLoadXd<bfloat16_t, float> op;
@@ -112,7 +113,8 @@ extern "C" __global__ __aicore__ void rotary_position_embedding(GM_ADDR x, GM_AD
         RotateHalfBf16<half, float> rotateHalfOp;
         rotateHalfOp.Init(x, cos, sin, y, tilingData);
         rotateHalfOp.Process();
-#if !(((defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113)) || (defined(__CCE_AICORE__) && __CCE_AICORE__ == 200)))
+#if !(((defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113)) || \
+       (defined(__CCE_AICORE__) && __CCE_AICORE__ == 200)))
     } else if (TILING_KEY_IS(1013)) {
         RotateHalfBf16<bfloat16_t, float> rotateHalfOp;
         rotateHalfOp.Init(x, cos, sin, y, tilingData);
@@ -246,7 +248,7 @@ extern "C" __global__ __aicore__ void rotary_position_embedding(GM_ADDR x, GM_AD
         interleavedSplitBSNPad.Process();
     }
 #endif
-    
+
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 220
     if (TILING_KEY_IS(3011)) {
         using aT = MatmulType<TPosition::GM, CubeFormat::ND, float>;

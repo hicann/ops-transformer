@@ -41,14 +41,14 @@ static constexpr uint64_t K_SCALE_CACHE_OUT_INDEX = 4;
 static constexpr uint64_t QKV_DIM_NUM = 3;
 static constexpr int64_t MAX_Q_HEAD_NUM = 64;
 static constexpr int64_t SUPPORTED_HEAD_DIM = 128;
-static constexpr const char *QKV_LAYOUT_NTD = "NTD";
-static constexpr const char *QKV_LAYOUT_TND = "TND";
-static constexpr const char *Q_QUANT_MODE_PER_TOKEN_PER_HEAD = "PerTokenPerHead";
-static constexpr const char *Q_QUANT_MODE_NO_QUANT = "NoQuant";
-static constexpr const char *Q_QUANT_MODE_MX = "Mx";
-static constexpr const char *K_QUANT_MODE_PER_TOKEN_PER_HEAD = "PerTokenPerHead";
-static constexpr const char *K_QUANT_MODE_MX = "Mx";
-static constexpr const char *DEFAULT_OP_NAME = "QkvRmsNormRopeCacheWithKScale";
+static constexpr const char* QKV_LAYOUT_NTD = "NTD";
+static constexpr const char* QKV_LAYOUT_TND = "TND";
+static constexpr const char* Q_QUANT_MODE_PER_TOKEN_PER_HEAD = "PerTokenPerHead";
+static constexpr const char* Q_QUANT_MODE_NO_QUANT = "NoQuant";
+static constexpr const char* Q_QUANT_MODE_MX = "Mx";
+static constexpr const char* K_QUANT_MODE_PER_TOKEN_PER_HEAD = "PerTokenPerHead";
+static constexpr const char* K_QUANT_MODE_MX = "Mx";
+static constexpr const char* DEFAULT_OP_NAME = "QkvRmsNormRopeCacheWithKScale";
 static constexpr int64_t MX_SCALE_GROUP_SIZE = 32;
 
 enum class QScaleKind {
@@ -67,18 +67,18 @@ struct InferAttrs {
 };
 
 struct InputShapes {
-    const gert::Shape *qkv = nullptr;
-    const gert::Shape *kCache = nullptr;
-    const gert::Shape *vCache = nullptr;
-    const gert::Shape *kScaleCache = nullptr;
+    const gert::Shape* qkv = nullptr;
+    const gert::Shape* kCache = nullptr;
+    const gert::Shape* vCache = nullptr;
+    const gert::Shape* kScaleCache = nullptr;
 };
 
 struct OutputShapes {
-    gert::Shape *qOut = nullptr;
-    gert::Shape *qScale = nullptr;
-    gert::Shape *kCache = nullptr;
-    gert::Shape *vCache = nullptr;
-    gert::Shape *kScaleCache = nullptr;
+    gert::Shape* qOut = nullptr;
+    gert::Shape* qScale = nullptr;
+    gert::Shape* kCache = nullptr;
+    gert::Shape* vCache = nullptr;
+    gert::Shape* kScaleCache = nullptr;
 };
 
 struct QOutputDims {
@@ -86,7 +86,7 @@ struct QOutputDims {
     int64_t headDim = 0;
 };
 
-static const char *GetLogOpName(gert::InferShapeContext *context)
+static const char* GetLogOpName(gert::InferShapeContext* context)
 {
     return context == nullptr || context->GetNodeName() == nullptr ? DEFAULT_OP_NAME : context->GetNodeName();
 }
@@ -96,13 +96,13 @@ static std::string RankString(uint64_t dimNum)
     return std::to_string(dimNum) + "D";
 }
 
-static std::string ShapeString(const gert::Shape *shape)
+static std::string ShapeString(const gert::Shape* shape)
 {
     return shape == nullptr ? "nullptr" : Ops::Base::ToString(*shape);
 }
 
-static ge::graphStatus CheckNotNull(gert::InferShapeContext *context, const void *ptr, const char *paramName,
-                                    const char *reason)
+static ge::graphStatus CheckNotNull(gert::InferShapeContext* context, const void* ptr, const char* paramName,
+                                    const char* reason)
 {
     if (ptr != nullptr) {
         return ge::GRAPH_SUCCESS;
@@ -111,13 +111,13 @@ static ge::graphStatus CheckNotNull(gert::InferShapeContext *context, const void
     return ge::GRAPH_FAILED;
 }
 
-static ge::graphStatus ParseLayoutQkv(gert::InferShapeContext *context, const gert::RuntimeAttrs *attrs, bool &isNtd)
+static ge::graphStatus ParseLayoutQkv(gert::InferShapeContext* context, const gert::RuntimeAttrs* attrs, bool& isNtd)
 {
     if (static_cast<uint64_t>(attrs->GetAttrNum()) <= QKV_LAYOUT_ATTR_INDEX) {
         isNtd = false;
         return ge::GRAPH_SUCCESS;
     }
-    const char *layoutQkv = attrs->GetStr(QKV_LAYOUT_ATTR_INDEX);
+    const char* layoutQkv = attrs->GetStr(QKV_LAYOUT_ATTR_INDEX);
     if (layoutQkv == nullptr || layoutQkv[0] == '\0') {
         isNtd = false;
         return ge::GRAPH_SUCCESS;
@@ -130,14 +130,14 @@ static ge::graphStatus ParseLayoutQkv(gert::InferShapeContext *context, const ge
     return ge::GRAPH_FAILED;
 }
 
-static ge::graphStatus ParseLayoutQOut(gert::InferShapeContext *context, const gert::RuntimeAttrs *attrs, bool qkvIsNtd,
-                                       bool &qOutIsNtd)
+static ge::graphStatus ParseLayoutQOut(gert::InferShapeContext* context, const gert::RuntimeAttrs* attrs, bool qkvIsNtd,
+                                       bool& qOutIsNtd)
 {
     if (static_cast<uint64_t>(attrs->GetAttrNum()) <= Q_OUT_LAYOUT_ATTR_INDEX) {
         qOutIsNtd = true;
         return ge::GRAPH_SUCCESS;
     }
-    const char *layoutQOut = attrs->GetStr(Q_OUT_LAYOUT_ATTR_INDEX);
+    const char* layoutQOut = attrs->GetStr(Q_OUT_LAYOUT_ATTR_INDEX);
     if (layoutQOut == nullptr || layoutQOut[0] == '\0') {
         qOutIsNtd = true;
         return ge::GRAPH_SUCCESS;
@@ -157,8 +157,8 @@ static ge::graphStatus ParseLayoutQOut(gert::InferShapeContext *context, const g
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ParseHeadNums(gert::InferShapeContext *context, const gert::RuntimeAttrs *attrs,
-                                     InferAttrs &inferAttrs)
+static ge::graphStatus ParseHeadNums(gert::InferShapeContext* context, const gert::RuntimeAttrs* attrs,
+                                     InferAttrs& inferAttrs)
 {
     const auto headNums = attrs->GetListInt(HEAD_NUMS_ATTR_INDEX);
     if (CheckNotNull(context, headNums, "head_nums", "head_nums must exist") != ge::GRAPH_SUCCESS) {
@@ -171,7 +171,7 @@ static ge::graphStatus ParseHeadNums(gert::InferShapeContext *context, const ger
         OP_LOGE_FOR_INVALID_LISTSIZE(GetLogOpName(context), "head_nums", incorrectSize.c_str(), correctSize.c_str());
         return ge::GRAPH_FAILED;
     }
-    const auto *headNumsData = headNums->GetData();
+    const auto* headNumsData = headNums->GetData();
     if (CheckNotNull(context, headNumsData, "head_nums", "head_nums data must exist") != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
@@ -190,34 +190,34 @@ static ge::graphStatus ParseHeadNums(gert::InferShapeContext *context, const ger
     return ge::GRAPH_SUCCESS;
 }
 
-static const char *GetQuantModeOrDefault(const gert::RuntimeAttrs *attrs, uint64_t attrIndex, const char *defaultMode)
+static const char* GetQuantModeOrDefault(const gert::RuntimeAttrs* attrs, uint64_t attrIndex, const char* defaultMode)
 {
     if (static_cast<uint64_t>(attrs->GetAttrNum()) <= attrIndex) {
         return defaultMode;
     }
-    const char *mode = attrs->GetStr(attrIndex);
+    const char* mode = attrs->GetStr(attrIndex);
     return mode == nullptr || mode[0] == '\0' ? defaultMode : mode;
 }
 
-static bool HasMropeSection(const gert::RuntimeAttrs *attrs)
+static bool HasMropeSection(const gert::RuntimeAttrs* attrs)
 {
     if (static_cast<uint64_t>(attrs->GetAttrNum()) <= MROPE_SECTION_ATTR_INDEX) {
         return false;
     }
-    const auto *section = attrs->GetListInt(MROPE_SECTION_ATTR_INDEX);
+    const auto* section = attrs->GetListInt(MROPE_SECTION_ATTR_INDEX);
     return section != nullptr && section->GetSize() != 0;
 }
 
-static ge::graphStatus ParseSceneAndQScaleKind(gert::InferShapeContext *context, const gert::RuntimeAttrs *attrs,
-                                               const InferAttrs &inferAttrs, QScaleKind &kind)
+static ge::graphStatus ParseSceneAndQScaleKind(gert::InferShapeContext* context, const gert::RuntimeAttrs* attrs,
+                                               const InferAttrs& inferAttrs, QScaleKind& kind)
 {
     const bool hasQueryStartLoc = context->GetOptionalInputShape(QUERY_START_LOC_INDEX) != nullptr;
     const bool hasSeqLens = context->GetOptionalInputShape(SEQ_LENS_INDEX) != nullptr;
     const bool hasRotation = context->GetOptionalInputShape(ROTATION_INDEX) != nullptr;
     const bool hasMropePosition = context->GetOptionalInputShape(MROPE_POSITION_INDEX) != nullptr;
     const bool hasMropeSection = HasMropeSection(attrs);
-    const char *qMode = GetQuantModeOrDefault(attrs, Q_QUANT_MODE_ATTR_INDEX, Q_QUANT_MODE_PER_TOKEN_PER_HEAD);
-    const char *kMode = GetQuantModeOrDefault(attrs, K_QUANT_MODE_ATTR_INDEX, K_QUANT_MODE_PER_TOKEN_PER_HEAD);
+    const char* qMode = GetQuantModeOrDefault(attrs, Q_QUANT_MODE_ATTR_INDEX, Q_QUANT_MODE_PER_TOKEN_PER_HEAD);
+    const char* kMode = GetQuantModeOrDefault(attrs, K_QUANT_MODE_ATTR_INDEX, K_QUANT_MODE_PER_TOKEN_PER_HEAD);
 
     if (hasMropePosition != hasMropeSection) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetLogOpName(context), "mrope_position/mrope_section",
@@ -256,8 +256,8 @@ static ge::graphStatus ParseSceneAndQScaleKind(gert::InferShapeContext *context,
     return ge::GRAPH_FAILED;
 }
 
-static ge::graphStatus ValidateQkvShapeForOutput(gert::InferShapeContext *context, const gert::Shape *qkvShape,
-                                                 const InferAttrs &attrs, QOutputDims &dims)
+static ge::graphStatus ValidateQkvShapeForOutput(gert::InferShapeContext* context, const gert::Shape* qkvShape,
+                                                 const InferAttrs& attrs, QOutputDims& dims)
 {
     const uint64_t actualDimNum = static_cast<uint64_t>(qkvShape->GetDimNum());
     if (actualDimNum != QKV_DIM_NUM) {
@@ -286,8 +286,8 @@ static ge::graphStatus ValidateQkvShapeForOutput(gert::InferShapeContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ParseInferAttrs(gert::InferShapeContext *context, const gert::RuntimeAttrs *attrs,
-                                       InferAttrs &inferAttrs)
+static ge::graphStatus ParseInferAttrs(gert::InferShapeContext* context, const gert::RuntimeAttrs* attrs,
+                                       InferAttrs& inferAttrs)
 {
     if (ParseHeadNums(context, attrs, inferAttrs) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -304,7 +304,7 @@ static ge::graphStatus ParseInferAttrs(gert::InferShapeContext *context, const g
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus GetInputShapes(gert::InferShapeContext *context, InputShapes &input)
+static ge::graphStatus GetInputShapes(gert::InferShapeContext* context, InputShapes& input)
 {
     input.qkv = context->GetInputShape(QKV_INDEX);
     if (CheckNotNull(context, input.qkv, "qkv", "qkv shape must exist") != ge::GRAPH_SUCCESS) {
@@ -326,7 +326,7 @@ static ge::graphStatus GetInputShapes(gert::InferShapeContext *context, InputSha
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus GetOutputShapes(gert::InferShapeContext *context, OutputShapes &output)
+static ge::graphStatus GetOutputShapes(gert::InferShapeContext* context, OutputShapes& output)
 {
     output.qOut = context->GetOutputShape(Q_OUT_INDEX);
     if (CheckNotNull(context, output.qOut, "q_out", "q_out shape must exist") != ge::GRAPH_SUCCESS) {
@@ -352,8 +352,8 @@ static ge::graphStatus GetOutputShapes(gert::InferShapeContext *context, OutputS
     return ge::GRAPH_SUCCESS;
 }
 
-static void SetOutputShapes(const InputShapes &input, const OutputShapes &output, const InferAttrs &attrs,
-                            const QOutputDims &dims)
+static void SetOutputShapes(const InputShapes& input, const OutputShapes& output, const InferAttrs& attrs,
+                            const QOutputDims& dims)
 {
     output.qOut->SetDimNum(3);
     output.qOut->SetDim(0, attrs.isQOutNtd ? attrs.qHeads : dims.totalTokens);
@@ -377,12 +377,12 @@ static void SetOutputShapes(const InputShapes &input, const OutputShapes &output
     *output.kScaleCache = *input.kScaleCache;
 }
 
-ge::graphStatus InferShape4QkvRmsNormRopeCacheWithKScale(gert::InferShapeContext *context)
+ge::graphStatus InferShape4QkvRmsNormRopeCacheWithKScale(gert::InferShapeContext* context)
 {
     if (CheckNotNull(context, context, "context", "context can not be nullptr") != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const auto *runtimeAttrs = context->GetAttrs();
+    const auto* runtimeAttrs = context->GetAttrs();
     if (CheckNotNull(context, runtimeAttrs, "attrs", "attrs can not be nullptr") != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
@@ -410,7 +410,7 @@ ge::graphStatus InferShape4QkvRmsNormRopeCacheWithKScale(gert::InferShapeContext
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDtype4QkvRmsNormRopeCacheWithKScale(gert::InferDataTypeContext *context)
+ge::graphStatus InferDtype4QkvRmsNormRopeCacheWithKScale(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(DEFAULT_OP_NAME, "context", "nullptr", "context can not be nullptr");
@@ -418,11 +418,11 @@ ge::graphStatus InferDtype4QkvRmsNormRopeCacheWithKScale(gert::InferDataTypeCont
     }
     ge::DataType qOutDtype = ge::DT_FLOAT8_E4M3FN;
     ge::DataType qScaleDtype = ge::DT_FLOAT;
-    const auto *attrs = context->GetAttrs();
-    const char *qQuantMode = attrs == nullptr ?
+    const auto* attrs = context->GetAttrs();
+    const char* qQuantMode = attrs == nullptr ?
                                  Q_QUANT_MODE_PER_TOKEN_PER_HEAD :
                                  GetQuantModeOrDefault(attrs, Q_QUANT_MODE_ATTR_INDEX, Q_QUANT_MODE_PER_TOKEN_PER_HEAD);
-    const char *kQuantMode = attrs == nullptr ?
+    const char* kQuantMode = attrs == nullptr ?
                                  K_QUANT_MODE_PER_TOKEN_PER_HEAD :
                                  GetQuantModeOrDefault(attrs, K_QUANT_MODE_ATTR_INDEX, K_QUANT_MODE_PER_TOKEN_PER_HEAD);
     const bool isRopeModePair = std::strcmp(qQuantMode, Q_QUANT_MODE_PER_TOKEN_PER_HEAD) == 0 &&
@@ -441,7 +441,7 @@ ge::graphStatus InferDtype4QkvRmsNormRopeCacheWithKScale(gert::InferDataTypeCont
         qScaleDtype = ge::DT_FLOAT8_E8M0;
     }
     if (attrs != nullptr && static_cast<uint64_t>(attrs->GetAttrNum()) > Q_OUT_DTYPE_ATTR_INDEX) {
-        const int64_t *qOutDtypeAttr = attrs->GetInt(Q_OUT_DTYPE_ATTR_INDEX);
+        const int64_t* qOutDtypeAttr = attrs->GetInt(Q_OUT_DTYPE_ATTR_INDEX);
         if (qOutDtypeAttr != nullptr) {
             const auto requestedDtype = static_cast<ge::DataType>(*qOutDtypeAttr);
             if (requestedDtype != ge::DT_FLOAT8_E4M3FN && requestedDtype != ge::DT_BF16) {

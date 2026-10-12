@@ -21,8 +21,7 @@
 using namespace std;
 using namespace op;
 
-class l2_rope_with_sin_cos_cache_test : public testing::Test
-{
+class l2_rope_with_sin_cos_cache_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -236,10 +235,10 @@ TEST_F(l2_rope_with_sin_cos_cache_test, rope_v2_case_7)
     auto tensorQueryOutDesc = TensorDesc({4, 64}, ACL_FLOAT, ACL_FORMAT_ND);
     auto tensorKeyOutDesc = TensorDesc({4, 64, 5}, ACL_FLOAT, ACL_FORMAT_ND);
 
-    auto ut = OP_API_UT(
-        aclnnRopeWithSinCosCacheV2,
-        INPUT(tensorPositions, tensorQueryIn, tensorKeyIn, tensorCosSinCache, mropeSection, headSize, isNeoxStyle, cacheMode),
-        OUTPUT(tensorQueryOutDesc, tensorKeyOutDesc));
+    auto ut = OP_API_UT(aclnnRopeWithSinCosCacheV2,
+                        INPUT(tensorPositions, tensorQueryIn, tensorKeyIn, tensorCosSinCache, mropeSection, headSize,
+                              isNeoxStyle, cacheMode),
+                        OUTPUT(tensorQueryOutDesc, tensorKeyOutDesc));
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);

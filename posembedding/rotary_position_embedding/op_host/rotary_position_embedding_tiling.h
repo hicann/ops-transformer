@@ -201,11 +201,11 @@ enum class RotaryPosEmbeddingMode : uint8_t {
 
 class RotaryPosEmbeddingMembaseTilingClass : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit RotaryPosEmbeddingMembaseTilingClass(gert::TilingContext *context)
+    explicit RotaryPosEmbeddingMembaseTilingClass(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         RotaryPosEmbeddingMembaseTilingClass::Reset(context);
     }
@@ -253,11 +253,11 @@ protected:
 
 class RopeRegBaseTilingClass : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit RopeRegBaseTilingClass(gert::TilingContext *context)
+    explicit RopeRegBaseTilingClass(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
     }
@@ -268,9 +268,9 @@ private:
     ge::graphStatus CheckShape();
     ge::graphStatus CheckDtypeAndAttr();
     ge::graphStatus CheckParam();
-    ge::graphStatus JudgeLayoutByShape(const gert::Shape &xShape, const gert::Shape &cosShape);
-    bool Is3dBsdBroadcastLayout(const gert::Shape &xShape, const gert::Shape &cosShape) const;
-    void Set3dBsdShapeAttrs(const gert::Shape &xShape);
+    ge::graphStatus JudgeLayoutByShape(const gert::Shape& xShape, const gert::Shape& cosShape);
+    bool Is3dBsdBroadcastLayout(const gert::Shape& xShape, const gert::Shape& cosShape) const;
+    void Set3dBsdShapeAttrs(const gert::Shape& xShape);
     ge::graphStatus CheckRotaryModeShapeRelation(const int64_t d);
     ge::graphStatus CheckShapeAllPositive(const int64_t idx) const;
     ge::graphStatus CheckShapeAllPositive() const;

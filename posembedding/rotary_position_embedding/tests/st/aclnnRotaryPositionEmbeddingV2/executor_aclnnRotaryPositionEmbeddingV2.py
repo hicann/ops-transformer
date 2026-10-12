@@ -27,13 +27,20 @@ class FunctionApi(BaseApi):
         input_x = input_data.kwargs["x"]
         cos = input_data.kwargs["cos"]
         sin = input_data.kwargs["sin"]
-        mode = int(input_data.kwargs.get('mode'))
+        mode = int(input_data.kwargs.get("mode"))
         if input_x.shape == torch.Size([]):
-            return input_data.kwargs["x"], input_data.kwargs["x"],input_data.kwargs["x"]
+            return (
+                input_data.kwargs["x"],
+                input_data.kwargs["x"],
+                input_data.kwargs["x"],
+            )
+
         def rotate_every_two(x):
             x1 = x[..., ::2]
             x2 = x[..., 1::2]
-            return rearrange(torch.stack((-x2, x1), dim=-1), "... d two -> ... (d two)", two=2)
+            return rearrange(
+                torch.stack((-x2, x1), dim=-1), "... d two -> ... (d two)", two=2
+            )
 
         def fused_rotary_position_embedding(x, cos, sin):
             return x * cos + rotate_every_two(x) * sin
@@ -44,6 +51,7 @@ class FunctionApi(BaseApi):
             sin = sin.float()
             res = fused_rotary_position_embedding(x, cos, sin)
             return res
+
         try:
             if self.output is None:
                 if mode == 0:
@@ -65,13 +73,11 @@ class FunctionApi(BaseApi):
                 elif isinstance(self.output, str):
                     output = input_data.kwargs[self.output]
                 else:
-                    raise ValueError(
-                        f"self.output {self.output} value is " f"error"
-                    )
+                    raise ValueError(f"self.output {self.output} value is error")
             return output
         except:
             return output
-        
+
     def get_format(self, input_data: InputDataset, index=None, name=None):
         """
         :param input_data: 参数列表
@@ -81,11 +87,12 @@ class FunctionApi(BaseApi):
         format at this index or name
         """
         from atk.tasks.backends.lib_interface.acl_wrapper import AclFormat
+
         return AclFormat.ACL_FORMAT_ND
+
 
 @register("aclnn_rotary_position_embedding_api")
 class AclnnRotaryPositionEmbedding(AclnnBaseApi):
-
     def init_by_input_data(self, input_data: InputDataset):
         input_args, output_packages = super().init_by_input_data(input_data)
 
@@ -100,4 +107,5 @@ class AclnnRotaryPositionEmbedding(AclnnBaseApi):
         format at this index or name
         """
         from atk.tasks.backends.lib_interface.acl_wrapper import AclFormat
+
         return AclFormat.ACL_FORMAT_ND

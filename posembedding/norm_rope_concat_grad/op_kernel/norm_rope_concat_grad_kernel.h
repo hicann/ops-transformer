@@ -22,7 +22,7 @@ namespace nrcg {
 template <NormType normType>
 class NormOperationBackward : public NormOperation<normType> {
 public:
-    __aicore__ inline NormOperationBackward(TBufPool<TPosition::VECCALC, BUF_ID_SIZE> &bufPool, GM_ADDR x,
+    __aicore__ inline NormOperationBackward(TBufPool<TPosition::VECCALC, BUF_ID_SIZE>& bufPool, GM_ADDR x,
                                             GM_ADDR weight, GM_ADDR bias, GM_ADDR mean, GM_ADDR rstd, GM_ADDR xGrad,
                                             GM_ADDR weightGrad, GM_ADDR biasGrad, float eps, float scale,
                                             uint32_t normDim, uint32_t normNum, uint32_t alignedNormDim,
@@ -32,7 +32,7 @@ public:
           affineBlockNums_(affineBlockNums),
           avgHeadsLow_(avgHeadsLow)
     {
-        xGradGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)xGrad);
+        xGradGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)xGrad);
         outParams_.blockLen = normDim * sizeof(DTYPE_QUERY);
         bufPool.InitBuffer(inGradQue_, DOUBLE_BUFFER, normNum * alignedNormDim * sizeof(DTYPE_QUERY));
 
@@ -68,27 +68,27 @@ public:
             weightParams_.blockLen = normDim * sizeof(DTYPE_QUERY);
             padWeightParams_.rightPadding = alignedNormDim - normDim;
 
-            weightGradGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)weightGrad);
-            biasGradGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)biasGrad);
+            weightGradGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)weightGrad);
+            biasGradGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)biasGrad);
             outWeightParams_.blockLen = NUM_TWO * alignedNormDim * sizeof(float);
 
             blockIdx_ = GetBlockIdx();
             affineOffset_ = blockIdx_ * affineBlockNums * avgHeadsLow * NUM_TWO * alignedNormDim;
         }
     }
-    __aicore__ inline void Process(const LocalTensor<float> &x, const GlobalTensor<float> &workspaceAffineGM,
+    __aicore__ inline void Process(const LocalTensor<float>& x, const GlobalTensor<float>& workspaceAffineGM,
                                    int64_t inOffset, int64_t normOffset, uint32_t heads);
     __aicore__ inline void Prepare();
-    __aicore__ inline void PostProcess(const LocalTensor<float> &x, const GlobalTensor<float> &workspaceAffineGM,
-                                       const GlobalTensor<float> &workspaceGM, uint32_t workspaceId);
+    __aicore__ inline void PostProcess(const LocalTensor<float>& x, const GlobalTensor<float>& workspaceAffineGM,
+                                       const GlobalTensor<float>& workspaceGM, uint32_t workspaceId);
 
 private:
     __aicore__ inline void CopyIn(int64_t inOffset, int64_t normOffset, uint32_t heads);
-    __aicore__ inline void Compute(const LocalTensor<float> &x, uint32_t heads);
-    __aicore__ inline void CopyOut(const LocalTensor<float> &x, const GlobalTensor<float> &workspaceAffineGM,
+    __aicore__ inline void Compute(const LocalTensor<float>& x, uint32_t heads);
+    __aicore__ inline void CopyOut(const LocalTensor<float>& x, const GlobalTensor<float>& workspaceAffineGM,
                                    int64_t inOffset, uint32_t heads);
-    __aicore__ inline void AffineAccSum(const LocalTensor<float> &x, const GlobalTensor<float> &workspaceAffineGM);
-    __aicore__ inline void BinarySum(const LocalTensor<float> &x, int64_t rows, int64_t cols);
+    __aicore__ inline void AffineAccSum(const LocalTensor<float>& x, const GlobalTensor<float>& workspaceAffineGM);
+    __aicore__ inline void BinarySum(const LocalTensor<float>& x, int64_t rows, int64_t cols);
 
 private:
     GlobalTensor<DTYPE_QUERY> xGradGM_;
@@ -149,8 +149,8 @@ __aicore__ inline void NormOperationBackward<normType>::Prepare()
 }
 
 template <NormType normType>
-__aicore__ inline void NormOperationBackward<normType>::Process(const LocalTensor<float> &x,
-                                                                const GlobalTensor<float> &workspaceAffineGM,
+__aicore__ inline void NormOperationBackward<normType>::Process(const LocalTensor<float>& x,
+                                                                const GlobalTensor<float>& workspaceAffineGM,
                                                                 int64_t inOffset, int64_t normOffset, uint32_t heads)
 {
     CopyIn(inOffset, normOffset, heads);
@@ -179,7 +179,7 @@ __aicore__ inline void NormOperationBackward<normType>::CopyIn(int64_t inOffset,
 }
 
 template <NormType normType>
-__aicore__ inline void NormOperationBackward<normType>::BinarySum(const LocalTensor<float> &x, int64_t rows,
+__aicore__ inline void NormOperationBackward<normType>::BinarySum(const LocalTensor<float>& x, int64_t rows,
                                                                   int64_t cols)
 {
     while (rows > 1) {
@@ -196,7 +196,7 @@ __aicore__ inline void NormOperationBackward<normType>::BinarySum(const LocalTen
 }
 
 template <NormType normType>
-__aicore__ inline void NormOperationBackward<normType>::Compute(const LocalTensor<float> &gradOut, uint32_t heads)
+__aicore__ inline void NormOperationBackward<normType>::Compute(const LocalTensor<float>& gradOut, uint32_t heads)
 {
     if constexpr (normType == NormType::NONE) {
         // EnQue
@@ -314,8 +314,8 @@ __aicore__ inline void NormOperationBackward<normType>::Compute(const LocalTenso
 }
 
 template <NormType normType>
-__aicore__ inline void NormOperationBackward<normType>::CopyOut(const LocalTensor<float> &x,
-                                                                const GlobalTensor<float> &workspaceAffineGM,
+__aicore__ inline void NormOperationBackward<normType>::CopyOut(const LocalTensor<float>& x,
+                                                                const GlobalTensor<float>& workspaceAffineGM,
                                                                 int64_t inOffset, uint32_t heads)
 {
     LocalTensor<DTYPE_QUERY> xGrad = inGradQue_.DeQue<DTYPE_QUERY>();
@@ -332,8 +332,8 @@ __aicore__ inline void NormOperationBackward<normType>::CopyOut(const LocalTenso
 }
 
 template <NormType normType>
-__aicore__ inline void NormOperationBackward<normType>::AffineAccSum(const LocalTensor<float> &x,
-                                                                     const GlobalTensor<float> &workspaceAffineGM)
+__aicore__ inline void NormOperationBackward<normType>::AffineAccSum(const LocalTensor<float>& x,
+                                                                     const GlobalTensor<float>& workspaceAffineGM)
 {
     affineArray_[0] += 1;
     for (size_t i = 0; i < affineBlockNums_; ++i) {
@@ -367,9 +367,9 @@ __aicore__ inline void NormOperationBackward<normType>::AffineAccSum(const Local
 }
 
 template <NormType normType>
-__aicore__ inline void NormOperationBackward<normType>::PostProcess(const LocalTensor<float> &x,
-                                                                    const GlobalTensor<float> &workspaceAffineGM,
-                                                                    const GlobalTensor<float> &workspaceGM,
+__aicore__ inline void NormOperationBackward<normType>::PostProcess(const LocalTensor<float>& x,
+                                                                    const GlobalTensor<float>& workspaceAffineGM,
+                                                                    const GlobalTensor<float>& workspaceGM,
                                                                     uint32_t workspaceId)
 {
     if constexpr (normType != NormType::LAYER_NORM_AFFINE && normType != NormType::LAYER_NORM_AFFINE_ACROSS_HEADS) {
@@ -413,23 +413,23 @@ __aicore__ inline void NormOperationBackward<normType>::PostProcess(const LocalT
 template <RopeType ropeType>
 class RopeOperationBackward : public RopeOperation<ropeType, false> {
 public:
-    __aicore__ inline RopeOperationBackward(TBufPool<TPosition::VECCALC, BUF_ID_SIZE> &bufPool, GM_ADDR xGradOut,
+    __aicore__ inline RopeOperationBackward(TBufPool<TPosition::VECCALC, BUF_ID_SIZE>& bufPool, GM_ADDR xGradOut,
                                             GM_ADDR ropeSin, GM_ADDR ropeCos, GM_ADDR y, uint32_t actualSeq,
                                             uint32_t totalSeq, uint32_t startSeq, uint32_t ropeDim, uint32_t ropeNum,
                                             uint32_t alignedRopeDim)
         : RopeOperation<ropeType, false>(bufPool, ropeSin, ropeCos, y, actualSeq, startSeq, ropeDim, alignedRopeDim)
     {
-        xGradOutGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)xGradOut);
+        xGradOutGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)xGradOut);
         bufPool.InitBuffer(outGradQue_, DOUBLE_BUFFER, ropeNum * alignedRopeDim * sizeof(DTYPE_QUERY));
         outGradParams_.blockLen = ropeDim * sizeof(DTYPE_QUERY);
         padParams_.rightPadding = alignedRopeDim - ropeDim;
         outGradParams_.srcStride = (totalSeq - 1) * ropeDim * sizeof(DTYPE_QUERY);
     }
-    __aicore__ inline void Process(const LocalTensor<float> &outGrad, int64_t outGradOffset, uint32_t heads);
+    __aicore__ inline void Process(const LocalTensor<float>& outGrad, int64_t outGradOffset, uint32_t heads);
 
 private:
     __aicore__ inline void CopyIn(int64_t outGradOffset, uint32_t heads);
-    __aicore__ inline void Compute(const LocalTensor<float> &outGrad, uint32_t heads);
+    __aicore__ inline void Compute(const LocalTensor<float>& outGrad, uint32_t heads);
 
 private:
     GlobalTensor<DTYPE_QUERY> xGradOutGm_;
@@ -439,7 +439,7 @@ private:
 };
 
 template <RopeType ropeType>
-__aicore__ inline void RopeOperationBackward<ropeType>::Process(const LocalTensor<float> &outGrad,
+__aicore__ inline void RopeOperationBackward<ropeType>::Process(const LocalTensor<float>& outGrad,
                                                                 int64_t outGradOffset, uint32_t heads)
 {
     CopyIn(outGradOffset, heads);
@@ -457,7 +457,7 @@ __aicore__ inline void RopeOperationBackward<ropeType>::CopyIn(int64_t outGradOf
 }
 
 template <RopeType ropeType>
-__aicore__ inline void RopeOperationBackward<ropeType>::Compute(const LocalTensor<float> &outGrad, uint32_t heads)
+__aicore__ inline void RopeOperationBackward<ropeType>::Compute(const LocalTensor<float>& outGrad, uint32_t heads)
 {
     LocalTensor<DTYPE_QUERY> outGradLocal = outGradQue_.DeQue<DTYPE_QUERY>();
     uint32_t size = heads * this->alignedRopeDim_;
@@ -540,7 +540,7 @@ public:
           workspace_(workspace)
     {}
 
-    __aicore__ inline void Init(TPipe *pipe, const NormRopeConcatGradTilingData &tilingData);
+    __aicore__ inline void Init(TPipe* pipe, const NormRopeConcatGradTilingData& tilingData);
     __aicore__ inline void Prepare();
     __aicore__ inline void Process();
 
@@ -549,26 +549,26 @@ private:
     __aicore__ inline void ProcessKey();
     __aicore__ inline void ProcessValue();
 
-    __aicore__ inline void ProcessQK(TBufPool<TPosition::VECCALC, BUF_ID_SIZE> &bufPool, GM_ADDR xGradOut, GM_ADDR x,
+    __aicore__ inline void ProcessQK(TBufPool<TPosition::VECCALC, BUF_ID_SIZE>& bufPool, GM_ADDR xGradOut, GM_ADDR x,
                                      GM_ADDR weight, GM_ADDR bias, GM_ADDR mean, GM_ADDR rstd, GM_ADDR xGrad,
                                      GM_ADDR weightGrad, GM_ADDR biasGrad, uint32_t xSeq, uint32_t totalSeq,
                                      uint32_t outputSeq);
 
-    __aicore__ inline void ProcessEncoderQK(TBufPool<TPosition::VECCALC, BUF_ID_SIZE> &bufPool, GM_ADDR xGradOut,
+    __aicore__ inline void ProcessEncoderQK(TBufPool<TPosition::VECCALC, BUF_ID_SIZE>& bufPool, GM_ADDR xGradOut,
                                             GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR mean, GM_ADDR rstd,
                                             GM_ADDR xGrad, GM_ADDR weightGrad, GM_ADDR biasGrad, uint32_t xSeq,
                                             uint32_t totalSeq, uint32_t outputSeq);
 
-    __aicore__ inline void ProcessV(TBufPool<TPosition::VECCALC, BUF_ID_SIZE> &bufPool, GM_ADDR x, GM_ADDR y,
+    __aicore__ inline void ProcessV(TBufPool<TPosition::VECCALC, BUF_ID_SIZE>& bufPool, GM_ADDR x, GM_ADDR y,
                                     uint32_t xSeq, uint32_t totalSeq, uint32_t outputSeq);
 
-    __aicore__ inline void GetSeqRange(uint32_t &startSeq, uint32_t &endSeq, uint32_t totalSeq, uint32_t usedCore);
+    __aicore__ inline void GetSeqRange(uint32_t& startSeq, uint32_t& endSeq, uint32_t totalSeq, uint32_t usedCore);
     __aicore__ inline void PostProcess();
-    __aicore__ inline void OneSumProcess(const GlobalTensor<float> &gradNormGm,
-                                         const GlobalTensor<float> &workspaceOneGm, uint32_t seq);
+    __aicore__ inline void OneSumProcess(const GlobalTensor<float>& gradNormGm,
+                                         const GlobalTensor<float>& workspaceOneGm, uint32_t seq);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     uint32_t blockIdx_;
     uint32_t querySeq_;
     uint32_t keySeq_;
@@ -669,7 +669,7 @@ private:
 
 template <NormType normType, NormType addedNormType, RopeType ropeType, ConcatOrder concatOrder>
 __aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, concatOrder>::Init(
-    TPipe *pipe, const NormRopeConcatGradTilingData &tilingData)
+    TPipe* pipe, const NormRopeConcatGradTilingData& tilingData)
 {
     pipe_ = pipe;
     blockIdx_ = GetBlockIdx();
@@ -739,18 +739,18 @@ __aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, con
 
     uint32_t maxAffineSeq = 0;
     if constexpr (normType == NormType::LAYER_NORM_AFFINE || normType == NormType::LAYER_NORM_AFFINE_ACROSS_HEADS) {
-        gradNormQueryWeightGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)gradNormQueryWeight_, normDim_);
-        gradNormQueryBiasGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)gradNormQueryBias_, normDim_);
-        gradNormKeyWeightGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)gradNormKeyWeight_, normDim_);
-        gradNormKeyBiasGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)gradNormKeyBias_, normDim_);
+        gradNormQueryWeightGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)gradNormQueryWeight_, normDim_);
+        gradNormQueryBiasGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)gradNormQueryBias_, normDim_);
+        gradNormKeyWeightGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)gradNormKeyWeight_, normDim_);
+        gradNormKeyBiasGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)gradNormKeyBias_, normDim_);
         maxAffineSeq = Max(querySeq_, keySeq_);
     }
     if constexpr (addedNormType == NormType::LAYER_NORM_AFFINE ||
                   addedNormType == NormType::LAYER_NORM_AFFINE_ACROSS_HEADS) {
-        gradNormAddedQueryWeightGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)gradNormAddedQueryWeight_, normDim_);
-        gradNormAddedQueryBiasGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)gradNormAddedQueryBias_, normDim_);
-        gradNormAddedKeyWeightGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)gradNormAddedKeyWeight_, normDim_);
-        gradNormAddedKeyBiasGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)gradNormAddedKeyBias_, normDim_);
+        gradNormAddedQueryWeightGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)gradNormAddedQueryWeight_, normDim_);
+        gradNormAddedQueryBiasGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)gradNormAddedQueryBias_, normDim_);
+        gradNormAddedKeyWeightGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)gradNormAddedKeyWeight_, normDim_);
+        gradNormAddedKeyBiasGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)gradNormAddedKeyBias_, normDim_);
         maxAffineSeq = Max(maxAffineSeq, Max(encoderQuerySeq_, encoderValueSeq_));
     }
 
@@ -770,7 +770,7 @@ __aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, con
         }
         affineBlockNums_ = affineBlockNums_ == 0 ? 1 : affineBlockNums_;
 
-        workspaceGM_.SetGlobalBuffer((__gm__ float *)workspace_,
+        workspaceGM_.SetGlobalBuffer((__gm__ float*)workspace_,
                                      TOTAL_NORM_NUM * usedCore_ * alignedNormDim_ +
                                          affineBlockNums_ * usedCore_ * avgHeadsLow_ * NUM_TWO * alignedNormDim_);
         workspaceAffineGM_ = workspaceGM_[TOTAL_NORM_NUM * usedCore_ * alignedNormDim_];
@@ -779,7 +779,7 @@ __aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, con
 
 template <NormType normType, NormType addedNormType, RopeType ropeType, ConcatOrder concatOrder>
 __aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, concatOrder>::GetSeqRange(
-    uint32_t &startSeq, uint32_t &endSeq, uint32_t totalSeq, uint32_t usedCore)
+    uint32_t& startSeq, uint32_t& endSeq, uint32_t totalSeq, uint32_t usedCore)
 {
     uint32_t eachCoreSeq = totalSeq / usedCore;
     uint32_t tailCoreSeq = totalSeq % usedCore;
@@ -891,7 +891,7 @@ __aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, con
 
 template <NormType normType, NormType addedNormType, RopeType ropeType, ConcatOrder concatOrder>
 __aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, concatOrder>::ProcessQK(
-    TBufPool<TPosition::VECCALC, BUF_ID_SIZE> &bufPool, GM_ADDR xGradOut, GM_ADDR x, GM_ADDR weight, GM_ADDR bias,
+    TBufPool<TPosition::VECCALC, BUF_ID_SIZE>& bufPool, GM_ADDR xGradOut, GM_ADDR x, GM_ADDR weight, GM_ADDR bias,
     GM_ADDR mean, GM_ADDR rstd, GM_ADDR xGrad, GM_ADDR weightGrad, GM_ADDR biasGrad, uint32_t xSeq, uint32_t totalSeq,
     uint32_t outputSeq)
 {
@@ -939,7 +939,7 @@ __aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, con
 
 template <NormType normType, NormType addedNormType, RopeType ropeType, ConcatOrder concatOrder>
 __aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, concatOrder>::ProcessEncoderQK(
-    TBufPool<TPosition::VECCALC, BUF_ID_SIZE> &bufPool, GM_ADDR xGradOut, GM_ADDR x, GM_ADDR weight, GM_ADDR bias,
+    TBufPool<TPosition::VECCALC, BUF_ID_SIZE>& bufPool, GM_ADDR xGradOut, GM_ADDR x, GM_ADDR weight, GM_ADDR bias,
     GM_ADDR mean, GM_ADDR rstd, GM_ADDR xGrad, GM_ADDR weightGrad, GM_ADDR biasGrad, uint32_t xSeq, uint32_t totalSeq,
     uint32_t outputSeq)
 {
@@ -987,7 +987,7 @@ __aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, con
 
 template <NormType normType, NormType addedNormType, RopeType ropeType, ConcatOrder concatOrder>
 __aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, concatOrder>::ProcessV(
-    TBufPool<TPosition::VECCALC, BUF_ID_SIZE> &bufPool, GM_ADDR xGradOut, GM_ADDR xGrad, uint32_t xSeq,
+    TBufPool<TPosition::VECCALC, BUF_ID_SIZE>& bufPool, GM_ADDR xGradOut, GM_ADDR xGrad, uint32_t xSeq,
     uint32_t totalSeq, uint32_t outputSeq)
 {
     uint32_t startSeq, endSeq;

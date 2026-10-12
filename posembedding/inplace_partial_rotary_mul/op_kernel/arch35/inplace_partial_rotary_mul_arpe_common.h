@@ -52,21 +52,21 @@ struct InplacePartialRotaryPosEmbeddingMode {
     qOut[1] = q[1] * cos[1] + q[0] * sin[1]
 */
 template <typename T>
-__aicore__ inline void HalfAlignVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-                                   const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen,
+__aicore__ inline void HalfAlignVF(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor,
+                                   const LocalTensor<T>& inTensor, const LocalTensor<T>& outTensor, uint32_t dLen,
                                    uint32_t dAlign, uint16_t currSNum, uint16_t currDNum)
 {
-    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
-    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
+    __ubuf__ T* sinUb = (__ubuf__ T*)sinTensor.GetPhyAddr();
+    __ubuf__ T* cosUb = (__ubuf__ T*)cosTensor.GetPhyAddr();
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)outTensor.GetPhyAddr();
     uint32_t halfD = dLen / HALF_INTERLEAVE_COEF;
     uint32_t halfDAlign = ops::CeilAlign(halfD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint16_t repeatTimes = ops::CeilDiv(halfD, VL_FLOAT32_SIZE);
-    __ubuf__ T *currInUb;
-    __ubuf__ T *currOutUb;
-    __ubuf__ T *currSinUb;
-    __ubuf__ T *currCosUb;
+    __ubuf__ T* currInUb;
+    __ubuf__ T* currOutUb;
+    __ubuf__ T* currSinUb;
+    __ubuf__ T* currCosUb;
 
     __VEC_SCOPE__
     {
@@ -119,21 +119,21 @@ __aicore__ inline void HalfAlignVF(const LocalTensor<T> &sinTensor, const LocalT
     qOut[3] = q[3] * cos[3] + q[2] * sin[3]
 */
 template <typename T>
-__aicore__ inline void QuarterAlignVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-                                      const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen,
+__aicore__ inline void QuarterAlignVF(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor,
+                                      const LocalTensor<T>& inTensor, const LocalTensor<T>& outTensor, uint32_t dLen,
                                       uint32_t dAlign, uint16_t currSNum, uint16_t currDNum)
 {
-    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
-    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
+    __ubuf__ T* sinUb = (__ubuf__ T*)sinTensor.GetPhyAddr();
+    __ubuf__ T* cosUb = (__ubuf__ T*)cosTensor.GetPhyAddr();
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)outTensor.GetPhyAddr();
     uint32_t quarterD = dLen / QUARTER_MODE_COEF;
     uint32_t quarterDAlign = ops::CeilAlign(quarterD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint16_t repeatTimes = ops::CeilDiv(quarterD, VL_FLOAT32_SIZE);
-    __ubuf__ T *currInUb;
-    __ubuf__ T *currOutUb;
-    __ubuf__ T *currSinUb;
-    __ubuf__ T *currCosUb;
+    __ubuf__ T* currInUb;
+    __ubuf__ T* currOutUb;
+    __ubuf__ T* currSinUb;
+    __ubuf__ T* currCosUb;
 
     __VEC_SCOPE__
     {
@@ -203,14 +203,14 @@ __aicore__ inline void QuarterAlignVF(const LocalTensor<T> &sinTensor, const Loc
 }
 
 template <typename T>
-__aicore__ inline void InterleaveModeVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-                                        const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen,
+__aicore__ inline void InterleaveModeVF(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor,
+                                        const LocalTensor<T>& inTensor, const LocalTensor<T>& outTensor, uint32_t dLen,
                                         uint16_t currSNum, uint16_t currDNum)
 {
-    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
-    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
+    __ubuf__ T* sinUb = (__ubuf__ T*)sinTensor.GetPhyAddr();
+    __ubuf__ T* cosUb = (__ubuf__ T*)cosTensor.GetPhyAddr();
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)outTensor.GetPhyAddr();
     uint16_t repeatTimes = dLen / VL_FLOAT32_SIZE;
     uint32_t dAlignLen = ops::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint16_t loopNum = repeatTimes / 2;
@@ -218,12 +218,12 @@ __aicore__ inline void InterleaveModeVF(const LocalTensor<T> &sinTensor, const L
     uint16_t tailTwoVL = tailNum / VL_FLOAT32_SIZE;
     uint16_t tailOneVL = (tailTwoVL == 1) ? 0 : 1;
     uint32_t tailLen = tailNum % VL_FLOAT32_SIZE;
-    __ubuf__ T *currInUb;
-    __ubuf__ T *currOutUb;
-    __ubuf__ T *currSinUb;
-    __ubuf__ T *currCosUb;
-    __ubuf__ T *tailSinUb;
-    __ubuf__ T *tailCosUb;
+    __ubuf__ T* currInUb;
+    __ubuf__ T* currOutUb;
+    __ubuf__ T* currSinUb;
+    __ubuf__ T* currCosUb;
+    __ubuf__ T* tailSinUb;
+    __ubuf__ T* tailCosUb;
 
     __VEC_SCOPE__
     {
@@ -317,14 +317,14 @@ __aicore__ inline void InterleaveModeVF(const LocalTensor<T> &sinTensor, const L
 }
 
 template <typename T>
-__aicore__ inline void DeepSeekInterleaveModeVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-                                                const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor,
+__aicore__ inline void DeepSeekInterleaveModeVF(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor,
+                                                const LocalTensor<T>& inTensor, const LocalTensor<T>& outTensor,
                                                 uint32_t dLen, uint16_t currSNum, uint16_t currDNum)
 {
-    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
-    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
+    __ubuf__ T* sinUb = (__ubuf__ T*)sinTensor.GetPhyAddr();
+    __ubuf__ T* cosUb = (__ubuf__ T*)cosTensor.GetPhyAddr();
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)outTensor.GetPhyAddr();
     uint32_t dAlign = ops::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint32_t halfD = dLen / HALF_INTERLEAVE_COEF;
     uint32_t halfDAlign = ops::CeilAlign(halfD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
@@ -334,10 +334,10 @@ __aicore__ inline void DeepSeekInterleaveModeVF(const LocalTensor<T> &sinTensor,
     uint16_t tailOneVL = tailTwoNum > 0 ? (1 - tailTwoVL) : 0;
     uint32_t halfTailNum = tailTwoNum / HALF_INTERLEAVE_COEF;
     uint32_t tailNum = tailTwoNum - tailTwoVL * VL_FLOAT32_SIZE;
-    __ubuf__ T *currInUb;
-    __ubuf__ T *currOutUb;
-    __ubuf__ T *currSinUb;
-    __ubuf__ T *currCosUb;
+    __ubuf__ T* currInUb;
+    __ubuf__ T* currOutUb;
+    __ubuf__ T* currSinUb;
+    __ubuf__ T* currCosUb;
 
     __VEC_SCOPE__
     {
@@ -439,7 +439,7 @@ __aicore__ inline void DeepSeekInterleaveModeVF(const LocalTensor<T> &sinTensor,
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchHalfAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin, __ubuf__ T *out,
+__aicore__ inline void BatchHalfAlignVF(__ubuf__ T* in, __ubuf__ T* cos, __ubuf__ T* sin, __ubuf__ T* out,
                                         uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign,
                                         int64_t ubFactorS, int64_t ubFactorN)
 {
@@ -506,7 +506,7 @@ __aicore__ inline void BatchHalfAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf_
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchQuarterAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin, __ubuf__ T *out,
+__aicore__ inline void BatchQuarterAlignVF(__ubuf__ T* in, __ubuf__ T* cos, __ubuf__ T* sin, __ubuf__ T* out,
                                            uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d,
                                            int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
 {
@@ -599,7 +599,7 @@ __aicore__ inline void BatchQuarterAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ub
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchInterleaveModeVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin, __ubuf__ T *out,
+__aicore__ inline void BatchInterleaveModeVF(__ubuf__ T* in, __ubuf__ T* cos, __ubuf__ T* sin, __ubuf__ T* out,
                                              uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d,
                                              int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
 {
@@ -682,7 +682,7 @@ __aicore__ inline void BatchInterleaveModeVF(__ubuf__ T *in, __ubuf__ T *cos, __
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchDeepSeekInterleaveModeVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin, __ubuf__ T *out,
+__aicore__ inline void BatchDeepSeekInterleaveModeVF(__ubuf__ T* in, __ubuf__ T* cos, __ubuf__ T* sin, __ubuf__ T* out,
                                                      uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d,
                                                      int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
 {
@@ -766,14 +766,14 @@ __aicore__ inline void BatchDeepSeekInterleaveModeVF(__ubuf__ T *in, __ubuf__ T 
 
 // Mixed precision: TX is half/bfloat16 for input, cos/sin are float
 template <typename TX>
-__aicore__ inline void InterleaveModeVFMixed(const LocalTensor<TX> &inTensor, const LocalTensor<float> &cosTensor,
-                                             const LocalTensor<float> &sinTensor, const LocalTensor<TX> &outTensor,
+__aicore__ inline void InterleaveModeVFMixed(const LocalTensor<TX>& inTensor, const LocalTensor<float>& cosTensor,
+                                             const LocalTensor<float>& sinTensor, const LocalTensor<TX>& outTensor,
                                              uint32_t dLen, uint16_t currSNum, uint16_t currDNum)
 {
-    __ubuf__ TX *inUb = (__ubuf__ TX *)inTensor.GetPhyAddr();
-    __ubuf__ float *cosUb = (__ubuf__ float *)cosTensor.GetPhyAddr();
-    __ubuf__ float *sinUb = (__ubuf__ float *)sinTensor.GetPhyAddr();
-    __ubuf__ TX *outUb = (__ubuf__ TX *)outTensor.GetPhyAddr();
+    __ubuf__ TX* inUb = (__ubuf__ TX*)inTensor.GetPhyAddr();
+    __ubuf__ float* cosUb = (__ubuf__ float*)cosTensor.GetPhyAddr();
+    __ubuf__ float* sinUb = (__ubuf__ float*)sinTensor.GetPhyAddr();
+    __ubuf__ TX* outUb = (__ubuf__ TX*)outTensor.GetPhyAddr();
     uint16_t repeatTimes = dLen / VL_FLOAT32_SIZE;
     uint32_t dAlignLen = ops::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(TX)));
     uint32_t dAlignLenFloat = ops::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(float)));
@@ -782,10 +782,10 @@ __aicore__ inline void InterleaveModeVFMixed(const LocalTensor<TX> &inTensor, co
     uint16_t tailTwoVL = tailNum / VL_FLOAT32_SIZE;
     uint16_t tailOneVL = (tailTwoVL == 1) ? 0 : 1;
     uint32_t tailLen = tailNum % VL_FLOAT32_SIZE;
-    __ubuf__ TX *currInUb;
-    __ubuf__ TX *currOutUb;
-    __ubuf__ float *currSinUb;
-    __ubuf__ float *currCosUb;
+    __ubuf__ TX* currInUb;
+    __ubuf__ TX* currOutUb;
+    __ubuf__ float* currSinUb;
+    __ubuf__ float* currCosUb;
 
     __VEC_SCOPE__
     {
@@ -830,8 +830,8 @@ __aicore__ inline void InterleaveModeVFMixed(const LocalTensor<TX> &inTensor, co
 
                 currInUb = inUb + (sIdx * currDNum + idxD) * dAlignLen + (loopNum * 2 * VL_FLOAT32_SIZE);
                 currOutUb = outUb + (sIdx * currDNum + idxD) * dAlignLen + (loopNum * 2 * VL_FLOAT32_SIZE);
-                __ubuf__ float *tailSinUb = currSinUb + loopNum * 2 * VL_FLOAT32_SIZE;
-                __ubuf__ float *tailCosUb = currCosUb + loopNum * 2 * VL_FLOAT32_SIZE;
+                __ubuf__ float* tailSinUb = currSinUb + loopNum * 2 * VL_FLOAT32_SIZE;
+                __ubuf__ float* tailCosUb = currCosUb + loopNum * 2 * VL_FLOAT32_SIZE;
                 for (uint16_t i = 0; i < tailTwoVL; i++) {
                     uint32_t updateCnt = tailLen;
                     pregTail = Reg::UpdateMask<float>(updateCnt);
@@ -875,8 +875,8 @@ __aicore__ inline void InterleaveModeVFMixed(const LocalTensor<TX> &inTensor, co
 
 // Mixed precision BatchInterleaveModeVF for ABA layout
 template <typename TX, bool IsBBoardcast>
-__aicore__ inline void BatchInterleaveModeVFMixed(__ubuf__ TX *in, __ubuf__ float *cos, __ubuf__ float *sin,
-                                                  __ubuf__ TX *out, uint16_t sLength, uint16_t bLength,
+__aicore__ inline void BatchInterleaveModeVFMixed(__ubuf__ TX* in, __ubuf__ float* cos, __ubuf__ float* sin,
+                                                  __ubuf__ TX* out, uint16_t sLength, uint16_t bLength,
                                                   uint16_t nLength, int64_t d, int64_t dAlign, int64_t dAlignFloat,
                                                   int64_t ubFactorS, int64_t ubFactorN)
 {

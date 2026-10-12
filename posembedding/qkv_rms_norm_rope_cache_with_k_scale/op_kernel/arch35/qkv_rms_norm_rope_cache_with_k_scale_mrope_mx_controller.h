@@ -35,8 +35,8 @@ namespace QkvRmsNormRopeCacheWithKScale {
  */
 class QkvRmsNormRopeCacheWithKScaleMropeMxController {
 public:
-    __aicore__ inline void Process(const GlobalTensors &tensors,
-                                   const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData)
+    __aicore__ inline void Process(const GlobalTensors& tensors,
+                                   const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData)
     {
         TokenRange range{};
         MakeCoreTokenRange(range, tilingData, GetBlockIdx(), AscendC::GetBlockNum());
@@ -64,8 +64,8 @@ private:
         uint64_t end;
     };
 
-    __aicore__ inline void MakeCoreTokenRange(TokenRange &range,
-                                              const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData,
+    __aicore__ inline void MakeCoreTokenRange(TokenRange& range,
+                                              const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData,
                                               uint32_t aivIndex, uint32_t activeAiv) const
     {
         // Host tiling rejects T == 0 and aivNum == 0, then launches exactly
@@ -76,8 +76,8 @@ private:
         range.end = range.begin + base + (aivIndex < remainder ? 1U : 0U);
     }
 
-    __aicore__ inline bool FillTile(MropeMxTileDesc &tile, const TokenRange &range,
-                                    const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData, uint64_t tokenBegin,
+    __aicore__ inline bool FillTile(MropeMxTileDesc& tile, const TokenRange& range,
+                                    const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData, uint64_t tokenBegin,
                                     uint64_t tileOrdinal) const
     {
         if (tokenBegin >= range.end) {

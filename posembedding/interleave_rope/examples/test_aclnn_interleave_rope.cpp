@@ -14,18 +14,19 @@
 #include <vector>
 
 #define CHECK_RET(cond, return_expr) \
-  do {                               \
-    if (!(cond)) {                   \
-      return_expr;                   \
-    }                                \
-  } while (0)
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
+    } while (0)
 
-#define LOG_PRINT(message, ...)     \
-  do {                              \
-    printf(message, ##__VA_ARGS__); \
-  } while (0)
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
+    } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t>& shape) {
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
+{
     int64_t shape_size = 1;
     for (auto i : shape) {
         shape_size *= i;
@@ -33,7 +34,8 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape) {
     return shape_size;
 }
 
-std::vector<aclFloat16> ConvertToFloat16(const std::vector<float>& data) {
+std::vector<aclFloat16> ConvertToFloat16(const std::vector<float>& data)
+{
     std::vector<aclFloat16> converted;
     converted.reserve(data.size());
     for (float value : data) {
@@ -42,7 +44,8 @@ std::vector<aclFloat16> ConvertToFloat16(const std::vector<float>& data) {
     return converted;
 }
 
-int Init(int32_t deviceId, aclrtStream* stream) {
+int Init(int32_t deviceId, aclrtStream* stream)
+{
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -55,7 +58,8 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 
 template <typename T>
 int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor) {
+                    aclDataType dataType, aclTensor** tensor)
+{
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -77,7 +81,8 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
     return 0;
 }
 
-int main() {
+int main()
+{
     // 1. 固定写法，device/stream初始化, 参考AscendCL对外接口列表
     // 根据自己的实际device填写deviceId
     int32_t deviceId = 0;
@@ -101,24 +106,18 @@ int main() {
     aclTensor* sin = nullptr;
     aclTensor* out = nullptr;
 
-    std::vector<aclFloat16> xHostData = ConvertToFloat16({
-        74, 54, 84, 125, 23, 78, 37, 72, 27, 98, 34, 107, 29, 23, 54, 60,
-        70, 49, 119, 54, 29, 54, 41, 99, 27, 62, 5, 46, 108, 39, 24, 123,
-        33, 82, 6, 40, 88, 24, 6, 116, 38, 119, 110, 5, 30, 79, 87, 18,
-        29, 100, 90, 24, 21, 93, 63, 68, 34, 112, 119, 48, 74, 43, 85, 64
-    });
-    std::vector<aclFloat16> cosHostData = ConvertToFloat16({
-        41, 37, 17, 25, 49, 25, 22, 24, 110, 120, 107, 3, 82, 66, 75, 86,
-        85, 115, 110, 56, 52, 39, 86, 23, 36, 71, 20, 73, 113, 25, 114, 56,
-        125, 80, 95, 82, 31, 63, 99, 62, 23, 55, 30, 99, 42, 121, 15, 24,
-        97, 87, 81, 67, 43, 21, 13, 9, 33, 29, 117, 10, 114, 61, 98, 15
-    });
-    std::vector<aclFloat16> sinHostData = ConvertToFloat16({
-        46, 56, 56, 101, 66, 10, 96, 16, 86, 57, 102, 66, 12, 105, 76, 58,
-        90, 6, 79, 128, 126, 82, 41, 3, 45, 7, 66, 4, 46, 22, 31, 26,
-        37, 63, 97, 84, 91, 90, 47, 77, 90, 34, 41, 83, 91, 108, 120, 13,
-        90, 32, 85, 37, 119, 31, 51, 82, 122, 125, 7, 116, 121, 108, 38, 56
-    });
+    std::vector<aclFloat16> xHostData = ConvertToFloat16(
+        {74, 54, 84, 125, 23, 78,  37,  72, 27, 98,  34, 107, 29, 23,  54,  60, 70, 49,  119, 54,  29,  54,
+         41, 99, 27, 62,  5,  46,  108, 39, 24, 123, 33, 82,  6,  40,  88,  24, 6,  116, 38,  119, 110, 5,
+         30, 79, 87, 18,  29, 100, 90,  24, 21, 93,  63, 68,  34, 112, 119, 48, 74, 43,  85,  64});
+    std::vector<aclFloat16> cosHostData = ConvertToFloat16(
+        {41, 37,  17, 25, 49, 25, 22,  24, 110, 120, 107, 3,  82, 66, 75,  86, 85,  115, 110, 56, 52, 39,
+         86, 23,  36, 71, 20, 73, 113, 25, 114, 56,  125, 80, 95, 82, 31,  63, 99,  62,  23,  55, 30, 99,
+         42, 121, 15, 24, 97, 87, 81,  67, 43,  21,  13,  9,  33, 29, 117, 10, 114, 61,  98,  15});
+    std::vector<aclFloat16> sinHostData = ConvertToFloat16(
+        {46, 56,  56,  101, 66, 10, 96, 16, 86,  57, 102, 66, 12,  105, 76, 58,  90,  6,   79, 128, 126, 82,
+         41, 3,   45,  7,   66, 4,  46, 22, 31,  26, 37,  63, 97,  84,  91, 90,  47,  77,  90, 34,  41,  83,
+         91, 108, 120, 13,  90, 32, 85, 37, 119, 31, 51,  82, 122, 125, 7,  116, 121, 108, 38, 56});
     std::vector<aclFloat16> outHostData(64, aclFloatToFloat16(0.0f));
 
     // 创建x aclTensor
@@ -139,7 +138,8 @@ int main() {
     aclOpExecutor* executor;
     // 调用aclnnInterleaveRope第一段接口
     ret = aclnnInterleaveRopeGetWorkspaceSize(x, cos, sin, out, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnInterleaveRopeGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnInterleaveRopeGetWorkspaceSize failed. ERROR: %d\n", ret);
+              return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
     void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
@@ -175,7 +175,7 @@ int main() {
     aclrtFree(sinDeviceAddr);
     aclrtFree(outDeviceAddr);
     if (workspaceSize > 0) {
-      aclrtFree(workspaceAddr);
+        aclrtFree(workspaceAddr);
     }
     aclrtDestroyStream(stream);
     aclrtResetDevice(deviceId);

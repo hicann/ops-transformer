@@ -20,14 +20,14 @@
 #include "aclnnop/aclnn_und_gen_qkv_rms_norm_rope_cache.h"
 
 #define CHECK_RET(cond, return_expr) \
-    do {                             \
-        if (!(cond)) {               \
-            return_expr;             \
-        }                            \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)     \
-    do {                            \
+#define LOG_PRINT(message, ...) \
+    do { \
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
@@ -217,8 +217,8 @@ int main()
     ret = aclnnUndGenQkvRmsNormRopeCacheGetWorkspaceSize(
         undQkv, undWq, undWk, cosSin, kCacheRef, vCacheRef, slotMapping, positions, genQkv, genWq, genWk, catIndices,
         NUM_HEADS_Q, NUM_HEADS_K, NUM_HEADS_V, NORM_EPS, mropeSection, qOut, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS,
-              LOG_PRINT("aclnnUndGenQkvRmsNormRopeCacheGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnUndGenQkvRmsNormRopeCacheGetWorkspaceSize failed. ERROR: %d\n", ret);
+              return ret);
 
     void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {

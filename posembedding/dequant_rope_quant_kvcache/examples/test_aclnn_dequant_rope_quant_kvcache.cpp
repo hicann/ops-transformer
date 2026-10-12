@@ -25,7 +25,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -34,7 +34,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<int8_t> resultData(size, 0);
@@ -46,7 +46,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -59,8 +59,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -128,34 +128,34 @@ int main()
     std::vector<float> activationHostData(shapeB * shapeS, 2);
     std::vector<float> biasHostData(shapeH, 2);
 
-    void *inputDeviceAddr = nullptr;
-    void *cosDeviceAddr = nullptr;
-    void *sinDeviceAddr = nullptr;
-    void *kcacheDeviceAddr = nullptr;
-    void *vcacheDeviceAddr = nullptr;
-    void *indicesDeviceAddr = nullptr;
-    void *kscaleDeviceAddr = nullptr;
-    void *vscaleDeviceAddr = nullptr;
-    void *koffsetDeviceAddr = nullptr;
-    void *voffsetDeviceAddr = nullptr;
+    void* inputDeviceAddr = nullptr;
+    void* cosDeviceAddr = nullptr;
+    void* sinDeviceAddr = nullptr;
+    void* kcacheDeviceAddr = nullptr;
+    void* vcacheDeviceAddr = nullptr;
+    void* indicesDeviceAddr = nullptr;
+    void* kscaleDeviceAddr = nullptr;
+    void* vscaleDeviceAddr = nullptr;
+    void* koffsetDeviceAddr = nullptr;
+    void* voffsetDeviceAddr = nullptr;
 
-    void *weightDeviceAddr = nullptr;
-    void *activationDeviceAddr = nullptr;
-    void *biasDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* activationDeviceAddr = nullptr;
+    void* biasDeviceAddr = nullptr;
 
-    aclTensor *input = nullptr;
-    aclTensor *cos = nullptr;
-    aclTensor *sin = nullptr;
-    aclTensor *kcache = nullptr;
-    aclTensor *vcache = nullptr;
-    aclTensor *indices = nullptr;
-    aclTensor *kscale = nullptr;
-    aclTensor *vscale = nullptr;
-    aclTensor *koffset = nullptr;
-    aclTensor *voffset = nullptr;
-    aclTensor *weight = nullptr;
-    aclTensor *activation = nullptr;
-    aclTensor *bias = nullptr;
+    aclTensor* input = nullptr;
+    aclTensor* cos = nullptr;
+    aclTensor* sin = nullptr;
+    aclTensor* kcache = nullptr;
+    aclTensor* vcache = nullptr;
+    aclTensor* indices = nullptr;
+    aclTensor* kscale = nullptr;
+    aclTensor* vscale = nullptr;
+    aclTensor* koffset = nullptr;
+    aclTensor* voffset = nullptr;
+    aclTensor* weight = nullptr;
+    aclTensor* activation = nullptr;
+    aclTensor* bias = nullptr;
 
     ret = CreateAclTensor(inputHostData, inputShape, &inputDeviceAddr, aclDataType::ACL_INT32, &input);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -188,17 +188,17 @@ int main()
 
     std::vector<int64_t> qShape = {shapeB, shapeS, shapeNq, shapeD};
     std::vector<int16_t> qHostData(shapeB * shapeS * shapeNq * shapeD, 9);
-    aclTensor *q = nullptr;
-    void *qDeviceAddr = nullptr;
+    aclTensor* q = nullptr;
+    void* qDeviceAddr = nullptr;
 
     std::vector<int64_t> kShape = {shapeB, shapeS, shapeNkv, shapeD};
     std::vector<int16_t> kHostData(shapeB * shapeS * shapeNkv * shapeD, 10);
-    aclTensor *k = nullptr;
-    void *kDeviceAddr = nullptr;
+    aclTensor* k = nullptr;
+    void* kDeviceAddr = nullptr;
     std::vector<int64_t> vShape = {shapeB, shapeS, shapeNkv, shapeD};
     std::vector<int16_t> vHostData(shapeB * shapeS * shapeNkv * shapeD, 10);
-    aclTensor *v = nullptr;
-    void *vDeviceAddr = nullptr;
+    aclTensor* v = nullptr;
+    void* vDeviceAddr = nullptr;
 
     ret = CreateAclTensor(qHostData, qShape, &qDeviceAddr, aclDataType::ACL_FLOAT16, &q);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -208,14 +208,14 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<int64_t> splitData = {shapeNq * shapeD, shapeNkv * shapeD, shapeNkv * shapeD};
-    aclIntArray *sizeSplits = aclCreateIntArray(splitData.data(), splitData.size());
+    aclIntArray* sizeSplits = aclCreateIntArray(splitData.data(), splitData.size());
     char quantMode[] = "static";
     char layout[] = "BSND";
     char cacheMode[] = "contiguous";
 
     // 3. 调用CANN算子库API，需要修改为具体的API
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 调用aclnnDequantRopeQuantKvcache第一段接口
     ret = aclnnDequantRopeQuantKvcacheGetWorkspaceSize(
@@ -225,7 +225,7 @@ int main()
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

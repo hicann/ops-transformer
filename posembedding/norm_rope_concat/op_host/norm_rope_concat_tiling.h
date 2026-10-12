@@ -79,8 +79,8 @@ enum class TensorType {
 };
 
 struct InputTensorInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
     TensorType type;
     size_t index;
     bool isRequired;
@@ -121,19 +121,19 @@ constexpr int64_t DOUBLE_BUFFER = 1;
 constexpr int64_t BLOCK_SIZE = 32;
 
 struct NormRopeConcatContext {
-    const char *opName;
+    const char* opName;
 
     InputTensorInfo inputs[MAX_FORWARD_INPUT_NUM];
 
     const size_t requiredInputNum{REQUIRED_FORWARD_INPUT_NUM};
     const size_t maxInputNum{MAX_FORWARD_INPUT_NUM};
 
-    const int64_t *normType;
-    const int64_t *normAddedType;
-    const int64_t *ropeType;
-    const int64_t *concatOrder;
-    const float *eps;
-    const bool *isTraining;
+    const int64_t* normType;
+    const int64_t* normAddedType;
+    const int64_t* ropeType;
+    const int64_t* concatOrder;
+    const float* eps;
+    const bool* isTraining;
 };
 
 class NormRopeConcatTiling {
@@ -141,20 +141,20 @@ public:
     NormRopeConcatTiling() = default;
     ~NormRopeConcatTiling() = default;
 
-    ge::graphStatus DoTiling(gert::TilingContext *ctx);
-    ge::graphStatus SetTiling(gert::TilingContext *ctx);
+    ge::graphStatus DoTiling(gert::TilingContext* ctx);
+    ge::graphStatus SetTiling(gert::TilingContext* ctx);
 
 private:
     ge::graphStatus GetShapeInfo();
     ge::graphStatus CheckInput();
-    ge::graphStatus CheckInput(const InputTensorInfo &x);
+    ge::graphStatus CheckInput(const InputTensorInfo& x);
     ge::graphStatus ComputeTilingKey();
     ge::graphStatus ComputeCoreTilingStrategy();
     ge::graphStatus ComputeUBTilingStrategy();
     ge::graphStatus ComputeWorkSpace();
     ge::graphStatus FillTilingData();
-    ge::graphStatus PrintTilingData(gert::TilingContext *ctx);
-    ge::graphStatus ConvertContextOne(gert::TilingContext *ctx, InputTensorInfo &x);
+    ge::graphStatus PrintTilingData(gert::TilingContext* ctx);
+    ge::graphStatus ConvertContextOne(gert::TilingContext* ctx, InputTensorInfo& x);
 
 private:
     int64_t batchSize_{0};
@@ -182,7 +182,7 @@ private:
 
     uint32_t numBlocks_{0};
     int64_t tilingKey_{0};
-    size_t *workspace_{nullptr};
+    size_t* workspace_{nullptr};
     ge::DataType inputDtype_{ge::DT_FLOAT};
 
     NormRopeConcatContext context_;

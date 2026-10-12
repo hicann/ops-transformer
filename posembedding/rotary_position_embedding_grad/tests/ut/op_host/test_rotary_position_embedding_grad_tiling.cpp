@@ -158,7 +158,7 @@ TEST_F(RotaryPositionEmbeddingGradTiling, RotaryPositionEmbeddingGradTiling_fp16
     ASSERT_EQ(tilingInfo.workspaceSizes.size(), 1);
     ASSERT_EQ(tilingInfo.workspaceSizes[0], 25165824);
 
-    auto tilingData = reinterpret_cast<const int64_t *>(tilingInfo.tilingData.get());
+    auto tilingData = reinterpret_cast<const int64_t*>(tilingInfo.tilingData.get());
     // ropeGradParams 起始下标 = reduceTiling 占用的 66 个 int64 之后
     EXPECT_EQ(tilingData[66], 8);    // B = T
     EXPECT_EQ(tilingData[67], 4096); // S = N

@@ -24,9 +24,9 @@ namespace optiling {
 using namespace Ops::Transformer::OpTiling;
 
 std::tuple<int64_t, int64_t, int64_t, int64_t> QkvRmsNormRopeCacheTilingBase::GetShapeTuple(
-    const gert::TilingContext *context, const int64_t index)
+    const gert::TilingContext* context, const int64_t index)
 {
-    const gert::StorageShape *shapePtr = context->GetInputShape(index);
+    const gert::StorageShape* shapePtr = context->GetInputShape(index);
     OP_CHECK_IF(shapePtr == nullptr, OP_LOGE(context->GetNodeName(), "Shape is nullptr."),
                 return std::make_tuple(0, 0, 0, 0));
     // check shape length is DIM_SIZE
@@ -37,10 +37,10 @@ std::tuple<int64_t, int64_t, int64_t, int64_t> QkvRmsNormRopeCacheTilingBase::Ge
                            shapePtr->GetStorageShape().GetDim(DIM_TWO), shapePtr->GetStorageShape().GetDim(DIM_THREE));
 }
 
-std::tuple<int64_t, int64_t> QkvRmsNormRopeCacheTilingBase::GetShapeTupleOfTH(const gert::TilingContext *context,
+std::tuple<int64_t, int64_t> QkvRmsNormRopeCacheTilingBase::GetShapeTupleOfTH(const gert::TilingContext* context,
                                                                               const int64_t index)
 {
-    const gert::StorageShape *shapePtr = context->GetInputShape(index);
+    const gert::StorageShape* shapePtr = context->GetInputShape(index);
     OP_CHECK_IF(shapePtr == nullptr, OP_LOGE(context->GetNodeName(), "Shape is nullptr."),
                 return std::make_tuple(0, 0));
     // check shape length is DIM_SIZE
@@ -80,7 +80,7 @@ uint64_t QkvRmsNormRopeCacheTilingBase::GetTilingKey() const
 {
     return tilingKey_;
 }
-ge::graphStatus Tiling4QkvRmsNormRopeCache(gert::TilingContext *context)
+ge::graphStatus Tiling4QkvRmsNormRopeCache(gert::TilingContext* context)
 {
     OP_LOGD(context, "Tiling4QkvRmsNormRopeCache running.");
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
@@ -88,7 +88,7 @@ ge::graphStatus Tiling4QkvRmsNormRopeCache(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingPrepare4QkvRmsNormRopeCache(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepare4QkvRmsNormRopeCache(gert::TilingParseContext* context)
 {
     OP_LOGD(context, "TilingPrepare4QkvRmsNormRopeCache running.");
     auto compileInfo = context->GetCompiledInfo<QkvRmsNormRopeCacheCompileInfo>();

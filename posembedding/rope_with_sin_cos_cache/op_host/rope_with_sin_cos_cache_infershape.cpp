@@ -33,8 +33,7 @@ static ge::graphStatus InferShapeForRopeWithSinCosCache(gert::InferShapeContext*
         OP_LOGE("InferShape4RopeWithSinCosCache", "Context is nullptr, check failed.");
         return GRAPH_FAILED;
     }
-    if (context->GetComputeNodeInputNum() != INPUT_NODE_NUM ||
-        context->GetComputeNodeOutputNum() != OUTPUT_NODE_NUM) {
+    if (context->GetComputeNodeInputNum() != INPUT_NODE_NUM || context->GetComputeNodeOutputNum() != OUTPUT_NODE_NUM) {
         return GRAPH_FAILED;
     }
 

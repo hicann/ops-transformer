@@ -22,14 +22,14 @@ using namespace AscendC;
 template <typename T>
 class RopeGradZeroFill {
 public:
-    __aicore__ inline RopeGradZeroFill(TPipe *pipe)
+    __aicore__ inline RopeGradZeroFill(TPipe* pipe)
         : pipe_(pipe){};
 
     __aicore__ inline void Init(GM_ADDR cosGrad, GM_ADDR sinGrad, int64_t cosShapeSize)
     {
         cosShapeSize_ = cosShapeSize;
-        cosGradGm_.SetGlobalBuffer((__gm__ T *)cosGrad, cosShapeSize_);
-        sinGradGm_.SetGlobalBuffer((__gm__ T *)sinGrad, cosShapeSize_);
+        cosGradGm_.SetGlobalBuffer((__gm__ T*)cosGrad, cosShapeSize_);
+        sinGradGm_.SetGlobalBuffer((__gm__ T*)sinGrad, cosShapeSize_);
         pipe_->InitBuffer(ubBuf_, UB_ELEMS * sizeof(T));
     }
 
@@ -63,7 +63,7 @@ public:
 
 private:
     constexpr static int64_t UB_ELEMS = 8192; // 清零块大小（fp32 32KB / fp16/bf16 16KB）
-    TPipe *pipe_;
+    TPipe* pipe_;
     TBuf<TPosition::VECCALC> ubBuf_;
     GlobalTensor<T> cosGradGm_;
     GlobalTensor<T> sinGradGm_;

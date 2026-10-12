@@ -33,7 +33,7 @@ constexpr int64_t INDICES_MAX__NUM = 512;
 constexpr int64_t OFFSET_OVERRIDE = 2;
 
 template <typename T>
-__aicore__ inline T GetDiv(const T &value1, const T &value2)
+__aicore__ inline T GetDiv(const T& value1, const T& value2)
 {
     if (value2 == 0) {
         return value2;
@@ -42,7 +42,7 @@ __aicore__ inline T GetDiv(const T &value1, const T &value2)
 }
 
 template <typename T>
-__aicore__ inline T GetCeilInt(const T &value1, const T &value2)
+__aicore__ inline T GetCeilInt(const T& value1, const T& value2)
 {
     if (value2 == 0) {
         return value2;
@@ -51,7 +51,7 @@ __aicore__ inline T GetCeilInt(const T &value1, const T &value2)
 }
 
 template <typename T>
-__aicore__ inline T GetRem(const T &value1, const T &value2)
+__aicore__ inline T GetRem(const T& value1, const T& value2)
 {
     if (value2 == 0) {
         return value2;
@@ -70,7 +70,7 @@ struct queType<half> {
 template <typename XTYPE, typename BIASTYPE, typename COSTYPE>
 class RopeQuantKvcacheV2 {
 public:
-    __aicore__ inline RopeQuantKvcacheV2(const DequantRopeQuantKvcacheTilingData *tilingData)
+    __aicore__ inline RopeQuantKvcacheV2(const DequantRopeQuantKvcacheTilingData* tilingData)
     {
         this->cacheSeqlen = tilingData->cacheSeqlen;
         this->seqlen = tilingData->seqlen;
@@ -123,44 +123,44 @@ public:
         this->indiceUbNum = ((onceB + FP32_ONE_BLOCK_NUM - 1) / FP32_ONE_BLOCK_NUM) * FP32_ONE_BLOCK_NUM;
         uint64_t qDataNum = OnceUBMaxS * this->qHeadNum * this->hiddenSize;
         uint64_t qBlockOffset = blockIdx * qDataNum;
-        inputGm.SetGlobalBuffer((__gm__ XTYPE *)qkv + qkvBlockOffset);
-        cosGm.SetGlobalBuffer((__gm__ COSTYPE *)cos + cossinBlockOffset, this->blockFactor * this->hiddenSize);
+        inputGm.SetGlobalBuffer((__gm__ XTYPE*)qkv + qkvBlockOffset);
+        cosGm.SetGlobalBuffer((__gm__ COSTYPE*)cos + cossinBlockOffset, this->blockFactor * this->hiddenSize);
         cosGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-        sinGm.SetGlobalBuffer((__gm__ COSTYPE *)sin + cossinBlockOffset, this->blockFactor * this->hiddenSize);
+        sinGm.SetGlobalBuffer((__gm__ COSTYPE*)sin + cossinBlockOffset, this->blockFactor * this->hiddenSize);
         sinGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-        quantScaleKGm.SetGlobalBuffer((__gm__ float *)quant_scale_k, this->kHiddenSize);
+        quantScaleKGm.SetGlobalBuffer((__gm__ float*)quant_scale_k, this->kHiddenSize);
         quantScaleKGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-        quantScaleVGm.SetGlobalBuffer((__gm__ float *)quant_scale_v, this->kHiddenSize);
+        quantScaleVGm.SetGlobalBuffer((__gm__ float*)quant_scale_v, this->kHiddenSize);
         quantScaleVGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
         if (this->hasQuantOffset == true) {
-            quantOffsetKGm.SetGlobalBuffer((__gm__ float *)quant_offset_k, this->kHiddenSize);
+            quantOffsetKGm.SetGlobalBuffer((__gm__ float*)quant_offset_k, this->kHiddenSize);
             quantOffsetKGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
-            quantOffsetVGm.SetGlobalBuffer((__gm__ float *)quant_offset_v, this->kHiddenSize);
+            quantOffsetVGm.SetGlobalBuffer((__gm__ float*)quant_offset_v, this->kHiddenSize);
             quantOffsetVGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
             pipe.InitBuffer(offsetKQueue, this->kHiddenSize * sizeof(float));
             pipe.InitBuffer(offsetVQueue, this->kHiddenSize * sizeof(float));
         }
 
-        indiceGm.SetGlobalBuffer((__gm__ int32_t *)indice);
+        indiceGm.SetGlobalBuffer((__gm__ int32_t*)indice);
         indiceGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
-        outputGm.SetGlobalBuffer((__gm__ COSTYPE *)q_out + sCoreOffset * this->qHiddenSize);
-        outputKGm.SetGlobalBuffer((__gm__ COSTYPE *)k_out + sCoreOffset * this->kHiddenSize);
-        outputVGm.SetGlobalBuffer((__gm__ COSTYPE *)v_out + sCoreOffset * this->vHiddenSize);
-        vCacheGm.SetGlobalBuffer((__gm__ int8_t *)v_cache_out);
-        kCacheGm.SetGlobalBuffer((__gm__ int8_t *)k_cache_out);
+        outputGm.SetGlobalBuffer((__gm__ COSTYPE*)q_out + sCoreOffset * this->qHiddenSize);
+        outputKGm.SetGlobalBuffer((__gm__ COSTYPE*)k_out + sCoreOffset * this->kHiddenSize);
+        outputVGm.SetGlobalBuffer((__gm__ COSTYPE*)v_out + sCoreOffset * this->vHiddenSize);
+        vCacheGm.SetGlobalBuffer((__gm__ int8_t*)v_cache_out);
+        kCacheGm.SetGlobalBuffer((__gm__ int8_t*)k_cache_out);
 
         if constexpr (IsSameType<XTYPE, int32_t>::value) {
             if (this->hasBias == true) {
-                biasGM.SetGlobalBuffer((__gm__ BIASTYPE *)bias);
+                biasGM.SetGlobalBuffer((__gm__ BIASTYPE*)bias);
             }
             if (this->hasAS == true) {
-                asGM.SetGlobalBuffer((__gm__ float *)activation_scale + sCoreOffset);
+                asGM.SetGlobalBuffer((__gm__ float*)activation_scale + sCoreOffset);
             }
-            wsGM.SetGlobalBuffer((__gm__ float *)weight_scale);
+            wsGM.SetGlobalBuffer((__gm__ float*)weight_scale);
         }
 
         if constexpr (IsSameType<COSTYPE, half>::value && !IsSameType<XTYPE, int32_t>::value) {

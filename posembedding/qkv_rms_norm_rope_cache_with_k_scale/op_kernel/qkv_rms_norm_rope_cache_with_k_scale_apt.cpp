@@ -35,7 +35,7 @@ __global__ __aicore__ void qkv_rms_norm_rope_cache_with_k_scale(
     // enable overflow mode to avoid nan/inf value
     AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(0);
     GET_TILING_DATA_WITH_STRUCT(QkvRmsNormRopeCacheWithKScaleTilingData, tilingDataIn, tiling);
-    const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData = &tilingDataIn;
+    const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData = &tilingDataIn;
 
     const GlobalTensors tensors = {
         qkv,         q_gamma,     k_gamma,           cos_sin,         slot_mapping,

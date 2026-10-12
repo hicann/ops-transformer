@@ -20,11 +20,11 @@
 namespace optiling {
 class RopeInterLeavedGradTlingClass : public RotaryPosEmbeddingGradMembaseTilingClass {
 public:
-    explicit RopeInterLeavedGradTlingClass(gert::TilingContext *context)
+    explicit RopeInterLeavedGradTlingClass(gert::TilingContext* context)
         : RotaryPosEmbeddingGradMembaseTilingClass(context)
     {}
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         RotaryPosEmbeddingGradMembaseTilingClass::Reset(context);
     }

@@ -24,16 +24,16 @@ static constexpr size_t INPUT_SIN_INDEX = 2;
 static constexpr size_t OUTPUT_Y_INDEX = 0;
 
 namespace ops {
-static ge::graphStatus InferShapeForRotaryPositionEmbedding(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeForRotaryPositionEmbedding(gert::InferShapeContext* context)
 {
     OP_LOGD(context, "Begin to do InferShapeForRotaryPositionEmbedding.");
-    const gert::Shape *xShape = context->GetInputShape(INPUT_X_INDEX);
+    const gert::Shape* xShape = context->GetInputShape(INPUT_X_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
-    const gert::Shape *cosShape = context->GetInputShape(INPUT_COS_INDEX);
+    const gert::Shape* cosShape = context->GetInputShape(INPUT_COS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, cosShape);
-    const gert::Shape *sinShape = context->GetInputShape(INPUT_SIN_INDEX);
+    const gert::Shape* sinShape = context->GetInputShape(INPUT_SIN_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, sinShape);
-    gert::Shape *yShape = context->GetOutputShape(OUTPUT_Y_INDEX);
+    gert::Shape* yShape = context->GetOutputShape(OUTPUT_Y_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
 
     *yShape = *xShape;
@@ -42,7 +42,7 @@ static ge::graphStatus InferShapeForRotaryPositionEmbedding(gert::InferShapeCont
     return ge::GRAPH_SUCCESS;
 }
 
-static graphStatus InferDataTypeForRotaryPositionEmbedding(gert::InferDataTypeContext *context)
+static graphStatus InferDataTypeForRotaryPositionEmbedding(gert::InferDataTypeContext* context)
 {
     context->SetOutputDataType(OUTPUT_Y_INDEX, context->GetInputDataType(INPUT_X_INDEX));
     return GRAPH_SUCCESS;

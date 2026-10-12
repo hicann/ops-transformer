@@ -46,13 +46,13 @@ TEST_F(rotary_position_embedding_test, test_case_mode_1_pad_fp16_001)
     size_t outputYByteSize = inputXByteSize;
     size_t tilingDataSize = sizeof(RotaryPositionEmbeddingTilingData);
 
-    uint8_t *x = (uint8_t *)AscendC::GmAlloc(inputXByteSize);
-    uint8_t *cos = (uint8_t *)AscendC::GmAlloc(inputCosByteSize);
-    uint8_t *sin = (uint8_t *)AscendC::GmAlloc(inputSinByteSize);
+    uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputXByteSize);
+    uint8_t* cos = (uint8_t*)AscendC::GmAlloc(inputCosByteSize);
+    uint8_t* sin = (uint8_t*)AscendC::GmAlloc(inputSinByteSize);
 
-    uint8_t *y = (uint8_t *)AscendC::GmAlloc(outputYByteSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(1024 * 1024 * 1024);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* y = (uint8_t*)AscendC::GmAlloc(outputYByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
     uint32_t blockDim = 40;
 
     system(
@@ -63,10 +63,9 @@ TEST_F(rotary_position_embedding_test, test_case_mode_1_pad_fp16_001)
     system("cd ./rotary_position_embedding_data/ && python3 gen_data.py 3 4 46 14 float16");
     system("cd ./rotary_position_embedding_data/ && python3 gen_tiling.py case0");
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
-    RotaryPositionEmbeddingTilingData *tilingDatafromBin =
-        reinterpret_cast<RotaryPositionEmbeddingTilingData *>(tiling);
+    RotaryPositionEmbeddingTilingData* tilingDatafromBin = reinterpret_cast<RotaryPositionEmbeddingTilingData*>(tiling);
 
     ReadFile(path + "/rotary_position_embedding_data/x.bin", inputXByteSize, x, inputXByteSize);
     ReadFile(path + "/rotary_position_embedding_data/cos.bin", inputCosByteSize, cos, inputCosByteSize);
@@ -75,7 +74,7 @@ TEST_F(rotary_position_embedding_test, test_case_mode_1_pad_fp16_001)
 
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_SET_TILING_KEY(2001);
-    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, nullptr, y, workspace, (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, nullptr, y, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(cos);
@@ -95,13 +94,13 @@ TEST_F(rotary_position_embedding_test, test_case_mode_0_rotate_half_fp16_001)
     size_t outputYByteSize = inputXByteSize;
     size_t tilingDataSize = sizeof(RotaryPositionEmbeddingTilingData);
 
-    uint8_t *x = (uint8_t *)AscendC::GmAlloc(inputXByteSize);
-    uint8_t *cos = (uint8_t *)AscendC::GmAlloc(inputCosByteSize);
-    uint8_t *sin = (uint8_t *)AscendC::GmAlloc(inputSinByteSize);
+    uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputXByteSize);
+    uint8_t* cos = (uint8_t*)AscendC::GmAlloc(inputCosByteSize);
+    uint8_t* sin = (uint8_t*)AscendC::GmAlloc(inputSinByteSize);
 
-    uint8_t *y = (uint8_t *)AscendC::GmAlloc(outputYByteSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(1024 * 1024 * 1024);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* y = (uint8_t*)AscendC::GmAlloc(outputYByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
     uint32_t blockDim = 40;
 
     system(
@@ -112,10 +111,9 @@ TEST_F(rotary_position_embedding_test, test_case_mode_0_rotate_half_fp16_001)
     system("cd ./rotary_position_embedding_data/ && python3 gen_data.py 1 64 2 64 float16");
     system("cd ./rotary_position_embedding_data/ && python3 gen_tiling.py case_rotate_half_fp16");
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
-    RotaryPositionEmbeddingTilingData *tilingDatafromBin =
-        reinterpret_cast<RotaryPositionEmbeddingTilingData *>(tiling);
+    RotaryPositionEmbeddingTilingData* tilingDatafromBin = reinterpret_cast<RotaryPositionEmbeddingTilingData*>(tiling);
 
     ReadFile(path + "/rotary_position_embedding_data/x.bin", inputXByteSize, x, inputXByteSize);
     ReadFile(path + "/rotary_position_embedding_data/cos.bin", inputCosByteSize, cos, inputCosByteSize);
@@ -124,7 +122,7 @@ TEST_F(rotary_position_embedding_test, test_case_mode_0_rotate_half_fp16_001)
 
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_SET_TILING_KEY(1032);
-    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, nullptr, y, workspace, (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, nullptr, y, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(cos);
@@ -144,13 +142,13 @@ TEST_F(rotary_position_embedding_test, test_case_mode_0_rotate_half_bf16_001)
     size_t outputYByteSize = inputXByteSize;
     size_t tilingDataSize = sizeof(RotaryPositionEmbeddingTilingData);
 
-    uint8_t *x = (uint8_t *)AscendC::GmAlloc(inputXByteSize);
-    uint8_t *cos = (uint8_t *)AscendC::GmAlloc(inputCosByteSize);
-    uint8_t *sin = (uint8_t *)AscendC::GmAlloc(inputSinByteSize);
+    uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputXByteSize);
+    uint8_t* cos = (uint8_t*)AscendC::GmAlloc(inputCosByteSize);
+    uint8_t* sin = (uint8_t*)AscendC::GmAlloc(inputSinByteSize);
 
-    uint8_t *y = (uint8_t *)AscendC::GmAlloc(outputYByteSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(1024 * 1024 * 1024);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* y = (uint8_t*)AscendC::GmAlloc(outputYByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
     uint32_t blockDim = 40;
 
     system(
@@ -161,10 +159,9 @@ TEST_F(rotary_position_embedding_test, test_case_mode_0_rotate_half_bf16_001)
     system("cd ./rotary_position_embedding_data/ && python3 gen_data.py 1 64 2 64 float16");
     system("cd ./rotary_position_embedding_data/ && python3 gen_tiling.py case_rotate_half_bf16");
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
-    RotaryPositionEmbeddingTilingData *tilingDatafromBin =
-        reinterpret_cast<RotaryPositionEmbeddingTilingData *>(tiling);
+    RotaryPositionEmbeddingTilingData* tilingDatafromBin = reinterpret_cast<RotaryPositionEmbeddingTilingData*>(tiling);
 
     ReadFile(path + "/rotary_position_embedding_data/x.bin", inputXByteSize, x, inputXByteSize);
     ReadFile(path + "/rotary_position_embedding_data/cos.bin", inputCosByteSize, cos, inputCosByteSize);
@@ -173,7 +170,7 @@ TEST_F(rotary_position_embedding_test, test_case_mode_0_rotate_half_bf16_001)
 
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_SET_TILING_KEY(1033);
-    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, nullptr, y, workspace, (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, nullptr, y, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(cos);
@@ -194,14 +191,14 @@ TEST_F(rotary_position_embedding_test, test_case_mode_1_rotate_bf16_001)
     size_t outputYByteSize = inputXByteSize;
     size_t tilingDataSize = sizeof(RotaryPositionEmbeddingTilingData);
 
-    uint8_t *x = (uint8_t *)AscendC::GmAlloc(inputXByteSize);
-    uint8_t *cos = (uint8_t *)AscendC::GmAlloc(inputCosByteSize);
-    uint8_t *sin = (uint8_t *)AscendC::GmAlloc(inputSinByteSize);
-    uint8_t *rotate_inter = (uint8_t *)AscendC::GmAlloc(inputRotateByteSize);
+    uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputXByteSize);
+    uint8_t* cos = (uint8_t*)AscendC::GmAlloc(inputCosByteSize);
+    uint8_t* sin = (uint8_t*)AscendC::GmAlloc(inputSinByteSize);
+    uint8_t* rotate_inter = (uint8_t*)AscendC::GmAlloc(inputRotateByteSize);
 
-    uint8_t *y = (uint8_t *)AscendC::GmAlloc(outputYByteSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(1024 * 1024 * 1024);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* y = (uint8_t*)AscendC::GmAlloc(outputYByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
     uint32_t blockDim = 20;
 
     system(
@@ -213,20 +210,21 @@ TEST_F(rotary_position_embedding_test, test_case_mode_1_rotate_bf16_001)
     system("cd ./rotary_position_embedding_data/ && python3 gen_data_torch.py 3 4 46 32 bfloat16");
     system("cd ./rotary_position_embedding_data/ && python3 gen_tiling.py case1_32");
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
-    RotaryPositionEmbeddingTilingData *tilingDatafromBin =
-        reinterpret_cast<RotaryPositionEmbeddingTilingData *>(tiling);
+    RotaryPositionEmbeddingTilingData* tilingDatafromBin = reinterpret_cast<RotaryPositionEmbeddingTilingData*>(tiling);
 
     ReadFile(path + "/rotary_position_embedding_data/x.pt", inputXByteSize, x, inputXByteSize);
     ReadFile(path + "/rotary_position_embedding_data/cos.pt", inputCosByteSize, cos, inputCosByteSize);
     ReadFile(path + "/rotary_position_embedding_data/sin.pt", inputCosByteSize, sin, inputCosByteSize);
-    ReadFile(path + "/rotary_position_embedding_data/rotate_inter.pt", inputRotateByteSize, rotate_inter, inputRotateByteSize);
+    ReadFile(path + "/rotary_position_embedding_data/rotate_inter.pt", inputRotateByteSize, rotate_inter,
+             inputRotateByteSize);
     ReadFile(path + "/rotary_position_embedding_data/tiling.bin", tilingDataSize, tilingDatafromBin, tilingDataSize);
 
     AscendC::SetKernelMode(KernelMode::MIX_MODE);
     ICPU_SET_TILING_KEY(3013);
-    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, rotate_inter, y, workspace, (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, rotate_inter, y, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(cos);
@@ -248,14 +246,14 @@ TEST_F(rotary_position_embedding_test, test_case_mode_1_rotate_fp32_001)
     size_t outputYByteSize = inputXByteSize;
     size_t tilingDataSize = sizeof(RotaryPositionEmbeddingTilingData);
 
-    uint8_t *x = (uint8_t *)AscendC::GmAlloc(inputXByteSize);
-    uint8_t *cos = (uint8_t *)AscendC::GmAlloc(inputCosByteSize);
-    uint8_t *sin = (uint8_t *)AscendC::GmAlloc(inputSinByteSize);
-    uint8_t *rotate_inter = (uint8_t *)AscendC::GmAlloc(inputRotateByteSize);
+    uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputXByteSize);
+    uint8_t* cos = (uint8_t*)AscendC::GmAlloc(inputCosByteSize);
+    uint8_t* sin = (uint8_t*)AscendC::GmAlloc(inputSinByteSize);
+    uint8_t* rotate_inter = (uint8_t*)AscendC::GmAlloc(inputRotateByteSize);
 
-    uint8_t *y = (uint8_t *)AscendC::GmAlloc(outputYByteSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(1024 * 1024 * 1024);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* y = (uint8_t*)AscendC::GmAlloc(outputYByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
     uint32_t blockDim = 20;
 
     system(
@@ -267,20 +265,21 @@ TEST_F(rotary_position_embedding_test, test_case_mode_1_rotate_fp32_001)
     system("cd ./rotary_position_embedding_data/ && python3 gen_data_torch.py 3 4 46 32 float32");
     system("cd ./rotary_position_embedding_data/ && python3 gen_tiling.py case1_32");
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
-    RotaryPositionEmbeddingTilingData *tilingDatafromBin =
-        reinterpret_cast<RotaryPositionEmbeddingTilingData *>(tiling);
+    RotaryPositionEmbeddingTilingData* tilingDatafromBin = reinterpret_cast<RotaryPositionEmbeddingTilingData*>(tiling);
 
     ReadFile(path + "/rotary_position_embedding_data/x.pt", inputXByteSize, x, inputXByteSize);
     ReadFile(path + "/rotary_position_embedding_data/cos.pt", inputCosByteSize, cos, inputCosByteSize);
     ReadFile(path + "/rotary_position_embedding_data/sin.pt", inputCosByteSize, sin, inputCosByteSize);
-    ReadFile(path + "/rotary_position_embedding_data/rotate_inter.pt", inputRotateByteSize, rotate_inter, inputRotateByteSize);
+    ReadFile(path + "/rotary_position_embedding_data/rotate_inter.pt", inputRotateByteSize, rotate_inter,
+             inputRotateByteSize);
     ReadFile(path + "/rotary_position_embedding_data/tiling.bin", tilingDataSize, tilingDatafromBin, tilingDataSize);
 
     AscendC::SetKernelMode(KernelMode::MIX_MODE);
     ICPU_SET_TILING_KEY(3011);
-    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, rotate_inter, y, workspace, (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, rotate_inter, y, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(cos);
@@ -301,13 +300,13 @@ TEST_F(rotary_position_embedding_test, test_case_fullloadxd_fp16_001)
     size_t outputYByteSize = inputXByteSize;
     size_t tilingDataSize = sizeof(RotaryPositionEmbeddingTilingData);
 
-    uint8_t *x = (uint8_t *)AscendC::GmAlloc(inputXByteSize);
-    uint8_t *cos = (uint8_t *)AscendC::GmAlloc(inputCosByteSize);
-    uint8_t *sin = (uint8_t *)AscendC::GmAlloc(inputSinByteSize);
+    uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputXByteSize);
+    uint8_t* cos = (uint8_t*)AscendC::GmAlloc(inputCosByteSize);
+    uint8_t* sin = (uint8_t*)AscendC::GmAlloc(inputSinByteSize);
 
-    uint8_t *y = (uint8_t *)AscendC::GmAlloc(outputYByteSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(1024 * 1024 * 1024);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* y = (uint8_t*)AscendC::GmAlloc(outputYByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
     uint32_t blockDim = 4;
 
     system(
@@ -318,10 +317,9 @@ TEST_F(rotary_position_embedding_test, test_case_fullloadxd_fp16_001)
     system("cd ./rotary_position_embedding_data/ && python3 gen_data.py 1 64 2 64 float16");
     system("cd ./rotary_position_embedding_data/ && python3 gen_tiling.py case_fullloadxd_fp16");
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
-    RotaryPositionEmbeddingTilingData *tilingDatafromBin =
-        reinterpret_cast<RotaryPositionEmbeddingTilingData *>(tiling);
+    RotaryPositionEmbeddingTilingData* tilingDatafromBin = reinterpret_cast<RotaryPositionEmbeddingTilingData*>(tiling);
 
     ReadFile(path + "/rotary_position_embedding_data/x.bin", inputXByteSize, x, inputXByteSize);
     ReadFile(path + "/rotary_position_embedding_data/cos.bin", inputCosByteSize, cos, inputCosByteSize);
@@ -330,7 +328,7 @@ TEST_F(rotary_position_embedding_test, test_case_fullloadxd_fp16_001)
 
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_SET_TILING_KEY(1132);
-    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, nullptr, y, workspace, (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, nullptr, y, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(cos);
@@ -350,13 +348,13 @@ TEST_F(rotary_position_embedding_test, test_case_fullloadxd_fp32_001)
     size_t outputYByteSize = inputXByteSize;
     size_t tilingDataSize = sizeof(RotaryPositionEmbeddingTilingData);
 
-    uint8_t *x = (uint8_t *)AscendC::GmAlloc(inputXByteSize);
-    uint8_t *cos = (uint8_t *)AscendC::GmAlloc(inputCosByteSize);
-    uint8_t *sin = (uint8_t *)AscendC::GmAlloc(inputSinByteSize);
+    uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputXByteSize);
+    uint8_t* cos = (uint8_t*)AscendC::GmAlloc(inputCosByteSize);
+    uint8_t* sin = (uint8_t*)AscendC::GmAlloc(inputSinByteSize);
 
-    uint8_t *y = (uint8_t *)AscendC::GmAlloc(outputYByteSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(1024 * 1024 * 1024);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* y = (uint8_t*)AscendC::GmAlloc(outputYByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
     uint32_t blockDim = 4;
 
     system(
@@ -367,10 +365,9 @@ TEST_F(rotary_position_embedding_test, test_case_fullloadxd_fp32_001)
     system("cd ./rotary_position_embedding_data/ && python3 gen_data.py 1 64 2 64 float32");
     system("cd ./rotary_position_embedding_data/ && python3 gen_tiling.py case_fullloadxd_fp32");
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
-    RotaryPositionEmbeddingTilingData *tilingDatafromBin =
-        reinterpret_cast<RotaryPositionEmbeddingTilingData *>(tiling);
+    RotaryPositionEmbeddingTilingData* tilingDatafromBin = reinterpret_cast<RotaryPositionEmbeddingTilingData*>(tiling);
 
     ReadFile(path + "/rotary_position_embedding_data/x.bin", inputXByteSize, x, inputXByteSize);
     ReadFile(path + "/rotary_position_embedding_data/cos.bin", inputCosByteSize, cos, inputCosByteSize);
@@ -379,7 +376,7 @@ TEST_F(rotary_position_embedding_test, test_case_fullloadxd_fp32_001)
 
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_SET_TILING_KEY(1131);
-    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, nullptr, y, workspace, (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, nullptr, y, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(cos);
@@ -399,13 +396,13 @@ TEST_F(rotary_position_embedding_test, test_case_fullloadxd_bf16_001)
     size_t outputYByteSize = inputXByteSize;
     size_t tilingDataSize = sizeof(RotaryPositionEmbeddingTilingData);
 
-    uint8_t *x = (uint8_t *)AscendC::GmAlloc(inputXByteSize);
-    uint8_t *cos = (uint8_t *)AscendC::GmAlloc(inputCosByteSize);
-    uint8_t *sin = (uint8_t *)AscendC::GmAlloc(inputSinByteSize);
+    uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputXByteSize);
+    uint8_t* cos = (uint8_t*)AscendC::GmAlloc(inputCosByteSize);
+    uint8_t* sin = (uint8_t*)AscendC::GmAlloc(inputSinByteSize);
 
-    uint8_t *y = (uint8_t *)AscendC::GmAlloc(outputYByteSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(1024 * 1024 * 1024);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* y = (uint8_t*)AscendC::GmAlloc(outputYByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
     uint32_t blockDim = 4;
 
     system(
@@ -416,10 +413,9 @@ TEST_F(rotary_position_embedding_test, test_case_fullloadxd_bf16_001)
     system("cd ./rotary_position_embedding_data/ && python3 gen_data.py 1 64 2 64 float16");
     system("cd ./rotary_position_embedding_data/ && python3 gen_tiling.py case_fullloadxd_bf16");
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
-    RotaryPositionEmbeddingTilingData *tilingDatafromBin =
-        reinterpret_cast<RotaryPositionEmbeddingTilingData *>(tiling);
+    RotaryPositionEmbeddingTilingData* tilingDatafromBin = reinterpret_cast<RotaryPositionEmbeddingTilingData*>(tiling);
 
     ReadFile(path + "/rotary_position_embedding_data/x.bin", inputXByteSize, x, inputXByteSize);
     ReadFile(path + "/rotary_position_embedding_data/cos.bin", inputCosByteSize, cos, inputCosByteSize);
@@ -428,7 +424,7 @@ TEST_F(rotary_position_embedding_test, test_case_fullloadxd_bf16_001)
 
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_SET_TILING_KEY(1133);
-    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, nullptr, y, workspace, (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, nullptr, y, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(cos);
@@ -449,14 +445,14 @@ TEST_F(rotary_position_embedding_test, test_case_mode_1_rotate_fp16_001)
     size_t outputYByteSize = inputXByteSize;
     size_t tilingDataSize = sizeof(RotaryPositionEmbeddingTilingData);
 
-    uint8_t *x = (uint8_t *)AscendC::GmAlloc(inputXByteSize);
-    uint8_t *cos = (uint8_t *)AscendC::GmAlloc(inputCosByteSize);
-    uint8_t *sin = (uint8_t *)AscendC::GmAlloc(inputSinByteSize);
-    uint8_t *rotate_inter = (uint8_t *)AscendC::GmAlloc(inputRotateByteSize);
+    uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputXByteSize);
+    uint8_t* cos = (uint8_t*)AscendC::GmAlloc(inputCosByteSize);
+    uint8_t* sin = (uint8_t*)AscendC::GmAlloc(inputSinByteSize);
+    uint8_t* rotate_inter = (uint8_t*)AscendC::GmAlloc(inputRotateByteSize);
 
-    uint8_t *y = (uint8_t *)AscendC::GmAlloc(outputYByteSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(1024 * 1024 * 1024);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* y = (uint8_t*)AscendC::GmAlloc(outputYByteSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
     uint32_t blockDim = 20;
 
     system(
@@ -468,20 +464,21 @@ TEST_F(rotary_position_embedding_test, test_case_mode_1_rotate_fp16_001)
     system("cd ./rotary_position_embedding_data/ && python3 gen_data_torch.py 3 4 46 32 float16");
     system("cd ./rotary_position_embedding_data/ && python3 gen_tiling.py case1_32");
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
-    RotaryPositionEmbeddingTilingData *tilingDatafromBin =
-        reinterpret_cast<RotaryPositionEmbeddingTilingData *>(tiling);
+    RotaryPositionEmbeddingTilingData* tilingDatafromBin = reinterpret_cast<RotaryPositionEmbeddingTilingData*>(tiling);
 
     ReadFile(path + "/rotary_position_embedding_data/x.pt", inputXByteSize, x, inputXByteSize);
     ReadFile(path + "/rotary_position_embedding_data/cos.pt", inputCosByteSize, cos, inputCosByteSize);
     ReadFile(path + "/rotary_position_embedding_data/sin.pt", inputCosByteSize, sin, inputCosByteSize);
-    ReadFile(path + "/rotary_position_embedding_data/rotate_inter.pt", inputRotateByteSize, rotate_inter, inputRotateByteSize);
+    ReadFile(path + "/rotary_position_embedding_data/rotate_inter.pt", inputRotateByteSize, rotate_inter,
+             inputRotateByteSize);
     ReadFile(path + "/rotary_position_embedding_data/tiling.bin", tilingDataSize, tilingDatafromBin, tilingDataSize);
 
     AscendC::SetKernelMode(KernelMode::MIX_MODE);
     ICPU_SET_TILING_KEY(3012);
-    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, rotate_inter, y, workspace, (uint8_t *)(tilingDatafromBin));
+    ICPU_RUN_KF(rotary_position_embedding, blockDim, x, cos, sin, rotate_inter, y, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
     AscendC::GmFree(cos);

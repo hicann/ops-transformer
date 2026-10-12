@@ -29,8 +29,8 @@ ge::graphStatus InplacePartialRotaryPosEmbeddingMembaseTilingClass::GetPlatformI
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
         aicoreParams_.ubSize = ubSizePlatForm;
     } else {
-        auto compileInfoPtr = reinterpret_cast<const InplacePartialRotaryPositionEmbeddingCompileInfo
-            *>(context_->GetCompileInfo());
+        auto compileInfoPtr =
+            reinterpret_cast<const InplacePartialRotaryPositionEmbeddingCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
         aicoreParams_.blockDim = compileInfoPtr->blockDim;
@@ -48,31 +48,25 @@ ge::graphStatus InplacePartialRotaryPosEmbeddingMembaseTilingClass::GetShapeAttr
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus Tiling4InplacePartialRotaryMulDispatcher(gert::TilingContext *context)
+ge::graphStatus Tiling4InplacePartialRotaryMulDispatcher(gert::TilingContext* context)
 {
     OP_LOGI(context, "Tiling4InplacePartialRotaryMulDispatcher start");
-    OP_CHECK_IF(context == nullptr, OP_LOGE(context, "Tiling context is null"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context == nullptr, OP_LOGE(context, "Tiling context is null"), return ge::GRAPH_FAILED);
 
     auto platformInfo = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context, "Tiling platformInfo is null"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context, "Tiling platformInfo is null"), return ge::GRAPH_FAILED);
     if (Ops::Transformer::OpTiling::IsRegbaseSocVersion(context)) {
         std::vector<std::unique_ptr<InplacePartialRopeRegBaseTilingClass>> regBaseTilingCases;
+        regBaseTilingCases.push_back(std::unique_ptr<InplacePartialRopeRegBaseTilingClass>(
+            new InplacePartialRopeRegBaseTilingClassAAndB(context)));
         regBaseTilingCases.push_back(
-            std::unique_ptr<InplacePartialRopeRegBaseTilingClass>(
-                new InplacePartialRopeRegBaseTilingClassAAndB(context)));
-        regBaseTilingCases.push_back(
-            std::unique_ptr<InplacePartialRopeRegBaseTilingClass>(
-                new InplacePartialRopeRegBaseTilingClassAB(context)));
-        regBaseTilingCases.push_back(
-            std::unique_ptr<InplacePartialRopeRegBaseTilingClass>(
-                new InplacePartialRopeRegBaseTilingClassABAAndBA(context)));
-        regBaseTilingCases.push_back(
-            std::unique_ptr<InplacePartialRopeRegBaseTilingClass>(
-                new InplacePartialRopeRegBaseTilingClassBAB(context)));
+            std::unique_ptr<InplacePartialRopeRegBaseTilingClass>(new InplacePartialRopeRegBaseTilingClassAB(context)));
+        regBaseTilingCases.push_back(std::unique_ptr<InplacePartialRopeRegBaseTilingClass>(
+            new InplacePartialRopeRegBaseTilingClassABAAndBA(context)));
+        regBaseTilingCases.push_back(std::unique_ptr<InplacePartialRopeRegBaseTilingClass>(
+            new InplacePartialRopeRegBaseTilingClassBAB(context)));
         OP_LOGI(context, "Using arch35 tiling for regbase soc");
-        
+
         for (const auto& ptr : regBaseTilingCases) {
             if (ptr) {
                 ge::graphStatus status = ptr->DoTiling();
@@ -91,7 +85,7 @@ ge::graphStatus Tiling4InplacePartialRotaryMulDispatcher(gert::TilingContext *co
     }
 }
 
-ge::graphStatus TilingPrepareForInplacePartialRotaryMul(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForInplacePartialRotaryMul(gert::TilingParseContext* context)
 {
     OP_LOGI(context, "TilingPrepareForInplacePartialRotaryMul context success");
     return ge::GRAPH_SUCCESS;

@@ -37,13 +37,13 @@ enum class RotaryPosEmbeddingMode : int64_t {
     x = [-x[1], x[0]]
 */
 template <typename T>
-__aicore__ inline void HalfRotaryVF(const LocalTensor<T> &inTensor, const LocalTensor<T> &rotaryTensor,
+__aicore__ inline void HalfRotaryVF(const LocalTensor<T>& inTensor, const LocalTensor<T>& rotaryTensor,
                                     const uint32_t dLen, const uint32_t dAlign, const uint16_t currDNum)
 {
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)rotaryTensor.GetPhyAddr();
-    __ubuf__ T *currInUb;
-    __ubuf__ T *currOutUb;
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)rotaryTensor.GetPhyAddr();
+    __ubuf__ T* currInUb;
+    __ubuf__ T* currOutUb;
     uint32_t vecLen = Ops::Base::GetVRegSize() / sizeof(T);
     uint32_t halfD = dLen / HALF_INTERLEAVE_COEF;
     uint32_t halfDAlign = Ops::Base::CeilAlign(halfD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
@@ -81,13 +81,13 @@ __aicore__ inline void HalfRotaryVF(const LocalTensor<T> &inTensor, const LocalT
     x = [-q1, q0, -q3, q2]
 */
 template <typename T>
-__aicore__ inline void QuarterRotaryVF(const LocalTensor<T> &inTensor, const LocalTensor<T> &rotaryTensor,
+__aicore__ inline void QuarterRotaryVF(const LocalTensor<T>& inTensor, const LocalTensor<T>& rotaryTensor,
                                        const uint32_t dLen, const uint32_t dAlign, const uint16_t currDNum)
 {
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)rotaryTensor.GetPhyAddr();
-    __ubuf__ T *currInUb;
-    __ubuf__ T *currOutUb;
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)rotaryTensor.GetPhyAddr();
+    __ubuf__ T* currInUb;
+    __ubuf__ T* currOutUb;
     uint32_t vecLen = Ops::Base::GetVRegSize() / sizeof(T);
     uint32_t quarterD = dLen / QUARTER_MODE_COEF;
     uint32_t quarterDAlign = Ops::Base::CeilAlign(quarterD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
@@ -138,13 +138,13 @@ __aicore__ inline void QuarterRotaryVF(const LocalTensor<T> &inTensor, const Loc
     x = [x_odd, - x_even]
 */
 template <typename T>
-__aicore__ inline void InterleaveRotaryVF(const LocalTensor<T> &inTensor, const LocalTensor<T> &rotaryTensor,
+__aicore__ inline void InterleaveRotaryVF(const LocalTensor<T>& inTensor, const LocalTensor<T>& rotaryTensor,
                                           const uint32_t dLen, const uint16_t currDNum)
 {
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)rotaryTensor.GetPhyAddr();
-    __ubuf__ T *currInUb;
-    __ubuf__ T *currOutUb;
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)rotaryTensor.GetPhyAddr();
+    __ubuf__ T* currInUb;
+    __ubuf__ T* currOutUb;
     uint32_t vecLen = Ops::Base::GetVRegSize() / sizeof(T);
     uint32_t dAlignLen = Ops::Base::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint32_t loopSize = vecLen * HALF_INTERLEAVE_COEF;
@@ -195,13 +195,13 @@ __aicore__ inline void InterleaveRotaryVF(const LocalTensor<T> &inTensor, const 
 }
 
 template <typename T>
-__aicore__ inline void DSDSinInterleaveHalfVF(const LocalTensor<T> &inTensor, const LocalTensor<T> &rotaryTensor,
+__aicore__ inline void DSDSinInterleaveHalfVF(const LocalTensor<T>& inTensor, const LocalTensor<T>& rotaryTensor,
                                               const uint32_t dLen, const uint16_t currDNum)
 {
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)rotaryTensor.GetPhyAddr();
-    __ubuf__ T *currInUb;
-    __ubuf__ T *currOutUb;
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)rotaryTensor.GetPhyAddr();
+    __ubuf__ T* currInUb;
+    __ubuf__ T* currOutUb;
 
     uint32_t vecLen = Ops::Base::GetVRegSize() / sizeof(T);
     uint32_t dAlignLen = Ops::Base::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
@@ -250,13 +250,13 @@ __aicore__ inline void DSDSinInterleaveHalfVF(const LocalTensor<T> &inTensor, co
 }
 
 template <typename T>
-__aicore__ inline void DSCosInterleaveHalfVF(const LocalTensor<T> &inTensor, const LocalTensor<T> &rotaryTensor,
+__aicore__ inline void DSCosInterleaveHalfVF(const LocalTensor<T>& inTensor, const LocalTensor<T>& rotaryTensor,
                                              const uint32_t dLen, const uint16_t currDNum)
 {
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)rotaryTensor.GetPhyAddr();
-    __ubuf__ T *currInUb;
-    __ubuf__ T *currOutUb;
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)rotaryTensor.GetPhyAddr();
+    __ubuf__ T* currInUb;
+    __ubuf__ T* currOutUb;
 
     uint32_t vecLen = Ops::Base::GetVRegSize() / sizeof(T);
     uint32_t dAlignLen = Ops::Base::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));

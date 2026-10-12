@@ -18,12 +18,12 @@
 #include "op_host/tiling_templates_registry.h"
 
 namespace optiling {
-ge::graphStatus Tiling4InplacePartialRotaryMulGrad(gert::TilingContext *context)
+ge::graphStatus Tiling4InplacePartialRotaryMulGrad(gert::TilingContext* context)
 {
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingPrepareForInplacePartialRotaryMulGrad(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForInplacePartialRotaryMulGrad(gert::TilingParseContext* context)
 {
     return ge::GRAPH_SUCCESS;
 }

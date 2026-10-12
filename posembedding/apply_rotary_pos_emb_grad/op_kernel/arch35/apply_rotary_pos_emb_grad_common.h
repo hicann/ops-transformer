@@ -37,14 +37,14 @@ constexpr uint32_t DOUBLE_BUFFER = 2;
     grad_out_2 = cos_2 * grad_2 - sin_1 * grad_1
 */
 template <typename T>
-__aicore__ inline void HalfGradAlignVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-                                       const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen,
+__aicore__ inline void HalfGradAlignVF(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor,
+                                       const LocalTensor<T>& inTensor, const LocalTensor<T>& outTensor, uint32_t dLen,
                                        uint32_t dAlign, uint16_t currSNum, uint16_t currDNum)
 {
-    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
-    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
+    __ubuf__ T* sinUb = (__ubuf__ T*)sinTensor.GetPhyAddr();
+    __ubuf__ T* cosUb = (__ubuf__ T*)cosTensor.GetPhyAddr();
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)outTensor.GetPhyAddr();
     uint32_t halfD = dLen / HALF_COEF;
     uint32_t halfDAlign = Ops::Base::CeilAlign(halfD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint16_t repeatTimes = Ops::Base::CeilDiv(halfD, VL_FLOAT32_SIZE);
@@ -96,20 +96,20 @@ __aicore__ inline void HalfGradAlignVF(const LocalTensor<T> &sinTensor, const Lo
 //   (rotate(x) = cat(-x2, x1))
 // ============================================================================
 template <typename T>
-__aicore__ inline void HalfGradCosSinPartialVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-                                               const LocalTensor<T> &gradIn, const LocalTensor<T> &gradOut,
-                                               const LocalTensor<T> &xIn, const LocalTensor<float> &cosPartial,
-                                               const LocalTensor<float> &sinPartial, uint32_t dLen, uint32_t dAlign,
+__aicore__ inline void HalfGradCosSinPartialVF(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor,
+                                               const LocalTensor<T>& gradIn, const LocalTensor<T>& gradOut,
+                                               const LocalTensor<T>& xIn, const LocalTensor<float>& cosPartial,
+                                               const LocalTensor<float>& sinPartial, uint32_t dLen, uint32_t dAlign,
                                                uint32_t partialDAlign, int64_t ubFactorN, uint16_t currSNum,
                                                uint16_t currDNum, bool isAccumulate)
 {
-    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
-    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
-    __ubuf__ T *gradUb = (__ubuf__ T *)gradIn.GetPhyAddr();
-    __ubuf__ T *gradOutUb = (__ubuf__ T *)gradOut.GetPhyAddr();
-    __ubuf__ T *xUb = (__ubuf__ T *)xIn.GetPhyAddr();
-    __ubuf__ float *cosPartialUb = (__ubuf__ float *)cosPartial.GetPhyAddr();
-    __ubuf__ float *sinPartialUb = (__ubuf__ float *)sinPartial.GetPhyAddr();
+    __ubuf__ T* sinUb = (__ubuf__ T*)sinTensor.GetPhyAddr();
+    __ubuf__ T* cosUb = (__ubuf__ T*)cosTensor.GetPhyAddr();
+    __ubuf__ T* gradUb = (__ubuf__ T*)gradIn.GetPhyAddr();
+    __ubuf__ T* gradOutUb = (__ubuf__ T*)gradOut.GetPhyAddr();
+    __ubuf__ T* xUb = (__ubuf__ T*)xIn.GetPhyAddr();
+    __ubuf__ float* cosPartialUb = (__ubuf__ float*)cosPartial.GetPhyAddr();
+    __ubuf__ float* sinPartialUb = (__ubuf__ float*)sinPartial.GetPhyAddr();
     uint32_t halfD = dLen / HALF_COEF;
     uint32_t halfDAlign = dAlign / HALF_COEF;
     uint32_t halfPartialDAlign = partialDAlign / HALF_COEF;
@@ -204,13 +204,13 @@ __aicore__ inline void HalfGradCosSinPartialVF(const LocalTensor<T> &sinTensor, 
 // 搬运统一按 D/2 拆分：每个半行独立 32B padding 对齐 (cos/sin/grad/x/dx 同布局)
 // ============================================================================
 template <typename T, bool kDcosFlag, int32_t bufferNum>
-__aicore__ inline void ProcessGradTile(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-                                       GlobalTensor<T> &gradXGm, GlobalTensor<T> &gradXOutGm, GlobalTensor<T> &xGm,
-                                       TQue<QuePosition::VECIN, bufferNum> &gradXInQue,
-                                       TQue<QuePosition::VECOUT, bufferNum> &gradXOutQue,
-                                       TQue<QuePosition::VECIN, bufferNum> &xInQue, int64_t gradGmOffset,
-                                       int64_t currXN, uint32_t currBS, LocalTensor<float> &cosPartial,
-                                       LocalTensor<float> &sinPartial, bool isAccumulate, uint32_t dLen,
+__aicore__ inline void ProcessGradTile(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor,
+                                       GlobalTensor<T>& gradXGm, GlobalTensor<T>& gradXOutGm, GlobalTensor<T>& xGm,
+                                       TQue<QuePosition::VECIN, bufferNum>& gradXInQue,
+                                       TQue<QuePosition::VECOUT, bufferNum>& gradXOutQue,
+                                       TQue<QuePosition::VECIN, bufferNum>& xInQue, int64_t gradGmOffset,
+                                       int64_t currXN, uint32_t currBS, LocalTensor<float>& cosPartial,
+                                       LocalTensor<float>& sinPartial, bool isAccumulate, uint32_t dLen,
                                        uint32_t dAlign, uint32_t partialDAlign, int64_t ubFactorN)
 {
     uint32_t dHalfByteSize = static_cast<uint32_t>(dLen / HALF_COEF * sizeof(T));
@@ -256,7 +256,7 @@ __aicore__ inline void ProcessGradTile(const LocalTensor<T> &sinTensor, const Lo
 // 后半段偏移为 dAlign/2，保证 D 非 16 对齐（如 D=100）时向量 Load/Store 地址仍然对齐
 // ============================================================================
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchHalfGradContiguousVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin, __ubuf__ T *out,
+__aicore__ inline void BatchHalfGradContiguousVF(__ubuf__ T* in, __ubuf__ T* cos, __ubuf__ T* sin, __ubuf__ T* out,
                                                  uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d,
                                                  int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
 {

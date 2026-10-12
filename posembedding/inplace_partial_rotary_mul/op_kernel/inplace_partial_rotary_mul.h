@@ -25,22 +25,22 @@ class InplacePartialRotaryMulABA {
 public:
     __aicore__ inline InplacePartialRotaryMulABA(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR r1, GM_ADDR r2, GM_ADDR y, GM_ADDR workspace,
-                                const InplacePartialRopeRegbaseTilingData *tilingData, TPipe *pipe);
+                                const InplacePartialRopeRegbaseTilingData* tilingData, TPipe* pipe);
     __aicore__ inline void Process();
-    __aicore__ inline void CopyInData(LocalTensor<T> &xUb, GlobalTensor<T> &xGm, int64_t blockCout, int64_t blockLen,
+    __aicore__ inline void CopyInData(LocalTensor<T>& xUb, GlobalTensor<T>& xGm, int64_t blockCout, int64_t blockLen,
                                       int64_t gmOffset, int64_t ubOffset);
-    __aicore__ inline void CopyInDataR(LocalTensor<T> &xUb, GlobalTensor<T> &xGm, int64_t blockCout, int64_t blockLen,
+    __aicore__ inline void CopyInDataR(LocalTensor<T>& xUb, GlobalTensor<T>& xGm, int64_t blockCout, int64_t blockLen,
                                        int64_t gmOffset, int64_t ubOffset);
-    __aicore__ inline void SetGatherSrcOffset(LocalTensor<int32_t> &idsUb, int64_t count);
-    __aicore__ inline void ComputeMul(LocalTensor<float> &dtsUb, LocalTensor<float> &src0Ub, LocalTensor<float> &src1Ub,
+    __aicore__ inline void SetGatherSrcOffset(LocalTensor<int32_t>& idsUb, int64_t count);
+    __aicore__ inline void ComputeMul(LocalTensor<float>& dtsUb, LocalTensor<float>& src0Ub, LocalTensor<float>& src1Ub,
                                       int64_t onceA, int64_t numHead, int64_t headDim);
-    __aicore__ inline void InterleavedInversion(int64_t count, LocalTensor<float> &ub);
-    __aicore__ inline void DataCopyOut(LocalTensor<T> &yUb, GlobalTensor<T> &xGm, int64_t blockCout, int64_t blockLen,
+    __aicore__ inline void InterleavedInversion(int64_t count, LocalTensor<float>& ub);
+    __aicore__ inline void DataCopyOut(LocalTensor<T>& yUb, GlobalTensor<T>& xGm, int64_t blockCout, int64_t blockLen,
                                        int64_t gmOffset, int64_t ubOffset);
 
 private:
-    TPipe *pipe_;
-    const InplacePartialRopeRegbaseTilingData *tiling_;
+    TPipe* pipe_;
+    const InplacePartialRopeRegbaseTilingData* tiling_;
     int32_t blockIdx_ = 0;
 
     // 需要的tilingdata
@@ -83,8 +83,8 @@ private:
 template <typename T, bool isBrc>
 __aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::Init(GM_ADDR x, GM_ADDR r1, GM_ADDR r2, GM_ADDR y,
                                                                   GM_ADDR workspace,
-                                                                  const InplacePartialRopeRegbaseTilingData *tilingData,
-                                                                  TPipe *pipe)
+                                                                  const InplacePartialRopeRegbaseTilingData* tilingData,
+                                                                  TPipe* pipe)
 {
     blockIdx_ = GetBlockIdx();
     tiling_ = tilingData;
@@ -101,10 +101,10 @@ __aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::Init(GM_ADDR x, GM_
     blockFactor_ = tiling_->blockFactor;
     start_ = tiling_->start;
 
-    xGm_.SetGlobalBuffer((__gm__ T *)x);
-    r1Gm_.SetGlobalBuffer((__gm__ T *)r1);
-    r2Gm_.SetGlobalBuffer((__gm__ T *)r2);
-    yGm_.SetGlobalBuffer((__gm__ T *)y);
+    xGm_.SetGlobalBuffer((__gm__ T*)x);
+    r1Gm_.SetGlobalBuffer((__gm__ T*)r1);
+    r2Gm_.SetGlobalBuffer((__gm__ T*)r2);
+    yGm_.SetGlobalBuffer((__gm__ T*)y);
     count_ = numHead_ * headDim_;
     xNum_ = ubFactor_ * count_;
     r1Num_ = ubFactor_ * headDim_;
@@ -121,7 +121,7 @@ __aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::Init(GM_ADDR x, GM_
 }
 
 template <typename T, bool isBrc>
-__aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::CopyInData(LocalTensor<T> &xUb, GlobalTensor<T> &xGm,
+__aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::CopyInData(LocalTensor<T>& xUb, GlobalTensor<T>& xGm,
                                                                         int64_t blockCout, int64_t blockLen,
                                                                         int64_t gmOffset, int64_t ubOffset)
 {
@@ -134,7 +134,7 @@ __aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::CopyInData(LocalTen
 }
 
 template <typename T, bool isBrc>
-__aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::CopyInDataR(LocalTensor<T> &xUb, GlobalTensor<T> &xGm,
+__aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::CopyInDataR(LocalTensor<T>& xUb, GlobalTensor<T>& xGm,
                                                                          int64_t blockCout, int64_t blockLen,
                                                                          int64_t gmOffset, int64_t ubOffset)
 {
@@ -147,7 +147,7 @@ __aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::CopyInDataR(LocalTe
 }
 
 template <typename T, bool isBrc>
-__aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::SetGatherSrcOffset(LocalTensor<int32_t> &idsUb,
+__aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::SetGatherSrcOffset(LocalTensor<int32_t>& idsUb,
                                                                                 int64_t count)
 {
     for (int32_t i = 0; i < 8; ++i) {
@@ -173,9 +173,9 @@ __aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::SetGatherSrcOffset(
 }
 
 template <typename T, bool isBrc>
-__aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::ComputeMul(LocalTensor<float> &dtsUb,
-                                                                        LocalTensor<float> &src0Ub,
-                                                                        LocalTensor<float> &src1Ub, int64_t onceA,
+__aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::ComputeMul(LocalTensor<float>& dtsUb,
+                                                                        LocalTensor<float>& src0Ub,
+                                                                        LocalTensor<float>& src1Ub, int64_t onceA,
                                                                         int64_t numHead, int64_t headDim)
 {
     int64_t count = numHead * headDim;
@@ -217,7 +217,7 @@ __aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::ComputeMul(LocalTen
 }
 
 template <typename T, bool isBrc>
-__aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::InterleavedInversion(int64_t count, LocalTensor<float> &ub)
+__aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::InterleavedInversion(int64_t count, LocalTensor<float>& ub)
 {
     // 做奇数位的*-1
     SetMaskNorm();
@@ -238,7 +238,7 @@ __aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::InterleavedInversio
 }
 
 template <typename T, bool isBrc>
-__aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::DataCopyOut(LocalTensor<T> &yUb, GlobalTensor<T> &xGm,
+__aicore__ inline void InplacePartialRotaryMulABA<T, isBrc>::DataCopyOut(LocalTensor<T>& yUb, GlobalTensor<T>& xGm,
                                                                          int64_t blockCout, int64_t blockLen,
                                                                          int64_t gmOffset, int64_t ubOffset)
 {

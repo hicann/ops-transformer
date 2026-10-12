@@ -11,18 +11,70 @@
 import sys
 
 # [10, 3, 64] bfloat16_t
-case0_params = [20, 128, 8, 1, 1, 16, 8, 1, 1, 16, 8, 8, 0, 8, 0, 8, 3456, 864, 1, 40, 1, 16, 1, 1, 8, 8, 248, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ]
+case0_params = [
+    20,
+    128,
+    8,
+    1,
+    1,
+    16,
+    8,
+    1,
+    1,
+    16,
+    8,
+    8,
+    0,
+    8,
+    0,
+    8,
+    3456,
+    864,
+    1,
+    40,
+    1,
+    16,
+    1,
+    1,
+    8,
+    8,
+    248,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+]
 
-params_info = {
-    "case0": case0_params
-}
+params_info = {"case0": case0_params}
+
 
 def main():
-    params_list = params_info[sys.argv[1]]   # python gen_tiling.py case0  sys.argv[1]="case0"
+    params_list = params_info[
+        sys.argv[1]
+    ]  # python gen_tiling.py case0  sys.argv[1]="case0"
     base_params = np.array(params_list, dtype=np.int64)
     tiling_file = open("tiling.bin", "wb")
     base_params.tofile(tiling_file)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

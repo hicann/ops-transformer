@@ -94,11 +94,11 @@ enum class InplacePartialRotaryMulGradMode : int64_t {
 
 class InplacePartialRotaryMulGradRegbaseTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit InplacePartialRotaryMulGradRegbaseTiling(gert::TilingContext *context)
+    explicit InplacePartialRotaryMulGradRegbaseTiling(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
     }
@@ -168,7 +168,7 @@ private:
     ge::graphStatus CheckParam();
     ge::graphStatus CheckShapeLimit();
     ge::graphStatus CheckShapeDim() const;
-    ge::graphStatus JudgeLayoutByShape(const gert::Shape &xShape, const gert::Shape &cosShape);
+    ge::graphStatus JudgeLayoutByShape(const gert::Shape& xShape, const gert::Shape& cosShape);
     ge::graphStatus CheckRotaryModeShapeRelation(const int64_t sliceLen);
     ge::graphStatus CheckInPutShapeAllPositive(const int64_t idx) const;
     ge::graphStatus CheckOutPutShapeAllPositive(const int64_t idx) const;

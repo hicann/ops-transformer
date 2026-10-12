@@ -29,7 +29,7 @@ public:
     __aicore__ inline ~RotaryPositionEmbeddingAAndB(){};
 
     __aicore__ inline void Init(GM_ADDR q, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut, GM_ADDR workspace,
-                                const RopeRegbaseTilingData *tilingData, TPipe *pipe);
+                                const RopeRegbaseTilingData* tilingData, TPipe* pipe);
 
     __aicore__ inline void Process();
 
@@ -39,19 +39,19 @@ private:
     __aicore__ inline void InitAllBuffer();
     __aicore__ inline void InitLoopParams();
     // 各个层级的Process函数
-    __aicore__ inline void ProcessInLoop(LocalTensor<T> &cos, LocalTensor<T> &sin, int64_t bStart, int64_t bLength);
+    __aicore__ inline void ProcessInLoop(LocalTensor<T>& cos, LocalTensor<T>& sin, int64_t bStart, int64_t bLength);
     // 拷入拷出函数
     __aicore__ inline void CopyInCosAndSin(int64_t bStart, int64_t bLength);
-    __aicore__ inline void CopyInQ(GlobalTensor<T> &source, int64_t bStart, int64_t bLength);
-    __aicore__ inline void CopyOutQ(GlobalTensor<T> &target, int64_t bStart, int64_t bLength);
+    __aicore__ inline void CopyInQ(GlobalTensor<T>& source, int64_t bStart, int64_t bLength);
+    __aicore__ inline void CopyOutQ(GlobalTensor<T>& target, int64_t bStart, int64_t bLength);
 
     // 计算函数
-    __aicore__ inline void Compute(LocalTensor<T> &cos, LocalTensor<T> &sin, int64_t bLength);
+    __aicore__ inline void Compute(LocalTensor<T>& cos, LocalTensor<T>& sin, int64_t bLength);
 
 private:
     constexpr static uint32_t COS_DB_BUFFER = IsBoardCast ? 1 : DOUBLE_BUFFER;
 
-    TPipe *pipe_;
+    TPipe* pipe_;
 
     // GlobalMemory
     GlobalTensor<T> qGm_;
@@ -71,7 +71,7 @@ private:
     int64_t bBlockLength_ = 0;
 
     // TilingData
-    const RopeRegbaseTilingData *tilingData_;
+    const RopeRegbaseTilingData* tilingData_;
     int64_t ubFactorB_ = 0;
     int64_t D_ = 0;
     int64_t dAlign_ = 0;
@@ -85,8 +85,8 @@ private:
 template <typename T, bool IsBoardCast>
 __aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::Init(GM_ADDR q, GM_ADDR cos, GM_ADDR sin,
                                                                           GM_ADDR qOut, GM_ADDR workspace,
-                                                                          const RopeRegbaseTilingData *tilingData,
-                                                                          TPipe *pipe)
+                                                                          const RopeRegbaseTilingData* tilingData,
+                                                                          TPipe* pipe)
 {
     this->tilingData_ = tilingData;
     this->pipe_ = pipe;
@@ -100,10 +100,10 @@ template <typename T, bool IsBoardCast>
 __aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::InitAllGlobalBuffer(GM_ADDR q, GM_ADDR cos,
                                                                                          GM_ADDR sin, GM_ADDR qOut)
 {
-    this->qGm_.SetGlobalBuffer((__gm__ T *)q);
-    this->cosGm_.SetGlobalBuffer((__gm__ T *)cos);
-    this->sinGm_.SetGlobalBuffer((__gm__ T *)sin);
-    this->qOutGm_.SetGlobalBuffer((__gm__ T *)qOut);
+    this->qGm_.SetGlobalBuffer((__gm__ T*)q);
+    this->cosGm_.SetGlobalBuffer((__gm__ T*)cos);
+    this->sinGm_.SetGlobalBuffer((__gm__ T*)sin);
+    this->qOutGm_.SetGlobalBuffer((__gm__ T*)qOut);
 }
 
 template <typename T, bool IsBoardCast>
@@ -180,8 +180,8 @@ __aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::Process()
 }
 
 template <typename T, bool IsBoardCast>
-__aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::ProcessInLoop(LocalTensor<T> &cos,
-                                                                                   LocalTensor<T> &sin,
+__aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::ProcessInLoop(LocalTensor<T>& cos,
+                                                                                   LocalTensor<T>& sin,
                                                                                    int64_t bUbStart, int64_t bUbLength)
 {
     CopyInQ(qGm_, bUbStart, bUbLength);
@@ -211,7 +211,7 @@ __aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::CopyInCosAn
 }
 
 template <typename T, bool IsBoardCast>
-__aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::CopyInQ(GlobalTensor<T> &source, int64_t bStart,
+__aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::CopyInQ(GlobalTensor<T>& source, int64_t bStart,
                                                                              int64_t bLength)
 {
     LocalTensor<T> target = this->qInQueue_.template AllocTensor<T>();
@@ -230,7 +230,7 @@ __aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::CopyInQ(Glo
 }
 
 template <typename T, bool IsBoardCast>
-__aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::CopyOutQ(GlobalTensor<T> &target, int64_t bStart,
+__aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::CopyOutQ(GlobalTensor<T>& target, int64_t bStart,
                                                                               int64_t bLength)
 {
     LocalTensor<T> source = this->qOutQueue_.template DeQue<T>();
@@ -244,7 +244,7 @@ __aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::CopyOutQ(Gl
 }
 
 template <typename T, bool IsBoardCast>
-__aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::Compute(LocalTensor<T> &cos, LocalTensor<T> &sin,
+__aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::Compute(LocalTensor<T>& cos, LocalTensor<T>& sin,
                                                                              int64_t bLength)
 {
     LocalTensor<T> inUb = this->qInQueue_.template DeQue<T>();
@@ -261,21 +261,21 @@ __aicore__ inline void RotaryPositionEmbeddingAAndB<T, IsBoardCast>::Compute(Loc
         }
     } else {
         if (tilingData_->rotaryMode == static_cast<int64_t>(RotaryPosEmbeddingMode::HALF)) {
-            BatchHalfAlignVF<T, IsBoardCast>((__ubuf__ T *)inUb.GetPhyAddr(), (__ubuf__ T *)cos.GetPhyAddr(),
-                                             (__ubuf__ T *)sin.GetPhyAddr(), (__ubuf__ T *)outUb.GetPhyAddr(), bLength,
-                                             1, 1, D_, dAlign_, ubFactorB_, 1);
+            BatchHalfAlignVF<T, IsBoardCast>((__ubuf__ T*)inUb.GetPhyAddr(), (__ubuf__ T*)cos.GetPhyAddr(),
+                                             (__ubuf__ T*)sin.GetPhyAddr(), (__ubuf__ T*)outUb.GetPhyAddr(), bLength, 1,
+                                             1, D_, dAlign_, ubFactorB_, 1);
         } else if (tilingData_->rotaryMode == static_cast<int64_t>(RotaryPosEmbeddingMode::INTERLEAVE)) {
-            BatchInterleaveModeVF<T, IsBoardCast>((__ubuf__ T *)inUb.GetPhyAddr(), (__ubuf__ T *)cos.GetPhyAddr(),
-                                                  (__ubuf__ T *)sin.GetPhyAddr(), (__ubuf__ T *)outUb.GetPhyAddr(),
+            BatchInterleaveModeVF<T, IsBoardCast>((__ubuf__ T*)inUb.GetPhyAddr(), (__ubuf__ T*)cos.GetPhyAddr(),
+                                                  (__ubuf__ T*)sin.GetPhyAddr(), (__ubuf__ T*)outUb.GetPhyAddr(),
                                                   bLength, 1, 1, D_, dAlign_, ubFactorB_, 1);
         } else if (tilingData_->rotaryMode == static_cast<int64_t>(RotaryPosEmbeddingMode::QUARTER)) {
-            BatchQuarterAlignVF<T, IsBoardCast>((__ubuf__ T *)inUb.GetPhyAddr(), (__ubuf__ T *)cos.GetPhyAddr(),
-                                                (__ubuf__ T *)sin.GetPhyAddr(), (__ubuf__ T *)outUb.GetPhyAddr(),
-                                                bLength, 1, 1, D_, dAlign_, ubFactorB_, 1);
+            BatchQuarterAlignVF<T, IsBoardCast>((__ubuf__ T*)inUb.GetPhyAddr(), (__ubuf__ T*)cos.GetPhyAddr(),
+                                                (__ubuf__ T*)sin.GetPhyAddr(), (__ubuf__ T*)outUb.GetPhyAddr(), bLength,
+                                                1, 1, D_, dAlign_, ubFactorB_, 1);
         } else {
             BatchDeepSeekInterleaveModeVF<T, IsBoardCast>(
-                (__ubuf__ T *)inUb.GetPhyAddr(), (__ubuf__ T *)cos.GetPhyAddr(), (__ubuf__ T *)sin.GetPhyAddr(),
-                (__ubuf__ T *)outUb.GetPhyAddr(), bLength, 1, 1, D_, dAlign_, ubFactorB_, 1);
+                (__ubuf__ T*)inUb.GetPhyAddr(), (__ubuf__ T*)cos.GetPhyAddr(), (__ubuf__ T*)sin.GetPhyAddr(),
+                (__ubuf__ T*)outUb.GetPhyAddr(), bLength, 1, 1, D_, dAlign_, ubFactorB_, 1);
         }
     }
 

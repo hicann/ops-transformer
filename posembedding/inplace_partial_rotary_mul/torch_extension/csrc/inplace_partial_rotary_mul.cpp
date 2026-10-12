@@ -21,7 +21,7 @@ namespace op_api {
 static const std::unordered_map<std::string, int64_t> mode_map = {
     {"half", 0}, {"interleave", 1}, {"quarter", 2}, {"interleave-half", 3}};
 
-void InplacePartialRotaryMul(at::Tensor &x, const at::Tensor &r1, const at::Tensor &r2, std::string rotaryMode,
+void InplacePartialRotaryMul(at::Tensor& x, const at::Tensor& r1, const at::Tensor& r2, std::string rotaryMode,
                              c10::IntArrayRef partialSlice)
 {
     TORCH_CHECK(x.dim() == 4, "Input tensor x's dim num should be 4, actual ", x.dim(), ".");

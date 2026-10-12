@@ -46,23 +46,23 @@ constexpr uint64_t TEST_L1_SIZE = 524288U;
 constexpr uint64_t TEST_L0C_SIZE = 131072U;
 constexpr uint64_t MROPE_MX_VECTOR_TILING_KEY = 302059776ULL;
 
-int64_t ReadExpected(const csv_map &csvMap, const std::string &key)
+int64_t ReadExpected(const csv_map& csvMap, const std::string& key)
 {
     const std::string value = ReadMap(csvMap, key);
     return value.empty() ? EXPECT_UNSET : std::stoll(value);
 }
 
-bool IsNullValue(const std::string &value)
+bool IsNullValue(const std::string& value)
 {
     return value.empty() || value == "<null>";
 }
 
-std::string DecodeString(const std::string &value)
+std::string DecodeString(const std::string& value)
 {
     return value == "<empty>" ? std::string() : value;
 }
 
-std::vector<int64_t> ParseIntList(const std::string &value)
+std::vector<int64_t> ParseIntList(const std::string& value)
 {
     if (IsNullValue(value) || value == "<empty>") {
         return {};
@@ -133,7 +133,7 @@ struct QkvTilingCase : public HostUtParamBase {
     std::string socVersion = "Ascend950";
     ExpectedTiling expected;
 
-    QkvTilingCase(const csv_map &csvMap)
+    QkvTilingCase(const csv_map& csvMap)
         : HostUtParamBase(csvMap)
     {
         inputInstance.emplace_back(GetTensorGE(csvMap, "qkv_shape", "qkv_dtype", "qkv_format", qkv));
@@ -201,7 +201,7 @@ struct QkvTilingCase : public HostUtParamBase {
     }
 };
 
-std::vector<gert::TilingContextPara::OpAttr> BuildAttrs(const QkvTilingCase &testCase)
+std::vector<gert::TilingContextPara::OpAttr> BuildAttrs(const QkvTilingCase& testCase)
 {
     std::vector<gert::TilingContextPara::OpAttr> attrs;
     if (IsNullValue(testCase.headNums)) {
@@ -248,7 +248,7 @@ std::vector<gert::TilingContextPara::OpAttr> BuildAttrs(const QkvTilingCase &tes
     return attrs;
 }
 
-CompileInfo BuildCompileInfo(const QkvTilingCase &testCase)
+CompileInfo BuildCompileInfo(const QkvTilingCase& testCase)
 {
     CompileInfo compileInfo;
     compileInfo.aicNum = testCase.aicNum;
@@ -260,7 +260,7 @@ CompileInfo BuildCompileInfo(const QkvTilingCase &testCase)
     return compileInfo;
 }
 
-gert::TilingContextPara BuildTilingContext(const QkvTilingCase &testCase, CompileInfo &compileInfo)
+gert::TilingContextPara BuildTilingContext(const QkvTilingCase& testCase, CompileInfo& compileInfo)
 {
     return gert::TilingContextPara(
         "QkvRmsNormRopeCacheWithKScale",
@@ -272,14 +272,14 @@ gert::TilingContextPara BuildTilingContext(const QkvTilingCase &testCase, Compil
         compileInfo.ubSize);
 }
 
-bool RunTiling(const QkvTilingCase &testCase, TilingInfo &tilingInfo)
+bool RunTiling(const QkvTilingCase& testCase, TilingInfo& tilingInfo)
 {
     auto compileInfo = BuildCompileInfo(testCase);
     auto tilingContext = BuildTilingContext(testCase, compileInfo);
     return ExecuteTiling(tilingContext, tilingInfo);
 }
 
-uint64_t ParseLayout(const std::string &value, uint64_t defaultLayout)
+uint64_t ParseLayout(const std::string& value, uint64_t defaultLayout)
 {
     const std::string layout = DecodeString(value);
     if (layout == "NTD") {
@@ -302,7 +302,7 @@ struct DerivedInput {
     float epsilon = DEFAULT_EPSILON;
 };
 
-DerivedInput DeriveInput(const QkvTilingCase &testCase)
+DerivedInput DeriveInput(const QkvTilingCase& testCase)
 {
     DerivedInput input;
     const auto headNums = ParseIntList(testCase.headNums);
@@ -311,7 +311,7 @@ DerivedInput DeriveInput(const QkvTilingCase &testCase)
     input.numVHeads = static_cast<uint64_t>(headNums[2]);
 
     const uint64_t layoutQkv = ParseLayout(testCase.layoutQkv, TEST_LAYOUT_TND);
-    const auto &qkvShape = testCase.qkv.shape_.GetStorageShape();
+    const auto& qkvShape = testCase.qkv.shape_.GetStorageShape();
     input.totalTokens = static_cast<uint64_t>(qkvShape.GetDim(layoutQkv == TEST_LAYOUT_TND ? 0 : 1));
     input.headDim = static_cast<uint64_t>(qkvShape.GetDim(2));
     // M-RoPE deliberately leaves the RoPE sequence tensors absent.
@@ -322,16 +322,16 @@ DerivedInput DeriveInput(const QkvTilingCase &testCase)
     return input;
 }
 
-void ExpectU64(const std::string &caseName, const char *field, int64_t expected, uint64_t actual)
+void ExpectU64(const std::string& caseName, const char* field, int64_t expected, uint64_t actual)
 {
     if (expected >= 0) {
         EXPECT_EQ(actual, static_cast<uint64_t>(expected)) << "caseName=" << caseName << ", field=" << field;
     }
 }
 
-void ExpectTilingResult(const QkvTilingCase &testCase, const TilingInfo &tilingInfo)
+void ExpectTilingResult(const QkvTilingCase& testCase, const TilingInfo& tilingInfo)
 {
-    const auto &expected = testCase.expected;
+    const auto& expected = testCase.expected;
     if (expected.tilingKey >= 0) {
         EXPECT_EQ(tilingInfo.tilingKey, expected.tilingKey) << "caseName=" << testCase.case_name;
     }
@@ -344,13 +344,13 @@ void ExpectTilingResult(const QkvTilingCase &testCase, const TilingInfo &tilingI
     ASSERT_EQ(tilingInfo.tilingDataSize, sizeof(TilingData)) << "caseName=" << testCase.case_name;
     ASSERT_NE(tilingInfo.tilingData, nullptr) << "caseName=" << testCase.case_name;
     if (expected.tilingDataZero == 1) {
-        const auto *begin = tilingInfo.tilingData.get();
+        const auto* begin = tilingInfo.tilingData.get();
         EXPECT_TRUE(std::all_of(begin, begin + sizeof(TilingData), [](uint8_t value) { return value == 0U; }))
             << "caseName=" << testCase.case_name;
         return;
     }
 
-    const auto &tiling = *reinterpret_cast<const TilingData *>(tilingInfo.tilingData.get());
+    const auto& tiling = *reinterpret_cast<const TilingData*>(tilingInfo.tilingData.get());
     const auto input = DeriveInput(testCase);
     EXPECT_EQ(tiling.totalTokens, input.totalTokens) << "caseName=" << testCase.case_name;
     EXPECT_EQ(tiling.batch, input.batch) << "caseName=" << testCase.case_name;
@@ -420,21 +420,21 @@ void ExpectTilingResult(const QkvTilingCase &testCase, const TilingInfo &tilingI
     EXPECT_FLOAT_EQ(tiling.epsilon, input.epsilon) << "caseName=" << testCase.case_name;
 }
 
-const std::vector<QkvTilingCase> &GetTilingCases()
+const std::vector<QkvTilingCase>& GetTilingCases()
 {
     static const auto cases = GetCasesFromCsv<QkvTilingCase>(ReplaceFileExtension2Csv(__FILE__));
     return cases;
 }
 
-const QkvTilingCase *FindTilingCase(const std::string &caseName)
+const QkvTilingCase* FindTilingCase(const std::string& caseName)
 {
-    const auto &cases = GetTilingCases();
+    const auto& cases = GetTilingCases();
     const auto it = std::find_if(cases.begin(), cases.end(),
-                                 [&](const QkvTilingCase &testCase) { return testCase.case_name == caseName; });
+                                 [&](const QkvTilingCase& testCase) { return testCase.case_name == caseName; });
     return it == cases.end() ? nullptr : &*it;
 }
 
-bool MatchesExpectedResult(const QkvTilingCase &testCase, bool success, const TilingInfo &tilingInfo)
+bool MatchesExpectedResult(const QkvTilingCase& testCase, bool success, const TilingInfo& tilingInfo)
 {
     if (success != (testCase.expectResult == ge::GRAPH_SUCCESS)) {
         return false;
@@ -445,7 +445,7 @@ bool MatchesExpectedResult(const QkvTilingCase &testCase, bool success, const Ti
     if (tilingInfo.tilingDataSize < sizeof(TilingData) || tilingInfo.tilingData == nullptr) {
         return false;
     }
-    const auto *tiling = reinterpret_cast<const TilingData *>(tilingInfo.tilingData.get());
+    const auto* tiling = reinterpret_cast<const TilingData*>(tilingInfo.tilingData.get());
     const auto matches = [](int64_t expected, uint64_t actual) {
         return expected < 0 || static_cast<uint64_t>(expected) == actual;
     };
@@ -473,7 +473,7 @@ class QkvRmsNormRopeCacheWithKScaleCsvTiling : public testing::TestWithParam<Qkv
 
 TEST_P(QkvRmsNormRopeCacheWithKScaleCsvTiling, RunsCase)
 {
-    const auto &testCase = GetParam();
+    const auto& testCase = GetParam();
     TilingInfo tilingInfo;
     const bool success = RunTiling(testCase, tilingInfo);
     const auto status = success ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED;
@@ -488,7 +488,7 @@ INSTANTIATE_TEST_SUITE_P(CsvCases, QkvRmsNormRopeCacheWithKScaleCsvTiling, testi
 
 TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, MropeMxHeadRoutesSelectSingleVectorKey)
 {
-    const std::array<std::pair<const char *, uint64_t>, 8> routes = {{
+    const std::array<std::pair<const char*, uint64_t>, 8> routes = {{
         {"mrope_mx_h8_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
         {"mrope_mx_h16_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
         {"mrope_mx_h24_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
@@ -498,8 +498,8 @@ TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, MropeMxHeadRoutesSelectSingleVecto
         {"mrope_mx_h56_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
         {"mrope_mx_h64_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
     }};
-    for (const auto &[caseName, expectedKey] : routes) {
-        const auto *testCase = FindTilingCase(caseName);
+    for (const auto& [caseName, expectedKey] : routes) {
+        const auto* testCase = FindTilingCase(caseName);
         ASSERT_NE(testCase, nullptr) << "caseName=" << caseName;
         TilingInfo tilingInfo;
         ASSERT_TRUE(RunTiling(*testCase, tilingInfo)) << "caseName=" << caseName;
@@ -509,15 +509,15 @@ TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, MropeMxHeadRoutesSelectSingleVecto
 
 TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, ChecksQuantizedQScaleDtype)
 {
-    const std::array<std::pair<const char *, ge::DataType>, 3> scenes = {{
+    const std::array<std::pair<const char*, ge::DataType>, 3> scenes = {{
         {"q16_k2_v2_tnd", ge::DT_FLOAT},
         {"q16_k2_v2_tnd_to_ntd", ge::DT_FLOAT},
         {"mrope_mx_h8_t129_current_route", ge::DT_FLOAT8_E8M0},
     }};
     const std::array<ge::DataType, 6> dtypes = {ge::DT_FLOAT, ge::DT_FLOAT16,       ge::DT_BF16,
                                                 ge::DT_INT8,  ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E8M0};
-    for (const auto &[caseName, expectedDtype] : scenes) {
-        const auto *baseCase = FindTilingCase(caseName);
+    for (const auto& [caseName, expectedDtype] : scenes) {
+        const auto* baseCase = FindTilingCase(caseName);
         ASSERT_NE(baseCase, nullptr);
         for (const auto dtype : dtypes) {
             SCOPED_TRACE(std::string(caseName) + ":" + std::to_string(dtype));
@@ -531,9 +531,9 @@ TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, ChecksQuantizedQScaleDtype)
 
 TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, ChecksQScaleDtypeForDefaultQuantMode)
 {
-    const auto *baseCase = FindTilingCase("q16_k2_v2_tnd");
+    const auto* baseCase = FindTilingCase("q16_k2_v2_tnd");
     ASSERT_NE(baseCase, nullptr);
-    for (const auto *mode : {"<null>", "<empty>", "PerTokenPerHead"}) {
+    for (const auto* mode : {"<null>", "<empty>", "PerTokenPerHead"}) {
         SCOPED_TRACE(mode);
         for (const auto dtype : {ge::DT_FLOAT, ge::DT_FLOAT8_E8M0}) {
             auto testCase = *baseCase;
@@ -548,7 +548,7 @@ TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, ChecksQScaleDtypeForDefaultQuantMo
 
 TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, MropeMxQTailWaveFallsBackToSingleTokenUnderUbPressure)
 {
-    const auto *baseCase = FindTilingCase("mrope_mx_h8_t129_current_route");
+    const auto* baseCase = FindTilingCase("mrope_mx_h8_t129_current_route");
     ASSERT_NE(baseCase, nullptr);
     ::QkvRmsNormRopeCacheWithKScale::MropeMxUbLayout oneToken{};
     ::QkvRmsNormRopeCacheWithKScale::MropeMxUbLayout twoTokens{};
@@ -561,7 +561,7 @@ TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, MropeMxQTailWaveFallsBackToSingleT
     TilingInfo tilingInfo;
     ASSERT_TRUE(RunTiling(lowUbCase, tilingInfo));
     ASSERT_NE(tilingInfo.tilingData, nullptr);
-    const auto *tiling = reinterpret_cast<const TilingData *>(tilingInfo.tilingData.get());
+    const auto* tiling = reinterpret_cast<const TilingData*>(tilingInfo.tilingData.get());
     EXPECT_EQ(tilingInfo.tilingKey, MROPE_MX_VECTOR_TILING_KEY);
     EXPECT_EQ(tiling->tokenTile, 1U);
 }
@@ -582,7 +582,7 @@ TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, RealTilingIsStableAcrossThreads)
         "q16_k2_v2_basic",  "t512_q64_k8",          "t1024_q16_k2", "mrope_mx_h8_t129_current_route",
         "too_many_q_heads", "unsupported_head_dim",
     };
-    std::array<const QkvTilingCase *, caseNames.size()> cases = {};
+    std::array<const QkvTilingCase*, caseNames.size()> cases = {};
     for (size_t i = 0; i < caseNames.size(); ++i) {
         cases[i] = FindTilingCase(caseNames[i]);
         ASSERT_NE(cases[i], nullptr) << "caseName=" << caseNames[i];
@@ -598,7 +598,7 @@ TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, RealTilingIsStableAcrossThreads)
             }
             for (uint32_t iter = 0U; iter < ITERATIONS; ++iter) {
                 const uint64_t caseIdx = (static_cast<uint64_t>(threadIdx) + iter) % cases.size();
-                const auto &testCase = *cases[caseIdx];
+                const auto& testCase = *cases[caseIdx];
                 TilingInfo tilingInfo;
                 const bool success = RunTiling(testCase, tilingInfo);
                 if (!MatchesExpectedResult(testCase, success, tilingInfo)) {
@@ -609,7 +609,7 @@ TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, RealTilingIsStableAcrossThreads)
                     results[threadIdx].blockNum = tilingInfo.blockNum;
                     if (success && tilingInfo.tilingDataSize >= sizeof(TilingData) &&
                         tilingInfo.tilingData != nullptr) {
-                        const auto *tiling = reinterpret_cast<const TilingData *>(tilingInfo.tilingData.get());
+                        const auto* tiling = reinterpret_cast<const TilingData*>(tilingInfo.tilingData.get());
                         results[threadIdx].tokenTile = tiling->tokenTile;
                         results[threadIdx].coreTokenTile = tiling->coreTokenTile;
                         results[threadIdx].coreGroupNum = tiling->coreGroupNum;
@@ -621,7 +621,7 @@ TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, RealTilingIsStableAcrossThreads)
     }
 
     start.store(true, std::memory_order_release);
-    for (auto &thread : threads) {
+    for (auto& thread : threads) {
         thread.join();
     }
 

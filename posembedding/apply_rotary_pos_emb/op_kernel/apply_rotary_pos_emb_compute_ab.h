@@ -26,47 +26,47 @@ class ARPEComputeAB : public ApplyRotaryPosEmbBase<T1> {
 public:
     __aicore__ inline ARPEComputeAB(){};
     __aicore__ inline void Init(GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut, GM_ADDR kOut,
-                                GM_ADDR workspace, const ApplyRotaryPosEmbTilingData *tilingData);
-    __aicore__ inline void Process(const ApplyRotaryPosEmbTilingData *tilingData);
+                                GM_ADDR workspace, const ApplyRotaryPosEmbTilingData* tilingData);
+    __aicore__ inline void Process(const ApplyRotaryPosEmbTilingData* tilingData);
 
 private:
-    __aicore__ inline void ProcessPreCore(const ApplyRotaryPosEmbTilingData *tilingData);
-    __aicore__ inline void ProcessLastCore(const ApplyRotaryPosEmbTilingData *tilingData);
+    __aicore__ inline void ProcessPreCore(const ApplyRotaryPosEmbTilingData* tilingData);
+    __aicore__ inline void ProcessLastCore(const ApplyRotaryPosEmbTilingData* tilingData);
 
     __aicore__ inline void CopyIn(const int64_t coreBatchIndex, const int64_t preCBatchB, const int64_t preCBBTimes,
-                                  const int64_t comBatchBBL, const ApplyRotaryPosEmbTilingData *tilingData);
+                                  const int64_t comBatchBBL, const ApplyRotaryPosEmbTilingData* tilingData);
     __aicore__ inline void CopyInQK(const int64_t coreBatchIndex, const int64_t preCBatchB,
-                                    const ApplyRotaryPosEmbTilingData *tilingData);
+                                    const ApplyRotaryPosEmbTilingData* tilingData);
     __aicore__ inline void CopyOut(const int64_t coreBatchIndex, const int64_t preCBatchB,
-                                   const ApplyRotaryPosEmbTilingData *tilingData);
-    __aicore__ inline void CTotaryBF32(const int64_t j, const int64_t comBatchBB, LocalTensor<T1> &qSize,
-                                       LocalTensor<T1> &cosSize, LocalTensor<T1> &sinSize, LocalTensor<T1> &outUb,
-                                       const ApplyRotaryPosEmbTilingData *tilingData);
-    __aicore__ inline void LargeQCFP16(const int64_t j, const int64_t comBatchBB, LocalTensor<T1> &mul1Ub,
-                                       LocalTensor<T1> &outUb, LocalTensor<T1> &sinSize, LocalTensor<T1> &mul2Ub,
-                                       LocalTensor<T1> &qSize, LocalTensor<T1> &cosSize,
-                                       const ApplyRotaryPosEmbTilingData *tilingData, BinaryRepeatParams &repeatParams);
+                                   const ApplyRotaryPosEmbTilingData* tilingData);
+    __aicore__ inline void CTotaryBF32(const int64_t j, const int64_t comBatchBB, LocalTensor<T1>& qSize,
+                                       LocalTensor<T1>& cosSize, LocalTensor<T1>& sinSize, LocalTensor<T1>& outUb,
+                                       const ApplyRotaryPosEmbTilingData* tilingData);
+    __aicore__ inline void LargeQCFP16(const int64_t j, const int64_t comBatchBB, LocalTensor<T1>& mul1Ub,
+                                       LocalTensor<T1>& outUb, LocalTensor<T1>& sinSize, LocalTensor<T1>& mul2Ub,
+                                       LocalTensor<T1>& qSize, LocalTensor<T1>& cosSize,
+                                       const ApplyRotaryPosEmbTilingData* tilingData, BinaryRepeatParams& repeatParams);
 
-    __aicore__ inline void ComputeTotary(const int64_t j, const int64_t comBatchBB, LocalTensor<T1> &qSize,
-                                         LocalTensor<T1> &cosSize, LocalTensor<T1> &sinSize, LocalTensor<T1> &outUb,
-                                         const ApplyRotaryPosEmbTilingData *tilingData);
-    __aicore__ inline void SmallQCFP16(const int64_t j, const int64_t comBatchBB, LocalTensor<T1> &mul1Ub,
-                                       LocalTensor<T1> &outUb, LocalTensor<T1> &sinSize, LocalTensor<T1> &mul2Ub,
-                                       LocalTensor<T1> &qSize, LocalTensor<T1> &cosSize,
-                                       const ApplyRotaryPosEmbTilingData *tilingData, BinaryRepeatParams &repeatParams);
-    __aicore__ inline void SmallQC(const int64_t j, const int64_t comBatchBB, LocalTensor<T1> &mul1Ub,
-                                   LocalTensor<T1> &outUb, LocalTensor<T1> &sinSize, LocalTensor<T1> &mul2Ub,
-                                   LocalTensor<T1> &qSize, LocalTensor<T1> &cosSize,
-                                   const ApplyRotaryPosEmbTilingData *tilingData, BinaryRepeatParams &repeatParams);
-    __aicore__ inline void LargeQC(const int64_t j, const int64_t comBatchBB, LocalTensor<T1> &mul1Ub,
-                                   LocalTensor<T1> &outUb, LocalTensor<T1> &sinSize, LocalTensor<T1> &mul2Ub,
-                                   LocalTensor<T1> &qSize, LocalTensor<T1> &cosSize,
-                                   const ApplyRotaryPosEmbTilingData *tilingData, BinaryRepeatParams &repeatParams);
+    __aicore__ inline void ComputeTotary(const int64_t j, const int64_t comBatchBB, LocalTensor<T1>& qSize,
+                                         LocalTensor<T1>& cosSize, LocalTensor<T1>& sinSize, LocalTensor<T1>& outUb,
+                                         const ApplyRotaryPosEmbTilingData* tilingData);
+    __aicore__ inline void SmallQCFP16(const int64_t j, const int64_t comBatchBB, LocalTensor<T1>& mul1Ub,
+                                       LocalTensor<T1>& outUb, LocalTensor<T1>& sinSize, LocalTensor<T1>& mul2Ub,
+                                       LocalTensor<T1>& qSize, LocalTensor<T1>& cosSize,
+                                       const ApplyRotaryPosEmbTilingData* tilingData, BinaryRepeatParams& repeatParams);
+    __aicore__ inline void SmallQC(const int64_t j, const int64_t comBatchBB, LocalTensor<T1>& mul1Ub,
+                                   LocalTensor<T1>& outUb, LocalTensor<T1>& sinSize, LocalTensor<T1>& mul2Ub,
+                                   LocalTensor<T1>& qSize, LocalTensor<T1>& cosSize,
+                                   const ApplyRotaryPosEmbTilingData* tilingData, BinaryRepeatParams& repeatParams);
+    __aicore__ inline void LargeQC(const int64_t j, const int64_t comBatchBB, LocalTensor<T1>& mul1Ub,
+                                   LocalTensor<T1>& outUb, LocalTensor<T1>& sinSize, LocalTensor<T1>& mul2Ub,
+                                   LocalTensor<T1>& qSize, LocalTensor<T1>& cosSize,
+                                   const ApplyRotaryPosEmbTilingData* tilingData, BinaryRepeatParams& repeatParams);
     __aicore__ inline void CopyOutPartialRotation(const int64_t coreBatchIndex, const int64_t preCBatchB,
-                                                  LocalTensor<T1> &qOutUbSize,
-                                                  const ApplyRotaryPosEmbTilingData *tilingData);
+                                                  LocalTensor<T1>& qOutUbSize,
+                                                  const ApplyRotaryPosEmbTilingData* tilingData);
     __aicore__ inline void CopyInPartialRotation(const int64_t coreBatchIndex, const int64_t preCBatchB,
-                                                 LocalTensor<T1> &qUb, const ApplyRotaryPosEmbTilingData *tilingData);
+                                                 LocalTensor<T1>& qUb, const ApplyRotaryPosEmbTilingData* tilingData);
 
     constexpr static int32_t bufferNum = 1;
     constexpr static int32_t bufferNumdb = 2;
@@ -97,13 +97,13 @@ private:
 template <typename T1, typename T2>
 __aicore__ inline void ARPEComputeAB<T1, T2>::Init(GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut,
                                                    GM_ADDR kOut, GM_ADDR workspace,
-                                                   const ApplyRotaryPosEmbTilingData *tilingData)
+                                                   const ApplyRotaryPosEmbTilingData* tilingData)
 {
     blockIdx = GetBlockIdx();
-    qGm.SetGlobalBuffer((__gm__ T1 *)q);
-    kGm.SetGlobalBuffer((__gm__ T1 *)k);
-    cosGm.SetGlobalBuffer((__gm__ T1 *)cos);
-    sinGm.SetGlobalBuffer((__gm__ T1 *)sin);
+    qGm.SetGlobalBuffer((__gm__ T1*)q);
+    kGm.SetGlobalBuffer((__gm__ T1*)k);
+    cosGm.SetGlobalBuffer((__gm__ T1*)cos);
+    sinGm.SetGlobalBuffer((__gm__ T1*)sin);
     pipe.InitBuffer(cosInQueue, bufferNumdb, tilingData->cosPart1Ub);
     pipe.InitBuffer(mul1, tilingData->q2q1Part1Ub);
     pipe.InitBuffer(sinInQueue, bufferNumdb, tilingData->cosPart1Ub);
@@ -140,11 +140,11 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::Init(GM_ADDR q, GM_ADDR k, GM_ADDR
 }
 template <typename T1, typename T2>
 __aicore__ inline void ARPEComputeAB<T1, T2>::SmallQC(const int64_t j, const int64_t comBatchBB,
-                                                      LocalTensor<T1> &mul1Ub, LocalTensor<T1> &outUb,
-                                                      LocalTensor<T1> &sinSize, LocalTensor<T1> &mul2Ub,
-                                                      LocalTensor<T1> &qSize, LocalTensor<T1> &cosSize,
-                                                      const ApplyRotaryPosEmbTilingData *tilingData,
-                                                      BinaryRepeatParams &repeatParams)
+                                                      LocalTensor<T1>& mul1Ub, LocalTensor<T1>& outUb,
+                                                      LocalTensor<T1>& sinSize, LocalTensor<T1>& mul2Ub,
+                                                      LocalTensor<T1>& qSize, LocalTensor<T1>& cosSize,
+                                                      const ApplyRotaryPosEmbTilingData* tilingData,
+                                                      BinaryRepeatParams& repeatParams)
 {
     int64_t offsin = j * tilingData->comBatchBB * tilingData->lastDim;
     int64_t qcdhalfNum = tilingData->lastDim / tilingData->mask; // 类似于tiling侧小shape情况处理
@@ -162,11 +162,11 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::SmallQC(const int64_t j, const int
 
 template <typename T1, typename T2>
 __aicore__ inline void ARPEComputeAB<T1, T2>::SmallQCFP16(const int64_t j, const int64_t comBatchBB,
-                                                          LocalTensor<T1> &mul1Ub, LocalTensor<T1> &outUb,
-                                                          LocalTensor<T1> &sinSize, LocalTensor<T1> &mul2Ub,
-                                                          LocalTensor<T1> &qSize, LocalTensor<T1> &cosSize,
-                                                          const ApplyRotaryPosEmbTilingData *tilingData,
-                                                          BinaryRepeatParams &repeatParams)
+                                                          LocalTensor<T1>& mul1Ub, LocalTensor<T1>& outUb,
+                                                          LocalTensor<T1>& sinSize, LocalTensor<T1>& mul2Ub,
+                                                          LocalTensor<T1>& qSize, LocalTensor<T1>& cosSize,
+                                                          const ApplyRotaryPosEmbTilingData* tilingData,
+                                                          BinaryRepeatParams& repeatParams)
 {
     int64_t offS = j * tilingData->comBatchBB * tilingData->lastDim;
     for (int64_t ii = 0; ii < tilingData->qkcNum; ii++) {
@@ -179,11 +179,11 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::SmallQCFP16(const int64_t j, const
 
 template <typename T1, typename T2>
 __aicore__ inline void ARPEComputeAB<T1, T2>::LargeQCFP16(const int64_t j, const int64_t comBatchBB,
-                                                          LocalTensor<T1> &mul1Ub, LocalTensor<T1> &outUb,
-                                                          LocalTensor<T1> &sinSize, LocalTensor<T1> &mul2Ub,
-                                                          LocalTensor<T1> &qSize, LocalTensor<T1> &cosSize,
-                                                          const ApplyRotaryPosEmbTilingData *tilingData,
-                                                          BinaryRepeatParams &repeatParams)
+                                                          LocalTensor<T1>& mul1Ub, LocalTensor<T1>& outUb,
+                                                          LocalTensor<T1>& sinSize, LocalTensor<T1>& mul2Ub,
+                                                          LocalTensor<T1>& qSize, LocalTensor<T1>& cosSize,
+                                                          const ApplyRotaryPosEmbTilingData* tilingData,
+                                                          BinaryRepeatParams& repeatParams)
 {
     for (int64_t i = 0; i < comBatchBB; i++) {
         int64_t off = i * tilingData->qkcNum * tilingData->lastDim;
@@ -196,11 +196,11 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::LargeQCFP16(const int64_t j, const
 
 template <typename T1, typename T2>
 __aicore__ inline void ARPEComputeAB<T1, T2>::LargeQC(const int64_t j, const int64_t comBatchBB,
-                                                      LocalTensor<T1> &mul1Ub, LocalTensor<T1> &outUb,
-                                                      LocalTensor<T1> &sinSize, LocalTensor<T1> &mul2Ub,
-                                                      LocalTensor<T1> &qSize, LocalTensor<T1> &cosSize,
-                                                      const ApplyRotaryPosEmbTilingData *tilingData,
-                                                      BinaryRepeatParams &repeatParams)
+                                                      LocalTensor<T1>& mul1Ub, LocalTensor<T1>& outUb,
+                                                      LocalTensor<T1>& sinSize, LocalTensor<T1>& mul2Ub,
+                                                      LocalTensor<T1>& qSize, LocalTensor<T1>& cosSize,
+                                                      const ApplyRotaryPosEmbTilingData* tilingData,
+                                                      BinaryRepeatParams& repeatParams)
 {
     int64_t qcdhalfNum = tilingData->lastDim / tilingData->mask; // 类似于tiling侧小shape情况处理
     for (int64_t i = 0; i < comBatchBB; i++) {
@@ -218,9 +218,9 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::LargeQC(const int64_t j, const int
 
 template <typename T1, typename T2>
 __aicore__ inline void ARPEComputeAB<T1, T2>::CTotaryBF32(const int64_t j, const int64_t comBatchBB,
-                                                          LocalTensor<T1> &qSize, LocalTensor<T1> &cosSize,
-                                                          LocalTensor<T1> &sinSize, LocalTensor<T1> &outUb,
-                                                          const ApplyRotaryPosEmbTilingData *tilingData)
+                                                          LocalTensor<T1>& qSize, LocalTensor<T1>& cosSize,
+                                                          LocalTensor<T1>& sinSize, LocalTensor<T1>& outUb,
+                                                          const ApplyRotaryPosEmbTilingData* tilingData)
 {
     LocalTensor<T1> mul2Ub = mul2.Get<T1>();
     LocalTensor<T1> mul1Ub = mul1.Get<T1>();
@@ -241,9 +241,9 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::CTotaryBF32(const int64_t j, const
 
 template <typename T1, typename T2>
 __aicore__ inline void ARPEComputeAB<T1, T2>::ComputeTotary(const int64_t j, const int64_t comBatchBB,
-                                                            LocalTensor<T1> &qSize, LocalTensor<T1> &cosSize,
-                                                            LocalTensor<T1> &sinSize, LocalTensor<T1> &outUb,
-                                                            const ApplyRotaryPosEmbTilingData *tilingData)
+                                                            LocalTensor<T1>& qSize, LocalTensor<T1>& cosSize,
+                                                            LocalTensor<T1>& sinSize, LocalTensor<T1>& outUb,
+                                                            const ApplyRotaryPosEmbTilingData* tilingData)
 {
 #if ORIG_DTYPE_QUERY == DT_FLOAT
     CTotaryBF32(j, comBatchBB, qSize, cosSize, sinSize, outUb, tilingData);
@@ -271,8 +271,8 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::ComputeTotary(const int64_t j, con
 template <typename T1, typename T2>
 __aicore__ inline void ARPEComputeAB<T1, T2>::CopyOutPartialRotation(const int64_t coreBatchIndex,
                                                                      const int64_t preCBatchB,
-                                                                     LocalTensor<T1> &qOutUbSize,
-                                                                     const ApplyRotaryPosEmbTilingData *tilingData)
+                                                                     LocalTensor<T1>& qOutUbSize,
+                                                                     const ApplyRotaryPosEmbTilingData* tilingData)
 {
     copyOut1.blockCount = tilingData->qcNum;
     copyOut1.blockLen = tilingData->blockMoveQ;
@@ -306,7 +306,7 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::CopyOutPartialRotation(const int64
 
 template <typename T1, typename T2>
 __aicore__ inline void ARPEComputeAB<T1, T2>::CopyOut(const int64_t coreBatchIndex, const int64_t preCBatchB,
-                                                      const ApplyRotaryPosEmbTilingData *tilingData)
+                                                      const ApplyRotaryPosEmbTilingData* tilingData)
 {
     LocalTensor<T1> qOutUbSize = qOutQueue.DeQue<T1>();
     copyOut1.blockCount = preCBatchB;
@@ -324,8 +324,8 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::CopyOut(const int64_t coreBatchInd
 
 template <typename T1, typename T2>
 __aicore__ inline void ARPEComputeAB<T1, T2>::CopyInPartialRotation(const int64_t coreBatchIndex,
-                                                                    const int64_t preCBatchB, LocalTensor<T1> &qUb,
-                                                                    const ApplyRotaryPosEmbTilingData *tilingData)
+                                                                    const int64_t preCBatchB, LocalTensor<T1>& qUb,
+                                                                    const ApplyRotaryPosEmbTilingData* tilingData)
 {
     copyIn1.blockCount = tilingData->qcNum;
     copyIn1.blockLen = tilingData->blockMoveQ;
@@ -358,7 +358,7 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::CopyInPartialRotation(const int64_
 
 template <typename T1, typename T2>
 __aicore__ inline void ARPEComputeAB<T1, T2>::CopyInQK(const int64_t coreBatchIndex, const int64_t preCBatchB,
-                                                       const ApplyRotaryPosEmbTilingData *tilingData)
+                                                       const ApplyRotaryPosEmbTilingData* tilingData)
 {
     copyIn1.blockCount = preCBatchB;
     copyIn2.blockCount = preCBatchB;
@@ -391,7 +391,7 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::CopyInQK(const int64_t coreBatchIn
 template <typename T1, typename T2>
 __aicore__ inline void ARPEComputeAB<T1, T2>::CopyIn(const int64_t coreBatchIndex, const int64_t preCBatchB,
                                                      const int64_t preCBBTimes, const int64_t comBatchBBL,
-                                                     const ApplyRotaryPosEmbTilingData *tilingData)
+                                                     const ApplyRotaryPosEmbTilingData* tilingData)
 
 {
     CopyInQK(coreBatchIndex, preCBatchB, tilingData);
@@ -418,7 +418,7 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::CopyIn(const int64_t coreBatchInde
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void ARPEComputeAB<T1, T2>::ProcessPreCore(const ApplyRotaryPosEmbTilingData *tilingData)
+__aicore__ inline void ARPEComputeAB<T1, T2>::ProcessPreCore(const ApplyRotaryPosEmbTilingData* tilingData)
 
 {
     for (int64_t i = 0; i < tilingData->preCLTimes; i++) {
@@ -429,7 +429,7 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::ProcessPreCore(const ApplyRotaryPo
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void ARPEComputeAB<T1, T2>::ProcessLastCore(const ApplyRotaryPosEmbTilingData *tilingData)
+__aicore__ inline void ARPEComputeAB<T1, T2>::ProcessLastCore(const ApplyRotaryPosEmbTilingData* tilingData)
 
 {
     for (int64_t i = 0; i < tilingData->lastCLTimes; i++) {
@@ -440,7 +440,7 @@ __aicore__ inline void ARPEComputeAB<T1, T2>::ProcessLastCore(const ApplyRotaryP
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void ARPEComputeAB<T1, T2>::Process(const ApplyRotaryPosEmbTilingData *tilingData)
+__aicore__ inline void ARPEComputeAB<T1, T2>::Process(const ApplyRotaryPosEmbTilingData* tilingData)
 {
     if (blockIdx >= tilingData->useCoreNum) {
         return;

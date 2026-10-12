@@ -17,10 +17,11 @@
 using namespace AscendC;
 using namespace RopeQuantKvcacheND;
 
-extern "C" __global__ __aicore__ void rope_quant_kvcache(
-    GM_ADDR qkv, GM_ADDR cos, GM_ADDR sin, GM_ADDR quant_scale, GM_ADDR quant_offset, GM_ADDR k_cache, GM_ADDR v_cache,
-    GM_ADDR indice, GM_ADDR q_out, GM_ADDR k_out, GM_ADDR v_out, GM_ADDR k_cache_out, GM_ADDR v_cache_out,
-    GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void rope_quant_kvcache(GM_ADDR qkv, GM_ADDR cos, GM_ADDR sin, GM_ADDR quant_scale,
+                                                         GM_ADDR quant_offset, GM_ADDR k_cache, GM_ADDR v_cache,
+                                                         GM_ADDR indice, GM_ADDR q_out, GM_ADDR k_out, GM_ADDR v_out,
+                                                         GM_ADDR k_cache_out, GM_ADDR v_cache_out, GM_ADDR workspace,
+                                                         GM_ADDR tiling)
 {
     GET_TILING_DATA(tilingData, tiling);
 

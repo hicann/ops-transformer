@@ -61,7 +61,7 @@ __aicore__ inline void SetWaitFlag(HardEvent evt)
 template <bool isPagedAttention, typename KV_DTYPE, typename K_DTYPE, typename V_DTYPE>
 class KernelKvRmsNormRopeCacheBase {
 public:
-    __aicore__ inline KernelKvRmsNormRopeCacheBase(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline KernelKvRmsNormRopeCacheBase(TPipe* pipe, const KvRmsNormRopeCacheTilingData* tiling)
         : pipe_(pipe),
           tilingData_(tiling)
     {}
@@ -91,8 +91,8 @@ protected:
     int64_t numHeadIdx{0};
 
     // Sahred members
-    TPipe *pipe_ = nullptr;
-    const KvRmsNormRopeCacheTilingData *tilingData_;
+    TPipe* pipe_ = nullptr;
+    const KvRmsNormRopeCacheTilingData* tilingData_;
 
     GlobalTensor<KV_DTYPE> kvGm, gammaGm, cosGm, sinGm, vGm;
     GlobalTensor<K_DTYPE> kCacheGm;
@@ -110,7 +110,7 @@ class KernelKvRmsNormRopeCacheMTP : public KernelKvRmsNormRopeCacheBase<isPagedA
     // Only 1 sub class: kv_rms_norm_rope_cache_b16_mtp.h
     // MTP is a simplified template for ONLY inputs in NORM and with no quant terms.
 public:
-    __aicore__ inline KernelKvRmsNormRopeCacheMTP(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline KernelKvRmsNormRopeCacheMTP(TPipe* pipe, const KvRmsNormRopeCacheTilingData* tiling)
         : KernelKvRmsNormRopeCacheBase<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE>(pipe, tiling)
     {}
 
@@ -123,7 +123,7 @@ template <bool isPagedAttention, typename KV_DTYPE, typename K_DTYPE, typename V
 class KernelKvRmsNormRopeCacheMTPQuant
     : public KernelKvRmsNormRopeCacheMTP<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE> {
 public:
-    __aicore__ inline KernelKvRmsNormRopeCacheMTPQuant(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline KernelKvRmsNormRopeCacheMTPQuant(TPipe* pipe, const KvRmsNormRopeCacheTilingData* tiling)
         : KernelKvRmsNormRopeCacheMTP<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE>(pipe, tiling)
     {}
 
@@ -138,7 +138,7 @@ template <bool isPagedAttention, typename KV_DTYPE, typename K_DTYPE, typename V
 class KernelKvRmsNormRopeCacheCutBS
     : public KernelKvRmsNormRopeCacheBase<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE> {
 public:
-    __aicore__ inline KernelKvRmsNormRopeCacheCutBS(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline KernelKvRmsNormRopeCacheCutBS(TPipe* pipe, const KvRmsNormRopeCacheTilingData* tiling)
         : KernelKvRmsNormRopeCacheBase<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE>(pipe, tiling)
     {}
 
@@ -155,7 +155,7 @@ template <bool isPagedAttention, typename KV_DTYPE, typename K_DTYPE, typename V
 class KernelKvRmsNormRopeCacheCutBSScatter
     : public KernelKvRmsNormRopeCacheCutBS<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE> {
 public:
-    __aicore__ inline KernelKvRmsNormRopeCacheCutBSScatter(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline KernelKvRmsNormRopeCacheCutBSScatter(TPipe* pipe, const KvRmsNormRopeCacheTilingData* tiling)
         : KernelKvRmsNormRopeCacheCutBS<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE>(pipe, tiling)
     {}
 
@@ -167,7 +167,7 @@ template <bool isPagedAttention, typename KV_DTYPE, typename K_DTYPE, typename V
 class KernelKvRmsNormRopeCacheCutBSQuant
     : public KernelKvRmsNormRopeCacheCutBSScatter<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE> {
 public:
-    __aicore__ inline KernelKvRmsNormRopeCacheCutBSQuant(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline KernelKvRmsNormRopeCacheCutBSQuant(TPipe* pipe, const KvRmsNormRopeCacheTilingData* tiling)
         : KernelKvRmsNormRopeCacheCutBSScatter<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE>(pipe, tiling)
     {}
 

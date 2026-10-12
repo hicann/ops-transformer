@@ -23,7 +23,7 @@ using namespace AscendC;
 template <typename T>
 class KernelInterleaveRopeFixBNSD {
 public:
-    __aicore__ inline KernelInterleaveRopeFixBNSD(TPipe *pipe, const InterleaveRopeTilingData *tiling)
+    __aicore__ inline KernelInterleaveRopeFixBNSD(TPipe* pipe, const InterleaveRopeTilingData* tiling)
         : pipe_(pipe),
           tilingData_(tiling)
     {}
@@ -44,13 +44,13 @@ public:
          */
 
         // init global memory
-        xGm.SetGlobalBuffer((__gm__ T *)x + GetBlockIdx() * tilingData_->batchsPerBlock * numHead * hiddenDim,
+        xGm.SetGlobalBuffer((__gm__ T*)x + GetBlockIdx() * tilingData_->batchsPerBlock * numHead * hiddenDim,
                             tilingData_->batchsPerBlock * numHead * hiddenDim);
-        cosGm.SetGlobalBuffer((__gm__ T *)cos + GetBlockIdx() * tilingData_->batchsPerBlock * hiddenDim,
+        cosGm.SetGlobalBuffer((__gm__ T*)cos + GetBlockIdx() * tilingData_->batchsPerBlock * hiddenDim,
                               tilingData_->batchsPerBlock * hiddenDim);
-        sinGm.SetGlobalBuffer((__gm__ T *)sin + GetBlockIdx() * tilingData_->batchsPerBlock * hiddenDim,
+        sinGm.SetGlobalBuffer((__gm__ T*)sin + GetBlockIdx() * tilingData_->batchsPerBlock * hiddenDim,
                               tilingData_->batchsPerBlock * hiddenDim);
-        yGm.SetGlobalBuffer((__gm__ T *)y + GetBlockIdx() * tilingData_->batchsPerBlock * numHead * hiddenDim,
+        yGm.SetGlobalBuffer((__gm__ T*)y + GetBlockIdx() * tilingData_->batchsPerBlock * numHead * hiddenDim,
                             tilingData_->batchsPerBlock * numHead * hiddenDim);
 
         // init pipe
@@ -149,8 +149,8 @@ public:
     }
 
 private:
-    TPipe *pipe_ = nullptr;
-    const InterleaveRopeTilingData *tilingData_;
+    TPipe* pipe_ = nullptr;
+    const InterleaveRopeTilingData* tilingData_;
     GlobalTensor<T> xGm;
     GlobalTensor<T> yGm;
     GlobalTensor<T> cosGm;

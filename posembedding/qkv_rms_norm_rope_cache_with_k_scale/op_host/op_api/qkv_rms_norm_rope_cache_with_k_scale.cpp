@@ -18,10 +18,10 @@ namespace l0op {
 OP_TYPE_REGISTER(QkvRmsNormRopeCacheWithKScale);
 
 namespace {
-constexpr const char *DEFAULT_QKV_LAYOUT = "TND";
-constexpr const char *DEFAULT_Q_OUT_LAYOUT = "NTD";
+constexpr const char* DEFAULT_QKV_LAYOUT = "TND";
+constexpr const char* DEFAULT_Q_OUT_LAYOUT = "NTD";
 
-const char *GetLayoutOrDefault(const char *layout, const char *defaultLayout)
+const char* GetLayoutOrDefault(const char* layout, const char* defaultLayout)
 {
     return layout == nullptr || layout[0] == '\0' ? defaultLayout : layout;
 }
@@ -29,16 +29,16 @@ const char *GetLayoutOrDefault(const char *layout, const char *defaultLayout)
 } // namespace
 
 QkvRmsNormRopeCacheWithKScaleResult QkvRmsNormRopeCacheWithKScale(
-    const aclTensor *qkv, const aclTensor *qGamma, const aclTensor *kGamma, const aclTensor *cosSin,
-    const aclTensor *slotMapping, aclTensor *kCache, aclTensor *vCache, aclTensor *kScaleCache,
-    const aclTensor *queryStartLoc, const aclTensor *seqLens, const aclTensor *rotationOptional,
-    const aclTensor *vScaleOptional, const aclTensor *mropePositionOptional, const aclIntArray *headNums,
-    const char *layoutQkv, const char *layoutQOut, float epsilon, const aclIntArray *mropeSectionOptional,
-    const char *qQuantMode, const char *kQuantMode, int64_t qOutDtype, aclTensor *qOut, aclTensor *qScaleOptional,
-    aclOpExecutor *executor)
+    const aclTensor* qkv, const aclTensor* qGamma, const aclTensor* kGamma, const aclTensor* cosSin,
+    const aclTensor* slotMapping, aclTensor* kCache, aclTensor* vCache, aclTensor* kScaleCache,
+    const aclTensor* queryStartLoc, const aclTensor* seqLens, const aclTensor* rotationOptional,
+    const aclTensor* vScaleOptional, const aclTensor* mropePositionOptional, const aclIntArray* headNums,
+    const char* layoutQkv, const char* layoutQOut, float epsilon, const aclIntArray* mropeSectionOptional,
+    const char* qQuantMode, const char* kQuantMode, int64_t qOutDtype, aclTensor* qOut, aclTensor* qScaleOptional,
+    aclOpExecutor* executor)
 {
-    const char *layoutQkvAttr = GetLayoutOrDefault(layoutQkv, DEFAULT_QKV_LAYOUT);
-    const char *layoutQOutAttr = GetLayoutOrDefault(layoutQOut, DEFAULT_Q_OUT_LAYOUT);
+    const char* layoutQkvAttr = GetLayoutOrDefault(layoutQkv, DEFAULT_QKV_LAYOUT);
+    const char* layoutQOutAttr = GetLayoutOrDefault(layoutQOut, DEFAULT_Q_OUT_LAYOUT);
     // The ACLNN entry point resolves null/empty quant modes before calling this L0 wrapper.
     L0_DFX(QkvRmsNormRopeCacheWithKScale, qkv, qGamma, kGamma, cosSin, slotMapping, kCache, vCache, kScaleCache,
            queryStartLoc, seqLens, rotationOptional, vScaleOptional, mropePositionOptional, headNums, layoutQkvAttr,
@@ -47,7 +47,7 @@ QkvRmsNormRopeCacheWithKScaleResult QkvRmsNormRopeCacheWithKScale(
     // A null optional output is omitted from the launcher argument list. Keep
     // the middle qScale ABI slot materialized internally; the public return
     // value remains null when the caller did not request qScale.
-    aclTensor *qScaleForKernel = qScaleOptional;
+    aclTensor* qScaleForKernel = qScaleOptional;
     if (qScaleForKernel == nullptr) {
         qScaleForKernel = executor->AllocTensor(op::DataType::DT_FLOAT, op::Format::FORMAT_ND, op::Format::FORMAT_ND);
         if (qScaleForKernel == nullptr) {

@@ -18,17 +18,17 @@
 
 namespace optiling {
 namespace {
-constexpr const char *OP_NAME = "QkvRmsNormRopeCacheWithKScale";
+constexpr const char* OP_NAME = "QkvRmsNormRopeCacheWithKScale";
 } // namespace
 
-ge::graphStatus Tiling4QkvRmsNormRopeCacheWithKScale(gert::TilingContext *context)
+ge::graphStatus Tiling4QkvRmsNormRopeCacheWithKScale(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE(OP_NAME, "context is nullptr."), return ge::GRAPH_FAILED);
     OP_LOGD(context, "QkvRmsNormRopeCacheWithKScale tiling start.");
     return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingPrepare4QkvRmsNormRopeCacheWithKScale(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepare4QkvRmsNormRopeCacheWithKScale(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE(OP_NAME, "context is nullptr."), return ge::GRAPH_FAILED);
     auto compileInfo = context->GetCompiledInfo<QkvRmsNormRopeCacheWithKScaleCompileInfo>();

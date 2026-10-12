@@ -101,7 +101,7 @@ struct MropeMxUbLayout {
     uint32_t totalBytes;
 };
 
-QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxCheckedAdd(uint64_t lhs, uint64_t rhs, uint64_t &result)
+QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxCheckedAdd(uint64_t lhs, uint64_t rhs, uint64_t& result)
 {
     if (lhs > MROPE_MX_UINT64_MAX - rhs) {
         return false;
@@ -110,7 +110,7 @@ QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxCheckedAdd(uint64_t lhs, uint64_t
     return true;
 }
 
-QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxCheckedMul(uint64_t lhs, uint64_t rhs, uint64_t &result)
+QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxCheckedMul(uint64_t lhs, uint64_t rhs, uint64_t& result)
 {
     if (lhs != 0U && rhs > MROPE_MX_UINT64_MAX / lhs) {
         return false;
@@ -119,7 +119,7 @@ QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxCheckedMul(uint64_t lhs, uint64_t
     return true;
 }
 
-QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxCheckedAlign(uint64_t value, uint64_t &result)
+QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxCheckedAlign(uint64_t value, uint64_t& result)
 {
     uint64_t withPadding = 0U;
     if (!MropeMxCheckedAdd(value, MROPE_MX_UB_ALIGN_BYTES - 1U, withPadding)) {
@@ -129,7 +129,7 @@ QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxCheckedAlign(uint64_t value, uint
     return true;
 }
 
-QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxNarrow(uint64_t value, uint32_t &result)
+QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxNarrow(uint64_t value, uint32_t& result)
 {
     if (value > MROPE_MX_UINT32_MAX) {
         return false;
@@ -138,8 +138,8 @@ QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxNarrow(uint64_t value, uint32_t &
     return true;
 }
 
-QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxAppendRegion(uint64_t regionBytes, uint64_t &cursor, uint32_t &offset,
-                                                            uint32_t *size = nullptr)
+QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxAppendRegion(uint64_t regionBytes, uint64_t& cursor, uint32_t& offset,
+                                                            uint32_t* size = nullptr)
 {
     uint64_t alignedCursor = 0U;
     uint64_t alignedBytes = 0U;
@@ -155,19 +155,19 @@ QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxAppendRegion(uint64_t regionBytes
     return true;
 }
 
-QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxProduct2(uint64_t lhs, uint64_t rhs, uint64_t &result)
+QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxProduct2(uint64_t lhs, uint64_t rhs, uint64_t& result)
 {
     return MropeMxCheckedMul(lhs, rhs, result);
 }
 
-QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxProduct3(uint64_t lhs, uint64_t mid, uint64_t rhs, uint64_t &result)
+QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxProduct3(uint64_t lhs, uint64_t mid, uint64_t rhs, uint64_t& result)
 {
     uint64_t partial = 0U;
     return MropeMxCheckedMul(lhs, mid, partial) && MropeMxCheckedMul(partial, rhs, result);
 }
 
 QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxProduct4(uint64_t a, uint64_t b, uint64_t c, uint64_t d,
-                                                        uint64_t &result)
+                                                        uint64_t& result)
 {
     uint64_t partial = 0U;
     return MropeMxProduct3(a, b, c, partial) && MropeMxCheckedMul(partial, d, result);
@@ -175,7 +175,7 @@ QKV_MROPE_MX_HOST_DEVICE constexpr bool MropeMxProduct4(uint64_t a, uint64_t b, 
 
 QKV_MROPE_MX_HOST_DEVICE constexpr bool TryMakeMropeMxUbLayout(uint64_t tokenTile, uint64_t qHeadNum,
                                                                uint64_t kvHeadNum, uint64_t headDim,
-                                                               MropeMxUbLayout &layout)
+                                                               MropeMxUbLayout& layout)
 {
     if (tokenTile == 0U || qHeadNum == 0U || kvHeadNum == 0U || headDim != MROPE_MX_HEAD_DIM_D128) {
         return false;
@@ -274,7 +274,7 @@ QKV_MROPE_MX_HOST_DEVICE constexpr bool TryMakeMropeMxUbLayout(uint64_t tokenTil
 // only its low eight rows.  No state crosses a tile or an AIV range.
 QKV_MROPE_MX_HOST_DEVICE constexpr bool TryMakeMropeMxQGlobalTileWaveUbLayout(uint64_t tokenTile, uint64_t qHeadNum,
                                                                               uint64_t kvHeadNum, uint64_t headDim,
-                                                                              MropeMxUbLayout &layout)
+                                                                              MropeMxUbLayout& layout)
 {
     MropeMxUbLayout candidate{};
     if (!TryMakeMropeMxUbLayout(tokenTile, qHeadNum, kvHeadNum, headDim, candidate)) {
@@ -319,8 +319,8 @@ __aicore__ inline uint32_t MropeMxAlignDevice(uint32_t value)
            static_cast<uint32_t>(MROPE_MX_UB_ALIGN_BYTES) * static_cast<uint32_t>(MROPE_MX_UB_ALIGN_BYTES);
 }
 
-__aicore__ inline void MropeMxAppendRegionDevice(uint32_t regionBytes, uint32_t &cursor, uint32_t &offset,
-                                                 uint32_t *size = nullptr)
+__aicore__ inline void MropeMxAppendRegionDevice(uint32_t regionBytes, uint32_t& cursor, uint32_t& offset,
+                                                 uint32_t* size = nullptr)
 {
     cursor = MropeMxAlignDevice(cursor);
     offset = cursor;
@@ -335,7 +335,7 @@ __aicore__ inline void MropeMxAppendRegionDevice(uint32_t regionBytes, uint32_t 
 // launch. Device materialization intentionally uses only uint32 arithmetic so
 // it cannot introduce compiler-rt wide-multiply dependencies.
 __aicore__ inline void MakeMropeMxUbLayoutDevice(uint32_t tokenTile, uint32_t qHeadNum, uint32_t kvHeadNum,
-                                                 uint32_t headDim, MropeMxUbLayout &layout)
+                                                 uint32_t headDim, MropeMxUbLayout& layout)
 {
     MropeMxUbLayout candidate{};
     uint32_t cursor = 0U;
@@ -393,7 +393,7 @@ __aicore__ inline void MakeMropeMxUbLayoutDevice(uint32_t tokenTile, uint32_t qH
 
 __aicore__ inline void MakeMropeMxQGlobalTileWaveUbLayoutDevice(uint32_t tokenTile, uint32_t qHeadNum,
                                                                 uint32_t kvHeadNum, uint32_t headDim,
-                                                                MropeMxUbLayout &layout)
+                                                                MropeMxUbLayout& layout)
 {
     MakeMropeMxUbLayoutDevice(tokenTile, qHeadNum, kvHeadNum, headDim, layout);
     const uint32_t fullBatchCount = qHeadNum / static_cast<uint32_t>(MROPE_MX_ROW_BATCH_ROWS);

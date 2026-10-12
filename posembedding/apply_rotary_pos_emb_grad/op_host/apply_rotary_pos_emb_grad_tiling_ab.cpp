@@ -29,7 +29,7 @@ constexpr int64_t AB_UB_DIVISOR_WITHOUT_DCOS = 8;
 
 class ApplyRotaryPosEmbGradRegbaseTilingClassAB : public ApplyRotaryPosEmbGradRegbaseTilingClass {
 public:
-    explicit ApplyRotaryPosEmbGradRegbaseTilingClassAB(gert::TilingContext *context)
+    explicit ApplyRotaryPosEmbGradRegbaseTilingClassAB(gert::TilingContext* context)
         : ApplyRotaryPosEmbGradRegbaseTilingClass(context)
     {}
 

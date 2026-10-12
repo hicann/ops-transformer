@@ -89,14 +89,14 @@ const uint64_t TILING_MODE_BNSD_BROADCAST_ONEDIM = 5;
 template <typename inType, typename outType, typename MT>
 class RotateMatrixAll {
 public:
-    __aicore__ inline RotateMatrixAll(MT &mm_)
+    __aicore__ inline RotateMatrixAll(MT& mm_)
         : mm(mm_){};
 
-    __aicore__ inline void SetGlobalTensors(const ROPEInitParams &initParams);
+    __aicore__ inline void SetGlobalTensors(const ROPEInitParams& initParams);
     __aicore__ inline void InitLocalBuffers();
-    __aicore__ inline void InitShapeParams(const RotaryPositionEmbeddingTilingData &tilingData);
+    __aicore__ inline void InitShapeParams(const RotaryPositionEmbeddingTilingData& tilingData);
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR rotate, GM_ADDR y, GM_ADDR workSpace,
-                                const RotaryPositionEmbeddingTilingData &tilingData, TPipe *pipe);
+                                const RotaryPositionEmbeddingTilingData& tilingData, TPipe* pipe);
 
     __aicore__ inline void Process();
     __aicore__ inline void MMCompute(uint32_t curBlock);
@@ -106,28 +106,28 @@ public:
     __aicore__ inline void VectorComputePre(uint32_t curBlock, uint32_t curVecBaseM, uint32_t offsetM);
     __aicore__ inline void VectorComputeProcess(uint32_t curBlock, uint32_t curVecBaseM, uint32_t offsetM);
 
-    __aicore__ inline void DataCopyX(GlobalTensor<inType> &xGM, LocalTensor<inType> &xLocal, uint32_t curVecBaseM,
+    __aicore__ inline void DataCopyX(GlobalTensor<inType>& xGM, LocalTensor<inType>& xLocal, uint32_t curVecBaseM,
                                      uint32_t offsetM);
-    __aicore__ inline void DataCopyxRotated(GlobalTensor<float> &xRotatedGM, LocalTensor<float> &xRotatedLocal,
+    __aicore__ inline void DataCopyxRotated(GlobalTensor<float>& xRotatedGM, LocalTensor<float>& xRotatedLocal,
                                             uint32_t curVecBaseM, uint32_t offsetM);
     __aicore__ inline void DataCopyOut(uint32_t curVecBaseM, uint32_t offsetM);
 
-    __aicore__ inline void DataCopySinCos(GlobalTensor<inType> &cosSinGM, LocalTensor<inType> &cosSinLocal,
-                                          LocalTensor<inType> &tmpUb, uint32_t curVecBaseM, uint32_t offsetM);
+    __aicore__ inline void DataCopySinCos(GlobalTensor<inType>& cosSinGM, LocalTensor<inType>& cosSinLocal,
+                                          LocalTensor<inType>& tmpUb, uint32_t curVecBaseM, uint32_t offsetM);
 
-    __aicore__ inline void DataCopySinCosBXXD(GlobalTensor<inType> &cosSinGM, LocalTensor<inType> &cosSinLocal,
-                                              LocalTensor<inType> &tmpUb, SinCosCopyParams &sinCosCopyParams);
-    __aicore__ inline void DataCopySinCosXXSD(GlobalTensor<inType> &cosSinGM, LocalTensor<inType> &cosSinLocal,
-                                              SinCosCopyParams &sinCosCopyParams);
-    __aicore__ inline void DataCopySinCos1S1D(GlobalTensor<inType> &cosSinGM, LocalTensor<inType> &cosSinLocal,
-                                              LocalTensor<inType> &tmpUb, SinCosCopyParams &sinCosCopyParams);
-    __aicore__ inline void CopyAndBroadcastCosSin(GlobalTensor<inType> &cosSinGM, LocalTensor<inType> &cosSinLocal,
-                                                  LocalTensor<inType> &ubLocal, uint32_t curResM,
-                                                  SinCosCopyParams &sinCosCopyParams);
+    __aicore__ inline void DataCopySinCosBXXD(GlobalTensor<inType>& cosSinGM, LocalTensor<inType>& cosSinLocal,
+                                              LocalTensor<inType>& tmpUb, SinCosCopyParams& sinCosCopyParams);
+    __aicore__ inline void DataCopySinCosXXSD(GlobalTensor<inType>& cosSinGM, LocalTensor<inType>& cosSinLocal,
+                                              SinCosCopyParams& sinCosCopyParams);
+    __aicore__ inline void DataCopySinCos1S1D(GlobalTensor<inType>& cosSinGM, LocalTensor<inType>& cosSinLocal,
+                                              LocalTensor<inType>& tmpUb, SinCosCopyParams& sinCosCopyParams);
+    __aicore__ inline void CopyAndBroadcastCosSin(GlobalTensor<inType>& cosSinGM, LocalTensor<inType>& cosSinLocal,
+                                                  LocalTensor<inType>& ubLocal, uint32_t curResM,
+                                                  SinCosCopyParams& sinCosCopyParams);
 
 protected:
-    MT &mm;
-    TPipe *pipe_;
+    MT& mm;
+    TPipe* pipe_;
 
     MMConfig mmConfig_;
     VectorOffsetParams vectorOffsetM;
@@ -170,14 +170,14 @@ protected:
 };
 
 template <typename inType, typename outType, typename MT>
-__aicore__ inline void RotateMatrixAll<inType, outType, MT>::SetGlobalTensors(const ROPEInitParams &initParams)
+__aicore__ inline void RotateMatrixAll<inType, outType, MT>::SetGlobalTensors(const ROPEInitParams& initParams)
 {
-    xGM_.SetGlobalBuffer((__gm__ inType *)initParams.x);
-    cosGM_.SetGlobalBuffer((__gm__ inType *)initParams.cos);
-    sinGM_.SetGlobalBuffer((__gm__ inType *)initParams.sin);
-    roMatGM_.SetGlobalBuffer((__gm__ inType *)initParams.rotationMatrix);
-    yGM_.SetGlobalBuffer((__gm__ outType *)initParams.y);
-    workspaceGM_.SetGlobalBuffer((__gm__ float *)initParams.workspace);
+    xGM_.SetGlobalBuffer((__gm__ inType*)initParams.x);
+    cosGM_.SetGlobalBuffer((__gm__ inType*)initParams.cos);
+    sinGM_.SetGlobalBuffer((__gm__ inType*)initParams.sin);
+    roMatGM_.SetGlobalBuffer((__gm__ inType*)initParams.rotationMatrix);
+    yGM_.SetGlobalBuffer((__gm__ outType*)initParams.y);
+    workspaceGM_.SetGlobalBuffer((__gm__ float*)initParams.workspace);
 }
 
 template <typename inType, typename outType, typename MT>
@@ -209,9 +209,9 @@ __aicore__ inline void RotateMatrixAll<inType, outType, MT>::InitLocalBuffers()
 
 template <typename inType, typename outType, typename MT>
 __aicore__ inline void RotateMatrixAll<inType, outType, MT>::InitShapeParams(
-    const RotaryPositionEmbeddingTilingData &tilingData)
+    const RotaryPositionEmbeddingTilingData& tilingData)
 {
-    const RotateMatrixParams &rotateTiling = tilingData.rotateMatrixParams;
+    const RotateMatrixParams& rotateTiling = tilingData.rotateMatrixParams;
     shape.X1 = rotateTiling.xFirstDim;
     shape.X2 = rotateTiling.xSecondDim;
     shape.X3 = rotateTiling.xThirdDim;
@@ -235,10 +235,10 @@ __aicore__ inline void RotateMatrixAll<inType, outType, MT>::InitShapeParams(
 template <typename inType, typename outType, typename MT>
 __aicore__ inline void RotateMatrixAll<inType, outType, MT>::Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR rotate,
                                                                   GM_ADDR y, GM_ADDR workSpace,
-                                                                  const RotaryPositionEmbeddingTilingData &tilingData,
-                                                                  TPipe *pipe)
+                                                                  const RotaryPositionEmbeddingTilingData& tilingData,
+                                                                  TPipe* pipe)
 {
-    const RotateMatrixParams &rotateTiling = tilingData.rotateMatrixParams;
+    const RotateMatrixParams& rotateTiling = tilingData.rotateMatrixParams;
     mmConfig_.baseM_ = rotateTiling.baseM;
     mmConfig_.baseN_ = rotateTiling.baseN;
     mmConfig_.m_ = rotateTiling.m;
@@ -470,8 +470,8 @@ __aicore__ inline void RotateMatrixAll<inType, outType, MT>::VectorComputeProces
 }
 
 template <typename inType, typename outType, typename MT>
-__aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopyX(GlobalTensor<inType> &xGM,
-                                                                       LocalTensor<inType> &xLocal,
+__aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopyX(GlobalTensor<inType>& xGM,
+                                                                       LocalTensor<inType>& xLocal,
                                                                        uint32_t curVecBaseM, uint32_t offsetM)
 {
     DataCopyPadExtParams<inType> padParams;
@@ -485,8 +485,8 @@ __aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopyX(GlobalTen
 }
 
 template <typename inType, typename outType, typename MT>
-__aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopyxRotated(GlobalTensor<float> &xRotatedGM,
-                                                                              LocalTensor<float> &xRotatedLocal,
+__aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopyxRotated(GlobalTensor<float>& xRotatedGM,
+                                                                              LocalTensor<float>& xRotatedLocal,
                                                                               uint32_t curVecBaseM, uint32_t offsetM)
 {
     uint32_t alignN = 0;
@@ -518,9 +518,9 @@ __aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopyOut(uint32_
 }
 
 template <typename inType, typename outType, typename MT>
-__aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopySinCos(GlobalTensor<inType> &cosSinGM,
-                                                                            LocalTensor<inType> &cosSinLocal,
-                                                                            LocalTensor<inType> &tmpUb,
+__aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopySinCos(GlobalTensor<inType>& cosSinGM,
+                                                                            LocalTensor<inType>& cosSinLocal,
+                                                                            LocalTensor<inType>& tmpUb,
                                                                             uint32_t curVecBaseM, uint32_t offsetM)
 {
     sinCosCopyParams.globalOffsetM = mmConfig_.baseOffsetM_ + mmConfig_.mIdx_ * mmConfig_.singleM_ + offsetM;
@@ -547,10 +547,10 @@ __aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopySinCos(Glob
 
 // BS1D、SB1D、S11D
 template <typename inType, typename outType, typename MT>
-__aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopySinCosBXXD(GlobalTensor<inType> &cosSinGM,
-                                                                                LocalTensor<inType> &cosSinLocal,
-                                                                                LocalTensor<inType> &ubLocal,
-                                                                                SinCosCopyParams &sinCosCopyParams)
+__aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopySinCosBXXD(GlobalTensor<inType>& cosSinGM,
+                                                                                LocalTensor<inType>& cosSinLocal,
+                                                                                LocalTensor<inType>& ubLocal,
+                                                                                SinCosCopyParams& sinCosCopyParams)
 {
     if (shape.broadcastSecondDim == 0 && shape.broadcastThirdDim == 0) { // B11SD
         sinCosCopyParams.broadShape = shape.X2 * shape.X3;
@@ -563,9 +563,9 @@ __aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopySinCosBXXD(
 
 // 11SD、B1SD、BNSD、BSND、SBND
 template <typename inType, typename outType, typename MT>
-__aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopySinCosXXSD(GlobalTensor<inType> &cosSinGM,
-                                                                                LocalTensor<inType> &cosSinLocal,
-                                                                                SinCosCopyParams &sinCosCopyParams)
+__aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopySinCosXXSD(GlobalTensor<inType>& cosSinGM,
+                                                                                LocalTensor<inType>& cosSinLocal,
+                                                                                SinCosCopyParams& sinCosCopyParams)
 {
     DataCopyPadExtParams<inType> padParams;
     DataCopyExtParams Params{static_cast<uint16_t>(sinCosCopyParams.curVecBaseM),
@@ -576,10 +576,10 @@ __aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopySinCosXXSD(
 
 // 1S1D
 template <typename inType, typename outType, typename MT>
-__aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopySinCos1S1D(GlobalTensor<inType> &cosSinGM,
-                                                                                LocalTensor<inType> &cosSinLocal,
-                                                                                LocalTensor<inType> &ubLocal,
-                                                                                SinCosCopyParams &sinCosCopyParams)
+__aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopySinCos1S1D(GlobalTensor<inType>& cosSinGM,
+                                                                                LocalTensor<inType>& cosSinLocal,
+                                                                                LocalTensor<inType>& ubLocal,
+                                                                                SinCosCopyParams& sinCosCopyParams)
 {
     uint32_t alignBaseN = Ceil(mmConfig_.curSingleN_, align32Byte) * align32Byte;
     uint32_t resM = sinCosCopyParams.curVecBaseM;
@@ -619,11 +619,11 @@ __aicore__ inline void RotateMatrixAll<inType, outType, MT>::DataCopySinCos1S1D(
 }
 
 template <typename inType, typename outType, typename MT>
-__aicore__ inline void RotateMatrixAll<inType, outType, MT>::CopyAndBroadcastCosSin(GlobalTensor<inType> &cosSinGM,
-                                                                                    LocalTensor<inType> &cosSinLocal,
-                                                                                    LocalTensor<inType> &ubLocal,
+__aicore__ inline void RotateMatrixAll<inType, outType, MT>::CopyAndBroadcastCosSin(GlobalTensor<inType>& cosSinGM,
+                                                                                    LocalTensor<inType>& cosSinLocal,
+                                                                                    LocalTensor<inType>& ubLocal,
                                                                                     uint32_t curResM,
-                                                                                    SinCosCopyParams &sinCosCopyParams)
+                                                                                    SinCosCopyParams& sinCosCopyParams)
 {
     uint32_t curCopyNum = 0;
     uint32_t middleCopyNum = 0;

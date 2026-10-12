@@ -37,43 +37,43 @@ enum class KQuantMode : uint8_t {
 
 struct QkvRmsNormRopeCacheWithKScaleParams {
     // Required inputs
-    const aclTensor *qkv{nullptr};
-    const aclTensor *qGamma{nullptr};
-    const aclTensor *kGamma{nullptr};
-    const aclTensor *cosSin{nullptr};
-    const aclTensor *slotMapping{nullptr};
-    aclTensor *kCache{nullptr};
-    aclTensor *vCache{nullptr};
-    aclTensor *kScaleCache{nullptr};
+    const aclTensor* qkv{nullptr};
+    const aclTensor* qGamma{nullptr};
+    const aclTensor* kGamma{nullptr};
+    const aclTensor* cosSin{nullptr};
+    const aclTensor* slotMapping{nullptr};
+    aclTensor* kCache{nullptr};
+    aclTensor* vCache{nullptr};
+    aclTensor* kScaleCache{nullptr};
     // Scene-specific optional inputs
-    const aclTensor *queryStartLoc{nullptr};
-    const aclTensor *seqLens{nullptr};
-    const aclTensor *rotationOptional{nullptr};
-    const aclTensor *vScaleOptional{nullptr};
-    const aclTensor *mropePositionOptional{nullptr};
+    const aclTensor* queryStartLoc{nullptr};
+    const aclTensor* seqLens{nullptr};
+    const aclTensor* rotationOptional{nullptr};
+    const aclTensor* vScaleOptional{nullptr};
+    const aclTensor* mropePositionOptional{nullptr};
     // Attributes
-    const aclIntArray *headNums{nullptr};
-    const char *layoutQkv{nullptr};
-    const char *layoutQOut{nullptr};
+    const aclIntArray* headNums{nullptr};
+    const char* layoutQkv{nullptr};
+    const char* layoutQOut{nullptr};
     float epsilon{DEFAULT_EPSILON};
-    const aclIntArray *mropeSectionOptional{nullptr};
+    const aclIntArray* mropeSectionOptional{nullptr};
     QQuantMode qQuantMode{QQuantMode::INVALID};
     KQuantMode kQuantMode{KQuantMode::INVALID};
     // Outputs
-    aclTensor *qOut{nullptr};
-    aclTensor *qScale{nullptr};
+    aclTensor* qOut{nullptr};
+    aclTensor* qScale{nullptr};
     // Workspace/executor
-    uint64_t *workspaceSize{nullptr};
-    aclOpExecutor **executor{nullptr};
+    uint64_t* workspaceSize{nullptr};
+    aclOpExecutor** executor{nullptr};
 };
 
 class QkvRmsNormRopeCacheWithKScaleChecker {
 public:
-    static constexpr const char *ACLNN_NAME = "aclnnQkvRmsNormRopeCacheWithKScale";
+    static constexpr const char* ACLNN_NAME = "aclnnQkvRmsNormRopeCacheWithKScale";
 
     // Semantic validation belongs to InferShape/graph tiling. ACLNN only checks
     // pointers required to construct the task and public optional-output presence.
-    aclnnStatus CheckParams(const QkvRmsNormRopeCacheWithKScaleParams &params) const
+    aclnnStatus CheckParams(const QkvRmsNormRopeCacheWithKScaleParams& params) const
     {
         const PointerNullRule requiredPointers[] = {
             {"qkv", params.qkv, "qkv can not be nullptr"},
@@ -90,7 +90,7 @@ public:
             {"workspaceSize", params.workspaceSize, "workspaceSize can not be nullptr"},
             {"executor", params.executor, "executor can not be nullptr"},
         };
-        for (const auto &rule : requiredPointers) {
+        for (const auto& rule : requiredPointers) {
             if (rule.ptr == nullptr) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_NAME, rule.paramName, "nullptr", rule.reason);
                 return ACLNN_ERR_PARAM_NULLPTR;
@@ -144,7 +144,7 @@ public:
             {"mropePositionOptional", params.mropePositionOptional,
              "mropePositionOptional can not be an empty tensor when passed"},
         };
-        for (const auto &rule : nonEmptyTensors) {
+        for (const auto& rule : nonEmptyTensors) {
             if (rule.tensor != nullptr && rule.tensor->IsEmpty()) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_NAME, rule.paramName, "empty tensor", rule.reason);
                 return ACLNN_ERR_PARAM_INVALID;
@@ -155,15 +155,15 @@ public:
 
 private:
     struct PointerNullRule {
-        const char *paramName;
-        const void *ptr;
-        const char *reason;
+        const char* paramName;
+        const void* ptr;
+        const char* reason;
     };
 
     struct TensorEmptyRule {
-        const char *paramName;
-        const aclTensor *tensor;
-        const char *reason;
+        const char* paramName;
+        const aclTensor* tensor;
+        const char* reason;
     };
 };
 

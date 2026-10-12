@@ -25,7 +25,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -34,7 +34,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<int8_t> resultData(size, 0);
@@ -46,7 +46,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -59,8 +59,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -118,35 +118,35 @@ int main()
     std::vector<float> kScaleHostData(1 * 128, 0.0f);
     std::vector<float> vScaleHostData(1 * 128, 0.0f);
 
-    void *qkvDeviceAddr = nullptr;
-    void *qGammaDeviceAddr = nullptr;
-    void *kGammaDeviceAddr = nullptr;
-    void *cosDeviceAddr = nullptr;
-    void *sinDeviceAddr = nullptr;
-    void *indexDeviceAddr = nullptr;
-    void *qOutDeviceAddr = nullptr;
-    void *kCacheDeviceAddr = nullptr;
-    void *vCacheDeviceAddr = nullptr;
-    void *kScaleDeviceAddr = nullptr;
-    void *vScaleDeviceAddr = nullptr;
+    void* qkvDeviceAddr = nullptr;
+    void* qGammaDeviceAddr = nullptr;
+    void* kGammaDeviceAddr = nullptr;
+    void* cosDeviceAddr = nullptr;
+    void* sinDeviceAddr = nullptr;
+    void* indexDeviceAddr = nullptr;
+    void* qOutDeviceAddr = nullptr;
+    void* kCacheDeviceAddr = nullptr;
+    void* vCacheDeviceAddr = nullptr;
+    void* kScaleDeviceAddr = nullptr;
+    void* vScaleDeviceAddr = nullptr;
 
-    aclTensor *qkv = nullptr;
-    aclTensor *qGamma = nullptr;
-    aclTensor *kGamma = nullptr;
-    aclTensor *cos = nullptr;
-    aclTensor *sin = nullptr;
-    aclTensor *index = nullptr;
-    aclTensor *qOut = nullptr;
-    aclTensor *kCache = nullptr;
-    aclTensor *vCache = nullptr;
-    aclTensor *kScale = nullptr;
-    aclTensor *vScale = nullptr;
+    aclTensor* qkv = nullptr;
+    aclTensor* qGamma = nullptr;
+    aclTensor* kGamma = nullptr;
+    aclTensor* cos = nullptr;
+    aclTensor* sin = nullptr;
+    aclTensor* index = nullptr;
+    aclTensor* qOut = nullptr;
+    aclTensor* kCache = nullptr;
+    aclTensor* vCache = nullptr;
+    aclTensor* kScale = nullptr;
+    aclTensor* vScale = nullptr;
 
-    aclIntArray *qkv_size = aclCreateIntArray(qkv_size_list.data(), qkv_size_list.size());
-    aclIntArray *head_nums = aclCreateIntArray(head_nums_list.data(), head_nums_list.size());
+    aclIntArray* qkv_size = aclCreateIntArray(qkv_size_list.data(), qkv_size_list.size());
+    aclIntArray* head_nums = aclCreateIntArray(head_nums_list.data(), head_nums_list.size());
 
     double epsilon = 1e-6;
-    char *cacheMode = "PA_NZ";
+    char* cacheMode = "PA_NZ";
 
     ret = CreateAclTensor(qkvHostData, qkvShape, &qkvDeviceAddr, aclDataType::ACL_FLOAT16, &qkv);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -173,7 +173,7 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的API
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 调用aclnnQkvRmsNormRopeCache第一段接口
     ret = aclnnQkvRmsNormRopeCacheGetWorkspaceSize(qkv, qGamma, kGamma, cos, sin, index, qOut, kCache, vCache, kScale,
@@ -183,7 +183,7 @@ int main()
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

@@ -14,8 +14,7 @@
 #include "infer_shape_case_executor.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 
-class RopeWithSinCosCache : public testing::Test
-{
+class RopeWithSinCosCache : public testing::Test {
 protected:
     static void SetUpTestCase()
     {

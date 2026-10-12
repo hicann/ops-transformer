@@ -27,7 +27,7 @@ constexpr uint64_t ROPE_AB_TILING_PRIORITY = 10000;
 
 class ApplyRotaryPosEmbTilingAB : public ApplyRotaryPosEmbRegbaseTilingBaseClass {
 public:
-    explicit ApplyRotaryPosEmbTilingAB(gert::TilingContext *context)
+    explicit ApplyRotaryPosEmbTilingAB(gert::TilingContext* context)
         : ApplyRotaryPosEmbRegbaseTilingBaseClass(context)
     {}
 
@@ -114,7 +114,7 @@ ge::graphStatus ApplyRotaryPosEmbTilingAB::PostTiling()
 
     context_->SetTilingKey(GetTilingKey());
     context_->SetBlockDim(blockNum_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     auto platformInfo = context_->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context_, platformInfo);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);

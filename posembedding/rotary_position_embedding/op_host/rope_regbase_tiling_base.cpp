@@ -52,7 +52,7 @@ ge::graphStatus RopeRegBaseTilingClass::GetPlatformInfo()
         aicoreParams_.ubSize = ubSizePlatForm;
         socVersion_ = ascendcPlatform.GetSocVersion();
     } else {
-        auto compileInfoPtr = reinterpret_cast<const RotaryPositionEmbeddingCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const RotaryPositionEmbeddingCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         aicoreParams_.numBlocks = compileInfoPtr->numBlocks;
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
@@ -126,7 +126,7 @@ ge::graphStatus RopeRegBaseTilingClass::CheckShapeAllPositive() const
     return ge::GRAPH_SUCCESS;
 }
 
-bool RopeRegBaseTilingClass::Is3dBsdBroadcastLayout(const gert::Shape &xShape, const gert::Shape &cosShape) const
+bool RopeRegBaseTilingClass::Is3dBsdBroadcastLayout(const gert::Shape& xShape, const gert::Shape& cosShape) const
 {
     // 识别 x（TND）cos（1ND）场景
     return xShape.GetDimNum() == DIM_NUM_TND && cosShape.GetDimNum() == DIM_NUM_TND && xShape.GetDim(DIM_1) != 1 &&
@@ -134,7 +134,7 @@ bool RopeRegBaseTilingClass::Is3dBsdBroadcastLayout(const gert::Shape &xShape, c
            cosShape.GetDim(DIM_2) == xShape.GetDim(DIM_2);
 }
 
-ge::graphStatus RopeRegBaseTilingClass::JudgeLayoutByShape(const gert::Shape &xShape, const gert::Shape &cosShape)
+ge::graphStatus RopeRegBaseTilingClass::JudgeLayoutByShape(const gert::Shape& xShape, const gert::Shape& cosShape)
 {
     isTndLayout_ = (xShape.GetDimNum() == DIM_NUM_TND);
     is3dBsdLayout_ = false;
@@ -178,10 +178,10 @@ ge::graphStatus RopeRegBaseTilingClass::JudgeLayoutByShape(const gert::Shape &xS
 
 ge::graphStatus RopeRegBaseTilingClass::CheckShape()
 {
-    auto &xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
-    auto &yShape = context_->GetOutputShape(Y_INDEX)->GetStorageShape();
+    auto& xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    auto& yShape = context_->GetOutputShape(Y_INDEX)->GetStorageShape();
     if (xShape.GetDimNum() != DIM_NUM && xShape.GetDimNum() != DIM_NUM_TND) {
         std::string dimNumStr = std::to_string(xShape.GetDimNum());
         OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "x", dimNumStr.c_str(), "3D or 4D");
@@ -315,7 +315,7 @@ ge::graphStatus RopeRegBaseTilingClass::CheckRotaryModeShapeRelation(const int64
     return ge::GRAPH_SUCCESS;
 }
 
-void RopeRegBaseTilingClass::Set3dBsdShapeAttrs(const gert::Shape &xShape)
+void RopeRegBaseTilingClass::Set3dBsdShapeAttrs(const gert::Shape& xShape)
 {
     // TND的广播场景需要映射成为BS1D，用于分核优化
     b_ = xShape.GetDim(DIM_0);
@@ -326,9 +326,9 @@ void RopeRegBaseTilingClass::Set3dBsdShapeAttrs(const gert::Shape &xShape)
 
 ge::graphStatus RopeRegBaseTilingClass::GetShapeAttrsInfo()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
-    const int32_t *mode = attrs->GetAttrPointer<int32_t>(0);
+    const int32_t* mode = attrs->GetAttrPointer<int32_t>(0);
     int32_t modeValue = (mode == nullptr) ? 0 : static_cast<int32_t>(*mode);
     if (IsRotaryPosEmbeddingMode(modeValue) != true) {
         std::string modeValueStr = std::to_string(modeValue);
@@ -340,8 +340,8 @@ ge::graphStatus RopeRegBaseTilingClass::GetShapeAttrsInfo()
     OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check param fail."), return ge::GRAPH_FAILED);
 
     dtype_ = context_->GetInputDesc(X_INDEX)->GetDataType();
-    auto &xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
     OP_CHECK_IF(JudgeLayoutByShape(xShape, cosShape) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_, "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
 

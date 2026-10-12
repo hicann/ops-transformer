@@ -104,25 +104,24 @@ TEST_F(RotaryPositionEmbeddingGrad, RotaryPositionEmbeddingGrad_infer_shape_fp32
 
 TEST_F(RotaryPositionEmbeddingGrad, RotaryPositionEmbeddingGrad_infer_shape_tnd)
 {
-    gert::InfershapeContextPara infershapeContextPara(
-        "RotaryPositionEmbeddingGrad",
-        {
-            // input info
-            {{{64, 2, 64}, {64, 2, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{64, 1, 64}, {64, 1, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{64, 1, 64}, {64, 1, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{64, 2, 64}, {64, 2, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        },
-        {
-            // output info
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        },
-        {
-            // attr
-            {"mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-        });
+    gert::InfershapeContextPara infershapeContextPara("RotaryPositionEmbeddingGrad",
+                                                      {
+                                                          // input info
+                                                          {{{64, 2, 64}, {64, 2, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{64, 1, 64}, {64, 1, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{64, 1, 64}, {64, 1, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{64, 2, 64}, {64, 2, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                      },
+                                                      {
+                                                          // output info
+                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                      },
+                                                      {
+                                                          // attr
+                                                          {"mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                                      });
     std::vector<std::vector<int64_t>> expectOutputShape = {{64, 2, 64}, {64, 1, 64}, {64, 1, 64}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }

@@ -13,37 +13,50 @@ import os
 import numpy as np
 import torch
 
-def norm(x, mean, rstd, modeType, weight=None, bias=None,  eps=1e-5):
+
+def norm(x, mean, rstd, modeType, weight=None, bias=None, eps=1e-5):
     headdim = x.shape[-1]
 
     x = x.float()
     mean = torch.mean(x, dim=-1, keepdim=True)
-    var = torch.var(x, dim=-1,correction=0, keepdim=True)
-    rstd =  1 / torch.sqrt(var + eps)
+    var = torch.var(x, dim=-1, correction=0, keepdim=True)
+    rstd = 1 / torch.sqrt(var + eps)
     out = (x - mean) * rstd
     if modeType == 2:
-        out = weight.float()*out + bias.float()
+        out = weight.float() * out + bias.float()
     return out
+
 
 def image_rotary_emb(hidden_states, ropeSin, ropeCos, mode=1):
     out = torch.empty_like(hidden_states)
     if mode == 1:
         x = hidden_states.view(*hidden_states.shape[:-1], -1, 2)
         x1, x2 = x[..., 0], x[..., 1]
-        rotated_x = torch.stack([-x2, x1],dim=-1).flatten(3)
+        rotated_x = torch.stack([-x2, x1], dim=-1).flatten(3)
 
-        out = hidden_states.float() * ropeCos + rotated_x.float()*ropeSin
+        out = hidden_states.float() * ropeCos + rotated_x.float() * ropeSin
         return out.type_as(hidden_states)
     else:
         x1, x2 = hidden_states.reshape(*hidden_states.shape[:-1], 2, -1).unbind(-2)
 
-        rotated_x = torch.cat([-x2, x1],dim=-1)
+        rotated_x = torch.cat([-x2, x1], dim=-1)
 
-        out = hidden_states.float() * ropeCos + rotated_x.float()*ropeSin
+        out = hidden_states.float() * ropeCos + rotated_x.float() * ropeSin
         return out.type_as(hidden_states)
 
 
-def gen_data_and_golden(batchSize, headNum, headDim, totalQuerySeq, totalKeySeq, querySeq, keySeq, ropeSeq, origin_dtype, tilingkey):
+def gen_data_and_golden(
+    batchSize,
+    headNum,
+    headDim,
+    totalQuerySeq,
+    totalKeySeq,
+    querySeq,
+    keySeq,
+    ropeSeq,
+    origin_dtype,
+    tilingkey,
+):
     torch.manual_seed(42)
     batchSize = int(batchSize)
     headNum = int(headNum)
@@ -85,23 +98,68 @@ def gen_data_and_golden(batchSize, headNum, headDim, totalQuerySeq, totalKeySeq,
     concatOrder = (tilingkey % 100) // 10
     eps = 1e-5
 
-    gradQueryOutput = torch.randn([batchSize, headNum, totalQuerySeq, headDim], dtype=origin_dtype)*10 - 5
-    gradKeyOutput = torch.randn([batchSize, headNum, totalKeySeq, headDim], dtype=origin_dtype)*10 - 5
-    gradValueOutput = torch.randn([batchSize, headNum, totalKeySeq, headDim], dtype=origin_dtype)*10 - 5
-    query = (torch.randn([batchSize, querySeq, headNum, headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    key = (torch.randn([batchSize, keySeq, headNum, headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    value = (torch.randn([batchSize, keySeq, headNum, headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    encoderQuery = (torch.randn([batchSize, encoderQuerySeq, headNum, headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    encoderKey = (torch.randn([batchSize, encoderKeySeq, headNum, headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    encoderValue = (torch.randn([batchSize, encoderKeySeq, headNum, headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    normQueryWeight =( torch.randn([headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    normQueryBias = (torch.randn([headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    normKeyWeight = (torch.randn([headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    normKeyBias = (torch.randn([headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    normAddedQueryWeight = (torch.randn([headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    normAddedQueryBias = (torch.randn([headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    normAddedKeyWeight = (torch.randn([headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
-    normAddedKeyBias = (torch.randn([headDim], dtype=origin_dtype)*10 - 5).requires_grad_(True)
+    gradQueryOutput = (
+        torch.randn([batchSize, headNum, totalQuerySeq, headDim], dtype=origin_dtype)
+        * 10
+        - 5
+    )
+    gradKeyOutput = (
+        torch.randn([batchSize, headNum, totalKeySeq, headDim], dtype=origin_dtype) * 10
+        - 5
+    )
+    gradValueOutput = (
+        torch.randn([batchSize, headNum, totalKeySeq, headDim], dtype=origin_dtype) * 10
+        - 5
+    )
+    query = (
+        torch.randn([batchSize, querySeq, headNum, headDim], dtype=origin_dtype) * 10
+        - 5
+    ).requires_grad_(True)
+    key = (
+        torch.randn([batchSize, keySeq, headNum, headDim], dtype=origin_dtype) * 10 - 5
+    ).requires_grad_(True)
+    value = (
+        torch.randn([batchSize, keySeq, headNum, headDim], dtype=origin_dtype) * 10 - 5
+    ).requires_grad_(True)
+    encoderQuery = (
+        torch.randn([batchSize, encoderQuerySeq, headNum, headDim], dtype=origin_dtype)
+        * 10
+        - 5
+    ).requires_grad_(True)
+    encoderKey = (
+        torch.randn([batchSize, encoderKeySeq, headNum, headDim], dtype=origin_dtype)
+        * 10
+        - 5
+    ).requires_grad_(True)
+    encoderValue = (
+        torch.randn([batchSize, encoderKeySeq, headNum, headDim], dtype=origin_dtype)
+        * 10
+        - 5
+    ).requires_grad_(True)
+    normQueryWeight = (
+        torch.randn([headDim], dtype=origin_dtype) * 10 - 5
+    ).requires_grad_(True)
+    normQueryBias = (
+        torch.randn([headDim], dtype=origin_dtype) * 10 - 5
+    ).requires_grad_(True)
+    normKeyWeight = (
+        torch.randn([headDim], dtype=origin_dtype) * 10 - 5
+    ).requires_grad_(True)
+    normKeyBias = (torch.randn([headDim], dtype=origin_dtype) * 10 - 5).requires_grad_(
+        True
+    )
+    normAddedQueryWeight = (
+        torch.randn([headDim], dtype=origin_dtype) * 10 - 5
+    ).requires_grad_(True)
+    normAddedQueryBias = (
+        torch.randn([headDim], dtype=origin_dtype) * 10 - 5
+    ).requires_grad_(True)
+    normAddedKeyWeight = (
+        torch.randn([headDim], dtype=origin_dtype) * 10 - 5
+    ).requires_grad_(True)
+    normAddedKeyBias = (
+        torch.randn([headDim], dtype=origin_dtype) * 10 - 5
+    ).requires_grad_(True)
 
     normQueryMean = torch.mean(query.float(), dim=-1, keepdim=True)
     normQueryVar = torch.var(query.float(), correction=0, dim=-1, keepdim=True)
@@ -112,12 +170,18 @@ def gen_data_and_golden(batchSize, headNum, headDim, totalQuerySeq, totalKeySeq,
     normKeyRstd = torch.rsqrt(normKeyVar + eps).to(torch.float32)  # 倒数标准差
 
     normAddedQueryMean = torch.mean(encoderQuery.float(), dim=-1, keepdim=True)
-    normAddedQueryVar = torch.var(encoderQuery.float(), correction=0, dim=-1, keepdim=True)
-    normAddedQueryRstd = torch.rsqrt(normAddedQueryVar + eps).to(torch.float32)  # 倒数标准差
+    normAddedQueryVar = torch.var(
+        encoderQuery.float(), correction=0, dim=-1, keepdim=True
+    )
+    normAddedQueryRstd = torch.rsqrt(normAddedQueryVar + eps).to(
+        torch.float32
+    )  # 倒数标准差
 
     normAddedKeyMean = torch.mean(encoderKey.float(), dim=-1, keepdim=True)
     normAddedKeyVar = torch.var(encoderKey.float(), correction=0, dim=-1, keepdim=True)
-    normAddedKeyRstd = torch.rsqrt(normAddedKeyVar + eps).to(torch.float32)  # 倒数标准差
+    normAddedKeyRstd = torch.rsqrt(normAddedKeyVar + eps).to(
+        torch.float32
+    )  # 倒数标准差
 
     positionIds = torch.arange(ropeSeq)
     invFreq = 1.0 / (10000 ** (torch.arange(0, headDim).float() / headDim))
@@ -150,15 +214,41 @@ def gen_data_and_golden(batchSize, headNum, headDim, totalQuerySeq, totalKeySeq,
 
     # 开始计算
     if normType != 0:
-        queryNorm = norm(query, normQueryMean, normQueryRstd, normType, normQueryWeight, normQueryBias, eps)
-        keyNorm = norm(key, normKeyMean, normKeyRstd, normType, normKeyWeight, normKeyBias, eps)
+        queryNorm = norm(
+            query,
+            normQueryMean,
+            normQueryRstd,
+            normType,
+            normQueryWeight,
+            normQueryBias,
+            eps,
+        )
+        keyNorm = norm(
+            key, normKeyMean, normKeyRstd, normType, normKeyWeight, normKeyBias, eps
+        )
     else:
         queryNorm = query
         keyNorm = key
 
     if normAddedType != 0:
-        encoderQueryNorm  = norm(encoderQuery, normAddedQueryMean, normAddedQueryRstd, normAddedType, normAddedQueryWeight, normAddedQueryBias, eps)
-        encoderKeyNorm = norm(encoderKey, normAddedKeyMean, normAddedKeyRstd, normAddedType, normAddedKeyWeight, normAddedKeyBias, eps)
+        encoderQueryNorm = norm(
+            encoderQuery,
+            normAddedQueryMean,
+            normAddedQueryRstd,
+            normAddedType,
+            normAddedQueryWeight,
+            normAddedQueryBias,
+            eps,
+        )
+        encoderKeyNorm = norm(
+            encoderKey,
+            normAddedKeyMean,
+            normAddedKeyRstd,
+            normAddedType,
+            normAddedKeyWeight,
+            normAddedKeyBias,
+            eps,
+        )
     else:
         encoderQueryNorm = encoderQuery
         encoderKeyNorm = encoderKey
@@ -168,7 +258,7 @@ def gen_data_and_golden(batchSize, headNum, headDim, totalQuerySeq, totalKeySeq,
         keyConcat = torch.cat([keyNorm, encoderKeyNorm], dim=1)
         valueConcat = torch.cat([value, encoderValue], dim=1)
     else:
-        queryConcat = torch.cat([encoderQueryNorm,queryNorm], dim=1)
+        queryConcat = torch.cat([encoderQueryNorm, queryNorm], dim=1)
         keyConcat = torch.cat([encoderKeyNorm, keyNorm], dim=1)
         valueConcat = torch.cat([encoderValue, value], dim=1)
 
@@ -177,8 +267,12 @@ def gen_data_and_golden(batchSize, headNum, headDim, totalQuerySeq, totalKeySeq,
     valueConcat = torch.permute(valueConcat, (0, 2, 1, 3))
 
     if ropeType != 0:
-        queryConcat[:,:,:ropeSeq] = image_rotary_emb(queryConcat[:,:,:ropeSeq], ropeSin, ropeCos,mode=ropeType)
-        keyConcat[:,:,:ropeSeq] = image_rotary_emb(keyConcat[:,:,:ropeSeq], ropeSin, ropeCos,mode=ropeType)
+        queryConcat[:, :, :ropeSeq] = image_rotary_emb(
+            queryConcat[:, :, :ropeSeq], ropeSin, ropeCos, mode=ropeType
+        )
+        keyConcat[:, :, :ropeSeq] = image_rotary_emb(
+            keyConcat[:, :, :ropeSeq], ropeSin, ropeCos, mode=ropeType
+        )
 
     # 反向求导
     queryConcat.backward(gradQueryOutput, retain_graph=True)
@@ -204,7 +298,7 @@ def gen_data_and_golden(batchSize, headNum, headDim, totalQuerySeq, totalKeySeq,
         gradNormKeyWeight = torch.empty([]).zero_()
         gradNormKeyBias = torch.empty([]).zero_()
 
-    if normAddedType ==2:
+    if normAddedType == 2:
         gradNormAddedQueryWeight = normAddedQueryWeight.grad.clone()
         gradNormAddedQueryBias = normAddedQueryBias.grad.clone()
         gradNormAddedKeyWeight = normAddedKeyWeight.grad.clone()
@@ -222,17 +316,38 @@ def gen_data_and_golden(batchSize, headNum, headDim, totalQuerySeq, totalKeySeq,
     gradencoderQuery.to(origin_dtype).numpy().tofile("./golden_gradEncoderQuery.bin")
     gradEncoderKey.to(origin_dtype).numpy().tofile("./golden_gradEncoderKey.bin")
     gradEncoderValue.to(origin_dtype).numpy().tofile("./golden_gradEncoderValue.bin")
-    gradNormQueryWeight.to(origin_dtype).numpy().tofile("./golden_gradNormQueryWeight.bin")
+    gradNormQueryWeight.to(origin_dtype).numpy().tofile(
+        "./golden_gradNormQueryWeight.bin"
+    )
     gradNormQueryBias.to(origin_dtype).numpy().tofile("./golden_gradNormQueryBias.bin")
     gradNormKeyWeight.to(origin_dtype).numpy().tofile("./golden_gradNormKeyWeight.bin")
     gradNormKeyBias.to(origin_dtype).numpy().tofile("./golden_gradNormKeyBias.bin")
-    gradNormAddedQueryWeight.to(origin_dtype).numpy().tofile("./golden_gradNormAddedQueryWeight.bin")
-    gradNormAddedQueryBias.to(origin_dtype).numpy().tofile("./golden_gradNormAddedQueryBias.bin")
-    gradNormAddedKeyWeight.to(origin_dtype).numpy().tofile("./golden_gradNormAddedKeyWeight.bin")
-    gradNormAddedKeyBias.to(origin_dtype).numpy().tofile("./golden_gradNormAddedKeyBias.bin")
+    gradNormAddedQueryWeight.to(origin_dtype).numpy().tofile(
+        "./golden_gradNormAddedQueryWeight.bin"
+    )
+    gradNormAddedQueryBias.to(origin_dtype).numpy().tofile(
+        "./golden_gradNormAddedQueryBias.bin"
+    )
+    gradNormAddedKeyWeight.to(origin_dtype).numpy().tofile(
+        "./golden_gradNormAddedKeyWeight.bin"
+    )
+    gradNormAddedKeyBias.to(origin_dtype).numpy().tofile(
+        "./golden_gradNormAddedKeyBias.bin"
+    )
 
 
 if __name__ == "__main__":
     os.system("rm -rf *.bin")
-    gen_data_and_golden(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10])
+    gen_data_and_golden(
+        sys.argv[1],
+        sys.argv[2],
+        sys.argv[3],
+        sys.argv[4],
+        sys.argv[5],
+        sys.argv[6],
+        sys.argv[7],
+        sys.argv[8],
+        sys.argv[9],
+        sys.argv[10],
+    )
     exit(0)

@@ -88,9 +88,9 @@ constexpr Reg::CastTrait MROPE_MX_CAST_FP32_TO_FP8_THREE = {Reg::RegLayout::THRE
                                                             Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
 
 __simd_callee__ inline void RmsNormMropeFp32D128(
-    Reg::RegTensor<float> &outLow, Reg::RegTensor<float> &outHigh, Reg::RegTensor<bfloat16_t> &inLowBf16,
-    Reg::RegTensor<bfloat16_t> &inHighBf16, Reg::RegTensor<float> &gammaCosLow, Reg::RegTensor<float> &gammaCosHigh,
-    Reg::RegTensor<float> &gammaSinLow, Reg::RegTensor<float> &gammaSinHigh, float epsilon, Reg::MaskReg mask64,
+    Reg::RegTensor<float>& outLow, Reg::RegTensor<float>& outHigh, Reg::RegTensor<bfloat16_t>& inLowBf16,
+    Reg::RegTensor<bfloat16_t>& inHighBf16, Reg::RegTensor<float>& gammaCosLow, Reg::RegTensor<float>& gammaCosHigh,
+    Reg::RegTensor<float>& gammaSinLow, Reg::RegTensor<float>& gammaSinHigh, float epsilon, Reg::MaskReg mask64,
     Reg::MaskReg maskFirst)
 {
     // 逐行参考通路：先得到 norm=x/rms，再完成 gamma 和旋转；输出仍为两个连续 D64。
@@ -107,7 +107,7 @@ __simd_callee__ inline void RmsNormMropeFp32D128(
     Reg::Add(outHigh, outHigh, rotateTmp, mask64);
 }
 
-__simd_callee__ inline void MxReduceMaxD32x2(Reg::RegTensor<uint32_t> &maxValue, Reg::RegTensor<float> &input,
+__simd_callee__ inline void MxReduceMaxD32x2(Reg::RegTensor<uint32_t>& maxValue, Reg::RegTensor<float>& input,
                                              Reg::MaskReg mask64, Reg::MaskReg maskLow32, Reg::MaskReg maskHigh32)
 {
     // 一个 D64 寄存器包含两个 D32 block。本函数输出这两个 block 的绝对值最大值。
@@ -119,16 +119,16 @@ __simd_callee__ inline void MxReduceMaxD32x2(Reg::RegTensor<uint32_t> &maxValue,
 
     // Step 1: 清除 FP32 符号位得到 abs(input)，整数比较保持非负 FP32 的大小顺序。
     Reg::Duplicate(absMask, MROPE_MX_FP32_ABS_MASK);
-    Reg::And(absValue, (Reg::RegTensor<uint32_t> &)input, absMask, mask64);
+    Reg::And(absValue, (Reg::RegTensor<uint32_t>&)input, absMask, mask64);
     // Step 2: 分别归约低/高 32 lanes；Interleave 把两个标量结果放入后续可拼接布局。
     Reg::ReduceMax(lowMax, absValue, maskLow32);
     Reg::ReduceMax(highMax, absValue, maskHigh32);
     Reg::Interleave(maxValue, interleaveScratch, lowMax, highMax);
 }
 
-__simd_callee__ inline void MxQuantCublasScaleD32x4(Reg::RegTensor<float> &reciprocal,
-                                                    Reg::RegTensor<uint32_t> &scaleExp,
-                                                    Reg::RegTensor<uint32_t> &maxValue, Reg::MaskReg mask4)
+__simd_callee__ inline void MxQuantCublasScaleD32x4(Reg::RegTensor<float>& reciprocal,
+                                                    Reg::RegTensor<uint32_t>& scaleExp,
+                                                    Reg::RegTensor<uint32_t>& maxValue, Reg::MaskReg mask4)
 {
     // 输入是四个 D32 amax 的原始 FP32 bit；输出是四个 E8M0 byte（暂存为 uint32）
     // 和对应的 FP32 倒数=1/scale。整个转换使用整数指数域，保持既定 MX 合同。
@@ -148,20 +148,20 @@ __simd_callee__ inline void MxQuantCublasScaleD32x4(Reg::RegTensor<float> &recip
                                                                      normalPredicate);
 
     // E8M0 指数 e 直接映射为 FP32 2^(-e) 的指数位，因此无需逐 lane 浮点除法。
-    Reg::Muls<uint32_t>((Reg::RegTensor<uint32_t> &)reciprocal, scaleExp, MROPE_MX_FP32_NEG_EXP_UNIT, mask4);
-    Reg::Adds<uint32_t>((Reg::RegTensor<uint32_t> &)reciprocal, (Reg::RegTensor<uint32_t> &)reciprocal,
+    Reg::Muls<uint32_t>((Reg::RegTensor<uint32_t>&)reciprocal, scaleExp, MROPE_MX_FP32_NEG_EXP_UNIT, mask4);
+    Reg::Adds<uint32_t>((Reg::RegTensor<uint32_t>&)reciprocal, (Reg::RegTensor<uint32_t>&)reciprocal,
                         MROPE_MX_FP32_EXP_BIAS_CUBLAS, mask4);
     // Inf/NaN 走固定编码；MERGING 只覆盖 invalid lanes，不改变正常结果。
     Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(scaleExp, MROPE_MX_E8M0_NAN, invalidPredicate);
-    Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>((Reg::RegTensor<uint32_t> &)reciprocal,
-                                                          MROPE_MX_FP32_NAN_BITS, invalidPredicate);
+    Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>((Reg::RegTensor<uint32_t>&)reciprocal, MROPE_MX_FP32_NAN_BITS,
+                                                          invalidPredicate);
 }
 
-__simd_callee__ inline void MxQuantCublasD128(__ubuf__ uint8_t *outBytes, Reg::AddrReg outAddr,
-                                              __ubuf__ uint8_t *scaleBytes, Reg::RegTensor<float> &inLow,
-                                              Reg::RegTensor<float> &inHigh,
-                                              Reg::RegTensor<uint32_t> &scaleGatherLowIndex,
-                                              Reg::RegTensor<uint32_t> &scaleGatherHighIndex, Reg::MaskReg mask64,
+__simd_callee__ inline void MxQuantCublasD128(__ubuf__ uint8_t* outBytes, Reg::AddrReg outAddr,
+                                              __ubuf__ uint8_t* scaleBytes, Reg::RegTensor<float>& inLow,
+                                              Reg::RegTensor<float>& inHigh,
+                                              Reg::RegTensor<uint32_t>& scaleGatherLowIndex,
+                                              Reg::RegTensor<uint32_t>& scaleGatherHighIndex, Reg::MaskReg mask64,
                                               Reg::MaskReg maskLow32, Reg::MaskReg maskHigh32, Reg::MaskReg mask4)
 {
     // 单行直接量化通路：D128 -> 4×D32 amax -> 4 scales -> 128 E4M3 bytes。
@@ -197,7 +197,7 @@ __simd_callee__ inline void MxQuantCublasD128(__ubuf__ uint8_t *outBytes, Reg::A
     Reg::Gather(expandedScale, reciprocalCombined, scaleGatherLowIndex);
     Reg::Mul(inLow, inLow, expandedScale, mask64);
     Reg::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8>(output, inLow, mask64);
-    Reg::StoreAlign<uint8_t, Reg::StoreDist::DIST_PACK4_B32>(outBytes, (Reg::RegTensor<uint8_t> &)output, outAddr,
+    Reg::StoreAlign<uint8_t, Reg::StoreDist::DIST_PACK4_B32>(outBytes, (Reg::RegTensor<uint8_t>&)output, outAddr,
                                                              mask64);
     Reg::StoreUnAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE>(scaleBytes, scale, scaleStore, 2U);
 
@@ -207,15 +207,15 @@ __simd_callee__ inline void MxQuantCublasD128(__ubuf__ uint8_t *outBytes, Reg::A
     Reg::Mul(inHigh, inHigh, expandedScale, mask64);
     Reg::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8>(output, inHigh, mask64);
     Reg::StoreAlign<uint8_t, Reg::StoreDist::DIST_PACK4_B32>(outBytes + QKV_K_SCALE_D128_HALF_SIZE,
-                                                             (Reg::RegTensor<uint8_t> &)output, outAddr, mask64);
+                                                             (Reg::RegTensor<uint8_t>&)output, outAddr, mask64);
     Reg::StoreUnAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE>(scaleBytes, scale, scaleStore, 2U);
     Reg::StoreUnAlignPost(scaleBytes, scaleStore, 0U);
 }
 
 __simd_callee__ inline void PrepareMropeGammaD128(
-    Reg::RegTensor<float> &gammaCosLow, Reg::RegTensor<float> &gammaCosHigh, Reg::RegTensor<float> &gammaSinLow,
-    Reg::RegTensor<float> &gammaSinHigh, Reg::RegTensor<float> &gammaLow, Reg::RegTensor<float> &gammaHigh,
-    Reg::RegTensor<uint32_t> &mropeIndex, __ubuf__ float *rawToken, Reg::MaskReg mask64)
+    Reg::RegTensor<float>& gammaCosLow, Reg::RegTensor<float>& gammaCosHigh, Reg::RegTensor<float>& gammaSinLow,
+    Reg::RegTensor<float>& gammaSinHigh, Reg::RegTensor<float>& gammaLow, Reg::RegTensor<float>& gammaHigh,
+    Reg::RegTensor<uint32_t>& mropeIndex, __ubuf__ float* rawToken, Reg::MaskReg mask64)
 {
     // 同一 token 的所有 heads 共用 cos/sin。先按 M-RoPE index Gather，再预乘 gamma，
     // 后续每行旋转只需四次 Mul 和一次 Add/Sub，不重复计算 gamma*cos/sin。
@@ -229,12 +229,12 @@ __simd_callee__ inline void PrepareMropeGammaD128(
     Reg::Mul(gammaCosHigh, gammaHigh, cosValue, mask64);
 }
 
-__simd_callee__ inline void LoadRmsNormMropeFp32D128(Reg::RegTensor<float> &outLow, Reg::RegTensor<float> &outHigh,
-                                                     __ubuf__ bfloat16_t *inputBf16, Reg::AddrReg inputAddr,
-                                                     Reg::RegTensor<float> &gammaCosLow,
-                                                     Reg::RegTensor<float> &gammaCosHigh,
-                                                     Reg::RegTensor<float> &gammaSinLow,
-                                                     Reg::RegTensor<float> &gammaSinHigh, float epsilon,
+__simd_callee__ inline void LoadRmsNormMropeFp32D128(Reg::RegTensor<float>& outLow, Reg::RegTensor<float>& outHigh,
+                                                     __ubuf__ bfloat16_t* inputBf16, Reg::AddrReg inputAddr,
+                                                     Reg::RegTensor<float>& gammaCosLow,
+                                                     Reg::RegTensor<float>& gammaCosHigh,
+                                                     Reg::RegTensor<float>& gammaSinLow,
+                                                     Reg::RegTensor<float>& gammaSinHigh, float epsilon,
                                                      Reg::MaskReg mask64, Reg::MaskReg maskFirst)
 {
     // 从自然 D128 BF16 行加载两个 D64，并进入“先归一化、后旋转”的逐行通路。
@@ -251,9 +251,9 @@ __simd_callee__ inline void LoadRmsNormMropeFp32D128(Reg::RegTensor<float> &outL
 // MX scale 只依赖 max(abs(y))，因此 Scale 阶段可以用 max(abs(z))/rms 得到相同输入；
 // Quant 阶段再用 z/(rms*scale) 一次完成原来的归一化与量化缩放。
 __simd_callee__ inline void LoadRmsSquaredMropeUnnormalizedFp32D128(
-    Reg::RegTensor<float> &outLow, Reg::RegTensor<float> &outHigh, Reg::RegTensor<float> &rmsSquared,
-    __ubuf__ bfloat16_t *inputBf16, Reg::AddrReg inputAddr, Reg::RegTensor<float> &gammaCosLow,
-    Reg::RegTensor<float> &gammaCosHigh, Reg::RegTensor<float> &gammaSinLow, Reg::RegTensor<float> &gammaSinHigh,
+    Reg::RegTensor<float>& outLow, Reg::RegTensor<float>& outHigh, Reg::RegTensor<float>& rmsSquared,
+    __ubuf__ bfloat16_t* inputBf16, Reg::AddrReg inputAddr, Reg::RegTensor<float>& gammaCosLow,
+    Reg::RegTensor<float>& gammaCosHigh, Reg::RegTensor<float>& gammaSinLow, Reg::RegTensor<float>& gammaSinHigh,
     float epsilon, Reg::MaskReg mask64, Reg::MaskReg maskFirst)
 {
     Reg::RegTensor<bfloat16_t> inLowBf16;
@@ -290,10 +290,10 @@ __simd_callee__ inline void LoadRmsSquaredMropeUnnormalizedFp32D128(
 
 template <bool REDUCE_MAX = true>
 __simd_callee__ inline void StoreAndReduceMropeMxD128x2(
-    __ubuf__ float *row0LowScratch, __ubuf__ float *row0HighScratch, __ubuf__ float *row1LowScratch,
-    __ubuf__ float *row1HighScratch, __ubuf__ uint32_t *maxScratch, Reg::AddrReg dataAddr, Reg::AddrReg maxAddr,
-    Reg::RegTensor<float> &row0Low, Reg::RegTensor<float> &row0High, Reg::RegTensor<float> &row1Low,
-    Reg::RegTensor<float> &row1High, Reg::RegTensor<uint32_t> &absMask, Reg::MaskReg mask64, Reg::MaskReg mask8)
+    __ubuf__ float* row0LowScratch, __ubuf__ float* row0HighScratch, __ubuf__ float* row1LowScratch,
+    __ubuf__ float* row1HighScratch, __ubuf__ uint32_t* maxScratch, Reg::AddrReg dataAddr, Reg::AddrReg maxAddr,
+    Reg::RegTensor<float>& row0Low, Reg::RegTensor<float>& row0High, Reg::RegTensor<float>& row1Low,
+    Reg::RegTensor<float>& row1High, Reg::RegTensor<uint32_t>& absMask, Reg::MaskReg mask64, Reg::MaskReg mask8)
 {
     // 两行是 RowBatch16 的最小 producer 单元。
     // Step 1: 先把 row0/row1 的 z 按自然行序写入 data scratch，供 Quant 阶段重读。
@@ -308,28 +308,28 @@ __simd_callee__ inline void StoreAndReduceMropeMxD128x2(
         Reg::DeInterleave(row1Low, row1High, row1Low, row1High);
         Reg::DeInterleave(row0Low, row1Low, row0Low, row1Low);
         Reg::DeInterleave(row0High, row1High, row0High, row1High);
-        Reg::And((Reg::RegTensor<uint32_t> &)row0Low, (Reg::RegTensor<uint32_t> &)row0Low, absMask, mask64);
-        Reg::And((Reg::RegTensor<uint32_t> &)row0High, (Reg::RegTensor<uint32_t> &)row0High, absMask, mask64);
-        Reg::And((Reg::RegTensor<uint32_t> &)row1Low, (Reg::RegTensor<uint32_t> &)row1Low, absMask, mask64);
-        Reg::And((Reg::RegTensor<uint32_t> &)row1High, (Reg::RegTensor<uint32_t> &)row1High, absMask, mask64);
-        Reg::Max((Reg::RegTensor<uint32_t> &)row0Low, (Reg::RegTensor<uint32_t> &)row0Low,
-                 (Reg::RegTensor<uint32_t> &)row1Low, mask64);
-        Reg::Max((Reg::RegTensor<uint32_t> &)row0High, (Reg::RegTensor<uint32_t> &)row0High,
-                 (Reg::RegTensor<uint32_t> &)row1High, mask64);
-        Reg::Max((Reg::RegTensor<uint32_t> &)row0Low, (Reg::RegTensor<uint32_t> &)row0Low,
-                 (Reg::RegTensor<uint32_t> &)row0High, mask64);
-        Reg::ReduceMaxWithDataBlock((Reg::RegTensor<uint32_t> &)row0Low, (Reg::RegTensor<uint32_t> &)row0Low, mask64);
-        Reg::StoreAlign<uint32_t>(maxScratch, (Reg::RegTensor<uint32_t> &)row0Low, maxAddr, mask8);
+        Reg::And((Reg::RegTensor<uint32_t>&)row0Low, (Reg::RegTensor<uint32_t>&)row0Low, absMask, mask64);
+        Reg::And((Reg::RegTensor<uint32_t>&)row0High, (Reg::RegTensor<uint32_t>&)row0High, absMask, mask64);
+        Reg::And((Reg::RegTensor<uint32_t>&)row1Low, (Reg::RegTensor<uint32_t>&)row1Low, absMask, mask64);
+        Reg::And((Reg::RegTensor<uint32_t>&)row1High, (Reg::RegTensor<uint32_t>&)row1High, absMask, mask64);
+        Reg::Max((Reg::RegTensor<uint32_t>&)row0Low, (Reg::RegTensor<uint32_t>&)row0Low,
+                 (Reg::RegTensor<uint32_t>&)row1Low, mask64);
+        Reg::Max((Reg::RegTensor<uint32_t>&)row0High, (Reg::RegTensor<uint32_t>&)row0High,
+                 (Reg::RegTensor<uint32_t>&)row1High, mask64);
+        Reg::Max((Reg::RegTensor<uint32_t>&)row0Low, (Reg::RegTensor<uint32_t>&)row0Low,
+                 (Reg::RegTensor<uint32_t>&)row0High, mask64);
+        Reg::ReduceMaxWithDataBlock((Reg::RegTensor<uint32_t>&)row0Low, (Reg::RegTensor<uint32_t>&)row0Low, mask64);
+        Reg::StoreAlign<uint32_t>(maxScratch, (Reg::RegTensor<uint32_t>&)row0Low, maxAddr, mask8);
     }
 }
 
 template <bool REDUCE_MAX = true>
 __simd_callee__ inline void StageMropeMxHeadPairD128(
-    __ubuf__ bfloat16_t *inputBf16, __ubuf__ float *row0LowScratch, __ubuf__ float *row0HighScratch,
-    __ubuf__ float *row1LowScratch, __ubuf__ float *row1HighScratch, __ubuf__ uint32_t *maxScratch,
+    __ubuf__ bfloat16_t* inputBf16, __ubuf__ float* row0LowScratch, __ubuf__ float* row0HighScratch,
+    __ubuf__ float* row1LowScratch, __ubuf__ float* row1HighScratch, __ubuf__ uint32_t* maxScratch,
     Reg::AddrReg inputAddr, Reg::AddrReg dataAddr, Reg::AddrReg maxAddr, uint32_t inputHeadStride,
-    Reg::RegTensor<float> &gammaCosLow, Reg::RegTensor<float> &gammaCosHigh, Reg::RegTensor<float> &gammaSinLow,
-    Reg::RegTensor<float> &gammaSinHigh, Reg::RegTensor<uint32_t> &absMask, float epsilon, Reg::MaskReg mask64,
+    Reg::RegTensor<float>& gammaCosLow, Reg::RegTensor<float>& gammaCosHigh, Reg::RegTensor<float>& gammaSinLow,
+    Reg::RegTensor<float>& gammaSinHigh, Reg::RegTensor<uint32_t>& absMask, float epsilon, Reg::MaskReg mask64,
     Reg::MaskReg maskFirst, Reg::MaskReg mask8)
 {
     // 已归一化 producer：两行各自完整执行 RMSNorm+M-RoPE，再共同写 data/max scratch。
@@ -348,12 +348,12 @@ __simd_callee__ inline void StageMropeMxHeadPairD128(
 }
 
 __simd_callee__ inline void StageMropeMxHeadPairDeferredRmsD128(
-    __ubuf__ bfloat16_t *inputBf16, __ubuf__ float *row0LowScratch, __ubuf__ float *row0HighScratch,
-    __ubuf__ float *row1LowScratch, __ubuf__ float *row1HighScratch, __ubuf__ uint32_t *maxScratch,
-    __ubuf__ float *rmsSquaredScratch, Reg::AddrReg inputAddr, Reg::AddrReg dataAddr, Reg::AddrReg maxAddr,
-    Reg::AddrReg rmsAddr, uint32_t inputHeadStride, Reg::RegTensor<float> &gammaCosLow,
-    Reg::RegTensor<float> &gammaCosHigh, Reg::RegTensor<float> &gammaSinLow, Reg::RegTensor<float> &gammaSinHigh,
-    Reg::RegTensor<uint32_t> &absMask, float epsilon, Reg::MaskReg mask64, Reg::MaskReg maskFirst, Reg::MaskReg mask8)
+    __ubuf__ bfloat16_t* inputBf16, __ubuf__ float* row0LowScratch, __ubuf__ float* row0HighScratch,
+    __ubuf__ float* row1LowScratch, __ubuf__ float* row1HighScratch, __ubuf__ uint32_t* maxScratch,
+    __ubuf__ float* rmsSquaredScratch, Reg::AddrReg inputAddr, Reg::AddrReg dataAddr, Reg::AddrReg maxAddr,
+    Reg::AddrReg rmsAddr, uint32_t inputHeadStride, Reg::RegTensor<float>& gammaCosLow,
+    Reg::RegTensor<float>& gammaCosHigh, Reg::RegTensor<float>& gammaSinLow, Reg::RegTensor<float>& gammaSinHigh,
+    Reg::RegTensor<uint32_t>& absMask, float epsilon, Reg::MaskReg mask64, Reg::MaskReg maskFirst, Reg::MaskReg mask8)
 {
     // 延迟归一化 producer：每对 head 同时产生
     //   dataScratch : 两行未归一化 z
@@ -382,11 +382,11 @@ __simd_callee__ inline void StageMropeMxHeadPairDeferredRmsD128(
     Reg::StoreAlign<float>(rmsSquaredScratch, rmsPair, rmsAddr, mask8);
 }
 
-__simd_callee__ inline void MxQuantCublasScaleRowBatch16DeferredRms(__ubuf__ uint32_t *maxScratch,
-                                                                    __ubuf__ float *rmsSquaredScratch,
-                                                                    __ubuf__ float *reciprocalScratch,
-                                                                    __ubuf__ uint8_t *scaleBytes,
-                                                                    Reg::RegTensor<uint32_t> &rmsGatherIndex,
+__simd_callee__ inline void MxQuantCublasScaleRowBatch16DeferredRms(__ubuf__ uint32_t* maxScratch,
+                                                                    __ubuf__ float* rmsSquaredScratch,
+                                                                    __ubuf__ float* reciprocalScratch,
+                                                                    __ubuf__ uint8_t* scaleBytes,
+                                                                    Reg::RegTensor<uint32_t>& rmsGatherIndex,
                                                                     Reg::MaskReg maskScale, Reg::MaskReg maskScaleB16)
 {
     // 一次处理 16 rows × 4 D32 = 64 个 scale lane。
@@ -407,23 +407,23 @@ __simd_callee__ inline void MxQuantCublasScaleRowBatch16DeferredRms(__ubuf__ uin
     Reg::Gather(rmsSquared, rmsSquaredSparse, rmsGatherIndex);
     // Step 2: rms=sqrt(rms^2)，normalizedMax=max(abs(z))/rms。
     Reg::Sqrt(rms, rmsSquared, maskScale);
-    Reg::Div(normalizedMax, (Reg::RegTensor<float> &)maxValue, rms, maskScale);
+    Reg::Div(normalizedMax, (Reg::RegTensor<float>&)maxValue, rms, maskScale);
     // Step 3: 由 normalizedMax 生成 E8M0 scale；再把 1/scale 合并成 1/(rms*scale)。
-    MxQuantCublasScaleD32x4(reciprocal, scaleExp, (Reg::RegTensor<uint32_t> &)normalizedMax, maskScale);
+    MxQuantCublasScaleD32x4(reciprocal, scaleExp, (Reg::RegTensor<uint32_t>&)normalizedMax, maskScale);
     Reg::Div(reciprocal, reciprocal, rms, maskScale);
 
     // Step 4: 64×uint32 exponent 压成连续 64×E8M0 byte；倒数保留 FP32 写入 scratch。
     Reg::Pack<uint16_t, uint32_t, Reg::HighLowPart::LOWEST>(scaleB16, scaleExp);
-    Reg::StoreAlign<uint16_t, Reg::StoreDist::DIST_PACK_B16>(reinterpret_cast<__ubuf__ uint16_t *>(scaleBytes),
-                                                             scaleB16, maskScaleB16);
+    Reg::StoreAlign<uint16_t, Reg::StoreDist::DIST_PACK_B16>(reinterpret_cast<__ubuf__ uint16_t*>(scaleBytes), scaleB16,
+                                                             maskScaleB16);
     Reg::StoreAlign<float>(reciprocalScratch, reciprocal, maskScale);
 }
 
 // Q 的 8-head tail 把两个 token 拼成一个 RowBatch16。两半数据已经完成逐行 RMSNorm，
 // 因此直接对 16 行统一算 scale，再将低/高 32 个 scale byte 分别写回 token0/token1。
 __simd_callee__ inline void MxQuantCublasScaleRowBatch16Split(
-    __ubuf__ uint32_t *maxScratch, __ubuf__ float *reciprocalScratch, __ubuf__ uint8_t *scaleBytes0,
-    __ubuf__ uint8_t *scaleBytes1, Reg::RegTensor<uint32_t> &scaleHighGatherIndex, Reg::MaskReg maskScale,
+    __ubuf__ uint32_t* maxScratch, __ubuf__ float* reciprocalScratch, __ubuf__ uint8_t* scaleBytes0,
+    __ubuf__ uint8_t* scaleBytes1, Reg::RegTensor<uint32_t>& scaleHighGatherIndex, Reg::MaskReg maskScale,
     Reg::MaskReg maskScaleB16, Reg::MaskReg maskScaleHalfB16)
 {
     // Step 1: 对两 token 的 16 行统一生成 64 个 scale/倒数。
@@ -439,19 +439,19 @@ __simd_callee__ inline void MxQuantCublasScaleRowBatch16Split(
 
     // Step 2: 低 8 行直接写 token0；Gather 高 8 行后写 token1。
     Reg::Pack<uint16_t, uint32_t, Reg::HighLowPart::LOWEST>(scaleB16, scaleExp);
-    Reg::StoreAlign<uint16_t, Reg::StoreDist::DIST_PACK_B16>(reinterpret_cast<__ubuf__ uint16_t *>(scaleBytes0),
+    Reg::StoreAlign<uint16_t, Reg::StoreDist::DIST_PACK_B16>(reinterpret_cast<__ubuf__ uint16_t*>(scaleBytes0),
                                                              scaleB16, maskScaleHalfB16);
     Reg::Gather(scaleExpHigh, scaleExp, scaleHighGatherIndex);
     Reg::Pack<uint16_t, uint32_t, Reg::HighLowPart::LOWEST>(scaleHighB16, scaleExpHigh);
-    Reg::StoreAlign<uint16_t, Reg::StoreDist::DIST_PACK_B16>(reinterpret_cast<__ubuf__ uint16_t *>(scaleBytes1),
+    Reg::StoreAlign<uint16_t, Reg::StoreDist::DIST_PACK_B16>(reinterpret_cast<__ubuf__ uint16_t*>(scaleBytes1),
                                                              scaleHighB16, maskScaleHalfB16);
 
     Reg::StoreAlign<float>(reciprocalScratch, reciprocal, maskScale);
 }
 
 template <uint32_t TOKEN_SCALE_COUNT>
-__simd_callee__ inline void StoreMropeMxScaleRowBatch16ToPadded(__ubuf__ uint32_t *scaleScratch,
-                                                                __ubuf__ uint8_t *paddedScaleBytes, uint16_t tokenCount)
+__simd_callee__ inline void StoreMropeMxScaleRowBatch16ToPadded(__ubuf__ uint32_t* scaleScratch,
+                                                                __ubuf__ uint8_t* paddedScaleBytes, uint16_t tokenCount)
 {
     // K 的一个 RowBatch16 可能由多个 token 组成。scratch 中 scale 按 16 行紧凑排列，
     // 公共输出却按 token 使用固定 32 B pitch；本函数逐 token 重排到该 padded 布局。
@@ -464,15 +464,15 @@ __simd_callee__ inline void StoreMropeMxScaleRowBatch16ToPadded(__ubuf__ uint32_
         Reg::LoadAlign<uint32_t>(tokenScaleExp, scaleScratch, scaleLoadAddr);
         Reg::Pack<uint16_t, uint32_t, Reg::HighLowPart::LOWEST>(tokenScaleB16, tokenScaleExp);
         Reg::AddrReg scaleStoreAddr = Reg::CreateAddrReg<uint16_t>(localToken, 16U);
-        Reg::StoreAlign<uint16_t, Reg::StoreDist::DIST_PACK_B16>(
-            reinterpret_cast<__ubuf__ uint16_t *>(paddedScaleBytes), tokenScaleB16, scaleStoreAddr, tokenScaleMaskB16);
+        Reg::StoreAlign<uint16_t, Reg::StoreDist::DIST_PACK_B16>(reinterpret_cast<__ubuf__ uint16_t*>(paddedScaleBytes),
+                                                                 tokenScaleB16, scaleStoreAddr, tokenScaleMaskB16);
     }
 }
 
 __simd_callee__ inline void MxQuantCublasScaleRowBatch16DeferredRmsToPadded(
-    __ubuf__ uint32_t *maxScratch, __ubuf__ float *rmsSquaredScratch, __ubuf__ float *reciprocalScratch,
-    __ubuf__ uint8_t *paddedScaleBytes, uint16_t tokenCount, uint16_t headSize,
-    Reg::RegTensor<uint32_t> &rmsGatherIndex, Reg::MaskReg maskScale, Reg::MaskReg maskScaleB16)
+    __ubuf__ uint32_t* maxScratch, __ubuf__ float* rmsSquaredScratch, __ubuf__ float* reciprocalScratch,
+    __ubuf__ uint8_t* paddedScaleBytes, uint16_t tokenCount, uint16_t headSize,
+    Reg::RegTensor<uint32_t>& rmsGatherIndex, Reg::MaskReg maskScale, Reg::MaskReg maskScaleB16)
 {
     // Nk=2/4：先按完整 RowBatch16 算 scale，再借用 maxScratch 暂存 uint32 exponent，
     // 将紧凑的 token×head×4 结果散到每 token 固定 pitch。倒数仍保持连续 64×FP32。
@@ -488,8 +488,8 @@ __simd_callee__ inline void MxQuantCublasScaleRowBatch16DeferredRmsToPadded(
     Reg::LoadAlign<float>(rmsSquaredSparse, rmsSquaredScratch);
     Reg::Gather(rmsSquared, rmsSquaredSparse, rmsGatherIndex);
     Reg::Sqrt(rms, rmsSquared, maskScale);
-    Reg::Div(normalizedMax, (Reg::RegTensor<float> &)maxValue, rms, maskScale);
-    MxQuantCublasScaleD32x4(reciprocal, scaleExp, (Reg::RegTensor<uint32_t> &)normalizedMax, maskScale);
+    Reg::Div(normalizedMax, (Reg::RegTensor<float>&)maxValue, rms, maskScale);
+    MxQuantCublasScaleD32x4(reciprocal, scaleExp, (Reg::RegTensor<uint32_t>&)normalizedMax, maskScale);
     Reg::Div(reciprocal, reciprocal, rms, maskScale);
 
     // exponent 的 producer Store 必须完成，后面的逐 token Load 才能安全重排。
@@ -504,8 +504,8 @@ __simd_callee__ inline void MxQuantCublasScaleRowBatch16DeferredRmsToPadded(
     Reg::StoreAlign<float>(reciprocalScratch, reciprocal, maskScale);
 }
 
-__simd_callee__ inline void MxQuantCublasDataRowBatch16(__ubuf__ float *dataScratch, __ubuf__ float *reciprocalScratch,
-                                                        __ubuf__ uint8_t *outBytes, uint16_t pairCount,
+__simd_callee__ inline void MxQuantCublasDataRowBatch16(__ubuf__ float* dataScratch, __ubuf__ float* reciprocalScratch,
+                                                        __ubuf__ uint8_t* outBytes, uint16_t pairCount,
                                                         Reg::MaskReg mask64, Reg::MaskReg maskFp8)
 {
     // Quant consumer 每次处理两行。dataScratch 是自然 row-major FP32 z；
@@ -541,20 +541,20 @@ __simd_callee__ inline void MxQuantCublasDataRowBatch16(__ubuf__ float *dataScra
         Reg::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8_THREE>(x1OneFp8, x1One, mask64);
         // Step 4: 这里的 byte Add 是合并互斥 lanes，不是对 E4M3 数值求和；三次合并后恢复
         // row0[128 B] + row1[128 B] 的自然顺序，再由一次 Store 写出 256 B。
-        Reg::Add((Reg::RegTensor<uint8_t> &)x0ZeroFp8, (Reg::RegTensor<uint8_t> &)x0ZeroFp8,
-                 (Reg::RegTensor<uint8_t> &)x0OneFp8, maskFp8);
-        Reg::Add((Reg::RegTensor<uint8_t> &)x1ZeroFp8, (Reg::RegTensor<uint8_t> &)x1ZeroFp8,
-                 (Reg::RegTensor<uint8_t> &)x1OneFp8, maskFp8);
-        Reg::Add((Reg::RegTensor<uint8_t> &)x0ZeroFp8, (Reg::RegTensor<uint8_t> &)x0ZeroFp8,
-                 (Reg::RegTensor<uint8_t> &)x1ZeroFp8, maskFp8);
+        Reg::Add((Reg::RegTensor<uint8_t>&)x0ZeroFp8, (Reg::RegTensor<uint8_t>&)x0ZeroFp8,
+                 (Reg::RegTensor<uint8_t>&)x0OneFp8, maskFp8);
+        Reg::Add((Reg::RegTensor<uint8_t>&)x1ZeroFp8, (Reg::RegTensor<uint8_t>&)x1ZeroFp8,
+                 (Reg::RegTensor<uint8_t>&)x1OneFp8, maskFp8);
+        Reg::Add((Reg::RegTensor<uint8_t>&)x0ZeroFp8, (Reg::RegTensor<uint8_t>&)x0ZeroFp8,
+                 (Reg::RegTensor<uint8_t>&)x1ZeroFp8, maskFp8);
         Reg::AddrReg outAddr = Reg::CreateAddrReg<uint8_t>(pairIdx, 2U * QKV_K_SCALE_D128_FULL_SIZE);
-        Reg::StoreAlign<uint8_t, Reg::StoreDist::DIST_NORM_B8>(outBytes, (Reg::RegTensor<uint8_t> &)x0ZeroFp8, outAddr,
+        Reg::StoreAlign<uint8_t, Reg::StoreDist::DIST_NORM_B8>(outBytes, (Reg::RegTensor<uint8_t>&)x0ZeroFp8, outAddr,
                                                                maskFp8);
     }
 }
 
-__simd_callee__ inline void QuantizeMropeMxRowBatch8AfterReady(__ubuf__ float *dataScratch, __ubuf__ uint8_t *outBytes,
-                                                               __ubuf__ uint8_t *scaleBytes, Reg::MaskReg mask64)
+__simd_callee__ inline void QuantizeMropeMxRowBatch8AfterReady(__ubuf__ float* dataScratch, __ubuf__ uint8_t* outBytes,
+                                                               __ubuf__ uint8_t* scaleBytes, Reg::MaskReg mask64)
 {
     // 奇数个 token 留下的最后 8 行无法与下一 token 拼成 RowBatch16。
     // Stage 已经生成归一化后的 y，因此逐行复用 MxQuantCublasD128，避免为半批构造额外布局。
@@ -565,7 +565,7 @@ __simd_callee__ inline void QuantizeMropeMxRowBatch8AfterReady(__ubuf__ float *d
     Reg::Not(maskHigh32, maskLow32, mask64);
     uint32_t scaleCount = MROPE_MX_SCALE_COUNT_D128;
     Reg::MaskReg mask4 = Reg::UpdateMask<float>(scaleCount);
-    Reg::Arange((Reg::RegTensor<int32_t> &)scaleGatherLowIndex, 0);
+    Reg::Arange((Reg::RegTensor<int32_t>&)scaleGatherLowIndex, 0);
     Reg::ShiftRights(scaleGatherLowIndex, scaleGatherLowIndex, static_cast<int16_t>(5), mask64);
     Reg::ShiftLefts(scaleGatherLowIndex, scaleGatherLowIndex, static_cast<int16_t>(1), mask64);
     Reg::Adds(scaleGatherHighIndex, scaleGatherLowIndex, 1U, mask64);
@@ -584,20 +584,20 @@ __simd_callee__ inline void QuantizeMropeMxRowBatch8AfterReady(__ubuf__ float *d
 
 template <bool REDUCE_MAX>
 __simd_callee__ inline void StageQTailToken8D128(
-    __ubuf__ bfloat16_t *inputBf16, __ubuf__ uint8_t *waveScratch, uint16_t rowOffset, uint32_t inputHeadStride,
-    Reg::RegTensor<float> &gammaCosLow, Reg::RegTensor<float> &gammaCosHigh, Reg::RegTensor<float> &gammaSinLow,
-    Reg::RegTensor<float> &gammaSinHigh, Reg::RegTensor<uint32_t> &absMask, float epsilon, Reg::MaskReg mask64,
+    __ubuf__ bfloat16_t* inputBf16, __ubuf__ uint8_t* waveScratch, uint16_t rowOffset, uint32_t inputHeadStride,
+    Reg::RegTensor<float>& gammaCosLow, Reg::RegTensor<float>& gammaCosHigh, Reg::RegTensor<float>& gammaSinLow,
+    Reg::RegTensor<float>& gammaSinHigh, Reg::RegTensor<uint32_t>& absMask, float epsilon, Reg::MaskReg mask64,
     Reg::MaskReg maskFirst, Reg::MaskReg mask8)
 {
     // 把一个 token 的 8 个 Q tail heads 写入 RowBatch16 scratch 的低半或高半。
     // rowOffset=0/8 决定所属半区；四个 pair 恰好覆盖八行。
-    __ubuf__ float *dataScratch =
-        reinterpret_cast<__ubuf__ float *>(waveScratch) + static_cast<uint32_t>(rowOffset) * QKV_K_SCALE_D128_FULL_SIZE;
-    __ubuf__ float *row0LowScratch = dataScratch;
-    __ubuf__ float *row0HighScratch = dataScratch + QKV_K_SCALE_D128_HALF_SIZE;
-    __ubuf__ float *row1LowScratch = dataScratch + QKV_K_SCALE_D128_FULL_SIZE;
-    __ubuf__ float *row1HighScratch = dataScratch + QKV_K_SCALE_D128_FULL_SIZE + QKV_K_SCALE_D128_HALF_SIZE;
-    __ubuf__ uint32_t *maxScratch = reinterpret_cast<__ubuf__ uint32_t *>(waveScratch + MROPE_MX_ROW_BATCH_DATA_BYTES) +
+    __ubuf__ float* dataScratch =
+        reinterpret_cast<__ubuf__ float*>(waveScratch) + static_cast<uint32_t>(rowOffset) * QKV_K_SCALE_D128_FULL_SIZE;
+    __ubuf__ float* row0LowScratch = dataScratch;
+    __ubuf__ float* row0HighScratch = dataScratch + QKV_K_SCALE_D128_HALF_SIZE;
+    __ubuf__ float* row1LowScratch = dataScratch + QKV_K_SCALE_D128_FULL_SIZE;
+    __ubuf__ float* row1HighScratch = dataScratch + QKV_K_SCALE_D128_FULL_SIZE + QKV_K_SCALE_D128_HALF_SIZE;
+    __ubuf__ uint32_t* maxScratch = reinterpret_cast<__ubuf__ uint32_t*>(waveScratch + MROPE_MX_ROW_BATCH_DATA_BYTES) +
                                     static_cast<uint32_t>(rowOffset) * MROPE_MX_SCALE_COUNT_D128;
     for (uint16_t pairIdx = 0U; pairIdx < 4U; ++pairIdx) {
         Reg::AddrReg inputAddr = Reg::CreateAddrReg<bfloat16_t>(pairIdx, 2U * inputHeadStride);
@@ -656,8 +656,8 @@ __simd_callee__ inline void StageQTailToken8D128(
  */
 template <bool HAS_Q_TAIL>
 __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
-    __ubuf__ bfloat16_t *inputBf16, __ubuf__ float *gamma, __ubuf__ float *rawCosSin, __ubuf__ uint32_t *gatherIndex,
-    __ubuf__ fp8_e4m3fn_t *out, __ubuf__ fp8_e8m0_t *outScale, __ubuf__ uint8_t *scratch, uint16_t tokenSize,
+    __ubuf__ bfloat16_t* inputBf16, __ubuf__ float* gamma, __ubuf__ float* rawCosSin, __ubuf__ uint32_t* gatherIndex,
+    __ubuf__ fp8_e4m3fn_t* out, __ubuf__ fp8_e8m0_t* outScale, __ubuf__ uint8_t* scratch, uint16_t tokenSize,
     uint32_t inputTokenStride, uint16_t headSize, uint32_t inputHeadStride, uint32_t scaleTokenStrideWords,
     float epsilon)
 {
@@ -686,7 +686,7 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
     Reg::RegTensor<uint32_t> rmsGatherIndex;
     Reg::RegTensor<uint32_t> rmsGatherBase;
     Reg::RegTensor<uint32_t> rmsGatherOne;
-    Reg::Arange((Reg::RegTensor<int32_t> &)rmsGatherIndex, 0);
+    Reg::Arange((Reg::RegTensor<int32_t>&)rmsGatherIndex, 0);
     Reg::ShiftRights(rmsGatherBase, rmsGatherIndex, static_cast<int16_t>(3), maskScale);
     Reg::ShiftLefts(rmsGatherBase, rmsGatherBase, static_cast<int16_t>(3), maskScale);
     Reg::ShiftRights(rmsGatherIndex, rmsGatherIndex, static_cast<int16_t>(2), maskScale);
@@ -696,7 +696,7 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
 
     // scaleHighGatherIndex 选出 RowBatch16 的高 8 行，供跨 token tail 分别写 scale。
     Reg::RegTensor<uint32_t> scaleHighGatherIndex;
-    Reg::Arange((Reg::RegTensor<int32_t> &)scaleHighGatherIndex, 0);
+    Reg::Arange((Reg::RegTensor<int32_t>&)scaleHighGatherIndex, 0);
     Reg::ShiftLefts(scaleHighGatherIndex, scaleHighGatherIndex, static_cast<int16_t>(27), maskScale);
     Reg::ShiftRights(scaleHighGatherIndex, scaleHighGatherIndex, static_cast<int16_t>(27), maskScale);
     Reg::Adds(scaleHighGatherIndex, scaleHighGatherIndex, 32U, maskScale);
@@ -717,24 +717,24 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
         Reg::RegTensor<float> gammaSinHigh;
         PrepareMropeGammaD128(gammaCosLow, gammaCosHigh, gammaSinLow, gammaSinHigh, gammaLow, gammaHigh, mropeIndex,
                               rawCosSin + static_cast<uint32_t>(tokenIdx) * 3U * QKV_K_SCALE_D128_FULL_SIZE, mask64);
-        __ubuf__ bfloat16_t *tokenInput = inputBf16 + static_cast<uint32_t>(tokenIdx) * inputTokenStride;
+        __ubuf__ bfloat16_t* tokenInput = inputBf16 + static_cast<uint32_t>(tokenIdx) * inputTokenStride;
 
         // 完整前缀使用延迟归一化：每个 batch 正好 16 heads。
         for (uint16_t batchIdx = 0U; batchIdx < fullBatchCount; ++batchIdx) {
             const uint16_t scratchIdx = static_cast<uint16_t>(tokenIdx * fullBatchCount + batchIdx);
-            __ubuf__ uint8_t *batchScratch =
+            __ubuf__ uint8_t* batchScratch =
                 scratch + static_cast<uint32_t>(scratchIdx) * MROPE_MX_ROW_BATCH_SCRATCH_BYTES;
-            __ubuf__ float *dataScratch = reinterpret_cast<__ubuf__ float *>(batchScratch);
-            __ubuf__ float *row0LowScratch = dataScratch;
-            __ubuf__ float *row0HighScratch = dataScratch + QKV_K_SCALE_D128_HALF_SIZE;
-            __ubuf__ float *row1LowScratch = dataScratch + QKV_K_SCALE_D128_FULL_SIZE;
-            __ubuf__ float *row1HighScratch = dataScratch + QKV_K_SCALE_D128_FULL_SIZE + QKV_K_SCALE_D128_HALF_SIZE;
-            __ubuf__ uint32_t *maxScratch =
-                reinterpret_cast<__ubuf__ uint32_t *>(batchScratch + MROPE_MX_ROW_BATCH_DATA_BYTES);
-            __ubuf__ float *rmsSquaredScratch =
-                reinterpret_cast<__ubuf__ float *>(batchScratch + MROPE_MX_ROW_BATCH_DATA_BYTES +
-                                                   MROPE_MX_ROW_BATCH_MAX_BYTES + MROPE_MX_ROW_BATCH_RECIP_BYTES);
-            __ubuf__ bfloat16_t *batchInput =
+            __ubuf__ float* dataScratch = reinterpret_cast<__ubuf__ float*>(batchScratch);
+            __ubuf__ float* row0LowScratch = dataScratch;
+            __ubuf__ float* row0HighScratch = dataScratch + QKV_K_SCALE_D128_HALF_SIZE;
+            __ubuf__ float* row1LowScratch = dataScratch + QKV_K_SCALE_D128_FULL_SIZE;
+            __ubuf__ float* row1HighScratch = dataScratch + QKV_K_SCALE_D128_FULL_SIZE + QKV_K_SCALE_D128_HALF_SIZE;
+            __ubuf__ uint32_t* maxScratch =
+                reinterpret_cast<__ubuf__ uint32_t*>(batchScratch + MROPE_MX_ROW_BATCH_DATA_BYTES);
+            __ubuf__ float* rmsSquaredScratch =
+                reinterpret_cast<__ubuf__ float*>(batchScratch + MROPE_MX_ROW_BATCH_DATA_BYTES +
+                                                  MROPE_MX_ROW_BATCH_MAX_BYTES + MROPE_MX_ROW_BATCH_RECIP_BYTES);
+            __ubuf__ bfloat16_t* batchInput =
                 tokenInput + static_cast<uint32_t>(batchIdx) * MROPE_MX_ROW_BATCH_ROWS * inputHeadStride;
             for (uint16_t pairIdx = 0U; pairIdx < 8U; ++pairIdx) {
                 Reg::AddrReg inputAddr = Reg::CreateAddrReg<bfloat16_t>(pairIdx, 2U * inputHeadStride);
@@ -751,10 +751,10 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
         if constexpr (HAS_Q_TAIL) {
             // Nq%16==8 时，token 2k 写低八行，token 2k+1 写高八行，共用一个 record。
             const uint16_t tailScratchIdx = static_cast<uint16_t>(prefixScratchBatchCount + tokenIdx / 2U);
-            __ubuf__ uint8_t *tailScratch =
+            __ubuf__ uint8_t* tailScratch =
                 scratch + static_cast<uint32_t>(tailScratchIdx) * MROPE_MX_ROW_BATCH_SCRATCH_BYTES;
             const uint16_t tailRowOffset = static_cast<uint16_t>((tokenIdx & 1U) * 8U);
-            __ubuf__ bfloat16_t *tailInput = tokenInput + static_cast<uint32_t>(fullHeadCount) * inputHeadStride;
+            __ubuf__ bfloat16_t* tailInput = tokenInput + static_cast<uint32_t>(fullHeadCount) * inputHeadStride;
             const bool isFinalOddToken = hasOddTailToken && tokenIdx + 1U == tokenSize;
             if (isFinalOddToken) {
                 // 没有配对 token：不生成批量 max，Quant 时逐行重新归约，避免读取空高半。
@@ -773,19 +773,19 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
     Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     // Phase 2a - Scale 完整前缀：64 lanes 同时完成 16 rows 的 rms/scale/倒数。
     for (uint16_t tokenIdx = 0U; tokenIdx < tokenSize; ++tokenIdx) {
-        __ubuf__ uint8_t *tokenScaleBytes = reinterpret_cast<__ubuf__ uint8_t *>(outScale) +
+        __ubuf__ uint8_t* tokenScaleBytes = reinterpret_cast<__ubuf__ uint8_t*>(outScale) +
                                             static_cast<uint32_t>(tokenIdx) * scaleTokenStrideWords * sizeof(uint32_t);
         for (uint16_t batchIdx = 0U; batchIdx < fullBatchCount; ++batchIdx) {
             const uint16_t scratchIdx = static_cast<uint16_t>(tokenIdx * fullBatchCount + batchIdx);
-            __ubuf__ uint8_t *batchScratch =
+            __ubuf__ uint8_t* batchScratch =
                 scratch + static_cast<uint32_t>(scratchIdx) * MROPE_MX_ROW_BATCH_SCRATCH_BYTES;
-            __ubuf__ uint32_t *maxScratch =
-                reinterpret_cast<__ubuf__ uint32_t *>(batchScratch + MROPE_MX_ROW_BATCH_DATA_BYTES);
-            __ubuf__ float *reciprocalScratch = reinterpret_cast<__ubuf__ float *>(
+            __ubuf__ uint32_t* maxScratch =
+                reinterpret_cast<__ubuf__ uint32_t*>(batchScratch + MROPE_MX_ROW_BATCH_DATA_BYTES);
+            __ubuf__ float* reciprocalScratch = reinterpret_cast<__ubuf__ float*>(
                 batchScratch + MROPE_MX_ROW_BATCH_DATA_BYTES + MROPE_MX_ROW_BATCH_MAX_BYTES);
-            __ubuf__ float *rmsSquaredScratch =
-                reinterpret_cast<__ubuf__ float *>(batchScratch + MROPE_MX_ROW_BATCH_DATA_BYTES +
-                                                   MROPE_MX_ROW_BATCH_MAX_BYTES + MROPE_MX_ROW_BATCH_RECIP_BYTES);
+            __ubuf__ float* rmsSquaredScratch =
+                reinterpret_cast<__ubuf__ float*>(batchScratch + MROPE_MX_ROW_BATCH_DATA_BYTES +
+                                                  MROPE_MX_ROW_BATCH_MAX_BYTES + MROPE_MX_ROW_BATCH_RECIP_BYTES);
             MxQuantCublasScaleRowBatch16DeferredRms(
                 maxScratch, rmsSquaredScratch, reciprocalScratch,
                 tokenScaleBytes + static_cast<uint32_t>(batchIdx) * scaleBatchStride, rmsGatherIndex, maskScale,
@@ -796,17 +796,17 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
     for (uint16_t pairIdx = 0U; pairIdx < tailPairCount; ++pairIdx) {
         const uint16_t token0 = static_cast<uint16_t>(pairIdx * 2U);
         const uint16_t token1 = static_cast<uint16_t>(token0 + 1U);
-        __ubuf__ uint8_t *tailScratch =
+        __ubuf__ uint8_t* tailScratch =
             scratch + static_cast<uint32_t>(prefixScratchBatchCount + pairIdx) * MROPE_MX_ROW_BATCH_SCRATCH_BYTES;
-        __ubuf__ uint32_t *maxScratch =
-            reinterpret_cast<__ubuf__ uint32_t *>(tailScratch + MROPE_MX_ROW_BATCH_DATA_BYTES);
-        __ubuf__ float *reciprocalScratch = reinterpret_cast<__ubuf__ float *>(
+        __ubuf__ uint32_t* maxScratch =
+            reinterpret_cast<__ubuf__ uint32_t*>(tailScratch + MROPE_MX_ROW_BATCH_DATA_BYTES);
+        __ubuf__ float* reciprocalScratch = reinterpret_cast<__ubuf__ float*>(
             tailScratch + MROPE_MX_ROW_BATCH_DATA_BYTES + MROPE_MX_ROW_BATCH_MAX_BYTES);
-        __ubuf__ uint8_t *scaleBytes0 =
-            reinterpret_cast<__ubuf__ uint8_t *>(outScale) +
+        __ubuf__ uint8_t* scaleBytes0 =
+            reinterpret_cast<__ubuf__ uint8_t*>(outScale) +
             (static_cast<uint32_t>(token0) * scaleTokenStrideWords + fullHeadCount) * sizeof(uint32_t);
-        __ubuf__ uint8_t *scaleBytes1 =
-            reinterpret_cast<__ubuf__ uint8_t *>(outScale) +
+        __ubuf__ uint8_t* scaleBytes1 =
+            reinterpret_cast<__ubuf__ uint8_t*>(outScale) +
             (static_cast<uint32_t>(token1) * scaleTokenStrideWords + fullHeadCount) * sizeof(uint32_t);
         MxQuantCublasScaleRowBatch16Split(maxScratch, reciprocalScratch, scaleBytes0, scaleBytes1, scaleHighGatherIndex,
                                           maskScale, maskScaleB16, maskScaleHalfB16);
@@ -818,14 +818,14 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
     }
     // Phase 3a - Quant 完整前缀：每次处理一对 head，按自然 row-major 写 E4M3。
     for (uint16_t tokenIdx = 0U; tokenIdx < tokenSize; ++tokenIdx) {
-        __ubuf__ uint8_t *tokenOutBytes = reinterpret_cast<__ubuf__ uint8_t *>(out) +
+        __ubuf__ uint8_t* tokenOutBytes = reinterpret_cast<__ubuf__ uint8_t*>(out) +
                                           static_cast<uint32_t>(tokenIdx) * headSize * QKV_K_SCALE_D128_FULL_SIZE;
         for (uint16_t batchIdx = 0U; batchIdx < fullBatchCount; ++batchIdx) {
             const uint16_t scratchIdx = static_cast<uint16_t>(tokenIdx * fullBatchCount + batchIdx);
-            __ubuf__ uint8_t *batchScratch =
+            __ubuf__ uint8_t* batchScratch =
                 scratch + static_cast<uint32_t>(scratchIdx) * MROPE_MX_ROW_BATCH_SCRATCH_BYTES;
-            __ubuf__ float *dataScratch = reinterpret_cast<__ubuf__ float *>(batchScratch);
-            __ubuf__ float *reciprocalScratch = reinterpret_cast<__ubuf__ float *>(
+            __ubuf__ float* dataScratch = reinterpret_cast<__ubuf__ float*>(batchScratch);
+            __ubuf__ float* reciprocalScratch = reinterpret_cast<__ubuf__ float*>(
                 batchScratch + MROPE_MX_ROW_BATCH_DATA_BYTES + MROPE_MX_ROW_BATCH_MAX_BYTES);
             MxQuantCublasDataRowBatch16(
                 dataScratch, reciprocalScratch,
@@ -837,16 +837,16 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
     for (uint16_t pairIdx = 0U; pairIdx < tailPairCount; ++pairIdx) {
         const uint16_t token0 = static_cast<uint16_t>(pairIdx * 2U);
         const uint16_t token1 = static_cast<uint16_t>(token0 + 1U);
-        __ubuf__ uint8_t *tailScratch =
+        __ubuf__ uint8_t* tailScratch =
             scratch + static_cast<uint32_t>(prefixScratchBatchCount + pairIdx) * MROPE_MX_ROW_BATCH_SCRATCH_BYTES;
-        __ubuf__ float *dataScratch = reinterpret_cast<__ubuf__ float *>(tailScratch);
-        __ubuf__ float *reciprocalScratch = reinterpret_cast<__ubuf__ float *>(
+        __ubuf__ float* dataScratch = reinterpret_cast<__ubuf__ float*>(tailScratch);
+        __ubuf__ float* reciprocalScratch = reinterpret_cast<__ubuf__ float*>(
             tailScratch + MROPE_MX_ROW_BATCH_DATA_BYTES + MROPE_MX_ROW_BATCH_MAX_BYTES);
-        __ubuf__ uint8_t *outBytes0 =
-            reinterpret_cast<__ubuf__ uint8_t *>(out) +
+        __ubuf__ uint8_t* outBytes0 =
+            reinterpret_cast<__ubuf__ uint8_t*>(out) +
             (static_cast<uint32_t>(token0) * headSize + fullHeadCount) * QKV_K_SCALE_D128_FULL_SIZE;
-        __ubuf__ uint8_t *outBytes1 =
-            reinterpret_cast<__ubuf__ uint8_t *>(out) +
+        __ubuf__ uint8_t* outBytes1 =
+            reinterpret_cast<__ubuf__ uint8_t*>(out) +
             (static_cast<uint32_t>(token1) * headSize + fullHeadCount) * QKV_K_SCALE_D128_FULL_SIZE;
         MxQuantCublasDataRowBatch16(dataScratch, reciprocalScratch, outBytes0, 4U, mask64, maskFp8);
         MxQuantCublasDataRowBatch16(dataScratch + 8U * QKV_K_SCALE_D128_FULL_SIZE,
@@ -855,15 +855,15 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
     if (hasOddTailToken) {
         // Phase 3c - 最后一个未配对 tail：只处理已初始化的低八行。
         const uint16_t oddToken = static_cast<uint16_t>(tokenSize - 1U);
-        __ubuf__ uint8_t *oddScratch =
+        __ubuf__ uint8_t* oddScratch =
             scratch + static_cast<uint32_t>(prefixScratchBatchCount + tailPairCount) * MROPE_MX_ROW_BATCH_SCRATCH_BYTES;
-        __ubuf__ uint8_t *oddOutBytes =
-            reinterpret_cast<__ubuf__ uint8_t *>(out) +
+        __ubuf__ uint8_t* oddOutBytes =
+            reinterpret_cast<__ubuf__ uint8_t*>(out) +
             (static_cast<uint32_t>(oddToken) * headSize + fullHeadCount) * QKV_K_SCALE_D128_FULL_SIZE;
-        __ubuf__ uint8_t *oddScaleBytes =
-            reinterpret_cast<__ubuf__ uint8_t *>(outScale) +
+        __ubuf__ uint8_t* oddScaleBytes =
+            reinterpret_cast<__ubuf__ uint8_t*>(outScale) +
             (static_cast<uint32_t>(oddToken) * scaleTokenStrideWords + fullHeadCount) * sizeof(uint32_t);
-        QuantizeMropeMxRowBatch8AfterReady(reinterpret_cast<__ubuf__ float *>(oddScratch), oddOutBytes, oddScaleBytes,
+        QuantizeMropeMxRowBatch8AfterReady(reinterpret_cast<__ubuf__ float*>(oddScratch), oddOutBytes, oddScaleBytes,
                                            mask64);
     }
     // Quant 对 scratch 的 Load 完成后，上层才能让下一 tile 覆盖同一 UB 区域。
@@ -873,10 +873,10 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
 // K RowBatch16 的单-token Stage。headSize 必须为偶数；每次处理两个 heads，
 // 将该 token 的数据放到当前 16-row record 中由 tokenRowBegin 指定的连续行区间。
 __simd_callee__ inline void StageKMropeMxEvenTokenD128(
-    __ubuf__ bfloat16_t *tokenInputBf16, __ubuf__ float *rawToken, __ubuf__ float *tokenDataScratch,
-    __ubuf__ uint32_t *tokenMaxScratch, __ubuf__ float *tokenRmsSquaredScratch, uint16_t headSize,
-    uint32_t inputHeadStride, float epsilon, Reg::RegTensor<uint32_t> &mropeIndex, Reg::RegTensor<uint32_t> &absMask,
-    Reg::RegTensor<float> &gammaLow, Reg::RegTensor<float> &gammaHigh, Reg::MaskReg mask64, Reg::MaskReg maskFirst,
+    __ubuf__ bfloat16_t* tokenInputBf16, __ubuf__ float* rawToken, __ubuf__ float* tokenDataScratch,
+    __ubuf__ uint32_t* tokenMaxScratch, __ubuf__ float* tokenRmsSquaredScratch, uint16_t headSize,
+    uint32_t inputHeadStride, float epsilon, Reg::RegTensor<uint32_t>& mropeIndex, Reg::RegTensor<uint32_t>& absMask,
+    Reg::RegTensor<float>& gammaLow, Reg::RegTensor<float>& gammaHigh, Reg::MaskReg mask64, Reg::MaskReg maskFirst,
     Reg::MaskReg mask8)
 {
     // cos/sin 只按 token 准备一次，随后被该 token 的所有 K heads 复用。
@@ -902,12 +902,12 @@ __simd_callee__ inline void StageKMropeMxEvenTokenD128(
     }
 }
 
-__simd_callee__ inline void FinishKMropeMxD128EvenRows(__ubuf__ float *dataScratch, __ubuf__ uint32_t *maxScratch,
-                                                       __ubuf__ float *rmsSquaredScratch,
-                                                       __ubuf__ float *reciprocalScratch,
-                                                       __ubuf__ uint8_t *batchOutBytes,
-                                                       __ubuf__ uint8_t *batchPaddedScaleBytes, uint16_t tokenCount,
-                                                       uint16_t headSize, Reg::RegTensor<uint32_t> &rmsGatherIndex,
+__simd_callee__ inline void FinishKMropeMxD128EvenRows(__ubuf__ float* dataScratch, __ubuf__ uint32_t* maxScratch,
+                                                       __ubuf__ float* rmsSquaredScratch,
+                                                       __ubuf__ float* reciprocalScratch,
+                                                       __ubuf__ uint8_t* batchOutBytes,
+                                                       __ubuf__ uint8_t* batchPaddedScaleBytes, uint16_t tokenCount,
+                                                       uint16_t headSize, Reg::RegTensor<uint32_t>& rmsGatherIndex,
                                                        Reg::MaskReg mask64, Reg::MaskReg maskFp8)
 {
     // Stage-ready 后完成一个 K RowBatch16：先生成 scale/倒数，再量化 16 行。
@@ -929,12 +929,12 @@ __simd_callee__ inline void FinishKMropeMxD128EvenRows(__ubuf__ float *dataScrat
 }
 
 __simd_callee__ inline void ProcessKMropeMxD128RowBatch16(
-    __ubuf__ bfloat16_t *batchInputBf16, __ubuf__ float *batchRawCosSin, __ubuf__ uint8_t *batchOutBytes,
-    __ubuf__ uint8_t *batchPaddedScaleBytes, __ubuf__ float *dataScratch, __ubuf__ uint32_t *maxScratch,
-    __ubuf__ float *reciprocalScratch, __ubuf__ float *rmsSquaredScratch, uint16_t batchTokenCount, uint16_t headSize,
+    __ubuf__ bfloat16_t* batchInputBf16, __ubuf__ float* batchRawCosSin, __ubuf__ uint8_t* batchOutBytes,
+    __ubuf__ uint8_t* batchPaddedScaleBytes, __ubuf__ float* dataScratch, __ubuf__ uint32_t* maxScratch,
+    __ubuf__ float* reciprocalScratch, __ubuf__ float* rmsSquaredScratch, uint16_t batchTokenCount, uint16_t headSize,
     uint32_t inputTokenStride, uint32_t inputHeadStride, uint32_t scaleTokenStrideWords, float epsilon,
-    Reg::RegTensor<uint32_t> &mropeIndex, Reg::RegTensor<uint32_t> &absMask, Reg::RegTensor<float> &gammaLow,
-    Reg::RegTensor<float> &gammaHigh, Reg::RegTensor<uint32_t> &rmsGatherIndex, Reg::MaskReg mask64,
+    Reg::RegTensor<uint32_t>& mropeIndex, Reg::RegTensor<uint32_t>& absMask, Reg::RegTensor<float>& gammaLow,
+    Reg::RegTensor<float>& gammaHigh, Reg::RegTensor<uint32_t>& rmsGatherIndex, Reg::MaskReg mask64,
     Reg::MaskReg maskFirst, Reg::MaskReg mask8, Reg::MaskReg maskFp8)
 {
     // 一个 K batch 始终填满 16 rows：batchTokenCount * headSize == 16。
@@ -942,13 +942,13 @@ __simd_callee__ inline void ProcessKMropeMxD128RowBatch16(
     // Phase 1 - Stage 各 token，共享同一 data/max/rms^2 scratch record。
     for (uint16_t localToken = 0U; localToken < batchTokenCount; ++localToken) {
         const uint16_t tokenRowBegin = static_cast<uint16_t>(localToken * headSize);
-        __ubuf__ bfloat16_t *tokenInputBf16 = batchInputBf16 + static_cast<uint32_t>(localToken) * inputTokenStride;
-        __ubuf__ float *tokenDataScratch =
+        __ubuf__ bfloat16_t* tokenInputBf16 = batchInputBf16 + static_cast<uint32_t>(localToken) * inputTokenStride;
+        __ubuf__ float* tokenDataScratch =
             dataScratch + static_cast<uint32_t>(tokenRowBegin) * QKV_K_SCALE_D128_FULL_SIZE;
-        __ubuf__ uint32_t *tokenMaxScratch =
+        __ubuf__ uint32_t* tokenMaxScratch =
             maxScratch + static_cast<uint32_t>(tokenRowBegin) * MROPE_MX_SCALE_COUNT_D128;
-        __ubuf__ float *tokenRmsSquaredScratch = rmsSquaredScratch + static_cast<uint32_t>(tokenRowBegin) * 4U;
-        __ubuf__ float *rawToken = batchRawCosSin + static_cast<uint32_t>(localToken) * 3U * QKV_K_SCALE_D128_FULL_SIZE;
+        __ubuf__ float* tokenRmsSquaredScratch = rmsSquaredScratch + static_cast<uint32_t>(tokenRowBegin) * 4U;
+        __ubuf__ float* rawToken = batchRawCosSin + static_cast<uint32_t>(localToken) * 3U * QKV_K_SCALE_D128_FULL_SIZE;
         StageKMropeMxEvenTokenD128(tokenInputBf16, rawToken, tokenDataScratch, tokenMaxScratch, tokenRmsSquaredScratch,
                                    headSize, inputHeadStride, epsilon, mropeIndex, absMask, gammaLow, gammaHigh, mask64,
                                    maskFirst, mask8);
@@ -963,8 +963,8 @@ __simd_callee__ inline void ProcessKMropeMxD128RowBatch16(
 }
 
 __simd_vf__ inline void KRmsNormMropeMxD128RowBatch16EvenVfImpl(
-    __ubuf__ bfloat16_t *inputBf16, __ubuf__ float *gamma, __ubuf__ float *rawCosSin, __ubuf__ uint32_t *gatherIndex,
-    __ubuf__ fp8_e4m3fn_t *out, __ubuf__ fp8_e8m0_t *outScale, __ubuf__ uint8_t *scratch, uint16_t tokenSize,
+    __ubuf__ bfloat16_t* inputBf16, __ubuf__ float* gamma, __ubuf__ float* rawCosSin, __ubuf__ uint32_t* gatherIndex,
+    __ubuf__ fp8_e4m3fn_t* out, __ubuf__ fp8_e8m0_t* outScale, __ubuf__ uint8_t* scratch, uint16_t tokenSize,
     uint16_t headSize, uint32_t inputTokenStride, uint32_t inputHeadStride, uint32_t scaleTokenStrideWords,
     float epsilon)
 {
@@ -986,7 +986,7 @@ __simd_vf__ inline void KRmsNormMropeMxD128RowBatch16EvenVfImpl(
     Reg::RegTensor<uint32_t> rmsGatherBase;
     Reg::RegTensor<uint32_t> rmsGatherOne;
     Reg::MaskReg maskScale = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-    Reg::Arange((Reg::RegTensor<int32_t> &)rmsGatherIndex, 0);
+    Reg::Arange((Reg::RegTensor<int32_t>&)rmsGatherIndex, 0);
     Reg::ShiftRights(rmsGatherBase, rmsGatherIndex, static_cast<int16_t>(3), maskScale);
     Reg::ShiftLefts(rmsGatherBase, rmsGatherBase, static_cast<int16_t>(3), maskScale);
     Reg::ShiftRights(rmsGatherIndex, rmsGatherIndex, static_cast<int16_t>(2), maskScale);
@@ -994,28 +994,28 @@ __simd_vf__ inline void KRmsNormMropeMxD128RowBatch16EvenVfImpl(
     Reg::And(rmsGatherIndex, rmsGatherIndex, rmsGatherOne, maskScale);
     Reg::Add(rmsGatherIndex, rmsGatherBase, rmsGatherIndex, maskScale);
 
-    __ubuf__ float *dataScratch = reinterpret_cast<__ubuf__ float *>(scratch);
-    __ubuf__ uint32_t *maxScratch =
-        reinterpret_cast<__ubuf__ uint32_t *>(scratch + static_cast<uint32_t>(MROPE_MX_ROW_BATCH_DATA_BYTES));
-    __ubuf__ float *reciprocalScratch = reinterpret_cast<__ubuf__ float *>(
+    __ubuf__ float* dataScratch = reinterpret_cast<__ubuf__ float*>(scratch);
+    __ubuf__ uint32_t* maxScratch =
+        reinterpret_cast<__ubuf__ uint32_t*>(scratch + static_cast<uint32_t>(MROPE_MX_ROW_BATCH_DATA_BYTES));
+    __ubuf__ float* reciprocalScratch = reinterpret_cast<__ubuf__ float*>(
         scratch + static_cast<uint32_t>(MROPE_MX_ROW_BATCH_DATA_BYTES + MROPE_MX_ROW_BATCH_MAX_BYTES));
-    __ubuf__ float *rmsSquaredScratch = reinterpret_cast<__ubuf__ float *>(
+    __ubuf__ float* rmsSquaredScratch = reinterpret_cast<__ubuf__ float*>(
         scratch + static_cast<uint32_t>(MROPE_MX_ROW_BATCH_DATA_BYTES + MROPE_MX_ROW_BATCH_MAX_BYTES +
                                         MROPE_MX_ROW_BATCH_RECIP_BYTES));
-    __ubuf__ uint8_t *outBytes = reinterpret_cast<__ubuf__ uint8_t *>(out);
-    __ubuf__ uint8_t *paddedScaleBytes = reinterpret_cast<__ubuf__ uint8_t *>(outScale);
+    __ubuf__ uint8_t* outBytes = reinterpret_cast<__ubuf__ uint8_t*>(out);
+    __ubuf__ uint8_t* paddedScaleBytes = reinterpret_cast<__ubuf__ uint8_t*>(outScale);
     // 选择能恰好拼成 16 行的 token 数；不会在热循环中处理不完整 batch。
     const uint16_t tokensPerBatch = static_cast<uint16_t>(MROPE_MX_ROW_BATCH_ROWS / headSize);
 
     uint16_t batchTokenBegin = 0U;
     while (static_cast<uint16_t>(tokenSize - batchTokenBegin) >= tokensPerBatch) {
         const uint16_t batchTokenCount = tokensPerBatch;
-        __ubuf__ bfloat16_t *batchInputBf16 = inputBf16 + static_cast<uint32_t>(batchTokenBegin) * inputTokenStride;
-        __ubuf__ float *batchRawCosSin =
+        __ubuf__ bfloat16_t* batchInputBf16 = inputBf16 + static_cast<uint32_t>(batchTokenBegin) * inputTokenStride;
+        __ubuf__ float* batchRawCosSin =
             rawCosSin + static_cast<uint32_t>(batchTokenBegin) * 3U * QKV_K_SCALE_D128_FULL_SIZE;
-        __ubuf__ uint8_t *batchOutBytes =
+        __ubuf__ uint8_t* batchOutBytes =
             outBytes + static_cast<uint32_t>(batchTokenBegin) * headSize * QKV_K_SCALE_D128_FULL_SIZE;
-        __ubuf__ uint8_t *batchPaddedScaleBytes =
+        __ubuf__ uint8_t* batchPaddedScaleBytes =
             paddedScaleBytes + static_cast<uint32_t>(batchTokenBegin) * scaleTokenStrideWords * sizeof(uint32_t);
         ProcessKMropeMxD128RowBatch16(batchInputBf16, batchRawCosSin, batchOutBytes, batchPaddedScaleBytes, dataScratch,
                                       maxScratch, reciprocalScratch, rmsSquaredScratch, batchTokenCount, headSize,
@@ -1024,10 +1024,10 @@ __simd_vf__ inline void KRmsNormMropeMxD128RowBatch16EvenVfImpl(
         batchTokenBegin = static_cast<uint16_t>(batchTokenBegin + batchTokenCount);
     }
 }
-__simd_vf__ inline void KRmsNormMropeMxD128VfImpl(__ubuf__ bfloat16_t *inputBf16, __ubuf__ float *gamma,
-                                                  __ubuf__ float *rawCosSin, __ubuf__ uint32_t *gatherIndex,
-                                                  __ubuf__ fp8_e4m3fn_t *out, __ubuf__ fp8_e8m0_t *outScale,
-                                                  __ubuf__ uint8_t *scratch, uint16_t tokenSize, uint16_t headSize,
+__simd_vf__ inline void KRmsNormMropeMxD128VfImpl(__ubuf__ bfloat16_t* inputBf16, __ubuf__ float* gamma,
+                                                  __ubuf__ float* rawCosSin, __ubuf__ uint32_t* gatherIndex,
+                                                  __ubuf__ fp8_e4m3fn_t* out, __ubuf__ fp8_e8m0_t* outScale,
+                                                  __ubuf__ uint8_t* scratch, uint16_t tokenSize, uint16_t headSize,
                                                   uint32_t inputTokenStride, uint32_t inputHeadStride,
                                                   uint32_t scaleTokenStrideWords, float epsilon)
 {
@@ -1051,7 +1051,7 @@ __simd_vf__ inline void KRmsNormMropeMxD128VfImpl(__ubuf__ bfloat16_t *inputBf16
     Reg::Not(maskHigh32, maskLow32, mask64);
     uint32_t scaleCountPerHead = 4U;
     Reg::MaskReg mask4 = Reg::UpdateMask<float>(scaleCountPerHead);
-    Reg::Arange((Reg::RegTensor<int32_t> &)scaleGatherLowIndex, 0);
+    Reg::Arange((Reg::RegTensor<int32_t>&)scaleGatherLowIndex, 0);
     Reg::ShiftRights(scaleGatherLowIndex, scaleGatherLowIndex, static_cast<int16_t>(5), mask64);
     Reg::ShiftLefts(scaleGatherLowIndex, scaleGatherLowIndex, static_cast<int16_t>(1), mask64);
     Reg::Adds(scaleGatherHighIndex, scaleGatherLowIndex, 1U, mask64);
@@ -1061,7 +1061,7 @@ __simd_vf__ inline void KRmsNormMropeMxD128VfImpl(__ubuf__ bfloat16_t *inputBf16
         Reg::RegTensor<float> gammaCosHigh;
         Reg::RegTensor<float> gammaSinLow;
         Reg::RegTensor<float> gammaSinHigh;
-        __ubuf__ float *rawToken = rawCosSin + static_cast<uint32_t>(tokenIdx) * 3U * QKV_K_SCALE_D128_FULL_SIZE;
+        __ubuf__ float* rawToken = rawCosSin + static_cast<uint32_t>(tokenIdx) * 3U * QKV_K_SCALE_D128_FULL_SIZE;
         PrepareMropeGammaD128(gammaCosLow, gammaCosHigh, gammaSinLow, gammaSinHigh, gammaLow, gammaHigh, mropeIndex,
                               rawToken, mask64);
         for (uint16_t headIdx = 0U; headIdx < headSize; ++headIdx) {
@@ -1074,10 +1074,10 @@ __simd_vf__ inline void KRmsNormMropeMxD128VfImpl(__ubuf__ bfloat16_t *inputBf16
             Reg::AddrReg outAddr =
                 Reg::CreateAddrReg<uint8_t>(tokenIdx, static_cast<uint32_t>(headSize) * QKV_K_SCALE_D128_FULL_SIZE,
                                             headIdx, QKV_K_SCALE_D128_FULL_SIZE);
-            __ubuf__ uint8_t *scaleBytes =
-                reinterpret_cast<__ubuf__ uint8_t *>(outScale) +
+            __ubuf__ uint8_t* scaleBytes =
+                reinterpret_cast<__ubuf__ uint8_t*>(outScale) +
                 (static_cast<uint32_t>(tokenIdx) * scaleTokenStrideWords + headIdx) * sizeof(uint32_t);
-            MxQuantCublasD128(reinterpret_cast<__ubuf__ uint8_t *>(out), outAddr, scaleBytes, outLowFp32, outHighFp32,
+            MxQuantCublasD128(reinterpret_cast<__ubuf__ uint8_t*>(out), outAddr, scaleBytes, outLowFp32, outHighFp32,
                               scaleGatherLowIndex, scaleGatherHighIndex, mask64, maskLow32, maskHigh32, mask4);
         }
     }

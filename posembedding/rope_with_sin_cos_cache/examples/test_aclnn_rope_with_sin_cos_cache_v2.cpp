@@ -26,7 +26,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -35,7 +35,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<float> resultData(size, 0);
@@ -47,7 +47,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -60,8 +60,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -99,22 +99,22 @@ int main()
     std::vector<int64_t> cosSinCacheShape = {2, 32};
     std::vector<int64_t> queryOutShape = {2, 64};
     std::vector<int64_t> keyOutShape = {2, 64};
-    void *positionsDeviceAddr = nullptr;
-    void *queryInDeviceAddr = nullptr;
-    void *keyInDeviceAddr = nullptr;
-    void *cosSinCacheDeviceAddr = nullptr;
-    void *queryOutDeviceAddr = nullptr;
-    void *keyOutDeviceAddr = nullptr;
+    void* positionsDeviceAddr = nullptr;
+    void* queryInDeviceAddr = nullptr;
+    void* keyInDeviceAddr = nullptr;
+    void* cosSinCacheDeviceAddr = nullptr;
+    void* queryOutDeviceAddr = nullptr;
+    void* keyOutDeviceAddr = nullptr;
 
-    aclTensor *positions = nullptr;
-    aclTensor *queryIn = nullptr;
-    aclTensor *keyIn = nullptr;
-    aclTensor *cosSinCache = nullptr;
+    aclTensor* positions = nullptr;
+    aclTensor* queryIn = nullptr;
+    aclTensor* keyIn = nullptr;
+    aclTensor* cosSinCache = nullptr;
     int64_t headSize = 32;
     bool isNeoxStyle = true;
     int64_t cacheMode = 0;
-    aclTensor *queryOut = nullptr;
-    aclTensor *keyOut = nullptr;
+    aclTensor* queryOut = nullptr;
+    aclTensor* keyOut = nullptr;
 
     std::vector<int64_t> positionsHostData = {0, 1};
     std::vector<float> queryInHostData = {
@@ -163,7 +163,7 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 调用aclnnRopeWithSinCosCacheV2第一段接口
     ret =
@@ -173,7 +173,7 @@ int main()
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

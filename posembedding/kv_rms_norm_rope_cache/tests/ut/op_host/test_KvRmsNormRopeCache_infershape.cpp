@@ -29,7 +29,7 @@ std::vector<gert::InfershapeContextPara::OpAttr> CommonAttrs()
         {"is_output_kv", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
     };
 }
-}
+} // namespace
 
 class KvRmsNormRopeCache : public testing::Test {
 protected:
@@ -246,34 +246,33 @@ TEST_F(KvRmsNormRopeCache, KvRmsNormRopeCache_inferdtype_test1)
     ge::DataType input_1 = ge::DT_INT64;
     ge::DataType input_2 = ge::DT_FLOAT;
     ge::DataType output_0 = ge::DT_FLOAT16;
-    auto context_holder = gert::InferDataTypeContextFaker()
-                              .IrInputNum(12)
-                              .NodeIoNum(12, 4)
-                              .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(3, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(4, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(5, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(6, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(7, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(8, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(11, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeAttrs(
-                                  {{"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05)},
-                                   {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BNSD")},
-                                   {"is_output_kv", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}})
-                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .InputDataTypes(
-                                  {&input_0, &input_0, &input_0, &input_0, &input_1, &input_0, &input_0, &input_2,
-                                   &input_2, &input_2, &input_2})
-                              .OutputDataTypes({&output_0, &output_0, &output_0, &output_0})
-                              .Build();
+    auto context_holder =
+        gert::InferDataTypeContextFaker()
+            .IrInputNum(12)
+            .NodeIoNum(12, 4)
+            .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(3, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(4, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(5, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(6, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(7, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(8, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(11, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeAttrs({{"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05)},
+                        {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BNSD")},
+                        {"is_output_kv", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}})
+            .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
+            .InputDataTypes({&input_0, &input_0, &input_0, &input_0, &input_1, &input_0, &input_0, &input_2, &input_2,
+                             &input_2, &input_2})
+            .OutputDataTypes({&output_0, &output_0, &output_0, &output_0})
+            .Build();
     auto context = context_holder.GetContext<gert::InferDataTypeContext>();
     EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
     ASSERT_NE(context, nullptr);
@@ -299,34 +298,33 @@ TEST_F(KvRmsNormRopeCache, KvRmsNormRopeCache_inferdtype_test2)
     ge::DataType input_1 = ge::DT_INT64;
     ge::DataType input_2 = ge::DT_FLOAT;
     ge::DataType output_0 = ge::DT_BF16;
-    auto context_holder = gert::InferDataTypeContextFaker()
-                              .IrInputNum(12)
-                              .NodeIoNum(12, 4)
-                              .NodeInputTd(0, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(1, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(2, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(3, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(4, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(5, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(6, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(7, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(8, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(11, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeAttrs(
-                                  {{"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05)},
-                                   {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BNSD")},
-                                   {"is_output_kv", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}})
-                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .InputDataTypes(
-                                  {&input_0, &input_0, &input_0, &input_0, &input_1, &input_0, &input_0, &input_2,
-                                   &input_2, &input_2, &input_2, &input_0})
-                              .OutputDataTypes({&output_0, &output_0, &output_0, &output_0})
-                              .Build();
+    auto context_holder =
+        gert::InferDataTypeContextFaker()
+            .IrInputNum(12)
+            .NodeIoNum(12, 4)
+            .NodeInputTd(0, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(1, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(2, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(3, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(4, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(5, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(6, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(7, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(8, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(11, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeAttrs({{"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05)},
+                        {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BNSD")},
+                        {"is_output_kv", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}})
+            .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
+            .InputDataTypes({&input_0, &input_0, &input_0, &input_0, &input_1, &input_0, &input_0, &input_2, &input_2,
+                             &input_2, &input_2, &input_0})
+            .OutputDataTypes({&output_0, &output_0, &output_0, &output_0})
+            .Build();
     auto context = context_holder.GetContext<gert::InferDataTypeContext>();
     EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
     ASSERT_NE(context, nullptr);
@@ -354,34 +352,33 @@ TEST_F(KvRmsNormRopeCache, KvRmsNormRopeCache_inferdtype_test3)
     ge::DataType input_3 = ge::DT_FLOAT;
     ge::DataType output_0 = ge::DT_INT8;
     ge::DataType output_1 = ge::DT_FLOAT16;
-    auto context_holder = gert::InferDataTypeContextFaker()
-                              .IrInputNum(12)
-                              .NodeIoNum(12, 4)
-                              .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(3, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(4, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(5, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(6, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(7, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(8, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(11, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeAttrs(
-                                  {{"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05)},
-                                   {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BNSD")},
-                                   {"is_output_kv", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}})
-                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .InputDataTypes(
-                                  {&input_0, &input_0, &input_0, &input_0, &input_1, &input_2, &input_2, &input_3,
-                                   &input_3, &input_3, &input_3, &input_0})
-                              .OutputDataTypes({&output_0, &output_0, &output_1, &output_1})
-                              .Build();
+    auto context_holder =
+        gert::InferDataTypeContextFaker()
+            .IrInputNum(12)
+            .NodeIoNum(12, 4)
+            .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(3, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(4, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(5, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(6, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(7, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(8, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(11, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeAttrs({{"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05)},
+                        {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BNSD")},
+                        {"is_output_kv", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}})
+            .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
+            .InputDataTypes({&input_0, &input_0, &input_0, &input_0, &input_1, &input_2, &input_2, &input_3, &input_3,
+                             &input_3, &input_3, &input_0})
+            .OutputDataTypes({&output_0, &output_0, &output_1, &output_1})
+            .Build();
     auto context = context_holder.GetContext<gert::InferDataTypeContext>();
     EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
     ASSERT_NE(context, nullptr);
@@ -409,34 +406,33 @@ TEST_F(KvRmsNormRopeCache, KvRmsNormRopeCache_inferdtype_test4)
     ge::DataType input_3 = ge::DT_FLOAT;
     ge::DataType output_0 = ge::DT_INT8;
     ge::DataType output_1 = ge::DT_BF16;
-    auto context_holder = gert::InferDataTypeContextFaker()
-                              .IrInputNum(12)
-                              .NodeIoNum(12, 4)
-                              .NodeInputTd(0, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(1, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(2, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(3, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(4, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(5, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(6, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(7, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(8, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(11, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeAttrs(
-                                  {{"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05)},
-                                   {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BNSD")},
-                                   {"is_output_kv", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}})
-                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .InputDataTypes(
-                                  {&input_0, &input_0, &input_0, &input_0, &input_1, &input_2, &input_2, &input_3,
-                                   &input_3, &input_3, &input_3, &input_0})
-                              .OutputDataTypes({&output_0, &output_0, &output_1, &output_1})
-                              .Build();
+    auto context_holder =
+        gert::InferDataTypeContextFaker()
+            .IrInputNum(12)
+            .NodeIoNum(12, 4)
+            .NodeInputTd(0, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(1, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(2, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(3, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(4, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(5, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(6, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(7, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(8, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(11, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeAttrs({{"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05)},
+                        {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BNSD")},
+                        {"is_output_kv", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}})
+            .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
+            .InputDataTypes({&input_0, &input_0, &input_0, &input_0, &input_1, &input_2, &input_2, &input_3, &input_3,
+                             &input_3, &input_3, &input_0})
+            .OutputDataTypes({&output_0, &output_0, &output_1, &output_1})
+            .Build();
     auto context = context_holder.GetContext<gert::InferDataTypeContext>();
     EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
     ASSERT_NE(context, nullptr);

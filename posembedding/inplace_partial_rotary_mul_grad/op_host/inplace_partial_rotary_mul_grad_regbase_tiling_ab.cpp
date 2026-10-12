@@ -21,7 +21,7 @@ constexpr int64_t DB_FLAG = 2;
 
 class InplacePartialRotaryMulGradRegbaseTilingAb : public InplacePartialRotaryMulGradRegbaseTiling {
 public:
-    explicit InplacePartialRotaryMulGradRegbaseTilingAb(gert::TilingContext *context)
+    explicit InplacePartialRotaryMulGradRegbaseTilingAb(gert::TilingContext* context)
         : InplacePartialRotaryMulGradRegbaseTiling(context)
     {}
 
@@ -151,7 +151,7 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTilingAb::PostTiling()
     tilingDataAb_.set_sliceLength(sliceLength_);
 
     // set userWorkspace
-    size_t *userWorkspaceSize = context_->GetWorkspaceSizes(WORKSPACE_COUNT);
+    size_t* userWorkspaceSize = context_->GetWorkspaceSizes(WORKSPACE_COUNT);
     OP_CHECK_NULL_WITH_CONTEXT(context_, userWorkspaceSize);
     userWorkspaceSize[0] = RESERVED_WORKSPACE;
 

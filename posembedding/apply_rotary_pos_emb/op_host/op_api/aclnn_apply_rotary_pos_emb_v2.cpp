@@ -16,12 +16,11 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnApplyRotaryPosEmbV2GetWorkspaceSize(aclTensor* queryRef, aclTensor* keyRef, const aclTensor* cos,
-                                                     const aclTensor* sin, int64_t layout,
-                                                     char* rotaryMode, uint64_t* workspaceSize,
-                                                     aclOpExecutor** executor)
+                                                     const aclTensor* sin, int64_t layout, char* rotaryMode,
+                                                     uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    aclnnStatus ret = aclnnInnerApplyRotaryPosEmbGetWorkspaceSize(queryRef, keyRef, cos, sin, layout,
-                                                                  rotaryMode, workspaceSize, executor);
+    aclnnStatus ret = aclnnInnerApplyRotaryPosEmbGetWorkspaceSize(queryRef, keyRef, cos, sin, layout, rotaryMode,
+                                                                  workspaceSize, executor);
     return ret;
 }
 

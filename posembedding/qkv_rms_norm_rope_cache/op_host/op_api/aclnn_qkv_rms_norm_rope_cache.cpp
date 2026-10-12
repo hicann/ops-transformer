@@ -39,46 +39,43 @@ extern "C" {
 #endif
 
 namespace qkv_rms_norm_rope_cache {
-    static inline bool CheckNotNull(const aclTensor *qkv, 
-                                    const aclTensor *qGamma,
-                                    const aclTensor *kGamma,
-                                    const aclTensor* cos, 
-                                    const aclTensor* sin, 
-                                    const aclTensor* index,
-                                    aclTensor* qOut, 
-                                    aclTensor* kCache, 
-                                    aclTensor* vCache,
-                                    const aclIntArray* qkvSize, 
-                                    const aclIntArray* headNums) {
-        OP_CHECK_NULL(qkv, return false);
-        OP_CHECK_NULL(qGamma, return false);
-        OP_CHECK_NULL(kGamma,  return false);
-        OP_CHECK_NULL(cos,  return false);
-        OP_CHECK_NULL(sin, return false);
-        OP_CHECK_NULL(index, return false);
-        OP_CHECK_NULL(qOut, return false);
-        OP_CHECK_NULL(kCache,  return false);
-        OP_CHECK_NULL(vCache,  return false);
-        OP_CHECK_NULL(qkvSize, return false);
-        OP_CHECK_NULL(headNums, return false);
-        return true;
-    }
+static inline bool CheckNotNull(const aclTensor* qkv, const aclTensor* qGamma, const aclTensor* kGamma,
+                                const aclTensor* cos, const aclTensor* sin, const aclTensor* index, aclTensor* qOut,
+                                aclTensor* kCache, aclTensor* vCache, const aclIntArray* qkvSize,
+                                const aclIntArray* headNums)
+{
+    OP_CHECK_NULL(qkv, return false);
+    OP_CHECK_NULL(qGamma, return false);
+    OP_CHECK_NULL(kGamma, return false);
+    OP_CHECK_NULL(cos, return false);
+    OP_CHECK_NULL(sin, return false);
+    OP_CHECK_NULL(index, return false);
+    OP_CHECK_NULL(qOut, return false);
+    OP_CHECK_NULL(kCache, return false);
+    OP_CHECK_NULL(vCache, return false);
+    OP_CHECK_NULL(qkvSize, return false);
+    OP_CHECK_NULL(headNums, return false);
+    return true;
+}
 } // namespace qkv_rms_norm_rope_cache
 
 aclnnStatus aclnnQkvRmsNormRopeCacheGetWorkspaceSize(
-    const aclTensor* qkv, const aclTensor* qGamma, const aclTensor* kGamma, const aclTensor* cos, const aclTensor* sin, 
-    const aclTensor* index, aclTensor* qOut, aclTensor* kCache, aclTensor* vCache, const aclTensor* kScaleOptional, const aclTensor* vScaleOptional, 
-    const aclTensor* kOffsetOptional, const aclTensor* vOffsetOptional, const aclIntArray* qkvSize, const aclIntArray* headNums, double epsilon, char* cacheModeOptional,
-    const aclTensor* qOutBeforeQuant, const aclTensor* kOutBeforeQuant, const aclTensor* vOutBeforeQuant, uint64_t* workspaceSize, aclOpExecutor** executor)
+    const aclTensor* qkv, const aclTensor* qGamma, const aclTensor* kGamma, const aclTensor* cos, const aclTensor* sin,
+    const aclTensor* index, aclTensor* qOut, aclTensor* kCache, aclTensor* vCache, const aclTensor* kScaleOptional,
+    const aclTensor* vScaleOptional, const aclTensor* kOffsetOptional, const aclTensor* vOffsetOptional,
+    const aclIntArray* qkvSize, const aclIntArray* headNums, double epsilon, char* cacheModeOptional,
+    const aclTensor* qOutBeforeQuant, const aclTensor* kOutBeforeQuant, const aclTensor* vOutBeforeQuant,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     L2_DFX_PHASE_1(aclnnQkvRmsNormRopeCache,
-                   DFX_IN(qkv, qGamma, kGamma, cos, sin, index, qOut, kCache, vCache, kScaleOptional, vScaleOptional, kOffsetOptional, vOffsetOptional, qkvSize, headNums, epsilon, cacheModeOptional),
+                   DFX_IN(qkv, qGamma, kGamma, cos, sin, index, qOut, kCache, vCache, kScaleOptional, vScaleOptional,
+                          kOffsetOptional, vOffsetOptional, qkvSize, headNums, epsilon, cacheModeOptional),
                    DFX_OUT(qOut, kCache, vCache, qOutBeforeQuant, kOutBeforeQuant, vOutBeforeQuant));
-    
+
     // 固定写法，参数检查
-    auto ret = qkv_rms_norm_rope_cache::CheckNotNull(qkv, qGamma, kGamma, cos, sin, index, qOut, kCache, vCache, 
-                            qkvSize, headNums);
+    auto ret = qkv_rms_norm_rope_cache::CheckNotNull(qkv, qGamma, kGamma, cos, sin, index, qOut, kCache, vCache,
+                                                     qkvSize, headNums);
 
     CHECK_RET(ret, ACLNN_ERR_PARAM_NULLPTR);
 
@@ -87,17 +84,17 @@ aclnnStatus aclnnQkvRmsNormRopeCacheGetWorkspaceSize(
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     // 固定写法，将输入self转换成连续的tensor
-    auto qkvContiguous = l0op::Contiguous(qkv, uniqueExecutor.get()); 
+    auto qkvContiguous = l0op::Contiguous(qkv, uniqueExecutor.get());
     CHECK_RET(qkvContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-    auto qGammaContiguous = l0op::Contiguous(qGamma, uniqueExecutor.get()); 
+    auto qGammaContiguous = l0op::Contiguous(qGamma, uniqueExecutor.get());
     CHECK_RET(qGammaContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-    auto kGammaContiguous = l0op::Contiguous(kGamma, uniqueExecutor.get()); 
+    auto kGammaContiguous = l0op::Contiguous(kGamma, uniqueExecutor.get());
     CHECK_RET(kGammaContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-    auto cosContiguous = l0op::Contiguous(cos, uniqueExecutor.get()); 
+    auto cosContiguous = l0op::Contiguous(cos, uniqueExecutor.get());
     CHECK_RET(cosContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-    auto sinContiguous = l0op::Contiguous(sin, uniqueExecutor.get()); 
+    auto sinContiguous = l0op::Contiguous(sin, uniqueExecutor.get());
     CHECK_RET(sinContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-    auto indexContiguous = l0op::Contiguous(index, uniqueExecutor.get()); 
+    auto indexContiguous = l0op::Contiguous(index, uniqueExecutor.get());
     CHECK_RET(indexContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     auto qOutContiguous = l0op::Contiguous(qOut, uniqueExecutor.get());
     qOut = const_cast<aclTensor*>(qOutContiguous);
@@ -112,34 +109,36 @@ aclnnStatus aclnnQkvRmsNormRopeCacheGetWorkspaceSize(
     const aclTensor* vScaleContiguous = nullptr;
     const aclTensor* vOffsetContiguous = nullptr;
     if (kScaleOptional != nullptr) {
-        kScaleContiguous = l0op::Contiguous(kScaleOptional, uniqueExecutor.get()); 
+        kScaleContiguous = l0op::Contiguous(kScaleOptional, uniqueExecutor.get());
         CHECK_RET(kScaleContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     }
     if (kOffsetOptional != nullptr) {
-        kOffsetContiguous = l0op::Contiguous(kOffsetOptional, uniqueExecutor.get()); 
+        kOffsetContiguous = l0op::Contiguous(kOffsetOptional, uniqueExecutor.get());
         CHECK_RET(kOffsetContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     }
     if (vScaleOptional != nullptr) {
-        vScaleContiguous = l0op::Contiguous(vScaleOptional, uniqueExecutor.get()); 
+        vScaleContiguous = l0op::Contiguous(vScaleOptional, uniqueExecutor.get());
         CHECK_RET(vScaleContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     }
     if (vOffsetOptional != nullptr) {
-        vOffsetContiguous = l0op::Contiguous(vOffsetOptional, uniqueExecutor.get()); 
+        vOffsetContiguous = l0op::Contiguous(vOffsetOptional, uniqueExecutor.get());
         CHECK_RET(vOffsetContiguous != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     }
-    
+
     // 设置isOutputQkv
     bool isOutputQkv = qOutBeforeQuant == nullptr ? false : true;
-    
+
     auto qkvRmsNormRopeCacheResult = std::tuple<aclTensor*, aclTensor*, aclTensor*>(nullptr, nullptr, nullptr);
-    
+
     // 调用v3版本的l0接口进行计算
-    qkvRmsNormRopeCacheResult = l0op::QkvRmsNormRopeCache(qkvContiguous, qGammaContiguous, kGammaContiguous, cosContiguous, 
-                                        sinContiguous, indexContiguous, qOut, kCache, vCache, kScaleContiguous, vScaleContiguous,
-                                        kOffsetContiguous, vOffsetContiguous, qkvSize, headNums, epsilon, cacheModeOptional, isOutputQkv, uniqueExecutor.get());
+    qkvRmsNormRopeCacheResult = l0op::QkvRmsNormRopeCache(
+        qkvContiguous, qGammaContiguous, kGammaContiguous, cosContiguous, sinContiguous, indexContiguous, qOut, kCache,
+        vCache, kScaleContiguous, vScaleContiguous, kOffsetContiguous, vOffsetContiguous, qkvSize, headNums, epsilon,
+        cacheModeOptional, isOutputQkv, uniqueExecutor.get());
     auto [qOutBeforeQuant_, kOutBeforeQuant_, vOutBeforeQuant_] = qkvRmsNormRopeCacheResult;
-    bool checkBeforeQuantOut = ((qOutBeforeQuant_ != nullptr) && (kOutBeforeQuant_ != nullptr) && (vOutBeforeQuant_ != nullptr)) || 
-                      ((qOutBeforeQuant_ == nullptr) && (kOutBeforeQuant_ == nullptr) && (vOutBeforeQuant_ == nullptr));
+    bool checkBeforeQuantOut =
+        ((qOutBeforeQuant_ != nullptr) && (kOutBeforeQuant_ != nullptr) && (vOutBeforeQuant_ != nullptr)) ||
+        ((qOutBeforeQuant_ == nullptr) && (kOutBeforeQuant_ == nullptr) && (vOutBeforeQuant_ == nullptr));
     CHECK_RET(checkBeforeQuantOut == true, ACLNN_ERR_INNER_NULLPTR);
 
     bool hasBeforeQuantOut = qOutBeforeQuant_ != nullptr ? true : false;
@@ -159,7 +158,8 @@ aclnnStatus aclnnQkvRmsNormRopeCacheGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnQkvRmsNormRopeCache(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
+aclnnStatus aclnnQkvRmsNormRopeCache(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                     aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnQkvRmsNormRopeCache);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
@@ -167,4 +167,4 @@ aclnnStatus aclnnQkvRmsNormRopeCache(void* workspace, uint64_t workspaceSize, ac
 
 #ifdef __cplusplus
 }
-#endif 
+#endif

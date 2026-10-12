@@ -24,7 +24,7 @@ class InterleavedSplitSPadMixed {
 public:
     __aicore__ inline InterleavedSplitSPadMixed(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
-                                const InplacePartialRopeRegbaseTilingData *tiling, TPipe *pipe);
+                                const InplacePartialRopeRegbaseTilingData* tiling, TPipe* pipe);
     __aicore__ inline void Process();
 
 protected:
@@ -38,7 +38,7 @@ protected:
     TBuf<TPosition::VECCALC> tmpFp32Buf1;
     TBuf<TPosition::VECCALC> tmpFp32Buf3;
     TBuf<TPosition::VECCALC> gatherOffsetBuf;
-    const InplacePartialRopeRegbaseTilingData *tiling_;
+    const InplacePartialRopeRegbaseTilingData* tiling_;
 
     // tilingdata
     uint64_t batchSize;
@@ -78,19 +78,19 @@ protected:
     uint32_t triBlockNum = BLOCK_SIZE / sizeof(float);
     uint32_t triHeadDimAlign;
 
-    __aicore__ inline void InitData(const InplacePartialRopeRegbaseTilingData *tiling);
-    __aicore__ inline void CopyInX(LocalTensor<T> &x, uint32_t loopIdx, uint32_t calcLen);
-    __aicore__ inline void CopyInCos(LocalTensor<float> &cos, uint32_t loopIdx, uint32_t calcLen);
-    __aicore__ inline void CopyInSin(LocalTensor<float> &sin, uint32_t loopIdx, uint32_t calcLen);
+    __aicore__ inline void InitData(const InplacePartialRopeRegbaseTilingData* tiling);
+    __aicore__ inline void CopyInX(LocalTensor<T>& x, uint32_t loopIdx, uint32_t calcLen);
+    __aicore__ inline void CopyInCos(LocalTensor<float>& cos, uint32_t loopIdx, uint32_t calcLen);
+    __aicore__ inline void CopyInSin(LocalTensor<float>& sin, uint32_t loopIdx, uint32_t calcLen);
     __aicore__ inline void CopyOut(uint32_t loopIdx, uint32_t calcLen);
-    __aicore__ inline void Compute(uint32_t loopIdx, LocalTensor<uint32_t> &gatherOffsetCast, uint32_t calcLen);
-    __aicore__ inline void ComputeCastFp32(uint32_t loopIdx, LocalTensor<uint32_t> &gatherOffsetCast, uint32_t calcLen);
+    __aicore__ inline void Compute(uint32_t loopIdx, LocalTensor<uint32_t>& gatherOffsetCast, uint32_t calcLen);
+    __aicore__ inline void ComputeCastFp32(uint32_t loopIdx, LocalTensor<uint32_t>& gatherOffsetCast, uint32_t calcLen);
 };
 
 template <typename T>
 __aicore__ inline void InterleavedSplitSPadMixed<T>::Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
-                                                          const InplacePartialRopeRegbaseTilingData *tiling,
-                                                          TPipe *pipe)
+                                                          const InplacePartialRopeRegbaseTilingData* tiling,
+                                                          TPipe* pipe)
 {
     InitData(tiling);
 
@@ -117,10 +117,10 @@ __aicore__ inline void InterleavedSplitSPadMixed<T>::Init(GM_ADDR x, GM_ADDR cos
     }
 
     bufferBsndSize = batchSize * seqLen * bufferNdSizeAll;
-    xGm.SetGlobalBuffer((__gm__ T *)x + ioOffsetAll, bufferBsndSize);
-    yGm.SetGlobalBuffer((__gm__ T *)y + ioOffsetAll, bufferBsndSize);
-    cosGm.SetGlobalBuffer((__gm__ float *)cos + triOffset, bufferSdSize);
-    sinGm.SetGlobalBuffer((__gm__ float *)sin + triOffset, bufferSdSize);
+    xGm.SetGlobalBuffer((__gm__ T*)x + ioOffsetAll, bufferBsndSize);
+    yGm.SetGlobalBuffer((__gm__ T*)y + ioOffsetAll, bufferBsndSize);
+    cosGm.SetGlobalBuffer((__gm__ float*)cos + triOffset, bufferSdSize);
+    sinGm.SetGlobalBuffer((__gm__ float*)sin + triOffset, bufferSdSize);
 
     bufferLenSize = batchSize * ubCalcSeq * numHeads * headDimAlign * sizeof(T);
     pipe->InitBuffer(inQueX, BUFFER_NUM, bufferLenSize);
@@ -136,7 +136,7 @@ __aicore__ inline void InterleavedSplitSPadMixed<T>::Init(GM_ADDR x, GM_ADDR cos
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitSPadMixed<T>::InitData(const InplacePartialRopeRegbaseTilingData *tiling)
+__aicore__ inline void InterleavedSplitSPadMixed<T>::InitData(const InplacePartialRopeRegbaseTilingData* tiling)
 {
     tiling_ = tiling;
     batchSize = tiling_->batchSize;
@@ -163,7 +163,7 @@ __aicore__ inline void InterleavedSplitSPadMixed<T>::InitData(const InplaceParti
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitSPadMixed<T>::CopyInX(LocalTensor<T> &x, uint32_t loopIdx, uint32_t calcLen)
+__aicore__ inline void InterleavedSplitSPadMixed<T>::CopyInX(LocalTensor<T>& x, uint32_t loopIdx, uint32_t calcLen)
 {
     DataCopyExtParams dataCopyParams;
     for (uint32_t batchIdx = 0; batchIdx < batchSize; ++batchIdx) {
@@ -181,7 +181,7 @@ __aicore__ inline void InterleavedSplitSPadMixed<T>::CopyInX(LocalTensor<T> &x, 
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitSPadMixed<T>::CopyInCos(LocalTensor<float> &cos, uint32_t loopIdx,
+__aicore__ inline void InterleavedSplitSPadMixed<T>::CopyInCos(LocalTensor<float>& cos, uint32_t loopIdx,
                                                                uint32_t calcLen)
 {
     DataCopyExtParams dataCopyTriParams;
@@ -198,7 +198,7 @@ __aicore__ inline void InterleavedSplitSPadMixed<T>::CopyInCos(LocalTensor<float
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitSPadMixed<T>::CopyInSin(LocalTensor<float> &sin, uint32_t loopIdx,
+__aicore__ inline void InterleavedSplitSPadMixed<T>::CopyInSin(LocalTensor<float>& sin, uint32_t loopIdx,
                                                                uint32_t calcLen)
 {
     event_t eventIdVToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
@@ -261,7 +261,7 @@ __aicore__ inline void InterleavedSplitSPadMixed<T>::Process()
 }
 
 template <typename T>
-__aicore__ inline void InterleavedSplitSPadMixed<T>::Compute(uint32_t loopIdx, LocalTensor<uint32_t> &gatherOffsetCast,
+__aicore__ inline void InterleavedSplitSPadMixed<T>::Compute(uint32_t loopIdx, LocalTensor<uint32_t>& gatherOffsetCast,
                                                              uint32_t calcLen)
 {
     uint64_t totalCount = calcLen * batchSize * numHeads * headDimAlign;
@@ -291,7 +291,7 @@ __aicore__ inline void InterleavedSplitSPadMixed<T>::Compute(uint32_t loopIdx, L
 
 template <typename T>
 __aicore__ inline void InterleavedSplitSPadMixed<T>::ComputeCastFp32(uint32_t loopIdx,
-                                                                     LocalTensor<uint32_t> &gatherOffsetCast,
+                                                                     LocalTensor<uint32_t>& gatherOffsetCast,
                                                                      uint32_t calcLen)
 {
     uint64_t totalCount = calcLen * batchSize * numHeads * headDimAlign;

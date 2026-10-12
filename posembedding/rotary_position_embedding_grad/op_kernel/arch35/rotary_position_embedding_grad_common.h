@@ -27,14 +27,14 @@ namespace RotaryPositionEmbeddingGrad {
     qOut[1] = q[1] * cos[1] - q[0] * sin[0]
 */
 template <typename T>
-__aicore__ inline void HalfGradAlignVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-                                       const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen,
+__aicore__ inline void HalfGradAlignVF(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor,
+                                       const LocalTensor<T>& inTensor, const LocalTensor<T>& outTensor, uint32_t dLen,
                                        uint32_t dAlign, uint16_t currSNum, uint16_t currDNum)
 {
-    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
-    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
+    __ubuf__ T* sinUb = (__ubuf__ T*)sinTensor.GetPhyAddr();
+    __ubuf__ T* cosUb = (__ubuf__ T*)cosTensor.GetPhyAddr();
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)outTensor.GetPhyAddr();
     uint32_t halfD = dLen / HALF_INTERLEAVE_COEF;
     uint32_t halfDAlign = Ops::Base::CeilAlign(halfD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint16_t repeatTimes = Ops::Base::CeilDiv(halfD, VL_FLOAT32_SIZE);
@@ -84,14 +84,14 @@ __aicore__ inline void HalfGradAlignVF(const LocalTensor<T> &sinTensor, const Lo
     qOut[3] = q[3] * cos[3] - q[2] * sin[2]
 */
 template <typename T>
-__aicore__ inline void QuarterGradAlignVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-                                          const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor,
+__aicore__ inline void QuarterGradAlignVF(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor,
+                                          const LocalTensor<T>& inTensor, const LocalTensor<T>& outTensor,
                                           uint32_t dLen, uint32_t dAlign, uint16_t currSNum, uint16_t currDNum)
 {
-    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
-    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
+    __ubuf__ T* sinUb = (__ubuf__ T*)sinTensor.GetPhyAddr();
+    __ubuf__ T* cosUb = (__ubuf__ T*)cosTensor.GetPhyAddr();
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)outTensor.GetPhyAddr();
     uint32_t quarterD = dLen / QUARTER_MODE_COEF;
     uint32_t quarterDAlign = Ops::Base::CeilAlign(quarterD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint16_t repeatTimes = Ops::Base::CeilDiv(quarterD, VL_FLOAT32_SIZE);
@@ -151,14 +151,14 @@ __aicore__ inline void QuarterGradAlignVF(const LocalTensor<T> &sinTensor, const
 }
 
 template <typename T>
-__aicore__ inline void InterleaveModeGradVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-                                            const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor,
+__aicore__ inline void InterleaveModeGradVF(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor,
+                                            const LocalTensor<T>& inTensor, const LocalTensor<T>& outTensor,
                                             uint16_t dLen, uint16_t currSNum, uint16_t currDNum)
 {
-    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
-    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
+    __ubuf__ T* sinUb = (__ubuf__ T*)sinTensor.GetPhyAddr();
+    __ubuf__ T* cosUb = (__ubuf__ T*)cosTensor.GetPhyAddr();
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)outTensor.GetPhyAddr();
     uint16_t loopSize = 2 * VL_FLOAT32_SIZE;
     uint16_t loopNum = (dLen + loopSize - 1) / (2 * VL_FLOAT32_SIZE);
     uint16_t dAlignLen = Ops::Base::CeilAlign(dLen, static_cast<uint16_t>(BLOCK_TYPE_SIZE / sizeof(T)));
@@ -220,14 +220,14 @@ __aicore__ inline void InterleaveModeGradVF(const LocalTensor<T> &sinTensor, con
 }
 
 template <typename T>
-__aicore__ inline void DeepSeekInterleaveModeGradVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-                                                    const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor,
+__aicore__ inline void DeepSeekInterleaveModeGradVF(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor,
+                                                    const LocalTensor<T>& inTensor, const LocalTensor<T>& outTensor,
                                                     uint32_t dLen, uint16_t currSNum, uint16_t currDNum)
 {
-    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
-    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
+    __ubuf__ T* sinUb = (__ubuf__ T*)sinTensor.GetPhyAddr();
+    __ubuf__ T* cosUb = (__ubuf__ T*)cosTensor.GetPhyAddr();
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)outTensor.GetPhyAddr();
     uint32_t dAlign = Ops::Base::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint32_t loopSize = 2 * VL_FLOAT32_SIZE;
     uint16_t repeatTimes = (dLen + loopSize - 1) / loopSize;
@@ -289,7 +289,7 @@ __aicore__ inline void DeepSeekInterleaveModeGradVF(const LocalTensor<T> &sinTen
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchHalfGradAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin, __ubuf__ T *out,
+__aicore__ inline void BatchHalfGradAlignVF(__ubuf__ T* in, __ubuf__ T* cos, __ubuf__ T* sin, __ubuf__ T* out,
                                             uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d,
                                             int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
 {
@@ -351,7 +351,7 @@ __aicore__ inline void BatchHalfGradAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __u
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchQuarterGradAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin, __ubuf__ T *out,
+__aicore__ inline void BatchQuarterGradAlignVF(__ubuf__ T* in, __ubuf__ T* cos, __ubuf__ T* sin, __ubuf__ T* out,
                                                uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d,
                                                int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
 {
@@ -434,7 +434,7 @@ __aicore__ inline void BatchQuarterGradAlignVF(__ubuf__ T *in, __ubuf__ T *cos, 
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchInterleaveModeGradVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin, __ubuf__ T *out,
+__aicore__ inline void BatchInterleaveModeGradVF(__ubuf__ T* in, __ubuf__ T* cos, __ubuf__ T* sin, __ubuf__ T* out,
                                                  uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d,
                                                  int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
 {
@@ -517,8 +517,8 @@ __aicore__ inline void BatchInterleaveModeGradVF(__ubuf__ T *in, __ubuf__ T *cos
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchDeepSeekInterleaveModeGradVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin,
-                                                         __ubuf__ T *out, uint16_t sLength, uint16_t bLength,
+__aicore__ inline void BatchDeepSeekInterleaveModeGradVF(__ubuf__ T* in, __ubuf__ T* cos, __ubuf__ T* sin,
+                                                         __ubuf__ T* out, uint16_t sLength, uint16_t bLength,
                                                          uint16_t nLength, int64_t d, int64_t dAlign, int64_t ubFactorS,
                                                          int64_t ubFactorN)
 {

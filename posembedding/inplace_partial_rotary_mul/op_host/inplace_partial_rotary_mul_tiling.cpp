@@ -45,7 +45,7 @@ constexpr int64_t CONST_2 = 2;
 
 class InplacePartialRotaryMulTiling {
 public:
-    explicit InplacePartialRotaryMulTiling(gert::TilingContext *context)
+    explicit InplacePartialRotaryMulTiling(gert::TilingContext* context)
         : context_(context) {};
 
     ge::graphStatus Init();
@@ -64,7 +64,7 @@ private:
     ge::graphStatus TilingSplitSMixed();
     ge::graphStatus TilingSplitMixed();
     int64_t GetMixedTilingKeyOffset() const;
-    ge::graphStatus InitSplitTilingData(int64_t &batchSizeOut, int64_t &seqLenOut, int64_t &numHeadsOut);
+    ge::graphStatus InitSplitTilingData(int64_t& batchSizeOut, int64_t& seqLenOut, int64_t& numHeadsOut);
     void FillTilingData();
     void PrintTilingData() const;
     void PrintInfo();
@@ -112,7 +112,7 @@ private:
     int64_t ubFactor_ = 0;
     int64_t start_ = 0;
     int64_t blockFactor_ = 0;
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     InplacePartialRopeRegbaseTilingData tilingData_;
 };
 int64_t GetCeilInt(int64_t value1, int64_t value2)
@@ -324,7 +324,7 @@ ge::graphStatus InplacePartialRotaryMulTiling::CheckInput()
     allHeadDim_ = xShape.GetDim(dimNum - 1);
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is nullptr"), return ge::GRAPH_FAILED);
-    const int64_t *modePtr = attrs->GetAttrPointer<int64_t>(0);
+    const int64_t* modePtr = attrs->GetAttrPointer<int64_t>(0);
     int64_t mode = (modePtr == nullptr) ? 0 : *modePtr;
     OP_CHECK_IF(
         mode != 1,
@@ -336,7 +336,7 @@ ge::graphStatus InplacePartialRotaryMulTiling::CheckInput()
         start_ = 0;
         end_ = 0;
     } else {
-        auto sliceData = static_cast<const int64_t *>(sliceListAttr->GetData());
+        auto sliceData = static_cast<const int64_t*>(sliceListAttr->GetData());
         OP_CHECK_IF(sliceListAttr->GetSize() != 2,
                     OP_LOGE(context_->GetNodeName(), "slice_attr must have exactly 2 elements, got %zu",
                             sliceListAttr->GetSize()),
@@ -608,8 +608,8 @@ int64_t InplacePartialRotaryMulTiling::GetMixedTilingKeyOffset() const
     return TILING_KEY_FLOAT16_FLOAT32_MIXED;
 }
 
-ge::graphStatus InplacePartialRotaryMulTiling::InitSplitTilingData(int64_t &batchSizeOut, int64_t &seqLenOut,
-                                                                   int64_t &numHeadsOut)
+ge::graphStatus InplacePartialRotaryMulTiling::InitSplitTilingData(int64_t& batchSizeOut, int64_t& seqLenOut,
+                                                                   int64_t& numHeadsOut)
 {
     if (r1dim1_ == 1 && r1dim2_ == 1 && xdim0_ == r1dim0_) {
         seqLenOut = r1dim0_;
@@ -802,7 +802,7 @@ ge::graphStatus InplacePartialRotaryMulTiling::DoTiling()
         FillTilingData();
         context_->SetBlockDim(1);
         context_->SetTilingKey(tilingKey_);
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         workspaces[0] = static_cast<size_t>(16 * 1024 * 1024);
         tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
         context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
@@ -827,7 +827,7 @@ ge::graphStatus InplacePartialRotaryMulTiling::DoTilingMixedPrecision()
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
     size_t usrWorkspaceSize = 0;
     size_t sysWorkspaceSize = static_cast<size_t>(16) * 1024 * 1024;
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     currentWorkspace[0] = usrWorkspaceSize + sysWorkspaceSize;
     PrintInfo();
     return ge::GRAPH_SUCCESS;
@@ -841,7 +841,7 @@ ge::graphStatus InplacePartialRotaryMulTiling::DoTilingRegular()
         context_->SetBlockDim(usedCoreNum_);
         context_->SetTilingKey(tilingKey_);
 
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         workspaces[0] = static_cast<size_t>(16 * 1024 * 1024);
         tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
         context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
@@ -867,14 +867,14 @@ ge::graphStatus InplacePartialRotaryMulTiling::DoTilingRegular()
         context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
         size_t usrWorkspaceSize = 0;
         size_t sysWorkspaceSize = 16 * 1024 * 1024;
-        size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+        size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
         currentWorkspace[0] = usrWorkspaceSize + sysWorkspaceSize;
 
         PrintInfo();
         return ge::GRAPH_SUCCESS;
     }
 };
-ge::graphStatus Tiling4InplacePartialRotaryMul(gert::TilingContext *context)
+ge::graphStatus Tiling4InplacePartialRotaryMul(gert::TilingContext* context)
 {
     InplacePartialRotaryMulTiling tilingImpl = InplacePartialRotaryMulTiling(context);
     if (tilingImpl.Init() != ge::GRAPH_SUCCESS) {

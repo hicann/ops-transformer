@@ -24,13 +24,12 @@ static constexpr size_t INPUT_COS_INDEX = 1;
 static constexpr size_t INPUT_SIN_INDEX = 2;
 static constexpr size_t OUTPUT_DY_INDEX = 0;
 
-
-static ge::graphStatus InferShapeForInplacePartialRotaryMulGrad(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeForInplacePartialRotaryMulGrad(gert::InferShapeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeForInplacePartialRotaryMulGrad.");
-    const gert::Shape *dyShape = context->GetInputShape(INPUT_DY_INDEX);
+    const gert::Shape* dyShape = context->GetInputShape(INPUT_DY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, dyShape);
-    gert::Shape *outDyShape = context->GetOutputShape(OUTPUT_DY_INDEX);
+    gert::Shape* outDyShape = context->GetOutputShape(OUTPUT_DY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, outDyShape);
 
     *outDyShape = *dyShape;
@@ -39,7 +38,7 @@ static ge::graphStatus InferShapeForInplacePartialRotaryMulGrad(gert::InferShape
     return ge::GRAPH_SUCCESS;
 }
 
-static graphStatus InferDataTypeForInplacePartialRotaryMulGrad(gert::InferDataTypeContext *context)
+static graphStatus InferDataTypeForInplacePartialRotaryMulGrad(gert::InferDataTypeContext* context)
 {
     context->SetOutputDataType(OUTPUT_DY_INDEX, context->GetInputDataType(INPUT_DY_INDEX));
     return GRAPH_SUCCESS;

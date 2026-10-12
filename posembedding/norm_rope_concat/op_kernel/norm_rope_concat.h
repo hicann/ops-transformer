@@ -25,7 +25,7 @@ using namespace AscendC::Reg;
 template <bool isTraining>
 class NormOperationForward : public NormOperation {
 public:
-    __aicore__ inline NormOperationForward(TPipe *pipe, float eps, float scale, uint32_t normDim, uint32_t normNum,
+    __aicore__ inline NormOperationForward(TPipe* pipe, float eps, float scale, uint32_t normDim, uint32_t normNum,
                                            uint32_t alignedNormDim, uint32_t alignedNormNum)
         : NormOperation(eps, scale, normDim, normNum, alignedNormDim, alignedNormNum)
     {
@@ -50,7 +50,7 @@ public:
     }
 
     template <NormType normType>
-    __aicore__ inline void Process(const LocalTensor<float> &x, int64_t inOffset, int64_t normOffset, uint32_t heads);
+    __aicore__ inline void Process(const LocalTensor<float>& x, int64_t inOffset, int64_t normOffset, uint32_t heads);
 
     template <NormType normType>
     __aicore__ inline void Prepare(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR mean, GM_ADDR rstd);
@@ -59,25 +59,25 @@ private:
     __aicore__ inline void CopyIn(int64_t inOffset, uint32_t heads);
 
     template <NormType normType>
-    __aicore__ inline void Compute(const LocalTensor<float> &x, uint32_t heads);
+    __aicore__ inline void Compute(const LocalTensor<float>& x, uint32_t heads);
 
     __aicore__ inline void CopyOutMeanAndRstd(int64_t normOffset, uint32_t heads);
 
-    __aicore__ inline void DoSum(const LocalTensor<float> &out, const LocalTensor<float> &in,
-                                 const LocalTensor<float> &buf, uint32_t heads);
+    __aicore__ inline void DoSum(const LocalTensor<float>& out, const LocalTensor<float>& in,
+                                 const LocalTensor<float>& buf, uint32_t heads);
     template <NormType normType>
-    __aicore__ inline void DoLayerNorm(const LocalTensor<float> &x, uint32_t heads);
+    __aicore__ inline void DoLayerNorm(const LocalTensor<float>& x, uint32_t heads);
 
     template <NormType normType>
-    __aicore__ inline void DoRMSNorm(const LocalTensor<float> &x, uint32_t heads);
+    __aicore__ inline void DoRMSNorm(const LocalTensor<float>& x, uint32_t heads);
 
-    __aicore__ inline void DoMulAdd(const LocalTensor<float> &x, uint32_t heads);
+    __aicore__ inline void DoMulAdd(const LocalTensor<float>& x, uint32_t heads);
 
-    __aicore__ inline void DoMul(const LocalTensor<float> &x, uint32_t heads);
+    __aicore__ inline void DoMul(const LocalTensor<float>& x, uint32_t heads);
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
-    __aicore__ inline void DoMulAddVfCall(const LocalTensor<float> &x, uint32_t heads);
-    __simd_vf__ inline void DoMulAddVf(__ubuf__ float *xBuf, __ubuf__ float *weightBuf, __ubuf__ float *biasBuf,
+    __aicore__ inline void DoMulAddVfCall(const LocalTensor<float>& x, uint32_t heads);
+    __simd_vf__ inline void DoMulAddVf(__ubuf__ float* xBuf, __ubuf__ float* weightBuf, __ubuf__ float* biasBuf,
                                        uint32_t heads);
 #endif
 private:
@@ -93,9 +93,9 @@ private:
 };
 
 template <bool isTraining>
-__aicore__ inline void NormOperationForward<isTraining>::DoSum(const LocalTensor<float> &out,
-                                                               const LocalTensor<float> &in,
-                                                               const LocalTensor<float> &buf, uint32_t heads)
+__aicore__ inline void NormOperationForward<isTraining>::DoSum(const LocalTensor<float>& out,
+                                                               const LocalTensor<float>& in,
+                                                               const LocalTensor<float>& buf, uint32_t heads)
 {
     if (isAligned64_) {
         Duplicate(buf, 0.f, B32_DATA_NUM_PER_REPEAT * heads);
@@ -111,7 +111,7 @@ __aicore__ inline void NormOperationForward<isTraining>::DoSum(const LocalTensor
 }
 
 template <bool isTraining>
-__aicore__ inline void NormOperationForward<isTraining>::DoMulAdd(const LocalTensor<float> &x, uint32_t heads)
+__aicore__ inline void NormOperationForward<isTraining>::DoMulAdd(const LocalTensor<float>& x, uint32_t heads)
 {
     if (isAligned64_) {
         for (uint32_t i = 0; i < rptTimes_; ++i) {
@@ -128,8 +128,8 @@ __aicore__ inline void NormOperationForward<isTraining>::DoMulAdd(const LocalTen
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
 template <bool isTraining>
-__simd_vf__ inline void NormOperationForward<isTraining>::DoMulAddVf(__ubuf__ float *xBuf, __ubuf__ float *weightBuf,
-                                                                     __ubuf__ float *biasBuf, uint32_t heads)
+__simd_vf__ inline void NormOperationForward<isTraining>::DoMulAddVf(__ubuf__ float* xBuf, __ubuf__ float* weightBuf,
+                                                                     __ubuf__ float* biasBuf, uint32_t heads)
 {
     RegTensor<float> xRegTensor;
     RegTensor<float> weightRegTensor;
@@ -139,9 +139,9 @@ __simd_vf__ inline void NormOperationForward<isTraining>::DoMulAddVf(__ubuf__ fl
     uint32_t repeatTimes = (this->alignedNormDim_ + oneRepeatSize - 1) / oneRepeatSize;
     for (uint32_t i = 0; i < heads; ++i) {
         uint32_t len = this->alignedNormDim_;
-        __ubuf__ float *tempXBuf = xBuf + i * len;
-        __ubuf__ float *tempWeightBuf = weightBuf;
-        __ubuf__ float *tempBiasBuf = biasBuf;
+        __ubuf__ float* tempXBuf = xBuf + i * len;
+        __ubuf__ float* tempWeightBuf = weightBuf;
+        __ubuf__ float* tempBiasBuf = biasBuf;
         for (uint32_t j = 0; j < repeatTimes; ++j) {
             MaskReg maskReg = UpdateMask<float>(len);
             LoadAlign(xRegTensor, tempXBuf + j * oneRepeatSize);
@@ -154,17 +154,17 @@ __simd_vf__ inline void NormOperationForward<isTraining>::DoMulAddVf(__ubuf__ fl
 }
 
 template <bool isTraining>
-__aicore__ inline void NormOperationForward<isTraining>::DoMulAddVfCall(const LocalTensor<float> &x, uint32_t heads)
+__aicore__ inline void NormOperationForward<isTraining>::DoMulAddVfCall(const LocalTensor<float>& x, uint32_t heads)
 {
-    __ubuf__ float *xBuf = (__ubuf__ float *)x.GetPhyAddr();
-    __ubuf__ float *weightBuf = (__ubuf__ float *)weight_.GetPhyAddr();
-    __ubuf__ float *biasBuf = (__ubuf__ float *)bias_.GetPhyAddr();
+    __ubuf__ float* xBuf = (__ubuf__ float*)x.GetPhyAddr();
+    __ubuf__ float* weightBuf = (__ubuf__ float*)weight_.GetPhyAddr();
+    __ubuf__ float* biasBuf = (__ubuf__ float*)bias_.GetPhyAddr();
     DoMulAddVf(xBuf, weightBuf, biasBuf, heads);
 }
 #endif
 
 template <bool isTraining>
-__aicore__ inline void NormOperationForward<isTraining>::DoMul(const LocalTensor<float> &x, uint32_t heads)
+__aicore__ inline void NormOperationForward<isTraining>::DoMul(const LocalTensor<float>& x, uint32_t heads)
 {
     if (isAligned64_) {
         for (uint32_t i = 0; i < rptTimes_; ++i) {
@@ -184,11 +184,11 @@ template <NormType normType>
 __aicore__ inline void NormOperationForward<isTraining>::Prepare(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR mean,
                                                                  GM_ADDR rstd)
 {
-    this->xGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)x);
-    this->weightGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)weight);
-    this->biasGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)bias);
-    this->meanGm_.SetGlobalBuffer((__gm__ float *)mean);
-    this->rstdGm_.SetGlobalBuffer((__gm__ float *)rstd);
+    this->xGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)x);
+    this->weightGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)weight);
+    this->biasGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)bias);
+    this->meanGm_.SetGlobalBuffer((__gm__ float*)mean);
+    this->rstdGm_.SetGlobalBuffer((__gm__ float*)rstd);
     if constexpr (normType == NormType::NONE) {
         return;
     }
@@ -226,7 +226,7 @@ __aicore__ inline void NormOperationForward<isTraining>::Prepare(GM_ADDR x, GM_A
 
 template <bool isTraining>
 template <NormType normType>
-__aicore__ inline void NormOperationForward<isTraining>::Process(const LocalTensor<float> &x, int64_t inOffset,
+__aicore__ inline void NormOperationForward<isTraining>::Process(const LocalTensor<float>& x, int64_t inOffset,
                                                                  int64_t normOffset, uint32_t heads)
 {
     CopyIn(inOffset, heads);
@@ -247,7 +247,7 @@ __aicore__ inline void NormOperationForward<isTraining>::CopyIn(int64_t inOffset
 
 template <bool isTraining>
 template <NormType normType>
-__aicore__ inline void NormOperationForward<isTraining>::DoLayerNorm(const LocalTensor<float> &x, uint32_t heads)
+__aicore__ inline void NormOperationForward<isTraining>::DoLayerNorm(const LocalTensor<float>& x, uint32_t heads)
 {
     uint32_t size = heads * this->alignedNormDim_;
     LocalTensor<float> reducedX = buf_.Get<float>();
@@ -307,7 +307,7 @@ __aicore__ inline void NormOperationForward<isTraining>::DoLayerNorm(const Local
 
 template <bool isTraining>
 template <NormType normType>
-__aicore__ inline void NormOperationForward<isTraining>::DoRMSNorm(const LocalTensor<float> &x, uint32_t heads)
+__aicore__ inline void NormOperationForward<isTraining>::DoRMSNorm(const LocalTensor<float>& x, uint32_t heads)
 {
     uint32_t size = heads * this->alignedNormDim_;
     LocalTensor<float> reducedX = buf_.Get<float>();
@@ -346,7 +346,7 @@ __aicore__ inline void NormOperationForward<isTraining>::DoRMSNorm(const LocalTe
 
 template <bool isTraining>
 template <NormType normType>
-__aicore__ inline void NormOperationForward<isTraining>::Compute(const LocalTensor<float> &x, uint32_t heads)
+__aicore__ inline void NormOperationForward<isTraining>::Compute(const LocalTensor<float>& x, uint32_t heads)
 {
     LocalTensor<DTYPE_QUERY> input = inQue_.DeQue<DTYPE_QUERY>();
     uint32_t size = heads * this->alignedNormDim_;
@@ -386,7 +386,7 @@ __aicore__ inline void NormOperationForward<isTraining>::CopyOutMeanAndRstd(int6
 template <RopeType ropeType>
 class RopeOperationForward : public RopeOperation<ropeType> {
 public:
-    __aicore__ inline RopeOperationForward(TPipe *pipe, GM_ADDR ropeSin, GM_ADDR ropeCos, uint32_t actualSeq,
+    __aicore__ inline RopeOperationForward(TPipe* pipe, GM_ADDR ropeSin, GM_ADDR ropeCos, uint32_t actualSeq,
                                            uint32_t ropeDim, uint32_t ropeNum, uint32_t alignedRopeDim)
         : RopeOperation<ropeType>(pipe, ropeSin, ropeCos, actualSeq, ropeDim, ropeNum, alignedRopeDim)
     {
@@ -394,19 +394,19 @@ public:
         outParams_.blockLen = this->ropeDim_ * sizeof(DTYPE_QUERY);
     }
     template <RopeType actualRopeType>
-    __aicore__ inline void Process(const LocalTensor<float> &x, int64_t outOffset, uint32_t heads);
+    __aicore__ inline void Process(const LocalTensor<float>& x, int64_t outOffset, uint32_t heads);
 
     template <RopeType actualRopeType>
     __aicore__ inline void Prepare(GM_ADDR y, uint32_t curSeq, uint32_t totalSeq)
     {
         outParams_.dstStride = (totalSeq - 1) * outParams_.blockLen;
-        this->yGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)y);
+        this->yGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)y);
         this->isActive_ = curSeq < this->actualSeq_;
     }
 
 private:
     template <RopeType actualRopeType>
-    __aicore__ inline void Compute(const LocalTensor<float> &x, uint32_t heads);
+    __aicore__ inline void Compute(const LocalTensor<float>& x, uint32_t heads);
 
     __aicore__ inline void CopyOut(int64_t outOffset, uint32_t heads);
 
@@ -417,7 +417,7 @@ private:
 
 template <RopeType ropeType>
 template <RopeType actualRopeType>
-__aicore__ inline void RopeOperationForward<ropeType>::Process(const LocalTensor<float> &x, int64_t outOffset,
+__aicore__ inline void RopeOperationForward<ropeType>::Process(const LocalTensor<float>& x, int64_t outOffset,
                                                                uint32_t heads)
 {
     Compute<actualRopeType>(x, heads);
@@ -426,7 +426,7 @@ __aicore__ inline void RopeOperationForward<ropeType>::Process(const LocalTensor
 
 template <RopeType ropeType>
 template <RopeType actualRopeType>
-__aicore__ inline void RopeOperationForward<ropeType>::Compute(const LocalTensor<float> &x, uint32_t heads)
+__aicore__ inline void RopeOperationForward<ropeType>::Compute(const LocalTensor<float>& x, uint32_t heads)
 {
     LocalTensor<DTYPE_QUERY> output = outQue_.AllocTensor<DTYPE_QUERY>();
     uint32_t size = this->alignedRopeDim_ * heads;
@@ -501,18 +501,18 @@ public:
           normAddedKeyRstd_(norm_added_key_rstd)
     {}
 
-    __aicore__ inline void Init(TPipe *pipe, const NormRopeConcatTilingData &tilingData);
+    __aicore__ inline void Init(TPipe* pipe, const NormRopeConcatTilingData& tilingData);
     __aicore__ inline void Process();
 
 private:
     template <NormType actualNormType, RopeType actualRopeType>
-    __aicore__ inline void ProcessOne(RopeOperationForward<ropeType> &ropeOp, NormOperationForward<isTraining> &normOp,
+    __aicore__ inline void ProcessOne(RopeOperationForward<ropeType>& ropeOp, NormOperationForward<isTraining>& normOp,
                                       GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR mean, GM_ADDR rstd, GM_ADDR y,
                                       uint32_t xSeq, uint32_t totalSeq, uint32_t outputSeq);
-    __aicore__ inline void GetSeqRange(uint32_t &startSeq, uint32_t &endSeq, uint32_t totalSeq, uint32_t usedCore);
+    __aicore__ inline void GetSeqRange(uint32_t& startSeq, uint32_t& endSeq, uint32_t totalSeq, uint32_t usedCore);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     uint32_t blockIdx_;
     // keySeq_ equal to valueSeq_
     // for self-attention, querySeq_ equal to keySeq_
@@ -561,7 +561,7 @@ private:
 
 template <NormType normType, NormType addedNormType, RopeType ropeType, ConcatOrder concatOrder, bool isTraining>
 __aicore__ inline void NormRopeConcat<normType, addedNormType, ropeType, concatOrder, isTraining>::Init(
-    TPipe *pipe, const NormRopeConcatTilingData &tilingData)
+    TPipe* pipe, const NormRopeConcatTilingData& tilingData)
 {
     pipe_ = pipe;
     blockIdx_ = GetBlockIdx();
@@ -598,7 +598,7 @@ __aicore__ inline void NormRopeConcat<normType, addedNormType, ropeType, concatO
 
 template <NormType normType, NormType addedNormType, RopeType ropeType, ConcatOrder concatOrder, bool isTraining>
 __aicore__ inline void NormRopeConcat<normType, addedNormType, ropeType, concatOrder, isTraining>::GetSeqRange(
-    uint32_t &startSeq, uint32_t &endSeq, uint32_t totalSeq, uint32_t usedCore)
+    uint32_t& startSeq, uint32_t& endSeq, uint32_t totalSeq, uint32_t usedCore)
 {
     uint32_t eachCoreSeq = totalSeq / usedCore;
     uint32_t tailCoreSeq = totalSeq % usedCore;
@@ -654,7 +654,7 @@ __aicore__ inline void NormRopeConcat<normType, addedNormType, ropeType, concatO
 template <NormType normType, NormType addedNormType, RopeType ropeType, ConcatOrder concatOrder, bool isTraining>
 template <NormType actualNormType, RopeType actualRopeType>
 __aicore__ inline void NormRopeConcat<normType, addedNormType, ropeType, concatOrder, isTraining>::ProcessOne(
-    RopeOperationForward<ropeType> &ropeOp, NormOperationForward<isTraining> &normOp, GM_ADDR x, GM_ADDR weight,
+    RopeOperationForward<ropeType>& ropeOp, NormOperationForward<isTraining>& normOp, GM_ADDR x, GM_ADDR weight,
     GM_ADDR bias, GM_ADDR mean, GM_ADDR rstd, GM_ADDR y, uint32_t xSeq, uint32_t totalSeq, uint32_t outputSeq)
 {
     uint32_t startSeq{0}, endSeq{0};

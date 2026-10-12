@@ -46,8 +46,8 @@ std::vector<gert::InfershapeContextPara::TensorDescription> BuildOutputs()
     };
 }
 
-std::vector<OpAttr> BuildAttrs(const std::vector<int64_t> &headNums, const std::string &layoutQkv = "NTD",
-                               const std::string &layoutQOut = "NTD", float epsilon = 1e-6f)
+std::vector<OpAttr> BuildAttrs(const std::vector<int64_t>& headNums, const std::string& layoutQkv = "NTD",
+                               const std::string& layoutQOut = "NTD", float epsilon = 1e-6f)
 {
     return {
         {"head_nums", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(headNums)},
@@ -57,7 +57,7 @@ std::vector<OpAttr> BuildAttrs(const std::vector<int64_t> &headNums, const std::
     };
 }
 
-void VerifyInferDtype(const std::vector<std::pair<std::string, Ops::Transformer::AnyValue>> &attrs,
+void VerifyInferDtype(const std::vector<std::pair<std::string, Ops::Transformer::AnyValue>>& attrs,
                       ge::DataType kCacheDtype, ge::DataType expectedQOutDtype,
                       ge::DataType expectedQScaleDtype = ge::DT_FLOAT, ge::DataType kScaleCacheDtype = ge::DT_FLOAT)
 {
@@ -85,7 +85,7 @@ void VerifyInferDtype(const std::vector<std::pair<std::string, Ops::Transformer:
     ASSERT_NE(registry->GetOpImpl("QkvRmsNormRopeCacheWithKScale"), nullptr);
     auto inferDtype = registry->GetOpImpl("QkvRmsNormRopeCacheWithKScale")->infer_datatype;
     ASSERT_NE(inferDtype, nullptr);
-    auto *context = contextHolder.GetContext<gert::InferDataTypeContext>();
+    auto* context = contextHolder.GetContext<gert::InferDataTypeContext>();
     ASSERT_NE(context, nullptr);
     EXPECT_EQ(inferDtype(context), ge::GRAPH_SUCCESS);
     EXPECT_EQ(context->GetOutputDataType(0), expectedQOutDtype);

@@ -56,16 +56,16 @@ template <typename OriT, typename CmpT>
 class RotateHalfBase {
 public:
     __aicore__ inline RotateHalfBase(){};
-    __aicore__ inline void BaseMemberInit(const RotaryPositionEmbeddingTilingData &tilingData);
+    __aicore__ inline void BaseMemberInit(const RotaryPositionEmbeddingTilingData& tilingData);
 
 protected:
-    __aicore__ inline void GetTilingData(const RotateHalfParams &tiling);
-    __aicore__ inline void SinCompute(LocalTensor<CmpT> &sin, uint32_t sLines);
-    __aicore__ inline void ComputeInner(LocalTensor<CmpT> &x, LocalTensor<CmpT> &xNew, LocalTensor<CmpT> &cos,
-                                        LocalTensor<CmpT> &sin, uint32_t calcLength);
-    __aicore__ inline void RBroadCast(LocalTensor<CmpT> &cos, LocalTensor<CmpT> &sin, uint32_t broadcastLines);
-    __aicore__ inline void XNewCopy(LocalTensor<CmpT> &x, LocalTensor<CmpT> &xNew, uint16_t sLines);
-    __aicore__ inline void FullLoadXDInit(const RotaryPositionEmbeddingTilingData &tilingData);
+    __aicore__ inline void GetTilingData(const RotateHalfParams& tiling);
+    __aicore__ inline void SinCompute(LocalTensor<CmpT>& sin, uint32_t sLines);
+    __aicore__ inline void ComputeInner(LocalTensor<CmpT>& x, LocalTensor<CmpT>& xNew, LocalTensor<CmpT>& cos,
+                                        LocalTensor<CmpT>& sin, uint32_t calcLength);
+    __aicore__ inline void RBroadCast(LocalTensor<CmpT>& cos, LocalTensor<CmpT>& sin, uint32_t broadcastLines);
+    __aicore__ inline void XNewCopy(LocalTensor<CmpT>& x, LocalTensor<CmpT>& xNew, uint16_t sLines);
+    __aicore__ inline void FullLoadXDInit(const RotaryPositionEmbeddingTilingData& tilingData);
 
     bool isAligned;
     uint16_t layout;
@@ -124,9 +124,9 @@ protected:
 };
 
 template <typename OriT, typename CmpT>
-__aicore__ inline void RotateHalfBase<OriT, CmpT>::BaseMemberInit(const RotaryPositionEmbeddingTilingData &tilingData)
+__aicore__ inline void RotateHalfBase<OriT, CmpT>::BaseMemberInit(const RotaryPositionEmbeddingTilingData& tilingData)
 {
-    const RotateHalfParams &tiling = tilingData.rotateHalfParams;
+    const RotateHalfParams& tiling = tilingData.rotateHalfParams;
     GetTilingData(tiling);
 
     // intermediate variable
@@ -165,9 +165,9 @@ __aicore__ inline void RotateHalfBase<OriT, CmpT>::BaseMemberInit(const RotaryPo
 
 // FullLoadXD: initData
 template <typename OriT, typename CmpT>
-__aicore__ inline void RotateHalfBase<OriT, CmpT>::FullLoadXDInit(const RotaryPositionEmbeddingTilingData &tilingData)
+__aicore__ inline void RotateHalfBase<OriT, CmpT>::FullLoadXDInit(const RotaryPositionEmbeddingTilingData& tilingData)
 {
-    const RotateHalfParams &tiling = tilingData.rotateHalfParams;
+    const RotateHalfParams& tiling = tilingData.rotateHalfParams;
 
     formerCoreNum = tiling.formerCoreNum;
     uint64_t ubLoopPerCore = tiling.formerUbLoop;
@@ -207,7 +207,7 @@ __aicore__ inline void RotateHalfBase<OriT, CmpT>::FullLoadXDInit(const RotaryPo
 }
 
 template <typename OriT, typename CmpT>
-__aicore__ inline void RotateHalfBase<OriT, CmpT>::GetTilingData(const RotateHalfParams &tiling)
+__aicore__ inline void RotateHalfBase<OriT, CmpT>::GetTilingData(const RotateHalfParams& tiling)
 {
     isAligned = tiling.isAligned == 1;
     layout = tiling.tilingMode;
@@ -254,7 +254,7 @@ __aicore__ inline void RotateHalfBase<OriT, CmpT>::GetTilingData(const RotateHal
 
 /* sin_l = -1 * sin_l */
 template <typename OriT, typename CmpT>
-__aicore__ inline void RotateHalfBase<OriT, CmpT>::SinCompute(LocalTensor<CmpT> &sin, uint32_t sLines)
+__aicore__ inline void RotateHalfBase<OriT, CmpT>::SinCompute(LocalTensor<CmpT>& sin, uint32_t sLines)
 {
     uint32_t repeatOffset, innerOffset;
     uint32_t repeatLoop = sLines / REPEAT_MAX;
@@ -287,8 +287,8 @@ __aicore__ inline void RotateHalfBase<OriT, CmpT>::SinCompute(LocalTensor<CmpT> 
 
 /* x = x * cos, xNew = xNew * sin, y = x + xNew */
 template <typename OriT, typename CmpT>
-__aicore__ inline void RotateHalfBase<OriT, CmpT>::ComputeInner(LocalTensor<CmpT> &x, LocalTensor<CmpT> &xNew,
-                                                                LocalTensor<CmpT> &cos, LocalTensor<CmpT> &sin,
+__aicore__ inline void RotateHalfBase<OriT, CmpT>::ComputeInner(LocalTensor<CmpT>& x, LocalTensor<CmpT>& xNew,
+                                                                LocalTensor<CmpT>& cos, LocalTensor<CmpT>& sin,
                                                                 uint32_t calcLength)
 {
     Mul(x, x, cos, calcLength);
@@ -298,7 +298,7 @@ __aicore__ inline void RotateHalfBase<OriT, CmpT>::ComputeInner(LocalTensor<CmpT
 
 /* broadcast cos, sin from (1, D) to (storeSLines, D) or (ubLast, D) shape */
 template <typename OriT, typename CmpT>
-__aicore__ inline void RotateHalfBase<OriT, CmpT>::RBroadCast(LocalTensor<CmpT> &cos, LocalTensor<CmpT> &sin,
+__aicore__ inline void RotateHalfBase<OriT, CmpT>::RBroadCast(LocalTensor<CmpT>& cos, LocalTensor<CmpT>& sin,
                                                               uint32_t broadcastLines)
 {
     uint32_t repeatOffset, copySrcOffset, copyDstOffset;
@@ -342,7 +342,7 @@ __aicore__ inline void RotateHalfBase<OriT, CmpT>::RBroadCast(LocalTensor<CmpT> 
 
 /* copy x to xNew: x_l --> xNew_r, x_r --> xNew_l */
 template <typename OriT, typename CmpT>
-__aicore__ inline void RotateHalfBase<OriT, CmpT>::XNewCopy(LocalTensor<CmpT> &x, LocalTensor<CmpT> &xNew,
+__aicore__ inline void RotateHalfBase<OriT, CmpT>::XNewCopy(LocalTensor<CmpT>& x, LocalTensor<CmpT>& xNew,
                                                             uint16_t sLines)
 {
     uint16_t stride = this->halfDPadLength * sizeof(CmpT) / BYTE_OF_BLOCK;

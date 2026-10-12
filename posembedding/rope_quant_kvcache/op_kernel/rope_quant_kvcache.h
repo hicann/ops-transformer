@@ -25,7 +25,7 @@ constexpr static int64_t FP16_ONE_BLOCK_NUM = 16;
 constexpr static int64_t FP16_ONE_REPEAT_NUM = 128;
 class RopeQuantKvcache {
 public:
-    __aicore__ inline RopeQuantKvcache(const RopeQuantKvcacheTilingData *tilingData)
+    __aicore__ inline RopeQuantKvcache(const RopeQuantKvcacheTilingData* tilingData)
     {
         this->cacheSeqlen = tilingData->cacheSeqlen;
         this->qHeadNum = tilingData->qHeadNum;
@@ -51,26 +51,26 @@ public:
         if (taskId == 1) {
             uint64_t qDataNum = this->qHeadNum * this->hiddenSize;
             uint64_t qBlockOffset = batchId * qDataNum;
-            inputGm.SetGlobalBuffer((__gm__ half *)qkv + qkvBlockOffset);
+            inputGm.SetGlobalBuffer((__gm__ half*)qkv + qkvBlockOffset);
 
-            cosGm.SetGlobalBuffer((__gm__ half *)cos + cossinBlockOffset);
+            cosGm.SetGlobalBuffer((__gm__ half*)cos + cossinBlockOffset);
             cosGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-            sinGm.SetGlobalBuffer((__gm__ half *)sin + cossinBlockOffset);
+            sinGm.SetGlobalBuffer((__gm__ half*)sin + cossinBlockOffset);
             sinGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-            outputGm.SetGlobalBuffer((__gm__ half *)q_out + qBlockOffset);
+            outputGm.SetGlobalBuffer((__gm__ half*)q_out + qBlockOffset);
 
-            quantScaleGm.SetGlobalBuffer((__gm__ float *)quant_scale);
+            quantScaleGm.SetGlobalBuffer((__gm__ float*)quant_scale);
             quantScaleGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-            quantOffsetGm.SetGlobalBuffer((__gm__ int32_t *)quant_offset);
+            quantOffsetGm.SetGlobalBuffer((__gm__ int32_t*)quant_offset);
             quantOffsetGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-            indiceGm.SetGlobalBuffer((__gm__ int32_t *)indice + batchId);
+            indiceGm.SetGlobalBuffer((__gm__ int32_t*)indice + batchId);
             indiceGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
             int32_t idx = indiceGm.GetValue(0);
-            vCacheGm.SetGlobalBuffer((__gm__ int8_t *)v_cache_out + kvCacheBlockOffset + idx * kvDataNum);
+            vCacheGm.SetGlobalBuffer((__gm__ int8_t*)v_cache_out + kvCacheBlockOffset + idx * kvDataNum);
 
             pipe.InitBuffer(inQueue, 1,
                             qDataNum * sizeof(half) + kvDataNum * sizeof(half) +
@@ -78,24 +78,24 @@ public:
                                 this->hiddenSize * sizeof(float) * QUANTIZE_TENSOR_NUM);
             pipe.InitBuffer(outQueue, 1, qDataNum * sizeof(half) + kvDataNum * sizeof(float));
         } else if (taskId == 0) {
-            inputGm.SetGlobalBuffer((__gm__ half *)qkv + qkvBlockOffset + this->qHiddenSize);
+            inputGm.SetGlobalBuffer((__gm__ half*)qkv + qkvBlockOffset + this->qHiddenSize);
 
-            cosGm.SetGlobalBuffer((__gm__ half *)cos + cossinBlockOffset);
+            cosGm.SetGlobalBuffer((__gm__ half*)cos + cossinBlockOffset);
             cosGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-            sinGm.SetGlobalBuffer((__gm__ half *)sin + cossinBlockOffset);
+            sinGm.SetGlobalBuffer((__gm__ half*)sin + cossinBlockOffset);
             sinGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-            quantScaleGm.SetGlobalBuffer((__gm__ float *)quant_scale);
+            quantScaleGm.SetGlobalBuffer((__gm__ float*)quant_scale);
             quantScaleGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-            quantOffsetGm.SetGlobalBuffer((__gm__ int32_t *)quant_offset);
+            quantOffsetGm.SetGlobalBuffer((__gm__ int32_t*)quant_offset);
             quantOffsetGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-            indiceGm.SetGlobalBuffer((__gm__ int32_t *)indice + batchId);
+            indiceGm.SetGlobalBuffer((__gm__ int32_t*)indice + batchId);
             indiceGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
             int32_t idx = indiceGm.GetValue(0);
-            kCacheGm.SetGlobalBuffer((__gm__ int8_t *)k_cache_out + kvCacheBlockOffset + idx * kvDataNum);
+            kCacheGm.SetGlobalBuffer((__gm__ int8_t*)k_cache_out + kvCacheBlockOffset + idx * kvDataNum);
 
             pipe.InitBuffer(inQueue, 1,
                             kvDataNum * sizeof(half) + this->hiddenSize * sizeof(half) * ROPE_TENSOR_NUM +

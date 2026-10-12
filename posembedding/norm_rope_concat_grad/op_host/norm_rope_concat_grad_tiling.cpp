@@ -19,7 +19,7 @@
 using namespace ge;
 using namespace AscendC;
 namespace optiling {
-ge::graphStatus NormRopeConcatGradTiling::CheckInput(const InputTensorInfo &x)
+ge::graphStatus NormRopeConcatGradTiling::CheckInput(const InputTensorInfo& x)
 {
     if (x.isRequired) {
         OP_CHECK_IF((x.desc == nullptr) || (x.shape == nullptr),
@@ -63,11 +63,11 @@ ge::graphStatus NormRopeConcatGradTiling::CheckInput(const InputTensorInfo &x)
                             OP_LOGE(context_.opName, "DIM0(%ld) Value of Shape should be batchSize_(%lu)",
                                     shape.GetDim(BATCH_DIM), batchSize_),
                             return ge::GRAPH_FAILED);
-                OP_CHECK_IF(shape.GetDim(GRAD_SEQ_DIM) < ropeSeq_,
-                            OP_LOGE(context_.opName,
-                                    "DIM2(%ld) Value of Shape should not be smaller than ropeSeq_(%lu)",
-                                    shape.GetDim(GRAD_SEQ_DIM), ropeSeq_),
-                            return ge::GRAPH_FAILED);
+                OP_CHECK_IF(
+                    shape.GetDim(GRAD_SEQ_DIM) < ropeSeq_,
+                    OP_LOGE(context_.opName, "DIM2(%ld) Value of Shape should not be smaller than ropeSeq_(%lu)",
+                            shape.GetDim(GRAD_SEQ_DIM), ropeSeq_),
+                    return ge::GRAPH_FAILED);
                 OP_CHECK_IF(shape.GetDim(GRAD_HEAD_DIM) != headNum_,
                             OP_LOGE(context_.opName, "DIM1(%ld) Value of Shape should be headNum_(%lu)",
                                     shape.GetDim(GRAD_HEAD_DIM), headNum_),
@@ -153,8 +153,8 @@ ge::graphStatus NormRopeConcatGradTiling::GetShapeInfo()
 {
     size_t queryIndex = static_cast<size_t>(InputIndexBackward::QUERY_INDEX);
     size_t keyIndex = static_cast<size_t>(InputIndexBackward::KEY_INDEX);
-    const gert::StorageShape *queryShape = context_.inputs[queryIndex].shape;
-    const gert::StorageShape *keyShape = context_.inputs[keyIndex].shape;
+    const gert::StorageShape* queryShape = context_.inputs[queryIndex].shape;
+    const gert::StorageShape* keyShape = context_.inputs[keyIndex].shape;
     OP_CHECK_IF(queryShape == nullptr || queryShape->GetStorageShape().GetDimNum() != INPUT_DIM_NUM,
                 OP_LOGE(context_.opName, "Shape of tensor query should be 4"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(keyShape == nullptr || keyShape->GetStorageShape().GetDimNum() != INPUT_DIM_NUM,
@@ -169,8 +169,8 @@ ge::graphStatus NormRopeConcatGradTiling::GetShapeInfo()
 
     size_t encoderQueryIndex = static_cast<size_t>(InputIndexBackward::ENCODER_QUERY_INDEX);
     size_t encoderKeyIndex = static_cast<size_t>(InputIndexBackward::ENCODER_KEY_INDEX);
-    const gert::StorageShape *encoderQueryShape = context_.inputs[encoderQueryIndex].shape;
-    const gert::StorageShape *encoderKeyShape = context_.inputs[encoderKeyIndex].shape;
+    const gert::StorageShape* encoderQueryShape = context_.inputs[encoderQueryIndex].shape;
+    const gert::StorageShape* encoderKeyShape = context_.inputs[encoderKeyIndex].shape;
     if (encoderQueryShape != nullptr && encoderQueryShape->GetStorageShape().GetDimNum() == INPUT_DIM_NUM) {
         encoderQuerySeq_ = encoderQueryShape->GetStorageShape().GetDim(SEQ_DIM);
     }
@@ -180,7 +180,7 @@ ge::graphStatus NormRopeConcatGradTiling::GetShapeInfo()
     encoderValueSeq_ = encoderKeySeq_;
 
     size_t ropeSinIndex = static_cast<size_t>(InputIndexBackward::ROPE_SIN_INDEX);
-    const gert::StorageShape *ropeSinShape = context_.inputs[ropeSinIndex].shape;
+    const gert::StorageShape* ropeSinShape = context_.inputs[ropeSinIndex].shape;
     if (ropeSinShape != nullptr && ropeSinShape->GetStorageShape().GetDimNum() == ROPE_DIM_NUM) {
         ropeSeq_ = ropeSinShape->GetStorageShape().GetDim(ROPE_SEQ_DIM);
         ropeDim_ = ropeSinShape->GetStorageShape().GetDim(ROPE_DIM_DIM);
@@ -268,7 +268,7 @@ ge::graphStatus NormRopeConcatGradTiling::FillTilingData()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus NormRopeConcatGradTiling::PrintTilingData(gert::TilingContext *ctx)
+ge::graphStatus NormRopeConcatGradTiling::PrintTilingData(gert::TilingContext* ctx)
 {
     OP_LOGD(ctx->GetNodeName(), "tilingKey:           %u.", tilingData_.get_tilingKey());
     OP_LOGD(ctx->GetNodeName(), "batch:               %u.", tilingData_.get_batch());
@@ -295,7 +295,7 @@ ge::graphStatus NormRopeConcatGradTiling::PrintTilingData(gert::TilingContext *c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus NormRopeConcatGradTiling::ConvertContextOne(gert::TilingContext *ctx, InputTensorInfo &x)
+ge::graphStatus NormRopeConcatGradTiling::ConvertContextOne(gert::TilingContext* ctx, InputTensorInfo& x)
 {
     size_t index = x.index;
     bool isRequired = x.isRequired;
@@ -326,18 +326,29 @@ ge::graphStatus NormRopeConcatGradTiling::ComputeUBTilingStrategy()
     uint64_t alignedNormDim_ = CeilAlign(normDim_, alignNum);
     uint64_t alignedRopeDim_ = CeilAlign(ropeDim_, alignNum);
     uint64_t normCoef = *(context_.normType) == static_cast<int64_t>(NormType::NONE) &&
-                                *(context_.normAddedType) == static_cast<int64_t>(NormType::NONE) ? 0 : 1;
+                                *(context_.normAddedType) == static_cast<int64_t>(NormType::NONE) ?
+                            0 :
+                            1;
     uint64_t ropeCoef = *(context_.ropeType) == static_cast<int64_t>(RopeType::NONE) ? 0 : 1;
-    uint64_t ropeUsedUbSize = SINGLE_BUFFER * alignedRopeDim_ * 2 * dataTypeSize + alignedRopeDim_ * sizeof(int32_t) + alignedRopeDim_ * 2 * sizeof(float); // mask, sin, cos
-    uint64_t normUsedUbSize = SINGLE_BUFFER * alignedNormDim_ * dataTypeSize // weight que
-        + NUM_TWO * DOUBLE_BUFFER * alignedNormDim_ * sizeof(float) + NUM_TWO * alignedNormDim_ * sizeof(float) // gradWeight & gradBias que + gradWeight & gradBias buf
-        + SINGLE_BUFFER * alignedNormDim_ * sizeof(float) + alignedNormDim_ * dataTypeSize + alignedNormDim_ * sizeof(float) // workspace get&push que, workspace buf
-        + MIN_SHARE_BUFFER; // extra shareCast buf
-    uint64_t oneHeadUbSize = NUM_THREE * alignedNormDim_ * sizeof(float) + NUM_TWO * DOUBLE_BUFFER * alignedNormDim_ * dataTypeSize + // grad_ouput & tempND & & shareCast buf + grad_ouput & grad_in que
+    uint64_t ropeUsedUbSize = SINGLE_BUFFER * alignedRopeDim_ * 2 * dataTypeSize + alignedRopeDim_ * sizeof(int32_t) +
+                              alignedRopeDim_ * 2 * sizeof(float); // mask, sin, cos
+    uint64_t normUsedUbSize =
+        SINGLE_BUFFER * alignedNormDim_ * dataTypeSize // weight que
+        + NUM_TWO * DOUBLE_BUFFER * alignedNormDim_ * sizeof(float) +
+        NUM_TWO * alignedNormDim_ * sizeof(float) // gradWeight & gradBias que + gradWeight & gradBias buf
+        + SINGLE_BUFFER * alignedNormDim_ * sizeof(float) + alignedNormDim_ * dataTypeSize +
+        alignedNormDim_ * sizeof(float) // workspace get&push que, workspace buf
+        + MIN_SHARE_BUFFER;             // extra shareCast buf
+    uint64_t oneHeadUbSize =
+        NUM_THREE * alignedNormDim_ * sizeof(float) +
+        NUM_TWO * DOUBLE_BUFFER * alignedNormDim_ *
+            dataTypeSize + // grad_ouput & tempND & & shareCast buf + grad_ouput & grad_in que
         normCoef * (NUM_TWO * DOUBLE_BUFFER + NUM_TWO) * sizeof(float) + // mean & rstd buf + mean & rstd que
-        normCoef * (NUM_THREE * alignedNormDim_ * sizeof(float) + DOUBLE_BUFFER * alignedNormDim_ * dataTypeSize); // input & share & weight buf + input que
+        normCoef * (NUM_THREE * alignedNormDim_ * sizeof(float) +
+                    DOUBLE_BUFFER * alignedNormDim_ * dataTypeSize); // input & share & weight buf + input que
 
-    avgHeads_ = (compileInfo_.ubSize - ropeCoef * ropeUsedUbSize - normCoef * normUsedUbSize - RES_UB_BUFFER) / oneHeadUbSize;
+    avgHeads_ =
+        (compileInfo_.ubSize - ropeCoef * ropeUsedUbSize - normCoef * normUsedUbSize - RES_UB_BUFFER) / oneHeadUbSize;
     avgHeads_ = std::min(avgHeads_, static_cast<uint64_t>(AVGHEAD_MAX_NUM));
     OP_CHECK_IF(avgHeads_ < 2, OP_LOGE(context_.opName, "input dim is too large, avgHeads_ should larger than 1"),
                 return ge::GRAPH_FAILED);
@@ -348,7 +359,7 @@ ge::graphStatus NormRopeConcatGradTiling::ComputeUBTilingStrategy()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus NormRopeConcatGradTiling::DoTiling(gert::TilingContext *ctx)
+ge::graphStatus NormRopeConcatGradTiling::DoTiling(gert::TilingContext* ctx)
 {
     auto platformInfoPtr = ctx->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE("NormRopeConcatGradTiling", "platformInfoPtr is null"),
@@ -398,7 +409,7 @@ ge::graphStatus NormRopeConcatGradTiling::DoTiling(gert::TilingContext *ctx)
     OP_CHECK_IF(context_.concatOrder == nullptr, OP_LOGE(context_.opName, "concatOrder is nullptr"),
                 return ge::GRAPH_FAILED);
 
-    size_t *workspaceSizes = ctx->GetWorkspaceSizes(1);
+    size_t* workspaceSizes = ctx->GetWorkspaceSizes(1);
     OP_CHECK_IF(workspaceSizes == nullptr,
                 OPS_REPORT_VECTOR_INNER_ERR(ctx->GetNodeName(), "workSpaceSize got from GE is nullptr"),
                 return ge::GRAPH_FAILED);
@@ -412,14 +423,14 @@ ge::graphStatus NormRopeConcatGradTiling::DoTiling(gert::TilingContext *ctx)
     }
     ctx->SetTilingKey(tilingKey_);
     ctx->SetBlockDim(numBlocks_);
-    if (tilingKey_ >= BATCH_MODE_MIN_KEY){
+    if (tilingKey_ >= BATCH_MODE_MIN_KEY) {
         ctx->SetScheduleMode(1);
     }
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus NormRopeConcatGradTiling::SetTiling(gert::TilingContext *ctx)
+ge::graphStatus NormRopeConcatGradTiling::SetTiling(gert::TilingContext* ctx)
 {
     OP_CHECK_IF(ctx->GetRawTilingData() == nullptr,
                 OPS_REPORT_VECTOR_INNER_ERR(ctx->GetNodeName(), "RawTilingData got from GE context is nullptr."),
@@ -430,7 +441,7 @@ ge::graphStatus NormRopeConcatGradTiling::SetTiling(gert::TilingContext *ctx)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingNormRopeConcatGrad(gert::TilingContext *ctx)
+ge::graphStatus TilingNormRopeConcatGrad(gert::TilingContext* ctx)
 {
     OP_CHECK_IF(ctx == nullptr, OPS_REPORT_VECTOR_INNER_ERR("NormRopeConcatGrad", "Context is nullptr."),
                 return ge::GRAPH_FAILED);
@@ -442,7 +453,7 @@ ge::graphStatus TilingNormRopeConcatGrad(gert::TilingContext *ctx)
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus TilingPrepareForNormRopeConcatGrad(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForNormRopeConcatGrad(gert::TilingParseContext* context)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE("TilingPrepareForNormRopeConcatGrad", "platformInfoPtr is null"),

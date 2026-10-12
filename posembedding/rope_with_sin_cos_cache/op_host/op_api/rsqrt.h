@@ -14,7 +14,7 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *Rsqrt(const aclTensor *self, aclOpExecutor *executor);
+const aclTensor* Rsqrt(const aclTensor* self, aclOpExecutor* executor);
 }
 
 #endif // PTA_NPU_OP_API_INC_LEVEL0_OP_RSQRT_H_

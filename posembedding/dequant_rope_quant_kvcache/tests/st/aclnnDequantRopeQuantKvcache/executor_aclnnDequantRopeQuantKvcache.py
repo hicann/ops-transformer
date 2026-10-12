@@ -21,7 +21,6 @@ from atk.tasks.api_execute.base_api import BaseApi
 @register("function_aclnn_dequant_rope_quant_kvcache")
 class FunctionApi(BaseApi):
     def __call__(self, input_data: InputDataset, with_output: bool = False):
-
         QUANTMAX = 127
         QUANTMIN = -128
 
@@ -35,7 +34,9 @@ class FunctionApi(BaseApi):
             input_tensor = input
             ws_cpu = weight_scale.reshape([1, 1, -1])
             if activation_scale != None:
-                as_cpu = activation_scale.reshape([input_tensor.shape[0], input_tensor.shape[1], 1])
+                as_cpu = activation_scale.reshape(
+                    [input_tensor.shape[0], input_tensor.shape[1], 1]
+                )
             else:
                 as_cpu = None
 
@@ -63,13 +64,14 @@ class FunctionApi(BaseApi):
             sin1 = sin
             cos1 = cos
             if dd == torch.bfloat16:
-
                 x1 = x
                 cos1 = cos
                 sin1 = sin
             axis_d = x.shape[-1]
-            rotary_x = torch.concat((-x1[..., axis_d // 2:], x1[..., :axis_d // 2]), dim=-1)
-            return (x1 * cos1 + rotary_x * sin1)
+            rotary_x = torch.concat(
+                (-x1[..., axis_d // 2 :], x1[..., : axis_d // 2]), dim=-1
+            )
+            return x1 * cos1 + rotary_x * sin1
 
         def quant_update_scatter(key_cache, key, scale, indice, offset, ifpa=False):
             # quant
@@ -88,10 +90,16 @@ class FunctionApi(BaseApi):
             d3 = key_cache.shape[3]
 
             # scatter
-            quant_out1 = torch.clamp(torch.round(quant_out.float()), min=QUANTMIN, max=QUANTMAX)
-            quant_out2 = quant_out1.reshape(-1, quant_out1.shape[-2], quant_out1.shape[-1])
+            quant_out1 = torch.clamp(
+                torch.round(quant_out.float()), min=QUANTMIN, max=QUANTMAX
+            )
+            quant_out2 = quant_out1.reshape(
+                -1, quant_out1.shape[-2], quant_out1.shape[-1]
+            )
             if ifpa:
-                key_cachepa = key_cache.reshape(-1, key_cache.shape[-2], key_cache.shape[-1])
+                key_cachepa = key_cache.reshape(
+                    -1, key_cache.shape[-2], key_cache.shape[-1]
+                )
 
                 for b in range(indice.shape[0]):
                     indice_value = indice[b]
@@ -101,13 +109,27 @@ class FunctionApi(BaseApi):
                 for b in range(indice.shape[0]):
                     indice_value = indice[b]
 
-                    key_cache[b][indice_value: indice_value + quant_out.shape[1]][:][:] = quant_out1[b][:][:][:]
+                    key_cache[b][indice_value : indice_value + quant_out.shape[1]][:][
+                        :
+                    ] = quant_out1[b][:][:][:]
 
-
-        def drqk(x_npu, cos_npu, sin_npu, k_cache_npu, v_cache_npu, indices_npu,
-                 scale_k_npu, scale_v_npu, size_splits, offset_k, offset_v, weight_scale,
-                 activation_scale, bias, ifpa="contiguous"):
-
+        def drqk(
+            x_npu,
+            cos_npu,
+            sin_npu,
+            k_cache_npu,
+            v_cache_npu,
+            indices_npu,
+            scale_k_npu,
+            scale_v_npu,
+            size_splits,
+            offset_k,
+            offset_v,
+            weight_scale,
+            activation_scale,
+            bias,
+            ifpa="contiguous",
+        ):
             if x_npu.ndimension() == 2:
                 x_npu = x_npu.reshape(x_npu.shape[-2], 1, x_npu.shape[-1])
                 cos_npu = cos_npu.reshape(cos_npu.shape[-2], 1, 1, cos_npu.shape[-1])
@@ -139,39 +161,61 @@ class FunctionApi(BaseApi):
                 s = x_npu.shape[1]
             q, k, v = x_npu.split(size_splits, dim=-1)
             print("*****************************************************************")
-            print('q.shape:',q.shape)
-            print('b:',b)
-            print('s:',s)
-            print('h:',h)
+            print("q.shape:", q.shape)
+            print("b:", b)
+            print("s:", s)
+            print("h:", h)
             q1 = q.reshape([b, s, -1, h])
             k1 = k.reshape([b, s, -1, h])
             v1 = v.reshape([b, s, -1, h])
             ropek = rope(k1, cos_npu, sin_npu)
             ropeq = rope(q1, cos_npu, sin_npu)
 
-            quant_update_scatter(k_cache_npu, ropek, 1 / scale_k_npu.to(torch.float), indices_npu, offset_k,
-                                 (ifpa != "contiguous"))
-            quant_update_scatter(v_cache_npu, v1, 1 / scale_v_npu.to(torch.float), indices_npu, offset_v,
-                                 (ifpa != "contiguous"))
+            quant_update_scatter(
+                k_cache_npu,
+                ropek,
+                1 / scale_k_npu.to(torch.float),
+                indices_npu,
+                offset_k,
+                (ifpa != "contiguous"),
+            )
+            quant_update_scatter(
+                v_cache_npu,
+                v1,
+                1 / scale_v_npu.to(torch.float),
+                indices_npu,
+                offset_v,
+                (ifpa != "contiguous"),
+            )
             return ropeq, ropek, v1, k_cache_npu, v_cache_npu
 
-
-        qout, kout, vout, k_cache_npu, v_cache_npu = drqk(input_data.kwargs["x"], input_data.kwargs["cos"],
-                                                          input_data.kwargs["sin"], input_data.kwargs["kCacheRef"],
-                                                          input_data.kwargs["vCacheRef"], input_data.kwargs["indices"],
-                                                          input_data.kwargs["scaleK"], input_data.kwargs["scaleV"],
-                                                          input_data.kwargs["sizeSplits"], input_data.kwargs["offsetKOptional"],
-                                                          input_data.kwargs["offsetVOptional"], input_data.kwargs["weightScaleOptional"],
-                                                          input_data.kwargs["activationScaleOptional"], input_data.kwargs["biasOptional"],
-                                                          input_data.kwargs["cacheModeOptional"])
-
+        qout, kout, vout, k_cache_npu, v_cache_npu = drqk(
+            input_data.kwargs["x"],
+            input_data.kwargs["cos"],
+            input_data.kwargs["sin"],
+            input_data.kwargs["kCacheRef"],
+            input_data.kwargs["vCacheRef"],
+            input_data.kwargs["indices"],
+            input_data.kwargs["scaleK"],
+            input_data.kwargs["scaleV"],
+            input_data.kwargs["sizeSplits"],
+            input_data.kwargs["offsetKOptional"],
+            input_data.kwargs["offsetVOptional"],
+            input_data.kwargs["weightScaleOptional"],
+            input_data.kwargs["activationScaleOptional"],
+            input_data.kwargs["biasOptional"],
+            input_data.kwargs["cacheModeOptional"],
+        )
 
         return qout, kout, vout
 
     def init_by_input_data(self, input_data: InputDataset):
         if input_data.kwargs["cacheModeOptional"] == "page":
             indices_shape = input_data.kwargs["indices"].shape[0]
-            high = input_data.kwargs["vCacheRef"].shape[0]*input_data.kwargs["vCacheRef"].shape[1]
+            high = (
+                input_data.kwargs["vCacheRef"].shape[0]
+                * input_data.kwargs["vCacheRef"].shape[1]
+            )
             indices = torch.randint(low=0, high=high, size=(high,)).to(torch.int32)
             indices = torch.argsort(indices).to(torch.int32)
             indices = indices[:indices_shape]

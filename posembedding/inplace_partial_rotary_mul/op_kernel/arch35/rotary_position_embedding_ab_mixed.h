@@ -25,7 +25,7 @@ class RotaryPositionEmbeddingABMixed {
 public:
     __aicore__ inline RotaryPositionEmbeddingABMixed(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y, GM_ADDR workspace,
-                                const InplacePartialRopeRegbaseTilingData *tilingData, TPipe *pipe);
+                                const InplacePartialRopeRegbaseTilingData* tilingData, TPipe* pipe);
     __aicore__ inline void Process();
 
 private:
@@ -33,7 +33,7 @@ private:
                                        int64_t ubIdx, int64_t bsCount, int64_t nCount);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> xInQueue_;
     TQue<QuePosition::VECIN, 1> cosInQueue_;
     TQue<QuePosition::VECIN, 1> sinInQueue_;
@@ -43,7 +43,7 @@ private:
     GlobalTensor<float> cosGm_;
     GlobalTensor<float> sinGm_;
     GlobalTensor<TX> yGm_;
-    const InplacePartialRopeRegbaseTilingData *tilingData_;
+    const InplacePartialRopeRegbaseTilingData* tilingData_;
     DataCopyPadExtParams<TX> padParams_ = {false, 0, 0, static_cast<TX>(0)};
     DataCopyPadExtParams<float> padParamsFloat_ = {false, 0, 0, 0};
     uint8_t DB_FLAG = 2;
@@ -58,8 +58,8 @@ private:
 template <typename TX>
 __aicore__ inline void RotaryPositionEmbeddingABMixed<TX>::Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
                                                                 GM_ADDR workspace,
-                                                                const InplacePartialRopeRegbaseTilingData *tilingData,
-                                                                TPipe *pipe)
+                                                                const InplacePartialRopeRegbaseTilingData* tilingData,
+                                                                TPipe* pipe)
 {
     pipe_ = pipe;
     tilingData_ = tilingData;
@@ -74,10 +74,10 @@ __aicore__ inline void RotaryPositionEmbeddingABMixed<TX>::Init(GM_ADDR x, GM_AD
     int64_t offset = blockDimBS * tilingData_->blockFactorBS * tilingData_->D;
     int64_t xOffset =
         offset * tilingData_->N + blockDimN * tilingData_->blockFactorN * tilingData_->D + tilingData_->sliceStart;
-    this->cosGm_.SetGlobalBuffer((__gm__ float *)cos + cosOffset);
-    this->sinGm_.SetGlobalBuffer((__gm__ float *)sin + cosOffset);
-    this->xGm_.SetGlobalBuffer((__gm__ TX *)x + xOffset);
-    this->yGm_.SetGlobalBuffer((__gm__ TX *)y + xOffset);
+    this->cosGm_.SetGlobalBuffer((__gm__ float*)cos + cosOffset);
+    this->sinGm_.SetGlobalBuffer((__gm__ float*)sin + cosOffset);
+    this->xGm_.SetGlobalBuffer((__gm__ TX*)x + xOffset);
+    this->yGm_.SetGlobalBuffer((__gm__ TX*)y + xOffset);
 
     sliceAlignTX_ =
         ops::CeilDiv(tilingData_->sliceLength * sizeof(TX), GetUbBlockSize()) * GetUbBlockSize() / sizeof(TX);

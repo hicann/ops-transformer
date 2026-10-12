@@ -76,7 +76,7 @@ TEST_F(l2_norm_rope_concat, Ascend910B2_norm_rope_concat_fp32)
                   OUTPUT(queryOutput, keyOutput, valueOutput, normQueryMean, normQueryRstd, normKeyMean, normKeyRstd,
                          normAddedQueryMean, normAddedQueryRstd, normAddedKeyMean, normAddedKeyRstd));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }

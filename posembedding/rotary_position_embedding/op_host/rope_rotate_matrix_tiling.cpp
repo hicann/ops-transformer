@@ -97,11 +97,14 @@ __attribute__((always_inline)) inline uint64_t GetBytePerData(uint64_t dtype)
     return BYTE_PER_DATA_2;
 }
 
-__attribute__((always_inline)) inline uint64_t GetTilingDtype(const ge::DataType &dtype)
+__attribute__((always_inline)) inline uint64_t GetTilingDtype(const ge::DataType& dtype)
 {
-    if (dtype == ge::DT_FLOAT) return TILING_DTYPE_FP32;
-    if (dtype == ge::DT_FLOAT16) return TILING_DTYPE_FP16;
-    if (dtype == ge::DT_BF16) return TILING_DTYPE_BF16;
+    if (dtype == ge::DT_FLOAT)
+        return TILING_DTYPE_FP32;
+    if (dtype == ge::DT_FLOAT16)
+        return TILING_DTYPE_FP16;
+    if (dtype == ge::DT_BF16)
+        return TILING_DTYPE_BF16;
     return TILING_DTYPE_UNKNOWN;
 }
 
@@ -115,30 +118,32 @@ namespace optiling {
 using namespace Ops::Base;
 class RotateMatrixTiling {
 public:
-    explicit RotateMatrixTiling(gert::TilingContext *tilingContext) : context(tilingContext) {};
+    explicit RotateMatrixTiling(gert::TilingContext* tilingContext)
+        : context(tilingContext) {};
     uint64_t coreNum = 0;
     size_t usrWorkspaceSize = 0;
     uint64_t tilingDtype = TILING_DTYPE_UNKNOWN;
     uint64_t tilingKey = TILING_KEY_PREFIX;
     RotaryPositionEmbeddingTilingData tiling;
-    RotateMatrixParams &tilingData_ = tiling.rotateMatrixParams;
+    RotateMatrixParams& tilingData_ = tiling.rotateMatrixParams;
     ge::graphStatus DoRotateMatrixTiling();
+
 private:
     uint64_t ubSize;
     uint64_t l1Size;
     uint64_t l0CSize;
-    gert::TilingContext *context = nullptr;
+    gert::TilingContext* context = nullptr;
     matmul_tiling::MultiCoreMatmulTiling mm_;
     inline void PrintTilingParams();
     inline void GetAlignedInfo(const ge::DataType inputDtype, uint64_t dLength);
-    inline void ChooseTilingMode(const gert::Shape &xShape, const gert::Shape &rShape);
+    inline void ChooseTilingMode(const gert::Shape& xShape, const gert::Shape& rShape);
     ge::graphStatus CheckShape();
     ge::graphStatus CheckDtype();
     ge::graphStatus CheckMode();
     ge::graphStatus GetDimLen();
     ge::graphStatus MatmulTilingProcess();
-    ge::graphStatus CheckShapeSupport(const gert::Shape &xShape, const gert::Shape &cosShape,
-                                      const gert::Shape &sinShape, const gert::Shape &rotateShape, uint64_t dLength);
+    ge::graphStatus CheckShapeSupport(const gert::Shape& xShape, const gert::Shape& cosShape,
+                                      const gert::Shape& sinShape, const gert::Shape& rotateShape, uint64_t dLength);
 };
 
 inline void RotateMatrixTiling::PrintTilingParams()
@@ -162,7 +167,7 @@ inline void RotateMatrixTiling::PrintTilingParams()
     OP_LOGD(nodeName, ">>> cosSinThirdDim:      %ld", tilingData_.get_cosSinThirdDim());
 }
 
-inline void RotateMatrixTiling::ChooseTilingMode(const gert::Shape &xShape, const gert::Shape &rShape)
+inline void RotateMatrixTiling::ChooseTilingMode(const gert::Shape& xShape, const gert::Shape& rShape)
 {
     uint64_t xFirstDim = 0;
     uint64_t xSecondDim = 0;
@@ -179,74 +184,65 @@ inline void RotateMatrixTiling::ChooseTilingMode(const gert::Shape &xShape, cons
     if (xFirstDim == rFirstDim && xSecondDim == rSecondDim && xThirdDim == rThirdDim) {
         OP_LOGD(context, "Rotate layout: NO_BROADCAST");
         tilingData_.set_tilingMode(TILING_MODE_NO_BROADCAST);
-    }
-    else if (rFirstDim == 1 && rSecondDim == 1 && xThirdDim == rThirdDim) {
+    } else if (rFirstDim == 1 && rSecondDim == 1 && xThirdDim == rThirdDim) {
         OP_LOGD(context, "Rotate layout: x:BNSD r:11SD");
         tilingData_.set_tilingMode(TILING_MODE_BNSD_BROADCAST_TWODIM);
-    }
-    else if (rFirstDim == 1 && rThirdDim == 1 && xSecondDim == rSecondDim) {
+    } else if (rFirstDim == 1 && rThirdDim == 1 && xSecondDim == rSecondDim) {
         OP_LOGD(context, "Rotate layout: x:BSND r:1S1D");
         tilingData_.set_tilingMode(TILING_MODE_BSND_BROADCAST_TWODIM);
-    }
-    else if (rSecondDim == 1 && rThirdDim == 1 && xFirstDim == rFirstDim) {
+    } else if (rSecondDim == 1 && rThirdDim == 1 && xFirstDim == rFirstDim) {
         OP_LOGD(context, "Rotate layout: x:SBND r:S11D");
         tilingData_.set_tilingMode(TILING_MODE_SBND_BROADCAST_TWODIM);
-    }
-    else if (xFirstDim == rFirstDim && rSecondDim == 1 && xThirdDim == rThirdDim) {
+    } else if (xFirstDim == rFirstDim && rSecondDim == 1 && xThirdDim == rThirdDim) {
         OP_LOGD(context, "Rotate layout: x:BNSD r:B1SD");
         tilingData_.set_tilingMode(TILING_MODE_BNSD_BROADCAST_ONEDIM);
-    }
-    else if (xFirstDim == rFirstDim && xSecondDim == rSecondDim && rThirdDim == 1) {
+    } else if (xFirstDim == rFirstDim && xSecondDim == rSecondDim && rThirdDim == 1) {
         OP_LOGD(context, "Rotate layout: x:BSND r:BS1D or x:SBND r:SB1D");
         tilingData_.set_tilingMode(TILING_MODE_BSND_SBND_BROADCAST_ONEDIM);
-    }
-    else if (rFirstDim == 1 && xSecondDim == rSecondDim && xThirdDim == rThirdDim) {
+    } else if (rFirstDim == 1 && xSecondDim == rSecondDim && xThirdDim == rThirdDim) {
         OP_LOGD(context, "Rotate layout: x:BSND r:1SND or x:BNSD r:1NSD");
         tilingData_.set_tilingMode(TILING_MODE_BNSD_BSND_BROADCAST_ONEDIM);
-    }
-    else {
+    } else {
         tilingData_.set_tilingMode(TILING_MODE_UNKNOWN);
     }
 }
 
-ge::graphStatus RotateMatrixTiling::CheckShapeSupport(const gert::Shape &xShape, const gert::Shape &cosShape,
-                                                      const gert::Shape &sinShape, const gert::Shape &rotateShape,
+ge::graphStatus RotateMatrixTiling::CheckShapeSupport(const gert::Shape& xShape, const gert::Shape& cosShape,
+                                                      const gert::Shape& sinShape, const gert::Shape& rotateShape,
                                                       uint64_t dLength)
 {
     if (xShape.GetDimNum() != DIM_NUM || cosShape.GetDimNum() != DIM_NUM || sinShape.GetDimNum() != DIM_NUM) {
-        std::string dimNumMsg = std::to_string(xShape.GetDimNum()) + ", " +
-                std::to_string(cosShape.GetDimNum()) + " and " + std::to_string(sinShape.GetDimNum());
-        std::string reasonMsg = "The shape dims of input x, cos and sin must be " +
-            std::to_string(DIM_NUM);
-        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context->GetNodeName(), "x, cos and sin",
-            dimNumMsg.c_str(), reasonMsg.c_str());
+        std::string dimNumMsg = std::to_string(xShape.GetDimNum()) + ", " + std::to_string(cosShape.GetDimNum()) +
+                                " and " + std::to_string(sinShape.GetDimNum());
+        std::string reasonMsg = "The shape dims of input x, cos and sin must be " + std::to_string(DIM_NUM);
+        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context->GetNodeName(), "x, cos and sin", dimNumMsg.c_str(),
+                                                  reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
 
     if (rotateShape.GetDimNum() != DIM_NUM_TWO) {
         std::string dimNumStr = std::to_string(rotateShape.GetDimNum());
-        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "rotate",
-            dimNumStr.c_str(), "2D");
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "rotate", dimNumStr.c_str(), "2D");
         return ge::GRAPH_FAILED;
     }
     if (dLength > D_LENGTH_LIMIT) {
-        std::string reasonMsg = "The D-dimension of input x must be less than or equal to " + std::to_string(D_LENGTH_LIMIT) +
-            ", where D is the last axis";
+        std::string reasonMsg = "The D-dimension of input x must be less than or equal to " +
+                                std::to_string(D_LENGTH_LIMIT) + ", where D is the last axis";
         std::string xShapeStr = ToString(xShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", xShapeStr.c_str(),
-            reasonMsg.c_str());
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", xShapeStr.c_str(), reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
     if (GetRem(dLength, TWO) != 0) {
         std::string xShapeStr = ToString(xShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", xShapeStr.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context->GetNodeName(), "x", xShapeStr.c_str(),
             "The D-dimension of input x must be an even number, where D is the last axis");
         return ge::GRAPH_FAILED;
     }
     if (cosShape != sinShape) {
         std::string shapeMsg = ToString(cosShape) + " and " + ToString(sinShape);
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "cos and sin", shapeMsg.c_str(),
-            "The shapes of input cos and input sin must be the same");
+                                               "The shapes of input cos and input sin must be the same");
         return ge::GRAPH_FAILED;
     }
     uint64_t cosDLength = static_cast<uint64_t>(cosShape.GetDim(DIM_FOURTH));
@@ -254,37 +250,40 @@ ge::graphStatus RotateMatrixTiling::CheckShapeSupport(const gert::Shape &xShape,
     uint64_t rotateSecondLength = static_cast<uint64_t>(rotateShape.GetDim(DIM_SECOND));
     if (rotateFirstLength != rotateSecondLength) {
         std::string rotateShapeStr = ToString(rotateShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "rotate", rotateShapeStr.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context->GetNodeName(), "rotate", rotateShapeStr.c_str(),
             "The 0th axis of input rotate must be equal to the 1st axis of input rotate");
         return ge::GRAPH_FAILED;
     }
 
     if (cosDLength != dLength || rotateSecondLength != dLength) {
         std::string shapeMsg = ToString(xShape) + ", " + ToString(cosShape) + " and " + ToString(rotateShape);
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "x, cos and rotate", shapeMsg.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            context->GetNodeName(), "x, cos and rotate", shapeMsg.c_str(),
             "The last axis of input cos and rotate must be equal to the last axis of input x");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus RotateMatrixTiling::CheckShape(){
+ge::graphStatus RotateMatrixTiling::CheckShape()
+{
     auto inputXShapePtr = context->GetInputShape(INDEX_INPUT_X);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputXShapePtr);
-    const gert::Shape &xShape = inputXShapePtr->GetStorageShape();
+    const gert::Shape& xShape = inputXShapePtr->GetStorageShape();
 
     auto inputCosShapePtr = context->GetInputShape(INDEX_INPUT_COS);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputCosShapePtr);
-    const gert::Shape &cosShape = inputCosShapePtr->GetStorageShape();
-    
+    const gert::Shape& cosShape = inputCosShapePtr->GetStorageShape();
+
     auto inputSinShapePtr = context->GetInputShape(INDEX_INPUT_SIN);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputSinShapePtr);
-    const gert::Shape &sinShape = inputSinShapePtr->GetStorageShape();
+    const gert::Shape& sinShape = inputSinShapePtr->GetStorageShape();
 
     auto inputRotateShapePtr = context->GetInputShape(INDEX_INPUT_ROTATE);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputRotateShapePtr);
-    const gert::Shape &rotateShape = inputRotateShapePtr->GetStorageShape();
-    
+    const gert::Shape& rotateShape = inputRotateShapePtr->GetStorageShape();
+
     uint64_t gmLength = static_cast<uint64_t>(xShape.GetShapeSize());
     uint64_t dLength = static_cast<uint64_t>(xShape.GetDim(DIM_FOURTH));
     tilingData_.set_gmLength(gmLength);
@@ -294,7 +293,8 @@ ge::graphStatus RotateMatrixTiling::CheckShape(){
     return shapeCheckRes;
 }
 
-ge::graphStatus RotateMatrixTiling::CheckDtype(){
+ge::graphStatus RotateMatrixTiling::CheckDtype()
+{
     auto inputInfoPtr = context->GetInputDesc(INDEX_INPUT_X);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputInfoPtr);
     auto cosInfoPtr = context->GetInputDesc(INDEX_INPUT_COS);
@@ -309,10 +309,10 @@ ge::graphStatus RotateMatrixTiling::CheckDtype(){
     const ge::DataType rotateDtype = rotateInfoPtr->GetDataType();
 
     if (inputDtype != cosDtype || inputDtype != sinDtype || inputDtype != rotateDtype) {
-        std::string dtypeMsg = ToString(inputDtype) + ", " + ToString(cosDtype) + ", " +
-            ToString(sinDtype) + " and " + ToString(rotateDtype);
+        std::string dtypeMsg = ToString(inputDtype) + ", " + ToString(cosDtype) + ", " + ToString(sinDtype) + " and " +
+                               ToString(rotateDtype);
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context->GetNodeName(), "x, cos, sin and rotate", dtypeMsg.c_str(),
-            "The dtypes of input x, cos, sin and rotate must be the same");
+                                               "The dtypes of input x, cos, sin and rotate must be the same");
         return ge::GRAPH_FAILED;
     }
 
@@ -328,7 +328,7 @@ ge::graphStatus RotateMatrixTiling::CheckMode()
 {
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const uint32_t *modePtr = attrs->GetAttrPointer<uint32_t>(INDEX_ATTR_MODE);
+    const uint32_t* modePtr = attrs->GetAttrPointer<uint32_t>(INDEX_ATTR_MODE);
     OP_CHECK_NULL_WITH_CONTEXT(context, modePtr);
     auto modeValue = *modePtr;
     uint64_t tilingMode = static_cast<uint64_t>(tilingData_.get_tilingMode());
@@ -339,20 +339,19 @@ ge::graphStatus RotateMatrixTiling::CheckMode()
     uint64_t rFirstDim = static_cast<uint64_t>(tilingData_.get_cosSinFirstDim());
     uint64_t rSecondDim = static_cast<uint64_t>(tilingData_.get_cosSinSecondDim());
     uint64_t rThirdDim = static_cast<uint64_t>(tilingData_.get_cosSinThirdDim());
-    OP_CHECK_IF((modeValue == MODE_ROTATE_INTERLEAVED) && 
-                !(
-                    (rFirstDim == 1 && rSecondDim == 1 && xThirdDim == rThirdDim) ||
-                    (rFirstDim == 1 && rThirdDim == 1 && xSecondDim == rSecondDim) ||
-                    (rSecondDim == 1 && rThirdDim == 1 && xFirstDim == rFirstDim)
-                ),
-                OP_LOGE(context, "Layout format invalid for interleave mode."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (modeValue == MODE_ROTATE_INTERLEAVED) && !((rFirstDim == 1 && rSecondDim == 1 && xThirdDim == rThirdDim) ||
+                                                    (rFirstDim == 1 && rThirdDim == 1 && xSecondDim == rSecondDim) ||
+                                                    (rSecondDim == 1 && rThirdDim == 1 && xFirstDim == rFirstDim)),
+        OP_LOGE(context, "Layout format invalid for interleave mode."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus RotateMatrixTiling::GetDimLen(){
+ge::graphStatus RotateMatrixTiling::GetDimLen()
+{
     auto inputXShapePtr = context->GetInputShape(INDEX_INPUT_X);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputXShapePtr);
-    const gert::Shape &xShape = inputXShapePtr->GetStorageShape();
+    const gert::Shape& xShape = inputXShapePtr->GetStorageShape();
     uint64_t xFirstDim = static_cast<uint64_t>(xShape.GetDim(DIM_FIRST));
     uint64_t xSecondDim = static_cast<uint64_t>(xShape.GetDim(DIM_SECOND));
     uint64_t xThirdDim = static_cast<uint64_t>(xShape.GetDim(DIM_THIRD));
@@ -362,7 +361,7 @@ ge::graphStatus RotateMatrixTiling::GetDimLen(){
 
     auto inputCosShapePtr = context->GetInputShape(INDEX_INPUT_COS);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputCosShapePtr);
-    const gert::Shape &cosShape = inputCosShapePtr->GetStorageShape();
+    const gert::Shape& cosShape = inputCosShapePtr->GetStorageShape();
     uint64_t cosSinFirstDim = static_cast<uint64_t>(cosShape.GetDim(DIM_FIRST));
     uint64_t cosSinSecondDim = static_cast<uint64_t>(cosShape.GetDim(DIM_SECOND));
     uint64_t cosSinThirdDim = static_cast<uint64_t>(cosShape.GetDim(DIM_THIRD));
@@ -388,7 +387,8 @@ ge::graphStatus RotateMatrixTiling::GetDimLen(){
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus RotateMatrixTiling::MatmulTilingProcess(){
+ge::graphStatus RotateMatrixTiling::MatmulTilingProcess()
+{
     uint64_t baseM = 0;
     uint64_t m = 0;
     uint64_t blockNumM = 0;
@@ -399,7 +399,9 @@ ge::graphStatus RotateMatrixTiling::MatmulTilingProcess(){
         m = tilingData_.get_xThirdDim();
         blockNumM = GetCeilDiv(m, baseM);
     } else {
-        baseM = tilingData_.get_xFirstDim() * tilingData_.get_xSecondDim() * tilingData_.get_xThirdDim() < BASE_M ? tilingData_.get_xFirstDim() * tilingData_.get_xSecondDim() * tilingData_.get_xThirdDim() : BASE_M;
+        baseM = tilingData_.get_xFirstDim() * tilingData_.get_xSecondDim() * tilingData_.get_xThirdDim() < BASE_M ?
+                    tilingData_.get_xFirstDim() * tilingData_.get_xSecondDim() * tilingData_.get_xThirdDim() :
+                    BASE_M;
         m = tilingData_.get_xFirstDim() * tilingData_.get_xSecondDim() * tilingData_.get_xThirdDim();
         blockNumM = GetCeilDiv(m, baseM);
     }
@@ -410,15 +412,14 @@ ge::graphStatus RotateMatrixTiling::MatmulTilingProcess(){
 
     auto inputXShapePtr = context->GetInputShape(INDEX_INPUT_X);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputXShapePtr);
-    const gert::Shape &xShape = inputXShapePtr->GetStorageShape();
+    const gert::Shape& xShape = inputXShapePtr->GetStorageShape();
 
     if (dLen == 0 || GetRem(gmLen, dLen) != 0) {
         std::string reasonMsg = "The D-dimension of input x can not be 0 "
-            "and the shape size of input x must be divisible by its D axis, "
-            "where D is the last dim";
+                                "and the shape size of input x must be divisible by its D axis, "
+                                "where D is the last dim";
         std::string xShapeStr = ToString(xShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", xShapeStr.c_str(),
-            reasonMsg.c_str());
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", xShapeStr.c_str(), reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -439,16 +440,22 @@ ge::graphStatus RotateMatrixTiling::MatmulTilingProcess(){
     ge::DataType inputDtype = inputInfoPtr->GetDataType();
     tilingDtype = GetTilingDtype(inputDtype);
     if (tilingDtype == TILING_DTYPE_BF16) {
-        mm_.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_BFLOAT16, false);
-        mm_.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_BFLOAT16, false);
+        mm_.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_BFLOAT16,
+                     false);
+        mm_.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_BFLOAT16,
+                     false);
         mm_.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT);
     } else if (tilingDtype == TILING_DTYPE_FP16) {
-        mm_.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT16, false);
-        mm_.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT16, false);
+        mm_.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT16,
+                     false);
+        mm_.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT16,
+                     false);
         mm_.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT);
     } else if (tilingDtype == TILING_DTYPE_FP32) {
-        mm_.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT, false);
-        mm_.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT, false);
+        mm_.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT,
+                     false);
+        mm_.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT,
+                     false);
         mm_.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT);
     } else {
         OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "x", ToString(inputDtype).c_str(), "FLOAT, BF16 or FLOAT16");
@@ -461,8 +468,10 @@ ge::graphStatus RotateMatrixTiling::MatmulTilingProcess(){
         mm_.SetShape(tilingData_.get_xThirdDim(), tilingData_.get_dLength(), tilingData_.get_dLength());
         mm_.SetOrgShape(tilingData_.get_xThirdDim(), tilingData_.get_dLength(), tilingData_.get_dLength());
     } else {
-        mm_.SetShape(tilingData_.get_xFirstDim() * tilingData_.get_xSecondDim() * tilingData_.get_xThirdDim(), tilingData_.get_dLength(), tilingData_.get_dLength());
-        mm_.SetOrgShape(tilingData_.get_xFirstDim() * tilingData_.get_xSecondDim() * tilingData_.get_xThirdDim(), tilingData_.get_dLength(), tilingData_.get_dLength());
+        mm_.SetShape(tilingData_.get_xFirstDim() * tilingData_.get_xSecondDim() * tilingData_.get_xThirdDim(),
+                     tilingData_.get_dLength(), tilingData_.get_dLength());
+        mm_.SetOrgShape(tilingData_.get_xFirstDim() * tilingData_.get_xSecondDim() * tilingData_.get_xThirdDim(),
+                        tilingData_.get_dLength(), tilingData_.get_dLength());
     }
     mm_.SetFixSplit(baseM, baseN, baseK);
     if (mm_.GetTiling(tilingData_.matmulTiling) == -1) {
@@ -527,13 +536,13 @@ ge::graphStatus RopeRotateMatrixTilingClass::DoOpTiling()
     context_->SetTilingKey(rotateTiling.tilingKey);
     context_->SetBlockDim(rotateTiling.coreNum);
     rotateTiling.tiling.SaveToBuffer(context_->GetRawTilingData()->GetData(),
-                                         context_->GetRawTilingData()->GetCapacity());
+                                     context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(rotateTiling.tiling.GetDataSize());
-    
+
     size_t usrWorkspaceSize = rotateTiling.coreNum * BASE_M * BASE_N * CV_PARALL_NUM * BYTE_PER_DATA_4;
-    auto ascendcPlatform = platform_ascendc:: PlatformAscendC(context_->GetPlatformInfo());
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
     uint32_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     currentWorkspace[0] = usrWorkspaceSize + sysWorkspaceSize;
 
     OP_LOGD(context_->GetNodeName(), "Rotate tiling end.");

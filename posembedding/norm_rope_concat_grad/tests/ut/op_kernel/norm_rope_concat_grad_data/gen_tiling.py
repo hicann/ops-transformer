@@ -11,7 +11,32 @@
 import numpy as np
 import sys
 
-case_info = {"case001": [0, 2, 4, 8, 8, 16, 32, 32, 20, 40, 40, 8, 1, 32, 32, 64, 64, 32, 64, 32, 4359484440219993516]}
+case_info = {
+    "case001": [
+        0,
+        2,
+        4,
+        8,
+        8,
+        16,
+        32,
+        32,
+        20,
+        40,
+        40,
+        8,
+        1,
+        32,
+        32,
+        64,
+        64,
+        32,
+        64,
+        32,
+        4359484440219993516,
+    ]
+}
+
 
 def main():
     print("111=", sys.argv[1])
@@ -20,6 +45,6 @@ def main():
     tiling_file = open("tiling.bin", "wb")
     base_params.tofile(tiling_file)
 
-if __name__ == '__main__':
-    main()
 
+if __name__ == "__main__":
+    main()

@@ -24,8 +24,7 @@
 
 using namespace std;
 
-class QkvRmsNormRopeCache : public testing::Test
-{
+class QkvRmsNormRopeCache : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -38,7 +37,8 @@ protected:
     }
 };
 
-std::vector<int64_t> ToString(const gert::Shape& shape) {
+std::vector<int64_t> ToString(const gert::Shape& shape)
+{
     size_t shape_size = shape.GetDimNum();
     std::vector<int64_t> shape_vec(shape_size, 0);
     for (size_t i = 0; i < shape_size; i++) {
@@ -74,8 +74,12 @@ TEST_F(QkvRmsNormRopeCache, QkvRmsNormRopeCache_infershapeA)
             {{{batch_size * seq_len, dim}, {batch_size * seq_len, dim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{batch_size * seq_len}, {batch_size * seq_len}}, ge::DT_INT64, ge::FORMAT_ND},
             {{{batch_size * seq_len, Nq * dim}, {batch_size * seq_len, Nq * dim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{block_num, Nk * dim / 32, block_size, 32}, {block_num, Nk * dim / 32, block_size, 32}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{block_num, Nv * dim / 32, block_size, 32}, {block_num, Nv * dim / 32, block_size, 32}}, ge::DT_INT8, ge::FORMAT_ND},
+            {{{block_num, Nk * dim / 32, block_size, 32}, {block_num, Nk * dim / 32, block_size, 32}},
+             ge::DT_INT8,
+             ge::FORMAT_ND},
+            {{{block_num, Nv * dim / 32, block_size, 32}, {block_num, Nv * dim / 32, block_size, 32}},
+             ge::DT_INT8,
+             ge::FORMAT_ND},
             {{{Nk, dim}, {Nk, dim}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{Nv, dim}, {Nv, dim}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
@@ -104,8 +108,8 @@ TEST_F(QkvRmsNormRopeCache, QkvRmsNormRopeCache_infershapeA)
     std::vector<int64_t> expectedoutput4 = {batch_size * seq_len, Nk * dim};
     std::vector<int64_t> expectedoutput5 = {batch_size * seq_len, Nv * dim};
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        expectedoutput0, expectedoutput1, expectedoutput2, expectedoutput3, expectedoutput4, expectedoutput5};
+    std::vector<std::vector<int64_t>> expectOutputShape = {expectedoutput0, expectedoutput1, expectedoutput2,
+                                                           expectedoutput3, expectedoutput4, expectedoutput5};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -136,8 +140,12 @@ TEST_F(QkvRmsNormRopeCache, QkvRmsNormRopeCache_infershapeB)
             {{{batch_size * seq_len, dim}, {batch_size * seq_len, dim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{batch_size * seq_len}, {batch_size * seq_len}}, ge::DT_INT64, ge::FORMAT_ND},
             {{{batch_size * seq_len, Nq * dim}, {batch_size * seq_len, Nq * dim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{block_num, Nk * dim / 32, block_size, 32}, {block_num, Nk * dim / 32, block_size, 32}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{block_num, Nv * dim / 32, block_size, 32}, {block_num, Nv * dim / 32, block_size, 32}}, ge::DT_INT8, ge::FORMAT_ND},
+            {{{block_num, Nk * dim / 32, block_size, 32}, {block_num, Nk * dim / 32, block_size, 32}},
+             ge::DT_INT8,
+             ge::FORMAT_ND},
+            {{{block_num, Nv * dim / 32, block_size, 32}, {block_num, Nv * dim / 32, block_size, 32}},
+             ge::DT_INT8,
+             ge::FORMAT_ND},
             {{{Nk, dim}, {Nk, dim}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{Nv, dim}, {Nv, dim}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
@@ -166,8 +174,8 @@ TEST_F(QkvRmsNormRopeCache, QkvRmsNormRopeCache_infershapeB)
     std::vector<int64_t> expectedoutput4 = {batch_size * seq_len, Nk * dim};
     std::vector<int64_t> expectedoutput5 = {batch_size * seq_len, Nv * dim};
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        expectedoutput0, expectedoutput1, expectedoutput2, expectedoutput3, expectedoutput4, expectedoutput5};
+    std::vector<std::vector<int64_t>> expectOutputShape = {expectedoutput0, expectedoutput1, expectedoutput2,
+                                                           expectedoutput3, expectedoutput4, expectedoutput5};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -198,8 +206,12 @@ TEST_F(QkvRmsNormRopeCache, QkvRmsNormRopeCache_infershapeC)
             {{{batch_size * seq_len, dim}, {batch_size * seq_len, dim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{batch_size * seq_len}, {batch_size * seq_len}}, ge::DT_INT64, ge::FORMAT_ND},
             {{{batch_size * seq_len, Nq * dim}, {batch_size * seq_len, Nq * dim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{block_num, Nk * dim / 32, block_size, 32}, {block_num, Nk * dim / 32, block_size, 32}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{block_num, Nv * dim / 32, block_size, 32}, {block_num, Nv * dim / 32, block_size, 32}}, ge::DT_INT8, ge::FORMAT_ND},
+            {{{block_num, Nk * dim / 32, block_size, 32}, {block_num, Nk * dim / 32, block_size, 32}},
+             ge::DT_INT8,
+             ge::FORMAT_ND},
+            {{{block_num, Nv * dim / 32, block_size, 32}, {block_num, Nv * dim / 32, block_size, 32}},
+             ge::DT_INT8,
+             ge::FORMAT_ND},
             {{{Nk, dim}, {Nk, dim}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{Nv, dim}, {Nv, dim}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
@@ -228,8 +240,8 @@ TEST_F(QkvRmsNormRopeCache, QkvRmsNormRopeCache_infershapeC)
     std::vector<int64_t> expectedoutput4 = {batch_size * seq_len, Nk * dim};
     std::vector<int64_t> expectedoutput5 = {batch_size * seq_len, Nv * dim};
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        expectedoutput0, expectedoutput1, expectedoutput2, expectedoutput3, expectedoutput4, expectedoutput5};
+    std::vector<std::vector<int64_t>> expectOutputShape = {expectedoutput0, expectedoutput1, expectedoutput2,
+                                                           expectedoutput3, expectedoutput4, expectedoutput5};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -261,39 +273,38 @@ TEST_F(QkvRmsNormRopeCache, QkvRmsNormRopeCache_inferdtype_test1)
         vector<int64_t> qkv_size = {batch_size, seq_len, Nqkv, dim};
         vector<int64_t> head_nums = {Nq, Nk, Nv};
 
-        auto context_holder = gert::InferDataTypeContextFaker()
-                                .IrInputNum(13)
-                                .NodeIoNum(13, 6)
-                                .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeInputTd(3, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeInputTd(4, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeInputTd(5, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeInputTd(6, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeInputTd(7, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeInputTd(8, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeInputTd(11, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeInputTd(12, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeAttrs(
-                                    {{"qkv_size", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(qkv_size)},
-                                    {"head_nums", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(head_nums)},
-                                    {"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-06)},
-                                    {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>(cache_mode)},
-                                    {"is_output_qkv", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}})
-                                .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeOutputTd(4, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .NodeOutputTd(5, ge::FORMAT_ND, ge::FORMAT_ND)
-                                .InputDataTypes(
-                                    {&input_0, &input_0, &input_0, &input_0, &input_0, &input_1, &input_0, &input_3, &input_3,
-                                    &input_2, &input_2, &input_2, &input_2})
-                                .OutputDataTypes({&output_0, &output_1, &output_1, &output_0, &output_0, &output_0})
-                                .Build();
+        auto context_holder =
+            gert::InferDataTypeContextFaker()
+                .IrInputNum(13)
+                .NodeIoNum(13, 6)
+                .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(3, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(4, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(5, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(6, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(7, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(8, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(11, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(12, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeAttrs({{"qkv_size", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(qkv_size)},
+                            {"head_nums", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(head_nums)},
+                            {"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-06)},
+                            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>(cache_mode)},
+                            {"is_output_qkv", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}})
+                .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(4, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(5, ge::FORMAT_ND, ge::FORMAT_ND)
+                .InputDataTypes({&input_0, &input_0, &input_0, &input_0, &input_0, &input_1, &input_0, &input_3,
+                                 &input_3, &input_2, &input_2, &input_2, &input_2})
+                .OutputDataTypes({&output_0, &output_1, &output_1, &output_0, &output_0, &output_0})
+                .Build();
         auto context = context_holder.GetContext<gert::InferDataTypeContext>();
         EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
         ASSERT_NE(context, nullptr);
@@ -322,7 +333,7 @@ TEST_F(QkvRmsNormRopeCache, QkvRmsNormRopeCache_inferdtype_test2)
     int dim = 128;
     int block_num = 72;
     int block_size = 11898;
-    
+
     ge::DataType input_0 = ge::DT_FLOAT16;
     ge::DataType input_1 = ge::DT_INT64;
     ge::DataType input_2 = ge::DT_FLOAT;
@@ -334,39 +345,38 @@ TEST_F(QkvRmsNormRopeCache, QkvRmsNormRopeCache_inferdtype_test2)
     vector<int64_t> qkv_size = {batch_size, seq_len, Nqkv, dim};
     vector<int64_t> head_nums = {Nq, Nk, Nv};
 
-    auto context_holder = gert::InferDataTypeContextFaker()
-                              .IrInputNum(13)
-                              .NodeIoNum(13, 6)
-                              .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(3, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(4, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(5, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(6, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(7, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(8, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(11, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(12, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeAttrs(
-                                  {{"qkv_size", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(qkv_size)},
-                                   {"head_nums", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(head_nums)},
-                                   {"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-06)},
-                                   {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>(cache_mode)},
-                                   {"is_output_qkv", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}})
-                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(4, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(5, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .InputDataTypes(
-                                  {&input_0, &input_0, &input_0, &input_0, &input_0, &input_1, &input_0, &input_3, &input_3,
-                                   &input_2, &input_2, &input_2, &input_2})
-                              .OutputDataTypes({&output_0, &output_1, &output_1, &output_0, &output_0, &output_0})
-                              .Build();
+    auto context_holder =
+        gert::InferDataTypeContextFaker()
+            .IrInputNum(13)
+            .NodeIoNum(13, 6)
+            .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(3, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(4, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(5, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(6, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(7, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(8, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(11, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(12, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeAttrs({{"qkv_size", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(qkv_size)},
+                        {"head_nums", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(head_nums)},
+                        {"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-06)},
+                        {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>(cache_mode)},
+                        {"is_output_qkv", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}})
+            .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(4, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(5, ge::FORMAT_ND, ge::FORMAT_ND)
+            .InputDataTypes({&input_0, &input_0, &input_0, &input_0, &input_0, &input_1, &input_0, &input_3, &input_3,
+                             &input_2, &input_2, &input_2, &input_2})
+            .OutputDataTypes({&output_0, &output_1, &output_1, &output_0, &output_0, &output_0})
+            .Build();
     auto context = context_holder.GetContext<gert::InferDataTypeContext>();
     EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
     ASSERT_NE(context, nullptr);
@@ -394,7 +404,7 @@ TEST_F(QkvRmsNormRopeCache, QkvRmsNormRopeCache_inferdtype_test3)
     int dim = 128;
     int block_num = 72;
     int block_size = 11898;
-    
+
     ge::DataType input_0 = ge::DT_FLOAT16;
     ge::DataType input_1 = ge::DT_INT64;
     ge::DataType input_2 = ge::DT_FLOAT;
@@ -406,39 +416,38 @@ TEST_F(QkvRmsNormRopeCache, QkvRmsNormRopeCache_inferdtype_test3)
     vector<int64_t> qkv_size = {batch_size, seq_len, Nqkv, dim};
     vector<int64_t> head_nums = {Nq, Nk, Nv};
 
-    auto context_holder = gert::InferDataTypeContextFaker()
-                              .IrInputNum(13)
-                              .NodeIoNum(13, 6)
-                              .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(3, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(4, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(5, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(6, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(7, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(8, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(11, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeInputTd(12, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeAttrs(
-                                  {{"qkv_size", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(qkv_size)},
-                                   {"head_nums", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(head_nums)},
-                                   {"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-06)},
-                                   {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>(cache_mode)},
-                                   {"is_output_qkv", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}})
-                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(4, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .NodeOutputTd(5, ge::FORMAT_ND, ge::FORMAT_ND)
-                              .InputDataTypes(
-                                  {&input_0, &input_0, &input_0, &input_0, &input_0, &input_1, &input_0, &input_3, &input_3,
-                                   &input_2, &input_2, &input_2, &input_2})
-                              .OutputDataTypes({&output_0, &output_1, &output_1, &output_0, &output_0, &output_0})
-                              .Build();
+    auto context_holder =
+        gert::InferDataTypeContextFaker()
+            .IrInputNum(13)
+            .NodeIoNum(13, 6)
+            .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(3, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(4, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(5, ge::DT_INT64, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(6, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(7, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(8, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(9, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(10, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(11, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(12, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeAttrs({{"qkv_size", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(qkv_size)},
+                        {"head_nums", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(head_nums)},
+                        {"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-06)},
+                        {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>(cache_mode)},
+                        {"is_output_qkv", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}})
+            .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(4, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(5, ge::FORMAT_ND, ge::FORMAT_ND)
+            .InputDataTypes({&input_0, &input_0, &input_0, &input_0, &input_0, &input_1, &input_0, &input_3, &input_3,
+                             &input_2, &input_2, &input_2, &input_2})
+            .OutputDataTypes({&output_0, &output_1, &output_1, &output_0, &output_0, &output_0})
+            .Build();
     auto context = context_holder.GetContext<gert::InferDataTypeContext>();
     EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
     ASSERT_NE(context, nullptr);

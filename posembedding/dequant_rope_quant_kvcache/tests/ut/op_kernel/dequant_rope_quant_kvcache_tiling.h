@@ -45,7 +45,7 @@ struct DequantRopeQuantKvcacheTilingData {
     int64_t hasAS = 1;
 };
 
-inline void IDequantRopeQuantKvcacheTilingData(uint8_t *tiling, DequantRopeQuantKvcacheTilingData *const_data)
+inline void IDequantRopeQuantKvcacheTilingData(uint8_t* tiling, DequantRopeQuantKvcacheTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(DequantRopeQuantKvcacheTilingData));
 }

@@ -22,7 +22,7 @@ constexpr int64_t UB_COS_SIN_FACTOR = 2;
 
 class InplacePartialRotaryMulGradRegbaseTilingAAndB : public InplacePartialRotaryMulGradRegbaseTiling {
 public:
-    explicit InplacePartialRotaryMulGradRegbaseTilingAAndB(gert::TilingContext *context)
+    explicit InplacePartialRotaryMulGradRegbaseTilingAAndB(gert::TilingContext* context)
         : InplacePartialRotaryMulGradRegbaseTiling(context)
     {}
 
@@ -170,7 +170,7 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTilingAAndB::PostTiling()
     tilingDataAAndB_.set_sliceLength(sliceLength_);
     tilingDataAAndB_.set_dSplitCoef(dSplitCoef_);
 
-    size_t *userWorkspaceSize = context_->GetWorkspaceSizes(WORKSPACE_COUNT);
+    size_t* userWorkspaceSize = context_->GetWorkspaceSizes(WORKSPACE_COUNT);
     OP_CHECK_NULL_WITH_CONTEXT(context_, userWorkspaceSize);
     userWorkspaceSize[0] = RESERVED_WORKSPACE;
 

@@ -30,7 +30,7 @@ constexpr int64_t QUARTER_MODE_COEF = 4;
 
 class ApplyRotaryPosEmbTilingABAAndBA : public ApplyRotaryPosEmbRegbaseTilingBaseClass {
 public:
-    explicit ApplyRotaryPosEmbTilingABAAndBA(gert::TilingContext *context)
+    explicit ApplyRotaryPosEmbTilingABAAndBA(gert::TilingContext* context)
         : ApplyRotaryPosEmbRegbaseTilingBaseClass(context)
     {}
 
@@ -261,7 +261,7 @@ ge::graphStatus ApplyRotaryPosEmbTilingABAAndBA::PostTiling()
     uint64_t tilingKey = GetTilingKey();
     context_->SetTilingKey(tilingKey);
     context_->SetBlockDim(blockNumB_ * blockNumS_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = workspaceSize_;
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());

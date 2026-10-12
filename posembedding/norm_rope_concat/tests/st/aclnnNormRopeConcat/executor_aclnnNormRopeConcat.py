@@ -56,7 +56,7 @@ def layer_norm(x, weight=None, bias=None, eps=1e-5, is_training=True):
 
 def rms_norm(x, weight=None, eps=1e-5):
     x = x.float()
-    rms = torch.sqrt(torch.mean(x ** 2, dim=-1, keepdim=True) + eps)
+    rms = torch.sqrt(torch.mean(x**2, dim=-1, keepdim=True) + eps)
     out = x / rms
     if weight is not None:
         weight = weight.float()
@@ -109,8 +109,16 @@ class TorchNormRopeConcatApi(BaseApi):
         ek_rstd = torch.zeros(1, dtype=torch.float32, device=query.device)
 
         if norm_type == 2:
-            query, q_mean, q_rstd = layer_norm(query, norm_query_weight, norm_query_bias, eps=eps, is_training=is_training)
-            key, k_mean, k_rstd = layer_norm(key, norm_key_weight, norm_key_bias, eps=eps, is_training=is_training)
+            query, q_mean, q_rstd = layer_norm(
+                query,
+                norm_query_weight,
+                norm_query_bias,
+                eps=eps,
+                is_training=is_training,
+            )
+            key, k_mean, k_rstd = layer_norm(
+                key, norm_key_weight, norm_key_bias, eps=eps, is_training=is_training
+            )
         elif norm_type == 1:
             query, q_mean, q_rstd = layer_norm(query, eps=eps, is_training=is_training)
             key, k_mean, k_rstd = layer_norm(key, eps=eps, is_training=is_training)
@@ -121,11 +129,27 @@ class TorchNormRopeConcatApi(BaseApi):
             query = rms_norm(query, norm_query_weight, eps=eps)
             key = rms_norm(key, norm_key_weight, eps=eps)
         if added_norm_type == 2:
-            encoder_query, eq_mean, eq_rstd = layer_norm(encoder_query, norm_added_query_weight, norm_added_query_bias, eps=eps, is_training=is_training)
-            encoder_key, ek_mean, ek_rstd = layer_norm(encoder_key, norm_added_key_weight, norm_added_key_bias, eps=eps, is_training=is_training)
+            encoder_query, eq_mean, eq_rstd = layer_norm(
+                encoder_query,
+                norm_added_query_weight,
+                norm_added_query_bias,
+                eps=eps,
+                is_training=is_training,
+            )
+            encoder_key, ek_mean, ek_rstd = layer_norm(
+                encoder_key,
+                norm_added_key_weight,
+                norm_added_key_bias,
+                eps=eps,
+                is_training=is_training,
+            )
         elif added_norm_type == 1:
-            encoder_query, eq_mean, eq_rstd = layer_norm(encoder_query, eps=eps, is_training=is_training)
-            encoder_key, ek_mean, ek_rstd = layer_norm(encoder_key, eps=eps, is_training=is_training)
+            encoder_query, eq_mean, eq_rstd = layer_norm(
+                encoder_query, eps=eps, is_training=is_training
+            )
+            encoder_key, ek_mean, ek_rstd = layer_norm(
+                encoder_key, eps=eps, is_training=is_training
+            )
         elif added_norm_type == 3:
             encoder_query = rms_norm(encoder_query, eps=eps)
             encoder_key = rms_norm(encoder_key, eps=eps)
@@ -147,10 +171,26 @@ class TorchNormRopeConcatApi(BaseApi):
 
         rope_sin_shape = rope_sin.shape
         if rope_type != 0:
-            query_res[:, :, :rope_sin_shape[0]] = image_rotary_emb(query_res[:, :, :rope_sin_shape[0]], rope_sin, rope_cos, mode=rope_type)
-            key_res[:, :, :rope_sin_shape[0]] = image_rotary_emb(key_res[:, :, :rope_sin_shape[0]], rope_sin, rope_cos, mode=rope_type)
+            query_res[:, :, : rope_sin_shape[0]] = image_rotary_emb(
+                query_res[:, :, : rope_sin_shape[0]], rope_sin, rope_cos, mode=rope_type
+            )
+            key_res[:, :, : rope_sin_shape[0]] = image_rotary_emb(
+                key_res[:, :, : rope_sin_shape[0]], rope_sin, rope_cos, mode=rope_type
+            )
 
-        return query_res.to(origin_dtype), key_res.to(origin_dtype), value_res.to(origin_dtype), q_mean, q_rstd, k_mean, k_rstd, eq_mean, eq_rstd, ek_mean, ek_rstd
+        return (
+            query_res.to(origin_dtype),
+            key_res.to(origin_dtype),
+            value_res.to(origin_dtype),
+            q_mean,
+            q_rstd,
+            k_mean,
+            k_rstd,
+            eq_mean,
+            eq_rstd,
+            ek_mean,
+            ek_rstd,
+        )
 
 
 @register("aclnn_norm_rope_concat")

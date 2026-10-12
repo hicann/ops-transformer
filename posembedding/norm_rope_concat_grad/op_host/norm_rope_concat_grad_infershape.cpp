@@ -20,8 +20,8 @@
 using namespace ge;
 using namespace NormRopeConcatGrad;
 namespace ops {
-static ge::graphStatus CheckShape(gert::InferShapeContext *context, const gert::Shape *shape, int64_t batch, int64_t head,
-                                  int64_t dim, int64_t &seq)
+static ge::graphStatus CheckShape(gert::InferShapeContext* context, const gert::Shape* shape, int64_t batch,
+                                  int64_t head, int64_t dim, int64_t& seq)
 {
     if (shape->GetDimNum() != INPUT_DIM_NUM) {
         OP_LOGE(context, "Input must be 4D tensors(B, S, H, D).");
@@ -35,8 +35,8 @@ static ge::graphStatus CheckShape(gert::InferShapeContext *context, const gert::
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckTransposeShape(gert::InferShapeContext *context, const gert::Shape *shape, int64_t batch,
-                                           int64_t head, int64_t dim, int64_t &seq)
+static ge::graphStatus CheckTransposeShape(gert::InferShapeContext* context, const gert::Shape* shape, int64_t batch,
+                                           int64_t head, int64_t dim, int64_t& seq)
 {
     if (shape->GetDimNum() != INPUT_DIM_NUM) {
         OP_LOGE(context, "Input must be 4D tensors(B, S, H, D).");
@@ -50,7 +50,7 @@ static ge::graphStatus CheckTransposeShape(gert::InferShapeContext *context, con
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShape4NormRopeConcatGrad(gert::InferShapeContext *context)
+static ge::graphStatus InferShape4NormRopeConcatGrad(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("InferShape4NormRopeConcatGrad", "context is nullptr.");
@@ -58,27 +58,27 @@ static ge::graphStatus InferShape4NormRopeConcatGrad(gert::InferShapeContext *co
     }
     OP_LOGD(context, "Enter InferShape4NormRopeConcatGrad.");
 
-    const gert::Shape *gradQueryOutputShape =
+    const gert::Shape* gradQueryOutputShape =
         context->GetInputShape(static_cast<size_t>(InputIndexBackward::GRAD_QUERY_OUTPUT_INDEX));
-    const gert::Shape *gradKeyOutputShape =
+    const gert::Shape* gradKeyOutputShape =
         context->GetInputShape(static_cast<size_t>(InputIndexBackward::GRAD_KEY_OUTPUT_INDEX));
-    const gert::Shape *gradValueOutputShape =
+    const gert::Shape* gradValueOutputShape =
         context->GetInputShape(static_cast<size_t>(InputIndexBackward::GRAD_VALUE_OUTPUT_INDEX));
-    const gert::Shape *queryShape = context->GetInputShape(static_cast<size_t>(InputIndexBackward::QUERY_INDEX));
-    const gert::Shape *keyShape = context->GetInputShape(static_cast<size_t>(InputIndexBackward::KEY_INDEX));
+    const gert::Shape* queryShape = context->GetInputShape(static_cast<size_t>(InputIndexBackward::QUERY_INDEX));
+    const gert::Shape* keyShape = context->GetInputShape(static_cast<size_t>(InputIndexBackward::KEY_INDEX));
     OP_CHECK_NULL_WITH_CONTEXT(context, gradQueryOutputShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradKeyOutputShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradValueOutputShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    gert::Shape *gradQueryShape = context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_QUERY_INDEX));
-    gert::Shape *gradKeyShape = context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_KEY_INDEX));
-    gert::Shape *gradValueShape = context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_VALUE_INDEX));
-    gert::Shape *gradEncoderQueryShape =
+    gert::Shape* gradQueryShape = context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_QUERY_INDEX));
+    gert::Shape* gradKeyShape = context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_KEY_INDEX));
+    gert::Shape* gradValueShape = context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_VALUE_INDEX));
+    gert::Shape* gradEncoderQueryShape =
         context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_ENCODER_QUERY_INDEX));
-    gert::Shape *gradEncoderKeyShape =
+    gert::Shape* gradEncoderKeyShape =
         context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_ENCODER_KEY_INDEX));
-    gert::Shape *gradEncoderValueShape =
+    gert::Shape* gradEncoderValueShape =
         context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_ENCODER_VALUE_INDEX));
 
     auto attrs = context->GetAttrs();
@@ -124,9 +124,9 @@ static ge::graphStatus InferShape4NormRopeConcatGrad(gert::InferShapeContext *co
         return ge::GRAPH_FAILED;
     }
 
-    const gert::Shape *encoderQueryShape =
+    const gert::Shape* encoderQueryShape =
         context->GetInputShape(static_cast<size_t>(InputIndexBackward::ENCODER_QUERY_INDEX));
-    const gert::Shape *encoderKeyShape =
+    const gert::Shape* encoderKeyShape =
         context->GetInputShape(static_cast<size_t>(InputIndexBackward::ENCODER_KEY_INDEX));
 
     if (encoderQueryShape != nullptr &&
@@ -159,13 +159,13 @@ static ge::graphStatus InferShape4NormRopeConcatGrad(gert::InferShapeContext *co
     }
 
     if (*normType == static_cast<int64_t>(NormType::LAYER_NORM_AFFINE)) {
-        gert::Shape *normQueryWeightShape =
+        gert::Shape* normQueryWeightShape =
             context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_NORM_QUERY_WEIGHT_INDEX));
-        gert::Shape *normQueryBiasShape =
+        gert::Shape* normQueryBiasShape =
             context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_NORM_QUERY_BIAS_INDEX));
-        gert::Shape *normKeyWeightShape =
+        gert::Shape* normKeyWeightShape =
             context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_NORM_KEY_WEIGHT_INDEX));
-        gert::Shape *normKeyBiasShape =
+        gert::Shape* normKeyBiasShape =
             context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_NORM_KEY_BIAS_INDEX));
         *normQueryWeightShape = {dim};
         *normQueryBiasShape = {dim};
@@ -174,13 +174,13 @@ static ge::graphStatus InferShape4NormRopeConcatGrad(gert::InferShapeContext *co
     }
 
     if (*normAddedType == static_cast<int64_t>(NormType::LAYER_NORM_AFFINE)) {
-        gert::Shape *normAddedQueryWeightShape =
+        gert::Shape* normAddedQueryWeightShape =
             context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_NORM_ADDED_QUERY_WEIGHT_INDEX));
-        gert::Shape *normAddedQueryBiasShape =
+        gert::Shape* normAddedQueryBiasShape =
             context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_NORM_ADDED_QUERY_BIAS_INDEX));
-        gert::Shape *normAddedKeyWeightShape =
+        gert::Shape* normAddedKeyWeightShape =
             context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_NORM_ADDED_KEY_WEIGHT_INDEX));
-        gert::Shape *normAddedKeyBiasShape =
+        gert::Shape* normAddedKeyBiasShape =
             context->GetOutputShape(static_cast<size_t>(OutputIndexBackward::GRAD_NORM_ADDED_KEY_BIAS_INDEX));
         *normAddedQueryWeightShape = {dim};
         *normAddedQueryBiasShape = {dim};
@@ -191,7 +191,7 @@ static ge::graphStatus InferShape4NormRopeConcatGrad(gert::InferShapeContext *co
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataType4NormRopeConcatGrad(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataType4NormRopeConcatGrad(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("InferDataType4NormRopeConcatGrad", "context is nullptr.");
@@ -233,5 +233,7 @@ static ge::graphStatus InferDataType4NormRopeConcatGrad(gert::InferDataTypeConte
     return GRAPH_SUCCESS;
 }
 
-IMPL_OP_INFERSHAPE(NormRopeConcatGrad).InferShape(InferShape4NormRopeConcatGrad).InferDataType(InferDataType4NormRopeConcatGrad);
+IMPL_OP_INFERSHAPE(NormRopeConcatGrad)
+    .InferShape(InferShape4NormRopeConcatGrad)
+    .InferDataType(InferDataType4NormRopeConcatGrad);
 } // namespace ops

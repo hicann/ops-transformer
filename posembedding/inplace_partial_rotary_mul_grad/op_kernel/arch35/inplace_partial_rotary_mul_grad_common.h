@@ -47,14 +47,14 @@ constexpr int64_t ROTARY_MODE_INTERLEAVE_HALF = 3;
 //   dx[2k+1] = cos[2k+1]*dy[2k+1] - sin[2k]*dy[2k]
 // Matches reference in rotary_position_embedding_grad.
 template <typename TDY, typename TCOS>
-__aicore__ inline void InterleaveModeGradVF(const LocalTensor<TCOS> &sinTensor, const LocalTensor<TCOS> &cosTensor,
-                                            const LocalTensor<TDY> &inTensor, const LocalTensor<TDY> &outTensor,
+__aicore__ inline void InterleaveModeGradVF(const LocalTensor<TCOS>& sinTensor, const LocalTensor<TCOS>& cosTensor,
+                                            const LocalTensor<TDY>& inTensor, const LocalTensor<TDY>& outTensor,
                                             uint16_t dLen, uint16_t dSplitCoef_, uint16_t currSNum, uint16_t currNNum)
 {
-    __ubuf__ TCOS *sinUb = (__ubuf__ TCOS *)sinTensor.GetPhyAddr();
-    __ubuf__ TCOS *cosUb = (__ubuf__ TCOS *)cosTensor.GetPhyAddr();
-    __ubuf__ TDY *inUb = (__ubuf__ TDY *)inTensor.GetPhyAddr();
-    __ubuf__ TDY *outUb = (__ubuf__ TDY *)outTensor.GetPhyAddr();
+    __ubuf__ TCOS* sinUb = (__ubuf__ TCOS*)sinTensor.GetPhyAddr();
+    __ubuf__ TCOS* cosUb = (__ubuf__ TCOS*)cosTensor.GetPhyAddr();
+    __ubuf__ TDY* inUb = (__ubuf__ TDY*)inTensor.GetPhyAddr();
+    __ubuf__ TDY* outUb = (__ubuf__ TDY*)outTensor.GetPhyAddr();
     uint16_t loopSize = 2 * VL_FLOAT32_SIZE;
     uint16_t loopNum = (dLen + loopSize - 1) / (2 * VL_FLOAT32_SIZE);
     uint16_t dAlignLenDy = Ops::Base::CeilAlign(static_cast<uint16_t>(dLen / dSplitCoef_),
@@ -124,8 +124,8 @@ __aicore__ inline void InterleaveModeGradVF(const LocalTensor<TCOS> &sinTensor, 
 // Batch version supporting mixed precision (TDY for dy/dx, TCOS for cos/sin).
 // UB layout: in/out are [B][N][S][dAlignDy], cos/sin are [B or 1][S][dAlignCos].
 template <typename TDY, typename TCOS, bool IsBroadCast>
-__aicore__ inline void BatchInterleaveModeGradVF(__ubuf__ TDY *in, __ubuf__ TCOS *cos, __ubuf__ TCOS *sin,
-                                                 __ubuf__ TDY *out, uint16_t sLength, uint16_t bLength,
+__aicore__ inline void BatchInterleaveModeGradVF(__ubuf__ TDY* in, __ubuf__ TCOS* cos, __ubuf__ TCOS* sin,
+                                                 __ubuf__ TDY* out, uint16_t sLength, uint16_t bLength,
                                                  uint16_t nLength, int64_t dLen, int64_t dAlignDy, int64_t dAlignCos,
                                                  int64_t ubFactorS, int64_t ubFactorN)
 {

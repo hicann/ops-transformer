@@ -33,19 +33,19 @@
 #define WARN_LOG(fmt, args...) fprintf(stdout, "[WARN]  " fmt "\n", ##args)
 #define ERROR_LOG(fmt, args...) fprintf(stderr, "[ERROR]  " fmt "\n", ##args)
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
-bool ReadFile(const std::string &filePath, size_t &fileSize, void *buffer, size_t bufferSize)
+bool ReadFile(const std::string& filePath, size_t& fileSize, void* buffer, size_t bufferSize)
 {
     struct stat sBuf;
     int fileStatus = stat(filePath.data(), &sBuf);
@@ -65,7 +65,7 @@ bool ReadFile(const std::string &filePath, size_t &fileSize, void *buffer, size_
         return false;
     }
 
-    std::filebuf *buf = file.rdbuf();
+    std::filebuf* buf = file.rdbuf();
     size_t size = buf->pubseekoff(0, std::ios::end, std::ios::in);
     if (size == 0) {
         ERROR_LOG("file size is 0");
@@ -78,13 +78,13 @@ bool ReadFile(const std::string &filePath, size_t &fileSize, void *buffer, size_
         return false;
     }
     buf->pubseekpos(0, std::ios::in);
-    buf->sgetn(static_cast<char *>(buffer), size);
+    buf->sgetn(static_cast<char*>(buffer), size);
     fileSize = size;
     file.close();
     return true;
 }
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -93,7 +93,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 固定写法，acl初始化
     auto ret = aclInit(nullptr);
@@ -110,8 +110,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **xOrResult)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** xOrResult)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -196,77 +196,77 @@ int main()
     std::vector<int64_t> gradNormAddedKeyWeightShape = {headDim};
     std::vector<int64_t> gradNormAddedKeyBiasShape = {headDim};
 
-    void *gradQueryOutputDeviceAddr = nullptr;
-    void *gradKeyOutputDeviceAddr = nullptr;
-    void *gradValueOutputDeviceAddr = nullptr;
-    void *queryDeviceAddr = nullptr;
-    void *keyDeviceAddr = nullptr;
-    void *encoderQueryDeviceAddr = nullptr;
-    void *encoderKeyDeviceAddr = nullptr;
-    void *normQueryWeightDeviceAddr = nullptr;
-    void *normQueryMeanDeviceAddr = nullptr;
-    void *normQueryRstdDeviceAddr = nullptr;
-    void *normKeyWeightDeviceAddr = nullptr;
-    void *normKeyMeanDeviceAddr = nullptr;
-    void *normKeyRstdDeviceAddr = nullptr;
-    void *normAddedQueryWeightDeviceAddr = nullptr;
-    void *normAddedQueryMeanDeviceAddr = nullptr;
-    void *normAddedQueryRstdDeviceAddr = nullptr;
-    void *normAddedKeyWeightDeviceAddr = nullptr;
-    void *normAddedKeyMeanDeviceAddr = nullptr;
-    void *normAddedKeyRstdDeviceAddr = nullptr;
-    void *ropeSinDeviceAddr = nullptr;
-    void *ropeCosDeviceAddr = nullptr;
-    void *gradQueryDeviceAddr = nullptr;
-    void *gradKeyDeviceAddr = nullptr;
-    void *gradValueDeviceAddr = nullptr;
-    void *gradEncoderQueryDeviceAddr = nullptr;
-    void *gradEncoderKeyDeviceAddr = nullptr;
-    void *gradEncoderValueDeviceAddr = nullptr;
-    void *gradNormQueryWeightDeviceAddr = nullptr;
-    void *gradNormQueryBiasDeviceAddr = nullptr;
-    void *gradNormKeyWeightDeviceAddr = nullptr;
-    void *gradNormKeyBiasDeviceAddr = nullptr;
-    void *gradNormAddedQueryWeightDeviceAddr = nullptr;
-    void *gradNormAddedQueryBiasDeviceAddr = nullptr;
-    void *gradNormAddedKeyWeightDeviceAddr = nullptr;
-    void *gradNormAddedKeyBiasDeviceAddr = nullptr;
+    void* gradQueryOutputDeviceAddr = nullptr;
+    void* gradKeyOutputDeviceAddr = nullptr;
+    void* gradValueOutputDeviceAddr = nullptr;
+    void* queryDeviceAddr = nullptr;
+    void* keyDeviceAddr = nullptr;
+    void* encoderQueryDeviceAddr = nullptr;
+    void* encoderKeyDeviceAddr = nullptr;
+    void* normQueryWeightDeviceAddr = nullptr;
+    void* normQueryMeanDeviceAddr = nullptr;
+    void* normQueryRstdDeviceAddr = nullptr;
+    void* normKeyWeightDeviceAddr = nullptr;
+    void* normKeyMeanDeviceAddr = nullptr;
+    void* normKeyRstdDeviceAddr = nullptr;
+    void* normAddedQueryWeightDeviceAddr = nullptr;
+    void* normAddedQueryMeanDeviceAddr = nullptr;
+    void* normAddedQueryRstdDeviceAddr = nullptr;
+    void* normAddedKeyWeightDeviceAddr = nullptr;
+    void* normAddedKeyMeanDeviceAddr = nullptr;
+    void* normAddedKeyRstdDeviceAddr = nullptr;
+    void* ropeSinDeviceAddr = nullptr;
+    void* ropeCosDeviceAddr = nullptr;
+    void* gradQueryDeviceAddr = nullptr;
+    void* gradKeyDeviceAddr = nullptr;
+    void* gradValueDeviceAddr = nullptr;
+    void* gradEncoderQueryDeviceAddr = nullptr;
+    void* gradEncoderKeyDeviceAddr = nullptr;
+    void* gradEncoderValueDeviceAddr = nullptr;
+    void* gradNormQueryWeightDeviceAddr = nullptr;
+    void* gradNormQueryBiasDeviceAddr = nullptr;
+    void* gradNormKeyWeightDeviceAddr = nullptr;
+    void* gradNormKeyBiasDeviceAddr = nullptr;
+    void* gradNormAddedQueryWeightDeviceAddr = nullptr;
+    void* gradNormAddedQueryBiasDeviceAddr = nullptr;
+    void* gradNormAddedKeyWeightDeviceAddr = nullptr;
+    void* gradNormAddedKeyBiasDeviceAddr = nullptr;
 
-    aclTensor *gradQueryOutput = nullptr;
-    aclTensor *gradKeyOutput = nullptr;
-    aclTensor *gradValueOutput = nullptr;
-    aclTensor *query = nullptr;
-    aclTensor *key = nullptr;
-    aclTensor *encoderQuery = nullptr;
-    aclTensor *encoderKey = nullptr;
-    aclTensor *normQueryWeight = nullptr;
-    aclTensor *normQueryMean = nullptr;
-    aclTensor *normQueryRstd = nullptr;
-    aclTensor *normKeyWeight = nullptr;
-    aclTensor *normKeyMean = nullptr;
-    aclTensor *normKeyRstd = nullptr;
-    aclTensor *normAddedQueryWeight = nullptr;
-    aclTensor *normAddedQueryMean = nullptr;
-    aclTensor *normAddedQueryRstd = nullptr;
-    aclTensor *normAddedKeyWeight = nullptr;
-    aclTensor *normAddedKeyMean = nullptr;
-    aclTensor *normAddedKeyRstd = nullptr;
-    aclTensor *ropeSin = nullptr;
-    aclTensor *ropeCos = nullptr;
-    aclTensor *gradQuery = nullptr;
-    aclTensor *gradKey = nullptr;
-    aclTensor *gradValue = nullptr;
-    aclTensor *gradEncoderQuery = nullptr;
-    aclTensor *gradEncoderKey = nullptr;
-    aclTensor *gradEncoderValue = nullptr;
-    aclTensor *gradNormQueryWeight = nullptr;
-    aclTensor *gradNormQueryBias = nullptr;
-    aclTensor *gradNormKeyWeight = nullptr;
-    aclTensor *gradNormKeyBias = nullptr;
-    aclTensor *gradNormAddedQueryWeight = nullptr;
-    aclTensor *gradNormAddedQueryBias = nullptr;
-    aclTensor *gradNormAddedKeyWeight = nullptr;
-    aclTensor *gradNormAddedKeyBias = nullptr;
+    aclTensor* gradQueryOutput = nullptr;
+    aclTensor* gradKeyOutput = nullptr;
+    aclTensor* gradValueOutput = nullptr;
+    aclTensor* query = nullptr;
+    aclTensor* key = nullptr;
+    aclTensor* encoderQuery = nullptr;
+    aclTensor* encoderKey = nullptr;
+    aclTensor* normQueryWeight = nullptr;
+    aclTensor* normQueryMean = nullptr;
+    aclTensor* normQueryRstd = nullptr;
+    aclTensor* normKeyWeight = nullptr;
+    aclTensor* normKeyMean = nullptr;
+    aclTensor* normKeyRstd = nullptr;
+    aclTensor* normAddedQueryWeight = nullptr;
+    aclTensor* normAddedQueryMean = nullptr;
+    aclTensor* normAddedQueryRstd = nullptr;
+    aclTensor* normAddedKeyWeight = nullptr;
+    aclTensor* normAddedKeyMean = nullptr;
+    aclTensor* normAddedKeyRstd = nullptr;
+    aclTensor* ropeSin = nullptr;
+    aclTensor* ropeCos = nullptr;
+    aclTensor* gradQuery = nullptr;
+    aclTensor* gradKey = nullptr;
+    aclTensor* gradValue = nullptr;
+    aclTensor* gradEncoderQuery = nullptr;
+    aclTensor* gradEncoderKey = nullptr;
+    aclTensor* gradEncoderValue = nullptr;
+    aclTensor* gradNormQueryWeight = nullptr;
+    aclTensor* gradNormQueryBias = nullptr;
+    aclTensor* gradNormKeyWeight = nullptr;
+    aclTensor* gradNormKeyBias = nullptr;
+    aclTensor* gradNormAddedQueryWeight = nullptr;
+    aclTensor* gradNormAddedQueryBias = nullptr;
+    aclTensor* gradNormAddedKeyWeight = nullptr;
+    aclTensor* gradNormAddedKeyBias = nullptr;
 
     std::vector<float> gradQueryOutputHostData(batchSize * headNum * (querySeq + encoderQuerySeq) * headDim, 1.0);
     std::vector<float> gradKeyOutputHostData(batchSize * headNum * (keySeq + encoderKeySeq) * headDim, 1.0);
@@ -405,7 +405,7 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的API名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     // 调用aclnnGeGluBackward第一段接口
     ret = aclnnNormRopeConcatBackwardGetWorkspaceSize(
         gradQueryOutput, gradKeyOutput, gradValueOutput, query, key, encoderQuery, encoderKey, normQueryWeight,
@@ -418,7 +418,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNormRopeConcatBackwardGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > static_cast<uint64_t>(0)) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

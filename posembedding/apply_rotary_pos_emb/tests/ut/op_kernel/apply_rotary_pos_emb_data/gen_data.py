@@ -13,15 +13,28 @@ import os
 import numpy as np
 import tensorflow as tf
 
+
 def gen_data_and_golden(a, b, c, d, kc, dtype_q):
     if dtype_q == "bfloat16":
-        data_q = np.random.uniform(-2, 2, [int(a), int(b), int(c), int(d)]).astype(tf.bfloat16.as_numpy_dtype)
-        data_k = np.random.uniform(-3, 2, [int(a), int(b), int(kc), int(d)]).astype(tf.bfloat16.as_numpy_dtype)
-        data_cos = np.random.uniform(-3, 4, [int(a), int(b), 1, int(d)]).astype(tf.bfloat16.as_numpy_dtype)
-        data_sin = np.random.uniform(-4, 5, [int(a), int(b), 1, int(d)]).astype(tf.bfloat16.as_numpy_dtype)
+        data_q = np.random.uniform(-2, 2, [int(a), int(b), int(c), int(d)]).astype(
+            tf.bfloat16.as_numpy_dtype
+        )
+        data_k = np.random.uniform(-3, 2, [int(a), int(b), int(kc), int(d)]).astype(
+            tf.bfloat16.as_numpy_dtype
+        )
+        data_cos = np.random.uniform(-3, 4, [int(a), int(b), 1, int(d)]).astype(
+            tf.bfloat16.as_numpy_dtype
+        )
+        data_sin = np.random.uniform(-4, 5, [int(a), int(b), 1, int(d)]).astype(
+            tf.bfloat16.as_numpy_dtype
+        )
     else:
-        data_q = np.random.uniform(-2, 2, [int(a), int(b), int(c), int(d)]).astype(dtype_q)
-        data_k = np.random.uniform(-3, 2, [int(a), int(b), int(kc), int(d)]).astype(dtype_q)
+        data_q = np.random.uniform(-2, 2, [int(a), int(b), int(c), int(d)]).astype(
+            dtype_q
+        )
+        data_k = np.random.uniform(-3, 2, [int(a), int(b), int(kc), int(d)]).astype(
+            dtype_q
+        )
         data_cos = np.random.uniform(-3, 4, [int(a), int(b), 1, int(d)]).astype(dtype_q)
         data_sin = np.random.uniform(-4, 5, [int(a), int(b), 1, int(d)]).astype(dtype_q)
     data_q.tofile("./q.bin")
@@ -29,12 +42,21 @@ def gen_data_and_golden(a, b, c, d, kc, dtype_q):
     data_cos.tofile("./cos.bin")
     data_sin.tofile("./sin.bin")
 
+
 def gen_data_and_golden_tnd(a, c, d, kc, dtype_q):
     if dtype_q == "bfloat16":
-        data_q = np.random.uniform(-2, 2, [int(a), int(c), int(d)]).astype(tf.bfloat16.as_numpy_dtype)
-        data_k = np.random.uniform(-3, 2, [int(a), int(kc), int(d)]).astype(tf.bfloat16.as_numpy_dtype)
-        data_cos = np.random.uniform(-3, 4, [int(a), 1, int(d)]).astype(tf.bfloat16.as_numpy_dtype)
-        data_sin = np.random.uniform(-4, 5, [int(a), 1, int(d)]).astype(tf.bfloat16.as_numpy_dtype)
+        data_q = np.random.uniform(-2, 2, [int(a), int(c), int(d)]).astype(
+            tf.bfloat16.as_numpy_dtype
+        )
+        data_k = np.random.uniform(-3, 2, [int(a), int(kc), int(d)]).astype(
+            tf.bfloat16.as_numpy_dtype
+        )
+        data_cos = np.random.uniform(-3, 4, [int(a), 1, int(d)]).astype(
+            tf.bfloat16.as_numpy_dtype
+        )
+        data_sin = np.random.uniform(-4, 5, [int(a), 1, int(d)]).astype(
+            tf.bfloat16.as_numpy_dtype
+        )
     else:
         data_q = np.random.uniform(-2, 2, [int(a), int(c), int(d)]).astype(dtype_q)
         data_k = np.random.uniform(-3, 2, [int(a), int(kc), int(d)]).astype(dtype_q)
@@ -45,11 +67,16 @@ def gen_data_and_golden_tnd(a, c, d, kc, dtype_q):
     data_cos.tofile("./cos.bin")
     data_sin.tofile("./sin.bin")
 
+
 if __name__ == "__main__":
     os.system("rm -rf *.bin")
     argc = len(sys.argv)
     if argc == 7:
-        gen_data_and_golden(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
+        gen_data_and_golden(
+            sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6]
+        )
     elif argc == 6:
-        gen_data_and_golden_tnd(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+        gen_data_and_golden_tnd(
+            sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+        )
     exit(0)

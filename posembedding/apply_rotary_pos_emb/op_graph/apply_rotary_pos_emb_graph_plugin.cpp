@@ -22,7 +22,7 @@ static constexpr size_t INPUT1 = 1;
 static constexpr size_t OUTPUT_0_IDX = 0;
 static constexpr size_t OUTPUT_1_IDX = 1;
 
-static ge::graphStatus ApplyRotaryPosEmbInferDtype(gert::InferDataTypeContext *context)
+static ge::graphStatus ApplyRotaryPosEmbInferDtype(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context, "ApplyRotaryPosEmbInferDtype begin.");
     context->SetOutputDataType(OUTPUT_0_IDX, context->GetInputDataType(INPUT0));

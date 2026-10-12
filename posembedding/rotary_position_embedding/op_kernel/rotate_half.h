@@ -25,7 +25,7 @@ class RotateHalf : public RotateHalfBase<T, T> {
 public:
     __aicore__ inline RotateHalf(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
-                                const RotaryPositionEmbeddingTilingData &tilingData);
+                                const RotaryPositionEmbeddingTilingData& tilingData);
     __aicore__ inline void Process();
 
 protected:
@@ -46,7 +46,7 @@ protected:
                                              uint64_t calcLength);
     __aicore__ inline void RB1sdSingleStepProcess(uint32_t progress, uint32_t sLines, uint64_t xBatchStartOffset,
                                                   uint64_t rBatchStartOffset, uint64_t copyLength, uint64_t calcLength);
-    __aicore__ inline void Compute(LocalTensor<T> &cos, LocalTensor<T> &sin, uint32_t sLines, uint32_t calcLength);
+    __aicore__ inline void Compute(LocalTensor<T>& cos, LocalTensor<T>& sin, uint32_t sLines, uint32_t calcLength);
     __aicore__ inline void CopyInR(uint64_t rStartOffset, uint16_t sLines, uint32_t copyLength);
     __aicore__ inline void CopyInX(uint64_t xStartOffset, uint16_t sLines, uint32_t copyLength);
     __aicore__ inline void CopyOut(uint64_t yStartOffset, uint16_t sLines, uint32_t copyLength);
@@ -54,15 +54,15 @@ protected:
 
 template <typename T>
 __aicore__ inline void RotateHalf<T>::Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
-                                           const RotaryPositionEmbeddingTilingData &tilingData)
+                                           const RotaryPositionEmbeddingTilingData& tilingData)
 {
     this->BaseMemberInit(tilingData);
 
-    xGm.SetGlobalBuffer((__gm__ T *)x + this->xOffset + this->xCoreOffset * this->coreRelativeIdx, this->xAllocLength);
-    yGm.SetGlobalBuffer((__gm__ T *)y + this->xOffset + this->xCoreOffset * this->coreRelativeIdx, this->xAllocLength);
-    cosGm.SetGlobalBuffer((__gm__ T *)cos + this->rOffset + this->rCoreOffset * this->coreRelativeIdx,
+    xGm.SetGlobalBuffer((__gm__ T*)x + this->xOffset + this->xCoreOffset * this->coreRelativeIdx, this->xAllocLength);
+    yGm.SetGlobalBuffer((__gm__ T*)y + this->xOffset + this->xCoreOffset * this->coreRelativeIdx, this->xAllocLength);
+    cosGm.SetGlobalBuffer((__gm__ T*)cos + this->rOffset + this->rCoreOffset * this->coreRelativeIdx,
                           this->rAllocLength);
-    sinGm.SetGlobalBuffer((__gm__ T *)sin + this->rOffset + this->rCoreOffset * this->coreRelativeIdx,
+    sinGm.SetGlobalBuffer((__gm__ T*)sin + this->rOffset + this->rCoreOffset * this->coreRelativeIdx,
                           this->rAllocLength);
 
     pipe.InitBuffer(inQueueX, DOUBLE_BUFFER, this->storePadDataLength * sizeof(T));
@@ -369,7 +369,7 @@ __aicore__ inline void RotateHalf<T>::CopyOut(uint64_t yStartOffset, uint16_t sL
 }
 
 template <typename T>
-__aicore__ inline void RotateHalf<T>::Compute(LocalTensor<T> &cos, LocalTensor<T> &sin, uint32_t sLines,
+__aicore__ inline void RotateHalf<T>::Compute(LocalTensor<T>& cos, LocalTensor<T>& sin, uint32_t sLines,
                                               uint32_t calcLength)
 {
     LocalTensor<T> xLocal = inQueueX.DeQue<T>();

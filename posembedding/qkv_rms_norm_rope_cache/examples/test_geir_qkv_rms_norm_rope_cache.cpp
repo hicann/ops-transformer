@@ -119,7 +119,7 @@ uint32_t GetDataTypeSize(DataType dt)
     return dilation;
 }
 
-int32_t GenOnesData(vector<int64_t> shapes, Tensor &input_tensor, TensorDesc &input_tensor_desc, DataType data_type,
+int32_t GenOnesData(vector<int64_t> shapes, Tensor& input_tensor, TensorDesc& input_tensor_desc, DataType data_type,
                     int value)
 {
     input_tensor_desc.SetRealDimCnt(shapes.size());
@@ -129,7 +129,7 @@ int32_t GenOnesData(vector<int64_t> shapes, Tensor &input_tensor, TensorDesc &in
     }
     uint32_t data_len = size * GetDataTypeSize(data_type);
     // 按字节分配并零初始化:dtype 宽于 4 字节时(index 为 DT_INT64)尾段才是已初始化的
-    uint8_t *pData = new (std::nothrow) uint8_t[data_len]();
+    uint8_t* pData = new (std::nothrow) uint8_t[data_len]();
     if (pData == nullptr) {
         return FAILED;
     }
@@ -140,9 +140,9 @@ int32_t GenOnesData(vector<int64_t> shapes, Tensor &input_tensor, TensorDesc &in
     return SUCCESS;
 }
 
-int32_t WriteDataToFile(const char *file_path, size_t data_size, uint8_t *data)
+int32_t WriteDataToFile(const char* file_path, size_t data_size, uint8_t* data)
 {
-    FILE *fp = fopen(file_path, "w");
+    FILE* fp = fopen(file_path, "w");
     if (fp == nullptr) {
         return FAILED;
     }
@@ -151,8 +151,8 @@ int32_t WriteDataToFile(const char *file_path, size_t data_size, uint8_t *data)
     return SUCCESS;
 }
 
-Status CreateOppInGraph(DataType inDtype, std::vector<ge::Tensor> &input, std::vector<Operator> &inputs,
-                        std::vector<Operator> &outputs, Graph &graph)
+Status CreateOppInGraph(DataType inDtype, std::vector<ge::Tensor>& input, std::vector<Operator>& inputs,
+                        std::vector<Operator>& outputs, Graph& graph)
 {
     Status ret = SUCCESS;
     auto qkv_rms_norm_rope_cache_op = op::QkvRmsNormRopeCache("test_geir_qkv_rms_norm_rope_cache");
@@ -200,9 +200,9 @@ Status CreateOppInGraph(DataType inDtype, std::vector<ge::Tensor> &input, std::v
     return SUCCESS;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-    const char *graph_name = "tc_ge_irrun_test";
+    const char* graph_name = "tc_ge_irrun_test";
     Graph graph(graph_name);
     std::vector<ge::Tensor> input;
 
@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
     }
 
     std::map<AscendString, AscendString> build_options = {};
-    ge::Session *session = new Session(build_options);
+    ge::Session* session = new Session(build_options);
     if (session == nullptr) {
         LOG_PRINT("%s - ERROR - [XIR]: Create ir session using build options failed\n", GetTime().c_str());
         return FAILED;

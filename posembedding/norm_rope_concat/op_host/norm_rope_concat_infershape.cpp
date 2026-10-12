@@ -20,8 +20,8 @@
 using namespace ge;
 using namespace nrc;
 namespace ops {
-static ge::graphStatus CheckShape(gert::InferShapeContext *context, const gert::Shape *shape, int64_t batch, int64_t head,
-                                  int64_t dim, int64_t &seq)
+static ge::graphStatus CheckShape(gert::InferShapeContext* context, const gert::Shape* shape, int64_t batch,
+                                  int64_t head, int64_t dim, int64_t& seq)
 {
     if (shape->GetDimNum() != INPUT_DIM_NUM) {
         OP_LOGE(context->GetNodeName(), "Input must be 4D tensors(B, S, H, D).");
@@ -35,22 +35,22 @@ static ge::graphStatus CheckShape(gert::InferShapeContext *context, const gert::
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShape4NormRopeConcat(gert::InferShapeContext *context)
+static ge::graphStatus InferShape4NormRopeConcat(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("NormRopeConcat", "context is nullptr"), return ge::GRAPH_FAILED);
     OP_LOGD(context, "Enter InferShape4NormRopeConcat.");
 
-    const gert::Shape *queryShape = context->GetInputShape(static_cast<size_t>(InputIndexForward::QUERY_INDEX));
-    const gert::Shape *keyShape = context->GetInputShape(static_cast<size_t>(InputIndexForward::KEY_INDEX));
-    const gert::Shape *valueShape = context->GetInputShape(static_cast<size_t>(InputIndexForward::VALUE_INDEX));
+    const gert::Shape* queryShape = context->GetInputShape(static_cast<size_t>(InputIndexForward::QUERY_INDEX));
+    const gert::Shape* keyShape = context->GetInputShape(static_cast<size_t>(InputIndexForward::KEY_INDEX));
+    const gert::Shape* valueShape = context->GetInputShape(static_cast<size_t>(InputIndexForward::VALUE_INDEX));
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
 
-    gert::Shape *queryOutputShape =
+    gert::Shape* queryOutputShape =
         context->GetOutputShape(static_cast<size_t>(OutputIndexForward::QUERY_OUTPUT_INDEX));
-    gert::Shape *keyOutputShape = context->GetOutputShape(static_cast<size_t>(OutputIndexForward::KEY_OUTPUT_INDEX));
-    gert::Shape *valueOutputShape =
+    gert::Shape* keyOutputShape = context->GetOutputShape(static_cast<size_t>(OutputIndexForward::KEY_OUTPUT_INDEX));
+    gert::Shape* valueOutputShape =
         context->GetOutputShape(static_cast<size_t>(OutputIndexForward::VALUE_OUTPUT_INDEX));
 
     auto attrs = context->GetAttrs();
@@ -83,11 +83,11 @@ static ge::graphStatus InferShape4NormRopeConcat(gert::InferShapeContext *contex
     if (CheckShape(context, valueShape, batch, head, dim, valueSeq) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape *encoderQueryShape =
+    const gert::Shape* encoderQueryShape =
         context->GetInputShape(static_cast<size_t>(InputIndexForward::ENCODER_QUERY_INDEX));
-    const gert::Shape *encoderKeyShape =
+    const gert::Shape* encoderKeyShape =
         context->GetInputShape(static_cast<size_t>(InputIndexForward::ENCODER_KEY_INDEX));
-    const gert::Shape *encoderValueShape =
+    const gert::Shape* encoderValueShape =
         context->GetInputShape(static_cast<size_t>(InputIndexForward::ENCODER_VALUE_INDEX));
     if (encoderQueryShape != nullptr &&
         CheckShape(context, encoderQueryShape, batch, head, dim, encoderQuerySeq) != ge::GRAPH_SUCCESS) {
@@ -108,13 +108,13 @@ static ge::graphStatus InferShape4NormRopeConcat(gert::InferShapeContext *contex
     if (*isTraining) {
         if (*normType == static_cast<int64_t>(NormType::LAYER_NORM) ||
             *normType == static_cast<int64_t>(NormType::LAYER_NORM_AFFINE)) {
-            gert::Shape *normQueryMeanShape =
+            gert::Shape* normQueryMeanShape =
                 context->GetOutputShape(static_cast<size_t>(OutputIndexForward::NORM_QUERY_MEAN_INDEX));
-            gert::Shape *normQueryRstdShape =
+            gert::Shape* normQueryRstdShape =
                 context->GetOutputShape(static_cast<size_t>(OutputIndexForward::NORM_QUERY_RSTD_INDEX));
-            gert::Shape *normKeyMeanShape =
+            gert::Shape* normKeyMeanShape =
                 context->GetOutputShape(static_cast<size_t>(OutputIndexForward::NORM_KEY_MEAN_INDEX));
-            gert::Shape *normKeyRstdShape =
+            gert::Shape* normKeyRstdShape =
                 context->GetOutputShape(static_cast<size_t>(OutputIndexForward::NORM_KEY_RSTD_INDEX));
             *normQueryMeanShape = {batch, querySeq, head, 1};
             *normQueryRstdShape = {batch, querySeq, head, 1};
@@ -123,13 +123,13 @@ static ge::graphStatus InferShape4NormRopeConcat(gert::InferShapeContext *contex
         }
         if (*normAddedType == static_cast<int64_t>(NormType::LAYER_NORM) ||
             *normAddedType == static_cast<int64_t>(NormType::LAYER_NORM_AFFINE)) {
-            gert::Shape *normAddedQueryMeanShape =
+            gert::Shape* normAddedQueryMeanShape =
                 context->GetOutputShape(static_cast<size_t>(OutputIndexForward::NORM_ADDED_QUERY_MEAN_INDEX));
-            gert::Shape *normAddedQueryRstdShape =
+            gert::Shape* normAddedQueryRstdShape =
                 context->GetOutputShape(static_cast<size_t>(OutputIndexForward::NORM_ADDED_QUERY_RSTD_INDEX));
-            gert::Shape *normAddedKeyMeanShape =
+            gert::Shape* normAddedKeyMeanShape =
                 context->GetOutputShape(static_cast<size_t>(OutputIndexForward::NORM_ADDED_KEY_MEAN_INDEX));
-            gert::Shape *normAddedKeyRstdShape =
+            gert::Shape* normAddedKeyRstdShape =
                 context->GetOutputShape(static_cast<size_t>(OutputIndexForward::NORM_ADDED_KEY_RSTD_INDEX));
             *normAddedQueryMeanShape = {batch, encoderQuerySeq, head, 1};
             *normAddedQueryRstdShape = {batch, encoderQuerySeq, head, 1};
@@ -141,7 +141,7 @@ static ge::graphStatus InferShape4NormRopeConcat(gert::InferShapeContext *contex
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataType4NormRopeConcat(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataType4NormRopeConcat(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("NormRopeConcat", "context is nullptr"), return ge::GRAPH_FAILED);
     OP_LOGD(context, "Enter InferDataType4NormRopeConcat.");

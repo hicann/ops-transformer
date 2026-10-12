@@ -56,7 +56,7 @@ struct ApplyRotaryPosEmbTilingData {
 #define __CCE_UT_TEST__
 #define __CCE_AICORE__ 220
 
-inline void InitApplyRotaryPosEmbTilingData(uint8_t *tiling, ApplyRotaryPosEmbTilingData *const_data)
+inline void InitApplyRotaryPosEmbTilingData(uint8_t* tiling, ApplyRotaryPosEmbTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(ApplyRotaryPosEmbTilingData));
 }

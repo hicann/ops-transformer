@@ -145,8 +145,8 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckShapeAllPositive(
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::JudgeLayoutByShape(const gert::Shape &xShape,
-                                                                             const gert::Shape &cosShape)
+ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::JudgeLayoutByShape(const gert::Shape& xShape,
+                                                                             const gert::Shape& cosShape)
 {
     uint64_t xShape0 = xShape.GetDim(DIM_0);
     uint64_t xShape1 = xShape.GetDim(DIM_1);
@@ -182,10 +182,10 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::JudgeLayoutByShape(con
 
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckShapeDim() const
 {
-    auto &dyInputShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
-    auto &dyOutputShape = context_->GetOutputShape(DY_OUTPUT_INDEX)->GetStorageShape();
+    auto& dyInputShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    auto& dyOutputShape = context_->GetOutputShape(DY_OUTPUT_INDEX)->GetStorageShape();
 
     if (dyInputShape.GetDimNum() != DIM_NUM) {
         std::string dimNumStr = std::to_string(dyInputShape.GetDimNum());
@@ -212,10 +212,10 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckShapeDim() const
 
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckShapeLimit()
 {
-    auto &dyInputShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
-    auto &dyOutputShape = context_->GetOutputShape(DY_OUTPUT_INDEX)->GetStorageShape();
+    auto& dyInputShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    auto& dyOutputShape = context_->GetOutputShape(DY_OUTPUT_INDEX)->GetStorageShape();
 
     if (cosShape != sinShape) {
         std::string shapeMsg = ToString(cosShape) + " and " + ToString(sinShape);
@@ -236,8 +236,8 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckShape()
 {
     // Shape checks still run for the no-op case: they enforce 4D and pass for the
     // valid no-op inputs (cos==sin, dy==out, cosD<=dyD all hold for empty shapes too).
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &dyInputShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& dyInputShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
     OP_CHECK_IF(CheckShapeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape dim fail."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckShapeLimit() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "CheckShapeLimit fail."),
@@ -310,7 +310,7 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckDtype()
 
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckRotaryModeShapeRelation(const int64_t sliceLen)
 {
-    auto &dyShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
+    auto& dyShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
     int64_t dyD = dyShape.GetDim(DIM_3);
     if (dyD > D_LIMIT) {
         std::string shapeMsg = ToString(dyShape);
@@ -356,10 +356,10 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckRotaryModeShapeRe
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckAttr()
 {
     isNoOp_ = false; // reset across tiling instances
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
-    const int32_t *mode = attrs->GetAttrPointer<int32_t>(0);
+    const int32_t* mode = attrs->GetAttrPointer<int32_t>(0);
     int32_t modeValue = (mode == nullptr) ? 0 : static_cast<int32_t>(*mode);
     if (IsInplacePartialRotaryMulGradMode(modeValue) != true) {
         std::string modeStr = std::to_string(modeValue);
@@ -374,9 +374,9 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckAttr()
     sliceEnd_ = partialSlicePtr->GetData()[1];
     sliceLength_ = sliceEnd_ - sliceStart_;
 
-    auto &dyShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    auto& dyShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
     int64_t dyD = dyShape.GetDim(DIM_3);
     int64_t cosD = cosShape.GetDim(DIM_3);
     int64_t dySize = dyShape.GetShapeSize();
@@ -442,8 +442,8 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::GetShapeAttrsInfo()
         return ge::GRAPH_SUCCESS;
     }
 
-    auto &dyInputShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
-    auto &cosInputShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& dyInputShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
+    auto& cosInputShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
     dyShape_ = dyInputShape;
     cosShape_ = cosInputShape;
     OP_CHECK_IF(JudgeLayoutByShape(dyInputShape, cosInputShape) != ge::GRAPH_SUCCESS,

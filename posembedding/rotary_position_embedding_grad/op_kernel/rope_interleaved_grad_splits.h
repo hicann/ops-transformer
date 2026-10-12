@@ -23,10 +23,10 @@ class RopeInterleavedGrad {
 public:
     __aicore__ inline RopeInterleavedGrad(){};
     __aicore__ inline void Init(GM_ADDR grad, GM_ADDR cos, GM_ADDR sin, GM_ADDR x, GM_ADDR xGrad, GM_ADDR cosGrad,
-                                GM_ADDR sinGrad, const RotaryPositionEmbeddingGradTilingData &tiling, TPipe *pipe);
-    __aicore__ inline void InitTilingData(const RotaryPositionEmbeddingGradTilingData &tiling);
-    __aicore__ inline void TensorMul(LocalTensor<float> &ansTensor, LocalTensor<float> &tempTensor,
-                                     LocalTensor<float> &mulTensor, uint32_t dataNum);
+                                GM_ADDR sinGrad, const RotaryPositionEmbeddingGradTilingData& tiling, TPipe* pipe);
+    __aicore__ inline void InitTilingData(const RotaryPositionEmbeddingGradTilingData& tiling);
+    __aicore__ inline void TensorMul(LocalTensor<float>& ansTensor, LocalTensor<float>& tempTensor,
+                                     LocalTensor<float>& mulTensor, uint32_t dataNum);
     __aicore__ inline void Process();
 
     __aicore__ inline void SmallProcess();
@@ -35,8 +35,8 @@ public:
     __aicore__ inline void SmallCopyOut(uint64_t loopIdx);
 
     __aicore__ inline void CalculateDx();
-    __aicore__ inline void CalculateDcos(const LocalTensor<T> &outCos, uint32_t loop_num);
-    __aicore__ inline void CalculateDsin(const LocalTensor<T> &outSin, uint32_t loop_num);
+    __aicore__ inline void CalculateDcos(const LocalTensor<T>& outCos, uint32_t loop_num);
+    __aicore__ inline void CalculateDsin(const LocalTensor<T>& outSin, uint32_t loop_num);
 
     __aicore__ inline void LargeProcess();
     __aicore__ inline void LargeCosSinInit();
@@ -45,11 +45,11 @@ public:
     __aicore__ inline void LargeXGradCopyOut(uint64_t gmOffset);
     __aicore__ inline void LargeCosSinCopyOut(uint64_t sIndex);
 
-    __aicore__ inline void BroadCastToBsnd(LocalTensor<T> &src, LocalTensor<T> &dst, uint32_t calcLen);
-    __aicore__ inline void ReduceToBsnd(LocalTensor<float> &x, LocalTensor<float> &y, uint32_t calcLen);
-    __aicore__ inline void BroadCastToSbnd(LocalTensor<T> &src, LocalTensor<T> &dst, uint32_t calcLen);
-    __aicore__ inline void ReduceToSbnd(LocalTensor<float> &x, LocalTensor<float> &tri, uint32_t calcLen);
-    __aicore__ inline void BroadCastToBnsd(LocalTensor<T> &src, uint32_t calcLen);
+    __aicore__ inline void BroadCastToBsnd(LocalTensor<T>& src, LocalTensor<T>& dst, uint32_t calcLen);
+    __aicore__ inline void ReduceToBsnd(LocalTensor<float>& x, LocalTensor<float>& y, uint32_t calcLen);
+    __aicore__ inline void BroadCastToSbnd(LocalTensor<T>& src, LocalTensor<T>& dst, uint32_t calcLen);
+    __aicore__ inline void ReduceToSbnd(LocalTensor<float>& x, LocalTensor<float>& tri, uint32_t calcLen);
+    __aicore__ inline void BroadCastToBnsd(LocalTensor<T>& src, uint32_t calcLen);
 
 protected:
     TPipe pipe;
@@ -175,7 +175,7 @@ protected:
 };
 
 template <typename T, bool LARGE, bool NEEDBACKWARD>
-__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::BroadCastToBnsd(LocalTensor<T> &src,
+__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::BroadCastToBnsd(LocalTensor<T>& src,
                                                                                     uint32_t calcLen)
 {
     // broadcast sd -> bnsd
@@ -190,8 +190,8 @@ __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::BroadCastToB
 }
 
 template <typename T, bool LARGE, bool NEEDBACKWARD>
-__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::BroadCastToSbnd(LocalTensor<T> &src,
-                                                                                    LocalTensor<T> &dst,
+__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::BroadCastToSbnd(LocalTensor<T>& src,
+                                                                                    LocalTensor<T>& dst,
                                                                                     uint32_t calcLen)
 {
     // broadcast sd -> sbnd
@@ -208,8 +208,8 @@ __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::BroadCastToS
 }
 
 template <typename T, bool LARGE, bool NEEDBACKWARD>
-__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::BroadCastToBsnd(LocalTensor<T> &src,
-                                                                                    LocalTensor<T> &dst,
+__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::BroadCastToBsnd(LocalTensor<T>& src,
+                                                                                    LocalTensor<T>& dst,
                                                                                     uint32_t calcLen)
 {
     DataCopyParams intriParams;
@@ -232,8 +232,8 @@ __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::BroadCastToB
 }
 
 template <typename T, bool LARGE, bool NEEDBACKWARD>
-__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::ReduceToSbnd(LocalTensor<float> &x,
-                                                                                 LocalTensor<float> &y,
+__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::ReduceToSbnd(LocalTensor<float>& x,
+                                                                                 LocalTensor<float>& y,
                                                                                  uint32_t calcLen)
 {
     // reduce sbnd -> sd
@@ -252,8 +252,8 @@ __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::ReduceToSbnd
 }
 
 template <typename T, bool LARGE, bool NEEDBACKWARD>
-__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::ReduceToBsnd(LocalTensor<float> &x,
-                                                                                 LocalTensor<float> &y,
+__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::ReduceToBsnd(LocalTensor<float>& x,
+                                                                                 LocalTensor<float>& y,
                                                                                  uint32_t calcLen)
 {
     for (uint32_t batchIndex = 0; batchIndex < batchSize; batchIndex++) {
@@ -279,9 +279,9 @@ __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::ReduceToBsnd
 }
 
 template <typename T, bool LARGE, bool NEEDBACKWARD>
-__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::TensorMul(LocalTensor<float> &ansTensor,
-                                                                              LocalTensor<float> &tempTensor,
-                                                                              LocalTensor<float> &mulTensor,
+__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::TensorMul(LocalTensor<float>& ansTensor,
+                                                                              LocalTensor<float>& tempTensor,
+                                                                              LocalTensor<float>& mulTensor,
                                                                               uint32_t dataNum)
 {
     if (dataNum % MASK_FP32 != 0) {
@@ -299,7 +299,7 @@ __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::TensorMul(Lo
 template <typename T, bool LARGE, bool NEEDBACKWARD>
 __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::Init(
     GM_ADDR grad, GM_ADDR cos, GM_ADDR sin, GM_ADDR x, GM_ADDR xGrad, GM_ADDR cosGrad, GM_ADDR sinGrad,
-    const RotaryPositionEmbeddingGradTilingData &tiling, TPipe *pipe)
+    const RotaryPositionEmbeddingGradTilingData& tiling, TPipe* pipe)
 {
     InitTilingData(tiling);
     blockIdx = GetBlockIdx();
@@ -338,21 +338,21 @@ __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::Init(
     bsndSize = batchSize * seqLen * numHeads * headDim;
     sdSize = seqLen * headDim;
     if (numHeadsLoop == 0 && batchNumHeadsLoop == 0) {
-        gradGm.SetGlobalBuffer((__gm__ T *)grad + xOffset, bsndSize);
-        cosGm.SetGlobalBuffer((__gm__ T *)cos + cosOffset, sdSize);
-        sinGm.SetGlobalBuffer((__gm__ T *)sin + cosOffset, sdSize);
-        xGm.SetGlobalBuffer((__gm__ T *)x + xOffset, bsndSize);
-        xGradGm.SetGlobalBuffer((__gm__ T *)xGrad + xOffset, bsndSize);
-        cosGradGm.SetGlobalBuffer((__gm__ T *)cosGrad + cosOffset, sdSize);
-        sinGradGm.SetGlobalBuffer((__gm__ T *)sinGrad + cosOffset, sdSize);
+        gradGm.SetGlobalBuffer((__gm__ T*)grad + xOffset, bsndSize);
+        cosGm.SetGlobalBuffer((__gm__ T*)cos + cosOffset, sdSize);
+        sinGm.SetGlobalBuffer((__gm__ T*)sin + cosOffset, sdSize);
+        xGm.SetGlobalBuffer((__gm__ T*)x + xOffset, bsndSize);
+        xGradGm.SetGlobalBuffer((__gm__ T*)xGrad + xOffset, bsndSize);
+        cosGradGm.SetGlobalBuffer((__gm__ T*)cosGrad + cosOffset, sdSize);
+        sinGradGm.SetGlobalBuffer((__gm__ T*)sinGrad + cosOffset, sdSize);
     } else {
-        gradGm.SetGlobalBuffer((__gm__ T *)grad, bsndSize);
-        cosGm.SetGlobalBuffer((__gm__ T *)cos, sdSize);
-        sinGm.SetGlobalBuffer((__gm__ T *)sin, sdSize);
-        xGm.SetGlobalBuffer((__gm__ T *)x, bsndSize);
-        xGradGm.SetGlobalBuffer((__gm__ T *)xGrad, bsndSize);
-        cosGradGm.SetGlobalBuffer((__gm__ T *)cosGrad, sdSize);
-        sinGradGm.SetGlobalBuffer((__gm__ T *)sinGrad, sdSize);
+        gradGm.SetGlobalBuffer((__gm__ T*)grad, bsndSize);
+        cosGm.SetGlobalBuffer((__gm__ T*)cos, sdSize);
+        sinGm.SetGlobalBuffer((__gm__ T*)sin, sdSize);
+        xGm.SetGlobalBuffer((__gm__ T*)x, bsndSize);
+        xGradGm.SetGlobalBuffer((__gm__ T*)xGrad, bsndSize);
+        cosGradGm.SetGlobalBuffer((__gm__ T*)cosGrad, sdSize);
+        sinGradGm.SetGlobalBuffer((__gm__ T*)sinGrad, sdSize);
     }
 
     // calc compute buffer inputSinOffset
@@ -510,9 +510,9 @@ __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::Init(
 
 template <typename T, bool LARGE, bool NEEDBACKWARD>
 __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::InitTilingData(
-    const RotaryPositionEmbeddingGradTilingData &tiling)
+    const RotaryPositionEmbeddingGradTilingData& tiling)
 {
-    const RopeInterleavedGradParams &ropeInterleavedGradTiling = tiling.ropeInterleavedGradParams;
+    const RopeInterleavedGradParams& ropeInterleavedGradTiling = tiling.ropeInterleavedGradParams;
     batchSize = ropeInterleavedGradTiling.batchSize;
     seqLen = ropeInterleavedGradTiling.seqLen;
     numHeads = ropeInterleavedGradTiling.numHeads;
@@ -678,7 +678,7 @@ __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::CalculateDx(
 }
 
 template <typename T, bool LARGE, bool NEEDBACKWARD>
-__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::CalculateDcos(const LocalTensor<T> &outCos,
+__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::CalculateDcos(const LocalTensor<T>& outCos,
                                                                                   uint32_t loop_num)
 {
     if constexpr (std::is_same<T, half>::value || std::is_same<T, bfloat16_t>::value) {
@@ -736,7 +736,7 @@ __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::CalculateDco
 }
 
 template <typename T, bool LARGE, bool NEEDBACKWARD>
-__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::CalculateDsin(const LocalTensor<T> &outSin,
+__aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::CalculateDsin(const LocalTensor<T>& outSin,
                                                                                   uint32_t loop_num)
 {
     if constexpr (std::is_same<T, float>::value) {

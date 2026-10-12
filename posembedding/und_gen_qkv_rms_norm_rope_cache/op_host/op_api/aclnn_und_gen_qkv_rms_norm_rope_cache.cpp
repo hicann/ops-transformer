@@ -41,9 +41,9 @@ constexpr size_t DIM_ONE = 1;
 constexpr size_t DIM_TWO = 2;
 constexpr size_t DIM_NUM_THREE = 3;
 
-static inline bool CheckNotNull(const aclTensor *undQkv, const aclTensor *undWeightsQ, const aclTensor *undWeightsK,
-                                const aclTensor *cosSinCache, aclTensor *kCacheRef, aclTensor *vCacheRef,
-                                const aclTensor *slotMapping, const aclTensor *positions, aclTensor *qOut)
+static inline bool CheckNotNull(const aclTensor* undQkv, const aclTensor* undWeightsQ, const aclTensor* undWeightsK,
+                                const aclTensor* cosSinCache, aclTensor* kCacheRef, aclTensor* vCacheRef,
+                                const aclTensor* slotMapping, const aclTensor* positions, aclTensor* qOut)
 {
     OP_CHECK_NULL(undQkv, return false);
     OP_CHECK_NULL(undWeightsQ, return false);
@@ -60,7 +60,7 @@ static inline bool CheckNotNull(const aclTensor *undQkv, const aclTensor *undWei
 // k_cache/v_cache 是调用方预分配、算子原地写入的缓冲区，不能走 Contiguous：
 // 非连续时 Contiguous 产出的是副本，kernel 写进副本后调用方的 cache 不会被更新且无任何报错。
 // 本算子只支持连续 BBND 布局，这里直接把非连续输入拒掉。
-static inline bool CheckCacheContiguous(const aclTensor *kCacheRef, const aclTensor *vCacheRef)
+static inline bool CheckCacheContiguous(const aclTensor* kCacheRef, const aclTensor* vCacheRef)
 {
     if (!IsContiguous(kCacheRef) || !IsContiguous(vCacheRef)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "kCacheRef/vCacheRef must be contiguous [Bn, Bs, N, D] tensors, "
@@ -77,7 +77,7 @@ static inline bool IsNdCompatibleFormat(op::Format format)
 
 // q 由 l0 内部分配后 ViewCopy 写回，tiling 看到的是内部张量的 shape/format，
 // 调用方 q 的这两项只有这里能查（ViewCopy 在 src 为 ND 时会跳过 format 比对）。
-static inline bool CheckQOutFormat(const aclTensor *qOut)
+static inline bool CheckQOutFormat(const aclTensor* qOut)
 {
     if (!IsNdCompatibleFormat(qOut->GetStorageFormat())) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "qOut only supports ND format, got %s.",
@@ -89,24 +89,24 @@ static inline bool CheckQOutFormat(const aclTensor *qOut)
 
 // l0 内部按 undQkv 的 dtype 分配 q，调用方 q 的 dtype 不一致时只有 ViewCopy 会拦，
 // 而那条路返回的是内部错误码，与 shape/format 两项对不齐
-static inline bool CheckQOutDtype(const aclTensor *qOut, const aclTensor *undQkv)
+static inline bool CheckQOutDtype(const aclTensor* qOut, const aclTensor* undQkv)
 {
     OP_CHECK_DTYPE_NOT_MATCH(qOut, undQkv->GetDataType(), return false);
     return true;
 }
 
-static inline bool CheckQOutShape(const aclTensor *qOut, const aclTensor *undQkv, const aclTensor *genQkvOptional,
+static inline bool CheckQOutShape(const aclTensor* qOut, const aclTensor* undQkv, const aclTensor* genQkvOptional,
                                   int64_t numHeadsQ)
 {
-    const op::Shape &qShape = qOut->GetViewShape();
-    const op::Shape &undShape = undQkv->GetViewShape();
+    const op::Shape& qShape = qOut->GetViewShape();
+    const op::Shape& undShape = undQkv->GetViewShape();
     OP_CHECK(undShape.GetDimNum() == DIM_NUM_THREE,
              OP_LOGE(ACLNN_ERR_PARAM_INVALID, "undQkv must be a 3D tensor, got %zuD.", undShape.GetDimNum()),
              return false);
 
     int64_t genLen = 0;
     if (genQkvOptional != nullptr) {
-        const op::Shape &genShape = genQkvOptional->GetViewShape();
+        const op::Shape& genShape = genQkvOptional->GetViewShape();
         OP_CHECK(genShape.GetDimNum() == DIM_NUM_THREE,
                  OP_LOGE(ACLNN_ERR_PARAM_INVALID, "genQkv must be a 3D tensor, got %zuD.", genShape.GetDimNum()),
                  return false);
@@ -122,8 +122,8 @@ static inline bool CheckQOutShape(const aclTensor *qOut, const aclTensor *undQkv
     return true;
 }
 
-static inline bool CheckGenPaired(const aclTensor *genQkvOptional, const aclTensor *genWeightsQOptional,
-                                  const aclTensor *genWeightsKOptional)
+static inline bool CheckGenPaired(const aclTensor* genQkvOptional, const aclTensor* genWeightsQOptional,
+                                  const aclTensor* genWeightsKOptional)
 {
     if (genQkvOptional == nullptr) {
         return true;
@@ -138,11 +138,11 @@ static inline bool CheckGenPaired(const aclTensor *genQkvOptional, const aclTens
 } // namespace und_gen_qkv_rms_norm_rope_cache
 
 aclnnStatus aclnnUndGenQkvRmsNormRopeCacheGetWorkspaceSize(
-    const aclTensor *undQkv, const aclTensor *undWeightsQ, const aclTensor *undWeightsK, const aclTensor *cosSinCache,
-    aclTensor *kCacheRef, aclTensor *vCacheRef, const aclTensor *slotMapping, const aclTensor *positions,
-    const aclTensor *genQkvOptional, const aclTensor *genWeightsQOptional, const aclTensor *genWeightsKOptional,
-    const aclTensor *catIndicesOptional, int64_t numHeadsQ, int64_t numHeadsK, int64_t numHeadsV, double normEps,
-    const aclIntArray *mropeSection, aclTensor *qOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* undQkv, const aclTensor* undWeightsQ, const aclTensor* undWeightsK, const aclTensor* cosSinCache,
+    aclTensor* kCacheRef, aclTensor* vCacheRef, const aclTensor* slotMapping, const aclTensor* positions,
+    const aclTensor* genQkvOptional, const aclTensor* genWeightsQOptional, const aclTensor* genWeightsKOptional,
+    const aclTensor* catIndicesOptional, int64_t numHeadsQ, int64_t numHeadsK, int64_t numHeadsV, double normEps,
+    const aclIntArray* mropeSection, aclTensor* qOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     L2_DFX_PHASE_1(aclnnUndGenQkvRmsNormRopeCache,
@@ -184,10 +184,10 @@ aclnnStatus aclnnUndGenQkvRmsNormRopeCacheGetWorkspaceSize(
     CHECK_RET(positionsContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     // 可选输入：为空时直接透传 nullptr
-    const aclTensor *genQkvContiguous = nullptr;
-    const aclTensor *genWeightsQContiguous = nullptr;
-    const aclTensor *genWeightsKContiguous = nullptr;
-    const aclTensor *catIndicesContiguous = nullptr;
+    const aclTensor* genQkvContiguous = nullptr;
+    const aclTensor* genWeightsQContiguous = nullptr;
+    const aclTensor* genWeightsKContiguous = nullptr;
+    const aclTensor* catIndicesContiguous = nullptr;
     if (genQkvOptional != nullptr) {
         genQkvContiguous = l0op::Contiguous(genQkvOptional, uniqueExecutor.get());
         CHECK_RET(genQkvContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -220,7 +220,7 @@ aclnnStatus aclnnUndGenQkvRmsNormRopeCacheGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnUndGenQkvRmsNormRopeCache(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnUndGenQkvRmsNormRopeCache(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnUndGenQkvRmsNormRopeCache);

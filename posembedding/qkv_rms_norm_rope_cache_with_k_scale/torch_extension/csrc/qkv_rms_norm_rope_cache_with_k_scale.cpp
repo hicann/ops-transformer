@@ -22,15 +22,15 @@ constexpr int64_t DIM_0 = 0;
 constexpr int64_t DIM_1 = 1;
 constexpr int64_t DIM_2 = 2;
 constexpr int64_t DIM_THREE = 3;
-constexpr const char *QKV_LAYOUT_TND = "TND";
-constexpr const char *QKV_LAYOUT_NTD = "NTD";
-constexpr const char *DEFAULT_QKV_LAYOUT = QKV_LAYOUT_TND;
-constexpr const char *DEFAULT_Q_OUT_LAYOUT = QKV_LAYOUT_NTD;
-constexpr const char *Q_QUANT_PER_TOKEN_PER_HEAD = "PerTokenPerHead";
-constexpr const char *Q_QUANT_NO_QUANT = "NoQuant";
-constexpr const char *Q_QUANT_MX = "Mx";
-constexpr const char *K_QUANT_PER_TOKEN_PER_HEAD = "PerTokenPerHead";
-constexpr const char *K_QUANT_MX = "Mx";
+constexpr const char* QKV_LAYOUT_TND = "TND";
+constexpr const char* QKV_LAYOUT_NTD = "NTD";
+constexpr const char* DEFAULT_QKV_LAYOUT = QKV_LAYOUT_TND;
+constexpr const char* DEFAULT_Q_OUT_LAYOUT = QKV_LAYOUT_NTD;
+constexpr const char* Q_QUANT_PER_TOKEN_PER_HEAD = "PerTokenPerHead";
+constexpr const char* Q_QUANT_NO_QUANT = "NoQuant";
+constexpr const char* Q_QUANT_MX = "Mx";
+constexpr const char* K_QUANT_PER_TOKEN_PER_HEAD = "PerTokenPerHead";
+constexpr const char* K_QUANT_MX = "Mx";
 constexpr int64_t MX_SCALE_GROUP_SIZE = 32;
 
 enum class QScaleOutputKind {
@@ -48,7 +48,7 @@ struct QkvKScaleParams {
     at::ScalarType q_out_dtype;
 };
 
-std::string ResolveLayout(const c10::optional<c10::string_view> &layout, const char *defaultLayout)
+std::string ResolveLayout(const c10::optional<c10::string_view>& layout, const char* defaultLayout)
 {
     if (!layout.has_value() || layout.value().empty()) {
         return std::string(defaultLayout);
@@ -56,23 +56,23 @@ std::string ResolveLayout(const c10::optional<c10::string_view> &layout, const c
     return std::string(layout.value());
 }
 
-std::string ResolveQQuantMode(const std::string &q_quant_mode)
+std::string ResolveQQuantMode(const std::string& q_quant_mode)
 {
     return q_quant_mode.empty() ? std::string(Q_QUANT_PER_TOKEN_PER_HEAD) : q_quant_mode;
 }
 
-std::string ResolveKQuantMode(const std::string &k_quant_mode)
+std::string ResolveKQuantMode(const std::string& k_quant_mode)
 {
     return k_quant_mode.empty() ? std::string(K_QUANT_PER_TOKEN_PER_HEAD) : k_quant_mode;
 }
 
-QScaleOutputKind ResolveSceneForOutput(const c10::optional<at::Tensor> &query_start_loc,
-                                       const c10::optional<at::Tensor> &seq_lens,
-                                       const c10::optional<at::Tensor> &rotation,
-                                       const c10::optional<at::Tensor> &mrope_position,
-                                       const c10::optional<std::vector<int64_t>> &mrope_section,
-                                       const std::string &layout_qkv, const std::string &layout_q_out,
-                                       const std::string &q_quant_mode, const std::string &k_quant_mode)
+QScaleOutputKind ResolveSceneForOutput(const c10::optional<at::Tensor>& query_start_loc,
+                                       const c10::optional<at::Tensor>& seq_lens,
+                                       const c10::optional<at::Tensor>& rotation,
+                                       const c10::optional<at::Tensor>& mrope_position,
+                                       const c10::optional<std::vector<int64_t>>& mrope_section,
+                                       const std::string& layout_qkv, const std::string& layout_q_out,
+                                       const std::string& q_quant_mode, const std::string& k_quant_mode)
 {
     const bool has_mrope_position = mrope_position.has_value();
     const bool has_mrope_section = mrope_section.has_value() && !mrope_section.value().empty();
@@ -107,7 +107,7 @@ QScaleOutputKind ResolveSceneForOutput(const c10::optional<at::Tensor> &query_st
     return QScaleOutputKind::E8M0_RANK3;
 }
 
-void CheckOptionalTensorDefined(const c10::optional<at::Tensor> &tensor, const char *name)
+void CheckOptionalTensorDefined(const c10::optional<at::Tensor>& tensor, const char* name)
 {
     if (tensor.has_value()) {
         TORCH_CHECK(tensor.value().defined(), "qkv_rms_norm_rope_cache_with_k_scale: ", name,
@@ -115,13 +115,13 @@ void CheckOptionalTensorDefined(const c10::optional<at::Tensor> &tensor, const c
     }
 }
 
-QkvKScaleParams ResolveOutputParams(const at::Tensor &qkv, at::IntArrayRef head_nums, const std::string &layout_qkv,
-                                    const std::string &layout_q_out, const c10::optional<at::Tensor> &query_start_loc,
-                                    const c10::optional<at::Tensor> &seq_lens,
-                                    const c10::optional<at::Tensor> &rotation,
-                                    const c10::optional<at::Tensor> &mrope_position,
-                                    const c10::optional<std::vector<int64_t>> &mrope_section,
-                                    const std::string &q_quant_mode, const std::string &k_quant_mode,
+QkvKScaleParams ResolveOutputParams(const at::Tensor& qkv, at::IntArrayRef head_nums, const std::string& layout_qkv,
+                                    const std::string& layout_q_out, const c10::optional<at::Tensor>& query_start_loc,
+                                    const c10::optional<at::Tensor>& seq_lens,
+                                    const c10::optional<at::Tensor>& rotation,
+                                    const c10::optional<at::Tensor>& mrope_position,
+                                    const c10::optional<std::vector<int64_t>>& mrope_section,
+                                    const std::string& q_quant_mode, const std::string& k_quant_mode,
                                     at::ScalarType q_out_dtype)
 {
     TORCH_CHECK(!head_nums.empty(),
@@ -153,7 +153,7 @@ QkvKScaleParams ResolveOutputParams(const at::Tensor &qkv, at::IntArrayRef head_
     return {n_q, token_num, head_size, q_out_is_tnd, q_scale_kind, q_out_dtype};
 }
 
-std::tuple<at::Tensor, c10::optional<at::Tensor>> MakeOutputs(const at::Tensor &qkv, const QkvKScaleParams &params)
+std::tuple<at::Tensor, c10::optional<at::Tensor>> MakeOutputs(const at::Tensor& qkv, const QkvKScaleParams& params)
 {
     c10::SmallVector<int64_t, DIM_THREE> q_out_shape =
         params.q_out_is_tnd ? c10::SmallVector<int64_t, DIM_THREE>{params.token_num, params.n_q, params.head_size} :
@@ -175,21 +175,21 @@ std::tuple<at::Tensor, c10::optional<at::Tensor>> MakeOutputs(const at::Tensor &
     return {q_out, q_scale};
 }
 
-void RunQkvKScaleAclnn(const at::Tensor &qkv, const at::Tensor &q_gamma, const at::Tensor &k_gamma,
-                       const at::Tensor &cos_sin, const at::Tensor &slot_mapping, const at::Tensor &k_cache,
-                       const at::Tensor &v_cache, const at::Tensor &k_scale_cache,
-                       const c10::optional<at::Tensor> &query_start_loc, const c10::optional<at::Tensor> &seq_lens,
-                       at::IntArrayRef head_nums, const std::string &layout_qkv, const std::string &layout_q_out,
-                       const c10::optional<at::Tensor> &rotation, const c10::optional<at::Tensor> &v_scale,
-                       const c10::optional<at::Tensor> &mrope_position,
-                       const c10::optional<std::vector<int64_t>> &mrope_section, const std::string &q_quant_mode,
-                       const std::string &k_quant_mode, double epsilon, at::Tensor &q_out,
-                       const c10::optional<at::Tensor> &q_scale)
+void RunQkvKScaleAclnn(const at::Tensor& qkv, const at::Tensor& q_gamma, const at::Tensor& k_gamma,
+                       const at::Tensor& cos_sin, const at::Tensor& slot_mapping, const at::Tensor& k_cache,
+                       const at::Tensor& v_cache, const at::Tensor& k_scale_cache,
+                       const c10::optional<at::Tensor>& query_start_loc, const c10::optional<at::Tensor>& seq_lens,
+                       at::IntArrayRef head_nums, const std::string& layout_qkv, const std::string& layout_q_out,
+                       const c10::optional<at::Tensor>& rotation, const c10::optional<at::Tensor>& v_scale,
+                       const c10::optional<at::Tensor>& mrope_position,
+                       const c10::optional<std::vector<int64_t>>& mrope_section, const std::string& q_quant_mode,
+                       const std::string& k_quant_mode, double epsilon, at::Tensor& q_out,
+                       const c10::optional<at::Tensor>& q_scale)
 {
-    const char *layout_qkv_ptr = layout_qkv.c_str();
-    const char *layout_q_out_ptr = layout_q_out.c_str();
-    const char *q_quant_mode_ptr = q_quant_mode.c_str();
-    const char *k_quant_mode_ptr = k_quant_mode.c_str();
+    const char* layout_qkv_ptr = layout_qkv.c_str();
+    const char* layout_q_out_ptr = layout_q_out.c_str();
+    const char* q_quant_mode_ptr = q_quant_mode.c_str();
+    const char* k_quant_mode_ptr = k_quant_mode.c_str();
     float epsilon_value = static_cast<float>(epsilon);
     c10::optional<at::IntArrayRef> mrope_section_ref = c10::nullopt;
     if (mrope_section.has_value()) {
@@ -205,14 +205,14 @@ void RunQkvKScaleAclnn(const at::Tensor &qkv, const at::Tensor &q_gamma, const a
 } // namespace
 
 std::tuple<at::Tensor, c10::optional<at::Tensor>> qkv_rms_norm_rope_cache_with_k_scale_(
-    const at::Tensor &qkv, const at::Tensor &q_gamma, const at::Tensor &k_gamma, const at::Tensor &cos_sin,
-    const at::Tensor &slot_mapping, const at::Tensor &k_cache, const at::Tensor &v_cache,
-    const at::Tensor &k_scale_cache, const c10::optional<at::Tensor> &query_start_loc,
-    const c10::optional<at::Tensor> &seq_lens, at::IntArrayRef head_nums,
-    const c10::optional<c10::string_view> &layout_qkv, const c10::optional<c10::string_view> &layout_q_out,
-    const c10::optional<at::Tensor> &rotation, const c10::optional<at::Tensor> &v_scale, double epsilon,
-    const c10::optional<at::Tensor> &mrope_position, const c10::optional<std::vector<int64_t>> &mrope_section,
-    const std::string &q_quant_mode, const std::string &k_quant_mode, at::ScalarType q_out_dtype)
+    const at::Tensor& qkv, const at::Tensor& q_gamma, const at::Tensor& k_gamma, const at::Tensor& cos_sin,
+    const at::Tensor& slot_mapping, const at::Tensor& k_cache, const at::Tensor& v_cache,
+    const at::Tensor& k_scale_cache, const c10::optional<at::Tensor>& query_start_loc,
+    const c10::optional<at::Tensor>& seq_lens, at::IntArrayRef head_nums,
+    const c10::optional<c10::string_view>& layout_qkv, const c10::optional<c10::string_view>& layout_q_out,
+    const c10::optional<at::Tensor>& rotation, const c10::optional<at::Tensor>& v_scale, double epsilon,
+    const c10::optional<at::Tensor>& mrope_position, const c10::optional<std::vector<int64_t>>& mrope_section,
+    const std::string& q_quant_mode, const std::string& k_quant_mode, at::ScalarType q_out_dtype)
 {
     const c10::OptionalDeviceGuard device_guard(qkv.device());
     const std::string layout_qkv_str = ResolveLayout(layout_qkv, DEFAULT_QKV_LAYOUT);
@@ -239,14 +239,14 @@ std::tuple<at::Tensor, c10::optional<at::Tensor>> qkv_rms_norm_rope_cache_with_k
 
 std::tuple<at::Tensor, c10::optional<at::Tensor>, at::Tensor, at::Tensor, at::Tensor>
 qkv_rms_norm_rope_cache_with_k_scale(
-    const at::Tensor &qkv, const at::Tensor &q_gamma, const at::Tensor &k_gamma, const at::Tensor &cos_sin,
-    const at::Tensor &slot_mapping, const at::Tensor &k_cache, const at::Tensor &v_cache,
-    const at::Tensor &k_scale_cache, const c10::optional<at::Tensor> &query_start_loc,
-    const c10::optional<at::Tensor> &seq_lens, at::IntArrayRef head_nums,
-    const c10::optional<c10::string_view> &layout_qkv, const c10::optional<c10::string_view> &layout_q_out,
-    const c10::optional<at::Tensor> &rotation, const c10::optional<at::Tensor> &v_scale, double epsilon,
-    const c10::optional<at::Tensor> &mrope_position, const c10::optional<std::vector<int64_t>> &mrope_section,
-    const std::string &q_quant_mode, const std::string &k_quant_mode, at::ScalarType q_out_dtype)
+    const at::Tensor& qkv, const at::Tensor& q_gamma, const at::Tensor& k_gamma, const at::Tensor& cos_sin,
+    const at::Tensor& slot_mapping, const at::Tensor& k_cache, const at::Tensor& v_cache,
+    const at::Tensor& k_scale_cache, const c10::optional<at::Tensor>& query_start_loc,
+    const c10::optional<at::Tensor>& seq_lens, at::IntArrayRef head_nums,
+    const c10::optional<c10::string_view>& layout_qkv, const c10::optional<c10::string_view>& layout_q_out,
+    const c10::optional<at::Tensor>& rotation, const c10::optional<at::Tensor>& v_scale, double epsilon,
+    const c10::optional<at::Tensor>& mrope_position, const c10::optional<std::vector<int64_t>>& mrope_section,
+    const std::string& q_quant_mode, const std::string& k_quant_mode, at::ScalarType q_out_dtype)
 {
     const c10::OptionalDeviceGuard device_guard(qkv.device());
     const std::string layout_qkv_str = ResolveLayout(layout_qkv, DEFAULT_QKV_LAYOUT);

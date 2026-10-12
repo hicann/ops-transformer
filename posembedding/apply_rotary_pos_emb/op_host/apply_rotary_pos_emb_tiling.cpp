@@ -120,22 +120,22 @@ struct ApplyRotaryPosEmbParams {
 
 class ApplyRotaryPosEmbTiling {
 public:
-    explicit ApplyRotaryPosEmbTiling(gert::TilingContext *context)
+    explicit ApplyRotaryPosEmbTiling(gert::TilingContext* context)
         : context_(context) {};
-    ge::graphStatus GetInputParams(gert::TilingContext *context, ApplyRotaryPosEmbParams &params);
-    ge::graphStatus CheckParams(gert::TilingContext *context, ApplyRotaryPosEmbParams &params);
-    ge::graphStatus ComputeAB(gert::TilingContext *context, ApplyRotaryPosEmbParams &params);
-    ge::graphStatus Compute(gert::TilingContext *context, ApplyRotaryPosEmbParams &params);
-    void PrintTilingData(gert::TilingContext *context, ApplyRotaryPosEmbTilingData &tiling,
-                         ApplyRotaryPosEmbParams &params);
-    void SetTilingData(gert::TilingContext *context, ApplyRotaryPosEmbTilingData &tiling,
-                       ApplyRotaryPosEmbParams &params);
+    ge::graphStatus GetInputParams(gert::TilingContext* context, ApplyRotaryPosEmbParams& params);
+    ge::graphStatus CheckParams(gert::TilingContext* context, ApplyRotaryPosEmbParams& params);
+    ge::graphStatus ComputeAB(gert::TilingContext* context, ApplyRotaryPosEmbParams& params);
+    ge::graphStatus Compute(gert::TilingContext* context, ApplyRotaryPosEmbParams& params);
+    void PrintTilingData(gert::TilingContext* context, ApplyRotaryPosEmbTilingData& tiling,
+                         ApplyRotaryPosEmbParams& params);
+    void SetTilingData(gert::TilingContext* context, ApplyRotaryPosEmbTilingData& tiling,
+                       ApplyRotaryPosEmbParams& params);
 
 private:
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
 };
 
-ge::graphStatus ApplyRotaryPosEmbTiling::GetInputParams(gert::TilingContext *context, ApplyRotaryPosEmbParams &params)
+ge::graphStatus ApplyRotaryPosEmbTiling::GetInputParams(gert::TilingContext* context, ApplyRotaryPosEmbParams& params)
 {
     auto q = context->GetInputTensor(INPUT0);
     OP_CHECK_NULL_WITH_CONTEXT(context, q);
@@ -206,13 +206,13 @@ ge::graphStatus ApplyRotaryPosEmbTiling::GetInputParams(gert::TilingContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ApplyRotaryPosEmbTiling::CheckParams(gert::TilingContext *context, ApplyRotaryPosEmbParams &params)
+ge::graphStatus ApplyRotaryPosEmbTiling::CheckParams(gert::TilingContext* context, ApplyRotaryPosEmbParams& params)
 {
     OP_CHECK_IF(GetInputParams(context, params) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context->GetNodeName(), "GetInputParams failed"), return ge::GRAPH_FAILED);
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *layoutAttr = attrs->GetAttrPointer<int64_t>(0);
+    const int64_t* layoutAttr = attrs->GetAttrPointer<int64_t>(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, layoutAttr);
     ApplyRotaryPosEmbLayout layout = static_cast<ApplyRotaryPosEmbLayout>(*layoutAttr);
     if (layout != ApplyRotaryPosEmbLayout::BSND && layout != ApplyRotaryPosEmbLayout::TND) {
@@ -319,7 +319,7 @@ ge::graphStatus ApplyRotaryPosEmbTiling::CheckParams(gert::TilingContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ApplyRotaryPosEmbTiling::ComputeAB(gert::TilingContext *context, ApplyRotaryPosEmbParams &params)
+ge::graphStatus ApplyRotaryPosEmbTiling::ComputeAB(gert::TilingContext* context, ApplyRotaryPosEmbParams& params)
 {
     // 一个batch搬运及计算使用的UB size (2: ping-pong)
     int64_t oneLoop = params.qPart1Ub * 2 + params.cosPart1Ub * 4 + params.qPart1Ub + params.q2q1Part1Ub * 2 +
@@ -377,7 +377,7 @@ ge::graphStatus ApplyRotaryPosEmbTiling::ComputeAB(gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ApplyRotaryPosEmbTiling::Compute(gert::TilingContext *context, ApplyRotaryPosEmbParams &params)
+ge::graphStatus ApplyRotaryPosEmbTiling::Compute(gert::TilingContext* context, ApplyRotaryPosEmbParams& params)
 {
     OP_LOGD(context->GetNodeName(), "ApplyRotaryPosEmb compute start");
     params.castDtypeSize = params.isCast ? DIM_4 : params.dtypeSize;
@@ -448,8 +448,8 @@ ge::graphStatus ApplyRotaryPosEmbTiling::Compute(gert::TilingContext *context, A
     return ge::GRAPH_SUCCESS;
 }
 
-void ApplyRotaryPosEmbTiling::PrintTilingData(gert::TilingContext *context, ApplyRotaryPosEmbTilingData &tiling,
-                                              ApplyRotaryPosEmbParams &params)
+void ApplyRotaryPosEmbTiling::PrintTilingData(gert::TilingContext* context, ApplyRotaryPosEmbTilingData& tiling,
+                                              ApplyRotaryPosEmbParams& params)
 {
     OP_LOGD(context->GetNodeName(),
             "Print ApplyRotaryPosEmb tilingData: useCoreNum is %ld, lastDim %ld,"
@@ -474,8 +474,8 @@ void ApplyRotaryPosEmbTiling::PrintTilingData(gert::TilingContext *context, Appl
             tiling.get_blockMoveQ());
 }
 
-void ApplyRotaryPosEmbTiling::SetTilingData(gert::TilingContext *context, ApplyRotaryPosEmbTilingData &tiling,
-                                            ApplyRotaryPosEmbParams &params)
+void ApplyRotaryPosEmbTiling::SetTilingData(gert::TilingContext* context, ApplyRotaryPosEmbTilingData& tiling,
+                                            ApplyRotaryPosEmbParams& params)
 {
     tiling.set_useCoreNum(params.useCoreNum);
     tiling.set_lastDim(params.lastDim);
@@ -522,7 +522,7 @@ void ApplyRotaryPosEmbTiling::SetTilingData(gert::TilingContext *context, ApplyR
     context->SetBlockDim(params.useCoreNum);
     context->SetTilingKey(params.tilingKey);
 
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
     workspaces[0] = params.sysWorkspaceSize;
 }
 
@@ -530,11 +530,11 @@ static std::unique_ptr<ApplyRotaryPosEmbCompileInfo> aropeCompileInfo = nullptr;
 
 class ApplyRotaryPosMembaseEmbTilingClass : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit ApplyRotaryPosMembaseEmbTilingClass(gert::TilingContext *context)
+    explicit ApplyRotaryPosMembaseEmbTilingClass(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
     }
@@ -630,14 +630,14 @@ private:
     ApplyRotaryPosEmbParams params;
 };
 
-static ge::graphStatus Tiling4ApplyRotaryPosEmb(gert::TilingContext *context)
+static ge::graphStatus Tiling4ApplyRotaryPosEmb(gert::TilingContext* context)
 {
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus TilingPrepare4ApplyRotaryPosEmb(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepare4ApplyRotaryPosEmb(gert::TilingParseContext* context)
 {
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "platformInfoPtr is null"),
                 return ge::GRAPH_FAILED);
 

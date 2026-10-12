@@ -22,8 +22,8 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(RotaryPositionEmbedding);
 
-const aclTensor *RotaryPositionEmbedding(const aclTensor *x, const aclTensor *cos, const aclTensor *sin,
-                                         const aclTensor *rotate, int64_t mode, aclOpExecutor *executor)
+const aclTensor* RotaryPositionEmbedding(const aclTensor* x, const aclTensor* cos, const aclTensor* sin,
+                                         const aclTensor* rotate, int64_t mode, aclOpExecutor* executor)
 {
     L0_DFX(RotaryPositionEmbedding, x, cos, sin, rotate, mode);
     OP_CHECK_NULL(x, return nullptr);

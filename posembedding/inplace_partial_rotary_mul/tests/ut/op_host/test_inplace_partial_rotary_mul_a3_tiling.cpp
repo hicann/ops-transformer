@@ -37,7 +37,7 @@ class InplacePartialRotaryMulTilingA3 : public testing::Test {
 protected:
     // Ascend910B hardware parameters
     static constexpr uint64_t k910bCoreNum = 64;
-    static constexpr uint64_t k910bUbSize = 262144;  // 256KB
+    static constexpr uint64_t k910bUbSize = 262144; // 256KB
     static constexpr const char* kSocVersion = "Ascend910B";
 
     static void SetUpTestCase()
@@ -59,7 +59,8 @@ protected:
 TEST_F(InplacePartialRotaryMulTilingA3, fast_path_key1_brc_fp16)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             // x: [1, 4, 1, 64] — xdim1=4 != 1, xdim2=1 == 1 → isSpecail
             {{{1, 4, 1, 64}, {1, 4, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -86,7 +87,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, fast_path_key1_brc_fp16)
 TEST_F(InplacePartialRotaryMulTilingA3, fast_path_key2_no_brc_fp16)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 1, 1, 64}, {1, 1, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 1, 1, 64}, {1, 1, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -120,7 +122,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, generic_split_s_fp16)
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
     // x=[1, 4, 1, 256], cos=[1, 4, 1, 256] → r1dim0=1, r1dim2=1, xdim1=4==r1dim1=4
     // → batchSizeOut=1, seqLenOut=4, numHeadsOut=1
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 4, 1, 256}, {1, 4, 1, 256}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 4, 1, 256}, {1, 4, 1, 256}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -147,7 +150,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, generic_split_s_fp16)
 TEST_F(InplacePartialRotaryMulTilingA3, generic_split_s_bf16)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 4, 1, 128}, {1, 4, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{1, 4, 1, 128}, {1, 4, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},
@@ -169,7 +173,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, generic_split_s_bf16)
 TEST_F(InplacePartialRotaryMulTilingA3, generic_split_s_fp32)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 4, 1, 64}, {1, 4, 1, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{1, 4, 1, 64}, {1, 4, 1, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
@@ -204,7 +209,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, generic_split_bs_fp16)
     // Actually: SBND → batchSize=xdim0=2, seqLen=r1dim1=4, numHeads=xdim2=1
     // But TilingSplit requires batchSizeOut==1! So this might FAIL.
     // Let me use a different shape that maps to BS split without the batchSize constraint
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             // x=[1, 8, 4, 128], cos=[1, 8, 1, 128] → xdim0=1, xdim1=8==r1dim1=8
             // → batchSize=xdim0=1, seqLen=r1dim1=8, numHeads=xdim2=4
@@ -228,7 +234,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, generic_split_bs_fp16)
 TEST_F(InplacePartialRotaryMulTilingA3, generic_split_bs_bf16)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             // Larger shape to force BS split: x=[1, 8, 16, 64], cos=[1, 8, 1, 64]
             {{{1, 8, 16, 64}, {1, 8, 16, 64}}, ge::DT_BF16, ge::FORMAT_ND},
@@ -257,7 +264,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, generic_split_bs_bf16)
 TEST_F(InplacePartialRotaryMulTilingA3, generic_bsnd_bsn_fp16)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 32, 4, 64}, {1, 32, 4, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 32, 1, 64}, {1, 32, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -279,7 +287,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, generic_bsnd_bsn_fp16)
 TEST_F(InplacePartialRotaryMulTilingA3, generic_bsnd_split_fp16)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 4, 32, 64}, {1, 4, 32, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 4, 1, 64}, {1, 4, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -306,7 +315,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, generic_pad_fp16)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
     // D=255 not divisible by 16
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 1, 4, 254}, {1, 1, 4, 254}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 1, 1, 254}, {1, 1, 1, 254}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -332,7 +342,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, generic_partial_slice)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
     // sliceStart=32, sliceEnd=96 → sliceLength=64, cos/sin last dim=64
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 4, 1, 128}, {1, 4, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 4, 1, 64}, {1, 4, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -353,7 +364,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, generic_partial_slice)
 TEST_F(InplacePartialRotaryMulTilingA3, cos_sin_empty_d_noop)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{458, 1, 8, 2}, {458, 1, 8, 2}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{458, 1, 1, 0}, {458, 1, 1, 0}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -379,7 +391,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, cos_sin_empty_d_noop)
 TEST_F(InplacePartialRotaryMulTilingA3, boundary_d_min)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 1, 1, 2}, {1, 1, 1, 2}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 1, 1, 2}, {1, 1, 1, 2}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -401,7 +414,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, boundary_d_min)
 TEST_F(InplacePartialRotaryMulTilingA3, boundary_d_max)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 1, 1, 1024}, {1, 1, 1, 1024}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 1, 1, 1024}, {1, 1, 1, 1024}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -427,7 +441,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, boundary_d_max)
 TEST_F(InplacePartialRotaryMulTilingA3, invalid_mode)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 4, 1, 64}, {1, 4, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 4, 1, 64}, {1, 4, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -449,7 +464,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, invalid_mode)
 TEST_F(InplacePartialRotaryMulTilingA3, invalid_d_too_large)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 1, 1, 2048}, {1, 1, 1, 2048}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 1, 1, 2048}, {1, 1, 1, 2048}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -471,7 +487,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, invalid_d_too_large)
 TEST_F(InplacePartialRotaryMulTilingA3, invalid_d_odd)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 1, 1, 63}, {1, 1, 1, 63}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 1, 1, 63}, {1, 1, 1, 63}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -494,7 +511,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, invalid_d_odd)
 TEST_F(InplacePartialRotaryMulTilingA3, cos_sin_shape_mismatch_not_caught)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 4, 1, 64}, {1, 4, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 1, 1, 64}, {1, 1, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -514,7 +532,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, cos_sin_shape_mismatch_not_caught)
 TEST_F(InplacePartialRotaryMulTilingA3, invalid_slice_negative)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 4, 1, 128}, {1, 4, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 4, 1, 64}, {1, 4, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -537,7 +556,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, invalid_slice_negative)
 TEST_F(InplacePartialRotaryMulTilingA3, invalid_slice_length_odd)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 4, 1, 128}, {1, 4, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 1, 1, 3}, {1, 1, 1, 3}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -559,7 +579,8 @@ TEST_F(InplacePartialRotaryMulTilingA3, invalid_slice_length_odd)
 TEST_F(InplacePartialRotaryMulTilingA3, invalid_cos_slicelen_mismatch)
 {
     optiling::InplacePartialRotaryPositionEmbeddingCompileInfo compileInfo = {};
-    gert::TilingContextPara tilingPara("InplacePartialRotaryMul",
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMul",
         {
             {{{1, 4, 1, 128}, {1, 4, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, 4, 1, 128}, {1, 4, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},

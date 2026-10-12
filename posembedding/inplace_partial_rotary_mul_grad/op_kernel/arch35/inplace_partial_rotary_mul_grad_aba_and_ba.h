@@ -27,8 +27,8 @@ using namespace AscendC;
 template <typename TDY, typename TCOS, bool IsBroadCast>
 class InplacePartialRotaryMulGradABAAndBA {
 public:
-    __aicore__ inline InplacePartialRotaryMulGradABAAndBA(TPipe *pipe,
-                                                          const InplacePartialRotaryMulGradRegbaseTilingData *tiling)
+    __aicore__ inline InplacePartialRotaryMulGradABAAndBA(TPipe* pipe,
+                                                          const InplacePartialRotaryMulGradRegbaseTilingData* tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR dy, GM_ADDR cos, GM_ADDR sin, GM_ADDR dx);
@@ -37,19 +37,19 @@ public:
 private:
     __aicore__ inline void ProcessInSLoop(int64_t sUbStart, int64_t sUbLength);
     __aicore__ inline void ProcessInSBLoop(int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength,
-                                           LocalTensor<TCOS> &cosUb, LocalTensor<TCOS> &sinUb);
+                                           LocalTensor<TCOS>& cosUb, LocalTensor<TCOS>& sinUb);
     __aicore__ inline void ProcessInSBNLoop(int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength,
                                             int64_t nUbStart, int64_t nUbLength, int64_t nTotalSize,
-                                            LocalTensor<TCOS> &cosUb, LocalTensor<TCOS> &sinUb);
+                                            LocalTensor<TCOS>& cosUb, LocalTensor<TCOS>& sinUb);
     __aicore__ inline void CopyInCosAndSin(int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength);
     __aicore__ inline void CopyInDy(int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart,
                                     int64_t nLength, int64_t nTotalSize);
     __aicore__ inline void CopyOutDx(int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart,
                                      int64_t nLength, int64_t nTotalSize);
-    __aicore__ inline void Compute(LocalTensor<TCOS> &cosUb, LocalTensor<TCOS> &sinUb, int64_t sLength, int64_t bLength,
+    __aicore__ inline void Compute(LocalTensor<TCOS>& cosUb, LocalTensor<TCOS>& sinUb, int64_t sLength, int64_t bLength,
                                    int64_t nLength);
 
-    TPipe *pipe_{nullptr};
+    TPipe* pipe_{nullptr};
     int64_t blockIdx_{0};
 
     GlobalTensor<TDY> dyGm_;
@@ -62,7 +62,7 @@ private:
     TQue<QuePosition::VECIN, 1> sinInQue_;
     TQue<QuePosition::VECOUT, 1> dxOutQue_;
 
-    const InplacePartialRotaryMulGradRegbaseTilingData *tilingData_{nullptr};
+    const InplacePartialRotaryMulGradRegbaseTilingData* tilingData_{nullptr};
 
     int64_t bBlockStart_{0};
     int64_t bBlockLength_{0};
@@ -104,10 +104,10 @@ __aicore__ inline void InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCas
     this->ubFactorS_ = tilingData_->ubFactorS;
     this->ubFactorN_ = tilingData_->ubFactorN;
 
-    this->dyGm_.SetGlobalBuffer((__gm__ TDY *)dy);
-    this->dxGm_.SetGlobalBuffer((__gm__ TDY *)dx);
-    this->cosGm_.SetGlobalBuffer((__gm__ TCOS *)cos);
-    this->sinGm_.SetGlobalBuffer((__gm__ TCOS *)sin);
+    this->dyGm_.SetGlobalBuffer((__gm__ TDY*)dy);
+    this->dxGm_.SetGlobalBuffer((__gm__ TDY*)dx);
+    this->cosGm_.SetGlobalBuffer((__gm__ TCOS*)cos);
+    this->sinGm_.SetGlobalBuffer((__gm__ TCOS*)sin);
 
     this->pipe_->InitBuffer(this->dyInQue_, 2, ubFactorB_ * ubFactorS_ * ubFactorN_ * dAlignDy_ * sizeof(TDY));
     this->pipe_->InitBuffer(this->dxOutQue_, 2, ubFactorB_ * ubFactorS_ * ubFactorN_ * dAlignDy_ * sizeof(TDY));
@@ -208,14 +208,14 @@ __aicore__ inline void InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCas
 
 template <typename TDY, typename TCOS, bool IsBroadCast>
 __aicore__ inline void InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::Compute(
-    LocalTensor<TCOS> &cosUb, LocalTensor<TCOS> &sinUb, int64_t sLength, int64_t bLength, int64_t nLength)
+    LocalTensor<TCOS>& cosUb, LocalTensor<TCOS>& sinUb, int64_t sLength, int64_t bLength, int64_t nLength)
 {
     LocalTensor<TDY> inUb = dyInQue_.DeQue<TDY>();
     LocalTensor<TDY> outUb = dxOutQue_.AllocTensor<TDY>();
 
     BatchInterleaveModeGradVF<TDY, TCOS, IsBroadCast>(
-        (__ubuf__ TDY *)inUb.GetPhyAddr(), (__ubuf__ TCOS *)cosUb.GetPhyAddr(), (__ubuf__ TCOS *)sinUb.GetPhyAddr(),
-        (__ubuf__ TDY *)outUb.GetPhyAddr(), static_cast<uint16_t>(sLength), static_cast<uint16_t>(bLength),
+        (__ubuf__ TDY*)inUb.GetPhyAddr(), (__ubuf__ TCOS*)cosUb.GetPhyAddr(), (__ubuf__ TCOS*)sinUb.GetPhyAddr(),
+        (__ubuf__ TDY*)outUb.GetPhyAddr(), static_cast<uint16_t>(sLength), static_cast<uint16_t>(bLength),
         static_cast<uint16_t>(nLength), tilingData_->sliceLength, dAlignDy_, dAlignCos_, ubFactorS_, ubFactorN_);
 
     dyInQue_.FreeTensor(inUb);
@@ -283,8 +283,8 @@ __aicore__ inline void InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCas
 
 template <typename TDY, typename TCOS, bool IsBroadCast>
 __aicore__ inline void InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::ProcessInSBLoop(
-    int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, LocalTensor<TCOS> &cosUb,
-    LocalTensor<TCOS> &sinUb)
+    int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, LocalTensor<TCOS>& cosUb,
+    LocalTensor<TCOS>& sinUb)
 {
     int64_t nUbLoopCount = Ops::Base::CeilDiv(tilingData_->n, ubFactorN_);
     for (int64_t ubLoopIdx = 0; ubLoopIdx < nUbLoopCount; ubLoopIdx++) {
@@ -297,7 +297,7 @@ __aicore__ inline void InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCas
 template <typename TDY, typename TCOS, bool IsBroadCast>
 __aicore__ inline void InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::ProcessInSBNLoop(
     int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, int64_t nUbStart, int64_t nUbLength,
-    int64_t nTotalSize, LocalTensor<TCOS> &cosUb, LocalTensor<TCOS> &sinUb)
+    int64_t nTotalSize, LocalTensor<TCOS>& cosUb, LocalTensor<TCOS>& sinUb)
 {
     CopyInDy(sUbStart, sUbLength, bUbStart, bUbLength, nUbStart, nUbLength, nTotalSize);
     Compute(cosUb, sinUb, sUbLength, bUbLength, nUbLength);

@@ -41,7 +41,7 @@ protected:
 
 // gert::StorageShape 只有 initializer_list 构造，维数在编译期固定；
 // 输出 shape 用例需要按运行期 vector 造 shape，这里补一个helper
-gert::StorageShape MakeStorageShape(const std::vector<int64_t> &dims)
+gert::StorageShape MakeStorageShape(const std::vector<int64_t>& dims)
 {
     gert::StorageShape shape;
     shape.MutableOriginShape().SetDimNum(dims.size());
@@ -58,10 +58,10 @@ gert::StorageShape MakeStorageShape(const std::vector<int64_t> &dims)
 gert::TilingContextPara BuildTilingContext(int64_t undLen, int64_t genLen, int64_t numHeadQ, int64_t numHeadK,
                                            int64_t numHeadV, int64_t headDim = HEAD_DIM, int64_t blockSize = BLOCK_SIZE,
                                            int64_t maxPos = 4096,
-                                           const std::vector<int64_t> &mropeSection = {16, 16, 16},
-                                           const std::vector<int64_t> &qOutOverride = {},
-                                           const std::vector<int64_t> &kCacheOutOverride = {},
-                                           const std::vector<int64_t> &vCacheOutOverride = {})
+                                           const std::vector<int64_t>& mropeSection = {16, 16, 16},
+                                           const std::vector<int64_t>& qOutOverride = {},
+                                           const std::vector<int64_t>& kCacheOutOverride = {},
+                                           const std::vector<int64_t>& vCacheOutOverride = {})
 {
     const int64_t total = undLen + genLen;
     const int64_t numHead = numHeadQ + numHeadK + numHeadV;
@@ -145,11 +145,11 @@ struct TilingDataMirror {
 constexpr int64_t PLATFORM_CORE_NUM = 64;
 constexpr int64_t PLATFORM_UB_BYTES = 256 * 1024;
 
-const TilingDataMirror *AsTilingData(const TilingInfo &tilingInfo)
+const TilingDataMirror* AsTilingData(const TilingInfo& tilingInfo)
 {
     EXPECT_EQ(tilingInfo.tilingDataSize, sizeof(TilingDataMirror))
         << "TilingData 布局已变，同步更新本文件的 TilingDataMirror";
-    return reinterpret_cast<const TilingDataMirror *>(tilingInfo.tilingData.get());
+    return reinterpret_cast<const TilingDataMirror*>(tilingInfo.tilingData.get());
 }
 
 // 按 tiling.h 的 "UB 划分" 注释复算一遍 ubFactor 的期望值
@@ -169,7 +169,7 @@ int64_t ExpectedUbFactor(int64_t numHeadQ, int64_t numHeadK, int64_t numHeadV, i
 }
 
 // 校验多核切分：核数拉满、总量守恒、核间负载差 ≤ 1
-void CheckBlockTiling(const TilingDataMirror *td, int64_t total)
+void CheckBlockTiling(const TilingDataMirror* td, int64_t total)
 {
     const int64_t expectUsedCore = std::min(PLATFORM_CORE_NUM, total);
     EXPECT_EQ(td->usedCoreNum, expectUsedCore);
@@ -196,7 +196,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_h8_1_1)
     ASSERT_EQ(tilingInfo.workspaceSizes.size(), 1U);
     EXPECT_EQ(tilingInfo.workspaceSizes[0], 0U);
 
-    const auto *td = AsTilingData(tilingInfo);
+    const auto* td = AsTilingData(tilingInfo);
     ASSERT_NE(td, nullptr);
     // total=8 < 64 核：每核 1 个 token，blockDim 只开 8 个
     CheckBlockTiling(td, undLen + genLen);
@@ -216,7 +216,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_h16_2_2)
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, 0);
 
-    const auto *td = AsTilingData(tilingInfo);
+    const auto* td = AsTilingData(tilingInfo);
     ASSERT_NE(td, nullptr);
     CheckBlockTiling(td, undLen + genLen);
     EXPECT_EQ(td->usedCoreNum, PLATFORM_CORE_NUM);
@@ -237,7 +237,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_when_total_tokens_far_exc
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
 
-    const auto *td = AsTilingData(tilingInfo);
+    const auto* td = AsTilingData(tilingInfo);
     ASSERT_NE(td, nullptr);
     EXPECT_EQ(td->totalTokens, undLen + genLen);
     CheckBlockTiling(td, undLen + genLen);
@@ -252,11 +252,11 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_when_total_tokens_far_exc
 TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_ub_factor_never_exceeds_und_mask_width)
 {
     const std::vector<std::vector<int64_t>> headCombos{{8, 1, 1}, {16, 2, 2}};
-    for (const auto &heads : headCombos) {
+    for (const auto& heads : headCombos) {
         auto para = BuildTilingContext(30000, 30000, heads[0], heads[1], heads[2]);
         TilingInfo tilingInfo;
         ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
-        const auto *td = AsTilingData(tilingInfo);
+        const auto* td = AsTilingData(tilingInfo);
         ASSERT_NE(td, nullptr);
         EXPECT_GT(td->ubFactor, 0);
         EXPECT_LE(td->ubFactor, optiling::MAX_UB_FACTOR) << "ubFactor 超过 kernel 侧 undMask 的位宽，会导致 gamma 选错";
@@ -272,7 +272,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_block_split_uses_all_cores_when_t
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
 
-    const auto *td = AsTilingData(tilingInfo);
+    const auto* td = AsTilingData(tilingInfo);
     ASSERT_NE(td, nullptr);
     CheckBlockTiling(td, undLen + genLen);
     EXPECT_EQ(td->usedCoreNum, PLATFORM_CORE_NUM); // 64 个核全用上
@@ -287,13 +287,13 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_ub_factor_differs_between_head_co
     TilingInfo infoSmall;
     auto paraSmall = BuildTilingContext(30000, 30000, 8, 1, 1);
     ASSERT_TRUE(ExecuteTiling(paraSmall, infoSmall));
-    const auto *tdSmall = AsTilingData(infoSmall);
+    const auto* tdSmall = AsTilingData(infoSmall);
     ASSERT_NE(tdSmall, nullptr);
 
     TilingInfo infoLarge;
     auto paraLarge = BuildTilingContext(30000, 30000, 16, 2, 2);
     ASSERT_TRUE(ExecuteTiling(paraLarge, infoLarge));
-    const auto *tdLarge = AsTilingData(infoLarge);
+    const auto* tdLarge = AsTilingData(infoLarge);
     ASSERT_NE(tdLarge, nullptr);
 
     EXPECT_EQ(tdSmall->ubFactor, ExpectedUbFactor(8, 1, 1, tdSmall->blockFactor));
@@ -315,7 +315,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_plain_rope_empty_mrope_se
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, 0);
 
-    const auto *td = AsTilingData(tilingInfo);
+    const auto* td = AsTilingData(tilingInfo);
     ASSERT_NE(td, nullptr);
     EXPECT_EQ(td->mropeSectionT, HEAD_DIM / 2);
     EXPECT_EQ(td->mropeSectionH, 0);
@@ -440,7 +440,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_with_various_block_size)
         auto para = BuildTilingContext(7, 1, 8, 1, 1, HEAD_DIM, bs);
         TilingInfo tilingInfo;
         ASSERT_TRUE(ExecuteTiling(para, tilingInfo)) << "block_size=" << bs << " 应当支持";
-        const auto *td = AsTilingData(tilingInfo);
+        const auto* td = AsTilingData(tilingInfo);
         ASSERT_NE(td, nullptr);
         EXPECT_EQ(td->blockSize, bs);
         // 切分只看 total 与 UB，与 Bs 无关

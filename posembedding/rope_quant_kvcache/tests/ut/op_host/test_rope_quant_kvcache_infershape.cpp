@@ -88,25 +88,27 @@ TEST_F(RopeQuantKvcache, RopeQuantKvcache_infertype_fp16)
         ge::DataType output_v_ref = ge::DT_FLOAT16;
         ge::DataType output_kcache_ref = ge::DT_INT8;
         ge::DataType output_vcache_ref = ge::DT_INT8;
-        auto context_holder = gert::InferDataTypeContextFaker()
-                                  .IrInputNum(8)
-                                  .NodeIoNum(8, 5)
-                                  .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(3, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(4, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(5, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(6, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(7, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(4, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .InputDataTypes({&qkv_ref, &cos_ref, &sin_ref, &qscale_ref, &qoffset_ref, &kcache_ref, &vcache_ref, &indice_ref})
-                                  .OutputDataTypes({&output_q_ref, &output_k_ref, &output_v_ref, &output_kcache_ref, &output_vcache_ref})
-                                  .Build();
+        auto context_holder =
+            gert::InferDataTypeContextFaker()
+                .IrInputNum(8)
+                .NodeIoNum(8, 5)
+                .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(3, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(4, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(5, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(6, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeInputTd(7, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(4, ge::FORMAT_ND, ge::FORMAT_ND)
+                .InputDataTypes(
+                    {&qkv_ref, &cos_ref, &sin_ref, &qscale_ref, &qoffset_ref, &kcache_ref, &vcache_ref, &indice_ref})
+                .OutputDataTypes({&output_q_ref, &output_k_ref, &output_v_ref, &output_kcache_ref, &output_vcache_ref})
+                .Build();
         auto context = context_holder.GetContext<gert::InferDataTypeContext>();
         EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
         ASSERT_NE(context, nullptr);

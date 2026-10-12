@@ -40,9 +40,8 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassBAB::DoOpTiling()
         return ge::GRAPH_FAILED;
     }
     if (blockNumB_ * blockNumS_ > coreNum_) {
-        OP_LOGE(
-            context_->GetNodeName(), "split coreNum [%ld] larger than coreNum [%ld]",
-            blockNumB_ * blockNumS_, coreNum_);
+        OP_LOGE(context_->GetNodeName(), "split coreNum [%ld] larger than coreNum [%ld]", blockNumB_ * blockNumS_,
+                coreNum_);
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -176,7 +175,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassBAB::PostTiling()
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
     context_->SetBlockDim(usedCoreNum_);
     context_->SetTilingKey(tilingKey_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = WORK_SPACE_SIZE;
     PrintTilingData();
     return ge::GRAPH_SUCCESS;

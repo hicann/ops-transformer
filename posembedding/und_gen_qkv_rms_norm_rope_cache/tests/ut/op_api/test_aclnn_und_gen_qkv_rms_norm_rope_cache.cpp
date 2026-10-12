@@ -60,7 +60,7 @@ TensorDesc DefaultGenQkv()
     return TensorDesc({GEN_LEN, NUM_HEAD, HEAD_DIM}, ACL_BF16, ACL_FORMAT_ND);
 }
 
-aclnnStatus RunWithQOutAndGenQkv(const TensorDesc &qOut, const TensorDesc &genQkv)
+aclnnStatus RunWithQOutAndGenQkv(const TensorDesc& qOut, const TensorDesc& genQkv)
 {
     auto undQkv = TensorDesc({UND_LEN, NUM_HEAD, HEAD_DIM}, ACL_BF16, ACL_FORMAT_ND);
     auto undWeightsQ = TensorDesc({HEAD_DIM}, ACL_BF16, ACL_FORMAT_ND);
@@ -85,7 +85,7 @@ aclnnStatus RunWithQOutAndGenQkv(const TensorDesc &qOut, const TensorDesc &genQk
     return ut.TestGetWorkspaceSize(&workspaceSize);
 }
 
-aclnnStatus RunWithQOut(const TensorDesc &qOut)
+aclnnStatus RunWithQOut(const TensorDesc& qOut)
 {
     return RunWithQOutAndGenQkv(qOut, DefaultGenQkv());
 }
@@ -210,7 +210,7 @@ TEST_F(und_gen_qkv_rms_norm_rope_cache_opapi_ut, aclnn_null_k_cache_rejected_bef
 
     auto ut = OP_API_UT(
         aclnnUndGenQkvRmsNormRopeCache,
-        INPUT(undQkv, undWeightsQ, undWeightsK, cosSinCache, (aclTensor *)nullptr, vCacheRef, slotMapping, positions,
+        INPUT(undQkv, undWeightsQ, undWeightsK, cosSinCache, (aclTensor*)nullptr, vCacheRef, slotMapping, positions,
               genQkv, genWeightsQ, genWeightsK, catIndices, NUM_HEAD_Q, NUM_HEAD_K, NUM_HEAD_V, NORM_EPS, mropeSection),
         OUTPUT(qOut));
 

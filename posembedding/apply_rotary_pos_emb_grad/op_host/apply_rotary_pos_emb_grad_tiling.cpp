@@ -192,9 +192,9 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckShapeAllPositive()
 }
 
 ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::ValidateBroadcastByLayout(int64_t attrLayout,
-                                                                                   const gert::Shape &gqShape,
-                                                                                   const gert::Shape &gkShape,
-                                                                                   const gert::Shape &cosShape)
+                                                                                   const gert::Shape& gqShape,
+                                                                                   const gert::Shape& gkShape,
+                                                                                   const gert::Shape& cosShape)
 {
     isTndLayout_ = (gqShape.GetDimNum() == DIM_NUM_TND);
 
@@ -339,12 +339,12 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::ValidateBroadcastByLayo
 
 ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckShapeDim() const
 {
-    auto &gqShape = context_->GetInputShape(GQ_INDEX)->GetStorageShape();
-    auto &gkShape = context_->GetInputShape(GK_INDEX)->GetStorageShape();
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
-    auto &ogqShape = context_->GetOutputShape(GRAD_Q_INDEX)->GetStorageShape();
-    auto &ogkShape = context_->GetOutputShape(GRAD_K_INDEX)->GetStorageShape();
+    auto& gqShape = context_->GetInputShape(GQ_INDEX)->GetStorageShape();
+    auto& gkShape = context_->GetInputShape(GK_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    auto& ogqShape = context_->GetOutputShape(GRAD_Q_INDEX)->GetStorageShape();
+    auto& ogkShape = context_->GetOutputShape(GRAD_K_INDEX)->GetStorageShape();
 
     // 必选输入必须3D或4D
     if (gqShape.GetDimNum() != DIM_NUM && gqShape.GetDimNum() != DIM_NUM_TND) {
@@ -380,10 +380,10 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckShapeDim() const
 
     // 可选输入维度检查
     if (context_->GetInputShape(QUERY_INDEX) != nullptr) {
-        auto &qShape = context_->GetInputShape(QUERY_INDEX)->GetStorageShape();
-        auto &kShape = context_->GetInputShape(KEY_INDEX)->GetStorageShape();
-        auto &ogcShape = context_->GetOutputShape(GRAD_COS_INDEX)->GetStorageShape();
-        auto &ogsShape = context_->GetOutputShape(GRAD_SIN_INDEX)->GetStorageShape();
+        auto& qShape = context_->GetInputShape(QUERY_INDEX)->GetStorageShape();
+        auto& kShape = context_->GetInputShape(KEY_INDEX)->GetStorageShape();
+        auto& ogcShape = context_->GetOutputShape(GRAD_COS_INDEX)->GetStorageShape();
+        auto& ogsShape = context_->GetOutputShape(GRAD_SIN_INDEX)->GetStorageShape();
         if (qShape.GetDimNum() != DIM_NUM && qShape.GetDimNum() != DIM_NUM_TND) {
             std::string dimNumStr = std::to_string(qShape.GetDimNum());
             OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "query", dimNumStr.c_str(), "3D or 4D");
@@ -410,12 +410,12 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckShapeDim() const
 
 ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckShapeLimit()
 {
-    auto &gqShape = context_->GetInputShape(GQ_INDEX)->GetStorageShape();
-    auto &gkShape = context_->GetInputShape(GK_INDEX)->GetStorageShape();
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
-    auto &ogqShape = context_->GetOutputShape(GRAD_Q_INDEX)->GetStorageShape();
-    auto &ogkShape = context_->GetOutputShape(GRAD_K_INDEX)->GetStorageShape();
+    auto& gqShape = context_->GetInputShape(GQ_INDEX)->GetStorageShape();
+    auto& gkShape = context_->GetInputShape(GK_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    auto& ogqShape = context_->GetOutputShape(GRAD_Q_INDEX)->GetStorageShape();
+    auto& ogkShape = context_->GetOutputShape(GRAD_K_INDEX)->GetStorageShape();
 
     if (cosShape != sinShape) {
         std::string shapeMsg = ToString(cosShape) + " and " + ToString(sinShape);
@@ -447,14 +447,14 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckShapeLimit()
 
 ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckOptionalInput() const
 {
-    auto &gqShape = context_->GetInputShape(GQ_INDEX)->GetStorageShape();
-    auto &gkShape = context_->GetInputShape(GK_INDEX)->GetStorageShape();
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
-    auto &qShape = context_->GetInputShape(QUERY_INDEX)->GetStorageShape();
-    auto &kShape = context_->GetInputShape(KEY_INDEX)->GetStorageShape();
-    auto &ogcShape = context_->GetOutputShape(GRAD_COS_INDEX)->GetStorageShape();
-    auto &ogsShape = context_->GetOutputShape(GRAD_SIN_INDEX)->GetStorageShape();
+    auto& gqShape = context_->GetInputShape(GQ_INDEX)->GetStorageShape();
+    auto& gkShape = context_->GetInputShape(GK_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    auto& qShape = context_->GetInputShape(QUERY_INDEX)->GetStorageShape();
+    auto& kShape = context_->GetInputShape(KEY_INDEX)->GetStorageShape();
+    auto& ogcShape = context_->GetOutputShape(GRAD_COS_INDEX)->GetStorageShape();
+    auto& ogsShape = context_->GetOutputShape(GRAD_SIN_INDEX)->GetStorageShape();
 
     if (qShape != gqShape) {
         std::string shapeMsg = ToString(qShape) + " and " + ToString(gqShape);
@@ -486,8 +486,8 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckOptionalInput() co
 
 ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckShape()
 {
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &gqShape = context_->GetInputShape(GQ_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& gqShape = context_->GetInputShape(GQ_INDEX)->GetStorageShape();
     OP_CHECK_IF(CheckShapeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape dim fail."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckShapeLimit() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "CheckShapeLimit fail."),
@@ -511,7 +511,7 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckShape()
     OP_CHECK_IF(CheckRotaryModeShapeRelation(gqLastDim) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_, "D is invalid for rotary mode."), return ge::GRAPH_FAILED);
     // 约束: gradQueryEmbed和gradKeyEmbed除N维度外其它维度必须相同
-    auto &gkShape = context_->GetInputShape(GK_INDEX)->GetStorageShape();
+    auto& gkShape = context_->GetInputShape(GK_INDEX)->GetStorageShape();
     if (gkShape.GetDimNum() != gqShape.GetDimNum()) {
         std::string shapeMsg = ToString(gqShape) + " and " + ToString(gkShape);
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "grad_query_embed and grad_key_embed",
@@ -637,11 +637,11 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckRotaryModeShapeRel
 
 ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::GetShapeAttrsInfo()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
     // attr 0: rotary_mode (string)
-    const char *rotaryModeStr = attrs->GetAttrPointer<char>(ATTR_INDEX_ROTARY_MODE);
+    const char* rotaryModeStr = attrs->GetAttrPointer<char>(ATTR_INDEX_ROTARY_MODE);
     std::string rotaryModeVal = (rotaryModeStr == nullptr) ? "half" : rotaryModeStr;
     if (rotaryModeVal != "half") {
         OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "rotary_mode", rotaryModeVal.c_str(), "half");
@@ -650,7 +650,7 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::GetShapeAttrsInfo()
     rotaryMode_ = ApplyRopeGradRotaryMode::HALF;
 
     // attr 1: layout (int64_t)
-    const int64_t *layoutPtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_LAYOUT);
+    const int64_t* layoutPtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_LAYOUT);
     int64_t layoutValue = (layoutPtr == nullptr) ? ATTR_LAYOUT_DEFAULT : (*layoutPtr);
     if (layoutValue != ATTR_LAYOUT_BSND && layoutValue != ATTR_LAYOUT_SBND && layoutValue != ATTR_LAYOUT_TND) {
         std::string layoutValStr = std::to_string(layoutValue);
@@ -663,14 +663,14 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::GetShapeAttrsInfo()
     dtype_ = context_->GetInputDesc(GQ_INDEX)->GetDataType();
     gqShape_ = context_->GetInputShape(GQ_INDEX)->GetStorageShape();
     cosShape_ = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &gkShape = context_->GetInputShape(GK_INDEX)->GetStorageShape();
+    auto& gkShape = context_->GetInputShape(GK_INDEX)->GetStorageShape();
     OP_CHECK_IF(ValidateBroadcastByLayout(layoutValue, gqShape_, gkShape, cosShape_) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_, "ValidateBroadcastByLayout fail."), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::GetInputParam(Ops::Base::ReduceOpInputParam &opInput,
+ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::GetInputParam(Ops::Base::ReduceOpInputParam& opInput,
                                                                        uint32_t inputIdx, uint32_t axesIdx)
 {
     auto inputDesc = context_->GetInputDesc(inputIdx);
@@ -722,7 +722,7 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::InitTilingData()
 }
 
 ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::GetReduceOpCompileInfo(
-    Ops::Base::ReduceOpCompileInfo *compileInfo)
+    Ops::Base::ReduceOpCompileInfo* compileInfo)
 {
     auto platformInfo = context_->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context_, platformInfo);
@@ -823,13 +823,13 @@ uint64_t ApplyRotaryPosEmbGradRegbaseTilingClass::GetTilingKey() const
 // Tiling entry point
 // =================================================================
 
-ge::graphStatus Tiling4ApplyRotaryPosEmbGrad(gert::TilingContext *context)
+ge::graphStatus Tiling4ApplyRotaryPosEmbGrad(gert::TilingContext* context)
 {
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
 template <typename ContextT>
-ge::graphStatus TilingPrepare4ReduceOp(ContextT *context, Ops::Base::ReduceOpCompileInfo *compileInfo)
+ge::graphStatus TilingPrepare4ReduceOp(ContextT* context, Ops::Base::ReduceOpCompileInfo* compileInfo)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);
     auto platformInfo = context->GetPlatformInfo();
@@ -859,7 +859,7 @@ ge::graphStatus TilingPrepare4ReduceOp(ContextT *context, Ops::Base::ReduceOpCom
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingPrepareForApplyRotaryPosEmbGrad(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForApplyRotaryPosEmbGrad(gert::TilingParseContext* context)
 {
     auto platformInfo = context->GetPlatformInfo();
     auto compileInfoPtr = context->GetCompiledInfo<ApplyRotaryPosEmbGradCompileInfo>();

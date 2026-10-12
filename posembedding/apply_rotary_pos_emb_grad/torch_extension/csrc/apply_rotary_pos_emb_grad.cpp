@@ -24,29 +24,29 @@ constexpr int64_t LAYOUT_BSND = 1;
 constexpr int64_t LAYOUT_SBND = 2;
 constexpr int64_t LAYOUT_BNSD = 3;
 constexpr int64_t LAYOUT_TND = 4;
-constexpr const char *ROTARY_MODE_HALF = "half";
+constexpr const char* ROTARY_MODE_HALF = "half";
 
-void CheckDimRange(const at::Tensor &tensor, const char *name)
+void CheckDimRange(const at::Tensor& tensor, const char* name)
 {
     TORCH_CHECK(tensor.dim() >= MIN_INPUT_DIM && tensor.dim() <= MAX_INPUT_DIM, "apply_rotary_pos_emb_grad: ", name,
                 " dim must be 3 or 4, but got ", tensor.dim(), ".");
 }
 
-void CheckSameDtype(const at::Tensor &tensor, const at::Tensor &reference, const char *name)
+void CheckSameDtype(const at::Tensor& tensor, const at::Tensor& reference, const char* name)
 {
     TORCH_CHECK(tensor.scalar_type() == reference.scalar_type(), "apply_rotary_pos_emb_grad: ", name,
                 " dtype must be same as grad_query_embed, but got ", tensor.scalar_type(), " vs ",
                 reference.scalar_type(), ".");
 }
 
-void CheckRequiredTensor(const at::Tensor &tensor, const char *name)
+void CheckRequiredTensor(const at::Tensor& tensor, const char* name)
 {
     TORCH_CHECK(tensor.defined(), "apply_rotary_pos_emb_grad: ", name, " must be defined.");
     TORCH_CHECK(tensor.numel() > 0, "apply_rotary_pos_emb_grad: ", name, " must not be empty.");
 }
 
-void CheckInputs(const at::Tensor &grad_query_embed, const at::Tensor &grad_key_embed, const at::Tensor &cos,
-                 const at::Tensor &sin, const at::Tensor &query, const at::Tensor &key, const std::string &rotary_mode,
+void CheckInputs(const at::Tensor& grad_query_embed, const at::Tensor& grad_key_embed, const at::Tensor& cos,
+                 const at::Tensor& sin, const at::Tensor& query, const at::Tensor& key, const std::string& rotary_mode,
                  int64_t layout)
 {
     CheckRequiredTensor(grad_query_embed, "grad_query_embed");
@@ -102,12 +102,12 @@ void CheckInputs(const at::Tensor &grad_query_embed, const at::Tensor &grad_key_
 } // namespace
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> ApplyRotaryPosEmbGrad(
-    const at::Tensor &grad_query_embed, const at::Tensor &grad_key_embed, const at::Tensor &cos, const at::Tensor &sin,
-    const c10::optional<at::Tensor> &query, const c10::optional<at::Tensor> &key,
+    const at::Tensor& grad_query_embed, const at::Tensor& grad_key_embed, const at::Tensor& cos, const at::Tensor& sin,
+    const c10::optional<at::Tensor>& query, const c10::optional<at::Tensor>& key,
     c10::optional<c10::string_view> rotary_mode, c10::optional<int64_t> layout)
 {
-    const at::Tensor &query_const = query.value_or(at::Tensor());
-    const at::Tensor &key_const = key.value_or(at::Tensor());
+    const at::Tensor& query_const = query.value_or(at::Tensor());
+    const at::Tensor& key_const = key.value_or(at::Tensor());
     const std::string rotary_mode_str = (!rotary_mode.has_value() || rotary_mode.value().empty()) ?
                                             std::string(ROTARY_MODE_HALF) :
                                             std::string(rotary_mode.value());
@@ -119,7 +119,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> ApplyRotaryPosEmbGrad
     at::Tensor grad_cos = at::empty(cos.sizes(), cos.options());
     at::Tensor grad_sin = at::empty(sin.sizes(), sin.options());
 
-    char *rotary_mode_ptr = const_cast<char *>(rotary_mode_str.c_str());
+    char* rotary_mode_ptr = const_cast<char*>(rotary_mode_str.c_str());
     ACLNN_CMD(aclnnApplyRotaryPosEmbGrad, grad_query_embed, grad_key_embed, cos, sin, query_const, key_const,
               rotary_mode_ptr, layout_value, grad_query, grad_key, grad_cos, grad_sin);
 

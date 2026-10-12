@@ -27,22 +27,22 @@ using namespace AscendC;
 template <typename TDY, typename TCOS, bool IsBroadCast>
 class InplacePartialRotaryMulGradAAndB {
 public:
-    __aicore__ inline InplacePartialRotaryMulGradAAndB(TPipe *pipe,
-                                                       const InplacePartialRotaryMulGradRegbaseTilingData *tiling)
+    __aicore__ inline InplacePartialRotaryMulGradAAndB(TPipe* pipe,
+                                                       const InplacePartialRotaryMulGradRegbaseTilingData* tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR dy, GM_ADDR cos, GM_ADDR sin, GM_ADDR dx);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void ProcessInLoop(int64_t bUbStart, int64_t bUbLength, LocalTensor<TCOS> &cosUb,
-                                         LocalTensor<TCOS> &sinUb);
+    __aicore__ inline void ProcessInLoop(int64_t bUbStart, int64_t bUbLength, LocalTensor<TCOS>& cosUb,
+                                         LocalTensor<TCOS>& sinUb);
     __aicore__ inline void CopyInCosAndSin(int64_t bStart, int64_t bLength);
     __aicore__ inline void CopyInDy(int64_t bStart, int64_t bLength);
     __aicore__ inline void CopyOutDx(int64_t bStart, int64_t bLength);
-    __aicore__ inline void Compute(LocalTensor<TCOS> &cosUb, LocalTensor<TCOS> &sinUb, int64_t bLength);
+    __aicore__ inline void Compute(LocalTensor<TCOS>& cosUb, LocalTensor<TCOS>& sinUb, int64_t bLength);
 
-    TPipe *pipe_{nullptr};
+    TPipe* pipe_{nullptr};
     int64_t blockIdx_{0};
 
     GlobalTensor<TDY> dyGm_;
@@ -55,7 +55,7 @@ private:
     TQue<QuePosition::VECIN, 1> sinInQue_;
     TQue<QuePosition::VECOUT, 1> dxOutQue_;
 
-    const InplacePartialRotaryMulGradRegbaseTilingData *tilingData_{nullptr};
+    const InplacePartialRotaryMulGradRegbaseTilingData* tilingData_{nullptr};
 
     int64_t bBlockStart_{0};
     int64_t bBlockLength_{0};
@@ -91,10 +91,10 @@ __aicore__ inline void InplacePartialRotaryMulGradAAndB<TDY, TCOS, IsBroadCast>:
     this->dSplitSizeCos_ = static_cast<uint32_t>(tilingData_->sliceLength * sizeof(TCOS) / dSplitCoef_);
     this->ubFactorB_ = tilingData_->ubFactorB;
 
-    this->dyGm_.SetGlobalBuffer((__gm__ TDY *)dy);
-    this->dxGm_.SetGlobalBuffer((__gm__ TDY *)dx);
-    this->cosGm_.SetGlobalBuffer((__gm__ TCOS *)cos);
-    this->sinGm_.SetGlobalBuffer((__gm__ TCOS *)sin);
+    this->dyGm_.SetGlobalBuffer((__gm__ TDY*)dy);
+    this->dxGm_.SetGlobalBuffer((__gm__ TDY*)dx);
+    this->cosGm_.SetGlobalBuffer((__gm__ TCOS*)cos);
+    this->sinGm_.SetGlobalBuffer((__gm__ TCOS*)sin);
 
     this->pipe_->InitBuffer(this->dyInQue_, 2, ubFactorB_ * dAlignDy_ * sizeof(TDY));
     this->pipe_->InitBuffer(this->dxOutQue_, 2, ubFactorB_ * dAlignDy_ * sizeof(TDY));
@@ -150,8 +150,8 @@ __aicore__ inline void InplacePartialRotaryMulGradAAndB<TDY, TCOS, IsBroadCast>:
 template <typename TDY, typename TCOS, bool IsBroadCast>
 __aicore__ inline void InplacePartialRotaryMulGradAAndB<TDY, TCOS, IsBroadCast>::ProcessInLoop(int64_t bUbStart,
                                                                                                int64_t bUbLength,
-                                                                                               LocalTensor<TCOS> &cosUb,
-                                                                                               LocalTensor<TCOS> &sinUb)
+                                                                                               LocalTensor<TCOS>& cosUb,
+                                                                                               LocalTensor<TCOS>& sinUb)
 {
     CopyInDy(bUbStart, bUbLength);
     Compute(cosUb, sinUb, bUbLength);
@@ -214,8 +214,8 @@ __aicore__ inline void InplacePartialRotaryMulGradAAndB<TDY, TCOS, IsBroadCast>:
 
 // ---- Compute ----
 template <typename TDY, typename TCOS, bool IsBroadCast>
-__aicore__ inline void InplacePartialRotaryMulGradAAndB<TDY, TCOS, IsBroadCast>::Compute(LocalTensor<TCOS> &cosUb,
-                                                                                         LocalTensor<TCOS> &sinUb,
+__aicore__ inline void InplacePartialRotaryMulGradAAndB<TDY, TCOS, IsBroadCast>::Compute(LocalTensor<TCOS>& cosUb,
+                                                                                         LocalTensor<TCOS>& sinUb,
                                                                                          int64_t bLength)
 {
     LocalTensor<TDY> inUb = dyInQue_.DeQue<TDY>();
@@ -228,8 +228,8 @@ __aicore__ inline void InplacePartialRotaryMulGradAAndB<TDY, TCOS, IsBroadCast>:
     } else {
         // cos/sin bLength rows, dy bLength rows: treat B as "S" dimension
         BatchInterleaveModeGradVF<TDY, TCOS, IsBroadCast>(
-            (__ubuf__ TDY *)inUb.GetPhyAddr(), (__ubuf__ TCOS *)cosUb.GetPhyAddr(), (__ubuf__ TCOS *)sinUb.GetPhyAddr(),
-            (__ubuf__ TDY *)outUb.GetPhyAddr(), static_cast<uint16_t>(bLength), static_cast<uint16_t>(1),
+            (__ubuf__ TDY*)inUb.GetPhyAddr(), (__ubuf__ TCOS*)cosUb.GetPhyAddr(), (__ubuf__ TCOS*)sinUb.GetPhyAddr(),
+            (__ubuf__ TDY*)outUb.GetPhyAddr(), static_cast<uint16_t>(bLength), static_cast<uint16_t>(1),
             static_cast<uint16_t>(1), tilingData_->sliceLength, dAlignDy_, dAlignCos_, ubFactorB_,
             static_cast<int64_t>(1));
     }

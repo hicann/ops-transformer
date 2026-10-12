@@ -28,7 +28,7 @@ template <bool isPagedAttention, typename KV_DTYPE, typename K_DTYPE, typename V
 class KernelKvRmsNormRopeCacheQuantB16PABLKNZ
     : public KernelKvRmsNormRopeCacheCutBSQuant<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE> {
 public:
-    __aicore__ inline KernelKvRmsNormRopeCacheQuantB16PABLKNZ(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline KernelKvRmsNormRopeCacheQuantB16PABLKNZ(TPipe* pipe, const KvRmsNormRopeCacheTilingData* tiling)
         : KernelKvRmsNormRopeCacheCutBSQuant<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE>(pipe, tiling)
     {}
 
@@ -51,12 +51,12 @@ public:
 
         // init global memory
         if (methodMode == 0) {
-            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE *)kv + GetBlockIdx() * this->tilingData_->blockFactor *
-                                                                   (this->RMS_NORM_LENGTH + this->ROPE_LENGTH));
+            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE*)kv + GetBlockIdx() * this->tilingData_->blockFactor *
+                                                                  (this->RMS_NORM_LENGTH + this->ROPE_LENGTH));
         } else {
-            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE *)kv +
+            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE*)kv +
                                        GetBlockIdx() * this->tilingData_->blockFactor * this->RMS_NORM_LENGTH);
-            this->vGm.SetGlobalBuffer((__gm__ KV_DTYPE *)v +
+            this->vGm.SetGlobalBuffer((__gm__ KV_DTYPE*)v +
                                       GetBlockIdx() * this->tilingData_->blockFactor * this->V_LENGTH);
             if (this->tilingData_->numHead > 1) {
                 int64_t startPosIdx = GetBlockIdx() * this->tilingData_->blockFactor;
@@ -70,29 +70,29 @@ public:
             }
         }
 
-        this->gammaGm.SetGlobalBuffer((__gm__ KV_DTYPE *)gamma);
-        this->cosGm.SetGlobalBuffer((__gm__ KV_DTYPE *)cos +
+        this->gammaGm.SetGlobalBuffer((__gm__ KV_DTYPE*)gamma);
+        this->cosGm.SetGlobalBuffer((__gm__ KV_DTYPE*)cos +
                                     GetBlockIdx() * this->tilingData_->blockFactor * this->ROPE_LENGTH);
-        this->sinGm.SetGlobalBuffer((__gm__ KV_DTYPE *)sin +
+        this->sinGm.SetGlobalBuffer((__gm__ KV_DTYPE*)sin +
                                     GetBlockIdx() * this->tilingData_->blockFactor * this->ROPE_LENGTH);
-        this->indexGm.SetGlobalBuffer((__gm__ int64_t *)index);
-        this->kCacheGm.SetGlobalBuffer((__gm__ K_DTYPE *)k_cache);
-        this->vCacheGm.SetGlobalBuffer((__gm__ V_DTYPE *)v_cache);
+        this->indexGm.SetGlobalBuffer((__gm__ int64_t*)index);
+        this->kCacheGm.SetGlobalBuffer((__gm__ K_DTYPE*)k_cache);
+        this->vCacheGm.SetGlobalBuffer((__gm__ V_DTYPE*)v_cache);
 
         if (this->tilingData_->isOutputKv) {
-            this->kCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE *)optional_k_rope);
-            this->vCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE *)optional_c_kv);
+            this->kCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE*)optional_k_rope);
+            this->vCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE*)optional_c_kv);
         }
 
-        this->kRopeScaleGm.SetGlobalBuffer((__gm__ float *)kpe_scale);
-        this->cKvScaleGm.SetGlobalBuffer((__gm__ float *)ckv_scale);
+        this->kRopeScaleGm.SetGlobalBuffer((__gm__ float*)kpe_scale);
+        this->cKvScaleGm.SetGlobalBuffer((__gm__ float*)ckv_scale);
 
         if (kpe_offset != nullptr && this->tilingData_->isKQuant) {
-            this->kRopeOffsetGm.SetGlobalBuffer((__gm__ float *)kpe_offset);
+            this->kRopeOffsetGm.SetGlobalBuffer((__gm__ float*)kpe_offset);
             isAsymmetricKQuant = true;
         }
         if (ckv_offset != nullptr && this->tilingData_->isVQuant) {
-            this->cKvOffsetGm.SetGlobalBuffer((__gm__ float *)ckv_offset);
+            this->cKvOffsetGm.SetGlobalBuffer((__gm__ float*)ckv_offset);
             isAsymmetricVQuant = true;
         }
 
@@ -198,7 +198,7 @@ public:
                 // Scatter Update kCache
                 if (this->tilingData_->isKQuant) {
                     ScatterUpdateNZWithQuant<int8_t, KV_DTYPE, isPagedAttention, D1_SIZE2_PA_BLK_NZ_QUANT,
-                                             D0_SIZE32_PA_BLK_NZ_QUANT>((GlobalTensor<int8_t> &)this->kCacheGm,
+                                             D0_SIZE32_PA_BLK_NZ_QUANT>((GlobalTensor<int8_t>&)this->kCacheGm,
                                                                         this->kCacheGmNd, outLocal, quantOutLocal,
                                                                         startIdx, this->ubFactor, this->ROPE_LENGTH);
                 } else {
@@ -235,7 +235,7 @@ public:
                 if (this->tilingData_->isVQuant) {
                     ScatterUpdateNZWithQuant<int8_t, KV_DTYPE, isPagedAttention, D1_SIZE16_PA_BLK_NZ_QUANT,
                                              D0_SIZE32_PA_BLK_NZ_QUANT>(
-                        (GlobalTensor<int8_t> &)this->vCacheGm, this->vCacheGmNd, outLocal, quantOutLocal, startIdx,
+                        (GlobalTensor<int8_t>&)this->vCacheGm, this->vCacheGmNd, outLocal, quantOutLocal, startIdx,
                         this->ubFactor, this->RMS_NORM_LENGTH);
                 } else {
                     LocalTensor<V_DTYPE> outputLocal = outLocal.template ReinterpretCast<V_DTYPE>();
@@ -284,7 +284,7 @@ public:
                 // Scatter Update kCache
                 if (this->tilingData_->isKQuant) {
                     ScatterUpdateNZWithQuant<int8_t, KV_DTYPE, isPagedAttention, D1_SIZE2_PA_BLK_NZ_QUANT,
-                                             D0_SIZE32_PA_BLK_NZ_QUANT>((GlobalTensor<int8_t> &)this->kCacheGm,
+                                             D0_SIZE32_PA_BLK_NZ_QUANT>((GlobalTensor<int8_t>&)this->kCacheGm,
                                                                         this->kCacheGmNd, outLocal, quantOutLocal,
                                                                         startIdx, this->ubTail, this->ROPE_LENGTH);
                 } else {
@@ -320,7 +320,7 @@ public:
                 // Scatter Update vCache
                 if (this->tilingData_->isVQuant) {
                     ScatterUpdateNZWithQuant<int8_t, KV_DTYPE, isPagedAttention, D1_SIZE16_PA_BLK_NZ_QUANT,
-                                             D0_SIZE32_PA_BLK_NZ_QUANT>((GlobalTensor<int8_t> &)this->vCacheGm,
+                                             D0_SIZE32_PA_BLK_NZ_QUANT>((GlobalTensor<int8_t>&)this->vCacheGm,
                                                                         this->vCacheGmNd, outLocal, quantOutLocal,
                                                                         startIdx, this->ubTail, this->RMS_NORM_LENGTH);
                 } else {
@@ -430,7 +430,7 @@ public:
                 if (this->tilingData_->isKQuant) {
                     ScatterUpdateNZWithQuant<int8_t, KV_DTYPE, isPagedAttention, D1_SIZE6_PA_BLK_NZ_QUANT,
                                              D0_SIZE32_PA_BLK_NZ_QUANT>(
-                        (GlobalTensor<int8_t> &)this->kCacheGm, this->kCacheGmNd, outLocal, quantOutLocal, startIdx,
+                        (GlobalTensor<int8_t>&)this->kCacheGm, this->kCacheGmNd, outLocal, quantOutLocal, startIdx,
                         this->ubFactor, this->RMS_NORM_LENGTH);
                 } else {
                     LocalTensor<K_DTYPE> outputLocal = outLocal.template ReinterpretCast<K_DTYPE>();
@@ -470,7 +470,7 @@ public:
                 // Scatter Update Vcache
                 if (this->tilingData_->isVQuant) {
                     ScatterUpdateNZWithQuant<int8_t, KV_DTYPE, isPagedAttention, D1_SIZE4_PA_BLK_NZ_QUANT,
-                                             D0_SIZE32_PA_BLK_NZ_QUANT>((GlobalTensor<int8_t> &)this->vCacheGm,
+                                             D0_SIZE32_PA_BLK_NZ_QUANT>((GlobalTensor<int8_t>&)this->vCacheGm,
                                                                         this->vCacheGmNd, outLocal, quantOutLocal,
                                                                         startIdx, this->ubFactor, this->V_LENGTH);
                 } else {
@@ -534,7 +534,7 @@ public:
                 // Scatter Update kCache
                 if (this->tilingData_->isKQuant) {
                     ScatterUpdateNZWithQuant<int8_t, KV_DTYPE, isPagedAttention, D1_SIZE6_PA_BLK_NZ_QUANT,
-                                             D0_SIZE32_PA_BLK_NZ_QUANT>((GlobalTensor<int8_t> &)this->kCacheGm,
+                                             D0_SIZE32_PA_BLK_NZ_QUANT>((GlobalTensor<int8_t>&)this->kCacheGm,
                                                                         this->kCacheGmNd, outLocal, quantOutLocal,
                                                                         startIdx, this->ubTail, this->RMS_NORM_LENGTH);
                 } else {
@@ -575,7 +575,7 @@ public:
                 // Scatter Update Vcache
                 if (this->tilingData_->isVQuant) {
                     ScatterUpdateNZWithQuant<int8_t, KV_DTYPE, isPagedAttention, D1_SIZE4_PA_BLK_NZ_QUANT,
-                                             D0_SIZE32_PA_BLK_NZ_QUANT>((GlobalTensor<int8_t> &)this->vCacheGm,
+                                             D0_SIZE32_PA_BLK_NZ_QUANT>((GlobalTensor<int8_t>&)this->vCacheGm,
                                                                         this->vCacheGmNd, outLocal, quantOutLocal,
                                                                         startIdx, this->ubTail, this->V_LENGTH);
                 } else {
@@ -592,10 +592,10 @@ public:
     }
 
     template <typename T, bool isElementWise = true>
-    __aicore__ inline void RoPEWithQuant(const LocalTensor<T> &outLocal, const LocalTensor<int8_t> &quantOutLocal,
-                                         const LocalTensor<T> &xLocal, const LocalTensor<T> &cosLocal,
-                                         const LocalTensor<T> &sinLocal, const LocalTensor<float> &wsLocal,
-                                         const LocalTensor<float> &scaleLocal, int64_t rows, int64_t headSize)
+    __aicore__ inline void RoPEWithQuant(const LocalTensor<T>& outLocal, const LocalTensor<int8_t>& quantOutLocal,
+                                         const LocalTensor<T>& xLocal, const LocalTensor<T>& cosLocal,
+                                         const LocalTensor<T>& sinLocal, const LocalTensor<float>& wsLocal,
+                                         const LocalTensor<float>& scaleLocal, int64_t rows, int64_t headSize)
     {
         constexpr static int64_t NUM_ONE = 1;
         constexpr static int64_t NUM_TWO = 2;
@@ -697,8 +697,8 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void Quant(const LocalTensor<int8_t> &quantOutLocal, LocalTensor<float> &srcTensor,
-                                 const LocalTensor<float> &scaleLocal, const LocalTensor<float> &offsetLocal,
+    __aicore__ inline void Quant(const LocalTensor<int8_t>& quantOutLocal, LocalTensor<float>& srcTensor,
+                                 const LocalTensor<float>& scaleLocal, const LocalTensor<float>& offsetLocal,
                                  bool ifAsymmetricQuant, int64_t headSize, int64_t rows)
     {
         if (this->tilingData_->numHead == 1 ||
@@ -751,7 +751,7 @@ public:
         RoundFloat2Int8(quantOutLocal, srcTensor, rows * headSize);
     }
 
-    __aicore__ inline void RoundFloat2Int8(const LocalTensor<int8_t> &dstTensor, const LocalTensor<float> &srcTensor,
+    __aicore__ inline void RoundFloat2Int8(const LocalTensor<int8_t>& dstTensor, const LocalTensor<float>& srcTensor,
                                            int32_t size)
     {
         Cast(srcTensor.ReinterpretCast<int32_t>(), srcTensor, RoundMode::CAST_RINT, size);
@@ -764,9 +764,9 @@ public:
     }
 
     template <typename T1, typename T2, bool isPA = false, int64_t D1, int64_t D0>
-    __aicore__ inline void ScatterUpdateNZWithQuant(const GlobalTensor<T1> &dst, const GlobalTensor<T2> &dstNd,
-                                                    const LocalTensor<T2> &outLocal,
-                                                    const LocalTensor<T1> &quantOutLocal, int64_t startIdx,
+    __aicore__ inline void ScatterUpdateNZWithQuant(const GlobalTensor<T1>& dst, const GlobalTensor<T2>& dstNd,
+                                                    const LocalTensor<T2>& outLocal,
+                                                    const LocalTensor<T1>& quantOutLocal, int64_t startIdx,
                                                     int64_t rows, int64_t headSize)
     {
         DataCopyExtParams copyParamsNz{static_cast<uint16_t>(D1),              // 2
@@ -809,9 +809,9 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void RmsNormWithQuant(const LocalTensor<T> &outLocal, const LocalTensor<int8_t> &quantOutLocal,
-                                            const LocalTensor<T> &xLocal, const LocalTensor<float> &gammaLocal,
-                                            const LocalTensor<float> &wsLocal, const LocalTensor<float> &scaleLocal,
+    __aicore__ inline void RmsNormWithQuant(const LocalTensor<T>& outLocal, const LocalTensor<int8_t>& quantOutLocal,
+                                            const LocalTensor<T>& xLocal, const LocalTensor<float>& gammaLocal,
+                                            const LocalTensor<float>& wsLocal, const LocalTensor<float>& scaleLocal,
                                             int64_t rows, int64_t headSize)
     {
         constexpr static int64_t NUM_EIGHT = 8;
@@ -889,10 +889,10 @@ public:
 
     template <typename T, bool isElementWise = true>
     __aicore__ inline void RmsNormAndRopeV2WithQuant(
-        LocalTensor<T> &xLocal, const LocalTensor<T> &outLocal, const LocalTensor<int8_t> &quantOutLocal,
-        const LocalTensor<float> &gammaLocal, const LocalTensor<T> &cosLocal, const LocalTensor<T> &sinLocal,
-        const LocalTensor<float> &scaleLocal, const LocalTensor<float> &offsetLocal, bool ifAsymmetricQuant,
-        LocalTensor<float> &wsLocal, int64_t rows, int64_t headSize, int64_t ropeLen)
+        LocalTensor<T>& xLocal, const LocalTensor<T>& outLocal, const LocalTensor<int8_t>& quantOutLocal,
+        const LocalTensor<float>& gammaLocal, const LocalTensor<T>& cosLocal, const LocalTensor<T>& sinLocal,
+        const LocalTensor<float>& scaleLocal, const LocalTensor<float>& offsetLocal, bool ifAsymmetricQuant,
+        LocalTensor<float>& wsLocal, int64_t rows, int64_t headSize, int64_t ropeLen)
     {
         constexpr static int64_t NUM_ZERO = 0;
         constexpr static int64_t NUM_ONE = 1;

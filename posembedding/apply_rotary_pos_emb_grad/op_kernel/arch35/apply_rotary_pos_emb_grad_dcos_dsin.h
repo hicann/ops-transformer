@@ -22,11 +22,11 @@ namespace ApplyRotaryPosEmbGrad {
 using namespace AscendC;
 
 template <typename T>
-__aicore__ inline void HalfRotaryVF(const LocalTensor<T> &inTensor, const LocalTensor<T> &rotaryTensor, uint32_t dLen,
+__aicore__ inline void HalfRotaryVF(const LocalTensor<T>& inTensor, const LocalTensor<T>& rotaryTensor, uint32_t dLen,
                                     uint32_t dAlign, uint16_t currDNum)
 {
-    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
-    __ubuf__ T *outUb = (__ubuf__ T *)rotaryTensor.GetPhyAddr();
+    __ubuf__ T* inUb = (__ubuf__ T*)inTensor.GetPhyAddr();
+    __ubuf__ T* outUb = (__ubuf__ T*)rotaryTensor.GetPhyAddr();
     uint32_t halfD = dLen / HALF_COEF;
     uint32_t halfDAlign = dAlign / HALF_COEF;
     uint16_t repeatTimes = Ops::Base::CeilDiv(halfD, VL_FLOAT32_SIZE);
@@ -56,7 +56,7 @@ __aicore__ inline void HalfRotaryVF(const LocalTensor<T> &inTensor, const LocalT
 template <typename T>
 class ApplyRotaryXDual {
 public:
-    __aicore__ inline ApplyRotaryXDual(TPipe *pipe, const ApplyRopeGradRegbaseParams *td)
+    __aicore__ inline ApplyRotaryXDual(TPipe* pipe, const ApplyRopeGradRegbaseParams* td)
         : pipe_(pipe),
           tilingData_(td)
     {}
@@ -66,13 +66,13 @@ public:
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void RotateOne(GlobalTensor<T> &xGm, GlobalTensor<T> &wsGm);
-    __aicore__ inline void CopyIn(GlobalTensor<T> &src, int64_t pos, int64_t len);
-    __aicore__ inline void CopyOut(GlobalTensor<T> &dst, int64_t pos, int64_t len);
+    __aicore__ inline void RotateOne(GlobalTensor<T>& xGm, GlobalTensor<T>& wsGm);
+    __aicore__ inline void CopyIn(GlobalTensor<T>& src, int64_t pos, int64_t len);
+    __aicore__ inline void CopyOut(GlobalTensor<T>& dst, int64_t pos, int64_t len);
 
 private:
-    TPipe *pipe_;
-    const ApplyRopeGradRegbaseParams *tilingData_;
+    TPipe* pipe_;
+    const ApplyRopeGradRegbaseParams* tilingData_;
     GlobalTensor<T> qGm_, kGm_, wsQGm_, wsKGm_;
     TQue<QuePosition::VECIN, 1> xInQ_;
     TQue<QuePosition::VECOUT, 1> rotOutQ_;
@@ -90,10 +90,10 @@ __aicore__ inline void ApplyRotaryXDual<T>::Init(GM_ADDR query, GM_ADDR key, GM_
     dBuffer_ = Ops::Base::CeilAlign<int64_t>(dHalf_, BLOCK_TYPE_SIZE / sizeof(T)) * HALF_COEF;
     ubB_ = tilingData_->ubFactorS;
 
-    qGm_.SetGlobalBuffer((__gm__ T *)query);
-    kGm_.SetGlobalBuffer((__gm__ T *)key);
-    wsQGm_.SetGlobalBuffer((__gm__ T *)workspace, bTotal_ * D_);
-    wsKGm_.SetGlobalBuffer((__gm__ T *)workspace + bTotal_ * D_, bTotal_ * D_);
+    qGm_.SetGlobalBuffer((__gm__ T*)query);
+    kGm_.SetGlobalBuffer((__gm__ T*)key);
+    wsQGm_.SetGlobalBuffer((__gm__ T*)workspace, bTotal_ * D_);
+    wsKGm_.SetGlobalBuffer((__gm__ T*)workspace + bTotal_ * D_, bTotal_ * D_);
 
     pipe_->InitBuffer(xInQ_, DOUBLE_BUFFER, ubB_ * dBuffer_ * sizeof(T));
     pipe_->InitBuffer(rotOutQ_, DOUBLE_BUFFER, ubB_ * dBuffer_ * sizeof(T));
@@ -116,7 +116,7 @@ __aicore__ inline void ApplyRotaryXDual<T>::Process()
 }
 
 template <typename T>
-__aicore__ inline void ApplyRotaryXDual<T>::RotateOne(GlobalTensor<T> &xGm, GlobalTensor<T> &wsGm)
+__aicore__ inline void ApplyRotaryXDual<T>::RotateOne(GlobalTensor<T>& xGm, GlobalTensor<T>& wsGm)
 {
     int64_t ulc = Ops::Base::CeilDiv(bLen_, ubB_);
     for (int64_t i = 0; i < ulc; i++) {
@@ -133,7 +133,7 @@ __aicore__ inline void ApplyRotaryXDual<T>::RotateOne(GlobalTensor<T> &xGm, Glob
 }
 
 template <typename T>
-__aicore__ inline void ApplyRotaryXDual<T>::CopyIn(GlobalTensor<T> &src, int64_t pos, int64_t len)
+__aicore__ inline void ApplyRotaryXDual<T>::CopyIn(GlobalTensor<T>& src, int64_t pos, int64_t len)
 {
     LocalTensor<T> t = xInQ_.template AllocTensor<T>();
     DataCopyExtParams ep{static_cast<uint16_t>(len * HALF_COEF), static_cast<uint32_t>(dHalf_ * sizeof(T)), 0, 0, 0};
@@ -143,7 +143,7 @@ __aicore__ inline void ApplyRotaryXDual<T>::CopyIn(GlobalTensor<T> &src, int64_t
 }
 
 template <typename T>
-__aicore__ inline void ApplyRotaryXDual<T>::CopyOut(GlobalTensor<T> &dst, int64_t pos, int64_t len)
+__aicore__ inline void ApplyRotaryXDual<T>::CopyOut(GlobalTensor<T>& dst, int64_t pos, int64_t len)
 {
     LocalTensor<T> s = rotOutQ_.template DeQue<T>();
     DataCopyExtParams ep{static_cast<uint16_t>(len * HALF_COEF), static_cast<uint32_t>(dHalf_ * sizeof(T)), 0, 0, 0};
@@ -154,7 +154,7 @@ __aicore__ inline void ApplyRotaryXDual<T>::CopyOut(GlobalTensor<T> &dst, int64_
 template <typename T>
 class ApplyDcosDsin {
 public:
-    __aicore__ inline ApplyDcosDsin(TPipe *pipe, const ApplyRopeGradRegbaseParams *td)
+    __aicore__ inline ApplyDcosDsin(TPipe* pipe, const ApplyRopeGradRegbaseParams* td)
         : pipe_(pipe),
           tilingData_(td)
     {}
@@ -165,14 +165,14 @@ public:
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void CopyIn(TQue<QuePosition::VECIN, 1> &inQ, GlobalTensor<T> &src, int64_t pos, int64_t len);
-    __aicore__ inline void CopyOut(TQue<QuePosition::VECOUT, 1> &outQ, GlobalTensor<T> &dst, int64_t pos, int64_t len);
-    __aicore__ inline LocalTensor<float> CastInputToFloat(LocalTensor<T> &input, uint32_t elemCnt);
+    __aicore__ inline void CopyIn(TQue<QuePosition::VECIN, 1>& inQ, GlobalTensor<T>& src, int64_t pos, int64_t len);
+    __aicore__ inline void CopyOut(TQue<QuePosition::VECOUT, 1>& outQ, GlobalTensor<T>& dst, int64_t pos, int64_t len);
+    __aicore__ inline LocalTensor<float> CastInputToFloat(LocalTensor<T>& input, uint32_t elemCnt);
     __aicore__ inline void ProcessTile(int64_t pos, int64_t len);
 
 private:
-    TPipe *pipe_;
-    const ApplyRopeGradRegbaseParams *tilingData_;
+    TPipe* pipe_;
+    const ApplyRopeGradRegbaseParams* tilingData_;
     GlobalTensor<T> gqGm_, gkGm_, qGm_, kGm_, wsQGm_, wsKGm_, ocGm_, osGm_;
     TQue<QuePosition::VECIN, 1> gradInQQ_, xInQQ_, rotInQQ_;
     TQue<QuePosition::VECIN, 1> gradInQK_, xInQK_, rotInQK_;
@@ -193,14 +193,14 @@ __aicore__ inline void ApplyDcosDsin<T>::Init(GM_ADDR gradQ, GM_ADDR gradK, GM_A
     if constexpr (sizeof(T) != sizeof(float)) {
         inputTOffset_ = Ops::Base::CeilAlign<int64_t>(ubB_ * D_ * sizeof(float), BLOCK_TYPE_SIZE) / sizeof(T);
     }
-    gqGm_.SetGlobalBuffer((__gm__ T *)gradQ);
-    gkGm_.SetGlobalBuffer((__gm__ T *)gradK);
-    qGm_.SetGlobalBuffer((__gm__ T *)query);
-    kGm_.SetGlobalBuffer((__gm__ T *)key);
-    wsQGm_.SetGlobalBuffer((__gm__ T *)wsQ);
-    wsKGm_.SetGlobalBuffer((__gm__ T *)wsK);
-    ocGm_.SetGlobalBuffer((__gm__ T *)gradCosOut);
-    osGm_.SetGlobalBuffer((__gm__ T *)gradSinOut);
+    gqGm_.SetGlobalBuffer((__gm__ T*)gradQ);
+    gkGm_.SetGlobalBuffer((__gm__ T*)gradK);
+    qGm_.SetGlobalBuffer((__gm__ T*)query);
+    kGm_.SetGlobalBuffer((__gm__ T*)key);
+    wsQGm_.SetGlobalBuffer((__gm__ T*)wsQ);
+    wsKGm_.SetGlobalBuffer((__gm__ T*)wsK);
+    ocGm_.SetGlobalBuffer((__gm__ T*)gradCosOut);
+    osGm_.SetGlobalBuffer((__gm__ T*)gradSinOut);
     int64_t inputBufferSize = ubB_ * D_ * sizeof(T);
     if constexpr (sizeof(T) != sizeof(float)) {
         inputBufferSize =
@@ -291,7 +291,7 @@ __aicore__ inline void ApplyDcosDsin<T>::ProcessTile(int64_t pos, int64_t len)
 }
 
 template <typename T>
-__aicore__ inline void ApplyDcosDsin<T>::CopyIn(TQue<QuePosition::VECIN, 1> &inQ, GlobalTensor<T> &src, int64_t pos,
+__aicore__ inline void ApplyDcosDsin<T>::CopyIn(TQue<QuePosition::VECIN, 1>& inQ, GlobalTensor<T>& src, int64_t pos,
                                                 int64_t len)
 {
     LocalTensor<T> t = inQ.template AllocTensor<T>();
@@ -306,7 +306,7 @@ __aicore__ inline void ApplyDcosDsin<T>::CopyIn(TQue<QuePosition::VECIN, 1> &inQ
 }
 
 template <typename T>
-__aicore__ inline void ApplyDcosDsin<T>::CopyOut(TQue<QuePosition::VECOUT, 1> &outQ, GlobalTensor<T> &dst, int64_t pos,
+__aicore__ inline void ApplyDcosDsin<T>::CopyOut(TQue<QuePosition::VECOUT, 1>& outQ, GlobalTensor<T>& dst, int64_t pos,
                                                  int64_t len)
 {
     LocalTensor<T> s = outQ.template DeQue<T>();
@@ -316,7 +316,7 @@ __aicore__ inline void ApplyDcosDsin<T>::CopyOut(TQue<QuePosition::VECOUT, 1> &o
 }
 
 template <typename T>
-__aicore__ inline LocalTensor<float> ApplyDcosDsin<T>::CastInputToFloat(LocalTensor<T> &input, uint32_t elemCnt)
+__aicore__ inline LocalTensor<float> ApplyDcosDsin<T>::CastInputToFloat(LocalTensor<T>& input, uint32_t elemCnt)
 {
     LocalTensor<float> inputFloat = input.template ReinterpretCast<float>();
     if constexpr (sizeof(T) != sizeof(float)) {

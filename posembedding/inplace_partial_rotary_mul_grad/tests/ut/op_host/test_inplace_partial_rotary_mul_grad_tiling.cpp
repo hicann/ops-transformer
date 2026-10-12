@@ -33,7 +33,7 @@ class InplacePartialRotaryMulGradTilingTest : public testing::Test {
 protected:
     static constexpr uint64_t k950CoreNum = 64;
     static constexpr uint64_t k950UbSize = 253952; // 248KB
-    static constexpr const char *kSocVersion = "Ascend950";
+    static constexpr const char* kSocVersion = "Ascend950";
     optiling::InplacePartialRotaryMulGradCompileInfo compileInfo_ = {};
 
     static void SetUpTestCase()

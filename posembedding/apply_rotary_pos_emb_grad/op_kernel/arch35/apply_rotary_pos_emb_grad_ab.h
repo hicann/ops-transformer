@@ -30,7 +30,7 @@ using namespace AscendC;
 template <typename T, bool kDcosFlag>
 class ApplyRotaryPosEmbGradAB {
 public:
-    __aicore__ inline ApplyRotaryPosEmbGradAB(TPipe *pipe, const ApplyRopeGradRegbaseABParams *tiling)
+    __aicore__ inline ApplyRotaryPosEmbGradAB(TPipe* pipe, const ApplyRopeGradRegbaseABParams* tiling)
         : pipe_(pipe),
           tilingData_(tiling)
     {}
@@ -41,8 +41,8 @@ public:
 private:
     constexpr static int32_t bufferNum = 2;
 
-    const ApplyRopeGradRegbaseABParams *tilingData_;
-    TPipe *pipe_;
+    const ApplyRopeGradRegbaseABParams* tilingData_;
+    TPipe* pipe_;
 
     GlobalTensor<T> gradQGm_;
     GlobalTensor<T> gradKGm_;
@@ -74,12 +74,12 @@ private:
 
 private:
     __aicore__ inline void ProcessNLoop(int64_t bsAbsIdx, int64_t nStart, uint32_t currBS, int64_t nBlockCount);
-    __aicore__ inline void ProcessN(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-                                    GlobalTensor<T> &gradXGm, GlobalTensor<T> &gradXOutGm, GlobalTensor<T> &xGm,
-                                    TQue<QuePosition::VECIN, bufferNum> &gradXInQue,
-                                    TQue<QuePosition::VECOUT, bufferNum> &gradXOutQue,
-                                    TQue<QuePosition::VECIN, bufferNum> &xInQue, int64_t gradGmOffset, int64_t currXN,
-                                    uint32_t currBS, LocalTensor<float> &cosPartial, LocalTensor<float> &sinPartial,
+    __aicore__ inline void ProcessN(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor,
+                                    GlobalTensor<T>& gradXGm, GlobalTensor<T>& gradXOutGm, GlobalTensor<T>& xGm,
+                                    TQue<QuePosition::VECIN, bufferNum>& gradXInQue,
+                                    TQue<QuePosition::VECOUT, bufferNum>& gradXOutQue,
+                                    TQue<QuePosition::VECIN, bufferNum>& xInQue, int64_t gradGmOffset, int64_t currXN,
+                                    uint32_t currBS, LocalTensor<float>& cosPartial, LocalTensor<float>& sinPartial,
                                     bool isAccumulate);
 };
 
@@ -100,16 +100,16 @@ __aicore__ inline void ApplyRotaryPosEmbGradAB<T, kDcosFlag>::Init(GM_ADDR gradQ
     ubFactorN_ = tilingData_->ubFactorN;
     ubFactorBS_ = tilingData_->ubFactorBS;
 
-    gradQGm_.SetGlobalBuffer((__gm__ T *)gradQueryEmbed);
-    gradKGm_.SetGlobalBuffer((__gm__ T *)gradKeyEmbed);
-    cosGm_.SetGlobalBuffer((__gm__ T *)cos);
-    sinGm_.SetGlobalBuffer((__gm__ T *)sin);
-    queryGm_.SetGlobalBuffer((__gm__ T *)query);
-    keyGm_.SetGlobalBuffer((__gm__ T *)key);
-    gradQOutGm_.SetGlobalBuffer((__gm__ T *)gradQueryOut);
-    gradKOutGm_.SetGlobalBuffer((__gm__ T *)gradKeyOut);
-    cosWsGm_.SetGlobalBuffer((__gm__ float *)cosWs);
-    sinWsGm_.SetGlobalBuffer((__gm__ float *)sinWs);
+    gradQGm_.SetGlobalBuffer((__gm__ T*)gradQueryEmbed);
+    gradKGm_.SetGlobalBuffer((__gm__ T*)gradKeyEmbed);
+    cosGm_.SetGlobalBuffer((__gm__ T*)cos);
+    sinGm_.SetGlobalBuffer((__gm__ T*)sin);
+    queryGm_.SetGlobalBuffer((__gm__ T*)query);
+    keyGm_.SetGlobalBuffer((__gm__ T*)key);
+    gradQOutGm_.SetGlobalBuffer((__gm__ T*)gradQueryOut);
+    gradKOutGm_.SetGlobalBuffer((__gm__ T*)gradKeyOut);
+    cosWsGm_.SetGlobalBuffer((__gm__ float*)cosWs);
+    sinWsGm_.SetGlobalBuffer((__gm__ float*)sinWs);
 
     gradQGm_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
     gradKGm_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
@@ -256,11 +256,11 @@ __aicore__ inline void ApplyRotaryPosEmbGradAB<T, kDcosFlag>::ProcessNLoop(int64
 // =================================================================
 template <typename T, bool kDcosFlag>
 __aicore__ inline void ApplyRotaryPosEmbGradAB<T, kDcosFlag>::ProcessN(
-    const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor, GlobalTensor<T> &gradXGm,
-    GlobalTensor<T> &gradXOutGm, GlobalTensor<T> &xGm, TQue<QuePosition::VECIN, bufferNum> &gradXInQue,
-    TQue<QuePosition::VECOUT, bufferNum> &gradXOutQue, TQue<QuePosition::VECIN, bufferNum> &xInQue,
-    int64_t gradGmOffset, int64_t currXN, uint32_t currBS, LocalTensor<float> &cosPartial,
-    LocalTensor<float> &sinPartial, bool isAccumulate)
+    const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, GlobalTensor<T>& gradXGm,
+    GlobalTensor<T>& gradXOutGm, GlobalTensor<T>& xGm, TQue<QuePosition::VECIN, bufferNum>& gradXInQue,
+    TQue<QuePosition::VECOUT, bufferNum>& gradXOutQue, TQue<QuePosition::VECIN, bufferNum>& xInQue,
+    int64_t gradGmOffset, int64_t currXN, uint32_t currBS, LocalTensor<float>& cosPartial,
+    LocalTensor<float>& sinPartial, bool isAccumulate)
 {
     ProcessGradTile<T, kDcosFlag, bufferNum>(sinTensor, cosTensor, gradXGm, gradXOutGm, xGm, gradXInQue, gradXOutQue,
                                              xInQue, gradGmOffset, currXN, currBS, cosPartial, sinPartial, isAccumulate,

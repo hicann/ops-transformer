@@ -25,8 +25,9 @@
 
 using namespace ApplyRotaryPosEmb;
 
-extern "C" __global__ __aicore__ void apply_rotary_pos_emb(
-    GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR q_out, GM_ADDR k_out, GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void apply_rotary_pos_emb(GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin,
+                                                           GM_ADDR q_out, GM_ADDR k_out, GM_ADDR workspace,
+                                                           GM_ADDR tiling)
 {
     if (g_coreType == AIC) {
         return;

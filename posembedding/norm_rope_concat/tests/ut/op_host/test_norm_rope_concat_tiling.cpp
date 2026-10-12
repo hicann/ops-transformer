@@ -34,12 +34,12 @@ protected:
     }
 };
 
-static string TilingData2Str(const gert::TilingData *tiling_data)
+static string TilingData2Str(const gert::TilingData* tiling_data)
 {
     auto data = tiling_data->GetData();
     string result;
     for (size_t i = 0; i < tiling_data->GetDataSize(); i += sizeof(int64_t)) {
-        result += std::to_string((reinterpret_cast<const int64_t *>(tiling_data->GetData())[i / sizeof(int64_t)]));
+        result += std::to_string((reinterpret_cast<const int64_t*>(tiling_data->GetData())[i / sizeof(int64_t)]));
         result += " ";
     }
 
@@ -87,7 +87,7 @@ TEST_F(NormRopeConcatTiling, norm_rope_concat_tiling_0)
             {"norm_added_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"rope_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"concat_order", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-                     {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+            {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
             {"is_training", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
         },
         &compileInfo);

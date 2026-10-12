@@ -46,8 +46,8 @@ def partial_rotary_mul_golden(x, cos, sin, slice_start, slice_end):
     x_rotate = np.concatenate((-x2, x1), axis=-1)
 
     # Broadcast cos/sin to match x_slice shape
-    cos_b = np.broadcast_to(cos[..., :slice_end - slice_start], x_slice.shape)
-    sin_b = np.broadcast_to(sin[..., :slice_end - slice_start], x_slice.shape)
+    cos_b = np.broadcast_to(cos[..., : slice_end - slice_start], x_slice.shape)
+    sin_b = np.broadcast_to(sin[..., : slice_end - slice_start], x_slice.shape)
 
     # Inplace update
     x[..., d_slice] = x_slice * cos_b + x_rotate * sin_b
@@ -62,7 +62,10 @@ def load_bin(filename, shape, dtype):
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python3 gen_golden.py <slice_start> <slice_end> [B S N D dtype]", file=sys.stderr)
+        print(
+            "Usage: python3 gen_golden.py <slice_start> <slice_end> [B S N D dtype]",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     slice_start = int(sys.argv[1])
@@ -70,32 +73,39 @@ def main():
 
     # Try to read shape info from params or from x_shape.txt
     try:
-        with open('x_shape.txt', 'r') as f:
+        with open("x_shape.txt", "r") as f:
             parts = f.read().strip().split()
             b, s, n, d = int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
             cos_shape = list(map(int, parts[4:8])) if len(parts) >= 8 else [b, s, n, d]
-            dtype_str = parts[8] if len(parts) >= 9 else 'float16'
+            dtype_str = parts[8] if len(parts) >= 9 else "float16"
     except FileNotFoundError:
         if len(sys.argv) < 7:
-            print("Error: need B S N D dtype when x_shape.txt is missing", file=sys.stderr)
+            print(
+                "Error: need B S N D dtype when x_shape.txt is missing", file=sys.stderr
+            )
             sys.exit(1)
-        b, s, n, d = int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]), int(sys.argv[6])
+        b, s, n, d = (
+            int(sys.argv[3]),
+            int(sys.argv[4]),
+            int(sys.argv[5]),
+            int(sys.argv[6]),
+        )
         cos_shape = [b, s, n, d]
-        dtype_str = sys.argv[7] if len(sys.argv) >= 8 else 'float16'
+        dtype_str = sys.argv[7] if len(sys.argv) >= 8 else "float16"
 
-    dtype_map = {'float16': np.float16, 'bfloat16': np.float32, 'float32': np.float32}
+    dtype_map = {"float16": np.float16, "bfloat16": np.float32, "float32": np.float32}
     np_dtype = dtype_map.get(dtype_str, np.float16)
 
-    x = load_bin('x.bin', [b, s, n, d], np_dtype)
-    cos = load_bin('cos.bin', cos_shape, np_dtype)
-    sin = load_bin('sin.bin', cos_shape, np_dtype)
+    x = load_bin("x.bin", [b, s, n, d], np_dtype)
+    cos = load_bin("cos.bin", cos_shape, np_dtype)
+    sin = load_bin("sin.bin", cos_shape, np_dtype)
 
     # Copy x since it's modified inplace (no-op when slice_start==slice_end)
     x_golden = partial_rotary_mul_golden(x.copy(), cos, sin, slice_start, slice_end)
 
-    x_golden.astype(np_dtype).tofile('golden.bin')
+    x_golden.astype(np_dtype).tofile("golden.bin")
     print(f"Generated golden: x{x.shape} slice=[{slice_start},{slice_end})")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

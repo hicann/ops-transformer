@@ -12,6 +12,7 @@ import sys
 import os
 import numpy as np
 
+
 def gen_data_and_golden(a, b, c, d, dtype_q):
     data_x = np.random.uniform(-2, 2, [int(a), int(b), int(c), int(d)]).astype(dtype_q)
     data_cos = np.random.uniform(-3, 4, [1, 1, int(c), int(d)]).astype(dtype_q)
@@ -19,6 +20,7 @@ def gen_data_and_golden(a, b, c, d, dtype_q):
     data_x.tofile("./x.bin")
     data_cos.tofile("./cos.bin")
     data_sin.tofile("./sin.bin")
+
 
 if __name__ == "__main__":
     os.system("rm -rf *.bin")

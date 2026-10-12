@@ -27,8 +27,8 @@ using namespace AscendC;
 template <typename TDY, typename TCOS>
 class InplacePartialRotaryMulGradBAB {
 public:
-    __aicore__ inline InplacePartialRotaryMulGradBAB(TPipe *pipe,
-                                                     const InplacePartialRotaryMulGradRegbaseTilingData *tiling)
+    __aicore__ inline InplacePartialRotaryMulGradBAB(TPipe* pipe,
+                                                     const InplacePartialRotaryMulGradRegbaseTilingData* tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR dy, GM_ADDR cos, GM_ADDR sin, GM_ADDR dx);
@@ -36,13 +36,13 @@ public:
 
 private:
     __aicore__ inline void ProcessNLoop(const uint32_t bIdx, const uint32_t sIdx, const uint32_t currSNum);
-    __aicore__ inline void ProcessN(LocalTensor<TCOS> &sinTensor, LocalTensor<TCOS> &cosTensor, const uint32_t bIdx,
+    __aicore__ inline void ProcessN(LocalTensor<TCOS>& sinTensor, LocalTensor<TCOS>& cosTensor, const uint32_t bIdx,
                                     const uint32_t sIdx, const uint32_t currSNum);
-    __aicore__ inline void Compute(LocalTensor<TCOS> &sinTensor, LocalTensor<TCOS> &cosTensor,
-                                   LocalTensor<TDY> &dyTensor, LocalTensor<TDY> &dxTensor, const uint32_t currSNum,
+    __aicore__ inline void Compute(LocalTensor<TCOS>& sinTensor, LocalTensor<TCOS>& cosTensor,
+                                   LocalTensor<TDY>& dyTensor, LocalTensor<TDY>& dxTensor, const uint32_t currSNum,
                                    const uint32_t currNNum);
 
-    TPipe *pipe_{nullptr};
+    TPipe* pipe_{nullptr};
     int64_t blockIdx_{0};
     TQue<QuePosition::VECIN, 1> dyInQue_;
     TQue<QuePosition::VECIN, 1> cosInQue_;
@@ -54,7 +54,7 @@ private:
     GlobalTensor<TCOS> cosGm_;
     GlobalTensor<TCOS> sinGm_;
 
-    const InplacePartialRotaryMulGradRegbaseTilingData *tilingData_{nullptr};
+    const InplacePartialRotaryMulGradRegbaseTilingData* tilingData_{nullptr};
     uint32_t dSplitSizeDy_{0};
     uint32_t dSplitSizeCos_{0};
     int64_t dAlignLenDy_{0};
@@ -86,10 +86,10 @@ __aicore__ inline void InplacePartialRotaryMulGradBAB<TDY, TCOS>::Init(GM_ADDR d
     this->dSplitSizeCos_ = static_cast<uint32_t>(tilingData_->sliceLength * sizeof(TCOS) / dSplitCoef_);
     this->ubFactorN_ = tilingData_->ubFactorN;
     this->ubFactorS_ = tilingData_->ubFactorS;
-    this->dyGm_.SetGlobalBuffer((__gm__ TDY *)dy);
-    this->dxGm_.SetGlobalBuffer((__gm__ TDY *)dx);
-    this->cosGm_.SetGlobalBuffer((__gm__ TCOS *)cos);
-    this->sinGm_.SetGlobalBuffer((__gm__ TCOS *)sin);
+    this->dyGm_.SetGlobalBuffer((__gm__ TDY*)dy);
+    this->dxGm_.SetGlobalBuffer((__gm__ TDY*)dx);
+    this->cosGm_.SetGlobalBuffer((__gm__ TCOS*)cos);
+    this->sinGm_.SetGlobalBuffer((__gm__ TCOS*)sin);
 
     this->pipe_->InitBuffer(this->dyInQue_, 2, ubFactorS_ * ubFactorN_ * dAlignLenDy_ * sizeof(TDY));
     this->pipe_->InitBuffer(this->dxOutQue_, 2, ubFactorS_ * ubFactorN_ * dAlignLenDy_ * sizeof(TDY));
@@ -151,8 +151,8 @@ __aicore__ inline void InplacePartialRotaryMulGradBAB<TDY, TCOS>::ProcessNLoop(c
 }
 
 template <typename TDY, typename TCOS>
-__aicore__ inline void InplacePartialRotaryMulGradBAB<TDY, TCOS>::ProcessN(LocalTensor<TCOS> &sinTensor,
-                                                                           LocalTensor<TCOS> &cosTensor,
+__aicore__ inline void InplacePartialRotaryMulGradBAB<TDY, TCOS>::ProcessN(LocalTensor<TCOS>& sinTensor,
+                                                                           LocalTensor<TCOS>& cosTensor,
                                                                            const uint32_t bIdx, const uint32_t sIdx,
                                                                            const uint32_t currSNum)
 {
@@ -185,7 +185,7 @@ __aicore__ inline void InplacePartialRotaryMulGradBAB<TDY, TCOS>::ProcessN(Local
 
 template <typename TDY, typename TCOS>
 __aicore__ inline void InplacePartialRotaryMulGradBAB<TDY, TCOS>::Compute(
-    LocalTensor<TCOS> &sinTensor, LocalTensor<TCOS> &cosTensor, LocalTensor<TDY> &dyTensor, LocalTensor<TDY> &dxTensor,
+    LocalTensor<TCOS>& sinTensor, LocalTensor<TCOS>& cosTensor, LocalTensor<TDY>& dyTensor, LocalTensor<TDY>& dxTensor,
     const uint32_t currSNum, const uint32_t currNNum)
 {
     InterleaveModeGradVF<TDY, TCOS>(sinTensor, cosTensor, dyTensor, dxTensor, tilingData_->sliceLength, dSplitCoef_,

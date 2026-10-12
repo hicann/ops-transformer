@@ -50,23 +50,17 @@ tiling_params = {
     # === No-op (empty slice, sliceStart == sliceEnd) ===
     # Kernel reads sliceLength==0 and returns without computation
     (TILING_KEY_NOOP, 32, 32): None,  # placeholder, tiling data sets sliceLength=0
-
     # === AAndB: x=[2,4,8,128], cos=[2,4,8,128], FP16, slice=[0,128] → TilingKey 20040 ===
     # TODO: Fill in from OpHost UT run on Ascend dev machine
     (20040, 0, 128): None,
-
     # AAndB: x=[2,4,8,128], cos=[1,1,1,128], FP16, slice=[0,128] → TilingKey 20041
     (20041, 0, 128): None,
-
     # BAB: x=[2,4,8,64], cos=[1,4,1,64], FP16, slice=[0,64] → TilingKey 20020
     (20020, 0, 64): None,
-
     # Fast path: Key 1 (isBrc=true), x=[1,4,1,64], FP16, slice=[0,64]
     (1, 0, 64): None,
-
     # Fast path: Key 2 (isBrc=false), x=[1,1,1,64], FP16, slice=[0,64]
     (2, 0, 64): None,
-
     # Generic Split S: x=[1,4,1,256], FP16, slice=[0,256] → TilingKey 2000
     (2000, 0, 256): None,
 }
@@ -74,7 +68,10 @@ tiling_params = {
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python3 gen_tiling.py <tiling_key> [slice_start] [slice_end]", file=sys.stderr)
+        print(
+            "Usage: python3 gen_tiling.py <tiling_key> [slice_start] [slice_end]",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     tiling_key = int(sys.argv[1])
@@ -89,17 +86,22 @@ def main():
         # Fallback: zero-filled tiling data
         # Note: this is a placeholder. Actual tiling data must be calibrated
         # from the OpHost UT output for each specific shape/dtype combination.
-        print(f"Warning: no calibrated tiling data for (key={tiling_key}, "
-              f"slice=[{slice_start},{slice_end}]), using zero-filled placeholder", file=sys.stderr)
+        print(
+            f"Warning: no calibrated tiling data for (key={tiling_key}, "
+            f"slice=[{slice_start},{slice_end}]), using zero-filled placeholder",
+            file=sys.stderr,
+        )
         params = [0] * TILING_DATA_SIZE
 
     base_params = np.array(params, dtype=np.int64)
     with open("tiling.bin", "wb") as f:
         base_params.tofile(f)
 
-    print(f"Written tiling.bin: tiling_key={tiling_key}, "
-          f"slice=[{slice_start},{slice_end}], size={len(params)} int64")
+    print(
+        f"Written tiling.bin: tiling_key={tiling_key}, "
+        f"slice=[{slice_start},{slice_end}], size={len(params)} int64"
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

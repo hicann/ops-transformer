@@ -27,7 +27,7 @@ static constexpr size_t OUTPUT_0_IDX = 0;
 static constexpr size_t OUTPUT_1_IDX = 1;
 static constexpr int64_t NEG_TWO = -2;
 
-static bool BroadcastDim(int64_t &dim1, const int64_t dim2)
+static bool BroadcastDim(int64_t& dim1, const int64_t dim2)
 {
     /* column is dim1, row is dim2, matrix value is broadcast(dim1, dim2)
     dim -1  0  1  d2
@@ -69,11 +69,11 @@ static bool BroadcastDim(int64_t &dim1, const int64_t dim2)
  * @param [in/out] shape_output: gert::Shape*, output shape
  * @return succeed or not
  */
-static bool BroadcastShapeToOutShape(const gert::Shape *shape, gert::Shape *shape_output)
+static bool BroadcastShapeToOutShape(const gert::Shape* shape, gert::Shape* shape_output)
 {
     OP_LOGD("BroadcastShapeToOutShape", "start broadcast %s to %s!", Ops::Base::ToString(*shape).c_str(),
             Ops::Base::ToString(*shape_output).c_str());
-    
+
     if (Ops::Base::IsUnknownRank(*shape) || Ops::Base::IsUnknownRank(*shape_output)) {
         OP_LOGD("BroadcastShapeToOutShape", "the input shape is [-2], set output shape is [-2]!");
         shape_output->SetDimNum(1);
@@ -113,7 +113,7 @@ static bool BroadcastShapeToOutShape(const gert::Shape *shape, gert::Shape *shap
     return true;
 }
 
-static bool BroadcastShape(const gert::Shape *in1_shape, const gert::Shape *in2_shape, gert::Shape *out_shape)
+static bool BroadcastShape(const gert::Shape* in1_shape, const gert::Shape* in2_shape, gert::Shape* out_shape)
 {
     *out_shape = *in1_shape;
 
@@ -124,23 +124,22 @@ static bool BroadcastShape(const gert::Shape *in1_shape, const gert::Shape *in2_
     return true;
 }
 
-
-static ge::graphStatus ApplyRotaryPosEmbInferShape(gert::InferShapeContext *context)
+static ge::graphStatus ApplyRotaryPosEmbInferShape(gert::InferShapeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do ApplyRotaryPosEmbInferShape");
     // get input shapes
-    const gert::Shape *qShape = context->GetInputShape(INPUT0);
+    const gert::Shape* qShape = context->GetInputShape(INPUT0);
     OP_CHECK_NULL_WITH_CONTEXT(context, qShape);
-    const gert::Shape *kShape = context->GetInputShape(INPUT1);
+    const gert::Shape* kShape = context->GetInputShape(INPUT1);
     OP_CHECK_NULL_WITH_CONTEXT(context, kShape);
-    const gert::Shape *cosShape = context->GetInputShape(INPUT2);
+    const gert::Shape* cosShape = context->GetInputShape(INPUT2);
     OP_CHECK_NULL_WITH_CONTEXT(context, cosShape);
-    const gert::Shape *sinShape = context->GetInputShape(INPUT3);
+    const gert::Shape* sinShape = context->GetInputShape(INPUT3);
     OP_CHECK_NULL_WITH_CONTEXT(context, sinShape);
     // get output shapes
-    gert::Shape *qOutshape = context->GetOutputShape(OUTPUT_0_IDX);
+    gert::Shape* qOutshape = context->GetOutputShape(OUTPUT_0_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, qOutshape);
-    gert::Shape *kOutshape = context->GetOutputShape(OUTPUT_1_IDX);
+    gert::Shape* kOutshape = context->GetOutputShape(OUTPUT_1_IDX);
     if (Ops::Base::IsUnknownRank(*qShape)) {
         qOutshape->SetDimNum(1);
         qOutshape->SetDim(0, NEG_TWO);

@@ -56,33 +56,89 @@ def norm(x, mean, rstd, modeType, weight=None, bias=None, eps=1e-5):
 class MethodTorchNnNormRopeConcatGradApi(BaseApi):
     def normropeconcat_forward(self, input_data):
         self.origin_dtype = input_data.kwargs["gradQueryOutput"].dtype
-        self.gradQueryOutput = input_data.kwargs["gradQueryOutput"].float().clone().requires_grad_(False)
-        self.gradKeyOutput = input_data.kwargs["gradKeyOutput"].float().clone().requires_grad_(False)
-        self.gradValueOutput = input_data.kwargs["gradValueOutput"].float().clone().requires_grad_(False)
+        self.gradQueryOutput = (
+            input_data.kwargs["gradQueryOutput"].float().clone().requires_grad_(False)
+        )
+        self.gradKeyOutput = (
+            input_data.kwargs["gradKeyOutput"].float().clone().requires_grad_(False)
+        )
+        self.gradValueOutput = (
+            input_data.kwargs["gradValueOutput"].float().clone().requires_grad_(False)
+        )
         self.query = input_data.kwargs["query"].float().clone().requires_grad_(True)
         self.key = input_data.kwargs["key"].float().clone().requires_grad_(True)
         self.value = input_data.kwargs["key"].float().clone().requires_grad_(True)
-        self.encoderQuery = input_data.kwargs["encoderQuery"].float().clone().requires_grad_(True)
-        self.encoderKey = input_data.kwargs["encoderKey"].float().clone().requires_grad_(True)
-        self.encoderValue = input_data.kwargs["encoderKey"].float().clone().requires_grad_(True)
-        self.normQueryWeight = nn.Parameter(input_data.kwargs["normQueryWeight"].float().clone(), requires_grad=True)
-        self.normQueryBias = nn.Parameter(input_data.kwargs["normQueryWeight"].float().clone(), requires_grad=True)
-        self.normQueryMean = input_data.kwargs["normQueryMean"].float().clone().requires_grad_(False)
-        self.normQueryRstd = input_data.kwargs["normQueryRstd"].float().clone().requires_grad_(False)
-        self.normKeyWeight = nn.Parameter(input_data.kwargs["normKeyWeight"].float().clone(), requires_grad=True)
-        self.normKeyBias = nn.Parameter(input_data.kwargs["normKeyWeight"].float().clone(), requires_grad=True)
-        self.normKeyMean = input_data.kwargs["normKeyMean"].float().clone().requires_grad_(False)
-        self.normKeyRstd = input_data.kwargs["normKeyRstd"].float().clone().requires_grad_(False)
-        self.normAddedQueryWeight = nn.Parameter(input_data.kwargs["normAddedQueryWeight"].float().clone(), requires_grad=True)
-        self.normAddedQueryBias = nn.Parameter(input_data.kwargs["normAddedQueryWeight"].float().clone(), requires_grad=True)
-        self.normAddedQueryMean = input_data.kwargs["normAddedQueryMean"].float().clone().requires_grad_(False)
-        self.normAddedQueryRstd = input_data.kwargs["normAddedQueryRstd"].float().clone().requires_grad_(False)
-        self.normAddedKeyWeight = nn.Parameter(input_data.kwargs["normAddedKeyWeight"].float().clone(), requires_grad=True)
-        self.normAddedKeyBias = nn.Parameter(input_data.kwargs["normAddedKeyWeight"].float().clone(), requires_grad=True)
-        self.normAddedKeyMean = input_data.kwargs["normAddedKeyMean"].float().clone().requires_grad_(False)
-        self.normAddedKeyRstd = input_data.kwargs["normAddedKeyRstd"].float().clone().requires_grad_(False)
-        self.ropeSin = input_data.kwargs["ropeSin"].float().clone().requires_grad_(False)
-        self.ropeCos = input_data.kwargs["ropeCos"].float().clone().requires_grad_(False)
+        self.encoderQuery = (
+            input_data.kwargs["encoderQuery"].float().clone().requires_grad_(True)
+        )
+        self.encoderKey = (
+            input_data.kwargs["encoderKey"].float().clone().requires_grad_(True)
+        )
+        self.encoderValue = (
+            input_data.kwargs["encoderKey"].float().clone().requires_grad_(True)
+        )
+        self.normQueryWeight = nn.Parameter(
+            input_data.kwargs["normQueryWeight"].float().clone(), requires_grad=True
+        )
+        self.normQueryBias = nn.Parameter(
+            input_data.kwargs["normQueryWeight"].float().clone(), requires_grad=True
+        )
+        self.normQueryMean = (
+            input_data.kwargs["normQueryMean"].float().clone().requires_grad_(False)
+        )
+        self.normQueryRstd = (
+            input_data.kwargs["normQueryRstd"].float().clone().requires_grad_(False)
+        )
+        self.normKeyWeight = nn.Parameter(
+            input_data.kwargs["normKeyWeight"].float().clone(), requires_grad=True
+        )
+        self.normKeyBias = nn.Parameter(
+            input_data.kwargs["normKeyWeight"].float().clone(), requires_grad=True
+        )
+        self.normKeyMean = (
+            input_data.kwargs["normKeyMean"].float().clone().requires_grad_(False)
+        )
+        self.normKeyRstd = (
+            input_data.kwargs["normKeyRstd"].float().clone().requires_grad_(False)
+        )
+        self.normAddedQueryWeight = nn.Parameter(
+            input_data.kwargs["normAddedQueryWeight"].float().clone(),
+            requires_grad=True,
+        )
+        self.normAddedQueryBias = nn.Parameter(
+            input_data.kwargs["normAddedQueryWeight"].float().clone(),
+            requires_grad=True,
+        )
+        self.normAddedQueryMean = (
+            input_data.kwargs["normAddedQueryMean"]
+            .float()
+            .clone()
+            .requires_grad_(False)
+        )
+        self.normAddedQueryRstd = (
+            input_data.kwargs["normAddedQueryRstd"]
+            .float()
+            .clone()
+            .requires_grad_(False)
+        )
+        self.normAddedKeyWeight = nn.Parameter(
+            input_data.kwargs["normAddedKeyWeight"].float().clone(), requires_grad=True
+        )
+        self.normAddedKeyBias = nn.Parameter(
+            input_data.kwargs["normAddedKeyWeight"].float().clone(), requires_grad=True
+        )
+        self.normAddedKeyMean = (
+            input_data.kwargs["normAddedKeyMean"].float().clone().requires_grad_(False)
+        )
+        self.normAddedKeyRstd = (
+            input_data.kwargs["normAddedKeyRstd"].float().clone().requires_grad_(False)
+        )
+        self.ropeSin = (
+            input_data.kwargs["ropeSin"].float().clone().requires_grad_(False)
+        )
+        self.ropeCos = (
+            input_data.kwargs["ropeCos"].float().clone().requires_grad_(False)
+        )
         self.normType = input_data.kwargs["normType"]
         self.normAddedType = input_data.kwargs["normAddedType"]
         self.ropeType = input_data.kwargs["ropeType"]
@@ -104,15 +160,43 @@ class MethodTorchNnNormRopeConcatGradApi(BaseApi):
 
         # 开始计算
         if self.normType != 0:
-            queryNorm = norm(self.query, self.normQueryMean, self.normQueryRstd, self.normType, self.normQueryWeight, self.normQueryBias)
-            keyNorm = norm(self.key, self.normKeyMean, self.normKeyRstd, self.normType, self.normKeyWeight, self.normKeyBias)
+            queryNorm = norm(
+                self.query,
+                self.normQueryMean,
+                self.normQueryRstd,
+                self.normType,
+                self.normQueryWeight,
+                self.normQueryBias,
+            )
+            keyNorm = norm(
+                self.key,
+                self.normKeyMean,
+                self.normKeyRstd,
+                self.normType,
+                self.normKeyWeight,
+                self.normKeyBias,
+            )
         else:
             queryNorm = self.query
             keyNorm = self.key
 
         if self.normAddedType != 0:
-            encoderQueryNorm = norm(self.encoderQuery, self.normAddedQueryMean, self.normAddedQueryRstd, self.normAddedType, self.normAddedQueryWeight, self.normAddedQueryBias)
-            encoderKeyNorm = norm(self.encoderKey, self.normAddedKeyMean, self.normAddedKeyRstd, self.normAddedType, self.normAddedKeyWeight, self.normAddedKeyBias)
+            encoderQueryNorm = norm(
+                self.encoderQuery,
+                self.normAddedQueryMean,
+                self.normAddedQueryRstd,
+                self.normAddedType,
+                self.normAddedQueryWeight,
+                self.normAddedQueryBias,
+            )
+            encoderKeyNorm = norm(
+                self.encoderKey,
+                self.normAddedKeyMean,
+                self.normAddedKeyRstd,
+                self.normAddedType,
+                self.normAddedKeyWeight,
+                self.normAddedKeyBias,
+            )
         else:
             encoderQueryNorm = self.encoderQuery
             encoderKeyNorm = self.encoderKey
@@ -131,12 +215,22 @@ class MethodTorchNnNormRopeConcatGradApi(BaseApi):
         self.valueConcat = torch.permute(valueConcat, (0, 2, 1, 3))
 
         if self.ropeType != 0:
-            self.queryConcat[:, :, :ropeSeq] = image_rotary_emb(self.queryConcat[:, :, :ropeSeq], self.ropeSin, self.ropeCos, mode=self.ropeType)
-            self.keyConcat[:, :, :ropeSeq] = image_rotary_emb(self.keyConcat[:, :, :ropeSeq], self.ropeSin, self.ropeCos, mode=self.ropeType)
+            self.queryConcat[:, :, :ropeSeq] = image_rotary_emb(
+                self.queryConcat[:, :, :ropeSeq],
+                self.ropeSin,
+                self.ropeCos,
+                mode=self.ropeType,
+            )
+            self.keyConcat[:, :, :ropeSeq] = image_rotary_emb(
+                self.keyConcat[:, :, :ropeSeq],
+                self.ropeSin,
+                self.ropeCos,
+                mode=self.ropeType,
+            )
 
     def __call__(self, input_data: InputDataset, with_output: bool = False):
         results = []
-        if self.device == 'cpu' or self.device == 'npu':
+        if self.device == "cpu" or self.device == "npu":
             # 反向求导
             self.queryConcat.backward(self.gradQueryOutput, retain_graph=True)
             self.keyConcat.backward(self.gradKeyOutput, retain_graph=True)
@@ -172,8 +266,22 @@ class MethodTorchNnNormRopeConcatGradApi(BaseApi):
                 gradNormAddedKeyWeight = self.normAddedKeyWeight.grad.clone()
                 gradNormAddedKeyBias = self.normAddedKeyBias.grad.clone()
 
-            results = [gradQuery, gradKey, gradValue, gradencoderQuery, gradEncoderKey, gradEncoderValue, gradNormQueryWeight, gradNormQueryBias, gradNormKeyWeight,
-                       gradNormKeyBias, gradNormAddedQueryWeight, gradNormAddedQueryBias, gradNormAddedKeyWeight, gradNormAddedKeyBias]
+            results = [
+                gradQuery,
+                gradKey,
+                gradValue,
+                gradencoderQuery,
+                gradEncoderKey,
+                gradEncoderValue,
+                gradNormQueryWeight,
+                gradNormQueryBias,
+                gradNormKeyWeight,
+                gradNormKeyBias,
+                gradNormAddedQueryWeight,
+                gradNormAddedQueryBias,
+                gradNormAddedKeyWeight,
+                gradNormAddedKeyBias,
+            ]
             for i in range(len(results)):
                 results[i] = results[i].to(self.origin_dtype)
 
@@ -183,7 +291,6 @@ class MethodTorchNnNormRopeConcatGradApi(BaseApi):
         return AclFormat.ACL_FORMAT_ND
 
     def init_by_input_data(self, input_data: InputDataset, with_output: bool = False):
-
         normType = input_data.kwargs["normType"]
         normAddedType = input_data.kwargs["normAddedType"]
         ropeType = input_data.kwargs["ropeType"]
@@ -191,31 +298,46 @@ class MethodTorchNnNormRopeConcatGradApi(BaseApi):
         eps = 1e-5
         if normType is not None and normType != 0:
             mean = torch.mean(input_data.kwargs["query"].float(), -1, keepdim=True)
-            var = torch.var(input_data.kwargs["query"].float(), -1, correction=0, keepdim=True)
+            var = torch.var(
+                input_data.kwargs["query"].float(), -1, correction=0, keepdim=True
+            )
             rstd = torch.rsqrt(var + eps)
             input_data.kwargs["normQueryMean"] = mean.to(torch.float32)
             input_data.kwargs["normQueryRstd"] = rstd.to(torch.float32)
 
             mean2 = torch.mean(input_data.kwargs["key"].float(), -1, keepdim=True)
-            var2 = torch.var(input_data.kwargs["key"].float(), -1, correction=0, keepdim=True)
+            var2 = torch.var(
+                input_data.kwargs["key"].float(), -1, correction=0, keepdim=True
+            )
             rstd2 = torch.rsqrt(var2 + eps)
             input_data.kwargs["normKeyMean"] = mean2.to(torch.float32)
             input_data.kwargs["normKeyRstd"] = rstd2.to(torch.float32)
 
         if normAddedType is not None and normAddedType != 0:
-            mean3 = torch.mean(input_data.kwargs["encoderQuery"].float(), -1, keepdim=True)
-            var3 = torch.var(input_data.kwargs["encoderQuery"].float(), -1, correction=0, keepdim=True)
+            mean3 = torch.mean(
+                input_data.kwargs["encoderQuery"].float(), -1, keepdim=True
+            )
+            var3 = torch.var(
+                input_data.kwargs["encoderQuery"].float(),
+                -1,
+                correction=0,
+                keepdim=True,
+            )
             rstd3 = torch.rsqrt(var3 + eps)
             input_data.kwargs["normAddedQueryMean"] = mean3.to(torch.float32)
             input_data.kwargs["normAddedQueryRstd"] = rstd3.to(torch.float32)
 
-            mean4 = torch.mean(input_data.kwargs["encoderKey"].float(), -1, keepdim=True)
-            var4 = torch.var(input_data.kwargs["encoderKey"].float(), -1, correction=0, keepdim=True)
+            mean4 = torch.mean(
+                input_data.kwargs["encoderKey"].float(), -1, keepdim=True
+            )
+            var4 = torch.var(
+                input_data.kwargs["encoderKey"].float(), -1, correction=0, keepdim=True
+            )
             rstd4 = torch.rsqrt(var4 + eps)
             input_data.kwargs["normAddedKeyMean"] = mean4.to(torch.float32)
             input_data.kwargs["normAddedKeyRstd"] = rstd4.to(torch.float32)
 
-        if self.device == 'cpu' or self.device == 'npu':
+        if self.device == "cpu" or self.device == "npu":
             self.normropeconcat_forward(input_data)
 
         time.sleep(2)
@@ -232,12 +354,26 @@ class NormRopeConcatGradAclnnApi(AclnnBaseApi):
         return super().init_by_input_data(input_data)
 
     def after_call(self, output_packages):
-
         output = []
         for output_pack in output_packages:
             output.append(self.acl_tensor_to_torch(output_pack))
 
-        gradQuery, gradKey, gradValue, gradencoderQuery, gradEncoderKey, gradEncoderValue, gradNormQueryWeight, gradNormQueryBias, gradNormKeyWeight, gradNormKeyBias, gradNormAddedQueryWeight, gradNormAddedQueryBias, gradNormAddedKeyWeight, gradNormAddedKeyBias = output
+        (
+            gradQuery,
+            gradKey,
+            gradValue,
+            gradencoderQuery,
+            gradEncoderKey,
+            gradEncoderValue,
+            gradNormQueryWeight,
+            gradNormQueryBias,
+            gradNormKeyWeight,
+            gradNormKeyBias,
+            gradNormAddedQueryWeight,
+            gradNormAddedQueryBias,
+            gradNormAddedKeyWeight,
+            gradNormAddedKeyBias,
+        ) = output
         if self.my_data.kwargs["normType"] != 2:
             gradNormQueryWeight.zero_()
             gradNormQueryBias.zero_()
@@ -250,5 +386,20 @@ class NormRopeConcatGradAclnnApi(AclnnBaseApi):
             gradNormAddedKeyWeight.zero_()
             gradNormAddedKeyBias.zero_()
 
-        output = (gradQuery, gradKey, gradValue, gradencoderQuery, gradEncoderKey, gradEncoderValue, gradNormQueryWeight, gradNormQueryBias, gradNormKeyWeight, gradNormKeyBias, gradNormAddedQueryWeight, gradNormAddedQueryBias, gradNormAddedKeyWeight, gradNormAddedKeyBias)
+        output = (
+            gradQuery,
+            gradKey,
+            gradValue,
+            gradencoderQuery,
+            gradEncoderKey,
+            gradEncoderValue,
+            gradNormQueryWeight,
+            gradNormQueryBias,
+            gradNormKeyWeight,
+            gradNormKeyBias,
+            gradNormAddedQueryWeight,
+            gradNormAddedQueryBias,
+            gradNormAddedKeyWeight,
+            gradNormAddedKeyBias,
+        )
         return output

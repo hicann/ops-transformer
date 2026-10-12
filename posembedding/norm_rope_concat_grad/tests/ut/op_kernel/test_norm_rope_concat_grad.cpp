@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-
 #include <array>
 #include <vector>
 #include <iostream>
@@ -28,18 +27,18 @@
 using namespace std;
 
 // CPU模式下kernel最多支持32个输入输出tensor，超过部分统一设置uint32_t固定常数且避开使用
-extern "C" __global__ __aicore__ void norm_rope_concat_grad(GM_ADDR gm_grad_query_output, 
-    GM_ADDR gm_grad_key_output, GM_ADDR gm_grad_value_output, GM_ADDR gm_query, GM_ADDR gm_key,
-    GM_ADDR gm_encoder_query, GM_ADDR gm_encoder_key, GM_ADDR gm_norm_query_weight, GM_ADDR gm_norm_query_mean,
-    GM_ADDR gm_norm_query_rstd, GM_ADDR gm_norm_key_weight, GM_ADDR gm_norm_key_mean, GM_ADDR gm_norm_key_rstd,
-    GM_ADDR gm_norm_added_query_weight, GM_ADDR gm_norm_added_query_mean, GM_ADDR gm_norm_added_query_rstd,
-    GM_ADDR gm_norm_added_key_weight, GM_ADDR gm_norm_added_key_mean, GM_ADDR gm_norm_added_key_rstd,
-    GM_ADDR gm_rope_sin, GM_ADDR gm_rope_cos,GM_ADDR gm_grad_query, 
+extern "C" __global__ __aicore__ void norm_rope_concat_grad(
+    GM_ADDR gm_grad_query_output, GM_ADDR gm_grad_key_output, GM_ADDR gm_grad_value_output, GM_ADDR gm_query,
+    GM_ADDR gm_key, GM_ADDR gm_encoder_query, GM_ADDR gm_encoder_key, GM_ADDR gm_norm_query_weight,
+    GM_ADDR gm_norm_query_mean, GM_ADDR gm_norm_query_rstd, GM_ADDR gm_norm_key_weight, GM_ADDR gm_norm_key_mean,
+    GM_ADDR gm_norm_key_rstd, GM_ADDR gm_norm_added_query_weight, GM_ADDR gm_norm_added_query_mean,
+    GM_ADDR gm_norm_added_query_rstd, GM_ADDR gm_norm_added_key_weight, GM_ADDR gm_norm_added_key_mean,
+    GM_ADDR gm_norm_added_key_rstd, GM_ADDR gm_rope_sin, GM_ADDR gm_rope_cos, GM_ADDR gm_grad_query,
     GM_ADDR gm_grad_key, GM_ADDR gm_grad_value, GM_ADDR gm_grad_encoder_query, GM_ADDR gm_grad_encoder_key,
     GM_ADDR gm_grad_encoder_value, GM_ADDR gm_grad_norm_query_weight, GM_ADDR gm_grad_norm_query_bias,
     GM_ADDR gm_grad_norm_key_weight, GM_ADDR gm_grad_norm_key_bias, uint32_t gm_grad_norm_added_query_weight,
-    uint32_t gm_grad_norm_added_query_bias, uint32_t gm_grad_norm_added_key_weight, uint32_t gm_grad_norm_added_key_bias,
-    GM_ADDR workspaceGM, GM_ADDR tiling);
+    uint32_t gm_grad_norm_added_query_bias, uint32_t gm_grad_norm_added_key_weight,
+    uint32_t gm_grad_norm_added_key_bias, GM_ADDR workspaceGM, GM_ADDR tiling);
 
 class norm_rope_concat_grad_test : public testing::Test {
 protected:
@@ -52,23 +51,23 @@ protected:
         cout << "norm_rope_concat_grad_test TearDown\n" << endl;
     }
 };
-void run_norm_rope_concat_grad_case(
-    uint64_t batchSize, uint64_t querySeq, uint64_t keySeq, uint64_t encoderQuerySeq, uint64_t encoderKeySeq, 
-    uint64_t ropeSeq, uint64_t headDim, uint64_t headNum, uint32_t usedCore, std::string& originDtype, std::string& caseName, uint64_t tiling_key)
+void run_norm_rope_concat_grad_case(uint64_t batchSize, uint64_t querySeq, uint64_t keySeq, uint64_t encoderQuerySeq,
+                                    uint64_t encoderKeySeq, uint64_t ropeSeq, uint64_t headDim, uint64_t headNum,
+                                    uint32_t usedCore, std::string& originDtype, std::string& caseName,
+                                    uint64_t tiling_key)
 {
-    system(
-        "cp -r ../../../../../posembedding/norm_rope_concat_grad/tests/ut/op_kernel/norm_rope_concat_grad_data "
-        "./");
+    system("cp -r ../../../../../posembedding/norm_rope_concat_grad/tests/ut/op_kernel/norm_rope_concat_grad_data "
+           "./");
     system("chmod -R 755 ./norm_rope_concat_grad_data/");
     system("cd ./norm_rope_concat_grad_data/ && rm -rf ./*bin");
     system("ls -lh ./norm_rope_concat_grad_data/");
 
-    std::string gen_data_cmd = "cd ./norm_rope_concat_grad_data/ && python3 gen_data.py " +
-                               std::to_string(batchSize) + std::string(" ") + std::to_string(headNum) + std::string(" ") + 
-                               std::to_string(headDim) + std::string(" ") + std::to_string(querySeq + encoderQuerySeq) + std::string(" ") + 
-                               std::to_string(keySeq + encoderKeySeq) + std::string(" ") + std::to_string(querySeq) + std::string(" ") + 
-                               std::to_string(keySeq) + std::string(" ") + std::to_string(ropeSeq) + std::string(" ") + 
-                               originDtype + std::string(" ") + std::to_string(tiling_key);
+    std::string gen_data_cmd = "cd ./norm_rope_concat_grad_data/ && python3 gen_data.py " + std::to_string(batchSize) +
+                               std::string(" ") + std::to_string(headNum) + std::string(" ") + std::to_string(headDim) +
+                               std::string(" ") + std::to_string(querySeq + encoderQuerySeq) + std::string(" ") +
+                               std::to_string(keySeq + encoderKeySeq) + std::string(" ") + std::to_string(querySeq) +
+                               std::string(" ") + std::to_string(keySeq) + std::string(" ") + std::to_string(ropeSeq) +
+                               std::string(" ") + originDtype + std::string(" ") + std::to_string(tiling_key);
     system(gen_data_cmd.c_str());
 
     std::string gen_tiling_cmd = "cd ./norm_rope_concat_grad_data/ && python3 gen_tiling.py " + caseName;
@@ -150,45 +149,56 @@ void run_norm_rope_concat_grad_case(
     uint8_t* gradNormAddedKeyWeight = (uint8_t*)AscendC::GmAlloc(gradNormAddedKeyWeightSize);
     uint8_t* gradNormAddedKeyBias = (uint8_t*)AscendC::GmAlloc(gradNormAddedKeyBiasSize);
 
-
-    uint8_t* workSpace = (uint8_t*)AscendC::GmAlloc(37814272*2);
+    uint8_t* workSpace = (uint8_t*)AscendC::GmAlloc(37814272 * 2);
     size_t tilingSize = sizeof(NormRopeConcatGradTilingData);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingSize);
     NormRopeConcatGradTilingData* tilingDatafromBin = reinterpret_cast<NormRopeConcatGradTilingData*>(tiling);
     string curPath = "./";
 
-    ReadFile(curPath + "norm_rope_concat_grad_data/gradQueryOutput.bin", gradQueryOutputSize, gradQueryOutput, gradQueryOutputSize);
-    ReadFile(curPath + "norm_rope_concat_grad_data/gradKeyOutput.bin", gradKeyOutputSize, gradKeyOutput, gradKeyOutputSize);
-    ReadFile(curPath + "norm_rope_concat_grad_data/gradValueOutput.bin", gradValueOutputSize, gradValueOutput, gradValueOutputSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/gradQueryOutput.bin", gradQueryOutputSize, gradQueryOutput,
+             gradQueryOutputSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/gradKeyOutput.bin", gradKeyOutputSize, gradKeyOutput,
+             gradKeyOutputSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/gradValueOutput.bin", gradValueOutputSize, gradValueOutput,
+             gradValueOutputSize);
     ReadFile(curPath + "norm_rope_concat_grad_data/query.bin", querySize, query, querySize);
     ReadFile(curPath + "norm_rope_concat_grad_data/key.bin", keySize, key, keySize);
     ReadFile(curPath + "norm_rope_concat_grad_data/encoderQuery.bin", encoderQuerySize, encoderQuery, encoderQuerySize);
     ReadFile(curPath + "norm_rope_concat_grad_data/encoderKey.bin", encoderKeySize, encoderKey, encoderKeySize);
-    ReadFile(curPath + "norm_rope_concat_grad_data/normQueryWeight.bin", normQueryWeightSize, normQueryWeight, normQueryWeightSize);
-    ReadFile(curPath + "norm_rope_concat_grad_data/normQueryMean.bin", normQueryMeanSize, normQueryMean, normQueryMeanSize);
-    ReadFile(curPath + "norm_rope_concat_grad_data/normQueryRstd.bin", normQueryRstdSize, normQueryRstd, normQueryRstdSize);
-    ReadFile(curPath + "norm_rope_concat_grad_data/normKeyWeight.bin", normKeyWeightSize, normKeyWeight, normKeyWeightSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/normQueryWeight.bin", normQueryWeightSize, normQueryWeight,
+             normQueryWeightSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/normQueryMean.bin", normQueryMeanSize, normQueryMean,
+             normQueryMeanSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/normQueryRstd.bin", normQueryRstdSize, normQueryRstd,
+             normQueryRstdSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/normKeyWeight.bin", normKeyWeightSize, normKeyWeight,
+             normKeyWeightSize);
     ReadFile(curPath + "norm_rope_concat_grad_data/normKeyMean.bin", normKeyMeanSize, normKeyMean, normKeyMeanSize);
     ReadFile(curPath + "norm_rope_concat_grad_data/normKeyRstd.bin", normKeyRstdSize, normKeyRstd, normKeyRstdSize);
-    ReadFile(curPath + "norm_rope_concat_grad_data/normAddedQueryWeight.bin", normAddedQueryWeightSize, normAddedQueryWeight, normAddedQueryWeightSize);
-    ReadFile(curPath + "norm_rope_concat_grad_data/normAddedQueryMean.bin", normAddedQueryMeanSize, normAddedQueryMean, normAddedQueryMeanSize);
-    ReadFile(curPath + "norm_rope_concat_grad_data/normAddedQueryRstd.bin", normAddedQueryRstdSize, normAddedQueryRstd, normAddedQueryRstdSize);
-    ReadFile(curPath + "norm_rope_concat_grad_data/normAddedKeyWeight.bin", normAddedKeyWeightSize, normAddedKeyWeight, normAddedKeyWeightSize);
-    ReadFile(curPath + "norm_rope_concat_grad_data/normAddedKeyMean.bin", normAddedKeyMeanSize, normAddedKeyMean, normAddedKeyMeanSize);
-    ReadFile(curPath + "norm_rope_concat_grad_data/normAddedKeyRstd.bin", normAddedKeyRstdSize, normAddedKeyRstd, normAddedKeyRstdSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/normAddedQueryWeight.bin", normAddedQueryWeightSize,
+             normAddedQueryWeight, normAddedQueryWeightSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/normAddedQueryMean.bin", normAddedQueryMeanSize, normAddedQueryMean,
+             normAddedQueryMeanSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/normAddedQueryRstd.bin", normAddedQueryRstdSize, normAddedQueryRstd,
+             normAddedQueryRstdSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/normAddedKeyWeight.bin", normAddedKeyWeightSize, normAddedKeyWeight,
+             normAddedKeyWeightSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/normAddedKeyMean.bin", normAddedKeyMeanSize, normAddedKeyMean,
+             normAddedKeyMeanSize);
+    ReadFile(curPath + "norm_rope_concat_grad_data/normAddedKeyRstd.bin", normAddedKeyRstdSize, normAddedKeyRstd,
+             normAddedKeyRstdSize);
     ReadFile(curPath + "norm_rope_concat_grad_data/ropeSin.bin", ropeSinSize, ropeSin, ropeSinSize);
     ReadFile(curPath + "norm_rope_concat_grad_data/ropeCos.bin", ropeCosSize, ropeCos, ropeCosSize);
     ReadFile(curPath + "norm_rope_concat_grad_data/tiling.bin", tilingSize, tilingDatafromBin, tilingSize);
     ICPU_SET_TILING_KEY(tiling_key);
 
     uint32_t blockDim = usedCore;
-    ICPU_RUN_KF(
-        norm_rope_concat_grad, 
-        blockDim, 
-        gradQueryOutput, gradKeyOutput, gradValueOutput, query, key, encoderQuery, encoderKey, normQueryWeight, 
-        normQueryMean, normQueryRstd, normKeyWeight, normKeyMean, normKeyRstd, normAddedQueryWeight, normAddedQueryMean, normAddedQueryRstd, normAddedKeyWeight, 
-        normAddedKeyMean, normAddedKeyRstd, ropeSin, ropeCos, gradQuery, gradKey, gradValue, gradEncoderQuery, gradEncoderKey, gradEncoderValue, 
-        gradNormQueryWeight, gradNormQueryBias, gradNormKeyWeight, gradNormKeyBias, 0, 0, 0, 0, workSpace, (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(norm_rope_concat_grad, blockDim, gradQueryOutput, gradKeyOutput, gradValueOutput, query, key,
+                encoderQuery, encoderKey, normQueryWeight, normQueryMean, normQueryRstd, normKeyWeight, normKeyMean,
+                normKeyRstd, normAddedQueryWeight, normAddedQueryMean, normAddedQueryRstd, normAddedKeyWeight,
+                normAddedKeyMean, normAddedKeyRstd, ropeSin, ropeCos, gradQuery, gradKey, gradValue, gradEncoderQuery,
+                gradEncoderKey, gradEncoderValue, gradNormQueryWeight, gradNormQueryBias, gradNormKeyWeight,
+                gradNormKeyBias, 0, 0, 0, 0, workSpace, (uint8_t*)(tilingDatafromBin));
 
     WriteFile(curPath + "/norm_rope_concat_grad_data/gradQuery.bin", gradQuery, gradQuerySize);
     WriteFile(curPath + "/norm_rope_concat_grad_data/gradKey.bin", gradKey, gradKeySize);
@@ -196,17 +206,19 @@ void run_norm_rope_concat_grad_case(
     WriteFile(curPath + "/norm_rope_concat_grad_data/gradEncoderQuery.bin", gradEncoderQuery, gradEncoderQuerySize);
     WriteFile(curPath + "/norm_rope_concat_grad_data/gradEncoderKey.bin", gradEncoderKey, gradEncoderKeySize);
     WriteFile(curPath + "/norm_rope_concat_grad_data/gradEncoderValue.bin", gradEncoderValue, gradEncoderValueSize);
-    WriteFile(curPath + "/norm_rope_concat_grad_data/gradNormQueryWeight.bin", gradNormQueryWeight, gradNormQueryWeightSize);
+    WriteFile(curPath + "/norm_rope_concat_grad_data/gradNormQueryWeight.bin", gradNormQueryWeight,
+              gradNormQueryWeightSize);
     WriteFile(curPath + "/norm_rope_concat_grad_data/gradNormQueryBias.bin", gradNormQueryBias, gradNormQueryBiasSize);
     WriteFile(curPath + "/norm_rope_concat_grad_data/gradNormKeyWeight.bin", gradNormKeyWeight, gradNormKeyWeightSize);
     WriteFile(curPath + "/norm_rope_concat_grad_data/gradNormKeyBias.bin", gradNormKeyBias, gradNormKeyBiasSize);
     system("ls -lh ./norm_rope_concat_grad_data/");
 
     std::string compare_cmd = "cd ./norm_rope_concat_grad_data/ && python3 compare_data.py " +
-                                std::to_string(batchSize) + std::string(" ") + std::to_string(headNum) + std::string(" ") + 
-                                std::to_string(headDim) + std::string(" ") + std::to_string(querySeq) + std::string(" ") + 
-                                std::to_string(keySeq) + std::string(" ") + std::to_string(encoderQuerySeq) + std::string(" ") + 
-                                std::to_string(encoderKeySeq) + std::string(" ") + originDtype + std::string(" ") + std::to_string(tiling_key);
+                              std::to_string(batchSize) + std::string(" ") + std::to_string(headNum) +
+                              std::string(" ") + std::to_string(headDim) + std::string(" ") + std::to_string(querySeq) +
+                              std::string(" ") + std::to_string(keySeq) + std::string(" ") +
+                              std::to_string(encoderQuerySeq) + std::string(" ") + std::to_string(encoderKeySeq) +
+                              std::string(" ") + originDtype + std::string(" ") + std::to_string(tiling_key);
 
     EXPECT_EQ(system(compare_cmd.c_str()), 0);
 
@@ -259,5 +271,6 @@ TEST_F(norm_rope_concat_grad_test, test_case_fp32_001)
     std::string caseName = "case001";
     uint64_t tiling_key = 0;
 
-    run_norm_rope_concat_grad_case(batchSize, querySeq, keySeq, encoderQuerySeq, encoderKeySeq, ropeSeq, headDim, headNum, usedCore, originDtype, caseName, tiling_key);
+    run_norm_rope_concat_grad_case(batchSize, querySeq, keySeq, encoderQuerySeq, encoderKeySeq, ropeSeq, headDim,
+                                   headNum, usedCore, originDtype, caseName, tiling_key);
 }

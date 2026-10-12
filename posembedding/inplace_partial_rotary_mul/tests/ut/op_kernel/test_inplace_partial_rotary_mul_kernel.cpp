@@ -34,7 +34,7 @@
 using namespace std;
 
 extern "C" __global__ __aicore__ void inplace_partial_rotary_mul(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
-                                                                   GM_ADDR workspace, GM_ADDR tiling);
+                                                                 GM_ADDR workspace, GM_ADDR tiling);
 
 class InplacePartialRotaryMulKernelTest : public testing::Test {
 protected:
@@ -57,66 +57,58 @@ protected:
      * @param sliceStart Partial slice start
      * @param sliceEnd   Partial slice end
      */
-    void RunKernelTest(const vector<int64_t>& xShape,
-                       const vector<int64_t>& cosShape,
-                       const string& dtype,
-                       uint64_t tilingKey,
-                       uint32_t blockDim,
-                       int64_t sliceStart = 0,
-                       int64_t sliceEnd = 0)
+    void RunKernelTest(const vector<int64_t>& xShape, const vector<int64_t>& cosShape, const string& dtype,
+                       uint64_t tilingKey, uint32_t blockDim, int64_t sliceStart = 0, int64_t sliceEnd = 0)
     {
         // Calculate byte sizes
         int64_t dtypeSize = (dtype == "float32") ? 4 : 2;
         int64_t cosDtypeSize = dtypeSize;
         size_t inputXByteSize = 1;
-        for (auto d : xShape) inputXByteSize *= d;
+        for (auto d : xShape)
+            inputXByteSize *= d;
         inputXByteSize *= dtypeSize;
 
         size_t inputCosByteSize = 1;
-        for (auto d : cosShape) inputCosByteSize *= d;
+        for (auto d : cosShape)
+            inputCosByteSize *= d;
         inputCosByteSize *= cosDtypeSize;
         size_t inputSinByteSize = inputCosByteSize;
 
         // Inplace: output is same as input x
         size_t outputYByteSize = inputXByteSize;
-        size_t tilingDataSize = 4096;  // RopeRegbaseTilingData is large
+        size_t tilingDataSize = 4096; // RopeRegbaseTilingData is large
 
         // Allocate GM buffers
-        uint8_t *xGm = (uint8_t *)AscendC::GmAlloc(inputXByteSize);
-        uint8_t *cosGm = (uint8_t *)AscendC::GmAlloc(inputCosByteSize);
-        uint8_t *sinGm = (uint8_t *)AscendC::GmAlloc(inputSinByteSize);
-        uint8_t *yGm = (uint8_t *)AscendC::GmAlloc(outputYByteSize);
-        uint8_t *workspaceGm = (uint8_t *)AscendC::GmAlloc(16 * 1024 * 1024);
-        uint8_t *tilingGm = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+        uint8_t* xGm = (uint8_t*)AscendC::GmAlloc(inputXByteSize);
+        uint8_t* cosGm = (uint8_t*)AscendC::GmAlloc(inputCosByteSize);
+        uint8_t* sinGm = (uint8_t*)AscendC::GmAlloc(inputSinByteSize);
+        uint8_t* yGm = (uint8_t*)AscendC::GmAlloc(outputYByteSize);
+        uint8_t* workspaceGm = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
+        uint8_t* tilingGm = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
 
         // Generate test data (runs Python scripts)
         string dataCmd = "cd ./inplace_partial_rotary_mul_data/ && "
                          "rm -rf ./*.bin && "
                          "python3 gen_data.py ";
-        for (auto d : xShape) dataCmd += to_string(d) + " ";
+        for (auto d : xShape)
+            dataCmd += to_string(d) + " ";
         dataCmd += dtype;
         system(dataCmd.c_str());
 
         string tilingCmd = "cd ./inplace_partial_rotary_mul_data/ && "
-                          "python3 gen_tiling.py "
-                          + to_string(tilingKey) + " "
-                          + to_string(sliceStart) + " "
-                          + to_string(sliceEnd);
+                           "python3 gen_tiling.py " +
+                           to_string(tilingKey) + " " + to_string(sliceStart) + " " + to_string(sliceEnd);
         system(tilingCmd.c_str());
 
         // Read data from generated binaries
-        char *cwd = get_current_dir_name();
+        char* cwd = get_current_dir_name();
         string basePath(cwd);
         free(cwd);
 
-        ReadFile(basePath + "/inplace_partial_rotary_mul_data/x.bin",
-                 inputXByteSize, xGm, inputXByteSize);
-        ReadFile(basePath + "/inplace_partial_rotary_mul_data/cos.bin",
-                 inputCosByteSize, cosGm, inputCosByteSize);
-        ReadFile(basePath + "/inplace_partial_rotary_mul_data/sin.bin",
-                 inputSinByteSize, sinGm, inputSinByteSize);
-        ReadFile(basePath + "/inplace_partial_rotary_mul_data/tiling.bin",
-                 tilingDataSize, tilingGm, tilingDataSize);
+        ReadFile(basePath + "/inplace_partial_rotary_mul_data/x.bin", inputXByteSize, xGm, inputXByteSize);
+        ReadFile(basePath + "/inplace_partial_rotary_mul_data/cos.bin", inputCosByteSize, cosGm, inputCosByteSize);
+        ReadFile(basePath + "/inplace_partial_rotary_mul_data/sin.bin", inputSinByteSize, sinGm, inputSinByteSize);
+        ReadFile(basePath + "/inplace_partial_rotary_mul_data/tiling.bin", tilingDataSize, tilingGm, tilingDataSize);
 
         // Run kernel
         AscendC::SetKernelMode(KernelMode::AIV_MODE);
@@ -129,14 +121,14 @@ protected:
 
         // Generate golden reference
         string goldenCmd = "cd ./inplace_partial_rotary_mul_data/ && "
-                          "python3 gen_golden.py "
-                          + to_string(sliceStart) + " " + to_string(sliceEnd);
+                           "python3 gen_golden.py " +
+                           to_string(sliceStart) + " " + to_string(sliceEnd);
         system(goldenCmd.c_str());
 
         // Compare result against golden
         vector<uint8_t> goldenData(outputYByteSize);
-        ReadFile(basePath + "/inplace_partial_rotary_mul_data/golden.bin",
-                 outputYByteSize, goldenData.data(), outputYByteSize);
+        ReadFile(basePath + "/inplace_partial_rotary_mul_data/golden.bin", outputYByteSize, goldenData.data(),
+                 outputYByteSize);
 
         // Validate: compare yGm vs golden
         bool match = (memcmp(yGm, goldenData.data(), outputYByteSize) == 0);

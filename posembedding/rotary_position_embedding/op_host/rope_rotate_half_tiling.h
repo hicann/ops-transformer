@@ -21,11 +21,11 @@ namespace optiling {
 
 class RopeRotateHalfTilingClass : public RotaryPosEmbeddingMembaseTilingClass {
 public:
-    explicit RopeRotateHalfTilingClass(gert::TilingContext *context)
+    explicit RopeRotateHalfTilingClass(gert::TilingContext* context)
         : RotaryPosEmbeddingMembaseTilingClass(context)
     {}
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
     }

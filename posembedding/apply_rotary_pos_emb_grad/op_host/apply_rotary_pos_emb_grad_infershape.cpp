@@ -34,7 +34,7 @@ static constexpr int64_t NEG_TWO = -2;
  * @param [in/out] outputShape: gert::Shape*, output shape
  * 动态 shape 处理: -2 (unknown rank), -1 (unknown dim)
  */
-static void SetGradOutputShape(const gert::Shape &inputShape, gert::Shape *outputShape)
+static void SetGradOutputShape(const gert::Shape& inputShape, gert::Shape* outputShape)
 {
     if (Ops::Base::IsUnknownRank(inputShape)) {
         outputShape->SetDimNum(1);
@@ -44,23 +44,23 @@ static void SetGradOutputShape(const gert::Shape &inputShape, gert::Shape *outpu
     *outputShape = inputShape;
 }
 
-static ge::graphStatus InferShapeForApplyRotaryPosEmbGrad(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeForApplyRotaryPosEmbGrad(gert::InferShapeContext* context)
 {
-    const gert::Shape *gq = context->GetInputShape(IGQ);
+    const gert::Shape* gq = context->GetInputShape(IGQ);
     OP_CHECK_NULL_WITH_CONTEXT(context, gq);
-    const gert::Shape *gk = context->GetInputShape(IGK);
+    const gert::Shape* gk = context->GetInputShape(IGK);
     OP_CHECK_NULL_WITH_CONTEXT(context, gk);
-    const gert::Shape *cs = context->GetInputShape(ICS);
+    const gert::Shape* cs = context->GetInputShape(ICS);
     OP_CHECK_NULL_WITH_CONTEXT(context, cs);
-    const gert::Shape *sn = context->GetInputShape(ISN);
+    const gert::Shape* sn = context->GetInputShape(ISN);
     OP_CHECK_NULL_WITH_CONTEXT(context, sn);
 
-    gert::Shape *ogq = context->GetOutputShape(OGQ);
+    gert::Shape* ogq = context->GetOutputShape(OGQ);
     OP_CHECK_NULL_WITH_CONTEXT(context, ogq);
-    gert::Shape *ogk = context->GetOutputShape(OGK);
+    gert::Shape* ogk = context->GetOutputShape(OGK);
     OP_CHECK_NULL_WITH_CONTEXT(context, ogk);
-    gert::Shape *ogc = context->GetOutputShape(OGC);
-    gert::Shape *ogs = context->GetOutputShape(OGS);
+    gert::Shape* ogc = context->GetOutputShape(OGC);
+    gert::Shape* ogs = context->GetOutputShape(OGS);
 
     SetGradOutputShape(*gq, ogq);
     SetGradOutputShape(*gk, ogk);
@@ -73,7 +73,7 @@ static ge::graphStatus InferShapeForApplyRotaryPosEmbGrad(gert::InferShapeContex
     return ge::GRAPH_SUCCESS;
 }
 
-static graphStatus InferDataTypeForApplyRotaryPosEmbGrad(gert::InferDataTypeContext *context)
+static graphStatus InferDataTypeForApplyRotaryPosEmbGrad(gert::InferDataTypeContext* context)
 {
     context->SetOutputDataType(OGQ, context->GetInputDataType(IGQ));
     context->SetOutputDataType(OGK, context->GetInputDataType(IGK));

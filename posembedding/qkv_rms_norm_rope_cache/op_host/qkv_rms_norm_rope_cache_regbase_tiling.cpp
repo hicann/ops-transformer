@@ -124,12 +124,12 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CalUbTiling()
 //      读到 cos 张量之外的内存。
 ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckCosSinExact()
 {
-    const gert::StorageShape *cosShapePtr = context_->GetInputShape(COS_INDEX);
+    const gert::StorageShape* cosShapePtr = context_->GetInputShape(COS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, cosShapePtr);
-    const gert::StorageShape *sinShapePtr = context_->GetInputShape(SIN_INDEX);
+    const gert::StorageShape* sinShapePtr = context_->GetInputShape(SIN_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, sinShapePtr);
-    const gert::Shape &cosShape = cosShapePtr->GetStorageShape();
-    const gert::Shape &sinShape = sinShapePtr->GetStorageShape();
+    const gert::Shape& cosShape = cosShapePtr->GetStorageShape();
+    const gert::Shape& sinShape = sinShapePtr->GetStorageShape();
 
     // 秩已由基类 CheckCosSinValid 校为 2,此处可直接取 dim 0/1
     const int64_t expect = batchSize_ * seqLength_;
@@ -189,7 +189,7 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::PostTiling()
     context_->SetBlockDim(static_cast<uint32_t>(blockDim_));
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
     uint32_t sysWorkSpaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, currentWorkspace);
     currentWorkspace[0] = static_cast<size_t>(0UL + sysWorkSpaceSize);
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());

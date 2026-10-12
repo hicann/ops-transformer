@@ -35,7 +35,7 @@ ge::graphStatus RotaryPosEmbeddingMembaseTilingClass::GetPlatformInfo()
         socVersion_ = ascendcPlatform.GetSocVersion();
         aicoreParams_.ubSize = ubSizePlatForm;
     } else {
-        auto compileInfoPtr = reinterpret_cast<const RotaryPositionEmbeddingCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const RotaryPositionEmbeddingCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
         aicoreParams_.numBlocks = compileInfoPtr->numBlocks;
@@ -43,7 +43,6 @@ ge::graphStatus RotaryPosEmbeddingMembaseTilingClass::GetPlatformInfo()
     }
     return ge::GRAPH_SUCCESS;
 }
-
 
 ge::graphStatus RotaryPosEmbeddingMembaseTilingClass::GetShapeAttrsInfo()
 {
@@ -55,12 +54,12 @@ ge::graphStatus RotaryPosEmbeddingMembaseTilingClass::GetShapeAttrsInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus Tiling4RotaryPositionEmbedding(gert::TilingContext *context)
+ge::graphStatus Tiling4RotaryPositionEmbedding(gert::TilingContext* context)
 {
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingPrepareForRotaryPositionEmbedding(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForRotaryPositionEmbedding(gert::TilingParseContext* context)
 {
     OP_LOGD(context, "TilingPrepareForRotaryPositionEmbedding context success");
     return ge::GRAPH_SUCCESS;

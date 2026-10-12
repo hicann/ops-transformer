@@ -26,13 +26,12 @@ extern "C" {
 
 constexpr int64_t HALF_INTERLEAVE_MODE = 3;
 
-aclnnStatus aclnnInterleaveRopeGetWorkspaceSize(
-    const aclTensor* x, const aclTensor* cos, const aclTensor* sin, aclTensor* out, uint64_t* workspaceSize,
-    aclOpExecutor** executor)
+aclnnStatus aclnnInterleaveRopeGetWorkspaceSize(const aclTensor* x, const aclTensor* cos, const aclTensor* sin,
+                                                aclTensor* out, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (Ops::Transformer::AclnnUtil::IsRegbase()) {
-        return aclnnRotaryPositionEmbeddingGetWorkspaceSize(
-            x, cos, sin, HALF_INTERLEAVE_MODE, out, workspaceSize, executor);
+        return aclnnRotaryPositionEmbeddingGetWorkspaceSize(x, cos, sin, HALF_INTERLEAVE_MODE, out, workspaceSize,
+                                                            executor);
     } else {
         return aclnnInnerInterleaveRopeGetWorkspaceSize(x, cos, sin, out, workspaceSize, executor);
     }

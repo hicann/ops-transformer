@@ -20,8 +20,7 @@
 
 using namespace std;
 
-class l2_interleave_rope_test : public testing::Test
-{
+class l2_interleave_rope_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {

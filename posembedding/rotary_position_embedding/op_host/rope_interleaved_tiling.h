@@ -22,11 +22,11 @@ namespace optiling {
 
 class RopeInterLeavedTilingClass : public RotaryPosEmbeddingMembaseTilingClass {
 public:
-    explicit RopeInterLeavedTilingClass(gert::TilingContext *context)
+    explicit RopeInterLeavedTilingClass(gert::TilingContext* context)
         : RotaryPosEmbeddingMembaseTilingClass(context)
     {}
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         RotaryPosEmbeddingMembaseTilingClass::Reset(context);
     }

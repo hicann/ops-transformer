@@ -22,12 +22,12 @@ static constexpr size_t INPUT_X_INDEX = 0;
 static constexpr size_t OUTPUT_X_INDEX = 0;
 
 namespace ops {
-static ge::graphStatus InferShapeForInplacePartialRotaryMul(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeForInplacePartialRotaryMul(gert::InferShapeContext* context)
 {
     OP_LOGD(context, "Begin to do InferShapeForInplacePartialRotaryMul.");
-    const gert::Shape *xShape = context->GetInputShape(INPUT_X_INDEX);
+    const gert::Shape* xShape = context->GetInputShape(INPUT_X_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
-    gert::Shape *yShape = context->GetOutputShape(OUTPUT_X_INDEX);
+    gert::Shape* yShape = context->GetOutputShape(OUTPUT_X_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
 
     *yShape = *xShape;
@@ -36,7 +36,7 @@ static ge::graphStatus InferShapeForInplacePartialRotaryMul(gert::InferShapeCont
     return ge::GRAPH_SUCCESS;
 }
 
-static graphStatus InferDataTypeForInplacePartialRotaryMul(gert::InferDataTypeContext *context)
+static graphStatus InferDataTypeForInplacePartialRotaryMul(gert::InferDataTypeContext* context)
 {
     context->SetOutputDataType(OUTPUT_X_INDEX, context->GetInputDataType(INPUT_X_INDEX));
     return GRAPH_SUCCESS;

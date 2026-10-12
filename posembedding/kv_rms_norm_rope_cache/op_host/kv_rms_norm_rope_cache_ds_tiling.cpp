@@ -42,7 +42,7 @@ constexpr uint64_t TLING_KEY_1010 = 1010;
 constexpr uint64_t TLING_KEY_1001 = 1001;
 constexpr uint64_t TLING_KEY_1011 = 1011;
 
-bool KvRmsNormRopeCacheTilingDs::CheckScaleValid(const gert::TilingContext *context)
+bool KvRmsNormRopeCacheTilingDs::CheckScaleValid(const gert::TilingContext* context)
 {
     auto scale1Shape = context->GetOptionalInputShape(K_ROPE_SCALE_IDX);
     auto scale2Shape = context->GetOptionalInputShape(C_KV_SCALE_IDX);
@@ -90,7 +90,7 @@ bool KvRmsNormRopeCacheTilingDs::CheckScaleValid(const gert::TilingContext *cont
     return isValid;
 }
 
-bool KvRmsNormRopeCacheTilingDs::CheckOffsetValid(const gert::TilingContext *context)
+bool KvRmsNormRopeCacheTilingDs::CheckOffsetValid(const gert::TilingContext* context)
 {
     auto offset1Shape = context->GetOptionalInputShape(K_ROPE_OFFSET_IDX);
     auto offset2Shape = context->GetOptionalInputShape(C_KV_OFFSET_IDX);
@@ -373,7 +373,7 @@ ge::graphStatus KvRmsNormRopeCacheTilingDs::PostTiling()
 {
     context_->SetTilingKey(GetTilingKey());
     context_->SetBlockDim(tilingData_.get_numBlocks());
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = DEFAULT_WORKSPACE_SIZE;
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());

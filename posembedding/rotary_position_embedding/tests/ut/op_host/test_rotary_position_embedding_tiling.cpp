@@ -175,7 +175,7 @@ TEST_F(RotaryPositionEmbeddingTiling, RotaryPositionEmbedding_fp16_3d_bsd_broadc
     ASSERT_EQ(tilingInfo.workspaceSizes.size(), 1);
     ASSERT_EQ(tilingInfo.workspaceSizes[0], 16 * 1024 * 1024);
 
-    auto tilingData = reinterpret_cast<const int64_t *>(tilingInfo.tilingData.get());
+    auto tilingData = reinterpret_cast<const int64_t*>(tilingInfo.tilingData.get());
     EXPECT_EQ(tilingInfo.tilingDataSize / sizeof(int64_t), 19);
     EXPECT_EQ(tilingData[0], 8);    // B
     EXPECT_EQ(tilingData[1], 0);    // CosB, BAB kernel treats cos as B-broadcast
@@ -240,9 +240,10 @@ TEST_F(RotaryPositionEmbeddingTiling, RotaryPositionEmbedding_rotate_half_fp32_r
                                               },
                                               &compileInfo);
     uint64_t expectTilingKey = 1011;
-    string expectTilingData = "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "
-                              "0 0 1 2 8 4 1 1 4 0 4096 2 8 64 32 32 64 1 4 126 8064 8064 4 1 0 1 1024 64 256 256 64 64 "
-                              "0 1 0 1 1024 64 64 64 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+    string expectTilingData =
+        "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "
+        "0 0 1 2 8 4 1 1 4 0 4096 2 8 64 32 32 64 1 4 126 8064 8064 4 1 0 1 1024 64 256 256 64 64 "
+        "0 1 0 1 1024 64 64 64 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }

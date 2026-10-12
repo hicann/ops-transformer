@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
- #include <array>
+#include <array>
 #include <vector>
 #include <iostream>
 #include <string>
@@ -22,12 +22,11 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void rotary_position_embedding_grad(
-    GM_ADDR grad, GM_ADDR cos, GM_ADDR sin, GM_ADDR x, GM_ADDR xGrad, GM_ADDR cosGrad, GM_ADDR sinGrad,
-    GM_ADDR workspace, GM_ADDR tiling);
+extern "C" __global__ __aicore__ void rotary_position_embedding_grad(GM_ADDR grad, GM_ADDR cos, GM_ADDR sin, GM_ADDR x,
+                                                                     GM_ADDR xGrad, GM_ADDR cosGrad, GM_ADDR sinGrad,
+                                                                     GM_ADDR workspace, GM_ADDR tiling);
 
-class rotary_position_embedding_grad_test : public testing::Test
-{
+class rotary_position_embedding_grad_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -57,9 +56,10 @@ TEST_F(rotary_position_embedding_grad_test, test_case_mode_0_SBND_fp16_pad_needb
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
     uint32_t blockDim = 40;
 
-    system(
-        "cp -r ../../../../../posembedding/rotary_position_embedding_grad/tests/ut/op_kernel/rotary_position_embedding_grad_data "
-        "./");
+    system("cp -r "
+           "../../../../../posembedding/rotary_position_embedding_grad/tests/ut/op_kernel/"
+           "rotary_position_embedding_grad_data "
+           "./");
     system("chmod -R 755 ./rotary_position_embedding_grad_data/");
     system("cd ./rotary_position_embedding_grad_data/ && rm -rf ./*bin");
     system("cd ./rotary_position_embedding_grad_data/ && python3 gen_data.py 40 1 16 8 float16");
@@ -72,13 +72,13 @@ TEST_F(rotary_position_embedding_grad_test, test_case_mode_0_SBND_fp16_pad_needb
     ReadFile(path + "/rotary_position_embedding_grad_data/dy.bin", inputXByteSize, grad, inputXByteSize);
     ReadFile(path + "/rotary_position_embedding_grad_data/cos.bin", inputCosByteSize, cos, inputCosByteSize);
     ReadFile(path + "/rotary_position_embedding_grad_data/sin.bin", inputCosByteSize, sin, inputCosByteSize);
-    ReadFile(path + "/rotary_position_embedding_grad_data/tiling.bin", tilingDataSize, tilingDatafromBin, tilingDataSize);
+    ReadFile(path + "/rotary_position_embedding_grad_data/tiling.bin", tilingDataSize, tilingDatafromBin,
+             tilingDataSize);
 
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_SET_TILING_KEY(120);
-    ICPU_RUN_KF(
-        rotary_position_embedding_grad, blockDim, grad, cos, sin, x, xGrad, cosGrad, sinGrad, workspace,
-        (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(rotary_position_embedding_grad, blockDim, grad, cos, sin, x, xGrad, cosGrad, sinGrad, workspace,
+                (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(grad);
     AscendC::GmFree(cos);

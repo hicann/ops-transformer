@@ -30,9 +30,9 @@ def generate_data(b, s, n, d, dtype_str, cos_shape=None):
     """Generate random test data for InplacePartialRotaryMul."""
 
     dtype_map = {
-        'float16': np.float16,
-        'bfloat16': np.float32,  # numpy doesn't have bfloat16 natively
-        'float32': np.float32,
+        "float16": np.float16,
+        "bfloat16": np.float32,  # numpy doesn't have bfloat16 natively
+        "float32": np.float32,
     }
 
     if dtype_str not in dtype_map:
@@ -53,14 +53,14 @@ def generate_data(b, s, n, d, dtype_str, cos_shape=None):
     assert d % 2 == 0, f"D={d} must be multiple of 2 for interleave mode"
 
     # Write binary files
-    x.astype(np_dtype).tofile('x.bin')
-    cos.astype(np_dtype).tofile('cos.bin')
-    sin.astype(np_dtype).tofile('sin.bin')
+    x.astype(np_dtype).tofile("x.bin")
+    cos.astype(np_dtype).tofile("cos.bin")
+    sin.astype(np_dtype).tofile("sin.bin")
 
     print(f"Generated: x{x.shape} cos{cos.shape} sin{sin.shape} dtype={dtype_str}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) < 6:
         print("Usage: python3 gen_data.py <B> <S> <N> <D> <dtype>", file=sys.stderr)
         sys.exit(1)

@@ -25,7 +25,7 @@ using namespace AscendC;
 template <typename T>
 class ApplyRotaryPosEmbGradA {
 public:
-    __aicore__ inline ApplyRotaryPosEmbGradA(TPipe *pipe, const ApplyRopeGradRegbaseParams *td)
+    __aicore__ inline ApplyRotaryPosEmbGradA(TPipe* pipe, const ApplyRopeGradRegbaseParams* td)
         : pipe_(pipe),
           tilingData_(td)
     {}
@@ -39,19 +39,19 @@ private:
     __aicore__ inline void InitAllGlobalBuffer(GM_ADDR grad_query_embed, GM_ADDR grad_key_embed, GM_ADDR cos,
                                                GM_ADDR sin, GM_ADDR grad_query, GM_ADDR grad_key);
     __aicore__ inline void InitAllBuffer();
-    __aicore__ inline void ProcessInLoop(TQue<QuePosition::VECIN, 1> &gInQ, TQue<QuePosition::VECOUT, 1> &oOutQ,
-                                         GlobalTensor<T> &gGm, GlobalTensor<T> &oGm, LocalTensor<T> &cU,
-                                         LocalTensor<T> &sU, int64_t pos, int64_t len);
+    __aicore__ inline void ProcessInLoop(TQue<QuePosition::VECIN, 1>& gInQ, TQue<QuePosition::VECOUT, 1>& oOutQ,
+                                         GlobalTensor<T>& gGm, GlobalTensor<T>& oGm, LocalTensor<T>& cU,
+                                         LocalTensor<T>& sU, int64_t pos, int64_t len);
 
     __aicore__ inline void CopyInCosAndSin(int64_t pos, int64_t len);
-    __aicore__ inline void CopyIn(TQue<QuePosition::VECIN, 1> &inQ, GlobalTensor<T> &src, int64_t pos, int64_t len);
-    __aicore__ inline void CopyOut(TQue<QuePosition::VECOUT, 1> &outQ, GlobalTensor<T> &dst, int64_t pos, int64_t len);
-    __aicore__ inline void Compute(TQue<QuePosition::VECIN, 1> &gInQ, TQue<QuePosition::VECOUT, 1> &oOutQ,
-                                   LocalTensor<T> &cU, LocalTensor<T> &sU, int64_t bL, int64_t nL);
+    __aicore__ inline void CopyIn(TQue<QuePosition::VECIN, 1>& inQ, GlobalTensor<T>& src, int64_t pos, int64_t len);
+    __aicore__ inline void CopyOut(TQue<QuePosition::VECOUT, 1>& outQ, GlobalTensor<T>& dst, int64_t pos, int64_t len);
+    __aicore__ inline void Compute(TQue<QuePosition::VECIN, 1>& gInQ, TQue<QuePosition::VECOUT, 1>& oOutQ,
+                                   LocalTensor<T>& cU, LocalTensor<T>& sU, int64_t bL, int64_t nL);
 
 private:
-    TPipe *pipe_;
-    const ApplyRopeGradRegbaseParams *tilingData_;
+    TPipe* pipe_;
+    const ApplyRopeGradRegbaseParams* tilingData_;
     GlobalTensor<T> gqGm_, gkGm_, cosGm_, sinGm_, oqGm_, okGm_;
     TQue<QuePosition::VECIN, 1> gradQInQ_, gradKInQ_, cosInQ_, sinInQ_;
     TQue<QuePosition::VECOUT, 1> gradQOutQ_, gradKOutQ_;
@@ -78,12 +78,12 @@ template <typename T>
 __aicore__ inline void ApplyRotaryPosEmbGradA<T>::InitAllGlobalBuffer(GM_ADDR gq, GM_ADDR gk, GM_ADDR cos, GM_ADDR sin,
                                                                       GM_ADDR oq, GM_ADDR ok)
 {
-    gqGm_.SetGlobalBuffer((__gm__ T *)gq);
-    gkGm_.SetGlobalBuffer((__gm__ T *)gk);
-    cosGm_.SetGlobalBuffer((__gm__ T *)cos);
-    sinGm_.SetGlobalBuffer((__gm__ T *)sin);
-    oqGm_.SetGlobalBuffer((__gm__ T *)oq);
-    okGm_.SetGlobalBuffer((__gm__ T *)ok);
+    gqGm_.SetGlobalBuffer((__gm__ T*)gq);
+    gkGm_.SetGlobalBuffer((__gm__ T*)gk);
+    cosGm_.SetGlobalBuffer((__gm__ T*)cos);
+    sinGm_.SetGlobalBuffer((__gm__ T*)sin);
+    oqGm_.SetGlobalBuffer((__gm__ T*)oq);
+    okGm_.SetGlobalBuffer((__gm__ T*)ok);
 
     gqGm_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
     gkGm_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
@@ -129,10 +129,10 @@ __aicore__ inline void ApplyRotaryPosEmbGradA<T>::Process()
 }
 
 template <typename T>
-__aicore__ inline void ApplyRotaryPosEmbGradA<T>::ProcessInLoop(TQue<QuePosition::VECIN, 1> &gInQ,
-                                                                TQue<QuePosition::VECOUT, 1> &oOutQ,
-                                                                GlobalTensor<T> &gGm, GlobalTensor<T> &oGm,
-                                                                LocalTensor<T> &cU, LocalTensor<T> &sU, int64_t pos,
+__aicore__ inline void ApplyRotaryPosEmbGradA<T>::ProcessInLoop(TQue<QuePosition::VECIN, 1>& gInQ,
+                                                                TQue<QuePosition::VECOUT, 1>& oOutQ,
+                                                                GlobalTensor<T>& gGm, GlobalTensor<T>& oGm,
+                                                                LocalTensor<T>& cU, LocalTensor<T>& sU, int64_t pos,
                                                                 int64_t len)
 {
     CopyIn(gInQ, gGm, pos, len);
@@ -159,7 +159,7 @@ __aicore__ inline void ApplyRotaryPosEmbGradA<T>::CopyInCosAndSin(int64_t pos, i
 }
 
 template <typename T>
-__aicore__ inline void ApplyRotaryPosEmbGradA<T>::CopyIn(TQue<QuePosition::VECIN, 1> &inQ, GlobalTensor<T> &src,
+__aicore__ inline void ApplyRotaryPosEmbGradA<T>::CopyIn(TQue<QuePosition::VECIN, 1>& inQ, GlobalTensor<T>& src,
                                                          int64_t pos, int64_t len)
 {
     LocalTensor<T> t = inQ.AllocTensor<T>();
@@ -175,7 +175,7 @@ __aicore__ inline void ApplyRotaryPosEmbGradA<T>::CopyIn(TQue<QuePosition::VECIN
 }
 
 template <typename T>
-__aicore__ inline void ApplyRotaryPosEmbGradA<T>::CopyOut(TQue<QuePosition::VECOUT, 1> &outQ, GlobalTensor<T> &dst,
+__aicore__ inline void ApplyRotaryPosEmbGradA<T>::CopyOut(TQue<QuePosition::VECOUT, 1>& outQ, GlobalTensor<T>& dst,
                                                           int64_t pos, int64_t len)
 {
     LocalTensor<T> s = outQ.DeQue<T>();
@@ -190,14 +190,14 @@ __aicore__ inline void ApplyRotaryPosEmbGradA<T>::CopyOut(TQue<QuePosition::VECO
 }
 
 template <typename T>
-__aicore__ inline void ApplyRotaryPosEmbGradA<T>::Compute(TQue<QuePosition::VECIN, 1> &gInQ,
-                                                          TQue<QuePosition::VECOUT, 1> &oOutQ, LocalTensor<T> &cU,
-                                                          LocalTensor<T> &sU, int64_t bL, int64_t nL)
+__aicore__ inline void ApplyRotaryPosEmbGradA<T>::Compute(TQue<QuePosition::VECIN, 1>& gInQ,
+                                                          TQue<QuePosition::VECOUT, 1>& oOutQ, LocalTensor<T>& cU,
+                                                          LocalTensor<T>& sU, int64_t bL, int64_t nL)
 {
     LocalTensor<T> in = gInQ.DeQue<T>();
     LocalTensor<T> out = oOutQ.AllocTensor<T>();
-    BatchHalfGradContiguousVF<T, false>((__ubuf__ T *)in.GetPhyAddr(), (__ubuf__ T *)cU.GetPhyAddr(),
-                                        (__ubuf__ T *)sU.GetPhyAddr(), (__ubuf__ T *)out.GetPhyAddr(), bL, 1, nL, D_,
+    BatchHalfGradContiguousVF<T, false>((__ubuf__ T*)in.GetPhyAddr(), (__ubuf__ T*)cU.GetPhyAddr(),
+                                        (__ubuf__ T*)sU.GetPhyAddr(), (__ubuf__ T*)out.GetPhyAddr(), bL, 1, nL, D_,
                                         dBuffer_, ubB_, ubN_);
     gInQ.FreeTensor(in);
     oOutQ.EnQue(out);

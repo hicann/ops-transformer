@@ -23,7 +23,7 @@ using namespace AscendC;
 template <typename T>
 class KernelInterleaveRopeB1SD {
 public:
-    __aicore__ inline KernelInterleaveRopeB1SD(TPipe *pipe, const InterleaveRopeTilingData *tiling)
+    __aicore__ inline KernelInterleaveRopeB1SD(TPipe* pipe, const InterleaveRopeTilingData* tiling)
         : pipe_(pipe),
           tilingData_(tiling)
     {}
@@ -57,10 +57,10 @@ public:
             hiddenDimCountLastLoop_ = tilingData_->hiddenDimCountLastLoopLastBlock;
         }
 
-        xGm.SetGlobalBuffer((__gm__ T *)x);
-        yGm.SetGlobalBuffer((__gm__ T *)y);
-        cosGm.SetGlobalBuffer((__gm__ T *)cos);
-        sinGm.SetGlobalBuffer((__gm__ T *)sin);
+        xGm.SetGlobalBuffer((__gm__ T*)x);
+        yGm.SetGlobalBuffer((__gm__ T*)y);
+        cosGm.SetGlobalBuffer((__gm__ T*)cos);
+        sinGm.SetGlobalBuffer((__gm__ T*)sin);
 
         // init pipe
         pipe_->InitBuffer(inQueueX, 1, hiddenDimCountPerLoop_ * hiddenDim * sizeof(T));
@@ -160,8 +160,8 @@ public:
     }
 
 private:
-    TPipe *pipe_ = nullptr;
-    const InterleaveRopeTilingData *tilingData_;
+    TPipe* pipe_ = nullptr;
+    const InterleaveRopeTilingData* tilingData_;
     GlobalTensor<T> xGm;
     GlobalTensor<T> yGm;
     GlobalTensor<T> cosGm;

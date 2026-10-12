@@ -19,7 +19,7 @@ using namespace ge;
 using namespace nrc;
 using namespace AscendC;
 namespace optiling {
-ge::graphStatus NormRopeConcatTiling::CheckInput(const InputTensorInfo &x)
+ge::graphStatus NormRopeConcatTiling::CheckInput(const InputTensorInfo& x)
 {
     if (x.isRequired) {
         OP_CHECK_IF(x.desc == nullptr, OP_LOGE(context_.opName, "desc is nullptr"), return ge::GRAPH_FAILED);
@@ -116,8 +116,8 @@ ge::graphStatus NormRopeConcatTiling::GetShapeInfo()
 {
     size_t queryIndex = static_cast<size_t>(InputIndexForward::QUERY_INDEX);
     size_t keyIndex = static_cast<size_t>(InputIndexForward::KEY_INDEX);
-    const gert::StorageShape *queryShape = context_.inputs[queryIndex].shape;
-    const gert::StorageShape *keyShape = context_.inputs[keyIndex].shape;
+    const gert::StorageShape* queryShape = context_.inputs[queryIndex].shape;
+    const gert::StorageShape* keyShape = context_.inputs[keyIndex].shape;
     OP_CHECK_IF(queryShape == nullptr || queryShape->GetStorageShape().GetDimNum() != INPUT_DIM_NUM,
                 OP_LOGE(context_.opName, "Shape of tensor query should be 4"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(keyShape == nullptr || keyShape->GetStorageShape().GetDimNum() != INPUT_DIM_NUM,
@@ -130,15 +130,15 @@ ge::graphStatus NormRopeConcatTiling::GetShapeInfo()
     keySeq_ = keyShape->GetStorageShape().GetDim(SEQ_DIM);
     valueSeq_ = keySeq_;
     size_t valueIndex = static_cast<size_t>(InputIndexForward::VALUE_INDEX);
-    const gert::StorageShape *valueShape = context_.inputs[valueIndex].shape;
+    const gert::StorageShape* valueShape = context_.inputs[valueIndex].shape;
     if (valueShape != nullptr && valueShape->GetStorageShape().GetDimNum() == INPUT_DIM_NUM) {
         valueSeq_ = valueShape->GetStorageShape().GetDim(SEQ_DIM);
     }
 
     size_t encoderQueryIndex = static_cast<size_t>(InputIndexForward::ENCODER_QUERY_INDEX);
     size_t encoderKeyIndex = static_cast<size_t>(InputIndexForward::ENCODER_KEY_INDEX);
-    const gert::StorageShape *encoderQueryShape = context_.inputs[encoderQueryIndex].shape;
-    const gert::StorageShape *encoderKeyShape = context_.inputs[encoderKeyIndex].shape;
+    const gert::StorageShape* encoderQueryShape = context_.inputs[encoderQueryIndex].shape;
+    const gert::StorageShape* encoderKeyShape = context_.inputs[encoderKeyIndex].shape;
     if (encoderQueryShape != nullptr && encoderQueryShape->GetStorageShape().GetDimNum() == INPUT_DIM_NUM) {
         encoderQuerySeq_ = encoderQueryShape->GetStorageShape().GetDim(SEQ_DIM);
     }
@@ -147,13 +147,13 @@ ge::graphStatus NormRopeConcatTiling::GetShapeInfo()
     }
     encoderValueSeq_ = encoderKeySeq_;
     size_t encoderValueIndex = static_cast<size_t>(InputIndexForward::ENCODER_VALUE_INDEX);
-    const gert::StorageShape *encoderValueShape = context_.inputs[encoderValueIndex].shape;
+    const gert::StorageShape* encoderValueShape = context_.inputs[encoderValueIndex].shape;
     if (encoderValueShape != nullptr && encoderValueShape->GetStorageShape().GetDimNum() == INPUT_DIM_NUM) {
         encoderValueSeq_ = encoderValueShape->GetStorageShape().GetDim(SEQ_DIM);
     }
 
     size_t ropeSinIndex = static_cast<size_t>(InputIndexForward::ROPE_SIN_INDEX);
-    const gert::StorageShape *ropeSinShape = context_.inputs[ropeSinIndex].shape;
+    const gert::StorageShape* ropeSinShape = context_.inputs[ropeSinIndex].shape;
     if (ropeSinShape != nullptr && ropeSinShape->GetStorageShape().GetDimNum() == ROPE_DIM_NUM) {
         ropeSeq_ = ropeSinShape->GetStorageShape().GetDim(ROPE_SEQ_DIM);
         ropeDim_ = ropeSinShape->GetStorageShape().GetDim(ROPE_DIM_DIM);
@@ -209,7 +209,7 @@ ge::graphStatus NormRopeConcatTiling::FillTilingData()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus NormRopeConcatTiling::PrintTilingData(gert::TilingContext *ctx)
+ge::graphStatus NormRopeConcatTiling::PrintTilingData(gert::TilingContext* ctx)
 {
     OP_LOGD(ctx->GetNodeName(), "batch:               %u.", tilingData_.get_batch());
     OP_LOGD(ctx->GetNodeName(), "querySeq:            %u.", tilingData_.get_querySeq());
@@ -235,7 +235,7 @@ ge::graphStatus NormRopeConcatTiling::PrintTilingData(gert::TilingContext *ctx)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus NormRopeConcatTiling::ConvertContextOne(gert::TilingContext *ctx, InputTensorInfo &x)
+ge::graphStatus NormRopeConcatTiling::ConvertContextOne(gert::TilingContext* ctx, InputTensorInfo& x)
 {
     size_t index = x.index;
     bool isRequired = x.isRequired;
@@ -289,7 +289,7 @@ ge::graphStatus NormRopeConcatTiling::ComputeUBTilingStrategy()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus NormRopeConcatTiling::DoTiling(gert::TilingContext *ctx)
+ge::graphStatus NormRopeConcatTiling::DoTiling(gert::TilingContext* ctx)
 {
     auto platformInfoPtr = ctx->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(ctx, platformInfoPtr);
@@ -331,7 +331,7 @@ ge::graphStatus NormRopeConcatTiling::DoTiling(gert::TilingContext *ctx)
     OP_CHECK_NULL_WITH_CONTEXT(ctx, context_.ropeType);
     OP_CHECK_NULL_WITH_CONTEXT(ctx, context_.concatOrder);
 
-    size_t *workspaceSizes = ctx->GetWorkspaceSizes(1);
+    size_t* workspaceSizes = ctx->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(ctx, workspaceSizes);
     workspace_ = workspaceSizes;
 
@@ -347,7 +347,7 @@ ge::graphStatus NormRopeConcatTiling::DoTiling(gert::TilingContext *ctx)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus NormRopeConcatTiling::SetTiling(gert::TilingContext *ctx)
+ge::graphStatus NormRopeConcatTiling::SetTiling(gert::TilingContext* ctx)
 {
     OP_CHECK_NULL_WITH_CONTEXT(ctx, ctx->GetRawTilingData());
     tilingData_.SaveToBuffer(ctx->GetRawTilingData()->GetData(), ctx->GetRawTilingData()->GetCapacity());
@@ -356,7 +356,7 @@ ge::graphStatus NormRopeConcatTiling::SetTiling(gert::TilingContext *ctx)
     return ge::GRAPH_SUCCESS;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingNormRopeConcat(gert::TilingContext *ctx)
+ASCENDC_EXTERN_C ge::graphStatus TilingNormRopeConcat(gert::TilingContext* ctx)
 {
     OP_CHECK_IF(ctx == nullptr, OP_LOGE("NormRopeConcat", "context is nullptr"), return ge::GRAPH_FAILED);
     NormRopeConcatTiling tiling;
@@ -367,7 +367,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingNormRopeConcat(gert::TilingContext *ctx)
     return ge::GRAPH_FAILED;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForNormRopeConcat(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForNormRopeConcat(gert::TilingParseContext* context)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfoPtr);

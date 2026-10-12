@@ -25,7 +25,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -34,7 +34,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shape_size;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -47,8 +47,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -92,28 +92,28 @@ int main()
     std::vector<int64_t> gradCosOutShape = {1, 1, 1, 128};
     std::vector<int64_t> gradSinOutShape = {1, 1, 1, 128};
     int64_t layout = 1;
-    const char *rotaryModeOptional = "half";
+    const char* rotaryModeOptional = "half";
 
-    void *gradQEmbedDeviceAddr = nullptr;
-    void *gradKEmbedDeviceAddr = nullptr;
-    void *cosDeviceAddr = nullptr;
-    void *sinDeviceAddr = nullptr;
-    void *queryDeviceAddr = nullptr;
-    void *keyDeviceAddr = nullptr;
-    void *gradQueryOutDeviceAddr = nullptr;
-    void *gradKeyOutDeviceAddr = nullptr;
-    void *gradCosOutDeviceAddr = nullptr;
-    void *gradSinOutDeviceAddr = nullptr;
-    aclTensor *gradQueryEmbed = nullptr;
-    aclTensor *gradKeyEmbed = nullptr;
-    aclTensor *cos = nullptr;
-    aclTensor *sin = nullptr;
-    aclTensor *query = nullptr;
-    aclTensor *key = nullptr;
-    aclTensor *gradQueryOut = nullptr;
-    aclTensor *gradKeyOut = nullptr;
-    aclTensor *gradCosOut = nullptr;
-    aclTensor *gradSinOut = nullptr;
+    void* gradQEmbedDeviceAddr = nullptr;
+    void* gradKEmbedDeviceAddr = nullptr;
+    void* cosDeviceAddr = nullptr;
+    void* sinDeviceAddr = nullptr;
+    void* queryDeviceAddr = nullptr;
+    void* keyDeviceAddr = nullptr;
+    void* gradQueryOutDeviceAddr = nullptr;
+    void* gradKeyOutDeviceAddr = nullptr;
+    void* gradCosOutDeviceAddr = nullptr;
+    void* gradSinOutDeviceAddr = nullptr;
+    aclTensor* gradQueryEmbed = nullptr;
+    aclTensor* gradKeyEmbed = nullptr;
+    aclTensor* cos = nullptr;
+    aclTensor* sin = nullptr;
+    aclTensor* query = nullptr;
+    aclTensor* key = nullptr;
+    aclTensor* gradQueryOut = nullptr;
+    aclTensor* gradKeyOut = nullptr;
+    aclTensor* gradCosOut = nullptr;
+    aclTensor* gradSinOut = nullptr;
 
     std::vector<float> gradQEmbedHostData = {
         74,  54, 84, 125, 23,  78,  37,  72,  27, 98,  34,  107, 29,  23,  54,  60, 70,  49,  119, 54,  29,  54,
@@ -198,15 +198,15 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 3. 调用CANN算子库API，需要修改为具体的API
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     // 调用aclnnApplyRotaryPosEmbGrad第一段接口
     ret = aclnnApplyRotaryPosEmbGradGetWorkspaceSize(gradQueryEmbed, gradKeyEmbed, cos, sin, query, key,
-                                                     const_cast<char *>(rotaryModeOptional), layout, gradQueryOut,
+                                                     const_cast<char*>(rotaryModeOptional), layout, gradQueryOut,
                                                      gradKeyOut, gradCosOut, gradSinOut, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnApplyRotaryPosEmbGradGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret;);

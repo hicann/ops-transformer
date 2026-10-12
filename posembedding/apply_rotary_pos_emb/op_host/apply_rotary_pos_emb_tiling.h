@@ -151,12 +151,12 @@ enum class ApplyRotaryPosEmbRotaryMode : int64_t {
 
 class ApplyRotaryPosEmbRegbaseTilingBaseClass : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit ApplyRotaryPosEmbRegbaseTilingBaseClass(gert::TilingContext *context)
+    explicit ApplyRotaryPosEmbRegbaseTilingBaseClass(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
     virtual ~ApplyRotaryPosEmbRegbaseTilingBaseClass() {}
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
     }
@@ -215,8 +215,8 @@ private:
     ge::graphStatus CheckDtypeAndAttr();
     ge::graphStatus CheckParam();
     ge::graphStatus CheckShapeRelation();
-    ge::graphStatus CheckRotaryModeShapeRelation(const int64_t &d);
-    ge::graphStatus CheckShapeAllPositive(const int64_t &idx, const gert::Shape &shape);
+    ge::graphStatus CheckRotaryModeShapeRelation(const int64_t& d);
+    ge::graphStatus CheckShapeAllPositive(const int64_t& idx, const gert::Shape& shape);
     ge::graphStatus CheckShapeAllPositive();
     void ConvertRotaryMode();
     void SetBsnd();

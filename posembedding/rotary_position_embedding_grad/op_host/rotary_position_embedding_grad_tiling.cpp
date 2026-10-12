@@ -35,9 +35,7 @@ ge::graphStatus RotaryPosEmbeddingGradMembaseTilingClass::GetPlatformInfo()
         socVersion_ = ascendcPlatform.GetSocVersion();
     } else {
         auto compileInfoPtr = context_->GetCompileInfo<RotaryPositionEmbeddingGradCompileInfo>();
-        OP_CHECK_IF(
-            compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         aicoreParams_.numBlocks = compileInfoPtr->numBlocks;
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
         socVersion_ = compileInfoPtr->socVersion;
@@ -48,9 +46,7 @@ ge::graphStatus RotaryPosEmbeddingGradMembaseTilingClass::GetPlatformInfo()
 ge::graphStatus RotaryPosEmbeddingGradMembaseTilingClass::GetShapeAttrsInfo()
 {
     auto attrs = context_->GetAttrs();
-    OP_CHECK_IF(
-        attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is null."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is null."), return ge::GRAPH_FAILED);
     const uint32_t inputMode = *(attrs->GetAttrPointer<char>(MODE_ATTR_IDX));
     OP_LOGI("[RotaryPositionEmbedding]", "[mode]: %d", inputMode);
 
@@ -59,8 +55,7 @@ ge::graphStatus RotaryPosEmbeddingGradMembaseTilingClass::GetShapeAttrsInfo()
     if (!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_) &&
         (inputMode != MODE_ROTATE_HALF && inputMode != MODE_ROTATE_INTERLEAVED)) {
         std::string modeStr = std::to_string(inputMode);
-        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "mode",
-            modeStr.c_str(), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "mode", modeStr.c_str(), "0 or 1");
         return ge::GRAPH_FAILED;
     }
     inputMode_ = inputMode;
@@ -86,40 +81,35 @@ ge::graphStatus TilingPrepare4ReduceOp(ContextT* context, Ops::Base::ReduceOpCom
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     compileInfo->vectorCoreNum = ascendcPlatform.GetCoreNumAiv();
-    OP_CHECK_IF(
-        (compileInfo->vectorCoreNum == 0UL),
-        OP_LOGE(context->GetNodeName(), "ReduceOp GetHardwareInfo Failed, vectorCoreNum:%lu",
-                                        compileInfo->vectorCoreNum),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((compileInfo->vectorCoreNum == 0UL),
+                OP_LOGE(context->GetNodeName(), "ReduceOp GetHardwareInfo Failed, vectorCoreNum:%lu",
+                        compileInfo->vectorCoreNum),
+                return ge::GRAPH_FAILED);
 
     uint64_t ubSize = 0;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
     OP_CHECK_IF(ubSize <= Ops::Base::CACHE_BUF_SIZE,
-                    OP_LOGE(context->GetNodeName(),
-                                                    "ReduceOp GetHardwareInfo Failed, ubSize:%lu, at least:%lu.",
-                                                    compileInfo->ubSize, Ops::Base::CACHE_BUF_SIZE),
-                    return ge::GRAPH_FAILED);
+                OP_LOGE(context->GetNodeName(), "ReduceOp GetHardwareInfo Failed, ubSize:%lu, at least:%lu.",
+                        compileInfo->ubSize, Ops::Base::CACHE_BUF_SIZE),
+                return ge::GRAPH_FAILED);
     compileInfo->ubSize = ubSize;
 
     compileInfo->cacheLineSize = Ops::Base::GetCacheLineSize(context);
-    OP_CHECK_IF(
-        compileInfo->cacheLineSize == 0UL,
-        OP_LOGE(context->GetNodeName(), "ReduceOp GetHardwareInfo Failed, cacheLineSize:%lu.",
-                                        compileInfo->cacheLineSize),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(compileInfo->cacheLineSize == 0UL,
+                OP_LOGE(context->GetNodeName(), "ReduceOp GetHardwareInfo Failed, cacheLineSize:%lu.",
+                        compileInfo->cacheLineSize),
+                return ge::GRAPH_FAILED);
 
     compileInfo->ubBlockSize = Ops::Base::GetUbBlockSize(context);
     OP_CHECK_IF(
         compileInfo->ubBlockSize == 0UL,
-        OP_LOGE(context->GetNodeName(), "ReduceOp GetHardwareInfo Failed, ubBlockSize:%lu.",
-                                        compileInfo->ubBlockSize),
+        OP_LOGE(context->GetNodeName(), "ReduceOp GetHardwareInfo Failed, ubBlockSize:%lu.", compileInfo->ubBlockSize),
         return ge::GRAPH_FAILED);
 
     compileInfo->vRegSize = Ops::Base::GetVRegSize(context);
     OP_CHECK_IF(
         compileInfo->vRegSize == 0UL,
-        OP_LOGE(context->GetNodeName(), "ReduceOp GetHardwareInfo Failed, vRegSize:%lu.",
-                                        compileInfo->vRegSize),
+        OP_LOGE(context->GetNodeName(), "ReduceOp GetHardwareInfo Failed, vRegSize:%lu.", compileInfo->vRegSize),
         return ge::GRAPH_FAILED);
 
     OP_LOGD(context->GetNodeName(), "GetCoreNum:%lu, ubSize:%lu, cacheLineSize:%lu, ubBlockSize:%lu, vRegSize:%lu",
@@ -133,9 +123,7 @@ ge::graphStatus TilingPrepareForRotaryPositionEmbeddingGrad(gert::TilingParseCon
 {
     auto platformInfo = context->GetPlatformInfo();
     auto compileInfoPtr = context->GetCompiledInfo<RotaryPositionEmbeddingGradCompileInfo>();
-    OP_CHECK_IF(
-        compileInfoPtr == nullptr, OP_LOGE(context, "compile info is null"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context, "compile info is null"), return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
     compileInfoPtr->numBlocks = ascendcPlatform.GetCoreNumAiv();

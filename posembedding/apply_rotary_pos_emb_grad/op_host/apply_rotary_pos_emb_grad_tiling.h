@@ -82,11 +82,11 @@ enum class ApplyRopeGradDxTilingKey : uint32_t {
 
 class ApplyRotaryPosEmbGradRegbaseTilingClass : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit ApplyRotaryPosEmbGradRegbaseTilingClass(gert::TilingContext *context)
+    explicit ApplyRotaryPosEmbGradRegbaseTilingClass(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         reduceInputFloat_ = false;
@@ -100,8 +100,8 @@ private:
     ge::graphStatus CheckShapeLimit();
     ge::graphStatus CheckOptionalInput() const;
     ge::graphStatus CheckShapeDim() const;
-    ge::graphStatus ValidateBroadcastByLayout(int64_t attrLayout, const gert::Shape &gqShape,
-                                              const gert::Shape &gkShape, const gert::Shape &cosShape);
+    ge::graphStatus ValidateBroadcastByLayout(int64_t attrLayout, const gert::Shape& gqShape,
+                                              const gert::Shape& gkShape, const gert::Shape& cosShape);
     ge::graphStatus CheckRotaryModeShapeRelation(const int64_t d);
     ge::graphStatus CheckInPutShapeAllPositive(const int64_t idx) const;
     ge::graphStatus CheckOutPutShapeAllPositive(const int64_t idx) const;
@@ -137,8 +137,8 @@ protected:
         return true;
     }
 
-    ge::graphStatus GetReduceOpCompileInfo(Ops::Base::ReduceOpCompileInfo *compileInfo);
-    ge::graphStatus GetInputParam(Ops::Base::ReduceOpInputParam &opInput, uint32_t inputIdx, uint32_t axesIdx);
+    ge::graphStatus GetReduceOpCompileInfo(Ops::Base::ReduceOpCompileInfo* compileInfo);
+    ge::graphStatus GetInputParam(Ops::Base::ReduceOpInputParam& opInput, uint32_t inputIdx, uint32_t axesIdx);
     ge::graphStatus InitTilingData();
     ge::graphStatus TilingReduce();
     ge::graphStatus SetTilingKeyBlockDim(uint32_t dxTilingKey);
@@ -158,7 +158,7 @@ protected:
     ge::DataType dtype_;
     ApplyRopeGradLayout layout_;
     ApplyRopeGradRotaryMode rotaryMode_;
-    ApplyRopeGradTilingData *tilingData_{nullptr};
+    ApplyRopeGradTilingData* tilingData_{nullptr};
 
     gert::Shape gqShape_; // grad_query_embed shape
     gert::Shape cosShape_;

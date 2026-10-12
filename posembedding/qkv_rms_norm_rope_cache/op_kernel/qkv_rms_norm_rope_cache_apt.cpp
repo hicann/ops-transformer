@@ -40,7 +40,7 @@ extern "C" __global__ __aicore__ void qkv_rms_norm_rope_cache(
     TPipe pipe;
     if (TILING_KEY_IS(QKV_RMS_NORM_ROPE_CACHE_REGBASE_PA_NZ)) {
         GET_TILING_DATA_WITH_STRUCT(QkvRmsNormRopeCacheRegbaseTilingData, tiling_data_in, tiling);
-        const QkvRmsNormRopeCacheRegbaseTilingData *__restrict tilingData = &tiling_data_in;
+        const QkvRmsNormRopeCacheRegbaseTilingData* __restrict tilingData = &tiling_data_in;
         QkvRmsNormRopeCacheRegbase<DTYPE_QKV, DTYPE_K_CACHE, DTYPE_V_CACHE> op(&pipe, tilingData);
         op.Init(qkv, q_gamma, k_gamma, cos, sin, index, q_out, k_cache, v_cache, k_scale, v_scale, k_offset, v_offset,
                 q_out_out, k_cache_out, v_cache_out, q_out_proto, k_cache_proto, v_cache_proto);

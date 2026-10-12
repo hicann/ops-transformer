@@ -97,7 +97,7 @@ static_assert(IDX_WINDOW_TOKENS >= DIGIT_THREE * UND_MASK_BITS,
 template <typename T_QKV, typename T_CACHE>
 class UndGenQkvRmsNormRopeCacheRegbase {
 public:
-    __aicore__ inline UndGenQkvRmsNormRopeCacheRegbase(TPipe *pipe, const UndGenQkvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline UndGenQkvRmsNormRopeCacheRegbase(TPipe* pipe, const UndGenQkvRmsNormRopeCacheTilingData* tiling)
         : pipe_(pipe),
           tiling_(tiling)
     {}
@@ -222,23 +222,23 @@ private:
                                              GM_ADDR positions, GM_ADDR genQkv, GM_ADDR genWeightsQ,
                                              GM_ADDR genWeightsK, GM_ADDR catIndices, GM_ADDR q)
     {
-        undQkvGm_.SetGlobalBuffer((__gm__ T_QKV *)undQkv);
-        undWeightsQGm_.SetGlobalBuffer((__gm__ T_QKV *)undWeightsQ);
-        undWeightsKGm_.SetGlobalBuffer((__gm__ T_QKV *)undWeightsK);
-        cosSinCacheGm_.SetGlobalBuffer((__gm__ float *)cosSinCache);
-        kCacheGm_.SetGlobalBuffer((__gm__ T_CACHE *)kCache);
-        vCacheGm_.SetGlobalBuffer((__gm__ T_CACHE *)vCache);
-        slotMappingGm_.SetGlobalBuffer((__gm__ int64_t *)slotMapping);
-        positionsGm_.SetGlobalBuffer((__gm__ int64_t *)positions);
+        undQkvGm_.SetGlobalBuffer((__gm__ T_QKV*)undQkv);
+        undWeightsQGm_.SetGlobalBuffer((__gm__ T_QKV*)undWeightsQ);
+        undWeightsKGm_.SetGlobalBuffer((__gm__ T_QKV*)undWeightsK);
+        cosSinCacheGm_.SetGlobalBuffer((__gm__ float*)cosSinCache);
+        kCacheGm_.SetGlobalBuffer((__gm__ T_CACHE*)kCache);
+        vCacheGm_.SetGlobalBuffer((__gm__ T_CACHE*)vCache);
+        slotMappingGm_.SetGlobalBuffer((__gm__ int64_t*)slotMapping);
+        positionsGm_.SetGlobalBuffer((__gm__ int64_t*)positions);
         if (hasGen_) {
-            genQkvGm_.SetGlobalBuffer((__gm__ T_QKV *)genQkv);
-            genWeightsQGm_.SetGlobalBuffer((__gm__ T_QKV *)genWeightsQ);
-            genWeightsKGm_.SetGlobalBuffer((__gm__ T_QKV *)genWeightsK);
+            genQkvGm_.SetGlobalBuffer((__gm__ T_QKV*)genQkv);
+            genWeightsQGm_.SetGlobalBuffer((__gm__ T_QKV*)genWeightsQ);
+            genWeightsKGm_.SetGlobalBuffer((__gm__ T_QKV*)genWeightsK);
         }
         if (hasCatIndices_) {
-            catIndicesGm_.SetGlobalBuffer((__gm__ int64_t *)catIndices);
+            catIndicesGm_.SetGlobalBuffer((__gm__ int64_t*)catIndices);
         }
-        qGm_.SetGlobalBuffer((__gm__ T_QKV *)q);
+        qGm_.SetGlobalBuffer((__gm__ T_QKV*)q);
     }
 
     // 多核切分：前 formerCoreNum 个核多处理 1 个 token，与 host CalBlockTiling 一致
@@ -355,7 +355,7 @@ private:
     cur：当前 tile
     返回紧接其后的 tile；已越过 coreEnd_ 时返回 num = 0 的 Tile 表示没有下一个
     */
-    __aicore__ inline Tile NextTile(const Tile &cur)
+    __aicore__ inline Tile NextTile(const Tile& cur)
     {
         Tile t;
         t.start = cur.start + cur.num;
@@ -382,7 +382,7 @@ private:
     num：拷贝的元素个数
     走 DataCopyPad，不足 32B 的尾部由硬件补齐，不需要调用方对齐 num
     */
-    __aicore__ inline void CopyIndexToUb(const LocalTensor<int64_t> &dst, const GlobalTensor<int64_t> &src, int64_t num)
+    __aicore__ inline void CopyIndexToUb(const LocalTensor<int64_t>& dst, const GlobalTensor<int64_t>& src, int64_t num)
     {
         DataCopyExtParams params{1, static_cast<uint32_t>(num * sizeof(int64_t)), 0, 0, 0};
         DataCopyPadExtParams<int64_t> padParams{false, 0, 0, 0};
@@ -460,7 +460,7 @@ private:
     只发 MTE2 不等落地，落地由 Compute 的 DeQue 保证；
     返回时 undMask_[tile.maskSlot] 已填好本 tile 的 und/gen 位图供 VF 选 gamma
     */
-    __aicore__ inline void CopyIn(const Tile &tile)
+    __aicore__ inline void CopyIn(const Tile& tile)
     {
         const int64_t tileStart = tile.start;
         const int64_t tokenNum = tile.num;
@@ -503,7 +503,7 @@ private:
     选 gamma，所以 cat_indices 无论怎么交错都只发一次 VF。V 不参与，直通
     发完 VF 即返回不等它算完，结果已 EnQue 到 outQue_ 等 CopyOut 取走
     */
-    __aicore__ inline void Compute(const Tile &tile)
+    __aicore__ inline void Compute(const Tile& tile)
     {
         const int64_t tokenNum = tile.num;
         LocalTensor<T_QKV> qkvLocal = qkvInQue_.DeQue<T_QKV>();
@@ -516,13 +516,13 @@ private:
         // Q/K 的 RMSNorm+MRoPE 与 V 的直通都在这次 VF 里完成。
         // shape 参数在 ParseTiling 就填好了，这里只组本 tile 的地址
         QkvMropeTileAddr addr;
-        addr.qkvIn = (__ubuf__ bfloat16_t *)qkvLocal.GetPhyAddr();
-        addr.gammaAll = (__ubuf__ float *)wFp32Local_.GetPhyAddr();
-        addr.rawCosSin = (__ubuf__ float *)cosSinLocal.GetPhyAddr();
-        addr.gatherIndex = (__ubuf__ uint32_t *)gatherIdxLocal_.GetPhyAddr();
-        addr.qOut = (__ubuf__ bfloat16_t *)outLocal.GetPhyAddr();
-        addr.kOut = (__ubuf__ bfloat16_t *)outLocal[kSegBase].GetPhyAddr();
-        addr.vOut = (__ubuf__ bfloat16_t *)outLocal[vSegBase].GetPhyAddr();
+        addr.qkvIn = (__ubuf__ bfloat16_t*)qkvLocal.GetPhyAddr();
+        addr.gammaAll = (__ubuf__ float*)wFp32Local_.GetPhyAddr();
+        addr.rawCosSin = (__ubuf__ float*)cosSinLocal.GetPhyAddr();
+        addr.gatherIndex = (__ubuf__ uint32_t*)gatherIdxLocal_.GetPhyAddr();
+        addr.qOut = (__ubuf__ bfloat16_t*)outLocal.GetPhyAddr();
+        addr.kOut = (__ubuf__ bfloat16_t*)outLocal[kSegBase].GetPhyAddr();
+        addr.vOut = (__ubuf__ bfloat16_t*)outLocal[vSegBase].GetPhyAddr();
         QkRmsNormMropeTileVF(addr, vfShape_, static_cast<uint16_t>(tokenNum), undMask_[tile.maskSlot]);
 
         outQue_.EnQue(outLocal);
@@ -537,7 +537,7 @@ private:
     out_t 连续可一笔写出，k/v 按 slot_mapping 散写只能逐 token
     slot 越界的 token 跳过写入而不是踩内存（运行期数据，host 校验不到）
     */
-    __aicore__ inline void CopyOut(const Tile &tile)
+    __aicore__ inline void CopyOut(const Tile& tile)
     {
         const int64_t tileStart = tile.start;
         const int64_t tokenNum = tile.num;
@@ -575,8 +575,8 @@ private:
     }
 
 private:
-    TPipe *pipe_ = nullptr;
-    const UndGenQkvRmsNormRopeCacheTilingData *tiling_ = nullptr;
+    TPipe* pipe_ = nullptr;
+    const UndGenQkvRmsNormRopeCacheTilingData* tiling_ = nullptr;
 
     // 模板参数是 queue depth（同时"已 EnQue 未 DeQue"的句柄数），不是 buffer 数；
     // 物理 buffer 数由 InitUbBuffers 的 BUFFER_NUM_DB 决定，UB 占用不受 depth 影响。

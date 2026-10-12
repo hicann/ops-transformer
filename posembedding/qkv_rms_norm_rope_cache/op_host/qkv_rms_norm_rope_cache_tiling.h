@@ -178,7 +178,7 @@ static constexpr int64_t UB_RESERVED_BYTES = 1 * BYTES_PER_KILO_BYTE; // 多留1
 
 class QkvRmsNormRopeCacheTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit QkvRmsNormRopeCacheTilingBase(gert::TilingContext *tillingContext)
+    explicit QkvRmsNormRopeCacheTilingBase(gert::TilingContext* tillingContext)
         : TilingBaseClass(tillingContext)
     {}
     ~QkvRmsNormRopeCacheTilingBase() override {}
@@ -250,14 +250,14 @@ protected:
     void DumpTilingInfo() override {}
 
 protected:
-    std::tuple<int64_t, int64_t, int64_t, int64_t> GetShapeTuple(const gert::TilingContext *context,
+    std::tuple<int64_t, int64_t, int64_t, int64_t> GetShapeTuple(const gert::TilingContext* context,
                                                                  const int64_t index = 0);
-    std::tuple<int64_t, int64_t> GetShapeTupleOfTH(const gert::TilingContext *context, const int64_t index = 0);
+    std::tuple<int64_t, int64_t> GetShapeTupleOfTH(const gert::TilingContext* context, const int64_t index = 0);
 };
 
 class QkvRmsNormRopeCacheTilingDs : virtual public QkvRmsNormRopeCacheTilingBase {
 public:
-    explicit QkvRmsNormRopeCacheTilingDs(gert::TilingContext *tillingContext)
+    explicit QkvRmsNormRopeCacheTilingDs(gert::TilingContext* tillingContext)
         : QkvRmsNormRopeCacheTilingBase(tillingContext)
     {}
     ~QkvRmsNormRopeCacheTilingDs() {}
@@ -293,7 +293,7 @@ private:
 class QkvRmsNormRopeCacheTilingRegbase : public QkvRmsNormRopeCacheTilingDs {
 public:
     // 基类是虚继承,最派生类必须显式初始化虚基类
-    explicit QkvRmsNormRopeCacheTilingRegbase(gert::TilingContext *tillingContext)
+    explicit QkvRmsNormRopeCacheTilingRegbase(gert::TilingContext* tillingContext)
         : QkvRmsNormRopeCacheTilingBase(tillingContext),
           QkvRmsNormRopeCacheTilingDs(tillingContext)
     {}

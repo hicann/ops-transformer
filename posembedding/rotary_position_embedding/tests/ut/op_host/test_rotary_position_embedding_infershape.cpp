@@ -101,7 +101,7 @@ TEST_F(RotaryPositionEmbeddingInfershape, RotaryPositionEmbedding_rotate_matrix_
             // input info
             {{{1, 24, 32, 128}, {1, 24, 32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{1, 1, 32, 128}, {1, 1, 32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
-             {{{1, 1, 32, 128}, {1, 1, 32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1, 1, 32, 128}, {1, 1, 32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{128, 128}, {128, 128}}, ge::DT_BF16, ge::FORMAT_ND},
         },
         {

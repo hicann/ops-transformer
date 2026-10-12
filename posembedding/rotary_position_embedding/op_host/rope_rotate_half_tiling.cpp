@@ -23,8 +23,8 @@ namespace {
 constexpr uint64_t NUM_ZERO = 0;
 constexpr uint64_t NUM_ONE = 1;
 constexpr uint64_t NUM_TWO = 2;
-constexpr uint64_t MIN_CORE_NUM = 4;                // minimum 4 cores for small shapes
-constexpr uint64_t MASK_MAX = 64;                   // max elements per mask (D threshold for repeat broadcast)
+constexpr uint64_t MIN_CORE_NUM = 4; // minimum 4 cores for small shapes
+constexpr uint64_t MASK_MAX = 64;    // max elements per mask (D threshold for repeat broadcast)
 
 const uint64_t INDEX_INPUT_X = 0;
 const uint64_t INDEX_INPUT_COS = 1;
@@ -91,7 +91,7 @@ __attribute__((always_inline)) inline uint64_t GetRem(uint64_t value1, uint64_t 
     return value1 % value2;
 }
 
-__attribute__((always_inline)) inline uint64_t GetBytePerData(const ge::DataType &dtype)
+__attribute__((always_inline)) inline uint64_t GetBytePerData(const ge::DataType& dtype)
 {
     if (dtype == ge::DT_FLOAT) {
         return BYTE_PER_DATA_4;
@@ -102,7 +102,7 @@ __attribute__((always_inline)) inline uint64_t GetBytePerData(const ge::DataType
     return BYTE_PER_DATA_4;
 }
 
-__attribute__((always_inline)) inline uint64_t GetTilingDtype(const ge::DataType &dtype)
+__attribute__((always_inline)) inline uint64_t GetTilingDtype(const ge::DataType& dtype)
 {
     if (dtype == ge::DT_FLOAT) {
         return TILING_DTYPE_FP32;
@@ -126,31 +126,32 @@ namespace optiling {
 using namespace Ops::Base;
 class RotateHalfTiling {
 public:
-    explicit RotateHalfTiling(gert::TilingContext *tilingContext) : context(tilingContext) {};
+    explicit RotateHalfTiling(gert::TilingContext* tilingContext)
+        : context(tilingContext) {};
     uint64_t coreNum = 0;
     uint64_t tilingDtype = TILING_DTYPE_UNKNOWN;
     uint64_t tilingKey = TILING_KEY_PREFIX;
     bool isTndLayOut = false;
     platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND310P;
     RotaryPositionEmbeddingTilingData tiling;
-    RotateHalfParams &tilingData_ = tiling.rotateHalfParams;
+    RotateHalfParams& tilingData_ = tiling.rotateHalfParams;
     ge::graphStatus DoRotateHalfTiling();
 
 private:
-    gert::TilingContext *context = nullptr;
+    gert::TilingContext* context = nullptr;
     inline void GetCoreDataTiling();
     inline void PrintTilingParams();
     inline void GetUbLoopTiling();
     inline bool CheckBnsdBlockSkip();
     inline void GetAlignedInfo(const ge::DataType inputDtype, uint64_t dLength);
-    inline void GetStoreLines(const uint64_t ubSize, const uint64_t bytePerData, const ge::DataType &dtype);
-    inline void ChooseTilingMode(const gert::Shape &xShape, const gert::Shape &rShape);
-    inline void CalcRotateHalfTiling(const ge::DataType &dtype, uint64_t ubSize);
-    inline bool CheckRotHalfFullLoadXDConds(const ge::DataType &dtype, uint64_t ubSize);
-    inline bool CalcFullLoadXDTiling(const ge::DataType &origType, const uint64_t ubSize,
-        const uint64_t totalS, const uint64_t totalRopeS, const uint8_t isThreeOneDim);
-    ge::graphStatus CheckShapeSupport(const gert::Shape &xShape, const gert::Shape &cosShape,
-                                      const gert::Shape &sinShape, uint64_t dLength);
+    inline void GetStoreLines(const uint64_t ubSize, const uint64_t bytePerData, const ge::DataType& dtype);
+    inline void ChooseTilingMode(const gert::Shape& xShape, const gert::Shape& rShape);
+    inline void CalcRotateHalfTiling(const ge::DataType& dtype, uint64_t ubSize);
+    inline bool CheckRotHalfFullLoadXDConds(const ge::DataType& dtype, uint64_t ubSize);
+    inline bool CalcFullLoadXDTiling(const ge::DataType& origType, const uint64_t ubSize, const uint64_t totalS,
+                                     const uint64_t totalRopeS, const uint8_t isThreeOneDim);
+    ge::graphStatus CheckShapeSupport(const gert::Shape& xShape, const gert::Shape& cosShape,
+                                      const gert::Shape& sinShape, uint64_t dLength);
     ge::graphStatus CheckStrideSupport(const ge::DataType inputDtype);
 };
 
@@ -292,7 +293,7 @@ inline void RotateHalfTiling::GetUbLoopTiling()
 
 /* Cut UB size to ubNum, compute how many Lines of D_pad(split S) can store in each split UB */
 inline void RotateHalfTiling::GetStoreLines(const uint64_t ubSize, const uint64_t bytePerData,
-                                            const ge::DataType &dtype)
+                                            const ge::DataType& dtype)
 {
     uint64_t ubNum = dtype == ge::DT_FLOAT ? DOUBLE_BUFFER * UB_NUM : DOUBLE_BUFFER * UB_NUM_BF16;
     uint64_t splitUbSize = GetDiv(ubSize - UB_RESERVE_SIZE, ubNum);
@@ -302,15 +303,15 @@ inline void RotateHalfTiling::GetStoreLines(const uint64_t ubSize, const uint64_
     tilingData_.set_storePadDataLength(storeSLines * tilingData_.get_dPadLength());
 }
 
-inline void RotateHalfTiling::ChooseTilingMode(const gert::Shape &xShape, const gert::Shape &rShape)
-{   
+inline void RotateHalfTiling::ChooseTilingMode(const gert::Shape& xShape, const gert::Shape& rShape)
+{
     uint64_t xFirstDim = 0;
     uint64_t xSecondDim = 0;
     uint64_t xThirdDim = 0;
     uint64_t rFirstDim = 0;
     uint64_t rSecondDim = 0;
     uint64_t rThirdDim = 0;
-    if(isTndLayOut){
+    if (isTndLayOut) {
         xFirstDim = 1;
         xSecondDim = static_cast<int64_t>(xShape.GetDim(DIM_FIRST));
         xThirdDim = static_cast<int64_t>(xShape.GetDim(DIM_SECOND));
@@ -333,7 +334,7 @@ inline void RotateHalfTiling::ChooseTilingMode(const gert::Shape &xShape, const 
     tilingData_.set_axisLenR1(rFirstDim);
     tilingData_.set_axisLenR2(rSecondDim);
     tilingData_.set_axisLenR3(rThirdDim);
-    
+
     if (rFirstDim == xFirstDim && rSecondDim == xSecondDim && rThirdDim == xThirdDim) { // x = r, NO_BROADCAST
         OP_LOGD(context, "RotateHalf layout: x = r, NO_BROADCAST");
         tilingData_.set_tilingMode(TILING_MODE_NO_BROADCAST);
@@ -399,9 +400,9 @@ inline void RotateHalfTiling::ChooseTilingMode(const gert::Shape &xShape, const 
     }
 }
 
-inline bool RotateHalfTiling::CalcFullLoadXDTiling(
-    const ge::DataType &origType, const uint64_t ubSize,
-    const uint64_t totalS, const uint64_t totalRopeS, const uint8_t isThreeOneDim)
+inline bool RotateHalfTiling::CalcFullLoadXDTiling(const ge::DataType& origType, const uint64_t ubSize,
+                                                   const uint64_t totalS, const uint64_t totalRopeS,
+                                                   const uint8_t isThreeOneDim)
 {
     // Commence RotateHalfRoPEFullLoadXD Tiling
     const ge::DataType cmpType = ge::DT_FLOAT;
@@ -417,7 +418,7 @@ inline bool RotateHalfTiling::CalcFullLoadXDTiling(
     // Init Lr equation params
     uint64_t numRopeQueueIn = needTypeCast ? NUM_TWO : NUM_ZERO;
     uint64_t numXQueueIn = needTypeCast ? NUM_ONE : NUM_ZERO;
-    uint64_t numXYBuf = NUM_TWO;  // xBufFp32
+    uint64_t numXYBuf = NUM_TWO; // xBufFp32
     uint64_t numRopeTBuf = NUM_TWO;
 
     // When isThreeOneDim && D > MASK_MAX, broadcast cos/sin to axisX3 rows for element-wise Mul.
@@ -434,8 +435,8 @@ inline bool RotateHalfTiling::CalcFullLoadXDTiling(
             return false;
         }
         // Per-loop: only x buffers (xBufFp32 + outQueueY + inQueueX)
-        uint64_t perLoopFactor = dPadLength * (bytePerOrigData * axisX3 * numXQueueIn +
-                                               bytePerCmpData * axisX3 * numXYBuf);
+        uint64_t perLoopFactor =
+            dPadLength * (bytePerOrigData * axisX3 * numXQueueIn + bytePerCmpData * axisX3 * numXYBuf);
         ubLoopPerCoreMax = GetDiv(ubSize - fixedCost, perLoopFactor);
     } else {
         uint64_t ubTBufSizeFactor = bytePerCmpData * (axisX3 * numXYBuf + numRopeTBuf);
@@ -445,11 +446,11 @@ inline bool RotateHalfTiling::CalcFullLoadXDTiling(
     }
 
     // Compute tiling factors for RoPE and x
-    if (ubLoopPerCoreMax < NUM_ONE) {  // Guard condition for insufficient ub space
+    if (ubLoopPerCoreMax < NUM_ONE) { // Guard condition for insufficient ub space
         return false;
     }
 
-    uint64_t formerCoreNum = GetCeilDiv(totalS, ubLoopPerCoreMax);  // total cores used
+    uint64_t formerCoreNum = GetCeilDiv(totalS, ubLoopPerCoreMax); // total cores used
     uint64_t ubLoopPerCore = 0;
     uint64_t ubLoopLastCore = 0;
     if (formerCoreNum <= NUM_TWO && totalS >= MIN_CORE_NUM) {
@@ -495,7 +496,7 @@ inline bool RotateHalfTiling::CalcFullLoadXDTiling(
     return true;
 }
 
-inline bool RotateHalfTiling::CheckRotHalfFullLoadXDConds(const ge::DataType &origType, const uint64_t ubSize)
+inline bool RotateHalfTiling::CheckRotHalfFullLoadXDConds(const ge::DataType& origType, const uint64_t ubSize)
 {
     // FullLoadXD kernel only supports 910B and 910C
     if (socVersion != platform_ascendc::SocVersion::ASCEND910_93 &&
@@ -505,14 +506,14 @@ inline bool RotateHalfTiling::CheckRotHalfFullLoadXDConds(const ge::DataType &or
 
     // XY1D: second to last dim of RoPE MUST BE 1
     uint64_t axisR3 = tilingData_.get_axisLenR3();
-    uint64_t dLength = tilingData_.get_dLength();  // Dim
+    uint64_t dLength = tilingData_.get_dLength(); // Dim
 
     // RotateHalfRoPEFullLoadXD will deterriorate if single-core procession load of input x exceeds saved inter-kernel
     // MTE costs of RoPE. Hence the totalS allocated to kernels shall not exceed a certain upper cap.
     bool hasRotHalfFLXD = (axisR3 == NUM_ONE);
 
     if (hasRotHalfFLXD) {
-        uint8_t isThreeOneDim = NUM_ZERO;  // Recompute phi_rope on kernel using BroadcastDims.
+        uint8_t isThreeOneDim = NUM_ZERO; // Recompute phi_rope on kernel using BroadcastDims.
         // Extract broadcastAxes
         uint64_t axisR1 = tilingData_.get_axisLenR1();
         uint64_t axisR2 = tilingData_.get_axisLenR2();
@@ -523,7 +524,7 @@ inline bool RotateHalfTiling::CheckRotHalfFullLoadXDConds(const ge::DataType &or
         uint64_t totalRopeS = axisR1 * axisR2;
 
         bool hasSameHeadDims = (axisX1 == axisR1 && axisX2 == axisR2);
-        bool brcbAxesAligned = (hasSameHeadDims || totalRopeS == NUM_ONE);  // RoPE in XY1D or 111D
+        bool brcbAxesAligned = (hasSameHeadDims || totalRopeS == NUM_ONE); // RoPE in XY1D or 111D
         if (!brcbAxesAligned) {
             return false;
         }
@@ -537,7 +538,7 @@ inline bool RotateHalfTiling::CheckRotHalfFullLoadXDConds(const ge::DataType &or
     return hasRotHalfFLXD;
 }
 
-inline void RotateHalfTiling::CalcRotateHalfTiling(const ge::DataType &dtype, uint64_t ubSize)
+inline void RotateHalfTiling::CalcRotateHalfTiling(const ge::DataType& dtype, uint64_t ubSize)
 {
     uint64_t bytePerData = GetBytePerData(dtype);
 
@@ -572,54 +573,56 @@ inline void RotateHalfTiling::GetAlignedInfo(const ge::DataType inputDtype, uint
 }
 
 /* Check input shape */
-ge::graphStatus RotateHalfTiling::CheckShapeSupport(const gert::Shape &xShape, const gert::Shape &cosShape,
-                                                    const gert::Shape &sinShape, uint64_t dLength)
-{   
-    if(isTndLayOut){
-        if (xShape.GetDimNum() != TND_DIM_NUM || cosShape.GetDimNum() != TND_DIM_NUM || sinShape.GetDimNum() != TND_DIM_NUM) {
-            std::string dimNumMsg = std::to_string(xShape.GetDimNum()) + ", " +
-                std::to_string(cosShape.GetDimNum()) + " and " + std::to_string(sinShape.GetDimNum());
+ge::graphStatus RotateHalfTiling::CheckShapeSupport(const gert::Shape& xShape, const gert::Shape& cosShape,
+                                                    const gert::Shape& sinShape, uint64_t dLength)
+{
+    if (isTndLayOut) {
+        if (xShape.GetDimNum() != TND_DIM_NUM || cosShape.GetDimNum() != TND_DIM_NUM ||
+            sinShape.GetDimNum() != TND_DIM_NUM) {
+            std::string dimNumMsg = std::to_string(xShape.GetDimNum()) + ", " + std::to_string(cosShape.GetDimNum()) +
+                                    " and " + std::to_string(sinShape.GetDimNum());
             OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context->GetNodeName(), "x, cos and sin", dimNumMsg.c_str(),
-                "The shape dims of input x, cos and sin should all be 3D or 4D");
+                                                      "The shape dims of input x, cos and sin should all be 3D or 4D");
             return ge::GRAPH_FAILED;
         }
     } else {
         if (xShape.GetDimNum() != DIM_NUM || cosShape.GetDimNum() != DIM_NUM || sinShape.GetDimNum() != DIM_NUM) {
-            std::string dimNumMsg = std::to_string(xShape.GetDimNum()) + ", " +
-                std::to_string(cosShape.GetDimNum()) + " and " + std::to_string(sinShape.GetDimNum());
+            std::string dimNumMsg = std::to_string(xShape.GetDimNum()) + ", " + std::to_string(cosShape.GetDimNum()) +
+                                    " and " + std::to_string(sinShape.GetDimNum());
             OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context->GetNodeName(), "x, cos and sin", dimNumMsg.c_str(),
-                "The shape dims of input x, cos and sin should all be 3D or 4D");
+                                                      "The shape dims of input x, cos and sin should all be 3D or 4D");
             return ge::GRAPH_FAILED;
         }
     }
 
     if (dLength > D_LENGTH_LIMIT) {
         std::string reasonMsg = "The D axis of input x can not be greater than " + std::to_string(D_LENGTH_LIMIT) +
-            ", where D refers to the last dim";
+                                ", where D refers to the last dim";
         std::string xShapeStr = ToString(xShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", xShapeStr.c_str(),
-            reasonMsg.c_str());
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", xShapeStr.c_str(), reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
     if (GetRem(dLength, TWO) != 0) {
         std::string xShapeStr = ToString(xShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", xShapeStr.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context->GetNodeName(), "x", xShapeStr.c_str(),
             "The D axis of input x must be an even number, where D refers to the last dim");
         return ge::GRAPH_FAILED;
     }
     if (cosShape != sinShape) {
         std::string shapeMsg = ToString(cosShape) + " and " + ToString(sinShape);
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "cos and sin", shapeMsg.c_str(),
-            "The shapes of input cos and input sin should be the same");
+                                               "The shapes of input cos and input sin should be the same");
         return ge::GRAPH_FAILED;
     }
     uint64_t cosDLength = static_cast<uint64_t>(cosShape.GetDim(DIM_FOURTH));
-    if(isTndLayOut) {
+    if (isTndLayOut) {
         cosDLength = static_cast<uint64_t>(cosShape.GetDim(DIM_THIRD));
     }
     if (cosDLength != dLength) {
         std::string shapeMsg = ToString(xShape) + " and " + ToString(cosShape);
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "x and cos", shapeMsg.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            context->GetNodeName(), "x and cos", shapeMsg.c_str(),
             "The D axes of input x and input cos should be the same, where D refers to the last dim");
         return ge::GRAPH_FAILED;
     }
@@ -628,7 +631,7 @@ ge::graphStatus RotateHalfTiling::CheckShapeSupport(const gert::Shape &xShape, c
 
 /* Check stride support */
 ge::graphStatus RotateHalfTiling::CheckStrideSupport(const ge::DataType inputDtype)
-{   
+{
     uint64_t tilingMode = tilingData_.get_tilingMode();
     uint64_t stride = 0;
     uint64_t bSize = tilingData_.get_broadcastFirstDim();
@@ -636,10 +639,9 @@ ge::graphStatus RotateHalfTiling::CheckStrideSupport(const ge::DataType inputDty
     uint64_t dLength = tilingData_.get_dLength();
     uint64_t bytePerData = GetBytePerData(inputDtype);
     if (tilingMode == TILING_MODE_SBND) {
-        stride = (bSize * nSize -1) * dLength * bytePerData / BYTE_OF_BLOCK;
-    }
-    else if (tilingMode == TILING_MODE_BSND) {
-        stride = (nSize -1) * dLength * bytePerData / BYTE_OF_BLOCK;
+        stride = (bSize * nSize - 1) * dLength * bytePerData / BYTE_OF_BLOCK;
+    } else if (tilingMode == TILING_MODE_BSND) {
+        stride = (nSize - 1) * dLength * bytePerData / BYTE_OF_BLOCK;
     }
     OP_CHECK_IF(stride > UINT16_MAX,
                 OP_LOGE(context, "DataCopy Stride should be less than [%lu], but got [%lu].", UINT16_MAX, stride),
@@ -688,16 +690,16 @@ ge::graphStatus RotateHalfTiling::DoRotateHalfTiling()
     // get x and r shape. layout: [..., head_dim]
     auto inputXShapePtr = context->GetInputShape(INDEX_INPUT_X);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputXShapePtr);
-    const gert::Shape &xShape = inputXShapePtr->GetStorageShape();
+    const gert::Shape& xShape = inputXShapePtr->GetStorageShape();
     auto inputCosShapePtr = context->GetInputShape(INDEX_INPUT_COS);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputCosShapePtr);
-    const gert::Shape &cosShape = inputCosShapePtr->GetStorageShape();
+    const gert::Shape& cosShape = inputCosShapePtr->GetStorageShape();
     auto inputSinShapePtr = context->GetInputShape(INDEX_INPUT_SIN);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputSinShapePtr);
-    const gert::Shape &sinShape = inputSinShapePtr->GetStorageShape();
+    const gert::Shape& sinShape = inputSinShapePtr->GetStorageShape();
     uint64_t dLength = 0;
     uint64_t gmLength = static_cast<uint64_t>(xShape.GetShapeSize());
-    if(xShape.GetDimNum() == TND_DIM_NUM){
+    if (xShape.GetDimNum() == TND_DIM_NUM) {
         isTndLayOut = true;
         dLength = static_cast<uint64_t>(xShape.GetDim(DIM_THIRD));
     } else {
@@ -724,32 +726,31 @@ ge::graphStatus RotateHalfTiling::DoRotateHalfTiling()
     if (inputDtype != cosDtype || inputDtype != sinDtype) {
         std::string dtypeMsg = ToString(inputDtype) + ", " + ToString(cosDtype) + " and " + ToString(sinDtype);
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context->GetNodeName(), "x, cos and sin", dtypeMsg.c_str(),
-            "The dtypes of input x, cos and sin should be the same");
+                                               "The dtypes of input x, cos and sin should be the same");
         return ge::GRAPH_FAILED;
     }
 
     tilingDtype = GetTilingDtype(inputDtype);
     if (tilingDtype == TILING_DTYPE_UNKNOWN) {
         std::string inputDtypeStr = ToString(inputDtype);
-        OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "x", inputDtypeStr.c_str(),
-            "FLOAT, BF16, FLOAT16");
+        OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "x", inputDtypeStr.c_str(), "FLOAT, BF16, FLOAT16");
         return ge::GRAPH_FAILED;
     }
 
     // check D/2 aligned
     GetAlignedInfo(inputDtype, dLength);
-    OP_CHECK_IF(tilingData_.get_isAligned() == 0 &&
-                    ascendcPlatform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND910,
-                OP_LOGE(context, "current soc does not support non aligned calculations."), return ge::GRAPH_FAILED);
-    
-    OP_CHECK_IF(dLength != 32  && dLength != 64 && dLength != 96 && dLength != 128 &&
+    OP_CHECK_IF(
+        tilingData_.get_isAligned() == 0 && ascendcPlatform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND910,
+        OP_LOGE(context, "current soc does not support non aligned calculations."), return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(dLength != 32 && dLength != 64 && dLength != 96 && dLength != 128 &&
                     ascendcPlatform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND310P,
                 OP_LOGE(context, "current soc only supports d = 32/64/96/128."), return ge::GRAPH_FAILED);
 
     ChooseTilingMode(xShape, cosShape);
     OP_CHECK_IF(tilingData_.get_tilingMode() == TILING_MODE_UNKNOWN,
                 OP_LOGE(context, "unknown input layout, unable to calculate."), return ge::GRAPH_FAILED);
-    
+
     // block some layout=BNSD case, use small operators for higher performance
     OP_CHECK_IF(CheckBnsdBlockSkip(),
                 OP_LOGE(context, "when input is BNSD layout and  B * N is large or D is not aligned, "
@@ -759,12 +760,11 @@ ge::graphStatus RotateHalfTiling::DoRotateHalfTiling()
     tilingKey = GetTilingKey(tilingData_.get_tilingMode(), tilingDtype);
     CalcRotateHalfTiling(inputDtype, ubSize);
     OP_CHECK_IF(!tilingData_.get_tailAxesFLBoost() && tilingData_.get_storeSLines() <= 0,
-                OP_LOGE(context, "head_dim shape is too large to compute."),
-                return ge::GRAPH_FAILED);
-    
+                OP_LOGE(context, "head_dim shape is too large to compute."), return ge::GRAPH_FAILED);
+
     if (ascendcPlatform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND310P) {
-        OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckStrideSupport(inputDtype), OP_LOGE(context, "Stride is too large to compute."),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckStrideSupport(inputDtype),
+                    OP_LOGE(context, "Stride is too large to compute."), return ge::GRAPH_FAILED);
     }
 
     PrintTilingParams();
@@ -789,7 +789,7 @@ ge::graphStatus RopeRotateHalfTilingClass::DoOpTiling()
     context_->GetRawTilingData()->SetDataSize(rotateHalfTiling.tiling.GetDataSize());
     size_t usrWorkspaceSize = 0;
     size_t sysWorkspaceSize = DEFAULT_SYSTEM_WORKSPACESIZE;
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     currentWorkspace[0] = usrWorkspaceSize + sysWorkspaceSize;
 
     OP_LOGD(context_->GetNodeName(), "RotateHalf tiling end.");

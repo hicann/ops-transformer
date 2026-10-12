@@ -33,28 +33,28 @@ using ops::ut::Trim;
 
 constexpr size_t kCsvColumnCount = 38;
 
-vector<int64_t> ParseDims(const string &value)
+vector<int64_t> ParseDims(const string& value)
 {
     return ops::ut::ParseDims(value);
 }
 
-vector<int64_t> ParseI64List(const string &value)
+vector<int64_t> ParseI64List(const string& value)
 {
     return ops::ut::ParseI64List(value);
 }
 
-aclDataType ParseDtype(const string &dtype)
+aclDataType ParseDtype(const string& dtype)
 {
     return ops::ut::ParseAclDtype(dtype);
 }
 
-bool IsNullArg(const string &value)
+bool IsNullArg(const string& value)
 {
     const string trimmed = Trim(value);
     return trimmed.empty() || trimmed == "<null>" || trimmed == "NONE";
 }
 
-bool HasEmptyDim(const string &shape)
+bool HasEmptyDim(const string& shape)
 {
     if (IsNullArg(shape)) {
         return false;
@@ -63,7 +63,7 @@ bool HasEmptyDim(const string &shape)
     return std::any_of(dims.begin(), dims.end(), [](int64_t dim) { return dim == 0; });
 }
 
-TensorDesc MakeTensorDesc(const vector<int64_t> &shape, aclDataType dtype, bool useRange = true)
+TensorDesc MakeTensorDesc(const vector<int64_t>& shape, aclDataType dtype, bool useRange = true)
 {
     auto desc = TensorDesc(shape, dtype, ACL_FORMAT_ND);
     if (useRange) {
@@ -72,7 +72,7 @@ TensorDesc MakeTensorDesc(const vector<int64_t> &shape, aclDataType dtype, bool 
     return desc;
 }
 
-aclTensor *BuildTensor(const string &shape, const string &dtype, bool useRange = true)
+aclTensor* BuildTensor(const string& shape, const string& dtype, bool useRange = true)
 {
     if (IsNullArg(shape)) {
         return nullptr;
@@ -80,8 +80,8 @@ aclTensor *BuildTensor(const string &shape, const string &dtype, bool useRange =
     return MakeTensorDesc(ParseDims(shape), ParseDtype(dtype), useRange).ToAclTypeRawPtr();
 }
 
-aclTensor *BuildTensor(const string &shape, const string &dtype, const vector<int64_t> &stride,
-                       const vector<int64_t> &storageShape)
+aclTensor* BuildTensor(const string& shape, const string& dtype, const vector<int64_t>& stride,
+                       const vector<int64_t>& storageShape)
 {
     if (stride.empty()) {
         return BuildTensor(shape, dtype);
@@ -91,7 +91,7 @@ aclTensor *BuildTensor(const string &shape, const string &dtype, const vector<in
         .ToAclTypeRawPtr();
 }
 
-aclIntArray *BuildIntArray(const string &value)
+aclIntArray* BuildIntArray(const string& value)
 {
     if (IsNullArg(value)) {
         return nullptr;
@@ -101,7 +101,7 @@ aclIntArray *BuildIntArray(const string &value)
     return IntArrayDesc(values).ToAclTypeRawPtr();
 }
 
-const char *BuildStringArg(const string &value)
+const char* BuildStringArg(const string& value)
 {
     if (IsNullArg(value)) {
         return nullptr;
@@ -160,30 +160,30 @@ struct QkvRmsNormRopeCacheWithKScaleCase {
 };
 
 struct QkvRmsNormRopeCacheWithKScaleAclArgs {
-    aclTensor *qkv = nullptr;
-    aclTensor *qGamma = nullptr;
-    aclTensor *kGamma = nullptr;
-    aclTensor *cosSin = nullptr;
-    aclTensor *slotMapping = nullptr;
-    aclTensor *kCache = nullptr;
-    aclTensor *vCache = nullptr;
-    aclTensor *kScaleCache = nullptr;
-    aclTensor *queryStartLoc = nullptr;
-    aclTensor *seqLens = nullptr;
-    aclTensor *rotationOptional = nullptr;
-    aclTensor *vScaleOptional = nullptr;
-    aclTensor *mropePosition = nullptr;
-    aclIntArray *headNums = nullptr;
-    const char *layoutQkv = nullptr;
-    const char *layoutQOut = nullptr;
-    aclIntArray *mropeSection = nullptr;
-    const char *qQuantMode = nullptr;
-    const char *kQuantMode = nullptr;
-    aclTensor *qOut = nullptr;
-    aclTensor *qScale = nullptr;
+    aclTensor* qkv = nullptr;
+    aclTensor* qGamma = nullptr;
+    aclTensor* kGamma = nullptr;
+    aclTensor* cosSin = nullptr;
+    aclTensor* slotMapping = nullptr;
+    aclTensor* kCache = nullptr;
+    aclTensor* vCache = nullptr;
+    aclTensor* kScaleCache = nullptr;
+    aclTensor* queryStartLoc = nullptr;
+    aclTensor* seqLens = nullptr;
+    aclTensor* rotationOptional = nullptr;
+    aclTensor* vScaleOptional = nullptr;
+    aclTensor* mropePosition = nullptr;
+    aclIntArray* headNums = nullptr;
+    const char* layoutQkv = nullptr;
+    const char* layoutQOut = nullptr;
+    aclIntArray* mropeSection = nullptr;
+    const char* qQuantMode = nullptr;
+    const char* kQuantMode = nullptr;
+    aclTensor* qOut = nullptr;
+    aclTensor* qScale = nullptr;
 };
 
-QkvRmsNormRopeCacheWithKScaleAclArgs BuildAclArgs(const QkvRmsNormRopeCacheWithKScaleCase &testCase)
+QkvRmsNormRopeCacheWithKScaleAclArgs BuildAclArgs(const QkvRmsNormRopeCacheWithKScaleCase& testCase)
 {
     QkvRmsNormRopeCacheWithKScaleAclArgs args;
     args.qkv = BuildTensor(testCase.qkvShape, testCase.qkvDtype);
@@ -213,7 +213,7 @@ QkvRmsNormRopeCacheWithKScaleAclArgs BuildAclArgs(const QkvRmsNormRopeCacheWithK
     return args;
 }
 
-void RunCase(const QkvRmsNormRopeCacheWithKScaleCase &testCase)
+void RunCase(const QkvRmsNormRopeCacheWithKScaleCase& testCase)
 {
     const auto args = BuildAclArgs(testCase);
     uint64_t workspaceSize = 0;
@@ -257,7 +257,7 @@ void RunCase(const QkvRmsNormRopeCacheWithKScaleCase &testCase)
                                 << ", operatorExpectRet=" << testCase.operatorExpectRet;
 }
 
-vector<QkvRmsNormRopeCacheWithKScaleCase> LoadCases(const string &csvFilePath)
+vector<QkvRmsNormRopeCacheWithKScaleCase> LoadCases(const string& csvFilePath)
 {
     ifstream in(csvFilePath);
     EXPECT_TRUE(in.is_open()) << "Failed to open CSV file: " << csvFilePath;
@@ -325,7 +325,7 @@ vector<QkvRmsNormRopeCacheWithKScaleCase> LoadCases(const string &csvFilePath)
             c.qQuantMode = Trim(cols[i++]);
             c.operatorExpectRet = Trim(cols[i++]);
             cases.emplace_back(c);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvFilePath, lineNo, caseName, error);
         }
     }
@@ -333,7 +333,7 @@ vector<QkvRmsNormRopeCacheWithKScaleCase> LoadCases(const string &csvFilePath)
     return cases;
 }
 
-const vector<QkvRmsNormRopeCacheWithKScaleCase> &GetCases()
+const vector<QkvRmsNormRopeCacheWithKScaleCase>& GetCases()
 {
     static const auto cases =
         LoadCases(ops::ut::ResolveCsvPath("test_aclnn_qkv_rms_norm_rope_cache_with_k_scale.csv",
@@ -341,7 +341,7 @@ const vector<QkvRmsNormRopeCacheWithKScaleCase> &GetCases()
     return cases;
 }
 
-string MakeParamName(const testing::TestParamInfo<QkvRmsNormRopeCacheWithKScaleCase> &info)
+string MakeParamName(const testing::TestParamInfo<QkvRmsNormRopeCacheWithKScaleCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.caseName);
 }
@@ -356,8 +356,8 @@ TEST_P(qkv_rms_norm_rope_cache_with_k_scale_csv_test, csvDrivenCase)
 
 QkvRmsNormRopeCacheWithKScaleCase MakeMropeMxCase()
 {
-    const auto &cases = GetCases();
-    const auto it = std::find_if(cases.begin(), cases.end(), [](const auto &testCase) {
+    const auto& cases = GetCases();
+    const auto it = std::find_if(cases.begin(), cases.end(), [](const auto& testCase) {
         return testCase.caseName == "mrope_position_token_major_valid";
     });
     EXPECT_NE(it, cases.end());
@@ -400,9 +400,9 @@ TEST(QkvRmsNormRopeCacheWithKScaleAclnn, AcceptsMropeMxFiveOutputContract)
 
 TEST(QkvRmsNormRopeCacheWithKScaleAclnn, AcceptsModifiedV1PerTokenPerHeadContract)
 {
-    const auto &cases = GetCases();
+    const auto& cases = GetCases();
     const auto it = std::find_if(cases.begin(), cases.end(),
-                                 [](const auto &testCase) { return testCase.caseName == "normal_decode_t128"; });
+                                 [](const auto& testCase) { return testCase.caseName == "normal_decode_t128"; });
     ASSERT_NE(it, cases.end());
     RunCase(*it);
 }
@@ -430,9 +430,9 @@ TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsUnsupportedMropeKModeToGraphVal
 
 TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsRopeTokenCountAboveLimitToGraphValidation)
 {
-    const auto &cases = GetCases();
+    const auto& cases = GetCases();
     const auto it = std::find_if(cases.begin(), cases.end(),
-                                 [](const auto &testCase) { return testCase.caseName == "normal_decode_t128"; });
+                                 [](const auto& testCase) { return testCase.caseName == "normal_decode_t128"; });
     ASSERT_NE(it, cases.end());
     auto testCase = *it;
     testCase.qkvShape = "10:262145:128";
@@ -441,8 +441,8 @@ TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsRopeTokenCountAboveLimitToGraph
 
 TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsMropeTokenCountAboveLimitToGraphValidation)
 {
-    const auto &cases = GetCases();
-    const auto it = std::find_if(cases.begin(), cases.end(), [](const auto &testCase) {
+    const auto& cases = GetCases();
+    const auto it = std::find_if(cases.begin(), cases.end(), [](const auto& testCase) {
         return testCase.caseName == "mrope_position_token_major_valid";
     });
     ASSERT_NE(it, cases.end());
@@ -525,9 +525,9 @@ TEST(QkvRmsNormRopeCacheWithKScaleAclnn, AcceptsMropeMxPaddedNonOverlappingViews
 
 TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsRopeOverlappingKvBlockViewToGraphValidation)
 {
-    const auto &cases = GetCases();
+    const auto& cases = GetCases();
     const auto it = std::find_if(cases.begin(), cases.end(),
-                                 [](const auto &testCase) { return testCase.caseName == "normal_decode_t128"; });
+                                 [](const auto& testCase) { return testCase.caseName == "normal_decode_t128"; });
     ASSERT_NE(it, cases.end());
     auto testCase = *it;
     testCase.kCacheShape = "2:2:16:128";
@@ -542,8 +542,8 @@ TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsRopeOverlappingKvBlockViewToGra
 
 TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsMropeOverlappingKScaleBlockViewToGraphValidation)
 {
-    const auto &cases = GetCases();
-    const auto it = std::find_if(cases.begin(), cases.end(), [](const auto &testCase) {
+    const auto& cases = GetCases();
+    const auto it = std::find_if(cases.begin(), cases.end(), [](const auto& testCase) {
         return testCase.caseName == "mrope_position_token_major_valid";
     });
     ASSERT_NE(it, cases.end());
@@ -558,9 +558,9 @@ TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsMropeOverlappingKScaleBlockView
 
 TEST(QkvRmsNormRopeCacheWithKScaleAclnn, AcceptsRopePaddedNonOverlappingViews)
 {
-    const auto &cases = GetCases();
+    const auto& cases = GetCases();
     const auto it = std::find_if(cases.begin(), cases.end(),
-                                 [](const auto &testCase) { return testCase.caseName == "normal_decode_t128"; });
+                                 [](const auto& testCase) { return testCase.caseName == "normal_decode_t128"; });
     ASSERT_NE(it, cases.end());
     auto testCase = *it;
     testCase.kCacheStride = {6144, 3072, 160, 1};

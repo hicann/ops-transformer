@@ -34,8 +34,8 @@ constexpr uint64_t TILING_KEY_B_FP16_FP32 = 20241;
 bool InplacePartialRopeRegBaseTilingClassAAndB::IsCapable()
 {
     // 处理全boardcast和不boardcast的情况
-    return (IsRegbaseSocVersion()) && (layout_ == InplacePartialRopeLayout::NO_BROADCAST || layout_ ==
-        InplacePartialRopeLayout::BROADCAST_BSN);
+    return (IsRegbaseSocVersion()) &&
+           (layout_ == InplacePartialRopeLayout::NO_BROADCAST || layout_ == InplacePartialRopeLayout::BROADCAST_BSN);
 }
 
 ge::graphStatus InplacePartialRopeRegBaseTilingClassAAndB::MergeDim()
@@ -84,38 +84,33 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAAndB::ComputeUbFactor()
         }
         int64_t numOfDAvailable = FloorDiv(static_cast<int64_t>(aicoreParams_.ubSize), totalPerBUnit);
         OP_CHECK_IF(numOfDAvailable < 1,
-            OP_LOGE(context_,
-                "D is too big to load in ub, ubSize is %ld bytes, loading requires %ld bytes.",
-                static_cast<int64_t>(aicoreParams_.ubSize),
-                totalPerBUnit),
-            return ge::GRAPH_FAILED);
+                    OP_LOGE(context_, "D is too big to load in ub, ubSize is %ld bytes, loading requires %ld bytes.",
+                            static_cast<int64_t>(aicoreParams_.ubSize), totalPerBUnit),
+                    return ge::GRAPH_FAILED);
         ubFactorB_ = std::min(blockFactorB_, numOfDAvailable);
     } else {
         if (isMixedPrecision) {
             // UB: UB_X_FACTOR * ubFactorB * dSizeX + UB_COS_SIN_FACTOR * dSizeCosSin
             int64_t availableForX = static_cast<int64_t>(aicoreParams_.ubSize) - UB_COS_SIN_FACTOR * dSizeCosSin;
             if (availableForX <= 0) {
-                OP_LOGE(context_,
-                    "D is too big to load in ub, ubSize is %ld bytes, cos/sin requires %ld bytes.",
-                    static_cast<int64_t>(aicoreParams_.ubSize),
-                    UB_COS_SIN_FACTOR * dSizeCosSin);
+                OP_LOGE(context_, "D is too big to load in ub, ubSize is %ld bytes, cos/sin requires %ld bytes.",
+                        static_cast<int64_t>(aicoreParams_.ubSize), UB_COS_SIN_FACTOR * dSizeCosSin);
                 return ge::GRAPH_FAILED;
             }
             int64_t numOfDAvailable = FloorDiv(availableForX, UB_X_FACTOR * dSizeX);
-            OP_CHECK_IF(numOfDAvailable < 1,
-                OP_LOGE(context_,
-                    "D is too big to load in ub, ubSize is %ld bytes, loading requires %ld bytes.",
-                    static_cast<int64_t>(aicoreParams_.ubSize),
-                    UB_X_FACTOR * dSizeX + UB_COS_SIN_FACTOR * dSizeCosSin),
+            OP_CHECK_IF(
+                numOfDAvailable < 1,
+                OP_LOGE(context_, "D is too big to load in ub, ubSize is %ld bytes, loading requires %ld bytes.",
+                        static_cast<int64_t>(aicoreParams_.ubSize),
+                        UB_X_FACTOR * dSizeX + UB_COS_SIN_FACTOR * dSizeCosSin),
                 return ge::GRAPH_FAILED);
             ubFactorB_ = std::min(blockFactorB_, numOfDAvailable);
         } else {
             int64_t numOfDAvailable = FloorDiv(static_cast<int64_t>(aicoreParams_.ubSize), DOUBLE_BUFFER * dSizeX);
-            OP_CHECK_IF(numOfDAvailable < UB_FACTOR,
-                OP_LOGE(context_,
-                    "D is too big to load in ub, ubSize is %ld bytes, loading requires %ld bytes.",
-                    static_cast<int64_t>(aicoreParams_.ubSize),
-                    UB_FACTOR * dSizeX * (ubFactorB_ + 1)),
+            OP_CHECK_IF(
+                numOfDAvailable < UB_FACTOR,
+                OP_LOGE(context_, "D is too big to load in ub, ubSize is %ld bytes, loading requires %ld bytes.",
+                        static_cast<int64_t>(aicoreParams_.ubSize), UB_FACTOR * dSizeX * (ubFactorB_ + 1)),
                 return ge::GRAPH_FAILED);
             numOfDAvailable -= 1;
             numOfDAvailable /= DOUBLE_BUFFER;
@@ -154,48 +149,29 @@ void InplacePartialRopeRegBaseTilingClassAAndB::SetTilingData()
     tilingData_.set_sliceLength(static_cast<int64_t>(sliceLength_));
 
     OP_LOGI(context_->GetNodeName(),
-        "InplacePartialRopeRegBaseTilingClassAAndB tilingData: "
-        "B is %ld, CosB is %ld, S is %ld, D is %ld, N is %ld, blockNumB %ld,"
-        "blockFactorB_ is %ld, blockNumS %ld, blockFactorS is %ld, ubLoopNumS is %ld,"
-        "ubFactorS is %ld, ubTailFactorS %ld, ubLoopNumB is %ld, ubFactorB is %ld,"
-        "ubTailFactorB is %ld, ubLoopNumN is %ld, ubFactorN is %ld, ubTailFactorN is %ld,"
-        "rotaryMode is %ld, tilingKey is %ld, sliceStart is %ld, sliceEnd is %ld, sliceLength is %ld",
-        tilingData_.get_B(),
-        tilingData_.get_CosB(),
-        tilingData_.get_S(),
-        tilingData_.get_D(),
-        tilingData_.get_N(),
-        tilingData_.get_blockNumB(),
-        tilingData_.get_blockFactorB(),
-        tilingData_.get_blockNumS(),
-        tilingData_.get_blockFactorS(),
-        tilingData_.get_ubLoopNumS(),
-        tilingData_.get_ubFactorS(),
-        tilingData_.get_ubTailFactorS(),
-        tilingData_.get_ubLoopNumB(),
-        tilingData_.get_ubFactorB(),
-        tilingData_.get_ubTailFactorB(),
-        tilingData_.get_ubLoopNumN(),
-        tilingData_.get_ubFactorN(),
-        tilingData_.get_ubTailFactorN(),
-        tilingData_.get_rotaryMode(),
-        GetTilingKey(),
-        tilingData_.get_sliceStart(),
-        tilingData_.get_sliceEnd(),
-        tilingData_.get_sliceLength());
+            "InplacePartialRopeRegBaseTilingClassAAndB tilingData: "
+            "B is %ld, CosB is %ld, S is %ld, D is %ld, N is %ld, blockNumB %ld,"
+            "blockFactorB_ is %ld, blockNumS %ld, blockFactorS is %ld, ubLoopNumS is %ld,"
+            "ubFactorS is %ld, ubTailFactorS %ld, ubLoopNumB is %ld, ubFactorB is %ld,"
+            "ubTailFactorB is %ld, ubLoopNumN is %ld, ubFactorN is %ld, ubTailFactorN is %ld,"
+            "rotaryMode is %ld, tilingKey is %ld, sliceStart is %ld, sliceEnd is %ld, sliceLength is %ld",
+            tilingData_.get_B(), tilingData_.get_CosB(), tilingData_.get_S(), tilingData_.get_D(), tilingData_.get_N(),
+            tilingData_.get_blockNumB(), tilingData_.get_blockFactorB(), tilingData_.get_blockNumS(),
+            tilingData_.get_blockFactorS(), tilingData_.get_ubLoopNumS(), tilingData_.get_ubFactorS(),
+            tilingData_.get_ubTailFactorS(), tilingData_.get_ubLoopNumB(), tilingData_.get_ubFactorB(),
+            tilingData_.get_ubTailFactorB(), tilingData_.get_ubLoopNumN(), tilingData_.get_ubFactorN(),
+            tilingData_.get_ubTailFactorN(), tilingData_.get_rotaryMode(), GetTilingKey(), tilingData_.get_sliceStart(),
+            tilingData_.get_sliceEnd(), tilingData_.get_sliceLength());
 }
 
 ge::graphStatus InplacePartialRopeRegBaseTilingClassAAndB::DoOpTiling()
 {
-    OP_CHECK_IF(MergeDim() != ge::GRAPH_SUCCESS,
-        OP_LOGE(context_->GetNodeName(), "failed to merge dim."),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(SplitCore() != ge::GRAPH_SUCCESS,
-        OP_LOGE(context_->GetNodeName(), "failed to split core."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(MergeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "failed to merge dim."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(SplitCore() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "failed to split core."),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(ComputeUbFactor() != ge::GRAPH_SUCCESS,
-        OP_LOGE(context_->GetNodeName(), "failed to compute ub factor."),
-        return ge::GRAPH_FAILED);
+                OP_LOGE(context_->GetNodeName(), "failed to compute ub factor."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -232,7 +208,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAAndB::PostTiling()
     uint64_t tilingKey = GetTilingKey();
     context_->SetTilingKey(tilingKey);
     context_->SetBlockDim(blockNumB_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = workspaceSize_;
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
@@ -240,4 +216,4 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAAndB::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-}  // namespace optiling
+} // namespace optiling

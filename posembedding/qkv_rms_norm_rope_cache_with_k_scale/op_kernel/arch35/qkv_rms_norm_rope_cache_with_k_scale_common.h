@@ -372,7 +372,7 @@ __aicore__ inline uint64_t NzMatrixElements(uint64_t rowCount)
 }
 
 template <typename T>
-__aicore__ inline void DataCopyGmToUb2D(const LocalTensor<T> &dst, const GlobalTensor<T> &src, uint64_t rowCount,
+__aicore__ inline void DataCopyGmToUb2D(const LocalTensor<T>& dst, const GlobalTensor<T>& src, uint64_t rowCount,
                                         uint64_t colCount, uint64_t srcStride)
 {
     if (rowCount == 0U || colCount == 0U) {
@@ -396,7 +396,7 @@ __aicore__ inline void DataCopyGmToUb2D(const LocalTensor<T> &dst, const GlobalT
 }
 
 template <typename T>
-__aicore__ inline void DataCopyUbToGm2D(const GlobalTensor<T> &dst, const LocalTensor<T> &src, uint64_t rowCount,
+__aicore__ inline void DataCopyUbToGm2D(const GlobalTensor<T>& dst, const LocalTensor<T>& src, uint64_t rowCount,
                                         uint64_t colCount, uint64_t srcStride, uint64_t dstStride)
 {
     if (rowCount == 0U || colCount == 0U) {

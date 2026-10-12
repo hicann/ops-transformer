@@ -77,8 +77,8 @@ const int64_t BLOCK_SIZE = 8;
 const int64_t MAX_POS = 64;
 const int64_t MROPE_AXIS_NUM = 3;
 
-#define LOG_PRINT(message, ...)     \
-    do {                            \
+#define LOG_PRINT(message, ...) \
+    do { \
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
@@ -111,7 +111,7 @@ uint32_t GetDataTypeSize(DataType dt)
     }
 }
 
-int64_t ShapeSize(const vector<int64_t> &shapes)
+int64_t ShapeSize(const vector<int64_t>& shapes)
 {
     int64_t size = 1;
     for (size_t i = 0; i < shapes.size(); i++) {
@@ -125,7 +125,9 @@ int64_t ShapeSize(const vector<int64_t> &shapes)
  * 便于用回读的输入 bin 离线复算 golden 做数值比对。*/
 class Lcg {
 public:
-    explicit Lcg(uint32_t seed) : state_(seed) {}
+    explicit Lcg(uint32_t seed)
+        : state_(seed)
+    {}
     float Next()
     {
         state_ = state_ * 1103515245u + 12345u;
@@ -148,20 +150,20 @@ uint16_t FloatToBf16(float value)
 
 /* 浮点类输入填确定性伪随机值。全零输入会让 RMSNorm 恒输出 0，
  * 那样样例区分不出「算对了」和「什么都没算」，故此处必须填非平凡值。*/
-int32_t GenFloatData(const vector<int64_t> &shapes, Tensor &input_tensor, TensorDesc &input_tensor_desc,
-    DataType data_type, uint32_t seed)
+int32_t GenFloatData(const vector<int64_t>& shapes, Tensor& input_tensor, TensorDesc& input_tensor_desc,
+                     DataType data_type, uint32_t seed)
 {
     input_tensor_desc.SetRealDimCnt(shapes.size());
     size_t size = static_cast<size_t>(ShapeSize(shapes));
     vector<uint8_t> data(size * GetDataTypeSize(data_type), 0);
     Lcg lcg(seed);
     if (data_type == DT_FLOAT) {
-        float *values = reinterpret_cast<float *>(data.data());
+        float* values = reinterpret_cast<float*>(data.data());
         for (size_t i = 0; i < size; i++) {
             values[i] = lcg.Next();
         }
-    } else {  // DT_BF16
-        uint16_t *values = reinterpret_cast<uint16_t *>(data.data());
+    } else { // DT_BF16
+        uint16_t* values = reinterpret_cast<uint16_t*>(data.data());
         for (size_t i = 0; i < size; i++) {
             values[i] = FloatToBf16(lcg.Next());
         }
@@ -176,15 +178,18 @@ int32_t GenFloatData(const vector<int64_t> &shapes, Tensor &input_tensor, Tensor
  *   kCatReverse 取 n-1..0 —— cat_indices 逆序，使输出 token 同时命中 und 段与 gen 段
  *   kPosCycle 按 max_pos 取模 —— positions 须落在 [0, max_pos)
  * 统一走 vector<uint8_t> 重载，由 Tensor 内部拷贝，不涉及裸指针生命周期。*/
-enum IndexFill { kSlot, kCatReverse, kPosCycle };
+enum IndexFill {
+    kSlot,
+    kCatReverse,
+    kPosCycle
+};
 
-int32_t GenIndexData(const vector<int64_t> &shapes, Tensor &input_tensor, TensorDesc &input_tensor_desc,
-    IndexFill fill)
+int32_t GenIndexData(const vector<int64_t>& shapes, Tensor& input_tensor, TensorDesc& input_tensor_desc, IndexFill fill)
 {
     input_tensor_desc.SetRealDimCnt(shapes.size());
     size_t size = static_cast<size_t>(ShapeSize(shapes));
     vector<uint8_t> data(size * sizeof(int64_t), 0);
-    int64_t *values = reinterpret_cast<int64_t *>(data.data());
+    int64_t* values = reinterpret_cast<int64_t*>(data.data());
     for (size_t i = 0; i < size; i++) {
         int64_t idx = static_cast<int64_t>(i);
         if (fill == kSlot) {
@@ -199,9 +204,9 @@ int32_t GenIndexData(const vector<int64_t> &shapes, Tensor &input_tensor, Tensor
     return SUCCESS;
 }
 
-int32_t WriteDataToFile(const string &bin_file, uint64_t data_size, uint8_t *inputData)
+int32_t WriteDataToFile(const string& bin_file, uint64_t data_size, uint8_t* inputData)
 {
-    FILE *fp = fopen(bin_file.c_str(), "w");
+    FILE* fp = fopen(bin_file.c_str(), "w");
     if (fp == nullptr) {
         return FAILED;
     }
@@ -213,39 +218,39 @@ int32_t WriteDataToFile(const string &bin_file, uint64_t data_size, uint8_t *inp
 /* 建一个 Data 节点并接到算子的第 inputIdx 个输入上。
  * 注意 Data 的名字必须用 std::string 拼，写成 "placeholder" + idx 是指针算术不是字符串拼接。
  * fillKind：0 = 浮点伪随机（用 seed 区分各输入），1/2/3 = slot / cat 逆序 / positions 取模。*/
-#define ADD_INPUT(inputIdx, inputName, inputDtype, inputShape, fillKind, seed)                       \
-    do {                                                                                             \
-        vector<int64_t> shape_##inputName = inputShape;                                              \
+#define ADD_INPUT(inputIdx, inputName, inputDtype, inputShape, fillKind, seed) \
+    do { \
+        vector<int64_t> shape_##inputName = inputShape; \
         auto data_##inputName = op::Data((string("data_") + #inputName).c_str()).set_attr_index(inputIdx); \
         TensorDesc desc_##inputName = TensorDesc(ge::Shape(shape_##inputName), FORMAT_ND, inputDtype); \
-        desc_##inputName.SetPlacement(ge::kPlacementHost);                                           \
-        desc_##inputName.SetFormat(FORMAT_ND);                                                       \
-        Tensor tensor_##inputName;                                                                   \
-        ret = ((fillKind) == 0)                                                                      \
-            ? GenFloatData(shape_##inputName, tensor_##inputName, desc_##inputName, inputDtype, seed) \
-            : GenIndexData(shape_##inputName, tensor_##inputName, desc_##inputName,                  \
-                           static_cast<IndexFill>((fillKind) - 1));                                  \
-        if (ret != SUCCESS) {                                                                        \
-            printf("%s - ERROR - [XIR]: Generate input data failed\n", GetTime().c_str());           \
-            return FAILED;                                                                           \
-        }                                                                                            \
-        data_##inputName.update_input_desc_x(desc_##inputName);                                      \
-        data_##inputName.update_output_desc_y(desc_##inputName);                                     \
-        input.push_back(tensor_##inputName);                                                         \
-        graph.AddOp(data_##inputName);                                                               \
-        op_und_gen.set_input_##inputName(data_##inputName);                                          \
-        op_und_gen.update_input_desc_##inputName(desc_##inputName);                                  \
-        inputs.push_back(data_##inputName);                                                          \
+        desc_##inputName.SetPlacement(ge::kPlacementHost); \
+        desc_##inputName.SetFormat(FORMAT_ND); \
+        Tensor tensor_##inputName; \
+        ret = ((fillKind) == 0) ? \
+                  GenFloatData(shape_##inputName, tensor_##inputName, desc_##inputName, inputDtype, seed) : \
+                  GenIndexData(shape_##inputName, tensor_##inputName, desc_##inputName, \
+                               static_cast<IndexFill>((fillKind) - 1)); \
+        if (ret != SUCCESS) { \
+            printf("%s - ERROR - [XIR]: Generate input data failed\n", GetTime().c_str()); \
+            return FAILED; \
+        } \
+        data_##inputName.update_input_desc_x(desc_##inputName); \
+        data_##inputName.update_output_desc_y(desc_##inputName); \
+        input.push_back(tensor_##inputName); \
+        graph.AddOp(data_##inputName); \
+        op_und_gen.set_input_##inputName(data_##inputName); \
+        op_und_gen.update_input_desc_##inputName(desc_##inputName); \
+        inputs.push_back(data_##inputName); \
     } while (0)
 
-#define ADD_OUTPUT(outputName, outputDtype, outputShape)                                             \
-    do {                                                                                             \
+#define ADD_OUTPUT(outputName, outputDtype, outputShape) \
+    do { \
         TensorDesc desc_out_##outputName = TensorDesc(ge::Shape(outputShape), FORMAT_ND, outputDtype); \
-        op_und_gen.update_output_desc_##outputName(desc_out_##outputName);                           \
+        op_und_gen.update_output_desc_##outputName(desc_out_##outputName); \
     } while (0)
 
-int CreateOppInGraph(std::vector<ge::Tensor> &input, std::vector<Operator> &inputs,
-    std::vector<Operator> &outputs, Graph &graph)
+int CreateOppInGraph(std::vector<ge::Tensor>& input, std::vector<Operator>& inputs, std::vector<Operator>& outputs,
+                     Graph& graph)
 {
     Status ret = SUCCESS;
     auto op_und_gen = op::UndGenQkvRmsNormRopeCache("test_geir_und_gen_qkv_rms_norm_rope_cache");
@@ -293,9 +298,9 @@ int CreateOppInGraph(std::vector<ge::Tensor> &input, std::vector<Operator> &inpu
     return SUCCESS;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-    const char *graph_name = "tc_ge_irrun_test";
+    const char* graph_name = "tc_ge_irrun_test";
     Graph graph(graph_name);
     std::vector<ge::Tensor> input;
 
@@ -323,7 +328,7 @@ int main(int argc, char *argv[])
 
     std::map<AscendString, AscendString> build_options = {};
     printf("%s - INFO - [XIR]: Start to create ir session using build options\n", GetTime().c_str());
-    ge::Session *session = new Session(build_options);
+    ge::Session* session = new Session(build_options);
     if (session == nullptr) {
         printf("%s - ERROR - [XIR]: Create ir session using build options failed\n", GetTime().c_str());
         return FAILED;
@@ -360,7 +365,7 @@ int main(int argc, char *argv[])
     int input_num = input.size();
     for (int i = 0; i < input_num; i++) {
         string input_file = "./tc_ge_irrun_test_npu_input_" + std::to_string(i) + ".bin";
-        uint8_t *input_data_i = input[i].GetData();
+        uint8_t* input_data_i = input[i].GetData();
         int64_t input_shape = input[i].GetTensorDesc().GetShape().GetShapeSize();
         uint32_t data_size = input_shape * GetDataTypeSize(input[i].GetTensorDesc().GetDataType());
         WriteDataToFile(input_file, data_size, input_data_i);
@@ -370,7 +375,7 @@ int main(int argc, char *argv[])
     for (int i = 0; i < output_num; i++) {
         std::cout << "output " << i << " dtype :  " << output[i].GetTensorDesc().GetDataType() << std::endl;
         string output_file = "./tc_ge_irrun_test_npu_output_" + std::to_string(i) + ".bin";
-        uint8_t *output_data_i = output[i].GetData();
+        uint8_t* output_data_i = output[i].GetData();
         int64_t output_shape = output[i].GetTensorDesc().GetShape().GetShapeSize();
         std::cout << "this is " << i << "th output, output shape size =" << output_shape << std::endl;
         uint32_t data_size = output_shape * GetDataTypeSize(output[i].GetTensorDesc().GetDataType());

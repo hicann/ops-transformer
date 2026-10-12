@@ -17,14 +17,14 @@ using namespace at_npu::native;
 const int64_t HEAD_DIM = 128;
 const int64_t MROPE_AXIS_NUM = 3;
 
-at::Tensor UndGenQkvRmsNormRopeCache(const at::Tensor &undQkv, const at::Tensor &undWeightsQ,
-                                     const at::Tensor &undWeightsK, const at::Tensor &cosSinCache,
-                                     const at::Tensor &kCache, const at::Tensor &vCache, const at::Tensor &slotMapping,
-                                     const at::Tensor &positions, const c10::optional<at::Tensor> &genQkv,
-                                     const c10::optional<at::Tensor> &genWeightsQ,
-                                     const c10::optional<at::Tensor> &genWeightsK,
-                                     const c10::optional<at::Tensor> &catIndices, int64_t numHeadsQ, int64_t numHeadsK,
-                                     int64_t numHeadsV, double normEps, const at::IntArrayRef &mropeSection)
+at::Tensor UndGenQkvRmsNormRopeCache(const at::Tensor& undQkv, const at::Tensor& undWeightsQ,
+                                     const at::Tensor& undWeightsK, const at::Tensor& cosSinCache,
+                                     const at::Tensor& kCache, const at::Tensor& vCache, const at::Tensor& slotMapping,
+                                     const at::Tensor& positions, const c10::optional<at::Tensor>& genQkv,
+                                     const c10::optional<at::Tensor>& genWeightsQ,
+                                     const c10::optional<at::Tensor>& genWeightsK,
+                                     const c10::optional<at::Tensor>& catIndices, int64_t numHeadsQ, int64_t numHeadsK,
+                                     int64_t numHeadsV, double normEps, const at::IntArrayRef& mropeSection)
 {
     TORCH_CHECK(undQkv.dim() == 3, "und_qkv must be 3D [und_len, N, D], got ", undQkv.dim(), "D");
     TORCH_CHECK(undQkv.size(2) == HEAD_DIM, "head_dim must be ", HEAD_DIM, ", got ", undQkv.size(2));

@@ -21,34 +21,33 @@ extern "C" {
 #endif
 
 extern aclnnStatus aclnnInnerNormRopeConcatGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *encoderQuery,
-    const aclTensor *encoderKey, const aclTensor *encoderValue, const aclTensor *normQueryWeight,
-    const aclTensor *normQueryBias, const aclTensor *normKeyWeight, const aclTensor *normKeyBias,
-    const aclTensor *normAddedQueryWeight, const aclTensor *normAddedQueryBias, const aclTensor *normAddedKeyWeight,
-    const aclTensor *normAddedKeyBias, const aclTensor *ropeSin, const aclTensor *ropeCos, int64_t normType,
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* encoderQuery,
+    const aclTensor* encoderKey, const aclTensor* encoderValue, const aclTensor* normQueryWeight,
+    const aclTensor* normQueryBias, const aclTensor* normKeyWeight, const aclTensor* normKeyBias,
+    const aclTensor* normAddedQueryWeight, const aclTensor* normAddedQueryBias, const aclTensor* normAddedKeyWeight,
+    const aclTensor* normAddedKeyBias, const aclTensor* ropeSin, const aclTensor* ropeCos, int64_t normType,
     int64_t normAddedType, int64_t ropeType, int64_t concatOrder, double eps, bool isTraining,
-    const aclTensor *queryOutput, const aclTensor *keyOutput, const aclTensor *valueOutput,
-    const aclTensor *normQueryMean, const aclTensor *normQueryRstd, const aclTensor *normKeyMean,
-    const aclTensor *normKeyRstd, const aclTensor *normAddedQueryMean, const aclTensor *normAddedQueryRstd,
-    const aclTensor *normAddedKeyMean, const aclTensor *normAddedKeyRstd, uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensor* queryOutput, const aclTensor* keyOutput, const aclTensor* valueOutput,
+    const aclTensor* normQueryMean, const aclTensor* normQueryRstd, const aclTensor* normKeyMean,
+    const aclTensor* normKeyRstd, const aclTensor* normAddedQueryMean, const aclTensor* normAddedQueryRstd,
+    const aclTensor* normAddedKeyMean, const aclTensor* normAddedKeyRstd, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
-extern aclnnStatus aclnnInnerNormRopeConcat(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerNormRopeConcat(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                             aclrtStream stream);
 
-
 aclnnStatus aclnnNormRopeConcatGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *encoderQuery,
-    const aclTensor *encoderKey, const aclTensor *encoderValue, const aclTensor *normQueryWeight,
-    const aclTensor *normQueryBias, const aclTensor *normKeyWeight, const aclTensor *normKeyBias,
-    const aclTensor *normAddedQueryWeight, const aclTensor *normAddedQueryBias, const aclTensor *normAddedKeyWeight,
-    const aclTensor *normAddedKeyBias, const aclTensor *ropeSin, const aclTensor *ropeCos, int64_t normType,
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* encoderQuery,
+    const aclTensor* encoderKey, const aclTensor* encoderValue, const aclTensor* normQueryWeight,
+    const aclTensor* normQueryBias, const aclTensor* normKeyWeight, const aclTensor* normKeyBias,
+    const aclTensor* normAddedQueryWeight, const aclTensor* normAddedQueryBias, const aclTensor* normAddedKeyWeight,
+    const aclTensor* normAddedKeyBias, const aclTensor* ropeSin, const aclTensor* ropeCos, int64_t normType,
     int64_t normAddedType, int64_t ropeType, int64_t concatOrder, double eps, bool isTraining,
-    const aclTensor *queryOutput, const aclTensor *keyOutput, const aclTensor *valueOutput,
-    const aclTensor *normQueryMean, const aclTensor *normQueryRstd, const aclTensor *normKeyMean,
-    const aclTensor *normKeyRstd, const aclTensor *normAddedQueryMean, const aclTensor *normAddedQueryRstd,
-    const aclTensor *normAddedKeyMean, const aclTensor *normAddedKeyRstd, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor* queryOutput, const aclTensor* keyOutput, const aclTensor* valueOutput,
+    const aclTensor* normQueryMean, const aclTensor* normQueryRstd, const aclTensor* normKeyMean,
+    const aclTensor* normKeyRstd, const aclTensor* normAddedQueryMean, const aclTensor* normAddedQueryRstd,
+    const aclTensor* normAddedKeyMean, const aclTensor* normAddedKeyRstd, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     return aclnnInnerNormRopeConcatGetWorkspaceSize(
         query, key, value, encoderQuery, encoderKey, encoderValue, normQueryWeight, normQueryBias, normKeyWeight,
@@ -58,7 +57,7 @@ aclnnStatus aclnnNormRopeConcatGetWorkspaceSize(
         normAddedKeyMean, normAddedKeyRstd, workspaceSize, executor);
 }
 
-aclnnStatus aclnnNormRopeConcat(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnNormRopeConcat(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     return aclnnInnerNormRopeConcat(workspace, workspaceSize, executor, stream);
 }

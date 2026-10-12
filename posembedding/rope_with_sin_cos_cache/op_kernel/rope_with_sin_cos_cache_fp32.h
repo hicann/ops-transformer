@@ -26,8 +26,8 @@ class RopeWithSinCosCacheF32 : public RopeWithSinCosCacheBase<T> {
 public:
     __aicore__ inline RopeWithSinCosCacheF32(){};
     __aicore__ inline void Init(GM_ADDR position_id, GM_ADDR query_in, GM_ADDR key_in, GM_ADDR cos_sin_cache,
-                                GM_ADDR query_out, GM_ADDR key_out, const RopeWithSinCosCacheTilingData &tiling_data,
-                                TPipe *pipe);
+                                GM_ADDR query_out, GM_ADDR key_out, const RopeWithSinCosCacheTilingData& tiling_data,
+                                TPipe* pipe);
     __aicore__ inline void Process();
     __aicore__ inline void Compute(uint64_t index, uint64_t loopN);
     __aicore__ inline void ComputeAlongHeads(uint64_t indexToken, uint64_t indexHeads);
@@ -66,7 +66,7 @@ protected:
 template <typename T>
 __aicore__ inline void RopeWithSinCosCacheF32<T>::Init(GM_ADDR position_id, GM_ADDR query_in, GM_ADDR key_in,
                                                        GM_ADDR cos_sin_cache, GM_ADDR query_out, GM_ADDR key_out,
-                                                       const RopeWithSinCosCacheTilingData &tiling_data, TPipe *pipe)
+                                                       const RopeWithSinCosCacheTilingData& tiling_data, TPipe* pipe)
 {
     this->InitData(tiling_data);
     headBlockLen = static_cast<uint16_t>(this->head_size / ELE_NUM_FP32);
@@ -81,13 +81,13 @@ __aicore__ inline void RopeWithSinCosCacheF32<T>::Init(GM_ADDR position_id, GM_A
                       (this->blockIdx_ - this->front_core) * this->num_tokens_each_tail_core;
     }
 
-    position_id_GM.SetGlobalBuffer((__gm__ uint64_t *)position_id + blockOffset);
-    query_in_GM.SetGlobalBuffer((__gm__ T *)query_in + blockOffset * this->num_q_heads * this->head_size);
-    key_in_GM.SetGlobalBuffer((__gm__ T *)key_in + blockOffset * this->num_kv_heads * this->head_size);
-    cos_sin_cache_GM.SetGlobalBuffer((__gm__ T *)cos_sin_cache);
+    position_id_GM.SetGlobalBuffer((__gm__ uint64_t*)position_id + blockOffset);
+    query_in_GM.SetGlobalBuffer((__gm__ T*)query_in + blockOffset * this->num_q_heads * this->head_size);
+    key_in_GM.SetGlobalBuffer((__gm__ T*)key_in + blockOffset * this->num_kv_heads * this->head_size);
+    cos_sin_cache_GM.SetGlobalBuffer((__gm__ T*)cos_sin_cache);
 
-    queryGM.SetGlobalBuffer((__gm__ T *)query_out + blockOffset * this->num_q_heads * this->head_size);
-    keyGM.SetGlobalBuffer((__gm__ T *)key_out + blockOffset * this->num_kv_heads * this->head_size);
+    queryGM.SetGlobalBuffer((__gm__ T*)query_out + blockOffset * this->num_q_heads * this->head_size);
+    keyGM.SetGlobalBuffer((__gm__ T*)key_out + blockOffset * this->num_kv_heads * this->head_size);
 
     pipe->InitBuffer(copyBuf0, this->rotary_dim / 2 * sizeof(T));
     if (this->loop_for_one_token == 0) {

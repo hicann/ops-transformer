@@ -40,7 +40,7 @@ using ApplyRopeGradKernelFunc = void (*)(GM_ADDR, GM_ADDR, GM_ADDR, GM_ADDR, GM_
 // AB 模板(SBND, DxTilingKey=204) + dCosFlag=1 用例公共流程:
 //   B=2 S=64 nQ=nK=4, cos/sin=[B,S,1,D] 与 grad 的 B/S 轴一致(N 轴广播) → 内部 layout=SBND
 //   blockDim = ropeGradABParams.blockNumBS * blockNumN = 43 * 1 = 43
-void RunAbSbndCase(const string &caseName, int64_t dimD)
+void RunAbSbndCase(const string& caseName, int64_t dimD)
 {
     const int64_t B = 2;
     const int64_t S = 64;
@@ -51,19 +51,19 @@ void RunAbSbndCase(const string &caseName, int64_t dimD)
     size_t cosByteSize = B * S * 1 * D * sizeof(float);
     size_t tilingDataSize = sizeof(ApplyRopeGradTilingData);
 
-    uint8_t *gradQueryEmbed = (uint8_t *)AscendC::GmAlloc(gradByteSize);
-    uint8_t *gradKeyEmbed = (uint8_t *)AscendC::GmAlloc(gradByteSize);
-    uint8_t *cos = (uint8_t *)AscendC::GmAlloc(cosByteSize);
-    uint8_t *sin = (uint8_t *)AscendC::GmAlloc(cosByteSize);
-    uint8_t *query = (uint8_t *)AscendC::GmAlloc(gradByteSize);
-    uint8_t *key = (uint8_t *)AscendC::GmAlloc(gradByteSize);
-    uint8_t *gradQueryOut = (uint8_t *)AscendC::GmAlloc(gradByteSize);
-    uint8_t *gradKeyOut = (uint8_t *)AscendC::GmAlloc(gradByteSize);
-    uint8_t *gradCosOut = (uint8_t *)AscendC::GmAlloc(cosByteSize);
-    uint8_t *gradSinOut = (uint8_t *)AscendC::GmAlloc(cosByteSize);
+    uint8_t* gradQueryEmbed = (uint8_t*)AscendC::GmAlloc(gradByteSize);
+    uint8_t* gradKeyEmbed = (uint8_t*)AscendC::GmAlloc(gradByteSize);
+    uint8_t* cos = (uint8_t*)AscendC::GmAlloc(cosByteSize);
+    uint8_t* sin = (uint8_t*)AscendC::GmAlloc(cosByteSize);
+    uint8_t* query = (uint8_t*)AscendC::GmAlloc(gradByteSize);
+    uint8_t* key = (uint8_t*)AscendC::GmAlloc(gradByteSize);
+    uint8_t* gradQueryOut = (uint8_t*)AscendC::GmAlloc(gradByteSize);
+    uint8_t* gradKeyOut = (uint8_t*)AscendC::GmAlloc(gradByteSize);
+    uint8_t* gradCosOut = (uint8_t*)AscendC::GmAlloc(cosByteSize);
+    uint8_t* gradSinOut = (uint8_t*)AscendC::GmAlloc(cosByteSize);
     // workspace: dcos/dsin 两份 fp32 部分积(B*S*maxN*D*4B*2) + reduce 暂存, 预留 16MB
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16 * 1024 * 1024);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingDataSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
     uint32_t blockDim = 43; // ropeGradABParams.blockNumBS * ropeGradABParams.blockNumN
 
     // 生成输入与 tiling (gen_data.py: dx/dy→grad_query/key_embed, x/y→query/key; cos/sin=[B,S,1,D])
@@ -74,9 +74,9 @@ void RunAbSbndCase(const string &caseName, int64_t dimD)
     system("cd ./apply_rotary_pos_emb_grad_data/ && rm -rf ./*bin");
     system((cmdPrefix + "python3 gen_data.py 2 64 4 " + to_string(D) + " float32").c_str());
     system((cmdPrefix + "python3 gen_tiling.py " + caseName).c_str());
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
-    ApplyRopeGradTilingData *tilingDatafromBin = reinterpret_cast<ApplyRopeGradTilingData *>(tiling);
+    ApplyRopeGradTilingData* tilingDatafromBin = reinterpret_cast<ApplyRopeGradTilingData*>(tiling);
     ReadFile(path + "/apply_rotary_pos_emb_grad_data/dx.bin", gradByteSize, gradQueryEmbed, gradByteSize);
     ReadFile(path + "/apply_rotary_pos_emb_grad_data/dy.bin", gradByteSize, gradKeyEmbed, gradByteSize);
     ReadFile(path + "/apply_rotary_pos_emb_grad_data/cos.bin", cosByteSize, cos, cosByteSize);
@@ -91,7 +91,7 @@ void RunAbSbndCase(const string &caseName, int64_t dimD)
                                                                    LOOP_INNER_AR_COUNT, TILING_KEY_AB, DCOS_FLAG>;
     ICPU_SET_TILING_KEY(TILING_KEY_AB);
     ICPU_RUN_KF(kernelFunc, blockDim, gradQueryEmbed, gradKeyEmbed, cos, sin, query, key, gradQueryOut, gradKeyOut,
-                gradCosOut, gradSinOut, workspace, (uint8_t *)(tilingDatafromBin));
+                gradCosOut, gradSinOut, workspace, (uint8_t*)(tilingDatafromBin));
 
     // 输出落盘, 供与 numpy/python golden 比对
     WriteFile(path + "/apply_rotary_pos_emb_grad_data/grad_query_out.bin", gradQueryOut, gradByteSize);

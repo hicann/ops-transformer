@@ -23,7 +23,7 @@ template <bool isPagedAttention, typename KV_DTYPE, typename K_DTYPE, typename V
 class KernelKvRmsNormRopeCacheB16PABLKBNSDQUANT
     : public KernelKvRmsNormRopeCacheCutBSQuant<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE> {
 public:
-    __aicore__ inline KernelKvRmsNormRopeCacheB16PABLKBNSDQUANT(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline KernelKvRmsNormRopeCacheB16PABLKBNSDQUANT(TPipe* pipe, const KvRmsNormRopeCacheTilingData* tiling)
         : KernelKvRmsNormRopeCacheCutBSQuant<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE>(pipe, tiling)
     {}
 
@@ -46,13 +46,13 @@ public:
 
         // init global memory
         if (methodMode == 0) {
-            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE *)kv + GetBlockIdx() * this->tilingData_->blockFactor *
-                                                                   (this->RMS_NORM_LENGTH + this->ROPE_LENGTH));
+            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE*)kv + GetBlockIdx() * this->tilingData_->blockFactor *
+                                                                  (this->RMS_NORM_LENGTH + this->ROPE_LENGTH));
         } else if (methodMode == 1) {
             // init global memory
-            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE *)kv +
+            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE*)kv +
                                        GetBlockIdx() * this->tilingData_->blockFactor * this->RMS_NORM_LENGTH);
-            this->vGm.SetGlobalBuffer((__gm__ KV_DTYPE *)v +
+            this->vGm.SetGlobalBuffer((__gm__ KV_DTYPE*)v +
                                       GetBlockIdx() * this->tilingData_->blockFactor * this->V_LENGTH);
             if (this->tilingData_->numHead > 1) {
                 int64_t startPosIdx = GetBlockIdx() * this->tilingData_->blockFactor;
@@ -65,27 +65,27 @@ public:
                     (this->tilingData_->seqLength);
             }
         }
-        this->gammaGm.SetGlobalBuffer((__gm__ KV_DTYPE *)gamma);
-        this->cosGm.SetGlobalBuffer((__gm__ KV_DTYPE *)cos +
+        this->gammaGm.SetGlobalBuffer((__gm__ KV_DTYPE*)gamma);
+        this->cosGm.SetGlobalBuffer((__gm__ KV_DTYPE*)cos +
                                     GetBlockIdx() * this->tilingData_->blockFactor * this->ROPE_LENGTH);
-        this->sinGm.SetGlobalBuffer((__gm__ KV_DTYPE *)sin +
+        this->sinGm.SetGlobalBuffer((__gm__ KV_DTYPE*)sin +
                                     GetBlockIdx() * this->tilingData_->blockFactor * this->ROPE_LENGTH);
-        this->indexGm.SetGlobalBuffer((__gm__ int64_t *)index);
-        this->kCacheGm.SetGlobalBuffer((__gm__ K_DTYPE *)k_cache);
-        this->vCacheGm.SetGlobalBuffer((__gm__ V_DTYPE *)v_cache);
-        this->kRopeScaleGm.SetGlobalBuffer((__gm__ float *)k_rope_scale);
-        this->cKvScaleGm.SetGlobalBuffer((__gm__ float *)c_kv_scale);
+        this->indexGm.SetGlobalBuffer((__gm__ int64_t*)index);
+        this->kCacheGm.SetGlobalBuffer((__gm__ K_DTYPE*)k_cache);
+        this->vCacheGm.SetGlobalBuffer((__gm__ V_DTYPE*)v_cache);
+        this->kRopeScaleGm.SetGlobalBuffer((__gm__ float*)k_rope_scale);
+        this->cKvScaleGm.SetGlobalBuffer((__gm__ float*)c_kv_scale);
         if (this->tilingData_->isOutputKv) {
-            this->kCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE *)optional_k_rope);
-            this->vCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE *)optional_c_kv);
+            this->kCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE*)optional_k_rope);
+            this->vCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE*)optional_c_kv);
         }
         isKOffset = k_rope_offset == nullptr ? 0 : 1;
         isVOffset = c_kv_offset == nullptr ? 0 : 1;
         if (isKOffset) {
-            this->kRopeOffsetGm.SetGlobalBuffer((__gm__ float *)k_rope_offset);
+            this->kRopeOffsetGm.SetGlobalBuffer((__gm__ float*)k_rope_offset);
         }
         if (isVOffset) {
-            this->cKvOffsetGm.SetGlobalBuffer((__gm__ float *)c_kv_offset);
+            this->cKvOffsetGm.SetGlobalBuffer((__gm__ float*)c_kv_offset);
         }
         // init pipe
         if (methodMode == 0) {
@@ -188,7 +188,7 @@ public:
 
                 // Scatter Update kCache
                 if (this->tilingData_->isKQuant) {
-                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t> &)this->kCacheGm,
+                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t>&)this->kCacheGm,
                                                                       this->kCacheGmNd, outLocal, quantLocal, startIdx,
                                                                       this->ubFactor, this->ROPE_LENGTH);
                 } else {
@@ -225,7 +225,7 @@ public:
 
                 // Scatter Update vCache
                 if (this->tilingData_->isVQuant) {
-                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t> &)this->vCacheGm,
+                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t>&)this->vCacheGm,
                                                                       this->vCacheGmNd, outLocal, quantLocal, startIdx,
                                                                       this->ubFactor, this->RMS_NORM_LENGTH);
                 } else {
@@ -276,7 +276,7 @@ public:
 
                 // Scatter Update kCache
                 if (this->tilingData_->isKQuant) {
-                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t> &)this->kCacheGm,
+                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t>&)this->kCacheGm,
                                                                       this->kCacheGmNd, outLocal, quantLocal, startIdx,
                                                                       this->ubTail, this->ROPE_LENGTH);
                 } else {
@@ -313,7 +313,7 @@ public:
 
                 // Scatter Update vCache
                 if (this->tilingData_->isVQuant) {
-                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t> &)this->vCacheGm,
+                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t>&)this->vCacheGm,
                                                                       this->vCacheGmNd, outLocal, quantLocal, startIdx,
                                                                       this->ubTail, this->RMS_NORM_LENGTH);
                 } else {
@@ -415,7 +415,7 @@ public:
 
                 // Scatter Update kCache
                 if (this->tilingData_->isKQuant) {
-                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t> &)this->kCacheGm,
+                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t>&)this->kCacheGm,
                                                                       this->kCacheGmNd, outLocal, quantLocal, startIdx,
                                                                       this->ubFactor, this->RMS_NORM_LENGTH);
                 } else {
@@ -454,7 +454,7 @@ public:
 
                 // Scatter Update vCache
                 if (this->tilingData_->isVQuant) {
-                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t> &)this->vCacheGm,
+                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t>&)this->vCacheGm,
                                                                       this->vCacheGmNd, outLocal, quantLocal, startIdx,
                                                                       this->ubFactor, this->V_LENGTH);
                 } else {
@@ -514,7 +514,7 @@ public:
 
                 // Scatter Update kCache
                 if (this->tilingData_->isKQuant) {
-                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t> &)this->kCacheGm,
+                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t>&)this->kCacheGm,
                                                                       this->kCacheGmNd, outLocal, quantLocal, startIdx,
                                                                       this->ubTail, this->RMS_NORM_LENGTH);
                 } else {
@@ -553,7 +553,7 @@ public:
 
                 // Scatter Update vCache
                 if (this->tilingData_->isVQuant) {
-                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t> &)this->vCacheGm,
+                    ScatterUpdate<int8_t, KV_DTYPE, isPagedAttention>((GlobalTensor<int8_t>&)this->vCacheGm,
                                                                       this->vCacheGmNd, outLocal, quantLocal, startIdx,
                                                                       this->ubTail, this->V_LENGTH);
                 } else {
@@ -572,10 +572,10 @@ public:
     }
 
     template <typename T, bool isElementWise = true>
-    __aicore__ inline void RoPE(const LocalTensor<T> &outLocal, const LocalTensor<int8_t> &quantLocal,
-                                const LocalTensor<T> &xLocal, const LocalTensor<T> &cosLocal,
-                                const LocalTensor<T> &sinLocal, const LocalTensor<float> &scaleLocal,
-                                const LocalTensor<float> &wsLocal, int64_t rows, int64_t headSize)
+    __aicore__ inline void RoPE(const LocalTensor<T>& outLocal, const LocalTensor<int8_t>& quantLocal,
+                                const LocalTensor<T>& xLocal, const LocalTensor<T>& cosLocal,
+                                const LocalTensor<T>& sinLocal, const LocalTensor<float>& scaleLocal,
+                                const LocalTensor<float>& wsLocal, int64_t rows, int64_t headSize)
     {
         constexpr static int64_t NUM_ONE = 1;
         constexpr static int64_t NUM_TWO = 2;
@@ -676,8 +676,8 @@ public:
     }
 
     template <typename T1, typename T2, bool isPA = false>
-    __aicore__ inline void ScatterUpdate(const GlobalTensor<T1> &dst, const GlobalTensor<T2> &dstNd,
-                                         const LocalTensor<T2> &outLocal, const LocalTensor<T1> &quantLocal,
+    __aicore__ inline void ScatterUpdate(const GlobalTensor<T1>& dst, const GlobalTensor<T2>& dstNd,
+                                         const LocalTensor<T2>& outLocal, const LocalTensor<T1>& quantLocal,
                                          int64_t startIdx, int64_t rows, int64_t headSize)
     {
         DataCopyExtParams copyParams{1, static_cast<uint32_t>(headSize * sizeof(T1)), 0, 0, 0};
@@ -714,9 +714,9 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void RmsNorm(const LocalTensor<T> &outLocal, const LocalTensor<int8_t> &quantLocal,
-                                   const LocalTensor<T> &xLocal, const LocalTensor<float> &gammaLocal,
-                                   const LocalTensor<float> &scaleLocal, const LocalTensor<float> &wsLocal,
+    __aicore__ inline void RmsNorm(const LocalTensor<T>& outLocal, const LocalTensor<int8_t>& quantLocal,
+                                   const LocalTensor<T>& xLocal, const LocalTensor<float>& gammaLocal,
+                                   const LocalTensor<float>& scaleLocal, const LocalTensor<float>& wsLocal,
                                    int64_t rows, int64_t headSize)
     {
         constexpr static int64_t NUM_EIGHT = 8;
@@ -810,7 +810,7 @@ public:
         WaitFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
     }
 
-    __aicore__ inline void RoundFloat2Int8(const LocalTensor<int8_t> &dstTensor, const LocalTensor<float> &srcTensor,
+    __aicore__ inline void RoundFloat2Int8(const LocalTensor<int8_t>& dstTensor, const LocalTensor<float>& srcTensor,
                                            int32_t size)
     {
         Cast(srcTensor.ReinterpretCast<int32_t>(), srcTensor, RoundMode::CAST_RINT, size);
@@ -824,10 +824,10 @@ public:
 
     template <typename T, bool isElementWise = true>
     __aicore__ inline void RmsNormAndRopeV2WithQuant(
-        const LocalTensor<T> &xLocal, const LocalTensor<T> &outLocal, const LocalTensor<int8_t> &quantOutLocal,
-        const LocalTensor<float> &gammaLocal, const LocalTensor<T> &cosLocal, const LocalTensor<T> &sinLocal,
-        const LocalTensor<float> &scaleLocal, const LocalTensor<float> &offsetLocal, bool ifAsymmetricQuant,
-        const LocalTensor<float> &wsLocal, int64_t rows, int64_t headSize, int64_t ropeLen)
+        const LocalTensor<T>& xLocal, const LocalTensor<T>& outLocal, const LocalTensor<int8_t>& quantOutLocal,
+        const LocalTensor<float>& gammaLocal, const LocalTensor<T>& cosLocal, const LocalTensor<T>& sinLocal,
+        const LocalTensor<float>& scaleLocal, const LocalTensor<float>& offsetLocal, bool ifAsymmetricQuant,
+        const LocalTensor<float>& wsLocal, int64_t rows, int64_t headSize, int64_t ropeLen)
     {
         constexpr static int64_t NUM_ZERO = 0;
         constexpr static int64_t NUM_ONE = 1;
@@ -971,8 +971,8 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void Quant(const LocalTensor<int8_t> &quantOutLocal, LocalTensor<float> &srcTensor,
-                                 const LocalTensor<float> &scaleLocal, const LocalTensor<float> &offsetLocal,
+    __aicore__ inline void Quant(const LocalTensor<int8_t>& quantOutLocal, LocalTensor<float>& srcTensor,
+                                 const LocalTensor<float>& scaleLocal, const LocalTensor<float>& offsetLocal,
                                  bool ifAsymmetricQuant, int64_t headSize, int64_t rows)
     {
         if (this->tilingData_->numHead == 1 ||

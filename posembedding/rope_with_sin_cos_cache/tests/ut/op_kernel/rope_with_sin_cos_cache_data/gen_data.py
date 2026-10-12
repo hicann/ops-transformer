@@ -18,19 +18,24 @@ import os
 bf16 = tf.bfloat16.as_numpy_dtype
 np.random.seed(0)
 
+
 def gen_golden_data_simple(numTokens, numQHeads, numKHeads, headSize, rotaryDim, dtype):
-    d_type_dict = {
-        "fp32": np.float32,
-        "fp16": np.float16,
-        "bf16": bf16
-    }
+    d_type_dict = {"fp32": np.float32, "fp16": np.float16, "bf16": bf16}
 
     dtype = d_type_dict.get(dtype)
 
-    data_position = np.random.uniform(1, int(numTokens), [int(numTokens)]).astype(np.int64)
-    data_query = np.random.uniform(-2, 2, [int(numTokens), int(numQHeads) * int(headSize)]).astype(dtype)
-    data_key = np.random.uniform(-2, 2, [int(numTokens), int(numKHeads) * int(headSize)]).astype(dtype)
-    data_cosSinCache = np.random.uniform(-2, 2, [int(numTokens), int(rotaryDim)]).astype(dtype)
+    data_position = np.random.uniform(1, int(numTokens), [int(numTokens)]).astype(
+        np.int64
+    )
+    data_query = np.random.uniform(
+        -2, 2, [int(numTokens), int(numQHeads) * int(headSize)]
+    ).astype(dtype)
+    data_key = np.random.uniform(
+        -2, 2, [int(numTokens), int(numKHeads) * int(headSize)]
+    ).astype(dtype)
+    data_cosSinCache = np.random.uniform(
+        -2, 2, [int(numTokens), int(rotaryDim)]
+    ).astype(dtype)
 
     data_position.tofile("./input_position.bin")
     data_query.tofile("./input_query.bin")
@@ -46,4 +51,6 @@ def gen_golden_data_simple(numTokens, numQHeads, numKHeads, headSize, rotaryDim,
 
 if __name__ == "__main__":
     os.system("rm -rf *.bin")
-    gen_golden_data_simple(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5],sys.argv[6])
+    gen_golden_data_simple(
+        sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6]
+    )

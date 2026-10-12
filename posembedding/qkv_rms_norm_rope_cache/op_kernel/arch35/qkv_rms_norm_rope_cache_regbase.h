@@ -60,25 +60,25 @@ constexpr static Reg::CastTrait CAST_FP16_TO_INT8 = {Reg::RegLayout::ZERO, Reg::
 
 // UB(原生 dtype) -> 寄存器(fp32);16bit 类型随路 unpack + cast
 template <typename T>
-__aicore__ inline void LoadTensorForDtypeT(__ubuf__ T *input, Reg::RegTensor<float> &dst, Reg::MaskReg &preg,
+__aicore__ inline void LoadTensorForDtypeT(__ubuf__ T* input, Reg::RegTensor<float>& dst, Reg::MaskReg& preg,
                                            uint32_t offset)
 {
     if constexpr (IsSameType<T, half>::value) {
         Reg::RegTensor<half> xFp16;
-        Reg::LoadAlign<half, Reg::LoadDist::DIST_UNPACK_B16>(xFp16, ((__ubuf__ half *)(input) + (offset)));
+        Reg::LoadAlign<half, Reg::LoadDist::DIST_UNPACK_B16>(xFp16, ((__ubuf__ half*)(input) + (offset)));
         Cast<float, half, CAST_B16_TO_B32>(dst, xFp16, preg);
     } else if constexpr (IsSameType<T, bfloat16_t>::value) {
         Reg::RegTensor<bfloat16_t> xBf16;
-        Reg::LoadAlign<bfloat16_t, Reg::LoadDist::DIST_UNPACK_B16>(xBf16, ((__ubuf__ bfloat16_t *)(input) + (offset)));
+        Reg::LoadAlign<bfloat16_t, Reg::LoadDist::DIST_UNPACK_B16>(xBf16, ((__ubuf__ bfloat16_t*)(input) + (offset)));
         Cast<float, bfloat16_t, CAST_B16_TO_B32>(dst, xBf16, preg);
     } else {
-        Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(dst, ((__ubuf__ float *)(input) + (offset)));
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(dst, ((__ubuf__ float*)(input) + (offset)));
     }
 }
 
 // 寄存器(fp32) -> UB(原生 dtype)
 template <typename T>
-__aicore__ inline void StoreTensorForDtypeTOut(__ubuf__ T *dst, Reg::RegTensor<float> &src, Reg::MaskReg &preg,
+__aicore__ inline void StoreTensorForDtypeTOut(__ubuf__ T* dst, Reg::RegTensor<float>& src, Reg::MaskReg& preg,
                                                uint32_t offset)
 {
     if constexpr (IsSameType<T, float>::value) {
@@ -92,8 +92,8 @@ __aicore__ inline void StoreTensorForDtypeTOut(__ubuf__ T *dst, Reg::RegTensor<f
 
 // 寄存器(fp32,一个 VL = 64 lane) -> UB(int8):round-half-even + clamp,落 64 个 int8。
 // 与 A2 RoundFloat2Int8(fp32 -> int32 RINT -> half -> int8 TRUNC)语义等价。
-__aicore__ inline void StoreInt8OneVl(__ubuf__ int8_t *&dst, Reg::RegTensor<float> &src, Reg::UnalignRegForStore &ureg,
-                                      Reg::MaskReg &preg)
+__aicore__ inline void StoreInt8OneVl(__ubuf__ int8_t*& dst, Reg::RegTensor<float>& src, Reg::UnalignRegForStore& ureg,
+                                      Reg::MaskReg& preg)
 {
     Reg::RegTensor<int16_t> tmpInt16;
     Reg::RegTensor<half> tmpHalf;
@@ -101,14 +101,14 @@ __aicore__ inline void StoreInt8OneVl(__ubuf__ int8_t *&dst, Reg::RegTensor<floa
     Reg::Cast<int16_t, float, CAST_FP32_TO_INT16>(tmpInt16, src, preg);
     Reg::Cast<half, int16_t, CAST_INT16_TO_FP16>(tmpHalf, tmpInt16, preg);
     Reg::Cast<int8_t, half, CAST_FP16_TO_INT8>(quantInt8, tmpHalf, preg);
-    Pack((Reg::RegTensor<uint16_t> &)tmpInt16, (Reg::RegTensor<uint32_t> &)quantInt8);
-    Pack((Reg::RegTensor<uint8_t> &)quantInt8, (Reg::RegTensor<uint16_t> &)tmpInt16);
+    Pack((Reg::RegTensor<uint16_t>&)tmpInt16, (Reg::RegTensor<uint32_t>&)quantInt8);
+    Pack((Reg::RegTensor<uint8_t>&)quantInt8, (Reg::RegTensor<uint16_t>&)tmpInt16);
     Reg::StoreUnAlign(dst, quantInt8, ureg, static_cast<uint32_t>(REGBASE_VL_FP32));
 }
 
 // 量化:(out / scale)[+ offset],scale/offset 按 head 索引,shape [N_head, D]
-__aicore__ inline void QuantTwoVl(Reg::RegTensor<float> &low, Reg::RegTensor<float> &high, __ubuf__ float *scaleRow,
-                                  __ubuf__ float *offsetRow, int64_t headIdx, bool hasOffset, Reg::MaskReg &preg)
+__aicore__ inline void QuantTwoVl(Reg::RegTensor<float>& low, Reg::RegTensor<float>& high, __ubuf__ float* scaleRow,
+                                  __ubuf__ float* offsetRow, int64_t headIdx, bool hasOffset, Reg::MaskReg& preg)
 {
     const uint32_t headOffset = static_cast<uint32_t>(headIdx * REGBASE_HEAD_DIM);
     Reg::RegTensor<float> scaleLow, scaleHigh;
@@ -130,9 +130,9 @@ __aicore__ inline void QuantTwoVl(Reg::RegTensor<float> &low, Reg::RegTensor<flo
 // WRITE_CACHE=false 时只写 ND(Q 分支:q_out 与 q_out_before_quant 同值)
 // ---------------------------------------------------------------------------
 template <typename T_QKV, typename T_CACHE, bool WRITE_CACHE>
-__aicore__ inline void VfNormRopeRow(__ubuf__ T_QKV *xRow, __ubuf__ T_QKV *cosRow, __ubuf__ T_QKV *sinRow,
-                                     __ubuf__ T_QKV *gammaRow, float reciprocal, float epsilon, __ubuf__ T_QKV *ndRow,
-                                     __ubuf__ T_CACHE *cacheRow, __ubuf__ float *scaleRow, __ubuf__ float *offsetRow,
+__aicore__ inline void VfNormRopeRow(__ubuf__ T_QKV* xRow, __ubuf__ T_QKV* cosRow, __ubuf__ T_QKV* sinRow,
+                                     __ubuf__ T_QKV* gammaRow, float reciprocal, float epsilon, __ubuf__ T_QKV* ndRow,
+                                     __ubuf__ T_CACHE* cacheRow, __ubuf__ float* scaleRow, __ubuf__ float* offsetRow,
                                      bool hasOffset, int64_t headIdx)
 {
     __VEC_SCOPE__
@@ -180,7 +180,7 @@ __aicore__ inline void VfNormRopeRow(__ubuf__ T_QKV *xRow, __ubuf__ T_QKV *cosRo
         if constexpr (WRITE_CACHE) {
             if constexpr (IsSameType<T_CACHE, int8_t>::value) {
                 QuantTwoVl(outLow, outHigh, scaleRow, offsetRow, headIdx, hasOffset, pFull);
-                __ubuf__ int8_t *dst = (__ubuf__ int8_t *)cacheRow;
+                __ubuf__ int8_t* dst = (__ubuf__ int8_t*)cacheRow;
                 Reg::UnalignRegForStore ureg;
                 StoreInt8OneVl(dst, outLow, ureg, pFull);
                 StoreInt8OneVl(dst, outHigh, ureg, pFull);
@@ -197,8 +197,8 @@ __aicore__ inline void VfNormRopeRow(__ubuf__ T_QKV *xRow, __ubuf__ T_QKV *cosRo
 // VF:V 分支(不做 RmsNorm / RoPE,可选量化)
 // ---------------------------------------------------------------------------
 template <typename T_QKV, typename T_CACHE>
-__aicore__ inline void VfQuantRow(__ubuf__ T_QKV *xRow, __ubuf__ T_QKV *ndRow, __ubuf__ T_CACHE *cacheRow,
-                                  __ubuf__ float *scaleRow, __ubuf__ float *offsetRow, bool hasOffset, int64_t headIdx)
+__aicore__ inline void VfQuantRow(__ubuf__ T_QKV* xRow, __ubuf__ T_QKV* ndRow, __ubuf__ T_CACHE* cacheRow,
+                                  __ubuf__ float* scaleRow, __ubuf__ float* offsetRow, bool hasOffset, int64_t headIdx)
 {
     __VEC_SCOPE__
     {
@@ -213,7 +213,7 @@ __aicore__ inline void VfQuantRow(__ubuf__ T_QKV *xRow, __ubuf__ T_QKV *ndRow, _
 
         if constexpr (IsSameType<T_CACHE, int8_t>::value) {
             QuantTwoVl(xLow, xHigh, scaleRow, offsetRow, headIdx, hasOffset, pFull);
-            __ubuf__ int8_t *dst = (__ubuf__ int8_t *)cacheRow;
+            __ubuf__ int8_t* dst = (__ubuf__ int8_t*)cacheRow;
             Reg::UnalignRegForStore ureg;
             StoreInt8OneVl(dst, xLow, ureg, pFull);
             StoreInt8OneVl(dst, xHigh, ureg, pFull);
@@ -231,7 +231,7 @@ __aicore__ inline void VfQuantRow(__ubuf__ T_QKV *xRow, __ubuf__ T_QKV *ndRow, _
 template <typename T_QKV, typename T_K_CACHE, typename T_V_CACHE>
 class QkvRmsNormRopeCacheRegbase {
 public:
-    __aicore__ inline QkvRmsNormRopeCacheRegbase(TPipe *pipe, const QkvRmsNormRopeCacheRegbaseTilingData *tiling)
+    __aicore__ inline QkvRmsNormRopeCacheRegbase(TPipe* pipe, const QkvRmsNormRopeCacheRegbaseTilingData* tiling)
         : pipe_(pipe),
           tiling_(tiling)
     {}
@@ -296,52 +296,52 @@ private:
                                              GM_ADDR qOutOut, GM_ADDR kCacheOut, GM_ADDR vCacheOut, GM_ADDR qOutProto,
                                              GM_ADDR kOutProto, GM_ADDR vOutProto)
     {
-        qkvGm_.SetGlobalBuffer((__gm__ T_QKV *)qkv);
-        gammaQGm_.SetGlobalBuffer((__gm__ T_QKV *)qGamma);
-        gammaKGm_.SetGlobalBuffer((__gm__ T_QKV *)kGamma);
-        cosGm_.SetGlobalBuffer((__gm__ T_QKV *)cos);
-        sinGm_.SetGlobalBuffer((__gm__ T_QKV *)sin);
-        indexGm_.SetGlobalBuffer((__gm__ int64_t *)index);
+        qkvGm_.SetGlobalBuffer((__gm__ T_QKV*)qkv);
+        gammaQGm_.SetGlobalBuffer((__gm__ T_QKV*)qGamma);
+        gammaKGm_.SetGlobalBuffer((__gm__ T_QKV*)kGamma);
+        cosGm_.SetGlobalBuffer((__gm__ T_QKV*)cos);
+        sinGm_.SetGlobalBuffer((__gm__ T_QKV*)sin);
+        indexGm_.SetGlobalBuffer((__gm__ int64_t*)index);
         // 原地输出:graph / aclnn 通路下 in-place 输入(6/7/8)与输出(0/1/2)同地址;
         // kernel 单算子通路下两者是不同 buffer,故对输出再写一份(地址相同时跳过,零开销)。
-        qOutGm_.SetGlobalBuffer((__gm__ T_QKV *)qOut);
-        kCacheGm_.SetGlobalBuffer((__gm__ T_K_CACHE *)kCache);
-        vCacheGm_.SetGlobalBuffer((__gm__ T_V_CACHE *)vCache);
+        qOutGm_.SetGlobalBuffer((__gm__ T_QKV*)qOut);
+        kCacheGm_.SetGlobalBuffer((__gm__ T_K_CACHE*)kCache);
+        vCacheGm_.SetGlobalBuffer((__gm__ T_V_CACHE*)vCache);
         qOutIsAliased_ = (qOut == qOutOut);
         kCacheIsAliased_ = (kCache == kCacheOut);
         vCacheIsAliased_ = (vCache == vCacheOut);
         if (!qOutIsAliased_) {
-            qOutOutGm_.SetGlobalBuffer((__gm__ T_QKV *)qOutOut);
+            qOutOutGm_.SetGlobalBuffer((__gm__ T_QKV*)qOutOut);
         }
         if (!kCacheIsAliased_) {
-            kCacheOutGm_.SetGlobalBuffer((__gm__ T_K_CACHE *)kCacheOut);
+            kCacheOutGm_.SetGlobalBuffer((__gm__ T_K_CACHE*)kCacheOut);
         }
         if (!vCacheIsAliased_) {
-            vCacheOutGm_.SetGlobalBuffer((__gm__ T_V_CACHE *)vCacheOut);
+            vCacheOutGm_.SetGlobalBuffer((__gm__ T_V_CACHE*)vCacheOut);
         }
         // k_scale/v_scale 只在对应 cache 为 int8 时存在;非量化档传 nullptr,不绑定也不读
         if constexpr (IsSameType<T_K_CACHE, int8_t>::value) {
-            kScaleGm_.SetGlobalBuffer((__gm__ float *)kScale);
+            kScaleGm_.SetGlobalBuffer((__gm__ float*)kScale);
         }
         if constexpr (IsSameType<T_V_CACHE, int8_t>::value) {
-            vScaleGm_.SetGlobalBuffer((__gm__ float *)vScale);
+            vScaleGm_.SetGlobalBuffer((__gm__ float*)vScale);
         }
         if (kOffset != nullptr) {
-            kOffsetGm_.SetGlobalBuffer((__gm__ float *)kOffset);
+            kOffsetGm_.SetGlobalBuffer((__gm__ float*)kOffset);
             hasOffsetK_ = true;
         }
         if (vOffset != nullptr) {
-            vOffsetGm_.SetGlobalBuffer((__gm__ float *)vOffset);
+            vOffsetGm_.SetGlobalBuffer((__gm__ float*)vOffset);
             hasOffsetV_ = true;
         }
         if (qOutProto != nullptr) {
-            qOutProtoGm_.SetGlobalBuffer((__gm__ T_QKV *)qOutProto);
+            qOutProtoGm_.SetGlobalBuffer((__gm__ T_QKV*)qOutProto);
         }
         if (kOutProto != nullptr) {
-            kOutProtoGm_.SetGlobalBuffer((__gm__ T_QKV *)kOutProto);
+            kOutProtoGm_.SetGlobalBuffer((__gm__ T_QKV*)kOutProto);
         }
         if (vOutProto != nullptr) {
-            vOutProtoGm_.SetGlobalBuffer((__gm__ T_QKV *)vOutProto);
+            vOutProtoGm_.SetGlobalBuffer((__gm__ T_QKV*)vOutProto);
         }
     }
 
@@ -457,16 +457,16 @@ private:
         LocalTensor<T_K_CACHE> kOut = outQueueK_.AllocTensor<T_K_CACHE>();
         LocalTensor<T_V_CACHE> vOut = outQueueV_.AllocTensor<T_V_CACHE>();
 
-        __ubuf__ T_QKV *xBuf = (__ubuf__ T_QKV *)x.GetPhyAddr();
-        __ubuf__ T_QKV *cosBuf = (__ubuf__ T_QKV *)cos.GetPhyAddr();
-        __ubuf__ T_QKV *sinBuf = (__ubuf__ T_QKV *)sin.GetPhyAddr();
-        __ubuf__ T_QKV *gammaBuf = (__ubuf__ T_QKV *)gammaBuf_.Get<T_QKV>().GetPhyAddr();
-        __ubuf__ T_QKV *qOutBuf = (__ubuf__ T_QKV *)qOut.GetPhyAddr();
-        __ubuf__ T_QKV *kProtoBuf = (__ubuf__ T_QKV *)kProto.GetPhyAddr();
-        __ubuf__ T_QKV *vProtoBuf = (__ubuf__ T_QKV *)vProto.GetPhyAddr();
-        __ubuf__ T_K_CACHE *kOutBuf = (__ubuf__ T_K_CACHE *)kOut.GetPhyAddr();
-        __ubuf__ T_V_CACHE *vOutBuf = (__ubuf__ T_V_CACHE *)vOut.GetPhyAddr();
-        __ubuf__ float *quantBuf = (__ubuf__ float *)quantBuf_.Get<float>().GetPhyAddr();
+        __ubuf__ T_QKV* xBuf = (__ubuf__ T_QKV*)x.GetPhyAddr();
+        __ubuf__ T_QKV* cosBuf = (__ubuf__ T_QKV*)cos.GetPhyAddr();
+        __ubuf__ T_QKV* sinBuf = (__ubuf__ T_QKV*)sin.GetPhyAddr();
+        __ubuf__ T_QKV* gammaBuf = (__ubuf__ T_QKV*)gammaBuf_.Get<T_QKV>().GetPhyAddr();
+        __ubuf__ T_QKV* qOutBuf = (__ubuf__ T_QKV*)qOut.GetPhyAddr();
+        __ubuf__ T_QKV* kProtoBuf = (__ubuf__ T_QKV*)kProto.GetPhyAddr();
+        __ubuf__ T_QKV* vProtoBuf = (__ubuf__ T_QKV*)vProto.GetPhyAddr();
+        __ubuf__ T_K_CACHE* kOutBuf = (__ubuf__ T_K_CACHE*)kOut.GetPhyAddr();
+        __ubuf__ T_V_CACHE* vOutBuf = (__ubuf__ T_V_CACHE*)vOut.GetPhyAddr();
+        __ubuf__ float* quantBuf = (__ubuf__ float*)quantBuf_.Get<float>().GetPhyAddr();
 
         // quantBuf 布局: [k_scale | k_offset | v_scale | v_offset]
         const int64_t kOffsetIdx = numHeadK_ * qkvDim_;
@@ -480,7 +480,7 @@ private:
                 // gammaBuf 布局: [q_gamma | k_gamma]
                 VfNormRopeRow<T_QKV, T_QKV, false>(xBuf + t * tokenStride_ + h * qkvDim_, cosBuf + t * qkvDim_,
                                                    sinBuf + t * qkvDim_, gammaBuf, reciprocal_, epsilon_, qOutBuf + row,
-                                                   (__ubuf__ T_QKV *)nullptr, nullptr, nullptr, false, 0);
+                                                   (__ubuf__ T_QKV*)nullptr, nullptr, nullptr, false, 0);
             }
         }
 
@@ -582,7 +582,7 @@ private:
 
     // PA_NZ 散射:cache 排布 [BlockNum, N*D1, BlockSize, D0],D0 = 32B/sizeof(T),D1 = D/D0
     template <typename T_CACHE>
-    __aicore__ inline void ScatterNz(const GlobalTensor<T_CACHE> &cacheGm, const LocalTensor<T_CACHE> &srcRow,
+    __aicore__ inline void ScatterNz(const GlobalTensor<T_CACHE>& cacheGm, const LocalTensor<T_CACHE>& srcRow,
                                      int64_t pageId, int64_t tokenInPage, int64_t headIdx, int64_t headNum)
     {
         constexpr int64_t D0 = REGBASE_UB_BLOCK / static_cast<int64_t>(sizeof(T_CACHE));
@@ -609,8 +609,8 @@ private:
     }
 
 private:
-    TPipe *pipe_ = nullptr;
-    const QkvRmsNormRopeCacheRegbaseTilingData *tiling_ = nullptr;
+    TPipe* pipe_ = nullptr;
+    const QkvRmsNormRopeCacheRegbaseTilingData* tiling_ = nullptr;
 
     GlobalTensor<T_QKV> qkvGm_, gammaQGm_, gammaKGm_, cosGm_, sinGm_, qOutGm_;
     GlobalTensor<T_QKV> qOutProtoGm_, kOutProtoGm_, vOutProtoGm_;

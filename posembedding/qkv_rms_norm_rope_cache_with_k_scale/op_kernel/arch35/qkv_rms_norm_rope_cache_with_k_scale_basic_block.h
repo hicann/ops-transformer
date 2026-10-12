@@ -19,7 +19,7 @@ namespace QkvRmsNormRopeCacheWithKScale {
 template <uint32_t QKV_LAYOUT, uint32_t Q_OUT_LAYOUT, uint32_t ROPE_MODE, uint32_t K_QUANT_MODE, uint32_t Q_QUANT_MODE>
 class QkvRmsNormRopeCacheWithKScaleBasicBlock {
 public:
-    __aicore__ inline void Init(const GlobalTensors &tensors, const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData)
+    __aicore__ inline void Init(const GlobalTensors& tensors, const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData)
     {
         if ASCEND_IS_AIC {
             InitAic(tensors, tilingData);
@@ -47,7 +47,7 @@ public:
         }
     }
 
-    __aicore__ inline void ComputeTile(TileParam &tile, const TileParam &lastTile, uint64_t tileCount, bool isLastTile)
+    __aicore__ inline void ComputeTile(TileParam& tile, const TileParam& lastTile, uint64_t tileCount, bool isLastTile)
     {
         if ASCEND_IS_AIC {
             ComputeTileAic(tile, isLastTile);
@@ -56,7 +56,7 @@ public:
         }
     }
 
-    __aicore__ inline void End(const TileParam &lastTile, uint64_t tileCount)
+    __aicore__ inline void End(const TileParam& lastTile, uint64_t tileCount)
     {
         if ASCEND_IS_AIC {
             EndAic();
@@ -73,8 +73,8 @@ private:
         kRotationBufferUseId_ = 0U;
     }
 
-    __aicore__ inline void InitAic(const GlobalTensors &tensors,
-                                   const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData)
+    __aicore__ inline void InitAic(const GlobalTensors& tensors,
+                                   const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData)
     {
         ResetBufferState();
         aRotL1Pool_ = LocalTensor<bfloat16_t>(TPosition::TSCM, QKV_K_SCALE_A_ROT_L1_POOL_OFFSET,
@@ -90,8 +90,8 @@ private:
         cube_.InitIntraCoreEvents();
     }
 
-    __aicore__ inline void InitAiv(const GlobalTensors &tensors,
-                                   const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData)
+    __aicore__ inline void InitAiv(const GlobalTensors& tensors,
+                                   const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData)
     {
         ResetBufferState();
         aRotL1Pool_ = LocalTensor<bfloat16_t>(TPosition::TSCM, QKV_K_SCALE_A_ROT_L1_POOL_OFFSET,
@@ -109,7 +109,7 @@ private:
         vec_.InitIntraCoreEvents();
     }
 
-    __aicore__ inline void ComputeTileAic(const TileParam &tile, bool isLastTile)
+    __aicore__ inline void ComputeTileAic(const TileParam& tile, bool isLastTile)
     {
         const uint32_t aRotL1BufferId = static_cast<uint32_t>(aRotL1BufferUseId_ % A_ROT_L1_BUFFER_NUM);
         const LocalTensor<bfloat16_t> aRotL1Nz =
@@ -146,7 +146,7 @@ private:
         ++aRotL1BufferUseId_;
     }
 
-    __aicore__ inline void ComputeTileAiv(TileParam &tile, const TileParam &lastTile, uint64_t tileCount,
+    __aicore__ inline void ComputeTileAiv(TileParam& tile, const TileParam& lastTile, uint64_t tileCount,
                                           bool isLastTile)
     {
         const uint32_t aRotL1BufferId = static_cast<uint32_t>(aRotL1BufferUseId_ % A_ROT_L1_BUFFER_NUM);
@@ -210,7 +210,7 @@ private:
         cube_.EndIntraCoreEvents();
     }
 
-    __aicore__ inline void EndAiv(const TileParam &lastTile, uint64_t tileCount)
+    __aicore__ inline void EndAiv(const TileParam& lastTile, uint64_t tileCount)
     {
         if constexpr (IS_MROPE) {
             if (tileCount > 0U) {

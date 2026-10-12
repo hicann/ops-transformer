@@ -164,7 +164,7 @@ ge::graphStatus RopeGradRegBaseTilingClass::CheckShapeAllPositive() const
     return ge::GRAPH_SUCCESS;
 }
 
-bool RopeGradRegBaseTilingClass::Is3dBsdBroadcastLayout(const gert::Shape &xShape, const gert::Shape &cosShape) const
+bool RopeGradRegBaseTilingClass::Is3dBsdBroadcastLayout(const gert::Shape& xShape, const gert::Shape& cosShape) const
 {
     // 识别 dy（TND）cos（1ND）场景
     return xShape.GetDimNum() == DIM_NUM_TND && cosShape.GetDimNum() == DIM_NUM_TND && xShape.GetDim(DIM_1) != 1 &&
@@ -172,7 +172,7 @@ bool RopeGradRegBaseTilingClass::Is3dBsdBroadcastLayout(const gert::Shape &xShap
            cosShape.GetDim(DIM_2) == xShape.GetDim(DIM_2);
 }
 
-ge::graphStatus RopeGradRegBaseTilingClass::JudgeLayoutByShape(const gert::Shape &xShape, const gert::Shape &cosShape)
+ge::graphStatus RopeGradRegBaseTilingClass::JudgeLayoutByShape(const gert::Shape& xShape, const gert::Shape& cosShape)
 {
     isTndLayout_ = (xShape.GetDimNum() == DIM_NUM_TND);
     is3dBsdLayout_ = false;
@@ -216,10 +216,10 @@ ge::graphStatus RopeGradRegBaseTilingClass::JudgeLayoutByShape(const gert::Shape
 
 ge::graphStatus RopeGradRegBaseTilingClass::CheckShapeDim() const
 {
-    auto &dyShape = context_->GetInputShape(DY_INDEX)->GetStorageShape();
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
-    auto &dxShape = context_->GetOutputShape(DX_INDEX)->GetStorageShape();
+    auto& dyShape = context_->GetInputShape(DY_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    auto& dxShape = context_->GetOutputShape(DX_INDEX)->GetStorageShape();
 
     if (dyShape.GetDimNum() != DIM_NUM && dyShape.GetDimNum() != DIM_NUM_TND) {
         std::string dimNumStr = std::to_string(dyShape.GetDimNum());
@@ -227,9 +227,9 @@ ge::graphStatus RopeGradRegBaseTilingClass::CheckShapeDim() const
         return ge::GRAPH_FAILED;
     }
     if (context_->GetInputShape(X_INDEX) != nullptr) {
-        auto &xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
-        auto &dcosShape = context_->GetOutputShape(DCOS_INDEX)->GetStorageShape();
-        auto &dsinShape = context_->GetOutputShape(DSIN_INDEX)->GetStorageShape();
+        auto& xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
+        auto& dcosShape = context_->GetOutputShape(DCOS_INDEX)->GetStorageShape();
+        auto& dsinShape = context_->GetOutputShape(DSIN_INDEX)->GetStorageShape();
         if (xShape.GetDimNum() != DIM_NUM && xShape.GetDimNum() != DIM_NUM_TND) {
             std::string dimNumStr = std::to_string(xShape.GetDimNum());
             OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "x", dimNumStr.c_str(), "3D or 4D");
@@ -266,10 +266,10 @@ ge::graphStatus RopeGradRegBaseTilingClass::CheckShapeDim() const
 
 ge::graphStatus RopeGradRegBaseTilingClass::CheckShapeLimit()
 {
-    auto &dyShape = context_->GetInputShape(DY_INDEX)->GetStorageShape();
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
-    auto &dxShape = context_->GetOutputShape(DX_INDEX)->GetStorageShape();
+    auto& dyShape = context_->GetInputShape(DY_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    auto& dxShape = context_->GetOutputShape(DX_INDEX)->GetStorageShape();
 
     if (cosShape != sinShape) {
         std::string shapeMsg = ToString(cosShape) + " and " + ToString(sinShape);
@@ -293,12 +293,12 @@ ge::graphStatus RopeGradRegBaseTilingClass::CheckShapeLimit()
 
 ge::graphStatus RopeGradRegBaseTilingClass::CheckOptionalInput() const
 {
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
-    auto &dxShape = context_->GetOutputShape(DX_INDEX)->GetStorageShape();
-    auto &xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
-    auto &dcosShape = context_->GetOutputShape(DCOS_INDEX)->GetStorageShape();
-    auto &dsinShape = context_->GetOutputShape(DSIN_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    auto& dxShape = context_->GetOutputShape(DX_INDEX)->GetStorageShape();
+    auto& xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
+    auto& dcosShape = context_->GetOutputShape(DCOS_INDEX)->GetStorageShape();
+    auto& dsinShape = context_->GetOutputShape(DSIN_INDEX)->GetStorageShape();
     if (xShape != dxShape) {
         std::string shapeMsg = ToString(xShape) + " and " + ToString(dxShape);
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "x and dx", shapeMsg.c_str(),
@@ -322,8 +322,8 @@ ge::graphStatus RopeGradRegBaseTilingClass::CheckOptionalInput() const
 
 ge::graphStatus RopeGradRegBaseTilingClass::CheckShape()
 {
-    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-    auto &dyShape = context_->GetInputShape(DY_INDEX)->GetStorageShape();
+    auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto& dyShape = context_->GetInputShape(DY_INDEX)->GetStorageShape();
     OP_CHECK_IF(CheckShapeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape dim fail."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckShapeLimit() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "CheckShapeLimit fail."),
@@ -441,7 +441,7 @@ ge::graphStatus RopeGradRegBaseTilingClass::CheckRotaryModeShapeRelation(const i
     return ge::GRAPH_SUCCESS;
 }
 
-void RopeGradRegBaseTilingClass::Set3dBsdShapeAttrs(const gert::Shape &xShape)
+void RopeGradRegBaseTilingClass::Set3dBsdShapeAttrs(const gert::Shape& xShape)
 {
     // TND的广播场景需要映射成为BS1D，用于分核优化
     b_ = xShape.GetDim(DIM_0);
@@ -452,9 +452,9 @@ void RopeGradRegBaseTilingClass::Set3dBsdShapeAttrs(const gert::Shape &xShape)
 
 ge::graphStatus RopeGradRegBaseTilingClass::GetShapeAttrsInfo()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
-    const int32_t *mode = attrs->GetAttrPointer<int32_t>(0);
+    const int32_t* mode = attrs->GetAttrPointer<int32_t>(0);
     int32_t modeValue = (mode == nullptr) ? 0 : static_cast<int32_t>(*mode);
     if (IsRotaryPosEmbeddingMode(modeValue) != true) {
         std::string modeStr = std::to_string(modeValue);
@@ -516,7 +516,7 @@ ge::graphStatus RopeGradRegBaseTilingClass::GetShapeAttrsInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus RopeGradRegBaseTilingClass::GetInputParam(Ops::Base::ReduceOpInputParam &opInput, uint32_t inputIdx,
+ge::graphStatus RopeGradRegBaseTilingClass::GetInputParam(Ops::Base::ReduceOpInputParam& opInput, uint32_t inputIdx,
                                                           uint32_t axesIdx)
 {
     // set opInput dtype
@@ -568,7 +568,7 @@ ge::graphStatus RopeGradRegBaseTilingClass::InitTilingData()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus RopeGradRegBaseTilingClass::GetReduceOpCompileInfo(Ops::Base::ReduceOpCompileInfo *compileInfo)
+ge::graphStatus RopeGradRegBaseTilingClass::GetReduceOpCompileInfo(Ops::Base::ReduceOpCompileInfo* compileInfo)
 {
     auto platformInfo = context_->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context_, platformInfo);

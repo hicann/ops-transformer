@@ -353,7 +353,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_total_falls_back_to_slot_
 TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_unknown_rank_all_inputs)
 {
     auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
-    for (auto &desc : para.inputTensorDesc_) {
+    for (auto& desc : para.inputTensorDesc_) {
         desc.shape_ = {{-2}, {-2}};
     }
     std::vector<std::vector<int64_t>> expectOutputShape = {
@@ -381,7 +381,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_without_optional_inputs)
 TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_without_optional_inputs_all_unknown_rank)
 {
     auto para = BuildInferShapeContextWithoutOptional(5, 8, 1, 1);
-    for (auto &desc : para.inputTensorDesc_) {
+    for (auto& desc : para.inputTensorDesc_) {
         desc.shape_ = {{-2}, {-2}};
     }
     std::vector<std::vector<int64_t>> expectOutputShape = {
@@ -539,12 +539,12 @@ namespace {
 struct RankCase {
     size_t inputIdx;
     size_t expectDimNum;
-    const char *name;
+    const char* name;
 };
 
 struct HeadDimSourceCase {
     size_t inputIdx;
-    const char *name;
+    const char* name;
 };
 
 // D 出现在这 9 个输入里，与 infershape 中 HEAD_DIM_SOURCES 一一对应
@@ -559,7 +559,7 @@ class UndGenQkvRmsNormRopeCacheInferShapeRank : public testing::TestWithParam<Ra
 // 这是在钉 INPUT_SPECS 这张表本身的录入正确性，表里任一条 expectDimNum 写错都会被抓到。
 TEST_P(UndGenQkvRmsNormRopeCacheInferShapeRank, infershape_fail_when_rank_mismatch)
 {
-    const auto &param = GetParam();
+    const auto& param = GetParam();
     auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
     auto dtype = para.inputTensorDesc_[param.inputIdx].dtype_;
     // 比预期多一维
@@ -574,7 +574,7 @@ INSTANTIATE_TEST_SUITE_P(AllInputs, UndGenQkvRmsNormRopeCacheInferShapeRank,
                                          RankCase{6, 1, "slot_mapping"}, RankCase{7, 2, "positions"},
                                          RankCase{8, 3, "gen_qkv"}, RankCase{9, 1, "gen_weights_q"},
                                          RankCase{10, 1, "gen_weights_k"}, RankCase{11, 1, "cat_indices"}),
-                         [](const testing::TestParamInfo<RankCase> &info) { return std::string(info.param.name); });
+                         [](const testing::TestParamInfo<RankCase>& info) { return std::string(info.param.name); });
 
 class UndGenQkvRmsNormRopeCacheInferShapeHeadDim : public testing::TestWithParam<HeadDimSourceCase> {};
 
@@ -583,7 +583,7 @@ class UndGenQkvRmsNormRopeCacheInferShapeHeadDim : public testing::TestWithParam
 // 其中 v_cache 那条同时覆盖了 Bn/Bs 在 k_cache 不可用时退到 v_cache 的路径。
 TEST_P(UndGenQkvRmsNormRopeCacheInferShapeHeadDim, infershape_head_dim_from_single_source)
 {
-    const auto &param = GetParam();
+    const auto& param = GetParam();
     auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
     for (size_t idx : HEAD_DIM_INPUT_IDXS) {
         if (idx != param.inputIdx) {
@@ -606,6 +606,6 @@ INSTANTIATE_TEST_SUITE_P(AllHeadDimSources, UndGenQkvRmsNormRopeCacheInferShapeH
                                          HeadDimSourceCase{4, "k_cache"}, HeadDimSourceCase{5, "v_cache"},
                                          HeadDimSourceCase{8, "gen_qkv"}, HeadDimSourceCase{9, "gen_weights_q"},
                                          HeadDimSourceCase{10, "gen_weights_k"}),
-                         [](const testing::TestParamInfo<HeadDimSourceCase> &info) {
+                         [](const testing::TestParamInfo<HeadDimSourceCase>& info) {
                              return std::string(info.param.name);
                          });

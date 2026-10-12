@@ -58,18 +58,14 @@ bool isTndLayout = false;
 
 int64_t GetCeilInt(int64_t value1, int64_t value2)
 {
-    OP_CHECK_IF(
-        value2 == 0, OP_LOGE("RopeHalfGrad", "In the GetCeilInt function, the divisor is 0"),
-        return value1);
+    OP_CHECK_IF(value2 == 0, OP_LOGE("RopeHalfGrad", "In the GetCeilInt function, the divisor is 0"), return value1);
     return static_cast<int64_t>((value1 + value2 - 1) / value2);
 }
 
 int64_t GetGcdForRotary(int64_t value1, int64_t value2)
 {
-    OP_CHECK_IF(
-        value2 == 0,
-        OP_LOGE("RopeHalfGrad", "In the GetGcdForRotary function, the divisor is 0"),
-        return value1);
+    OP_CHECK_IF(value2 == 0, OP_LOGE("RopeHalfGrad", "In the GetGcdForRotary function, the divisor is 0"),
+                return value1);
     int64_t remainder = value1 % value2;
     if (remainder == 0) {
         return value2;
@@ -81,10 +77,7 @@ int64_t GetGcdForRotary(int64_t value1, int64_t value2)
 int64_t GetLcmForRotary(int64_t value1, int64_t value2)
 {
     int64_t temp = value1 * value2;
-    OP_CHECK_IF(
-        value2 == 0,
-        OP_LOGE("RopeHalfGrad", "In the GetLcmForRotary function, the divisor is 0"),
-        return temp);
+    OP_CHECK_IF(value2 == 0, OP_LOGE("RopeHalfGrad", "In the GetLcmForRotary function, the divisor is 0"), return temp);
     temp = temp / GetGcdForRotary(value1, value2);
     return temp;
 }
@@ -93,10 +86,8 @@ int64_t GetDtypeSize(const gert::TilingContext* context)
 {
     int64_t dtypeSize = DTYPE_SIZE_FP16;
     auto indexGrad = context->GetInputDesc(INDEX_GRAD);
-    OP_CHECK_IF(
-        indexGrad == nullptr,
-        OP_LOGE(context->GetNodeName(), "[GetDtypeSize] indexGrad is null."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(indexGrad == nullptr, OP_LOGE(context->GetNodeName(), "[GetDtypeSize] indexGrad is null."),
+                return ge::GRAPH_FAILED);
     auto inputDtype = indexGrad->GetDataType();
     if (inputDtype == ge::DT_FLOAT) {
         dtypeSize = DTYPE_SIZE_FP32;
@@ -165,42 +156,40 @@ static ge::graphStatus RopeHalfGradShapeDimCheck(const gert::TilingContext* cont
 
     if (xDimNum != inputDimNum) {
         std::string xDimNumStr = std::to_string(xDimNum);
-        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "dy",
-            xDimNumStr.c_str(), "3D or 4D");
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "dy", xDimNumStr.c_str(), "3D or 4D");
         return ge::GRAPH_FAILED;
     }
     if (cosShape.GetDimNum() != inputDimNum) {
         std::string dimNumMsg = std::to_string(cosShape.GetDimNum()) + " and " + std::to_string(xDimNum);
-        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context->GetNodeName(), "cos and dy",
-            dimNumMsg.c_str(), "The shape dims of input cos and dy should be the same");
+        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context->GetNodeName(), "cos and dy", dimNumMsg.c_str(),
+                                                  "The shape dims of input cos and dy should be the same");
         return ge::GRAPH_FAILED;
     }
     if (cosShape != sinShape) {
         std::string shapeMsg = ToString(cosShape) + " and " + ToString(sinShape);
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "cos and sin", shapeMsg.c_str(),
-            "The shapes of input cos and sin should be the same");
+                                               "The shapes of input cos and sin should be the same");
         return ge::GRAPH_FAILED;
     }
     if (xShape.GetDim(xDimNum - 1) != cosShape.GetDim(xDimNum - 1)) {
         std::string shapeMsg = ToString(xShape) + " and " + ToString(cosShape);
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "dy and cos", shapeMsg.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            context->GetNodeName(), "dy and cos", shapeMsg.c_str(),
             "The D axes of input dy and cos should be the same, where D refers to the last dim");
         return ge::GRAPH_FAILED;
     }
     if (xShape.GetDim(xDimNum - 1) > D_THRESHOLD) {
-        std::string reasonMsg = "The D axis of input dy can not be greater than " +
-            std::to_string(D_THRESHOLD) + ", where D refers to the last dim";
+        std::string reasonMsg = "The D axis of input dy can not be greater than " + std::to_string(D_THRESHOLD) +
+                                ", where D refers to the last dim";
         std::string xShapeStr = ToString(xShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "dy", xShapeStr.c_str(),
-            reasonMsg.c_str());
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "dy", xShapeStr.c_str(), reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
     if (xShape.GetDim(xDimNum - 1) % CHUNK_SIZE != 0) {
-        std::string reasonMsg = "The D axis of input dy should be divisible by " +
-            std::to_string(CHUNK_SIZE) + ", where D refers to the last dim";
+        std::string reasonMsg = "The D axis of input dy should be divisible by " + std::to_string(CHUNK_SIZE) +
+                                ", where D refers to the last dim";
         std::string xShapeStr = ToString(xShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "dy", xShapeStr.c_str(),
-            reasonMsg.c_str());
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "dy", xShapeStr.c_str(), reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
     auto xOptionalInput = context->GetOptionalInputDesc(INDEX_X);
@@ -210,7 +199,7 @@ static ge::graphStatus RopeHalfGradShapeDimCheck(const gert::TilingContext* cont
         if (xOptionalStorageShape != xShape) {
             std::string shapeMsg = ToString(xOptionalStorageShape) + " and " + ToString(xShape);
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "x and dy", shapeMsg.c_str(),
-                "The shapes of input x and input dy should be the same");
+                                                   "The shapes of input x and input dy should be the same");
             return ge::GRAPH_FAILED;
         }
     }
@@ -218,9 +207,8 @@ static ge::graphStatus RopeHalfGradShapeDimCheck(const gert::TilingContext* cont
     return ge::GRAPH_SUCCESS;
 }
 
-static uint64_t RopeHalfGradSelectLayout(
-    const gert::TilingContext* context, const std::vector<int64_t> xShapePerDim,
-    const std::vector<int64_t> cosShapePerDim)
+static uint64_t RopeHalfGradSelectLayout(const gert::TilingContext* context, const std::vector<int64_t> xShapePerDim,
+                                         const std::vector<int64_t> cosShapePerDim)
 {
     uint64_t layout = LAYOUT_KEY_UNDEFINED;
     int64_t xDim0 = xShapePerDim[DIM_ZERO];
@@ -267,16 +255,16 @@ static uint64_t RopeHalfGradSelectLayout(
         const auto cosShape = cosStorage->GetStorageShape();
 
         std::string shapeMsg = ToString(cosShape) + " and " + ToString(xShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "cos and dy", shapeMsg.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context->GetNodeName(), "cos and dy", shapeMsg.c_str(),
             "Each axis of input cos except the last must be 1 or equal to the same axis of input dy");
     }
 
     return layout;
 }
 
-static bool SetLayoutTiling(
-    const gert::TilingContext* context, const std::vector<int64_t> xShapePerDim,
-    const std::vector<int64_t> cosShapePerDim)
+static bool SetLayoutTiling(const gert::TilingContext* context, const std::vector<int64_t> xShapePerDim,
+                            const std::vector<int64_t> cosShapePerDim)
 {
     uint64_t layout = RopeHalfGradSelectLayout(context, xShapePerDim, cosShapePerDim);
     uint64_t dimD = xShapePerDim[DIM_THREE];
@@ -326,16 +314,12 @@ static bool SetLayoutTiling(
 static bool RopeHalfGradInitShapeInfo(const gert::TilingContext* context)
 {
     const auto xStorage = context->GetInputShape(INDEX_GRAD);
-    OP_CHECK_IF(
-        xStorage == nullptr,
-        OP_LOGE(context->GetNodeName(), "[RopeHalfGradInitShapeInfo] xStorage is null."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(xStorage == nullptr, OP_LOGE(context->GetNodeName(), "[RopeHalfGradInitShapeInfo] xStorage is null."),
+                return ge::GRAPH_FAILED);
     const auto xShape = xStorage->GetStorageShape();
     const uint64_t xShapeSize = static_cast<uint64_t>(xShape.GetShapeSize());
     const auto cosStorage = context->GetInputShape(INDEX_COS);
-    OP_CHECK_IF(
-        cosStorage == nullptr, OP_LOGE(context->GetNodeName(), "cosStorage is null."),
-        return false);
+    OP_CHECK_IF(cosStorage == nullptr, OP_LOGE(context->GetNodeName(), "cosStorage is null."), return false);
     const auto cosShape = cosStorage->GetStorageShape();
     const uint64_t cosShapeSize = static_cast<uint64_t>(cosShape.GetShapeSize());
     tiling.ropeHalfGradParams.set_xShapeSize(xShapeSize);
@@ -357,10 +341,8 @@ static bool RopeHalfGradInitShapeInfo(const gert::TilingContext* context)
         }
     }
 
-    OP_CHECK_IF(
-        !SetLayoutTiling(context, xShapePerDim, cosShapePerDim),
-        OP_LOGE(context->GetNodeName(), "[SetLayoutTiling] SetLayoutTiling failed."),
-        return false);
+    OP_CHECK_IF(!SetLayoutTiling(context, xShapePerDim, cosShapePerDim),
+                OP_LOGE(context->GetNodeName(), "[SetLayoutTiling] SetLayoutTiling failed."), return false);
 
     return true;
 }
@@ -368,9 +350,7 @@ static bool RopeHalfGradInitShapeInfo(const gert::TilingContext* context)
 static bool RopeHalfGradSetTiling(const gert::TilingContext* context, int64_t availableUbSize, uint64_t maxCoreNum)
 {
     const auto xStorage = context->GetInputShape(INDEX_GRAD);
-    OP_CHECK_IF(
-        xStorage == nullptr, OP_LOGE(context->GetNodeName(), "xStorage is null."),
-        return false);
+    OP_CHECK_IF(xStorage == nullptr, OP_LOGE(context->GetNodeName(), "xStorage is null."), return false);
     const auto xShape = xStorage->GetStorageShape();
     uint64_t dimD = isTndLayout ? xShape.GetDim(DIM_TWO) : xShape.GetDim(DIM_THREE);
     uint64_t halfDimDAlignNum = tiling.ropeHalfGradParams.get_halfDimDAlignNum();
@@ -383,17 +363,14 @@ static bool RopeHalfGradSetTiling(const gert::TilingContext* context, int64_t av
         reserveAlignNum = GetLcmForRotary(halfDimDAlignNum * CHUNK_SIZE, MASK_NUM_FP32);
         ubPerReserveNum = reserveAlignNum / (halfDimDAlignNum * CHUNK_SIZE);
     }
-    OP_CHECK_IF(
-        reserveAlignNum == 0, OP_LOGE("RopeHalfGrad", "reserveAlignNum is 0"), return false);
+    OP_CHECK_IF(reserveAlignNum == 0, OP_LOGE("RopeHalfGrad", "reserveAlignNum is 0"), return false);
 
     alignUbSize = availableUbSize / reserveAlignNum * reserveAlignNum;
     calcUbSize = availableUbSize / reserveAlignNum * ubPerReserveNum * dimD;
-    OP_CHECK_IF(
-        halfDimDAlignNum * 2 > alignUbSize || alignUbSize == 0 || calcUbSize == 0,
-        OP_LOGE(
-            "RopeHalfGrad", "halfDimDAlignNum * 2 = %lu is too large, aicore does not support it.",
-            halfDimDAlignNum * 2),
-        return false);
+    OP_CHECK_IF(halfDimDAlignNum * 2 > alignUbSize || alignUbSize == 0 || calcUbSize == 0,
+                OP_LOGE("RopeHalfGrad", "halfDimDAlignNum * 2 = %lu is too large, aicore does not support it.",
+                        halfDimDAlignNum * 2),
+                return false);
 
     uint64_t taskNum = tiling.ropeHalfGradParams.get_cosShapeSize();
     if (tiling.ropeHalfGradParams.get_layout() == LAYOUT_KEY_BNSD && tiling.ropeHalfGradParams.get_cosDimB() != 1 &&
@@ -430,10 +407,8 @@ static bool RopeHalfGradInitSplitInfo(const gert::TilingContext* context)
 
     uint64_t maxUbSize;
     auto indexGrad = context->GetInputDesc(INDEX_GRAD);
-    OP_CHECK_IF(
-        indexGrad == nullptr,
-        OP_LOGE(context->GetNodeName(), "[RopeHalfGradInitSplitInfo] indexGrad is null."),
-        return false);
+    OP_CHECK_IF(indexGrad == nullptr, OP_LOGE(context->GetNodeName(), "[RopeHalfGradInitSplitInfo] indexGrad is null."),
+                return false);
     auto inputDtype = indexGrad->GetDataType();
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, maxUbSize);
     int64_t availableUbSize = static_cast<int64_t>(maxUbSize) - RESERVE_UB_SIZE;
@@ -454,9 +429,8 @@ static bool RopeHalfGradInitSplitInfo(const gert::TilingContext* context)
         }
     }
 
-    OP_CHECK_IF(
-        !RopeHalfGradSetTiling(context, availableUbSize, maxCoreNum),
-        OP_LOGE(context->GetNodeName(), "RopeHalfGradSetTiling failed."), return false);
+    OP_CHECK_IF(!RopeHalfGradSetTiling(context, availableUbSize, maxCoreNum),
+                OP_LOGE(context->GetNodeName(), "RopeHalfGradSetTiling failed."), return false);
 
     return true;
 }
@@ -498,8 +472,8 @@ static bool RopeHalfGradInitParamInfo(const gert::TilingContext* context)
         strideInner = GetCeilInt(dimB / cosDimB * dimN / cosDimN * dimD - dimD, dataEachBlock);
         stridePadInner = (dimB / cosDimB * dimN / cosDimN * dimD - dimD / CHUNK_SIZE) * dtypeSize;
     } else {
-        OP_LOGE(context->GetNodeName(),
-                "The layout only supports BSND, BNSD, SBND, got layout = %lu.", tiling.ropeHalfGradParams.get_layout());
+        OP_LOGE(context->GetNodeName(), "The layout only supports BSND, BNSD, SBND, got layout = %lu.",
+                tiling.ropeHalfGradParams.get_layout());
         return false;
     }
 
@@ -517,10 +491,8 @@ static bool RopeHalfGradInitParamInfo(const gert::TilingContext* context)
 static uint32_t RopeHalfGradSelectTilingKey(const gert::TilingContext* context)
 {
     auto indexGrad = context->GetInputDesc(INDEX_GRAD);
-    OP_CHECK_IF(
-        indexGrad == nullptr,
-        OP_LOGE(context->GetNodeName(), "[RopeHalfGradSelectTilingKey] indexGrad is null."),
-        return 0);
+    OP_CHECK_IF(indexGrad == nullptr,
+                OP_LOGE(context->GetNodeName(), "[RopeHalfGradSelectTilingKey] indexGrad is null."), return 0);
     auto inputDtype = indexGrad->GetDataType();
     uint32_t inputDtypeKey = 0;
     uint32_t layoutKey = 0;
@@ -559,25 +531,17 @@ ge::graphStatus RopeRotateHalfGradTlingClass::DoOpTiling()
 {
     OP_LOGD("RopeHalfGradTiling tiling start");
 
-    OP_CHECK_IF(
-        RopeHalfGradShapeDimCheck(context_) != ge::GRAPH_SUCCESS,
-        OP_LOGE(context_->GetNodeName(), "RopeHalfGradShapeDimCheck not support."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(RopeHalfGradShapeDimCheck(context_) != ge::GRAPH_SUCCESS,
+                OP_LOGE(context_->GetNodeName(), "RopeHalfGradShapeDimCheck not support."), return ge::GRAPH_FAILED);
     OP_LOGD("RopeHalfGradTiling RopeHalfGradShapeDimCheck");
-    OP_CHECK_IF(
-        !RopeHalfGradInitShapeInfo(context_),
-        OP_LOGE(context_->GetNodeName(), "RopeHalfGradInitShapeInfo not support."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!RopeHalfGradInitShapeInfo(context_),
+                OP_LOGE(context_->GetNodeName(), "RopeHalfGradInitShapeInfo not support."), return ge::GRAPH_FAILED);
     OP_LOGD("RopeHalfGradTiling RopeHalfGradInitShapeInfo");
-    OP_CHECK_IF(
-        !RopeHalfGradInitSplitInfo(context_),
-        OP_LOGE(context_->GetNodeName(), "RopeHalfGradInitSplitInfo not support."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!RopeHalfGradInitSplitInfo(context_),
+                OP_LOGE(context_->GetNodeName(), "RopeHalfGradInitSplitInfo not support."), return ge::GRAPH_FAILED);
     OP_LOGD("RopeHalfGradTiling RopeHalfGradInitSplitInfo");
-    OP_CHECK_IF(
-        !RopeHalfGradInitParamInfo(context_),
-        OP_LOGE(context_->GetNodeName(), "RopeHalfGradInitParamInfo not support."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!RopeHalfGradInitParamInfo(context_),
+                OP_LOGE(context_->GetNodeName(), "RopeHalfGradInitParamInfo not support."), return ge::GRAPH_FAILED);
     OP_LOGD("RopeHalfGradTiling RopeHalfGradInitParamInfo");
 
     RopeHalfGradPrintParam(context_);

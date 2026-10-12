@@ -18,8 +18,9 @@
 
 using namespace ApplyRotaryPosEmb;
 
-extern "C" __global__ __aicore__ void apply_rotary_pos_emb(
-    GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR q_out, GM_ADDR k_out, GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void apply_rotary_pos_emb(GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin,
+                                                           GM_ADDR q_out, GM_ADDR k_out, GM_ADDR workspace,
+                                                           GM_ADDR tiling)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
     if (workspace == nullptr) {

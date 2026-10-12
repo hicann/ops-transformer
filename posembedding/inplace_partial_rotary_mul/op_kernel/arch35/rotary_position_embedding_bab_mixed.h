@@ -24,7 +24,7 @@ using namespace AscendC;
 template <typename TX>
 class RotaryPositionEmbeddingBABMixed {
 public:
-    __aicore__ inline RotaryPositionEmbeddingBABMixed(TPipe *pipe, const InplacePartialRopeRegbaseTilingData *tiling)
+    __aicore__ inline RotaryPositionEmbeddingBABMixed(TPipe* pipe, const InplacePartialRopeRegbaseTilingData* tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y);
@@ -32,8 +32,8 @@ public:
 
 private:
     constexpr static int32_t bufferNum = 2;
-    const InplacePartialRopeRegbaseTilingData *tilingData_;
-    TPipe *pipe_;
+    const InplacePartialRopeRegbaseTilingData* tilingData_;
+    TPipe* pipe_;
     int64_t blockIdx_ = 0;
     int64_t dSplitCoef_ = 1;
     uint32_t dSplitSize_ = 0;
@@ -58,10 +58,10 @@ private:
 private:
     __aicore__ inline void PrePareParams();
     __aicore__ inline void ProcessNLoop(const uint32_t bIdx, const uint32_t sIdx, const uint32_t currSNum);
-    __aicore__ inline void Compute(const LocalTensor<float> &sinTensor, const LocalTensor<float> &cosTensor,
-                                   const LocalTensor<TX> &inTensor, const LocalTensor<TX> &outTensor,
+    __aicore__ inline void Compute(const LocalTensor<float>& sinTensor, const LocalTensor<float>& cosTensor,
+                                   const LocalTensor<TX>& inTensor, const LocalTensor<TX>& outTensor,
                                    const uint32_t currSNum, const uint32_t currDNum);
-    __aicore__ inline void ProcessN(const LocalTensor<float> &sinTensor, const LocalTensor<float> &cosTensor,
+    __aicore__ inline void ProcessN(const LocalTensor<float>& sinTensor, const LocalTensor<float>& cosTensor,
                                     const uint32_t bIdx, const uint32_t sIdx, const uint32_t currSNum);
 };
 
@@ -82,10 +82,10 @@ __aicore__ inline void RotaryPositionEmbeddingBABMixed<TX>::Init(GM_ADDR x, GM_A
         ops::CeilAlign<int64_t>(tilingData_->sliceLength / dSplitCoef_, BLOCK_TYPE_SIZE / sizeof(float)) * dSplitCoef_;
     ubFactorN_ = tilingData_->ubFactorN;
     ubFactorS_ = tilingData_->ubFactorS;
-    this->xGm_.SetGlobalBuffer((__gm__ TX *)x);
-    this->cosGm_.SetGlobalBuffer((__gm__ float *)cos);
-    this->sinGm_.SetGlobalBuffer((__gm__ float *)sin);
-    this->yOutGm_.SetGlobalBuffer((__gm__ TX *)y);
+    this->xGm_.SetGlobalBuffer((__gm__ TX*)x);
+    this->cosGm_.SetGlobalBuffer((__gm__ float*)cos);
+    this->sinGm_.SetGlobalBuffer((__gm__ float*)sin);
+    this->yOutGm_.SetGlobalBuffer((__gm__ TX*)y);
     this->pipe_->InitBuffer(xInQue_, bufferNum, ubFactorS_ * ubFactorN_ * dAlign_ * sizeof(TX));
     this->pipe_->InitBuffer(cosInQue_, bufferNum, ubFactorS_ * dAlignFloat_ * sizeof(float));
     this->pipe_->InitBuffer(sinInQue_, bufferNum, ubFactorS_ * dAlignFloat_ * sizeof(float));
@@ -144,8 +144,8 @@ __aicore__ inline void RotaryPositionEmbeddingBABMixed<TX>::ProcessNLoop(const u
 }
 
 template <typename TX>
-__aicore__ inline void RotaryPositionEmbeddingBABMixed<TX>::ProcessN(const LocalTensor<float> &sinTensor,
-                                                                     const LocalTensor<float> &cosTensor,
+__aicore__ inline void RotaryPositionEmbeddingBABMixed<TX>::ProcessN(const LocalTensor<float>& sinTensor,
+                                                                     const LocalTensor<float>& cosTensor,
                                                                      const uint32_t bIdx, const uint32_t sIdx,
                                                                      const uint32_t currSNum)
 {
@@ -182,10 +182,10 @@ __aicore__ inline void RotaryPositionEmbeddingBABMixed<TX>::ProcessN(const Local
 }
 
 template <typename TX>
-__aicore__ inline void RotaryPositionEmbeddingBABMixed<TX>::Compute(const LocalTensor<float> &sinTensor,
-                                                                    const LocalTensor<float> &cosTensor,
-                                                                    const LocalTensor<TX> &inTensor,
-                                                                    const LocalTensor<TX> &outTensor,
+__aicore__ inline void RotaryPositionEmbeddingBABMixed<TX>::Compute(const LocalTensor<float>& sinTensor,
+                                                                    const LocalTensor<float>& cosTensor,
+                                                                    const LocalTensor<TX>& inTensor,
+                                                                    const LocalTensor<TX>& outTensor,
                                                                     const uint32_t currSNum, const uint32_t currDNum)
 {
     if (tilingData_->rotaryMode == static_cast<int64_t>(InplacePartialRotaryPosEmbeddingMode::INTERLEAVE)) {

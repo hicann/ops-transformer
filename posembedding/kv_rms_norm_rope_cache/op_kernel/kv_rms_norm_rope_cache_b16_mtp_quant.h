@@ -23,7 +23,7 @@ template <bool isPagedAttention, typename KV_DTYPE, typename K_DTYPE, typename V
 class KvRmsNormRopeCacheB16MTPQUANT
     : public KernelKvRmsNormRopeCacheMTPQuant<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE> {
 public:
-    __aicore__ inline KvRmsNormRopeCacheB16MTPQUANT(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline KvRmsNormRopeCacheB16MTPQUANT(TPipe* pipe, const KvRmsNormRopeCacheTilingData* tiling)
         : KernelKvRmsNormRopeCacheMTPQuant<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE>(pipe, tiling)
     {}
 
@@ -35,49 +35,48 @@ public:
         this->InitSharedData(methodMode);
         if (methodMode == 1) {
             // init global memory
-            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE *)kv +
-                                       GetBlockIdx() * this->tilingData_->rowsPerBlock * this->tilingData_->numHead *
-                                           this->tilingData_->seqLength * this->RMS_NORM_LENGTH);
-            this->vGm.SetGlobalBuffer((__gm__ KV_DTYPE *)v + GetBlockIdx() * this->tilingData_->rowsPerBlock *
-                                                                 this->tilingData_->numHead *
-                                                                 this->tilingData_->seqLength * this->V_LENGTH);
-            this->gammaGm.SetGlobalBuffer((__gm__ KV_DTYPE *)gamma);
-            this->cosGm.SetGlobalBuffer((__gm__ KV_DTYPE *)cos + GetBlockIdx() * this->tilingData_->rowsPerBlock *
-                                                                     this->tilingData_->numHead * this->ROPE_LENGTH);
-            this->sinGm.SetGlobalBuffer((__gm__ KV_DTYPE *)sin + GetBlockIdx() * this->tilingData_->rowsPerBlock *
-                                                                     this->tilingData_->numHead * this->ROPE_LENGTH);
+            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE*)kv + GetBlockIdx() * this->tilingData_->rowsPerBlock *
+                                                                  this->tilingData_->numHead *
+                                                                  this->tilingData_->seqLength * this->RMS_NORM_LENGTH);
+            this->vGm.SetGlobalBuffer((__gm__ KV_DTYPE*)v + GetBlockIdx() * this->tilingData_->rowsPerBlock *
+                                                                this->tilingData_->numHead *
+                                                                this->tilingData_->seqLength * this->V_LENGTH);
+            this->gammaGm.SetGlobalBuffer((__gm__ KV_DTYPE*)gamma);
+            this->cosGm.SetGlobalBuffer((__gm__ KV_DTYPE*)cos + GetBlockIdx() * this->tilingData_->rowsPerBlock *
+                                                                    this->tilingData_->numHead * this->ROPE_LENGTH);
+            this->sinGm.SetGlobalBuffer((__gm__ KV_DTYPE*)sin + GetBlockIdx() * this->tilingData_->rowsPerBlock *
+                                                                    this->tilingData_->numHead * this->ROPE_LENGTH);
             if constexpr (isPagedAttention) {
-                this->indexGm.SetGlobalBuffer((__gm__ int64_t *)index);
-                this->kCacheGm.SetGlobalBuffer((__gm__ K_DTYPE *)k_cache);
-                this->vCacheGm.SetGlobalBuffer((__gm__ V_DTYPE *)v_cache);
+                this->indexGm.SetGlobalBuffer((__gm__ int64_t*)index);
+                this->kCacheGm.SetGlobalBuffer((__gm__ K_DTYPE*)k_cache);
+                this->vCacheGm.SetGlobalBuffer((__gm__ V_DTYPE*)v_cache);
             } else {
-                this->indexGm.SetGlobalBuffer((__gm__ int64_t *)index + GetBlockIdx() *
-                                                                            this->tilingData_->rowsPerBlock *
-                                                                            this->tilingData_->seqLength);
-                this->kCacheGm.SetGlobalBuffer((__gm__ K_DTYPE *)k_cache +
+                this->indexGm.SetGlobalBuffer((__gm__ int64_t*)index + GetBlockIdx() * this->tilingData_->rowsPerBlock *
+                                                                           this->tilingData_->seqLength);
+                this->kCacheGm.SetGlobalBuffer((__gm__ K_DTYPE*)k_cache +
                                                GetBlockIdx() * this->tilingData_->rowsPerBlock *
                                                    this->tilingData_->numHead * this->tilingData_->cacheLength *
                                                    this->RMS_NORM_LENGTH);
-                this->vCacheGm.SetGlobalBuffer((__gm__ V_DTYPE *)v_cache +
+                this->vCacheGm.SetGlobalBuffer((__gm__ V_DTYPE*)v_cache +
                                                GetBlockIdx() * this->tilingData_->rowsPerBlock *
                                                    this->tilingData_->numHead * this->tilingData_->cacheLength *
                                                    this->V_LENGTH);
             }
             if (this->tilingData_->isOutputKv) {
-                this->kCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE *)optional_k_rope);
-                this->vCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE *)optional_c_kv);
+                this->kCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE*)optional_k_rope);
+                this->vCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE*)optional_c_kv);
             }
             isKOffset = k_rope_offset == nullptr ? 0 : 1;
             isVOffset = c_kv_offset == nullptr ? 0 : 1;
             if (this->tilingData_->isKQuant) {
-                this->kRopeScaleGm.SetGlobalBuffer((__gm__ float *)k_rope_scale);
+                this->kRopeScaleGm.SetGlobalBuffer((__gm__ float*)k_rope_scale);
                 if (isKOffset == 1)
-                    this->kRopeOffsetGm.SetGlobalBuffer((__gm__ float *)k_rope_offset);
+                    this->kRopeOffsetGm.SetGlobalBuffer((__gm__ float*)k_rope_offset);
             }
             if (this->tilingData_->isVQuant) {
-                this->cKvScaleGm.SetGlobalBuffer((__gm__ float *)c_kv_scale);
+                this->cKvScaleGm.SetGlobalBuffer((__gm__ float*)c_kv_scale);
                 if (isVOffset == 1)
-                    this->cKvOffsetGm.SetGlobalBuffer((__gm__ float *)c_kv_offset);
+                    this->cKvOffsetGm.SetGlobalBuffer((__gm__ float*)c_kv_offset);
             }
 
             // init pipe
@@ -207,7 +206,7 @@ public:
 
                     // ScatterUpdate
                     if (this->tilingData_->isKQuant) {
-                        ScatterUpdate<int8_t, KV_DTYPE>((GlobalTensor<int8_t> &)this->kCacheGm, this->kCacheGmNd,
+                        ScatterUpdate<int8_t, KV_DTYPE>((GlobalTensor<int8_t>&)this->kCacheGm, this->kCacheGmNd,
                                                         outLocalK, outLocalKQuant, n, i, this->RMS_NORM_LENGTH);
                     } else {
                         LocalTensor<K_DTYPE> outputLocal = outLocalK.template ReinterpretCast<K_DTYPE>();
@@ -253,7 +252,7 @@ public:
                     outLocalV = this->outQueueV.template DeQue<KV_DTYPE>();
                     // ScatterUpdate
                     if (this->tilingData_->isVQuant) {
-                        ScatterUpdate<int8_t, KV_DTYPE>((GlobalTensor<int8_t> &)this->vCacheGm, this->vCacheGmNd,
+                        ScatterUpdate<int8_t, KV_DTYPE>((GlobalTensor<int8_t>&)this->vCacheGm, this->vCacheGmNd,
                                                         outLocalV, outLocalVQuant, n, i, this->V_LENGTH);
                     } else {
                         LocalTensor<V_DTYPE> outputLocal = outLocalV.template ReinterpretCast<V_DTYPE>();
@@ -269,11 +268,11 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void RopeKV2(const LocalTensor<T> &xLocal, const LocalTensor<float> &xFp32Local,
-                                   const LocalTensor<T> &cosLocal, const LocalTensor<T> &sinLocal,
-                                   const LocalTensor<T> &cosLocalB16, const LocalTensor<T> &sinLocalB16,
-                                   const LocalTensor<int8_t> &outLocalKQuant, const LocalTensor<float> &scaleLocal,
-                                   const LocalTensor<float> &offsetLocal, bool ifAsymmetricQuant, int64_t kvLength)
+    __aicore__ inline void RopeKV2(const LocalTensor<T>& xLocal, const LocalTensor<float>& xFp32Local,
+                                   const LocalTensor<T>& cosLocal, const LocalTensor<T>& sinLocal,
+                                   const LocalTensor<T>& cosLocalB16, const LocalTensor<T>& sinLocalB16,
+                                   const LocalTensor<int8_t>& outLocalKQuant, const LocalTensor<float>& scaleLocal,
+                                   const LocalTensor<float>& offsetLocal, bool ifAsymmetricQuant, int64_t kvLength)
     {
         constexpr static int64_t BLOCK_SIZE = 32;
         // realLocal, imagLocal comes from odd/even elements in kLocal
@@ -345,7 +344,7 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void RmsNormV2(const LocalTensor<float> &xFp32Local, const LocalTensor<T> &gammaLocal)
+    __aicore__ inline void RmsNormV2(const LocalTensor<float>& xFp32Local, const LocalTensor<T>& gammaLocal)
     {
         // Calc: xSquare = xFp32 * xFp32, xSquare shape is [this->tilingData_->rowsPerBlock, this->RMS_NORM_LENGTH]
         LocalTensor<float> xSquareLocal = this->bufferXSquare.template Get<float>();
@@ -417,8 +416,8 @@ public:
     }
 
     template <typename T1, typename T2>
-    __aicore__ inline void ScatterUpdate(const GlobalTensor<T1> &dst, const GlobalTensor<T2> &dstNd,
-                                         const LocalTensor<T2> &outLocal, const LocalTensor<T1> &quantLocal,
+    __aicore__ inline void ScatterUpdate(const GlobalTensor<T1>& dst, const GlobalTensor<T2>& dstNd,
+                                         const LocalTensor<T2>& outLocal, const LocalTensor<T1>& quantLocal,
                                          int64_t nIdx, int64_t seqId, int64_t kvLength)
     {
         DataCopyExtParams copyParams{1, static_cast<uint32_t>(kvLength * sizeof(T1)), 0, 0, 0};
@@ -459,8 +458,8 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void Quant(const LocalTensor<int8_t> &quantOutLocal, const LocalTensor<float> &srcTensor,
-                                 const LocalTensor<float> &scaleLocal, const LocalTensor<float> &offsetLocal,
+    __aicore__ inline void Quant(const LocalTensor<int8_t>& quantOutLocal, const LocalTensor<float>& srcTensor,
+                                 const LocalTensor<float>& scaleLocal, const LocalTensor<float>& offsetLocal,
                                  bool ifAsymmetricQuant, int64_t kvLength)
     {
         int64_t totalMask = kvLength;
@@ -485,7 +484,7 @@ public:
         RoundFloat2Int8(quantOutLocal, srcTensor, this->tilingData_->rowsPerBlock * kvLength);
     }
 
-    __aicore__ inline void RoundFloat2Int8(const LocalTensor<int8_t> &dstTensor, const LocalTensor<float> &srcTensor,
+    __aicore__ inline void RoundFloat2Int8(const LocalTensor<int8_t>& dstTensor, const LocalTensor<float>& srcTensor,
                                            int32_t size)
     {
         Cast(srcTensor.ReinterpretCast<int32_t>(), srcTensor, RoundMode::CAST_RINT, size);

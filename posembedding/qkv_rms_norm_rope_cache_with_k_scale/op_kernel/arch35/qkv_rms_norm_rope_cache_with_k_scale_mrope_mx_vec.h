@@ -39,8 +39,8 @@ namespace QkvRmsNormRopeCacheWithKScale {
  */
 class QkvRmsNormRopeCacheWithKScaleMropeMxVec {
 public:
-    __aicore__ inline QkvRmsNormRopeCacheWithKScaleMropeMxVec(const GlobalTensors &tensors,
-                                                              const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData,
+    __aicore__ inline QkvRmsNormRopeCacheWithKScaleMropeMxVec(const GlobalTensors& tensors,
+                                                              const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData,
                                                               uint64_t coreTokenBegin, uint64_t coreTokenEnd)
     {
         Init(tensors, tilingData, coreTokenBegin, coreTokenEnd);
@@ -58,10 +58,10 @@ public:
         WaitFlag<HardEvent::S_MTE2>(POSITION_FREE_EVENT);
     }
 
-    QkvRmsNormRopeCacheWithKScaleMropeMxVec(const QkvRmsNormRopeCacheWithKScaleMropeMxVec &) = delete;
-    QkvRmsNormRopeCacheWithKScaleMropeMxVec &operator=(const QkvRmsNormRopeCacheWithKScaleMropeMxVec &) = delete;
-    QkvRmsNormRopeCacheWithKScaleMropeMxVec(QkvRmsNormRopeCacheWithKScaleMropeMxVec &&) = delete;
-    QkvRmsNormRopeCacheWithKScaleMropeMxVec &operator=(QkvRmsNormRopeCacheWithKScaleMropeMxVec &&) = delete;
+    QkvRmsNormRopeCacheWithKScaleMropeMxVec(const QkvRmsNormRopeCacheWithKScaleMropeMxVec&) = delete;
+    QkvRmsNormRopeCacheWithKScaleMropeMxVec& operator=(const QkvRmsNormRopeCacheWithKScaleMropeMxVec&) = delete;
+    QkvRmsNormRopeCacheWithKScaleMropeMxVec(QkvRmsNormRopeCacheWithKScaleMropeMxVec&&) = delete;
+    QkvRmsNormRopeCacheWithKScaleMropeMxVec& operator=(QkvRmsNormRopeCacheWithKScaleMropeMxVec&&) = delete;
 
     __aicore__ inline void PrepareBeforeLoop()
     {
@@ -74,7 +74,7 @@ public:
         WaitFlag<HardEvent::S_V>(GATHER_READY_EVENT);
     }
 
-    __aicore__ inline void LoadTile(const MropeMxTileDesc &tile)
+    __aicore__ inline void LoadTile(const MropeMxTileDesc& tile)
     {
         // FREE protects this slot from overwrite. slotMapping is published to Scalar separately from the QKV and
         // raw cos/sin data published to Vector because the two consumers run on different pipelines.
@@ -87,14 +87,14 @@ public:
         SetInputReady(tile.inputSlot);
     }
 
-    __aicore__ inline void WaitTileReady(const MropeMxTileDesc &tile)
+    __aicore__ inline void WaitTileReady(const MropeMxTileDesc& tile)
     {
         // Cache addressing and Vector computation may start only after both independent input domains are ready.
         WaitSlotReady(tile.inputSlot);
         WaitInputReady(tile.inputSlot);
     }
 
-    __aicore__ inline void ProcessV(const MropeMxTileDesc &tile)
+    __aicore__ inline void ProcessV(const MropeMxTileDesc& tile)
     {
         // V/K/Q staging buffers are single-buffered. Each FREE wait prevents Vector from overwriting a pending MTE3
         // write, and the matching READY event publishes the newly produced staging data to MTE3.
@@ -103,8 +103,8 @@ public:
         const uint32_t inputTokenStride = static_cast<uint32_t>(headCount_ * headDim_);
         const uint32_t vInputOffset = static_cast<uint32_t>((qHeadNum_ + kvHeadNum_) * headDim_);
         AscendC::VF_CALL<VScaleFp8D128ToNtdVfImpl<true>>(
-            (__ubuf__ bfloat16_t *)inputQkvUb_[tile.inputSlot][vInputOffset].GetPhyAddr(),
-            (__ubuf__ float *)vScaleUb_.GetPhyAddr(), (__ubuf__ fp8_e4m3fn_t *)vDataUb_.GetPhyAddr(),
+            (__ubuf__ bfloat16_t*)inputQkvUb_[tile.inputSlot][vInputOffset].GetPhyAddr(),
+            (__ubuf__ float*)vScaleUb_.GetPhyAddr(), (__ubuf__ fp8_e4m3fn_t*)vDataUb_.GetPhyAddr(),
             static_cast<uint16_t>(tile.tokenCount), static_cast<uint16_t>(kvHeadNum_), inputTokenStride,
             static_cast<uint32_t>(headDim_));
         SetFlag<HardEvent::V_MTE3>(V_READY_EVENT);
@@ -113,20 +113,20 @@ public:
         SetFlag<HardEvent::MTE3_V>(V_FREE_EVENT);
     }
 
-    __aicore__ inline void ProcessK(const MropeMxTileDesc &tile)
+    __aicore__ inline void ProcessK(const MropeMxTileDesc& tile)
     {
         WaitFlag<HardEvent::MTE3_V>(K_FREE_EVENT);
         const uint32_t inputTokenStride = static_cast<uint32_t>(headCount_ * headDim_);
         const uint32_t kInputOffset = static_cast<uint32_t>(qHeadNum_ * headDim_);
         const uint32_t scaleTokenStrideWords =
             MropeMxAlignDevice(static_cast<uint32_t>(kvHeadNum_ * MROPE_MX_SCALE_COUNT_D128)) / sizeof(uint32_t);
-        __ubuf__ bfloat16_t *kInput = (__ubuf__ bfloat16_t *)inputQkvUb_[tile.inputSlot][kInputOffset].GetPhyAddr();
-        __ubuf__ float *kGamma = (__ubuf__ float *)kGammaUb_.GetPhyAddr();
-        __ubuf__ float *rawCosSin = (__ubuf__ float *)rawCosSinUb_[tile.inputSlot].GetPhyAddr();
-        __ubuf__ uint32_t *gatherIndex = (__ubuf__ uint32_t *)gatherIndexUb_.GetPhyAddr();
-        __ubuf__ fp8_e4m3fn_t *kData = (__ubuf__ fp8_e4m3fn_t *)kDataUb_.GetPhyAddr();
-        __ubuf__ fp8_e8m0_t *kScale = (__ubuf__ fp8_e8m0_t *)kScaleUb_.GetPhyAddr();
-        __ubuf__ uint8_t *mxScratch = (__ubuf__ uint8_t *)mxScratchUb_.GetPhyAddr();
+        __ubuf__ bfloat16_t* kInput = (__ubuf__ bfloat16_t*)inputQkvUb_[tile.inputSlot][kInputOffset].GetPhyAddr();
+        __ubuf__ float* kGamma = (__ubuf__ float*)kGammaUb_.GetPhyAddr();
+        __ubuf__ float* rawCosSin = (__ubuf__ float*)rawCosSinUb_[tile.inputSlot].GetPhyAddr();
+        __ubuf__ uint32_t* gatherIndex = (__ubuf__ uint32_t*)gatherIndexUb_.GetPhyAddr();
+        __ubuf__ fp8_e4m3fn_t* kData = (__ubuf__ fp8_e4m3fn_t*)kDataUb_.GetPhyAddr();
+        __ubuf__ fp8_e8m0_t* kScale = (__ubuf__ fp8_e8m0_t*)kScaleUb_.GetPhyAddr();
+        __ubuf__ uint8_t* mxScratch = (__ubuf__ uint8_t*)mxScratchUb_.GetPhyAddr();
         const uint16_t tokenCount = static_cast<uint16_t>(tile.tokenCount);
         const uint16_t kHeadCount = static_cast<uint16_t>(kvHeadNum_);
         const uint32_t inputHeadStride = static_cast<uint32_t>(headDim_);
@@ -167,7 +167,7 @@ public:
         SetFlag<HardEvent::MTE3_V>(K_FREE_EVENT);
     }
 
-    __aicore__ inline void ProcessQ(const MropeMxTileDesc &tile)
+    __aicore__ inline void ProcessQ(const MropeMxTileDesc& tile)
     {
         WaitFlag<HardEvent::MTE3_V>(Q_FREE_EVENT);
         const uint32_t inputTokenStride = static_cast<uint32_t>(headCount_ * headDim_);
@@ -178,29 +178,29 @@ public:
         SetFlag<HardEvent::MTE3_V>(Q_FREE_EVENT);
     }
 
-    __aicore__ inline void ProcessQGlobalTileWave(const MropeMxTileDesc &tile, uint32_t inputTokenStride)
+    __aicore__ inline void ProcessQGlobalTileWave(const MropeMxTileDesc& tile, uint32_t inputTokenStride)
     {
         if ((qHeadNum_ % MROPE_MX_ROW_BATCH_ROWS) == MROPE_MX_ROW_BATCH_ROWS / 2U) {
             AscendC::VF_CALL<QRmsNormMropeMxD128GlobalTileWaveVfImpl<true>>(
-                (__ubuf__ bfloat16_t *)inputQkvUb_[tile.inputSlot].GetPhyAddr(),
-                (__ubuf__ float *)qGammaUb_.GetPhyAddr(), (__ubuf__ float *)rawCosSinUb_[tile.inputSlot].GetPhyAddr(),
-                (__ubuf__ uint32_t *)gatherIndexUb_.GetPhyAddr(), (__ubuf__ fp8_e4m3fn_t *)qDataUb_.GetPhyAddr(),
-                (__ubuf__ fp8_e8m0_t *)qScaleUb_.GetPhyAddr(), (__ubuf__ uint8_t *)mxScratchUb_.GetPhyAddr(),
+                (__ubuf__ bfloat16_t*)inputQkvUb_[tile.inputSlot].GetPhyAddr(), (__ubuf__ float*)qGammaUb_.GetPhyAddr(),
+                (__ubuf__ float*)rawCosSinUb_[tile.inputSlot].GetPhyAddr(),
+                (__ubuf__ uint32_t*)gatherIndexUb_.GetPhyAddr(), (__ubuf__ fp8_e4m3fn_t*)qDataUb_.GetPhyAddr(),
+                (__ubuf__ fp8_e8m0_t*)qScaleUb_.GetPhyAddr(), (__ubuf__ uint8_t*)mxScratchUb_.GetPhyAddr(),
                 static_cast<uint16_t>(tile.tokenCount), inputTokenStride, static_cast<uint16_t>(qHeadNum_),
                 static_cast<uint32_t>(headDim_), static_cast<uint32_t>(qHeadNum_), epsilon_);
         } else {
             AscendC::VF_CALL<QRmsNormMropeMxD128GlobalTileWaveVfImpl<false>>(
-                (__ubuf__ bfloat16_t *)inputQkvUb_[tile.inputSlot].GetPhyAddr(),
-                (__ubuf__ float *)qGammaUb_.GetPhyAddr(), (__ubuf__ float *)rawCosSinUb_[tile.inputSlot].GetPhyAddr(),
-                (__ubuf__ uint32_t *)gatherIndexUb_.GetPhyAddr(), (__ubuf__ fp8_e4m3fn_t *)qDataUb_.GetPhyAddr(),
-                (__ubuf__ fp8_e8m0_t *)qScaleUb_.GetPhyAddr(), (__ubuf__ uint8_t *)mxScratchUb_.GetPhyAddr(),
+                (__ubuf__ bfloat16_t*)inputQkvUb_[tile.inputSlot].GetPhyAddr(), (__ubuf__ float*)qGammaUb_.GetPhyAddr(),
+                (__ubuf__ float*)rawCosSinUb_[tile.inputSlot].GetPhyAddr(),
+                (__ubuf__ uint32_t*)gatherIndexUb_.GetPhyAddr(), (__ubuf__ fp8_e4m3fn_t*)qDataUb_.GetPhyAddr(),
+                (__ubuf__ fp8_e8m0_t*)qScaleUb_.GetPhyAddr(), (__ubuf__ uint8_t*)mxScratchUb_.GetPhyAddr(),
                 static_cast<uint16_t>(tile.tokenCount), inputTokenStride, static_cast<uint16_t>(qHeadNum_),
                 static_cast<uint32_t>(headDim_), static_cast<uint32_t>(qHeadNum_), epsilon_);
         }
     }
 
     // Q is the last consumer of inputQkv/rawCosSin, so only the controller's post-Q release may return the slot.
-    __aicore__ inline void ReleaseInput(const MropeMxTileDesc &tile)
+    __aicore__ inline void ReleaseInput(const MropeMxTileDesc& tile)
     {
         SetInputFree(tile.inputSlot);
     }
@@ -225,7 +225,7 @@ private:
     static constexpr event_t PERSISTENT_READY_EVENT = static_cast<event_t>(3U);
     static constexpr event_t GATHER_READY_EVENT = static_cast<event_t>(0U);
 
-    __aicore__ inline void Init(const GlobalTensors &tensors, const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData,
+    __aicore__ inline void Init(const GlobalTensors& tensors, const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData,
                                 uint64_t coreTokenBegin, uint64_t coreTokenEnd)
     {
         qHeadNum_ = tilingData->qHeadNum;
@@ -314,7 +314,7 @@ private:
         }
     }
 
-    __aicore__ inline void EnsurePositionWindow(const MropeMxTileDesc &tile)
+    __aicore__ inline void EnsurePositionWindow(const MropeMxTileDesc& tile)
     {
         // Keep a bounded position table in UB and refill it only when the current tile leaves the resident window.
         const uint64_t tileEnd = tile.tokenBegin + tile.tokenCount;
@@ -341,20 +341,20 @@ private:
         positionWindowEnd_ = windowBegin + windowTokenCount;
     }
 
-    __aicore__ inline void CopySlotMapping(const MropeMxTileDesc &tile)
+    __aicore__ inline void CopySlotMapping(const MropeMxTileDesc& tile)
     {
         DataCopyGmToUb2D(slotMappingUb_[tile.inputSlot], slotMappingGm_[tile.tokenBegin], 1U, tile.tokenCount,
                          tile.tokenCount);
     }
 
-    __aicore__ inline void CopyQkv(const MropeMxTileDesc &tile)
+    __aicore__ inline void CopyQkv(const MropeMxTileDesc& tile)
     {
         const uint64_t elements = static_cast<uint64_t>(tile.tokenCount) * headCount_ * headDim_;
         DataCopyGmToUb2D(inputQkvUb_[tile.inputSlot], qkvGm_[tile.tokenBegin * headCount_ * headDim_], 1U, elements,
                          elements);
     }
 
-    __aicore__ inline void GatherRawCosSin(const MropeMxTileDesc &tile)
+    __aicore__ inline void GatherRawCosSin(const MropeMxTileDesc& tile)
     {
         // Materialize the three position-selected cos/sin rows per token so the VF can gather all M-RoPE lanes in UB.
         const uint64_t positionOffset = tile.tokenBegin - positionWindowBegin_;
@@ -373,19 +373,19 @@ private:
         }
     }
 
-    __aicore__ inline uint64_t CacheDataOffset(const MropeMxTileDesc &tile, uint32_t tokenIdx) const
+    __aicore__ inline uint64_t CacheDataOffset(const MropeMxTileDesc& tile, uint32_t tokenIdx) const
     {
         const uint64_t slot = static_cast<uint64_t>(slotMappingUb_[tile.inputSlot].GetValue(tokenIdx));
         return slot / blockSize_ * kvCacheStrideBlock_ + slot % blockSize_ * kvCacheStrideToken_;
     }
 
-    __aicore__ inline uint64_t CacheScaleOffset(const MropeMxTileDesc &tile, uint32_t tokenIdx) const
+    __aicore__ inline uint64_t CacheScaleOffset(const MropeMxTileDesc& tile, uint32_t tokenIdx) const
     {
         const uint64_t slot = static_cast<uint64_t>(slotMappingUb_[tile.inputSlot].GetValue(tokenIdx));
         return slot / blockSize_ * kScaleCacheStrideBlock_ + slot % blockSize_ * kScaleCacheStrideToken_;
     }
 
-    __aicore__ inline void ScatterVCache(const MropeMxTileDesc &tile)
+    __aicore__ inline void ScatterVCache(const MropeMxTileDesc& tile)
     {
         // VScaleFp8D128ToNtdVfImpl stores [Nv, tileT, D].  For one cache
         // token, walk heads with the VF's head stride instead of interpreting
@@ -398,7 +398,7 @@ private:
         }
     }
 
-    __aicore__ inline void ScatterKCacheAndScale(const MropeMxTileDesc &tile)
+    __aicore__ inline void ScatterKCacheAndScale(const MropeMxTileDesc& tile)
     {
         const uint64_t dataTokenStride = kvHeadNum_ * headDim_;
         const uint64_t scaleTokenStride =
@@ -413,7 +413,7 @@ private:
         }
     }
 
-    __aicore__ inline void StoreQAndScale(const MropeMxTileDesc &tile)
+    __aicore__ inline void StoreQAndScale(const MropeMxTileDesc& tile)
     {
         const uint64_t dataElements = static_cast<uint64_t>(tile.tokenCount) * qHeadNum_ * headDim_;
         const uint64_t scaleElements = static_cast<uint64_t>(tile.tokenCount) * qHeadNum_ * MROPE_MX_SCALE_COUNT_D128;
@@ -423,7 +423,7 @@ private:
                                 scaleElements);
     }
 
-    __aicore__ inline void DataCopyScaleCompact(const GlobalTensor<fp8_e8m0_t> &dst, const LocalTensor<fp8_e8m0_t> &src,
+    __aicore__ inline void DataCopyScaleCompact(const GlobalTensor<fp8_e8m0_t>& dst, const LocalTensor<fp8_e8m0_t>& src,
                                                 uint64_t rowCount, uint64_t dstStride)
     {
         // Reinterpret as uint8_t because DataCopyExtParams lengths and strides below are expressed in bytes.
@@ -433,8 +433,8 @@ private:
                                                             src.template ReinterpretCast<uint8_t>(), params);
     }
 
-    __aicore__ inline void DataCopyScaleContiguous(const GlobalTensor<fp8_e8m0_t> &dst,
-                                                   const LocalTensor<fp8_e8m0_t> &src, uint64_t elementCount)
+    __aicore__ inline void DataCopyScaleContiguous(const GlobalTensor<fp8_e8m0_t>& dst,
+                                                   const LocalTensor<fp8_e8m0_t>& src, uint64_t elementCount)
     {
         // One E8M0 element is one byte, so elementCount is also the transfer byte count.
         DataCopyExtParams params{1U, static_cast<uint32_t>(elementCount), 0U, 0U, 0U};
@@ -442,24 +442,24 @@ private:
                                                             src.template ReinterpretCast<uint8_t>(), params);
     }
 
-    __aicore__ inline void BindGlobalTensors(const GlobalTensors &tensors)
+    __aicore__ inline void BindGlobalTensors(const GlobalTensors& tensors)
     {
-        qkvGm_.SetGlobalBuffer((__gm__ bfloat16_t *)tensors.qkv);
+        qkvGm_.SetGlobalBuffer((__gm__ bfloat16_t*)tensors.qkv);
         qkvGm_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
-        qGammaGm_.SetGlobalBuffer((__gm__ float *)tensors.qGamma);
-        kGammaGm_.SetGlobalBuffer((__gm__ float *)tensors.kGamma);
-        cosSinGm_.SetGlobalBuffer((__gm__ float *)tensors.cosSin);
-        slotMappingGm_.SetGlobalBuffer((__gm__ int32_t *)tensors.slotMapping);
-        vScaleGm_.SetGlobalBuffer((__gm__ float *)tensors.vScale);
-        mropePositionGm_.SetGlobalBuffer((__gm__ int32_t *)tensors.mropePosition);
-        qOutGm_.SetGlobalBuffer((__gm__ fp8_e4m3fn_t *)tensors.qOut);
-        qScaleGm_.SetGlobalBuffer((__gm__ fp8_e8m0_t *)tensors.qScale);
-        kCacheOutGm_.SetGlobalBuffer((__gm__ fp8_e4m3fn_t *)tensors.kCacheOut);
-        vCacheOutGm_.SetGlobalBuffer((__gm__ fp8_e4m3fn_t *)tensors.vCacheOut);
-        kScaleCacheOutGm_.SetGlobalBuffer((__gm__ fp8_e8m0_t *)tensors.kScaleCacheOut);
+        qGammaGm_.SetGlobalBuffer((__gm__ float*)tensors.qGamma);
+        kGammaGm_.SetGlobalBuffer((__gm__ float*)tensors.kGamma);
+        cosSinGm_.SetGlobalBuffer((__gm__ float*)tensors.cosSin);
+        slotMappingGm_.SetGlobalBuffer((__gm__ int32_t*)tensors.slotMapping);
+        vScaleGm_.SetGlobalBuffer((__gm__ float*)tensors.vScale);
+        mropePositionGm_.SetGlobalBuffer((__gm__ int32_t*)tensors.mropePosition);
+        qOutGm_.SetGlobalBuffer((__gm__ fp8_e4m3fn_t*)tensors.qOut);
+        qScaleGm_.SetGlobalBuffer((__gm__ fp8_e8m0_t*)tensors.qScale);
+        kCacheOutGm_.SetGlobalBuffer((__gm__ fp8_e4m3fn_t*)tensors.kCacheOut);
+        vCacheOutGm_.SetGlobalBuffer((__gm__ fp8_e4m3fn_t*)tensors.vCacheOut);
+        kScaleCacheOutGm_.SetGlobalBuffer((__gm__ fp8_e8m0_t*)tensors.kScaleCacheOut);
     }
 
-    __aicore__ inline void BindLocalTensors(const MropeMxUbLayout &layout)
+    __aicore__ inline void BindLocalTensors(const MropeMxUbLayout& layout)
     {
         // Only tile inputs are double-buffered. V/K/Q outputs and MX scratch are shared and protected by FREE events.
         qGammaUb_ = LocalTensor<float>(TPosition::LCM, layout.qGammaOffsetBytes, headDim_);

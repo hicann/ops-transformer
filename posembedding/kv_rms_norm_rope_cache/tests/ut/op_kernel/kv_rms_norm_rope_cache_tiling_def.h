@@ -47,15 +47,15 @@ struct KvRmsNormRopeCacheTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, KvRmsNormRopeCacheTilingData *const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, KvRmsNormRopeCacheTilingData* const_data)
 {
-    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
-    uint32_t *dst = (uint32_t *)const_data;
+    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
+    uint32_t* dst = (uint32_t*)const_data;
     for (auto i = 0; i < sizeof(KvRmsNormRopeCacheTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t *tiling, KvRmsNormRopeCacheTilingData *const_data)
+inline void InitTilingData(uint8_t* tiling, KvRmsNormRopeCacheTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(KvRmsNormRopeCacheTilingData));
 }
@@ -66,8 +66,8 @@ inline void InitTilingData(uint8_t *tiling, KvRmsNormRopeCacheTilingData *const_
     InitTilingData(tiling_arg, &tiling_data)
 
 #define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
-    __ubuf__ tilingStruct *tilingDataPointer = \
-        reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
+    __ubuf__ tilingStruct* tilingDataPointer = \
+        reinterpret_cast<__ubuf__ tilingStruct*>((__ubuf__ uint8_t*)(tilingPointer));
 
 #define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
@@ -126,8 +126,8 @@ struct KvRmsNormRopeCacheTilingData {
 #pragma pack()
 
 #define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
-    __ubuf__ tilingStruct *tilingDataPointer = \
-        reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
+    __ubuf__ tilingStruct* tilingDataPointer = \
+        reinterpret_cast<__ubuf__ tilingStruct*>((__ubuf__ uint8_t*)(tilingPointer));
 
 #define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);

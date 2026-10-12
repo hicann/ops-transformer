@@ -69,7 +69,7 @@ uint32_t GetDataTypeSize(DataType dt)
     return 1;
 }
 
-int64_t GetShapeSize(const vector<int64_t> &shape)
+int64_t GetShapeSize(const vector<int64_t>& shape)
 {
     int64_t size = 1;
     for (auto dim : shape) {
@@ -79,23 +79,23 @@ int64_t GetShapeSize(const vector<int64_t> &shape)
 }
 
 template <typename T>
-int32_t GenTensorData(const vector<int64_t> &shape, Tensor &tensor, TensorDesc &desc, T value)
+int32_t GenTensorData(const vector<int64_t>& shape, Tensor& tensor, TensorDesc& desc, T value)
 {
     desc.SetRealDimCnt(shape.size());
     const int64_t elemNum = GetShapeSize(shape);
     const uint64_t dataSize = static_cast<uint64_t>(elemNum) * sizeof(T);
-    T *data = new (std::nothrow) T[elemNum];
+    T* data = new (std::nothrow) T[elemNum];
     if (data == nullptr) {
         return FAILED;
     }
     for (int64_t i = 0; i < elemNum; ++i) {
         data[i] = value;
     }
-    tensor = Tensor(desc, reinterpret_cast<uint8_t *>(data), dataSize);
+    tensor = Tensor(desc, reinterpret_cast<uint8_t*>(data), dataSize);
     return SUCCESS;
 }
 
-int32_t GenInputData(const vector<int64_t> &shape, Tensor &tensor, TensorDesc &desc, DataType dataType, float value)
+int32_t GenInputData(const vector<int64_t>& shape, Tensor& tensor, TensorDesc& desc, DataType dataType, float value)
 {
     if (dataType == DT_FLOAT) {
         return GenTensorData<float>(shape, tensor, desc, value);
@@ -106,9 +106,9 @@ int32_t GenInputData(const vector<int64_t> &shape, Tensor &tensor, TensorDesc &d
     return FAILED;
 }
 
-int32_t WriteDataToFile(const string &binFile, uint64_t dataSize, uint8_t *inputData)
+int32_t WriteDataToFile(const string& binFile, uint64_t dataSize, uint8_t* inputData)
 {
-    FILE *fp = fopen(binFile.c_str(), "wb");
+    FILE* fp = fopen(binFile.c_str(), "wb");
     if (fp == nullptr) {
         return FAILED;
     }
@@ -117,7 +117,7 @@ int32_t WriteDataToFile(const string &binFile, uint64_t dataSize, uint8_t *input
     return SUCCESS;
 }
 
-int32_t CreateInputTensor(const vector<int64_t> &shape, DataType dtype, float value, TensorDesc &desc, Tensor &tensor)
+int32_t CreateInputTensor(const vector<int64_t>& shape, DataType dtype, float value, TensorDesc& desc, Tensor& tensor)
 {
     desc = TensorDesc(ge::Shape(shape), FORMAT_ND, dtype);
     desc.SetPlacement(ge::kPlacementHost);
@@ -131,10 +131,10 @@ int32_t CreateInputTensor(const vector<int64_t> &shape, DataType dtype, float va
     return SUCCESS;
 }
 
-int32_t ParseDeviceId(int argc, char *argv[])
+int32_t ParseDeviceId(int argc, char* argv[])
 {
     // Prefer an explicit command-line device id, then fall back to ASCEND_DEVICE_ID.
-    const char *deviceIdText = nullptr;
+    const char* deviceIdText = nullptr;
     if (argc > 1) {
         deviceIdText = argv[1];
     } else {
@@ -144,7 +144,7 @@ int32_t ParseDeviceId(int argc, char *argv[])
         return 0;
     }
 
-    char *endPtr = nullptr;
+    char* endPtr = nullptr;
     long deviceId = std::strtol(deviceIdText, &endPtr, 10);
     if (endPtr == deviceIdText || *endPtr != '\0' || deviceId < 0) {
         return 0;
@@ -152,8 +152,8 @@ int32_t ParseDeviceId(int argc, char *argv[])
     return static_cast<int32_t>(deviceId);
 }
 
-int CreateOppInGraph(DataType inDtype, vector<Tensor> &input, vector<Operator> &inputs, vector<Operator> &outputs,
-                     Graph &graph)
+int CreateOppInGraph(DataType inDtype, vector<Tensor>& input, vector<Operator>& inputs, vector<Operator>& outputs,
+                     Graph& graph)
 {
     // Build one GEIR custom-op node. Input and output port names match inplace_partial_rotary_mul_grad_proto.h.
     auto inplacePartialRotaryMulGradOp = op::InplacePartialRotaryMulGrad("test_geir_inplace_partial_rotary_mul_grad");
@@ -222,10 +222,10 @@ int CreateOppInGraph(DataType inDtype, vector<Tensor> &input, vector<Operator> &
 }
 } // namespace
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     // bash build.sh --run_example inplace_partial_rotary_mul_grad graph
-    const char *graphName = "tc_ge_irrun_test";
+    const char* graphName = "tc_ge_irrun_test";
     Graph graph(graphName);
     vector<Tensor> input;
     int32_t deviceId = ParseDeviceId(argc, argv);
@@ -259,7 +259,7 @@ int main(int argc, char *argv[])
 
     map<AscendString, AscendString> buildOptions;
     printf("%s - INFO - [XIR]: Start to create ir session using build options\n", GetTime().c_str());
-    Session *session = new (std::nothrow) Session(buildOptions);
+    Session* session = new (std::nothrow) Session(buildOptions);
     if (session == nullptr) {
         printf("%s - ERROR - [XIR]: Create ir session using build options failed\n", GetTime().c_str());
         GEFinalize();
@@ -305,7 +305,7 @@ int main(int argc, char *argv[])
         WriteDataToFile(outputFile, dataSize, output[i].GetData());
 
         if (output[i].GetTensorDesc().GetDataType() == DT_FLOAT) {
-            const float *resultData = reinterpret_cast<const float *>(output[i].GetData());
+            const float* resultData = reinterpret_cast<const float*>(output[i].GetData());
             const int64_t elemNum = output[i].GetTensorDesc().GetShape().GetShapeSize();
             for (int64_t j = 0; j < elemNum && j < 16; ++j) {
                 printf("result[%ld] is: %f\n", j, resultData[j]);

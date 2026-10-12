@@ -26,7 +26,7 @@ using namespace AscendC;
 template <typename T>
 class RotaryPositionEmbeddingGradAB {
 public:
-    __aicore__ inline RotaryPositionEmbeddingGradAB(TPipe *pipe, const RopeGradRegbaseABParams *tiling)
+    __aicore__ inline RotaryPositionEmbeddingGradAB(TPipe* pipe, const RopeGradRegbaseABParams* tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR grad, GM_ADDR cos, GM_ADDR sin, GM_ADDR xGrad);
@@ -37,7 +37,7 @@ private:
                                        int64_t ubIdx, int64_t bsCount, int64_t nCount);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> gradInQueue_;
     TQue<QuePosition::VECIN, 1> cosInQueue_;
     TQue<QuePosition::VECIN, 1> sinInQueue_;
@@ -47,7 +47,7 @@ private:
     GlobalTensor<T> cosGm_;
     GlobalTensor<T> sinGm_;
     GlobalTensor<T> xGradOutGm_;
-    const RopeGradRegbaseABParams *tilingData_;
+    const RopeGradRegbaseABParams* tilingData_;
     DataCopyPadExtParams<T> padParams_ = {false, 0, 0, static_cast<T>(0)};
     uint8_t DB_FLAG = 2;
     uint32_t dSplitSize_ = 0;
@@ -69,10 +69,10 @@ __aicore__ inline void RotaryPositionEmbeddingGradAB<T>::Init(GM_ADDR grad, GM_A
 
     int64_t cosOffset = blockDimBS * tilingData_->blockFactorBS * tilingData_->d;
     int64_t gradOffset = cosOffset * tilingData_->n + blockDimN * tilingData_->blockFactorN * tilingData_->d;
-    this->cosGm_.SetGlobalBuffer((__gm__ T *)cos + cosOffset);
-    this->sinGm_.SetGlobalBuffer((__gm__ T *)sin + cosOffset);
-    this->gradGm_.SetGlobalBuffer((__gm__ T *)grad + gradOffset);
-    this->xGradOutGm_.SetGlobalBuffer((__gm__ T *)xGradOut + gradOffset);
+    this->cosGm_.SetGlobalBuffer((__gm__ T*)cos + cosOffset);
+    this->sinGm_.SetGlobalBuffer((__gm__ T*)sin + cosOffset);
+    this->gradGm_.SetGlobalBuffer((__gm__ T*)grad + gradOffset);
+    this->xGradOutGm_.SetGlobalBuffer((__gm__ T*)xGradOut + gradOffset);
 
     int64_t bufferSize = tilingData_->dAlign * sizeof(T) * tilingData_->ubFactorBS;
     pipe_->InitBuffer(gradInQueue_, DB_FLAG, bufferSize * tilingData_->ubFactorN);

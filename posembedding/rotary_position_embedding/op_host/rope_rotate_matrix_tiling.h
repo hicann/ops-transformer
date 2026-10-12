@@ -22,11 +22,11 @@ constexpr uint32_t ROTATE_INPUT_IDX = 3;
 
 class RopeRotateMatrixTilingClass : public RotaryPosEmbeddingMembaseTilingClass {
 public:
-    explicit RopeRotateMatrixTilingClass(gert::TilingContext *context)
+    explicit RopeRotateMatrixTilingClass(gert::TilingContext* context)
         : RotaryPosEmbeddingMembaseTilingClass(context)
     {}
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
     }

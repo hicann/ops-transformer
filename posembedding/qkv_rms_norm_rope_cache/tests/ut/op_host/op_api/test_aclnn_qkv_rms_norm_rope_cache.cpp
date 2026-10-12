@@ -37,16 +37,19 @@ int block_size;
 
 class l2_qkv_rms_norm_rope_cache_test : public testing::Test {
 protected:
-  static void SetUpTestCase() {
-      cout << "l2_qkv_rms_norm_rope_cache_test SetUp" << endl;
-  }
+    static void SetUpTestCase()
+    {
+        cout << "l2_qkv_rms_norm_rope_cache_test SetUp" << endl;
+    }
 
-  static void TearDownTestCase() {
-      cout << "l2_qkv_rms_norm_rope_cache_test TearDown" << endl;
-  }
+    static void TearDownTestCase()
+    {
+        cout << "l2_qkv_rms_norm_rope_cache_test TearDown" << endl;
+    }
 };
 
-TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_01) {
+TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_01)
+{
     batch_size = 72;
     seq_len = 2;
     Nqkv = 18;
@@ -78,15 +81,17 @@ TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_01) {
     TensorDesc kCache_proto_desc = TensorDesc({batch_size * seq_len, Nk * dim}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc vCache_proto_desc = TensorDesc({batch_size * seq_len, Nv * dim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
-    auto ut = OP_API_UT(aclnnQkvRmsNormRopeCache, INPUT(qkv_desc, qGamma_desc, kGamma_desc, cos_desc, sin_desc, index_desc,
-                        qOut_desc, kCache_desc, vCache_desc, kScale_desc, vScale_desc, nullptr, nullptr,
-                        qkv_size, head_nums, epsilon, cache_mode),
-                        OUTPUT(nullptr, nullptr, nullptr));
+    auto ut = OP_API_UT(
+        aclnnQkvRmsNormRopeCache,
+        INPUT(qkv_desc, qGamma_desc, kGamma_desc, cos_desc, sin_desc, index_desc, qOut_desc, kCache_desc, vCache_desc,
+              kScale_desc, vScale_desc, nullptr, nullptr, qkv_size, head_nums, epsilon, cache_mode),
+        OUTPUT(nullptr, nullptr, nullptr));
     uint64_t workspace_size = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
 }
 
-TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_01A) {
+TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_01A)
+{
     batch_size = 72;
     seq_len = 2;
     Nqkv = 18;
@@ -118,15 +123,17 @@ TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_01A) {
     TensorDesc kCache_proto_desc = TensorDesc({batch_size * seq_len, Nk * dim}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc vCache_proto_desc = TensorDesc({batch_size * seq_len, Nv * dim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
-    auto ut = OP_API_UT(aclnnQkvRmsNormRopeCache, INPUT(qkv_desc, qGamma_desc, kGamma_desc, cos_desc, sin_desc, index_desc,
-                        qOut_desc, kCache_desc, vCache_desc, kScale_desc, vScale_desc, nullptr, nullptr,
-                        qkv_size, head_nums, epsilon, cache_mode),
-                        OUTPUT(qOut_proto_desc, kCache_proto_desc, vCache_proto_desc));
+    auto ut = OP_API_UT(
+        aclnnQkvRmsNormRopeCache,
+        INPUT(qkv_desc, qGamma_desc, kGamma_desc, cos_desc, sin_desc, index_desc, qOut_desc, kCache_desc, vCache_desc,
+              kScale_desc, vScale_desc, nullptr, nullptr, qkv_size, head_nums, epsilon, cache_mode),
+        OUTPUT(qOut_proto_desc, kCache_proto_desc, vCache_proto_desc));
     uint64_t workspace_size = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
 }
 
-TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_02) {
+TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_02)
+{
     batch_size = 72;
     seq_len = 2;
     Nqkv = 18;
@@ -160,15 +167,17 @@ TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_02) {
     TensorDesc kCache_proto_desc = TensorDesc({batch_size * seq_len, Nk * dim}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc vCache_proto_desc = TensorDesc({batch_size * seq_len, Nv * dim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
-    auto ut = OP_API_UT(aclnnQkvRmsNormRopeCache, INPUT(qkv_desc, qGamma_desc, kGamma_desc, cos_desc, sin_desc, index_desc,
-                        qOut_desc, kCache_desc, vCache_desc, kScale_desc, vScale_desc, kOffset_desc, vOffset_desc,
-                        qkv_size, head_nums, epsilon, cache_mode),
-                        OUTPUT(qOut_proto_desc, kCache_proto_desc, vCache_proto_desc));
+    auto ut = OP_API_UT(
+        aclnnQkvRmsNormRopeCache,
+        INPUT(qkv_desc, qGamma_desc, kGamma_desc, cos_desc, sin_desc, index_desc, qOut_desc, kCache_desc, vCache_desc,
+              kScale_desc, vScale_desc, kOffset_desc, vOffset_desc, qkv_size, head_nums, epsilon, cache_mode),
+        OUTPUT(qOut_proto_desc, kCache_proto_desc, vCache_proto_desc));
     uint64_t workspace_size = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
 }
 
-TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_02A) {
+TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_02A)
+{
     batch_size = 72;
     seq_len = 2;
     Nqkv = 18;
@@ -202,15 +211,17 @@ TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_02A) {
     TensorDesc kCache_proto_desc = TensorDesc({batch_size * seq_len, Nk * dim}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc vCache_proto_desc = TensorDesc({batch_size * seq_len, Nv * dim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
-    auto ut = OP_API_UT(aclnnQkvRmsNormRopeCache, INPUT(qkv_desc, qGamma_desc, kGamma_desc, cos_desc, sin_desc, index_desc,
-                        qOut_desc, kCache_desc, vCache_desc, kScale_desc, vScale_desc, kOffset_desc, vOffset_desc,
-                        qkv_size, head_nums, epsilon, cache_mode),
-                        OUTPUT(nullptr, nullptr, nullptr));
+    auto ut = OP_API_UT(
+        aclnnQkvRmsNormRopeCache,
+        INPUT(qkv_desc, qGamma_desc, kGamma_desc, cos_desc, sin_desc, index_desc, qOut_desc, kCache_desc, vCache_desc,
+              kScale_desc, vScale_desc, kOffset_desc, vOffset_desc, qkv_size, head_nums, epsilon, cache_mode),
+        OUTPUT(nullptr, nullptr, nullptr));
     uint64_t workspace_size = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
 }
 
-TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_03) {
+TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_03)
+{
     batch_size = 72;
     seq_len = 2;
     Nqkv = 18;
@@ -242,15 +253,17 @@ TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_03) {
     TensorDesc kCache_proto_desc = TensorDesc({batch_size * seq_len, Nk * dim}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc vCache_proto_desc = TensorDesc({batch_size * seq_len, Nv * dim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
-    auto ut = OP_API_UT(aclnnQkvRmsNormRopeCache, INPUT(qkv_desc, qGamma_desc, kGamma_desc, cos_desc, sin_desc, index_desc,
-                        qOut_desc, kCache_desc, vCache_desc, nullptr, nullptr, nullptr, nullptr,
-                        qkv_size, head_nums, epsilon, cache_mode),
-                        OUTPUT(qOut_proto_desc, kCache_proto_desc, vCache_proto_desc));
+    auto ut =
+        OP_API_UT(aclnnQkvRmsNormRopeCache,
+                  INPUT(qkv_desc, qGamma_desc, kGamma_desc, cos_desc, sin_desc, index_desc, qOut_desc, kCache_desc,
+                        vCache_desc, nullptr, nullptr, nullptr, nullptr, qkv_size, head_nums, epsilon, cache_mode),
+                  OUTPUT(qOut_proto_desc, kCache_proto_desc, vCache_proto_desc));
     uint64_t workspace_size = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
 }
 
-TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_03A) {
+TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_03A)
+{
     batch_size = 72;
     seq_len = 2;
     Nqkv = 18;
@@ -282,10 +295,11 @@ TEST_F(l2_qkv_rms_norm_rope_cache_test, qkv_rms_norm_rope_cache_case_03A) {
     TensorDesc kCache_proto_desc = TensorDesc({batch_size * seq_len, Nk * dim}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc vCache_proto_desc = TensorDesc({batch_size * seq_len, Nv * dim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
-    auto ut = OP_API_UT(aclnnQkvRmsNormRopeCache, INPUT(qkv_desc, qGamma_desc, kGamma_desc, cos_desc, sin_desc, index_desc,
-                        qOut_desc, kCache_desc, vCache_desc, nullptr, nullptr, nullptr, nullptr,
-                        qkv_size, head_nums, epsilon, cache_mode),
-                        OUTPUT(nullptr, nullptr, nullptr));
+    auto ut =
+        OP_API_UT(aclnnQkvRmsNormRopeCache,
+                  INPUT(qkv_desc, qGamma_desc, kGamma_desc, cos_desc, sin_desc, index_desc, qOut_desc, kCache_desc,
+                        vCache_desc, nullptr, nullptr, nullptr, nullptr, qkv_size, head_nums, epsilon, cache_mode),
+                  OUTPUT(nullptr, nullptr, nullptr));
     uint64_t workspace_size = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
 }

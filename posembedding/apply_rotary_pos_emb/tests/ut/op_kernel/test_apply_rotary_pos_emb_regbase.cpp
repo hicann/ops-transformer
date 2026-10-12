@@ -21,11 +21,10 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void apply_rotary_pos_emb(
-    GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR qout, GM_ADDR kout, GM_ADDR workspace, GM_ADDR tiling);
+extern "C" __global__ __aicore__ void apply_rotary_pos_emb(GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR qout,
+                                                           GM_ADDR kout, GM_ADDR workspace, GM_ADDR tiling);
 
-class apply_rotary_pos_emb_regbase_test : public testing::Test
-{
+class apply_rotary_pos_emb_regbase_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {

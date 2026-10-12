@@ -24,11 +24,11 @@ constexpr uint32_t MIN_UB_LOAD_D_NUM_DCOS1_FLOAT_PARTIAL = 20;
 
 class ApplyRotaryPosEmbGradRegbaseTilingClassBAB : public ApplyRotaryPosEmbGradRegbaseTilingClass {
 public:
-    explicit ApplyRotaryPosEmbGradRegbaseTilingClassBAB(gert::TilingContext *context_)
+    explicit ApplyRotaryPosEmbGradRegbaseTilingClassBAB(gert::TilingContext* context_)
         : ApplyRotaryPosEmbGradRegbaseTilingClass(context_)
     {}
     ~ApplyRotaryPosEmbGradRegbaseTilingClassBAB() override = default;
-    void Reset(gert::TilingContext *context_) override
+    void Reset(gert::TilingContext* context_) override
     {
         ApplyRotaryPosEmbGradRegbaseTilingClass::Reset(context_);
     }

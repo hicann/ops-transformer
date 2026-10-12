@@ -123,7 +123,7 @@ __aicore__ inline void SToVSync()
 template <RopeType ropeType, bool forward>
 class RopeOperation {
 public:
-    __aicore__ inline RopeOperation(TBufPool<TPosition::VECCALC, BUF_ID_SIZE> &bufPool, GM_ADDR sin, GM_ADDR cos,
+    __aicore__ inline RopeOperation(TBufPool<TPosition::VECCALC, BUF_ID_SIZE>& bufPool, GM_ADDR sin, GM_ADDR cos,
                                     GM_ADDR y, uint32_t actualSeq, uint32_t curSeq, uint32_t ropeDim,
                                     uint32_t alignedRopeDim)
         : ropeDim_(ropeDim),
@@ -131,7 +131,7 @@ public:
           isActive_(curSeq < actualSeq),
           actualSeq_(actualSeq)
     {
-        yGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)y);
+        yGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)y);
         if constexpr (ropeType == RopeType::NONE) {
             return;
         }
@@ -139,8 +139,8 @@ public:
         if (!isActive_) {
             return;
         }
-        sinGm_.SetGlobalBuffer((__gm__ DTYPE_ROPE_SIN *)sin);
-        cosGm_.SetGlobalBuffer((__gm__ DTYPE_ROPE_SIN *)cos);
+        sinGm_.SetGlobalBuffer((__gm__ DTYPE_ROPE_SIN*)sin);
+        cosGm_.SetGlobalBuffer((__gm__ DTYPE_ROPE_SIN*)cos);
         bufPool.InitBuffer(ropeQueue_, SINGLE_BUFFER, alignedRopeDim * NUM_TWO * sizeof(DTYPE_ROPE_SIN));
         bufPool.InitBuffer(buf_, (alignedRopeDim * sizeof(int32_t) + alignedRopeDim * NUM_TWO * sizeof(float)));
         sin_ = buf_.GetWithOffset<float>(alignedRopeDim * NUM_TWO, 0);
@@ -233,7 +233,7 @@ public:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void Rotate(const LocalTensor<float> &x, const LocalTensor<float> &rotatedX)
+    __aicore__ inline void Rotate(const LocalTensor<float>& x, const LocalTensor<float>& rotatedX)
     {
         if constexpr (forward) {
             Gather(rotatedX, x, mask_, 0, alignedRopeDim_);
@@ -245,7 +245,7 @@ public:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void Collect(const LocalTensor<float> &x, const LocalTensor<float> &rotatedX)
+    __aicore__ inline void Collect(const LocalTensor<float>& x, const LocalTensor<float>& rotatedX)
     {
         if constexpr (forward) {
             Mul(x, x, cos_, alignedRopeDim_);
@@ -288,11 +288,11 @@ public:
           alignedNormDim_(alignedNormDim),
           alignedNormNum_(alignedNormNum)
     {
-        xGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)x);
-        weightGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)weight);
-        biasGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)bias);
-        meanGm_.SetGlobalBuffer((__gm__ float *)mean);
-        rstdGm_.SetGlobalBuffer((__gm__ float *)rstd);
+        xGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)x);
+        weightGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)weight);
+        biasGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY*)bias);
+        meanGm_.SetGlobalBuffer((__gm__ float*)mean);
+        rstdGm_.SetGlobalBuffer((__gm__ float*)rstd);
     }
 
 protected:

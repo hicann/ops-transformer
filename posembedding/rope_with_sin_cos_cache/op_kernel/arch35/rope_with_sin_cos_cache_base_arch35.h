@@ -27,7 +27,7 @@ class RopeWithSinCosCacheBase {
 public:
     // 构造函数
     __aicore__ inline RopeWithSinCosCacheBase(){};
-    __aicore__ inline void InitData(const RopeWithSinCosCacheTilingData &tilingData);
+    __aicore__ inline void InitData(const RopeWithSinCosCacheTilingData& tilingData);
     __aicore__ inline void SToMTE2Sync();
     __aicore__ inline void MTE2ToSSync();
     __aicore__ inline void SToMTE3Sync();
@@ -71,7 +71,7 @@ protected:
 };
 
 template <typename T>
-__aicore__ inline void RopeWithSinCosCacheBase<T>::InitData(const RopeWithSinCosCacheTilingData &tilingData)
+__aicore__ inline void RopeWithSinCosCacheBase<T>::InitData(const RopeWithSinCosCacheTilingData& tilingData)
 {
     blockIdx_ = AscendC::GetBlockIdx();
 

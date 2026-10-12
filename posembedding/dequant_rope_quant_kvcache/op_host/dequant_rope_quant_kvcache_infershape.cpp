@@ -117,10 +117,8 @@ ge::graphStatus InferShapeForDequantRopeQuantKvcache(gert::InferShapeContext* co
     int64_t hiddenSize = -1;
 
     if (!IsUnknownRank(qkvShape)) {
-        OP_CHECK_IF(
-            (qkvShape->GetDimNum() != X_DIM && qkvShape->GetDimNum() != BASE_2),
-            OP_LOGE(context->GetNodeName(), "input_x's dimnum should be 3 or 2."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF((qkvShape->GetDimNum() != X_DIM && qkvShape->GetDimNum() != BASE_2),
+                    OP_LOGE(context->GetNodeName(), "input_x's dimnum should be 3 or 2."), return ge::GRAPH_FAILED);
         batch = qkvShape->GetDim(0);
         if (qkvShape->GetDimNum() == BASE_2) {
             qkvSeqlen = 1;
@@ -129,17 +127,13 @@ ge::graphStatus InferShapeForDequantRopeQuantKvcache(gert::InferShapeContext* co
         }
     }
     if (!IsUnknownRank(kCacheShape)) {
-        OP_CHECK_IF(
-            kCacheShape->GetDimNum() != TOTAL_DIM,
-            OP_LOGE(context->GetNodeName(), "kCache's dimnum should be 4."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(kCacheShape->GetDimNum() != TOTAL_DIM,
+                    OP_LOGE(context->GetNodeName(), "kCache's dimnum should be 4."), return ge::GRAPH_FAILED);
         kvHead = cacheKShape->GetDim(THIRD_DIM);
         hiddenSize = cacheKShape->GetDim(FORTH_DIM);
     }
-    OP_CHECK_IF(
-        splitSizeArray[0] < 0,
-        OP_LOGE(context->GetNodeName(), "size_splits[0] should not less than 0."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(splitSizeArray[0] < 0, OP_LOGE(context->GetNodeName(), "size_splits[0] should not less than 0."),
+                return ge::GRAPH_FAILED);
     int64_t qHead = hiddenSize < 0 ? -1 : GetDiv(splitSizeArray[0], hiddenSize);
 
     if (IsUnknownRank(qkvShape)) {

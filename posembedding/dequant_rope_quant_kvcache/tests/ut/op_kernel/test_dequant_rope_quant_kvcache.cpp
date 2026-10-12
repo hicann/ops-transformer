@@ -25,8 +25,7 @@ extern "C" __global__ __aicore__ void dequant_rope_quant_kvcache(
     GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR k_cache, GM_ADDR v_cache, GM_ADDR indices, GM_ADDR scale_k,
     GM_ADDR scale_v, GM_ADDR offset_k, GM_ADDR offset_v, GM_ADDR weight_scale, GM_ADDR activation_scale, GM_ADDR bias,
     GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR k_cache_ref, GM_ADDR v_cache_ref, GM_ADDR workspace, GM_ADDR tiling);
-class dequant_rope_quant_kvcache_test : public testing::Test
-{
+class dequant_rope_quant_kvcache_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -109,9 +108,8 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_0)
     string path(path_);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        dequant_rope_quant_kvcache, blockDim, x, cos, sin, kCache, vCache, indices, scaleK, scaleV, offsetK, offsetV,
-        weightScale, activationScale, bias, q, k, v, kCache, vCache, workspace, tiling);
+    ICPU_RUN_KF(dequant_rope_quant_kvcache, blockDim, x, cos, sin, kCache, vCache, indices, scaleK, scaleV, offsetK,
+                offsetV, weightScale, activationScale, bias, q, k, v, kCache, vCache, workspace, tiling);
 
     AscendC::GmFree((void*)x);
     AscendC::GmFree((void*)cos);
@@ -205,9 +203,8 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_1)
     string path(path_);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        dequant_rope_quant_kvcache, blockDim, x, cos, sin, kCache, vCache, indices, scaleK, scaleV, offsetK, offsetV,
-        weightScale, activationScale, bias, q, k, v, kCache, vCache, workspace, tiling);
+    ICPU_RUN_KF(dequant_rope_quant_kvcache, blockDim, x, cos, sin, kCache, vCache, indices, scaleK, scaleV, offsetK,
+                offsetV, weightScale, activationScale, bias, q, k, v, kCache, vCache, workspace, tiling);
 
     AscendC::GmFree((void*)x);
     AscendC::GmFree((void*)cos);
@@ -301,9 +298,8 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_2)
     string path(path_);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        dequant_rope_quant_kvcache, blockDim, x, cos, sin, kCache, vCache, indices, scaleK, scaleV, offsetK, offsetV,
-        weightScale, activationScale, bias, q, k, v, kCache, vCache, workspace, tiling);
+    ICPU_RUN_KF(dequant_rope_quant_kvcache, blockDim, x, cos, sin, kCache, vCache, indices, scaleK, scaleV, offsetK,
+                offsetV, weightScale, activationScale, bias, q, k, v, kCache, vCache, workspace, tiling);
 
     AscendC::GmFree((void*)x);
     AscendC::GmFree((void*)cos);
@@ -397,9 +393,8 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_3)
     string path(path_);
 
     ICPU_SET_TILING_KEY(tilingKey);
-    ICPU_RUN_KF(
-        dequant_rope_quant_kvcache, blockDim, x, cos, sin, kCache, vCache, indices, scaleK, scaleV, offsetK, offsetV,
-        weightScale, activationScale, bias, q, k, v, kCache, vCache, workspace, tiling);
+    ICPU_RUN_KF(dequant_rope_quant_kvcache, blockDim, x, cos, sin, kCache, vCache, indices, scaleK, scaleV, offsetK,
+                offsetV, weightScale, activationScale, bias, q, k, v, kCache, vCache, workspace, tiling);
 
     AscendC::GmFree((void*)x);
     AscendC::GmFree((void*)cos);

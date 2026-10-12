@@ -26,7 +26,7 @@ constexpr uint64_t SPLIT_NS = 1;
 template <typename T>
 class KernelInterleaveRopeB11D {
 public:
-    __aicore__ inline KernelInterleaveRopeB11D(TPipe *pipe, const InterleaveRopeTilingData *tiling)
+    __aicore__ inline KernelInterleaveRopeB11D(TPipe* pipe, const InterleaveRopeTilingData* tiling)
         : pipe_(pipe),
           tilingData_(tiling)
     {}
@@ -64,10 +64,10 @@ public:
             sinCosIdxOffsetBase_ = GetBlockIdx() * batchsPerBlock_;
         }
 
-        xGm.SetGlobalBuffer((__gm__ T *)x);
-        yGm.SetGlobalBuffer((__gm__ T *)y);
-        cosGm.SetGlobalBuffer((__gm__ T *)cos);
-        sinGm.SetGlobalBuffer((__gm__ T *)sin);
+        xGm.SetGlobalBuffer((__gm__ T*)x);
+        yGm.SetGlobalBuffer((__gm__ T*)y);
+        cosGm.SetGlobalBuffer((__gm__ T*)cos);
+        sinGm.SetGlobalBuffer((__gm__ T*)sin);
 
         // init pipe
         pipe_->InitBuffer(inQueueX, 1, hiddenDimCountPerLoop_ * hiddenDim * sizeof(T));
@@ -163,8 +163,8 @@ public:
     }
 
 private:
-    TPipe *pipe_ = nullptr;
-    const InterleaveRopeTilingData *tilingData_;
+    TPipe* pipe_ = nullptr;
+    const InterleaveRopeTilingData* tilingData_;
     GlobalTensor<T> xGm;
     GlobalTensor<T> yGm;
     GlobalTensor<T> cosGm;

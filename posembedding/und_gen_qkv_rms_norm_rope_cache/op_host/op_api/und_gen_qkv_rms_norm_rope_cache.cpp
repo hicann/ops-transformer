@@ -22,14 +22,14 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(UndGenQkvRmsNormRopeCache);
 
-const aclTensor *UndGenQkvRmsNormRopeCache(const aclTensor *undQkv, const aclTensor *undWeightsQ,
-                                           const aclTensor *undWeightsK, const aclTensor *cosSinCache,
-                                           aclTensor *kCacheRef, aclTensor *vCacheRef, const aclTensor *slotMapping,
-                                           const aclTensor *positions, const aclTensor *genQkv,
-                                           const aclTensor *genWeightsQ, const aclTensor *genWeightsK,
-                                           const aclTensor *catIndices, int64_t numHeadsQ, int64_t numHeadsK,
-                                           int64_t numHeadsV, double normEps, const aclIntArray *mropeSection,
-                                           aclOpExecutor *executor)
+const aclTensor* UndGenQkvRmsNormRopeCache(const aclTensor* undQkv, const aclTensor* undWeightsQ,
+                                           const aclTensor* undWeightsK, const aclTensor* cosSinCache,
+                                           aclTensor* kCacheRef, aclTensor* vCacheRef, const aclTensor* slotMapping,
+                                           const aclTensor* positions, const aclTensor* genQkv,
+                                           const aclTensor* genWeightsQ, const aclTensor* genWeightsK,
+                                           const aclTensor* catIndices, int64_t numHeadsQ, int64_t numHeadsK,
+                                           int64_t numHeadsV, double normEps, const aclIntArray* mropeSection,
+                                           aclOpExecutor* executor)
 {
     L0_DFX(UndGenQkvRmsNormRopeCache, undQkv, undWeightsQ, undWeightsK, cosSinCache, kCacheRef, vCacheRef, slotMapping,
            positions, genQkv, genWeightsQ, genWeightsK, catIndices, numHeadsQ, numHeadsK, numHeadsV, normEps,

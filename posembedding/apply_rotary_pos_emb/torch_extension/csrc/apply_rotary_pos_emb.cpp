@@ -24,8 +24,8 @@ constexpr int64_t LAYOUT_BNSD = 3;
 constexpr int64_t LAYOUT_TND = 4;
 } // namespace
 
-std::tuple<at::Tensor, at::Tensor> ApplyRotaryPosEmb(const at::Tensor &query, const at::Tensor &key,
-                                                     const at::Tensor &cos, const at::Tensor &sin,
+std::tuple<at::Tensor, at::Tensor> ApplyRotaryPosEmb(const at::Tensor& query, const at::Tensor& key,
+                                                     const at::Tensor& cos, const at::Tensor& sin,
                                                      c10::string_view layout, c10::string_view rotary_mode)
 {
     std::string layout_str = std::string(layout);
@@ -45,7 +45,7 @@ std::tuple<at::Tensor, at::Tensor> ApplyRotaryPosEmb(const at::Tensor &query, co
     at::Tensor query_out = query.clone();
     at::Tensor key_out = key.clone();
 
-    char *rotary_mode_ptr = const_cast<char *>(rotary_mode_str.c_str());
+    char* rotary_mode_ptr = const_cast<char*>(rotary_mode_str.c_str());
     ACLNN_CMD(aclnnApplyRotaryPosEmbV2, query_out, key_out, cos, sin, layout_value, rotary_mode_ptr);
 
     return std::make_tuple(query_out, key_out);

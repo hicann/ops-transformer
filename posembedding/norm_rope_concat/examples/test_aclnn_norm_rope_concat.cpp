@@ -33,19 +33,19 @@
 #define WARN_LOG(fmt, args...) fprintf(stdout, "[WARN]  " fmt "\n", ##args)
 #define ERROR_LOG(fmt, args...) fprintf(stderr, "[ERROR]  " fmt "\n", ##args)
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
-bool ReadFile(const std::string &filePath, size_t &fileSize, void *buffer, size_t bufferSize)
+bool ReadFile(const std::string& filePath, size_t& fileSize, void* buffer, size_t bufferSize)
 {
     struct stat sBuf;
     int fileStatus = stat(filePath.data(), &sBuf);
@@ -65,7 +65,7 @@ bool ReadFile(const std::string &filePath, size_t &fileSize, void *buffer, size_
         return false;
     }
 
-    std::filebuf *buf = file.rdbuf();
+    std::filebuf* buf = file.rdbuf();
     size_t size = buf->pubseekoff(0, std::ios::end, std::ios::in);
     if (size == 0) {
         ERROR_LOG("file size is 0");
@@ -78,13 +78,13 @@ bool ReadFile(const std::string &filePath, size_t &fileSize, void *buffer, size_
         return false;
     }
     buf->pubseekpos(0, std::ios::in);
-    buf->sgetn(static_cast<char *>(buffer), size);
+    buf->sgetn(static_cast<char*>(buffer), size);
     fileSize = size;
     file.close();
     return true;
 }
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -93,7 +93,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 固定写法，acl初始化
     auto ret = aclInit(nullptr);
@@ -110,8 +110,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **result)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** result)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -193,68 +193,68 @@ int main()
     std::vector<int64_t> normAddedKeyMeanShape = {batchSize, encoderKeySeq, headNum, 1};
     std::vector<int64_t> normAddedKeyRstdShape = {batchSize, encoderKeySeq, headNum, 1};
 
-    void *queryDeviceAddr = nullptr;
-    void *keyDeviceAddr = nullptr;
-    void *valueDeviceAddr = nullptr;
-    void *encoderQueryDeviceAddr = nullptr;
-    void *encoderKeyDeviceAddr = nullptr;
-    void *encoderValueDeviceAddr = nullptr;
+    void* queryDeviceAddr = nullptr;
+    void* keyDeviceAddr = nullptr;
+    void* valueDeviceAddr = nullptr;
+    void* encoderQueryDeviceAddr = nullptr;
+    void* encoderKeyDeviceAddr = nullptr;
+    void* encoderValueDeviceAddr = nullptr;
     // layernorm
-    void *normQueryWeightDeviceAddr = nullptr;
-    void *normQueryBiasDeviceAddr = nullptr;
-    void *normKeyWeightDeviceAddr = nullptr;
-    void *normKeyBiasDeviceAddr = nullptr;
-    void *normAddedQueryWeightDeviceAddr = nullptr;
-    void *normAddedQueryBiasDeviceAddr = nullptr;
-    void *normAddedKeyWeightDeviceAddr = nullptr;
-    void *normAddedKeyBiasDeviceAddr = nullptr;
+    void* normQueryWeightDeviceAddr = nullptr;
+    void* normQueryBiasDeviceAddr = nullptr;
+    void* normKeyWeightDeviceAddr = nullptr;
+    void* normKeyBiasDeviceAddr = nullptr;
+    void* normAddedQueryWeightDeviceAddr = nullptr;
+    void* normAddedQueryBiasDeviceAddr = nullptr;
+    void* normAddedKeyWeightDeviceAddr = nullptr;
+    void* normAddedKeyBiasDeviceAddr = nullptr;
     // rope
-    void *ropeSinDeviceAddr = nullptr;
-    void *ropeCosDeviceAddr = nullptr;
+    void* ropeSinDeviceAddr = nullptr;
+    void* ropeCosDeviceAddr = nullptr;
 
-    void *queryOutputDeviceAddr = nullptr;
-    void *keyOutputDeviceAddr = nullptr;
-    void *valueOutputDeviceAddr = nullptr;
+    void* queryOutputDeviceAddr = nullptr;
+    void* keyOutputDeviceAddr = nullptr;
+    void* valueOutputDeviceAddr = nullptr;
 
-    void *normQueryMeanDeviceAddr = nullptr;
-    void *normQueryRstdDeviceAddr = nullptr;
-    void *normKeyMeanDeviceAddr = nullptr;
-    void *normKeyRstdDeviceAddr = nullptr;
-    void *normAddedQueryMeanDeviceAddr = nullptr;
-    void *normAddedQueryRstdDeviceAddr = nullptr;
-    void *normAddedKeyMeanDeviceAddr = nullptr;
-    void *normAddedKeyRstdDeviceAddr = nullptr;
+    void* normQueryMeanDeviceAddr = nullptr;
+    void* normQueryRstdDeviceAddr = nullptr;
+    void* normKeyMeanDeviceAddr = nullptr;
+    void* normKeyRstdDeviceAddr = nullptr;
+    void* normAddedQueryMeanDeviceAddr = nullptr;
+    void* normAddedQueryRstdDeviceAddr = nullptr;
+    void* normAddedKeyMeanDeviceAddr = nullptr;
+    void* normAddedKeyRstdDeviceAddr = nullptr;
 
-    aclTensor *query = nullptr;
-    aclTensor *key = nullptr;
-    aclTensor *value = nullptr;
-    aclTensor *encoderQuery = nullptr;
-    aclTensor *encoderKey = nullptr;
-    aclTensor *encoderValue = nullptr;
-    aclTensor *normQueryWeight = nullptr;
-    aclTensor *normQueryBias = nullptr;
-    aclTensor *normKeyWeight = nullptr;
-    aclTensor *normKeyBias = nullptr;
-    aclTensor *normAddedQueryWeight = nullptr;
-    aclTensor *normAddedQueryBias = nullptr;
-    aclTensor *normAddedKeyWeight = nullptr;
-    aclTensor *normAddedKeyBias = nullptr;
+    aclTensor* query = nullptr;
+    aclTensor* key = nullptr;
+    aclTensor* value = nullptr;
+    aclTensor* encoderQuery = nullptr;
+    aclTensor* encoderKey = nullptr;
+    aclTensor* encoderValue = nullptr;
+    aclTensor* normQueryWeight = nullptr;
+    aclTensor* normQueryBias = nullptr;
+    aclTensor* normKeyWeight = nullptr;
+    aclTensor* normKeyBias = nullptr;
+    aclTensor* normAddedQueryWeight = nullptr;
+    aclTensor* normAddedQueryBias = nullptr;
+    aclTensor* normAddedKeyWeight = nullptr;
+    aclTensor* normAddedKeyBias = nullptr;
 
-    aclTensor *ropeSin = nullptr;
-    aclTensor *ropeCos = nullptr;
+    aclTensor* ropeSin = nullptr;
+    aclTensor* ropeCos = nullptr;
 
-    aclTensor *normQueryMean = nullptr;
-    aclTensor *normQueryRstd = nullptr;
-    aclTensor *normKeyMean = nullptr;
-    aclTensor *normKeyRstd = nullptr;
-    aclTensor *normAddedQueryMean = nullptr;
-    aclTensor *normAddedQueryRstd = nullptr;
-    aclTensor *normAddedKeyMean = nullptr;
-    aclTensor *normAddedKeyRstd = nullptr;
+    aclTensor* normQueryMean = nullptr;
+    aclTensor* normQueryRstd = nullptr;
+    aclTensor* normKeyMean = nullptr;
+    aclTensor* normKeyRstd = nullptr;
+    aclTensor* normAddedQueryMean = nullptr;
+    aclTensor* normAddedQueryRstd = nullptr;
+    aclTensor* normAddedKeyMean = nullptr;
+    aclTensor* normAddedKeyRstd = nullptr;
 
-    aclTensor *queryOutput = nullptr;
-    aclTensor *keyOutput = nullptr;
-    aclTensor *valueOutput = nullptr;
+    aclTensor* queryOutput = nullptr;
+    aclTensor* keyOutput = nullptr;
+    aclTensor* valueOutput = nullptr;
 
     std::vector<float> queryOutputHostData(batchSize * headNum * (querySeq * 2) + encoderQuerySeq * headDim, 0.0);
     std::vector<float> keyOutputHostData(batchSize * headNum * keySeq + encoderKeySeq * headDim, 0.0);
@@ -376,7 +376,7 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     bool isTraining = false;
     // 调用aclnnGeGluBackward第一段接口
     ret = aclnnNormRopeConcatGetWorkspaceSize(
@@ -388,7 +388,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNormRopeConcatGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
@@ -507,7 +507,6 @@ int main()
     for (int64_t i = 0; i < size; i++) {
         LOG_PRINT("normAddedKeyRstd result[%ld] is: %f\n", i, normAddedKeyRstdData[i]);
     }
-
 
     // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
     aclDestroyTensor(query);

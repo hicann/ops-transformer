@@ -50,12 +50,12 @@ int blockNum;
 int blockSize;
 
 extern "C" __global__ __aicore__ void qkv_rms_norm_rope_cache(
-    GM_ADDR qkv, GM_ADDR gamma_q, GM_ADDR gamma_k, GM_ADDR cos, GM_ADDR sin, GM_ADDR index, GM_ADDR q_out, GM_ADDR k_cache, GM_ADDR v_cache,
-    GM_ADDR k_scale, GM_ADDR v_scale, GM_ADDR k_offset, GM_ADDR v_offset, GM_ADDR qOut_out, GM_ADDR kCache_out, 
-    GM_ADDR vCache_out, GM_ADDR q_out_before_quant, GM_ADDR k_before_quant, GM_ADDR v_before_quant, GM_ADDR workspace, GM_ADDR tiling);
+    GM_ADDR qkv, GM_ADDR gamma_q, GM_ADDR gamma_k, GM_ADDR cos, GM_ADDR sin, GM_ADDR index, GM_ADDR q_out,
+    GM_ADDR k_cache, GM_ADDR v_cache, GM_ADDR k_scale, GM_ADDR v_scale, GM_ADDR k_offset, GM_ADDR v_offset,
+    GM_ADDR qOut_out, GM_ADDR kCache_out, GM_ADDR vCache_out, GM_ADDR q_out_before_quant, GM_ADDR k_before_quant,
+    GM_ADDR v_before_quant, GM_ADDR workspace, GM_ADDR tiling);
 
-class qkv_rms_norm_rope_cache_test : public testing::Test
-{
+class qkv_rms_norm_rope_cache_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -92,7 +92,7 @@ TEST_F(qkv_rms_norm_rope_cache_test, test_QkvRmsNormRopeCache_fp16_pa_nz_bath_qu
     size_t vCacheSize = blockNum * (Nv * dim / 32) * blockSize * 32 * sizeof(int8_t);
     size_t kScaleSize = Nk * dim * sizeof(float);
     size_t vScaleSize = Nv * dim * sizeof(float);
-    
+
     size_t qOutOutSize = batch_size * seq_len * Nq * dim * sizeof(DTYPE_QKV_fp16);
     size_t kCacheOutSize = blockNum * (Nk * dim / 32) * blockSize * 32 * sizeof(int8_t);
     size_t vCacheOutSize = blockNum * (Nv * dim / 32) * blockSize * 32 * sizeof(int8_t);
@@ -155,11 +155,11 @@ TEST_F(qkv_rms_norm_rope_cache_test, test_QkvRmsNormRopeCache_fp16_pa_nz_bath_qu
     tilingDatafromBin->isOutputQkv = false;
     tilingDatafromBin->isKQuant = 1;
     tilingDatafromBin->isVQuant = 1;
-    
+
     ICPU_SET_TILING_KEY(3);
-    ICPU_RUN_KF(
-        qkv_rms_norm_rope_cache, blockDim, qkv, gammaQ, gammaK, cos, sin, index, qOut, kCache, vCache, kScale, vScale,
-        nullptr, nullptr, qOutOut, kCacheOut, vCacheOut, qOutProtoOut, kCacheProtoOut, vCacheProtoOut, workspace, (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(qkv_rms_norm_rope_cache, blockDim, qkv, gammaQ, gammaK, cos, sin, index, qOut, kCache, vCache, kScale,
+                vScale, nullptr, nullptr, qOutOut, kCacheOut, vCacheOut, qOutProtoOut, kCacheProtoOut, vCacheProtoOut,
+                workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(qkv);
     AscendC::GmFree(gammaQ);
@@ -207,7 +207,7 @@ TEST_F(qkv_rms_norm_rope_cache_test, test_QkvRmsNormRopeCache_fp16_pa_nz_k_quant
     size_t vCacheSize = blockNum * (Nv * dim / 32) * blockSize * 32 * sizeof(int8_t);
     size_t kScaleSize = Nk * dim * sizeof(float);
     size_t vScaleSize = Nv * dim * sizeof(float);
-    
+
     size_t qOutOutSize = batch_size * seq_len * Nq * dim * sizeof(DTYPE_QKV_fp16);
     size_t kCacheOutSize = blockNum * (Nk * dim / 32) * blockSize * 32 * sizeof(int8_t);
     size_t vCacheOutSize = blockNum * (Nv * dim / 32) * blockSize * 32 * sizeof(int8_t);
@@ -270,11 +270,11 @@ TEST_F(qkv_rms_norm_rope_cache_test, test_QkvRmsNormRopeCache_fp16_pa_nz_k_quant
     tilingDatafromBin->isOutputQkv = false;
     tilingDatafromBin->isKQuant = 1;
     tilingDatafromBin->isVQuant = 0;
-    
+
     ICPU_SET_TILING_KEY(3);
-    ICPU_RUN_KF(
-        qkv_rms_norm_rope_cache, blockDim, qkv, gammaQ, gammaK, cos, sin, index, qOut, kCache, vCache, kScale, nullptr,
-        nullptr, nullptr, qOutOut, kCacheOut, vCacheOut, qOutProtoOut, kCacheProtoOut, vCacheProtoOut, workspace, (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(qkv_rms_norm_rope_cache, blockDim, qkv, gammaQ, gammaK, cos, sin, index, qOut, kCache, vCache, kScale,
+                nullptr, nullptr, nullptr, qOutOut, kCacheOut, vCacheOut, qOutProtoOut, kCacheProtoOut, vCacheProtoOut,
+                workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(qkv);
     AscendC::GmFree(gammaQ);
@@ -322,7 +322,7 @@ TEST_F(qkv_rms_norm_rope_cache_test, test_QkvRmsNormRopeCache_fp16_pa_nz_v_quant
     size_t vCacheSize = blockNum * (Nv * dim / 32) * blockSize * 32 * sizeof(int8_t);
     size_t kScaleSize = Nk * dim * sizeof(float);
     size_t vScaleSize = Nv * dim * sizeof(float);
-    
+
     size_t qOutOutSize = batch_size * seq_len * Nq * dim * sizeof(DTYPE_QKV_fp16);
     size_t kCacheOutSize = blockNum * (Nk * dim / 32) * blockSize * 32 * sizeof(int8_t);
     size_t vCacheOutSize = blockNum * (Nv * dim / 32) * blockSize * 32 * sizeof(int8_t);
@@ -385,11 +385,11 @@ TEST_F(qkv_rms_norm_rope_cache_test, test_QkvRmsNormRopeCache_fp16_pa_nz_v_quant
     tilingDatafromBin->isOutputQkv = false;
     tilingDatafromBin->isKQuant = 0;
     tilingDatafromBin->isVQuant = 1;
-    
+
     ICPU_SET_TILING_KEY(3);
-    ICPU_RUN_KF(
-        qkv_rms_norm_rope_cache, blockDim, qkv, gammaQ, gammaK, cos, sin, index, qOut, kCache, vCache, nullptr, vScale,
-        nullptr, nullptr, qOutOut, kCacheOut, vCacheOut, qOutProtoOut, kCacheProtoOut, vCacheProtoOut, workspace, (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(qkv_rms_norm_rope_cache, blockDim, qkv, gammaQ, gammaK, cos, sin, index, qOut, kCache, vCache, nullptr,
+                vScale, nullptr, nullptr, qOutOut, kCacheOut, vCacheOut, qOutProtoOut, kCacheProtoOut, vCacheProtoOut,
+                workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(qkv);
     AscendC::GmFree(gammaQ);
@@ -437,7 +437,7 @@ TEST_F(qkv_rms_norm_rope_cache_test, test_QkvRmsNormRopeCache_fp16_pa_nz_no_quan
     size_t vCacheSize = blockNum * (Nv * dim / 32) * blockSize * 32 * sizeof(int8_t);
     size_t kScaleSize = Nk * dim * sizeof(float);
     size_t vScaleSize = Nv * dim * sizeof(float);
-    
+
     size_t qOutOutSize = batch_size * seq_len * Nq * dim * sizeof(DTYPE_QKV_fp16);
     size_t kCacheOutSize = blockNum * (Nk * dim / 32) * blockSize * 32 * sizeof(int8_t);
     size_t vCacheOutSize = blockNum * (Nv * dim / 32) * blockSize * 32 * sizeof(int8_t);
@@ -500,11 +500,11 @@ TEST_F(qkv_rms_norm_rope_cache_test, test_QkvRmsNormRopeCache_fp16_pa_nz_no_quan
     tilingDatafromBin->isOutputQkv = false;
     tilingDatafromBin->isKQuant = 0;
     tilingDatafromBin->isVQuant = 0;
-    
+
     ICPU_SET_TILING_KEY(3);
-    ICPU_RUN_KF(
-        qkv_rms_norm_rope_cache, blockDim, qkv, gammaQ, gammaK, cos, sin, index, qOut, kCache, vCache, nullptr, nullptr,
-        nullptr, nullptr, qOutOut, kCacheOut, vCacheOut, qOutProtoOut, kCacheProtoOut, vCacheProtoOut, workspace, (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(qkv_rms_norm_rope_cache, blockDim, qkv, gammaQ, gammaK, cos, sin, index, qOut, kCache, vCache, nullptr,
+                nullptr, nullptr, nullptr, qOutOut, kCacheOut, vCacheOut, qOutProtoOut, kCacheProtoOut, vCacheProtoOut,
+                workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(qkv);
     AscendC::GmFree(gammaQ);

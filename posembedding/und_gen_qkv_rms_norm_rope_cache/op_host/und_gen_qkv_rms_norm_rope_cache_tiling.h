@@ -173,7 +173,7 @@ static_assert(IDX_WINDOW_TOKENS >= DIM_NUM_THREE * MAX_UB_FACTOR,
 
 class UndGenQkvRmsNormRopeCacheTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit UndGenQkvRmsNormRopeCacheTilingBase(gert::TilingContext *tilingContext)
+    explicit UndGenQkvRmsNormRopeCacheTilingBase(gert::TilingContext* tilingContext)
         : TilingBaseClass(tilingContext)
     {}
     ~UndGenQkvRmsNormRopeCacheTilingBase() override {}
@@ -234,7 +234,7 @@ protected:
 
 class UndGenQkvRmsNormRopeCacheRegbaseTiling : virtual public UndGenQkvRmsNormRopeCacheTilingBase {
 public:
-    explicit UndGenQkvRmsNormRopeCacheRegbaseTiling(gert::TilingContext *tilingContext)
+    explicit UndGenQkvRmsNormRopeCacheRegbaseTiling(gert::TilingContext* tilingContext)
         : UndGenQkvRmsNormRopeCacheTilingBase(tilingContext)
     {}
     ~UndGenQkvRmsNormRopeCacheRegbaseTiling() {}

@@ -26,12 +26,12 @@ constexpr int64_t TILING_KEY_BAB = 20020;
 
 class ApplyRotaryPosEmbTilingBAB : public ApplyRotaryPosEmbRegbaseTilingBaseClass {
 public:
-    explicit ApplyRotaryPosEmbTilingBAB(gert::TilingContext *context)
+    explicit ApplyRotaryPosEmbTilingBAB(gert::TilingContext* context)
         : ApplyRotaryPosEmbRegbaseTilingBaseClass(context)
     {}
     ~ApplyRotaryPosEmbTilingBAB() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         ApplyRotaryPosEmbRegbaseTilingBaseClass::Reset(context);
     }
@@ -232,7 +232,7 @@ ge::graphStatus ApplyRotaryPosEmbTilingBAB::PostTiling()
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
     context_->SetBlockDim(usedCoreNum_);
     context_->SetTilingKey(tilingKey_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = WORK_SPACE_SIZE;
     PrintTilingData();
     return ge::GRAPH_SUCCESS;

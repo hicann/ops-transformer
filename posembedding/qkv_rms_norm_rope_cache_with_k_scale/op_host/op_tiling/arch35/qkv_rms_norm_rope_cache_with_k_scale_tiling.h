@@ -27,8 +27,8 @@ struct QkvRmsNormRopeCacheWithKScaleCompileInfo {
     uint64_t opWorkspaceSize = 0;
 };
 
-ge::graphStatus Tiling4QkvRmsNormRopeCacheWithKScale(gert::TilingContext *context);
-ge::graphStatus TilingPrepare4QkvRmsNormRopeCacheWithKScale(gert::TilingParseContext *context);
+ge::graphStatus Tiling4QkvRmsNormRopeCacheWithKScale(gert::TilingContext* context);
+ge::graphStatus TilingPrepare4QkvRmsNormRopeCacheWithKScale(gert::TilingParseContext* context);
 
 } // namespace optiling
 

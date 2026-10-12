@@ -42,12 +42,17 @@ class MethodApplyRotaryPosEmb(BaseApi):
 
     def __call__(self, input_data: InputDataset, with_output: bool = False):
         if self.device == "cpu":
-            output = self.golden(input_data.kwargs["queryRef"], input_data.kwargs["keyRef"], input_data.kwargs["cos"], input_data.kwargs["sin"])
+            output = self.golden(
+                input_data.kwargs["queryRef"],
+                input_data.kwargs["keyRef"],
+                input_data.kwargs["cos"],
+                input_data.kwargs["sin"],
+            )
             return output
 
     def get_aclnn_func_signature_type(self):
         return "aclnnStatus aclnnApplyRotaryPosEmbGetWorkspaceSize(aclTensor* queryRef, aclTensor* keyRef, const aclTensor* cos, const aclTensor* sin, int64_t layout, uint64_t* workspaceSize, aclOpExecutor** executor)"
-    
+
 
 @register("aclnn_apply_rotary_pos_emb")
 class ApplyRotaryPosEmbAclnnApi(AclnnBaseApi):

@@ -71,7 +71,7 @@ __aicore__ inline void SToMTE3Sync()
 template <typename QKV_DTYPE, typename K_DTYPE, typename V_DTYPE>
 class KernelQkvRmsNormRopeCacheBase {
 public:
-    __aicore__ inline KernelQkvRmsNormRopeCacheBase(TPipe *pipe, const QkvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline KernelQkvRmsNormRopeCacheBase(TPipe* pipe, const QkvRmsNormRopeCacheTilingData* tiling)
         : pipe_(pipe),
           tilingData_(tiling)
     {}
@@ -95,8 +95,8 @@ protected:
     int64_t numHeadV{1};
 
     // Sahred members
-    TPipe *pipe_ = nullptr;
-    const QkvRmsNormRopeCacheTilingData *tilingData_;
+    TPipe* pipe_ = nullptr;
+    const QkvRmsNormRopeCacheTilingData* tilingData_;
 
     GlobalTensor<QKV_DTYPE> qkvGm, gammaQGm, gammaKGm, cosGm, sinGm, qOutGm;
     GlobalTensor<K_DTYPE> kCacheGm;
@@ -110,7 +110,7 @@ protected:
 template <typename QKV_DTYPE, typename K_DTYPE, typename V_DTYPE>
 class KernelQkvRmsNormRopeCacheCutBSN : public KernelQkvRmsNormRopeCacheBase<QKV_DTYPE, K_DTYPE, V_DTYPE> {
 public:
-    __aicore__ inline KernelQkvRmsNormRopeCacheCutBSN(TPipe *pipe, const QkvRmsNormRopeCacheTilingData *tiling)
+    __aicore__ inline KernelQkvRmsNormRopeCacheCutBSN(TPipe* pipe, const QkvRmsNormRopeCacheTilingData* tiling)
         : KernelQkvRmsNormRopeCacheBase<QKV_DTYPE, K_DTYPE, V_DTYPE>(pipe, tiling)
     {}
 

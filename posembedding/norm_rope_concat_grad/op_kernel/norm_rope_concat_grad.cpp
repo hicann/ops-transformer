@@ -49,61 +49,222 @@ extern "C" __global__ __aicore__ void norm_rope_concat_grad(
 {
     GET_TILING_DATA(tilingData, tiling);
     AscendC::TPipe pipe;
-    Impl(0, NormType::NONE, NormType::NONE, RopeType::NONE, ConcatOrder::BEFORE_ENCODER)
-        Impl(10, NormType::NONE, NormType::NONE, RopeType::NONE, ConcatOrder::AFTER_ENCODER)
-            Impl(100, NormType::NONE, NormType::NONE, RopeType::INTERLEAVE, ConcatOrder::BEFORE_ENCODER)
-                Impl(110, NormType::NONE, NormType::NONE, RopeType::INTERLEAVE, ConcatOrder::AFTER_ENCODER)
-                    Impl(200, NormType::NONE, NormType::NONE, RopeType::HALF, ConcatOrder::BEFORE_ENCODER)
-                        Impl(210, NormType::NONE, NormType::NONE, RopeType::HALF, ConcatOrder::AFTER_ENCODER)
+    Impl(0, NormType::NONE, NormType::NONE, RopeType::NONE, ConcatOrder::BEFORE_ENCODER) Impl(
+        10, NormType::NONE, NormType::NONE, RopeType::NONE, ConcatOrder::AFTER_ENCODER)
+        Impl(100, NormType::NONE, NormType::NONE, RopeType::INTERLEAVE, ConcatOrder::BEFORE_ENCODER) Impl(
+            110, NormType::NONE, NormType::NONE, RopeType::INTERLEAVE,
+            ConcatOrder::AFTER_ENCODER) Impl(200, NormType::NONE, NormType::NONE, RopeType::HALF,
+                                             ConcatOrder::BEFORE_ENCODER) Impl(210, NormType::NONE, NormType::NONE,
+                                                                               RopeType::HALF,
+                                                                               ConcatOrder::AFTER_ENCODER)
 
-                            Impl(100000, NormType::NONE, NormType::LAYER_NORM, RopeType::NONE, ConcatOrder::BEFORE_ENCODER)
-                                Impl(100010, NormType::NONE, NormType::LAYER_NORM, RopeType::NONE, ConcatOrder::AFTER_ENCODER)
-                                    Impl(100100, NormType::NONE, NormType::LAYER_NORM, RopeType::INTERLEAVE, ConcatOrder::BEFORE_ENCODER)
-                                        Impl(100110, NormType::NONE, NormType::LAYER_NORM, RopeType::INTERLEAVE, ConcatOrder::AFTER_ENCODER)
-                                            Impl(100200, NormType::NONE, NormType::LAYER_NORM, RopeType::HALF, ConcatOrder::BEFORE_ENCODER)
-                                                Impl(100210, NormType::NONE, NormType::LAYER_NORM, RopeType::HALF, ConcatOrder::AFTER_ENCODER)
-                                                    Impl(200000, NormType::NONE, NormType::LAYER_NORM_AFFINE, RopeType::NONE, ConcatOrder::BEFORE_ENCODER)
-                                                        Impl(200010, NormType::NONE, NormType::LAYER_NORM_AFFINE, RopeType::NONE, ConcatOrder::AFTER_ENCODER)
-                                                            Impl(200100, NormType::NONE, NormType::LAYER_NORM_AFFINE, RopeType::INTERLEAVE, ConcatOrder::BEFORE_ENCODER)
-                                                                Impl(200110, NormType::NONE, NormType::LAYER_NORM_AFFINE, RopeType::INTERLEAVE, ConcatOrder::AFTER_ENCODER)
-                                                                    Impl(200200, NormType::NONE, NormType::LAYER_NORM_AFFINE, RopeType::HALF, ConcatOrder::BEFORE_ENCODER)
-                                                                        Impl(200210, NormType::NONE, NormType::LAYER_NORM_AFFINE, RopeType::HALF, ConcatOrder::AFTER_ENCODER)
+            Impl(100000, NormType::NONE, NormType::LAYER_NORM, RopeType::NONE, ConcatOrder::BEFORE_ENCODER) Impl(
+                100010, NormType::NONE, NormType::LAYER_NORM, RopeType::NONE,
+                ConcatOrder::AFTER_ENCODER) Impl(100100, NormType::NONE, NormType::LAYER_NORM, RopeType::INTERLEAVE,
+                                                 ConcatOrder::BEFORE_ENCODER)
+                Impl(100110, NormType::NONE, NormType::LAYER_NORM, RopeType::INTERLEAVE,
+                     ConcatOrder::AFTER_ENCODER) Impl(100200, NormType::NONE, NormType::LAYER_NORM, RopeType::HALF,
+                                                      ConcatOrder::BEFORE_ENCODER)
+                    Impl(100210, NormType::NONE, NormType::LAYER_NORM, RopeType::HALF, ConcatOrder::AFTER_ENCODER) Impl(
+                        200000, NormType::NONE, NormType::LAYER_NORM_AFFINE, RopeType::NONE,
+                        ConcatOrder::BEFORE_ENCODER) Impl(200010, NormType::NONE, NormType::LAYER_NORM_AFFINE,
+                                                          RopeType::NONE, ConcatOrder::AFTER_ENCODER)
+                        Impl(200100, NormType::NONE, NormType::LAYER_NORM_AFFINE, RopeType::INTERLEAVE,
+                             ConcatOrder::BEFORE_ENCODER) Impl(200110, NormType::NONE, NormType::LAYER_NORM_AFFINE,
+                                                               RopeType::INTERLEAVE, ConcatOrder::AFTER_ENCODER)
+                            Impl(200200, NormType::NONE, NormType::LAYER_NORM_AFFINE, RopeType::HALF,
+                                 ConcatOrder::BEFORE_ENCODER) Impl(200210, NormType::NONE, NormType::LAYER_NORM_AFFINE,
+                                                                   RopeType::HALF,
+                                                                   ConcatOrder::AFTER_ENCODER)
 
-                                                                            Impl(100000000, NormType::LAYER_NORM, NormType::NONE, RopeType::NONE, ConcatOrder::BEFORE_ENCODER)
-                                                                                Impl(100000010, NormType::LAYER_NORM, NormType::NONE, RopeType::NONE, ConcatOrder::AFTER_ENCODER)
-                                                                                    Impl(100000100, NormType::LAYER_NORM, NormType::NONE, RopeType::INTERLEAVE, ConcatOrder::BEFORE_ENCODER)
-                                                                                        Impl(100000110, NormType::LAYER_NORM, NormType::NONE, RopeType::INTERLEAVE, ConcatOrder::AFTER_ENCODER)
-                                                                                            Impl(100000200, NormType::LAYER_NORM, NormType::NONE, RopeType::HALF, ConcatOrder::BEFORE_ENCODER)
-                                                                                                Impl(100000210, NormType::LAYER_NORM, NormType::NONE, RopeType::HALF, ConcatOrder::AFTER_ENCODER)
-                                                                                                    Impl(100100000, NormType::LAYER_NORM, NormType::LAYER_NORM, RopeType::NONE, ConcatOrder::BEFORE_ENCODER)
-                                                                                                        Impl(100100010, NormType::LAYER_NORM, NormType::LAYER_NORM, RopeType::NONE, ConcatOrder::AFTER_ENCODER)
-                                                                                                            Impl(100100100, NormType::LAYER_NORM, NormType::LAYER_NORM, RopeType::INTERLEAVE, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                Impl(100100110, NormType::LAYER_NORM, NormType::LAYER_NORM, RopeType::INTERLEAVE, ConcatOrder::AFTER_ENCODER)
-                                                                                                                    Impl(100100200, NormType::LAYER_NORM, NormType::LAYER_NORM, RopeType::HALF, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                        Impl(100100210, NormType::LAYER_NORM, NormType::LAYER_NORM, RopeType::HALF, ConcatOrder::AFTER_ENCODER)
-                                                                                                                            Impl(100200000, NormType::LAYER_NORM, NormType::LAYER_NORM_AFFINE, RopeType::NONE, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                                Impl(100200010, NormType::LAYER_NORM, NormType::LAYER_NORM_AFFINE, RopeType::NONE, ConcatOrder::AFTER_ENCODER)
-                                                                                                                                    Impl(100200100, NormType::LAYER_NORM, NormType::LAYER_NORM_AFFINE, RopeType::INTERLEAVE, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                                        Impl(100200110, NormType::LAYER_NORM, NormType::LAYER_NORM_AFFINE, RopeType::INTERLEAVE, ConcatOrder::AFTER_ENCODER)
-                                                                                                                                            Impl(100200200, NormType::LAYER_NORM, NormType::LAYER_NORM_AFFINE, RopeType::HALF, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                                                Impl(100200210, NormType::LAYER_NORM, NormType::LAYER_NORM_AFFINE, RopeType::HALF, ConcatOrder::AFTER_ENCODER)
+                                Impl(100000000, NormType::LAYER_NORM, NormType::NONE, RopeType::NONE,
+                                     ConcatOrder::BEFORE_ENCODER) Impl(100000010, NormType::LAYER_NORM, NormType::NONE,
+                                                                       RopeType::NONE,
+                                                                       ConcatOrder::AFTER_ENCODER)
+                                    Impl(100000100, NormType::LAYER_NORM, NormType::NONE, RopeType::INTERLEAVE,
+                                         ConcatOrder::BEFORE_ENCODER)
+                                        Impl(100000110, NormType::LAYER_NORM, NormType::NONE, RopeType::INTERLEAVE,
+                                             ConcatOrder::AFTER_ENCODER) Impl(100000200, NormType::LAYER_NORM,
+                                                                              NormType::NONE, RopeType::HALF,
+                                                                              ConcatOrder::BEFORE_ENCODER)
+                                            Impl(100000210, NormType::LAYER_NORM, NormType::NONE, RopeType::HALF,
+                                                 ConcatOrder::AFTER_ENCODER) Impl(100100000, NormType::LAYER_NORM,
+                                                                                  NormType::LAYER_NORM, RopeType::NONE,
+                                                                                  ConcatOrder::BEFORE_ENCODER)
+                                                Impl(100100010, NormType::LAYER_NORM, NormType::LAYER_NORM,
+                                                     RopeType::NONE,
+                                                     ConcatOrder::AFTER_ENCODER) Impl(100100100, NormType::LAYER_NORM,
+                                                                                      NormType::LAYER_NORM,
+                                                                                      RopeType::INTERLEAVE,
+                                                                                      ConcatOrder::BEFORE_ENCODER)
+                                                    Impl(100100110, NormType::LAYER_NORM, NormType::LAYER_NORM,
+                                                         RopeType::INTERLEAVE,
+                                                         ConcatOrder::
+                                                             AFTER_ENCODER) Impl(100100200, NormType::LAYER_NORM,
+                                                                                 NormType::LAYER_NORM,
+                                                                                 RopeType::HALF, ConcatOrder::BEFORE_ENCODER)
+                                                        Impl(100100210, NormType::LAYER_NORM, NormType::LAYER_NORM,
+                                                             RopeType::HALF,
+                                                             ConcatOrder::AFTER_ENCODER)
+                                                            Impl(100200000, NormType::LAYER_NORM,
+                                                                 NormType::LAYER_NORM_AFFINE, RopeType::NONE,
+                                                                 ConcatOrder::BEFORE_ENCODER)
+                                                                Impl(
+                                                                    100200010,
+                                                                    NormType::LAYER_NORM, NormType::LAYER_NORM_AFFINE,
+                                                                    RopeType::NONE,
+                                                                    ConcatOrder::
+                                                                        AFTER_ENCODER) Impl(100200100,
+                                                                                            NormType::LAYER_NORM,
+                                                                                            NormType::LAYER_NORM_AFFINE,
+                                                                                            RopeType::INTERLEAVE,
+                                                                                            ConcatOrder::
+                                                                                                BEFORE_ENCODER)
+                                                                    Impl(100200110, NormType::LAYER_NORM,
+                                                                         NormType::LAYER_NORM_AFFINE,
+                                                                         RopeType::INTERLEAVE,
+                                                                         ConcatOrder::AFTER_ENCODER)
+                                                                        Impl(100200200, NormType::LAYER_NORM,
+                                                                             NormType::LAYER_NORM_AFFINE,
+                                                                             RopeType::HALF,
+                                                                             ConcatOrder::
+                                                                                 BEFORE_ENCODER) Impl(100200210,
+                                                                                                      NormType::LAYER_NORM, NormType::LAYER_NORM_AFFINE,
+                                                                                                      RopeType::HALF,
+                                                                                                      ConcatOrder::AFTER_ENCODER)
 
-                                                                                                                                                    Impl(200000000, NormType::LAYER_NORM_AFFINE, NormType::NONE, RopeType::NONE, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                                                        Impl(200000010, NormType::LAYER_NORM_AFFINE, NormType::NONE, RopeType::NONE, ConcatOrder::AFTER_ENCODER)
-                                                                                                                                                            Impl(200000100, NormType::LAYER_NORM_AFFINE, NormType::NONE, RopeType::INTERLEAVE, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                                                                Impl(200000110, NormType::LAYER_NORM_AFFINE, NormType::NONE, RopeType::INTERLEAVE, ConcatOrder::AFTER_ENCODER)
-                                                                                                                                                                    Impl(200000200, NormType::LAYER_NORM_AFFINE, NormType::NONE, RopeType::HALF, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                                                                        Impl(200000210, NormType::LAYER_NORM_AFFINE, NormType::NONE, RopeType::HALF, ConcatOrder::AFTER_ENCODER)
-                                                                                                                                                                            Impl(200100000, NormType::LAYER_NORM_AFFINE, NormType::LAYER_NORM, RopeType::NONE, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                                                                                Impl(200100010, NormType::LAYER_NORM_AFFINE, NormType::LAYER_NORM, RopeType::NONE, ConcatOrder::AFTER_ENCODER)
-                                                                                                                                                                                    Impl(200100100, NormType::LAYER_NORM_AFFINE, NormType::LAYER_NORM, RopeType::INTERLEAVE, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                                                                                        Impl(200100110, NormType::LAYER_NORM_AFFINE, NormType::LAYER_NORM, RopeType::INTERLEAVE, ConcatOrder::AFTER_ENCODER)
-                                                                                                                                                                                            Impl(200100200, NormType::LAYER_NORM_AFFINE, NormType::LAYER_NORM, RopeType::HALF, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                                                                                                Impl(200100210, NormType::LAYER_NORM_AFFINE, NormType::LAYER_NORM, RopeType::HALF, ConcatOrder::AFTER_ENCODER)
-                                                                                                                                                                                                    Impl(200200000, NormType::LAYER_NORM_AFFINE, NormType::LAYER_NORM_AFFINE, RopeType::NONE, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                                                                                                        Impl(200200010, NormType::LAYER_NORM_AFFINE, NormType::LAYER_NORM_AFFINE, RopeType::NONE, ConcatOrder::AFTER_ENCODER)
-                                                                                                                                                                                                            Impl(200200100, NormType::LAYER_NORM_AFFINE, NormType::LAYER_NORM_AFFINE, RopeType::INTERLEAVE, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                                                                                                                Impl(200200110, NormType::LAYER_NORM_AFFINE, NormType::LAYER_NORM_AFFINE, RopeType::INTERLEAVE, ConcatOrder::AFTER_ENCODER)
-                                                                                                                                                                                                                    Impl(200200200, NormType::LAYER_NORM_AFFINE, NormType::LAYER_NORM_AFFINE, RopeType::HALF, ConcatOrder::BEFORE_ENCODER)
-                                                                                                                                                                                                                        Impl(200200210, NormType::LAYER_NORM_AFFINE, NormType::LAYER_NORM_AFFINE, RopeType::HALF, ConcatOrder::AFTER_ENCODER)
+                                                                            Impl(200000000, NormType::LAYER_NORM_AFFINE,
+                                                                                 NormType::NONE,
+                                                                                 RopeType::NONE,
+                                                                                 ConcatOrder::
+                                                                                     BEFORE_ENCODER) Impl(200000010,
+                                                                                                          NormType::LAYER_NORM_AFFINE,
+                                                                                                          NormType::NONE,
+                                                                                                          RopeType::NONE,
+                                                                                                          ConcatOrder::AFTER_ENCODER)
+                                                                                Impl(200000100,
+                                                                                     NormType::LAYER_NORM_AFFINE,
+                                                                                     NormType::NONE,
+                                                                                     RopeType::INTERLEAVE,
+                                                                                     ConcatOrder::
+                                                                                         BEFORE_ENCODER) Impl(200000110,
+                                                                                                              NormType::LAYER_NORM_AFFINE,
+                                                                                                              NormType::NONE,
+                                                                                                              RopeType::INTERLEAVE, ConcatOrder::AFTER_ENCODER)
+                                                                                    Impl(200000200,
+                                                                                         NormType::LAYER_NORM_AFFINE,
+                                                                                         NormType::NONE,
+                                                                                         RopeType::HALF,
+                                                                                         ConcatOrder::
+                                                                                             BEFORE_ENCODER) Impl(200000210,
+                                                                                                                  NormType::LAYER_NORM_AFFINE,
+                                                                                                                  NormType::NONE,
+                                                                                                                  RopeType::HALF,
+                                                                                                                  ConcatOrder::AFTER_ENCODER)
+                                                                                        Impl(200100000,
+                                                                                             NormType::
+                                                                                                 LAYER_NORM_AFFINE,
+                                                                                             NormType::LAYER_NORM,
+                                                                                             RopeType::NONE,
+                                                                                             ConcatOrder::
+                                                                                                 BEFORE_ENCODER) Impl(200100010,
+                                                                                                                      NormType::LAYER_NORM_AFFINE,
+                                                                                                                      NormType::LAYER_NORM, RopeType::NONE,
+                                                                                                                      ConcatOrder::AFTER_ENCODER)
+                                                                                            Impl(200100100,
+                                                                                                 NormType::
+                                                                                                     LAYER_NORM_AFFINE,
+                                                                                                 NormType::LAYER_NORM,
+                                                                                                 RopeType::INTERLEAVE,
+                                                                                                 ConcatOrder::
+                                                                                                     BEFORE_ENCODER)
+                                                                                                Impl(
+                                                                                                    200100110,
+                                                                                                    NormType::
+                                                                                                        LAYER_NORM_AFFINE,
+                                                                                                    NormType::
+                                                                                                        LAYER_NORM,
+                                                                                                    RopeType::
+                                                                                                        INTERLEAVE,
+                                                                                                    ConcatOrder::
+                                                                                                        AFTER_ENCODER)
+                                                                                                    Impl(
+                                                                                                        200100200,
+                                                                                                        NormType::
+                                                                                                            LAYER_NORM_AFFINE,
+                                                                                                        NormType::
+                                                                                                            LAYER_NORM,
+                                                                                                        RopeType::HALF,
+                                                                                                        ConcatOrder::
+                                                                                                            BEFORE_ENCODER)
+                                                                                                        Impl(
+                                                                                                            200100210,
+                                                                                                            NormType::
+                                                                                                                LAYER_NORM_AFFINE,
+                                                                                                            NormType::
+                                                                                                                LAYER_NORM,
+                                                                                                            RopeType::
+                                                                                                                HALF,
+                                                                                                            ConcatOrder::
+                                                                                                                AFTER_ENCODER)
+                                                                                                            Impl(
+                                                                                                                200200000,
+                                                                                                                NormType::
+                                                                                                                    LAYER_NORM_AFFINE,
+                                                                                                                NormType::
+                                                                                                                    LAYER_NORM_AFFINE,
+                                                                                                                RopeType::
+                                                                                                                    NONE,
+                                                                                                                ConcatOrder::
+                                                                                                                    BEFORE_ENCODER)
+                                                                                                                Impl(
+                                                                                                                    200200010,
+                                                                                                                    NormType::
+                                                                                                                        LAYER_NORM_AFFINE,
+                                                                                                                    NormType::
+                                                                                                                        LAYER_NORM_AFFINE,
+                                                                                                                    RopeType::
+                                                                                                                        NONE,
+                                                                                                                    ConcatOrder::
+                                                                                                                        AFTER_ENCODER)
+                                                                                                                    Impl(
+                                                                                                                        200200100,
+                                                                                                                        NormType::
+                                                                                                                            LAYER_NORM_AFFINE,
+                                                                                                                        NormType::
+                                                                                                                            LAYER_NORM_AFFINE,
+                                                                                                                        RopeType::
+                                                                                                                            INTERLEAVE,
+                                                                                                                        ConcatOrder::
+                                                                                                                            BEFORE_ENCODER)
+                                                                                                                        Impl(
+                                                                                                                            200200110,
+                                                                                                                            NormType::
+                                                                                                                                LAYER_NORM_AFFINE,
+                                                                                                                            NormType::
+                                                                                                                                LAYER_NORM_AFFINE,
+                                                                                                                            RopeType::
+                                                                                                                                INTERLEAVE,
+                                                                                                                            ConcatOrder::
+                                                                                                                                AFTER_ENCODER)
+                                                                                                                            Impl(
+                                                                                                                                200200200,
+                                                                                                                                NormType::
+                                                                                                                                    LAYER_NORM_AFFINE,
+                                                                                                                                NormType::
+                                                                                                                                    LAYER_NORM_AFFINE,
+                                                                                                                                RopeType::
+                                                                                                                                    HALF,
+                                                                                                                                ConcatOrder::
+                                                                                                                                    BEFORE_ENCODER)
+                                                                                                                                Impl(
+                                                                                                                                    200200210,
+                                                                                                                                    NormType::
+                                                                                                                                        LAYER_NORM_AFFINE,
+                                                                                                                                    NormType::
+                                                                                                                                        LAYER_NORM_AFFINE,
+                                                                                                                                    RopeType::
+                                                                                                                                        HALF,
+                                                                                                                                    ConcatOrder::
+                                                                                                                                        AFTER_ENCODER)
 }

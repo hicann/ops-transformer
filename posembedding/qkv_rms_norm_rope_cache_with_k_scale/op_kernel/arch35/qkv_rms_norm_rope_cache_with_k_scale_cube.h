@@ -22,7 +22,7 @@ constexpr uint8_t QKV_K_SCALE_FIXPIPE_DUAL_DST_SPLIT_M = 1;
 template <uint32_t ROPE_MODE>
 class QkvRmsNormRopeCacheWithKScaleCube {
 public:
-    __aicore__ inline void Init(const GlobalTensors &tensors, const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData)
+    __aicore__ inline void Init(const GlobalTensors& tensors, const QkvRmsNormRopeCacheWithKScaleTilingData* tilingData)
     {
         qHeadNum_ = tilingData->qHeadNum;
         kvHeadNum_ = tilingData->kvHeadNum;
@@ -55,7 +55,7 @@ public:
         WaitFlag<HardEvent::MTE1_M>(static_cast<event_t>(EVT_MTE1_TO_MMAD_ROTATION_READY));
     }
 
-    __aicore__ inline void ComputeTile(const TileParam &tile, const LocalTensor<bfloat16_t> &aRotL1Nz,
+    __aicore__ inline void ComputeTile(const TileParam& tile, const LocalTensor<bfloat16_t>& aRotL1Nz,
                                        LocalTensor<float> qkAfterCubeUb)
     {
         const uint32_t l0cBufferId = static_cast<uint32_t>(l0cBufferUseId_ % AIC_L0C_BUFFER_NUM);
@@ -75,7 +75,7 @@ public:
         ++l0cBufferUseId_;
     }
 
-    __aicore__ inline void FixpipeQToGm(const TileParam &tile)
+    __aicore__ inline void FixpipeQToGm(const TileParam& tile)
     {
         if constexpr (!IS_MROPE) {
             return;
@@ -134,7 +134,7 @@ private:
         LoadData(l0b_, rotationL1Nz_, loadDataParams);
     }
 
-    __aicore__ inline void ComputePreprocessedQkToL0C(const LocalTensor<bfloat16_t> &aRotL1Nz, uint64_t qRows,
+    __aicore__ inline void ComputePreprocessedQkToL0C(const LocalTensor<bfloat16_t>& aRotL1Nz, uint64_t qRows,
                                                       uint64_t kRows, uint32_t bufferId, uint64_t kL0cOffset)
     {
         if (qRows == 0U && kRows == 0U) {
@@ -153,8 +153,8 @@ private:
         }
     }
 
-    __aicore__ inline void ComputeSegmentToL0C(uint64_t segmentRows, const LocalTensor<bfloat16_t> &segmentL1Nz,
-                                               uint32_t l0cBufferId, uint64_t l0cOffset, uint32_t &l0aBufferUseId)
+    __aicore__ inline void ComputeSegmentToL0C(uint64_t segmentRows, const LocalTensor<bfloat16_t>& segmentL1Nz,
+                                               uint32_t l0cBufferId, uint64_t l0cOffset, uint32_t& l0aBufferUseId)
     {
         if (segmentRows == 0U) {
             return;
@@ -183,7 +183,7 @@ private:
     }
 
     __aicore__ inline void LoadAToL0(uint64_t segmentRows, uint64_t mSize, uint64_t dStart, uint64_t dSize,
-                                     uint32_t bufferId, const LocalTensor<bfloat16_t> &segmentL1Nz)
+                                     uint32_t bufferId, const LocalTensor<bfloat16_t>& segmentL1Nz)
     {
         if (mSize == 0U) {
             return;
@@ -204,7 +204,7 @@ private:
 
     __aicore__ inline void ComputeMmad(uint64_t mSize, uint64_t dSize, bool initC, bool updateUnitFlag,
                                        uint32_t l0aBufferId, uint32_t l0cBufferId,
-                                       const LocalTensor<bfloat16_t> &rotationL0bChunk, uint64_t l0cOffset)
+                                       const LocalTensor<bfloat16_t>& rotationL0bChunk, uint64_t l0cOffset)
     {
         if (mSize == 0U) {
             return;
@@ -222,7 +222,7 @@ private:
     }
 
     __aicore__ inline void FixpipeSegmentToAivUb(uint64_t segmentRows, uint64_t dstBaseRow, uint32_t bufferId,
-                                                 uint64_t l0cBaseOffset, const LocalTensor<float> &qkAfterCubeUb)
+                                                 uint64_t l0cBaseOffset, const LocalTensor<float>& qkAfterCubeUb)
     {
         if (segmentRows == 0U) {
             return;
@@ -279,11 +279,11 @@ private:
         l0c_ = LocalTensor<float>(TPosition::CO1, 0, AIC_L0C_BUFFER_ELEMENTS);
     }
 
-    __aicore__ inline void BindGlobalTensors(const GlobalTensors &tensors)
+    __aicore__ inline void BindGlobalTensors(const GlobalTensors& tensors)
     {
-        rotationGm_.SetGlobalBuffer((__gm__ bfloat16_t *)tensors.rotation);
+        rotationGm_.SetGlobalBuffer((__gm__ bfloat16_t*)tensors.rotation);
         if constexpr (IS_MROPE) {
-            qOutBf16Gm_.SetGlobalBuffer((__gm__ bfloat16_t *)tensors.qOut);
+            qOutBf16Gm_.SetGlobalBuffer((__gm__ bfloat16_t*)tensors.qOut);
         }
     }
 

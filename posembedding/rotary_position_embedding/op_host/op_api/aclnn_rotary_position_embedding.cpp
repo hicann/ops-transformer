@@ -35,8 +35,8 @@ static bool IsAscend950()
     return GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
 }
 
-static aclnnStatus CheckDtype(const aclTensor *x, const aclTensor *cos, const aclTensor *sin, const aclTensor *rotate,
-                              const aclTensor *out)
+static aclnnStatus CheckDtype(const aclTensor* x, const aclTensor* cos, const aclTensor* sin, const aclTensor* rotate,
+                              const aclTensor* out)
 {
     // Keep nullptr handling in the existing preprocessing path. This function is
     // responsible only for validating tensors that are present.
@@ -71,7 +71,7 @@ static aclnnStatus CheckDtype(const aclTensor *x, const aclTensor *cos, const ac
     return ACLNN_SUCCESS;
 }
 
-static inline bool TensorContiguousProcess(const aclTensor *&contiguousTensor, aclOpExecutor *executor)
+static inline bool TensorContiguousProcess(const aclTensor*& contiguousTensor, aclOpExecutor* executor)
 {
     if (contiguousTensor == nullptr) {
         OP_LOGD("RotaryPositionEmbedding no need to do contiguous process.");
@@ -83,8 +83,8 @@ static inline bool TensorContiguousProcess(const aclTensor *&contiguousTensor, a
     return true;
 }
 
-static aclnnStatus PreProcess(const aclTensor *&x, const aclTensor *&cos, const aclTensor *&sin,
-                              const aclTensor *&rotate, aclOpExecutor *executor)
+static aclnnStatus PreProcess(const aclTensor*& x, const aclTensor*& cos, const aclTensor*& sin,
+                              const aclTensor*& rotate, aclOpExecutor* executor)
 {
     CHECK_RET(TensorContiguousProcess(x, executor), ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(TensorContiguousProcess(cos, executor), ACLNN_ERR_INNER_NULLPTR);
@@ -93,9 +93,9 @@ static aclnnStatus PreProcess(const aclTensor *&x, const aclTensor *&cos, const 
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus RotaryPositionEmbeddingCommonProcess(const aclTensor *x, const aclTensor *cos, const aclTensor *sin,
-                                                        const aclTensor *rotate, int64_t mode, aclTensor *out,
-                                                        aclOpExecutor *executor)
+static aclnnStatus RotaryPositionEmbeddingCommonProcess(const aclTensor* x, const aclTensor* cos, const aclTensor* sin,
+                                                        const aclTensor* rotate, int64_t mode, aclTensor* out,
+                                                        aclOpExecutor* executor)
 {
     aclnnStatus ret = ACLNN_SUCCESS;
     if (IsAscend950()) {
@@ -103,10 +103,10 @@ static aclnnStatus RotaryPositionEmbeddingCommonProcess(const aclTensor *x, cons
         CHECK_RET(ret == ACLNN_SUCCESS, ret);
     }
 
-    const aclTensor *xProcessed = x;
-    const aclTensor *cosProcessed = cos;
-    const aclTensor *sinProcessed = sin;
-    const aclTensor *rotateProcessed = rotate;
+    const aclTensor* xProcessed = x;
+    const aclTensor* cosProcessed = cos;
+    const aclTensor* sinProcessed = sin;
+    const aclTensor* rotateProcessed = rotate;
 
     ret = PreProcess(xProcessed, cosProcessed, sinProcessed, rotateProcessed, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -127,9 +127,9 @@ static aclnnStatus RotaryPositionEmbeddingCommonProcess(const aclTensor *x, cons
 } // namespace
 
 /* v1 interface - rotate parameter is implicitly nullptr */
-aclnnStatus aclnnRotaryPositionEmbeddingGetWorkspaceSize(const aclTensor *x, const aclTensor *cos, const aclTensor *sin,
-                                                         int64_t mode, aclTensor *out, uint64_t *workspaceSize,
-                                                         aclOpExecutor **executor)
+aclnnStatus aclnnRotaryPositionEmbeddingGetWorkspaceSize(const aclTensor* x, const aclTensor* cos, const aclTensor* sin,
+                                                         int64_t mode, aclTensor* out, uint64_t* workspaceSize,
+                                                         aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnRotaryPositionEmbedding, DFX_IN(x, cos, sin, mode), DFX_OUT(out));
 
@@ -143,7 +143,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingGetWorkspaceSize(const aclTensor *x, con
         return ACLNN_SUCCESS;
     }
 
-    const aclTensor *rotate = nullptr; // v1接口不支持rotate参数
+    const aclTensor* rotate = nullptr; // v1接口不支持rotate参数
     auto ret = RotaryPositionEmbeddingCommonProcess(x, cos, sin, rotate, mode, out, uniqueExecutor.get());
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
@@ -152,7 +152,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingGetWorkspaceSize(const aclTensor *x, con
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnRotaryPositionEmbedding(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnRotaryPositionEmbedding(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                          aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnRotaryPositionEmbedding);
@@ -160,10 +160,10 @@ aclnnStatus aclnnRotaryPositionEmbedding(void *workspace, uint64_t workspaceSize
 }
 
 /* v2 interface - supports rotate parameter */
-aclnnStatus aclnnRotaryPositionEmbeddingV2GetWorkspaceSize(const aclTensor *x, const aclTensor *cos,
-                                                           const aclTensor *sin, int64_t mode, const aclTensor *rotate,
-                                                           aclTensor *out, uint64_t *workspaceSize,
-                                                           aclOpExecutor **executor)
+aclnnStatus aclnnRotaryPositionEmbeddingV2GetWorkspaceSize(const aclTensor* x, const aclTensor* cos,
+                                                           const aclTensor* sin, int64_t mode, const aclTensor* rotate,
+                                                           aclTensor* out, uint64_t* workspaceSize,
+                                                           aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnRotaryPositionEmbeddingV2, DFX_IN(x, cos, sin, mode, rotate), DFX_OUT(out));
 
@@ -191,7 +191,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2GetWorkspaceSize(const aclTensor *x, c
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnRotaryPositionEmbeddingV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnRotaryPositionEmbeddingV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnRotaryPositionEmbeddingV2);

@@ -24,10 +24,10 @@ constexpr int64_t UB_FACTOR = 4;
 constexpr int64_t HALF_INTERLEAVE_COEF = 2;
 constexpr int64_t QUARTER_MODE_COEF = 4;
 
-class RopeGradRegBaseTilingClassAAndB : public RopeGradRegBaseTilingClass
-{
+class RopeGradRegBaseTilingClassAAndB : public RopeGradRegBaseTilingClass {
 public:
-    explicit RopeGradRegBaseTilingClassAAndB(gert::TilingContext* context) : RopeGradRegBaseTilingClass(context)
+    explicit RopeGradRegBaseTilingClassAAndB(gert::TilingContext* context)
+        : RopeGradRegBaseTilingClass(context)
     {}
 
 protected:
@@ -89,12 +89,10 @@ ge::graphStatus RopeGradRegBaseTilingClassAAndB::ComputeUbFactor()
     // b1sd：2 * 4 * b * dAlign
     int64_t dSize = Ops::Base::CeilAlign(d_ * GetSizeByDataType(dtype_) / dSplitCoef_, this->blockSize_) * dSplitCoef_;
     int64_t numOfDAvailable = Ops::Base::FloorDiv(static_cast<int64_t>(aicoreParams_.ubSize), DOUBLE_BUFFER * dSize);
-    OP_CHECK_IF(
-        numOfDAvailable < UB_FACTOR,
-        OP_LOGE(
-            context_, "D is too big to load in ub, ubSize is %ld bytes, loading requires %ld bytes.",
-            static_cast<int64_t>(aicoreParams_.ubSize), UB_FACTOR * dSize * (ubFactorB_ + 1)),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(numOfDAvailable < UB_FACTOR,
+                OP_LOGE(context_, "D is too big to load in ub, ubSize is %ld bytes, loading requires %ld bytes.",
+                        static_cast<int64_t>(aicoreParams_.ubSize), UB_FACTOR * dSize * (ubFactorB_ + 1)),
+                return ge::GRAPH_FAILED);
     if (layout_ == RopeLayout::NO_BROADCAST) {
         numOfDAvailable /= UB_FACTOR;
         ubFactorB_ = std::min(blockFactorB_, numOfDAvailable);
@@ -128,40 +126,33 @@ void RopeGradRegBaseTilingClassAAndB::SetTilingData()
     tilingData_->ropeGradParams.rotaryMode = static_cast<int64_t>(rotaryMode_);
     tilingData_->dCosFlag = dCosFlag_;
 
-    OP_LOGI(
-        context_->GetNodeName(),
-        "RopeGradRegBaseTilingClassAAndB tilingData: "
-        "B is %ld, S is %ld, D is %ld, N is %ld, blockNumB %ld, blockFactorB_ is %ld, "
-        "blockNumS %ld, blockFactorS is %ld, ubFactorS is %ld, ubFactorB is %ld,"
-        "ubLoopNumN is %ld, ubFactorN is %ld, ubTailFactorN is %ld, rotaryMode is %ld, tilingKey is %ld,"
-        "usedCoreNum = %ld.",
-        tilingData_->ropeGradParams.b, tilingData_->ropeGradParams.s, tilingData_->ropeGradParams.d,
-        tilingData_->ropeGradParams.n, tilingData_->ropeGradParams.blockNumB, tilingData_->ropeGradParams.blockFactorB,
-        tilingData_->ropeGradParams.blockNumS, tilingData_->ropeGradParams.blockFactorS,
-        tilingData_->ropeGradParams.ubFactorS, tilingData_->ropeGradParams.ubFactorB,
-        tilingData_->ropeGradParams.ubLoopNumN, tilingData_->ropeGradParams.ubFactorN,
-        tilingData_->ropeGradParams.ubTailFactorN, tilingData_->ropeGradParams.rotaryMode, tilingKey_,
-        tilingData_->ropeGradParams.usedCoreNum);
+    OP_LOGI(context_->GetNodeName(),
+            "RopeGradRegBaseTilingClassAAndB tilingData: "
+            "B is %ld, S is %ld, D is %ld, N is %ld, blockNumB %ld, blockFactorB_ is %ld, "
+            "blockNumS %ld, blockFactorS is %ld, ubFactorS is %ld, ubFactorB is %ld,"
+            "ubLoopNumN is %ld, ubFactorN is %ld, ubTailFactorN is %ld, rotaryMode is %ld, tilingKey is %ld,"
+            "usedCoreNum = %ld.",
+            tilingData_->ropeGradParams.b, tilingData_->ropeGradParams.s, tilingData_->ropeGradParams.d,
+            tilingData_->ropeGradParams.n, tilingData_->ropeGradParams.blockNumB,
+            tilingData_->ropeGradParams.blockFactorB, tilingData_->ropeGradParams.blockNumS,
+            tilingData_->ropeGradParams.blockFactorS, tilingData_->ropeGradParams.ubFactorS,
+            tilingData_->ropeGradParams.ubFactorB, tilingData_->ropeGradParams.ubLoopNumN,
+            tilingData_->ropeGradParams.ubFactorN, tilingData_->ropeGradParams.ubTailFactorN,
+            tilingData_->ropeGradParams.rotaryMode, tilingKey_, tilingData_->ropeGradParams.usedCoreNum);
 }
 
 ge::graphStatus RopeGradRegBaseTilingClassAAndB::DoOpTiling()
 {
-    OP_CHECK_IF(
-        MergeDim() != ge::GRAPH_SUCCESS,
-        OP_LOGE(context_->GetNodeName(), "failed to merge dim."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        SplitCore() != ge::GRAPH_SUCCESS,
-        OP_LOGE(context_->GetNodeName(), "failed to split core."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        ComputeUbFactor() != ge::GRAPH_SUCCESS,
-        OP_LOGE(context_->GetNodeName(), "failed to compute ub factor."),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        InitTilingData() != ge::GRAPH_SUCCESS,
-        OP_LOGE(context_->GetNodeName(), "InitTilingData failed."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        TilingReduce() != ge::GRAPH_SUCCESS,
-        OP_LOGE(context_->GetNodeName(), "TilingReduce failed."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(MergeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "failed to merge dim."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(SplitCore() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "failed to split core."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ComputeUbFactor() != ge::GRAPH_SUCCESS,
+                OP_LOGE(context_->GetNodeName(), "failed to compute ub factor."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(InitTilingData() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "InitTilingData failed."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(TilingReduce() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "TilingReduce failed."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -174,12 +165,12 @@ ge::graphStatus RopeGradRegBaseTilingClassAAndB::PostTiling()
 {
     SetTilingData();
     SetRotaryXTilingData();
-    uint32_t tilingKey =
-        (layout_ == RopeLayout::NO_BROADCAST ? static_cast<uint32_t>(ropeGradTilingKey::TILING_KEY_A) :
-                                               static_cast<uint32_t>(ropeGradTilingKey::TILING_KEY_B));
+    uint32_t tilingKey = (layout_ == RopeLayout::NO_BROADCAST ? static_cast<uint32_t>(ropeGradTilingKey::TILING_KEY_A) :
+                                                                static_cast<uint32_t>(ropeGradTilingKey::TILING_KEY_B));
     SetTilingKeyBlockDim(tilingKey);
     return ge::GRAPH_SUCCESS;
 }
 
-REGISTER_OPS_TILING_TEMPLATE(RotaryPositionEmbeddingGrad, RopeGradRegBaseTilingClassAAndB, ROPE_GRAD_A_AND_B_TILING_PRIORITY);
+REGISTER_OPS_TILING_TEMPLATE(RotaryPositionEmbeddingGrad, RopeGradRegBaseTilingClassAAndB,
+                             ROPE_GRAD_A_AND_B_TILING_PRIORITY);
 } // namespace optiling

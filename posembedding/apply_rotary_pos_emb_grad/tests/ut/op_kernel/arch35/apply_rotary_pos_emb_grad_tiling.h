@@ -60,7 +60,7 @@ inline uint64_t min(uint64_t x, uint64_t y)
 }
 
 template <typename T>
-inline void InitApplyRopeGradTilingData(const uint8_t *tiling, T *tilingData)
+inline void InitApplyRopeGradTilingData(const uint8_t* tiling, T* tilingData)
 {
     (void)memcpy(tilingData, tiling, sizeof(T));
 }

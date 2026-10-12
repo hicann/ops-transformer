@@ -26,11 +26,11 @@ constexpr int64_t TILING_KEY_BAB = 20020;
 
 class RopeRegBaseTilingClassBAB : public RopeRegBaseTilingClass {
 public:
-    explicit RopeRegBaseTilingClassBAB(gert::TilingContext *context_)
+    explicit RopeRegBaseTilingClassBAB(gert::TilingContext* context_)
         : RopeRegBaseTilingClass(context_)
     {}
     ~RopeRegBaseTilingClassBAB() override = default;
-    void Reset(gert::TilingContext *context_) override
+    void Reset(gert::TilingContext* context_) override
     {
         RopeRegBaseTilingClass::Reset(context_);
     }
@@ -213,7 +213,7 @@ ge::graphStatus RopeRegBaseTilingClassBAB::PostTiling()
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
     context_->SetBlockDim(usedCoreNum_);
     context_->SetTilingKey(tilingKey_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = WORK_SPACE_SIZE;
     PrintTilingData();
     return ge::GRAPH_SUCCESS;

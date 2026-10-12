@@ -28,7 +28,7 @@ using namespace AscendC;
 template <typename T>
 class ApplyRotaryPosEmbGradBAB {
 public:
-    __aicore__ inline ApplyRotaryPosEmbGradBAB(TPipe *pipe, const ApplyRopeGradRegbaseParams *tiling)
+    __aicore__ inline ApplyRotaryPosEmbGradBAB(TPipe* pipe, const ApplyRopeGradRegbaseParams* tiling)
         : pipe_(pipe),
           tilingData_(tiling)
     {}
@@ -39,8 +39,8 @@ public:
 private:
     constexpr static int32_t bufferNum = 2;
 
-    const ApplyRopeGradRegbaseParams *tilingData_;
-    TPipe *pipe_;
+    const ApplyRopeGradRegbaseParams* tilingData_;
+    TPipe* pipe_;
 
     GlobalTensor<T> gradQGm_;
     GlobalTensor<T> gradKGm_;
@@ -79,9 +79,9 @@ private:
 private:
     __aicore__ inline void PrePareParams();
     __aicore__ inline void ProcessNLoop(uint32_t bIdx, uint32_t sIdx, uint32_t currSNum);
-    __aicore__ inline void ProcessN(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor, int64_t gmOffset,
-                                    int64_t nPath, int64_t currXN, uint32_t currSNum, LocalTensor<float> &cosPartial,
-                                    LocalTensor<float> &sinPartial, bool isQPath, bool isAccumulate);
+    __aicore__ inline void ProcessN(const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, int64_t gmOffset,
+                                    int64_t nPath, int64_t currXN, uint32_t currSNum, LocalTensor<float>& cosPartial,
+                                    LocalTensor<float>& sinPartial, bool isQPath, bool isAccumulate);
 };
 
 // =================================================================
@@ -102,16 +102,16 @@ __aicore__ inline void ApplyRotaryPosEmbGradBAB<T>::Init(GM_ADDR gradQueryEmbed,
     ubFactorN_ = tilingData_->ubFactorN;
     ubFactorS_ = tilingData_->ubFactorS;
 
-    this->gradQGm_.SetGlobalBuffer((__gm__ T *)gradQueryEmbed);
-    this->gradKGm_.SetGlobalBuffer((__gm__ T *)gradKeyEmbed);
-    this->cosGm_.SetGlobalBuffer((__gm__ T *)cos);
-    this->sinGm_.SetGlobalBuffer((__gm__ T *)sin);
-    this->queryGm_.SetGlobalBuffer((__gm__ T *)query);
-    this->keyGm_.SetGlobalBuffer((__gm__ T *)key);
-    this->gradQOutGm_.SetGlobalBuffer((__gm__ T *)gradQueryOut);
-    this->gradKOutGm_.SetGlobalBuffer((__gm__ T *)gradKeyOut);
-    this->cosWsGm_.SetGlobalBuffer((__gm__ float *)cosWs);
-    this->sinWsGm_.SetGlobalBuffer((__gm__ float *)sinWs);
+    this->gradQGm_.SetGlobalBuffer((__gm__ T*)gradQueryEmbed);
+    this->gradKGm_.SetGlobalBuffer((__gm__ T*)gradKeyEmbed);
+    this->cosGm_.SetGlobalBuffer((__gm__ T*)cos);
+    this->sinGm_.SetGlobalBuffer((__gm__ T*)sin);
+    this->queryGm_.SetGlobalBuffer((__gm__ T*)query);
+    this->keyGm_.SetGlobalBuffer((__gm__ T*)key);
+    this->gradQOutGm_.SetGlobalBuffer((__gm__ T*)gradQueryOut);
+    this->gradKOutGm_.SetGlobalBuffer((__gm__ T*)gradKeyOut);
+    this->cosWsGm_.SetGlobalBuffer((__gm__ float*)cosWs);
+    this->sinWsGm_.SetGlobalBuffer((__gm__ float*)sinWs);
 
     gradQGm_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
     gradKGm_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
@@ -268,15 +268,15 @@ __aicore__ inline void ApplyRotaryPosEmbGradBAB<T>::ProcessNLoop(uint32_t bIdx, 
 // =================================================================
 template <typename T>
 __aicore__ inline void ApplyRotaryPosEmbGradBAB<T>::ProcessN(
-    const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor, int64_t gmOffset, int64_t nPath, int64_t currXN,
-    uint32_t currSNum, LocalTensor<float> &cosPartial, LocalTensor<float> &sinPartial, bool isQPath, bool isAccumulate)
+    const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, int64_t gmOffset, int64_t nPath, int64_t currXN,
+    uint32_t currSNum, LocalTensor<float>& cosPartial, LocalTensor<float>& sinPartial, bool isQPath, bool isAccumulate)
 {
-    auto &gradXGm = isQPath ? gradQGm_ : gradKGm_;
-    auto &gradXOutGm = isQPath ? gradQOutGm_ : gradKOutGm_;
-    auto &gradXInQue = isQPath ? gradQInQue_ : gradKInQue_;
-    auto &gradXOutQue = isQPath ? gradQOutQue_ : gradKOutQue_;
-    auto &xGm = isQPath ? queryGm_ : keyGm_;
-    auto &xInQue = isQPath ? queryInQue_ : keyInQue_;
+    auto& gradXGm = isQPath ? gradQGm_ : gradKGm_;
+    auto& gradXOutGm = isQPath ? gradQOutGm_ : gradKOutGm_;
+    auto& gradXInQue = isQPath ? gradQInQue_ : gradKInQue_;
+    auto& gradXOutQue = isQPath ? gradQOutQue_ : gradKOutQue_;
+    auto& xGm = isQPath ? queryGm_ : keyGm_;
+    auto& xInQue = isQPath ? queryInQue_ : keyInQue_;
 
     if (tilingData_->dCosFlag) {
         ProcessGradTile<T, true, bufferNum>(sinTensor, cosTensor, gradXGm, gradXOutGm, xGm, gradXInQue, gradXOutQue,

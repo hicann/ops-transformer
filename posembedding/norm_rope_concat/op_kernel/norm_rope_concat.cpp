@@ -13,21 +13,19 @@
  * \brief
  */
 
-
 #include "norm_rope_concat.h"
 #include "norm_rope_concat_tiling_key.h"
 using namespace nrc;
 
 template <uint8_t NORM_TYPE, uint8_t ADDED_NORM_TYPE, uint8_t ROPE_TYPE, uint8_t CONCAT_ORDER, bool IS_TRAINING>
-__global__ __aicore__ void
-norm_rope_concat(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR encoder_query, GM_ADDR encoder_key,
-                 GM_ADDR encoder_value, GM_ADDR norm_query_weight, GM_ADDR norm_query_bias, GM_ADDR norm_key_weight,
-                 GM_ADDR norm_key_bias, GM_ADDR norm_added_query_weight, GM_ADDR norm_added_query_bias,
-                 GM_ADDR norm_added_key_weight, GM_ADDR norm_added_key_bias, GM_ADDR rope_sin, GM_ADDR rope_cos,
-                 GM_ADDR query_output, GM_ADDR key_output, GM_ADDR value_output, GM_ADDR norm_query_mean,
-                 GM_ADDR norm_query_rstd, GM_ADDR norm_key_mean, GM_ADDR norm_key_rstd, GM_ADDR norm_added_query_mean,
-                 GM_ADDR norm_added_query_rstd, GM_ADDR norm_added_key_mean, GM_ADDR norm_added_key_rstd,
-                 GM_ADDR workspace, GM_ADDR tiling)
+__global__ __aicore__ void norm_rope_concat(
+    GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR encoder_query, GM_ADDR encoder_key, GM_ADDR encoder_value,
+    GM_ADDR norm_query_weight, GM_ADDR norm_query_bias, GM_ADDR norm_key_weight, GM_ADDR norm_key_bias,
+    GM_ADDR norm_added_query_weight, GM_ADDR norm_added_query_bias, GM_ADDR norm_added_key_weight,
+    GM_ADDR norm_added_key_bias, GM_ADDR rope_sin, GM_ADDR rope_cos, GM_ADDR query_output, GM_ADDR key_output,
+    GM_ADDR value_output, GM_ADDR norm_query_mean, GM_ADDR norm_query_rstd, GM_ADDR norm_key_mean,
+    GM_ADDR norm_key_rstd, GM_ADDR norm_added_query_mean, GM_ADDR norm_added_query_rstd, GM_ADDR norm_added_key_mean,
+    GM_ADDR norm_added_key_rstd, GM_ADDR workspace, GM_ADDR tiling)
 {
     GET_TILING_DATA(tilingData, tiling);
     AscendC::TPipe pipe;

@@ -41,9 +41,9 @@ extern "C" {
 static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT, DataType::DT_FLOAT16,
                                                                        DataType::DT_BF16};
 
-static inline bool CheckNotNull(const aclTensor *gradQueryOutput, const aclTensor *gradKeyOutput,
-                                const aclTensor *gradValueOutput, const aclTensor *query, const aclTensor *key,
-                                const aclTensor *gradQuery, const aclTensor *gradKey, const aclTensor *gradValue)
+static inline bool CheckNotNull(const aclTensor* gradQueryOutput, const aclTensor* gradKeyOutput,
+                                const aclTensor* gradValueOutput, const aclTensor* query, const aclTensor* key,
+                                const aclTensor* gradQuery, const aclTensor* gradKey, const aclTensor* gradValue)
 {
     OP_CHECK_NULL(gradQueryOutput, return false);
     OP_CHECK_NULL(gradKeyOutput, return false);
@@ -56,18 +56,18 @@ static inline bool CheckNotNull(const aclTensor *gradQueryOutput, const aclTenso
     return true;
 }
 
-static bool CheckDtypeValid(const aclTensor *gradQueryOutput, const aclTensor *gradKeyOutput,
-                            const aclTensor *gradValueOutput, const aclTensor *query, const aclTensor *key,
-                            const aclTensor *encoderQuery, const aclTensor *encoderKey,
-                            const aclTensor *normQueryWeight, const aclTensor *normKeyWeight,
-                            const aclTensor *normAddedQueryWeight, const aclTensor *normAddedKeyWeight,
-                            const aclTensor *ropeSin, const aclTensor *ropeCos, const aclTensor *gradQuery,
-                            const aclTensor *gradKey, const aclTensor *gradValue, const aclTensor *gradEncoderQuery,
-                            const aclTensor *gradEncoderKey, const aclTensor *gradEncoderValue,
-                            const aclTensor *gradNormQueryWeight, const aclTensor *gradNormQueryBias,
-                            const aclTensor *gradNormKeyWeight, const aclTensor *gradNormKeyBias,
-                            const aclTensor *gradNormAddedQueryWeight, const aclTensor *gradNormAddedQueryBias,
-                            const aclTensor *gradNormAddedKeyWeight, const aclTensor *gradNormAddedKeyBias)
+static bool CheckDtypeValid(const aclTensor* gradQueryOutput, const aclTensor* gradKeyOutput,
+                            const aclTensor* gradValueOutput, const aclTensor* query, const aclTensor* key,
+                            const aclTensor* encoderQuery, const aclTensor* encoderKey,
+                            const aclTensor* normQueryWeight, const aclTensor* normKeyWeight,
+                            const aclTensor* normAddedQueryWeight, const aclTensor* normAddedKeyWeight,
+                            const aclTensor* ropeSin, const aclTensor* ropeCos, const aclTensor* gradQuery,
+                            const aclTensor* gradKey, const aclTensor* gradValue, const aclTensor* gradEncoderQuery,
+                            const aclTensor* gradEncoderKey, const aclTensor* gradEncoderValue,
+                            const aclTensor* gradNormQueryWeight, const aclTensor* gradNormQueryBias,
+                            const aclTensor* gradNormKeyWeight, const aclTensor* gradNormKeyBias,
+                            const aclTensor* gradNormAddedQueryWeight, const aclTensor* gradNormAddedQueryBias,
+                            const aclTensor* gradNormAddedKeyWeight, const aclTensor* gradNormAddedKeyBias)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(gradQueryOutput, DTYPE_SUPPORT_LIST, return false);
 
@@ -154,10 +154,10 @@ static bool CheckDtypeValid(const aclTensor *gradQueryOutput, const aclTensor *g
     return true;
 }
 
-static bool CheckNormDtypeValid(const aclTensor *normQueryMean, const aclTensor *normQueryRstd,
-                                const aclTensor *normKeyMean, const aclTensor *normKeyRstd,
-                                const aclTensor *normAddedQueryMean, const aclTensor *normAddedQueryRstd,
-                                const aclTensor *normAddedKeyMean, const aclTensor *normAddedKeyRstd)
+static bool CheckNormDtypeValid(const aclTensor* normQueryMean, const aclTensor* normQueryRstd,
+                                const aclTensor* normKeyMean, const aclTensor* normKeyRstd,
+                                const aclTensor* normAddedQueryMean, const aclTensor* normAddedQueryRstd,
+                                const aclTensor* normAddedKeyMean, const aclTensor* normAddedKeyRstd)
 {
     OP_CHECK(normQueryMean == nullptr || normQueryMean->GetDataType() == DataType::DT_FLOAT,
              OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Input normQueryMean dtype should be DT_FLOAT."), return false);
@@ -178,32 +178,32 @@ static bool CheckNormDtypeValid(const aclTensor *normQueryMean, const aclTensor 
     return true;
 }
 
-inline static aclnnStatus CheckParam(const aclTensor *gradQueryOutput, const aclTensor *gradKeyOutput, const aclTensor *gradValueOutput,
-                                     const aclTensor *query, const aclTensor *key, const aclTensor *encoderQuery, const aclTensor *encoderKey,
-                                     const aclTensor *normQueryWeight, const aclTensor *normQueryMean, const aclTensor *normQueryRstd,
-                                     const aclTensor *normKeyWeight, const aclTensor *normKeyMean, const aclTensor *normKeyRstd,
-                                     const aclTensor *normAddedQueryWeight, const aclTensor *normAddedQueryMean,
-                                     const aclTensor *normAddedQueryRstd, const aclTensor *normAddedKeyWeight, const aclTensor *normAddedKeyMean,
-                                     const aclTensor *normAddedKeyRstd, const aclTensor *ropeSin, const aclTensor *ropeCos,
-                                     const aclTensor *gradQuery, const aclTensor *gradKey, const aclTensor *gradValue,
-                                     const aclTensor *gradEncoderQuery, const aclTensor *gradEncoderKey, const aclTensor *gradEncoderValue,
-                                     const aclTensor *gradNormQueryWeight, const aclTensor *gradNormQueryBias, const aclTensor *gradNormKeyWeight,
-                                     const aclTensor *gradNormKeyBias, const aclTensor *gradNormAddedQueryWeight,
-                                     const aclTensor *gradNormAddedQueryBias, const aclTensor *gradNormAddedKeyWeight,
-                                     const aclTensor *gradNormAddedKeyBias)
+inline static aclnnStatus CheckParam(
+    const aclTensor* gradQueryOutput, const aclTensor* gradKeyOutput, const aclTensor* gradValueOutput,
+    const aclTensor* query, const aclTensor* key, const aclTensor* encoderQuery, const aclTensor* encoderKey,
+    const aclTensor* normQueryWeight, const aclTensor* normQueryMean, const aclTensor* normQueryRstd,
+    const aclTensor* normKeyWeight, const aclTensor* normKeyMean, const aclTensor* normKeyRstd,
+    const aclTensor* normAddedQueryWeight, const aclTensor* normAddedQueryMean, const aclTensor* normAddedQueryRstd,
+    const aclTensor* normAddedKeyWeight, const aclTensor* normAddedKeyMean, const aclTensor* normAddedKeyRstd,
+    const aclTensor* ropeSin, const aclTensor* ropeCos, const aclTensor* gradQuery, const aclTensor* gradKey,
+    const aclTensor* gradValue, const aclTensor* gradEncoderQuery, const aclTensor* gradEncoderKey,
+    const aclTensor* gradEncoderValue, const aclTensor* gradNormQueryWeight, const aclTensor* gradNormQueryBias,
+    const aclTensor* gradNormKeyWeight, const aclTensor* gradNormKeyBias, const aclTensor* gradNormAddedQueryWeight,
+    const aclTensor* gradNormAddedQueryBias, const aclTensor* gradNormAddedKeyWeight,
+    const aclTensor* gradNormAddedKeyBias)
 {
     // check nullptr
     CHECK_RET(CheckNotNull(gradQueryOutput, gradKeyOutput, gradValueOutput, query, key, gradQuery, gradKey, gradValue),
               ACLNN_ERR_PARAM_NULLPTR);
 
     // check dtype
-    CHECK_RET(CheckDtypeValid(gradQueryOutput, gradKeyOutput, gradValueOutput, query, key, encoderQuery, encoderKey,
-                              normQueryWeight, normKeyWeight, normAddedQueryWeight, normAddedKeyWeight, ropeSin,
-                              ropeCos, gradQuery, gradKey, gradValue, gradEncoderQuery, gradEncoderKey,
-                              gradEncoderValue, gradNormQueryWeight, gradNormQueryBias, gradNormKeyWeight,
-                              gradNormKeyBias, gradNormAddedQueryWeight, gradNormAddedQueryBias, gradNormAddedKeyWeight,
-                              gradNormAddedKeyBias),
-              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(
+        CheckDtypeValid(gradQueryOutput, gradKeyOutput, gradValueOutput, query, key, encoderQuery, encoderKey,
+                        normQueryWeight, normKeyWeight, normAddedQueryWeight, normAddedKeyWeight, ropeSin, ropeCos,
+                        gradQuery, gradKey, gradValue, gradEncoderQuery, gradEncoderKey, gradEncoderValue,
+                        gradNormQueryWeight, gradNormQueryBias, gradNormKeyWeight, gradNormKeyBias,
+                        gradNormAddedQueryWeight, gradNormAddedQueryBias, gradNormAddedKeyWeight, gradNormAddedKeyBias),
+        ACLNN_ERR_PARAM_INVALID);
 
     CHECK_RET(CheckNormDtypeValid(normQueryMean, normQueryRstd, normKeyMean, normKeyRstd, normAddedQueryMean,
                                   normAddedQueryRstd, normAddedKeyMean, normAddedKeyRstd),
@@ -212,7 +212,7 @@ inline static aclnnStatus CheckParam(const aclTensor *gradQueryOutput, const acl
     return ACLNN_SUCCESS;
 }
 
-bool checkViewCopyResult(const aclTensor *l0Tensor, const aclTensor *inTensor, aclOpExecutor *l0Executor)
+bool checkViewCopyResult(const aclTensor* l0Tensor, const aclTensor* inTensor, aclOpExecutor* l0Executor)
 {
     if (l0Tensor != nullptr) {
         auto viewCopyResult = l0op::ViewCopy(l0Tensor, inTensor, l0Executor);
@@ -222,19 +222,19 @@ bool checkViewCopyResult(const aclTensor *l0Tensor, const aclTensor *inTensor, a
 }
 
 aclnnStatus aclnnNormRopeConcatBackwardGetWorkspaceSize(
-    const aclTensor *gradQueryOutput, const aclTensor *gradKeyOutput, const aclTensor *gradValueOutput,
-    const aclTensor *query, const aclTensor *key, const aclTensor *encoderQuery, const aclTensor *encoderKey,
-    const aclTensor *normQueryWeight, const aclTensor *normQueryMean, const aclTensor *normQueryRstd,
-    const aclTensor *normKeyWeight, const aclTensor *normKeyMean, const aclTensor *normKeyRstd,
-    const aclTensor *normAddedQueryWeight, const aclTensor *normAddedQueryMean, const aclTensor *normAddedQueryRstd,
-    const aclTensor *normAddedKeyWeight, const aclTensor *normAddedKeyMean, const aclTensor *normAddedKeyRstd,
-    const aclTensor *ropeSin, const aclTensor *ropeCos, int64_t normType, int64_t normAddedType, int64_t ropeType,
-    int64_t concatOrder, const aclTensor *gradQuery, const aclTensor *gradKey, const aclTensor *gradValue,
-    const aclTensor *gradEncoderQuery, const aclTensor *gradEncoderKey, const aclTensor *gradEncoderValue,
-    const aclTensor *gradNormQueryWeight, const aclTensor *gradNormQueryBias, const aclTensor *gradNormKeyWeight,
-    const aclTensor *gradNormKeyBias, const aclTensor *gradNormAddedQueryWeight,
-    const aclTensor *gradNormAddedQueryBias, const aclTensor *gradNormAddedKeyWeight,
-    const aclTensor *gradNormAddedKeyBias, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* gradQueryOutput, const aclTensor* gradKeyOutput, const aclTensor* gradValueOutput,
+    const aclTensor* query, const aclTensor* key, const aclTensor* encoderQuery, const aclTensor* encoderKey,
+    const aclTensor* normQueryWeight, const aclTensor* normQueryMean, const aclTensor* normQueryRstd,
+    const aclTensor* normKeyWeight, const aclTensor* normKeyMean, const aclTensor* normKeyRstd,
+    const aclTensor* normAddedQueryWeight, const aclTensor* normAddedQueryMean, const aclTensor* normAddedQueryRstd,
+    const aclTensor* normAddedKeyWeight, const aclTensor* normAddedKeyMean, const aclTensor* normAddedKeyRstd,
+    const aclTensor* ropeSin, const aclTensor* ropeCos, int64_t normType, int64_t normAddedType, int64_t ropeType,
+    int64_t concatOrder, const aclTensor* gradQuery, const aclTensor* gradKey, const aclTensor* gradValue,
+    const aclTensor* gradEncoderQuery, const aclTensor* gradEncoderKey, const aclTensor* gradEncoderValue,
+    const aclTensor* gradNormQueryWeight, const aclTensor* gradNormQueryBias, const aclTensor* gradNormKeyWeight,
+    const aclTensor* gradNormKeyBias, const aclTensor* gradNormAddedQueryWeight,
+    const aclTensor* gradNormAddedQueryBias, const aclTensor* gradNormAddedKeyWeight,
+    const aclTensor* gradNormAddedKeyBias, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(
         aclnnNormRopeConcatBackward,
@@ -259,7 +259,7 @@ aclnnStatus aclnnNormRopeConcatBackwardGetWorkspaceSize(
                    gradNormAddedQueryWeight, gradNormAddedQueryBias, gradNormAddedKeyWeight, gradNormAddedKeyBias);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    aclOpExecutor *l0Executor = uniqueExecutor.get();
+    aclOpExecutor* l0Executor = uniqueExecutor.get();
     auto l0NormRopeConcatGradOuts = l0op::NormRopeConcatGrad(
         gradQueryOutput, gradKeyOutput, gradValueOutput, query, key, encoderQuery, encoderKey, normQueryWeight,
         normQueryMean, normQueryRstd, normKeyWeight, normKeyMean, normKeyRstd, normAddedQueryWeight, normAddedQueryMean,
@@ -267,31 +267,74 @@ aclnnStatus aclnnNormRopeConcatBackwardGetWorkspaceSize(
         normAddedType, ropeType, concatOrder, l0Executor);
 
     // required tensor
-    CHECK_RET(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_QUERY_INDEX)] != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_KEY_INDEX)] != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_VALUE_INDEX)] != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_QUERY_INDEX)], gradQuery, l0Executor), ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_KEY_INDEX)], gradKey, l0Executor), ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_VALUE_INDEX)], gradValue, l0Executor), ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_QUERY_INDEX)] != nullptr,
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_KEY_INDEX)] != nullptr,
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_VALUE_INDEX)] != nullptr,
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_QUERY_INDEX)],
+                                  gradQuery, l0Executor),
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_KEY_INDEX)],
+                                  gradKey, l0Executor),
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_VALUE_INDEX)],
+                                  gradValue, l0Executor),
+              ACLNN_ERR_INNER_NULLPTR);
     // optional tensor
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_ENCODER_QUERY_INDEX)], gradEncoderQuery, l0Executor), ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_ENCODER_KEY_INDEX)], gradEncoderKey, l0Executor), ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_ENCODER_VALUE_INDEX)], gradEncoderValue, l0Executor), ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_QUERY_WEIGHT_INDEX)], gradNormQueryWeight, l0Executor), ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_QUERY_BIAS_INDEX)], gradNormQueryBias, l0Executor), ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_KEY_WEIGHT_INDEX)], gradNormKeyWeight, l0Executor), ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_KEY_BIAS_INDEX)], gradNormKeyBias, l0Executor), ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_ADDED_QUERY_WEIGHT_INDEX)], gradNormAddedQueryWeight, l0Executor), ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_ADDED_QUERY_BIAS_INDEX)], gradNormAddedQueryBias, l0Executor), ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_ADDED_KEY_WEIGHT_INDEX)], gradNormAddedKeyWeight, l0Executor), ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_ADDED_KEY_BIAS_INDEX)], gradNormAddedKeyBias, l0Executor), ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(checkViewCopyResult(
+                  l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_ENCODER_QUERY_INDEX)],
+                  gradEncoderQuery, l0Executor),
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(
+        checkViewCopyResult(l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_ENCODER_KEY_INDEX)],
+                            gradEncoderKey, l0Executor),
+        ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(checkViewCopyResult(
+                  l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_ENCODER_VALUE_INDEX)],
+                  gradEncoderValue, l0Executor),
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(checkViewCopyResult(
+                  l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_QUERY_WEIGHT_INDEX)],
+                  gradNormQueryWeight, l0Executor),
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(checkViewCopyResult(
+                  l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_QUERY_BIAS_INDEX)],
+                  gradNormQueryBias, l0Executor),
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(checkViewCopyResult(
+                  l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_KEY_WEIGHT_INDEX)],
+                  gradNormKeyWeight, l0Executor),
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(checkViewCopyResult(
+                  l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_KEY_BIAS_INDEX)],
+                  gradNormKeyBias, l0Executor),
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(
+        checkViewCopyResult(
+            l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_ADDED_QUERY_WEIGHT_INDEX)],
+            gradNormAddedQueryWeight, l0Executor),
+        ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(checkViewCopyResult(
+                  l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_ADDED_QUERY_BIAS_INDEX)],
+                  gradNormAddedQueryBias, l0Executor),
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(checkViewCopyResult(
+                  l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_ADDED_KEY_WEIGHT_INDEX)],
+                  gradNormAddedKeyWeight, l0Executor),
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(checkViewCopyResult(
+                  l0NormRopeConcatGradOuts[static_cast<size_t>(OutputIndexBackward::GRAD_NORM_ADDED_KEY_BIAS_INDEX)],
+                  gradNormAddedKeyBias, l0Executor),
+              ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
     uniqueExecutor.ReleaseTo(executor);
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnNormRopeConcatBackward(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnNormRopeConcatBackward(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                         aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnNormRopeConcatBackward);

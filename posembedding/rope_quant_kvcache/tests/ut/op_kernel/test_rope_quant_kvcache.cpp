@@ -25,13 +25,13 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void rope_quant_kvcache(
-    GM_ADDR qkv, GM_ADDR cos, GM_ADDR sin, GM_ADDR quant_scale, GM_ADDR quant_offset, GM_ADDR k_cache, GM_ADDR v_cache,
-    GM_ADDR indice, GM_ADDR q_out, GM_ADDR k_out, GM_ADDR v_out, GM_ADDR k_cache_out, GM_ADDR v_cache_out,
-    GM_ADDR workspace, GM_ADDR tiling);
+extern "C" __global__ __aicore__ void rope_quant_kvcache(GM_ADDR qkv, GM_ADDR cos, GM_ADDR sin, GM_ADDR quant_scale,
+                                                         GM_ADDR quant_offset, GM_ADDR k_cache, GM_ADDR v_cache,
+                                                         GM_ADDR indice, GM_ADDR q_out, GM_ADDR k_out, GM_ADDR v_out,
+                                                         GM_ADDR k_cache_out, GM_ADDR v_cache_out, GM_ADDR workspace,
+                                                         GM_ADDR tiling);
 
-class rope_quant_kvcache_test : public testing::Test
-{
+class rope_quant_kvcache_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -102,9 +102,8 @@ TEST_F(rope_quant_kvcache_test, test_case_half)
     tilingDatafromBin->kHiddenSize = 128;
     tilingDatafromBin->vHiddenSize = 128;
 
-    ICPU_RUN_KF(
-        rope_quant_kvcache, blockDim, qkv, cos, sin, scale, offset, k_cache, v_cache, indice, q_out, k_out, v_out,
-        k_cache_out, v_cache_out, workspace, (uint8_t*)(tilingDatafromBin));
+    ICPU_RUN_KF(rope_quant_kvcache, blockDim, qkv, cos, sin, scale, offset, k_cache, v_cache, indice, q_out, k_out,
+                v_out, k_cache_out, v_cache_out, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(qkv);
     AscendC::GmFree(cos);

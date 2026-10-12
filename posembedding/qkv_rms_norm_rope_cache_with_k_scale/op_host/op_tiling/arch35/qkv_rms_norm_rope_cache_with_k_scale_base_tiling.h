@@ -106,12 +106,12 @@ public:
     static constexpr uint64_t AIV_PER_AIC = 2;
     static constexpr uint64_t MAX_TOKENS = 262144;
 
-    explicit QkvRmsNormRopeCacheWithKScaleBaseTiling(gert::TilingContext *context)
+    explicit QkvRmsNormRopeCacheWithKScaleBaseTiling(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
     ~QkvRmsNormRopeCacheWithKScaleBaseTiling() override = default;
 
-    void Reset(gert::TilingContext *context) override;
+    void Reset(gert::TilingContext* context) override;
 
 protected:
     bool IsCapable() override;
@@ -132,7 +132,7 @@ private:
     ge::graphStatus ValidateDtypes() const;
     ge::graphStatus ValidateMropeSection();
     ge::graphStatus ValidateQOutDtypeAttr() const;
-    ge::graphStatus ValidateShapeRank(const TensorContractInfo &tensor, const char *tensorName,
+    ge::graphStatus ValidateShapeRank(const TensorContractInfo& tensor, const char* tensorName,
                                       uint64_t expectedRank) const;
     ge::graphStatus ValidateShapeInputsForDerivedFields() const;
     ge::graphStatus ValidateNonCacheShapeRanks() const;
@@ -149,17 +149,17 @@ private:
     // M-RoPE MX tile. UB offsets and total size are validated by the layout
     // builder and SelectMropeMxTokenTile(), respectively.
     bool AreMropeMxCopyAndVfFieldsRepresentable(uint64_t tokenTile,
-                                                const ::QkvRmsNormRopeCacheWithKScale::MropeMxUbLayout &layout) const;
+                                                const ::QkvRmsNormRopeCacheWithKScale::MropeMxUbLayout& layout) const;
     // Selects the largest tile that fits the position window, UB capacity,
     // DataCopy parameters, and VF loop/stride fields. Outputs are written only
     // when a feasible candidate is found.
-    ge::graphStatus SelectMropeMxTokenTile(uint64_t &tokenTile,
-                                           ::QkvRmsNormRopeCacheWithKScale::MropeMxUbLayout &selectedLayout) const;
+    ge::graphStatus SelectMropeMxTokenTile(uint64_t& tokenTile,
+                                           ::QkvRmsNormRopeCacheWithKScale::MropeMxUbLayout& selectedLayout) const;
     void FillTilingData(uint64_t tokenTile);
     void FillMropeMxTilingData(uint64_t tokenTile);
     ge::graphStatus ValidateParsedInput() const;
     ge::graphStatus ComputeTilingData();
-    void LogTensorInfo(const char *tensorName, const TensorContractInfo &info) const;
+    void LogTensorInfo(const char* tensorName, const TensorContractInfo& info) const;
     void LogContractInput() const;
     void LogTilingData() const;
     ge::graphStatus ParseHeadNumsAttr();
@@ -175,13 +175,13 @@ private:
     ge::graphStatus FillRequiredTensorInputs();
     void FillOptionalTensorInputs();
     ge::graphStatus BuildContractInput();
-    ge::graphStatus ValidateCompileInfo(const QkvRmsNormRopeCacheWithKScaleCompileInfo &compileInfo) const;
+    ge::graphStatus ValidateCompileInfo(const QkvRmsNormRopeCacheWithKScaleCompileInfo& compileInfo) const;
     /**
      * @param scene Validated operator scene produced by ResolveScene().
      */
-    static const SceneTraits &GetSceneTraits(Scene scene);
-    const char *opName_ = "QkvRmsNormRopeCacheWithKScale";
-    const QkvRmsNormRopeCacheWithKScaleCompileInfo *compileInfo_ = nullptr;
+    static const SceneTraits& GetSceneTraits(Scene scene);
+    const char* opName_ = "QkvRmsNormRopeCacheWithKScale";
+    const QkvRmsNormRopeCacheWithKScaleCompileInfo* compileInfo_ = nullptr;
     ContractInput input_;
     QkvRmsNormRopeCacheWithKScaleTilingData tilingData_;
     uint64_t aicNum_ = 0;
@@ -195,7 +195,7 @@ private:
     uint64_t tilingDataSize_ = 0;
     uint64_t mropeSectionSize_ = 0;
     bool hasMropeSection_ = false;
-    const int64_t *mropeSectionData_ = nullptr;
+    const int64_t* mropeSectionData_ = nullptr;
     uint64_t mropeSectionH_ = 0;
     uint64_t mropeSectionW_ = 0;
 };

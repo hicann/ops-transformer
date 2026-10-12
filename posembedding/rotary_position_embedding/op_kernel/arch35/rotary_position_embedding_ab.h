@@ -28,7 +28,7 @@ class RotaryPositionEmbeddingAB {
 public:
     __aicore__ inline RotaryPositionEmbeddingAB(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y, GM_ADDR workspace,
-                                const RopeRegbaseABTilingData *tilingData, TPipe *pipe);
+                                const RopeRegbaseABTilingData* tilingData, TPipe* pipe);
     __aicore__ inline void Process();
 
 private:
@@ -36,7 +36,7 @@ private:
                                        int64_t ubIdx, int64_t bsCount, int64_t nCount);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> xInQueue_;
     TQue<QuePosition::VECIN, 1> cosInQueue_;
     TQue<QuePosition::VECIN, 1> sinInQueue_;
@@ -46,7 +46,7 @@ private:
     GlobalTensor<T> cosGm_;
     GlobalTensor<T> sinGm_;
     GlobalTensor<T> yGm_;
-    const RopeRegbaseABTilingData *tilingData_;
+    const RopeRegbaseABTilingData* tilingData_;
     DataCopyPadExtParams<T> padParams_ = {false, 0, 0, static_cast<T>(0)};
     uint8_t DB_FLAG = 2;
     uint32_t dSplitSize_ = 0;
@@ -56,8 +56,8 @@ private:
 
 template <typename T>
 __aicore__ inline void RotaryPositionEmbeddingAB<T>::Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
-                                                          GM_ADDR workspace, const RopeRegbaseABTilingData *tilingData,
-                                                          TPipe *pipe)
+                                                          GM_ADDR workspace, const RopeRegbaseABTilingData* tilingData,
+                                                          TPipe* pipe)
 {
     pipe_ = pipe;
     tilingData_ = tilingData;
@@ -69,10 +69,10 @@ __aicore__ inline void RotaryPositionEmbeddingAB<T>::Init(GM_ADDR x, GM_ADDR cos
 
     int64_t cosOffset = blockDimBS * tilingData_->blockFactorBS * tilingData_->D;
     int64_t xOffset = cosOffset * tilingData_->N + blockDimN * tilingData_->blockFactorN * tilingData_->D;
-    this->cosGm_.SetGlobalBuffer((__gm__ T *)cos + cosOffset);
-    this->sinGm_.SetGlobalBuffer((__gm__ T *)sin + cosOffset);
-    this->xGm_.SetGlobalBuffer((__gm__ T *)x + xOffset);
-    this->yGm_.SetGlobalBuffer((__gm__ T *)y + xOffset);
+    this->cosGm_.SetGlobalBuffer((__gm__ T*)cos + cosOffset);
+    this->sinGm_.SetGlobalBuffer((__gm__ T*)sin + cosOffset);
+    this->xGm_.SetGlobalBuffer((__gm__ T*)x + xOffset);
+    this->yGm_.SetGlobalBuffer((__gm__ T*)y + xOffset);
 
     int64_t bufferSize = tilingData_->dAlign * sizeof(T) * tilingData_->ubFactorBS;
     pipe_->InitBuffer(xInQueue_, DB_FLAG, bufferSize * tilingData_->ubFactorN);

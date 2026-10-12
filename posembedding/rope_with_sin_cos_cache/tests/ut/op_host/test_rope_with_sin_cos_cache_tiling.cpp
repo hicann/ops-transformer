@@ -19,7 +19,6 @@
 #include "tiling_case_executor.h"
 #include "../../../op_host/rope_with_sin_cos_cache_tiling.h"
 
-
 using namespace std;
 
 struct RopeWithSinCosCacheCompileInfo {};
