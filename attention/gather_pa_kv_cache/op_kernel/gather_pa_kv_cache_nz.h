@@ -219,7 +219,7 @@ __aicore__ inline void GatherPaKvCacheNz<T>::Process()
             if (blkOffset == 0) {
                 localBlkTabId = localtokenId * this->numblkTabCol + ctxtId / this->blockSize;
                 if (this->hasSeqStarts)
-                    localBlkTabId += this->inseqOffsetGM.GetValue(localtokenId);
+                    localBlkTabId += this->inseqOffsetGM.GetValue(tokenId) / this->blockSize;
                 blkTabValue = this->blockTableTensor.GetValue(localBlkTabId);
             }
 
