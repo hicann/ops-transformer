@@ -29,7 +29,7 @@
 - 场景简称：SWA（Sliding Window Attention）、CSA（Compressed Sparse Attention）、HCA（Heavily Compressed Attention）。
 - 计算公式：
 
-  该算子为AICPU调度算子，不涉及数值计算。核心流程为：解析各Batch的Q/KV序列长度 → 根据mask模式计算每个S1G块的有效S2范围 → 基于开销模型进行负载均衡分核 → 输出分核元数据。
+  该算子为AI CPU调度算子，不涉及数值计算。核心流程为：解析各Batch的Q/KV序列长度 → 根据mask模式计算每个S1G块的有效S2范围 → 基于开销模型进行负载均衡分核 → 输出分核元数据。
 
   输出metadata tensor的shape为(1024,)，数据类型为INT32，内部结构如下：
 
@@ -486,7 +486,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <tr>
         <td>ACLNN_ERR_INNER_NULLPTR</td>
         <td>561103</td>
-        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AICPU任务失败。</td>
+        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AI CPU任务失败。</td>
       </tr>
       <tr>
         <td rowspan="8">ACLNN_ERR_PARAM_INVALID</td>
@@ -541,7 +541,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <tr>
         <td>ACLNN_ERR_INNER_NULLPTR</td>
         <td>561103</td>
-        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AICPU任务失败。</td>
+        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AI CPU任务失败。</td>
       </tr>
       <tr>
         <td rowspan="9">ACLNN_ERR_PARAM_INVALID</td>
@@ -599,7 +599,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <tr>
         <td>ACLNN_ERR_INNER_NULLPTR</td>
         <td>561103</td>
-        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AICPU任务失败。</td>
+        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AI CPU任务失败。</td>
       </tr>
       <tr>
         <td rowspan="9">ACLNN_ERR_PARAM_INVALID</td>

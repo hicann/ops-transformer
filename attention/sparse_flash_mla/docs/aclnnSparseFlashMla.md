@@ -251,7 +251,7 @@ aclnnStatus aclnnSparseFlashMla(
     <tr>
       <td>oriBlockTableOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>PageAttention中oriKvCache存储使用的block映射表。</td>
+      <td>PageAttention中oriKvCache内存使用的block映射表。</td>
       <td>layoutKv为PA_BBND时必须传入。第二维长度不小于所有batch中最大的S2对应的block数量。</td>
       <td>INT32</td>
       <td>ND</td>

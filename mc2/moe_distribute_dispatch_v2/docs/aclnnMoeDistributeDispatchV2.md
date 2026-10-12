@@ -69,7 +69,7 @@
     dynamicScalesOut = allToAllDynamicScalesOut
     $$
 
-    - 情形4：如果quantMode=3（pertile动态量化场景）：
+    - 情形4：如果quantMode=3（pergroup动态量化场景）：
 
     $$
     xFp32 = CastToFp32(X) \times scales \\
@@ -752,7 +752,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
 
     两机16卡场景中，需将参数MACHINE_NUM设置为2，即
 
-    ```Cpp
+    ```cpp
     const uint32_t MACHINE_NUM = 2;
     ```
 
@@ -791,7 +791,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
 <!-- npu="950,A3,910b" id26 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  、<term>Ascend 950DT系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

@@ -21,7 +21,6 @@
 - <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
-
 ## 功能说明
 
 - 接口功能：`lightning_indexer_kl_loss` 计算 Lightning Indexer 中 teacher 分布与 student 分布之间的 KL 散度损失函数。
