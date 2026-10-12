@@ -248,10 +248,10 @@ uint64_t AllToAllFpMatmulTilingBase::GetTilingKey() const
     // 非量化+有bias: 按M/N规模选择分核策略; 否则关闭
     uint8_t addBiasSplitMode = contextInfo_.args_.isBias ? ChooseAddBiasSplitMode() : ADDBIAS_OFF;
     const uint64_t tilingKey =
-        GET_TPL_TILING_KEY(NON_QUANT_MODE, x2TransposeFlag, biasDType, false, commMode, false, addBiasSplitMode);
+        GET_TPL_TILING_KEY(NON_QUANT_MODE, x2TransposeFlag, biasDType, false, commMode, false, addBiasSplitMode, false);
     OP_LOGD(opName_,
-            "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,ISSMALLK,COMMMODE,ADDBIASSPLITMODE is: [%d,%d,%d,0,%d,%d], "
-            "and tilingKey is [%lu].",
+            "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,ISSMALLK,COMMMODE,USING_APACE_IMPL,ADDBIASSPLITMODE,"
+            "ENABLE_HCOMM_ALL_TO_ALL_OUT: [%d,%d,%d,0,%d,0,%d,0], TilingKey is [%lu].",
             NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, addBiasSplitMode, tilingKey);
     return tilingKey;
 }

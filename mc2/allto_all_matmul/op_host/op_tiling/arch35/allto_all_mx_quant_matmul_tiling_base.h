@@ -61,6 +61,7 @@ protected:
     uint64_t GetTilingKey() const override;
     CutResult GetCutResOfCommAndCompute() override;
     void AlignCutResForKernel(CutResult& cutRes, uint64_t mValue) const;
+    ge::graphStatus CheckHcommTileInfo() const;
     ge::graphStatus CheckMxQuantTensorDataType(const gert::TilingContext* context, const char* opName);
     ge::graphStatus CheckX2Transpose(const gert::TilingContext* context, const char* opName,
                                      const OpAttrIndexSchema& indexSchema);
@@ -82,7 +83,7 @@ protected:
                                       TilingContextInfo& contextInfo);
 
     void SetTilingInfo(AlltoAllMatmulTilingInfo& tilingInfo) const;
-    void SetHcommTilingInfo(CommTilingData& tilingInfo) const;
+    void SetHcommTilingInfo(Apace::hcommAllToAllMatmulTilingData& tilingData) const;
     ge::graphStatus DoHcommMxQuantMMTiling();
     void PrintAlltoAllMxQuantMatmulTilingData(AlltoAllQuantMatmulTilingData& outTilingData);
 

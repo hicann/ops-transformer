@@ -580,10 +580,10 @@ uint64_t AllToAllKcQuantMatmulTilingBase::GetTilingKey() const
     uint32_t quantMode = (x1QuantDtype == FP8_E5M2_VALUES) ? KC_QUANT_FP8E5M2_MODE : KC_QUANT_FP8E4M3_MODE;
     uint8_t commMode = (hcclServerType_ == mc2tiling::A5_CCU_ENGINE) ? ALL2ALL_COMM_TYPE_CCU : ALL2ALL_COMM_TYPE_AICPU;
     const uint64_t tilingKey =
-        GET_TPL_TILING_KEY(quantMode, x2TransposeFlag, biasDType, isSmallK, commMode, false, ADDBIAS_OFF);
+        GET_TPL_TILING_KEY(quantMode, x2TransposeFlag, biasDType, isSmallK, commMode, false, ADDBIAS_OFF, false);
     OP_LOGD(opName_,
-            "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,ISSMALLK,COMMMODE,USING_APACE_IMPL,ADDBIASSPLITMODE: "
-            "[%d,%d,%d,%d,%d,0,0], TilingKey is [%lu].",
+            "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,ISSMALLK,COMMMODE,USING_APACE_IMPL,ADDBIASSPLITMODE,"
+            "ENABLE_HCOMM_ALL_TO_ALL_OUT: [%d,%d,%d,%d,%d,0,0,0], TilingKey is [%lu].",
             quantMode, x2TransposeFlag, biasDType, isSmallK, commMode, tilingKey);
     return tilingKey;
 }

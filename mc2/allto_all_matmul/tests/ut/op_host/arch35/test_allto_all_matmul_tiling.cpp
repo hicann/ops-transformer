@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include "../allto_all_matmul_host_ut_param.h"
 #include "tiling_case_executor.h"
+#include "mc2_hcom_topology_mocker.h"
 
 static std::string GetCsvPath(const char* file)
 {
@@ -34,6 +35,11 @@ protected:
     static void SetUpTestCase()
     {
         std::cout << "AlltoAllMatmulArch35TilingTest SetUp." << std::endl;
+    }
+
+    void TearDown() override
+    {
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().Reset();
     }
 
     static void TearDownTestCase()
@@ -71,6 +77,10 @@ TEST_P(AlltoAllMatmulArch35TilingTest, param)
 
     gert::TilingContextPara tilingContextPara(OP_NAME, inputTensorDesc_, outputTensorDesc_, attrs_, &compileInfo,
                                               param.soc);
+    if (param.alltoalloutFlag && param.x1QuantMode == 6 && param.x2QuantMode == 6 && param.worldSize > 0 &&
+        param.worldSize <= 8) {
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValue("rankNum", static_cast<uint64_t>(param.worldSize));
+    }
     ExecuteTestCase(tilingContextPara, param.expectResult, param.expectTilingKey, param.expectTilingData,
                     param.expectWorkspaces, param.mc2TilingDataReservedLen);
 }

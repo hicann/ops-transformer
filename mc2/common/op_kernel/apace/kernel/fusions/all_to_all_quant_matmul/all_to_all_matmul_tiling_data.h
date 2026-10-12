@@ -48,5 +48,6 @@ struct hcommAllToAllMatmulTilingData {
     CommTilingData commTilingData;
     QuantMatmulTilingData tileQbmmTilingData;
     uint32_t localMatmul{0};
+    uint32_t rankDim{0}; // Host-provided rank count for AIV initialization without HCCL calls.
 };
 } // namespace Apace
